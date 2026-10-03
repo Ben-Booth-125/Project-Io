@@ -200,7 +200,7 @@ nation's towns, never another nation's (a border link is a Track between two net
 either backbone), and the join runs over the nation's own land. A market whose nation holds no
 town has no backbone and stays off it, counted.
 **One cost model** (§ 1): every route is priced with `tile_traversal_cost` on the field as it
-stands. The **direct route** walks any land and any strait of up to three shore-water cells, never
+stands. The **direct route** walks any land and any strait of up to two shore-water cells, never
 open ocean; every link is laid along it, so it reuses the roads that already shorten it. Catchments
 are grid-nearest, so these roads move no catchment and no fold.
 
@@ -254,6 +254,13 @@ qualified labour.
 **Roads are a land feature.** Water tiles are skipped, and an edge whose route crosses *open* ocean
 is not stamped at all — that is a sea route, and stamping it would scatter fragments on distant
 shores. A short crossing made of shore (a strait, TILES.md § Water kinds) does get a road.
+**A bridge spans at most two water tiles** (Ben, 2026-10-03, playing the build: *"bridges can
+cross a further distance than I expected — let's put a cap on that"*; he ruled two). The cap is
+one constant every writer of the road field reads — the national lattice, its spurs and border
+links, the ancient corridors (§ 4a), and the market joins, pulls and trunk — and a link whose
+route would bridge a longer run is refused or walked round by land. The wizard's lapse draws
+its roads anchor to anchor with no tile chain, so it holds the same cap by not drawing a
+corridor whose straight line would bridge more.
 Territorial adjacency tolerates a short unowned gap, so an island or coastal nation is reachable
 rather than silently left off the lattice.
 

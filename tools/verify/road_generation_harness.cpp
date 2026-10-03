@@ -27,6 +27,16 @@
 //                   the before/after readings (road tiles by tier, trunk links,
 //                   off-backbone markets, median market-to-market cost) off the
 //                   pass's trace, which restores the field it found.
+//   R7 bridges    — the bridge cap (Ben, 2026-10-03: "bridges can cross a further
+//                   distance than I expected"; he ruled two). On the same shipped
+//                   worlds, every route each writer of road_level LAID — the
+//                   national tree/loop/spur/border (re-laid trace), the ancient
+//                   corridors (stamp_history_roads' trace) and the market joins,
+//                   pulls and trunk (lay_market_roads' trace) — has no contiguous
+//                   water run longer than kMaxCrossingTiles, each offender named by
+//                   its writer. Printed beside it: the raster's four-cardinal water
+//                   runs bounded by roaded land at both ends (a control), the
+//                   refusals the cap made, and the nations whose town network splits.
 //   Q  differential — the same world regenerated at floor vs high qualification
 //                   produces measurably different lattices (BL-618's contract):
 //                   promoted tiers appear only on the qualified run, and the
@@ -73,6 +83,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
+#include <functional>
 #include <limits>
 #include <map>
 #include <set>
@@ -81,6 +92,10 @@
 #include <tuple>
 #include <vector>
 
+// THE BRIDGE CAP as RULED (Ben, 2026-10-03: two water tiles), held here rather
+// than read off the generator's kMaxCrossingTiles, so R6's walker and R7 ask the ruling of the
+// laid field and not the code of itself.
+constexpr int kBridgeCap = 2;
 static int g_fail = 0;
 static void check(bool ok, const char* what)
 {
@@ -437,7 +452,7 @@ h_grid h_build(world& w, entity_id body)
 std::vector<std::int64_t> h_walk(const h_grid& g, int src, bool roads_only, entity_id held_by,
                                  int target = -1, std::int64_t bound = -1)
 {
-    constexpr int R = 4; // runs 0..3
+    constexpr int R = kBridgeCap + 1; // runs 0..kBridgeCap (the bridge cap)
     const std::size_t n = g.wgt.size();
     std::vector<std::int64_t> best(n * R, -1);
     std::vector<std::int64_t> out(n, -1);
@@ -463,7 +478,7 @@ std::vector<std::int64_t> h_walk(const h_grid& g, int src, bool roads_only, enti
             const std::size_t vi = static_cast<std::size_t>(v);
             if (g.wgt[vi] < 0 || g.kind[vi] == 2) continue;
             int nr = 0;
-            if (g.kind[vi] == 1) { nr = r + 1; if (nr > 3) continue; }
+            if (g.kind[vi] == 1) { nr = r + 1; if (nr > kBridgeCap) continue; }
             else if ((roads_only && !g.road[vi]) || (held_by != null_entity && g.nation[vi] != held_by)) continue;
             const std::int64_t nd = d + g.wgt[static_cast<std::size_t>(c)] + g.wgt[vi];
             std::int64_t& b = best[vi * R + nr];
@@ -845,9 +860,19 @@ struct shipped_highway_row
     int    corp_focus[3] = { 0, 0, 0 }; // extraction / processing / trade
     int    highway_ancient_only = 0;     // shipped Highway tiles the national lattice does not lay
     double build_s = 0.0;
+    // R7 — the bridge cap.
+    std::map<int, int> run_hist;         // longest water run on a laid route -> routes
+    std::map<int, int> raster_hist;      // four-cardinal water runs between roaded land -> runs
+    int    longest_route_run = 0, longest_raster_run = 0;
+    int    routes = 0, over_cap = 0;
+    std::vector<std::string> offenders;  // writer, ends, run
+    int    refused_candidates = 0, refused_spurs = 0, refused_border = 0, refused_ancient = 0;
+    int    ancient_laid = 0, ancient_corridors = 0;
+    int    nations_with_towns = 0, nations_split = 0;
 };
 
 static bool g_read_corps = false; // --corps: count the searched roster's focus too
+
 
 static shipped_highway_row read_shipped_highways(lua_state& lua, uint32_t seed)
 {
@@ -1016,6 +1041,116 @@ static shipped_highway_row read_shipped_highways(lua_state& lua, uint32_t seed)
         }
         if (all && land > 0) ++r.qualifying_at_highway;
     }
+
+    // R7 — THE BRIDGE CAP, asked of every route every writer laid.
+    auto note_route = [&](const char* writer, entity_id from, entity_id to,
+                          const std::vector<entity_id>& path) {
+        const int run = longest_water_run(w, path);
+        ++r.routes;
+        ++r.run_hist[run];
+        r.longest_route_run = std::max(r.longest_route_run, run);
+        if (run > kBridgeCap)
+        {
+            ++r.over_cap;
+            if (r.offenders.size() < 12)
+            {
+                const auto& ta = w.tiles.at(from);
+                const auto& tb = w.tiles.at(to);
+                char buf[160];
+                std::snprintf(buf, sizeof buf, "%s (%d,%d) -> (%d,%d): water run %d", writer,
+                              ta.grid_x, ta.grid_y, tb.grid_x, tb.grid_y, run);
+                r.offenders.push_back(buf);
+            }
+        }
+    };
+    for (const auto& rt : tr.routes)
+    {
+        const char* k = rt.k == road_generation_trace::kind::tree   ? "national tree"
+                      : rt.k == road_generation_trace::kind::loop   ? "national loop"
+                      : rt.k == road_generation_trace::kind::spur   ? "village spur"
+                                                                    : "border link";
+        note_route(k, rt.from, rt.to, rt.path);
+    }
+    for (const auto& rt : out.report.history_road_links.routes)
+        note_route("ancient corridor (stamp_history_roads)", rt.from, rt.to, rt.path);
+    for (const auto& l : out.report.market_road_links.links)
+    {
+        if (!l.laid || l.path.empty()) continue;
+        const char* k = l.k == market_road_trace::kind::join ? "market join"
+                      : l.k == market_road_trace::kind::pull ? "market pull"
+                                                             : "market trunk";
+        note_route(k, l.path.front(), l.path.back(), l.path);
+    }
+    r.refused_candidates = st.candidates_long_crossing;
+    r.refused_spurs      = st.spurs_long_crossing;
+    r.refused_border     = st.border_long_crossing;
+    r.refused_ancient    = out.report.history_roads.refused_long_crossing;
+    r.ancient_laid       = out.report.history_roads.laid;
+    r.ancient_corridors  = out.report.history_roads.corridors;
+
+    // The raster control: a maximal four-cardinal run of water tiles with SHIPPED
+    // roaded land at both ends (column wrap on rows). Roads never stamp water, so
+    // this is where a gap between two road ends reads as a bridge on the map.
+    {
+        const auto bit = w.bodies.find(body);
+        const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+        const std::vector<entity_id>& grid = body_tile_grid(w, body);
+        auto wet = [&](entity_id t) { return is_water(w.tiles.at(t).substrate); };
+        auto roaded = [&](entity_id t) {
+            const auto it = shipped_level.find(t);
+            return !wet(t) && it != shipped_level.end() && it->second > 0;
+        };
+        auto scan = [&](auto at, int len, bool wraps) {
+            for (int i = 0; i < len; ++i)
+            {
+                if (!roaded(at(i))) continue;
+                int j = 1;
+                while (j < len && (wraps || i + j < len) && wet(at((i + j) % len))) ++j;
+                const int run = j - 1;
+                if (run == 0 || (!wraps && i + j >= len)) continue;
+                if (roaded(at((i + j) % len)))
+                {
+                    ++r.raster_hist[run];
+                    r.longest_raster_run = std::max(r.longest_raster_run, run);
+                }
+            }
+        };
+        for (int y = 0; y < gh; ++y)
+            scan([&](int c) { return grid[static_cast<std::size_t>(y) * gw + c]; }, gw, true);
+        for (int x = 0; x < gw; ++x)
+            scan([&](int y) { return grid[static_cast<std::size_t>(y) * gw + x]; }, gh, false);
+    }
+
+    // Nations whose town network SPLITS: towns (scale >= 2) joined through the laid
+    // national tree and loops, union-find per nation; more than one component splits.
+    {
+        std::map<entity_id, entity_id> parent;
+        std::function<entity_id(entity_id)> find = [&](entity_id t) {
+            auto it = parent.find(t);
+            if (it == parent.end()) { parent[t] = t; return t; }
+            if (it->second == t) return t;
+            const entity_id root = find(it->second);
+            parent[t] = root;
+            return root;
+        };
+        for (const auto& rt : tr.routes)
+            if (rt.k == road_generation_trace::kind::tree || rt.k == road_generation_trace::kind::loop)
+            {
+                const entity_id a = find(rt.from), b = find(rt.to);
+                if (a != b) parent[std::max(a, b)] = std::min(a, b);
+            }
+        std::map<entity_id, std::set<entity_id>> comps;
+        for (const auto& [tile, sc] : scale_at)
+        {
+            if (sc < 2) continue;
+            const auto nit = w.tile_to_nation.find(tile);
+            if (nit == w.tile_to_nation.end() || nit->second == null_entity) continue;
+            comps[nit->second].insert(find(tile));
+        }
+        r.nations_with_towns = static_cast<int>(comps.size());
+        for (const auto& [n, c] : comps)
+            if (c.size() > 1) ++r.nations_split;
+    }
     return r;
 }
 
@@ -1063,10 +1198,12 @@ static void run_shipped_highway_rows(const std::vector<uint32_t>& seeds)
     lua_state lua; // one long-lived state, as the app keeps m_lua
     int qualifying = 0, qualifying_ok = 0, seeds_qualifying_with_highway = 0, above = 0;
     std::vector<market_road_row> mrows;
+    std::vector<shipped_highway_row> hrows;
     for (const uint32_t seed : seeds)
     {
         const shipped_highway_row r = read_shipped_highways(lua, seed);
         mrows.push_back(r.market);
+        hrows.push_back(r);
         std::printf("      %4u | %5d | %3d, %3d, %3d | %5d, %5d | %4d, %4d | %6d (%6d) |"
                     " %d/%d/%d | %d | %.1f\n",
                     r.seed, r.majors, r.nations, r.nations_two_major, r.two_major_at_gate,
@@ -1095,6 +1232,58 @@ static void run_shipped_highway_rows(const std::vector<uint32_t>& seeds)
                 " Highway %d of %zu; re-laid tiles above the shipped field %d)\n",
                 qualifying, qualifying_ok, seeds_qualifying_with_highway, seeds.size(), above);
     check(above == 0, "R2s0 the re-laid national lattice sits within the shipped field");
+
+    // R7 — the bridge cap (Ben, 2026-10-03), per seed then pooled.
+    std::printf("      (R7 the bridge cap: ruled %d, kMaxCrossingTiles = %d)\n", kBridgeCap,
+                kMaxCrossingTiles);
+    std::printf("      seed | routes | longest water run on a laid route (raster control) | over cap |"
+                " refused by the cap: candidates/spurs/border/ancient | ancient laid of corridors |"
+                " nations split of with towns | run histogram routes [raster]\n");
+    long long r7_over = 0, r7_routes = 0;
+    int r7_longest = 0, r7_longest_raster = 0;
+    std::map<int, long long> r7_hist, r7_raster;
+    for (std::size_t i = 0; i < hrows.size(); ++i)
+    {
+        const shipped_highway_row& r = hrows[i];
+        std::string hist, rh;
+        char buf[32];
+        for (const auto& [k, n] : r.run_hist)
+        {
+            std::snprintf(buf, sizeof buf, " %d:%d", k, n);
+            hist += buf;
+            r7_hist[k] += n;
+        }
+        for (const auto& [k, n] : r.raster_hist)
+        {
+            std::snprintf(buf, sizeof buf, " %d:%d", k, n);
+            rh += buf;
+            r7_raster[k] += n;
+        }
+        std::printf("      %4u | %5d | %d (%d) | %d | %d/%d/%d/%d | %d of %d | %d of %d |%s [%s ]\n",
+                    r.seed, r.routes, r.longest_route_run, r.longest_raster_run, r.over_cap,
+                    r.refused_candidates, r.refused_spurs, r.refused_border, r.refused_ancient,
+                    r.ancient_laid, r.ancient_corridors, r.nations_split, r.nations_with_towns,
+                    hist.c_str(), rh.c_str());
+        for (const std::string& o : r.offenders)
+            std::printf("           over the cap: %s\n", o.c_str());
+        r7_over += r.over_cap;
+        r7_routes += r.routes;
+        r7_longest = std::max(r7_longest, r.longest_route_run);
+        r7_longest_raster = std::max(r7_longest_raster, r.longest_raster_run);
+    }
+    {
+        std::string hist, rh;
+        char buf[40];
+        for (const auto& [k, n] : r7_hist) { std::snprintf(buf, sizeof buf, " %d:%lld", k, n); hist += buf; }
+        for (const auto& [k, n] : r7_raster) { std::snprintf(buf, sizeof buf, " %d:%lld", k, n); rh += buf; }
+        std::printf("      (R7 pooled: %lld routes, %lld over the cap; longest %d (raster %d);"
+                    " routes by longest run%s; raster runs%s)\n",
+                    r7_routes, r7_over, r7_longest, r7_longest_raster, hist.c_str(), rh.c_str());
+    }
+    check(r7_routes > 0 && r7_over == 0,
+          "R7 no laid road route, by any writer (national tree/loop/spur/border, ancient corridor,"
+          " market join/pull/trunk), crosses a water run longer than two tiles (Ben, 2026-10-03),"
+          " each offender named by its writer");
 
     // R6 — roads pull toward markets (BL-1138), per seed then pooled.
     std::printf("      (R6 roads pull toward markets, BL-1138; K = %d neighbours, detour ratio %.2f)\n",

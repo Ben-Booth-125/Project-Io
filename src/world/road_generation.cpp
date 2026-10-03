@@ -47,7 +47,9 @@ constexpr int          kMidScale   = 2;
 // of SHORE. The length bound stays because it is a second, independent claim (a road bridges a
 // channel, it does not run twenty tiles along a shelf), and dropping it would let a long
 // shallow shelf read as a crossing.
-constexpr int          kMaxCrossingTiles = 3;
+//
+// THE LENGTH IS TWO (Ben, 2026-10-03, ruling the bridge cap): `kMaxCrossingTiles`,
+// road_generation.hpp, read by every writer below.
 
 // BL-620 (road generation scales to density). At demography-derived density (BL-610) the home
 // body carries ~1,500-2,000 centres, almost all villages; the old pass ran pairwise A* between
@@ -128,44 +130,54 @@ entity_id nation_of(const world& w, entity_id tile)
     return (it != w.tile_to_nation.end()) ? it->second : null_entity;
 }
 
-/// True if every contiguous water run along @p p is a strait: SHORT (<= kMaxCrossingTiles) and
-/// made entirely of SHORE (`coast`, or a lake — enclosed water a causeway crosses; never open
-/// `ocean`). See kMaxCrossingTiles for why both halves are needed.
-bool crossings_are_straits(const world& w, const logistics_path& p)
+/// Why a route's crossings are or are not straits (see crossings_are_straits).
+enum class crossing_verdict : std::uint8_t { strait, open_sea, too_long };
+
+/// Every contiguous water run along @p p is a strait when it is SHORT (<= kMaxCrossingTiles,
+/// the bridge cap) and made entirely of SHORE (`coast`, or a lake — enclosed water a causeway
+/// crosses; never open `ocean`). See kMaxCrossingTiles for why both halves are needed. Open
+/// sea anywhere answers `open_sea` before length is asked, so `too_long` names exactly the
+/// routes the cap alone refuses.
+crossing_verdict crossing_kind(const world& w, const logistics_path& p)
 {
-    int run = 0;
+    // BL-516: one open-sea tile anywhere in the run disqualifies it outright,
+    // however short the run is. That is the case the old length-only rule could
+    // not see — a path clipping the corner of an ocean in three tiles.
     for (const entity_id t : p.tiles)
     {
         const auto it = w.tiles.find(t);
-        if (it == w.tiles.end() || !is_water(it->second.substrate))
-        {
-            run = 0;
-            continue;
-        }
-        // BL-516: one open-sea tile anywhere in the run disqualifies it outright,
-        // however short the run is. That is the case the old length-only rule could
-        // not see — a path clipping the corner of an ocean in three tiles.
-        if (is_open_ocean(it->second.substrate))
-            return false;
-        if (++run > kMaxCrossingTiles)
-            return false;
+        if (it != w.tiles.end() && is_open_ocean(it->second.substrate))
+            return crossing_verdict::open_sea;
     }
-    return true;
+    return longest_water_run(w, p.tiles) > kMaxCrossingTiles ? crossing_verdict::too_long
+                                                             : crossing_verdict::strait;
+}
+
+bool crossings_are_straits(const world& w, const logistics_path& p)
+{
+    return crossing_kind(w, p) == crossing_verdict::strait;
 }
 
 /// Stamp a road of @p level along the A* path between two tiles, taking the max on
 /// overlap and skipping WATER OF EVERY KIND (roads are a land feature). No-op if unreachable, or
 /// if the route crosses open sea rather than a strait (see kMaxCrossingTiles). Returns whether
 /// the edge was laid; when @p stamped is given, appends every land tile of the route (BL-620:
-/// the village-spur pass feeds these back as future spur targets).
+/// the village-spur pass feeds these back as future spur targets). @p too_long, when given,
+/// counts a refusal the bridge cap alone made (a shore crossing longer than kMaxCrossingTiles).
 bool stamp_edge(world& w, entity_id body, entity_id ta, entity_id tb, std::uint8_t level,
-                std::vector<entity_id>* stamped = nullptr)
+                std::vector<entity_id>* stamped = nullptr, int* too_long = nullptr)
 {
     const logistics_path& p = intra_body_path(w, body, ta, tb);
     if (!p.reachable)
         return false;
-    if (p.crosses_ocean && !crossings_are_straits(w, p))
-        return false;
+    if (p.crosses_ocean)
+    {
+        const crossing_verdict v = crossing_kind(w, p);
+        if (v == crossing_verdict::too_long && too_long != nullptr)
+            ++*too_long;
+        if (v != crossing_verdict::strait)
+            return false;
+    }
     for (const entity_id t : p.tiles)
     {
         const auto it = w.tiles.find(t);
@@ -282,6 +294,22 @@ std::map<entity_id, float> road_qualification_percentiles(const world& w)
                           : 0.0f;
     }
     return out;
+}
+
+int longest_water_run(const world& w, const std::vector<entity_id>& path)
+{
+    int run = 0, longest = 0;
+    for (const entity_id t : path)
+    {
+        const auto it = w.tiles.find(t);
+        if (it == w.tiles.end() || !is_water(it->second.substrate))
+        {
+            run = 0;
+            continue;
+        }
+        longest = std::max(longest, ++run);
+    }
+    return longest;
 }
 
 long long village_spur_size(const world& w, entity_id centre)
@@ -518,7 +546,11 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
                     // landmass.
                     if (p.reachable)
                     {
-                        if (p.crosses_ocean && !crossings_are_straits(w, p))
+                        const crossing_verdict v =
+                            p.crosses_ocean ? crossing_kind(w, p) : crossing_verdict::strait;
+                        if (v == crossing_verdict::too_long)
+                            ++st.candidates_long_crossing;
+                        if (v != crossing_verdict::strait)
                             ++st.candidates_unlayable;
                         else
                             edges.push_back({ p.cost, a, b });
@@ -682,7 +714,8 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
                     if (best[s].tile == null_entity)
                         break;
                     stamped.clear();
-                    if (!stamp_edge(w, body, nodes[m].tile, best[s].tile, kTrack, &stamped))
+                    if (!stamp_edge(w, body, nodes[m].tile, best[s].tile, kTrack, &stamped,
+                                    &st.spurs_long_crossing))
                         continue; // unreachable or open-sea route: try the next-nearest
                     for (const entity_id t : stamped)
                         if (nation_of(w, t) == nation)
@@ -843,7 +876,8 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
         }
         const entity_id best_a = toward_a ? best_to : best_from; // nation A's endpoint
         const entity_id best_b = toward_a ? best_from : best_to; // nation B's endpoint
-        if (best_from != null_entity && stamp_edge(w, body, best_from, best_to, kTrack))
+        if (best_from != null_entity
+            && stamp_edge(w, body, best_from, best_to, kTrack, nullptr, &st.border_long_crossing))
         {
             record(road_generation_trace::kind::border, best_from, best_to, na);
             ++st.border_links;
@@ -881,7 +915,8 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
 void stamp_history_roads(world& w, entity_id body,
                          const std::vector<history_road_node>& nodes,
                          const std::vector<history_corridor>&  corridors,
-                         generation_progress* progress, history_road_stats* stats)
+                         generation_progress* progress, history_road_stats* stats,
+                         history_road_trace* trace)
 {
     history_road_stats hs{};
     const long long floods_at_entry = static_cast<long long>(w.logistics_flood_fields.size());
@@ -968,8 +1003,12 @@ void stamp_history_roads(world& w, entity_id body,
         if (c.tier >= 3) tier = kHighway;
         ++hs.corridors;
         destinations.insert(to);
-        if (stamp_edge(w, body, from, to, tier))
+        if (stamp_edge(w, body, from, to, tier, nullptr, &hs.refused_long_crossing))
+        {
             ++hs.laid;
+            if (trace != nullptr) // write-only: the route just laid, answered again from the cache
+                trace->routes.push_back({ from, to, tier, intra_body_path(w, body, from, to).tiles });
+        }
     }
     hs.destinations = static_cast<int>(destinations.size());
     hs.floods = static_cast<long long>(w.logistics_flood_fields.size()) - floods_at_entry;

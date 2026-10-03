@@ -944,6 +944,10 @@ struct generation_report
     // What `lay_market_roads` did on the home body, after the folds. Write-only.
     market_road_stats market_roads;
     market_road_trace market_road_links;
+    // What `stamp_history_roads` did on the home body (the bridge cap's row reads
+    // every corridor laid, whole). Write-only.
+    history_road_stats history_roads;
+    history_road_trace history_road_links;
     /// Markets destroyed by conquest in the history (BL-1125 cause 3), per
     /// span -- [0] Empires (to 1200), [1] Exploration (to 1660), [2]
     /// Industrialisation (to 1960): a capital market whose region a rival took.
