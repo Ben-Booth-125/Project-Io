@@ -111,15 +111,19 @@ Deterministic integer arithmetic, no RNG. Because the supply factor feeds
 `unit_strength` and the combat adapter, an unsupplied army is measurably weaker **in the
 resolver**, not merely more expensive.
 
-**The ceiling is checked twice: once at the draw, once at the price that clears.** It is
-`price_band.reservation_mult` (2.0 — twice what a good is worth at an even market: dear, but a
-price a supplied market reaches, where the 10× cap is the signal of a good nobody makes). The
-draw decides against last tick's price, and its own bid can resolve this tick's price far above
-it. Where the price that clears sits above the ceiling, the upkeep part of the fill is not
-bought: it goes back on the shelf, nothing is billed and no exchange is recorded, and the
-drawing unit or building takes its supply step as if that part never arrived. What is bought
-is billed at the clearing price, the price its sellers were paid. The refusal belongs to the
-market and the good, so every buyer's upkeep fill of that good there is refused alike.
+**The ceiling is checked once, at the posted price, and the draw pays that price.** The ceiling
+is `price_band.reservation_mult` (2.0 — twice what a good is worth at an even market: dear, but a
+price a supplied market reaches, where the 10× cap is the signal of a good nobody makes). Every
+goods draw from a shelf — unit and building upkeep, processor inputs, construction — reads the
+posted price, the price the last clearing left standing (base, on a market that has never
+resolved one), takes the good only where that price is at or under the ceiling, and is billed at
+it, with one exchange row at that price. The price the tick goes on to resolve, which the draw's
+own want helped drive, is never what the draw pays. Above the ceiling the good is not drawn: a
+unit or building goes short and takes the shortfall rule, a processor runs on what its pool
+holds, and a construction site pauses for want of that material (construction capacity over the
+ceiling stretches the build instead, as an empty yard does). A ceiling of zero switches the rule
+off, and off means what each draw did before it: upkeep never buys, processors and construction
+buy whatever the shelf holds.
 
 The pass also carries **orphan cleanup**: `demolish_building` erases the building, the
 corp asset and the building stockpile but never touches `w.units`, so without it
@@ -242,9 +246,13 @@ minted at generation, as `base_capital` is (Ben, 2026-10-03): no treasury or cha
 for it. The rule: cash is
 one quarter of the stock's value, each good at its base price in the market the stock is pooled in
 (`k_background_working_capital_of_stock`, `corporation_generation.cpp`). Base, never the live price,
-so an opening position is priced by worth rather than by the first tick's scarcity. The constant is the single
-source of truth: the live loop and the `econ_bankruptcy` harness read the same value.
-Interest is a pure function of balance × rate — deterministic. Design: BL-073 (debt
+so an opening position is priced by worth rather than by the first tick's scarcity. A stock pooled
+at body level, on a body with no market carved yet, is priced at the lowest-id market on that body
+— a fixed choice, so the figure cannot depend on container order; on a body with no market at all
+there is nowhere the stock could be sold, and the working capital is zero.
+
+The interest rate `k_debt_interest_per_quarter` is the single source of truth: the live loop and
+the `econ_bankruptcy` harness read the same value. Interest is a pure function of balance × rate — deterministic. Design: BL-073 (debt
 interest).
 
 ## The quarterly return

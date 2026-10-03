@@ -339,6 +339,7 @@ building_report run_processing(world& w, const recipe_registry& reg,
     // market's real inventory — a genuine finite draw, not an unconditional
     // auto-buy. Mutable: this function actually consumes what it draws, below.
     market_component* mc = (market_id != null_entity) ? &w.markets.at(market_id) : nullptr;
+    const float res_mult = reg.price_band().reservation_mult; // BL-1172: the fair-price ceiling
 
     // Coverage of a full run = the scarcest input's (pool + market inventory) fraction.
     //
@@ -358,7 +359,9 @@ building_report run_processing(world& w, const recipe_registry& reg,
             continue;
         has_input = true;
         const float need   = in * batches_full;
-        const float avail  = pool.quantities[r] + (mc ? std::max(0.0f, mc->inventory[r]) : 0.0f);
+        // BL-1172: the shelf counts only where the ceiling admits the posted price.
+        const bool  shelf  = mc && shelf_admits(*mc, r, res_mult, /*off_buys=*/true);
+        const float avail  = pool.quantities[r] + (shelf ? std::max(0.0f, mc->inventory[r]) : 0.0f);
         const float cov    = (need > 0.0f) ? avail / need : std::numeric_limits<float>::infinity();
 
         // The want registered is the want OF THE MARKET: the full-run need less
@@ -432,8 +435,11 @@ building_report run_processing(world& w, const recipe_registry& reg,
         const float remainder = need - from_pool;
         if (remainder <= 0.0f)
             continue;
-        const float from_market = mc ? std::min(std::max(0.0f, mc->inventory[r]), remainder) : 0.0f;
-        if (mc)
+        // BL-1172: never off a shelf the ceiling refuses (coverage above already
+        // excluded it, so the remainder there is zero up to rounding).
+        const bool  shelf       = mc && shelf_admits(*mc, r, res_mult, /*off_buys=*/true);
+        const float from_market = shelf ? std::min(std::max(0.0f, mc->inventory[r]), remainder) : 0.0f;
+        if (shelf)
             mc->inventory[r] = std::max(0.0f, mc->inventory[r] - from_market);
         bought[r] += from_market;
     }
@@ -690,6 +696,15 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
         // (below), same as any other consumer competing for the same stock.
         const entity_id mid = market_for_tile(w, b.tile);
         market_component* m = (mid != null_entity) ? &w.markets.at(mid) : nullptr;
+        // BL-1172 — THE FAIR-PRICE CEILING. A material whose posted price is over
+        // reservation_mult x base is not on offer to this site: its availability
+        // reads 0, so a material over the ceiling PAUSES the build exactly as an
+        // empty shelf does, and capacity over the ceiling stretches it (BL-709).
+        // Either way nothing over the ceiling is drawn or billed below.
+        const float res_mult = reg.price_band().reservation_mult;
+        auto admitted = [&](std::size_t r) {
+            return m != nullptr && shelf_admits(*m, r, res_mult, /*off_buys=*/true);
+        };
 
         // BL-1003 — want and fill book under the SITE's market key (the
         // body-level key on a market-less body), so the site's demand prices ITS
@@ -715,7 +730,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
             const float need = need_row[r];
             if (need <= 0.0f)
                 continue;
-            const float avail = m ? std::max(0.0f, m->inventory[r]) : 0.0f;
+            const float avail = admitted(r) ? std::max(0.0f, m->inventory[r]) : 0.0f;
             rate = std::min(rate, avail / need);
         }
 
@@ -747,7 +762,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
         if (capacity_rate > 0.0f)
         {
             const float need  = need_row[cap_index];
-            const float avail = m ? std::max(0.0f, m->inventory[cap_index]) : 0.0f;
+            const float avail = admitted(cap_index) ? std::max(0.0f, m->inventory[cap_index]) : 0.0f;
             const float cov   = (need > 0.0f) ? (avail / need) : 1.0f;
             rate = std::min(rate, std::max(cov, pause_below));
         }
@@ -791,6 +806,8 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
                 const float need = need_row[r];
                 if (need <= 0.0f)
                     continue;
+                if (m != nullptr && !admitted(r))
+                    continue; // BL-1172: over the ceiling — not bought, not billed
                 const float drawn = need * rate;
                 bought[r] += drawn;
                 if (m)
@@ -2344,6 +2361,14 @@ migration_tick run_population_migration(world& w, const recipe_registry& reg,
 
 namespace {
 
+/// BL-1172 — what one upkeep draw asked for and got, per good (see
+/// `draw_goods_or_bid`'s `rec`).
+struct draw_outcome
+{
+    std::array<float, resource_count> need{};
+    std::array<float, resource_count> met{};
+};
+
 /// Draw one tick of `need` for (`corp`, `body`) standing at `tile`: the corp's
 /// own pool first, then the local market for whatever the pool could not cover
 /// — declining outright any good the market prices above the buyer's
@@ -2397,20 +2422,20 @@ namespace {
 /// caller's shortfall rule takes it unchanged: the building SCALES ITS OUTPUT
 /// DOWN (`building_supply_scalar`), it is not idled — the lights go dim, not out.
 ///
-/// BL-1172 — THE OUTCOME RECORD. `rec`, when non-null, receives what the draw
-/// asked for (`need`), what it got per good (`met`: pool take plus market fill,
-/// stored as `need - shortfall` so a fully met good is exactly `need`), the
-/// market fill alone (`from_market`) and the market it drew in. The caller
-/// reads the supply share off it (`draw_share_permille`) and keeps it on the
-/// report when the market part is non-zero, so clearing can refuse that part
-/// at the price it actually resolves to (`settle_refused_upkeep`).
+/// BL-1172 — THE OUTCOME. `rec`, when non-null, receives what the draw asked
+/// for (`need`) and what it got per good (`met`: pool take plus market fill,
+/// stored as `need - shortfall` so a fully met good is exactly `need`). The unit
+/// pass reads its supply share off it (`draw_share_permille`). The market fill
+/// is bought at the POSTED price — decided here, billed at it by clear_markets
+/// (FINANCE.md § Standing-force upkeep, Ben 2026-10-03) — so the outcome is
+/// final when the draw returns.
 ///
 /// Deterministic: resource index order, no RNG, no container-order dependence.
 /// `tile_reach_cost` is a const read off a field the caller warms.
 bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& report,
                        entity_id corp, entity_id body, entity_id tile,
                        const std::array<float, resource_count>& need,
-                       upkeep_draw_record* rec = nullptr)
+                       draw_outcome* rec = nullptr)
 {
     // BL-1003: the draw is from the pool of the TILE's market — the shelf the
     // buyer stands at — or the body-level pool on a market-less body, and the
@@ -2426,10 +2451,8 @@ bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& rep
     const float res_mult = reg.price_band().reservation_mult;
     if (rec != nullptr)
     {
-        rec->market = mid;
-        rec->need   = need;
+        rec->need = need;
         rec->met.fill(0.0f);
-        rec->from_market.fill(0.0f);
     }
 
     // BL-708. `any()` first, so a world that authors no grid good pays one bool
@@ -2450,7 +2473,6 @@ bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& rep
     std::array<float, resource_count>* want   = nullptr;
     std::array<float, resource_count>* bought = nullptr;
     std::array<float, resource_count>* upk    = nullptr;
-    std::array<float, resource_count>* upb    = nullptr; // BL-1172: upkeep fill mirror
 
     bool unmet = false;
     for (std::size_t r = 0; r < resource_count; ++r)
@@ -2483,39 +2505,26 @@ bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& rep
         // `base <= 0` is untradeable, and its ceiling is 0, so no price clears
         // it — "unpriced == unbuyable" falls out of the arithmetic rather than
         // needing a rule of its own. `res_mult <= 0` is the authored OFF switch.
-        if (m != nullptr && res_mult > 0.0f)
+        // BL-1172: the one rule every goods draw shares (`shelf_admits`).
+        if (m != nullptr && shelf_admits(*m, r, res_mult, /*off_buys=*/false))
         {
-            const float base = m->base_price[r];
-            if (base > 0.0f)
+            if (want == nullptr)
             {
-                const float price = (m->price[r] > 0.0f) ? m->price[r] : base;
-                if (price <= base * res_mult)
-                {
-                    if (want == nullptr)
-                    {
-                        want = &report.wants[std::make_pair(corp, pool_key)];
-                        upk  = &report.upkeep_wants[std::make_pair(corp, pool_key)];
-                    }
-                    (*want)[r] += shortfall; // the BID: the whole shortfall
-                    (*upk)[r]  += shortfall; // attribution mirror; nothing pays it
+                want = &report.wants[std::make_pair(corp, pool_key)];
+                upk  = &report.upkeep_wants[std::make_pair(corp, pool_key)];
+            }
+            (*want)[r] += shortfall; // the BID: the whole shortfall
+            (*upk)[r]  += shortfall; // attribution mirror; nothing pays it
 
-                    const float avail = std::max(0.0f, m->inventory[r]);
-                    const float drawn = std::min(shortfall, avail);
-                    if (drawn > 0.0f)
-                    {
-                        m->inventory[r] -= drawn;
-                        if (bought == nullptr)
-                        {
-                            bought = &report.purchases[std::make_pair(corp, pool_key)];
-                            upb    = &report.upkeep_purchases[std::make_pair(corp, pool_key)];
-                        }
-                        (*bought)[r] += drawn; // the FILL: this is what is billed
-                        (*upb)[r]    += drawn; // ...unless clearing resolves it over the ceiling
-                        if (rec != nullptr)
-                            rec->from_market[r] = drawn;
-                        shortfall -= drawn;
-                    }
-                }
+            const float avail = std::max(0.0f, m->inventory[r]);
+            const float drawn = std::min(shortfall, avail);
+            if (drawn > 0.0f)
+            {
+                m->inventory[r] -= drawn;
+                if (bought == nullptr)
+                    bought = &report.purchases[std::make_pair(corp, pool_key)];
+                (*bought)[r] += drawn; // the FILL: billed at the posted price
+                shortfall -= drawn;
             }
         }
 
@@ -2532,9 +2541,8 @@ bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& rep
 /// once, unweighted by price, so the share says "how much of what it needs it
 /// got", not "how much it spent"; a fully met draw is exactly 1000, and a grid
 /// good on an unreached tile is 0 for that good. The one place a float becomes
-/// the integer the supply factor is steered by — the unit pass and
-/// `settle_refused_upkeep` both read it here.
-int draw_share_permille(const upkeep_draw_record& d)
+/// the integer the supply factor is steered by.
+int draw_share_permille(const draw_outcome& d)
 {
     int sum = 0, goods = 0;
     for (std::size_t r = 0; r < resource_count; ++r)
@@ -2550,17 +2558,7 @@ int draw_share_permille(const upkeep_draw_record& d)
     return (goods > 0) ? sum / goods : 1000;
 }
 
-bool record_has_market_fill(const upkeep_draw_record& d)
-{
-    for (std::size_t r = 0; r < resource_count; ++r)
-        if (d.from_market[r] > 0.0f)
-            return true;
-    return false;
-}
-
-/// BL-1172 — a unit's supply step toward its target, and the building's. The
-/// passes and `settle_refused_upkeep` share them, so a re-taken step is the
-/// same arithmetic as the first one.
+/// BL-1172 — a unit's supply step toward its target, and the building's.
 int step_unit_supply(int factor, int target_permille, const unit_upkeep_params& up)
 {
     if (factor > target_permille)
@@ -2660,7 +2658,6 @@ unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg, economy_r
         // to the share of the draw actually met, so an army fed half its rations
         // settles at half strength rather than starving to nothing.
         int target_permille = 1000;
-        bool out_of_reach = false;
 
         // --- 2a. Trigger (a): beyond the reach field (BL-325 S3) --------------
         // Opt-in: a non-positive limit disables the trigger AND, with it, the
@@ -2674,15 +2671,12 @@ unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg, economy_r
             if (rc < 0.0f || !(rc <= up.out_of_supply_reach))
             {
                 target_permille = 0;
-                out_of_reach    = true;
                 ++out.out_of_reach;
             }
         }
 
         // --- 2b. The goods draw ------------------------------------------------
         const unit_upkeep_draw d = resolve_unit_upkeep(u, up);
-        upkeep_draw_record rec;
-        bool keep_rec = false;
         if (d.any_goods)
         {
             // BL-654: THE SAME PATH the building pass takes, not a second one.
@@ -2690,21 +2684,12 @@ unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg, economy_r
             // unit's local market and paid for, unless the good prices above the
             // buyer's reservation ceiling — in which case the unit goes without
             // and the decay rule below does exactly what it always did.
+            draw_outcome rec;
             if (draw_goods_or_bid(w, reg, report, u.owner, body, u.position, d.goods, &rec))
             {
                 target_permille = std::min(target_permille, draw_share_permille(rec));
                 ++out.unmet;
             }
-            keep_rec = record_has_market_fill(rec);
-        }
-        if (keep_rec)
-        {
-            // Clearing may yet refuse the market part (settle_refused_upkeep).
-            rec.asset         = id;
-            rec.is_unit       = true;
-            rec.factor_before = u.supply_factor_permille;
-            rec.out_of_reach  = out_of_reach;
-            report.upkeep_draws.push_back(rec);
         }
 
         // --- 3. The decay rule: ONE subtraction, TWO triggers ------------------
@@ -2846,18 +2831,9 @@ building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg,
         }
         // A basket the strip emptied draws nothing and creates no pool; the
         // building counts as supplied for the tick (recovery below).
-        upkeep_draw_record rec;
         const bool unmet = any_need
-            ? draw_goods_or_bid(w, reg, report, corp, body, b.tile, need, &rec)
+            ? draw_goods_or_bid(w, reg, report, corp, body, b.tile, need)
             : false;
-        if (any_need && record_has_market_fill(rec))
-        {
-            // BL-1172: clearing may yet refuse the market part.
-            rec.asset         = bid;
-            rec.is_unit       = false;
-            rec.factor_before = b.supply_factor_permille;
-            report.upkeep_draws.push_back(rec);
-        }
 
         // THE SHORTFALL RULE IS THE SAME RULE. An unmet draw takes the same
         // subtraction an out-of-supply unit takes; it never destroys, idles or
@@ -2877,58 +2853,6 @@ building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg,
     return out;
 }
 
-// ---------------------------------------------------------------------------
-// BL-1172 — the upkeep fills clearing refused
-// ---------------------------------------------------------------------------
-
-int settle_refused_upkeep(world& w, const recipe_registry& reg, const economy_report& report,
-                          const std::map<entity_id, std::array<bool, resource_count>>& refused)
-{
-    if (refused.empty())
-        return 0;
-    int settled = 0;
-    for (const upkeep_draw_record& d : report.upkeep_draws) // draw order: deterministic
-    {
-        const auto rit = refused.find(d.market);
-        if (rit == refused.end())
-            continue;
-        upkeep_draw_record c = d;
-        bool touched = false;
-        for (std::size_t r = 0; r < resource_count; ++r)
-            if (rit->second[r] && c.from_market[r] > 0.0f)
-            {
-                c.met[r] = std::max(0.0f, c.met[r] - c.from_market[r]);
-                c.from_market[r] = 0.0f;
-                touched = true;
-            }
-        if (!touched)
-            continue;
-
-        if (d.is_unit)
-        {
-            const auto uit = w.units.find(d.asset);
-            if (uit == w.units.end())
-                continue;
-            // The pass's own target, re-taken: 0 out of reach, else the
-            // corrected share. A refused good was bought only because the pool
-            // fell short, so the corrected draw is short by construction.
-            int target = d.out_of_reach ? 0 : 1000;
-            target = std::min(target, draw_share_permille(c));
-            uit->second.supply_factor_permille =
-                step_unit_supply(d.factor_before, target, reg.military().upkeep);
-        }
-        else
-        {
-            const auto bit = w.buildings.find(d.asset);
-            if (bit == w.buildings.end())
-                continue;
-            bit->second.supply_factor_permille =
-                step_building_supply(d.factor_before, /*unmet=*/true, reg.building_upkeep());
-        }
-        ++settled;
-    }
-    return settled;
-}
 
 // ---------------------------------------------------------------------------
 // BL-470 — the unit march pass

@@ -147,34 +147,35 @@ struct agency_event
     int       value      = 0;           ///< workforce_set: new target; road_placed: tier; order_*: resource id.
 };
 
-/// BL-1172 — ONE UPKEEP DRAW THAT TOOK GOODS OFF A MARKET SHELF, kept so the
-/// clearing can settle it at the price it actually resolves to.
-///
-/// The draw runs before this tick's price exists: it bids against LAST tick's
-/// price and takes the fill off `market_component::inventory` then. Clearing
-/// resolves the price the fill really costs (`ref_price`), and where that is
-/// above the buyer's reservation ceiling (`reservation_mult` x base) the buyer
-/// would not have paid it — FINANCE.md § Standing-force upkeep: "a unit buys
-/// only the part of its need that clears at or under the ceiling". So clearing
-/// does not bill that part at all: it puts the goods back on the shelf and
-/// hands this record to `settle_refused_upkeep`, which re-takes the asset's
-/// supply step as if that part had never arrived. The step is re-taken from
-/// `factor_before`, so the asset moves once per tick, not twice.
-///
-/// Written only when a draw took something off a shelf (`from_market` non-zero
-/// somewhere) — a pool-covered draw has nothing clearing could refuse. Transient;
-/// never saved.
-struct upkeep_draw_record
+/// BL-1172 — THE POSTED PRICE of good `r` on market `m`: the price that stands
+/// on the shelf while the tick's draws are made — the last clearing's price,
+/// or the base price on a market that has never resolved one. Every shelf draw
+/// is DECIDED against it and BILLED at it (FINANCE.md § Standing-force upkeep,
+/// Ben 2026-10-03: "A draw pays the posted price"). `market_component::price`
+/// is written only at the end of `clear_markets`, so the price a draw saw is
+/// the price clearing bills, whichever pass drew.
+inline float posted_price(const market_component& m, std::size_t r)
 {
-    entity_id asset   = null_entity; ///< The unit or building that drew.
-    bool      is_unit = false;       ///< Unit pass (true) or building pass (false).
-    entity_id market  = null_entity; ///< The market the shelf belongs to.
-    int  factor_before = 1000;       ///< `supply_factor_permille` before this tick's step.
-    bool out_of_reach  = false;      ///< Units: trigger (a) fired this tick (target 0).
-    std::array<float, resource_count> need{};        ///< What the draw asked for.
-    std::array<float, resource_count> met{};         ///< Pool take + market fill, per good.
-    std::array<float, resource_count> from_market{}; ///< The market fill alone, per good.
-};
+    return (m.price[r] > 0.0f) ? m.price[r] : m.base_price[r];
+}
+
+/// BL-1172 — THE FAIR-PRICE CEILING, one rule for every goods draw (FINANCE.md
+/// § Standing-force upkeep, Ben 2026-10-03: "unit and building upkeep, processor
+/// inputs and construction alike buy only at or under it"). True when a draw may
+/// buy good `r` off `m`'s shelf: it is priced (`base > 0` — unpriced is
+/// unbuyable, the ceiling being 0) and its posted price is at or under
+/// `reservation_mult x base`. `reservation_mult <= 0` is the authored OFF
+/// switch, and OFF means what each draw did before the ceiling existed:
+/// upkeep (`off_buys = false`) never buys; processor inputs and construction
+/// (`off_buys = true`) buy whatever the shelf holds.
+inline bool shelf_admits(const market_component& m, std::size_t r, float reservation_mult,
+                         bool off_buys)
+{
+    if (reservation_mult <= 0.0f)
+        return off_buys;
+    const float base = m.base_price[r];
+    return base > 0.0f && posted_price(m, r) <= base * reservation_mult;
+}
 
 /// Result of one economy step: the per-building reports plus the auto-bought
 /// input shortfalls per (corp, body), which become market demand and corporate
@@ -260,24 +261,6 @@ struct economy_report
     /// sorted-accumulation reason.
     std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> upkeep_wants;
 
-    /// BL-1172 — the upkeep FILL, per (corporation, market): the part of
-    /// `purchases` an upkeep draw (`run_unit_upkeep` / `run_building_upkeep`)
-    /// took off a shelf. A SUBSET of `purchases`, never in addition to it.
-    /// `clear_markets` reads it for one thing: where the resolved price of a
-    /// good sits ABOVE the buyer's reservation ceiling
-    /// (`price_band_params::reservation_mult` x base), the upkeep part of the
-    /// fill is NOT BOUGHT — returned to the shelf, unbilled, no exchange row —
-    /// and the rest of the fill is billed at the resolved price as always. At
-    /// or under the ceiling it is billed at the resolved price like any fill:
-    /// never below what its sellers were paid (FINANCE.md § Standing-force
-    /// upkeep, Ben 2026-10-03). Same key and std::map as `wants`.
-    std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> upkeep_purchases;
-
-    /// BL-1172 — every upkeep draw that took goods off a shelf this tick, in
-    /// draw order (units ascending id, then buildings ascending id). Read by
-    /// `settle_refused_upkeep` when clearing refuses a fill. See
-    /// `upkeep_draw_record`.
-    std::vector<upkeep_draw_record> upkeep_draws;
 
     /// Per (corporation, body): the pool-level workforce scarcity figure this
     /// tick — `min(1, supply/demand)`, rescaled by habitability efficiency after
@@ -627,23 +610,6 @@ struct building_upkeep_tick
 /// @param report Same three registers `run_unit_upkeep` writes.
 building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg,
                                          economy_report& report);
-
-/// BL-1172 — SETTLE THE UPKEEP FILLS CLEARING REFUSED. Called by
-/// `clear_markets` once it knows which (market, good) pairs resolved above the
-/// buyer's reservation ceiling: `refused[market][r]` true means every upkeep
-/// fill of good r on that market was NOT bought (clearing has already put it
-/// back on the shelf and billed nothing for it). For each record in
-/// `report.upkeep_draws` that drew a refused good, this removes that fill from
-/// the record's `met`, recomputes the draw's outcome and re-takes the asset's
-/// supply step from `factor_before` — the unit steps toward its corrected
-/// supply share, the building decays if the corrected draw is short. The same
-/// step functions the two passes use; a record with nothing refused is left
-/// alone, so an all-bought tick is untouched. Ascending record order; integer
-/// steps; no RNG. An asset no longer in the world is skipped.
-///
-/// @return How many assets had their step re-taken.
-int settle_refused_upkeep(world& w, const recipe_registry& reg, const economy_report& report,
-                          const std::map<entity_id, std::array<bool, resource_count>>& refused);
 
 // ---------------------------------------------------------------------------
 // BL-470 — the unit march pass

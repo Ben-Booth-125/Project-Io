@@ -1371,17 +1371,15 @@ economy = {
     --   that is the insolvency the ruling exists to stop. Only 2.0 was
     --   measured; it is a first cut, and the trace is the tool to move it.
     --
-    -- AND IT IS CHECKED AGAIN AT THE PRICE THAT CLEARS. The draw decides
-    -- against LAST tick's price; its own bid can resolve this tick's far
-    -- higher. Where clear_markets resolves a good over this ceiling, the
-    -- upkeep part of the fill (economy_report::upkeep_purchases) is NOT
-    -- BOUGHT: back on the shelf, unbilled, no exchange row, and the drawing
-    -- unit or building steps as if it never arrived (settle_refused_upkeep).
-    -- What is bought is billed at the resolved price, never below what its
-    -- sellers were paid (FINANCE.md, Ben 2026-10-03).
+    -- AND THE DRAW PAYS THE POSTED PRICE (Ben, 2026-10-03). A shelf draw
+    -- checks the price standing on the shelf against this ceiling and is
+    -- billed at that same price (economy_system.hpp posted_price /
+    -- shelf_admits; clear_markets) - never the price its own want resolves.
     --
-    -- Read by every goods draw, building upkeep's power included (one rule
-    -- for every goods draw); nothing else buys through this ceiling.
+    -- Read by EVERY goods draw: unit and building upkeep, processor inputs
+    -- and construction (FINANCE.md § Standing-force upkeep). 0 switches the
+    -- ceiling off: upkeep then never buys; processors and construction buy
+    -- whatever the shelf holds, as before the ceiling existed.
     --
     -- RE-MEASURE RATHER THAN TRUST. Whenever base_price, ceil_mult or either
     -- upkeep basket changes, re-read demand_census R3 (what each good prices

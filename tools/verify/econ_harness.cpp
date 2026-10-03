@@ -190,11 +190,15 @@ int main()
     check(near(m.price[ri(resource_type::steel)], 5.0f),
           "A.R2 steel price floored (no demand) and eased from base", m.price[ri(resource_type::steel)], 5.0f);
 
-    // Budget (Brief A, R3 + L3 R5): cash flows valued at the resolved price.
+    // Budget (Brief A, R3 + L3 R5): sales valued at the resolved price; a shelf
+    // draw billed at the POSTED price it was decided against (BL-1172, FINANCE.md
+    // § Standing-force upkeep, Ben 2026-10-03: "A draw pays the posted price").
     //   E: income 20*1.809017=36.180, maint 5, wage 0.5*8=4 -> +27.180 -> 1027.180
-    //   P: income 4*5=20, expend 4*1.809017=7.236, maint 10, wage 0.5*12=6 -> -3.236 -> 996.764
+    //   P: income 4*5=20, expend 4*2.5 (iron posted at base) = 10, maint 10,
+    //      wage 0.5*12=6 -> -6 -> 994.000   (was 4*1.809 = 7.236 -> 996.764 under
+    //      the resolved-price billing the ruling retired)
     check(near(w.corporations[corp_e].balance, 1027.180f), "A.R3 extraction corp balance at resolved price", w.corporations[corp_e].balance, 1027.180f);
-    check(near(w.corporations[corp_p].balance, 996.764f),  "A.R3 processing corp balance at resolved price", w.corporations[corp_p].balance, 996.764f);
+    check(near(w.corporations[corp_p].balance, 994.0f),    "A.R3 processing corp balance: sales at resolved, the shelf draw at posted", w.corporations[corp_p].balance, 994.0f);
 
     // R3.3 idle below t_idle: zero P's workforce-pool scenario -> empty pool, run again.
     {

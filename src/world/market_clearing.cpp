@@ -1072,9 +1072,11 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // to `corp_cash_flow`, so the record cannot come to disagree with the money
     // loop. Authority: docs/economy/MARKETS.md § The exchange record.
     //
-    // `unit_price` IS THE PRICE CLEARING RESOLVED. For the three auto paths that
-    // is `ref_price` — the market as counterparty of last resort — and for a
-    // matched trade it is the price the match executed on. It is never read back
+    // `unit_price` IS THE PRICE THE EXCHANGE WAS MADE AT. For the two auto SALE
+    // paths that is `ref_price` — the market as counterparty of last resort; for
+    // the auto-demand path (row 2) it is the POSTED price the shelf draw was
+    // decided and billed at (BL-1172, `posted_price`); and for a matched trade it
+    // is the price the match executed on. It is never read back
     // off a `sell_order::floor_price` or a `buy_order::max_price`: those are the
     // reservation prices an order CARRIED into clearing, and an order is honoured
     // at clearing, so what a seller asked and what they got are different numbers.
@@ -1425,50 +1427,28 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
                         se.corp, null_entity);
     }
 
-    // --- Auto-demand clearing: expenditure at ref_price ---
-    // BL-1172 (FINANCE.md § Standing-force upkeep, Ben 2026-10-03): "a unit buys
-    // only the part of its need that clears at or under the ceiling, and pays the
-    // clearing price for it; it is never billed below the price its sellers were
-    // paid". The upkeep draw ran before this tick's price existed: it took its
-    // fill off the shelf against LAST tick's price, and its own bid can resolve
-    // the price above the reservation ceiling (reservation_mult x base). Where it
-    // does, the upkeep part of the fill (`report.upkeep_purchases`, a subset of
-    // the entry's qty) is NOT BOUGHT: it goes back on the shelf, nothing is
-    // billed for it, no exchange row is written, and `settle_refused_upkeep`
-    // re-takes the drawing asset's supply step without it — the unit draws less
-    // and fights weaker. Every unit of every fill that IS bought is billed at
-    // ref_price, the price the shelf's sellers were paid: one row per real trade
-    // at the real price. The rest of a fill (construction, processor inputs) is
-    // billed at ref_price exactly as before. The ceiling is a property of the
-    // (market, good), so the refusal is too: every buyer's upkeep fill of that
-    // good on that market is refused alike. `res_mult <= 0` never buys, so the
-    // register is empty and this is the old loop.
-    const float res_mult = reg.price_band().reservation_mult;
-    std::map<entity_id, std::array<bool, resource_count>> refused_upkeep; // sorted: settle walks records, not this
+    // --- Auto-demand clearing: expenditure at the POSTED price ---
+    // BL-1172 (FINANCE.md § Standing-force upkeep, Ben 2026-10-03): "a draw from
+    // a market's shelf is decided and billed at the price that stood when it was
+    // made — the price it checked against the ceiling — with one exchange row at
+    // that price". Every fill here is a shelf draw made this tick — upkeep,
+    // processor inputs, construction — and every one of them checked
+    // `posted_price` against the fair-price ceiling before drawing
+    // (`shelf_admits`). `market_component::price` is not written until the end
+    // of this pass, so `posted_price` read here IS the price each draw saw. The
+    // shelf's seller is the market, whose suppliers were paid when they listed
+    // (row 1 above), so billing the posted price leaves no unpaid gap. Read
+    // before the price update below, never `ref_price`: the fill's own want is
+    // in this tick's demand, and billing the price it drove up would charge a
+    // buyer more than the price it agreed to.
     for (const auto_buy_entry& be : auto_buys)
     {
-        const float ref = ref_price[be.market][be.r];
-        float bought_qty = be.qty;
-        if (const auto uit = report.upkeep_purchases.find(std::make_pair(be.corp, be.market));
-            uit != report.upkeep_purchases.end())
-        {
-            const float upkeep_qty = std::clamp(uit->second[be.r], 0.0f, be.qty);
-            const float ceiling    = w.markets.at(be.market).base_price[be.r] * res_mult;
-            if (upkeep_qty > 0.0f && ref > ceiling)
-            {
-                w.markets.at(be.market).inventory[be.r] += upkeep_qty; // back on the shelf
-                bought_qty = be.qty - upkeep_qty;
-                refused_upkeep[be.market][be.r] = true;
-            }
-        }
-
-        flows[be.corp].expenditure += bought_qty * ref;
+        const float px = posted_price(w.markets.at(be.market), be.r);
+        flows[be.corp].expenditure += be.qty * px;
         // Row 2 of 4: the mirror of row 1 — the market is the SELLER, so this is
         // the buy side of a player's history (what I bought, at what price).
-        record_exchange(be.market, be.r, bought_qty, ref, null_entity, be.corp);
+        record_exchange(be.market, be.r, be.qty, px, null_entity, be.corp);
     }
-    // The refused fills' assets step as if that part never arrived.
-    settle_refused_upkeep(w, reg, report, refused_upkeep);
 
     // --- Explicit order-book matching (player sell vs player buy) ---
     // Provides preferred-seller routing and a VWAP price signal when priced orders

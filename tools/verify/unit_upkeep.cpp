@@ -672,25 +672,26 @@ void u9_half_fed_settles_at_half()
 }
 
 // ---------------------------------------------------------------------------
-// U10 — BL-1172: CLEARING BUYS ONLY WHAT CLEARS AT OR UNDER THE CEILING
+// U10 — BL-1172: A SHELF DRAW PAYS THE POSTED PRICE
 // ---------------------------------------------------------------------------
-// FINANCE.md § Standing-force upkeep (Ben, 2026-10-03): "a unit buys only the
-// part of its need that clears at or under the ceiling, and pays the clearing
-// price for it; it is never billed below the price its sellers were paid, so
-// no fill is subsidised and no money appears from nowhere."
+// FINANCE.md § Standing-force upkeep (Ben, 2026-10-03): "a draw from a market's
+// shelf is decided and billed at the price that stood when it was made — the
+// price it checked against the ceiling — with one exchange row at that price
+// ... a unit beside a full shelf is never refused by a price its own want drove
+// up."
 //
-// The draw bids against LAST tick's price (here 1.5x base, under the 2x
-// ceiling) and takes the fill off the shelf; clearing then resolves the price
-// its bid produces. (a) With no seller the price resolves to
-// 1.5b + 0.5 x (10b - 1.5b) = 5.75b, over the ceiling: the fill is NOT bought.
-// (b) With a seller listing plenty it resolves under: the fill is bought at the
-// resolved price, the price the seller was paid.
+// The shelf posts 1.5x base (under the 2x ceiling). (a) SHELF ONLY, no listing
+// this tick: the unit's own want resolves the price to 5.75x base, far over the
+// ceiling — and the unit still buys, at 1.5x. (b) A seller listing plenty: the
+// price resolves low, and the unit still pays the 1.5x it agreed to, not the
+// resolved price.
 
-void u10_clearing_refuses_above_the_ceiling()
+void u10_a_shelf_draw_pays_the_posted_price()
 {
-    std::printf("\n-- U10: BL-1172, clearing buys upkeep only at or under the ceiling --\n");
+    std::printf("\n-- U10: BL-1172, a shelf draw pays the posted price --\n");
 
     constexpr float base     = 43.0f;
+    constexpr float posted   = base * 1.5f;
     constexpr float per_head = 0.1f;
     constexpr int   heads    = 10;
     constexpr float need     = per_head * heads;
@@ -702,7 +703,7 @@ void u10_clearing_refuses_above_the_ceiling()
         mc.body        = f.body;
         mc.centre_tile = f.tile;
         mc.base_price[ORD] = base;
-        mc.price[ORD]      = base * 1.5f; // last tick: under the ceiling, so it bids
+        mc.price[ORD]      = posted;
         mc.inventory[ORD]  = shelf;
         f.w.markets[mid] = mc;
         return mid;
@@ -724,43 +725,39 @@ void u10_clearing_refuses_above_the_ceiling()
         return n;
     };
 
-    // --- (a) resolved over the ceiling: not bought, not billed -------------
+    // --- (a) shelf only: the want drives the price over the ceiling; it still buys
     {
         fixture f = make_fixture();
-        // Half the need from the pool, half off the shelf; the unit starts at 600.
         const entity_id u   = add_unit(f, ROW_LEVY, heads, f.base, 600);
         const entity_id mid = setup(f);
-        f.w.pool_at(f.corp, mid).quantities[ORD] = need * 0.5f;
+        f.w.pool_at(f.corp, mid).quantities[ORD] = need * 0.5f; // half from the pool
         recipe_registry reg = reg_for();
 
         economy_report rep;
-        run_unit_upkeep(f.w, reg, rep);
-        check(near(f.w.markets.at(mid).inventory[ORD], shelf - need * 0.5f),
-              "U10a the draw took the shortfall off the shelf against last tick's price");
-        check(f.w.units.at(u).supply_factor_permille == 700,
-              "U10a ... and, fully fed for now, stepped toward 1000 (600 -> 700)");
-
+        const unit_upkeep_tick t = run_unit_upkeep(f.w, reg, rep);
+        check(t.unmet == 0, "U10a the shelf covered the rest: the draw is met, and the tally says so");
         const auto flows = clear_markets(f.w, reg, rep);
-        const float ref = f.w.markets.at(mid).price[ORD];
-        check(ref > base * k_shipped_reservation,
-              "U10a the price its bid resolved to sits OVER the ceiling (5.75x base)");
+        const float resolved = f.w.markets.at(mid).price[ORD];
+        check(resolved > base * k_shipped_reservation,
+              "U10a its own want resolved the price OVER the ceiling (shelf only, no listing)");
         const auto fit = flows.find(f.corp);
         const float spent = (fit == flows.end()) ? 0.0f : fit->second.expenditure;
-        check(near(spent, 0.0f), "U10a the refused fill is billed NOTHING");
-        check(near(f.w.markets.at(mid).inventory[ORD], shelf),
-              "U10a the refused fill is back on the shelf: goods and money both conserved");
+        check(near(spent, need * 0.5f * posted),
+              "U10a ... and it is billed at the POSTED 1.5x, not refused and not the resolved price");
         float q, lo, hi;
-        check(buyer_rows(f, q, lo, hi) == 0, "U10a no exchange row records a trade that did not happen");
-        check(f.w.units.at(u).supply_factor_permille == 550,
-              "U10a the unit steps as half-fed: from 600 toward its share 500 (550), not 700");
+        check(buyer_rows(f, q, lo, hi) == 1 && near(q, need * 0.5f) && near(lo, posted) && near(hi, posted),
+              "U10a one exchange row, the shelf fill, at the posted price");
+        check(near(f.w.markets.at(mid).inventory[ORD], shelf - need * 0.5f),
+              "U10a the shelf gave up exactly the fill");
+        check(f.w.units.at(u).supply_factor_permille == 700,
+              "U10a fully fed, the unit steps toward 1000 (600 -> 700)");
     }
 
-    // --- (b) resolved at or under the ceiling: bought at the resolved price --
+    // --- (b) a seller listing plenty: the price resolves low; the unit pays posted
     {
         fixture f = make_fixture();
         const entity_id u   = add_unit(f, ROW_LEVY, heads, f.base, 600);
         const entity_id mid = setup(f);
-        // A seller listing plenty: supply 40 against a want of 1 resolves low.
         const entity_id seller = f.w.create_entity();
         corporation_component sc{};
         sc.name = "Seller";
@@ -771,24 +768,86 @@ void u10_clearing_refuses_above_the_ceiling()
         economy_report rep;
         run_unit_upkeep(f.w, reg, rep);
         const auto flows = clear_markets(f.w, reg, rep);
-        const float ref = f.w.markets.at(mid).price[ORD];
-        check(ref <= base * k_shipped_reservation, "U10b the price resolves at or under the ceiling");
-
-        const float spent = flows.at(f.corp).expenditure;
-        check(near(spent, need * ref), "U10b the fill is billed at the RESOLVED price, need x ref");
+        const float resolved = f.w.markets.at(mid).price[ORD];
+        check(!near(resolved, posted), "U10b the price resolved away from the posted price");
+        check(near(flows.at(f.corp).expenditure, need * posted),
+              "U10b the unit is billed need x POSTED, the price it decided against");
         float q, lo, hi;
-        const int n = buyer_rows(f, q, lo, hi);
-        check(n == 1 && near(q, need) && near(lo, ref) && near(hi, ref),
-              "U10b one exchange row, the whole fill, at the resolved price");
-        float seller_px = -1.0f;
-        for (const exchange_record& e : f.w.exchanges.entries)
-            if (e.seller == seller) seller_px = e.unit_price;
-        check(near(seller_px, ref), "U10b ... the same price the shelf's seller was paid (never below it)");
+        check(buyer_rows(f, q, lo, hi) == 1 && near(q, need) && near(lo, posted) && near(hi, posted),
+              "U10b one exchange row, the whole fill, at the posted price");
         check(near(f.w.markets.at(mid).inventory[ORD], shelf - need + 40.0f),
               "U10b the shelf lost the fill and gained the seller's listing");
         check(f.w.units.at(u).supply_factor_permille == 700,
-              "U10b a bought fill stands: the unit stepped toward 1000 (600 -> 700)");
+              "U10b the unit stepped toward 1000 (600 -> 700)");
     }
+}
+
+// ---------------------------------------------------------------------------
+// U11 — BL-1172: ONE GOOD OVER THE CEILING, ONE UNDER
+// ---------------------------------------------------------------------------
+// "A unit buys only the part of its need that clears at or under the ceiling."
+// Ordnance posts 1.5x base, rations 2.5x; the pool is empty. The unit buys its
+// ordnance and goes without its rations: billed for ordnance alone, the ration
+// shelf untouched, and its supply share is 500 (one good of two met), so it
+// steps down from 1000 toward 500 — not to 0, and not held at 1000.
+
+void u11_one_good_over_one_under()
+{
+    std::printf("\n-- U11: BL-1172, a two-good draw with one good over the ceiling --\n");
+
+    constexpr float base_o = 43.0f, base_r = 10.0f;
+    constexpr float per_head = 0.1f;
+    constexpr int   heads    = 10;
+    constexpr float need     = per_head * heads;
+
+    fixture f = make_fixture();
+    const entity_id u = add_unit(f, ROW_LEVY, heads, f.base, 1000);
+    const entity_id mid = f.w.create_entity();
+    {
+        market_component mc{};
+        mc.body        = f.body;
+        mc.centre_tile = f.tile;
+        mc.base_price[ORD] = base_o; mc.price[ORD] = base_o * 1.5f; mc.inventory[ORD] = 100.0f;
+        mc.base_price[RAT] = base_r; mc.price[RAT] = base_r * 2.5f; mc.inventory[RAT] = 100.0f;
+        f.w.markets[mid] = mc;
+    }
+    recipe_registry reg = registry_with_upkeep(0.0f, per_head, /*decay*/ 50, /*recovery*/ 100);
+    {
+        military_capability_params mp = reg.military();
+        mp.upkeep.goods_per_head[RAT] = per_head;
+        reg.set_military(mp);
+        price_band_params pb;
+        pb.floor_mult = 0.25f; pb.ceil_mult = 10.0f; pb.reservation_mult = k_shipped_reservation;
+        reg.set_price_band(pb);
+    }
+
+    economy_report rep;
+    const unit_upkeep_tick t = run_unit_upkeep(f.w, reg, rep);
+    check(t.unmet == 1, "U11 the draw is unmet (rations were over the ceiling)");
+    check(near(f.w.markets.at(mid).inventory[RAT], 100.0f), "U11 the ration shelf is untouched");
+    check(near(f.w.markets.at(mid).inventory[ORD], 100.0f - need), "U11 the ordnance was bought off the shelf");
+    check(f.w.units.at(u).supply_factor_permille == 950,
+          "U11 share 500 (one good of two): the unit steps 1000 -> 950 toward it");
+
+    const auto flows = clear_markets(f.w, reg, rep);
+    check(near(flows.at(f.corp).expenditure, need * base_o * 1.5f),
+          "U11 billed for the ordnance alone, at its posted price");
+    int rat_rows = 0;
+    for (const exchange_record& e : f.w.exchanges.entries)
+        if (e.buyer == f.corp && static_cast<std::size_t>(e.resource) == RAT)
+            ++rat_rows;
+    check(rat_rows == 0, "U11 no exchange row for the rations it did not buy");
+
+    // Run on: the share holds it at 500, the tally of every tick agrees.
+    for (int i = 0; i < 20; ++i)
+    {
+        f.w.markets.at(mid).price[RAT] = base_r * 2.5f; // keep rations over the ceiling
+        f.w.markets.at(mid).price[ORD] = base_o * 1.5f;
+        economy_report r2;
+        run_unit_upkeep(f.w, reg, r2);
+    }
+    check(f.w.units.at(u).supply_factor_permille == 500,
+          "U11 held half-fed, the unit settles at exactly 500");
 }
 
 } // namespace
@@ -807,7 +866,8 @@ int main()
     u7_adapter();
     u8_the_reservation_ceiling();
     u9_half_fed_settles_at_half();
-    u10_clearing_refuses_above_the_ceiling();
+    u10_a_shelf_draw_pays_the_posted_price();
+    u11_one_good_over_one_under();
 
     std::printf("\n=== %d passed, %d failed ===\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

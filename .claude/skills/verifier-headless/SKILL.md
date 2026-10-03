@@ -861,11 +861,20 @@ in `tools/verify/README.md`.
   Pass 4: the split was held RNG-identical draw-for-draw, so any census movement is a real
   regression rather than expected drift.
 
+- **`fair_price_ceiling`** — BL-1172: the fair-price ceiling governs EVERY goods draw, and a shelf
+  draw pays the POSTED price (FINANCE.md § Standing-force upkeep, Ben 2026-10-03). On a real tick
+  (`run_economy_step` + `clear_markets`): P1/P2 a processor buys at or under the ceiling at posted and
+  runs on its pool alone over it; C1/C2 a construction site draws at posted or pauses; S1 one corp
+  drawing one good for a processor and upkeep is billed once; S2 two corps on one shelf each billed
+  their own fill; Z the ceiling OFF (0) leaves processors buying. Billing rows assert the resolved
+  price DIFFERS from the posted one, so they cannot pass by accident. Build via `build_harness.js`.
+
 - **`working_capital`** — BL-1173: every background firm opens with working capital (FINANCE.md
   § Debt interest). On the shipped start (`build_app_start_world`, read before the settle), W1
   recomputes each background firm's opening cash independently as 0.25 x its pooled stock at base
   and asserts `starting_capital` and `balance` both equal it; W2 that the field is funded; W3 that
-  the seat is not a background firm and opens on its own capital alone. Build via
+  specialists (the seat among them) keep `base_capital`'s band, balance == starting_capital, and never
+  the working-capital figure. Build via
   `build_lua_harness.sh`; `--seeds a,b,c`, `--full` (prehistory on; default fast).
 
 - **`unit_upkeep_rates`** — What turning the upkeep rates off zero would actually cost (Sprint C3's

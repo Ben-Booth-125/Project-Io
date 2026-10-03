@@ -779,25 +779,25 @@ void r9_no_wire_no_draw()
 }
 
 // ---------------------------------------------------------------------------
-// R10 — BL-1172: CLEARING BUYS ONLY WHAT CLEARS AT OR UNDER THE CEILING
+// R10 — BL-1172: A SHELF DRAW PAYS THE POSTED PRICE
 // ---------------------------------------------------------------------------
 // FINANCE.md § Standing-force upkeep (Ben, 2026-10-03): the same ceiling
-// governs every goods draw, building upkeep's included, and "a unit buys only
-// the part of its need that clears at or under the ceiling, and pays the
-// clearing price for it; it is never billed below the price its sellers were
-// paid". The draw bids against last tick's price (1.5x base, under the 2x
-// ceiling); clearing resolves its own bid's price. (a) No seller: it resolves
-// to 1.5b + 0.5 x (10b - 1.5b) = 5.75b, over the ceiling — the fill is not
-// bought, and the building takes the shortfall rule. (b) A seller listing
-// plenty: it resolves under, and the fill is bought at the resolved price.
-void r10_clearing_refuses_above_the_ceiling()
+// governs every goods draw, building upkeep's included, and "a draw from a
+// market's shelf is decided and billed at the price that stood when it was
+// made — the price it checked against the ceiling — with one exchange row at
+// that price". The shelf posts 1.5x base. (a) Shelf only: the draw's own want
+// resolves the price to 5.75x base — and the building is billed 1.5x and not
+// refused. (b) A seller listing plenty: the price resolves low — and the
+// building still pays 1.5x.
+void r10_a_shelf_draw_pays_the_posted_price()
 {
-    std::printf("\n--- R10  BL-1172: clearing buys upkeep only at or under the ceiling ---\n");
+    std::printf("\n--- R10  BL-1172: a shelf draw pays the posted price ---\n");
 
     constexpr resource_type good = resource_type::tools;
-    constexpr float need  = 0.5f;
-    constexpr float base  = 4.0f;
-    constexpr float shelf = 10.0f;
+    constexpr float need   = 0.5f;
+    constexpr float base   = 4.0f;
+    constexpr float posted = base * 1.5f;
+    constexpr float shelf  = 10.0f;
 
     auto buyer_rows = [&](const fixture& f, float& qty, float& px) {
         int n = 0; qty = 0.0f; px = -1.0f;
@@ -806,43 +806,40 @@ void r10_clearing_refuses_above_the_ceiling()
         return n;
     };
 
-    // --- R10a: resolved OVER the ceiling — not bought, not billed ----------
+    // --- R10a: shelf only — resolved over the ceiling, billed at posted ------
     {
         fixture f;
         f.build(1, building_type::extraction_site);
-        const entity_id mid = add_market(f, good, base, base * 1.5f, shelf);
+        const entity_id mid = add_market(f, good, base, posted, shelf);
         recipe_registry reg = registry_with_reservation(good, need, k_shipped_reservation);
-        const float balance_before = f.w.corporations.at(f.corp).balance;
 
         economy_report rep;
-        run_building_upkeep(f.w, reg, rep);
-        check_near(fill_of(rep, f.corp, mid, good), need,
-                   "R10a the draw took its shortfall off the shelf against last tick's price");
-        check(f.w.buildings.at(f.buildings[0]).supply_factor_permille == 1000,
-              "R10a ... and, covered for now, did not weaken");
+        const building_upkeep_tick t = run_building_upkeep(f.w, reg, rep);
+        check(t.unmet == 0 && t.weakened == 0, "R10a the shelf covered the draw; the tally says met, not weakened");
 
         const auto flows = clear_markets(f.w, reg, rep);
-        const float ref = f.w.markets.at(mid).price[ri(good)];
-        check(ref > base * k_shipped_reservation,
-              "R10a the price its bid resolved to sits OVER the ceiling (5.75x base)");
+        const float resolved = f.w.markets.at(mid).price[ri(good)];
+        check(resolved > base * k_shipped_reservation,
+              "R10a the draw's own want resolved the price OVER the ceiling (shelf only)");
         const auto fit = flows.find(f.corp);
-        check_near(fit == flows.end() ? 0.0f : fit->second.expenditure, 0.0f,
-                   "R10a the refused fill is billed NOTHING");
-        check_near(f.w.markets.at(mid).inventory[ri(good)], shelf,
-                   "R10a the refused fill is back on the shelf");
-        check_near(f.w.corporations.at(f.corp).balance, balance_before,
-                   "R10a clearing moved no money for it");
+        check_near(fit == flows.end() ? 0.0f : fit->second.expenditure, need * posted,
+                   "R10a billed need x POSTED: not refused, and not the resolved price");
         float q, px;
-        check(buyer_rows(f, q, px) == 0, "R10a no exchange row records a trade that did not happen");
-        check(f.w.buildings.at(f.buildings[0]).supply_factor_permille == 950,
-              "R10a the building takes the shortfall rule instead (1000 -> 950)");
+        check(buyer_rows(f, q, px) == 1, "R10a exactly one exchange row for the fill");
+        check_near(px, posted, "R10a ... at the posted price");
+        check_near(q * px, fit == flows.end() ? 0.0f : fit->second.expenditure,
+                   "R10a the row's value is exactly what the buyer was charged");
+        check_near(f.w.markets.at(mid).inventory[ri(good)], shelf - need,
+                   "R10a the shelf gave up exactly the fill");
+        check(f.w.buildings.at(f.buildings[0]).supply_factor_permille == 1000,
+              "R10a the building, supplied, does not weaken");
     }
 
-    // --- R10b: resolved at or under the ceiling — bought at the resolved price
+    // --- R10b: a seller listing plenty — resolved low, billed at posted ------
     {
         fixture f;
         f.build(1, building_type::extraction_site);
-        const entity_id mid = add_market(f, good, base, base * 1.5f, shelf);
+        const entity_id mid = add_market(f, good, base, posted, shelf);
         const entity_id seller = f.w.create_entity();
         corporation_component sc;
         sc.name = "Seller";
@@ -853,21 +850,14 @@ void r10_clearing_refuses_above_the_ceiling()
         economy_report rep;
         run_building_upkeep(f.w, reg, rep);
         const auto flows = clear_markets(f.w, reg, rep);
-        const float ref = f.w.markets.at(mid).price[ri(good)];
-        check(ref <= base * k_shipped_reservation, "R10b the price resolves at or under the ceiling");
-        check_near(flows.at(f.corp).expenditure, need * ref,
-                   "R10b the fill is billed at the RESOLVED price, need x ref");
+        const float resolved = f.w.markets.at(mid).price[ri(good)];
+        check(std::fabs(resolved - posted) > 1e-3f, "R10b the price resolved away from the posted price");
+        check_near(flows.at(f.corp).expenditure, need * posted,
+                   "R10b billed need x POSTED, the price the draw decided against");
         float q, px;
-        const int n = buyer_rows(f, q, px);
-        check(n == 1, "R10b exactly one exchange row for the fill");
+        check(buyer_rows(f, q, px) == 1, "R10b exactly one exchange row for the fill");
         check_near(q, need, "R10b ... carrying the whole fill");
-        check_near(px, ref, "R10b ... at the resolved price");
-        float seller_px = -1.0f;
-        for (const exchange_record& e : f.w.exchanges.entries)
-            if (e.seller == seller) seller_px = e.unit_price;
-        check_near(seller_px, ref, "R10b the same price its seller was paid — never billed below it");
-        check(f.w.buildings.at(f.buildings[0]).supply_factor_permille == 1000,
-              "R10b a bought fill stands: the building does not weaken");
+        check_near(px, posted, "R10b ... at the posted price");
     }
 }
 
@@ -886,7 +876,7 @@ int main()
     r7_the_reservation_ceiling();
     r8_the_floor();
     r9_no_wire_no_draw();
-    r10_clearing_refuses_above_the_ceiling();
+    r10_a_shelf_draw_pays_the_posted_price();
 
     std::printf("\n%s — %d failure(s)\n", g_failures == 0 ? "PASS" : "FAIL", g_failures);
     return g_failures == 0 ? 0 : 1;

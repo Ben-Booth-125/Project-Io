@@ -229,10 +229,12 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
 7. **Standing buy orders** — read from `world::buy_orders`, entered into demand and the
    explicit buy book (`max_price`, optional `preferred_seller`).
 8. **Reference prices** — computed once from the accumulated supply/demand (below), so every
-   flow this tick uses the same price.
+   sale this tick uses the same price.
 9. **Auto clearing** — auto-surplus sells at the reference price (**perfect counterparty**: the
-   sell side is unconditional — see § Real market inventory); auto-demand billed at the
-   reference price for whatever was already drawn in step 6.
+   sell side is unconditional — see § Real market inventory); auto-demand is billed at the
+   **posted price** — the price standing on the shelf when it was drawn in step 6, the one the
+   draw checked against its reservation ceiling — never the reference price its own want helped
+   resolve ([FINANCE.md](FINANCE.md) § Standing-force upkeep, Ben 2026-10-03).
 10. **Order-book matching** (BL-037, preferential purchasing) — explicit sells vs explicit buys
     by price-time priority: cheapest ask first, highest bid first, corp id as the deterministic
     tiebreak. A buyer's `preferred_seller` is served first, tolerated up to **1.10×** the cheapest
@@ -416,6 +418,11 @@ draw** — unit upkeep takes the same shape, not a second one.
 - **Above a reservation ceiling, it does not buy.** The draw goes unmet and the shortfall rule
   applies — the building weakens, exactly as an unsupplied unit does. Going without is an outcome
   the design already knows how to express.
+- **It pays the posted price, and so does every other goods draw (Ben, 2026-10-03).** The ceiling
+  is read against the price standing on the shelf, and that price is what the draw is billed.
+  Processor inputs and construction materials obey the same ceiling: a processor runs on its own
+  pool, and a site pauses, rather than buy above it. [FINANCE.md](FINANCE.md) § Standing-force
+  upkeep owns the rule.
 
 **This is the exact mirror of a rule the market already has.** Step 11's `floor_price` is a
 seller's reservation — *"hold rather than sell below this"*, never a price the market is made to
