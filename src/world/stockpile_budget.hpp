@@ -298,22 +298,26 @@ std::vector<std::int64_t> stockpile_region_reach(const world& w, const std::vect
 // (whose prices have no shipped default by design). Every one is RULED
 // (INDUSTRIALISATION.md § 1): the specialist's price anchored to the seat menu and the
 // square root's base (Ben, 2026-09-21, NR-910), the density ceiling (NR-902).
-// The FIRM price is not a constant at all: it is derived from the world's own
-// stockpile by `k_stockpile_price_divisor` (above, NR-907). They are read only
+// The FIRM price is not a constant at all: it is derived from the stockpile
+// within each centre's trade reach by `k_stockpile_price_divisor` (above, NR-907;
+// the reach is BL-1168's, Ben 2026-10-03). They are read only
 // when the budget is non-empty — a world the Industrialisation span ran on; with the
 // span off no price is read.
 
-/// Firm charters one specialist costs: TWO (Ben, 2026-09-21, NR-910). A
-/// specialist's price is this many DERIVED firm prices (BL-1039's structure,
-/// NR-907), and this is the knob anchored to the SEAT MENU (Ben, 2026-09-18 and
-/// 2026-09-21, NR-908): with the divisor above, it sets the share of the stock a
-/// seat costs, and the seats turn on the ratio d/m alone. Whole charters are too
-/// coarse to land the anchor on their own — at the divisor that runs the legacy
-/// tick, three open a median of about four seats and two about thirteen — so the
-/// divisor takes the last step (above).
+/// Firm charters one specialist costs: 44 (Ben, 2026-10-03, option a; BL-1168
+/// folding BL-1151). A specialist's price is this many DERIVED firm prices
+/// (BL-1039's structure, NR-907), and this is the knob anchored to the SEAT MENU
+/// (Ben, 2026-09-18 and 2026-09-21, NR-908): with the divisor above, it sets the
+/// share of the stock a seat costs, and the seats turn on the ratio d/m alone.
 ///
-/// RE-ANCHORED TO 44 (BL-1168 folding BL-1151, 2026-10-03; Ben to ratify — it
-/// moves NR-910's pin of two). The rule is NR-908's: this knob answers the seat
+/// PROVENANCE: NR-910 (Ben, 2026-09-21) pinned this at TWO under the world's
+/// price, with the divisor taking the last step to the anchor (whole charters
+/// were too coarse: at the divisor that runs the legacy tick, three opened a
+/// median of about four seats and two about thirteen). That pin is OVERTURNED
+/// (Ben, 2026-10-03, option a), the divisor's 650 kept.
+///
+/// RE-ANCHORED TO 44 (SETTLED, Ben 2026-10-03, option a: seats move off the
+/// heartland). The rule is NR-908's: this knob answers the seat
 /// menu, the divisor answers live-play cost. The anchor is the NO-BUDGET world
 /// of the shipped arc (the span on, no budget: the world NR-910's fallback
 /// lays), whose library median is 8 seats (16 seeds; the span-off legacy

@@ -277,8 +277,9 @@ price, in firm charters, is the one at which the median library world offers abo
 a world with no budget does. The number is read on real stockpiles.
 
 **SETTLED (Ben, 2026-09-21, NR-907): the price is a SHARE OF THE WORLD'S OWN STOCKPILE, not a fixed
-number of points.** A charter's price is the world's whole industry stockpile divided by a constant,
-fixed once when the budget is built; a specialist still costs its whole number of firm charters. So
+number of points.** *Whose stock is narrowed (Ben, 2026-10-03): the stock is the one within the
+centre's trade reach, not the world's — below.* A charter's price is the stockpile divided by a
+constant, fixed once when the budget is built; a specialist still costs its whole number of firm charters. So
 the size of a world's stockpile no longer decides the size of its menu, and the price is a derived
 number rather than a clamp on the outcome. It does not make the menu the same size everywhere: how
 many near-equal cities a world holds still decides how many cross the price together, and NR-910
@@ -288,31 +289,41 @@ seats a fixed price opens track that stockpile almost proportionally, while the 
 does not track it at all — seed 31 holds 95.3M points and offers 6 legacy seats, seed 9 holds 27.5M
 and offers 16. At 40000 points a firm the poorest world offered 1 seat and the richest 91, against
 an anchor median of 9; no single number sits inside both tails. The constant itself is read off the
-sweep and pinned at the re-bless. **Whose stock is narrowed (Ben, 2026-10-03):** a centre pays a share of the stock within its own trade reach, not the world's (§ Industry spreads beyond its heartland); the divisor and the charters are the same knobs.
+sweep and pinned at the re-bless. **Whose stock is narrowed (Ben, 2026-10-03):** a centre pays a
+share of the stock within its own trade reach, not the world's (§ Industry spreads beyond its
+heartland); the divisor and the charters are the same knobs. **The reach is the LANDMASS** the
+centre stands on — every point of the stockpile counted where it stands, the razed and dropped
+included — and a centre with no landmass pays the world's price, which is the dearest. A market's
+catchment, the ruling's other reading, is kept as a measurement and does not price.
 
 **SETTLED (Ben, 2026-09-21, NR-908): the divisor answers LIVE-PLAY COST, and the specialist's
 price answers the SEAT MENU.** Once the price is a share of the stock, a centre affords a
 specialist when its points cover the specialist's firm charters over the divisor, as a share of
-the world's stock. So the seat menu turns on that ratio alone, and the price in firm charters is
+the stock it is priced by (the world's when this was ruled; its trade reach's since 2026-10-03). So
+the seat menu turns on that ratio alone, and the price in firm charters is
 the knob the seat-menu anchor sets; measured on the library (BL-1043 stage 2 and the seat curve),
-the anchor's nine seats sit near a ratio of 290 (divisor over charters). The divisor alone sets
-how many firm charters a world's stock buys, which is its density and so its tick, and it is set
+the anchor's nine seats sat near a ratio of 290 (divisor over charters) under the world's price.
+The divisor alone sets how many firm charters a stock buys, which is its density and so its tick, and it is set
 against live-play cost. Each knob has one job; a divisor tuned to the seat menu would leave density
 with no knob at all.
 
-**PROPOSED (2026-10-03, BL-1168 folding BL-1151; Ben to ratify): under the reach price the charters
+**SETTLED (Ben, 2026-10-03, option a; BL-1168 folding BL-1151): under the reach price the charters
 carry the anchor.** Priced by its trade reach, the median library world affords a specialist at about
 158 centres at two charters, against a no-budget world of 8 (the shipped arc's span-on fallback
 world; the span-off legacy roster opens 12). The divisor alone would need about 36 to reach it, and
 there the web starves — 14 to 80 background firms where 650 fills the 120 ceiling. So NR-908's own
 knob takes it: **44 charters**, the first whole number at which the median library world opens the
 no-budget world's 8 seats, with the divisor held at 650 for live-play cost. The spread runs 1 to 29
-seats; a world of one landmass whose capital towers offers one.
+seats; a world of one landmass whose capital towers offers one. Seats move off the heartland: at
+44 charters almost no centre on a world's richest landmass affords one, because there the reach is
+dearest.
 
-**SETTLED (Ben, 2026-09-21, NR-910): the pins.** A specialist costs **two** firm charters. The
+**SETTLED (Ben, 2026-09-21, NR-910): the pins.** *The charter pin is OVERTURNED (Ben, 2026-10-03,
+option a, above): a specialist costs 44 firm charters, not two; the divisor pin of 650 and the
+rest of this ruling stand.* As ruled, a specialist cost two firm charters. The
 charter count moves in whole charters, which is too coarse to land the anchor on its own, so the
 divisor takes the last step, inside the band live-play cost allows: it is **the divisor at which
-the median library world, at two charters, opens the anchor's nine seats**. The rule is read on the
+the median library world, at the charters then pinned, opens the anchor's nine seats**. The rule is read on the
 world that ships (Ben, 2026-09-22, NR-914): **650**, the first divisor at which the median library
 world opens nine and none opens none, at about 0.91 of the legacy world's tick. (Read on a world
 without BL-1037's corridor tier the same rule gave 580; the tier moves every stockpile.) The step
@@ -320,7 +331,8 @@ past it is steep — at 660 the median jumps to thirteen and a half, as a world 
 crosses the price together. **The seat spread is accepted:** the anchor is a median, and a world
 with many cities near the line offers more seats than one whose capital towers over the rest — at
 the pinned price the library runs from four seats to ninety-eight. That is the world talking, not a
-menu to be capped. **A world whose budget opens no specialist falls
+menu to be capped (those figures are the world's price at two charters; at the reach price and 44
+the library runs from one seat to twenty-nine). **A world whose budget opens no specialist falls
 back to the world it would have built with no budget**, exactly as a refused spend does, decided
 from the budget before anything is chartered; above a ratio of about 325 no library world opens
 none. Affording is not placing: a centre that affords a specialist and finds no ground for one
@@ -733,7 +745,9 @@ exploit polities far away."*
 centre's charters are priced as a share of the stock within its trade reach — its landmass, or its
 market's catchment — not of the whole world's. Capital is dear where it is scarce and cheap where it
 is all that is around, so a far landmass with little capital still charters its own firms rather
-than being priced out by a richer continent's stock.
+than being priced out by a richer continent's stock. **The reach that prices is the landmass**
+(§ 1); the span's works notes read the same reach's running stock (§ Beat 1), so the span and the
+close price one stock by one divisor.
 
 **SETTLED (Ben, 2026-10-03): a crowded heartland yields less.** A treasury's points convert at a
 lower rate where a region is already crowded with capital — industry points standing on it per

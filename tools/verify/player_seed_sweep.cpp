@@ -711,7 +711,9 @@ const std::vector<world_digest_pin> k_world_digest_pins = {
 // THE SHIPPED ARC'S PINS (BL-1044) — the same sixteen library worlds on the
 // world the player is handed since BL-1044: the Industrialisation span and BL-1037's
 // tier on, the charter web bought from the world's own stockpile at the ruled
-// prices (divisor 650, two firm charters a specialist; NR-910, NR-914).
+// prices as they stood when the table was taken (divisor 650, two firm charters a
+// specialist; NR-910, NR-914 — the charter pin is 44 since Ben's 2026-10-03 ruling,
+// option a, and the price reads the centre's trade reach, BL-1168).
 //
 // PROVENANCE. Taken 2026-09-22 by `player_seed_sweep --digest` (shipped arc,
 // the library seeds, 3383 s), re-bless authorised by Ben at BL-1044's Gate 2,
