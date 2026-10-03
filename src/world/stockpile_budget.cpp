@@ -48,66 +48,6 @@ stockpile_budget rejected_budget(std::int64_t points_total, std::vector<stockpil
 
 } // namespace
 
-namespace {
-
-/// The home body's raster, read once for a reach: each cell's tile (null where
-/// none) and, under `landmass`, the landmass labels over its substrate. Filled
-/// by grid position, so no iteration order of the tile map reaches it; a cell no
-/// tile fills reads as ocean and holds no tile.
-struct reach_raster
-{
-    int                    gw = 0, gh = 0;
-    std::vector<entity_id> tile_at;
-    std::vector<int32_t>   labels;   ///< `landmass` only
-    bool ok() const { return gw > 0 && gh > 0; }
-};
-
-reach_raster read_reach_raster(const world& w, charter_price_reach reach)
-{
-    reach_raster r;
-    if (reach == charter_price_reach::world)
-        return r;
-    const auto b = w.bodies.find(w.home_body);
-    if (b == w.bodies.end() || b->second.grid_width <= 0 || b->second.grid_height <= 0)
-        return r;
-    r.gw = b->second.grid_width;
-    r.gh = b->second.grid_height;
-    const std::size_t cells = static_cast<std::size_t>(r.gw) * static_cast<std::size_t>(r.gh);
-    std::vector<terrain_substrate> substrate(cells, terrain_substrate::ocean);
-    r.tile_at.assign(cells, null_entity);
-    for (const auto& [tid, t] : w.tiles)
-    {
-        if (t.body != w.home_body || t.grid_x < 0 || t.grid_y < 0 || t.grid_x >= r.gw || t.grid_y >= r.gh)
-            continue;
-        const std::size_t i = static_cast<std::size_t>(t.grid_y) * static_cast<std::size_t>(r.gw)
-                            + static_cast<std::size_t>(t.grid_x);
-        substrate[i] = t.substrate;
-        r.tile_at[i] = tid;
-    }
-    if (reach == charter_price_reach::landmass)
-        r.labels = landmass_labels(substrate, r.gw, r.gh);
-    return r;
-}
-
-/// The reach key at grid cell (@p col, @p row): its landmass (`landmass_at`, so
-/// a place on the sea reads the land it borders), or the market its tile
-/// clears at; -1 where it has none.
-std::int64_t reach_key_at(const world& w, const reach_raster& r, charter_price_reach reach, int col, int row)
-{
-    if (!r.ok() || col < 0 || row < 0 || col >= r.gw || row >= r.gh)
-        return -1;
-    if (reach == charter_price_reach::landmass)
-        return landmass_at(r.labels, r.gw, r.gh, col, row);
-    const entity_id tid = r.tile_at[static_cast<std::size_t>(row) * static_cast<std::size_t>(r.gw)
-                                    + static_cast<std::size_t>(col)];
-    if (tid == null_entity)
-        return -1;
-    const entity_id m = market_for_tile(w, tid);
-    return m != null_entity ? static_cast<std::int64_t>(m) : -1;
-}
-
-} // namespace
-
 std::vector<std::int64_t> stockpile_region_reach(const world& w, charter_price_reach reach)
 {
     const settlement_state* ss = w.gen_settlement.get();
@@ -120,76 +60,69 @@ std::vector<std::int64_t> stockpile_region_reach(const world& w, const std::vect
                                                  charter_price_reach reach)
 {
     std::vector<std::int64_t> out;
-    const reach_raster r = read_reach_raster(w, reach);
-    if (!r.ok())
+    if (reach == charter_price_reach::world)
         return out;
+    const auto b = w.bodies.find(w.home_body);
+    if (b == w.bodies.end())
+        return out;
+    const int gw = b->second.grid_width, gh = b->second.grid_height;
+    if (gw <= 0 || gh <= 0)
+        return out;
+
+    // The home body's raster, filled by grid position: no iteration order of
+    // the tile map reaches it. A cell no tile fills reads as ocean (sea) and
+    // holds no tile.
+    const std::size_t cells = static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh);
+    std::vector<terrain_substrate> substrate(cells, terrain_substrate::ocean);
+    std::vector<entity_id>         tile_at(cells, null_entity);
+    for (const auto& [tid, t] : w.tiles)
+    {
+        if (t.body != w.home_body || t.grid_x < 0 || t.grid_y < 0 || t.grid_x >= gw || t.grid_y >= gh)
+            continue;
+        const std::size_t i = static_cast<std::size_t>(t.grid_y) * static_cast<std::size_t>(gw)
+                            + static_cast<std::size_t>(t.grid_x);
+        substrate[i] = t.substrate;
+        tile_at[i]   = tid;
+    }
+
     out.assign(regions.size(), -1);
-    for (std::size_t i = 0; i < regions.size(); ++i)
-        out[i] = reach_key_at(w, r, reach, regions[i].col, regions[i].row);
-    return out;
-}
-
-namespace {
-
-std::map<entity_id, std::int64_t> centre_reach_on(const world& w, const reach_raster& r,
-                                                  charter_price_reach reach)
-{
-    std::map<entity_id, std::int64_t> out;
-    if (!r.ok())
-        return out;
-    for (const auto& [centre, slot] : w.gen_carve_centres)   // std::map: ascending centre id
+    if (reach == charter_price_reach::landmass)
     {
-        (void)slot;
-        const auto ct = w.population_centre_tile.find(centre);
-        if (ct == w.population_centre_tile.end())
-            continue;
-        const auto t = w.tiles.find(ct->second);
-        if (t == w.tiles.end() || t->second.body != w.home_body)
-            continue;
-        const std::int64_t k = reach_key_at(w, r, reach, t->second.grid_x, t->second.grid_y);
-        if (k >= 0)
-            out[centre] = k;
-    }
-    return out;
-}
-
-} // namespace
-
-std::map<entity_id, std::int64_t> stockpile_centre_reach(const world& w, charter_price_reach reach)
-{
-    return centre_reach_on(w, read_reach_raster(w, reach), reach);
-}
-
-stockpile_budget build_stockpile_budget_for_regions(const world& w, const std::vector<region>& regions,
-                                                    std::int64_t price_divisor, charter_price_reach reach)
-{
-    // One raster for both readings: each region's anchor and each carved
-    // centre's own tile. No home-body grid to read a reach off (a hand-built
-    // fixture): every centre pays the world's price, and the budget says `world`.
-    const reach_raster r = read_reach_raster(w, reach);
-    std::vector<std::int64_t>         region_reach;
-    std::map<entity_id, std::int64_t> centre_reach;
-    if (r.ok())
-    {
-        region_reach.assign(regions.size(), -1);
+        const std::vector<int32_t> labels = landmass_labels(substrate, gw, gh);
         for (std::size_t i = 0; i < regions.size(); ++i)
-            region_reach[i] = reach_key_at(w, r, reach, regions[i].col, regions[i].row);
-        centre_reach = centre_reach_on(w, r, reach);
+            out[i] = landmass_at(labels, gw, gh, regions[i].col, regions[i].row);
     }
-    const bool read = reach != charter_price_reach::world && r.ok();
-    return build_stockpile_budget(&regions, w.gen_carve_centres, w.gen_carve_dropped, price_divisor,
-                                  read ? &region_reach : nullptr,
-                                  read ? reach : charter_price_reach::world,
-                                  read ? &centre_reach : nullptr);
+    else
+    {
+        for (std::size_t i = 0; i < regions.size(); ++i)
+        {
+            const region& rg = regions[i];
+            if (rg.col < 0 || rg.row < 0 || rg.col >= gw || rg.row >= gh)
+                continue;
+            const entity_id tid = tile_at[static_cast<std::size_t>(rg.row) * static_cast<std::size_t>(gw)
+                                          + static_cast<std::size_t>(rg.col)];
+            if (tid == null_entity)
+                continue;
+            const entity_id m = market_for_tile(w, tid);
+            if (m != null_entity)
+                out[i] = static_cast<std::int64_t>(m);
+        }
+    }
+    return out;
 }
 
 stockpile_budget build_stockpile_budget(const world& w, std::int64_t price_divisor,
                                         charter_price_reach reach)
 {
     const settlement_state* ss = w.gen_settlement.get();
-    if (ss == nullptr)
-        return stockpile_budget{};   // no settlement record: no stockpile, nothing to account
-    return build_stockpile_budget_for_regions(w, ss->regions, price_divisor, reach);
+    // No home-body grid to read a reach off (a hand-built fixture): every
+    // centre pays the world's price, and the budget says `world`.
+    const std::vector<std::int64_t> region_reach = stockpile_region_reach(w, reach);
+    const bool read = reach != charter_price_reach::world && !region_reach.empty();
+    return build_stockpile_budget(ss != nullptr ? &ss->regions : nullptr,
+                                  w.gen_carve_centres, w.gen_carve_dropped, price_divisor,
+                                  read ? &region_reach : nullptr,
+                                  read ? reach : charter_price_reach::world);
 }
 
 stockpile_budget build_stockpile_budget(const std::vector<region>*             regions,
@@ -197,16 +130,13 @@ stockpile_budget build_stockpile_budget(const std::vector<region>*             r
                                         const std::vector<carve_dropped_slot>& dropped,
                                         std::int64_t                           price_divisor,
                                         const std::vector<std::int64_t>*       region_reach,
-                                        charter_price_reach                    reach,
-                                        const std::map<entity_id, std::int64_t>* centre_reach)
+                                        charter_price_reach                          reach)
 {
     stockpile_budget out;
     if (regions == nullptr)
         return out;   // a loaded world or a fixture: no stockpile, nothing to account
     if (reach == charter_price_reach::world)
         region_reach = nullptr;
-    if (region_reach == nullptr)
-        centre_reach = nullptr;   // a centre's key refines its region's; with none, no reach is read
 
     // --- the stock, per region ----------------------------------------------
     std::vector<stockpile_region_row> rows;
@@ -396,57 +326,28 @@ stockpile_budget build_stockpile_budget(const std::vector<region>*             r
     }
     else if (region_reach != nullptr)
     {
-        // BL-1168 — THE PRICE BY TRADE REACH. A reach's stock is every point
-        // standing on it: a founded centre's share on its OWN tile's reach
-        // (`centre_reach`; a carved centre can stand on another landmass than
-        // its region's anchor — an islet off the coast), and the rest of each
-        // region's points — the dropped slots' shares, the razed and residual
-        // points — on the region anchor's reach. A centre pays its own reach's
-        // stock over the divisor, floored, at least 1; a reach's stock is at
-        // most the world's, so its price is at most the world's; a centre with
-        // no reach (neither its tile nor its region has one) pays the world's.
+        // BL-1168 — THE PRICE BY TRADE REACH: each reach's stock is every
+        // region's points on it (the ones no centre took included, as the
+        // world price counts them), and a centre pays its region's reach's
+        // stock over the divisor. A reach's stock is at most the world's, so
+        // its price is at most the world's; a centre whose region has no reach
+        // pays the world's.
         if (region_reach->size() != regions->size())
             return rejected_budget(total, std::move(rows),
                                    "the region reach keys do not match the settlement record");
         out.reach = reach;
-        const auto key_of_centre = [&](entity_id centre) -> std::int64_t {
-            if (centre_reach != nullptr)
-            {
-                const auto ck = centre_reach->find(centre);
-                if (ck != centre_reach->end() && ck->second >= 0)
-                    return ck->second;
-            }
-            const auto slot = founded.find(centre);   // every budgeted centre is a founded slot
-            return (slot != founded.end())
-                ? (*region_reach)[static_cast<std::size_t>(slot->second.region)] : -1;
-        };
         for (const stockpile_region_row& row : rows)
         {
             const std::int64_t key = (*region_reach)[static_cast<std::size_t>(row.region)];
             if (key >= 0)
                 out.reach_stock[key] += row.points;   // <= total <= 2^62: no overflow
         }
-        // Move each founded share whose centre stands on another reach than
-        // its region's anchor: off the anchor's reach, onto its own.
-        for (const auto& [centre, share] : centre_points)
-        {
-            const auto slot = founded.find(centre);
-            if (slot == founded.end() || share == 0)
-                continue;
-            const std::int64_t from = (*region_reach)[static_cast<std::size_t>(slot->second.region)];
-            const std::int64_t to   = key_of_centre(centre);
-            if (to == from)
-                continue;
-            if (from >= 0)
-                out.reach_stock[from] -= share;
-            if (to >= 0)
-                out.reach_stock[to] += share;
-            ++out.centres_off_anchor;
-        }
         for (const auto& [centre, pts] : out.budget.points())
         {
             (void)pts;
-            const std::int64_t key = key_of_centre(centre);
+            const auto slot = founded.find(centre);   // every budgeted centre is a founded slot
+            const std::int64_t key = (slot != founded.end())
+                ? (*region_reach)[static_cast<std::size_t>(slot->second.region)] : -1;
             out.centre_reach[centre] = key;
             std::int64_t p = out.firm_price_points;
             if (key >= 0)

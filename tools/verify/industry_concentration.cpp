@@ -202,10 +202,8 @@ int main(int argc, char** argv)
             int differ = 0;
             for (std::size_t i = 0; i < R.size() && i < reach.size(); ++i)
                 if (reach[i] != reg_lm[i]) ++differ;
-            std::printf("REACH seed=%u regions=%zu landmass_differs_from_sim=%d centres_off_anchor=%d "
-                        "centres_unreached=%d reaches=%zu\n", seed, R.size(),
-                        reach.size() == R.size() ? differ : -1, out->land.stockpile.centres_off_anchor,
-                        out->land.stockpile.centres_unreached, out->land.stockpile.reach_stock.size());
+            std::printf("REACH seed=%u regions=%zu landmass_differs_from_sim=%d\n", seed, R.size(),
+                        reach.size() == R.size() ? differ : -1);
             // A GATE, not a reading: the span's works notes and the close's
             // price must read one reach (NR-907's one-divisor rule, carried to
             // the reach by BL-1168), so a region the two place on different

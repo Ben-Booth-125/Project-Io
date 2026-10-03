@@ -2416,34 +2416,17 @@ std::string stockpile_price_failure(const world& w, const stockpile_budget& sb,
             const std::vector<std::int64_t> key = stockpile_region_reach(w, sb.reach);
             if (key.size() != regs.size())
                 return " price: the reach keys do not cover the settlement record;";
-            // A centre standing off its anchor's reach is priced by its own
-            // tile's, and its share is counted there (`stockpile_centre_reach`).
-            const std::map<entity_id, std::int64_t> own = stockpile_centre_reach(w, sb.reach);
-            const auto region_key = [&](entity_id centre) -> std::int64_t {
-                const auto slot = w.gen_carve_centres.find(centre);
-                return (slot != w.gen_carve_centres.end() && slot->second.region >= 0
-                        && static_cast<std::size_t>(slot->second.region) < key.size())
-                    ? key[static_cast<std::size_t>(slot->second.region)] : -1;
-            };
-            const auto centre_key = [&](entity_id centre) -> std::int64_t {
-                const auto o = own.find(centre);
-                return o != own.end() && o->second >= 0 ? o->second : region_key(centre);
-            };
             std::map<std::int64_t, long long> stock;
             for (std::size_t i = 0; i < regs.size(); ++i)
                 if (key[i] >= 0) stock[key[i]] += regs[i].industry_points;
-            for (const auto& [centre, pts] : sb.budget.points())
-            {
-                const std::int64_t from = region_key(centre), to = centre_key(centre);
-                if (from == to) continue;
-                if (from >= 0) stock[from] -= pts;
-                if (to >= 0) stock[to] += pts;
-            }
             int wrong = 0, unreached = 0;
             for (const auto& [centre, pts] : sb.budget.points())
             {
                 (void)pts;
-                const std::int64_t k = centre_key(centre);
+                const auto slot = w.gen_carve_centres.find(centre);
+                const std::int64_t k = (slot != w.gen_carve_centres.end() && slot->second.region >= 0
+                                        && static_cast<std::size_t>(slot->second.region) < key.size())
+                    ? key[static_cast<std::size_t>(slot->second.region)] : -1;
                 long long want_c = want;
                 if (k >= 0)
                     want_c = std::min<long long>(want, std::max<long long>(1, stock[k] / cfg.price_divisor));
