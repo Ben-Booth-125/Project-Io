@@ -353,6 +353,12 @@ touch — as the old-road stamp does (§ 4a), which is where tribute and trade f
 readings, NR-955). A laned sea tile's traversal cost is **halved** (× 0.50): the lane is the road
 ladder's second rung on water, as four uses make a Road on land.
 
+**Lanes reuse lanes, as roads reuse roads (Ben, 2026-10-03).** Lanes are walked busiest first — most
+uses, ties by the leg's two regions — and a walk enters water an earlier lane already laid at half
+its priced step (`kSeaLaneReuseCostQ` = 500, the lane's own × 0.50 read as a traveller reads it).
+So lanes into one port share a trunk near it and fan out far from it, and the map shows a network
+rather than a fan of parallel lines. At 1000 every lane is walked alone.
+
 **A tie is therefore a force on the map, never a preference inside an actor.** Because § 1 is one
 weight function, a lane is read by everything that reads traversal cost: a convoy between a
 colony's market and its metropole's lands cheaper than one to a stranger's, so a colony's chains

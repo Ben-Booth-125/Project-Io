@@ -26,6 +26,11 @@
 //       walked both ways
 //   R6  the pick measures across the column seam
 //   R7  no realm table handed: counted as its own reason, never as unheld
+//   T1  lanes reuse lanes (kSeaLaneReuseCostQ): two lanes into one port share
+//       their last tiles, where walked alone they meet only at the port
+//   T2  a reuse cost of 1000 (no discount) is the plain stamp: every lane the
+//       plain walk, the field their union
+//   T3  the busiest lane is walked first, whatever order the record arrives in
 //   W0  the realms handed the stamp are the last close's region owners
 //   W1  on a generated 1960 world lanes are stamped (count reported), only on
 //       sea tiles, and no road lies on water (the road lens has none to draw);
@@ -46,6 +51,11 @@
 //       straight line port to port (tiles), the still-water walk's own offset,
 //       and the mean separation between the two walks -- per seed, reported
 //
+// --ladder Q1,Q2,..  re-stamps each seed's lane record at each reuse cost
+//   (per mille; 1000 = no reuse) and prints the trunk reading per rung.
+// --census  per seed, the lanes the 1660 and the 1960 closes earn: by writer,
+//   length in sea steps, longest, cross-landmass; contact and trade across
+//   landmasses at each close. Report only.
 // --picture SEED --png PATH  draws the body's ground, the current field (one
 //   arrow per ocean region) and the stamped lanes.
 //
@@ -79,7 +89,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <array>
 #include <map>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -365,6 +377,172 @@ void realm_port_rows()
 }
 
 // ---------------------------------------------------------------------------
+// T1-T3: lanes reuse lanes, so lanes into one port share a trunk near it
+// ---------------------------------------------------------------------------
+
+/// What the lane field looks like as a network: how much water the lanes lay,
+/// and how much of it lanes meeting at a port share.
+struct trunk_read
+{
+    long long path_tiles   = 0;   ///< tiles over every laid lane (a shared tile per lane)
+    int       lane_tiles   = 0;   ///< distinct lane tiles
+    int       ports        = 0;   ///< port tiles some laid lane ends on
+    int       max_per_port = 0;   ///< the most lanes ending on one port
+    double    per_port     = 0.0; ///< mean laid lanes per port
+    int       pairs        = 0;   ///< pairs of lanes ending on one port
+    double    mean_shared  = 0.0; ///< mean tiles such a pair shares outward from the port (port excluded)
+    int       pairs_3      = 0;   ///< of the pairs, those sharing 3 tiles or more
+};
+
+/// The tiles two lanes meeting at @p port share outward from it, the port itself
+/// excluded: their common run, each path read from the port end.
+int shared_from_port(const std::vector<int>& a, const std::vector<int>& b, int port)
+{
+    std::vector<int> x = a, y = b;
+    if (!x.empty() && x.front() != port) std::reverse(x.begin(), x.end());
+    if (!y.empty() && y.front() != port) std::reverse(y.begin(), y.end());
+    if (x.empty() || y.empty() || x.front() != port || y.front() != port) return 0;
+    std::size_t k = 0;
+    while (k < x.size() && k < y.size() && x[k] == y[k]) ++k;
+    return k > 0 ? static_cast<int>(k) - 1 : 0;
+}
+
+trunk_read read_trunks(const sea_lane_stats& st, const sea_lane_trace& tr)
+{
+    trunk_read r;
+    r.path_tiles = st.path_tiles;
+    r.lane_tiles = st.lane_tiles;
+    std::map<int, std::vector<std::size_t>> at; // port -> lanes ending there
+    for (std::size_t i = 0; i < tr.lanes.size(); ++i)
+    {
+        at[tr.lanes[i].from_port].push_back(i);
+        at[tr.lanes[i].to_port].push_back(i);
+    }
+    long long shared = 0, lanes_at = 0;
+    for (const auto& [port, ls] : at)
+    {
+        ++r.ports;
+        lanes_at += static_cast<long long>(ls.size());
+        r.max_per_port = std::max(r.max_per_port, static_cast<int>(ls.size()));
+        for (std::size_t i = 0; i < ls.size(); ++i)
+            for (std::size_t j = i + 1; j < ls.size(); ++j)
+            {
+                const int s = shared_from_port(tr.lanes[ls[i]].path, tr.lanes[ls[j]].path, port);
+                ++r.pairs;
+                shared += s;
+                if (s >= 3) ++r.pairs_3;
+            }
+    }
+    r.per_port = r.ports > 0 ? static_cast<double>(lanes_at) / r.ports : 0.0;
+    r.mean_shared = r.pairs > 0 ? static_cast<double>(shared) / r.pairs : 0.0;
+    return r;
+}
+
+void print_trunks(const char* tag, const trunk_read& r)
+{
+    std::printf("      %s path tiles %lld, distinct lane tiles %d, ports %d (lanes per port %.2f, max %d),"
+                " port-sharing lane pairs %d sharing %.2f tiles out from the port on average (%d share 3+)\n",
+                tag, r.path_tiles, r.lane_tiles, r.ports, r.per_port, r.max_per_port, r.pairs, r.mean_shared, r.pairs_3);
+}
+
+struct trunk_case
+{
+    sea_lane_stats st;
+    sea_lane_trace tr;
+    std::vector<uint8_t> field;
+};
+
+/// Still water, 40 x 30, with an island in cols 15-25, rows 10-20. A hub seat south
+/// of it at (20,25); two seats north of it, (12,5) west of the island's middle and
+/// (23,5) east of it, each on the sea, so each seat is its own port. Walked alone,
+/// the west seat goes round the island's west side and the east seat round its east
+/// side, meeting only by the hub; the busier west lane walked first, the east one
+/// crosses over to ride it round the west side.
+trunk_case stamp_trunk_case(int reuse_cost_q, std::vector<uint8_t>* sea_out = nullptr)
+{
+    constexpr int gw = 40, gh = 30;
+    world fw;
+    const entity_id fbody = fw.create_entity();
+    body_component bc{};
+    bc.grid_width = gw;
+    bc.grid_height = gh;
+    fw.bodies[fbody] = bc;
+    for (int r = 0; r < gh; ++r)
+        for (int c = 0; c < gw; ++c)
+        {
+            const bool island = c >= 15 && c <= 25 && r >= 10 && r <= 20;
+            const entity_id id = fw.create_entity();
+            tile_component t{};
+            t.body = fbody; t.grid_x = c; t.grid_y = r;
+            t.substrate = island ? terrain_substrate::sedimentary : terrain_substrate::ocean;
+            t.landform = terrain_landform::plains;
+            fw.tiles.emplace(id, t);
+        }
+    if (sea_out != nullptr)
+    {
+        sea_out->assign(static_cast<std::size_t>(gw) * gh, 1);
+        for (int r = 10; r <= 20; ++r)
+            for (int c = 15; c <= 25; ++c) (*sea_out)[static_cast<std::size_t>(r) * gw + c] = 0;
+    }
+    const std::vector<history_road_node> nodes = { {20, 25, 0}, {23, 5, 0}, {12, 5, 0} };
+    // The record arrives sorted by (a, b), NOT by uses: the stamp orders it itself,
+    // so the 10-use west lane (0-2) walks before the 8-use east lane (0-1).
+    const std::vector<sea_leg> legs = { sea_leg{0, 1, 8}, sea_leg{0, 2, 10} };
+    trunk_case k;
+    stamp_sea_lanes(fw, fbody, nodes, legs, {}, 4, /*weight=*/0, 1, &k.st, &k.tr, reuse_cost_q);
+    const std::vector<entity_id>& grid = body_tile_grid(fw, fbody);
+    k.field.assign(static_cast<std::size_t>(gw) * gh, 0);
+    for (int i = 0; i < gw * gh; ++i) k.field[static_cast<std::size_t>(i)] = fw.tiles.at(grid[static_cast<std::size_t>(i)]).lane_level;
+    return k;
+}
+
+void trunk_rows()
+{
+    std::printf("\n--- T1-T3: lanes reuse lanes, so lanes into one port share a trunk (kSeaLaneReuseCostQ %d) ---\n",
+                kSeaLaneReuseCostQ);
+    constexpr int gw = 40, gh = 30;
+    const int hub = 25 * gw + 20;
+    std::vector<uint8_t> sea;
+    const trunk_case on  = stamp_trunk_case(kSeaLaneReuseCostQ, &sea);
+    const trunk_case off = stamp_trunk_case(1000);
+    const auto lane_of = [](const trunk_case& k, int a, int b) -> const sea_lane_trace::lane* {
+        for (const sea_lane_trace::lane& ln : k.tr.lanes) if (ln.a == a && ln.b == b) return &ln;
+        return nullptr;
+    };
+    const sea_lane_trace::lane* on1 = lane_of(on, 0, 1);
+    const sea_lane_trace::lane* on2 = lane_of(on, 0, 2);
+    const sea_lane_trace::lane* off1 = lane_of(off, 0, 1);
+    const sea_lane_trace::lane* off2 = lane_of(off, 0, 2);
+    const int shared_on  = on1 && on2 ? shared_from_port(on1->path, on2->path, hub) : -1;
+    const int shared_off = off1 && off2 ? shared_from_port(off1->path, off2->path, hub) : -1;
+    std::printf("      lanes 0-1 and 0-2 into the hub share their last %d tiles with reuse, %d without;"
+                " lane tiles %d with reuse, %d without\n", shared_on, shared_off, on.st.lane_tiles, off.st.lane_tiles);
+    print_trunks("reuse:   ", read_trunks(on.st, on.tr));
+    print_trunks("no reuse:", read_trunks(off.st, off.tr));
+    check(on.st.laid == 2 && on1 && on2 && on1->to_port == hub && on2->to_port == hub && shared_on >= 20
+          && shared_off <= 6 && on.st.lane_tiles < off.st.lane_tiles,
+          "T1  two lanes into one port share their last 20+ tiles once lanes reuse lanes (6 or fewer walked"
+          " alone), and lay less water");
+    // T2: no reuse is today's stamp: every lane is the plain walk between its ports,
+    // and the field is their union.
+    bool plain = off.st.laid == 2 && static_cast<int>(off.tr.lanes.size()) == 2;
+    std::vector<uint8_t> uni(sea.size(), 0);
+    for (const sea_lane_trace::lane& ln : off.tr.lanes)
+    {
+        if (ln.path != sea_lane_walk(sea, gw, gh, nullptr, 0, ln.from_port, ln.to_port)) plain = false;
+        for (const int t : ln.path) uni[static_cast<std::size_t>(t)] = 1;
+    }
+    check(plain && uni == off.field,
+          "T2  at a reuse cost of 1000 (no discount) every lane is the plain walk and the field is their union:"
+          " today's stamp");
+    // T3: busiest first -- the 10-use lane (0-2) walks on empty water, so it is the
+    // plain walk even with reuse on, and the trace lists it first.
+    const bool first = !on.tr.lanes.empty() && on.tr.lanes.front().a == 0 && on.tr.lanes.front().b == 2;
+    check(first && on2 && on2->path == sea_lane_walk(sea, gw, gh, nullptr, 0, on2->from_port, on2->to_port),
+          "T3  the busiest lane is walked first, on empty water, whatever order the record arrives in");
+}
+
+// ---------------------------------------------------------------------------
 // S1-S3: synthetic ground
 // ---------------------------------------------------------------------------
 
@@ -540,6 +718,7 @@ void synthetic_rows()
     }
 
     realm_port_rows();
+    trunk_rows();
 }
 
 // ---------------------------------------------------------------------------
@@ -698,6 +877,7 @@ void world_rows(shipped_inputs& shipped, uint32_t seed)
                 st.same_port, st.unreachable, st.moved_ends, st.path_tiles, st.lane_tiles, stamp_ms);
     check(restamped == generated && st.lane_tiles == lane_tiles,
           "W2  re-stamping the world's own lane record reproduces its lane field exactly");
+    print_trunks("trunks:", read_trunks(st, tr));
     // A world whose record earned no lane with a port at both ends legitimately
     // stamps none; one that laid any carries lane tiles on its 1960 map.
     check((lane_tiles > 0) == (st.laid > 0),
@@ -959,6 +1139,222 @@ void world_rows(shipped_inputs& shipped, uint32_t seed)
 }
 
 // ---------------------------------------------------------------------------
+// --ladder: the reuse cost read on generated worlds
+// ---------------------------------------------------------------------------
+
+void run_ladder(shipped_inputs& shipped, const std::vector<uint32_t>& seeds, const std::vector<int>& rungs)
+{
+    std::printf("\n=== --ladder: lanes reuse lanes, the reuse cost per mille (1000 = no reuse; shipped %d) ===\n",
+                kSeaLaneReuseCostQ);
+    const history_sim_params lp = exploration_sim_params(world_params{});
+    std::map<int, std::array<double, 7>> sum; // rung -> path, distinct, per_port, max, pairs, shared, pairs_3
+    int n = 0;
+    for (const uint32_t s : seeds)
+    {
+        lane_world L;
+        if (!build_lane_world(shipped, s, L)) { std::printf("  seed %u: spans did not run\n", s); continue; }
+        ++n;
+        const std::vector<uint8_t> generated = lane_field(L);
+        std::printf("  seed %u\n", s);
+        for (const int q : rungs)
+        {
+            set_lane_field(L, std::vector<uint8_t>(generated.size(), 0));
+            sea_lane_stats st;
+            sea_lane_trace tr;
+            stamp_sea_lanes(L.w, L.body, L.nodes, L.legs, L.realms, lp.sea_lane_tier1_uses, lp.sea_current_weight_q,
+                            lp.sea_current_rotation_sense, &st, &tr, q);
+            const trunk_read r = read_trunks(st, tr);
+            char tag[32];
+            std::snprintf(tag, sizeof tag, "q %4d:", q);
+            print_trunks(tag, r);
+            std::array<double, 7>& a = sum[q];
+            a[0] += r.path_tiles; a[1] += r.lane_tiles; a[2] += r.per_port; a[3] += r.max_per_port;
+            a[4] += r.pairs; a[5] += r.mean_shared; a[6] += r.pairs_3;
+        }
+        set_lane_field(L, generated);
+        std::fflush(stdout);
+    }
+    std::printf("  MEAN over %d seeds:\n", n);
+    for (const int q : rungs)
+    {
+        const std::array<double, 7>& a = sum[q];
+        std::printf("    q %4d: path tiles %.1f, distinct lane tiles %.1f, lanes per port %.2f (max %.1f),"
+                    " port-sharing pairs %.1f sharing %.2f tiles out from the port (%.1f share 3+)\n",
+                    q, a[0] / n, a[1] / n, a[2] / n, a[3] / n, a[4] / n, a[5] / n, a[6] / n);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// --census: which lanes each span writes, how long, and between which landmasses
+// ---------------------------------------------------------------------------
+
+struct lane_census
+{
+    int earned = 0, laid = 0;
+    int by_writer[4] = {0, 0, 0, 0}; ///< laid lanes by the writer that noted most of their uses (c/p/t/trade)
+    int buckets[5] = {0, 0, 0, 0, 0}; ///< sea steps: <=5, 6-15, 16-30, 31-60, 61+
+    int longest = 0;
+    int longest_writer = -1;
+    int cross = 0;                   ///< laid lanes whose two seats stand on different landmasses
+    int cross_by_writer[4] = {0, 0, 0, 0};
+    int cross_long = 0;              ///< of them, 31+ sea steps
+    int fresh = 0;                   ///< laid lanes not earned at the earlier close (1960 only)
+    int fresh_by_writer[4] = {0, 0, 0, 0};
+    int fresh_cross = 0;
+};
+
+lane_census census_lanes(lane_world& L, const exploration_output& close,
+                         const std::vector<sea_leg_writer_row>& w1, const std::vector<sea_leg_writer_row>& w2,
+                         const std::set<std::pair<int, int>>* earlier, const std::vector<int32_t>& mass)
+{
+    const history_sim_params lp = exploration_sim_params(world_params{});
+    std::vector<history_road_node> nodes;
+    std::vector<int> realms;
+    for (const region& r : close.regions)
+    {
+        nodes.push_back(history_road_node{ r.col, r.row, r.work_reach_mod });
+        realms.push_back(r.nation);
+    }
+    const std::vector<uint8_t> generated = lane_field(L);
+    set_lane_field(L, std::vector<uint8_t>(generated.size(), 0));
+    sea_lane_stats st;
+    sea_lane_trace tr;
+    stamp_sea_lanes(L.w, L.body, nodes, close.sea_legs, realms, lp.sea_lane_tier1_uses, lp.sea_current_weight_q,
+                    lp.sea_current_rotation_sense, &st, &tr);
+    set_lane_field(L, generated);
+    std::map<std::pair<int, int>, std::array<int64_t, 4>> by_leg;
+    for (const auto* rows : {&w1, &w2})
+        for (const sea_leg_writer_row& r : *rows)
+        {
+            std::array<int64_t, 4>& a = by_leg[{r.a, r.b}];
+            a[0] += r.campaign; a[1] += r.purchase; a[2] += r.tribute; a[3] += r.trade;
+        }
+    lane_census c;
+    c.earned = st.earned;
+    c.laid = st.laid;
+    for (const sea_lane_trace::lane& ln : tr.lanes)
+    {
+        int wr = -1;
+        const auto it = by_leg.find({ln.a, ln.b});
+        if (it != by_leg.end())
+        {
+            wr = 0;
+            for (int k = 1; k < 4; ++k) if (it->second[k] > it->second[wr]) wr = k;
+        }
+        const int len = static_cast<int>(ln.path.size()) - 1;
+        const int bk = len <= 5 ? 0 : len <= 15 ? 1 : len <= 30 ? 2 : len <= 60 ? 3 : 4;
+        ++c.buckets[bk];
+        if (wr >= 0) ++c.by_writer[wr];
+        if (len > c.longest) { c.longest = len; c.longest_writer = wr; }
+        const history_road_node& sa = nodes[static_cast<std::size_t>(ln.from_seat)];
+        const history_road_node& sb = nodes[static_cast<std::size_t>(ln.to_seat)];
+        const int32_t ma = landmass_at(mass, L.gw, L.gh, sa.col, sa.row);
+        const int32_t mb = landmass_at(mass, L.gw, L.gh, sb.col, sb.row);
+        const bool cross = ma >= 0 && mb >= 0 && ma != mb;
+        if (cross) { ++c.cross; if (wr >= 0) ++c.cross_by_writer[wr]; if (len > 30) ++c.cross_long; }
+        if (earlier != nullptr && earlier->count({ln.a, ln.b}) == 0)
+        {
+            ++c.fresh;
+            if (wr >= 0) ++c.fresh_by_writer[wr];
+            if (cross) ++c.fresh_cross;
+        }
+    }
+    return c;
+}
+
+/// Who is in contact across water, and what trade crosses it, at a close.
+struct cross_read
+{
+    int alive_pairs = 0, cross_pairs = 0, cross_contacted = 0, cross_bound = 0;
+    int64_t volume = 0, cross_volume_sea = 0, cross_volume_road = 0;
+    int cross_flows_sea = 0, cross_flows_road = 0;
+    int battles = 0;
+};
+
+cross_read census_cross(const history_sim_state& hs, const std::vector<region>& regions,
+                        const std::vector<int32_t>& mass, int gw, int gh)
+{
+    cross_read c;
+    c.battles = static_cast<int>(hs.battles);
+    const std::size_t np = hs.polities.size();
+    const auto mass_of = [&](int pid) -> int32_t {
+        if (pid < 0 || static_cast<std::size_t>(pid) >= np) return -1;
+        const int cap = hs.polities[static_cast<std::size_t>(pid)].capital;
+        if (cap < 0 || static_cast<std::size_t>(cap) >= regions.size()) return -1;
+        return landmass_at(mass, gw, gh, regions[static_cast<std::size_t>(cap)].col, regions[static_cast<std::size_t>(cap)].row);
+    };
+    std::set<std::pair<int, int>> met;
+    for (const contact& k : hs.contacts) met.insert({std::min<int>(k.from, k.to), std::max<int>(k.from, k.to)});
+    for (std::size_t a = 0; a < np; ++a)
+    {
+        if (!hs.polities[a].alive) continue;
+        for (std::size_t b = a + 1; b < np; ++b)
+        {
+            if (!hs.polities[b].alive) continue;
+            ++c.alive_pairs;
+            const int32_t ma = mass_of(static_cast<int>(a)), mb = mass_of(static_cast<int>(b));
+            if (ma < 0 || mb < 0 || ma == mb) continue;
+            ++c.cross_pairs;
+            if (met.count({static_cast<int>(a), static_cast<int>(b)})) ++c.cross_contacted;
+            if (has_treaty_clause(hs, static_cast<int>(a), static_cast<int>(b), treaty_clause::trade_access)) ++c.cross_bound;
+        }
+    }
+    for (const trade_flow& f : hs.trade_flows)
+    {
+        c.volume += f.volume_q;
+        const int32_t ms = mass_of(f.seller), mb = mass_of(f.buyer);
+        if (ms < 0 || mb < 0 || ms == mb) continue;
+        if (f.by_sea) { c.cross_volume_sea += f.volume_q; ++c.cross_flows_sea; }
+        else          { c.cross_volume_road += f.volume_q; ++c.cross_flows_road; }
+    }
+    return c;
+}
+
+void print_census(const char* tag, const lane_census& c, const cross_read& x, bool fresh)
+{
+    std::printf("    %s lanes earned %d laid %d | by writer c/p/t/trade %d/%d/%d/%d | steps <=5/6-15/16-30/31-60/61+"
+                " %d/%d/%d/%d/%d | longest %d (writer %d) | cross-landmass %d (c/p/t/trade %d/%d/%d/%d; 31+ steps %d)",
+                tag, c.earned, c.laid, c.by_writer[0], c.by_writer[1], c.by_writer[2], c.by_writer[3],
+                c.buckets[0], c.buckets[1], c.buckets[2], c.buckets[3], c.buckets[4], c.longest, c.longest_writer,
+                c.cross, c.cross_by_writer[0], c.cross_by_writer[1], c.cross_by_writer[2], c.cross_by_writer[3],
+                c.cross_long);
+    if (fresh)
+        std::printf(" | new since 1660 %d (c/p/t/trade %d/%d/%d/%d, cross %d)", c.fresh, c.fresh_by_writer[0],
+                    c.fresh_by_writer[1], c.fresh_by_writer[2], c.fresh_by_writer[3], c.fresh_cross);
+    std::printf("\n    %s battles %d | alive pairs %d, cross-landmass %d, of them in contact %d, trade-bound %d |"
+                " trade volume %lld, cross-landmass by sea %lld (%d flows), by road %lld (%d flows)\n",
+                tag, x.battles, x.alive_pairs, x.cross_pairs, x.cross_contacted, x.cross_bound,
+                static_cast<long long>(x.volume), static_cast<long long>(x.cross_volume_sea), x.cross_flows_sea,
+                static_cast<long long>(x.cross_volume_road), x.cross_flows_road);
+}
+
+void run_census(shipped_inputs& shipped, const std::vector<uint32_t>& seeds)
+{
+    std::printf("\n=== --census: lanes by span, writer, length and landmass (lengths in sea steps, the walk's own) ===\n");
+    const history_sim_params lp = exploration_sim_params(world_params{});
+    for (const uint32_t s : seeds)
+    {
+        lane_world L;
+        if (!build_lane_world(shipped, s, L) || !L.fx.industrialisation_ran)
+        { std::printf("  seed %u: spans did not run\n", s); continue; }
+        const std::vector<int32_t> mass = landmass_labels(L.sub, L.gw, L.gh);
+        std::set<std::int32_t> masses;
+        for (const int32_t m : mass) if (m >= 0) masses.insert(m);
+        const exploration_output& e = L.fx.exploration_handoff;
+        const exploration_output& i = L.fx.industrialisation_handoff;
+        std::set<std::pair<int, int>> earned_1660;
+        for (const sea_leg& l : e.sea_legs) if (l.uses >= lp.sea_lane_tier1_uses) earned_1660.insert({l.a, l.b});
+        const lane_census c1 = census_lanes(L, e, L.fx.exploration_state.sea_leg_writers, {}, nullptr, mass);
+        const lane_census c2 = census_lanes(L, i, L.fx.exploration_state.sea_leg_writers,
+                                            L.fx.industrialisation_state.sea_leg_writers, &earned_1660, mass);
+        std::printf("  seed %u (%zu landmasses)\n", s, masses.size());
+        print_census("1660", c1, census_cross(L.fx.exploration_state, e.regions, mass, L.gw, L.gh), false);
+        print_census("1960", c2, census_cross(L.fx.industrialisation_state, i.regions, mass, L.gw, L.gh), true);
+        std::fflush(stdout);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // --picture
 // ---------------------------------------------------------------------------
 
@@ -1071,7 +1467,8 @@ std::vector<int> parse_ints(const char* s)
 int main(int argc, char** argv)
 {
     std::vector<uint32_t> seeds = {32, 46};
-    bool picture = false;
+    bool picture = false, census = false;
+    std::vector<int> ladder;
     uint32_t picture_seed = 32;
     std::string png = "sea_lanes.png";
     for (int i = 1; i < argc; ++i)
@@ -1084,6 +1481,8 @@ int main(int argc, char** argv)
         }
         else if (a == "--picture" && i + 1 < argc) { picture = true; picture_seed = static_cast<uint32_t>(std::strtoul(argv[++i], nullptr, 10)); }
         else if (a == "--png" && i + 1 < argc) png = argv[++i];
+        else if (a == "--ladder" && i + 1 < argc) ladder = parse_ints(argv[++i]);
+        else if (a == "--census") census = true;
         else { std::printf("unknown argument %s\n", a.c_str()); return 2; }
     }
     shipped_inputs shipped;
@@ -1091,6 +1490,16 @@ int main(int argc, char** argv)
     if (picture)
     {
         run_picture(shipped, picture_seed, png);
+        return 0;
+    }
+    if (!ladder.empty())
+    {
+        run_ladder(shipped, seeds, ladder);
+        return 0;
+    }
+    if (census)
+    {
+        run_census(shipped, seeds);
         return 0;
     }
     synthetic_rows();
