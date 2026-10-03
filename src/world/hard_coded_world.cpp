@@ -2705,16 +2705,12 @@ void run_tail(generation_cursor& c)
     // specialist lays the world-gen roster below and the carve reads it. The
     // budget read is pure: no entity, no draw, no write.
     bump(c, 11);
-    // BL-1168: priced by the same trade reach the close's spend reads, off the
-    // same regions, so the carve plans the charters the walk will make.
-    const std::vector<std::int64_t> carve_reach =
-        stockpile_region_reach(w, kepler_settlement.regions, k_stockpile_charter_reach);
+    // BL-1168: priced by the same trade reach the close's spend reads — each
+    // region's anchor and each carved centre's own tile, off the same regions
+    // and the same world — so the carve plans the charters the walk will make.
     const stockpile_budget carve_stockpile =
-        build_stockpile_budget(&kepler_settlement.regions, w.gen_carve_centres, w.gen_carve_dropped,
-                               k_stockpile_price_divisor,
-                               carve_reach.empty() ? nullptr : &carve_reach,
-                               carve_reach.empty() ? charter_price_reach::world
-                                                   : k_stockpile_charter_reach);
+        build_stockpile_budget_for_regions(w, kepler_settlement.regions, k_stockpile_price_divisor,
+                                           k_stockpile_charter_reach);
     const charter_spend_params carve_spend = stockpile_charter_spend(carve_stockpile);
     const bool carve_budget_world =
         is_budget_world(w, &carve_stockpile.budget, carve_spend, /*reg=*/nullptr);

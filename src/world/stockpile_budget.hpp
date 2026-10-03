@@ -65,10 +65,14 @@ struct region;   // settlement.hpp
 /// charters are priced as a share of the stock within its trade reach -- its
 /// landmass, or its market's catchment -- not of the whole world's").
 ///
-/// A centre's REACH is its carve region's: the region's anchor decides it, and
-/// every point of the stock is counted in the reach of the region that holds it
-/// (the razed and dropped points included, as NR-907's world-wide price counts
-/// them). The firm price at a centre is then its reach's stock over the same
+/// A centre's REACH is the reach of the tile it stands on — usually its carve
+/// region's anchor's, but a carved centre can stand on another landmass than
+/// its anchor (an islet off the coast; 0 to 13 per library world, measured
+/// 2026-10-03), and it trades from where it stands. Every point of the stock is
+/// counted where it stands: a founded centre's share on its own tile's reach,
+/// and the rest of each region's points — its dropped slots' shares, its razed
+/// and residual points, as NR-907's world-wide price counts them — on the
+/// region anchor's reach. The firm price at a centre is then its reach's stock over the same
 /// divisor, floored and never below 1. A reach's stock is never more than the
 /// world's, so no reach price exceeds the world price.
 ///   * `world`    — one price, the world's (NR-907; the pre-BL-1168 rule, kept
@@ -79,8 +83,15 @@ struct region;   // settlement.hpp
 ///   * `market`   — the market the region's anchor tile clears at
 ///                  (`market_for_tile`): a measurement for the ruling's second
 ///                  reading.
-/// A region with no reach (no tile, a lake with no ground near, no market)
-/// prices at the world's price, and the budget counts how many centres did.
+/// A centre with no reach (neither its tile nor its region has one: no tile, a
+/// lake with no ground near, no market) prices at the world's price, and the
+/// budget counts how many centres did.
+///
+/// THE SPAN'S WORKS NOTES read each REGION's anchor reach (`history_sim.cpp`;
+/// the sim holds no centre tiles), so for a region with a centre off its
+/// anchor's landmass the note's running price and the close's price read
+/// different stocks. The dating pairs notes to charters by region, so this
+/// moves only which year such a centre's charter is dated to.
 enum class charter_price_reach : std::uint8_t
 {
     world    = 0,
@@ -199,6 +210,9 @@ struct stockpile_budget
     std::map<std::int64_t, std::int64_t> reach_stock;
     std::map<entity_id, std::int64_t>   centre_reach;   ///< each budgeted centre's reach key (-1: none)
     int                                 centres_unreached = 0;
+    /// Founded centres holding points whose own tile's reach is not their
+    /// region anchor's: their share counted on their own reach (above).
+    int                                 centres_off_anchor = 0;
 
     /// The firm price at @p centre: its reach price, else the world's.
     std::int32_t firm_price_at(entity_id centre) const
@@ -258,8 +272,9 @@ inline constexpr std::int64_t stockpile_region_keys_max = 1LL << 32;
 /// spend's price type): rejected, never clamped.
 ///
 /// @p reach (BL-1168) names whose stock a centre's charters are priced by
-/// (`charter_price_reach`); the world overload reads each region's reach key off the
-/// world (`stockpile_region_reach`). A world with no home-body grid to read a
+/// (`charter_price_reach`); the world overload reads each region's reach key and
+/// each carved centre's own off the world (`stockpile_region_reach`,
+/// `stockpile_centre_reach`, one raster read). A world with no home-body grid to read a
 /// reach off prices every centre at the world's price (`reach` reads `world`).
 stockpile_budget build_stockpile_budget(const world& w,
                                         std::int64_t price_divisor = k_stockpile_price_divisor,
@@ -271,12 +286,24 @@ stockpile_budget build_stockpile_budget(const world& w,
 /// non-null and @p reach is not `world`, is each region's reach key (indexed as
 /// @p regions; a key < 0 is no reach) — a vector of the wrong size REJECTS the
 /// budget; null or `world` prices every centre at the world's price.
+/// @p centre_reach, when non-null (and @p region_reach is), is each founded
+/// centre's own tile's reach key; a centre it does not list (or lists < 0)
+/// takes its region's.
 stockpile_budget build_stockpile_budget(const std::vector<region>*            regions,
                                         const std::map<entity_id, carve_slot>& founded,
                                         const std::vector<carve_dropped_slot>& dropped,
                                         std::int64_t price_divisor = k_stockpile_price_divisor,
                                         const std::vector<std::int64_t>* region_reach = nullptr,
-                                        charter_price_reach reach = charter_price_reach::world);
+                                        charter_price_reach reach = charter_price_reach::world,
+                                        const std::map<entity_id, std::int64_t>* centre_reach = nullptr);
+
+/// The world overload's builder over @p regions held apart from the world —
+/// generation's carve stage, before `world::gen_settlement` is filled
+/// (hard_coded_world.cpp) — with the world's carve index, tiles and centre
+/// tiles, so the carve's plan prices exactly as the close's spend does.
+stockpile_budget build_stockpile_budget_for_regions(const world& w, const std::vector<region>& regions,
+                                                    std::int64_t price_divisor = k_stockpile_price_divisor,
+                                                    charter_price_reach reach = k_stockpile_charter_reach);
 
 /// BL-1168: each settlement region's reach key on @p w under @p reach — a
 /// landmass label, or a market id — indexed as `gen_settlement->regions`; -1
@@ -291,6 +318,12 @@ std::vector<std::int64_t> stockpile_region_reach(const world& w, charter_price_r
 /// `world` or with no home-body grid.
 std::vector<std::int64_t> stockpile_region_reach(const world& w, const std::vector<region>& regions,
                                                  charter_price_reach reach);
+
+/// BL-1168: each carved founded centre's own reach key on @p w — the landmass
+/// (`landmass_at`) or market of the tile it stands on — keyed by centre id;
+/// a centre with no tile on the home body, or no reach there, is absent.
+/// Empty under `world` or with no home-body grid.
+std::map<entity_id, std::int64_t> stockpile_centre_reach(const world& w, charter_price_reach reach);
 
 // --- THE SPEND ---------------------------------------------------------------
 //
@@ -330,6 +363,13 @@ std::vector<std::int64_t> stockpile_region_reach(const world& w, const std::vect
 /// (player_seed_sweep --charter-cost, seeds 0, 12, 28, 46). The spread stays
 /// accepted (NR-910): 1 to 29 seats, the one-seat world a single landmass
 /// whose capital towers (seed 11).
+///
+/// THAT CURVE PRICED EVERY CENTRE BY ITS REGION'S ANCHOR. Priced by the tile it
+/// stands on (`charter_price_reach`, 2026-10-03), an islet centre is its
+/// reach's whole stock and always affords a specialist: the same seat curve
+/// reads median 164 / 10.5 / 10 / 10 at m = 2 / 42 / 44 / 46, spread 1 to 28 at
+/// 44. The pin is NOT moved here; whether 44 still answers the anchor is
+/// raised for Ben.
 inline constexpr std::int32_t k_stockpile_specialist_firm_charters = 44;
 /// The per-good cap's floor and the square root's base c: 8, Pass 6's legacy
 /// per-good cap (Ben, 2026-09-21, NR-910), so a body at the legacy firm spend

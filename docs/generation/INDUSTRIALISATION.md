@@ -293,7 +293,9 @@ sweep and pinned at the re-bless. **Whose stock is narrowed (Ben, 2026-10-03):**
 share of the stock within its own trade reach, not the world's (§ Industry spreads beyond its
 heartland); the divisor and the charters are the same knobs. **The reach is the LANDMASS** the
 centre stands on — every point of the stockpile counted where it stands, the razed and dropped
-included — and a centre with no landmass pays the world's price, which is the dearest. A market's
+included — and a centre with no landmass pays the world's price, which is the dearest. A centre
+standing on other land than its region's heart (an islet off the coast) is priced by the land it
+stands on, and its share is counted there. A market's
 catchment, the ruling's other reading, is kept as a measurement and does not price.
 
 **SETTLED (Ben, 2026-09-21, NR-908): the divisor answers LIVE-PLAY COST, and the specialist's
@@ -316,7 +318,9 @@ knob takes it: **44 charters**, the first whole number at which the median libra
 no-budget world's 8 seats, with the divisor held at 650 for live-play cost. The spread runs 1 to 29
 seats; a world of one landmass whose capital towers offers one. Seats move off the heartland: at
 44 charters almost no centre on a world's richest landmass affords one, because there the reach is
-dearest.
+dearest. *Those readings priced every centre by its region's heart. Priced by the land it stands on
+(below), an islet centre is its reach's whole stock and always affords a specialist, and the same
+seat curve reads a median of 10 at 44 charters, 1 to 28 seats (2026-10-03, raised for Ben's call).*
 
 **SETTLED (Ben, 2026-09-21, NR-910): the pins.** *The charter pin is OVERTURNED (Ben, 2026-10-03,
 option a, above): a specialist costs 44 firm charters, not two; the divisor pin of 650 and the

@@ -511,6 +511,39 @@ void part_one_reach()
               "1c.10 under the world reading every centre pays the world's price, and the reach moves "
               "the PRICE only: the split and every reason are the same");
     }
+    {
+        // A CENTRE OFF ITS ANCHOR'S LANDMASS (the straddle, measured 0-13 per
+        // library world): it is priced by the reach of the tile it stands on,
+        // and its share is counted there. Centre 31 (region 1, anchor reach 5)
+        // stands on reach 9: its 3 points leave reach 5 (1706 -> 1703, still
+        // 17) for reach 9 (3 -> the floor of 1). Centre 70 (region 7, NO
+        // anchor reach) stands on reach 7: its 300 join reach 7's 66 (366 ->
+        // 3), which reprices centres 50 and 51 too. Centre 10 is listed on its
+        // own anchor's reach: nothing moves.
+        const std::map<entity_id, std::int64_t> centre_keys = { { 10, 5 }, { 31, 9 }, { 70, 7 } };
+        const stockpile_budget c = build_stockpile_budget(&regions, founded, dropped, 100, &keys,
+                                                          charter_price_reach::landmass, &centre_keys);
+        const auto pc = [&](entity_id id) { return static_cast<int>(c.firm_price_at(id)); };
+        const auto stock = [&](std::int64_t k) {
+            return c.reach_stock.count(k) ? static_cast<long long>(c.reach_stock.at(k)) : -1LL;
+        };
+        std::printf("     off-anchor: stock 5=%lld 7=%lld 9=%lld; prices 10=%d 31=%d 50=%d 70=%d; "
+                    "off anchor %d, unreached %d\n",
+                    stock(5), stock(7), stock(9), pc(10), pc(31), pc(50), pc(70), c.centres_off_anchor,
+                    c.centres_unreached);
+        check(!c.rejected && c.balanced() && c.budget.points() == sb.budget.points() && c.unspent == sb.unspent,
+              "1c.11 a centre's own reach moves the PRICE only: the split and every reason are the same");
+        check(stock(5) == 1703 && stock(7) == 366 && stock(9) == 3 && c.reach_stock.size() == 3,
+              "1c.12 an off-anchor centre's share is counted on the reach it stands on (5: 1706 - 3; "
+              "7: 66 + 300; 9: 3), the rest of its region's points on the anchor's");
+        check(pc(10) == 17 && pc(11) == 17 && pc(30) == 17 && pc(31) == 1 && pc(50) == 3 && pc(51) == 3
+                  && pc(70) == 3 && c.centre_reach.at(31) == 9 && c.centre_reach.at(70) == 7,
+              "1c.13 each centre pays its OWN tile's reach (31 -> 1, 70 -> 3) and its neighbours the "
+              "stock it joined (50, 51 -> 3)");
+        check(c.centres_off_anchor == 2 && c.centres_unreached == 0,
+              "1c.14 two centres stand off their anchor's reach; a centre whose own tile has a reach "
+              "is not unreached though its region has none");
+    }
 }
 
 /// Every field of a stockpile budget and the carve index behind it, compared.
