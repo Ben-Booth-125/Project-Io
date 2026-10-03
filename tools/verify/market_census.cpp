@@ -740,12 +740,20 @@ seed_record run_seed(lua_state& lua, uint32_t seed, int live_ticks, bool travers
     const int shells_live = rec.shells_marked - rec.shells_folded;
     rec.id_tile_match = shells_live >= 0 && shells_live <= rec.home_markets;
     {
+        // BL-1138 review: a shell's centre may stand off its anchor (a market stands on
+        // land), so a shell is matched to its region through the anchor generation
+        // RECORDED for it (generation_report::capital_shell_anchors), never by copying
+        // the placement rule here. I1b below asks the land rule itself, directly.
+        std::map<entity_id, entity_id> recorded_anchor(out->report.capital_shell_anchors.begin(),
+                                                       out->report.capital_shell_anchors.end());
         std::vector<int>       live_region;
         std::vector<entity_id> live_anchor;
         std::size_t s = 0;
         for (int k = 0; rec.id_tile_match && k < shells_live; ++k)
         {
-            const entity_id centre = w.markets.at(home_ids[static_cast<std::size_t>(k)]).centre_tile;
+            const auto rit = recorded_anchor.find(home_ids[static_cast<std::size_t>(k)]);
+            if (rit == recorded_anchor.end()) { rec.id_tile_match = false; break; }
+            const entity_id centre = rit->second;
             while (s < shell_anchor.size() && shell_anchor[s] != centre) ++s;
             if (s == shell_anchor.size()) { rec.id_tile_match = false; break; }
             live_region.push_back(shell_region[s]);
@@ -1164,8 +1172,30 @@ seed_record run_seed(lua_state& lua, uint32_t seed, int live_ticks, bool travers
     std::printf("     of the %d whose maker lost it: %d now stand on NO living capital, %d on a "
                 "successor's capital\n",
                 rec.fate[1] + rec.fate[2], rec.lost_living_capital, rec.lost_successor);
-    check(rec.id_tile_match, "I1", "the lowest-id home markets sit, in order, on the has_market "
-                                   "regions' anchor tiles (shells spawn before the carve)");
+    check(rec.id_tile_match, "I1", "the lowest-id home markets are the capital shells, in order, of"
+                                   " the has_market regions (bound by the anchor recorded at spawn;"
+                                   " shells spawn before the carve)");
+    {
+        int on_water = 0;
+        for (const entity_id mid : home_ids)
+        {
+            const auto tit = w.tiles.find(w.markets.at(mid).centre_tile);
+            if (tit == w.tiles.end() || is_water(tit->second.substrate))
+            {
+                ++on_water;
+                const bool shell = std::any_of(out->report.capital_shell_anchors.begin(),
+                    out->report.capital_shell_anchors.end(),
+                    [&](const std::pair<entity_id, entity_id>& sa) { return sa.first == mid; });
+                std::printf("      I1b: market %u on %s (%s)\n", static_cast<unsigned>(mid),
+                            tit == w.tiles.end() ? "no tile" : "water",
+                            shell ? "a capital shell" : "a carve market");
+            }
+        }
+        char lb[160];
+        std::snprintf(lb, sizeof lb, "every home market centre is a land tile (%d of %d on water or"
+                                     " unanchored; BL-1138 review)", on_water, rec.home_markets);
+        check(on_water == 0, "I1b", lb);
+    }
     char buf[160];
     std::snprintf(buf, sizeof buf, "the price vote agrees market for market (%d voted shell, "
                                    "premium x%.2f on every non-endemic good)",

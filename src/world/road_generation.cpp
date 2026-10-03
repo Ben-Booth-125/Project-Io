@@ -3,10 +3,12 @@
 #include "components.hpp"
 #include "hard_coded_world.hpp" // generation_progress -- the BL-1072 loading-bar tap
 #include "logistics.hpp"
+#include "market_clearing.hpp" // BL-1138: market_for_tile, a town's market
 #include "ocean_currents.hpp" // BL-1098: the current field a lane's walk is priced with
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <functional>
@@ -255,6 +257,33 @@ double network_route_cost(const std::vector<std::vector<std::pair<int, double>>>
 
 } // namespace
 
+/// BL-621: each nation's qualification PERCENTILE among the world's nations, mid-rank on
+/// ties — (count below + half the tied group) / N — over ascending nation ids. All-tied
+/// -> 0.5 each. The ONE formula the road gates read (generate_roads, lay_market_roads).
+std::map<entity_id, float> road_qualification_percentiles(const world& w)
+{
+    std::map<entity_id, float> out;
+    std::vector<std::pair<entity_id, float>> qs;
+    for (const auto& [nid, nc] : w.nations)
+        qs.push_back({ nid, nc.qualification });
+    std::sort(qs.begin(), qs.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+    const int nn = static_cast<int>(qs.size());
+    for (const auto& [nid, q] : qs)
+    {
+        int below = 0, tied = 0;
+        for (const auto& [nid2, q2] : qs)
+        {
+            below += q2 < q;
+            tied  += q2 == q;
+        }
+        out[nid] = nn > 0 ? (static_cast<float>(below) + 0.5f * static_cast<float>(tied))
+                                / static_cast<float>(nn)
+                          : 0.0f;
+    }
+    return out;
+}
+
 long long village_spur_size(const world& w, entity_id centre)
 {
     if (const auto sit = w.gen_carve_centres.find(centre); sit != w.gen_carve_centres.end())
@@ -350,28 +379,8 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
     // mid-rank on ties — (count below + half the tied group) / N. Computed once,
     // over ascending nation ids (float-free ranking, but the order is fixed
     // anyway so a future float term stays deterministic). All-tied -> 0.5 each.
-    std::map<entity_id, float> qual_percentile;
-    {
-        std::vector<std::pair<entity_id, float>> qs;
-        for (const auto& [nid, nc] : w.nations)
-            qs.push_back({ nid, nc.qualification });
-        std::sort(qs.begin(), qs.end(),
-                  [](const auto& a, const auto& b) { return a.first < b.first; });
-        const int nn = static_cast<int>(qs.size());
-        for (const auto& [nid, q] : qs)
-        {
-            int below = 0, tied = 0;
-            for (const auto& [nid2, q2] : qs)
-            {
-                below += q2 < q;
-                tied  += q2 == q;
-            }
-            qual_percentile[nid] =
-                nn > 0 ? (static_cast<float>(below) + 0.5f * static_cast<float>(tied))
-                             / static_cast<float>(nn)
-                       : 0.0f;
-        }
-    }
+    // (One formula, shared with lay_market_roads: road_qualification_percentiles.)
+    const std::map<entity_id, float> qual_percentile = road_qualification_percentiles(w);
 
     // BL-1072 -- THE LOADING BAR'S COUNT. This pass is most of a world build's
     // wall clock (30-57 s Release, measured 2026-09-24), and nearly all of that
@@ -970,6 +979,541 @@ void stamp_history_roads(world& w, entity_id body,
     // Same contract as generate_roads' tail: road_level moved, so every cache
     // keyed on traversal cost is stale — the whole set, through its one owner.
     invalidate_logistics_caches(w);
+}
+
+// ---------------------------------------------------------------------------
+// Roads pull toward markets (BL-1138) — road_generation.hpp § the same title
+// ---------------------------------------------------------------------------
+
+namespace {
+
+constexpr std::int64_t kNoCost = -1;
+
+/// A cell's weight in the pass's integer unit: `tile_traversal_cost` (LOGISTICS.md § 1,
+/// the one weight function) in millionths, rounded.
+std::int64_t market_cell_weight(const tile_component& tc)
+{
+    return static_cast<std::int64_t>(
+        std::llround(static_cast<double>(tile_traversal_cost(tc)) * 1.0e6));
+}
+
+/// The body's raster as the pass walks it, kept current as the pass stamps.
+struct market_cost_grid
+{
+    int gw = 0, gh = 0;
+    std::vector<entity_id>    tile;   ///< raster -> tile (null = no cell)
+    std::vector<std::int64_t> q;      ///< cell weight; kNoCost = no cell
+    std::vector<char>         water;  ///< shore water / lake: entered in strait runs only
+    std::vector<char>         ocean;  ///< open ocean: never entered (a walk may start on it)
+    std::vector<char>         roaded; ///< land with road_level > 0
+    std::vector<entity_id>    nation; ///< the nation holding the cell
+};
+
+market_cost_grid build_market_cost_grid(world& w, entity_id body)
+{
+    market_cost_grid g;
+    const auto bit = w.bodies.find(body);
+    if (bit == w.bodies.end()) return g;
+    g.gw = bit->second.grid_width;
+    g.gh = bit->second.grid_height;
+    if (g.gw <= 0 || g.gh <= 0) { g.gw = g.gh = 0; return g; }
+    g.tile = body_tile_grid(w, body);
+    const std::size_t n = static_cast<std::size_t>(g.gw) * static_cast<std::size_t>(g.gh);
+    if (g.tile.size() < n) { g.gw = g.gh = 0; g.tile.clear(); return g; }
+    g.q.assign(n, kNoCost);
+    g.water.assign(n, 0);
+    g.ocean.assign(n, 0);
+    g.roaded.assign(n, 0);
+    g.nation.assign(n, null_entity);
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        const auto it = w.tiles.find(g.tile[i]);
+        if (it == w.tiles.end()) continue;
+        const tile_component& tc = it->second;
+        g.q[i] = market_cell_weight(tc);
+        g.nation[i] = nation_of(w, g.tile[i]);
+        if (is_water(tc.substrate))
+        {
+            if (is_open_ocean(tc.substrate)) g.ocean[i] = 1;
+            else                             g.water[i] = 1;
+            continue;
+        }
+        g.roaded[i] = tc.road_level > 0 ? 1 : 0;
+    }
+    return g;
+}
+
+/// One Dijkstra over (cell, water run 0..kMaxCrossingTiles) states: a water cell is
+/// entered only within a run of at most kMaxCrossingTiles (a strait), open ocean never.
+/// @p roads_only admits only roaded land; @p held_by (non-null) admits only land that
+/// nation holds. Frontier ordered on (cost, state), unique. Stops when @p stop says so
+/// of a settled cell (returning it), or past @p bound (>= 0); else -1.
+struct market_walk
+{
+    std::vector<std::int64_t> dist;   ///< per state
+    std::vector<std::int32_t> parent; ///< per state, -1 at a source
+    int runs = kMaxCrossingTiles + 1;
+
+    std::int64_t cell_cost(int cell) const
+    {
+        std::int64_t best = kNoCost;
+        for (int r = 0; r < runs; ++r)
+        {
+            const std::int64_t d = dist[static_cast<std::size_t>(cell) * runs + r];
+            if (d != kNoCost && (best == kNoCost || d < best)) best = d;
+        }
+        return best;
+    }
+    std::vector<int> path_to(int cell) const
+    {
+        int best_s = -1;
+        std::int64_t best = kNoCost;
+        for (int r = 0; r < runs; ++r)
+        {
+            const int s = cell * runs + r;
+            const std::int64_t d = dist[static_cast<std::size_t>(s)];
+            if (d != kNoCost && (best == kNoCost || d < best)) { best = d; best_s = s; }
+        }
+        std::vector<int> out;
+        for (int s = best_s; s >= 0; s = parent[static_cast<std::size_t>(s)])
+            out.push_back(s / runs);
+        std::reverse(out.begin(), out.end());
+        return out;
+    }
+};
+
+template <class Stop>
+int run_market_walk(const market_cost_grid& g, const std::vector<int>& sources, bool roads_only,
+                    entity_id held_by, std::int64_t bound, Stop stop, market_walk& out,
+                    long long* walks)
+{
+    if (walks != nullptr) ++*walks;
+    const int runs = out.runs;
+    const std::size_t n = static_cast<std::size_t>(g.gw) * static_cast<std::size_t>(g.gh);
+    out.dist.assign(n * static_cast<std::size_t>(runs), kNoCost);
+    out.parent.assign(n * static_cast<std::size_t>(runs), -1);
+    std::vector<char> done(n * static_cast<std::size_t>(runs), 0);
+    using item = std::pair<std::int64_t, int>;
+    std::priority_queue<item, std::vector<item>, std::greater<item>> pq;
+    for (const int c : sources)
+    {
+        if (c < 0 || static_cast<std::size_t>(c) >= n || g.q[static_cast<std::size_t>(c)] == kNoCost)
+            continue;
+        const bool wet = g.water[static_cast<std::size_t>(c)] || g.ocean[static_cast<std::size_t>(c)];
+        const int s = c * runs + (wet ? 1 : 0);
+        if (out.dist[static_cast<std::size_t>(s)] == 0) continue;
+        out.dist[static_cast<std::size_t>(s)] = 0;
+        pq.push({ 0, s });
+    }
+    while (!pq.empty())
+    {
+        const auto [d, s] = pq.top();
+        pq.pop();
+        if (done[static_cast<std::size_t>(s)]) continue;
+        if (bound >= 0 && d > bound) break;
+        done[static_cast<std::size_t>(s)] = 1;
+        const int c = s / runs, run = s % runs;
+        if (stop(c)) return c;
+        const int cx = c % g.gw, cy = c / g.gw;
+        const int nbr[4][2] = { { cx - 1, cy }, { cx + 1, cy }, { cx, cy - 1 }, { cx, cy + 1 } };
+        for (const auto& p : nbr)
+        {
+            if (p[1] < 0 || p[1] >= g.gh) continue;
+            const int vx = ((p[0] % g.gw) + g.gw) % g.gw; // the east-west wrap
+            const int v  = p[1] * g.gw + vx;
+            const std::size_t vi = static_cast<std::size_t>(v);
+            if (g.q[vi] == kNoCost || g.ocean[vi]) continue;
+            int nrun = 0;
+            if (g.water[vi])
+            {
+                nrun = run + 1;
+                if (nrun > kMaxCrossingTiles) continue; // past a strait: open water
+            }
+            else
+            {
+                if (roads_only && !g.roaded[vi]) continue;
+                if (held_by != null_entity && g.nation[vi] != held_by) continue;
+            }
+            const int ns = v * runs + nrun;
+            const std::int64_t nd = d + g.q[static_cast<std::size_t>(c)] + g.q[vi];
+            std::int64_t& cur = out.dist[static_cast<std::size_t>(ns)];
+            if (cur == kNoCost || nd < cur)
+            {
+                cur = nd;
+                out.parent[static_cast<std::size_t>(ns)] = s;
+                pq.push({ nd, ns });
+            }
+        }
+    }
+    return -1;
+}
+
+int cell_of(const world& w, int gw, entity_id tile)
+{
+    const auto it = w.tiles.find(tile);
+    if (it == w.tiles.end()) return -1;
+    return it->second.grid_y * gw + it->second.grid_x;
+}
+
+} // namespace
+
+void undo_market_roads(world& w, const market_road_trace& trace)
+{
+    for (auto it = trace.raises.rbegin(); it != trace.raises.rend(); ++it)
+    {
+        const auto tit = w.tiles.find(it->first);
+        if (tit != w.tiles.end()) tit->second.road_level = it->second;
+    }
+    invalidate_logistics_caches(w);
+}
+
+void lay_market_roads(world& w, entity_id body, market_road_stats* stats, market_road_trace* trace)
+{
+    market_road_stats st{};
+    market_cost_grid g = build_market_cost_grid(w, body);
+    if (g.gw == 0)
+    {
+        if (stats != nullptr) *stats = st;
+        return;
+    }
+    const int gw = g.gw;
+    const std::size_t ncell = g.q.size();
+    auto is_land = [&](int c) {
+        const std::size_t i = static_cast<std::size_t>(c);
+        return g.q[i] != kNoCost && !g.water[i] && !g.ocean[i];
+    };
+
+    // The markets: anchored, on this body, ascending id.
+    struct mkt { entity_id id; entity_id tile; int cell; entity_id nation; int scale; };
+    std::vector<mkt> markets;
+    for (const auto& [mid, mc] : w.markets)
+    {
+        if (mc.body != body) continue;
+        const int c = cell_of(w, gw, mc.centre_tile);
+        if (c < 0 || static_cast<std::size_t>(c) >= ncell) continue;
+        markets.push_back({ mid, mc.centre_tile, c, nation_of(w, mc.centre_tile), kMidScale });
+    }
+    std::sort(markets.begin(), markets.end(), [](const mkt& a, const mkt& b) { return a.id < b.id; });
+    st.markets = static_cast<int>(markets.size());
+    if (markets.empty())
+    {
+        if (stats != nullptr) *stats = st;
+        return;
+    }
+
+    // The towns (scale >= 2), ascending tile; the highest centre scale per tile is what a
+    // market end reads as its scale (a centre on no centre's tile reads as a Town).
+    struct town { entity_id tile; int cell; entity_id nation; int scale; };
+    std::vector<town> towns;
+    std::map<entity_id, int> scale_at;
+    for (const auto& [cid, tile] : w.population_centre_tile)
+    {
+        const auto tit = w.tiles.find(tile);
+        if (tit == w.tiles.end() || tit->second.body != body) continue;
+        const auto pit = w.population_centres.find(cid);
+        const int sc = pit != w.population_centres.end() ? static_cast<int>(pit->second.scale) : 1;
+        int& s = scale_at[tile];
+        s = std::max(s, sc);
+    }
+    for (const auto& [tile, sc] : scale_at)
+        if (sc >= kMidScale)
+            towns.push_back({ tile, cell_of(w, gw, tile), nation_of(w, tile), sc });
+    st.towns = static_cast<int>(towns.size());
+    std::set<entity_id> nations_with_towns;
+    for (const town& t : towns)
+        if (t.nation != null_entity) nations_with_towns.insert(t.nation);
+    auto has_backbone = [&](entity_id n) { return n != null_entity && nations_with_towns.count(n) != 0; };
+    for (mkt& m : markets)
+    {
+        const auto it = scale_at.find(m.tile);
+        if (it != scale_at.end()) m.scale = std::max(kMidScale, it->second);
+        if (m.nation == null_entity) ++st.markets_unowned;
+        if (!has_backbone(m.nation)) ++st.no_backbone;
+    }
+
+    const std::map<entity_id, float> pct = road_qualification_percentiles(w);
+    auto pct_of = [&](entity_id n) {
+        const auto it = pct.find(n);
+        return it != pct.end() ? it->second : 0.0f; // unowned: below every gate (generate_roads' rule)
+    };
+
+    std::set<entity_id> raised;
+    // Stamp a route at @p level (land cells only, max on overlap). EACH TILE TAKES THE TIER
+    // OF THE NATION WHOSE LAND IT CROSSES (Ben, 2026-10-03): a tile's level is the link's,
+    // capped by the gate at the percentile of the nation holding the tile (`edge_tier` of
+    // the link's two end scales @p sa / @p sb), so a sub-0.40 nation's ground stays Track
+    // and unowned land (percentile 0) reads Track. Returns the land cells on the route: a
+    // route with none lays nothing.
+    auto stamp = [&](const std::vector<int>& cells, std::uint8_t link_level, int sa, int sb,
+                     std::vector<entity_id>* path) {
+        int land = 0;
+        for (const int c : cells)
+        {
+            const std::size_t ci = static_cast<std::size_t>(c);
+            const entity_id t = g.tile[ci];
+            if (path != nullptr) path->push_back(t);
+            if (!is_land(c)) continue;
+            ++land;
+            const auto tit = w.tiles.find(t);
+            if (tit == w.tiles.end()) continue;
+            tile_component& tc = tit->second;
+            const std::uint8_t level =
+                std::min(link_level, edge_tier(sa, sb, pct_of(g.nation[ci])));
+            if (tc.road_level >= level) continue;
+            if (trace != nullptr) trace->raises.push_back({ t, tc.road_level });
+            raised.insert(t);
+            tc.road_level = level;
+            g.roaded[ci] = 1;
+            g.q[ci] = market_cell_weight(tc); // the road now discounts it
+        }
+        return land;
+    };
+    auto raises_now = [&]() { return trace != nullptr ? trace->raises.size() : std::size_t{ 0 }; };
+
+    market_walk mw;
+    // ON ITS NATION'S BACKBONE: a road-only walk over the nation's OWN roads (and the
+    // straits between them) from the centre reaches one of the nation's towns. A land
+    // centre must carry a road itself; a water centre carries none.
+    auto on_backbone = [&](const mkt& m) {
+        if (!has_backbone(m.nation)) return false;
+        if (is_land(m.cell) && !g.roaded[static_cast<std::size_t>(m.cell)]) return false;
+        std::vector<char> target(ncell, 0);
+        for (const town& t : towns)
+            if (t.nation == m.nation) target[static_cast<std::size_t>(t.cell)] = 1;
+        return run_market_walk(g, { m.cell }, /*roads_only=*/true, m.nation, -1,
+                   [&](int c) { return target[static_cast<std::size_t>(c)] != 0; }, mw, &st.walks) >= 0;
+    };
+    auto count_off_backbone = [&]() {
+        int off = 0;
+        for (const mkt& m : markets)
+            if (!on_backbone(m)) ++off;
+        return off;
+    };
+    st.off_backbone_before = count_off_backbone();
+
+    // 0. THE TRUNK'S PAIRS, on the network as found: each centre's K nearest centres by
+    //    direct route, unioned, each priced from a land end (the lower id's when both are).
+    std::vector<std::vector<std::int64_t>> found(markets.size());
+    for (std::size_t i = 0; i < markets.size(); ++i)
+    {
+        run_market_walk(g, { markets[i].cell }, /*roads_only=*/false, null_entity, -1,
+                        [](int) { return false; }, mw, &st.walks);
+        found[i].resize(markets.size(), kNoCost);
+        for (std::size_t j = 0; j < markets.size(); ++j)
+            found[i][j] = mw.cell_cost(markets[j].cell);
+    }
+    struct pair_c { std::int64_t d; std::size_t a; std::size_t b; std::size_t from; };
+    std::set<std::pair<std::size_t, std::size_t>> seen;
+    std::vector<pair_c> pairs;
+    for (std::size_t i = 0; i < markets.size(); ++i)
+    {
+        std::vector<std::pair<std::int64_t, std::size_t>> near;
+        for (std::size_t j = 0; j < markets.size(); ++j)
+        {
+            if (j == i || markets[j].cell == markets[i].cell) continue;
+            if (found[i][j] != kNoCost) near.push_back({ found[i][j], j });
+        }
+        std::sort(near.begin(), near.end());
+        for (int k = 0; k < kMarketTrunkNeighbours && k < static_cast<int>(near.size()); ++k)
+        {
+            const std::size_t j = near[static_cast<std::size_t>(k)].second;
+            const std::size_t lo = std::min(i, j), hi = std::max(i, j);
+            if (!seen.insert({ lo, hi }).second) continue;
+            // Priced from a LAND end: a walk never enters open ocean, so a price read
+            // toward an ocean centre does not exist.
+            std::size_t from = lo;
+            if (!is_land(markets[lo].cell) && is_land(markets[hi].cell)) from = hi;
+            const std::size_t to = from == lo ? hi : lo;
+            const std::int64_t d = is_land(markets[from].cell) ? found[from][to] : kNoCost;
+            pairs.push_back({ d, lo, hi, from });
+        }
+    }
+    st.trunk_pairs = static_cast<int>(pairs.size());
+
+    // 1. JOIN — every market centre on its nation's own backbone.
+    for (const mkt& m : markets)
+    {
+        if (!has_backbone(m.nation)) continue; // counted in no_backbone: nothing to join
+        if (on_backbone(m)) continue;
+        // The nation's own joined roads: a road-only walk over its own roads from its towns.
+        std::vector<int> src;
+        for (const town& t : towns)
+            if (t.nation == m.nation) src.push_back(t.cell);
+        run_market_walk(g, src, /*roads_only=*/true, m.nation, -1, [](int) { return false; },
+                        mw, &st.walks);
+        std::vector<char> joined(ncell, 0);
+        for (int c = 0; c < static_cast<int>(ncell); ++c)
+            if (is_land(c) && g.roaded[static_cast<std::size_t>(c)] && mw.cell_cost(c) != kNoCost)
+                joined[static_cast<std::size_t>(c)] = 1;
+        market_road_trace::link l;
+        l.k = market_road_trace::kind::join;
+        l.from = m.tile;
+        l.market_a = m.id;
+        l.raises_before = raises_now();
+        // The join is the nation's own road, so its route stays on the nation's own land
+        // (and the straits between): a route over another nation's ground, or an
+        // unclaimed margin, would leave the centre off its own backbone still.
+        const int hit = run_market_walk(g, { m.cell }, /*roads_only=*/false, m.nation, -1,
+            [&](int c) { return joined[static_cast<std::size_t>(c)] != 0; }, mw, &st.walks);
+        if (hit < 0)
+        {
+            ++st.joins_failed;
+            if (trace != nullptr) trace->links.push_back(std::move(l));
+            continue;
+        }
+        l.to = g.tile[static_cast<std::size_t>(hit)];
+        l.direct_q = mw.cell_cost(hit);
+        l.tier = edge_tier(m.scale, kMidScale, pct_of(m.nation));
+        const std::vector<int> route = mw.path_to(hit);
+        l.laid = stamp(route, l.tier, m.scale, kMidScale, trace != nullptr ? &l.path : nullptr) > 0;
+        if (l.laid) ++st.joins_laid;
+        else        ++st.joins_failed;
+        if (trace != nullptr) trace->links.push_back(std::move(l));
+    }
+
+    // 2. PULL — a town weighed by how much nearer the link brings it to its market.
+    std::map<entity_id, std::size_t> market_index;
+    for (std::size_t i = 0; i < markets.size(); ++i) market_index[markets[i].id] = i;
+    std::vector<std::vector<std::size_t>> pull_towns(markets.size());
+    for (std::size_t ti = 0; ti < towns.size(); ++ti)
+    {
+        const auto it = market_index.find(market_for_tile(w, towns[ti].tile));
+        if (it == market_index.end()) continue;
+        const mkt& m = markets[it->second];
+        if (towns[ti].nation == null_entity || m.nation != towns[ti].nation) continue;
+        if (towns[ti].cell == m.cell) continue;
+        ++st.towns_in_nation;
+        pull_towns[it->second].push_back(ti);
+    }
+    market_walk direct;
+    for (std::size_t i = 0; i < markets.size(); ++i)
+    {
+        if (pull_towns[i].empty()) continue;
+        const mkt& m = markets[i];
+        std::vector<char> settled(pull_towns[i].size(), 0);
+        bool first = true;
+        for (;;)
+        {
+            run_market_walk(g, { m.cell }, /*roads_only=*/false, null_entity, -1,
+                            [](int) { return false; }, direct, &st.walks);
+            run_market_walk(g, { m.cell }, /*roads_only=*/true, null_entity, -1,
+                            [](int) { return false; }, mw, &st.walks);
+            // The heaviest town failing the detour test: gain = network - direct; a town
+            // the network does not reach at all weighs most; ties to the lower tile.
+            int best = -1;
+            std::int64_t best_gain = 0, best_net = kNoCost;
+            for (std::size_t k = 0; k < pull_towns[i].size(); ++k)
+            {
+                if (settled[k]) continue;
+                const town& t = towns[pull_towns[i][k]];
+                const std::int64_t d = direct.cell_cost(t.cell);
+                if (d == kNoCost) { settled[k] = 1; continue; } // no layable route
+                const std::int64_t net = mw.cell_cost(t.cell);
+                if (net != kNoCost && net <= 2 * d) continue;
+                if (first) ++st.pull_candidates;
+                const std::int64_t gain = net == kNoCost
+                                              ? std::numeric_limits<std::int64_t>::max()
+                                              : net - d;
+                if (best < 0 || gain > best_gain)
+                {
+                    best = static_cast<int>(k);
+                    best_gain = gain;
+                    best_net = net;
+                }
+            }
+            first = false;
+            if (best < 0)
+            {
+                // The market's pull walk is over: no town of it fails the test now.
+                if (trace != nullptr)
+                {
+                    market_road_trace::link e;
+                    e.k = market_road_trace::kind::pull_settled;
+                    e.market_a = m.id;
+                    e.to = m.tile;
+                    e.raises_before = raises_now();
+                    trace->links.push_back(std::move(e));
+                }
+                break;
+            }
+            settled[static_cast<std::size_t>(best)] = 1;
+            const town& t = towns[pull_towns[i][static_cast<std::size_t>(best)]];
+            market_road_trace::link l;
+            l.k = market_road_trace::kind::pull;
+            l.from = t.tile;
+            l.to = m.tile;
+            l.market_a = m.id;
+            l.direct_q = direct.cell_cost(t.cell);
+            l.network_q = best_net;
+            l.raises_before = raises_now();
+            l.tier = edge_tier(t.scale, m.scale, pct_of(t.nation));
+            std::vector<int> route = direct.path_to(t.cell);
+            std::reverse(route.begin(), route.end()); // town -> market
+            l.laid = stamp(route, l.tier, t.scale, m.scale, trace != nullptr ? &l.path : nullptr) > 0;
+            if (l.laid) ++st.pull_laid;
+            if (trace != nullptr) trace->links.push_back(std::move(l));
+        }
+    }
+
+    // 3. TRUNK — cheapest first; the detour test re-read at each pair's turn.
+    std::sort(pairs.begin(), pairs.end(), [&](const pair_c& x, const pair_c& y) {
+        const bool xu = x.d == kNoCost, yu = y.d == kNoCost;
+        if (xu != yu) return !xu;
+        if (x.d != y.d) return x.d < y.d;
+        if (markets[x.a].id != markets[y.a].id) return markets[x.a].id < markets[y.a].id;
+        return markets[x.b].id < markets[y.b].id;
+    });
+    for (const pair_c& p : pairs)
+    {
+        const mkt& from = markets[p.from];
+        const mkt& to   = markets[p.from == p.a ? p.b : p.a];
+        market_road_trace::link l;
+        l.k = market_road_trace::kind::trunk;
+        l.from = from.tile;
+        l.to = to.tile;
+        l.market_a = markets[p.a].id;
+        l.market_b = markets[p.b].id;
+        l.pair_q = p.d;
+        l.raises_before = raises_now();
+        if (p.d == kNoCost)
+        {
+            ++st.trunk_unpriced;
+            if (trace != nullptr) trace->links.push_back(std::move(l));
+            continue;
+        }
+        run_market_walk(g, { from.cell }, /*roads_only=*/false, null_entity, -1,
+                        [&](int c) { return c == to.cell; }, direct, &st.walks);
+        const std::int64_t d = direct.cell_cost(to.cell);
+        l.direct_q = d;
+        if (d == kNoCost)
+        {
+            ++st.trunk_unpriced;
+            if (trace != nullptr) trace->links.push_back(std::move(l));
+            continue;
+        }
+        run_market_walk(g, { from.cell }, /*roads_only=*/true, null_entity, 2 * d,
+                        [&](int c) { return c == to.cell; }, mw, &st.walks);
+        const std::int64_t net = mw.cell_cost(to.cell);
+        l.network_q = net;
+        if (net != kNoCost && net <= 2 * d)
+        {
+            ++st.trunk_refused; // a serviceable route already joins them
+            if (trace != nullptr) trace->links.push_back(std::move(l));
+            continue;
+        }
+        l.tier = edge_tier(from.scale, to.scale, std::min(pct_of(from.nation), pct_of(to.nation)));
+        l.laid = stamp(direct.path_to(to.cell), l.tier, from.scale, to.scale,
+                       trace != nullptr ? &l.path : nullptr) > 0;
+        if (l.laid) ++st.trunk_laid;
+        else        ++st.trunk_empty;
+        if (trace != nullptr) trace->links.push_back(std::move(l));
+    }
+
+    st.off_backbone_after = count_off_backbone();
+    st.tiles_raised = static_cast<int>(raised.size());
+    if (stats != nullptr) *stats = st;
+    // road_level moved: every traversal cache is stale (generate_roads' contract).
+    if (!raised.empty()) invalidate_logistics_caches(w);
 }
 
 

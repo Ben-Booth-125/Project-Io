@@ -195,6 +195,10 @@ struct generation_cursor
     /// BL-910 capital markets, recorded as they are placed so the pricing pass
     /// after the carve can price them (Ben, 2026-09-23).
     std::vector<entity_id> capital_market_shells;
+    /// Parallel to it (BL-1138 review): each shell's REGION ANCHOR tile. A shell on
+    /// a water anchor stands on land, but the gravity fold's port gate still binds
+    /// it to its own region through this tile.
+    std::vector<entity_id> capital_shell_anchor;
 
     // --- Reported only (BL-754, BL-1072) --------------------------------------
     struct clock_state

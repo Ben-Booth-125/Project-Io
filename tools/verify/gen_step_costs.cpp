@@ -40,7 +40,8 @@
 // the road tiles the pass laid, its spurs, the villages it left unspurred and
 // its wall time. Before the ladder it prints the village size distribution the
 // floor reads, and a REPLAY CHECK: the build's own floor replayed, with the
-// history roads re-stamped from the fixture, must reproduce the built world's
+// history roads re-stamped from the fixture and the market roads re-laid
+// (BL-1138, `lay_market_roads`), must reproduce the built world's
 // road field tile for tile — otherwise the replay is not measuring the pass the
 // build ran, and the row says so. Each replay starts from a road-free body and
 // cold A* caches, exactly as the in-generation pass does. Each row is followed by a
@@ -320,6 +321,18 @@ void measure_road_floors(world& w, const generation_report& rep, const era_minus
                         " tiles | floods %lld | %.2f s\n",
                         seed, hs.corridors, hs.laid, hs.destinations, hs.floods,
                         secs_between(h0, clk::now()));
+        }
+        {
+            // BL-1138: the market pulls and the trunk, which generation lays after the
+            // folds (the built world's markets are the folded set, so this replays it).
+            market_road_stats ms{};
+            const clk::time_point m0 = clk::now();
+            lay_market_roads(w, body, &ms);
+            std::printf("  ROADS seed %u MARKETS: %d markets, joins %d (%d failed), pulls %d of %d,"
+                        " trunk %d of %d pairs (%d refused), %d tiles raised | walks %lld | %.2f s\n",
+                        seed, ms.markets, ms.joins_laid, ms.joins_failed, ms.pull_laid,
+                        ms.pull_candidates, ms.trunk_laid, ms.trunk_pairs, ms.trunk_refused,
+                        ms.tiles_raised, ms.walks, secs_between(m0, clk::now()));
         }
         const std::map<entity_id, std::uint8_t> replay = road_field(w, body);
         std::size_t diff = 0;
