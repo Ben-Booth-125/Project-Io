@@ -389,6 +389,9 @@ void recipe_registry::load_from_lua(lua_state& lua)
         // BL-654: the buyer's reservation ceiling, in the same authored family.
         // Absent -> 0.0 -> no goods draw ever buys, the pre-BL-654 behaviour.
         pb.reservation_mult = price_band->get_or("reservation_mult", pb.reservation_mult);
+        // BL-1172: the shelf's share of supply, in ticks of demand. Absent ->
+        // 0 -> listings only, the price law before the ruling.
+        pb.shelf_supply_ticks = price_band->get_or("shelf_supply_ticks", pb.shelf_supply_ticks);
         m_price_band = pb;
     }
 

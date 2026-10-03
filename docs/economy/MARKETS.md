@@ -228,11 +228,15 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
    inventory).
 7. **Standing buy orders** — read from `world::buy_orders`, entered into demand and the
    explicit buy book (`max_price`, optional `preferred_seller`).
-8. **Reference prices** — computed once from the accumulated supply/demand (below), so every
-   flow this tick uses the same price.
+8. **Reference prices** — computed once from the accumulated demand and the supply the price law
+   reads — this tick's listings plus the shelf's share, at most k ticks of demand off the stock
+   standing after the tick's draws (k = 0 until shelf spoilage, BL-1179; § Price resolution,
+   below) — so every sale this tick uses the same price.
 9. **Auto clearing** — auto-surplus sells at the reference price (**perfect counterparty**: the
-   sell side is unconditional — see § Real market inventory); auto-demand billed at the
-   reference price for whatever was already drawn in step 6.
+   sell side is unconditional — see § Real market inventory); auto-demand is billed at the
+   **posted price** — the price standing on the shelf when it was drawn in step 6, the one the
+   draw checked against its reservation ceiling — never the reference price its own want helped
+   resolve ([FINANCE.md](FINANCE.md) § Standing-force upkeep, Ben 2026-10-03).
 10. **Order-book matching** (BL-037, preferential purchasing) — explicit sells vs explicit buys
     by price-time priority: cheapest ask first, highest bid first, corp id as the deterministic
     tiebreak. A buyer's `preferred_seller` is served first, tolerated up to **1.10×** the cheapest
@@ -416,6 +420,11 @@ draw** — unit upkeep takes the same shape, not a second one.
 - **Above a reservation ceiling, it does not buy.** The draw goes unmet and the shortfall rule
   applies — the building weakens, exactly as an unsupplied unit does. Going without is an outcome
   the design already knows how to express.
+- **It pays the posted price, and so does every other goods draw (Ben, 2026-10-03).** The ceiling
+  is read against the price standing on the shelf, and that price is what the draw is billed.
+  Processor inputs and construction materials obey the same ceiling: a processor runs on its own
+  pool, and a site pauses, rather than buy above it. [FINANCE.md](FINANCE.md) § Standing-force
+  upkeep owns the rule.
 
 **This is the exact mirror of a rule the market already has.** Step 11's `floor_price` is a
 seller's reservation — *"hold rather than sell below this"*, never a price the market is made to
@@ -426,7 +435,9 @@ chasing a shortfall it cannot fix.
 
 The ceiling belongs to the **price band's** authored family (`floor_mult` / `ceil_mult`,
 § Price resolution) rather than to upkeep, because it is a statement about what a good is worth
-paying, not about who is buying. Its value is measured, not guessed.
+paying, not about who is buying. Its value (2.0) is a first cut, set by ruling rather than
+derived; `firm_attrition_trace` and `demand_census` are the instruments that move it
+(`scripts/economy.lua` carries the reasoning).
 
 Every remaining channel inherits this question and is checked against it **before** it is built:
 BL-643 (infrastructure), BL-644 (state), BL-645 (research), BL-646 (conflict).
@@ -755,15 +766,16 @@ One row per exchange, appended by the clearing tick, ring-capped the way the plo
 | `market` | Which board. The surface is per-market. |
 | `resource` | What moved. |
 | `quantity` | How much. |
-| `unit_price` | The price clearing resolved, not the floor the order carried — an order is honoured *at clearing*, so what the seller asked and what they got are different numbers and only one of them is the trade. |
+| `unit_price` | The price the exchange was made at, not the floor or cap an order carried — an order is honoured *at clearing*, so what the seller asked and what they got are different numbers and only one of them is the trade. A sale to the market is made at the resolved price; a draw off the shelf at the **posted** price it was decided and billed at ([FINANCE.md](FINANCE.md) § Standing-force upkeep); a matched trade at the price its match executed on. |
 | `seller`, `buyer` | The two corps. Either may be a background firm — and either may be **absent**, which means the market itself and not an unknown party (see below). |
 
 **One side is often the MARKET, and a reader must say so rather than blank the row.** Only the
 matched order-book path (§ Where the order book lives) has a real corp on both sides, and that path
 is dormant in play while the buy side has no emitter. The three paths that carry the volume trade
 against the market as counterparty of last resort: a corp's auto-surplus is *sold to the market*, a
-processor's input draw is *bought from the market*, and an unmatched standing sell auto-clears *to
-the market* at the resolved price. Those exchanges are real — goods moved, cash moved — so they are
+consumer's shelf draw (a processor's input, a site's material, an upkeep draw) is *bought from the
+market* at the posted price, and an unmatched standing sell auto-clears *to the market* at the
+resolved price. Those exchanges are real — goods moved, cash moved — so they are
 recorded, with the absent side left empty. A surface renders that side as the market; treating it as
 missing data would hide most of the history the record exists to keep.
 
@@ -895,9 +907,11 @@ target = base_price × √(demand / supply)     — damped elasticity
 price  = prior + 0.5 × (target − prior)       — EMA smoothing
 ```
 
-**The shelf is supply (Ben, 2026-10-03):** `supply` is this tick's listings plus the stock
-standing on the market's shelf (`inventory`). A market fed only by deliveries is not a market with
-nothing to sell, so its own buyers cannot drive its price to the ceiling against a full shelf.
+**The shelf is supply (Ben, 2026-10-03):** `supply` is this tick's listings plus the shelf's share
+of the stock standing on the market's shelf (`inventory`) — at most k ticks of demand, and k = 0
+until shelf spoilage (BL-1179), below. A market fed only by deliveries is not a market with
+nothing to sell, so at k > 0 its own buyers cannot drive its price to the ceiling against a full
+shelf.
 **The shelf counts only as far as it can sell (Ben, 2026-10-03):** the shelf's share of `supply` is
 at most what the market's demand would take off it within k ticks, `min(inventory, k × demand)`.
 Counted whole, a market that buys every surplus as the buyer of last resort grows a glut that

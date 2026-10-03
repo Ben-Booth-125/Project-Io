@@ -136,6 +136,7 @@ struct network_purchase
 std::vector<network_purchase> derive_network_upkeep_claims(const world& w,
                                                            const std::map<entity_id, nation_budget>& budgets,
                                                            const network_upkeep_params& p,
+                                                           float reservation_mult,
                                                            std::vector<budget_claim>& claims);
 
 /// Settle the derived intents against what `run_national_budget` actually

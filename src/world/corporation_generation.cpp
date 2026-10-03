@@ -818,6 +818,56 @@ entity_id corp_home_body(const world& w, const std::vector<entity_id>& assets)
     return null_entity;
 }
 
+/// BL-1173 — WORKING CAPITAL, x the opening stock's value at base price.
+///
+/// FINANCE.md § Debt interest: "Every firm opens with it". A background firm is
+/// handed a BL-116 opening stockpile and used to be handed no money at all, so
+/// the first quarter's wages and maintenance put it below zero before it had
+/// sold a unit, and interest compounded the rest — 57 % of the field started
+/// one bad quarter from the spiral the 400-credit `base_capital` exists to
+/// stop for the seat and the specialists.
+///
+/// THE RULE: cash = this fraction x the value of the stock, each good valued at
+/// its BASE price in the market the stock is pooled in. Base, never the live
+/// price: an opening position is priced by what a good is worth, not by the
+/// first tick's scarcity, and base is fixed at generation so the result cannot
+/// move with clearing order. A quarter of the stock's worth is "a firm keeps
+/// one part in four of its working assets liquid" — enough to carry the
+/// opening quarters' wages and maintenance while it sells the stock it holds,
+/// without minting a balance larger than what the firm actually owns.
+constexpr float k_background_working_capital_of_stock = 0.25f;
+
+/// The opening cash a background firm is handed: the rule above. `pool_key` is
+/// the key its stock was pooled under (`corp_home_pool_key`): a market prices
+/// it at that market's base; a body-level key (no market carved yet) prices it
+/// at the LOWEST-ID market on that body, a fixed choice so it cannot depend on
+/// container order; a body with no market at all prices it at 0, since there
+/// is nowhere the stock could be sold. Pure; deterministic; no RNG.
+static float background_working_capital(const world& w, entity_id pool_key,
+                                        const std::array<float, resource_count>& stock)
+{
+    const market_component* m = nullptr;
+    if (const auto it = w.markets.find(pool_key); it != w.markets.end())
+        m = &it->second;
+    else
+    {
+        entity_id best = null_entity;
+        for (const auto& [mid, mc] : w.markets)
+            if (mc.body == pool_key && (best == null_entity || mid < best))
+                best = mid;
+        if (best != null_entity)
+            m = &w.markets.at(best);
+    }
+    if (m == nullptr)
+        return 0.0f;
+
+    double value = 0.0; // resource index order: a fixed summation order
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (stock[r] > 0.0f && m->base_price[r] > 0.0f)
+            value += static_cast<double>(stock[r]) * m->base_price[r];
+    return static_cast<float>(value * k_background_working_capital_of_stock);
+}
+
 // ---------------------------------------------------------------------------
 // Pass 5 helpers — procedural naming
 // ---------------------------------------------------------------------------
@@ -2572,9 +2622,9 @@ std::vector<entity_id> generate_background_firms(
                 }
             }
 
-            // Financial profile: background firms open lean, same as every other
-            // generated corp (corporation_params::base_capital defaults to 0 —
-            // capital is earned through the pre-game warm start, not seeded).
+            // Financial profile: opened at zero here and handed its working
+            // capital (BL-1173, background_working_capital) once its opening
+            // stock is generated below, since the capital is priced from it.
             corporation_component cc;
             cc.name          = make_corp_name(nit->second.name, name_rng);
             cc.home_nation   = home_nid;
@@ -2625,9 +2675,18 @@ std::vector<entity_id> generate_background_firms(
             {
                 const auto stock = generate_starting_stockpile(
                     focus, /*capital=*/0.0f, /*base_capital=*/0.0f, stock_rng);
-                stockpile_component& pool = w.pool_at(corp_id, corp_home_pool_key(w, corp_id, home_body)); // BL-1003: HQ tile market pool
+                const entity_id pool_key = corp_home_pool_key(w, corp_id, home_body);
+                stockpile_component& pool = w.pool_at(corp_id, pool_key); // BL-1003: HQ tile market pool
                 for (std::size_t r = 0; r < resource_count; ++r)
                     pool.quantities[r] += stock[r];
+
+                // BL-1173: the firm opens with working capital priced from the
+                // stock it was just handed (background_working_capital, above).
+                // Set after the stock so the stock stream is drawn exactly as
+                // before; no RNG is read here.
+                corporation_component& opened = w.corporations.at(corp_id);
+                opened.starting_capital = background_working_capital(w, pool_key, stock);
+                opened.balance          = opened.starting_capital;
             }
         }
     }
@@ -4304,7 +4363,8 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             }
 
             // The company, as Pass 6 authors it: open by construction (BL-678),
-            // no capital, a stockpile from the BL-116 generator.
+            // a stockpile from the BL-116 generator, and working capital priced from
+            // it (BL-1173) once the stock is generated below.
             corporation_component corp;
             corp.name             = make_corp_name(nc.name, name_rng);
             corp.home_nation      = cc.nation;
@@ -4340,9 +4400,18 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             {
                 const auto stock = generate_starting_stockpile(
                     focus, /*capital=*/0.0f, /*base_capital=*/0.0f, stock_rng);
-                stockpile_component& pool = w.pool_at(corp_id, corp_home_pool_key(w, corp_id, home_body)); // BL-1003: HQ tile market pool
+                const entity_id pool_key = corp_home_pool_key(w, corp_id, home_body);
+                stockpile_component& pool = w.pool_at(corp_id, pool_key); // BL-1003: HQ tile market pool
                 for (std::size_t r = 0; r < resource_count; ++r)
                     pool.quantities[r] += stock[r];
+
+                // BL-1173: the firm opens with working capital priced from the
+                // stock it was just handed (background_working_capital, above).
+                // Set after the stock so the stock stream is drawn exactly as
+                // before; no RNG is read here.
+                corporation_component& opened = w.corporations.at(corp_id);
+                opened.starting_capital = background_working_capital(w, pool_key, stock);
+                opened.balance          = opened.starting_capital;
             }
         }
     }

@@ -74,8 +74,8 @@ retuning, so the equipment-to-wage ratio the roster is anchored on survives.
 rations and ordnance are bought at most at their reservation price; above it the unit draws less
 and fights weaker, so a supply shortage weakens an army rather than bankrupting the firm that keeps
 it. **"Draws less" is literal (Ben, 2026-10-03):** a unit buys only the part of its need that
-clears at or under the ceiling, and pays the clearing price for it; it is never billed below the
-price its sellers were paid, so no fill is subsidised and no money appears from nowhere. **What
+is offered at or under the ceiling, and pays for it at the posted price (below); no fill is
+subsidised and no money appears from nowhere. **What
 the owner can afford is the ceiling alone (Ben, 2026-10-03):** the draw reads the price, not the
 owner's balance. **A draw pays the posted price (Ben, 2026-10-03):** a
 draw from a market's shelf is decided and billed at the price that stood when it was made — the
@@ -85,8 +85,9 @@ and a unit beside a full shelf is never refused by a price its own want drove up
 ceiling governs every goods draw (Ben, 2026-10-03):** unit and building upkeep, processor inputs
 and construction alike buy only at or under it, and a draw over it does not bid either, so its
 want leaves the price and the price can ease back. **Nations' draws too (Ben, 2026-10-03):** a
-nation's network upkeep and its space programme draw a shelf under the same ceiling and the same
-posted price. Measured on the curated seeds, a 50-head unit cost about 970 a year at the prices the market
+nation's network upkeep and its space programme draw under the same ceiling and the same posted
+price — every draw, whether out of a corporation's pool (priced at its market) or off a market's
+shelf. Measured on the curated seeds, a 50-head unit cost about 970 a year at the prices the market
 actually charged (rations ~3.5x and ordnance ~6x their base) against a hire price near 120, and
 standing-force upkeep was what wound most of the field up.
 
@@ -106,9 +107,43 @@ goods do not arrive the unit *weakens* rather than vanishing. The unit's
 `supply_factor_permille` takes the same subtraction whether (a) it is beyond the reach
 field (the out-of-supply decay of BL-325, reach as the placement constraint) or (b) its
 draw went unmet. Same subtraction, same reason; a met draw and a unit in reach recover
-it. Deterministic scalar arithmetic, no RNG. Because the supply factor feeds
+it. **The subtraction stops at the unit's supply share** (BL-1172, fair-price upkeep): out of
+reach the share is zero, and a short draw's share is the mean over its goods of the fraction
+actually met, in integer per-mille. A unit fed half its draw therefore settles at half
+strength rather than starving to nothing, and climbs back toward its share from below.
+Deterministic integer arithmetic, no RNG. Because the supply factor feeds
 `unit_strength` and the combat adapter, an unsupplied army is measurably weaker **in the
 resolver**, not merely more expensive.
+
+**The ceiling is checked once, at the posted price, and the draw pays that price.** The ceiling
+is `price_band.reservation_mult` (2.0 — twice what a good is worth at an even market: dear, but a
+price a supplied market reaches, where the 10× cap is the signal of a good nobody makes). Every
+goods draw from a shelf — unit and building upkeep, processor inputs, construction, and a
+nation's network upkeep and space programme — reads the posted price, the price the last clearing
+left standing (base, on a market that has never resolved one), takes the good only where that
+price is at or under the ceiling, and is billed at it, with one exchange row at that price. The
+price the tick goes on to resolve is never what the draw pays. Above the ceiling the good is not
+drawn **and not bid for**, so its want leaves the price and the price can ease: a unit or
+building goes short and takes the shortfall rule, a processor runs on what its pool holds, a
+construction site pauses for want of that material (construction capacity over the ceiling
+stretches the build instead, as an empty yard does), and a nation buys elsewhere or not at all.
+What a draw is billed is only what the shelf gave.
+
+**The cost of listings-only supply, stated (k = 0 until shelf spoilage, Ben 2026-10-03).** While
+the shelf does not count as supply (MARKETS.md § Price resolution), a draw on a market nobody lists
+into prices itself out of a full shelf: its own want is demand against zero supply, the price
+resolves from 1.5× toward the 10× cap (5.75× in one tick), the draw is then over the ceiling and
+does not bid, and the price eases back under it over three ticks. Measured on a unit and on a
+processor beside a full shelf (`unit_upkeep` U13, `fair_price_ceiling` M5): each is fed **one tick
+in four** — 3 of 12 — never more than three ticks running without. The processor runs at a quarter
+of its capacity. The unit's supply factor nets −50 per four-tick cycle and walks down to a floor
+cycle of 100, 50, 0, 0: an army fed only from such a shelf ends near zero strength. A market that
+is also being listed into at a rate near its demand does not pulse this way, since its listings
+are supply; thin listings do not save it (0.1 listed against a demand of 1 still resolves 1.5× to
+2.33×, over the ceiling). The cost is
+accepted until spoilage (BL-1179) lets a shelf count without its glut flooring prices.
+A ceiling of zero switches the rule off, and off means what each draw did before it: upkeep never
+buys; processors, construction and the nations buy whatever the shelf holds.
 
 The pass also carries **orphan cleanup**: `demolish_building` erases the building, the
 corp asset and the building stockpile but never touches `w.units`, so without it
@@ -228,9 +263,16 @@ a survivable bad quarter starting the spiral at all. **Every firm opens with it 
 a background firm opens with working capital priced from its opening stock, not at zero, so the
 buffer exists for the whole field and not only for the seat and the specialists. It is
 minted at generation, as `base_capital` is (Ben, 2026-10-03): no treasury or charter budget pays
-for it. The constant is the single
-source of truth: the live loop and the `econ_bankruptcy` harness read the same value.
-Interest is a pure function of balance × rate — deterministic. Design: BL-073 (debt
+for it. The rule: cash is
+one quarter of the stock's value, each good at its base price in the market the stock is pooled in
+(`k_background_working_capital_of_stock`, `corporation_generation.cpp`). Base, never the live price,
+so an opening position is priced by worth rather than by the first tick's scarcity. A stock pooled
+at body level, on a body with no market carved yet, is priced at the lowest-id market on that body
+— a fixed choice, so the figure cannot depend on container order; on a body with no market at all
+there is nowhere the stock could be sold, and the working capital is zero.
+
+The interest rate `k_debt_interest_per_quarter` is the single source of truth: the live loop and
+the `econ_bankruptcy` harness read the same value. Interest is a pure function of balance × rate — deterministic. Design: BL-073 (debt
 interest).
 
 ## The quarterly return

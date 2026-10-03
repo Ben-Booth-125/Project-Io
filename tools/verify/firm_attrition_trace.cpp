@@ -113,11 +113,18 @@ int main(int argc, char** argv)
     int ticks = 450, every = 25;
     bool per_corp = false;
     std::vector<uint32_t> seeds = {0};
+    std::set<int> at_ticks; // --at a,b,c: extra rows at these (1-based, settle-inclusive) ticks
     for (int i = 1; i < argc; ++i)
     {
         if (!std::strcmp(argv[i], "--ticks") && i + 1 < argc) ticks = std::atoi(argv[++i]);
         else if (!std::strcmp(argv[i], "--every") && i + 1 < argc) every = std::max(1, std::atoi(argv[++i]));
         else if (!std::strcmp(argv[i], "--corps")) per_corp = true;
+        else if (!std::strcmp(argv[i], "--at") && i + 1 < argc)
+        {
+            std::stringstream ss(argv[++i]);
+            std::string t;
+            while (std::getline(ss, t, ',')) if (!t.empty()) at_ticks.insert(std::atoi(t.c_str()));
+        }
         else if (!std::strcmp(argv[i], "--seeds") && i + 1 < argc)
         {
             seeds.clear();
@@ -165,6 +172,7 @@ int main(int argc, char** argv)
         std::size_t ex_total = w.exchanges.total; int ex_overflow = 0; double win_off = 0;
         std::map<int, double> win_sold, win_bought;
         double win_f[7] = {0};
+        int win_dispatch = 0, tot_dispatch = 0;
         std::map<int, int> exit_hist_ins, exit_hist_acq;
         const int total = k_campaign_settle_ticks + ticks;
         for (int step = 0; step < total; ++step)
@@ -248,6 +256,8 @@ int main(int argc, char** argv)
             for (const auto& [cid, cc] : w.corporations)
                 if (!track.count(cid)) { corp_track& t = track[cid]; t.born = step; t.bal0 = cc.balance; t.background = cc.is_background; }
             c_ins += ins; c_acq += acq;
+            win_dispatch += static_cast<int>(res.report.battle_dispatches.size());
+            tot_dispatch += static_cast<int>(res.report.battle_dispatches.size());
             for (const auto& [uid, u] : w.units) { (void)uid; if (auto it = track.find(u.owner); it != track.end()) ++it->second.unit_ticks; }
 
             // Buildings: gone this tick, attributed by last tick's owner.
@@ -290,7 +300,7 @@ int main(int argc, char** argv)
             }
             snapshot_owners();
 
-            if ((step + 1) % every == 0 || step == k_campaign_settle_ticks - 1)
+            if ((step + 1) % every == 0 || step == k_campaign_settle_ticks - 1 || at_ticks.count(step + 1))
             {
                 int live = 0, idlef = 0;
                 for (const auto& kv : w.buildings)
@@ -310,6 +320,15 @@ int main(int argc, char** argv)
                             live, b_built, b_demol, b_wound, idlef, neg, flo, fb);
                 for (int i = 0; i < 7; ++i) { std::printf(" %.0f", win_f[i] / span); win_f[i] = 0; }
                 std::printf(" off-loop %.0f", win_off / span); win_off = 0;
+                {
+                    // Battles in play and the standing force's supply (BL-1172 lane).
+                    int cu = 0; long long sup = 0;
+                    for (const auto& [uid, u] : w.units)
+                    { (void)uid; if (w.corporations.count(u.owner)) { ++cu; sup += u.supply_factor_permille; } }
+                    std::printf(" | battles live %zu dispatched %d (cum %d) | corp units %d supply %.0f",
+                                w.battles.size(), win_dispatch, tot_dispatch, cu, cu ? static_cast<double>(sup) / cu : 0.0);
+                    win_dispatch = 0;
+                }
                 auto top = [&](const char* l, std::map<int, double>& m) {
                     std::vector<std::pair<double, int>> v; for (auto& [r, x] : m) v.push_back({-x, r}); std::sort(v.begin(), v.end());
                     std::printf(" | %s", l); for (std::size_t i = 0; i < v.size() && i < 4; ++i) std::printf(" %s %.0f", gname(v[i].second).c_str(), -v[i].first / span);

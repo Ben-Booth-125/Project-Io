@@ -1152,7 +1152,7 @@ int main()
         };
         auto run_space = [](space_fixture& s) {
             std::vector<space_purchase> intents = derive_space_programme_claims(
-                s.f.w, s.f.budgets, s.params, s.f.claims);
+                s.f.w, s.f.budgets, s.params, /*reservation_mult: no ceiling (pre-BL-1172)*/ 0.0f, s.f.claims);
             national_budget_tick t;
             run_national_budget(s.f.w, s.f.budgets, s.f.claims, &t);
             settle_space_purchases(s.f.w, intents, t);
@@ -1292,7 +1292,7 @@ int main()
             s.params.propellant_lump = 0.0f;
             const double credit_before = world_credit_exact(s.f.w);
             std::vector<space_purchase> intents = derive_space_programme_claims(
-                s.f.w, s.f.budgets, s.params, s.f.claims);
+                s.f.w, s.f.budgets, s.params, /*reservation_mult: no ceiling (pre-BL-1172)*/ 0.0f, s.f.claims);
             s.f.w.corp_market_pools.at(std::make_pair(s.f.corp_1, pool_key_for_body(s.f.w, s.body_a)))
                 .quantities[k_comp] = 0.0f; // the out-of-band draw
             national_budget_tick t;
@@ -1364,7 +1364,7 @@ int main()
             space_fixture s = make_space_fixture(100.0f, 100.0f);
             const double credit_before = world_credit_exact(s.f.w);
             std::vector<space_purchase> intents = derive_space_programme_claims(
-                s.f.w, s.f.budgets, s.params, s.f.claims);
+                s.f.w, s.f.budgets, s.params, /*reservation_mult: no ceiling (pre-BL-1172)*/ 0.0f, s.f.claims);
             budget_claim rogue;
             rogue.nation  = s.f.nation_a;
             rogue.corp    = s.f.corp_2; // holds no stock, made no intent
@@ -1426,7 +1426,7 @@ int main()
             mc.base_price[k_comp] = 1.0f;
             mc.inventory[k_comp]  = 100.0f; // holds the whole lump of 8
             std::vector<space_purchase> intents = derive_space_programme_claims(
-                s.f.w, s.f.budgets, s.params, s.f.claims);
+                s.f.w, s.f.budgets, s.params, /*reservation_mult: no ceiling (pre-BL-1172)*/ 0.0f, s.f.claims);
             national_budget_tick t;
             run_national_budget(s.f.w, s.f.budgets, s.f.claims, &t);
             settle_space_purchases(s.f.w, intents, t);
@@ -1443,12 +1443,75 @@ int main()
             qmc.base_price[k_comp] = 1.0f;
             qmc.inventory[k_comp]  = 4.0f; // HALF a lump: no purchase
             std::vector<space_purchase> q_intents = derive_space_programme_claims(
-                q.f.w, q.f.budgets, q.params, q.f.claims);
+                q.f.w, q.f.budgets, q.params, /*reservation_mult: no ceiling (pre-BL-1172)*/ 0.0f, q.f.claims);
             check(whole_ok && q_intents.empty() &&
                   same(qmc.inventory[k_comp], 4.0f),
                   "R7m (BL-742) empty pools, stocked shelf: the lump comes "
                   "whole off market inventory (treasury debited directly, no "
                   "claim, no corp paid) - and a half-lump shelf buys nothing");
+        }
+
+        // R7n (BL-1172, Ben 2026-10-03: "a nation's network upkeep and its space
+        // programme draw a shelf under the same ceiling and the same posted
+        // price"). Ceiling 2.0 x base 1.0. Components posted at 2.5: EIGHT
+        // ticks of derive -> spend -> settle buy nothing, the shelf and the
+        // treasury untouched. Then posted at 2.0 (at the ceiling): the lump of
+        // 8 comes off the shelf at the posted 2.0 -> 16 credits.
+        {
+            space_fixture s = make_space_fixture(0.0f, 0.0f);
+            s.params.propellant_lump = 0.0f;
+            auto& mc = s.f.w.markets.at(s.market);
+            mc.base_price[k_comp] = 1.0f;
+            mc.price[k_comp]      = 2.5f;
+            mc.inventory[k_comp]  = 100.0f;
+            int bought = 0;
+            for (int tick = 0; tick < 8; ++tick)
+            {
+                s.f.claims.clear();
+                std::vector<space_purchase> intents = derive_space_programme_claims(
+                    s.f.w, s.f.budgets, s.params, /*reservation_mult*/ 2.0f, s.f.claims);
+                national_budget_tick t;
+                run_national_budget(s.f.w, s.f.budgets, s.f.claims, &t);
+                settle_space_purchases(s.f.w, intents, t);
+                bought += static_cast<int>(intents.size());
+            }
+            const bool refused = bought == 0 && same(mc.inventory[k_comp], 100.0f) &&
+                                 same(s.f.w.nations.at(s.f.nation_a).treasury, 1024.0f);
+            mc.price[k_comp] = 2.0f;
+            s.f.claims.clear();
+            std::vector<space_purchase> intents = derive_space_programme_claims(
+                s.f.w, s.f.budgets, s.params, /*reservation_mult*/ 2.0f, s.f.claims);
+            national_budget_tick t;
+            run_national_budget(s.f.w, s.f.budgets, s.f.claims, &t);
+            settle_space_purchases(s.f.w, intents, t);
+            check(refused && intents.size() == 1 && intents[0].completed &&
+                  same(intents[0].credits, 16.0f) && same(mc.inventory[k_comp], 92.0f) &&
+                  same(s.f.w.nations.at(s.f.nation_a).treasury, 1024.0f - 16.0f),
+                  "R7n (BL-1172) over the ceiling, eight ticks of the space "
+                  "programme buy nothing off the shelf; at it, the lump is bought "
+                  "at the posted price");
+        }
+
+        // R7o (BL-1172, "yes, every draw"): the corp-pool path too. A pool
+        // holds a whole lump of components posted at 9x base: no intent, the
+        // pool intact. At 2x (the ceiling) the same pool supplies the lump.
+        {
+            space_fixture s = make_space_fixture(100.0f, 0.0f);
+            s.params.propellant_lump = 0.0f;
+            auto& mc = s.f.w.markets.at(s.market);
+            mc.base_price[k_comp] = 1.0f;
+            mc.price[k_comp]      = 9.0f;
+            std::vector<space_purchase> over = derive_space_programme_claims(
+                s.f.w, s.f.budgets, s.params, /*reservation_mult*/ 2.0f, s.f.claims);
+            const bool refused = over.empty() && s.f.claims.empty();
+            s.f.claims.clear();
+            mc.price[k_comp] = 2.0f;
+            std::vector<space_purchase> at = derive_space_programme_claims(
+                s.f.w, s.f.budgets, s.params, /*reservation_mult*/ 2.0f, s.f.claims);
+            check(refused && at.size() == 1 && at[0].supplier == s.f.corp_1 &&
+                  same(at[0].credits, 16.0f),
+                  "R7o (BL-1172) a corp pool's components posted at 9x are refused; "
+                  "at the ceiling the pool supplies the lump at the posted price");
         }
     }
 
@@ -1551,7 +1614,7 @@ int main()
         };
         auto run_net = [](net_fixture& s) {
             std::vector<network_purchase> intents = derive_network_upkeep_claims(
-                s.f.w, s.f.budgets, s.params, s.f.claims);
+                s.f.w, s.f.budgets, s.params, /*reservation_mult: no ceiling (pre-BL-1172)*/ 0.0f, s.f.claims);
             national_budget_tick t;
             run_national_budget(s.f.w, s.f.budgets, s.f.claims, &t);
             settle_network_purchases(s.f.w, intents, t);
@@ -1702,7 +1765,7 @@ int main()
             net_fixture s = make_net_fixture(100.0f, 0.0f);
             const double credit_before = world_credit_exact(s.f.w);
             std::vector<network_purchase> intents = derive_network_upkeep_claims(
-                s.f.w, s.f.budgets, s.params, s.f.claims);
+                s.f.w, s.f.budgets, s.params, /*reservation_mult: no ceiling (pre-BL-1172)*/ 0.0f, s.f.claims);
             s.f.w.corp_market_pools.at(std::make_pair(s.f.corp_1, pool_key_for_body(s.f.w, s.body_a)))
                 .quantities[k_stone] = 0.0f; // the out-of-band draw
             national_budget_tick t;
@@ -1718,7 +1781,7 @@ int main()
             net_fixture r = make_net_fixture(100.0f, 100.0f);
             const double r_credit_before = world_credit_exact(r.f.w);
             std::vector<network_purchase> r_intents = derive_network_upkeep_claims(
-                r.f.w, r.f.budgets, r.params, r.f.claims);
+                r.f.w, r.f.budgets, r.params, /*reservation_mult: no ceiling (pre-BL-1172)*/ 0.0f, r.f.claims);
             budget_claim rogue;
             rogue.nation = r.f.nation_a;
             rogue.corp   = r.f.corp_2; // holds no stock, made no intent
@@ -1840,6 +1903,68 @@ int main()
                   same(s.f.w.nations.at(s.f.nation_a).treasury, 128.0f - 48.0f),
                   "R9l (BL-742) the shelf purchase caps itself at the line "
                   "share, pro-rata - 48 of the 64.0 bill, never the treasury");
+        }
+
+        // R9m (BL-1172, Ben 2026-10-03): network upkeep's shelf fallback draws
+        // under the fair-price ceiling at the posted price. Ceiling 2.0 x base
+        // 1.0: stone posted 2.0 (at it) is bought, timber posted 4.0 (over it)
+        // is not — for EIGHT ticks running. Stone 16 a tick at 2.0 = 32; the
+        // timber shelf never moves; the treasury falls by stone alone.
+        {
+            net_fixture s = make_net_fixture(0.0f, 0.0f);
+            auto& mc = s.f.w.markets.at(s.market);
+            mc.base_price[k_stone]  = 1.0f;
+            mc.base_price[k_timber] = 1.0f;
+            mc.inventory[k_stone]   = 1000.0f;
+            mc.inventory[k_timber]  = 1000.0f;
+            bool every_tick = true;
+            for (int tick = 0; tick < 8; ++tick)
+            {
+                s.f.claims.clear();
+                std::vector<network_purchase> intents = derive_network_upkeep_claims(
+                    s.f.w, s.f.budgets, s.params, /*reservation_mult*/ 2.0f, s.f.claims);
+                national_budget_tick t;
+                run_national_budget(s.f.w, s.f.budgets, s.f.claims, &t);
+                settle_network_purchases(s.f.w, intents, t);
+                every_tick = every_tick && intents.size() == 1 &&
+                             intents[0].resource == resource_type::stone &&
+                             intents[0].completed && same(intents[0].credits, 32.0f);
+            }
+            check(every_tick && same(mc.inventory[k_timber], 1000.0f) &&
+                  same(mc.inventory[k_stone], 1000.0f - 8.0f * 16.0f) &&
+                  same(s.f.w.nations.at(s.f.nation_a).treasury, 1024.0f - 8.0f * 32.0f),
+                  "R9m (BL-1172) over eight ticks the network buys stone at its "
+                  "posted 2.0 (at the ceiling) and never the timber posted over it");
+        }
+
+        // R9n (BL-1172, Ben 2026-10-03: the ceiling governs EVERY draw, "yes,
+        // every draw" — the corp-pool path as well as the shelf fallback).
+        // Pools hold stone and timber; stone posts at 9x its base (over the 2x
+        // ceiling), timber at 2x (at it). The network buys the timber out of
+        // the pool, and refuses the stone: no intent, the pool's stone intact.
+        {
+            net_fixture s = make_net_fixture(100.0f, 100.0f);
+            auto& mc = s.f.w.markets.at(s.market);
+            mc.base_price[k_stone]  = 1.0f;
+            mc.price[k_stone]       = 9.0f;
+            mc.base_price[k_timber] = 2.0f;
+            mc.price[k_timber]      = 4.0f;
+            std::vector<network_purchase> intents = derive_network_upkeep_claims(
+                s.f.w, s.f.budgets, s.params, /*reservation_mult*/ 2.0f, s.f.claims);
+            national_budget_tick t;
+            run_national_budget(s.f.w, s.f.budgets, s.f.claims, &t);
+            settle_network_purchases(s.f.w, intents, t);
+            const auto& pool = s.f.w.corp_market_pools.at(
+                std::make_pair(s.f.corp_1, pool_key_for_body(s.f.w, s.body_a)));
+            bool stone_intent = false;
+            for (const network_purchase& np : intents)
+                stone_intent = stone_intent || np.resource == resource_type::stone;
+            check(!stone_intent && intents.size() == 1 &&
+                  intents[0].resource == resource_type::timber &&
+                  intents[0].supplier == s.f.corp_1 && intents[0].completed &&
+                  same(pool.quantities[k_stone], 100.0f),
+                  "R9n (BL-1172) a corp pool's stone posted at 9x is refused "
+                  "(pool untouched); its timber at the ceiling is bought");
         }
     }
 

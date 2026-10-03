@@ -700,7 +700,10 @@ Naming a good here is a one-line `economy.lua` change, never a code change.
 **One decay rule, two triggers.** A unit is unsupplied if it sits beyond the reach field *or* its
 goods draw went unmet. Both fire the **same** subtraction on `supply_factor_permille`, because both
 mean the same thing — an army that is not being supplied gets weaker. It is deliberately not two
-rules.
+rules. The subtraction stops at the unit's **supply share**: zero out of reach, and on a short draw
+the mean over its goods of the fraction met, in integer per-mille (BL-1172, fair-price upkeep). A
+unit fed half its draw fights at half strength, since `unit_strength` and `unit_to_stack_entry`
+both scale by the supply factor.
 
 The reach trigger is **opt-in**: a non-positive `out_of_supply_reach` disables it *and* the
 Dijkstra behind it, so a zero table costs no time as well as no credits. The test is

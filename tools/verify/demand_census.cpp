@@ -805,8 +805,19 @@ band_result run_band(const char* band_name, era_band band, uint32_t seed,
             if (econ.build_duration_ticks <= 0.0f)
                 continue;
             const auto& row = reg.resource_build_cost_for(b.type, b.target_resource, b.recipe);
+            // BL-1172: run_construction registers no want for a good its site's
+            // shelf posts over the fair-price ceiling (FINANCE.md, Ben
+            // 2026-10-03: "a draw over it does not bid either"); mirror it, at
+            // the posted price the census tick's draw will read.
+            const entity_id site_mid = market_for_tile(w, b.tile);
+            const market_component* site_m =
+                (site_mid != null_entity) ? &w.markets.at(site_mid) : nullptr;
+            const float res_mult = reg.price_band().reservation_mult;
+            auto bids_for = [&](std::size_t r) {
+                return site_m == nullptr || shelf_admits(*site_m, r, res_mult, /*off_buys=*/true);
+            };
             for (std::size_t r = 0; r < resource_count; ++r)
-                if (row[r] > 0.0f)
+                if (row[r] > 0.0f && bids_for(r))
                     out.construction[r] += static_cast<double>(row[r] / econ.build_duration_ticks);
             // BL-709: the sector's own draw is part of THIS channel, and it has
             // to be counted here or the reconciliation below misattributes it.
@@ -816,8 +827,9 @@ band_result run_band(const char* band_name, era_band band, uint32_t seed,
             // processor's input bid, which is a worse lie than a missing row.
             // Mirrors `run_construction`'s own expression exactly: flat per
             // tick, NOT divided by build_duration_ticks.
-            out.construction[static_cast<std::size_t>(resource_type::construction_capacity)] +=
-                static_cast<double>(reg.construction().capacity_per_build_tick);
+            if (bids_for(static_cast<std::size_t>(resource_type::construction_capacity)))
+                out.construction[static_cast<std::size_t>(resource_type::construction_capacity)] +=
+                    static_cast<double>(reg.construction().capacity_per_build_tick);
         }
     }
 
@@ -898,7 +910,7 @@ band_result run_band(const char* band_name, era_band band, uint32_t seed,
     {
         std::vector<budget_claim> scratch;
         const std::vector<space_purchase> intents = derive_space_programme_claims(
-            w, w.nation_budgets, reg.space_programme(), scratch);
+            w, w.nation_budgets, reg.space_programme(), reg.price_band().reservation_mult, scratch);
         for (const space_purchase& sp : intents)
             out.state_pl[static_cast<std::size_t>(sp.resource)] +=
                 static_cast<double>(sp.quantity);
@@ -910,7 +922,7 @@ band_result run_band(const char* band_name, era_band band, uint32_t seed,
     {
         std::vector<budget_claim> scratch;
         const std::vector<network_purchase> intents = derive_network_upkeep_claims(
-            w, w.nation_budgets, reg.network_upkeep(), scratch);
+            w, w.nation_budgets, reg.network_upkeep(), reg.price_band().reservation_mult, scratch);
         for (const network_purchase& np : intents)
             out.infra_pl[static_cast<std::size_t>(np.resource)] +=
                 static_cast<double>(np.quantity);

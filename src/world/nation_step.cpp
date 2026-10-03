@@ -45,7 +45,8 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     // carry what each claim is FOR (good, quantity, pool) and are settled after
     // the spend.
     std::vector<space_purchase> space = derive_space_programme_claims(
-        w, w.nation_budgets, reg.space_programme(), report.budget_claims);
+        w, w.nation_budgets, reg.space_programme(), reg.price_band().reservation_mult,
+        report.budget_claims);
 
     // ---- 2c. ...and network upkeep (BL-643): the logistics_maintenance
     // line's consumer, the same state-purchase shape one claim kind over —
@@ -53,7 +54,8 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     // buys half its materials (network_upkeep.hpp says why that is the right
     // shape for a continuous sink where the launch lot's lump is not).
     std::vector<network_purchase> network = derive_network_upkeep_claims(
-        w, w.nation_budgets, reg.network_upkeep(), report.budget_claims);
+        w, w.nation_budgets, reg.network_upkeep(), reg.price_band().reservation_mult,
+        report.budget_claims);
     const std::vector<budget_claim>& claims = report.budget_claims;
 
     // ---- 3. Spend: the pure pass -------------------------------------------

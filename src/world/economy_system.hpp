@@ -231,6 +231,7 @@ struct economy_report
     /// sorted-accumulation reason.
     std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> upkeep_wants;
 
+
     /// Per (corporation, body): the pool-level workforce scarcity figure this
     /// tick — `min(1, supply/demand)`, rescaled by habitability efficiency after
     /// production. Since BL-614 (wage competition) this is a REPORTING aggregate
@@ -487,7 +488,11 @@ struct unit_upkeep_tick
 ///  3. THE DECAY RULE — ONE rule, TWO triggers. (a) the unit is beyond the reach
 ///     field (BL-325 S3's out-of-supply decay), or (b) the draw in step 2 went
 ///     unmet. Either fires the SAME subtraction on `supply_factor_permille`;
-///     neither firing lets it recover. Deterministic scalar arithmetic, no RNG.
+///     neither firing lets it recover. BL-1172: the subtraction stops at the
+///     unit's SUPPLY SHARE — 0 out of reach, the met share of a short draw
+///     (mean per-good met per-mille) otherwise — and a unit below its share
+///     recovers toward it, so a half-fed army settles at half strength.
+///     Deterministic integer arithmetic, no RNG.
 ///
 /// The CREDIT half is deliberately not here — it is a budget flow and lands as
 /// its own term in apply_budget's decomposition (budget_system.hpp).

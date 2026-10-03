@@ -29,6 +29,7 @@
 
 #include "world/components.hpp"
 #include "world/economy_system.hpp"
+#include "world/market_clearing.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
 
@@ -69,6 +70,23 @@ void check_near(float got, float want, const char* what, float tol = 1e-3f)
 }
 
 std::size_t ri(resource_type r) { return static_cast<std::size_t>(r); }
+
+/// The SHIPPED reservation multiple (scripts/economy.lua `price_band.
+/// reservation_mult`, BL-1172 "a fair price"). Restated, not loaded — this
+/// harness reads no Lua — so a retune moves it here too; the rows only place
+/// prices either side of it.
+constexpr float k_shipped_reservation = 2.0f;
+
+/// The SHIPPED shelf share of supply, in ticks of demand (scripts/economy.lua
+/// `price_band.shelf_supply_ticks`): 0 — listings only — until shelf spoilage
+/// (BL-1179) lands (Ben, 2026-10-03, MARKETS.md § Price resolution). Restated,
+/// not loaded. Every row that claims shipped behaviour runs at this.
+constexpr float k_shipped_shelf_ticks = 0.0f;
+
+/// A DORMANT k > 0: the k = 4 the sweep measured, NOT shipped. Rows that are
+/// deliberately about the k > 0 path (the law Ben will revisit after BL-1179)
+/// run at this, and say so in their names.
+constexpr float k_dormant_shelf_ticks = 4.0f;
 
 /// The fixture: ONE body, ONE corp, and however many buildings the caller asks
 /// for on it, all sharing the corp's single pool. That sharing is the whole point
@@ -480,13 +498,15 @@ entity_id add_market(fixture& f, resource_type good, float base, float price, fl
 /// A registry authoring both the upkeep basket and a price band, so the
 /// reservation ceiling is reachable. floor/ceil are the shipped pair; only
 /// `reservation` varies across the rows below.
-recipe_registry registry_with_reservation(resource_type good, float qty, float reservation)
+recipe_registry registry_with_reservation(resource_type good, float qty, float reservation,
+                                          float shelf_ticks = k_shipped_shelf_ticks)
 {
     recipe_registry reg = make_registry(building_type::extraction_site, era_band::any, good, qty);
     price_band_params pb;
     pb.floor_mult       = 0.25f;
     pb.ceil_mult        = 10.0f;
     pb.reservation_mult = reservation;
+    pb.shelf_supply_ticks = shelf_ticks;
     reg.set_price_band(pb);
     return reg;
 }
@@ -521,8 +541,8 @@ void r7_the_reservation_ceiling()
     {
         fixture f;
         f.build(1, building_type::extraction_site);
-        add_market(f, good, base, base * 5.0f, /*inventory*/ 10.0f); // 5x base, under 9x
-        recipe_registry reg = registry_with_reservation(good, need, 9.0f);
+        add_market(f, good, base, base * 1.5f, /*inventory*/ 10.0f); // 1.5x base, under 2x
+        recipe_registry reg = registry_with_reservation(good, need, k_shipped_reservation);
 
         economy_report rep;
         const int before = f.w.buildings.at(f.buildings[0]).supply_factor_permille;
@@ -545,8 +565,8 @@ void r7_the_reservation_ceiling()
     {
         fixture f;
         f.build(1, building_type::extraction_site);
-        add_market(f, good, base, base * 9.5f, /*inventory*/ 10.0f); // 9.5x base, over 9x
-        recipe_registry reg = registry_with_reservation(good, need, 9.0f);
+        add_market(f, good, base, base * 2.5f, /*inventory*/ 10.0f); // 2.5x base, over 2x
+        recipe_registry reg = registry_with_reservation(good, need, k_shipped_reservation);
 
         economy_report rep;
         const int before = f.w.buildings.at(f.buildings[0]).supply_factor_permille;
@@ -570,8 +590,8 @@ void r7_the_reservation_ceiling()
     {
         fixture f;
         f.build(1, building_type::extraction_site);
-        add_market(f, good, base, base * 2.0f, /*inventory*/ 0.2f); // shelf < need
-        recipe_registry reg = registry_with_reservation(good, need, 9.0f);
+        add_market(f, good, base, base * 1.5f, /*inventory*/ 0.2f); // shelf < need
+        recipe_registry reg = registry_with_reservation(good, need, k_shipped_reservation);
 
         economy_report rep;
         const building_upkeep_tick t = run_building_upkeep(f.w, reg, rep);
@@ -590,7 +610,7 @@ void r7_the_reservation_ceiling()
         fixture f;
         f.build(1, building_type::extraction_site);
         add_market(f, good, base, base, /*inventory*/ 10.0f);
-        recipe_registry reg = registry_with_reservation(good, need, 9.0f);
+        recipe_registry reg = registry_with_reservation(good, need, k_shipped_reservation);
         f.pool().quantities[ri(good)] = need * 0.4f;
 
         economy_report rep;
@@ -608,7 +628,7 @@ void r7_the_reservation_ceiling()
         fixture f;
         f.build(1, building_type::extraction_site);
         add_market(f, good, /*base*/ 0.0f, /*price*/ 0.0f, /*inventory*/ 10.0f);
-        recipe_registry reg = registry_with_reservation(good, need, 9.0f);
+        recipe_registry reg = registry_with_reservation(good, need, k_shipped_reservation);
 
         economy_report rep;
         const building_upkeep_tick t = run_building_upkeep(f.w, reg, rep);
@@ -771,6 +791,110 @@ void r9_no_wire_no_draw()
     }
 }
 
+// ---------------------------------------------------------------------------
+// R10 — BL-1172: A SHELF DRAW PAYS THE POSTED PRICE
+// ---------------------------------------------------------------------------
+// FINANCE.md § Standing-force upkeep (Ben, 2026-10-03): the same ceiling
+// governs every goods draw, building upkeep's included, and "a draw from a
+// market's shelf is decided and billed at the price that stood when it was
+// made — the price it checked against the ceiling — with one exchange row at
+// that price". The shelf posts 1.5x base. (a) Shelf only, at the SHIPPED k = 0:
+// the building is billed 1.5x — though its own want, against zero listed
+// supply, resolves this tick's price over the ceiling (k = 0's known cost;
+// fair_price_ceiling M5 / unit_upkeep U13). (b) A seller listing plenty,
+// shipped k: the price resolves elsewhere — and the building still pays 1.5x.
+// (c) DORMANT k = 4: the shelf's share is supply, so the same want leaves the
+// price at or under the ceiling.
+void r10_a_shelf_draw_pays_the_posted_price()
+{
+    std::printf("\n--- R10  BL-1172: a shelf draw pays the posted price ---\n");
+
+    constexpr resource_type good = resource_type::tools;
+    constexpr float need   = 0.5f;
+    constexpr float base   = 4.0f;
+    constexpr float posted = base * 1.5f;
+    constexpr float shelf  = 10.0f;
+
+    auto buyer_rows = [&](const fixture& f, float& qty, float& px) {
+        int n = 0; qty = 0.0f; px = -1.0f;
+        for (const exchange_record& e : f.w.exchanges.entries)
+            if (e.buyer == f.corp && e.resource == good) { ++n; qty += e.quantity; px = e.unit_price; }
+        return n;
+    };
+
+    // --- R10a: shelf only, shipped k = 0 — billed at posted -----------------
+    {
+        fixture f;
+        f.build(1, building_type::extraction_site);
+        const entity_id mid = add_market(f, good, base, posted, shelf);
+        recipe_registry reg = registry_with_reservation(good, need, k_shipped_reservation);
+
+        economy_report rep;
+        const building_upkeep_tick t = run_building_upkeep(f.w, reg, rep);
+        check(t.unmet == 0 && t.weakened == 0, "R10a the shelf covered the draw; the tally says met, not weakened");
+
+        const auto flows = clear_markets(f.w, reg, rep);
+        const float resolved = f.w.markets.at(mid).price[ri(good)];
+        check(resolved > base * k_shipped_reservation,
+              "R10a at shipped k = 0 the draw's own want resolves the price OVER the ceiling (the known cost)");
+        const auto fit = flows.find(f.corp);
+        check_near(fit == flows.end() ? 0.0f : fit->second.expenditure, need * posted,
+                   "R10a billed need x POSTED, not the resolved price");
+        float q, px;
+        check(buyer_rows(f, q, px) == 1, "R10a exactly one exchange row for the fill");
+        check_near(px, posted, "R10a ... at the posted price");
+        check_near(q * px, fit == flows.end() ? 0.0f : fit->second.expenditure,
+                   "R10a the row's value is exactly what the buyer was charged");
+        check_near(f.w.markets.at(mid).inventory[ri(good)], shelf - need,
+                   "R10a the shelf gave up exactly the fill");
+        check(f.w.buildings.at(f.buildings[0]).supply_factor_permille == 1000,
+              "R10a the building, supplied, does not weaken");
+    }
+
+    // --- R10c: DORMANT k = 4 — the shelf's share holds the price down ---------
+    {
+        fixture f;
+        f.build(1, building_type::extraction_site);
+        const entity_id mid = add_market(f, good, base, posted, shelf);
+        recipe_registry reg = registry_with_reservation(good, need, k_shipped_reservation,
+                                                        k_dormant_shelf_ticks);
+        economy_report rep;
+        run_building_upkeep(f.w, reg, rep);
+        const auto flows = clear_markets(f.w, reg, rep);
+        const float resolved = f.w.markets.at(mid).price[ri(good)];
+        check(resolved <= base * k_shipped_reservation && std::fabs(resolved - posted) > 1e-3f,
+              "R10c DORMANT k = 4: the shelf's share is supply, so the draw's own want leaves the price at or under the ceiling");
+        const auto fit = flows.find(f.corp);
+        check_near(fit == flows.end() ? 0.0f : fit->second.expenditure, need * posted,
+                   "R10c DORMANT k = 4: ... billed at the posted price all the same");
+    }
+
+    // --- R10b: a seller listing plenty — resolved low, billed at posted ------
+    {
+        fixture f;
+        f.build(1, building_type::extraction_site);
+        const entity_id mid = add_market(f, good, base, posted, shelf);
+        const entity_id seller = f.w.create_entity();
+        corporation_component sc;
+        sc.name = "Seller";
+        f.w.corporations[seller] = sc;
+        f.w.pool_at(seller, mid).quantities[ri(good)] = 20.0f;
+        recipe_registry reg = registry_with_reservation(good, need, k_shipped_reservation);
+
+        economy_report rep;
+        run_building_upkeep(f.w, reg, rep);
+        const auto flows = clear_markets(f.w, reg, rep);
+        const float resolved = f.w.markets.at(mid).price[ri(good)];
+        check(std::fabs(resolved - posted) > 1e-3f, "R10b the price resolved away from the posted price");
+        check_near(flows.at(f.corp).expenditure, need * posted,
+                   "R10b billed need x POSTED, the price the draw decided against");
+        float q, px;
+        check(buyer_rows(f, q, px) == 1, "R10b exactly one exchange row for the fill");
+        check_near(q, need, "R10b ... carrying the whole fill");
+        check_near(px, posted, "R10b ... at the posted price");
+    }
+}
+
 int main()
 {
     std::printf("building_upkeep — BL-641, requirement group `building-upkeep-goods` R1-R3, R6;\n");
@@ -786,6 +910,7 @@ int main()
     r7_the_reservation_ceiling();
     r8_the_floor();
     r9_no_wire_no_draw();
+    r10_a_shelf_draw_pays_the_posted_price();
 
     std::printf("\n%s — %d failure(s)\n", g_failures == 0 ? "PASS" : "FAIL", g_failures);
     return g_failures == 0 ? 0 : 1;

@@ -1159,8 +1159,13 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         if (in <= 0.0f)
                             continue;
                         const float need  = in * batches;
+                        // BL-1172: the tick counts the shelf only where the
+                        // fair-price ceiling admits it (run_processing); the
+                        // prediction asks the same question, no more.
+                        const bool  shelf = mkt && shelf_admits(*mkt, r, reg.price_band().reservation_mult,
+                                                                /*off_buys=*/true);
                         const float avail = (pool ? pool->quantities[r] : 0.0f)
-                                          + (mkt ? std::max(0.0f, mkt->inventory[r]) : 0.0f);
+                                          + (shelf ? std::max(0.0f, mkt->inventory[r]) : 0.0f);
                         if (need > 0.0f && avail / need < reg.t_idle())
                             reachable = false;
                     }

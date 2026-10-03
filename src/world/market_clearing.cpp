@@ -1072,9 +1072,11 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // to `corp_cash_flow`, so the record cannot come to disagree with the money
     // loop. Authority: docs/economy/MARKETS.md § The exchange record.
     //
-    // `unit_price` IS THE PRICE CLEARING RESOLVED. For the three auto paths that
-    // is `ref_price` — the market as counterparty of last resort — and for a
-    // matched trade it is the price the match executed on. It is never read back
+    // `unit_price` IS THE PRICE THE EXCHANGE WAS MADE AT. For the two auto SALE
+    // paths that is `ref_price` — the market as counterparty of last resort; for
+    // the auto-demand path (row 2) it is the POSTED price the shelf draw was
+    // decided and billed at (BL-1172, `posted_price`); and for a matched trade it
+    // is the price the match executed on. It is never read back
     // off a `sell_order::floor_price` or a `buy_order::max_price`: those are the
     // reservation prices an order CARRIED into clearing, and an order is honoured
     // at clearing, so what a seller asked and what they got are different numbers.
@@ -1393,13 +1395,18 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
 
     // --- Reference prices from accumulated supply/demand ---
     // Computed once, before any clearing, so all income/expenditure uses the same price.
+    // BL-1172: supply here is the listings PLUS the shelf's share, at most k
+    // ticks of this tick's demand (`pricing_supply`), read now — after the
+    // tick's draws and this tick's demand phase, before the auto-surplus loop
+    // below credits this clear's listings to the shelf. (The shipped k is 0 —
+    // listings only — until shelf spoilage, BL-1179.)
     std::unordered_map<entity_id, std::array<float, resource_count>> ref_price;
     for (const auto& [mid, mc] : w.markets)
     {
         ref_price[mid] = {};
         for (std::size_t r = 0; r < resource_count; ++r)
             ref_price[mid][r] = resolve_price(mc.price[r], mc.base_price[r],
-                                              mc.supply[r], mc.demand[r],
+                                              pricing_supply(mc, r, reg.price_band().shelf_supply_ticks), mc.demand[r],
                                               reg.price_band().floor_mult,
                                               reg.price_band().ceil_mult);
     }
@@ -1425,14 +1432,28 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
                         se.corp, null_entity);
     }
 
-    // --- Auto-demand clearing: expenditure at ref_price ---
+    // --- Auto-demand clearing: expenditure at the POSTED price ---
+    // BL-1172 (FINANCE.md § Standing-force upkeep, Ben 2026-10-03): "a draw from
+    // a market's shelf is decided and billed at the price that stood when it was
+    // made — the price it checked against the ceiling — with one exchange row at
+    // that price". Every fill here is a quantity a draw took off a market's
+    // shelf this tick — upkeep, processor inputs, construction — each capped by
+    // what the shelf held, and each checked `posted_price` against the
+    // fair-price ceiling before drawing (`shelf_admits`). A body-level key (no
+    // market) never reaches here (skipped where auto_buys is built). `market_component::price` is not written until the end
+    // of this pass, so `posted_price` read here IS the price each draw saw. The
+    // shelf's seller is the market, whose suppliers were paid when they listed
+    // (row 1 above), so billing the posted price leaves no unpaid gap. Read
+    // before the price update below, never `ref_price`: the fill's own want is
+    // in this tick's demand, and billing the price it drove up would charge a
+    // buyer more than the price it agreed to.
     for (const auto_buy_entry& be : auto_buys)
     {
-        flows[be.corp].expenditure += be.qty * ref_price[be.market][be.r];
+        const float px = posted_price(w.markets.at(be.market), be.r);
+        flows[be.corp].expenditure += be.qty * px;
         // Row 2 of 4: the mirror of row 1 — the market is the SELLER, so this is
         // the buy side of a player's history (what I bought, at what price).
-        record_exchange(be.market, be.r, be.qty, ref_price[be.market][be.r],
-                        null_entity, be.corp);
+        record_exchange(be.market, be.r, be.qty, px, null_entity, be.corp);
     }
 
     // --- Explicit order-book matching (player sell vs player buy) ---
