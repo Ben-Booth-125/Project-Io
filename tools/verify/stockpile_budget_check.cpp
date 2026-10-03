@@ -415,6 +415,104 @@ void part_one_price()
     }
 }
 
+/// BL-1168 — THE PRICE BY TRADE REACH, on hand-built reach keys: the
+/// arithmetic `build_stockpile_budget` prices each centre by, every number
+/// below worked by hand.
+void part_one_reach()
+{
+    std::printf("\n--- PART 1c (BL-1168): a centre pays its trade reach's stock over the divisor ---\n");
+
+    // Part 1's hand world plus region 7 (300 points, one founded centre 70).
+    // Reach keys: regions 0, 1, 2 on reach 5; regions 3, 4, 5 on reach 7;
+    // regions 6 and 7 on NO reach (-1).
+    //   world: 1772 + 300 = 2072 points -> divisor 100 prices 20.
+    //   reach 5: 1001 + 5 + 700 = 1706 -> 17 (floored). Region 0's DROPPED
+    //            slot (160) and region 2's RAZED 700 are counted: the reach's
+    //            stock is every point on it, as the world price's is.
+    //   reach 7: 50 + 7 + 9 = 66 -> 66 / 100 = 0 -> the floor of 1. Region 3's
+    //            residual and region 5's no-tile points are counted.
+    //   centre 70: region 7 has no reach -> the world's 20, counted unreached.
+    std::vector<region> regions = {
+        points_region(1001), points_region(5), points_region(700, 2), points_region(50),
+        points_region(7),    points_region(9), points_region(0),      points_region(300),
+    };
+    std::map<entity_id, carve_slot> founded = {
+        { 10, { 0, 1, 300 } }, { 11, { 0, 2, 150 } }, { 13, { 0, 4, 75 } },
+        { 31, { 1, 1, 10 } },  { 30, { 1, 2, 10 } },
+        { 50, { 4, 1, 0 } },   { 51, { 4, 2, 0 } },
+        { 60, { 6, 1, 500 } }, { 70, { 7, 1, 100 } },
+    };
+    std::vector<carve_dropped_slot> dropped = {
+        { 0, 3, 100, carve_drop_reason::body_built_out },
+        { 5, 1, 40,  carve_drop_reason::no_tile },
+    };
+    const std::vector<std::int64_t> keys = { 5, 5, 5, 7, 7, 7, -1, -1 };
+    const stockpile_budget sb = build_stockpile_budget(&regions, founded, dropped, 100, &keys,
+                                                       charter_price_reach::landmass);
+    const auto price = [&](entity_id c) { return static_cast<int>(sb.firm_price_at(c)); };
+    std::printf("     world price %d; reach stock 5=%lld 7=%lld (%zu reaches); prices 10=%d 31=%d 50=%d "
+                "51=%d 70=%d; unreached %d\n",
+                sb.firm_price_points,
+                sb.reach_stock.count(5) ? static_cast<long long>(sb.reach_stock.at(5)) : -1LL,
+                sb.reach_stock.count(7) ? static_cast<long long>(sb.reach_stock.at(7)) : -1LL,
+                sb.reach_stock.size(), price(10), price(31), price(50), price(51), price(70),
+                sb.centres_unreached);
+    check(!sb.rejected && sb.balanced() && sb.firm_price_points == 20 && sb.reach == charter_price_reach::landmass,
+          "1c.1 the world's price is the whole stock's (2072 / 100 -> 20) and the account closes");
+    check(sb.reach_stock.size() == 2 && sb.reach_stock.count(5) && sb.reach_stock.at(5) == 1706
+              && sb.reach_stock.count(7) && sb.reach_stock.at(7) == 66,
+          "1c.2 each reach's stock is EVERY point on it, the dropped slot's and the razed region's "
+          "included (1706, 66), and a region with no reach adds to none");
+    check(price(10) == 17 && price(11) == 17 && price(13) == 17 && price(31) == 17 && price(30) == 17,
+          "1c.3 a reach's price is its stock over the divisor, FLOORED: 1706 / 100 -> 17");
+    check(price(50) == 1 && price(51) == 1,
+          "1c.4 a reach stock below the divisor prices 1 point, never 0 (66 / 100 -> 1)");
+    check(price(70) == 20 && sb.centres_unreached == 1 && sb.centre_reach.count(70) && sb.centre_reach.at(70) == -1,
+          "1c.5 a centre whose region has no reach pays the WORLD's price (20) and is counted unreached");
+    check(sb.centre_firm_price.size() == sb.budget.points().size() && pts(sb, 60) == 0
+              && sb.centre_firm_price.count(60) == 0,
+          "1c.6 every budgeted centre carries a price; a centre on a pointless region is not budgeted");
+    {
+        const charter_spend_params s = stockpile_charter_spend(sb);
+        check(s.firm_price_points == 20 && s.centre_firm_price == sb.centre_firm_price
+                  && s.firm_price_of(50) == 1 && s.specialist_price_of(50)
+                                                     == static_cast<std::int64_t>(k_stockpile_specialist_firm_charters),
+              "1c.7 the spend charges each centre its reach price, and a specialist its firm charters at it");
+    }
+    {
+        // ONE reach holding every point: its price IS the world's, never above.
+        const std::vector<std::int64_t> one = { 3, 3, 3, 3, 3, 3, 3, 3 };
+        const stockpile_budget a = build_stockpile_budget(&regions, founded, dropped, 100, &one,
+                                                          charter_price_reach::landmass);
+        bool all_world = !a.rejected && a.firm_price_points == 20;
+        for (const auto& [c, p] : a.centre_firm_price)
+            if (p != a.firm_price_points) all_world = false;
+        check(all_world && a.centres_unreached == 0 && a.reach_stock.size() == 1 && a.reach_stock.at(3) == 2072,
+              "1c.8 a reach holding the whole stock prices at the world's price exactly (the cap's edge: "
+              "a reach price is never above the world's)");
+    }
+    {
+        // The wrong-size key vector: rejected whole, every point rejected.
+        const std::vector<std::int64_t> short_keys = { 5, 5, 5, 7, 7, 7, -1 };
+        const stockpile_budget r = build_stockpile_budget(&regions, founded, dropped, 100, &short_keys,
+                                                          charter_price_reach::landmass);
+        std::printf("     wrong-size keys: rejected=%d (%s)\n", r.rejected ? 1 : 0, r.rejection.c_str());
+        check(r.rejected && r.budget.empty() && r.centre_firm_price.empty() && r.firm_price_points == 0
+                  && unspent(r, stockpile_unspent_reason::rejected) == 2072 && r.balanced(),
+              "1c.9 a reach key vector of the wrong size REJECTS the whole budget, never misreads it");
+    }
+    {
+        // `world` ignores any keys handed in: one price, no reach maps.
+        const stockpile_budget wd = build_stockpile_budget(&regions, founded, dropped, 100, &keys,
+                                                           charter_price_reach::world);
+        check(!wd.rejected && wd.reach == charter_price_reach::world && wd.centre_firm_price.empty()
+                  && wd.reach_stock.empty() && wd.firm_price_at(50) == 20
+                  && wd.budget.points() == sb.budget.points() && wd.unspent == sb.unspent,
+              "1c.10 under the world reading every centre pays the world's price, and the reach moves "
+              "the PRICE only: the split and every reason are the same");
+    }
+}
+
 /// Every field of a stockpile budget and the carve index behind it, compared.
 std::string diff_budgets(const stockpile_budget& a, const stockpile_budget& b)
 {
@@ -1229,6 +1327,7 @@ int main(int argc, char** argv)
 
     part_one();
     part_one_price();
+    part_one_reach();
     if (r8)
         part_two(seed);
     else

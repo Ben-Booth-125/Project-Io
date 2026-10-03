@@ -2379,8 +2379,8 @@ double spearman_rho(const std::vector<double>& x, const std::vector<double>& y)
 /// by the row's divisor at the whole stock over it (floored, at least 1) —
 /// RECOMPUTED here, not trusted — and the shipped path charged that price. A
 /// fixed-price row: it charged its own price. Empty when all hold.
-std::string stockpile_price_failure(const stockpile_budget& sb, const charter_spend_params& charged,
-                                    const cost_config& cfg)
+std::string stockpile_price_failure(const world& w, const stockpile_budget& sb,
+                                    const charter_spend_params& charged, const cost_config& cfg)
 {
     char buf[240];
     if (cfg.price_divisor != 0)
@@ -2402,6 +2402,48 @@ std::string stockpile_price_failure(const stockpile_budget& sb, const charter_sp
         }
         if (charged.centre_firm_price != sb.centre_firm_price)   // BL-1168: the reach prices too
             return " price: the spend's reach prices are not the budget's;";
+        // BL-1168 — THE REACH PRICES, RECOMPUTED rather than trusted: each
+        // reach's stock summed here from the settlement record (every region's
+        // points on its reach key, the razed and dropped included), and every
+        // budgeted centre's price its region's reach stock over the divisor,
+        // floored, at least 1, at most the world's; a centre whose region has
+        // no reach pays the world's. The reach KEYS are the shipped labeller's
+        // (`stockpile_region_reach`), so this checks the arithmetic, not the
+        // labelling (industry_concentration checks the labels against the sim's).
+        if (cfg.price_divisor > 0 && sb.reach != charter_price_reach::world && w.gen_settlement)
+        {
+            const std::vector<region>& regs = w.gen_settlement->regions;
+            const std::vector<std::int64_t> key = stockpile_region_reach(w, sb.reach);
+            if (key.size() != regs.size())
+                return " price: the reach keys do not cover the settlement record;";
+            std::map<std::int64_t, long long> stock;
+            for (std::size_t i = 0; i < regs.size(); ++i)
+                if (key[i] >= 0) stock[key[i]] += regs[i].industry_points;
+            int wrong = 0, unreached = 0;
+            for (const auto& [centre, pts] : sb.budget.points())
+            {
+                (void)pts;
+                const auto slot = w.gen_carve_centres.find(centre);
+                const std::int64_t k = (slot != w.gen_carve_centres.end() && slot->second.region >= 0
+                                        && static_cast<std::size_t>(slot->second.region) < key.size())
+                    ? key[static_cast<std::size_t>(slot->second.region)] : -1;
+                long long want_c = want;
+                if (k >= 0)
+                    want_c = std::min<long long>(want, std::max<long long>(1, stock[k] / cfg.price_divisor));
+                else
+                    ++unreached;
+                if (charged.firm_price_of(centre) != want_c) ++wrong;
+            }
+            if (wrong != 0 || unreached != sb.centres_unreached
+                || sb.centre_firm_price.size() != sb.budget.points().size())
+            {
+                std::snprintf(buf, sizeof buf, " price: %d of %zu centres charged other than their "
+                              "reach's stock / %lld (recomputed); %d unreached, the budget says %d;",
+                              wrong, sb.budget.points().size(), static_cast<long long>(cfg.price_divisor),
+                              unreached, sb.centres_unreached);
+                return buf;
+            }
+        }
         return {};
     }
     if (charged.firm_price_points != cfg.firm_price_points)
@@ -2749,7 +2791,7 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
         if (stock_row)
         {
             measure_stockpile_row(w, run->land.stockpile, report, row);
-            row.stockpile_fail += stockpile_price_failure(run->land.stockpile, spend, cfg);
+            row.stockpile_fail += stockpile_price_failure(w, run->land.stockpile, spend, cfg);
             if (!row.stockpile_fail.empty())
             {
                 row.balanced = false;
