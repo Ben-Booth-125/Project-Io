@@ -259,6 +259,8 @@ inline shipped_landscape apply_shipped_landscape(
                                                                 : stockpile_charter_spend(out.stockpile);
         if (charter.stockpile_spend != nullptr && charter.stockpile_price_divisor != 0)
             spend.firm_price_points = out.stockpile.firm_price_points;   // a divisor row
+        if (charter.stockpile_spend != nullptr && charter.stockpile_price_divisor != 0)
+            spend.centre_firm_price = out.stockpile.centre_firm_price;   // BL-1168: its reach prices
         out.stockpile_spend = spend;
     }
     sp.budget = budget;

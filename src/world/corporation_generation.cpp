@@ -3011,6 +3011,8 @@ struct charter_body_state
     /// B: the body's points for FIRMS (`charter_centre_firm_points`, summed over
     /// its nation-resolved centres) — the same units as B_ref.
     int64_t                           firm_points = 0;
+    /// B in whole firm charters, each centre's at its own price (BL-1168).
+    int64_t                           firm_charters = 0;
     /// G: goods with demand before the walk (resource indices, ascending).
     std::vector<std::uint16_t>        goods;
     /// B_ref = c x |G| x firm price.
@@ -3191,9 +3193,11 @@ void charter_fix_body_rules(const world& w, const recipe_registry& reg,
         break;
     case charter_cap_rule::sqrt_capital:
     {
+        // BL-1168: read in WHOLE CHARTERS (a firm price of 1), each centre's
+        // at its own reach price. Where one price holds this is the old
+        // c x B / (|G| x fp) exactly, since B is whole charters times fp.
         bs.per_good_cap = charter_sqrt_per_good_cap(spend.per_resource_firm_cap,
-                                                    bs.firm_points, g,
-                                                    spend.firm_price_points);
+                                                    bs.firm_charters, g, 1);
         bs.density_ceiling = spend.density_ceiling;
         // The turn: G ascending, construction capacity out (it keeps its own
         // provisioning step, which runs before the turn — see the walk).
@@ -3213,7 +3217,7 @@ void charter_fix_body_rules(const world& w, const recipe_registry& reg,
         // index, the turn's own order). Where it does not bind there are no
         // shares and the turn fills every good to its cap, as before.
         const int64_t n_turn   = static_cast<int64_t>(bs.turn.size());
-        const int64_t charters = bs.firm_points / spend.firm_price_points;
+        const int64_t charters = bs.firm_charters;
         const int64_t ceiling  = bs.density_ceiling;
         const std::size_t cap_i = static_cast<std::size_t>(cap_good);
         bs.yard_places = charter_yard_places(w, reg, body_id,
@@ -3262,9 +3266,6 @@ charter_pool_plan plan_charter_pool(const world& w, const charter_budget& budget
     charter_pool_plan plan;
     if (spend.pool == charter_pool::none || budget.empty() || spend.firm_price_points <= 0)
         return plan;
-    const int64_t fp = spend.firm_price_points;
-    const int64_t sp = spend.specialist_price_points();
-
     std::map<int64_t, std::vector<std::pair<entity_id, int32_t>>> groups;
     for (const auto& [centre_id, pts] : budget.points())
     {
@@ -3314,6 +3315,9 @@ charter_pool_plan plan_charter_pool(const world& w, const charter_budget& budget
                 richest     = c;
                 richest_pts = pts;
             }
+            // BL-1168: each member's remainder at its own price.
+            const int64_t fp = spend.firm_price_of(c);
+            const int64_t sp = spend.specialist_price_of(c);
             int64_t left = pts;
             if (sp > 0 && left >= sp)
                 left -= sp;
@@ -3349,7 +3353,7 @@ int64_t charter_pool_whole(const charter_pool_plan& plan, entity_id centre,
     const auto it = plan.in.find(centre);
     if (it == plan.in.end() || spend.firm_price_points <= 0)
         return 0;
-    const int64_t fp = spend.firm_price_points;
+    const int64_t fp = spend.firm_price_of(centre);   // the receiver spends at its own price
     return (it->second / fp) * fp;
 }
 
@@ -3362,7 +3366,6 @@ const char* charter_spend_world_refusal(const world& w, const recipe_registry& r
     if (budget.empty() || spend.resource_cap_rule != charter_cap_rule::sqrt_capital
         || charter_spend_refusal(budget, spend) != nullptr)
         return nullptr;   // not a sqrt budget world, or already refused on its params
-    const int64_t specialist_price = spend.specialist_price_points();
     const charter_pool_plan pool = plan_charter_pool(w, budget, spend);   // NR-913
     std::map<entity_id, charter_body_state> bodies;   // std::map: ascending body id
     std::map<entity_id, int64_t> specialists;
@@ -3379,9 +3382,11 @@ const char* charter_spend_world_refusal(const world& w, const recipe_registry& r
         const auto own = w.tile_to_nation.find(tile_it->second);
         if (own == w.tile_to_nation.end() || w.nations.count(own->second) == 0)
             continue;
-        bodies[t->second.body].firm_points += charter_centre_firm_points(pts, spend)
-                                              + charter_pool_whole(pool, centre_id, spend);
-        if (static_cast<int64_t>(pts) >= specialist_price)
+        const int64_t fpts = charter_centre_firm_points(pts, spend, centre_id)
+                           + charter_pool_whole(pool, centre_id, spend);
+        bodies[t->second.body].firm_points   += fpts;
+        bodies[t->second.body].firm_charters += fpts / spend.firm_price_of(centre_id);
+        if (static_cast<int64_t>(pts) >= spend.specialist_price_of(centre_id))
             ++specialists[t->second.body];
     }
     // THE TEST: every good of the turn must be able to keep a share of at least
@@ -3403,10 +3408,9 @@ const char* charter_spend_world_refusal(const world& w, const recipe_registry& r
 bool charter_budget_affords_specialist(const world& w, const charter_budget& budget,
                                        const charter_spend_params& spend)
 {
-    const int64_t specialist_price = spend.specialist_price_points();
     for (const auto& [centre_id, pts] : budget.points())
     {
-        if (static_cast<int64_t>(pts) < specialist_price)
+        if (static_cast<int64_t>(pts) < spend.specialist_price_of(centre_id))
             continue;
         // The walk's own resolution: the centre's tile, and the nation owning
         // it (a centre without one charters nothing).
@@ -3475,10 +3479,8 @@ std::map<entity_id, charter_nation_plan> plan_charters_by_nation(
     const world& w, const charter_budget& budget, const charter_spend_params& spend)
 {
     std::map<entity_id, charter_nation_plan> out;   // std::map: ascending nation id
-    const int64_t fp = spend.firm_price_points;
-    if (budget.empty() || fp <= 0)
+    if (budget.empty() || spend.firm_price_points <= 0)
         return out;
-    const int64_t specialist_price = spend.specialist_price_points();
 
     // The walk's resolution of every budgeted centre: its tile, its body and the
     // nation owning the tile. A centre without one charters nothing.
@@ -3526,6 +3528,8 @@ std::map<entity_id, charter_nation_plan> plan_charters_by_nation(
     std::map<entity_id, int64_t> firms_on_body;   // planned so far, per body
     for (const planned_centre& pc : centres)
     {
+        const int64_t fp               = spend.firm_price_of(pc.centre);       // BL-1168
+        const int64_t specialist_price = spend.specialist_price_of(pc.centre);
         int64_t after_specialist = pc.points;
         int64_t specialists      = 0;
         if (static_cast<int64_t>(pc.points) >= specialist_price)
@@ -3618,9 +3622,9 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         return chartered;
     }
 
-    // Widened: the product of two int32 inputs. A price above every int32
+    // Prices are per centre (BL-1168, `firm_price_of`); a specialist's is
+    // widened, the product of two int32 inputs, and a price above every int32
     // budget entry is simply never affordable.
-    const int64_t specialist_price = spend.specialist_price_points();
 
     // Sorted nation ids — the index space `region::nation` speaks, exactly as
     // generate_corporations builds it.
@@ -3797,12 +3801,17 @@ std::vector<entity_id> charter_web_from_budget(world& w,
     std::map<entity_id, charter_body_state> bodies;
     for (const charter_centre& cc : centres)
         if (cc.nation != null_entity)
-            bodies[cc.body].firm_points += charter_centre_firm_points(cc.points, spend)
-                                         + charter_pool_whole(pool, cc.centre, spend);
+        {
+            const int64_t fpts = charter_centre_firm_points(cc.points, spend, cc.centre)
+                               + charter_pool_whole(pool, cc.centre, spend);
+            bodies[cc.body].firm_points   += fpts;
+            bodies[cc.body].firm_charters += fpts / spend.firm_price_of(cc.centre);
+        }
     // Specialists each body's centres can afford: the yards' places read them.
     std::map<entity_id, int64_t> specialists_on_body;
     for (const charter_centre& cc : centres)
-        if (cc.nation != null_entity && static_cast<int64_t>(cc.points) >= specialist_price)
+        if (cc.nation != null_entity
+            && static_cast<int64_t>(cc.points) >= spend.specialist_price_of(cc.centre))
             ++specialists_on_body[cc.body];
     for (auto& [body_id, bs] : bodies)
         charter_fix_body_rules(w, reg, spend, body_id, specialists_on_body[body_id], bs);
@@ -3841,6 +3850,9 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             continue;
         const nation_component& nc = w.nations.at(cc.nation);
         cc.points_after_specialist = cc.points;
+        // BL-1168: this centre's prices, by its own trade reach.
+        const int32_t fp               = spend.firm_price_of(cc.centre);
+        const int64_t specialist_price = spend.specialist_price_of(cc.centre);
 
         // --- this centre's specialist, if it can afford one -------------------
         if (static_cast<int64_t>(cc.points) >= specialist_price)
@@ -3935,8 +3947,8 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         if (firm_budget <= 0)
             continue;
 
-        const int32_t n_firms  = static_cast<int32_t>(firm_budget / spend.firm_price_points);
-        const int32_t leftover = static_cast<int32_t>(firm_budget % spend.firm_price_points);
+        const int32_t n_firms  = static_cast<int32_t>(firm_budget / fp);
+        const int32_t leftover = static_cast<int32_t>(firm_budget % fp);
         if (leftover > 0)
             cc.unspent[static_cast<std::size_t>(charter_unspent_reason::remainder)] += leftover;
         if (n_firms <= 0)
@@ -3971,7 +3983,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
 
         for (int32_t k = 0; k < n_firms; ++k)
         {
-            const int32_t left = (n_firms - k) * spend.firm_price_points;
+            const int32_t left = (n_firms - k) * fp;
 
             // The runaway guard first, so a runaway is always named as one; the
             // density ceiling sits below it (refused otherwise), so under
@@ -4313,7 +4325,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             corp.influence_range = hq.range;
 
             const entity_id corp_id = w.create_entity();
-            record(corp_id, cc, /*specialist=*/false, rung, assets, spend.firm_price_points);
+            record(corp_id, cc, /*specialist=*/false, rung, assets, fp);
             rep.charters.back().good = static_cast<std::uint16_t>(gap_r);
             corp.assets = std::move(assets);
             w.corporations[corp_id] = std::move(corp);
@@ -4369,19 +4381,23 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         for (const std::uint16_t r : bs.turn)
             if (demand[r] > production[r] && bs.firms_by_resource[r] < bs.share[r])
                 open += bs.share[r] - bs.firms_by_resource[r];
-        int64_t gap_points = std::min(room, open) * static_cast<int64_t>(spend.firm_price_points);
+        // BL-1168: the gap is counted in FIRMS and each stop gives up whole
+        // firms at its own centre's price (its stop is whole firms at that
+        // price). Where one price holds this is the old points arithmetic.
+        int64_t gap_firms = std::min(room, open);
         for (const std::size_t oi : order)
         {
-            if (gap_points <= 0)
+            if (gap_firms <= 0)
                 break;
             charter_centre& cc = centres[oi];
             if (cc.nation == null_entity || cc.body != body_id || cc.firm_stop_points <= 0)
                 continue;
-            const int32_t take = static_cast<int32_t>(
-                std::min<int64_t>(cc.firm_stop_points, gap_points));
+            const int64_t cfp   = spend.firm_price_of(cc.centre);
+            const int64_t firms = std::min<int64_t>(cc.firm_stop_points / cfp, gap_firms);
+            const int32_t take  = static_cast<int32_t>(firms * cfp);
             cc.unspent[static_cast<std::size_t>(cc.firm_stop_reason)] -= take;
             cc.unspent[static_cast<std::size_t>(charter_unspent_reason::share_unplaced)] += take;
-            gap_points -= take;
+            gap_firms -= firms;
         }
     }
 
@@ -4392,6 +4408,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         charter_body_record br;
         br.body              = body_id;
         br.firm_points       = bs.firm_points;
+        br.firm_charters     = bs.firm_charters;
         br.goods_with_demand = static_cast<int>(bs.goods.size());
         br.goods             = bs.goods;
         br.reference_points  = bs.reference_points;

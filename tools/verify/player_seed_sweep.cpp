@@ -1086,10 +1086,10 @@ charter_rule_check check_charter_rules(const world& w, const charter_budget& bud
     char buf[256];
 
     // --- B, re-derived: points on FIRMS, net of the specialist price ---
+    // BL-1168: every centre at its OWN reach price; B_ref at the world's.
     const long long fp = spend.firm_price_points;
-    const long long sp = static_cast<long long>(spend.firm_price_points)
-                       * static_cast<long long>(spend.specialist_firm_charters);
     std::map<entity_id, long long> firm_points_by_body;
+    std::map<entity_id, long long> firm_charters_by_body;
     for (const auto& [centre, pts] : budget.points())
     {
         const auto ct = w.population_centre_tile.find(centre);
@@ -1099,10 +1099,13 @@ charter_rule_check check_charter_rules(const world& w, const charter_budget& bud
         const auto own = w.tile_to_nation.find(ct->second);
         if (t == w.tiles.end() || own == w.tile_to_nation.end() || w.nations.count(own->second) == 0)
             continue;
+        const long long cfp = spend.firm_price_of(centre);
+        const long long csp = spend.specialist_price_of(centre);
         long long left = pts;
-        if (left >= sp)
-            left -= sp;
-        firm_points_by_body[t->second.body] += fp > 0 ? (left / fp) * fp : 0;
+        if (left >= csp)
+            left -= csp;
+        firm_points_by_body[t->second.body]   += cfp > 0 ? (left / cfp) * cfp : 0;
+        firm_charters_by_body[t->second.body] += cfp > 0 ? left / cfp : 0;
     }
     if (firm_points_by_body.size() != rep.bodies.size())
     {
@@ -1161,7 +1164,15 @@ charter_rule_check check_charter_rules(const world& w, const charter_budget& bud
             break;
         case charter_cap_rule::sqrt_capital:
         {
-            const long long B = b.firm_points;
+            // BL-1168: B in whole charters, each centre's at its own price —
+            // c x charters / |G|, which is c B / (|G| fp) where one price holds.
+            const long long B = firm_charters_by_body[b.body];
+            if (B != b.firm_charters)
+            {
+                std::snprintf(buf, sizeof buf, "body %u: B %lld charters, re-derived %lld", b.body,
+                              static_cast<long long>(b.firm_charters), B);
+                failed(buf);
+            }
             // k^2 B_ref <= c^2 B < (k+1)^2 B_ref, divided through by c |G| fp:
             // k^2 <= y < (k+1)^2 with y = floor(c B / (|G| fp)) — the same
             // inequality, exact for integers, but c^2 B itself can pass int64 on
@@ -1174,7 +1185,7 @@ charter_rule_check check_charter_rules(const world& w, const charter_budget& bud
                 ok = false;   // c x B past int64: charter_spend_refusal should have refused it
             else
             {
-                const long long y = (c * B) / (g * fp);
+                const long long y = (c * B) / g;
                 if (k > c)
                     ok = k * k <= y && y < (k + 1) * (k + 1);
                 else
@@ -1257,7 +1268,8 @@ charter_rule_check check_charter_rules(const world& w, const charter_budget& bud
                               static_cast<int>(b.yard_places));
                 failed(buf);
             }
-            const bool binds = n_turn > 0 && room >= n_turn && fp > 0 && b.firm_points / fp > ceil_n
+            // BL-1168: the body's charters, each centre's at its own price.
+            const bool binds = n_turn > 0 && room >= n_turn && b.firm_charters > ceil_n
                             && n_turn * k > ceil_n;
             const long long want_share = binds ? room / n_turn : 0;
             const long long want_extra = binds ? room % n_turn : 0;
@@ -1333,7 +1345,7 @@ void print_charter_report(const world& w, charter_mode mode, const charter_budge
         for (const auto& kv : budget.points())
         {
             richest = std::max(richest, kv.second);
-            if (priced && kv.second >= spend.specialist_price_points())
+            if (priced && kv.second >= spend.specialist_price_of(kv.first))
                 ++affords;
         }
         int non_razed = 0;
@@ -2386,6 +2398,8 @@ std::string stockpile_price_failure(const stockpile_budget& sb, const charter_sp
                           static_cast<int>(charged.firm_price_points));
             return buf;
         }
+        if (charged.centre_firm_price != sb.centre_firm_price)   // BL-1168: the reach prices too
+            return " price: the spend's reach prices are not the budget's;";
         return {};
     }
     if (charged.firm_price_points != cfg.firm_price_points)
@@ -2715,7 +2729,7 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
         for (const auto& kv : bud.points())
         {
             row.richest_centre_points = std::max(row.richest_centre_points, kv.second);
-            if (kv.second >= spend.specialist_price_points())
+            if (kv.second >= spend.specialist_price_of(kv.first))
                 ++row.centres_affording_specialist;
         }
         measure_charter_spill(w, report, spend.window_radius, row.spec_spill, row.firm_spill);

@@ -33,6 +33,10 @@
 // THE PRICE IS THE STOCK'S OWN (BL-1064, NR-907): one firm charter costs the
 // whole stockpile over `k_stockpile_price_divisor`, derived here once and carried
 // on the budget, so the spend charges every world the same SHARE of itself.
+// BL-1168 (Ben, 2026-10-03) narrows WHOSE stock: a centre's charters are priced
+// by the stock within its TRADE REACH — its landmass — over the same divisor
+// (`charter_price_reach`), so a far landmass with little capital charters its
+// own firms rather than being priced out by a richer continent's stock.
 //
 // WITH THE INDUSTRIALISATION SPAN OFF (the legacy arc; it runs by default since
 // BL-1044) no region holds a point, the budget is EMPTY, and an empty budget is
@@ -55,6 +59,48 @@
 #include <vector>
 
 struct region;   // settlement.hpp
+
+/// BL-1168 — WHOSE STOCK A CENTRE'S CHARTERS ARE PRICED BY (Ben, 2026-10-03;
+/// INDUSTRIALISATION.md § Industry spreads beyond its heartland: "a centre's
+/// charters are priced as a share of the stock within its trade reach -- its
+/// landmass, or its market's catchment -- not of the whole world's").
+///
+/// A centre's REACH is its carve region's: the region's anchor decides it, and
+/// every point of the stock is counted in the reach of the region that holds it
+/// (the razed and dropped points included, as NR-907's world-wide price counts
+/// them). The firm price at a centre is then its reach's stock over the same
+/// divisor, floored and never below 1. A reach's stock is never more than the
+/// world's, so no reach price exceeds the world price.
+///   * `world`    — one price, the world's (NR-907; the pre-BL-1168 rule, kept
+///                  selectable so its readings reproduce).
+///   * `landmass` — THE SHIPPED READING: the region anchor's `landmass_at` over
+///                  `landmass_labels` of the home body's tile substrate, the
+///                  labels the span's own cross-water reads use.
+///   * `market`   — the market the region's anchor tile clears at
+///                  (`market_for_tile`): a measurement for the ruling's second
+///                  reading.
+/// A region with no reach (no tile, a lake with no ground near, no market)
+/// prices at the world's price, and the budget counts how many centres did.
+enum class charter_price_reach : std::uint8_t
+{
+    world    = 0,
+    landmass = 1,
+    market   = 2,
+};
+
+inline const char* charter_price_reach_name(charter_price_reach r)
+{
+    switch (r)
+    {
+    case charter_price_reach::world:    return "world";
+    case charter_price_reach::landmass: return "landmass";
+    case charter_price_reach::market:   return "market";
+    }
+    return "?";
+}
+
+/// The shipped reach (BL-1168): the landmass.
+inline constexpr charter_price_reach k_stockpile_charter_reach = charter_price_reach::landmass;
 
 /// Why a region's industry point reached no centre's budget. Nothing here is
 /// persistent, so the numbering follows the reading.
@@ -133,11 +179,34 @@ struct stockpile_budget
     /// world: a centre's points and the price both scale with the stock. 0 on
     /// every EMPTY budget — the span off, a stock whose every point went unspent
     /// (all razed or dropped), and a rejection — because an empty budget is
-    /// today's world and prices nothing.
+    /// today's world and prices nothing. Under a reach reading (BL-1168) this
+    /// is the WORLD's price — the dearest — and a centre pays `firm_price_at`.
     std::int32_t firm_price_points = 0;
     /// The divisor the price was derived by (the build's argument); 0 wherever
     /// the price is.
     std::int64_t price_divisor     = 0;
+
+    /// BL-1168 — THE PRICE BY TRADE REACH. `reach` is the reading the prices
+    /// below were taken by; under `world` both maps are empty and every centre
+    /// pays `firm_price_points`. Otherwise every budgeted centre has an entry
+    /// in `centre_firm_price`: its reach's stock over `price_divisor`, floored,
+    /// never below 1, never above `firm_price_points`. `reach_stock` is each
+    /// reach key's stock (a landmass label, or a market id), ascending key.
+    /// `centres_unreached` counts budgeted centres whose region had no reach
+    /// and so priced at the world's price. All empty / 0 on an empty budget.
+    charter_price_reach                       reach = charter_price_reach::world;
+    std::map<entity_id, std::int32_t>   centre_firm_price;
+    std::map<std::int64_t, std::int64_t> reach_stock;
+    std::map<entity_id, std::int64_t>   centre_reach;   ///< each budgeted centre's reach key (-1: none)
+    int                                 centres_unreached = 0;
+
+    /// The firm price at @p centre: its reach price, else the world's.
+    std::int32_t firm_price_at(entity_id centre) const
+    {
+        const auto it = centre_firm_price.find(centre);
+        return it == centre_firm_price.end() ? firm_price_points : it->second;
+    }
+
     std::array<std::int64_t, stockpile_unspent_reason_count> unspent{};
 
     /// Every region with points > 0, ascending region index.
@@ -187,16 +256,41 @@ inline constexpr std::int64_t stockpile_region_keys_max = 1LL << 32;
 /// index can never pass as regions that carved no centre. So is a stock with
 /// points priced by a divisor <= 0, or whose derived price is past int32 (the
 /// spend's price type): rejected, never clamped.
+///
+/// @p reach (BL-1168) names whose stock a centre's charters are priced by
+/// (`charter_price_reach`); the world overload reads each region's reach key off the
+/// world (`stockpile_region_reach`). A world with no home-body grid to read a
+/// reach off prices every centre at the world's price (`reach` reads `world`).
 stockpile_budget build_stockpile_budget(const world& w,
-                                        std::int64_t price_divisor = k_stockpile_price_divisor);
+                                        std::int64_t price_divisor = k_stockpile_price_divisor,
+                                        charter_price_reach reach = k_stockpile_charter_reach);
 
 /// The same builder over its three inputs, for a caller holding them apart from
 /// a world (tools/verify/stockpile_budget_check's hand-built slots). @p regions
-/// may be null (no settlement record: an empty budget).
+/// may be null (no settlement record: an empty budget). @p region_reach, when
+/// non-null and @p reach is not `world`, is each region's reach key (indexed as
+/// @p regions; a key < 0 is no reach) — a vector of the wrong size REJECTS the
+/// budget; null or `world` prices every centre at the world's price.
 stockpile_budget build_stockpile_budget(const std::vector<region>*            regions,
                                         const std::map<entity_id, carve_slot>& founded,
                                         const std::vector<carve_dropped_slot>& dropped,
-                                        std::int64_t price_divisor = k_stockpile_price_divisor);
+                                        std::int64_t price_divisor = k_stockpile_price_divisor,
+                                        const std::vector<std::int64_t>* region_reach = nullptr,
+                                        charter_price_reach reach = charter_price_reach::world);
+
+/// BL-1168: each settlement region's reach key on @p w under @p reach — a
+/// landmass label, or a market id — indexed as `gen_settlement->regions`; -1
+/// where a region has none. Empty under `world`, or with no settlement record
+/// or no home-body grid. Pure: reads the home body's tiles (their substrate,
+/// or the market each clears at) and the regions' anchors.
+std::vector<std::int64_t> stockpile_region_reach(const world& w, charter_price_reach reach);
+
+/// The same over @p regions held apart from the world — generation's carve
+/// stage, before `world::gen_settlement` is filled (hard_coded_world.cpp), so
+/// the carve's plan prices exactly as the close's spend does. Empty under
+/// `world` or with no home-body grid.
+std::vector<std::int64_t> stockpile_region_reach(const world& w, const std::vector<region>& regions,
+                                                 charter_price_reach reach);
 
 // --- THE SPEND ---------------------------------------------------------------
 //

@@ -288,7 +288,7 @@ seats a fixed price opens track that stockpile almost proportionally, while the 
 does not track it at all — seed 31 holds 95.3M points and offers 6 legacy seats, seed 9 holds 27.5M
 and offers 16. At 40000 points a firm the poorest world offered 1 seat and the richest 91, against
 an anchor median of 9; no single number sits inside both tails. The constant itself is read off the
-sweep and pinned at the re-bless.
+sweep and pinned at the re-bless. **Whose stock is narrowed (Ben, 2026-10-03):** a centre pays a share of the stock within its own trade reach, not the world's (§ Industry spreads beyond its heartland); the divisor and the charters are the same knobs.
 
 **SETTLED (Ben, 2026-09-21, NR-908): the divisor answers LIVE-PLAY COST, and the specialist's
 price answers the SEAT MENU.** Once the price is a share of the stock, a centre affords a

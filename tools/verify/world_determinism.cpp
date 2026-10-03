@@ -393,7 +393,9 @@ int main()
               "R3.7 the span runs by default: seeds A and B carry a non-empty, balanced, priced "
               "stockpile; prehistory OFF carries none (BL-1042, BL-1044)");
         check(s_a1.points_total == s_a2.points_total && s_a1.budget.points() == s_a2.budget.points()
-                  && s_a1.firm_price_points == s_a2.firm_price_points,
+                  && s_a1.firm_price_points == s_a2.firm_price_points
+                  && s_a1.centre_firm_price == s_a2.centre_firm_price   // BL-1168
+                  && s_a1.reach_stock == s_a2.reach_stock,
               "R3.7 the stockpile budget is identical across two same-seed builds (BL-1044)");
     }
     check(!w_a1.gen_carve_centres.empty() && w_a1.gen_carve_centres == w_a2.gen_carve_centres,
