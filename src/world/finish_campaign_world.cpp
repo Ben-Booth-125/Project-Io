@@ -195,12 +195,23 @@ finish_campaign_result finish_campaign_world(world& w, const generation_report& 
             return static_cast<long long>(sb.unspent[static_cast<std::size_t>(k)]);
         };
         // BL-1064: an empty budget (rejected, or every point unspent) prices nothing.
-        char price[96] = "no price (an empty budget)";
+        char price[192] = "no price (an empty budget)";
         if (!sb.budget.empty())
-            std::snprintf(price, sizeof price, "firm price %d (the stock / %lld), specialist %lld",
+        {
+            // BL-1168: a centre pays its trade reach's price; the world's is the dearest.
+            std::int32_t lo = sb.firm_price_points;
+            for (const auto& kv : sb.centre_firm_price)
+                lo = std::min(lo, kv.second);
+            std::snprintf(price, sizeof price,
+                          "firm price %d (the stock / %lld), specialist %lld; priced by %s reach "
+                          "(%zu reaches, firm price %d..%d, %d centres unreached)",
                           static_cast<int>(sb.firm_price_points),
                           static_cast<long long>(sb.price_divisor),
-                          static_cast<long long>(out.spend.specialist_price_points()));
+                          static_cast<long long>(out.spend.specialist_price_points()),
+                          charter_price_reach_name(sb.reach), sb.reach_stock.size(),
+                          static_cast<int>(lo), static_cast<int>(sb.firm_price_points),
+                          sb.centres_unreached);
+        }
         std::printf("[stockpile_budget] %lld points: %lld to %zu centres, %lld unspent "
                     "(carve_dropped %lld, carve_no_tile %lld, razed %lld, "
                     "no_carved_centre %lld, rejected %lld)%s%s; %s; spent %lld of %lld%s\n",

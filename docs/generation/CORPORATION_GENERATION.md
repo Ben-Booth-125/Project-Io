@@ -75,8 +75,10 @@ On that path a specialist's home nation is its centre's nation, one specialist p
 to afford one, and **the balancing factor above does not apply** (Ben, 2026-09-17): a nation whose
 cities built capital holds the seats it bought. A specialist's price is anchored to the seat menu
 (Ben, 2026-09-18): the median library world offers about as many seats as a world with no budget.
-It costs two firm charters, each priced as a share of the world's stockpile (NR-907, NR-910;
-`INDUSTRIALISATION.md` § 1), and a world rich in near-equal cities offers more seats than the median —
+It costs 44 firm charters (Ben, 2026-10-03, option a, overturning NR-910's two), each priced as a
+share of the stock within the centre's trade reach — its landmass (NR-907, narrowed 2026-10-03;
+`INDUSTRIALISATION.md` § 1), so seats sit off the heartland as well as on it — and a world rich in
+near-equal cities offers more seats than the median —
 the spread is the world's, not capped. **A world whose budget opens no specialist is built as the
 world with no budget** (Ben, 2026-09-21, NR-910), so the player is seated from a specialist. The one
 exception — a world whose affording centres all find no ground for their specialist — is reported

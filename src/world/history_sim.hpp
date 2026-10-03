@@ -656,9 +656,11 @@ struct history_sim_params
     /// Beat 1 "Works chartered"; Ben, 2026-09-24, R15; STARTUP.md sec Round 6).
     /// After each round's accrual, a region with centres whose `industry_points`
     /// have crossed the next multiple of THIS fraction (per mille) of the
-    /// RUNNING charter price -- the world's stock so far over
-    /// `k_stockpile_price_divisor` (`charter_running_price`, the arithmetic the
-    /// close prices by) -- gets a `works_chartered` event, at most
+    /// RUNNING charter price -- the stock so far within the region's trade
+    /// reach (its landmass, the anchor's `landmass_at`; the world's where it
+    /// has none) over `k_stockpile_price_divisor` (`charter_running_price`, the
+    /// arithmetic and the reach the close prices by, BL-1168) -- gets a
+    /// `works_chartered` event, at most
     /// `works_event_region_cap` per region per span, from a counter local to
     /// the year loop (never a region field). It fires on the same switches
     /// that let the span record points at all: `industry_points_enabled` from
@@ -685,7 +687,9 @@ struct history_sim_params
     /// on every seed; the count was monotone in f and bounded on every seed.
     /// The notes cluster in the span's first century (the running price is
     /// tiny at the open, so a region crosses its four multiples early) -- a
-    /// consequence of the running-price rule, raised as NR-940.
+    /// consequence of the running-price rule, raised as NR-940. Those readings
+    /// were taken on the WORLD's running price; the reach price (BL-1168) is
+    /// cheaper on every landmass but the richest, so a far landmass notes more.
     int     works_event_fraction_q = 2000;
 
     /// DEFAULT A (RULED, Ben 2026-09-18, wave 1 form). A region the span FOUNDS
