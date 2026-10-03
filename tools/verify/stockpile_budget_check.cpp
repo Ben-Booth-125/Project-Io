@@ -256,6 +256,20 @@ void part_one()
 /// one specialist. The count `charter_web_from_budget` charters — one specialist
 /// per centre that can afford one (INDUSTRIALISATION.md § 1) — before any ground is
 /// read; a centre whose window holds no free site can only lower it.
+/// BL-1168: the reach the seat curve prices by (`--reach`); the shipped one by default.
+charter_price_reach g_curve_reach = k_stockpile_charter_reach;
+
+/// Centres affording @p m firm charters at their OWN price (BL-1168: the
+/// centre's trade reach's, `firm_price_at`; the world's under `world`).
+int seats_by_reach(const stockpile_budget& sb, std::int64_t m)
+{
+    int n = 0;
+    for (const auto& [centre, p] : sb.budget.points())
+        if (p >= m * static_cast<std::int64_t>(sb.firm_price_at(centre)))
+            ++n;
+    return n;
+}
+
 int seats_at(const stockpile_budget& sb, std::int64_t specialist_price)
 {
     int n = 0;
@@ -543,7 +557,8 @@ std::vector<std::pair<std::int64_t, std::int64_t>> parse_list(const std::string&
 void part_three_seat_curve(const std::vector<std::uint32_t>& seeds,
                            const std::vector<std::pair<std::int64_t, std::int64_t>>& pairs)
 {
-    std::printf("\n--- PART 3: the seat curve — centres affording a specialist, from the budget alone ---\n");
+    std::printf("\n--- PART 3: the seat curve — centres affording a specialist, from the budget alone "
+                "(priced by %s reach) ---\n", charter_price_reach_name(g_curve_reach));
     std::printf("     %-5s %12s %7s", "seed", "stock", "centres");
     for (const auto& [d, m] : pairs)
         std::printf(" %7s", (std::to_string(d) + ":" + std::to_string(m)).c_str());
@@ -562,15 +577,16 @@ void part_three_seat_curve(const std::vector<std::uint32_t>& seeds,
         lua_state lua;
         auto out = std::make_unique<app_start_world>();
         build_app_base_world(lua, p, *out);
-        const stockpile_budget base = build_stockpile_budget(out->w);
+        const stockpile_budget base = build_stockpile_budget(out->w, k_stockpile_price_divisor,
+                                                             g_curve_reach);
         check(!base.budget.empty() && !base.rejected && base.balanced(),
               "3.1 seed " + std::to_string(seed) + ": the span-on budget is non-empty and closes");
         std::printf("     %-5u %12lld %7zu", seed, static_cast<long long>(base.points_total),
                     base.budget.points().size());
         for (std::size_t i = 0; i < pairs.size(); ++i)
         {
-            const stockpile_budget sb = build_stockpile_budget(out->w, pairs[i].first);
-            const int n = seats_at(sb, pairs[i].second * static_cast<std::int64_t>(sb.firm_price_points));
+            const stockpile_budget sb = build_stockpile_budget(out->w, pairs[i].first, g_curve_reach);
+            const int n = seats_by_reach(sb, pairs[i].second);
             col[i].push_back(n);
             std::printf(" %7d", n);
         }
@@ -1152,6 +1168,19 @@ int main(int argc, char** argv)
         if (arg == "--seat-curve")
         {
             curve = true;
+            continue;
+        }
+        if (arg == "--reach" && a + 1 < argc)
+        {
+            const std::string v = argv[++a];
+            if (v == "world") g_curve_reach = charter_price_reach::world;
+            else if (v == "landmass") g_curve_reach = charter_price_reach::landmass;
+            else if (v == "market") g_curve_reach = charter_price_reach::market;
+            else
+            {
+                std::printf("--reach: '%s' is not world, landmass or market\n", v.c_str());
+                return 2;
+            }
             continue;
         }
         if (arg == "--firm-census")

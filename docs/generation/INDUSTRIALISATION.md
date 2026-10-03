@@ -288,7 +288,7 @@ seats a fixed price opens track that stockpile almost proportionally, while the 
 does not track it at all — seed 31 holds 95.3M points and offers 6 legacy seats, seed 9 holds 27.5M
 and offers 16. At 40000 points a firm the poorest world offered 1 seat and the richest 91, against
 an anchor median of 9; no single number sits inside both tails. The constant itself is read off the
-sweep and pinned at the re-bless.
+sweep and pinned at the re-bless. **Whose stock is narrowed (Ben, 2026-10-03):** a centre pays a share of the stock within its own trade reach, not the world's (§ Industry spreads beyond its heartland); the divisor and the charters are the same knobs.
 
 **SETTLED (Ben, 2026-09-21, NR-908): the divisor answers LIVE-PLAY COST, and the specialist's
 price answers the SEAT MENU.** Once the price is a share of the stock, a centre affords a
@@ -299,6 +299,15 @@ the anchor's nine seats sit near a ratio of 290 (divisor over charters). The div
 how many firm charters a world's stock buys, which is its density and so its tick, and it is set
 against live-play cost. Each knob has one job; a divisor tuned to the seat menu would leave density
 with no knob at all.
+
+**PROPOSED (2026-10-03, BL-1168 folding BL-1151; Ben to ratify): under the reach price the charters
+carry the anchor.** Priced by its trade reach, the median library world affords a specialist at about
+158 centres at two charters, against a no-budget world of 8 (the shipped arc's span-on fallback
+world; the span-off legacy roster opens 12). The divisor alone would need about 36 to reach it, and
+there the web starves — 14 to 80 background firms where 650 fills the 120 ceiling. So NR-908's own
+knob takes it: **44 charters**, the first whole number at which the median library world opens the
+no-budget world's 8 seats, with the divisor held at 650 for live-play cost. The spread runs 1 to 29
+seats; a world of one landmass whose capital towers offers one.
 
 **SETTLED (Ben, 2026-09-21, NR-910): the pins.** A specialist costs **two** firm charters. The
 charter count moves in whole charters, which is too coarse to land the anchor on its own, so the

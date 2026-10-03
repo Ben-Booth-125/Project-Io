@@ -475,6 +475,19 @@ int main()
       expect("specialist -1 charters (price -1), firm price 1", small, s, true,
              "specialist_firm_charters"); }
 
+    // --- BL-1168: a reach price is a positive price no dearer than the world's ---
+    { auto s = base(); s.firm_price_points = 4; s.centre_firm_price = { { 1, 2 }, { 2, 4 } };
+      expect("reach prices 2 and 4 under a world price of 4", small, s, false); }
+    { auto s = base(); s.firm_price_points = 4; s.centre_firm_price = { { 1, 0 } };
+      expect("reach price 0", small, s, true, "reach firm price must be > 0"); }
+    { auto s = base(); s.firm_price_points = 4; s.centre_firm_price = { { 1, 5 } };
+      expect("reach price 5 above a world price of 4", small, s, true, "must not exceed the world's"); }
+    { auto s = base(); s.firm_price_points = 4; s.centre_firm_price = { { 1, 2 } };
+      expect_true("a listed centre pays its reach price, an unlisted one the world's",
+                  s.firm_price_of(1) == 2 && s.firm_price_of(2) == 4
+                && s.specialist_price_of(1) == 2LL * s.specialist_firm_charters
+                && charter_centre_firm_points(40, s, 1) == ((40 - 2LL * s.specialist_firm_charters) / 2) * 2); }
+
     // --- lifted: c is unread, so a set c is refused ---
     { auto s = base(); s.resource_cap_rule = charter_cap_rule::lifted;
       expect("lifted rule, c 8 set (unread)", small, s, true, "not read under the lifted"); }

@@ -44,6 +44,16 @@
 /// seats across the library at 650:2: the anchor is a median. Live-play cost:
 /// the divisor alone sets the tick (BL-1043 stage 2: x0.43 / x0.91 / x1.70 the
 /// legacy world at 325 / 650 / 1300), so 650 runs near x0.91 the legacy tick.
+///
+/// THE SEAT MENU NO LONGER TURNS ON THIS (BL-1168, 2026-10-03): under the
+/// reach price the anchor is re-read on the charters (44, stockpile_budget.hpp),
+/// because the divisor that would reach it alone (~36 at two charters) starves
+/// the web; 650 stays the live-play-cost pin.
+///
+/// BL-1168 (Ben, 2026-10-03): the close divides a centre's TRADE REACH's stock
+/// (its landmass) by this, not the world's (`stockpile_budget.hpp`
+/// `charter_price_reach`). The span's running price below still reads the
+/// world's stock.
 inline constexpr std::int64_t k_stockpile_price_divisor = 650;
 static_assert(k_stockpile_price_divisor > 0, "the price divisor must be > 0");
 

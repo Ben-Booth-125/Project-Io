@@ -44,6 +44,7 @@
 #include "world/ocean_currents.hpp"
 #include "world/settlement.hpp"
 #include "world/spawn_seat.hpp"
+#include "world/stockpile_budget.hpp"
 #include "world/world.hpp"
 #include "world/works_roster.hpp"
 
@@ -165,6 +166,16 @@ int main(int argc, char** argv)
         std::vector<int> reg_lm(R.size(), -1);
         for (std::size_t i = 0; i < R.size(); ++i)
             reg_lm[i] = landmass_at(labels, gw, gh, R[i].col, R[i].row);
+        {
+            // BL-1168: the charter price reads the landmass off the world's own
+            // tiles (`stockpile_region_reach`); it must agree with the sim's.
+            const std::vector<std::int64_t> reach = stockpile_region_reach(w, charter_price_reach::landmass);
+            int differ = 0;
+            for (std::size_t i = 0; i < R.size() && i < reach.size(); ++i)
+                if (reach[i] != reg_lm[i]) ++differ;
+            std::printf("REACH seed=%u regions=%zu landmass_differs_from_sim=%d\n", seed, R.size(),
+                        reach.size() == R.size() ? differ : -1);
+        }
         auto tile_lm = [&](entity_id tid) -> int {
             const auto t = w.tiles.find(tid);
             if (t == w.tiles.end() || t->second.body != home) return -2;
