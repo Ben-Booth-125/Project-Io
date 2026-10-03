@@ -1097,6 +1097,26 @@ static int trade_land_line_q(const trade_context& ctx, int a, int b)
     return (it != ctx.land_lines.end() && it->lo == lo && it->hi == hi) ? it->line_q : 0;
 }
 
+/// The ROAD a (@p seller, @p buyer) trade may ride: the land line above, read as
+/// 0 where BL-1171's rule is on and the two seats stand on different landmasses
+/// (EXPLORATION.md sec The colonial tie is a sea lane: a road joins seats on one
+/// landmass only). The one place the rule zeroes a land line, so the flow's
+/// sizing (`trade_lines`) and the across-water want's reachability read it alike.
+static int trade_road_line_q(const trade_context& ctx, int seller, int buyer)
+{
+    const int land_q = trade_land_line_q(ctx, seller, buyer);
+    if (land_q > 0 && ctx.road_joins_one_landmass && ctx.seat_landmass != nullptr
+     && seller >= 0 && buyer >= 0
+     && static_cast<std::size_t>(seller) < ctx.seat_landmass->size()
+     && static_cast<std::size_t>(buyer) < ctx.seat_landmass->size())
+    {
+        const int32_t ms = (*ctx.seat_landmass)[static_cast<std::size_t>(seller)];
+        const int32_t mb = (*ctx.seat_landmass)[static_cast<std::size_t>(buyer)];
+        if (ms >= 0 && mb >= 0 && ms != mb) return 0;
+    }
+    return land_q;
+}
+
 void run_exploration_upkeep(std::vector<region>&                 regions,
                             std::vector<polity>&                 polities,
                             const std::vector<history_corridor>& corridors,
@@ -1185,11 +1205,12 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             const int gi = scarcity_good_index(r.dominant);
             if (gi >= 0) reachable[n][static_cast<std::size_t>(gi)] = true;
         }
+        // BL-1171: "joined by a land line" is the ROAD the rule leaves the
+        // pair (`trade_road_line_q`) -- zeroed only between seats on different
+        // landmasses -- never the carrier the flow picked: a same-landmass pair
+        // whose sea line happens to beat its road is still answered by land.
         for (const trade_flow& f : flows)
-            if (f.good < good_count
-             && (params.trade_road_joins_one_landmass
-                     ? f.by_sea == 0 // BL-1171: the road that carries it, not a road between the realms
-                     : trade_land_line_q(trade_ctx, f.seller, f.buyer) > 0))
+            if (f.good < good_count && trade_road_line_q(trade_ctx, f.seller, f.buyer) > 0)
                 reachable[f.buyer][f.good] = true;
 
         // The preference weight is only filled when `w_want_q` != 0 (generation
@@ -1727,17 +1748,9 @@ static bool trade_lines(const trade_context& ctx, const std::vector<region>& reg
 
     // LINE: the better of land (a corridor joining the two realms) and sea
     // (both seats' built ports, carried by the SELLER's navy).
-    land_q = trade_land_line_q(ctx, seller, buyer);
     // BL-1171 -- GOODS BETWEEN LANDMASSES GO BY SEA: a road joins two seats on
     // one landmass only, so a pair across water has no land line to ride.
-    if (ctx.road_joins_one_landmass && ctx.seat_landmass != nullptr
-     && static_cast<std::size_t>(seller) < ctx.seat_landmass->size()
-     && static_cast<std::size_t>(buyer) < ctx.seat_landmass->size())
-    {
-        const int32_t ms = (*ctx.seat_landmass)[static_cast<std::size_t>(seller)];
-        const int32_t mb = (*ctx.seat_landmass)[static_cast<std::size_t>(buyer)];
-        if (ms >= 0 && mb >= 0 && ms != mb) land_q = 0;
-    }
+    land_q = trade_road_line_q(ctx, seller, buyer);
     sea_q = ps.navy_stock > 0
           ? clampi(std::min(seller_seat.port_stock_q, buyer_seat.port_stock_q), 0, 1000)
           : 0;
