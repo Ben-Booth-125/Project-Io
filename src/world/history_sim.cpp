@@ -5161,8 +5161,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             // counts them). The landmass is `landmass_of_region`
                             // -- the labels the span's own cross-water reads
                             // use, read off the region's anchor exactly as the
-                            // close reads it (industry_concentration gates the
-                            // two agreeing). A region with no landmass, or a
+                            // close reads it (industry_concentration checks the
+                            // two rasters agree; no row yet runs this step
+                            // against the close's price). A region with no landmass, or a
                             // run with no substrate, reads the world's stock,
                             // as the close prices a region with no reach. A
                             // landmass's stock is at most the world's, so its

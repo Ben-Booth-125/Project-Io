@@ -294,7 +294,7 @@ share of the stock within its own trade reach, not the world's (§ Industry spre
 heartland); the divisor and the charters are the same knobs. **The reach is the LANDMASS** the
 centre stands on — every point of the stockpile counted where it stands, the razed and dropped
 included — and a centre with no landmass pays the world's price, which is the dearest. A market's
-catchment, the ruling's other reading, is kept as a measurement and does not price.
+catchment, the ruling's other reading, is not the reading that prices.
 
 **SETTLED (Ben, 2026-09-21, NR-908): the divisor answers LIVE-PLAY COST, and the specialist's
 price answers the SEAT MENU.** Once the price is a share of the stock, a centre affords a
