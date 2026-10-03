@@ -364,7 +364,11 @@ ladder's second rung on water, as four uses make a Road on land.
 uses, ties by the leg's two regions — and a walk enters water an earlier lane already laid at half
 its priced step (`kSeaLaneReuseCostQ` = 500, the lane's own × 0.50 read as a traveller reads it).
 So lanes into one port share a trunk near it and fan out far from it, and the map shows a network
-rather than a fan of parallel lines. At 1000 every lane is walked alone.
+rather than a fan of parallel lines. At 1000 every lane is walked alone. **A trunk is shared only
+with the current (Ben, 2026-10-03):** the reuse discount applies to a step only where the walk's
+step runs with the current; against it the walk pays the full step, trunk or not. A busy trunk
+does not carry a later lane upstream, so the lanes the map draws still ride the currents
+(`sea_lane_stamp_harness` row B).
 
 **A tie is therefore a force on the map, never a preference inside an actor.** Because § 1 is one
 weight function, a lane is read by everything that reads traversal cost: a convoy between a

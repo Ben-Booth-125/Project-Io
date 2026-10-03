@@ -214,7 +214,18 @@ struct charter_pool_transfer
 struct charter_spend_params
 {
     /// Points one background firm costs. Must be > 0 on a non-empty budget.
+    /// With `centre_firm_price` set this is the WORLD's price, and a centre
+    /// listed there pays its own.
     std::int32_t firm_price_points = 0;
+    /// BL-1168 — THE PRICE BY TRADE REACH (Ben, 2026-10-03; INDUSTRIALISATION.md
+    /// § Industry spreads beyond its heartland): a centre listed here prices its
+    /// firm charters, and so its specialist, at its own reach's price
+    /// (`stockpile_budget::centre_firm_price`); an unlisted centre pays
+    /// `firm_price_points`. Every entry must be in [1, firm_price_points]
+    /// (refused otherwise): a reach's stock is never more than the world's, and
+    /// the range proofs below lean on the world price being the dearest.
+    /// Empty — the uniform price — everywhere but the stockpile spend.
+    std::map<entity_id, std::int32_t> centre_firm_price;
     /// How many firm charters one specialist costs. Must be > 0 on a non-empty
     /// budget.
     std::int32_t specialist_firm_charters = 0;
@@ -260,6 +271,20 @@ struct charter_spend_params
     std::int64_t specialist_price_points() const
     {
         return static_cast<std::int64_t>(firm_price_points)
+             * static_cast<std::int64_t>(specialist_firm_charters);
+    }
+
+    /// The firm price at @p centre (BL-1168): its reach price where listed,
+    /// else `firm_price_points`.
+    std::int32_t firm_price_of(entity_id centre) const
+    {
+        const auto it = centre_firm_price.find(centre);
+        return it == centre_firm_price.end() ? firm_price_points : it->second;
+    }
+    /// The specialist price at @p centre: its firm price times the charters.
+    std::int64_t specialist_price_of(entity_id centre) const
+    {
+        return static_cast<std::int64_t>(firm_price_of(centre))
              * static_cast<std::int64_t>(specialist_firm_charters);
     }
 };
@@ -343,13 +368,17 @@ inline std::int32_t charter_sqrt_per_good_cap(std::int32_t c, std::int64_t firm_
 /// (`points_after_specialist`, unrounded), less the remainder no firm can be
 /// bought with. 0 when the firm price is not positive (such a spend is refused
 /// anyway).
-inline std::int64_t charter_centre_firm_points(std::int32_t points, const charter_spend_params& s)
+///
+/// @p centre picks the centre's own price (BL-1168, `firm_price_of`); the
+/// default prices it at the world's.
+inline std::int64_t charter_centre_firm_points(std::int32_t points, const charter_spend_params& s,
+                                               entity_id centre = null_entity)
 {
-    const std::int64_t fp = s.firm_price_points;
+    const std::int64_t fp = s.firm_price_of(centre);
     if (fp <= 0 || points <= 0)
         return 0;
     std::int64_t left = points;
-    const std::int64_t sp = s.specialist_price_points();
+    const std::int64_t sp = s.specialist_price_of(centre);
     if (sp > 0 && left >= sp)
         left -= sp;
     return (left / fp) * fp;
@@ -476,13 +505,18 @@ struct charter_body_record
     /// of each affordable specialist price, in whole firm charters
     /// (`charter_centre_firm_points`). The same units as B_ref.
     std::int64_t firm_points = 0;
+    /// B in WHOLE FIRM CHARTERS (BL-1168): each centre's firm points over its
+    /// own price. The square root reads this — c x charters / |G| — which is
+    /// c x B / B_ref exactly where one price holds, and stays meaningful where
+    /// a body's centres pay different reach prices.
+    std::int64_t firm_charters = 0;
     /// |G|: goods with demand on the body before the walk (see
     /// `charter_sqrt_per_good_cap`), and which they are (resource indices, ascending).
     int                        goods_with_demand = 0;
     std::vector<std::uint16_t> goods;
     /// B_ref = c x |G| x firm price (0 when |G| is 0, and under `lifted`, which
-    /// carries no c). Reported under `fixed` and `sqrt_capital`;
-    /// read only by `sqrt_capital`.
+    /// carries no c), at the WORLD's price (`firm_price_points`). Reported under
+    /// `fixed` and `sqrt_capital`; the cap reads its charter form, c x |G|.
     std::int64_t reference_points = 0;
     /// The per-good cap in force on this body: c under `fixed`, the rule's under
     /// `sqrt_capital`, -1 under `lifted` (no cap).
@@ -568,6 +602,16 @@ inline const char* charter_spend_refusal(const charter_budget& b, const charter_
         return "specialist_firm_charters must be > 0 on a non-empty charter budget (no shipped default)";
     if (s.window_radius < 0)
         return "window_radius must be >= 0";
+    // BL-1168: every reach price is a positive price no dearer than the world's.
+    for (const auto& [centre, fp] : s.centre_firm_price)
+    {
+        (void)centre;
+        if (fp <= 0)
+            return "a centre's reach firm price must be > 0";
+        if (fp > s.firm_price_points)
+            return "a centre's reach firm price must not exceed the world's (a reach's stock is "
+                   "never more than the world's)";
+    }
     if (static_cast<int>(s.pool) > static_cast<int>(charter_pool::nation))
         return "pool is not a known charter_pool";
     // NR-913: a pooled centre's firm budget can reach the budget's whole total,

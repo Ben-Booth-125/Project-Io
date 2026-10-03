@@ -5171,8 +5171,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // INDUSTRIALISATION.md sec Beat 1 "Works chartered" (Ben,
                 // 2026-09-24, R15). After the year's accrual and before the
                 // upkeep, every region with centres is read against the
-                // RUNNING charter price -- the world's stock so far over the
-                // charter divisor, the same arithmetic the close prices by
+                // RUNNING charter price -- the stock so far within its trade
+                // reach (its landmass, BL-1168) over the charter divisor, the
+                // same arithmetic and the same reach the close prices by
                 // (`charter_running_price`), never a constant and never the
                 // 1960 price applied backwards (NR-907) -- and a note fires for
                 // each multiple of `works_event_fraction_q` per mille of that
@@ -5198,9 +5199,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     }
                     else
                     {
-                        // The stock so far: every region's points, the ones
-                        // no centre will take included ("the world's whole
-                        // industry stockpile"). Each is inside
+                        // The world's stock so far: every region's points, the
+                        // ones no centre will take included -- the dearest
+                        // price, and the one a region with no reach pays. Each is inside
                         // [0, industry_points_ceiling] (the accrual refuses a
                         // credit past it), and a sum past 2^62 -- the close's
                         // own refusal bound -- prices nothing this year.
@@ -5218,21 +5219,61 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         }
                         if (priced)
                         {
-                            const int64_t price = charter_running_price(total);
+                            // BL-1168 (Ben, 2026-10-03): A CHARTER IS PRICED BY
+                            // THE CAPITAL IN ITS OWN TRADE REACH -- its landmass.
+                            // The close prices a centre at its region's
+                            // landmass stock over the divisor
+                            // (`build_stockpile_budget`, the `landmass`
+                            // reach), so the note reads the price THAT price
+                            // grows into: each region's landmass's running
+                            // stock, every region's points on it counted (the
+                            // ones no centre will take included, as the close
+                            // counts them). The landmass is `landmass_of_region`
+                            // -- the labels the span's own cross-water reads
+                            // use, read off the region's anchor exactly as the
+                            // close reads it (industry_concentration checks the
+                            // two rasters agree; no row yet runs this step
+                            // against the close's price). A region with no landmass, or a
+                            // run with no substrate, reads the world's stock,
+                            // as the close prices a region with no reach. A
+                            // landmass's stock is at most the world's, so its
+                            // sum cannot overflow where the world's did not.
+                            const int64_t world_price = charter_running_price(total);
+                            const std::size_t nreg = ss.regions.size();
+                            std::vector<int32_t> region_mass(nreg, -1);
+                            std::vector<int64_t> mass_stock;
+                            if (!landmass.empty())
+                                for (std::size_t ri = 0; ri < nreg; ++ri)
+                                {
+                                    const int32_t m = landmass_of_region(static_cast<int>(ri));
+                                    region_mass[ri] = m;
+                                    if (m < 0) continue;
+                                    if (mass_stock.size() <= static_cast<std::size_t>(m))
+                                        mass_stock.resize(static_cast<std::size_t>(m) + 1, 0);
+                                    mass_stock[static_cast<std::size_t>(m)] += ss.regions[ri].industry_points;
+                                }
                             // f per mille of the price, split so the product
                             // stays inside int64 at the domain's ceiling
                             // (price <= 2^62 / 650, f <= 10^6), and never
                             // below one point -- a price of 1 at f = 1 is a
                             // threshold of 1, as the close's floor is.
                             const int64_t f    = params.works_event_fraction_q;
-                            const int64_t step = std::max<int64_t>(
-                                1, (price / 1000) * f + ((price % 1000) * f) / 1000);
+                            const auto step_of = [f](int64_t price) {
+                                return std::max<int64_t>(
+                                    1, (price / 1000) * f + ((price % 1000) * f) / 1000);
+                            };
                             if (works_noted.size() < ss.regions.size())
                                 works_noted.resize(ss.regions.size(), 0);
                             for (std::size_t ri = 0; ri < ss.regions.size(); ++ri)
                             {
                                 const region& r = ss.regions[ri];
                                 if (r.centres <= 0) continue; // only ground that stands centres charters works
+                                const int32_t m = region_mass[ri];
+                                const int64_t price = (m >= 0)
+                                    ? std::min(world_price,
+                                               charter_running_price(mass_stock[static_cast<std::size_t>(m)]))
+                                    : world_price;
+                                const int64_t step = step_of(price);
                                 uint8_t& k = works_noted[ri];
                                 // pts >= (k + 1) * step, written as a division
                                 // so the product can never overflow.

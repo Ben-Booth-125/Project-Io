@@ -711,7 +711,9 @@ const std::vector<world_digest_pin> k_world_digest_pins = {
 // THE SHIPPED ARC'S PINS (BL-1044) — the same sixteen library worlds on the
 // world the player is handed since BL-1044: the Industrialisation span and BL-1037's
 // tier on, the charter web bought from the world's own stockpile at the ruled
-// prices (divisor 650, two firm charters a specialist; NR-910, NR-914).
+// prices as they stood when the table was taken (divisor 650, two firm charters a
+// specialist; NR-910, NR-914 — the charter pin is 44 since Ben's 2026-10-03 ruling,
+// option a, and the price reads the centre's trade reach, BL-1168).
 //
 // PROVENANCE. Taken 2026-09-22 by `player_seed_sweep --digest` (shipped arc,
 // the library seeds, 3383 s), re-bless authorised by Ben at BL-1044's Gate 2,
@@ -1086,10 +1088,10 @@ charter_rule_check check_charter_rules(const world& w, const charter_budget& bud
     char buf[256];
 
     // --- B, re-derived: points on FIRMS, net of the specialist price ---
+    // BL-1168: every centre at its OWN reach price; B_ref at the world's.
     const long long fp = spend.firm_price_points;
-    const long long sp = static_cast<long long>(spend.firm_price_points)
-                       * static_cast<long long>(spend.specialist_firm_charters);
     std::map<entity_id, long long> firm_points_by_body;
+    std::map<entity_id, long long> firm_charters_by_body;
     for (const auto& [centre, pts] : budget.points())
     {
         const auto ct = w.population_centre_tile.find(centre);
@@ -1099,10 +1101,13 @@ charter_rule_check check_charter_rules(const world& w, const charter_budget& bud
         const auto own = w.tile_to_nation.find(ct->second);
         if (t == w.tiles.end() || own == w.tile_to_nation.end() || w.nations.count(own->second) == 0)
             continue;
+        const long long cfp = spend.firm_price_of(centre);
+        const long long csp = spend.specialist_price_of(centre);
         long long left = pts;
-        if (left >= sp)
-            left -= sp;
-        firm_points_by_body[t->second.body] += fp > 0 ? (left / fp) * fp : 0;
+        if (left >= csp)
+            left -= csp;
+        firm_points_by_body[t->second.body]   += cfp > 0 ? (left / cfp) * cfp : 0;
+        firm_charters_by_body[t->second.body] += cfp > 0 ? left / cfp : 0;
     }
     if (firm_points_by_body.size() != rep.bodies.size())
     {
@@ -1161,7 +1166,15 @@ charter_rule_check check_charter_rules(const world& w, const charter_budget& bud
             break;
         case charter_cap_rule::sqrt_capital:
         {
-            const long long B = b.firm_points;
+            // BL-1168: B in whole charters, each centre's at its own price —
+            // c x charters / |G|, which is c B / (|G| fp) where one price holds.
+            const long long B = firm_charters_by_body[b.body];
+            if (B != b.firm_charters)
+            {
+                std::snprintf(buf, sizeof buf, "body %u: B %lld charters, re-derived %lld", b.body,
+                              static_cast<long long>(b.firm_charters), B);
+                failed(buf);
+            }
             // k^2 B_ref <= c^2 B < (k+1)^2 B_ref, divided through by c |G| fp:
             // k^2 <= y < (k+1)^2 with y = floor(c B / (|G| fp)) — the same
             // inequality, exact for integers, but c^2 B itself can pass int64 on
@@ -1174,7 +1187,7 @@ charter_rule_check check_charter_rules(const world& w, const charter_budget& bud
                 ok = false;   // c x B past int64: charter_spend_refusal should have refused it
             else
             {
-                const long long y = (c * B) / (g * fp);
+                const long long y = (c * B) / g;
                 if (k > c)
                     ok = k * k <= y && y < (k + 1) * (k + 1);
                 else
@@ -1257,7 +1270,8 @@ charter_rule_check check_charter_rules(const world& w, const charter_budget& bud
                               static_cast<int>(b.yard_places));
                 failed(buf);
             }
-            const bool binds = n_turn > 0 && room >= n_turn && fp > 0 && b.firm_points / fp > ceil_n
+            // BL-1168: the body's charters, each centre's at its own price.
+            const bool binds = n_turn > 0 && room >= n_turn && b.firm_charters > ceil_n
                             && n_turn * k > ceil_n;
             const long long want_share = binds ? room / n_turn : 0;
             const long long want_extra = binds ? room % n_turn : 0;
@@ -1333,7 +1347,7 @@ void print_charter_report(const world& w, charter_mode mode, const charter_budge
         for (const auto& kv : budget.points())
         {
             richest = std::max(richest, kv.second);
-            if (priced && kv.second >= spend.specialist_price_points())
+            if (priced && kv.second >= spend.specialist_price_of(kv.first))
                 ++affords;
         }
         int non_razed = 0;
@@ -2365,8 +2379,8 @@ double spearman_rho(const std::vector<double>& x, const std::vector<double>& y)
 /// by the row's divisor at the whole stock over it (floored, at least 1) —
 /// RECOMPUTED here, not trusted — and the shipped path charged that price. A
 /// fixed-price row: it charged its own price. Empty when all hold.
-std::string stockpile_price_failure(const stockpile_budget& sb, const charter_spend_params& charged,
-                                    const cost_config& cfg)
+std::string stockpile_price_failure(const world& w, const stockpile_budget& sb,
+                                    const charter_spend_params& charged, const cost_config& cfg)
 {
     char buf[240];
     if (cfg.price_divisor != 0)
@@ -2385,6 +2399,50 @@ std::string stockpile_price_failure(const stockpile_budget& sb, const charter_sp
                           static_cast<long long>(sb.points_total), want,
                           static_cast<int>(charged.firm_price_points));
             return buf;
+        }
+        if (charged.centre_firm_price != sb.centre_firm_price)   // BL-1168: the reach prices too
+            return " price: the spend's reach prices are not the budget's;";
+        // BL-1168 — THE REACH PRICES, RECOMPUTED rather than trusted: each
+        // reach's stock summed here from the settlement record (every region's
+        // points on its reach key, the razed and dropped included), and every
+        // budgeted centre's price its region's reach stock over the divisor,
+        // floored, at least 1, at most the world's; a centre whose region has
+        // no reach pays the world's. The reach KEYS are the shipped labeller's
+        // (`stockpile_region_reach`), so this checks the arithmetic, not the
+        // labelling (industry_concentration checks the labels against the sim's).
+        if (cfg.price_divisor > 0 && sb.reach != charter_price_reach::world && w.gen_settlement)
+        {
+            const std::vector<region>& regs = w.gen_settlement->regions;
+            const std::vector<std::int64_t> key = stockpile_region_reach(w, sb.reach);
+            if (key.size() != regs.size())
+                return " price: the reach keys do not cover the settlement record;";
+            std::map<std::int64_t, long long> stock;
+            for (std::size_t i = 0; i < regs.size(); ++i)
+                if (key[i] >= 0) stock[key[i]] += regs[i].industry_points;
+            int wrong = 0, unreached = 0;
+            for (const auto& [centre, pts] : sb.budget.points())
+            {
+                (void)pts;
+                const auto slot = w.gen_carve_centres.find(centre);
+                const std::int64_t k = (slot != w.gen_carve_centres.end() && slot->second.region >= 0
+                                        && static_cast<std::size_t>(slot->second.region) < key.size())
+                    ? key[static_cast<std::size_t>(slot->second.region)] : -1;
+                long long want_c = want;
+                if (k >= 0)
+                    want_c = std::min<long long>(want, std::max<long long>(1, stock[k] / cfg.price_divisor));
+                else
+                    ++unreached;
+                if (charged.firm_price_of(centre) != want_c) ++wrong;
+            }
+            if (wrong != 0 || unreached != sb.centres_unreached
+                || sb.centre_firm_price.size() != sb.budget.points().size())
+            {
+                std::snprintf(buf, sizeof buf, " price: %d of %zu centres charged other than their "
+                              "reach's stock / %lld (recomputed); %d unreached, the budget says %d;",
+                              wrong, sb.budget.points().size(), static_cast<long long>(cfg.price_divisor),
+                              unreached, sb.centres_unreached);
+                return buf;
+            }
         }
         return {};
     }
@@ -2715,7 +2773,7 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
         for (const auto& kv : bud.points())
         {
             row.richest_centre_points = std::max(row.richest_centre_points, kv.second);
-            if (kv.second >= spend.specialist_price_points())
+            if (kv.second >= spend.specialist_price_of(kv.first))
                 ++row.centres_affording_specialist;
         }
         measure_charter_spill(w, report, spend.window_radius, row.spec_spill, row.firm_spill);
@@ -2733,7 +2791,7 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
         if (stock_row)
         {
             measure_stockpile_row(w, run->land.stockpile, report, row);
-            row.stockpile_fail += stockpile_price_failure(run->land.stockpile, spend, cfg);
+            row.stockpile_fail += stockpile_price_failure(w, run->land.stockpile, spend, cfg);
             if (!row.stockpile_fail.empty())
             {
                 row.balanced = false;

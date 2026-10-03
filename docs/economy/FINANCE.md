@@ -77,7 +77,16 @@ it. **"Draws less" is literal (Ben, 2026-10-03):** a unit buys only the part of 
 clears at or under the ceiling, and pays the clearing price for it; it is never billed below the
 price its sellers were paid, so no fill is subsidised and no money appears from nowhere. **What
 the owner can afford is the ceiling alone (Ben, 2026-10-03):** the draw reads the price, not the
-owner's balance. The same ceiling governs every goods draw, building upkeep's included. Measured on the curated seeds, a 50-head unit cost about 970 a year at the prices the market
+owner's balance. **A draw pays the posted price (Ben, 2026-10-03):** a
+draw from a market's shelf is decided and billed at the price that stood when it was made — the
+price it checked against the ceiling — with one exchange row at that price. The shelf's seller is
+the market, whose suppliers were paid when they listed, so the posted price leaves no unpaid gap,
+and a unit beside a full shelf is never refused by a price its own want drove up. **The same
+ceiling governs every goods draw (Ben, 2026-10-03):** unit and building upkeep, processor inputs
+and construction alike buy only at or under it, and a draw over it does not bid either, so its
+want leaves the price and the price can ease back. **Nations' draws too (Ben, 2026-10-03):** a
+nation's network upkeep and its space programme draw a shelf under the same ceiling and the same
+posted price. Measured on the curated seeds, a 50-head unit cost about 970 a year at the prices the market
 actually charged (rations ~3.5x and ordnance ~6x their base) against a hire price near 120, and
 standing-force upkeep was what wound most of the field up.
 

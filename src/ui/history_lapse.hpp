@@ -713,7 +713,7 @@ struct history_lapse
 
     /// BL-1099: THE REAL CHARTERS AT THE CLOSE (STARTUP.md § Round 6, "Company
     /// creation flashes"; Ben, 2026-09-24, R15). One per firm the search
-    /// chartered from the world's stockpile -- `charter_spend_report.charters`
+    /// chartered from its centre's budget -- `charter_spend_report.charters`
     /// in its own order, richest centre first -- at the ANCHOR TILE's raster
     /// position (the report's `anchor_tile`, resolved to grid col/row by the
     /// caller, which holds the world), carrying the year the pairing dated it
