@@ -607,7 +607,8 @@ far_world make_far_world(int seat1_col, int old_seat_col, bool across_water, boo
 
 /// One decision round (1700) of Exploration's params resumed on @p w, at the
 /// given land and sea far penalties and cargo loss.
-history_sim_state run_far(const far_world& w, int land_pen, int sea_pen, int loss = 0)
+history_sim_state run_far(const far_world& w, int land_pen, int sea_pen, int loss = 0, bool reach_rule = false,
+                          bool meet_gate = true)
 {
     history_sim_params p = exploration_sim_params(world_params{});
     p.start_year = 1700;
@@ -619,6 +620,10 @@ history_sim_state run_far(const far_world& w, int land_pen, int sea_pen, int los
     p.treaty_far_sea_penalty_q = sea_pen;
     p.far_pairs_meet_by_sea    = true;
     p.sea_current_cargo_loss_q = loss;
+    // F1-F5 read the class rule alone (BL-1142); F6-F7 turn the fleet's reach on.
+    p.far_sea_bind_needs_fleet_reach = reach_rule;
+    // F13 (BL-1171): meeting by sea gated by the same comparison; shipped on.
+    p.far_sea_meet_needs_fleet_out_projection = meet_gate;
     p.resume_polities      = &w.polities;
     p.resume_contacts      = &w.contacts;
     p.resume_dated_objects = &w.objects;
@@ -685,6 +690,169 @@ void far_pair_rows()
     check(over.sea_cargo_loss_rejected && under.sea_cargo_loss_rejected
           && !top.sea_cargo_loss_rejected && !none.sea_cargo_loss_rejected,
           "F5  a cargo loss outside [0, 1000] is rejected at the open and says so; 0 and 1000 are in its domain");
+
+    // F6-F7 (BL-1171): the sea's penalty only where a fleet reaches. The F1
+    // pair (met across water, seats on two islands 12+ tiles of ocean apart),
+    // the sea penalty 0 and the land's 700, the fleet rule's own constants.
+    const far_world w6 = make_far_world(36, -1, true, false);
+    const history_sim_state f6 = run_far(w6, 700, 0, 0, true);
+    say("F6 met across water, NO fleet on either side, reach rule on:", f6);
+    check(f6.treaties_formed == 0 && !bound(f6) && f6.far_pairs_out_of_fleet_reach > 0,
+          "F6  no far pair binds across water where no fleet reaches: it reads the land's penalty");
+    far_world w7 = w6;
+    w7.polities[0].navy_stock = 5000;
+    const history_sim_state f7 = run_far(w7, 700, 0, 0, true);
+    say("F7 the same pair, polity 0 sailing a fleet of 5000:", f7);
+    check(f7.treaties_formed == 1 && f7.far_treaties_formed_across_water == 1 && bound(f7)
+          && f7.far_pairs_out_of_fleet_reach == 0,
+          "F7  ... and the same pair binds where one side's fleet reaches the other's port");
+    // F8 (BL-1171, Ben 2026-10-03): reach is OUT-PROJECTING. Both sides sail
+    // fleets of 5000: each is strongest at its own port (no distance there),
+    // so whichever side sells, its fleet at the partner's port is out-projected
+    // by the partner's own, and the pair reads the land's penalty -- where F7's
+    // fleet, met by no fleet at the partner's port, binds.
+    far_world w8 = w6;
+    w8.polities[0].navy_stock = 5000;
+    w8.polities[1].navy_stock = 5000;
+    const history_sim_state f8 = run_far(w8, 700, 0, 0, true);
+    say("F8 the same pair, BOTH sides sailing a fleet of 5000:", f8);
+    check(f8.treaties_formed == 0 && !bound(f8) && f8.far_pairs_out_of_fleet_reach > 0,
+          "F8  a seller whose fleet is out-projected at the partner's port by the partner's own does not bind");
+
+    // F11 (BL-1171 review): EXPLORATION'S SHIPPED PARAMS CARRY THE RULINGS, and
+    // the gates are live there: realms across water meet and bind by sea, the
+    // sea's penalty is below the land's, binding AND meeting are gated by fleet
+    // out-projection, and the fleet rule they read is on with a halving.
+    {
+        const history_sim_params ep = exploration_sim_params(world_params{});
+        std::printf("      Exploration shipped: meet by sea %d, sea penalty %d (land %d), bind gate %d, meet gate %d,"
+                    " men per hull %d, halving %d\n", ep.far_pairs_meet_by_sea ? 1 : 0, ep.treaty_far_sea_penalty_q,
+                    ep.treaty_far_penalty_q, ep.far_sea_bind_needs_fleet_reach ? 1 : 0,
+                    ep.far_sea_meet_needs_fleet_out_projection ? 1 : 0, ep.fleet_men_per_hull,
+                    ep.fleet_power_halving_tiles);
+        check(ep.far_pairs_meet_by_sea && ep.treaty_far_sea_penalty_q < ep.treaty_far_penalty_q
+              && ep.far_sea_bind_needs_fleet_reach && ep.far_sea_meet_needs_fleet_out_projection
+              && ep.fleet_decides_crossings && ep.fleet_men_per_hull > 0 && ep.fleet_power_halving_tiles > 0,
+              "F11 Exploration's shipped params meet and bind realms across water, both gated by fleet out-projection, the gate live");
+    }
+
+    // F12 (BL-1171 review): A MUTUAL-DEFENCE ALLY'S FLEET TIPS THE COMPARISON.
+    // F7's pair (polity 0 sails 5000, polity 1 none) binds; give polity 1 an
+    // ally on its own island (polity 2, seated at column 40, sailing 20000)
+    // bound to it by mutual defence alone, and the ally's power at polity 1's
+    // port out-projects polity 0's, so the pair reads the land's penalty and
+    // does not bind. The control is the same three realms without the clause.
+    {
+        const auto with_ally = [](bool mutual_defence) {
+            far_world w = make_far_world(36, -1, true, false);
+            w.polities[0].navy_stock = 5000;
+            region r;
+            r.col = 40; r.row = 10; r.anchor = 10 * far_world::gw + 40;
+            r.culture = culture_shares::pure(2); r.founding_culture = 2;
+            r.farm_q = 600; r.ore_q = 300; r.energy_q = 200; r.port_q = 0;
+            r.settle_score_q = 800; r.population = 120000;
+            r.nation = 2; r.is_seat = true; r.seat_region = static_cast<int>(w.ss.regions.size());
+            r.has_market = true; r.name = "Isle ally";
+            w.ss.regions.push_back(r);
+            polity q;
+            q.id = 2; q.culture = 2; q.capital = static_cast<int>(w.ss.regions.size()) - 1;
+            q.aggression_q = 600; q.alive = true; q.navy_stock = 20000;
+            w.polities.push_back(q);
+            if (mutual_defence)
+                w.objects.push_back(dated_object{ 1800, static_cast<int32_t>(treaty_clause::mutual_defence), 1, 2 });
+            return w;
+        };
+        const history_sim_state f12 = run_far(with_ally(true), 700, 0, 0, true);
+        const history_sim_state f12c = run_far(with_ally(false), 700, 0, 0, true);
+        say("F12 polity 0 sails 5000; polity 1's ally (mutual defence) 20000:", f12);
+        say("F12 control -- the same ally, no mutual-defence clause:", f12c);
+        check(!bound(f12) && f12.far_pairs_out_of_fleet_reach > 0 && bound(f12c) && f12c.far_pairs_out_of_fleet_reach == 0,
+              "F12 a partner's mutual-defence ally out-projecting the seller at the partner's port stops the binding (unbound without the clause)");
+    }
+
+    // F14 (BL-1171 review): THE TREATY'S TRADE VALUE READS THE ROAD RULE IN
+    // STILL WATER TOO. Polity 1's seat is on East (36) but it still holds the
+    // West ground it left (19), joined to polity 0's seat by a dry corridor: a
+    // land line between seats on two landmasses. Polity 0 is farm ground and
+    // wants ore, polity 1 ore ground and wants farm; no ports, no fleets, so no
+    // sea line. Met in 1300 (far), both penalties 500: a binding is worth
+    // 1000 - 150 - 500 = 350 before trade -- under the bar (400) -- and over it
+    // only with the trade a road would carry. Currents off (weight 0): with the
+    // road rule the treaty context gives the pair no road, so it does not bind;
+    // the control, the rule off, binds on the road.
+    {
+        far_world w = make_far_world(36, 19, true, false);
+        w.ss.regions[0].dominant = region_class::farm;
+        w.ss.regions[1].dominant = region_class::ore;
+        w.ss.regions[2].dominant = region_class::ore;
+        history_corridor road;
+        road.a = 0; road.b = 2; road.uses = 40; road.tier = 1; road.wet = 0;
+        const std::vector<history_corridor> corridors = { road };
+        const auto run_still = [&](bool rule) {
+            history_sim_params p = exploration_sim_params(world_params{});
+            p.start_year = 1700;
+            p.stop_year  = 1704;
+            p.tick_bands[0]   = { p.stop_year, 4 };
+            p.tick_band_count = 1;
+            p.trace_battles   = false;
+            p.treaty_far_penalty_q     = 500;
+            p.treaty_far_sea_penalty_q = 500;
+            p.sea_current_weight_q     = 0; // still water: no field is built
+            p.trade_road_joins_one_landmass = rule;
+            p.resume_polities      = &w.polities;
+            p.resume_contacts      = &w.contacts;
+            p.resume_dated_objects = &w.objects;
+            p.resume_corridors     = &corridors;
+            settlement_state ss = w.ss;
+            sim_terrain_view view;
+            view.substrate = &w.ground;
+            return run_history_sim(ss, nullptr, view, far_world::gw, far_world::gh, p, 4242u);
+        };
+        const history_sim_state on  = run_still(true);
+        const history_sim_state off = run_still(false);
+        say("F14 still water, a road across landmasses, road rule on:", on);
+        say("F14 control -- the same, road rule off:", off);
+        check(!bound(on) && on.treaties_formed == 0 && bound(off) && off.treaties_formed == 1,
+              "F14 in still water the treaty's trade value gives no road between seats on two landmasses"
+              " (the control, rule off, binds on it)");
+    }
+
+    // F13 (BL-1171, Ben 2026-10-03): MEETING BY SEA IS GATED TOO. Two realms on
+    // two islands, never met, both seats with a built port, polity 0
+    // farm-dominant and polity 1 ore-dominant (each wants the other's good):
+    // a trade by sea is open whenever one of them sails. With the gate on,
+    // polity 0 alone sailing 5000 meets polity 1; both sailing 5000, each is
+    // out-projected at the other's port by its own fleet and no contact is
+    // made; the control -- both sailing, the gate off -- meets.
+    {
+        const auto strangers = [](int64_t navy0, int64_t navy1) {
+            far_world w = make_far_world(36, -1, true, false);
+            w.contacts.clear();
+            w.ss.regions[0].dominant = region_class::farm;
+            w.ss.regions[1].dominant = region_class::ore;
+            w.ss.regions[0].port_q = 500; // the window a port needs (none: no port, ever)
+            w.ss.regions[1].port_q = 500;
+            w.ss.regions[0].port_stock_q = 1000;
+            w.ss.regions[1].port_stock_q = 1000;
+            w.polities[0].navy_stock = navy0;
+            w.polities[1].navy_stock = navy1;
+            return w;
+        };
+        const auto met = [](const history_sim_state& hs) { return has_contact(hs, 0, 1); };
+        const history_sim_state one  = run_far(strangers(5000, 0), 700, 300, 0, true, true);
+        const history_sim_state both = run_far(strangers(5000, 5000), 700, 300, 0, true, true);
+        const history_sim_state ctrl = run_far(strangers(5000, 5000), 700, 300, 0, true, false);
+        std::printf("      F13 met by sea: one fleet %lld (refused %lld); both fleets, gate on %lld (refused %lld);"
+                    " both fleets, gate off %lld\n",
+                    static_cast<long long>(one.contacts_met_by_sea), static_cast<long long>(one.far_meetings_out_of_fleet_reach),
+                    static_cast<long long>(both.contacts_met_by_sea), static_cast<long long>(both.far_meetings_out_of_fleet_reach),
+                    static_cast<long long>(ctrl.contacts_met_by_sea));
+        check(one.contacts_met_by_sea == 1 && met(one) && one.far_meetings_out_of_fleet_reach == 0,
+              "F13 realms across water meet where one side's fleet out-projects the other's at its port");
+        check(both.contacts_met_by_sea == 0 && !met(both) && both.far_meetings_out_of_fleet_reach > 0
+              && ctrl.contacts_met_by_sea == 1 && met(ctrl),
+              "F13 ... and never meet where neither does (the same pair meets with the gate off)");
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1324,6 +1492,11 @@ std::vector<std::pair<std::string, int>> g_set_both, g_set_ind;
 bool apply_set(history_sim_params& p, const std::string& name, int v)
 {
     if (name == "far_pairs_meet_by_sea")         { p.far_pairs_meet_by_sea = v != 0; return true; }
+    // BL-1171: the fleet-reach rule and the one-landmass road.
+    if (name == "far_sea_bind_needs_fleet_reach") { p.far_sea_bind_needs_fleet_reach = v != 0; return true; }
+    if (name == "far_sea_meet_needs_fleet_out_projection") { p.far_sea_meet_needs_fleet_out_projection = v != 0; return true; }
+    if (name == "far_sea_bind_min_fleet_power")  { p.far_sea_bind_min_fleet_power = v; return true; }
+    if (name == "trade_road_joins_one_landmass") { p.trade_road_joins_one_landmass = v != 0; return true; }
     if (name == "treaty_far_sea_penalty_q")      { p.treaty_far_sea_penalty_q = v; return true; }
     if (name == "sea_current_cargo_loss_q")      { p.sea_current_cargo_loss_q = v; return true; }
     if (name == "treaty_far_penalty_q")          { p.treaty_far_penalty_q = v; return true; }
@@ -2004,9 +2177,51 @@ void real_body_rows(shipped_inputs& shipped, uint32_t seed, int weight)
         check(dp.treaty_far_sea_penalty_q >= dp.treaty_far_penalty_q || !dp.far_pairs_meet_by_sea
               || hi.far_treaties_formed_across_water > 0,
               "W9  and far pairs across water bind");
-        check(fx.exploration_params.far_pairs_meet_by_sea == false
-              && fx.exploration_state.contacts_met_by_sea == 0,
-              "W9  meeting by sea is the Industrialisation span's alone: Exploration meets no one by sea");
+        // BL-1171 (Ben, 2026-10-03): Exploration meets by sea too where its
+        // params say so; the row reads the span's own switch either way.
+        check(fx.exploration_params.far_pairs_meet_by_sea
+                  ? fx.exploration_state.contacts_met_by_sea > 0
+                  : fx.exploration_state.contacts_met_by_sea == 0,
+              fx.exploration_params.far_pairs_meet_by_sea
+                  ? "W9  Exploration, meeting by sea on, meets realms across water by sea"
+                  : "W9  Exploration, meeting by sea off, meets no one by sea");
+        // F9 (BL-1171, Ben 2026-10-03): GOODS BETWEEN LANDMASSES GO BY SEA, in
+        // every span -- no cross-landmass volume rides a dry corridor in either
+        // of generation's spans, and both spans' shipped params say so.
+        std::printf("      cross-landmass volume by road: Exploration %lld, Industrialisation %lld\n",
+                    static_cast<long long>(fx.exploration_state.cross_landmass_volume_by_road_q),
+                    static_cast<long long>(hi.cross_landmass_volume_by_road_q));
+        check(fx.exploration_params.far_pairs_meet_by_sea && fx.exploration_params.far_sea_bind_needs_fleet_reach
+              && fx.exploration_params.far_sea_meet_needs_fleet_out_projection,
+              "F11 generation's own Exploration span ran meeting and binding by sea, both gated by fleet out-projection");
+        check(fx.exploration_params.trade_road_joins_one_landmass && dp.trade_road_joins_one_landmass
+              && fx.exploration_state.cross_landmass_volume_by_road_q == 0
+              && hi.cross_landmass_volume_by_road_q == 0,
+              "F9  goods between landmasses never ride a road, in the Exploration span or the Industrialisation span");
+        // F10 (BL-1171 review): THE ROAD RULE DOES NOT HANG ON THE CURRENT.
+        // Generation's Exploration span re-run in still water (weight 0: no
+        // field is built), once with the rule as shipped and once with it off:
+        // with the rule on no cross-landmass volume rides a road, where the
+        // control -- the same still-water span without the rule -- moves some
+        // by road, so the row can fail.
+        {
+            history_sim_params e_on = exploration_rerun_params(fx, 0, /*trace=*/false);
+            history_sim_params e_off = e_on;
+            e_off.trade_road_joins_one_landmass = false;
+            settlement_state ss_on = fx.pre_exploration_settlement, ss_off = fx.pre_exploration_settlement;
+            creed_state cs_on = fx.pre_exploration_creeds, cs_off = fx.pre_exploration_creeds;
+            const history_sim_state h_on = run_history_sim(ss_on, &cs_on, fx.terrain.view(), fx.gw, fx.gh, e_on,
+                                                           fx.exploration_seed, nullptr, fx.works, nullptr);
+            const history_sim_state h_off = run_history_sim(ss_off, &cs_off, fx.terrain.view(), fx.gw, fx.gh, e_off,
+                                                            fx.exploration_seed, nullptr, fx.works, nullptr);
+            std::printf("      still water (weight 0), Exploration re-run: cross-landmass volume by road %lld with the"
+                        " road rule, %lld without it\n",
+                        static_cast<long long>(h_on.cross_landmass_volume_by_road_q),
+                        static_cast<long long>(h_off.cross_landmass_volume_by_road_q));
+            check(e_on.trade_road_joins_one_landmass && h_on.cross_landmass_volume_by_road_q == 0
+                  && h_off.cross_landmass_volume_by_road_q > 0,
+                  "F10 with the currents off, goods between landmasses still never ride a road (the control, rule off, does)");
+        }
         check(dp.sea_current_cargo_loss_q <= 0 || hi.sea_trade_cargo_lost_q > 0,
               "W9  with a loss set, the Industrialisation span's trades across water lose cargo against the current");
         // The Exploration span's loss is PRINTED above, not bound: it is lost

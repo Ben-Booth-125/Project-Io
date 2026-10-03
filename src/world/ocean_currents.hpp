@@ -185,7 +185,11 @@ std::vector<int> sea_walk(const std::vector<std::uint8_t>& sea, int gw, int gh,
 /// `sea_walk`, with tiles already carrying a lane (@p laned: one byte per tile,
 /// raster order, non-zero on a lane) entered at @p laned_cost_q per mille of
 /// their priced step, at least 1 -- so a walk prefers water a lane already uses,
-/// as a road prefers road. Null @p laned, or @p laned_cost_q 1000 or more, is
+/// as a road prefers road. ONLY WITH THE CURRENT (LOGISTICS.md sec 4b): a step
+/// that runs against the entered tile's current (its alignment, the one that
+/// priced it, below 0) pays the full priced step on a lane too; a step across
+/// the current or through slack water (alignment 0), and every step of an
+/// unpriced walk, takes the discount. Null @p laned, or @p laned_cost_q 1000 or more, is
 /// `sea_walk` exactly. The Era -1 fleets never read it: only the lane stamp does.
 std::vector<int> sea_walk_laned(const std::vector<std::uint8_t>& sea, int gw, int gh,
                                 const ocean_current_field* currents, int weight_q,

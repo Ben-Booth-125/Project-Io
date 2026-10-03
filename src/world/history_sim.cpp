@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <limits>
+#include <map>
 #include <queue>
 #include <unordered_map>
 
@@ -1096,6 +1097,26 @@ static int trade_land_line_q(const trade_context& ctx, int a, int b)
     return (it != ctx.land_lines.end() && it->lo == lo && it->hi == hi) ? it->line_q : 0;
 }
 
+/// The ROAD a (@p seller, @p buyer) trade may ride: the land line above, read as
+/// 0 where BL-1171's rule is on and the two seats stand on different landmasses
+/// (EXPLORATION.md sec The colonial tie is a sea lane: a road joins seats on one
+/// landmass only). The one place the rule zeroes a land line, so the flow's
+/// sizing (`trade_lines`) and the across-water want's reachability read it alike.
+static int trade_road_line_q(const trade_context& ctx, int seller, int buyer)
+{
+    const int land_q = trade_land_line_q(ctx, seller, buyer);
+    if (land_q > 0 && ctx.road_joins_one_landmass && ctx.seat_landmass != nullptr
+     && seller >= 0 && buyer >= 0
+     && static_cast<std::size_t>(seller) < ctx.seat_landmass->size()
+     && static_cast<std::size_t>(buyer) < ctx.seat_landmass->size())
+    {
+        const int32_t ms = (*ctx.seat_landmass)[static_cast<std::size_t>(seller)];
+        const int32_t mb = (*ctx.seat_landmass)[static_cast<std::size_t>(buyer)];
+        if (ms >= 0 && mb >= 0 && ms != mb) return 0;
+    }
+    return land_q;
+}
+
 void run_exploration_upkeep(std::vector<region>&                 regions,
                             std::vector<polity>&                 polities,
                             const std::vector<history_corridor>& corridors,
@@ -1133,6 +1154,16 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             trade_ctx.seat_landmass = spend_ctx->seat_landmass;
             trade_ctx.cargo_loss_q  = spend_ctx->cargo_loss_q;
             trade_ctx.cargo_lost    = spend_ctx->cargo_lost_out;
+        }
+        // BL-1171 -- THE ROAD RULE READS THE SEATS' LANDMASSES, NOT THE
+        // CURRENT: a span with its currents off still sails its goods between
+        // landmasses, so the landmasses are handed whenever the rule is on.
+        // (The cargo loss reads `currents` as well, so it stays off there.)
+        if (params.trade_road_joins_one_landmass && spend_ctx != nullptr && spend_ctx->seat_landmass != nullptr)
+        {
+            trade_ctx.seat_landmass           = spend_ctx->seat_landmass;
+            trade_ctx.road_joins_one_landmass = true;
+            trade_ctx.road_rule_lost          = spend_ctx->road_rule_lost_out; // diagnostic
         }
         flows = compute_trade_flows(trade_ctx, regions, polities, *treaties);
     }
@@ -1182,8 +1213,12 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             const int gi = scarcity_good_index(r.dominant);
             if (gi >= 0) reachable[n][static_cast<std::size_t>(gi)] = true;
         }
+        // BL-1171: "joined by a land line" is the ROAD the rule leaves the
+        // pair (`trade_road_line_q`) -- zeroed only between seats on different
+        // landmasses -- never the carrier the flow picked: a same-landmass pair
+        // whose sea line happens to beat its road is still answered by land.
         for (const trade_flow& f : flows)
-            if (f.good < good_count && trade_land_line_q(trade_ctx, f.seller, f.buyer) > 0)
+            if (f.good < good_count && trade_road_line_q(trade_ctx, f.seller, f.buyer) > 0)
                 reachable[f.buyer][f.good] = true;
 
         // The preference weight is only filled when `w_want_q` != 0 (generation
@@ -1721,7 +1756,9 @@ static bool trade_lines(const trade_context& ctx, const std::vector<region>& reg
 
     // LINE: the better of land (a corridor joining the two realms) and sea
     // (both seats' built ports, carried by the SELLER's navy).
-    land_q = trade_land_line_q(ctx, seller, buyer);
+    // BL-1171 -- GOODS BETWEEN LANDMASSES GO BY SEA: a road joins two seats on
+    // one landmass only, so a pair across water has no land line to ride.
+    land_q = trade_road_line_q(ctx, seller, buyer);
     sea_q = ps.navy_stock > 0
           ? clampi(std::min(seller_seat.port_stock_q, buyer_seat.port_stock_q), 0, 1000)
           : 0;
@@ -2218,6 +2255,32 @@ std::vector<trade_flow> compute_trade_flows(const trade_context&             ctx
             int land_q = 0, sea_q = 0, align = 0;
             const bool lines = trade_lines(ctx, regions, polities, e[0], e[1], land_q, sea_q, align);
             const uint8_t by_sea = (lines && sea_q > land_q) ? 1 : 0;
+            // BL-1171 DIAGNOSTIC (write-only): what the road rule took from
+            // this directed pair -- the raw land line's volume over the sea
+            // line's, per good, before any sharing. Reads nothing back.
+            if (lines && ctx.road_rule_lost != nullptr && land_q == 0)
+            {
+                const int raw_land = trade_land_line_q(ctx, e[0], e[1]);
+                if (raw_land > sea_q)
+                {
+                    const polity& ps = polities[static_cast<std::size_t>(e[0])];
+                    const polity& pb = polities[static_cast<std::size_t>(e[1])];
+                    // A sea line of 0 with a navy and both ports built is one the
+                    // current's pricing floored: its own slot (3), never "no port".
+                    const int ports = std::min(
+                        regions[static_cast<std::size_t>(ps.capital)].port_stock_q,
+                        regions[static_cast<std::size_t>(pb.capital)].port_stock_q);
+                    const int slot = sea_q > 0 ? 2 : ps.navy_stock <= 0 ? 0 : ports > 0 ? 3 : 1;
+                    for (int g = 0; g < 4; ++g)
+                    {
+                        int want_q = 0, holding_q = 0;
+                        trade_want_holding(ctx, regions, polities, e[0], e[1], g, want_q, holding_q);
+                        if (want_q <= 0 || holding_q <= 0) continue;
+                        const int cap = std::min(want_q, holding_q);
+                        ctx.road_rule_lost[slot] += std::min(cap, raw_land) - std::min(cap, sea_q);
+                    }
+                }
+            }
             for (int g = 0; g < 4; ++g)
             {
                 const int v = trade_flow_volume_q(ctx, regions, polities, e[0], e[1], g);
@@ -2425,6 +2488,19 @@ history_sim_state run_history_sim(settlement_state&         ss,
     std::vector<std::vector<int>> fleet_ring;
     std::vector<std::uint8_t> fleet_ring_built;
     fleet_field_cache fleet_fields;
+    // BL-1171 -- A FAR PAIR READS THE SEA'S PENALTY WHERE THE SELLER'S FLEET
+    // OUT-PROJECTS THE PARTNER'S. The rule reads the fleet's own power curve,
+    // so it needs the fleet rule on with a halving; otherwise it reads nothing
+    // and BL-1142 stands as ruled. The cost field from each source set (a
+    // seat's coast tile, a defender's ports) is memoised for the span, keyed
+    // by the tiles (content: the sea never moves), cleared whole when it
+    // grows past a bound -- which moves the cost of the read, never its answer.
+    const bool far_reach_rule_on = params.far_sea_bind_needs_fleet_reach && fleet_rule_on
+                                && params.fleet_power_halving_tiles > 0;
+    // BL-1171: meeting by sea reads the same comparison, on the same terms.
+    const bool far_meet_rule_on = params.far_sea_meet_needs_fleet_out_projection && fleet_rule_on
+                               && params.fleet_power_halving_tiles > 0;
+    std::map<std::vector<int>, std::vector<int64_t>> far_reach_fields;
     if (fleet_rule_on)
     {
         fleet_comp = sea_components(fleet_sea, gw, gh);
@@ -5307,12 +5383,18 @@ history_sim_state run_history_sim(settlement_state&         ss,
             spend_ctx.seat_landmass  = landmass.empty() ? nullptr : &seat_landmass;
             spend_ctx.cargo_loss_q   = cargo_loss_q; // judged in domain at the open
             spend_ctx.cargo_lost_out = &out.sea_trade_cargo_lost_q;
+            int64_t road_rule_lost[4] = {0, 0, 0, 0}; // BL-1171 diagnostic
+            spend_ctx.road_rule_lost_out = road_rule_lost;
             // BL-954: the state's treaties open this round's flows, rebuilt
             // into `out.trade_flows` (never accumulated).
             run_exploration_upkeep(ss.regions, out.polities, out.supply_corridors,
                                    params, y, step_years, &upkeep_spend,
                                    &out.dated_objects, &out.trade_flows, &spend_ctx, works);
             note_trade_legs(); // BL-1140: the round's trade across water, the fourth writer
+            out.road_rule_lost_no_navy_q  += road_rule_lost[0]; // BL-1171 diagnostic
+            out.road_rule_lost_no_port_q  += road_rule_lost[1];
+            out.road_rule_lost_narrowed_q += road_rule_lost[2];
+            out.road_rule_lost_by_current_q += road_rule_lost[3];
             out.treasury_spent_on_ports           += upkeep_spend.ports;
             out.treasury_spent_on_navies          += upkeep_spend.navies;
             out.treasury_spent_on_standing_armies += upkeep_spend.standing_armies;
@@ -5425,8 +5507,73 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     t.seat_landmass = landmass.empty() ? nullptr : &seat_landmass;
                     t.cargo_loss_q  = cargo_loss_q;
                 }
+                // BL-1171: the road rule with or without a current (as the
+                // round's flows read it, `run_exploration_upkeep`).
+                if (params.trade_road_joins_one_landmass && !landmass.empty())
+                {
+                    t.seat_landmass           = &seat_landmass;
+                    t.road_joins_one_landmass = true;
+                }
                 return t;
             }();
+
+            // BL-1171 -- WHETHER THE SELLER'S FLEET OUT-PROJECTS THE PARTNER'S AT
+            // THE PARTNER'S PORT (Ben, 2026-10-03), read off the live stocks
+            // formation and the break re-score read. The seller's fleet sails
+            // from its seat's coast tile to the partner seat's, priced with the
+            // current, and its power there (`fleet_power_at`, halving over the
+            // fleet's own tiles) must be at least the stated minimum AND at least
+            // the power the partner's side projects onto that same tile. The
+            // partner's side is `judge_crossing`'s defenders, read by the same
+            // `crossing_defenders`: the partner and its mutual-defence partners
+            // with a fleet, each from its own ports (its seat's coast where it
+            // built none), less any partner bound to the seller by
+            // non-aggression. The comparison is judge_crossing's (the defenders'
+            // sum against the attacker's power, a tie to the attacker), taken at
+            // the one tile the trade lands on rather than along a leg. Either
+            // side can be the seller, so either side's fleet will do.
+            const auto seat_coast_tile = [&](int pid) -> int {
+                if (pid < 0 || static_cast<std::size_t>(pid) >= out.polities.size()) return -1;
+                const int cap = out.polities[static_cast<std::size_t>(pid)].capital;
+                if (cap < 0 || static_cast<std::size_t>(cap) >= ss.regions.size()) return -1;
+                const region& seat = ss.regions[static_cast<std::size_t>(cap)];
+                return nearest_sea_tile(fleet_sea, gw, gh, seat.col, seat.row, kFleetCoastRadius);
+            };
+            const auto reach_field = [&](const std::vector<int>& from) -> const std::vector<int64_t>& {
+                auto it = far_reach_fields.find(from);
+                if (it == far_reach_fields.end())
+                {
+                    if (far_reach_fields.size() >= 128) far_reach_fields.clear();
+                    it = far_reach_fields.emplace(from, sea_cost_field(fleet_sea, gw, gh,
+                             currents_on ? &currents : nullptr, params.sea_current_weight_q, from)).first;
+                }
+                return it->second;
+            };
+            const auto fleet_out_projects = [&](int x, int y) -> bool {
+                const polity& px = out.polities[static_cast<std::size_t>(x)];
+                if (!px.alive || px.navy_stock <= 0) return false;
+                const int from = seat_coast_tile(x), to = seat_coast_tile(y);
+                if (from < 0 || to < 0) return false;
+                const std::size_t ti = static_cast<std::size_t>(to);
+                const int64_t power = fleet_power_at(px.navy_stock, reach_field({ from })[ti],
+                                                     params.fleet_power_halving_tiles);
+                if (power <= 0 || power < params.far_sea_bind_min_fleet_power) return false;
+                const std::vector<fleet_defender> defenders =
+                    crossing_defenders(out, ss.regions, y, x, fleet_sea, gw, gh, kFleetCoastRadius, nullptr);
+                int64_t def = 0;
+                for (const fleet_defender& d : defenders)
+                    def += fleet_power_at(d.navy, reach_field(d.ports)[ti], params.fleet_power_halving_tiles);
+                return def <= power;
+            };
+            // The class a pair reads its far penalty by: met across water, and
+            // (with the rule on) one side's fleet out-projecting the other's.
+            const auto sea_far_class = [&](int a, int b, bool met_across_water) -> bool {
+                if (!met_across_water) return false;
+                if (!far_reach_rule_on) return true;
+                const bool reach = fleet_out_projects(a, b) || fleet_out_projects(b, a);
+                if (!reach) ++out.far_pairs_out_of_fleet_reach;
+                return reach;
+            };
 
             // BL-1142 -- REALMS ACROSS WATER MEET BY SEA (INDUSTRIALISATION.md
             // sec Far pairs meet and bind). Two living realms whose seats
@@ -5468,6 +5615,17 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             open = trade_sea_volume_q(treaty_trade_ctx, ss.regions, out.polities, ia, ib, g) > 0
                                 || trade_sea_volume_q(treaty_trade_ctx, ss.regions, out.polities, ib, ia, g) > 0;
                         if (!open) continue;
+                        // BL-1171 -- MEETING BY SEA IS GATED TOO (Ben,
+                        // 2026-10-03): the pair meets only where one side's
+                        // fleet out-projects the other's at its port -- the
+                        // binding's own comparison (`fleet_out_projects`),
+                        // read after the cheap tests and the trade, so only
+                        // an open pair pays for it.
+                        if (far_meet_rule_on && !fleet_out_projects(ia, ib) && !fleet_out_projects(ib, ia))
+                        {
+                            ++out.far_meetings_out_of_fleet_reach;
+                            continue;
+                        }
                         raise_contact(ia, ib, contact_kind::trade, pa.capital, y);
                         ++out.contacts_met_by_sea;
                     }
@@ -5523,7 +5681,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const int trade_ab = pair_trade_value_q(treaty_trade_ctx, ss.regions, out.polities, a, b,
                                                              out.trade_flows);
                 const bool met_across_water = c.first.across_water != 0; // BL-1142: recorded at the meeting
-                const int far_pen = treaty_far_penalty_for(params, met_across_water);
+                const int far_pen = near_home ? treaty_far_penalty_for(params, met_across_water)
+                                              : treaty_far_penalty_for(params, sea_far_class(a, b, met_across_water));
                 const int value_a = treaty_value_q(params, ga, gb, pb.treaties_broken, pa.aggression_q,
                                                     alarm_a, near_home, trade_ab, far_pen);
                 const int value_b = treaty_value_q(params, gb, ga, pa.treaties_broken, pb.aggression_q,
@@ -5593,7 +5752,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                                              out.trade_flows);
                     // BL-1142 -- the class the pair's contact recorded, the
                     // same fact formation read off the row it walked.
-                    const int far_pen = treaty_far_penalty_for(params, contact_met_across_water(out, a, b));
+                    const bool across = contact_met_across_water(out, a, b);
+                    const int far_pen = near_home ? treaty_far_penalty_for(params, across)
+                                                  : treaty_far_penalty_for(params, sea_far_class(a, b, across)); // BL-1171
                     const int value_a = treaty_value_q(params, ga, gb, pb.treaties_broken, pa.aggression_q,
                                                         alarm_a, near_home, trade_ab, far_pen);
                     const int value_b = treaty_value_q(params, gb, ga, pa.treaties_broken, pb.aggression_q,
@@ -5649,6 +5810,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     if (!polity_holds_exploration_sea_legs(arriving)) continue; // THE NODE, never a rank
                     if (arriving.capital < 0
                      || static_cast<std::size_t>(arriving.capital) >= ss.regions.size()) continue;
+                    ++out.subjection_arrivals_walked; // BL-1171 diagnostic
 
                     // BL-953 -- COLLECT, THEN RANK. Every native passing the
                     // same eligibility tests as before is gathered with the
@@ -5659,14 +5821,23 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // same want"). With the lean off every want is 0 and the
                     // pick is the lowest eligible id -- the old id-order walk.
                     std::vector<std::pair<int, int>> eligible_natives;
+                    // BL-1171 DIAGNOSTIC (write-only): which single test stood
+                    // between this arriving power and a native -- a native
+                    // failing exactly one of the overlord / treasury / sphere
+                    // tests (reach and contact passed).
+                    bool sole_blocked[3] = {false, false, false};
                     for (std::size_t ni = 0; ni < pc; ++ni)
                     {
                         if (ni == ai) continue;
                         polity& native = out.polities[ni];
-                        if (!native.alive || native.overlord >= 0) continue;
+                        if (!native.alive) continue;
                         if (native.capital < 0
                          || static_cast<std::size_t>(native.capital) >= ss.regions.size()) continue;
                         if (!has_contact(out, arriving.id, native.id)) continue;
+                        // The overlord test, read here rather than first: every
+                        // test in this walk is a side-effect-free `continue`, so
+                        // the order decides nothing but what the diagnostic sees.
+                        const bool is_subject = native.overlord >= 0;
 
                         // The two cheap scalar tests run BEFORE the O(P)
                         // sphere-of-claim scan below. Every test here is a
@@ -5685,8 +5856,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             ss.regions[static_cast<std::size_t>(arriving.capital)].treasury;
                         const int64_t native_treasury =
                             ss.regions[static_cast<std::size_t>(native.capital)].treasury;
-                        if (arriving_treasury < native_treasury + params.subjection_treasury_margin_q)
-                            continue;
+                        const bool treasury_short =
+                            arriving_treasury < native_treasury + params.subjection_treasury_margin_q;
+                        if (is_subject && treasury_short) continue; // two tests fail: nothing to read
 
                         // SPHERE OF CLAIM: non-interference over a native
                         // polity's ground BETWEEN THE TWO TREATY PARTIES --
@@ -5704,7 +5876,19 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             if (has_contact(out, static_cast<int>(oi), native.id))
                                 sphere_blocked = true;
                         }
-                        if (sphere_blocked) continue;
+                        if (is_subject || treasury_short || sphere_blocked)
+                        {
+                            const int fails = (is_subject ? 1 : 0) + (treasury_short ? 1 : 0) + (sphere_blocked ? 1 : 0);
+                            if (fails == 1)
+                            {
+                                const int k = is_subject ? 0 : (treasury_short ? 1 : 2);
+                                sole_blocked[k] = true;
+                                ++(k == 0 ? out.subjection_native_sole_overlord
+                                          : k == 1 ? out.subjection_native_sole_treasury
+                                                   : out.subjection_native_sole_sphere);
+                            }
+                            continue;
+                        }
 
                         const int want_q = want_lean_on
                             ? polity_good_want_q(ss.regions, out.polities, round_prefs, arriving.id,
@@ -5713,6 +5897,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         eligible_natives.push_back({static_cast<int>(ni), want_q});
                     }
 
+                    if (eligible_natives.empty()) // BL-1171 diagnostic
+                    {
+                        ++out.subjection_arrivals_none_eligible;
+                        if (sole_blocked[0]) ++out.subjection_arrivals_freed_by_overlord;
+                        if (sole_blocked[1]) ++out.subjection_arrivals_freed_by_treasury;
+                        if (sole_blocked[2]) ++out.subjection_arrivals_freed_by_sphere;
+                    }
                     const int chosen = choose_subjection_native(eligible_natives);
                     if (chosen >= 0)
                     {
