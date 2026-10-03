@@ -73,7 +73,11 @@ retuning, so the equipment-to-wage ratio the roster is anchored on survives.
 **SETTLED (Ben, 2026-10-03): an army eats what its owner can buy at a fair price.** A unit's
 rations and ordnance are bought at most at their reservation price; above it the unit draws less
 and fights weaker, so a supply shortage weakens an army rather than bankrupting the firm that keeps
-it. Measured on the curated seeds, a 50-head unit cost about 970 a year at the prices the market
+it. **"Draws less" is literal (Ben, 2026-10-03):** a unit buys only the part of its need that
+clears at or under the ceiling, and pays the clearing price for it; it is never billed below the
+price its sellers were paid, so no fill is subsidised and no money appears from nowhere. **What
+the owner can afford is the ceiling alone (Ben, 2026-10-03):** the draw reads the price, not the
+owner's balance. The same ceiling governs every goods draw, building upkeep's included. Measured on the curated seeds, a 50-head unit cost about 970 a year at the prices the market
 actually charged (rations ~3.5x and ordnance ~6x their base) against a hire price near 120, and
 standing-force upkeep was what wound most of the field up.
 
@@ -224,7 +228,9 @@ the cut: *"it's not fun to see an inevitable loss."* Paired with a
 non-zero opening capital (`corporation_params::base_capital`, 400), which is the buffer that stops
 a survivable bad quarter starting the spiral at all. **Every firm opens with it (Ben, 2026-10-03):**
 a background firm opens with working capital priced from its opening stock, not at zero, so the
-buffer exists for the whole field and not only for the seat and the specialists. The rule: cash is
+buffer exists for the whole field and not only for the seat and the specialists. It is
+minted at generation, as `base_capital` is (Ben, 2026-10-03): no treasury or charter budget pays
+for it. The rule: cash is
 one quarter of the stock's value, each good at its base price in the market the stock is pooled in
 (`k_background_working_capital_of_stock`, `corporation_generation.cpp`). Base, never the live price,
 so an opening position is priced by worth rather than by the first tick's scarcity. The constant is the single

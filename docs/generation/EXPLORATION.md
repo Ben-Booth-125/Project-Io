@@ -380,9 +380,16 @@ halving over sea distance as a fleet's does (§ the stocks table), so navies dec
 pairs trade, not a dial. **Reach means out-projecting (Ben, 2026-10-03):** the seller binds a far
 partner only where its fleet out-projects the partner's own fleet at the partner's port — the same
 defender comparison a crossing faces — because a fleet keeps some power for a long way and mere
-reach gated almost nothing. **Goods between landmasses go by sea, in every span (Ben, 2026-10-03):**
+reach gated almost nothing. **The seller is a potential seller (Ben, 2026-10-03):** either side's
+fleet out-projecting the other's at its port binds the pair, since either can sell to the other.
+**Goods between landmasses go by sea, in every span (Ben, 2026-10-03):**
 a road carries goods only between seats on one landmass, so trade between landmasses rides a fleet, writes sea lanes, and grounds the
-long lanes the age is remembered for. Measured on the curated seeds before it is set.
+long lanes the age is remembered for. **A bridged strait still parts two landmasses for trade
+(Ben, 2026-10-03):** a road may bridge at most two water tiles (`../economy/LOGISTICS.md`), but
+goods between seats on either shore sail all the same; the landmass is land connectivity alone. **Meeting by sea is gated too (Ben, 2026-10-03):** realms
+across water first meet only where one side's fleet out-projects the other's at its port — the same
+comparison binding faces — so a contact the sea forbids is never made, rather than made and left
+unbound. Measured on the curated seeds before it is set.
 
 *(Folded from `../research/COLONIAL_ERA.md` on 2026-09-16, NR-884.)*
 
