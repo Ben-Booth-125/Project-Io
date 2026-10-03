@@ -2056,6 +2056,30 @@ void real_body_rows(shipped_inputs& shipped, uint32_t seed, int weight)
               && fx.exploration_state.cross_landmass_volume_by_road_q == 0
               && hi.cross_landmass_volume_by_road_q == 0,
               "F9  goods between landmasses never ride a road, in the Exploration span or the Industrialisation span");
+        // F10 (BL-1171 review): THE ROAD RULE DOES NOT HANG ON THE CURRENT.
+        // Generation's Exploration span re-run in still water (weight 0: no
+        // field is built), once with the rule as shipped and once with it off:
+        // with the rule on no cross-landmass volume rides a road, where the
+        // control -- the same still-water span without the rule -- moves some
+        // by road, so the row can fail.
+        {
+            history_sim_params e_on = exploration_rerun_params(fx, 0, /*trace=*/false);
+            history_sim_params e_off = e_on;
+            e_off.trade_road_joins_one_landmass = false;
+            settlement_state ss_on = fx.pre_exploration_settlement, ss_off = fx.pre_exploration_settlement;
+            creed_state cs_on = fx.pre_exploration_creeds, cs_off = fx.pre_exploration_creeds;
+            const history_sim_state h_on = run_history_sim(ss_on, &cs_on, fx.terrain.view(), fx.gw, fx.gh, e_on,
+                                                           fx.exploration_seed, nullptr, fx.works, nullptr);
+            const history_sim_state h_off = run_history_sim(ss_off, &cs_off, fx.terrain.view(), fx.gw, fx.gh, e_off,
+                                                            fx.exploration_seed, nullptr, fx.works, nullptr);
+            std::printf("      still water (weight 0), Exploration re-run: cross-landmass volume by road %lld with the"
+                        " road rule, %lld without it\n",
+                        static_cast<long long>(h_on.cross_landmass_volume_by_road_q),
+                        static_cast<long long>(h_off.cross_landmass_volume_by_road_q));
+            check(e_on.trade_road_joins_one_landmass && h_on.cross_landmass_volume_by_road_q == 0
+                  && h_off.cross_landmass_volume_by_road_q > 0,
+                  "F10 with the currents off, goods between landmasses still never ride a road (the control, rule off, does)");
+        }
         check(dp.sea_current_cargo_loss_q <= 0 || hi.sea_trade_cargo_lost_q > 0,
               "W9  with a loss set, the Industrialisation span's trades across water lose cargo against the current");
         // The Exploration span's loss is PRINTED above, not bound: it is lost

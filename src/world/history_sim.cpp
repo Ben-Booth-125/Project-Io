@@ -1152,10 +1152,18 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             trade_ctx.current_weight_q = params.sea_current_weight_q;
             // BL-1142: the cargo a leg against its current loses.
             trade_ctx.seat_landmass = spend_ctx->seat_landmass;
-            trade_ctx.road_joins_one_landmass = params.trade_road_joins_one_landmass; // BL-1171
             trade_ctx.cargo_loss_q  = spend_ctx->cargo_loss_q;
             trade_ctx.cargo_lost    = spend_ctx->cargo_lost_out;
-            trade_ctx.road_rule_lost = spend_ctx->road_rule_lost_out; // BL-1171 diagnostic
+        }
+        // BL-1171 -- THE ROAD RULE READS THE SEATS' LANDMASSES, NOT THE
+        // CURRENT: a span with its currents off still sails its goods between
+        // landmasses, so the landmasses are handed whenever the rule is on.
+        // (The cargo loss reads `currents` as well, so it stays off there.)
+        if (params.trade_road_joins_one_landmass && spend_ctx != nullptr && spend_ctx->seat_landmass != nullptr)
+        {
+            trade_ctx.seat_landmass           = spend_ctx->seat_landmass;
+            trade_ctx.road_joins_one_landmass = true;
+            trade_ctx.road_rule_lost          = spend_ctx->road_rule_lost_out; // diagnostic
         }
         flows = compute_trade_flows(trade_ctx, regions, polities, *treaties);
     }
@@ -5446,8 +5454,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     t.current_weight_q = params.sea_current_weight_q;
                     // BL-1142: a binding is worth what arrives.
                     t.seat_landmass = landmass.empty() ? nullptr : &seat_landmass;
-                    t.road_joins_one_landmass = params.trade_road_joins_one_landmass; // BL-1171
                     t.cargo_loss_q  = cargo_loss_q;
+                }
+                // BL-1171: the road rule with or without a current (as the
+                // round's flows read it, `run_exploration_upkeep`).
+                if (params.trade_road_joins_one_landmass && !landmass.empty())
+                {
+                    t.seat_landmass           = &seat_landmass;
+                    t.road_joins_one_landmass = true;
                 }
                 return t;
             }();
