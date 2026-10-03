@@ -3,7 +3,7 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 226 entries across 2 volume(s).
+One line per session, newest first — 227 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
@@ -213,6 +213,7 @@ the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 | 2026-06-13 | [Layer 2: Primary canvases](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
 | 2026-06-13 | [Layer 1: ECS data model](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
 | 2026-06-13 | [Layer 0: Engine scaffolding](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
+| ? | [2026-09-25 (evening) — Sprint 48 cut: the world moves forward](DEVLOG.md) | BL-1003 BL-1077 BL-1084 BL-1101 BL-1114 BL-1117 BL-1118 BL-1119 BL-1124 BL-1125 | DEVLOG.md |
 | ? | [2026-09-25 (afternoon) — Sprint 47 closed: the re-bless applied, every call ruled, two live walks, v0.1.26 — version 0.1.26](DEVLOG.md) | BL-1084 BL-1114 BL-1117 BL-1118 BL-1124 | DEVLOG.md |
 | ? | [2026-09-24 (evening) — Sprint 47 cut: one history, told through the rounds](DEVLOG.md) | BL-1049 BL-1068 BL-1082 BL-1083 BL-1084 BL-1085 BL-1087 BL-1090 BL-1091 BL-1094 BL-1095 BL-1096 BL-1097 BL-1101 BL-1102 BL-1106 BL-1108 BL-1109 BL-1110 BL-1111 BL-1112 BL-1113 | DEVLOG.md |
 | ? | [2026-09-16 (late) — The queue emptied, the backlog cut, wave A built, and the rest archived](DEVLOG.md) | BL-1006 BL-1008 BL-1009 BL-1010 BL-1016 BL-1017 BL-1018 BL-1020 BL-1021 BL-1022 BL-1023 BL-841 BL-842 BL-880 BL-982 BL-996 | DEVLOG.md |

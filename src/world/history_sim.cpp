@@ -1,5 +1,7 @@
 #include "history_sim.hpp"
 
+#include "ocean_currents.hpp" // BL-1120: the current field a sea leg is priced with
+
 #include "charter_price.hpp"  // BL-1099: the running charter price the works notes are read against
 #include "unit_roster.hpp"
 #include "terrain_combat.hpp" // BL-384 trace: the defence term the scorer never sees
@@ -8,6 +10,8 @@
 #include <cctype>
 #include <chrono>
 #include <cstdint>
+#include <cstdlib>
+#include <limits>
 #include <queue>
 #include <unordered_map>
 
@@ -150,9 +154,21 @@ int region_value_q(const region& p)
 /// `run_history_sim` read it).
 int nation_tree_mod_q(const std::vector<polity>& ps, int nation, io::tree_modifier_term t);
 
+/// Per-mille of prize one centre's worth of urban heads carries in the
+/// settlement term, saturating at five (50,000 heads). BL-1130 (Ben,
+/// 2026-09-25: "a place's size is its people, never how many centres they are
+/// split into", and "a settled place is worth at least a village"): the term
+/// reads `region_settlement_size` — the centre-equivalents of the urban heads,
+/// never below one while the region stands a settlement — not
+/// `region::centres`. The 200 was sized when the count WAS one centre per
+/// 10,000 heads with the opening draw's one below that, and the settlement
+/// size is exactly that reading, so the same heads keep the same prize while
+/// consolidation merges villages into towns.
+constexpr int prize_per_centre_q = 200;
+
 int campaign_prize_q(const region& p)
 {
-    const int centre_q = clampi(p.centres * 200, 0, 1000);
+    const int centre_q = clampi(region_settlement_size(p) * prize_per_centre_q, 0, 1000);
     const int urban_q  = clampi(static_cast<int>(p.urban_population / 100), 0, 1000);
     const int works_q  = clampi((p.work_capacity_mod + p.work_manpower_mod
                                 + p.work_industrial_mod) / 3, 0, 1000);
@@ -385,7 +401,310 @@ int region_distance(const region& a, const region& b, int gw)
     if (gw > 0 && dc > gw / 2) dc = gw - dc; // Columns wrap: the map is a cylinder.
     int dr = a.row - b.row;
     if (dr < 0) dr = -dr;
-    return dc > dr ? dc : dr; // Chebyshev — movement is eight-connected.
+    return dc > dr ? dc : dr; // Chebyshev: the sim's water-blind region radius, not the tile pathfinder's four-way grid
+}
+
+namespace {
+
+/// Round x / n to the nearest integer, halves away from zero (n > 0).
+int div_round_nearest(int x, int n)
+{
+    return x >= 0 ? (2 * x + n) / (2 * n) : -((-2 * x + n) / (2 * n));
+}
+
+} // namespace
+
+bool anchors_joined_by_land(const std::vector<terrain_substrate>& sub,
+                            const region& a_in, const region& b_in, int gw, int gh)
+{
+    if (gw <= 0 || gh <= 0 || sub.size() != static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh))
+        return true;
+    // Symmetric: draw from the endpoint earlier in (row, col) order.
+    const bool swap = (b_in.row < a_in.row) || (b_in.row == a_in.row && b_in.col < a_in.col);
+    const region& a = swap ? b_in : a_in;
+    const region& b = swap ? a_in : b_in;
+    int dc = b.col - a.col;
+    if (dc > gw / 2) dc -= gw;
+    else if (dc < -(gw / 2)) dc += gw;
+    const int dr = b.row - a.row;
+    const int steps = std::max(std::abs(dc), std::abs(dr));
+    // The tiles strictly BETWEEN the anchors (s = 1 .. steps - 1): an anchor is
+    // where the region's people stand, never a crossing.
+    for (int s = 1; s < steps; ++s)
+    {
+        const int c = a.col + div_round_nearest(dc * s, steps);
+        const int r = a.row + div_round_nearest(dr * s, steps);
+        if (r < 0 || r >= gh) return false;
+        const int cc = ((c % gw) + gw) % gw;
+        if (is_water(sub[static_cast<std::size_t>(r) * static_cast<std::size_t>(gw)
+                         + static_cast<std::size_t>(cc)]))
+            return false;
+    }
+    return true;
+}
+
+bool stream_land_lines::joined(const std::vector<region>& regions, int a, int b)
+{
+    if (substrate == nullptr) return true;
+    if (a < 0 || b < 0 || static_cast<std::size_t>(a) >= regions.size()
+        || static_cast<std::size_t>(b) >= regions.size())
+        return false;
+    const uint32_t lo = static_cast<uint32_t>(std::min(a, b));
+    const uint32_t hi = static_cast<uint32_t>(std::max(a, b));
+    const uint64_t key = (static_cast<uint64_t>(lo) << 32) | static_cast<uint64_t>(hi);
+    const auto it = memo.find(key);
+    if (it != memo.end()) return it->second;
+    const bool ok = anchors_joined_by_land(*substrate, regions[lo], regions[hi], gw, gh);
+    memo.emplace(key, ok);
+    ++measured;
+    return ok;
+}
+
+bool rehome_stranded_points(std::vector<region>& regions, const std::vector<int>& owner,
+                            std::size_t i, int gw)
+{
+    if (i >= regions.size()) return false;
+    region& from = regions[i];
+    if (from.industry_points <= 0 || from.centres > 0) return false;
+    const int q = (i < owner.size()) ? owner[i] : -1;
+    if (q < 0) return false;
+    int best = -1, best_d = 1 << 30;
+    for (std::size_t j = 0; j < regions.size() && j < owner.size(); ++j)
+    {
+        if (j == i || owner[j] != q) continue;
+        const region& to = regions[j];
+        if (to.centres <= 0 || to.population <= 0) continue;
+        const int d = region_distance(from, to, gw);
+        if (d < best_d) { best_d = d; best = static_cast<int>(j); } // strict: ties to the lower index
+    }
+    if (best < 0) return false;
+    region& to = regions[static_cast<std::size_t>(best)];
+    if (to.industry_points > industry_points_ceiling - from.industry_points) return false;
+    to.industry_points += from.industry_points;
+    to.industry_points_from_treasury += from.industry_points_from_treasury;
+    from.industry_points = 0;
+    from.industry_points_from_treasury = 0;
+    return true;
+}
+
+namespace {
+
+/// floor(a * b / c) and (a * b) % c, EXACT, for 0 <= a, b < 2^62 and
+/// 0 < c < 2^62: the 128-bit product in two 64-bit halves, then a bitwise long
+/// division (the quotient fits 64 bits whenever a * b / c does, which every
+/// caller below guarantees by dividing by a total at least one factor's size).
+/// Integer throughout, so the apportionment is exact at any headcount.
+void mul_div_exact(uint64_t a, uint64_t b, uint64_t c, uint64_t& q, uint64_t& r)
+{
+    const uint64_t a_lo = a & 0xFFFFFFFFull, a_hi = a >> 32;
+    const uint64_t b_lo = b & 0xFFFFFFFFull, b_hi = b >> 32;
+    const uint64_t p0 = a_lo * b_lo, p1 = a_lo * b_hi, p2 = a_hi * b_lo, p3 = a_hi * b_hi;
+    const uint64_t mid = (p0 >> 32) + (p1 & 0xFFFFFFFFull) + (p2 & 0xFFFFFFFFull);
+    const uint64_t lo  = (p0 & 0xFFFFFFFFull) | (mid << 32);
+    const uint64_t hi  = p3 + (p1 >> 32) + (p2 >> 32) + (mid >> 32);
+    q = 0;
+    uint64_t rem = 0;
+    for (int i = 127; i >= 0; --i)
+    {
+        const uint64_t bit = (i >= 64) ? ((hi >> (i - 64)) & 1u) : ((lo >> i) & 1u);
+        rem = (rem << 1) | bit; // rem < 2c < 2^63: never overflows
+        if (rem >= c)
+        {
+            rem -= c;
+            if (i < 64) q |= (uint64_t{1} << i);
+        }
+    }
+    r = rem;
+}
+
+/// Share @p total over @p weights by LARGEST REMAINDER, exactly: each takes the
+/// floor of total * w / W, and what the floors leave goes one each to the
+/// largest remainders, ties to the lower index (the weights are in ascending
+/// region order). The shares sum to @p total. 0 <= total, each weight and their
+/// sum are below 2^62, and W > 0.
+std::vector<int64_t> apportion_exact(int64_t total, const std::vector<int64_t>& weights, int64_t W)
+{
+    std::vector<int64_t> share(weights.size(), 0);
+    std::vector<uint64_t> rem(weights.size(), 0);
+    int64_t given = 0;
+    for (std::size_t k = 0; k < weights.size(); ++k)
+    {
+        uint64_t q = 0, r = 0;
+        mul_div_exact(static_cast<uint64_t>(total), static_cast<uint64_t>(weights[k]),
+                      static_cast<uint64_t>(W), q, r);
+        share[k] = static_cast<int64_t>(q);
+        rem[k]   = r;
+        given   += share[k];
+    }
+    int64_t left = total - given; // 0 <= left < weights.size()
+    if (left > 0)
+    {
+        std::vector<std::size_t> order(weights.size());
+        for (std::size_t k = 0; k < order.size(); ++k) order[k] = k;
+        std::stable_sort(order.begin(), order.end(),
+                         [&rem](std::size_t a, std::size_t b) { return rem[a] > rem[b]; });
+        for (std::size_t k = 0; k < order.size() && left > 0; ++k, --left)
+            ++share[order[k]];
+    }
+    return share;
+}
+
+} // namespace
+
+std::vector<int> work_candidates(const std::vector<region>& regions, const std::vector<int>& held,
+                                 int capital, const history_sim_params& p, uint32_t polity_salt,
+                                 int64_t year)
+{
+    std::vector<int> out;
+    if (held.empty()) return out;
+    if (p.work_candidates_every_centre)
+    {
+        // The capital always; then every other held region standing a centre.
+        out.push_back(capital);
+        for (const int pi : held)
+        {
+            if (pi == capital || pi < 0 || static_cast<std::size_t>(pi) >= regions.size()) continue;
+            if (regions[static_cast<std::size_t>(pi)].centres > 0) out.push_back(pi);
+        }
+        return out;
+    }
+    const int slots = clampi(p.work_candidate_regions, 0, 8);
+    for (int slot = 0; slot < slots; ++slot)
+    {
+        if (slot == 0) { out.push_back(capital); continue; }
+        // Rotation is a hash of (polity, year, slot), not a counter: nothing is
+        // carried between rounds, so inserting or removing a decision cannot
+        // shift which region a later round looks at.
+        const uint32_t h = salt(polity_salt, static_cast<uint32_t>(year) * 977u + static_cast<uint32_t>(slot));
+        out.push_back(held[static_cast<std::size_t>(h % static_cast<uint32_t>(held.size()))]);
+    }
+    return out;
+}
+
+int64_t region_open_work(const region& r, int64_t employed_heads)
+{
+    if (employed_heads <= 0) return 0;
+    const int64_t urban = r.urban_population > 0 ? r.urban_population : 0;
+    return employed_heads > urban ? employed_heads - urban : 0;
+}
+
+urbanisation_round run_urbanisation_stream(std::vector<region>& regions,
+                                           const std::vector<int>& owner,
+                                           const std::vector<std::vector<int>>& neighbours,
+                                           const std::function<bool(int, int)>& linked,
+                                           const std::vector<int64_t>& open_work,
+                                           int step_years)
+{
+    urbanisation_round out;
+    const std::size_t n = regions.size();
+    if (step_years <= 0 || n == 0) return out;
+    std::vector<int> piece(n, -1);
+    std::vector<int> members, dests;
+    std::vector<int64_t> pull, want;
+    for (std::size_t start = 0; start < n; ++start)
+    {
+        const int q = (start < owner.size()) ? owner[start] : -1;
+        if (q < 0 || piece[start] >= 0) continue;
+        // THE LINE: the realm's held ground its own corridors join.
+        members.clear();
+        piece[start] = static_cast<int>(start);
+        members.push_back(static_cast<int>(start));
+        for (std::size_t f = 0; f < members.size(); ++f)
+        {
+            const int at = members[f];
+            if (static_cast<std::size_t>(at) >= neighbours.size()) continue;
+            for (int nb : neighbours[static_cast<std::size_t>(at)])
+            {
+                if (nb < 0 || static_cast<std::size_t>(nb) >= n) continue;
+                const std::size_t ni = static_cast<std::size_t>(nb);
+                if (piece[ni] >= 0 || ni >= owner.size() || owner[ni] != q) continue;
+                if (linked && !linked(at, nb)) continue;
+                piece[ni] = static_cast<int>(start);
+                members.push_back(nb);
+            }
+        }
+        std::sort(members.begin(), members.end()); // ascending: a total order
+
+        // THE DESTINATIONS, and the open work each offers (the pull).
+        dests.clear();
+        pull.clear();
+        int64_t open_total = 0;
+        for (int m : members)
+        {
+            const region& r = regions[static_cast<std::size_t>(m)];
+            // Any centre with open work (Ben, 2026-10-02), not towns only.
+            if (r.population <= 0 || r.centres <= 0) continue;
+            const int64_t ow = (static_cast<std::size_t>(m) < open_work.size())
+                                   ? open_work[static_cast<std::size_t>(m)] : 0;
+            if (ow <= 0) continue;
+            // Open work is at most a region's employed heads, under 2^31
+            // (`work_employs_max`); held there so the totals below stay in domain.
+            dests.push_back(m);
+            pull.push_back(std::min<int64_t>(ow, 1LL << 31));
+            open_total += pull.back();
+        }
+        if (dests.empty() || open_total <= 0) continue;
+
+        // THE PUSH: what every countryside of the piece would send, held to what
+        // `take_countryside` would take from it, so a send is always taken whole.
+        want.assign(members.size(), 0);
+        int64_t want_total = 0;
+        for (std::size_t k = 0; k < members.size(); ++k)
+        {
+            const region& r = regions[static_cast<std::size_t>(members[k])];
+            const int64_t countryside = std::max<int64_t>(r.population - r.urban_population, 0);
+            const int64_t farm_fed    = std::max<int64_t>(r.population - r.industrial_heads, 0);
+            want[k] = std::clamp<int64_t>(urbanisation_outflow(r, step_years), 0,
+                                          std::min(countryside, farm_fed));
+            want_total += want[k];
+        }
+        if (want_total <= 0) continue;
+
+        // ...UP TO THE OPEN WORK: the destinations take no more than they offer,
+        // so a push past it sends each countryside its share of the open work.
+        const int64_t send_total = std::min(want_total, open_total);
+        const std::vector<int64_t> send =
+            (send_total < want_total) ? apportion_exact(send_total, want, want_total) : want;
+        int64_t pool = 0;
+        for (std::size_t k = 0; k < members.size(); ++k)
+            pool += take_countryside(regions[static_cast<std::size_t>(members[k])], send[k]);
+        if (pool <= 0) continue;
+
+        // THE PULL: the migrants shared by open work. pool <= open_total, so no
+        // destination's share passes its own open work (a floor of pool * ow /
+        // total is under ow, and a remainder's one more stays within it).
+        const std::vector<int64_t> share = apportion_exact(pool, pull, open_total);
+        for (std::size_t k = 0; k < dests.size(); ++k)
+        {
+            if (share[k] <= 0) continue;
+            settle_urban_migrants(regions[static_cast<std::size_t>(dests[k])], share[k]);
+            out.destinations.push_back(dests[k]);
+            // What it took from its own countryside: members is ascending.
+            const auto at = std::lower_bound(members.begin(), members.end(), dests[k]);
+            if (at != members.end() && *at == dests[k])
+                out.moved_within += std::min(send[static_cast<std::size_t>(at - members.begin())], share[k]);
+        }
+        out.moved += pool;
+    }
+    std::sort(out.destinations.begin(), out.destinations.end());
+    return out;
+}
+
+int rehome_stranded_at_close(std::vector<region>& regions, const std::vector<int>& owner,
+                             const std::vector<uint8_t>& on_ruin, int gw)
+{
+    // Region order: a receiver stands a centre, so no stranded region receives
+    // from another and the order decides nothing but distance ties.
+    int moved = 0;
+    for (std::size_t i = 0; i < regions.size(); ++i)
+    {
+        const region& r = regions[i];
+        const bool ruin = i < on_ruin.size() && on_ruin[i] != 0;
+        if (r.industry_points > 0 && r.centres <= 0 && !ruin
+            && rehome_stranded_points(regions, owner, i, gw))
+            ++moved;
+    }
+    return moved;
 }
 
 int step_for_year(const history_sim_params& p, int64_t y)
@@ -622,6 +941,12 @@ bool subjection_purchase_params_valid(const history_sim_params& p)
         && p.subjection_purchase_floor  >= 0 && p.subjection_purchase_floor  <= (1LL << 48);
 }
 
+bool culture_profile_params_valid(const history_sim_params& p)
+{
+    return p.culture_profile_lack_max_q  >= 0 && p.culture_profile_lack_max_q  <= 1000
+        && p.culture_profile_amenity_div >= 1 && p.culture_profile_amenity_div <= 1000;
+}
+
 int64_t purchase_price_q(const region& native_seat, const history_sim_params& p)
 {
     // stock <= 2^48 (the treasury's own clamp) and rate <= 10^4 < 2^14, so
@@ -780,7 +1105,8 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
                             exploration_upkeep_spend*              spend,
                             const std::vector<dated_object>*       treaties,
                             std::vector<trade_flow>*               flows_out,
-                            const exploration_spend_context*       spend_ctx)
+                            const exploration_spend_context*       spend_ctx,
+                            const works_registry*                  works)
 {
     // BL-939 -- the demand half, refreshed on the same round-level cadence
     // the treasury's own earn runs on: a market's signal is a fact about
@@ -798,6 +1124,16 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
     if (treaties != nullptr && !treaties->empty())
     {
         trade_ctx = build_trade_context(regions, polities, corridors);
+        // BL-1140: the span's current prices every sea line this round.
+        if (spend_ctx != nullptr && spend_ctx->currents != nullptr)
+        {
+            trade_ctx.currents         = spend_ctx->currents;
+            trade_ctx.current_weight_q = params.sea_current_weight_q;
+            // BL-1142: the cargo a leg against its current loses.
+            trade_ctx.seat_landmass = spend_ctx->seat_landmass;
+            trade_ctx.cargo_loss_q  = spend_ctx->cargo_loss_q;
+            trade_ctx.cargo_lost    = spend_ctx->cargo_lost_out;
+        }
         flows = compute_trade_flows(trade_ctx, regions, polities, *treaties);
     }
     std::vector<int64_t> trade_volume(polities.size(), 0); // both ends, per polity
@@ -1034,7 +1370,7 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
                     const int64_t decay  = std::max<int64_t>(
                         (unpaid * params.navy_decay_per_mille_year_q * years_q) / 1000, 1);
                     q.navy_stock = clampi64(units - std::min(decay, units), 0, 1LL << 48);
-                    if (spend) ++spend->navy_unpaid;
+                    if (spend) { ++spend->navy_unpaid; spend->navy_hulls_decayed += std::min(decay, units); }
                 }
                 seat.treasury -= std::min(paid_sum, seat.treasury);
                 if (spend) spend->navy_upkeep += paid_sum;
@@ -1052,9 +1388,11 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         // never taxed a second time. The share LEAVES the treasury (a
         // conversion, not a copy); the scored purchase below reads what is left.
         // BL-1056 (RULED, Ben 2026-09-19, NR-897): the points SPREAD over the
-        // polity's held regions that stand centres, in proportion to their
-        // urban scale, by integer largest-remainder apportionment -- a treasury
-        // builds its realm's works where its people are. Landing them all on
+        // polity's held regions that stand centres by integer largest-remainder
+        // apportionment, in proportion to the heads their works employ (AMENDED,
+        // Ben 2026-10-01, NR-964: it was their urban scale) -- a treasury builds
+        // where its works are. A realm whose centres employ nobody converts
+        // nothing (NR-901, below). Landing them all on
         // the capital's region let one region hold up to 65% of a world's
         // points. The capital still leads where it is the largest centre.
         // NR-901 (RULED, Ben 2026-09-19, option A): A POLITY THAT HOLDS NO TOWN
@@ -1080,7 +1418,25 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             {
                 const int64_t credit = paid_in * params.industry_points_per_treasury_unit;
                 std::vector<std::pair<int, int64_t>> spread;
-                bool refuse = !industry_points_apportion_by_scale(regions, q.id, credit, spread);
+                bool refuse = !industry_points_apportion_by_scale(regions, q.id, credit, spread, works);
+                // BL-1169 -- A CROWDED HEARTLAND CONVERTS AT A LOWER RATE
+                // (INDUSTRIALISATION.md sec Industry spreads beyond its
+                // heartland; Ben, 2026-10-03). Each receiving region converts
+                // its share at K / (K + its crowding), and the whole treasury
+                // units the brake leaves unconverted STAY IN THE PURSE (the
+                // debit below falls by them). Off (K = 0) the spread and the
+                // debit are untouched.
+                int64_t debit = paid_in;
+                if (!refuse && !spread.empty() && params.industry_points_crowding_k > 0)
+                {
+                    const int64_t kept = industry_points_crowd_brake(
+                        regions, spread, params.industry_points_crowding_k,
+                        params.industry_points_per_treasury_unit, works);
+                    if (kept < 0) refuse = true; // out of the brake's domain: refused whole
+                    else debit -= kept;
+                }
+                int64_t credited = 0;
+                for (const auto& part : spread) credited += part.second;
                 // NR-901: no town, no conversion. Not a refusal (nothing was out
                 // of domain) and not a debit: the purse keeps the share.
                 const bool no_town = !refuse && spread.empty();
@@ -1095,13 +1451,13 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
                 {
                     // Nothing moves: the treasury keeps the round's share.
                 }
-                else if (refuse || paid_in > seat.treasury)
+                else if (refuse || debit > seat.treasury)
                 {
                     if (spend) ++spend->industry_points_refused;
                 }
                 else
                 {
-                    seat.treasury -= paid_in;
+                    seat.treasury -= debit;
                     for (const auto& part : spread)
                     {
                         region& rr = regions[static_cast<std::size_t>(part.first)];
@@ -1110,8 +1466,9 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
                     }
                     if (spend)
                     {
-                        spend->industry_points_paid_in   += credit;
-                        spend->industry_treasury_debited += paid_in;
+                        spend->industry_points_paid_in   += credited;
+                        spend->industry_treasury_debited += debit;
+                        spend->industry_treasury_kept_by_crowding += paid_in - debit; // BL-1169
                     }
                 }
             }
@@ -1144,8 +1501,24 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
         facts.levy_room           =
             (std::max<int64_t>(seat.manpower_stock, 0)
              * clampi(params.standing_army_levy_per_mille_q, 0, 1000)) / 1000;
-        const exploration_spend_option pick =
-            choose_exploration_spend(score_exploration_spend(params, facts));
+        const exploration_spend_scores pick_scores = score_exploration_spend(params, facts);
+        const exploration_spend_option pick = choose_exploration_spend(pick_scores);
+        if (spend != nullptr) // BL-1152 diagnosis, report only
+        {
+            const int k = pick == exploration_spend_option::army_step ? 1
+                        : pick == exploration_spend_option::port_step ? 2
+                        : pick == exploration_spend_option::navy_step ? 3 : 0;
+            ++spend->pick_counts[k];
+            if (!pick_scores.navy_eligible)
+            {
+                const bool t_short = facts.treasury < params.navy_build_cost_q;
+                const bool p_short = facts.port_stock_q < params.navy_min_port_stock_q;
+                if (t_short && p_short) ++spend->navy_short_both;
+                else if (t_short) ++spend->navy_short_treasury;
+                else if (p_short) ++spend->navy_short_port;
+            }
+            else if (pick != exploration_spend_option::navy_step) ++spend->navy_eligible_outbid;
+        }
         // PORT -- only ground carrying the endowment WINDOW can host one at
         // all; `port_q` is that window and is never itself spent.
         if (seat.port_q > 0)
@@ -1290,6 +1663,11 @@ trade_context build_trade_context(const std::vector<region>&           regions,
     // the best line per pair -- the result is a property of the integers.
     for (const history_corridor& c : corridors)
     {
+        // BL-1147 review: A CORRIDOR WALKED ACROSS SEA IS NO ROAD. A wet
+        // campaign or a line over a strait records a corridor as every walk
+        // does, but the goods it could carry go by sea -- so it offers no land
+        // line, and a pair joined only across water trades by sea or not at all.
+        if (c.wet) continue;
         if (static_cast<std::size_t>(c.a) >= regions.size()
          || static_cast<std::size_t>(c.b) >= regions.size()) continue;
         const region& ra = regions[c.a];
@@ -1318,41 +1696,429 @@ trade_context build_trade_context(const std::vector<region>&           regions,
     return ctx;
 }
 
+/// The two LINES one directed (seller, buyer) trade could run on, and the
+/// current along the sea one: land is the pair's best corridor (0 without
+/// one); sea is the smaller of both seats' built ports while the SELLER holds a
+/// navy (0 otherwise), priced with the current seller seat -> buyer seat when
+/// the context carries the field. False for a dead or out-of-range party, the
+/// same polity twice, or a capital out of range. `align_out` is the current's
+/// alignment along the leg (0 where no field or no sea line).
+static bool trade_lines(const trade_context& ctx, const std::vector<region>& regions,
+                        const std::vector<polity>& polities, int seller, int buyer,
+                        int& land_q, int& sea_q, int& align_out)
+{
+    land_q = 0; sea_q = 0; align_out = 0;
+    if (seller < 0 || buyer < 0 || seller == buyer) return false;
+    if (static_cast<std::size_t>(seller) >= polities.size()
+     || static_cast<std::size_t>(buyer) >= polities.size()) return false;
+    const polity& ps = polities[static_cast<std::size_t>(seller)];
+    const polity& pb = polities[static_cast<std::size_t>(buyer)];
+    if (!ps.alive || !pb.alive) return false;
+    if (ps.capital < 0 || static_cast<std::size_t>(ps.capital) >= regions.size()) return false;
+    if (pb.capital < 0 || static_cast<std::size_t>(pb.capital) >= regions.size()) return false;
+    const region& seller_seat = regions[static_cast<std::size_t>(ps.capital)];
+    const region& buyer_seat  = regions[static_cast<std::size_t>(pb.capital)];
+
+    // LINE: the better of land (a corridor joining the two realms) and sea
+    // (both seats' built ports, carried by the SELLER's navy).
+    land_q = trade_land_line_q(ctx, seller, buyer);
+    sea_q = ps.navy_stock > 0
+          ? clampi(std::min(seller_seat.port_stock_q, buyer_seat.port_stock_q), 0, 1000)
+          : 0;
+    // BL-1140 -- THE SEA LINE IS PRICED WITH ITS CURRENT, seller's seat to
+    // buyer's: the leg's cost against still water divides the line, so a
+    // current carrying the goods widens it and one set against them narrows
+    // it. The one place trade across water is decided -- this line is what
+    // sizes the flow (`compute_trade_flows`) AND what a binding is worth in
+    // trade (`pair_trade_value_q`), so the current decides both how much
+    // moves and whether the pair binds to move it. Exactly antisymmetric in
+    // direction (`ocean_current_alignment_q`), so a pair trades more the way
+    // the water runs. Land is never priced: a road has no current.
+    if (sea_q > 0 && ctx.currents != nullptr && ctx.current_weight_q > 0)
+    {
+        align_out = ocean_current_alignment_q(*ctx.currents, seller_seat.col, seller_seat.row,
+                                              buyer_seat.col, buyer_seat.row);
+        const int cost = ocean_current_leg_cost_q(ctx.current_weight_q, align_out); // >= 1: weight < 1000
+        sea_q = clampi(static_cast<int>((static_cast<int64_t>(sea_q) * 1000) / std::max(1, cost)), 0, 1000);
+    }
+    return true;
+}
+
+/// The want and the holding a directed trade reads (0 where either is absent).
+static void trade_want_holding(const trade_context& ctx, const std::vector<region>& regions,
+                               const std::vector<polity>& polities, int seller, int buyer, int good,
+                               int& want_q, int& holding_q)
+{
+    // WANT: the buyer capital market's RAW signal (0 where it stands no market).
+    want_q = regions[static_cast<std::size_t>(polities[static_cast<std::size_t>(buyer)].capital)]
+                 .scarcity_raw_q[good];
+    // HOLDER: the seller's share of held ground dominant in the good.
+    holding_q = static_cast<std::size_t>(seller) < ctx.holding_q.size()
+              ? ctx.holding_q[static_cast<std::size_t>(seller)][static_cast<std::size_t>(good)]
+              : 0;
+}
+
 int trade_flow_volume_q(const trade_context& ctx, const std::vector<region>& regions,
                         const std::vector<polity>& polities,
                         int seller, int buyer, int good)
 {
     if (good < 0 || good >= 4) return 0;
-    if (seller < 0 || buyer < 0 || seller == buyer) return 0;
-    if (static_cast<std::size_t>(seller) >= polities.size()
-     || static_cast<std::size_t>(buyer) >= polities.size()) return 0;
-    const polity& ps = polities[static_cast<std::size_t>(seller)];
-    const polity& pb = polities[static_cast<std::size_t>(buyer)];
-    if (!ps.alive || !pb.alive) return 0;
-    if (ps.capital < 0 || static_cast<std::size_t>(ps.capital) >= regions.size()) return 0;
-    if (pb.capital < 0 || static_cast<std::size_t>(pb.capital) >= regions.size()) return 0;
-    const region& seller_seat = regions[static_cast<std::size_t>(ps.capital)];
-    const region& buyer_seat  = regions[static_cast<std::size_t>(pb.capital)];
-
-    // WANT: the buyer capital market's RAW signal (0 where it stands no market).
-    const int want_q = buyer_seat.scarcity_raw_q[good];
-    if (want_q <= 0) return 0;
-
-    // HOLDER: the seller's share of held ground dominant in the good.
-    const int holding_q = static_cast<std::size_t>(seller) < ctx.holding_q.size()
-                        ? ctx.holding_q[static_cast<std::size_t>(seller)][static_cast<std::size_t>(good)]
-                        : 0;
-    if (holding_q <= 0) return 0;
-
-    // LINE: the better of land (a corridor joining the two realms) and sea
-    // (both seats' built ports, carried by the SELLER's navy).
-    const int land_q = trade_land_line_q(ctx, seller, buyer);
-    const int sea_q = ps.navy_stock > 0
-                    ? clampi(std::min(seller_seat.port_stock_q, buyer_seat.port_stock_q), 0, 1000)
-                    : 0;
+    int land_q = 0, sea_q = 0, align = 0;
+    if (!trade_lines(ctx, regions, polities, seller, buyer, land_q, sea_q, align)) return 0;
+    int want_q = 0, holding_q = 0;
+    trade_want_holding(ctx, regions, polities, seller, buyer, good, want_q, holding_q);
+    if (want_q <= 0 || holding_q <= 0) return 0;
     const int line_q = std::max(land_q, sea_q);
-
     return std::max(0, std::min({want_q, holding_q, line_q}));
+}
+
+int trade_sea_volume_q(const trade_context& ctx, const std::vector<region>& regions,
+                       const std::vector<polity>& polities,
+                       int seller, int buyer, int good)
+{
+    if (good < 0 || good >= 4) return 0;
+    int land_q = 0, sea_q = 0, align = 0;
+    if (!trade_lines(ctx, regions, polities, seller, buyer, land_q, sea_q, align)) return 0;
+    if (sea_q <= 0) return 0; // no navy for the seller, or no built port at a seat
+    int want_q = 0, holding_q = 0;
+    trade_want_holding(ctx, regions, polities, seller, buyer, good, want_q, holding_q);
+    return std::max(0, std::min({want_q, holding_q, sea_q}));
+}
+
+int treaty_far_penalty_for(const history_sim_params& p, bool met_across_water)
+{
+    return met_across_water ? p.treaty_far_sea_penalty_q : p.treaty_far_penalty_q;
+}
+
+/// BL-1147 -- the three coastal sea techs whose taking is a naval deed
+/// (EMPIRE_TREE.md: Deep-Hull Sail, Lateen & Long-Range Rig, Ocean-Rated
+/// Hulls), as a mask over the empire tree's node indices, found by id once.
+static uint64_t coastal_sea_tech_mask()
+{
+    static const uint64_t mask = [] {
+        uint64_t m = 0;
+        for (int i = 0; i < io::empire_tree::node_count; ++i)
+        {
+            const std::string id = io::empire_tree::nodes[i].id;
+            if (id == "EM-RD-2b" || id == "EM-RD-3b" || id == "EM-RD-4a") m |= (1ULL << i);
+        }
+        return m;
+    }();
+    return mask;
+}
+
+void update_coast_cells(coast_cells& c, const std::vector<region>& regions,
+                        const std::vector<terrain_substrate>& substrate, int gw, int gh)
+{
+    if (gw <= 0 || gh <= 0
+     || substrate.size() != static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh))
+        return;
+    const std::size_t n = regions.size();
+    if (c.raster_size != substrate.size() || c.measured > n)
+    {
+        c.shore.clear();
+        for (int t = 0; t < gw * gh; ++t)
+        {
+            if (is_water(substrate[static_cast<std::size_t>(t)])) continue;
+            const int col = t % gw, row = t / gw;
+            const int nc[4] = { col, col, (col + gw - 1) % gw, (col + 1) % gw };
+            const int nr[4] = { row - 1, row + 1, row, row };
+            bool shore = false;
+            for (int k = 0; k < 4 && !shore; ++k)
+                if (nr[k] >= 0 && nr[k] < gh
+                 && is_sea(substrate[static_cast<std::size_t>(nr[k]) * static_cast<std::size_t>(gw)
+                                     + static_cast<std::size_t>(nc[k])]))
+                    shore = true;
+            if (shore) c.shore.push_back(t);
+        }
+        c.owner.assign(c.shore.size(), -1);
+        c.dist.assign(c.shore.size(), std::numeric_limits<int32_t>::max());
+        c.count.clear();
+        c.raster_size = substrate.size();
+        c.measured    = 0;
+    }
+    if (c.measured >= n) return;
+    c.count.resize(n, 0);
+    // Adding the regions one at a time in index order with a strict `<` is the
+    // partition's argmin with its lowest-index tie-break.
+    for (std::size_t ri = c.measured; ri < n; ++ri)
+    {
+        const region& p = regions[ri];
+        for (std::size_t li = 0; li < c.shore.size(); ++li)
+        {
+            const int t = c.shore[li];
+            int dc = std::abs(t % gw - p.col);
+            if (dc > gw / 2) dc = gw - dc;
+            const int d = std::max(dc, std::abs(t / gw - p.row));
+            if (d >= c.dist[li]) continue;
+            if (c.owner[li] >= 0) --c.count[static_cast<std::size_t>(c.owner[li])];
+            c.owner[li] = static_cast<int32_t>(ri);
+            c.dist[li]  = d;
+            ++c.count[ri];
+        }
+    }
+    c.measured = n;
+}
+
+std::vector<fleet_defender> crossing_defenders(const history_sim_state& s, const std::vector<region>& regions,
+                                               int realm, int attacker,
+                                               const std::vector<std::uint8_t>& sea, int gw, int gh,
+                                               int radius, int64_t* abstained)
+{
+    std::vector<fleet_defender> out;
+    if (realm < 0 || static_cast<std::size_t>(realm) >= s.polities.size()) return out;
+    std::vector<int32_t> members{ realm };
+    for (const dated_object& o : s.dated_objects)
+    {
+        if (o.kind != static_cast<int32_t>(treaty_clause::mutual_defence)) continue;
+        if (o.a == realm) members.push_back(o.b);
+        else if (o.b == realm) members.push_back(o.a);
+    }
+    std::sort(members.begin(), members.end());
+    members.erase(std::unique(members.begin(), members.end()), members.end());
+    for (const int32_t pid : members)
+    {
+        if (pid < 0 || static_cast<std::size_t>(pid) >= s.polities.size() || pid == attacker) continue;
+        const polity& d = s.polities[static_cast<std::size_t>(pid)];
+        if (!d.alive || d.navy_stock <= 0) continue;
+        if (pid != realm && has_treaty_clause(s, pid, attacker, treaty_clause::non_aggression))
+        {
+            if (abstained != nullptr) ++*abstained; // bound not to fight the attacker
+            continue;
+        }
+        fleet_defender f;
+        f.polity = pid;
+        f.navy   = d.navy_stock;
+        for (const region& r : regions)
+        {
+            if (r.nation != pid || r.port_stock_q <= 0) continue;
+            const int t = nearest_sea_tile(sea, gw, gh, r.col, r.row, radius);
+            if (t >= 0) f.ports.push_back(t);
+        }
+        if (f.ports.empty() && d.capital >= 0 && static_cast<std::size_t>(d.capital) < regions.size())
+        {
+            const region& seat = regions[static_cast<std::size_t>(d.capital)];
+            const int t = nearest_sea_tile(sea, gw, gh, seat.col, seat.row, radius);
+            if (t >= 0) { f.ports.push_back(t); f.seat_coast = true; }
+        }
+        std::sort(f.ports.begin(), f.ports.end());
+        f.ports.erase(std::unique(f.ports.begin(), f.ports.end()), f.ports.end());
+        if (!f.ports.empty()) out.push_back(std::move(f));
+    }
+    return out;
+}
+
+crossing_verdict judge_crossing(const std::vector<std::uint8_t>& sea, int gw, int gh,
+                                const ocean_current_field* currents, int weight_q, int64_t halving_tiles,
+                                int hub_tile, int landing_tile, int64_t attacker_navy,
+                                const std::vector<fleet_defender>& defenders, fleet_field_cache* cache)
+{
+    crossing_verdict v;
+    if (hub_tile < 0 || landing_tile < 0) return v;
+    // The cheap exits first: with no halving, or no defending fleet, nothing
+    // can contest the crossing and no field is built.
+    if (halving_tiles <= 0 || defenders.empty())
+    {
+        v.leg = true; // the caller matched the two coasts' waters
+        return v;
+    }
+    // The hub's field carries the walk's predecessors, so the leg is read
+    // off it (the same path `sea_walk` returns) with no second search.
+    std::shared_ptr<const sea_field> hubf;
+    if (cache != nullptr)
+        for (const auto& e : cache->hub)
+            if (e.first == hub_tile) { hubf = e.second; ++cache->hits; break; }
+    if (!hubf)
+    {
+        hubf = std::make_shared<const sea_field>(sea_field_from(sea, gw, gh, currents, weight_q, hub_tile));
+        if (cache != nullptr)
+        {
+            if (cache->hub.size() >= cache->cap_hub && !cache->hub.empty()) cache->hub.erase(cache->hub.begin());
+            cache->hub.push_back({ hub_tile, hubf });
+            ++cache->built_hub;
+        }
+    }
+    const std::vector<int> leg = sea_path_on(*hubf, landing_tile);
+    if (leg.empty()) return v;
+    v.leg = true;
+    v.leg_tiles = static_cast<int>(leg.size());
+    std::vector<std::shared_ptr<const std::vector<int64_t>>> from_def;
+    from_def.reserve(defenders.size());
+    for (const fleet_defender& d : defenders)
+    {
+        std::shared_ptr<const std::vector<int64_t>> f;
+        if (cache != nullptr)
+            for (const auto& e : cache->ports)
+                if (e.first == d.ports) { f = e.second; ++cache->hits; break; }
+        if (!f)
+        {
+            f = std::make_shared<const std::vector<int64_t>>(sea_cost_field(sea, gw, gh, currents, weight_q, d.ports));
+            if (cache != nullptr)
+            {
+                if (cache->ports.size() >= cache->cap_ports && !cache->ports.empty())
+                    cache->ports.erase(cache->ports.begin());
+                cache->ports.push_back({ d.ports, f });
+                ++cache->built_ports;
+            }
+        }
+        from_def.push_back(std::move(f));
+    }
+    const std::vector<int64_t>& from_hub = hubf->dist;
+    for (const int t : leg)
+    {
+        const std::size_t ti = static_cast<std::size_t>(t);
+        const int64_t att = fleet_power_at(attacker_navy, from_hub[ti], halving_tiles);
+        int64_t def = 0, best = -1;
+        int best_id = -1;
+        for (std::size_t k = 0; k < defenders.size(); ++k)
+        {
+            const int64_t pk = fleet_power_at(defenders[k].navy, (*from_def[k])[ti], halving_tiles);
+            def += pk;
+            if (pk > best) { best = pk; best_id = defenders[k].polity; } // defenders are id-sorted
+        }
+        if (def > att)
+        {
+            v.stopped = true;
+            v.stopper = best_id;
+            v.stop_tile = t;
+            v.attacker_power = att;
+            v.defender_power = def;
+            return v;
+        }
+    }
+    return v;
+}
+
+namespace
+{
+/// floor(@p a x @p b / @p d) and its remainder, exact over the 128-bit
+/// product (a, b >= 0, 0 < d <= 2^62, the quotient within int64): integer
+/// throughout, the same on every compiler.
+void mul_div_floor(uint64_t a, uint64_t b, uint64_t d, uint64_t& q, uint64_t& r)
+{
+    const uint64_t al = a & 0xFFFFFFFFull, ah = a >> 32, bl = b & 0xFFFFFFFFull, bh = b >> 32;
+    const uint64_t p0 = al * bl, p1 = al * bh, p2 = ah * bl, p3 = ah * bh;
+    const uint64_t mid = (p0 >> 32) + (p1 & 0xFFFFFFFFull) + (p2 & 0xFFFFFFFFull);
+    const uint64_t lo  = (p0 & 0xFFFFFFFFull) | (mid << 32);
+    const uint64_t hi  = p3 + (p1 >> 32) + (p2 >> 32) + (mid >> 32);
+    q = 0; r = 0;
+    for (int i = 127; i >= 0; --i)
+    {
+        const uint64_t bit = i >= 64 ? (hi >> (i - 64)) & 1u : (lo >> i) & 1u;
+        r = (r << 1) | bit;
+        if (r >= d) { r -= d; if (i < 64) q |= (uint64_t{1} << i); }
+    }
+}
+} // namespace
+
+bool fleet_coasts(const std::vector<int>& comp, const std::vector<int>& hub_ring, const std::vector<int>& tgt_ring,
+                  int* hub_tile, int* landing)
+{
+    for (const int lt : tgt_ring)
+    {
+        if (lt < 0 || static_cast<std::size_t>(lt) >= comp.size() || comp[static_cast<std::size_t>(lt)] < 0) continue;
+        const int w = comp[static_cast<std::size_t>(lt)];
+        for (const int ht : hub_ring)
+        {
+            if (ht < 0 || static_cast<std::size_t>(ht) >= comp.size()) continue;
+            if (comp[static_cast<std::size_t>(ht)] == w)
+            {
+                if (hub_tile != nullptr) *hub_tile = ht;
+                if (landing != nullptr) *landing = lt;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+std::vector<int64_t> split_by_largest_remainder(int64_t total, const std::vector<int64_t>& weights,
+                                                const std::vector<int>& index)
+{
+    std::vector<int64_t> out(weights.size(), 0);
+    int64_t W = 0;
+    for (const int64_t w : weights) W += w > 0 ? w : 0;
+    if (total <= 0 || W <= 0) return out;
+    std::vector<std::pair<uint64_t, std::size_t>> rem; // (remainder, position)
+    int64_t given = 0;
+    for (std::size_t k = 0; k < weights.size(); ++k)
+    {
+        if (weights[k] <= 0) continue;
+        uint64_t q = 0, r = 0;
+        mul_div_floor(static_cast<uint64_t>(total), static_cast<uint64_t>(weights[k]), static_cast<uint64_t>(W), q, r);
+        out[k] = static_cast<int64_t>(q);
+        given += out[k];
+        rem.push_back({ r, k });
+    }
+    std::sort(rem.begin(), rem.end(), [&](const auto& x, const auto& y) {
+        if (x.first != y.first) return x.first > y.first;           // largest remainder first
+        return index[x.second] < index[y.second];                    // ties to the lower region index
+    });
+    for (std::size_t j = 0; given < total && j < rem.size(); ++j, ++given) ++out[rem[j].second];
+    return out;
+}
+
+int64_t fleet_lift_capacity(int64_t navy, int64_t men_per_hull)
+{
+    if (men_per_hull <= 0) return -1;
+    if (navy <= 0) return 0;
+    const int64_t cap_navy = std::min<int64_t>(navy, int64_t{1} << 40);
+    return cap_navy > (int64_t{1} << 62) / men_per_hull ? (int64_t{1} << 62) : cap_navy * men_per_hull;
+}
+
+naval_points_split naval_points_of(const polity& q, const history_sim_params& p)
+{
+    naval_points_split s;
+    s.coast     = q.naval_coastal_years * p.naval_points_per_coastal_year;
+    s.crossings = q.naval_crossings     * p.naval_points_per_crossing;
+    s.techs     = q.naval_sea_techs     * p.naval_points_per_sea_tech;
+    s.total     = s.coast + s.crossings + s.techs;
+    return s;
+}
+
+bool naval_points_params_valid(const history_sim_params& p)
+{
+    const auto weight_ok = [](int64_t w) { return w >= 0 && w <= 100000; };
+    return weight_ok(p.naval_points_per_coastal_year) && weight_ok(p.naval_points_per_crossing)
+        && weight_ok(p.naval_points_per_sea_tech)
+        && p.naval_points_navy_per_1000 >= 0 && p.naval_points_navy_per_1000 <= 100000;
+}
+
+int64_t naval_opening_fleet(const polity& q, const history_sim_params& p)
+{
+    if (!q.alive || p.naval_points_navy_per_1000 <= 0 || !naval_points_params_valid(p)) return 0;
+    if (q.naval_coastal_years < 0 || q.naval_crossings < 0 || q.naval_sea_techs < 0) return 0;
+    const int64_t pts = naval_points_of(q, p).total;
+    // points / 1000 x rate, then the remainder: the product never overflows
+    // however long the ledger (the same split the works note uses).
+    const int64_t k = p.naval_points_navy_per_1000;
+    const int64_t hulls = (pts / 1000) * k + ((pts % 1000) * k) / 1000;
+    return std::min<int64_t>(hulls, int64_t{1} << 48);
+}
+
+/// BL-1142 -- the share of a sized flow that ARRIVES, per mille: 1000 unless
+/// the context carries the seats' landmasses, the current field and a loss in
+/// (0, 1000], the two seats stand on different landmasses, AND the sea line is
+/// what carries the flow (it beats the land line -- a flow a road carries has
+/// no current), when it is `1000 - loss x max(0, -alignment) / 1000` for the
+/// leg seller seat -> buyer seat. A loss outside [0, 1000] delivers as sized
+/// (the sim rejects such a run at its open). Pure.
+static int trade_delivered_share_q(const trade_context& ctx, const std::vector<region>& regions,
+                                   const std::vector<polity>& polities, int seller, int buyer)
+{
+    if (ctx.seat_landmass == nullptr || ctx.currents == nullptr) return 1000;
+    if (ctx.cargo_loss_q <= 0 || ctx.cargo_loss_q > 1000) return 1000;
+    const std::vector<int32_t>& seat = *ctx.seat_landmass;
+    if (seller < 0 || buyer < 0
+     || static_cast<std::size_t>(seller) >= seat.size() || static_cast<std::size_t>(buyer) >= seat.size())
+        return 1000;
+    const int32_t ms = seat[static_cast<std::size_t>(seller)], mb = seat[static_cast<std::size_t>(buyer)];
+    if (ms < 0 || mb < 0 || ms == mb) return 1000; // no water between them
+    int land_q = 0, sea_q = 0, align = 0;
+    if (!trade_lines(ctx, regions, polities, seller, buyer, land_q, sea_q, align)) return 1000;
+    if (sea_q <= land_q) return 1000; // the road carries it: no current
+    const int against = align < 0 ? -align : 0;
+    return clampi(1000 - (ctx.cargo_loss_q * against) / 1000, 0, 1000);
 }
 
 int pair_trade_value_q(const trade_context& ctx, const std::vector<region>& regions,
@@ -1394,7 +2160,10 @@ int pair_trade_value_q(const trade_context& ctx, const std::vector<region>& regi
             const int holding_q = ctx.holding_q[static_cast<std::size_t>(seller)][static_cast<std::size_t>(g)];
             const int64_t want_room = std::max<int64_t>(0, want_q - in_other[buyer_side][g]);
             const int64_t hold_room = std::max<int64_t>(0, holding_q - out_other[seller_side][g]);
-            total += static_cast<int>(std::min<int64_t>({static_cast<int64_t>(v), want_room, hold_room}));
+            // BL-1142: the binding is worth what ARRIVES, after a leg run
+            // against its current has lost its share.
+            const int64_t arrives = std::min<int64_t>({static_cast<int64_t>(v), want_room, hold_room});
+            total += static_cast<int>((arrives * trade_delivered_share_q(ctx, regions, polities, seller, buyer)) / 1000);
         }
     return total; // bounded by 8 * 1000
 }
@@ -1443,13 +2212,22 @@ std::vector<trade_flow> compute_trade_flows(const trade_context&             ctx
     {
         const int ends[2][2] = { { pr.first, pr.second }, { pr.second, pr.first } };
         for (const auto& e : ends)
+        {
+            // THE CARRYING LINE, once per directed pair (it reads no good): the
+            // sea one where it beats the road -- the cargo loss's own test.
+            int land_q = 0, sea_q = 0, align = 0;
+            const bool lines = trade_lines(ctx, regions, polities, e[0], e[1], land_q, sea_q, align);
+            const uint8_t by_sea = (lines && sea_q > land_q) ? 1 : 0;
             for (int g = 0; g < 4; ++g)
             {
                 const int v = trade_flow_volume_q(ctx, regions, polities, e[0], e[1], g);
                 if (v <= 0) continue;
-                flows.push_back(trade_flow{static_cast<uint16_t>(e[0]), static_cast<uint16_t>(e[1]),
-                                           static_cast<uint8_t>(g), static_cast<int32_t>(v)});
+                trade_flow f{static_cast<uint16_t>(e[0]), static_cast<uint16_t>(e[1]),
+                             static_cast<uint8_t>(g), static_cast<int32_t>(v)};
+                f.by_sea = by_sea;
+                flows.push_back(f);
             }
+        }
     }
 
     // ONE WANT, SHARED ACROSS SELLERS. Each flow above is bounded by the
@@ -1515,6 +2293,26 @@ std::vector<trade_flow> compute_trade_flows(const trade_context&             ctx
                                [](const trade_flow& f) { return f.volume_q <= 0; }),
                 flows.end());
 
+    // BL-1142 -- A LEG RUN AGAINST ITS CURRENT DELIVERS LESS, applied AFTER the
+    // flow is sized: the want and the holding were shared on what was sent,
+    // and what arrives is the sent volume's delivered share. The loss is cargo
+    // gone, so the want it would have met stays unmet.
+    if (ctx.seat_landmass != nullptr && ctx.currents != nullptr
+     && ctx.cargo_loss_q > 0 && ctx.cargo_loss_q <= 1000)
+    {
+        for (trade_flow& f : flows)
+        {
+            const int share = trade_delivered_share_q(ctx, regions, polities, f.seller, f.buyer);
+            if (share >= 1000) continue;
+            const int delivered = static_cast<int>((static_cast<int64_t>(f.volume_q) * share) / 1000);
+            if (ctx.cargo_lost != nullptr) *ctx.cargo_lost += f.volume_q - delivered;
+            f.volume_q = delivered;
+        }
+        flows.erase(std::remove_if(flows.begin(), flows.end(),
+                                   [](const trade_flow& f) { return f.volume_q <= 0; }),
+                    flows.end());
+    }
+
     std::sort(flows.begin(), flows.end(), [](const trade_flow& x, const trade_flow& y) {
         if (x.seller != y.seller) return x.seller < y.seller;
         if (x.buyer != y.buyer) return x.buyer < y.buyer;
@@ -1546,6 +2344,135 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // says so -- rejected, never clamped. `subjection_verb` also refuses on
     // its own; this flag is the report.
     out.subjection_purchase_params_rejected = !subjection_purchase_params_valid(params);
+    // BL-1107: the profile's two magnitudes, judged once at the open. Out of
+    // domain, the whole run reads no profile term (lack 0, no amenity lean).
+    out.culture_profile_params_rejected = !culture_profile_params_valid(params);
+    out.culture_profile_lack_max_q  = out.culture_profile_params_rejected ? 0 : params.culture_profile_lack_max_q;
+    out.culture_profile_amenity_div = out.culture_profile_params_rejected ? 0 : params.culture_profile_amenity_div;
+
+    // BL-1120 -- THE CURRENT FIELD, built once for this span from the terrain
+    // it already runs on (EXPLORATION.md sec Currents are a force, not a
+    // picture). A pure function of the substrate, the grid and the rotation
+    // sense, so every caller that runs a span on this ground -- generation,
+    // a fixture re-run, a sweep -- prices its legs with the identical field
+    // without carrying one. Judged once at the open like the purchase fork: a
+    // weight or sense outside its domain prices nothing for the whole run and
+    // says so. At weight 0 no field is built and every leg costs still water,
+    // which is every fixture's meaning unchanged.
+    const bool currents_legal =
+        ocean_current_weight_valid(params.sea_current_weight_q)
+     && (params.sea_current_rotation_sense == 1 || params.sea_current_rotation_sense == -1);
+    out.sea_current_params_rejected = !currents_legal;
+    const ocean_current_field currents =
+        (currents_legal && params.sea_current_weight_q > 0 && terrain.substrate != nullptr)
+            ? build_ocean_currents(*terrain.substrate, gw, gh, params.sea_current_rotation_sense)
+            : ocean_current_field{};
+    const bool currents_on = !currents.empty();
+    out.sea_current_field_digest = currents_on ? ocean_current_digest(currents) : 0;
+    // The current along a leg FROM region `from` TO region `to`, per mille
+    // (`ocean_current_alignment_q`: exactly antisymmetric, so a return leg
+    // reads the negation of the outbound), and the leg's cost against still
+    // water. One weight, both directions.
+    const auto sea_leg_alignment_q = [&](int from, int to) -> int {
+        if (!currents_on || from < 0 || to < 0) return 0;
+        const region& ra = ss.regions[static_cast<std::size_t>(from)];
+        const region& rb = ss.regions[static_cast<std::size_t>(to)];
+        return ocean_current_alignment_q(currents, ra.col, ra.row, rb.col, rb.row);
+    };
+    const auto sea_leg_cost_q = [&](int from, int to) -> int {
+        if (!currents_on) return 1000;
+        return ocean_current_leg_cost_q(params.sea_current_weight_q, sea_leg_alignment_q(from, to));
+    };
+    // BL-1142 -- THE CARGO LOSS is judged once at the open as well: a loss
+    // outside [0, 1000] loses no cargo for the whole run and says so --
+    // rejected, never clamped.
+    const bool cargo_loss_legal =
+        params.sea_current_cargo_loss_q >= 0 && params.sea_current_cargo_loss_q <= 1000;
+    out.sea_cargo_loss_rejected = !cargo_loss_legal;
+    const int cargo_loss_q = cargo_loss_legal ? params.sea_current_cargo_loss_q : 0;
+
+    // BL-1140 -- WHICH LANDMASS EACH TILE STANDS ON, once per span, for the
+    // fourth writer's test (trade between realms on different landmasses)
+    // and, BL-1142, for the class every contact records at the meeting
+    // (`contact_event::across_water`) -- so every span that runs on terrain
+    // keeps it, the Empires round included: a pair it joins carries its
+    // class into the spans that read it.
+    // BL-1147 review: whose cells touch the sea, for the coastal-years deed.
+    coast_cells coast;
+    // BL-1152 -- THE FLEET'S RULE, judged once at the open: constants out of
+    // domain read nothing for the whole run and say so, never clamped. The
+    // sea mask is the walk's, built once for the span.
+    const bool fleet_legal = params.fleet_men_per_hull >= 0 && params.fleet_men_per_hull <= 1000000
+                          && params.fleet_power_halving_tiles >= 0 && params.fleet_power_halving_tiles <= 100000;
+    out.fleet_params_rejected = params.fleet_decides_crossings && !fleet_legal;
+    const bool fleet_rule_on = params.fleet_decides_crossings && fleet_legal && terrain.substrate != nullptr
+                            && (params.fleet_men_per_hull > 0 || params.fleet_power_halving_tiles > 0);
+    std::vector<std::uint8_t> fleet_sea;
+    if (fleet_rule_on)
+    {
+        fleet_sea.assign(static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh), 0);
+        for (std::size_t t = 0; t < fleet_sea.size() && t < terrain.substrate->size(); ++t)
+            fleet_sea[t] = is_sea((*terrain.substrate)[t]) ? 1 : 0;
+    }
+    // A seat's coast: its nearest sea tile within the lane stamp's port radius
+    // (road_generation.hpp kSeaLanePortRadius, the sim's own neighbour radius).
+    constexpr int kFleetCoastRadius = 9;
+    // BL-1152 review: which water each sea tile is in, so the gate embarks at
+    // a coast tile whose water reaches the target's; each region's coast tiles
+    // in ring order, built on first use (a region's tile never moves); and
+    // the sea-field memo, kept for the span (content-keyed: never stale).
+    std::vector<int> fleet_comp;
+    std::vector<std::vector<int>> fleet_ring;
+    std::vector<std::uint8_t> fleet_ring_built;
+    fleet_field_cache fleet_fields;
+    if (fleet_rule_on)
+    {
+        fleet_comp = sea_components(fleet_sea, gw, gh);
+        const std::size_t n = std::max<std::size_t>(1, static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh));
+        fleet_fields.cap_hub   = std::clamp<std::size_t>((std::size_t{48} << 20) / (12 * n), 4, 256);
+        fleet_fields.cap_ports = std::clamp<std::size_t>((std::size_t{48} << 20) / (8 * n), 4, 512);
+    }
+    const auto fleet_ring_of = [&](std::size_t ri) -> const std::vector<int>& {
+        if (fleet_ring.size() < ss.regions.size())
+        {
+            fleet_ring.resize(ss.regions.size());
+            fleet_ring_built.resize(ss.regions.size(), 0);
+        }
+        if (!fleet_ring_built[ri])
+        {
+            fleet_ring[ri] = sea_tiles_by_ring(fleet_sea, gw, gh, ss.regions[ri].col, ss.regions[ri].row,
+                                               kFleetCoastRadius);
+            fleet_ring_built[ri] = 1;
+        }
+        return fleet_ring[ri];
+    };
+    const std::vector<int32_t> landmass =
+        (terrain.substrate != nullptr)
+            ? landmass_labels(*terrain.substrate, gw, gh)
+            : std::vector<int32_t>{};
+    // A seat's landmass (`landmass_at`: a seat on the shoreline ring reads
+    // the landmass it borders); -1 writes no trade leg.
+    const auto landmass_of_region = [&](int ri) -> int32_t {
+        if (ri < 0 || static_cast<std::size_t>(ri) >= ss.regions.size()) return -1;
+        const region& r = ss.regions[static_cast<std::size_t>(ri)];
+        if (r.col < 0 || r.row < 0 || r.col >= gw || r.row >= gh) return -1;
+        return landmass_at(landmass, gw, gh, r.col, r.row);
+    };
+    // BL-1142 -- EACH POLITY'S SEAT LANDMASS, read ONCE per decision round,
+    // ahead of the upkeep (nothing between it and the break walk moves a
+    // capital), and shared by the round's trade contexts, meeting by sea and
+    // the fourth writer: one lookup per polity, never per pair or per flow.
+    std::vector<int32_t> seat_landmass;
+    const auto refresh_seat_landmass = [&]() {
+        seat_landmass.assign(out.polities.size(), -1);
+        if (landmass.empty()) return;
+        for (std::size_t i = 0; i < out.polities.size(); ++i)
+            seat_landmass[i] = landmass_of_region(out.polities[i].capital);
+    };
+    const auto seat_landmass_of = [&](int pid) -> int32_t {
+        return (pid >= 0 && static_cast<std::size_t>(pid) < seat_landmass.size())
+                   ? seat_landmass[static_cast<std::size_t>(pid)] : -1;
+    };
 
     // BL-914: seed the tap's geometry mirror with the regions this call
     // already opens on (round 4 always does — settlement/migration ran
@@ -1618,6 +2545,32 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // the one working copy the rest of this function actually consults —
         // BL-769's own comment on the field is exactly this reuse.
         out.polities = *params.resume_polities;
+        // BL-1147 -- THE FLEET THE EMPIRE AGE EARNED (EXPLORATION.md sec Force
+        // persists now): every LIVING polity's naval points become the fleet
+        // it opens this span with, added to what it resumed with. Read off the
+        // polity's own ledger, never the regions it holds now -- a polity that
+        // lost its coast keeps its sailors -- and a polity already dead
+        // carries nothing. Judged once, here: constants out of domain open no
+        // fleet and say so. At a conversion of 0 nothing moves. ONLY AT THE
+        // OPEN THE SPAN FLAG MARKS (`naval_points_convert_at_open`, the
+        // Exploration open's alone): a later resumed span converts nothing,
+        // whatever the rate a sweep sets on it.
+        if (params.naval_points_convert_at_open && params.naval_points_navy_per_1000 != 0)
+        {
+            out.naval_points_params_rejected = !naval_points_params_valid(params);
+            if (!out.naval_points_params_rejected)
+                for (polity& q : out.polities)
+                {
+                    const int64_t pts = naval_points_of(q, params).total;
+                    if (!q.alive) { out.naval_points_died += pts; continue; }
+                    out.naval_points_carried += pts;
+                    const int64_t hulls = naval_opening_fleet(q, params);
+                    if (hulls <= 0) continue;
+                    q.navy_stock = clampi64(q.navy_stock + hulls, 0, 1LL << 48);
+                    ++out.naval_fleets_opened;
+                    out.naval_hulls_opened += hulls;
+                }
+        }
         for (std::size_t i = 0; i < ss.regions.size(); ++i)
             owner[i] = ss.regions[i].nation;
         if (params.resume_grudges  != nullptr) out.grudges  = *params.resume_grudges;
@@ -1902,6 +2855,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // city-states, forms empires"). `battle_trace` still holds the
     // pure-observation contract; this record no longer does.
     std::vector<std::pair<uint16_t, uint16_t>> corridor_uses;
+    // BL-1147 review: the (lo, hi) of every walk that crossed sea, folded onto
+    // the record's `history_corridor::wet` at the close.
+    std::vector<std::pair<uint16_t, uint16_t>> corridor_wet;
 
     // Canonical (lo, hi) edge key -> live use count, read by `rebuild_reach`
     // and gated by `road_tier1_uses`/`road_tier2_uses` below. A plain
@@ -1922,6 +2878,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // output.
     std::vector<std::pair<uint16_t, uint16_t>> sea_leg_uses;
     std::unordered_map<uint64_t, int>          sea_uses_live;
+    // BL-1120 -- the same notes with their writer (`sea_leg_writer`), folded
+    // into `out.sea_leg_writers` at the close by the same sort-and-count.
+    std::vector<std::array<uint16_t, 3>>       sea_leg_writer_notes;
 
     // BL-925 -- which cross-border corridors are CURRENTLY open to amicable
     // trade, keyed the same way as `road_uses_live` above. Point lookups and
@@ -1941,18 +2900,122 @@ history_sim_state run_history_sim(settlement_state&         ss,
     int roads_version = 0;
 
     // BL-887 — THE SAME TRICK FOR THE CENTRE MAP. With `centre_chain_reach`
-    // on, a region's `centres` is an input to `rebuild_reach`, and towns turn
-    // over constantly (promoted in the demography loop, razed by a sack). This
-    // counter moves only when a count ACTUALLY CHANGES, so a quiet century
+    // on, a region's size is an input to `rebuild_reach`, and towns turn
+    // over constantly (grown in the demography loop, razed by a sack). This
+    // counter moves only when a size ACTUALLY CHANGES, so a quiet century
     // costs no rebuilds at all and the BL-834 cache survives. With the model
     // off nothing ever bumps it and the cache behaves exactly as it did.
+    // BL-1130: the size is `region_settlement_size` — the centre-equivalents
+    // of the urban heads, never below one while a settlement stands (a place's
+    // size is its people; a settled place is worth at least a village) — no
+    // longer `region::centres`.
     int centres_version = 0;
+
+    // BL-1130 (POPULATION.md "Growth consolidates") — THE GROUND EACH REGION'S
+    // CENTRES MUST FIT. The land of every region's cell of the settlement
+    // partition, kept up to date as foundings append regions (each one claims
+    // the tiles nearer its anchor, so older cells only shrink), and written
+    // onto `region::urban_ground` once a year before the urban step reads it.
+    // Local to this call: a resumed span re-measures on its first year. With
+    // no substrate (a synthetic fixture) nothing is measured and nothing caps.
+    urban_ground_field urban_ground;
+
+    // BL-1141 (the rebuild's review, 2026-09-26) — WHICH SETTLEMENTS A SACK
+    // ENDED. Per region: 1 when the event that last took its centres to none
+    // was a sack (the points it earned sit on the ruin, NR-901), 0 when it was
+    // anything else (its ground taken, its people gone — the points go on).
+    // Read by the close's retry, which skips only the first. A razing in a
+    // region's past says nothing here: a sack that left the settlement
+    // standing never sets it. Local to the call; a call resumed inside the
+    // span opens with every point-holding region that stands nothing and was
+    // ever razed read as a ruin — the most it can know, and the old reading.
+    std::vector<uint8_t> settlement_ended_by_sack(ss.regions.size(), 0);
+    for (std::size_t ri = 0; ri < ss.regions.size(); ++ri)
+    {
+        const region& r = ss.regions[ri];
+        if (r.industry_points > 0 && r.centres <= 0 && r.centres_razed > 0)
+            settlement_ended_by_sack[ri] = 1;
+    }
+    const auto note_settlement_end = [&](std::size_t i, bool by_sack) {
+        if (settlement_ended_by_sack.size() <= i) settlement_ended_by_sack.resize(i + 1, 0);
+        settlement_ended_by_sack[i] = by_sack ? 1 : 0;
+    };
+
+    // BL-1130 (review fix) — WHAT THE REACH CACHE WATCHES. The relay reads a
+    // region's size only through the REBATE it buys: none below
+    // `centre_reach_min_centres`, `size x centre_reach_rebate_q` above it,
+    // capped at `centre_reach_rebate_cap_q` (`rebuild_reach`). So the cache's
+    // version moves when a region's rebate moves, not when its size does: a
+    // town growing past the cap relays exactly as it did, and rebuilding every
+    // polity's reach for it changed no value. 0 with the relay off, where the
+    // cache never reads the version at all.
+    const auto relay_rebate_of = [&](const region& r) -> int {
+        if (!params.centre_chain_reach) return 0;
+        const int size = region_settlement_size(r);
+        if (size < std::max(1, params.centre_reach_min_centres)) return 0;
+        return static_cast<int>(std::min<int64_t>(
+            static_cast<int64_t>(size) * clampi(params.centre_reach_rebate_q, 0, 999),
+            clampi(params.centre_reach_rebate_cap_q, 0, 999)));
+    };
+
+    // BL-1130 (review fix) — THE RECORD NEVER OUTLIVES ITS CELL. Re-measure the
+    // partition and hold every region's centres to its ground (a merge, never a
+    // razing). Called once a year before the urban step, and — only when a
+    // founding has appended a region since the last measure — at every polity's
+    // turn, at the round's end and at the span's close, so a Settle founding
+    // late in a year is measured before any later reader and no span closes on
+    // a cell a founding cut. Cheap when nothing was founded: the guard is one
+    // size compare.
+    // BL-1141 — POINTS GO WITH THEIR PEOPLE (Ben, 2026-09-26; POPULATION.md
+    // § Generation). A region that loses its settlement WITHOUT a sack — its
+    // cell's ground taken by a newer founding, or its people gone — hands the
+    // industry points it earned to the NEAREST centre of the same realm
+    // (`region_distance`, ties to the lower region index), so none vanish. A
+    // sack keeps its points on the ruin: NR-901, "the points went with the
+    // towns" (the works themselves stand, Ben 2026-09-27), stays the budget's
+    // razed reason. Nothing moves where the region
+    // is held by no realm, where the realm stands no other centre, or where the
+    // receiving stock would pass `industry_points_ceiling` (refused, never
+    // clamped) — each of those stays on the region, and the close's budget
+    // counts it unspent under its own reason. The treasury-paid tally
+    // (report-only) moves with its points, so the world's paid-in share holds.
+    // One rule, `rehome_stranded_points` (history_sim.hpp), which the span's
+    // close calls again for whatever this left behind.
+    const auto rehome_points = [&](std::size_t i) {
+        note_settlement_end(i, /*by_sack=*/false); // every caller: an end that was not a sack
+        rehome_stranded_points(ss.regions, owner, i, gw);
+    };
+
+    const auto hold_to_ground = [&](bool only_after_founding) {
+        if (terrain.substrate == nullptr) return;
+        if (only_after_founding && ss.regions.size() == urban_ground.measured) return;
+        if (!update_urban_ground(ss, urban_ground, *terrain.substrate, terrain.standable, gw, gh))
+            return;
+        for (std::size_t ri = 0; ri < ss.regions.size(); ++ri)
+        {
+            region& r = ss.regions[ri];
+            const int rebate_before = relay_rebate_of(r);
+            if (!hold_region_to_ground(r)) continue;
+            if (relay_rebate_of(r) != rebate_before) ++centres_version;
+            if (r.centres == 0) rehome_points(ri); // BL-1141: its ground was taken
+        }
+    };
 
     const auto edge_key = [](int a, int b) -> uint64_t {
         const uint32_t lo = static_cast<uint32_t>(a < b ? a : b);
         const uint32_t hi = static_cast<uint32_t>(a < b ? b : a);
         return (static_cast<uint64_t>(lo) << 32) | static_cast<uint64_t>(hi);
     };
+
+    // BL-1137 (the centres cold review) — THE STREAM'S LINE, memoised per
+    // corridor (`stream_land_lines`, history_sim.hpp): anchors never move and
+    // the terrain is fixed for the run, so a corridor's answer is computed
+    // once. No substrate (a synthetic fixture): no water to cross, every
+    // corridor walks.
+    stream_land_lines stream_lines;
+    stream_lines.substrate = terrain.substrate;
+    stream_lines.gw = gw;
+    stream_lines.gh = gh;
     const auto road_tier_for_uses = [&](int uses) {
         // BL-940: the third rung. ORDINARY TRAFFIC is not meant to reach
         // `road_tier3_uses` (see that field's own comment) — it is bought,
@@ -2180,13 +3243,27 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // RECORD still counts the refused walk, so its `uses` can stand on a rung
     // the live count never paid for; a resumed span that seeds from `tier`
     // (BL-1037, `resume_seeds_corridor_tier`) reopens it one short, as here.
-    const auto note_corridor = [&](int a, int b, int payer_seat) {
+    // BL-1147 review: does a corridor's anchor-to-anchor line cross sea? The
+    // test a wet campaign is itself told by (`dry_contact`), asked of every
+    // walk the record notes, so a corridor across a strait is marked whatever
+    // noted it. Asked BOTH WAYS: the sampler's integer steps are not symmetric,
+    // and the record's row is an edge (lo, hi), not a direction.
+    const auto corridor_line_wet = [&](int a, int b) -> bool {
+        if (a < 0 || b < 0 || static_cast<std::size_t>(a) >= ss.regions.size()
+         || static_cast<std::size_t>(b) >= ss.regions.size()) return false;
+        const region& ra = ss.regions[static_cast<std::size_t>(a)];
+        const region& rb = ss.regions[static_cast<std::size_t>(b)];
+        return line_crosses_sea(ra, rb, terrain, gw, gh, params.neighbour_radius)
+            || line_crosses_sea(rb, ra, terrain, gw, gh, params.neighbour_radius);
+    };
+    const auto note_corridor = [&](int a, int b, int payer_seat, bool wet_walk) {
         if (a < 0 || b < 0 || a == b) return;
         if (a >= static_cast<int>(owner_index_limit)
          || b >= static_cast<int>(owner_index_limit)) return;
         const uint16_t lo = static_cast<uint16_t>(a < b ? a : b);
         const uint16_t hi = static_cast<uint16_t>(a < b ? b : a);
         corridor_uses.push_back({lo, hi});
+        if (wet_walk || corridor_line_wet(a, b)) corridor_wet.push_back({lo, hi});
 
         int& uses = road_uses_live[edge_key(a, b)];
         const int before = road_tier_for_uses(uses);
@@ -2224,13 +3301,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // always recorded; the ONE tier crossing (`sea_lane_tier1_uses`) notes a
     // `sea_lane_opened` event, and that event is the only thing outside the
     // fold that ever hears of a leg. Nothing below reads the count back.
-    const auto note_sea_leg = [&](int a, int b) {
+    const auto note_sea_leg = [&](int a, int b, sea_leg_writer writer) {
         if (a < 0 || b < 0 || a == b) return;
         if (a >= static_cast<int>(owner_index_limit)
          || b >= static_cast<int>(owner_index_limit)) return;
         const uint16_t lo = static_cast<uint16_t>(a < b ? a : b);
         const uint16_t hi = static_cast<uint16_t>(a < b ? b : a);
         sea_leg_uses.push_back({lo, hi});
+        sea_leg_writer_notes.push_back({lo, hi, static_cast<uint16_t>(writer)}); // BL-1120
 
         int& uses = sea_uses_live[edge_key(a, b)];
         const bool before = uses >= params.sea_lane_tier1_uses;
@@ -2240,6 +3318,83 @@ history_sim_state run_history_sim(settlement_state&         ss,
         {
             ++out.sea_lanes_opened;
             note_event(lapse_event_kind::sea_lane_opened, lo, 1, hi);
+        }
+    };
+
+    // BL-1140 -- THE FOURTH WRITER: TRADE ACROSS WATER (EXPLORATION.md sec
+    // The colonial tie is a sea lane, "A lane is a route of the ocean's
+    // currents and of trade between continents"). Read after the round's
+    // upkeep has rebuilt `out.trade_flows`: every pair of realms trading BY
+    // SEA this round (a flow whose carrying line is the sea one,
+    // `trade_flow::by_sea` -- a road between two coasts earns no lane) whose
+    // seats stand on DIFFERENT landmasses writes ONE use, seller
+    // seat to buyer seat, however many goods or directions the pair moves --
+    // the link is the traffic, not the tonnage, as it is for tribute. The
+    // pairs are collected into a sorted, deduplicated list first, so the
+    // notes land in pair order and no flow order can reach the record.
+    // The leg's direction for the current reading is the pair's NET flow
+    // this round (the heavier direction's seller seat to its buyer's; a tie
+    // reads lower id selling), counted with/against/slack when the field is
+    // built -- pure observation, read by nothing below.
+    const auto note_trade_legs = [&]() {
+        if (landmass.empty() || out.trade_flows.empty()) return;
+        // (lo, hi) -> volume lo sells hi, volume hi sells lo.
+        std::vector<std::array<int64_t, 4>> pairs; // {lo, hi, vol lo->hi, vol hi->lo}
+        pairs.reserve(out.trade_flows.size());
+        for (const trade_flow& f : out.trade_flows)
+        {
+            if (f.volume_q <= 0 || f.seller == f.buyer) continue;
+            if (f.seller >= out.polities.size() || f.buyer >= out.polities.size()) continue;
+            if (!f.by_sea)
+            {
+                // Carried by road: not trade across water. Counted where the
+                // seats stand on different landmasses, so the two readings
+                // together are all trade between such realms.
+                const int32_t ms = seat_landmass_of(f.seller), mb = seat_landmass_of(f.buyer);
+                if (ms >= 0 && mb >= 0 && ms != mb) out.cross_landmass_volume_by_road_q += f.volume_q;
+                continue;
+            }
+            const int lo = std::min<int>(f.seller, f.buyer), hi = std::max<int>(f.seller, f.buyer);
+            pairs.push_back({lo, hi, f.seller == lo ? f.volume_q : 0, f.seller == lo ? 0 : f.volume_q});
+        }
+        std::sort(pairs.begin(), pairs.end());
+        std::size_t i = 0;
+        while (i < pairs.size())
+        {
+            const int64_t lo = pairs[i][0], hi = pairs[i][1];
+            int64_t fwd = 0, back = 0;
+            for (; i < pairs.size() && pairs[i][0] == lo && pairs[i][1] == hi; ++i)
+            {
+                fwd  += pairs[i][2];
+                back += pairs[i][3];
+            }
+            const polity& pl = out.polities[static_cast<std::size_t>(lo)];
+            const polity& ph = out.polities[static_cast<std::size_t>(hi)];
+            const int32_t ml = seat_landmass_of(static_cast<int>(lo)), mh = seat_landmass_of(static_cast<int>(hi));
+            if (ml < 0 || mh < 0 || ml == mh) continue; // one landmass: no water between the realms
+            const bool lo_sells = fwd >= back;
+            const int from = lo_sells ? pl.capital : ph.capital;
+            const int to   = lo_sells ? ph.capital : pl.capital;
+            note_sea_leg(from, to, sea_leg_writer::trade);
+            ++out.sea_legs_noted_trade;
+            out.sea_trade_volume_q += fwd + back;
+            if (currents_on)
+            {
+                const int a = sea_leg_alignment_q(from, to);
+                if (a > 0)      ++out.sea_trade_with_current;
+                else if (a < 0) ++out.sea_trade_against_current;
+                else            ++out.sea_trade_slack_current;
+                out.sea_trade_alignment_sum_q += a;
+                // Each direction's volume against its own reading: `a` runs
+                // from -> to, the reverse is its exact negation.
+                const int a_lo_hi = lo_sells ? a : -a;
+                const auto split = [&](int64_t vol, int align) {
+                    if (align > 0)      out.sea_trade_volume_with_q    += vol;
+                    else if (align < 0) out.sea_trade_volume_against_q += vol;
+                };
+                split(fwd, a_lo_hi);
+                split(back, -a_lo_hi);
+            }
         }
     };
 
@@ -2287,6 +3442,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // end of the run (line ~4350 below) — a bought corridor has to
         // appear there or it renders as if it had never been walked at all.
         corridor_uses.push_back({lo, hi});
+        if (corridor_line_wet(a, b)) corridor_wet.push_back({lo, hi}); // BL-1147 review
         note_event(lapse_event_kind::road_promoted, lo, road_tier_for_uses(need), hi);
         return true;
     };
@@ -2320,6 +3476,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
         const uint16_t lo = static_cast<uint16_t>(a < b ? a : b);
         const uint16_t hi = static_cast<uint16_t>(a < b ? b : a);
         corridor_uses.push_back({lo, hi}); // same reasoning as try_upgrade_corridor's own push.
+        if (corridor_line_wet(a, b)) corridor_wet.push_back({lo, hi}); // BL-1147 review
         note_event(lapse_event_kind::road_promoted, lo, 3, hi);
         return true;
     };
@@ -2457,12 +3614,25 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                    int region_idx, int64_t year) {
         if (a < 0 || b < 0 || a == b) return;
         if (contact_exists(a, b)) return; // symmetric: (a,b) implies (b,a)
-        if (params.trace_battles) ++out.contacts_raised_trace[static_cast<int>(kind) & 1]; // BL-1019, trace only
+        if (params.trace_battles) ++out.contacts_raised_trace[clampi(static_cast<int>(kind), 0, 2)]; // BL-1019/BL-1142, trace only
         contact_event e;
         e.year   = static_cast<int32_t>(year);
         e.region = (region_idx >= 0 && region_idx < static_cast<int>(owner_index_limit))
                      ? static_cast<uint16_t>(region_idx) : owner_none;
         e.kind   = kind;
+        // BL-1142: WHAT KIND OF PAIR MET, recorded once off the two seats as
+        // they stand at the meeting and never re-read -- a capital that later
+        // moves onto the other landmass does not change it. Read live (not
+        // the round's seat table): a campaign or an inheritance can meet
+        // after a seat has moved this round.
+        {
+            const auto seat_mass = [&](int pid) -> int32_t {
+                if (static_cast<std::size_t>(pid) >= out.polities.size()) return -1;
+                return landmass_of_region(out.polities[static_cast<std::size_t>(pid)].capital);
+            };
+            const int32_t ma = seat_mass(a), mb = seat_mass(b);
+            e.across_water = (ma >= 0 && mb >= 0 && ma != mb) ? 1 : 0;
+        }
         if (contact* c = contact_slot(a, b)) c->first = e;
         if (contact* c = contact_slot(b, a)) c->first = e;
     };
@@ -2589,6 +3759,147 @@ history_sim_state run_history_sim(settlement_state&         ss,
         }
     };
     for (std::size_t i = 0; i < ss.regions.size(); ++i) link_region(i);
+
+    // --- Where a Settle founds (BL-310, BL-1132) --------------------------
+    //
+    // BL-310: find an UNOCCUPIED cell, widening the ring as the
+    // neighbourhood fills. The first cut offered nine candidate
+    // cells with no occupancy test and re-picked the same mature
+    // parent every year, so regions piled up — 132 regions on
+    // 33 distinct cells in one measured run, worst stack nine deep.
+    // Co-located regions then had region_distance 0 and the
+    // Ages map drew a whole stack as one dot.
+    //
+    // BL-1132 — AND AT A DISTANCE, NOT ON THE NEAREST FREE TILE
+    // (CIVILISATION.md § The unit is the city state; Ben,
+    // 2026-09-25). "Unoccupied" meant only "no region on this very
+    // tile", so a razed parent re-settling every round packed its
+    // whole neighbourhood a region to a tile, and every tile of a
+    // core became a one-tile cell whose one centre paved it. A
+    // candidate is now refused while ANY region's anchor stands
+    // nearer than `settle_min_spacing_tiles` (Chebyshev, columns
+    // wrapping — the partition's own metric; history_sim.hpp says
+    // why tiles). At 1 that is exactly the old occupancy test.
+    // EVERY REGION COUNTS, HELD OR NOT, living or not — another realm's,
+    // unorganised ground, an emptied region — because every anchor owns a
+    // cell of the partition, whoever holds it.
+    //
+    // AND EVERY SCHEDULED FOUNDING STILL TO COME (BL-1132 review fix).
+    // `pending_foundings` are the migration's regions dated after the sim
+    // opens; their anchors are already fixed, at least the settlement
+    // pass's own `sep` from each other and from its placed regions. Settle
+    // runs in the same years, so a daughter that saw only the standing
+    // regions could land on, or beside, ground the schedule is about to
+    // found — a stacked pair, or a cell under the spacing's guarantee. The
+    // pending anchors are refused like standing ones, so every founding
+    // arrives clear, and the schedule itself is never dropped or deferred.
+    //
+    // THE SEARCH KEEPS ITS SIX RINGS, STARTING AT THE SPACING.
+    // Every probe of a ring nearer than the spacing lies within it
+    // of the parent itself (a clamped row only shortens the
+    // offset), so those rings can never succeed and are skipped;
+    // the six rings searched are the spacing and the five beyond
+    // it — 1..6 at spacing 1, the old search exactly. The probe
+    // hash reads only the year and the probe index, so skipping a
+    // ring moves no later probe.
+    //
+    // THE NEAR LIST is an exact filter, not a heuristic: an anchor
+    // further than (last ring + spacing - 1) from the parent can
+    // never stand within the spacing of any probe, so only the
+    // anchors inside that radius are tested, once per probe. The list
+    // is one buffer reused across calls, so a call allocates nothing
+    // once it has grown.
+    //
+    // THE RINGS ARE SAMPLED, NOT SWEPT: each ring draws (2r + 1)^2 hashed
+    // probes, with repeats, so a free tile can go unprobed. "No room" means
+    // no site was FOUND this year from this parent, not that none exists;
+    // next year's probes are drawn afresh.
+    //
+    // ONE SITE RULE, a pure function of (parent, polity salt, year, the region
+    // list, the pending schedule): writes the chosen tile to (nc, nr), or -1/-1
+    // when the six rings yield no probe far enough from every standing region
+    // and every scheduled one.
+    //
+    // TWO READERS, ONE ANSWER: the Settle scorer asks it whether a source has
+    // room (a realm settles only where there is room; Ben, 2026-09-26) and the
+    // verb asks it where to found. Nothing between the two touches the region
+    // list or the schedule, so the site the scorer saw is the site the verb
+    // founds on.
+    std::vector<std::pair<int, int>> settle_near; // the near list's one buffer
+    const auto find_settle_site = [&](const region& src, uint32_t qs, int64_t y,
+                                      int& nc, int& nr) {
+        const int spacing    = std::max(1, params.settle_min_spacing_tiles);
+        const int ring_first = spacing;
+        const int ring_last  = spacing + 5;
+        const auto tile_gap = [gw](int c0, int r0, int c1, int r1) {
+            int dc = c0 - c1;
+            if (dc < 0) dc = -dc;
+            if (gw > 0 && dc > gw / 2) dc = gw - dc; // region_distance's wrap
+            int dr = r0 - r1;
+            if (dr < 0) dr = -dr;
+            return dc > dr ? dc : dr;
+        };
+        const int near_radius = ring_last + spacing - 1;
+        settle_near.clear();
+        for (const region& e : ss.regions)
+            if (tile_gap(e.col, e.row, src.col, src.row) <= near_radius)
+                settle_near.emplace_back(e.col, e.row);
+        for (const region& e : ss.pending_foundings)
+            if (tile_gap(e.col, e.row, src.col, src.row) <= near_radius)
+                settle_near.emplace_back(e.col, e.row);
+
+        nc = -1; nr = -1;
+        for (int ring = ring_first; ring <= ring_last && nc < 0; ++ring)
+        {
+            const int span = 2 * ring + 1;
+            for (int probe = 0; probe < span * span; ++probe)
+            {
+                const uint32_t h = salt(qs, static_cast<uint32_t>(y) * 131u
+                                            + static_cast<uint32_t>(probe));
+                const int dc = static_cast<int>(h % static_cast<uint32_t>(span)) - ring;
+                const int dr = static_cast<int>((h >> 8) % static_cast<uint32_t>(span)) - ring;
+                if (dc == 0 && dr == 0) continue;
+
+                int cc = src.col + dc;
+                if (gw > 0) cc = ((cc % gw) + gw) % gw;
+                const int rr = clampi(src.row + dr, 0, gh > 0 ? gh - 1 : 0);
+
+                // BL-777 — NOBODY FOUNDS ON OPEN OCEAN.
+                //
+                // This probe applied no terrain test at all, so 447 of
+                // 1754 regions across three seeds were anchored on
+                // water and 183 of those on open ocean (measured by
+                // sim_water_census, 2026-09-06). `terrain_combat`
+                // returns 0 defence and 0 forage for every water kind,
+                // so those regions were silently undefendable.
+                //
+                // IT IS NOT A "NO WATER" TEST, and the distinction is
+                // the design. Under the ownership ruling (BL-776,
+                // PROVINCES.md § Who owns water) coastal water belongs
+                // to whoever owns the shore, so founding on the
+                // shoreline ring or a lake is LEGITIMATE — there is an
+                // owner to found under. Open ocean has no owner at all,
+                // structurally, so it is the only domain refused. That
+                // is ~183 sites rather than the ~447 a blanket ban
+                // would have deleted.
+                //
+                // A caller with no terrain is unaffected: `sub_at`
+                // hands out the neutral dry default, so every synthetic
+                // harness case probes exactly the cells it always did.
+                const int cand = (gw > 0) ? rr * gw + cc : -1;
+                if (region_domain_of(sub_at(terrain, cand)) == region_domain::open_ocean)
+                    continue;
+
+                // The parent first: it refuses most of a ring's inner
+                // square without walking the list.
+                if (tile_gap(cc, rr, src.col, src.row) < spacing) continue;
+                bool taken = false;
+                for (const std::pair<int, int>& e : settle_near)
+                    if (tile_gap(cc, rr, e.first, e.second) < spacing) { taken = true; break; }
+                if (!taken) { nc = cc; nr = rr; break; }
+            }
+        }
+    };
 
     // --- Terrain-weighted reach (BL-314 S2) -------------------------------
     //
@@ -2802,14 +4113,22 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // THE REBATE. A fraction of what it COST to get here, never a
             // credit against nothing -- the capital sits at `best_c == 0` and
             // refunds zero, which is what stops a centre bootstrapping its own
-            // reach. The fraction rises with the town count (LOGISTICS.md's
+            // reach. The fraction rises with the town's SIZE (LOGISTICS.md's
             // "cities generate it", a bigger node moving more) and is capped
             // strictly below the whole cost.
+            //
+            // BL-1130 (Ben, 2026-09-25: a place's size is its people; a
+            // settled place is worth at least a village): the size is
+            // `region_settlement_size`, not `region::centres` — the per-centre
+            // rebate was calibrated on one centre per 10,000 heads with the
+            // opening draw's one below that, and the settlement size is that
+            // reading, so the same heads relay as they did before consolidation.
             int out_c = best_c;
-            if (relay && best != capital && bp.centres >= relay_min)
+            const int bp_size = region_settlement_size(bp);
+            if (relay && best != capital && bp_size >= relay_min)
             {
                 const int64_t frac = std::min<int64_t>(
-                    static_cast<int64_t>(bp.centres) * relay_per, relay_cap);
+                    static_cast<int64_t>(bp_size) * relay_per, relay_cap);
                 out_c = best_c - static_cast<int>((static_cast<int64_t>(best_c) * frac) / 1000);
                 if (out_c < 0) out_c = 0; // Unreachable given frac < 1000; belt and braces.
             }
@@ -3390,6 +4709,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     ++out.realm_years_by_trade_bucket[trade_bucket_of(q.id)];
         }
 
+        // BL-1130: this year's cells, after this year's foundings, so a region
+        // whose cell a founding just cut holds its centres to what is left of
+        // it in the same year's urban step below.
+        hold_to_ground(/*only_after_founding=*/false);
+
         for (std::size_t i = 0; i < ss.regions.size(); ++i)
         {
             // BL-835 — WAR PRESSURE IS NO LONGER A DEMOGRAPHIC INPUT, and the
@@ -3422,10 +4746,20 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // `rebuild_reach`, so the centre count is watched across the call
             // and `centres_version` bumped only when it actually moved. Most
             // years it does not, which is what keeps the BL-834 cache alive.
-            const int centres_before = ss.regions[i].centres;
+            // BL-1130: what the relay reads is the region's settlement size
+            // (`region_settlement_size`), so THAT is what is watched — it moves
+            // both ways with the heads, where the old count only ratcheted up.
+            // BL-1130 (review fix): the cache watches the rebate the size buys.
+            const int rebate_before = relay_rebate_of(ss.regions[i]);
+            const int had_centres   = ss.regions[i].centres;
             advance_region_urban(ss.regions[i],
                 ss.regions[i].network_supply_q > params.sustainable_settlement_floor_q);
-            if (ss.regions[i].centres != centres_before) ++centres_version;
+            if (relay_rebate_of(ss.regions[i]) != rebate_before)
+                ++centres_version;
+            // BL-1141: a settlement that ended without a sack (its people gone)
+            // hands its points to the realm's nearest centre.
+            if (had_centres > 0 && ss.regions[i].centres == 0)
+                rehome_points(i);
             // BL-835 — ONE YEAR OF THE MUSTER, for every region whether or not
             // anyone is fighting over it. This is what makes an undefended
             // region a TEMPORARY state: a region stripped by a march away, or
@@ -3692,6 +5026,26 @@ history_sim_state run_history_sim(settlement_state&         ss,
         step_years    = step_for_year(params, y);
         next_decision = y + step_years;
 
+        // ---- BL-1147: THE COASTAL PROVINCES HELD, per year held -----------
+        // Every region whose CELL TOUCHES THE SEA (`coast_cells`, the terrain
+        // -- never `port_q`, which a settled daughter inherits at 70% wherever
+        // it lands) counts the years this round covers to the polity holding
+        // it, off the round's OPENING map. A tally of deeds
+        // (`polity::naval_coastal_years`), read by nothing in the sim; the
+        // Empires round's alone (`naval_points_accrue`).
+        if (params.naval_points_accrue && terrain.substrate != nullptr)
+        {
+            update_coast_cells(coast, ss.regions, *terrain.substrate, gw, gh);
+            const int64_t years = std::max<int64_t>(0, std::min<int64_t>(step_years, params.stop_year - y));
+            for (std::size_t i = 0; i < ss.regions.size() && i < owner.size(); ++i)
+            {
+                const int o = owner[i];
+                if (o < 0 || static_cast<std::size_t>(o) >= out.polities.size()) continue;
+                if (!cell_touches_sea(coast, i)) continue;
+                out.polities[static_cast<std::size_t>(o)].naval_coastal_years += years;
+            }
+        }
+
         // ---- BL-931: OBJECTS WITH A TERM, AND THE UPKEEP STEP -------------
         //
         // Both run once per decision round, ahead of grudge decay and every
@@ -3704,6 +5058,18 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // the upkeep call is gated on `exploration_upkeep_enabled` so the
         // Empire span — every caller before this item — never takes it.
         expire_dated_objects(out.dated_objects, y);
+        // BL-1152 (trace only): the mutual-defence pairs standing this round.
+        if (params.trace_battles && params.exploration_upkeep_enabled)
+        {
+            std::vector<std::pair<int32_t, int32_t>> md;
+            for (const dated_object& o : out.dated_objects)
+                if (o.kind == static_cast<int32_t>(treaty_clause::mutual_defence))
+                    md.push_back({std::min<int32_t>(o.a, o.b), std::max<int32_t>(o.a, o.b)});
+            std::sort(md.begin(), md.end());
+            md.erase(std::unique(md.begin(), md.end()), md.end());
+            out.mutual_defence_pair_rounds_trace += static_cast<int64_t>(md.size());
+            ++out.mutual_defence_rounds_trace;
+        }
 
         // ---- BL-1041: INDUSTRY POINTS, THE SCALE ACCRUAL ------------------
         //
@@ -3724,8 +5090,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
             {
                 const scoped_ns prof_points(prof.ns_industry_points); // report-only
                 const industry_points_round pr =
-                    accrue_industry_points(ss.regions, out.polities, params, step_years);
+                    accrue_industry_points(ss.regions, out.polities, params, step_years, works);
                 out.industry_points_from_scale += pr.credited;
+                if (works == nullptr || works->size() == 0)
+                    ++out.industry_scale_inert_rounds; // BL-1149: said, not silent (null or empty)
                 out.industry_points_refused    += pr.refused;
 
                 // ---- BL-1099: WORKS CHARTERED, A RECORD-ONLY NOTE ------------
@@ -3816,6 +5184,54 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         }
                     }
                 }
+
+                // ---- BL-1137: THE URBANISATION STREAM -----------------------
+                //
+                // INDUSTRIALISATION.md sec Beat 2 (SET, Ben 2026-09-25: this span
+                // encourages more migration, and migration is how the map thins).
+                // Once a decision round, off this round's accrual, behind the
+                // same switch and open year as the points themselves, so every
+                // other span is untouched. `run_urbanisation_stream` is the rule
+                // (history_sim.hpp); the sim hands it the realm map, the supply
+                // corridors with a line that stays on land, and the open work
+                // each region's works offer (Ben, 2026-09-27: the pull is open
+                // work, not points -- a city whose works are full stops drawing).
+                //
+                // A MIGRANT CARRIES ITS FOOD WITH IT (NR-958): each head leaves
+                // its countryside with one head of ceiling and lands with it, so
+                // the round conserves the world's people AND its carrying
+                // capacity, and a thinned countryside cannot regrow into what
+                // left. The villages empty as a CONSEQUENCE: a region whose
+                // countryside leaves has a smaller urban target, its heads
+                // shrink toward it, and a centre whose heads fall below a
+                // village's worth is abandoned (`advance_region_urban`, both
+                // ways) and hands its points to the realm's nearest centre.
+                {
+                    const std::size_t n = ss.regions.size();
+                    // THE PULL IS OPEN WORK (Ben, 2026-09-27): the heads each
+                    // region's works employ beyond its urban heads. No works
+                    // table, no work stands and none is open: the stream is
+                    // inert (counted, `industry_scale_inert_rounds`).
+                    std::vector<int64_t> open_work(n, 0);
+                    if (works != nullptr)
+                        for (std::size_t ri = 0; ri < n; ++ri)
+                            open_work[ri] = region_open_work(ss.regions[ri],
+                                                             works->employed_heads_mask(ss.regions[ri].works_built));
+                    // The reach cache watches the rebate (BL-1130 review fix):
+                    // only a destination's heads move, so only they are read.
+                    std::vector<int> rebate_before(n, 0);
+                    for (std::size_t ri = 0; ri < n; ++ri)
+                        rebate_before[ri] = relay_rebate_of(ss.regions[ri]);
+                    const urbanisation_round ur = run_urbanisation_stream(
+                        ss.regions, owner, supply_neighbours,
+                        [&](int a, int b) { return stream_lines.joined(ss.regions, a, b); }, open_work, step_years);
+                    out.urbanisation_heads_moved += ur.moved;
+                    out.urbanisation_heads_within += ur.moved_within;
+                    for (const int d : ur.destinations)
+                        if (relay_rebate_of(ss.regions[static_cast<std::size_t>(d)])
+                            != rebate_before[static_cast<std::size_t>(d)])
+                            ++centres_version;
+                }
             }
         }
 
@@ -3833,7 +5249,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // writes -- so the table is identical either side of the call.
             if (want_lean_on)
                 round_prefs = derive_culture_preference(ss.regions, out.contacts,
-                                                        out.polities, want_culture_count);
+                                                        out.polities, want_culture_count,
+                                                        cs ? &cs->cultures : nullptr,
+                                                        out.culture_profile_lack_max_q,
+                                                        out.culture_profile_amenity_div);
 
             exploration_upkeep_spend upkeep_spend;
             // BL-955: the allocation reads the state's contacts (near-home
@@ -3842,11 +5261,17 @@ history_sim_state run_history_sim(settlement_state&         ss,
             spend_ctx.state  = &out;
             spend_ctx.creeds = cs;
             spend_ctx.prefs  = &round_prefs;
+            spend_ctx.currents = currents_on ? &currents : nullptr; // BL-1140
+            refresh_seat_landmass();                                 // BL-1142: once per round
+            spend_ctx.seat_landmass  = landmass.empty() ? nullptr : &seat_landmass;
+            spend_ctx.cargo_loss_q   = cargo_loss_q; // judged in domain at the open
+            spend_ctx.cargo_lost_out = &out.sea_trade_cargo_lost_q;
             // BL-954: the state's treaties open this round's flows, rebuilt
             // into `out.trade_flows` (never accumulated).
             run_exploration_upkeep(ss.regions, out.polities, out.supply_corridors,
                                    params, y, step_years, &upkeep_spend,
-                                   &out.dated_objects, &out.trade_flows, &spend_ctx);
+                                   &out.dated_objects, &out.trade_flows, &spend_ctx, works);
+            note_trade_legs(); // BL-1140: the round's trade across water, the fourth writer
             out.treasury_spent_on_ports           += upkeep_spend.ports;
             out.treasury_spent_on_navies          += upkeep_spend.navies;
             out.treasury_spent_on_standing_armies += upkeep_spend.standing_armies;
@@ -3855,11 +5280,18 @@ history_sim_state run_history_sim(settlement_state&         ss,
             out.treasury_spent_on_navy_upkeep += upkeep_spend.navy_upkeep;
             out.army_upkeep_unpaid_rounds     += upkeep_spend.army_unpaid;
             out.navy_upkeep_unpaid_rounds     += upkeep_spend.navy_unpaid;
+            out.navy_hulls_decayed_trace      += upkeep_spend.navy_hulls_decayed;
+            for (int k = 0; k < 4; ++k) out.spend_pick_trace[k] += upkeep_spend.pick_counts[k];
+            out.navy_short_treasury_trace     += upkeep_spend.navy_short_treasury;
+            out.navy_short_port_trace         += upkeep_spend.navy_short_port;
+            out.navy_short_both_trace         += upkeep_spend.navy_short_both;
+            out.navy_eligible_outbid_trace    += upkeep_spend.navy_eligible_outbid;
             out.levy_heads_raised             += upkeep_spend.levy_raised;
             out.levy_heads_returned           += upkeep_spend.levy_returned;
             // BL-1041: the treasury paid into industry points on capitals.
             out.industry_points_from_treasury += upkeep_spend.industry_points_paid_in;
             out.treasury_spent_on_industry    += upkeep_spend.industry_treasury_debited;
+            out.treasury_kept_by_crowding     += upkeep_spend.industry_treasury_kept_by_crowding;
             out.industry_points_refused       += upkeep_spend.industry_points_refused;
             out.port_steps_bought += upkeep_spend.port_steps;
             out.navy_steps_bought += upkeep_spend.navy_steps;
@@ -3940,8 +5372,71 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // re-score: nothing between here and the end of the break walk
             // changes who holds what, and the raw signal was refreshed by
             // the upkeep step above.
-            const trade_context treaty_trade_ctx =
-                build_trade_context(ss.regions, out.polities, out.supply_corridors);
+            // BL-1140: priced with the same current the round's flows were,
+            // so a binding is worth what its trade would actually carry.
+            const trade_context treaty_trade_ctx = [&]() {
+                trade_context t = build_trade_context(ss.regions, out.polities, out.supply_corridors);
+                if (currents_on)
+                {
+                    t.currents         = &currents;
+                    t.current_weight_q = params.sea_current_weight_q;
+                    // BL-1142: a binding is worth what arrives.
+                    t.seat_landmass = landmass.empty() ? nullptr : &seat_landmass;
+                    t.cargo_loss_q  = cargo_loss_q;
+                }
+                return t;
+            }();
+
+            // BL-1142 -- REALMS ACROSS WATER MEET BY SEA (INDUSTRIALISATION.md
+            // sec Far pairs meet and bind). Two living realms whose seats
+            // stand on different landmasses, and which have never met, MEET
+            // this round when a trade BY SEA is open between them in either
+            // direction: the seller holds a navy, both seats hold built
+            // ports, and the seller holds a good the buyer's market wants
+            // (`trade_sea_volume_q` -- the sea line alone; a land corridor's
+            // volume never counts) -- the fleet that could carry the cargo
+            // finds the market. Pairs walked in id order; `raise_contact` is
+            // a no-op on a pair already met, so the record keeps the first
+            // meeting. The cheap tests (alive, ports, a navy on one side,
+            // different landmasses, not met) run before the volume read,
+            // which is what keeps the walk small.
+            if (params.far_pairs_meet_by_sea && !landmass.empty())
+            {
+                const std::size_t pc = out.polities.size();
+                for (std::size_t ai = 0; ai < pc; ++ai)
+                {
+                    const polity& pa = out.polities[ai];
+                    if (!pa.alive || pa.capital < 0
+                     || static_cast<std::size_t>(pa.capital) >= ss.regions.size()) continue;
+                    if (ss.regions[static_cast<std::size_t>(pa.capital)].port_stock_q <= 0) continue;
+                    const int32_t ma = seat_landmass_of(static_cast<int>(ai));
+                    if (ma < 0) continue;
+                    for (std::size_t bi = ai + 1; bi < pc; ++bi)
+                    {
+                        const polity& pb = out.polities[bi];
+                        if (!pb.alive || pb.capital < 0
+                         || static_cast<std::size_t>(pb.capital) >= ss.regions.size()) continue;
+                        if (pa.navy_stock <= 0 && pb.navy_stock <= 0) continue;
+                        if (ss.regions[static_cast<std::size_t>(pb.capital)].port_stock_q <= 0) continue;
+                        const int32_t mb = seat_landmass_of(static_cast<int>(bi));
+                        if (mb < 0 || mb == ma) continue;
+                        const int ia = static_cast<int>(ai), ib = static_cast<int>(bi);
+                        if (contact_exists(ia, ib)) continue;
+                        bool open = false;
+                        for (int g = 0; g < 4 && !open; ++g)
+                            open = trade_sea_volume_q(treaty_trade_ctx, ss.regions, out.polities, ia, ib, g) > 0
+                                || trade_sea_volume_q(treaty_trade_ctx, ss.regions, out.polities, ib, ia, g) > 0;
+                        if (!open) continue;
+                        raise_contact(ia, ib, contact_kind::trade, pa.capital, y);
+                        ++out.contacts_met_by_sea;
+                    }
+                }
+            }
+            // BL-1142: the far penalty a pair reads is the sea's own where the
+            // pair MET across water -- the class its contact recorded at the
+            // meeting (`contact_event::across_water`), never the seats read
+            // again -- so formation and the break re-score read the same
+            // penalty however a capital moves after (`treaty_far_penalty_for`).
 
             // BL-1018 DIAGNOSTIC (trace only): the raw capability each side
             // of every living NEAR-HOME pair reads of the other this round,
@@ -3986,10 +5481,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const int alarm_b = deterrence_alarm_q(ss.regions, out, params, b, a);
                 const int trade_ab = pair_trade_value_q(treaty_trade_ctx, ss.regions, out.polities, a, b,
                                                              out.trade_flows);
+                const bool met_across_water = c.first.across_water != 0; // BL-1142: recorded at the meeting
+                const int far_pen = treaty_far_penalty_for(params, met_across_water);
                 const int value_a = treaty_value_q(params, ga, gb, pb.treaties_broken, pa.aggression_q,
-                                                    alarm_a, near_home, trade_ab);
+                                                    alarm_a, near_home, trade_ab, far_pen);
                 const int value_b = treaty_value_q(params, gb, ga, pa.treaties_broken, pb.aggression_q,
-                                                    alarm_b, near_home, trade_ab);
+                                                    alarm_b, near_home, trade_ab, far_pen);
                 if (value_a < params.treaty_formation_threshold_q
                  || value_b < params.treaty_formation_threshold_q) continue;
 
@@ -4010,6 +5507,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         expires, static_cast<int32_t>(tc), lo, hi_});
                 note_event(lapse_event_kind::treaty_formed, pa.capital, a, b);
                 ++out.treaties_formed;
+                if (met_across_water)
+                {
+                    ++out.treaties_formed_across_water; // BL-1142
+                    if (!near_home) ++out.far_treaties_formed_across_water;
+                }
             }
 
             // ---- BL-933: BREAKING A TREATY, "legal and costly" ------------
@@ -4048,10 +5550,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     const int alarm_b = deterrence_alarm_q(ss.regions, out, params, b, a);
                     const int trade_ab = pair_trade_value_q(treaty_trade_ctx, ss.regions, out.polities, a, b,
                                                              out.trade_flows);
+                    // BL-1142 -- the class the pair's contact recorded, the
+                    // same fact formation read off the row it walked.
+                    const int far_pen = treaty_far_penalty_for(params, contact_met_across_water(out, a, b));
                     const int value_a = treaty_value_q(params, ga, gb, pb.treaties_broken, pa.aggression_q,
-                                                        alarm_a, near_home, trade_ab);
+                                                        alarm_a, near_home, trade_ab, far_pen);
                     const int value_b = treaty_value_q(params, gb, ga, pa.treaties_broken, pb.aggression_q,
-                                                        alarm_b, near_home, trade_ab);
+                                                        alarm_b, near_home, trade_ab, far_pen);
 
                     int defector = -1, wronged = -1;
                     if (value_a < break_bar && value_a <= value_b) { defector = a; wronged = b; }
@@ -4129,6 +5634,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         const int dist = region_distance(
                             ss.regions[static_cast<std::size_t>(arriving.capital)],
                             ss.regions[static_cast<std::size_t>(native.capital)], gw);
+                        // Raw distance, never priced with the current: tribute
+                        // and its binding are standing traffic a current cannot
+                        // decide (EXPLORATION.md sec Currents, "Where currents
+                        // bite"; the sea-chain review).
                         if (dist > params.subjection_reach_q) continue;
 
                         const int64_t arriving_treasury =
@@ -4216,7 +5725,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                        native.capital, native.id, arriving.id);
                             // BL-1097: the purchase party's crossing, buyer's
                             // seat to the seat it buys, is a sea leg.
-                            note_sea_leg(arriving.capital, native.capital);
+                            note_sea_leg(arriving.capital, native.capital, sea_leg_writer::purchase);
                             ++out.sea_legs_noted_purchase;
                         }
                         else
@@ -4259,6 +5768,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     dist = region_distance(ss.regions[static_cast<std::size_t>(subj.capital)],
                                            ss.regions[static_cast<std::size_t>(lord.capital)], gw);
 
+                // Raw distance, never priced with the current (standing
+                // traffic; the sea-chain review).
                 const bool outrun = !reachable
                                   || dist > params.subject_secession_distance_q
                                   || subj.cohesion_q <= params.subject_secession_cohesion_q;
@@ -4304,7 +5815,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // the traffic is the link, not the amount.
                 if (subj.capital >= 0 && lord.capital >= 0 && subj.capital != lord.capital)
                 {
-                    note_sea_leg(lord.capital, subj.capital);
+                    note_sea_leg(lord.capital, subj.capital, sea_leg_writer::tribute);
                     ++out.sea_legs_noted_tribute;
                 }
 
@@ -4346,6 +5857,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
         ++prof.decision_rounds;
         for (polity& q : out.polities)
         {
+            // BL-1130 (review fix): an earlier polity's Settle this round cut
+            // its neighbours' cells; measure before this turn reads them.
+            hold_to_ground(/*only_after_founding=*/true);
             if (!q.alive) continue;
 
             // Holdings, and whether the capital still stands.
@@ -4701,12 +6215,25 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // terrain cost (BL-321): reach_mod is authored as a discount on the
             // supply cost through/from a region, so it is the staging
             // holding's roads and wharves doing the carrying, not the capital's.
-            const auto campaign_supply = [&](std::size_t ti, int hub) {
+            //
+            // BL-1120 -- A SEA LEG'S LAST HOP IS PRICED WITH ITS CURRENT.
+            // `sea_cost_q` is the leg's cost against still water
+            // (`sea_leg_cost_q`, hub to target), passed by the caller that has
+            // already asked whether the line is wet; 1000 -- a dry hop, or
+            // still water -- is the step exactly as it always was. The hop is
+            // the one piece of this reach that crosses the water, so it is the
+            // one the current can shorten or lengthen. The reach is carried in
+            // THOUSANDTHS of a step so the priced hop is never rounded to a
+            // whole step (a 7-step hop at cost 950 is 6.65 steps, not 6): at
+            // cost 1000 the thousandths are exact multiples and the terrain
+            // cost below is the old `reach_here * cost / 100` digit for digit.
+            const auto campaign_supply = [&](std::size_t ti, int hub, int sea_cost_q = 1000) {
                 const std::size_t hs = static_cast<std::size_t>(hub);
                 const bool hub_reached = hub >= 0 && hs < reach.size() && reach[hs] < (1 << 27);
-                const int reach_here = hub_reached
-                                     ? reach[hs] + edge_step(hub, static_cast<int>(ti))
-                                     : (1 << 27);
+                const int64_t reach_milli = hub_reached
+                    ? static_cast<int64_t>(reach[hs]) * 1000
+                        + static_cast<int64_t>(edge_step(hub, static_cast<int>(ti))) * sea_cost_q
+                    : static_cast<int64_t>(1 << 27) * 1000;
                 // (BL-973: the tree's `reach` term is NOT added here either —
                 // see the holdings-supply site above for the finding.)
                 const int hub_reach_q = (hub >= 0)
@@ -4714,8 +6241,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     : 0;
                 // 64-bit for the same reason as the holdings loop above: the
                 // sentinel times the cost does not fit an `int`.
-                const int64_t terrain_cost = static_cast<int64_t>(reach_here)
-                                           * leaned_terrain_reach_cost_q(params) / 100;
+                const int64_t terrain_cost = reach_milli
+                                           * leaned_terrain_reach_cost_q(params) / 100 / 1000;
                 const int64_t terrain_paid = terrain_cost - (terrain_cost * hub_reach_q) / 1000;
                 return static_cast<int>(clampi64(1000
                             - terrain_paid
@@ -4869,12 +6396,21 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // so the survivors keep their paid status in proportion wherever
             // they end the campaign. Always 0 in the Empire span.
             int64_t committed_standing = 0;
+            // BL-1152 review: what a COMMITTED gather drew from each region --
+            // (region, heads, paid heads) -- so men a fleet cannot lift go back
+            // where they came from.
+            struct army_draw { int region; int64_t men; int64_t paid; };
+            std::vector<army_draw> committed_draws;
             const auto gather_army = [&](int hub, bool commit) -> int64_t {
                 const std::size_t hs = static_cast<std::size_t>(hub);
                 int64_t total = ss.regions[hs].army_stock;
                 if (total <= 0) return 0; // BL-835: a hub with no army stages nothing.
                 if (commit)
+                {
+                    committed_draws.clear();
                     committed_standing = draw_army_with_standing(ss.regions[hs], total); // the whole hub
+                    committed_draws.push_back({ hub, total, committed_standing });
+                }
 
                 for (int hi : held)
                 {
@@ -4888,7 +6424,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     if (take <= 0) continue;
                     total += take;
                     if (commit)
-                        committed_standing += draw_army_with_standing(ss.regions[hii], take);
+                    {
+                        const int64_t paid = draw_army_with_standing(ss.regions[hii], take);
+                        committed_standing += paid;
+                        committed_draws.push_back({ hi, take, paid });
+                    }
                 }
                 // Paid heads marched can never exceed the men marched.
                 if (commit && committed_standing > total) committed_standing = total;
@@ -4931,6 +6471,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // run is byte-identical with tracing on or off.
             int      best_p_win_q = 0;
             int      best_hub     = -1;
+            int64_t  best_scored_men = 0; // BL-1152 review, trace only
             int      best_dclass  = 0; // BL-950 diagnostic, trace only.
             // Sprint 28 lane A instrumentation, ALSO READ ONLY BY THE TRACE.
             // The best Campaign score that cleared `campaign_threshold_q` this
@@ -4995,6 +6536,68 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 int& slot = fear_cache[static_cast<std::size_t>(target)];
                 if (slot < 0) slot = fear_of_next_q(out, params, q.id, target);
                 return slot;
+            };
+
+            // BL-1152 / NR-965 -- THE FLEET GATE. Whether the fleet rule lets a
+            // wet crossing from @p hub sail against region @p ti: 0 it may,
+            // 1 the attacker's fleet lifts no one (no fleet, under a lift
+            // bound), 2 the target's realm and its mutual-defence partners
+            // out-project the attacker's fleet somewhere on the leg, 3 no sea
+            // joins the hub's coast to the target's (not wet-capable: refused,
+            // fail closed). Asked where candidates are listed, so a refused
+            // crossing is never a candidate (a LEGALITY test, like the water
+            // gate and the treaty gate -- not a scorer term), and again where
+            // execute picks its staging hub, so it cannot launch one the
+            // scorer would refuse.
+            //
+            // THE COASTS. The landing is the target's first coast tile (ring
+            // order, ties to the lower raster index) whose water any of the
+            // hub's coast tiles shares; the embarkation is the hub's first
+            // coast tile in that water. A hub whose nearest sea is a lake no
+            // longer reads as an uncontested crossing.
+            //
+            // The defenders are read once per (realm) for this polity's turn
+            // (`fleet_defenders_turn`, dropped at launch, when the world moves).
+            struct fleet_check { int refusal = 0; crossing_verdict v; int64_t abstained = 0; int64_t seat_coast = 0; };
+            struct defenders_entry { int realm; std::vector<fleet_defender> d; int64_t abstained; };
+            std::vector<defenders_entry> fleet_defenders_turn;
+            const auto fleet_gate = [&](int hub, std::size_t ti) -> fleet_check
+            {
+                fleet_check c;
+                if (params.fleet_men_per_hull > 0
+                 && fleet_lift_capacity(q.navy_stock, params.fleet_men_per_hull) <= 0)
+                {
+                    c.refusal = 1;
+                    return c;
+                }
+                const std::vector<int>& hub_ring = fleet_ring_of(static_cast<std::size_t>(hub));
+                const std::vector<int>& tgt_ring = fleet_ring_of(ti);
+                int hub_tile = -1, landing = -1;
+                if (!fleet_coasts(fleet_comp, hub_ring, tgt_ring, &hub_tile, &landing)) { c.refusal = 3; return c; }
+                if (params.fleet_power_halving_tiles > 0)
+                {
+                    const int realm = owner[ti];
+                    const defenders_entry* de = nullptr;
+                    for (const defenders_entry& e : fleet_defenders_turn) if (e.realm == realm) { de = &e; break; }
+                    if (de == nullptr)
+                    {
+                        defenders_entry e;
+                        e.realm = realm;
+                        e.abstained = 0;
+                        e.d = crossing_defenders(out, ss.regions, realm, q.id, fleet_sea, gw, gh,
+                                                 kFleetCoastRadius, &e.abstained);
+                        fleet_defenders_turn.push_back(std::move(e));
+                        de = &fleet_defenders_turn.back();
+                    }
+                    c.abstained = de->abstained;
+                    for (const fleet_defender& d : de->d) if (d.seat_coast) ++c.seat_coast;
+                    c.v = judge_crossing(fleet_sea, gw, gh, currents_on ? &currents : nullptr,
+                                         params.sea_current_weight_q, params.fleet_power_halving_tiles,
+                                         hub_tile, landing, q.navy_stock, de->d, &fleet_fields);
+                    if (!c.v.leg) { c.refusal = 3; return c; } // matched waters always walk; a guard
+                    if (c.v.stopped) c.refusal = 2;
+                }
+                return c;
             };
 
             // -- Campaign --------------------------------------------------
@@ -5065,6 +6668,41 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // one's own shore, starving on a sea leg carried by ships.
                     // Ships get the force there; they do not feed it.
                     const bool forages = dry || shore;
+
+                    // BL-1152 / NR-965 -- THE FLEET GATE (the lambda above): a
+                    // crossing the fleet rule would refuse is not a candidate.
+                    if (!dry && fleet_rule_on)
+                    {
+                        ++out.fleet.read;
+                        const int hub_port = ss.regions[static_cast<std::size_t>(hi)].port_stock_q > 0 ? 1 : 0;
+                        ++out.fleet_read_by_hub_port[hub_port]; // report only
+                        const fleet_check fc = fleet_gate(hi, ti);
+                        if (fc.refusal == 1) ++out.fleet_unlifted_by_hub_port[hub_port]; // report only
+                        out.fleet.partners_abstained += fc.abstained;
+                        out.fleet.seat_coast_fleets  += fc.seat_coast;
+                        if (fc.refusal == 1) { ++out.fleet.unlifted; continue; } // no fleet: no one sails
+                        if (fc.refusal == 3) { ++out.fleet.no_leg; continue; }   // no sea joins the coasts
+                        if (fc.refusal == 2)
+                        {
+                            ++out.fleet.stopped;
+                            if (fc.v.stopper != to) ++out.fleet.stopped_by_partner;
+                            crossing_stop cst;
+                            cst.year     = static_cast<int32_t>(y);
+                            cst.attacker = static_cast<uint16_t>(q.id);
+                            cst.realm    = static_cast<uint16_t>(to);
+                            cst.stopper  = static_cast<uint16_t>(fc.v.stopper >= 0 ? fc.v.stopper : 0xFFFF);
+                            cst.region   = static_cast<uint16_t>(ti);
+                            cst.hub      = static_cast<uint16_t>(hi);
+                            cst.attacker_power = fc.v.attacker_power;
+                            cst.defender_power = fc.v.defender_power;
+                            cst.hub_army = ss.regions[static_cast<std::size_t>(hi)].army_stock;
+                            for (std::size_t ri = 0; ri < ss.regions.size() && ri < owner.size(); ++ri)
+                                if (owner[ri] == q.id) cst.realm_army += ss.regions[ri].army_stock;
+                            cst.navy     = q.navy_stock;
+                            out.fleet.stops.push_back(cst);
+                            continue; // never a candidate: nothing scored, drawn or fought
+                        }
+                    }
 
                     const region& tgt = ss.regions[ti];
                     const int cap_dist = region_distance(cap, tgt, gw);
@@ -5181,10 +6819,16 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // on the reduced ration its people's creed earned. Same
                     // `campaign_supply`, scaled; never a bonus added on top.
                     const int sl_ration = forages ? 0 : sea_legs_ration(hi);
+                    // BL-1120: a wet hop is priced with its current, hub to
+                    // target -- the same leg execute prices below. (A starved
+                    // crossing lands on nothing whatever the current, so its
+                    // line is not sampled.)
+                    const int sl_cost = (dry || (!forages && sl_ration <= 0))
+                                      ? 1000 : sea_leg_cost_q(hi, tn);
                     const int supply_here =
-                        forages ? campaign_supply(ti, hi)
+                        forages ? campaign_supply(ti, hi, sl_cost)
                                 : (sl_ration > 0
-                                       ? (campaign_supply(ti, hi) * sl_ration) / 1000
+                                       ? (campaign_supply(ti, hi, sl_cost) * sl_ration) / 1000
                                        : 0);
 
                     // BL-837 — REACH GATES A CAMPAIGN; IT DOES NOT MERELY
@@ -5221,7 +6865,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // scores the force it can actually put on the objective,
                     // which is the sharpened question the item asks for: not
                     // "can I take this" but "can I get an army there".
-                    const int64_t atk_men = hub_army;
+                    //
+                    // BL-1152 review -- AND THE ARMY THE FLEET CAN LIFT. A wet
+                    // crossing under a lift bound sails with at most the lift,
+                    // so the odds are priced on that, by the same function
+                    // execute clips with: one rule, read twice.
+                    const int64_t atk_men =
+                        (!dry && fleet_rule_on && params.fleet_men_per_hull > 0)
+                            ? std::min(hub_army, fleet_lift_capacity(q.navy_stock, params.fleet_men_per_hull))
+                            : hub_army;
                     const int64_t atk_est = (atk_men * supply_here / 1000)
                                           * clampi(q.cohesion_q, 1, 1000) / 1000;
                     const int64_t def_est = def_men > 0 ? def_men : 1;
@@ -5494,6 +7146,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             best_score = s; best_verb = sim_verb::campaign;
                             best_target = static_cast<int>(ti); best_winter = winter;
                             best_p_win_q = p_win_q; best_hub = hi; // trace only
+                            best_scored_men = atk_men;             // trace only
                             best_dclass = dclass;                  // trace only
                         }
                     }
@@ -5506,9 +7159,20 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // region before the stop year and leaves none after it, so
             // without this verb a 2000-year run has a frozen region count.
             {
+                // A polity fighting for its life does not colonise (BL-308).
+                // Letting it was the main reason losers regrew faster than they
+                // were conquered, and why elimination never happened.
+                //
+                // READ BEFORE THE SOURCE LOOP (BL-1132 review fix), not after
+                // it: the loop runs the site search for every eligible held
+                // region, and a polity the gate refuses can never pick Settle,
+                // so its search was pure cost. The gate reads only cohesion,
+                // which nothing in the loop writes, so the choice is unchanged.
+                const bool may_settle = q.cohesion_q >= params.settle_cohesion_gate_q;
                 int pressure_best = -1, pressure_src = -1;
                 for (int hi : held)
                 {
+                    if (!may_settle) break;
                     const region& p = ss.regions[static_cast<std::size_t>(hi)];
                     // The works-aware ceiling (BL-321), matching what
                     // `advance_region_demography` actually grows toward. The
@@ -5524,15 +7188,39 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // sack_region_urban) -- so this reads "has this ground ever
                     // been sacked", not "is it empty right now".
                     if (params.settle_requires_razed_ground && p.centres_razed <= 0) continue;
-                    const int64_t K = region_carrying_capacity(p.farm_q, p.work_capacity_mod);
+                    // NR-958: the ceiling growth reads — the farm-fed people
+                    // against what the region's ceiling feeds once its
+                    // industrial heads are fed (`region_farm_fed_ceiling`),
+                    // exactly the works-aware farm ceiling wherever the
+                    // urbanisation stream has not run.
+                    const int64_t K = region_farm_fed_ceiling(p);
                     if (K <= 0) continue;
-                    const int pressure = static_cast<int>(clampi64((p.population * 1000) / K, 0, 1000));
-                    if (pressure > pressure_best) { pressure_best = pressure; pressure_src = hi; }
+                    const int64_t farm_fed = clampi64(p.population - p.industrial_heads, 0, p.population);
+                    const int pressure = static_cast<int>(clampi64((farm_fed * 1000) / K, 0, 1000));
+                    if (pressure <= pressure_best) continue;
+                    // BL-1132 — A REALM SETTLES ONLY WHERE THERE IS ROOM (Ben,
+                    // 2026-09-26; CIVILISATION.md § The unit is the city state).
+                    // A source is scored only if `find_settle_site` finds it a
+                    // site that passes the spacing — the same call, on the same
+                    // (parent, salt, year, region list), that the verb then
+                    // founds with, so a chosen Settle always founds. Without it
+                    // the scorer picked the most crowded razed region whether or
+                    // not its neighbourhood was full, and the round was spent on
+                    // a founding that could not happen (main before BL-1132
+                    // wasted 624 / 2,161 / 3,274 Settle rounds in the Empires /
+                    // Exploration / Industrialisation spans on the curated
+                    // seeds; spacing 3 made it 85% of the Empires span's). The
+                    // search samples its rings (see `find_settle_site`), so a
+                    // source skipped here found no site THIS year and may find
+                    // one the next. A region below the pressure gate is skipped
+                    // outright: it could only ever fail the gate below, so it
+                    // needs no site.
+                    if (pressure < params.settle_pressure_q) continue;
+                    int site_c = -1, site_r = -1;
+                    find_settle_site(p, qs, y, site_c, site_r);
+                    if (site_c < 0) continue;
+                    pressure_best = pressure; pressure_src = hi;
                 }
-                // A polity fighting for its life does not colonise (BL-308).
-                // Letting it was the main reason losers regrew faster than they
-                // were conquered, and why elimination never happened.
-                const bool may_settle = q.cohesion_q >= params.settle_cohesion_gate_q;
                 if (may_settle && pressure_src >= 0 && pressure_best >= params.settle_pressure_q)
                 {
                     const region& sp = ss.regions[static_cast<std::size_t>(pressure_src)];
@@ -5723,13 +7411,16 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // strictly beat them, and `best_work_row` is only ever read on the
             // one path that just wrote it.
             //
-            // BOUNDED BY CONSTRUCTION, like the other four. Two candidate
-            // regions — the capital, and one rotated through the holdings by
-            // the year — rather than every holding. Scoring all of them would be
-            // O(held x rows) per polity per round inside a pass already costing
-            // ~23 s of a ~25 s world; the rotation still reaches every region
-            // over a run, because the round count (136 on the default ladder) is
-            // large against any one polity's holdings.
+            // BL-1155 (Ben, 2026-09-27; HISTORY.md sec The verb): EVERY REGION
+            // THE POLITY HOLDS THAT STANDS A CENTRE is a candidate, walked in
+            // region order (`held` is ascending), still one work a round and the
+            // same scorer. Two candidates -- the capital and one rotated region
+            // -- kept industry to about 110 of some 15,000 regions, because a
+            // work anywhere but the capital waited for the rotation to reach it.
+            // The bound is now the centres the polity holds: O(centres x rows)
+            // per polity per round, measured against the span times rather than
+            // assumed. `work_candidates_every_centre` false is the old bounded
+            // rule, kept as the switch's other reading.
             if (works != nullptr && works->size() > 0)
             {
                 // The materials band, derived ONCE above this round's verbs
@@ -5737,24 +7428,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // value. It used to be re-derived here.
                 const roster_band band = mat_band;
 
-                for (int slot = 0; slot < clampi(params.work_candidate_regions, 0, 8); ++slot)
+                (void)n_held;
+                for (const int pi : work_candidates(ss.regions, held, q.capital, params, qs, y))
                 {
-                    int pi = -1;
-                    if (slot == 0)
-                    {
-                        pi = q.capital;
-                    }
-                    else
-                    {
-                        // Rotation is a hash of (polity, year, slot), not a
-                        // counter: nothing is carried between rounds, so
-                        // inserting or removing a decision cannot shift which
-                        // region a later round looks at. Same reason the rest
-                        // of this file uses `salt` rather than a generator.
-                        const uint32_t h = salt(qs, static_cast<uint32_t>(y) * 977u
-                                                    + static_cast<uint32_t>(slot));
-                        pi = held[static_cast<std::size_t>(h % static_cast<uint32_t>(n_held))];
-                    }
                     if (pi < 0 || pi >= static_cast<int>(ss.regions.size())) continue;
 
                     const region& bp = ss.regions[static_cast<std::size_t>(pi)];
@@ -5964,10 +7640,33 @@ history_sim_state run_history_sim(settlement_state&         ss,
                      && !can_field_naval(ss.regions[hs], mil_band))
                         continue;
                     const int d = region_distance(ss.regions[hs], tgt, gw);
-                    if (d < src_d) { src_d = d; src = hi; }
+                    if (d >= src_d) continue;
+                    // BL-1152 / NR-965: and the fleet gate, by the same test
+                    // the scorer used, so execute never stages a crossing the
+                    // scorer would have refused.
+                    if (fleet_rule_on && !dry_contact(hi, ti) && fleet_gate(hi, ti).refusal != 0) continue;
+                    src_d = d; src = hi;
                 }
                 if (src < 0) break; // no legal staging holding — nothing marches
                 region& home = ss.regions[static_cast<std::size_t>(src)];
+
+                // BL-1152 -- A FLEET DECIDES WHO CROSSES (EXPLORATION.md, the
+                // SETTLED paragraph under the stocks table). The out-projection
+                // and no-fleet tests already ran where candidates were listed
+                // and where `src` was picked (the fleet gate, NR-965), so a
+                // crossing reaching here sails; the re-check is a guard, and
+                // `exec_failed` counts what it would have refused (0 by
+                // construction). Then the lift: the fleet carries at most
+                // `fleet_men_per_hull` men a hull.
+                const bool exec_dry = dry_contact(src, ti);
+                int64_t lift_cap = -1; // -1 = unbounded
+                if (!exec_dry && fleet_rule_on)
+                {
+                    if (fleet_gate(src, ti).refusal != 0) { ++out.fleet.exec_failed; break; }
+                    if (params.fleet_men_per_hull > 0)
+                        lift_cap = fleet_lift_capacity(q.navy_stock, params.fleet_men_per_hull);
+                }
+                fleet_defenders_turn.clear(); // the world moves from here on
 
                 // BL-835 — THE FIELD ARMY MARCHES, AND IT LEAVES. The staging
                 // holding's whole garrison goes; `home.army_stock` is zero
@@ -5981,8 +7680,48 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // an army conjured out of civilians at the moment of battle
                 // and never seen again, which is precisely the accounting that
                 // let war eat the population.
-                const int64_t raised = gather_army(src, /*commit=*/true);
+                int64_t raised = gather_army(src, /*commit=*/true);
                 if (raised <= 0) break;
+                // BL-1152 -- THE FLEET BOUNDS THE ARMY IT CARRIES. What it cannot
+                // lift never left: it goes back to the regions the muster drew
+                // it from, in proportion to what each gave (largest remainder,
+                // ties to the lower region index), and their paid heads with it
+                // in proportion to the paid heads each gave.
+                if (lift_cap >= 0 && raised > lift_cap)
+                {
+                    const int64_t ashore = raised - lift_cap;
+                    std::vector<int64_t> men_w, paid_w;
+                    std::vector<int> idx;
+                    int64_t paid_drawn = 0;
+                    for (const army_draw& d : committed_draws)
+                    {
+                        men_w.push_back(d.men); paid_w.push_back(d.paid); idx.push_back(d.region);
+                        paid_drawn += d.paid;
+                    }
+                    uint64_t paid_q = 0, paid_r = 0; // floor(paid x ashore / raised), exact
+                    mul_div_floor(static_cast<uint64_t>(std::min(committed_standing, raised)),
+                                  static_cast<uint64_t>(ashore), static_cast<uint64_t>(raised), paid_q, paid_r);
+                    const int64_t paid_ashore = static_cast<int64_t>(paid_q);
+                    const std::vector<int64_t> men_back  = split_by_largest_remainder(ashore, men_w, idx);
+                    const std::vector<int64_t> paid_back = paid_drawn > 0
+                        ? split_by_largest_remainder(paid_ashore, paid_w, idx) : std::vector<int64_t>(idx.size(), 0);
+                    committed_standing -= paid_ashore;
+                    for (std::size_t k = 0; k < committed_draws.size(); ++k)
+                    {
+                        region& back = ss.regions[static_cast<std::size_t>(idx[k])];
+                        if (men_back[k] <= 0) continue;
+                        const int64_t paid_before = standing_army_heads(back);
+                        back.army_stock = clampi64(back.army_stock + men_back[k], 0, 1LL << 40);
+                        if (paid_back[k] > 0)
+                        {
+                            back.standing_army       = std::min(paid_before + paid_back[k], back.army_stock);
+                            back.standing_army_owner = q.id;
+                        }
+                    }
+                    raised = lift_cap;
+                    ++out.fleet.clipped;
+                    out.fleet.men_ashore += ashore;
+                }
 
                 // FORCE COMMITMENT (BL-277 Q2), priced by the SAME lambda the
                 // scorer used. `src` is the staging hub; the army is fed from
@@ -6000,7 +7739,6 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // The file's own thesis applies: a cost authored on one scale
                 // and spent on another is the bug, so the estimate and the
                 // outcome ask the identical question.
-                const bool exec_dry     = dry_contact(src, ti);
                 const bool exec_forages = exec_dry || tgt_shore;
                 // BL-899 — SEA LEGS, asked of the staging holding execute
                 // actually chose, by the identical lambda the scorer used.
@@ -6009,7 +7747,22 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // what this march would have drawn foraging. `campaign_supply`
                 // is a pure read of this round's reach and burden, so asking it
                 // here rather than inside each arm below changes no value.
-                const int exec_forage_supply = campaign_supply(ti, src);
+                //
+                // BL-1120: the wet hop priced with its current, hub to target,
+                // by the identical rule the scorer used; counted at launch as
+                // with, against or across slack water (pure observation).
+                const int exec_align = (!exec_dry && currents_on)
+                                     ? sea_leg_alignment_q(src, static_cast<int>(ti)) : 0;
+                const int exec_sea_cost = currents_on
+                    ? ocean_current_leg_cost_q(params.sea_current_weight_q, exec_align) : 1000;
+                if (!exec_dry && currents_on)
+                {
+                    if (exec_align > 0)      ++out.sea_campaigns_with_current;
+                    else if (exec_align < 0) ++out.sea_campaigns_against_current;
+                    else                     ++out.sea_campaigns_slack_current;
+                    out.sea_campaign_alignment_sum_q += exec_align;
+                }
+                const int exec_forage_supply = campaign_supply(ti, src, exec_sea_cost);
                 const int atk_supply =
                     exec_forages ? exec_forage_supply
                                  : (exec_ration > 0
@@ -6033,7 +7786,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // whether or not the battle was won, and a network that only
                 // remembered the winners would be a map of conquests rather
                 // than a map of routes.
-                note_corridor(src, static_cast<int>(ti), q.capital);
+                note_corridor(src, static_cast<int>(ti), q.capital, /*wet_walk=*/!exec_dry);
                 // BL-1097 -- A WET CAMPAIGN'S CROSSING is a sea leg too, noted
                 // BESIDE the land note above (never instead of it, so the road
                 // record is byte for byte what it was): staging hub to target,
@@ -6043,9 +7796,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // § The colonial tie is a sea lane): the Empires span walks wet
                 // campaigns too and notes none, so round 4 draws no lane (the
                 // review's fix round on BL-1097).
+                // BL-1147 -- A SEA CROSSING MADE is a naval deed of the polity
+                // that launched it (`polity::naval_crossings`), the Empires
+                // round's alone; a tally read by nothing in the sim.
+                if (!exec_dry && params.naval_points_accrue) ++q.naval_crossings;
                 if (!exec_dry && params.exploration_upkeep_enabled)
                 {
-                    note_sea_leg(src, static_cast<int>(ti));
+                    note_sea_leg(src, static_cast<int>(ti), sea_leg_writer::campaign);
                     ++out.sea_legs_noted_campaign;
                     // BL-1095 -- THE WET CAMPAIGN IS A MOMENT OF ITS OWN on the
                     // record (EXPLORATION.md § Force persists now): its target,
@@ -6255,6 +8012,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     bt.defender = static_cast<uint16_t>(dq ? dq->id : 0);
                     bt.region   = static_cast<uint16_t>(ti);
                     bt.p_win_q    = best_p_win_q;
+                    bt.scored_men = best_scored_men;
                     bt.scored_hub = best_hub;
                     bt.winter     = best_winter;
                     bt.exec_hub          = src;
@@ -6269,6 +8027,33 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         sub_at(terrain, tgt.anchor), cov_at(terrain, tgt.anchor),
                         den_at(terrain, tgt.anchor), lf_at(terrain, tgt.anchor));
                     bt.exec_dry        = exec_dry;          // BL-1022
+                    // BL-1152 (trace only): the fleets at this launch.
+                    bt.hub_port_q    = home.port_stock_q;
+                    bt.army_carried  = raised;
+                    bt.attacker_navy = q.navy_stock;
+                    if (dq != nullptr)
+                    {
+                        bt.realm_navy = dq->navy_stock;
+                        std::vector<int32_t> partners;
+                        for (const dated_object& o : out.dated_objects)
+                        {
+                            if (o.kind != static_cast<int32_t>(treaty_clause::mutual_defence)) continue;
+                            if (o.a == dq->id) partners.push_back(o.b);
+                            else if (o.b == dq->id) partners.push_back(o.a);
+                        }
+                        std::sort(partners.begin(), partners.end());
+                        partners.erase(std::unique(partners.begin(), partners.end()), partners.end());
+                        for (int32_t pid : partners)
+                        {
+                            if (pid < 0 || static_cast<std::size_t>(pid) >= out.polities.size()) continue;
+                            const polity& pp = out.polities[static_cast<std::size_t>(pid)];
+                            if (!pp.alive) continue;
+                            ++bt.realm_partners;
+                            if (pp.navy_stock > 0) { ++bt.partners_with_fleet; bt.partner_navy += pp.navy_stock; }
+                            if (has_treaty_clause(out, pid, q.id, treaty_clause::non_aggression))
+                                ++bt.partners_bound_to_attacker;
+                        }
+                    }
                     bt.exec_forages    = exec_forages;
                     bt.ration_q        = exec_ration;
                     bt.forage_supply_q = exec_forage_supply;
@@ -6307,9 +8092,16 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     // on the epoch map.
                     // BL-887: a razed city is a relay REMOVED from the
                     // network, the mirror of the demography loop's bump.
+                    // BL-1130: the relay reads the settlement size, as above.
+                    const int sacked_rebate_before = relay_rebate_of(tgt);
                     const int sacked_centres_before = tgt.centres;
                     sack_region_urban(tgt, params.sack_population_loss_q);
-                    if (tgt.centres != sacked_centres_before) ++centres_version;
+                    // BL-1141: a sack that ENDS the settlement leaves its
+                    // points on the ruin (NR-901); one it survives, nothing.
+                    if (sacked_centres_before > 0 && tgt.centres == 0)
+                        note_settlement_end(ti, /*by_sack=*/true);
+                    if (relay_rebate_of(tgt) != sacked_rebate_before)
+                        ++centres_version;
 
                     // BL-835 — THE ARMY THAT TOOK IT IS THE ARMY THAT HOLDS IT,
                     // and this is the line that breaks the ping-pong.
@@ -6336,6 +8128,29 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     const int loser_id = dq ? dq->id : -1;
                     const bool was_seat =
                         dq && dq->capital == static_cast<int>(ti);
+
+                    // BL-1125 (markets can die), cause 3 -- CONQUEST
+                    // CONSOLIDATES (Ben, 2026-09-25; MARKETS.md § Market
+                    // centres and seeding). A market standing on ground a RIVAL
+                    // takes is destroyed here, at the conquest, so the
+                    // conqueror's strength is consolidated rather than a
+                    // monument left to the realm that lost it. The market's
+                    // whole history-grain record goes with it: the mark and its
+                    // want signal. Nothing absorbs it in the history -- it held
+                    // no stock -- and at the carve its catchment routes to the
+                    // nearest market still standing. Ground nobody held (a
+                    // prior owner < 0) is no rival's, and taking one's own
+                    // ground back is no conquest of a market.
+                    auto consolidate_market = [&](std::size_t ri, int prior_owner) {
+                        region& rg = ss.regions[ri];
+                        if (!rg.has_market || prior_owner < 0 || prior_owner == q.id)
+                            return;
+                        rg.has_market = false;
+                        for (int g = 0; g < 4; ++g) { rg.scarcity_q[g] = 0; rg.scarcity_raw_q[g] = 0; }
+                        ++out.markets_destroyed;
+                        out.markets_destroyed_regions.push_back(static_cast<int32_t>(ri));
+                    };
+                    consolidate_market(ti, owner[ti]);
 
                     owner[ti]  = q.id;
                     tgt.nation = q.id;
@@ -6364,6 +8179,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             region& h = ss.regions[hi];
                             if (h.seat_region != static_cast<int>(ti)) continue;
                             touch_owner(owner[hi]); // BL-922: whoever held it
+                            consolidate_market(hi, owner[hi]); // BL-1125: taken in this event too
                             owner[hi] = q.id;
                             h.nation  = q.id;
                             void_stale_standing_army(h); // BL-955
@@ -6503,61 +8319,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
             {
                 const region& src = ss.regions[static_cast<std::size_t>(best_target)];
 
-                // BL-310: find an UNOCCUPIED cell, widening the ring as the
-                // neighbourhood fills. The first cut offered nine candidate
-                // cells with no occupancy test and re-picked the same mature
-                // parent every year, so regions piled up — 132 regions on
-                // 33 distinct cells in one measured run, worst stack nine deep.
-                // Co-located regions then had region_distance 0 and the
-                // Ages map drew a whole stack as one dot.
+                // WHERE: the site rule above (BL-310, BL-1132) -- an unoccupied
+                // tile at least `settle_min_spacing_tiles` from every region. The
+                // scorer only chose this source because the same call found a
+                // site, so the guard below is never taken; it stays as the guard.
                 int nc = -1, nr = -1;
-                for (int ring = 1; ring <= 6 && nc < 0; ++ring)
-                {
-                    const int span = 2 * ring + 1;
-                    for (int probe = 0; probe < span * span; ++probe)
-                    {
-                        const uint32_t h = salt(qs, static_cast<uint32_t>(y) * 131u
-                                                    + static_cast<uint32_t>(probe));
-                        const int dc = static_cast<int>(h % static_cast<uint32_t>(span)) - ring;
-                        const int dr = static_cast<int>((h >> 8) % static_cast<uint32_t>(span)) - ring;
-                        if (dc == 0 && dr == 0) continue;
-
-                        int cc = src.col + dc;
-                        if (gw > 0) cc = ((cc % gw) + gw) % gw;
-                        const int rr = clampi(src.row + dr, 0, gh > 0 ? gh - 1 : 0);
-
-                        // BL-777 — NOBODY FOUNDS ON OPEN OCEAN.
-                        //
-                        // This probe applied no terrain test at all, so 447 of
-                        // 1754 regions across three seeds were anchored on
-                        // water and 183 of those on open ocean (measured by
-                        // sim_water_census, 2026-09-06). `terrain_combat`
-                        // returns 0 defence and 0 forage for every water kind,
-                        // so those regions were silently undefendable.
-                        //
-                        // IT IS NOT A "NO WATER" TEST, and the distinction is
-                        // the design. Under the ownership ruling (BL-776,
-                        // PROVINCES.md § Who owns water) coastal water belongs
-                        // to whoever owns the shore, so founding on the
-                        // shoreline ring or a lake is LEGITIMATE — there is an
-                        // owner to found under. Open ocean has no owner at all,
-                        // structurally, so it is the only domain refused. That
-                        // is ~183 sites rather than the ~447 a blanket ban
-                        // would have deleted.
-                        //
-                        // A caller with no terrain is unaffected: `sub_at`
-                        // hands out the neutral dry default, so every synthetic
-                        // harness case probes exactly the cells it always did.
-                        const int cand = (gw > 0) ? rr * gw + cc : -1;
-                        if (region_domain_of(sub_at(terrain, cand)) == region_domain::open_ocean)
-                            continue;
-
-                        bool taken = false;
-                        for (const region& e : ss.regions)
-                            if (e.col == cc && e.row == rr) { taken = true; break; }
-                        if (!taken) { nc = cc; nr = rr; break; }
-                    }
-                }
+                find_settle_site(src, qs, y, nc, nr);
                 if (nc < 0) break; // Neighbourhood full — no room to expand here.
 
                 region np;
@@ -6697,7 +8464,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // the commoner of the two corridor sources: a polity settles far
                 // more often than it campaigns, which is what gives a peaceful
                 // history a road network at all.
-                note_corridor(best_target, static_cast<int>(ss.regions.size()) - 1, q.capital);
+                note_corridor(best_target, static_cast<int>(ss.regions.size()) - 1, q.capital, /*wet_walk=*/false);
                 out.owner_changes.push_back(owner_change{
                     static_cast<int32_t>(y),
                     static_cast<uint16_t>(ss.regions.size() - 1),
@@ -6878,6 +8645,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         if (q.empire_progress_q >= tn_cost)
                         {
                             q.empire_mask |= (1ULL << q.empire_investing);
+                            // BL-1147: a coastal sea tech taken is a naval deed.
+                            if (params.naval_points_accrue
+                             && (coastal_sea_tech_mask() & (1ULL << q.empire_investing)) != 0)
+                                ++q.naval_sea_techs;
                             q.empire_progress_q = 0;
                             q.empire_investing  = -1;
                             apply_tree_effects(q); // BL-973: the surface follows the mask at once
@@ -8076,6 +9847,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
         // Ownership changes are appended where they happen (conquest, founding),
         // so there is nothing to snapshot at the end of a year.
 
+        // BL-1130 (review fix): the round's last founding, measured before the
+        // record is taken and before next year reads it.
+        hold_to_ground(/*only_after_founding=*/true);
+
         // ---- THE RECORDED STEP (BL-817) ----------------------------------
         //
         // Reached only on a decision round — the gate above `continue`s past it
@@ -8089,6 +9864,18 @@ history_sim_state run_history_sim(settlement_state&         ss,
             && (last_record_year == INT64_MIN || y - last_record_year >= record_interval))
             record_step(y);
     }
+
+    // BL-1130 (review fix): the span closes on a measured record.
+    hold_to_ground(/*only_after_founding=*/true);
+
+    // BL-1141 (the centres cold review, 2026-09-26) — POINTS LEFT BEHIND ARE
+    // RETRIED AT THE CLOSE. A settlement that ends without a sack hands its
+    // points on at the moment it ends, and that handoff can find nothing: its
+    // realm stood no other centre then, it was held by no realm, or the
+    // receiver was at the ceiling. Whatever is still stranded when the span
+    // closes is offered once more to its realm's nearest centre as the map now
+    // stands. A sack's points stay on the ruin (NR-901).
+    rehome_stranded_at_close(ss.regions, owner, settlement_ended_by_sack, gw);
 
     // THE CLOSING STEP, always taken, at the stop year. Without it the record's
     // last step is wherever the interval happened to land — up to one interval
@@ -8115,6 +9902,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // ancient tier rule reads, so the count has to survive the fold.
     {
         std::sort(corridor_uses.begin(), corridor_uses.end());
+        std::sort(corridor_wet.begin(), corridor_wet.end());
+        corridor_wet.erase(std::unique(corridor_wet.begin(), corridor_wet.end()), corridor_wet.end());
         std::vector<history_corridor> fresh;
         fresh.reserve(corridor_uses.size());
         for (const auto& e : corridor_uses)
@@ -8124,7 +9913,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 ++fresh.back().uses;
                 continue;
             }
-            fresh.push_back(history_corridor{e.first, e.second, 1});
+            history_corridor row{e.first, e.second, 1};
+            // BL-1147 review: a corridor any walk crossed sea on is wet, for good.
+            row.wet = std::binary_search(corridor_wet.begin(), corridor_wet.end(), e) ? 1 : 0;
+            fresh.push_back(row);
         }
 
         // BL-956: A RESUMED RUN ALREADY HOLDS A RECORD (`resume_corridors`),
@@ -8150,7 +9942,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 if (!out.supply_corridors.empty()
                     && out.supply_corridors.back().a == c.a
                     && out.supply_corridors.back().b == c.b)
+                {
                     out.supply_corridors.back().uses += c.uses;
+                    out.supply_corridors.back().wet = static_cast<uint8_t>(
+                        out.supply_corridors.back().wet | c.wet); // wet once, wet for good
+                }
                 else
                     out.supply_corridors.push_back(c);
             };
@@ -8185,6 +9981,28 @@ history_sim_state run_history_sim(settlement_state&         ss,
     // of `uses` against `sea_lane_tier1_uses`, earned by traffic and never
     // bought, so there is no second count for the record to disagree with.
     {
+        // BL-1120: who wrote this span's notes, per leg, by the same
+        // sort-and-count (a sorted array of (lo, hi, writer) has no container
+        // order to leak).
+        std::sort(sea_leg_writer_notes.begin(), sea_leg_writer_notes.end());
+        out.sea_leg_writers.clear();
+        for (const std::array<uint16_t, 3>& n : sea_leg_writer_notes)
+        {
+            if (out.sea_leg_writers.empty()
+             || out.sea_leg_writers.back().a != n[0] || out.sea_leg_writers.back().b != n[1])
+            {
+                sea_leg_writer_row row;
+                row.a = n[0];
+                row.b = n[1];
+                out.sea_leg_writers.push_back(row);
+            }
+            sea_leg_writer_row& row = out.sea_leg_writers.back();
+            if (n[2] == static_cast<uint16_t>(sea_leg_writer::campaign))      ++row.campaign;
+            else if (n[2] == static_cast<uint16_t>(sea_leg_writer::purchase)) ++row.purchase;
+            else if (n[2] == static_cast<uint16_t>(sea_leg_writer::tribute))  ++row.tribute;
+            else                                                              ++row.trade; // BL-1140
+        }
+
         std::sort(sea_leg_uses.begin(), sea_leg_uses.end());
         std::vector<sea_leg> fresh;
         fresh.reserve(sea_leg_uses.size());
@@ -8336,7 +10154,10 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // fold, on the same inputs, that `make_industrialisation_output`
             // hands forward as `culture_preference`.
             const std::vector<culture_good_preference> close_prefs =
-                derive_culture_preference(ss.regions, out.contacts, out.polities, want_culture_count);
+                derive_culture_preference(ss.regions, out.contacts, out.polities, want_culture_count,
+                                          cs ? &cs->cultures : nullptr,
+                                          out.culture_profile_lack_max_q,
+                                          out.culture_profile_amenity_div);
 
             constexpr int good_count = 4;
             const region_class goods[good_count] =
@@ -9082,7 +10903,8 @@ bool industry_points_params_valid(const history_sim_params& p)
         && p.industry_points_per_million_urban_heads_year <= 1000000
         && p.industry_points_per_treasury_unit >= 1 && p.industry_points_per_treasury_unit <= 10000
         && p.industry_points_fuel_floor_q     >= 0 && p.industry_points_fuel_floor_q     <= 1000
-        && p.industry_points_treasury_share_q >= 0 && p.industry_points_treasury_share_q <= 1000;
+        && p.industry_points_treasury_share_q >= 0 && p.industry_points_treasury_share_q <= 1000
+        && p.industry_points_crowding_k >= 0 && p.industry_points_crowding_k <= industry_points_crowding_k_max;
 }
 
 bool works_event_params_valid(const history_sim_params& p)
@@ -9133,11 +10955,14 @@ int industry_tree_industrial_q(uint64_t industry_mask)
 }
 
 int64_t industry_points_scale_credit(const region& r, int industrial_q,
-                                     const history_sim_params& p, int step_years)
+                                     const history_sim_params& p, int step_years,
+                                     int64_t employed_heads)
 {
     if (r.centres <= 0) return 0; // only a region with centres builds
-    const int64_t heads = r.urban_population;
-    if (heads < 0 || heads > industry_points_urban_heads_max) return -1;
+    if (r.urban_population < 0 || r.urban_population > industry_points_urban_heads_max) return -1;
+    if (employed_heads < 0 || employed_heads > industry_points_urban_heads_max) return -1;
+    // BL-1149 — THE WORKS, NOT THE CROWD: the urban heads its works employ.
+    const int64_t heads = std::min(r.urban_population, employed_heads);
     if (step_years < 1 || step_years > industry_points_step_years_max) return -1;
     // The tree multiplier's DOMAIN (see the header): outside it is a table
     // defect, refused rather than clamped into a plausible number.
@@ -9154,7 +10979,8 @@ int64_t industry_points_scale_credit(const region& r, int industrial_q,
 }
 
 bool industry_points_apportion_by_scale(const std::vector<region>& regions, int holder, int64_t credit,
-                                        std::vector<std::pair<int, int64_t>>& out)
+                                        std::vector<std::pair<int, int64_t>>& out,
+                                        const works_registry* works)
 {
     // BL-1056 (Ben, 2026-09-19, NR-897). LARGEST REMAINDER, EXACT: region i's
     // share is credit * w_i / W; it takes the floor, and the credit the floors
@@ -9170,9 +10996,13 @@ bool industry_points_apportion_by_scale(const std::vector<region>& regions, int 
         const region& r = regions[i];
         if (r.nation != holder || r.centres <= 0 || r.urban_population <= 0) continue;
         if (r.urban_population > industry_points_urban_heads_max) { out.clear(); return false; }
-        total += r.urban_population;
+        // NR-964: the heads its works employ (none without a table).
+        const int64_t employed = (works != nullptr) ? works->employed_heads_mask(r.works_built) : 0;
+        const int64_t w = std::min(r.urban_population, employed);
+        if (w <= 0) continue;
+        total += w;
         if (total > industry_points_apportion_heads_max) { out.clear(); return false; }
-        out.emplace_back(static_cast<int>(i), r.urban_population); // the weight, for now
+        out.emplace_back(static_cast<int>(i), w); // the weight, for now
     }
     if (out.empty()) return true;
 
@@ -9201,10 +11031,59 @@ bool industry_points_apportion_by_scale(const std::vector<region>& regions, int 
     return true;
 }
 
+int64_t industry_points_crowding_q(const region& r, const works_registry* works)
+{
+    const int64_t employed = (works != nullptr) ? works->employed_heads_mask(r.works_built) : 0;
+    const int64_t heads = std::min(r.urban_population, employed);
+    if (heads <= 0 || r.industry_points < 0 || r.industry_points > industry_points_ceiling) return -1;
+    // Points per THOUSAND employed heads, staged so nothing leaves int64:
+    // the whole part saturates at industry_points_crowding_saturation_q,
+    // which (the header says why) moves no factor the brake can compute.
+    const int64_t whole = r.industry_points / heads;
+    if (whole >= industry_points_crowding_saturation_q / 1000) return industry_points_crowding_saturation_q;
+    return whole * 1000 + ((r.industry_points % heads) * 1000) / heads;
+}
+
+int64_t industry_points_crowd_brake(const std::vector<region>& regions,
+                                    std::vector<std::pair<int, int64_t>>& spread,
+                                    int64_t k, int64_t points_per_unit,
+                                    const works_registry* works)
+{
+    if (k < 1 || k > industry_points_crowding_k_max || points_per_unit < 1) return -1;
+    // Each receiving region converts its share at f = K / (K + crowding),
+    // held in parts per million (K <= 10^9, so K x 10^6 < 2^60), and the
+    // share times f is staged (s / 10^6) x f + ((s % 10^6) x f) / 10^6.
+    constexpr int64_t ppm = 1000000;
+    int64_t   kept_points = 0;
+    std::size_t best      = 0;     // the least crowded receiver (ties: lower index)
+    int64_t   best_f      = -1;
+    for (std::size_t i = 0; i < spread.size(); ++i)
+    {
+        const int ri = spread[i].first;
+        if (ri < 0 || static_cast<std::size_t>(ri) >= regions.size()) return -1;
+        const int64_t c = industry_points_crowding_q(regions[static_cast<std::size_t>(ri)], works);
+        if (c < 0) return -1; // a receiver employs nobody: the apportion never sends one
+        const int64_t f = (k * ppm) / (k + c);
+        const int64_t s = spread[i].second;
+        const int64_t conv = (s / ppm) * f + ((s % ppm) * f) / ppm;
+        kept_points += s - conv;
+        spread[i].second = conv;
+        if (f > best_f) { best_f = f; best = i; }
+    }
+    // WHOLE UNITS STAY IN THE PURSE; the sub-unit residue (under one unit's
+    // worth of points a round) still converts, on the least crowded receiver,
+    // so every unit either stays or lands at the full exchange rate -- no
+    // point is deleted.
+    const int64_t kept_units = kept_points / points_per_unit;
+    spread[best].second += kept_points - kept_units * points_per_unit;
+    return kept_units;
+}
+
 industry_points_round accrue_industry_points(std::vector<region>&       regions,
                                              const std::vector<polity>& polities,
                                              const history_sim_params&  p,
-                                             int                        step_years)
+                                             int                        step_years,
+                                             const works_registry*      works)
 {
     // The holder's capacity, once per polity per round, indexed like the
     // table (every creation site assigns id = index; checked, and a region
@@ -9220,7 +11099,9 @@ industry_points_round accrue_industry_points(std::vector<region>&       regions,
         if (r.centres <= 0) continue;
         const int ind = (r.nation >= 0 && static_cast<std::size_t>(r.nation) < industrial.size())
                             ? industrial[static_cast<std::size_t>(r.nation)] : 0;
-        const int64_t credit = industry_points_scale_credit(r, ind, p, step_years);
+        // BL-1149: the heads its works employ; no table, no work, none.
+        const int64_t employed = (works != nullptr) ? works->employed_heads_mask(r.works_built) : 0;
+        const int64_t credit = industry_points_scale_credit(r, ind, p, step_years, employed);
         if (credit < 0 || r.industry_points > industry_points_ceiling - credit)
         {
             ++out.refused; // nothing moves on this region
@@ -9479,6 +11360,19 @@ int64_t contact_first_year(const history_sim_state& s, int from, int to)
     return INT64_MAX;
 }
 
+bool contact_met_across_water(const history_sim_state& s, int from, int to)
+{
+    if (from < 0 || to < 0 || from > 0xFFFE || to > 0xFFFE) return false;
+    const uint16_t f = static_cast<uint16_t>(from), t = static_cast<uint16_t>(to);
+    const auto it = std::lower_bound(
+        s.contacts.begin(), s.contacts.end(), std::pair<uint16_t, uint16_t>{f, t},
+        [](const contact& c, const std::pair<uint16_t, uint16_t>& k) {
+            if (c.from != k.first) return c.from < k.first;
+            return c.to < k.second;
+        });
+    return it != s.contacts.end() && it->from == f && it->to == t && it->first.across_water != 0;
+}
+
 // ---------------------------------------------------------------------------
 // Treaty reads and scoring (BL-933)
 // ---------------------------------------------------------------------------
@@ -9511,7 +11405,7 @@ int treaty_value_q(const history_sim_params& p,
                     int grudge_against_other_q, int grudge_from_other_q,
                     int counterpart_treaties_broken, int decider_aggression_q,
                     int alarm_from_other_q, bool near_home,
-                    int trade_value_q)
+                    int trade_value_q, int far_penalty_q)
 {
     // BASE: a treaty is worth more the less either side already resents the
     // other -- a biting mutual history makes a promise of peace both less
@@ -9547,7 +11441,7 @@ int treaty_value_q(const history_sim_params& p,
         value += clampi(alarm_from_other_q, 0, 1000)
                * clampi(p.deterrence_alarm_weight_q, 0, 1000) / 1000;
     else
-        value -= clampi(p.treaty_far_penalty_q, 0, 1000);
+        value -= clampi(far_penalty_q >= 0 ? far_penalty_q : p.treaty_far_penalty_q, 0, 1000); // BL-1142
 
     // BL-954 -- TRADE, NEAR AND FAR ALIKE. The flow the pair's trade-access
     // clause would open (both directions, every good) is part of what the
@@ -9684,7 +11578,8 @@ std::vector<want> derive_wants(const std::vector<region>& regions,
 
 std::vector<culture_good_preference> derive_culture_preference(
     const std::vector<region>& regions, const std::vector<contact>& contacts,
-    const std::vector<polity>& polities, int culture_count)
+    const std::vector<polity>& polities, int culture_count,
+    const std::vector<culture>* cultures, int lack_max_q, int amenity_div)
 {
     // THE SAME FOUR WINDOWS `derive_wants` reads, in the same order — no new
     // threshold invented for a culture-grain reading of the same facts.
@@ -9693,6 +11588,81 @@ std::vector<culture_good_preference> derive_culture_preference(
         { region_class::farm, region_class::ore, region_class::energy, region_class::port };
 
     if (culture_count <= 0) return {};
+
+    // --- INPUT 1: THE GROUND PROFILE (BL-1107) ------------------------------
+    //
+    // What the culture's cradle held, at culture grain (COLONISATION.md sec
+    // The ground profile: "the profile is the first of those two inputs").
+    // Per culture and good, `profile_q` is the term this input adds: the
+    // remembered lack of a good the cradle held below the cradle mean, plus
+    // the amenity lean toward the good its country lived by. Static across
+    // the span -- a fact about where a people BEGAN -- so the LIVE half of the
+    // preference stays the ground-held test and the exposure below.
+    std::vector<std::array<int, good_count>> profile_q(static_cast<std::size_t>(culture_count));
+    for (auto& row : profile_q) row.fill(0);
+    if (cultures != nullptr)
+    {
+        const int n_read = std::min(culture_count, static_cast<int>(cultures->size()));
+        // THE MEAN OVER THE CRADLES, not over every culture: a daughter carries
+        // its cradle's profile whole, so a mean over every culture would weight
+        // each cradle by how often its people split. Integer, ascending id.
+        std::array<int64_t, good_count> sum{};
+        int64_t cradles = 0;
+        const auto raw_of = [](const ground_profile& gp, int g) -> int64_t {
+            switch (g)
+            {
+            case 0:  return std::max(gp.farm, 0);
+            case 1:  return std::max(gp.ore, 0);
+            case 2:  return std::max(gp.energy, 0);
+            default: return std::max(gp.water, 0);
+            }
+        };
+        for (int c = 0; c < n_read; ++c)
+        {
+            const culture& cu = (*cultures)[static_cast<std::size_t>(c)];
+            if (!cu.profile.coined() || cu.coined_from >= 0) continue;
+            ++cradles;
+            for (int g = 0; g < good_count; ++g) sum[static_cast<std::size_t>(g)] += raw_of(cu.profile, g);
+        }
+        // The amenity class -> the good its country lived by (TILES.md sec
+        // Amenity tiles): a wood is fuel, a grassy shore is a harbour, a wet
+        // valley is a granary. `open` leans toward nothing.
+        constexpr int amenity_good[4] = { -1, /*forest*/ 2, /*coastal grass*/ 3, /*valley marsh*/ 0 };
+        for (int c = 0; c < n_read && cradles > 0; ++c)
+        {
+            const culture& cu = (*cultures)[static_cast<std::size_t>(c)];
+            if (!cu.profile.coined() || cu.folded_into >= 0) continue;
+            auto& row = profile_q[static_cast<std::size_t>(c)];
+            for (int g = 0; g < good_count; ++g)
+            {
+                const std::size_t gi = static_cast<std::size_t>(g);
+                // `score_against`'s scale against the EXACT mean (BL-1041):
+                // raw * 500 * n / sum, capped at 1000. Where NO cradle held
+                // any, every cradle sits AT the mean (all equal at zero), so
+                // the score is 500 and there is no lack: a good no people
+                // ever knew is nobody's remembered absence.
+                const int score = sum[gi] > 0
+                    ? static_cast<int>(clampi64((raw_of(cu.profile, g) * 500 * cradles) / sum[gi], 0, 1000))
+                    : 500;
+                if (score < 500)
+                    row[gi] += ((500 - score) * clampi(lack_max_q, 0, 1000)) / 500;
+            }
+            const int a = cu.profile.amenity;
+            if (amenity_div > 0 && a >= 0 && a < 4 && amenity_good[a] >= 0)
+                row[static_cast<std::size_t>(amenity_good[a])] +=
+                    clampi(cu.profile.amenity_share, 0, 1000) / amenity_div;
+        }
+    }
+    // A people STANDING ON GROUND: the plurality of at least one region. The
+    // profile term is read only for these -- a culture holding nothing is
+    // nobody's seat and nobody's market, and a table row for it would say
+    // nothing a reader could act on.
+    std::vector<uint8_t> on_ground(static_cast<std::size_t>(culture_count), 0u);
+    for (const region& r : regions)
+    {
+        const int pc = r.culture.id[0];
+        if (pc >= 0 && pc < culture_count) on_ground[static_cast<std::size_t>(pc)] = 1u;
+    }
 
     // CULTURE-GRAIN HOLDS: does at least one region where this culture is the
     // PLURALITY (`region::culture.id[0]`) sit dominant in this good? The same
@@ -9767,7 +11737,12 @@ std::vector<culture_good_preference> derive_culture_preference(
                     ++exposure;
                 }
             }
-            if (exposure == 0) continue; // a known absence with no route yet -- not a preference.
+            // INPUT 1 (BL-1107): the cradle's profile, for a people on ground.
+            const int from_profile = on_ground[static_cast<std::size_t>(c)]
+                ? profile_q[static_cast<std::size_t>(c)][gi] : 0;
+            // A known absence with no route yet and nothing in the cradle's
+            // memory -- not a preference.
+            if (exposure == 0 && from_profile <= 0) continue;
 
             culture_good_preference p;
             p.culture  = static_cast<int16_t>(c);
@@ -9776,8 +11751,8 @@ std::vector<culture_good_preference> derive_culture_preference(
             // where a fleet goes first" (EXPLORATION.md sec A good acquires
             // a cultural preference). Capped at 4 contacted holders so one
             // culture that has met everyone does not swamp the scale a
-            // sparser world reads on.
-            p.weight_q = static_cast<int16_t>(clampi(exposure * 250, 0, 1000));
+            // sparser world reads on; the profile term adds on the same scale.
+            p.weight_q = static_cast<int16_t>(clampi(exposure * 250 + from_profile, 0, 1000));
             out.push_back(p);
         }
     }
@@ -9978,6 +11953,7 @@ namespace
             if (!culture_god_equal(a.pantheon[g], b.pantheon[g])) return false;
         return a.aggression_q == b.aggression_q && a.sea_legs_q == b.sea_legs_q
             && a.parent == b.parent && a.origin_farm_class == b.origin_farm_class
+            && a.profile == b.profile // BL-1107
             && a.coined_year == b.coined_year
             && a.coined_from == b.coined_from && a.folded_into == b.folded_into;
     }
@@ -10229,6 +12205,17 @@ bool pass_one_output_valid(const pass_one_output& o, std::string* why,
         }
     }
 
+    // 1b. BL-1147: the naval ledger is a tally of deeds -- never negative, and
+    //     never more coastal sea techs than the tree holds.
+    for (std::size_t i = 0; i < o.polities.size(); ++i)
+    {
+        const polity& q = o.polities[i];
+        if (q.naval_coastal_years < 0 || q.naval_crossings < 0 || q.naval_sea_techs < 0)
+            return fail("polity " + std::to_string(i) + " carries a negative naval ledger");
+        if (q.naval_sea_techs > 3)
+            return fail("polity " + std::to_string(i) + " took more coastal sea techs than the tree holds");
+    }
+
     // 2. The holdings. Ascending polity ids, ascending region indices, every
     //    region held at most once, and every holder a living polity.
     std::vector<char> claimed(o.regions.size(), 0);
@@ -10322,6 +12309,8 @@ bool pass_one_output_valid(const pass_one_output& o, std::string* why,
         if (static_cast<int>(c.first.kind) < 0
             || static_cast<int>(c.first.kind) >= contact_kind_count)
             return fail("a contact names an out-of-range contact_kind");
+        if (c.first.across_water > 1)
+            return fail("a contact's across-water class is neither 0 nor 1");
 
         // SYMMETRIC BY CONSTRUCTION: meeting is mutual, so the reverse pair
         // must exist too, with the same first-contact year (the fact of
@@ -10333,6 +12322,8 @@ bool pass_one_output_valid(const pass_one_output& o, std::string* why,
             found_reverse = true;
             if (r.first.year != c.first.year)
                 return fail("a contact pair disagrees on its first-contact year");
+            if (r.first.across_water != c.first.across_water) // BL-1142: one meeting, one class
+                return fail("a contact pair disagrees on whether it met across water");
             break;
         }
         if (!found_reverse) return fail("a contact is missing its reverse direction");
@@ -10450,7 +12441,10 @@ exploration_output make_exploration_output(const settlement_state&  ss,
     // the same derivations the Empire handoff and the sim itself use.
     o.wants              = derive_wants(o.regions, o.contacts, o.polities);
     o.culture_preference = derive_culture_preference(o.regions, o.contacts, o.polities,
-                                                     culture_count);
+                                                     culture_count,
+                                                     cs != nullptr ? &cs->cultures : nullptr,
+                                                     hs.culture_profile_lack_max_q,
+                                                     hs.culture_profile_amenity_div);
 
     o.holdings            = derive_holdings(o.regions, o.polities);
     o.surviving_corridors = filter_surviving_corridors(hs.supply_corridors, o.regions, o.polities);
@@ -10462,6 +12456,7 @@ exploration_output make_exploration_output(const settlement_state&  ss,
 
     // BL-1096: the purchase fork's two counters, copied not re-derived.
     o.provinces_bought            = hs.provinces_bought;
+    o.fleet                       = hs.fleet; // BL-1152
     o.treasury_spent_on_purchases = hs.treasury_spent_on_purchases;
 
     // BL-1036: the records the carried civilisation and creed indices point
@@ -10522,6 +12517,8 @@ bool exploration_output_valid(const exploration_output& o, std::string* why,
                         + " has an overlord and a subject_kind that disagree");
         if (q.navy_stock < 0)
             return fail("polity " + std::to_string(i) + " carries a negative navy_stock");
+        if (q.naval_coastal_years < 0 || q.naval_crossings < 0 || q.naval_sea_techs < 0)
+            return fail("polity " + std::to_string(i) + " carries a negative naval ledger"); // BL-1147
     }
 
     // 3. The holdings. Ascending, in range, held by the living, each region
@@ -10808,8 +12805,16 @@ bool industrialisation_output_valid(const industrialisation_output& o, std::stri
         if (o.polities.size() < from->polities.size())
             return fail("the polity table shrank across the span");
         for (std::size_t i = 0; i < from->polities.size(); ++i)
+        {
             if (o.polities[i].id != from->polities[i].id)
                 return fail("polity " + std::to_string(i) + " changed its id across the span");
+            // BL-1147: THE NAVAL LEDGER IS CONSERVED. The deeds were the
+            // Empires round's; no later span adds to or takes from them.
+            if (o.polities[i].naval_coastal_years != from->polities[i].naval_coastal_years
+             || o.polities[i].naval_crossings     != from->polities[i].naval_crossings
+             || o.polities[i].naval_sea_techs     != from->polities[i].naval_sea_techs)
+                return fail("polity " + std::to_string(i) + "'s naval ledger changed across the span");
+        }
 
         if (o.culture_count < from->culture_count)
             return fail("the culture table shrank across the span");
@@ -10850,7 +12855,7 @@ bool industrialisation_output_valid(const industrialisation_output& o, std::stri
                 return fail("the contact " + std::to_string(c.from) + " -> " + std::to_string(c.to)
                             + " the span resumed is gone, with both polities alive at the close");
             if (it->first.year != c.first.year || it->first.region != c.first.region
-             || it->first.kind != c.first.kind)
+             || it->first.kind != c.first.kind || it->first.across_water != c.first.across_water)
                 return fail("the contact " + std::to_string(c.from) + " -> " + std::to_string(c.to)
                             + " changed the event that first joined it");
         }

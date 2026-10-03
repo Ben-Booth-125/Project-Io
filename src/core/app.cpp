@@ -586,13 +586,11 @@ int app::run(autostart_mode autostart)
 // config is loaded HERE, on the render thread, and only make_hard_coded_world —
 // which is pure C++ — goes to the worker.
 
-namespace {
-
 /// BL-1073: every field of `world_params`, compared. The guard behind the
 /// wizard's world cache: invalidation is what keeps the cache honest, and this
 /// is the check that it did. A new field on `world_params` must join this list,
 /// or a world built under a different value could be adopted.
-bool same_world_params(const world_params& a, const world_params& b)
+bool app::same_world_params(const world_params& a, const world_params& b)
 {
     const world_preferences& x = a.preferences;
     const world_preferences& y = b.preferences;
@@ -617,8 +615,6 @@ bool same_world_params(const world_params& a, const world_params& b)
         && x.roll[0] == y.roll[0] && x.roll[1] == y.roll[1] && x.roll[2] == y.roll[2];
 }
 
-} // namespace
-
 void app::begin_new_game()
 {
     m_lua.load("scripts/world_gen.lua");
@@ -627,6 +623,11 @@ void app::begin_new_game()
 
     m_worldgen_params = m_pending_world_params;
     m_generation_report = generation_report{};
+    // BL-1084 (the cold review): BEGIN COMMITS, so the rounds' held worlds go
+    // now -- whichever of the three paths below runs. Round 6's world (the one
+    // Begin adopts or waits on) and every round's record stay; a still-running
+    // round 6 holds its own copy of the slot it started from.
+    release_wizard_slots("Begin commits the world");
     // BL-1089: the realms' colours from the wizard's last landed round, so
     // the loading carve colours each nation by its realm before the nation
     // entities exist (the polity per nation index comes off the carve tap).
@@ -1021,7 +1022,14 @@ void app::draw_building_screen()
 /// The live carve (BL-305): the world's politics being DECIDED rather than
 /// handed over. It appears when generate_nations opens the carve and stays for
 /// the rest of the screen, so the borders grow, settle, and are then staked by
-/// the charters — all in the order the passes actually do it.
+/// the charters — in the order the passes actually do it. WHICH charters
+/// depends on the world (BL-1086): with no charter budget they are the roster
+/// generation lays at "Placing companies"; on a budget world generation lays no
+/// roster, and the rows and markers are the landscape search WINNER's
+/// specialists, published once its web is applied (`publish_charter_web`, in
+/// finish_campaign_world) — after "Searching the landscape", while the field
+/// is being proven. No row is marked as the player's there: the seat is drawn
+/// at Begin.
 ///
 /// Reads `m_worldgen_progress` and NOTHING else. The world belongs to the
 /// worker thread until poll_worldgen adopts it, so every read here is an atomic

@@ -5,6 +5,7 @@
 //   bash tools/verify/build_lua_harness.sh stockpile_budget_check
 //   ./build_gen/verify/stockpile_budget_check.exe [--r8] [--seed N]
 //        [--seat-curve [--seeds a,b,c] [--pairs d:m,...]]   (part 3, ~45 s a seed)
+//        [--firm-census [--seeds a,b,c]]                     (part 4, the whole start a seed)
 //
 // The DEFAULT run is part 1 alone (instant, script-free), so the ctest glob that
 // registers every tools/verify/*.cpp can run it under its 60 s default from the
@@ -41,21 +42,41 @@
 // price (BL-1064). It FAILS if the budget is empty (the check would be vacuous)
 // or any field differs.
 //
+// PART 4 — THE FIRM CENSUS (BL-1146, `--firm-census`; a reading, run from the
+// repo root). Each seed's campaign start is built as the app builds it
+// (harness_params.hpp `build_app_start_world`: generation, the stockpile budget,
+// the landscape search and its winner applied with that budget), and the world
+// is read at the seam before the settle: budget firms and Pass 6 firms apart,
+// every charter-unspent reason as points and as bookings (one row per centre and
+// reason), the land provinces on the charter bodies and the largest, the
+// provinces holding exactly 2 firms (the village's cap; since BL-1146 a province's
+// cap is 2 per rung of its centre — table E reads firms by rung), and where the budget concentrates
+// — the richest centre's share, its firms, its `province_cap`, and how many
+// provinces its window (the spend's own radius, the centre nation's tiles, the
+// walk's column-wrapped metric) spans. Asserts only that each world's budget
+// account closes; the numbers are the product.
+//
 // Exit 0 only when every check passes.
 // ---------------------------------------------------------------------------
 
 #include "harness_params.hpp"
 #include "scripting/lua_state.hpp"
+#include "world/charter_budget.hpp"
+#include "world/components.hpp"
+#include "world/corporation_generation.hpp"   // province_centre_rungs (BL-1146)
+#include "world/province.hpp"
 #include "world/settlement.hpp"
 #include "world/stockpile_budget.hpp"
 #include "world/world.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -572,6 +593,542 @@ void part_three_seat_curve(const std::vector<std::uint32_t>& seeds,
     std::printf("   (worlds with no centre affording a specialist)\n");
 }
 
+// ---------------------------------------------------------------------------
+// PART 4 — THE FIRM CENSUS (BL-1146)
+// ---------------------------------------------------------------------------
+// BL-1133 made a province its centre's whole ground, so a large centre's spend
+// window, which spanned several small provinces, may now sit inside one — and
+// the budget path's per-province cap would then refuse the rest of that
+// centre's budget. The cap was a flat 2 (NR-910); since BL-1146 (NR-960) it is 2
+// per rung of the province's centre, a village 2 .. a megacity 10. This reads
+// what the cap does on the shipped start. READ-ONLY on the world: nothing here
+// writes it after the build.
+
+/// Distinct provinces (non-zero ids) among @p centre's charter window: the
+/// centre nation's tiles on the centre's body within @p radius of the centre
+/// tile, on the walk's column-wrapped squared metric (corporation_generation.cpp
+/// `charter_centre_window`, restated read-only). 0 for a centre with no tile or
+/// no nation. @p tiles_out receives the window's tile count.
+int census_window_provinces(const world& w, entity_id centre, int radius, int& tiles_out)
+{
+    tiles_out = 0;
+    const auto ct = w.population_centre_tile.find(centre);
+    if (ct == w.population_centre_tile.end()) return 0;
+    const auto t = w.tiles.find(ct->second);
+    if (t == w.tiles.end()) return 0;
+    const auto own = w.tile_to_nation.find(ct->second);
+    if (own == w.tile_to_nation.end()) return 0;
+    const auto nit = w.nations.find(own->second);
+    if (nit == w.nations.end()) return 0;
+    const entity_id body = t->second.body;
+    const auto b = w.bodies.find(body);
+    const int gw = (b != w.bodies.end()) ? b->second.grid_width : 0;
+    const long long r2 = static_cast<long long>(radius) * radius;
+    std::set<std::uint32_t> provs;
+    for (const entity_id tid : nit->second.tiles)
+    {
+        const auto tt = w.tiles.find(tid);
+        if (tt == w.tiles.end() || tt->second.body != body) continue;
+        long long dx = std::abs(tt->second.grid_x - t->second.grid_x);
+        if (gw > 0 && dx > gw / 2) dx = gw - dx;
+        const long long dy = tt->second.grid_y - t->second.grid_y;
+        if (dx * dx + dy * dy > r2) continue;
+        ++tiles_out;
+        const std::uint32_t pv = w.provinces.province_of(tid);
+        if (pv != 0) provs.insert(pv);
+    }
+    return static_cast<int>(provs.size());
+}
+
+struct census_row
+{
+    std::uint32_t seed = 0;
+    char          kind = 'B';   ///< B budget world, F fell back (NR-910), R refused, E empty budget
+    // the stockpile, before the charter spend
+    std::int64_t stock_total = 0, stock_to_centres = 0;
+    std::array<std::int64_t, stockpile_unspent_reason_count> stock_unspent{};
+    int          centres = 0;       ///< budgeted centres
+    std::int32_t firm_price = 0;
+    std::int64_t specialist_price = 0;
+    // the charter spend
+    std::int64_t budgeted = 0, spent = 0;
+    std::array<std::int64_t, charter_unspent_reason_count> u_pts{};
+    std::array<int, charter_unspent_reason_count>          u_rows{};
+    int specialists = 0, budget_firms = 0, pass6_firms = 0, all_specialists = 0;
+    int body_firms_max = 0, density_ceiling = 0;
+    // provinces
+    int land_provs = 0, largest_prov = 0, median_prov = 0;       ///< on the charter bodies
+    int land_provs_world = 0, largest_prov_world = 0;
+    int prov_with_budget = 0, prov_at2_budget = 0, prov_over2_budget = 0, budget_no_prov = 0;
+    int prov_with_p6 = 0, prov_at2_p6 = 0, prov_over2_p6 = 0;
+    // concentration
+    std::int32_t top_pts = 0;
+    int top_firms = 0, top_window_provs = 0, top_window_tiles = 0;
+    std::int64_t top_pcap = 0;
+    std::int64_t top3_pts = 0, top3_pcap = 0;
+    double wmean_window_provs = 0.0;   ///< budget-weighted
+    int one_prov_centres = 0;          ///< budgeted centres whose window is ONE province
+    std::int64_t one_prov_pts = 0;
+    int pcap_centres_one_prov = 0;     ///< centres booking province_cap whose window is one province
+    int window_radius = 0;
+    bool balanced = false;
+    // BL-1146: the province's CENTRE, and what stands in it. The rung (1-5) is
+    // the province's ANCHOR's scale (`census_province_rungs`); index 0 = a
+    // province with no centre, which the cap reads as a village's.
+    std::array<int, 6> budget_firms_by_rung{};   ///< budget firms, by the rung of the province they stand in
+    std::array<int, 6> p6_firms_by_rung{};       ///< Pass 6 firms, the same
+    std::array<int, 6> provs_by_rung{};          ///< land provinces on the charter bodies, by rung
+    std::array<int, 6> max_budget_by_rung{};     ///< the most budget firms any one province of that rung holds
+    int max_prov_budget = 0, max_prov_p6 = 0;    ///< the largest per-province firm count
+    int shared_anchor_tiles = 0;                 ///< anchors whose tile holds more than one centre
+    int markets = 0;                             ///< home-body markets at the seam
+    double        winner_composite = 0.0;
+    std::uint32_t winner_placement = 0;
+    int           winner_tier = 0;
+};
+
+/// BL-1146 — each province's CENTRE RUNG, the one rule the charter cap reads
+/// (`province_centre_rungs`, corporation_generation.hpp, over province.cpp's
+/// `province_anchors` — the anchor `seed_province_holders` reads). CALLED, not
+/// restated (the review's fix round), so the census cannot read a different
+/// province from the cap. @p shared_out counts anchors whose tile holds more than
+/// one centre, where the summed scale and the largest single centre differ — a
+/// diagnostic of the clamp, read off the same anchors.
+std::map<std::uint32_t, int> census_province_rungs(const world& w, int& shared_out)
+{
+    shared_out = 0;
+    std::map<entity_id, int> centres_on_tile;
+    for (const auto& [cid, tid] : w.population_centre_tile)
+        if (w.population_centres.count(cid) != 0)
+            ++centres_on_tile[tid];
+    for (const auto& [pv, anchor] : province_anchors(w))
+        if (centres_on_tile[anchor.tile] > 1) ++shared_out;
+    return province_centre_rungs(w);
+}
+
+census_row census_one(std::uint32_t seed)
+{
+    census_row row;
+    row.seed = seed;
+
+    world_params p{};   // the shipped descriptor: the 1960 epoch, the span on (BL-1044)
+    p.seed = seed;
+    lua_state lua;
+    auto out = std::make_unique<app_start_world>();
+    charter_spend_report rep;
+    harness_charter_input in;   // null budget: the world's own stockpile, as the app
+    in.report = &rep;
+    build_app_start_world(lua, p, *out, in);
+    const world& w = out->w;
+    const stockpile_budget& sb = out->land.stockpile;
+    const charter_spend_params& spend = out->land.stockpile_spend;
+
+    row.stock_total      = sb.points_total;
+    row.stock_to_centres = sb.points_to_centres;
+    row.stock_unspent    = sb.unspent;
+    row.centres          = static_cast<int>(sb.budget.points().size());
+    row.firm_price       = spend.firm_price_points;
+    row.specialist_price = spend.specialist_price_points();
+    row.window_radius    = spend.window_radius;
+    row.kind = sb.budget.empty() ? 'E' : rep.refused ? 'R' : rep.fell_back ? 'F' : 'B';
+
+    row.budgeted = rep.points_budgeted;
+    row.spent    = rep.points_spent;
+    for (const charter_unspent& u : rep.unspent)
+    {
+        row.u_pts[static_cast<std::size_t>(u.reason)] += u.points;
+        ++row.u_rows[static_cast<std::size_t>(u.reason)];
+    }
+    std::int64_t u_sum = 0;
+    for (const std::int64_t v : row.u_pts) u_sum += v;
+    row.balanced = sb.budget.empty()
+        || (rep.points_budgeted == sb.budget.total() && rep.points_spent + u_sum == rep.points_budgeted
+            && rep.points_unspent == u_sum);
+
+    row.specialists     = static_cast<int>(rep.specialists.size());
+    row.budget_firms    = static_cast<int>(rep.firms.size());
+    row.all_specialists = static_cast<int>(out->land.specialists.size());
+    for (const charter_body_record& br : rep.bodies)
+    {
+        row.body_firms_max  = std::max(row.body_firms_max, static_cast<int>(br.firms));
+        row.density_ceiling = std::max(row.density_ceiling, static_cast<int>(br.density_ceiling));
+    }
+
+    // Pass 6's firms: the background firms the apply laid that the spend did not
+    // charter (a fallen-back or refused world lays the legacy passes).
+    const std::set<entity_id> budget_ids(rep.firms.begin(), rep.firms.end());
+    std::map<std::uint32_t, int> by_prov_budget, by_prov_p6;
+    for (const charter_record& r : rep.charters)
+    {
+        if (r.specialist) continue;
+        const std::uint32_t pv = w.provinces.province_of(r.anchor_tile);
+        if (pv == 0) ++row.budget_no_prov;
+        else         ++by_prov_budget[pv];
+    }
+    for (const entity_id f : out->land.firms)
+    {
+        if (budget_ids.count(f) != 0) continue;
+        ++row.pass6_firms;
+        const corporation_component& corp = w.corporations.at(f);
+        if (corp.assets.empty()) continue;
+        const auto bit = w.buildings.find(corp.assets.front());   // the anchor: Pass 6 reads the cap here
+        if (bit == w.buildings.end()) continue;
+        const std::uint32_t pv = w.provinces.province_of(bit->second.tile);
+        if (pv != 0) ++by_prov_p6[pv];
+    }
+    for (const auto& [pv, n] : by_prov_budget)
+    {
+        ++row.prov_with_budget;
+        if (n == 2) ++row.prov_at2_budget;
+        if (n > 2)  ++row.prov_over2_budget;
+    }
+    for (const auto& [pv, n] : by_prov_p6)
+    {
+        ++row.prov_with_p6;
+        if (n == 2) ++row.prov_at2_p6;
+        if (n > 2)  ++row.prov_over2_p6;
+    }
+
+    // BL-1146: the province's centre rung, and the firms by it.
+    const std::map<std::uint32_t, int> rungs = census_province_rungs(w, row.shared_anchor_tiles);
+    const auto rung_of = [&](std::uint32_t pv) {
+        const auto it = rungs.find(pv);
+        return it == rungs.end() ? 0 : it->second;
+    };
+    for (const auto& [pv, n] : by_prov_budget)
+    {
+        const int r = rung_of(pv);
+        row.budget_firms_by_rung[static_cast<std::size_t>(r)] += n;
+        row.max_budget_by_rung[static_cast<std::size_t>(r)] =
+            std::max(row.max_budget_by_rung[static_cast<std::size_t>(r)], n);
+        row.max_prov_budget = std::max(row.max_prov_budget, n);
+    }
+    for (const auto& [pv, n] : by_prov_p6)
+    {
+        row.p6_firms_by_rung[static_cast<std::size_t>(rung_of(pv))] += n;
+        row.max_prov_p6 = std::max(row.max_prov_p6, n);
+    }
+    for (const auto& [mid, mc] : w.markets)
+        if (mc.body == w.home_body) ++row.markets;
+    row.winner_composite = out->land.search.winner_score.composite;
+    row.winner_placement = out->land.search.winner.placement_seed;
+    row.winner_tier      = out->land.search.winner.road_tier;
+
+    // Land provinces: on the bodies holding a budgeted centre, and world-wide.
+    std::set<entity_id> charter_bodies;
+    for (const auto& [c, pts] : sb.budget.points())
+    {
+        const auto ct = w.population_centre_tile.find(c);
+        if (ct == w.population_centre_tile.end()) continue;
+        const auto t = w.tiles.find(ct->second);
+        if (t != w.tiles.end()) charter_bodies.insert(t->second.body);
+    }
+    std::vector<int> sizes;
+    for (const province& pr : w.provinces.provinces)
+    {
+        if (province_kind_of(w, pr) != province_kind::land) continue;
+        const int n = static_cast<int>(pr.tiles.size());
+        ++row.land_provs_world;
+        row.largest_prov_world = std::max(row.largest_prov_world, n);
+        if (charter_bodies.count(pr.body) == 0) continue;
+        ++row.land_provs;
+        row.largest_prov = std::max(row.largest_prov, n);
+        sizes.push_back(n);
+        row.provs_by_rung[static_cast<std::size_t>(rung_of(pr.id))] += 1;
+    }
+    if (!sizes.empty())
+    {
+        std::sort(sizes.begin(), sizes.end());
+        row.median_prov = sizes[sizes.size() / 2];
+    }
+
+    // Where the budget concentrates: centres in SPEND ORDER (points descending,
+    // ties to the lower id — INDUSTRIALISATION.md § 1).
+    std::vector<std::pair<entity_id, std::int32_t>> order(sb.budget.points().begin(),
+                                                          sb.budget.points().end());
+    std::sort(order.begin(), order.end(), [](const auto& a, const auto& b) {
+        return a.second != b.second ? a.second > b.second : a.first < b.first;
+    });
+    std::map<entity_id, std::int64_t> pcap_at;
+    for (const charter_unspent& u : rep.unspent)
+        if (u.reason == charter_unspent_reason::province_cap)
+            pcap_at[u.centre] += u.points;
+    std::map<entity_id, int> firms_at;
+    for (const charter_record& r : rep.charters)
+        if (!r.specialist) ++firms_at[r.centre];
+    double wsum = 0.0, wtot = 0.0;
+    for (std::size_t i = 0; i < order.size(); ++i)
+    {
+        const entity_id c = order[i].first;
+        const std::int32_t pts = order[i].second;
+        int tiles = 0;
+        const int provs = census_window_provinces(w, c, spend.window_radius, tiles);
+        wsum += static_cast<double>(pts) * provs;
+        wtot += static_cast<double>(pts);
+        const std::int64_t pc = pcap_at.count(c) ? pcap_at.at(c) : 0;
+        if (provs == 1)
+        {
+            ++row.one_prov_centres;
+            row.one_prov_pts += pts;
+            if (pc > 0) ++row.pcap_centres_one_prov;
+        }
+        if (i == 0)
+        {
+            row.top_pts          = pts;
+            row.top_firms        = firms_at.count(c) ? firms_at.at(c) : 0;
+            row.top_pcap         = pc;
+            row.top_window_provs = provs;
+            row.top_window_tiles = tiles;
+        }
+        if (i < 3)
+        {
+            row.top3_pts  += pts;
+            row.top3_pcap += pc;
+        }
+    }
+    row.wmean_window_provs = wtot > 0.0 ? wsum / wtot : 0.0;
+    return row;
+}
+
+double census_pct(std::int64_t part, std::int64_t whole)
+{
+    return whole > 0 ? 100.0 * static_cast<double>(part) / static_cast<double>(whole) : 0.0;
+}
+
+void part_four_firm_census(const std::vector<std::uint32_t>& seeds)
+{
+    std::printf("\n--- PART 4 (BL-1146): the firm census — the shipped start, the per-province cap ---\n");
+    std::printf("     kind: B budget world, F fell back (no specialist affordable, NR-910; Pass 6 laid),\n"
+                "     R refused, E empty budget. Firms per province by the ANCHOR's province, as each cap reads it.\n");
+    std::fflush(stdout);
+
+    std::vector<census_row> rows;
+    for (const std::uint32_t seed : seeds)
+    {
+        census_row r = census_one(seed);
+        check(r.balanced, "4.1 seed " + std::to_string(seed) + ": the charter account closes");
+        // One compact line per seed as it lands, so a long run shows progress.
+        std::printf("     [seed %u] kind %c: %d specialists, %d budget firms, %d Pass 6 firms; "
+                    "province_cap %lld points in %d bookings; %d land provinces, largest %d\n",
+                    r.seed, r.kind, r.specialists, r.budget_firms, r.pass6_firms,
+                    static_cast<long long>(r.u_pts[static_cast<std::size_t>(charter_unspent_reason::province_cap)]),
+                    r.u_rows[static_cast<std::size_t>(charter_unspent_reason::province_cap)],
+                    r.land_provs, r.largest_prov);
+        std::fflush(stdout);
+        rows.push_back(r);
+    }
+
+    const auto P = [](charter_unspent_reason r) { return static_cast<std::size_t>(r); };
+
+    // TABLE A — firms and provinces.
+    std::printf("\n  TABLE A — firms and provinces (land provinces on the charter bodies; world-wide in [])\n");
+    std::printf("  %-5s %1s %5s %5s %6s %6s | %6s %7s %6s %11s | %8s %6s %5s %6s | %8s %6s %5s\n",
+                "seed", "k", "spec", "all_s", "bfirms", "p6firm", "landpv", "largest", "median",
+                "[world pv/max]", "pv_bfirm", "at2_b", ">2_b", "b_nopv", "pv_p6", "at2_p6", ">2_p6");
+    census_row tot;
+    for (const census_row& r : rows)
+    {
+        char world_col[32];
+        std::snprintf(world_col, sizeof world_col, "[%d/%d]", r.land_provs_world, r.largest_prov_world);
+        std::printf("  %-5u %c %5d %5d %6d %6d | %6d %7d %6d %11s | %8d %6d %5d %6d | %8d %6d %5d\n",
+                    r.seed, r.kind, r.specialists, r.all_specialists, r.budget_firms, r.pass6_firms,
+                    r.land_provs, r.largest_prov, r.median_prov, world_col, r.prov_with_budget,
+                    r.prov_at2_budget, r.prov_over2_budget, r.budget_no_prov, r.prov_with_p6,
+                    r.prov_at2_p6, r.prov_over2_p6);
+        tot.specialists += r.specialists;         tot.all_specialists += r.all_specialists;
+        tot.budget_firms += r.budget_firms;       tot.pass6_firms += r.pass6_firms;
+        tot.land_provs += r.land_provs;           tot.largest_prov = std::max(tot.largest_prov, r.largest_prov);
+        tot.prov_with_budget += r.prov_with_budget; tot.prov_at2_budget += r.prov_at2_budget;
+        tot.prov_over2_budget += r.prov_over2_budget; tot.budget_no_prov += r.budget_no_prov;
+        tot.prov_with_p6 += r.prov_with_p6;       tot.prov_at2_p6 += r.prov_at2_p6;
+        tot.prov_over2_p6 += r.prov_over2_p6;
+    }
+    std::printf("  %-5s %1s %5d %5d %6d %6d | %6d %7d %6s %11s | %8d %6d %5d %6d | %8d %6d %5d\n",
+                "POOL", "", tot.specialists, tot.all_specialists, tot.budget_firms, tot.pass6_firms,
+                tot.land_provs, tot.largest_prov, "", "", tot.prov_with_budget, tot.prov_at2_budget,
+                tot.prov_over2_budget, tot.budget_no_prov, tot.prov_with_p6, tot.prov_at2_p6,
+                tot.prov_over2_p6);
+
+    // TABLE B — the budget and every unspent reason (points; bookings in ()).
+    std::printf("\n  TABLE B — the charter budget's account, points (bookings = one row per centre and reason)\n");
+    std::printf("  %-5s %1s %6s %6s %10s %10s | %14s %6s %5s | %12s %12s %12s %12s %12s %12s %12s %12s\n",
+                "seed", "k", "price", "spec$", "budgeted", "spent", "province_cap", "%bud", "firms",
+                "window_exh", "no_gap", "remainder", "density_ceil", "share_unpl", "late_short",
+                "no_special", "other");
+    std::int64_t tb = 0, ts = 0;
+    std::array<std::int64_t, charter_unspent_reason_count> tu{};
+    std::array<int, charter_unspent_reason_count> tr{};
+    int worlds_capped = 0;
+    double max_share = 0.0;
+    std::uint32_t max_share_seed = 0;
+    std::int64_t pcap_firms_tot = 0;
+    for (const census_row& r : rows)
+    {
+        const auto cell = [&](charter_unspent_reason why) {
+            static char buf[16][32];
+            static int k = 0;
+            char* s = buf[k++ & 15];
+            std::snprintf(s, 32, "%lld(%d)", static_cast<long long>(r.u_pts[P(why)]), r.u_rows[P(why)]);
+            return s;
+        };
+        const std::int64_t other = r.u_pts[P(charter_unspent_reason::no_nation)]
+                                 + r.u_pts[P(charter_unspent_reason::body_cap)]
+                                 + r.u_pts[P(charter_unspent_reason::refused)];
+        const std::int64_t pc = r.u_pts[P(charter_unspent_reason::province_cap)];
+        const std::int64_t pc_firms = r.firm_price > 0 ? pc / r.firm_price : 0;
+        const double share = census_pct(pc, r.budgeted);
+        if (pc > 0) ++worlds_capped;
+        if (share > max_share) { max_share = share; max_share_seed = r.seed; }
+        pcap_firms_tot += pc_firms;
+        std::printf("  %-5u %c %6d %6lld %10lld %10lld | %14s %5.1f%% %5lld | %12s %12s %12s %12s %12s %12s %12s %12lld\n",
+                    r.seed, r.kind, r.firm_price, static_cast<long long>(r.specialist_price),
+                    static_cast<long long>(r.budgeted), static_cast<long long>(r.spent),
+                    cell(charter_unspent_reason::province_cap), share, static_cast<long long>(pc_firms),
+                    cell(charter_unspent_reason::window_exhausted), cell(charter_unspent_reason::no_gap),
+                    cell(charter_unspent_reason::remainder), cell(charter_unspent_reason::density_ceiling),
+                    cell(charter_unspent_reason::share_unplaced), cell(charter_unspent_reason::late_shortfall),
+                    cell(charter_unspent_reason::no_specialist), static_cast<long long>(other));
+        tb += r.budgeted;
+        ts += r.spent;
+        for (int i = 0; i < charter_unspent_reason_count; ++i)
+        {
+            tu[static_cast<std::size_t>(i)] += r.u_pts[static_cast<std::size_t>(i)];
+            tr[static_cast<std::size_t>(i)] += r.u_rows[static_cast<std::size_t>(i)];
+        }
+    }
+    const auto tcell = [&](charter_unspent_reason why) {
+        static char buf[16][32];
+        static int k = 0;
+        char* s = buf[k++ & 15];
+        std::snprintf(s, 32, "%lld(%d)", static_cast<long long>(tu[P(why)]), tr[P(why)]);
+        return s;
+    };
+    std::printf("  %-5s %1s %6s %6s %10lld %10lld | %14s %5.1f%% %5lld | %12s %12s %12s %12s %12s %12s %12s %12lld\n",
+                "POOL", "", "", "", static_cast<long long>(tb), static_cast<long long>(ts),
+                tcell(charter_unspent_reason::province_cap),
+                census_pct(tu[P(charter_unspent_reason::province_cap)], tb),
+                static_cast<long long>(pcap_firms_tot),
+                tcell(charter_unspent_reason::window_exhausted), tcell(charter_unspent_reason::no_gap),
+                tcell(charter_unspent_reason::remainder), tcell(charter_unspent_reason::density_ceiling),
+                tcell(charter_unspent_reason::share_unplaced), tcell(charter_unspent_reason::late_shortfall),
+                tcell(charter_unspent_reason::no_specialist),
+                static_cast<long long>(tu[P(charter_unspent_reason::no_nation)]
+                                       + tu[P(charter_unspent_reason::body_cap)]
+                                       + tu[P(charter_unspent_reason::refused)]));
+    std::printf("  province_cap binds (> 0 points) on %d of %zu worlds; the largest share is %.1f%% of "
+                "a budget (seed %u)\n",
+                worlds_capped, rows.size(), max_share, max_share_seed);
+
+    // TABLE C — the stockpile before the spend.
+    std::printf("\n  TABLE C — the stockpile before the spend (points; unspent here never reaches a centre)\n");
+    std::printf("  %-5s %12s %12s %7s | %12s %12s %12s %12s %12s\n", "seed", "stock", "to_centres",
+                "centres", "carve_drop", "carve_notile", "razed", "no_carved", "rejected");
+    for (const census_row& r : rows)
+        std::printf("  %-5u %12lld %12lld %7d | %12lld %12lld %12lld %12lld %12lld\n", r.seed,
+                    static_cast<long long>(r.stock_total), static_cast<long long>(r.stock_to_centres),
+                    r.centres,
+                    static_cast<long long>(r.stock_unspent[0]), static_cast<long long>(r.stock_unspent[1]),
+                    static_cast<long long>(r.stock_unspent[2]), static_cast<long long>(r.stock_unspent[3]),
+                    static_cast<long long>(r.stock_unspent[4]));
+
+    // TABLE D — where the budget concentrates.
+    std::printf("\n  TABLE D — where the budget concentrates (centres in spend order; window = radius %d)\n",
+                rows.empty() ? 0 : rows.front().window_radius);
+    std::printf("  %-5s %7s | %10s %6s %6s %10s %8s %8s | %7s %9s | %8s %7s %8s %8s | %9s %9s\n",
+                "seed", "centres", "top_pts", "%bud", "firms", "top_pcap", "win_pv", "win_tile",
+                "top3%", "top3pcap%", "wmean_pv", "1pv_ctr", "1pv_%bud", "pcap1pv", "bodyfirms", "ceiling");
+    for (const census_row& r : rows)
+    {
+        const std::int64_t pc = r.u_pts[P(charter_unspent_reason::province_cap)];
+        std::printf("  %-5u %7d | %10d %5.1f%% %6d %10lld %8d %8d | %6.1f%% %8.1f%% | %8.2f %7d %7.1f%% %8d | %9d %9d\n",
+                    r.seed, r.centres, r.top_pts, census_pct(r.top_pts, r.budgeted), r.top_firms,
+                    static_cast<long long>(r.top_pcap), r.top_window_provs, r.top_window_tiles,
+                    census_pct(r.top3_pts, r.budgeted), census_pct(r.top3_pcap, pc),
+                    r.wmean_window_provs, r.one_prov_centres, census_pct(r.one_prov_pts, r.budgeted),
+                    r.pcap_centres_one_prov, r.body_firms_max, r.density_ceiling);
+    }
+
+    // TABLE E (BL-1146) — firms by the RUNG of the province they stand in (the
+    // province's anchor centre: 0 none, 1 village .. 5 megacity), and the most
+    // any one province of each rung holds.
+    static const char* const rung_name[6] = { "none", "village", "town", "city", "metro", "mega" };
+    std::printf("\n  TABLE E — budget firms by the rung of the province's centre (the most in one province of that rung in [])\n");
+    std::printf("  %-5s |", "seed");
+    for (int k = 0; k < 6; ++k) std::printf(" %11s", rung_name[k]);
+    std::printf(" | %6s %6s %6s | %6s\n", "maxpv", "p6", "maxp6", "shared");
+    std::array<int, 6> tot_firms{}, tot_max{}, tot_provs{}, tot_p6{};
+    int tot_maxpv = 0, tot_maxp6 = 0, tot_shared = 0;
+    for (const census_row& r : rows)
+    {
+        std::printf("  %-5u |", r.seed);
+        int p6 = 0;
+        for (int k = 0; k < 6; ++k)
+        {
+            char cell[24];
+            std::snprintf(cell, sizeof cell, "%d[%d]", r.budget_firms_by_rung[static_cast<std::size_t>(k)],
+                          r.max_budget_by_rung[static_cast<std::size_t>(k)]);
+            std::printf(" %11s", cell);
+            tot_firms[static_cast<std::size_t>(k)] += r.budget_firms_by_rung[static_cast<std::size_t>(k)];
+            tot_max[static_cast<std::size_t>(k)] = std::max(tot_max[static_cast<std::size_t>(k)],
+                                                            r.max_budget_by_rung[static_cast<std::size_t>(k)]);
+            tot_provs[static_cast<std::size_t>(k)] += r.provs_by_rung[static_cast<std::size_t>(k)];
+            tot_p6[static_cast<std::size_t>(k)] += r.p6_firms_by_rung[static_cast<std::size_t>(k)];
+            p6 += r.p6_firms_by_rung[static_cast<std::size_t>(k)];
+        }
+        std::printf(" | %6d %6d %6d | %6d\n", r.max_prov_budget, p6, r.max_prov_p6, r.shared_anchor_tiles);
+        tot_maxpv = std::max(tot_maxpv, r.max_prov_budget);
+        tot_maxp6 = std::max(tot_maxp6, r.max_prov_p6);
+        tot_shared += r.shared_anchor_tiles;
+    }
+    std::printf("  %-5s |", "POOL");
+    for (int k = 0; k < 6; ++k)
+    {
+        char cell[24];
+        std::snprintf(cell, sizeof cell, "%d[%d]", tot_firms[static_cast<std::size_t>(k)],
+                      tot_max[static_cast<std::size_t>(k)]);
+        std::printf(" %11s", cell);
+    }
+    std::printf(" | %6d %6s %6d | %6d\n", tot_maxpv, "", tot_maxp6, tot_shared);
+    std::printf("  land provinces on the charter bodies by rung, pooled:");
+    for (int k = 0; k < 6; ++k)
+        std::printf(" %s %d", rung_name[k], tot_provs[static_cast<std::size_t>(k)]);
+    std::printf("\n  Pass 6 firms by rung, pooled:");
+    for (int k = 0; k < 6; ++k)
+        std::printf(" %s %d", rung_name[k], tot_p6[static_cast<std::size_t>(k)]);
+    std::printf("\n");
+
+    // TABLE F (BL-1146) — markets and the search's winner, per seed.
+    std::printf("\n  TABLE F — home-body markets and the landscape search's winner\n");
+    std::printf("  %-5s %7s | %10s %4s %12s\n", "seed", "markets", "placement", "tier", "composite");
+    int tot_markets = 0;
+    for (const census_row& r : rows)
+    {
+        std::printf("  %-5u %7d | %08X %4d %12.9f\n", r.seed, r.markets, r.winner_placement,
+                    r.winner_tier, r.winner_composite);
+        tot_markets += r.markets;
+    }
+    std::printf("  %-5s %7d\n", "POOL", tot_markets);
+
+    // One machine-readable line per seed, for a before/after diff.
+    for (const census_row& r : rows)
+    {
+        std::printf("CENSUS seed=%u kind=%c spec=%d bfirms=%d p6firms=%d budgeted=%lld pcap=%lld "
+                    "density=%lld bodyfirms=%d maxpv=%d markets=%d placement=%08X tier=%d "
+                    "composite=%.12g rung_firms",
+                    r.seed, r.kind, r.specialists, r.budget_firms, r.pass6_firms,
+                    static_cast<long long>(r.budgeted),
+                    static_cast<long long>(r.u_pts[P(charter_unspent_reason::province_cap)]),
+                    static_cast<long long>(r.u_pts[P(charter_unspent_reason::density_ceiling)]),
+                    r.body_firms_max, r.max_prov_budget, r.markets, r.winner_placement, r.winner_tier,
+                    r.winner_composite);
+        for (int k = 0; k < 6; ++k) std::printf(" %d", r.budget_firms_by_rung[static_cast<std::size_t>(k)]);
+        std::printf(" rung_max");
+        for (int k = 0; k < 6; ++k) std::printf(" %d", r.max_budget_by_rung[static_cast<std::size_t>(k)]);
+        std::printf("\n");
+    }
+    std::fflush(stdout);
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -579,6 +1136,7 @@ int main(int argc, char** argv)
     bool          r8   = false;
     std::uint32_t seed = 28;
     bool          curve = false;
+    bool          census = false;
     std::vector<std::uint32_t> curve_seeds = { 46, 28, 11, 31, 40, 12, 37, 13,
                                                41, 43, 32, 10, 25, 38, 9, 0 };   // the library
     std::vector<std::pair<std::int64_t, std::int64_t>> curve_pairs = {
@@ -594,6 +1152,11 @@ int main(int argc, char** argv)
         if (arg == "--seat-curve")
         {
             curve = true;
+            continue;
+        }
+        if (arg == "--firm-census")
+        {
+            census = true;
             continue;
         }
         if ((arg == "--seeds" || arg == "--pairs") && a + 1 < argc)
@@ -631,7 +1194,7 @@ int main(int argc, char** argv)
             return 2;
         }
         std::printf("usage: stockpile_budget_check [--r8] [--seed N] "
-                    "[--seat-curve [--seeds a,b] [--pairs d:m,...]]\n");
+                    "[--seat-curve [--seeds a,b] [--pairs d:m,...]] [--firm-census [--seeds a,b]]\n");
         return 2;
     }
 
@@ -643,6 +1206,8 @@ int main(int argc, char** argv)
         std::printf("\n(part 2, R8's non-empty budget built twice, not run: pass --r8)\n");
     if (curve)
         part_three_seat_curve(curve_seeds, curve_pairs);
+    if (census)
+        part_four_firm_census(curve_seeds);   // --seeds names them; the library otherwise
 
     std::printf("\n%s (%d failure%s)\n", failures == 0 ? "ALL PASS" : "FAILURES", failures,
                 failures == 1 ? "" : "s");

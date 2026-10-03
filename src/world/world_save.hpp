@@ -26,7 +26,8 @@
 //      well-known entities, the belt, and every id counter INCLUDING the
 //      allocator cursor (world::next_entity_id).
 //   2. REBUILT, never read -- `body_tile_index`, `astar_cost_cache`,
-//      `logistics_flood_fields`, `body_reach_cost`, `body_market_index` and its two stamps, plus
+//      `logistics_flood_fields`, `body_reach_cost`, `lp_anchor_fields`,
+//      `body_market_index` and its two stamps, plus
 //      `ai_decisions` and `current_day_tick`. Pure functions of what bucket 1
 //      holds; writing them would only create a second thing to keep in
 //      agreement. `clear_derived_state` is what a load calls.
@@ -279,7 +280,30 @@ inline constexpr uint32_t world_save_magic =
 /// whole on the strict-equality contract, no migration (a pre-bump world's
 /// firms had no origin to carry). Claimed through
 /// `tools/session/next_save_version.js --kind world --claim`.
-inline constexpr uint32_t world_save_version = 27;
+/// Bumped to 28 by BL-1098 (the sea-lane tier stamped): the tile record gains one
+/// byte at its tail, after `height` -- `tile_component::lane_level`, the lane the
+/// history's sea legs earned on each sea tile their water-only path crosses, which
+/// traversal cost reads (LOGISTICS.md sec 4b). A v27 stream is one byte short per
+/// tile, so its second tile misreads; refused whole on the strict-equality contract,
+/// no migration (a pre-bump world stamped no lanes). Claimed through
+/// `tools/session/next_save_version.js --kind world --claim`.
+/// Bumped to 29 by BL-1125 (markets can die): `world::folded_markets`, the fold
+/// map `market_for_tile` routes through (a folded market's catchment passes to
+/// its absorber), is written as a new TRAILING section after the exchange ring.
+/// A v28 stream simply ends where this one continues; refused whole on the
+/// strict-equality contract. The reader refuses a record whose absorber is not
+/// a standing market on its body, whose centre is not a tile on its body, or
+/// whose own id is still a standing market. Claimed through
+/// `tools/session/next_save_version.js --kind world --claim`.
+/// Bumped to 30 by BL-1145 (a province's readers take its anchor; the review
+/// fix): the battle record gains one id at its tail, after `withdraw_requested`
+/// -- `active_battle::ground_tile`, the defender tile the resolver read its
+/// terrain from at open, which the battle card frames. A v29 stream with a
+/// live battle is eight bytes short per battle, so its next record misreads;
+/// refused whole on the strict-equality contract, no migration (a pre-bump
+/// battle recorded no ground). Claimed through
+/// `tools/session/next_save_version.js --kind world --claim`.
+inline constexpr uint32_t world_save_version = 30;
 
 /// Write @p w as a complete world snapshot.
 ///
@@ -321,7 +345,7 @@ bool read_world_snapshot(world& w, std::istream& in);
 /// needs to clear a freshly-generated world the same way a load does.
 ///
 /// Clears: `body_tile_index`, `astar_cost_cache`, `logistics_flood_fields`, `body_reach_cost`,
-/// `body_market_index` (and its count/cursor stamps), `ai_decisions`, and
+/// `lp_anchor_fields`, `body_market_index` (and its count/cursor stamps), `ai_decisions`, and
 /// `current_day_tick`. Does NOT touch `corp_modifiers` -- see above.
 ///
 /// @param w World whose caches are dropped.

@@ -76,7 +76,11 @@ connected body — and **whether the cheapest path touches water is what selects
 
 Roads discount it: `road_traversal_multiplier` = `1 / (1 + 0.5 × tier)`.
 
-An **edge** cost is the mean of its two nodes, which is what makes a path symmetric.
+An **edge** cost is the mean of its two nodes, but a river discounts an edge in one direction only
+(downstream is cheaper than upstream), so **a path is directed**. Its cost is always the origin →
+destination cost, read one way only — never whichever direction a cache happens to hold (Ben,
+2026-09-25; BL-1126, path cost reads the cache). A cost that depended on what was cached would
+make a loaded game continue differently from the one that was saved.
 
 ### 2. Pathfinding — `intra_body_path`
 
@@ -84,13 +88,14 @@ Terrain-weighted A\* over a body's tile grid, respecting the **east-west cylinde
 topology matches `nation_generation.cpp`: 4-cardinal neighbours, raster index
 `grid_y × grid_width + grid_x`. The core pathing design is BL-077 (intra-body pathfinding).
 
-Results cache on `world.astar_cost_cache` under a **canonicalised endpoint key**, so the per-tick
-dispatch loop pays each search once.
+Results cache on `world.astar_cost_cache` under the **ordered** (origin, destination) key, since a
+path is directed (§ 1), so the per-tick dispatch loop pays each search once.
 
-> **A trap worth carrying forward.** Because the cache key is canonicalised, a caller reading a
-> cached path must apply its own orientation. `body_surface_canvas.cpp` copies and conditionally
-> reverses it. Get the orientation wrong and a convoy's head lands at the wrong end of the lane half
-> the time — **invisible on screen, fatal to interdiction.**
+> **A trap worth carrying forward.** A cached path's tiles are stored low tile to high tile
+> whichever way it was asked, so a caller reading one must apply its own orientation.
+> `convoy_route_tiles` orients a convoy's route once for every reader (the canvas, interdiction),
+> and a unit's march orients its own. Get the orientation wrong and a convoy's head lands at the
+> wrong end of the lane half the time — **invisible on screen, fatal to interdiction.**
 
 ### 3. Reach — the placement constraint
 
@@ -163,24 +168,75 @@ between two centres is laid only when the network's own route between them costs
 is never built, and a loop exists only where the tree forces a long way round. This replaces
 the relative-neighbour redundancy edges, which laid the lattice.
 
+The test is read on the **town graph**, not the raster: the network's route is the cheapest chain
+of already-accepted links, each priced at its own direct cost. Candidates are walked
+cheapest-first, and each admitted loop joins the network as it is accepted. **Only a link that
+can be laid is a candidate** (delegated reading, NR-945): a route across open sea is never a road,
+so it never enters the tree or the test, and a nation the sea divides builds one tree per
+landmass.
+
+**Roads pull toward markets (Ben, 2026-09-25: "roads make trade easier, they should pull towards
+market centres per nation, and across markets to bridge and provide logistics extension for
+larger trades"; BL-1138, roads pull to markets).** Two pulls, read after the market folds leave a
+world its tens of markets (`MARKETS.md` § Market centres and seeding). **Within a nation** the
+network is drawn toward its market centres: every market centre is on the backbone, and a town's
+road is weighed by how much nearer it brings the town to its market. **Across markets** a trunk
+joins each market centre to its neighbouring market centres, over a border where the neighbour
+lies across one, so a larger trade has a road to travel beyond its own catchment; the trunk
+takes the lattice's own tier gates (Road or above where the gate allows; Ben, 2026-10-03: where a
+nation falls under 0.40 its roads stay Track, the newer ruling over the trunk's "at Road"). **Each
+tile of a trunk or pull takes the tier of the nation whose land it crosses** (Ben, 2026-10-03), so
+a sub-0.40 nation's ground stays Track and unowned land reads Track: the Road cliff holds
+everywhere. The
+detour test still refuses a trunk link a serviceable route already gives. The trunk's neighbours
+are a delegated reading, NR-950: each market centre's **three nearest** market centres by direct
+route, unioned over both ends (a Delaunay-like set, never all pairs), chosen on the network as the
+pass finds it and walked cheapest-first; a pair is priced from a land end, and a pair no land end
+can price is dropped.
+
+The two pulls are one pass after the folds, over the laid network. **A market centre
+joins its own nation's backbone**: the network it must reach is its nation's own roads from its
+nation's towns, never another nation's (a border link is a Track between two networks, not part of
+either backbone), and the join runs over the nation's own land. A market whose nation holds no
+town has no backbone and stays off it, counted.
+**One cost model** (§ 1): every route is priced with `tile_traversal_cost` on the field as it
+stands. The **direct route** walks any land and any strait of up to two shore-water cells, never
+open ocean; every link is laid along it, so it reuses the roads that already shorten it. Catchments
+are grid-nearest, so these roads move no catchment and no fold.
+
+Three readings, accepted by Ben (2026-10-03) and kept as readings: a trunk link's tier is the gate at the
+**lower** of its two nations' percentiles; **the network route** is the same walk over
+roaded land only, any nation's roads included (the road network as a convoy prices it; the river
+discount, which is directed, is not read); and **the pull is not rationed** by the qualification
+percentile, as detour loops are. A town's weight toward its market is the gain, network route less
+direct route; per market the heaviest town failing the test is joined first and the network
+re-read, so one spoke serves its neighbours.
+
 **Villages join locally, not as lattice members** (BL-620, road generation scales to density):
-**only a village above a size floor lays a spur (Ben, 2026-09-25)**; the floor is measured on
-the curated seeds before it is fixed. Each such village lays one Track spur to its nearest
-already-roaded same-nation tile — backbone
-raster, another centre's streets, or an earlier spur — chosen from a distance-prefiltered
-candidate set, never all-pairs. A village whose nearest target is beyond the spur cap, or
+**only a village at or above a size floor lays a spur (Ben, 2026-09-25)**, and the floor is
+**40,000 heads** (Ben, 2026-09-25, from the measured ladder: about the 90th percentile of village
+size on the curated seeds). A village's size is its headcount in the population step, the figure
+that tells villages apart when roads are laid. Each such village lays one Track spur to its
+nearest same-nation tile **already joined to the backbone** — backbone raster, a town's streets,
+or an earlier spur that reached the backbone — chosen from a distance-prefiltered candidate set,
+never all-pairs. A spur that only reaches another unjoined village joins nothing, so it does not
+count: a village is on its nation's network only when its road reaches a town. A village whose nearest target is beyond the spur cap, or
 whose every route would cross open sea, keeps only its local street. Low-stratum settlements
 feed the network; they do not define it — which is both the honest historical shape and what
 keeps generation cost linear in village count at demography-derived density (BL-610).
 
 **Three tiers** (Ben, 2026-07-11): **Highway** (3) between two major centres, **Road** (2) when at
 least one endpoint is Town+, **Track** (1) otherwise. Then one Track border link between the nearest
-centre pair of each territorially-adjacent nation pair, so the lattice connects across the continent.
+centre pair of each territorially-adjacent nation pair, so the network connects across the
+continent. **A border link ends only on a town or a spurring village** (Ben, 2026-09-25): a link
+that ended on a bare village street joined nothing, so the nearest pair is chosen among the centres
+that are on their nation's network.
 
 **The network scales with the nation's qualification** (Ben, 2026-08-25; BL-618, roads scale with
 qualification): a nation's qualification fraction (`docs/economy/POPULATION.md` § Qualification)
-modulates its redundancy-edge count and tier promotion, so a low-qualification nation generates a
-sparser, lower-tier lattice. A national development level the map already shows, not a new dial.
+modulates how many of its detour loops it keeps and its tier promotion, so a low-qualification
+nation generates a sparser, lower-tier network. A national development level the map already
+shows, not a new dial.
 
 The gates are **era-relative** (Ben, 2026-08-25, ruling on NR-641; BL-621, era-relative road
 gates): they read the nation's qualification **percentile among the world's nations** — mid-rank
@@ -198,6 +254,13 @@ qualified labour.
 **Roads are a land feature.** Water tiles are skipped, and an edge whose route crosses *open* ocean
 is not stamped at all — that is a sea route, and stamping it would scatter fragments on distant
 shores. A short crossing made of shore (a strait, TILES.md § Water kinds) does get a road.
+**A bridge spans at most two water tiles** (Ben, 2026-10-03, playing the build: *"bridges can
+cross a further distance than I expected — let's put a cap on that"*; he ruled two). The cap is
+one constant every writer of the road field reads — the national lattice, its spurs and border
+links, the ancient corridors (§ 4a), and the market joins, pulls and trunk — and a link whose
+route would bridge a longer run is refused or walked round by land. The wizard's lapse draws
+its roads anchor to anchor with no tile chain, so it holds the same cap by not drawing a
+corridor whose straight line would bridge more.
 Territorial adjacency tolerates a short unowned gap, so an island or coastal nation is reachable
 rather than silently left off the lattice.
 
@@ -278,7 +341,30 @@ a land corridor to its first rung, Track (`src/world/history_sim.hpp`), and the 
 the campaign map reads as a Road (`kAncientRoadUses`, § 4a) — so a crossing made once is no lane.
 **Purely additive and purely water**: land tiles are untouched, and the § 4a rule that a
 corridor crossing open ocean is not stamped as road is unchanged — the crossing becomes a lane
-instead.
+instead. Trade across water is the fourth writer of a use (`EXPLORATION.md`).
+
+**How a lane is laid (BL-1098).** A lane's path is walked over the sea only — ocean and coast, never
+a lake — on **the same grid every traversal reader walks**: the four cardinal steps of § 2, with
+the columns wrapping. A lane is laid only where a convoy can follow it tile to tile, so its discount
+is the same whatever its bearing; a diagonal walk would leave every other step on open water and
+the pathfinder could not ride it. A lane goes round a headland rather than across it. Each step is priced by its length
+and by the current it runs with or against (`EXPLORATION.md` § Currents), so a lane bends along the
+current. **A realm's port is its nearest coastal region's seat (Ben, 2026-09-27, NR-955):** a seat
+with no sea within the sim's neighbour radius (nine tiles) lays its lane from the nearest region of
+its realm that has one, rather than laying none, and the lane starts at that seat's nearest sea
+tile. Nearest is the sim's own region distance (Chebyshev between the seats, columns wrapping), ties
+to the lower region; the realm is the one holding the seat when the history closes. A seat no realm
+holds, or whose realm holds no coastal region, still lays none. The
+lane record carries no direction, so the walk runs toward the busier end — the seat more lanes
+touch — as the old-road stamp does (§ 4a), which is where tribute and trade flow (delegated
+readings, NR-955). A laned sea tile's traversal cost is **halved** (× 0.50): the lane is the road
+ladder's second rung on water, as four uses make a Road on land.
+
+**Lanes reuse lanes, as roads reuse roads (Ben, 2026-10-03).** Lanes are walked busiest first — most
+uses, ties by the leg's two regions — and a walk enters water an earlier lane already laid at half
+its priced step (`kSeaLaneReuseCostQ` = 500, the lane's own × 0.50 read as a traveller reads it).
+So lanes into one port share a trunk near it and fan out far from it, and the map shows a network
+rather than a fan of parallel lines. At 1000 every lane is walked alone.
 
 **A tie is therefore a force on the map, never a preference inside an actor.** Because § 1 is one
 weight function, a lane is read by everything that reads traversal cost: a convoy between a
@@ -329,8 +415,9 @@ that crosses a body's ground.
 
 ### 6. Cache invalidation — narrowed, for a real reason
 
-`invalidate_logistics_caches` clears both caches together. An over-clear costs one Dijkstra; **a
-missed clear is a reach field that lies.**
+`invalidate_logistics_caches` clears every derived logistics cache together: the reach field, the
+per-pair paths and the flood fields behind them, and the per-body nearest-anchor field. An
+over-clear costs one Dijkstra; **a missed clear is a reach field that lies.**
 
 Ben's 2026-08-08 ruling chose a simple every-event rule because *"each of these is rare against the
 per-frame reads."* That premise fails in a world where the corp AI builds every tick and hundreds of
@@ -473,7 +560,11 @@ Each rejected an earlier cut. Two are structural.
    is how a golden gets blessed dishonestly.
 2. **LP must have a spatial locus.** A rate justified as *"how much can move through HERE"* and
    then pooled per `(corp, body)` is a per-corp haul allowance — **the exact abstraction
-   `military_points` was deleted for.** Cities are the locus.
+   `military_points` was deleted for.** Cities are the locus. A draw lands on an anchor at the
+   least traversal cost from its origin, with a fixed choice among exact ties (the lower anchor
+   tile id wherever the costs can tell them apart); one multi-source field per body answers that
+   for every tile at once, so the answer depends on the body's tiles and anchors and on nothing a
+   cache happens to hold.
 3. **Specify the LP cost formula before the allocation sort key**, which is a function of it. If
    cost is proportional to distance, LP *is* haulage cost again; if flat, the sort degenerates.
    **Settled (Ben, 2026-08-25): the draw is what MOVES, not how far.** A passive convoy draw is

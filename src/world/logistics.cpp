@@ -82,6 +82,16 @@ float road_traversal_multiplier(std::uint8_t road_level)
     return 1.0f / (1.0f + 0.5f * static_cast<float>(road_level));
 }
 
+static float sea_lane_traversal_multiplier(std::uint8_t lane_level)
+{
+    // THE LANE READS AS THE LAND STAMP READS THE SAME COUNT (LOGISTICS.md § 4b): a leg
+    // earns its lane at `sea_lane_tier1_uses` (4), and four uses is the count the ancient
+    // stamp turns into a ROAD (`kAncientRoadUses`, § 4a) -- so the lane's one rung is the
+    // road ladder's second rung on the water, road_traversal_multiplier(2) = x0.50. The sea
+    // leg's 2.5 becomes 1.25 along a lane: still dearer than plains, cheaper than a rift.
+    return lane_level > 0 ? road_traversal_multiplier(2) : 1.0f;
+}
+
 /// A tile's traversal cost: ocean = sea leg, land = landform cost, both scaled by the
 /// road discount. The per-node weight; an edge cost is the average of its two nodes
 /// (A* and body_reach_field's Dijkstra both do this — see their own comments).
@@ -96,8 +106,11 @@ float tile_traversal_cost(const tile_component& tc)
     const float base = is_water(tc.substrate) // BL-516: water of any kind is the sea-mode leg
                            ? sea_leg_cost
                            : landform_logistics_cost(tc.landform);
-    return base * road_traversal_multiplier(tc.road_level);
+    // BL-1098: a sea lane discounts the water it lies on (only ever stamped on sea tiles;
+    // a land tile's lane_level is always 0, so this factor is 1 there).
+    return base * road_traversal_multiplier(tc.road_level) * sea_lane_traversal_multiplier(tc.lane_level);
 }
+
 
 const std::vector<entity_id>& body_tile_grid(world& w, entity_id body)
 {
@@ -131,6 +144,31 @@ const std::vector<entity_id>& body_tile_grid(world& w, entity_id body)
 
 namespace {
 
+/// 4-cardinal offsets, matching nation_generation::cardinal_neighbours (N, S, W, E).
+constexpr int k_flood_off_dc[4] = {  0,  0, -1, 1 };
+constexpr int k_flood_off_dr[4] = { -1,  1,  0, 0 };
+
+/// THE DIRECTED EDGE both intra-body floods relax (flood_field_for and, BL-1117,
+/// build_lp_anchor_field). A flood grows outward from its anchor, but what it
+/// prices is TRAVEL TOWARD the anchor (BL-1126, path cost reads the cache;
+/// LOGISTICS.md § 1: a path is directed, and its cost is always origin ->
+/// destination). So reaching neighbour @p n_tc (row @p n_row) from the settled
+/// cell (node weight @p cur_cost) along offset @p i prices the hop n -> settled:
+/// the mean of the two node weights, times the river discount of the side of
+/// @p n_tc the hop LEAVES by (river_edge_discount reads the tile being left;
+/// downstream is cheaper than upstream). A field anchored at D then holds, at
+/// every cell O, the cost of travelling O -> D, which is what intra_body_path(O,
+/// D) reads. Both floods share this one expression so they cannot disagree.
+inline float flood_edge_cost(float cur_cost, const tile_component& n_tc, int n_row, int i)
+{
+    // River discount (BL-170): a river-adjacent edge is cheaper, stacking
+    // multiplicatively with the road-tier discount inside tile_traversal_cost.
+    // The hop runs n -> settled: the reverse of offset i, from n's row parity.
+    const int hex_side = hex_side_for_offset(-k_flood_off_dc[i], -k_flood_off_dr[i], (n_row & 1) != 0);
+    const float river_mult = (hex_side >= 0) ? river_edge_discount(n_tc, hex_side) : 1.0f;
+    return 0.5f * (cur_cost + tile_traversal_cost(n_tc)) * river_mult;
+}
+
 /// Fetch or build the COMPLETED flood field anchored at @p anchor_tile — the
 /// full Dijkstra the pair search used to run per endpoint pair, run once and
 /// kept on `world.logistics_flood_fields` (2026-08-25 warm-start stall).
@@ -139,11 +177,12 @@ namespace {
 /// tick rate, so the per-pair searches re-flooded the grid hundreds of times
 /// every econ tick — the 2026-08-12 AppHangB1 disease with a new carrier.
 ///
-/// Relaxation order, edge costs and tie-breaks are IDENTICAL to the retired
-/// per-pair search (it was already Dijkstra — the "A*" name carried no
-/// heuristic); the only difference is no early exit, and a settled node's
-/// parent is final, so a pair reconstructed from this field matches what the
-/// early-exit search anchored at the same tile returned.
+/// A Dijkstra (the "A*" name carried no heuristic) with no early exit; a settled
+/// node's parent is final. THE FIELD IS A DESTINATION'S (BL-1126): every edge is
+/// priced as the hop TOWARD the anchor (`flood_edge_cost`), so `dist[i]` is the
+/// cost of travelling cell i -> anchor and `came_from[i]` is cell i's next hop
+/// on that route. `intra_body_path(o, d)` reads d's field at o, never o's field
+/// at d — the two differ wherever a river discounts an edge one way only.
 const logistics_flood_field& flood_field_for(world& w, entity_id body, entity_id anchor_tile,
                                              int gw, int gh,
                                              const std::vector<entity_id>& grid,
@@ -178,10 +217,6 @@ const logistics_flood_field& flood_field_for(world& w, entity_id body, entity_id
     std::priority_queue<pq_entry, std::vector<pq_entry>, std::greater<pq_entry>> pq;
     pq.push({ 0.0f, ac, ar });
 
-    // 4-cardinal offsets, matching nation_generation::cardinal_neighbours (N, S, W, E).
-    const int off_dc[4] = {  0,  0, -1, 1 };
-    const int off_dr[4] = { -1,  1,  0, 0 };
-
     while (!pq.empty())
     {
         const pq_entry cur = pq.top();
@@ -198,10 +233,10 @@ const logistics_flood_field& flood_field_for(world& w, entity_id body, entity_id
 
         for (int i = 0; i < 4; ++i)
         {
-            const int nr = cur.row + off_dr[i];
+            const int nr = cur.row + k_flood_off_dr[i];
             if (nr < 0 || nr >= gh)
                 continue;
-            const int nc = ((cur.col + off_dc[i]) % gw + gw) % gw;
+            const int nc = ((cur.col + k_flood_off_dc[i]) % gw + gw) % gw;
             const int nidx = raster_idx(nc, nr, gw);
             if (settled[static_cast<std::size_t>(nidx)])
                 continue;
@@ -209,13 +244,7 @@ const logistics_flood_field& flood_field_for(world& w, entity_id body, entity_id
             if (!n_tc)
                 continue; // absent grid cell — impassable
 
-            // River discount (BL-170): see the pair search this loop was lifted
-            // from — a river-adjacent edge is cheaper, stacking multiplicatively
-            // with the road-tier discount inside tile_traversal_cost.
-            const int hex_side = hex_side_for_offset(off_dc[i], off_dr[i], (cur.row & 1) != 0);
-            const float river_mult = (hex_side >= 0) ? river_edge_discount(*cur_tc, hex_side) : 1.0f;
-
-            const float edge = 0.5f * (cur_cost + tile_traversal_cost(*n_tc)) * river_mult;
+            const float edge = flood_edge_cost(cur_cost, *n_tc, nr, i);
             const float nd   = f.dist[static_cast<std::size_t>(idx)] + edge;
             if (nd < f.dist[static_cast<std::size_t>(nidx)])
             {
@@ -234,15 +263,90 @@ const logistics_flood_field& flood_field_for(world& w, entity_id body, entity_id
 
 } // namespace
 
+std::vector<std::pair<int, float>> bounded_cost_to_tile(world& w, entity_id body,
+                                                        entity_id anchor_tile, float max_cost,
+                                                        bool land_only)
+{
+    std::vector<std::pair<int, float>> out;
+    const auto bit = w.bodies.find(body);
+    const auto ait = w.tiles.find(anchor_tile);
+    if (bit == w.bodies.end() || ait == w.tiles.end() || ait->second.body != body)
+        return out;
+    const int gw = bit->second.grid_width;
+    const int gh = bit->second.grid_height;
+    if (gw <= 0 || gh <= 0)
+        return out;
+    const std::vector<entity_id>& grid = body_tile_grid(w, body);
+    if (static_cast<int>(grid.size()) < gw * gh)
+        return out;
+
+    const auto tile_at = [&](int idx) -> const tile_component* {
+        const entity_id tid = grid[static_cast<std::size_t>(idx)];
+        if (tid == null_entity)
+            return nullptr;
+        const auto tit = w.tiles.find(tid);
+        return (tit != w.tiles.end()) ? &tit->second : nullptr;
+    };
+
+    // The same Dijkstra as flood_field_for, over the same directed edge, cut
+    // off at max_cost: a node is pushed only when its cost is within reach, so
+    // the walk visits the reach and nothing beyond it. Not cached.
+    const int total = gw * gh;
+    std::vector<float> dist(static_cast<std::size_t>(total), 1e30f);
+    std::vector<char>  settled(static_cast<std::size_t>(total), 0);
+    const int ac = ait->second.grid_x, ar = ait->second.grid_y;
+    dist[static_cast<std::size_t>(raster_idx(ac, ar, gw))] = 0.0f;
+    std::priority_queue<pq_entry, std::vector<pq_entry>, std::greater<pq_entry>> pq;
+    pq.push({ 0.0f, ac, ar });
+    while (!pq.empty())
+    {
+        const pq_entry cur = pq.top();
+        pq.pop();
+        const int idx = raster_idx(cur.col, cur.row, gw);
+        if (settled[static_cast<std::size_t>(idx)])
+            continue;
+        settled[static_cast<std::size_t>(idx)] = 1;
+        out.emplace_back(idx, dist[static_cast<std::size_t>(idx)]);
+
+        const tile_component* cur_tc = tile_at(idx);
+        if (!cur_tc)
+            continue;
+        const float cur_cost = tile_traversal_cost(*cur_tc);
+        for (int i = 0; i < 4; ++i)
+        {
+            const int nr = cur.row + k_flood_off_dr[i];
+            if (nr < 0 || nr >= gh)
+                continue;
+            const int nc = ((cur.col + k_flood_off_dc[i]) % gw + gw) % gw;
+            const int nidx = raster_idx(nc, nr, gw);
+            if (settled[static_cast<std::size_t>(nidx)])
+                continue;
+            const tile_component* n_tc = tile_at(nidx);
+            if (!n_tc)
+                continue;
+            if (land_only && is_water(n_tc->substrate))
+                continue; // BL-1125: no water hop without a port at both ends
+            const float nd = dist[static_cast<std::size_t>(idx)]
+                           + flood_edge_cost(cur_cost, *n_tc, nr, i);
+            if (nd <= max_cost && nd < dist[static_cast<std::size_t>(nidx)])
+            {
+                dist[static_cast<std::size_t>(nidx)] = nd;
+                pq.push({ nd, nc, nr });
+            }
+        }
+    }
+    return out;
+}
+
 const logistics_path& intra_body_path(world& w, entity_id body, entity_id src_tile,
                                       entity_id dst_tile)
 {
     logistics_path res;
 
-    // Canonicalise the endpoint pair (the weighted path is symmetric) for the cache key.
-    const entity_id lo = std::min(src_tile, dst_tile);
-    const entity_id hi = std::max(src_tile, dst_tile);
-    const auto key = std::make_tuple(body, lo, hi);
+    // THE ORDERED PAIR (BL-1126, path cost reads the cache). A path is directed
+    // (LOGISTICS.md § 1): a river discounts an edge one way only, so src -> dst
+    // and dst -> src are two answers, and the key names which one this is.
+    const auto key = std::make_tuple(body, src_tile, dst_tile);
     const auto cit = w.astar_cost_cache.find(key);
     if (cit != w.astar_cost_cache.end())
         return cit->second;
@@ -272,53 +376,37 @@ const logistics_path& intra_body_path(world& w, entity_id body, entity_id src_ti
         return w.astar_cost_cache.emplace(key, std::move(res)).first->second;
     }
 
-    // Answer from a completed flood field rather than a per-pair search
-    // (2026-08-25 — see flood_field_for above). Prefer a field either endpoint
-    // already anchors; on a double miss, flood from the DESTINATION, because
-    // the hot callers (dispatch's net-price rule, nearest_lp_anchor, the march
-    // pass) ask many origins about the same few destination tiles.
-    const logistics_flood_field* field = nullptr;
-    {
-        const auto dfit = w.logistics_flood_fields.find(std::make_pair(body, dst_tile));
-        if (dfit != w.logistics_flood_fields.end())
-            field = &dfit->second;
-        else
-        {
-            const auto sfit = w.logistics_flood_fields.find(std::make_pair(body, src_tile));
-            if (sfit != w.logistics_flood_fields.end())
-                field = &sfit->second;
-        }
-    }
-    if (!field)
-        field = &flood_field_for(w, body, dst_tile, gw, gh, grid, dit->second);
+    // ONE WAY ONLY: the DESTINATION's completed flood field (2026-08-25 — see
+    // flood_field_for), built if absent, read at the origin. Never the origin's
+    // field, even when it exists: that field prices the reverse route, and
+    // answering from whichever field happened to be cached made the cost a
+    // function of cache state, so a loaded game (caches empty) re-derived some
+    // pairs the other way round and continued differently (lp_anchor_field_check
+    // L1). The hot callers ask many origins about the same few destinations
+    // (dispatch's net-price rule toward market centres, the march toward its
+    // order's tile), so one field per destination is also the cheap shape.
+    const logistics_flood_field& field = flood_field_for(w, body, dst_tile, gw, gh, grid, dit->second);
+    const int src_idx = raster_idx(sit->second.grid_x, sit->second.grid_y, gw);
 
-    // The endpoint the field is NOT anchored at — the walk start. The weighted
-    // path is symmetric (the cache key is the unordered pair for exactly that
-    // reason), so either endpoint's field prices the pair.
-    const bool anchored_at_dst =
-        field->anchor_idx == raster_idx(dit->second.grid_x, dit->second.grid_y, gw);
-    const tile_component& other_tc  = anchored_at_dst ? sit->second : dit->second;
-    const entity_id       other_tile = anchored_at_dst ? src_tile : dst_tile;
-    const int otherIdx = raster_idx(other_tc.grid_x, other_tc.grid_y, gw);
-
-    if (field->dist[static_cast<std::size_t>(otherIdx)] < 1e30f)
+    if (field.dist[static_cast<std::size_t>(src_idx)] < 1e30f)
     {
         res.reachable     = true;
-        res.cost          = field->dist[static_cast<std::size_t>(otherIdx)];
-        res.crosses_ocean = field->crossed[static_cast<std::size_t>(otherIdx)] != 0;
+        res.cost          = field.dist[static_cast<std::size_t>(src_idx)];
+        res.crosses_ocean = field.crossed[static_cast<std::size_t>(src_idx)] != 0;
 
-        // Reconstruct the tile sequence (BL-152): walk parents other→anchor,
-        // then canonicalise to lo→hi (the cache is keyed on the unordered pair)
-        // so every reader sees one stable order regardless of which endpoint
-        // anchored the field.
+        // Reconstruct the tile sequence (BL-152): walk src's next hops to the
+        // anchor (the travel order), then store it lo -> hi. THE STORED ORDER
+        // STAYS CANONICAL even though the key is ordered: every reader that
+        // wants travel order flips it when src is not the lower id
+        // (convoy_route_tiles, body_surface_canvas; LOGISTICS.md § 2's trap).
         std::vector<entity_id> seq;
-        for (int i = otherIdx; i != -1; i = field->came_from[static_cast<std::size_t>(i)])
+        for (int i = src_idx; i != -1; i = field.came_from[static_cast<std::size_t>(i)])
         {
             const entity_id tid = grid[static_cast<std::size_t>(i)];
             if (tid != null_entity) seq.push_back(tid);
-            if (i == field->anchor_idx) break;
+            if (i == field.anchor_idx) break;
         }
-        if (other_tile != lo) // seq runs other→anchor; flip unless other IS lo
+        if (src_tile > dst_tile) // seq runs src -> dst; lo -> hi needs the flip
             std::reverse(seq.begin(), seq.end());
         res.tiles = std::move(seq);
     }
@@ -567,25 +655,201 @@ std::unordered_map<entity_id, float>& lp_pool_for_body(lp_pool_map& pools_by_bod
     return it->second;
 }
 
+namespace {
+
+/// BL-1117 (settle tick one): ONE multi-source Dijkstra from every anchor in
+/// @p anchors (ascending), carrying which anchor each cell's cost came from.
+///
+/// WHAT IT REPLACES. `nearest_lp_anchor` used to call `intra_body_path(from,
+/// anchor)` for every anchor in the pool. On a cold cache each pair double-
+/// missed and flooded the WHOLE BODY from the anchor, so the first convoy commit
+/// of a settle built one flood field per city: 9,038 on seed 0 (~90 s, ~2.5 GB of
+/// fields), 6,079 on seed 28.
+///
+/// WHY IT IS THE SAME QUANTITY. The edges are `flood_edge_cost` — each hop priced
+/// TOWARD the anchor, exactly as an anchor's own flood field prices it — so a
+/// cell's cost is the cost of travelling cell -> anchor, which is what
+/// `intra_body_path(from, anchor)` reads (BL-1126: the destination's field, read
+/// at the origin). Float addition is monotone and a non-negative edge never
+/// lowers a sum, so Dijkstra settles each cell at the minimum over paths of the
+/// float sum built from its source; seeding every anchor at 0 is one super-
+/// source with zero edges (exact in float), so `cost[i]` is EXACTLY min over
+/// anchors a of a's own flood distance at cell i.
+///
+/// THE CONTRACT: an anchor at least cost, and a fixed choice among exact ties.
+/// Each label is the pair (cost, anchor) compared in that order and the queue
+/// pops in that order, so a settled label is final and the choice is a pure
+/// function of the inputs. It is USUALLY the lowest-id anchor among the equal-
+/// cost ones, but not always: round-half-to-even can fold a one-ulp gap between
+/// two partial sums into an equal total (inside one binade, not only at a
+/// boundary), and then the cell inherits the anchor the smaller partial sum
+/// carried, which may be the higher id. The cost is exact either way.
+/// lp_anchor_field_check's F2 row counts those cells against a brute-force flood
+/// per anchor and prints the count on its verdict line.
+lp_anchor_field build_lp_anchor_field(world& w, entity_id body, std::vector<entity_id> anchors)
+{
+    lp_anchor_field f;
+    f.anchors = std::move(anchors);
+
+    const auto bit = w.bodies.find(body);
+    if (bit == w.bodies.end())
+        return f;
+    const int gw = bit->second.grid_width;
+    const int gh = bit->second.grid_height;
+    const std::vector<entity_id>& grid = body_tile_grid(w, body);
+    if (gw <= 0 || gh <= 0 || grid.empty())
+        return f;
+
+    const int total = gw * gh;
+    f.cost.assign(static_cast<std::size_t>(total), 1e30f);
+    f.nearest.assign(static_cast<std::size_t>(total), null_entity);
+    std::vector<char> settled(static_cast<std::size_t>(total), 0);
+
+    const auto tile_at = [&](int idx) -> const tile_component* {
+        const entity_id tid = grid[static_cast<std::size_t>(idx)];
+        if (tid == null_entity)
+            return nullptr;
+        const auto tit = w.tiles.find(tid);
+        return (tit != w.tiles.end()) ? &tit->second : nullptr;
+    };
+
+    /// (cost, anchor) ascending, then the cell: a total order, so the pop order
+    /// (and with it every label) is a function of the inputs alone.
+    struct entry
+    {
+        float     cost;
+        entity_id anchor;
+        int       idx;
+        bool operator>(const entry& o) const
+        {
+            if (cost != o.cost) return cost > o.cost;
+            if (anchor != o.anchor) return anchor > o.anchor;
+            return idx > o.idx;
+        }
+    };
+    std::priority_queue<entry, std::vector<entry>, std::greater<entry>> pq;
+
+    // Seeds. An anchor the per-pair loop could never have reached is skipped
+    // the same way intra_body_path refuses it: unknown, or not on this body.
+    for (const entity_id a : f.anchors)
+    {
+        const auto tit = w.tiles.find(a);
+        if (tit == w.tiles.end() || tit->second.body != body)
+            continue;
+        const tile_component& tc = tit->second;
+        if (tc.grid_y < 0 || tc.grid_y >= gh)
+            continue;
+        const int idx = raster_idx(tc.grid_x, tc.grid_y, gw);
+        const std::size_t si = static_cast<std::size_t>(idx);
+        if (f.nearest[si] == null_entity || a < f.nearest[si])
+        {
+            f.cost[si]    = 0.0f;
+            f.nearest[si] = a;
+            pq.push({ 0.0f, a, idx });
+        }
+    }
+
+    while (!pq.empty())
+    {
+        const entry cur = pq.top();
+        pq.pop();
+        const std::size_t ci = static_cast<std::size_t>(cur.idx);
+        if (settled[ci])
+            continue;
+        settled[ci] = 1;
+
+        const tile_component* cur_tc = tile_at(cur.idx);
+        if (!cur_tc)
+            continue;
+        const float cur_cost = tile_traversal_cost(*cur_tc);
+        const int   col      = cur.idx % gw;
+        const int   row      = cur.idx / gw;
+
+        for (int i = 0; i < 4; ++i)
+        {
+            const int nr = row + k_flood_off_dr[i];
+            if (nr < 0 || nr >= gh)
+                continue;
+            const int nc = ((col + k_flood_off_dc[i]) % gw + gw) % gw;
+            const int nidx = raster_idx(nc, nr, gw);
+            const std::size_t ni = static_cast<std::size_t>(nidx);
+            if (settled[ni])
+                continue;
+            const tile_component* n_tc = tile_at(nidx);
+            if (!n_tc)
+                continue; // absent grid cell — impassable
+
+            const float edge = flood_edge_cost(cur_cost, *n_tc, nr, i);
+            const float nd   = f.cost[ci] + edge;
+            if (nd < f.cost[ni] || (nd == f.cost[ni] && f.nearest[ci] < f.nearest[ni]))
+            {
+                f.cost[ni]    = nd;
+                f.nearest[ni] = f.nearest[ci];
+                pq.push({ nd, f.nearest[ci], nidx });
+            }
+        }
+    }
+    return f;
+}
+
+/// True when @p f was built over exactly @p pool's key set. EXACT, never a
+/// fingerprint: a false match would hand back another anchor set's answer.
+bool built_over(const lp_anchor_field& f, const std::unordered_map<entity_id, float>& pool)
+{
+    if (f.anchors.size() != pool.size())
+        return false;
+    for (const auto& kv : pool)
+        if (!std::binary_search(f.anchors.begin(), f.anchors.end(), kv.first))
+            return false;
+    return true;
+}
+
+} // namespace
+
+const lp_anchor_field& body_lp_anchor_field(world& w, entity_id body,
+                                            const std::unordered_map<entity_id, float>& pool)
+{
+    const auto it = w.lp_anchor_fields.find(body);
+    if (it != w.lp_anchor_fields.end() && built_over(it->second, pool))
+        return it->second;
+
+    // Built over the POOL's key set, not re-derived from the world: the pool is
+    // the tick's snapshot of which anchors hold Logistic Points, and the caller
+    // indexes it with the answer (`pools.at(nearest)`), so the answer must be one
+    // of its keys even when an anchor changed state since the pool was made.
+    std::vector<entity_id> anchors;
+    anchors.reserve(pool.size());
+    for (const auto& kv : pool)
+        anchors.push_back(kv.first);
+    std::sort(anchors.begin(), anchors.end());
+    lp_anchor_field built = build_lp_anchor_field(w, body, std::move(anchors));
+    return w.lp_anchor_fields.insert_or_assign(body, std::move(built)).first->second;
+}
+
 entity_id nearest_lp_anchor(world& w, entity_id body, entity_id from_tile,
                             const std::unordered_map<entity_id, float>& pool)
 {
-    entity_id nearest_anchor = null_entity;
-    float best_cost = std::numeric_limits<float>::infinity();
-    for (const auto& kv : pool)
-    {
-        const entity_id anchor_tile = kv.first;
-        const logistics_path& p = intra_body_path(w, body, from_tile, anchor_tile);
-        if (!p.reachable)
-            continue;
-        if (nearest_anchor == null_entity || p.cost < best_cost
-            || (p.cost == best_cost && anchor_tile < nearest_anchor))
-        {
-            best_cost      = p.cost;
-            nearest_anchor = anchor_tile;
-        }
-    }
-    return nearest_anchor;
+    if (pool.empty())
+        return null_entity;
+    // intra_body_path refuses an unknown or foreign endpoint as unreachable, so
+    // every anchor did: nothing is nearest.
+    const auto sit = w.tiles.find(from_tile);
+    if (sit == w.tiles.end() || sit->second.body != body)
+        return null_entity;
+    const auto bit = w.bodies.find(body);
+    if (bit == w.bodies.end())
+        return null_entity;
+    const int gw = bit->second.grid_width;
+    const int gh = bit->second.grid_height;
+    if (gw <= 0 || sit->second.grid_y < 0 || sit->second.grid_y >= gh)
+        return null_entity;
+
+    const lp_anchor_field& f = body_lp_anchor_field(w, body, pool);
+    const std::size_t idx =
+        static_cast<std::size_t>(raster_idx(sit->second.grid_x, sit->second.grid_y, gw));
+    if (idx >= f.nearest.size() || !(f.cost[idx] < 1e30f))
+        return null_entity; // no anchor of the pool reaches this tile
+    return f.nearest[idx];
 }
 
 // ---------------------------------------------------------------------------
@@ -667,10 +931,10 @@ convoy_route convoy_route_tiles(world& w, const convoy_component& cv)
     route.body  = body;
     route.tiles = lp.tiles; // copied: the cache entry stays canonical lo->hi
 
-    // THE ORIENTATION RULE (BL-458). intra_body_path canonicalises its stored
-    // sequence to lo->hi to match its canonicalised (lo, hi) cache key, so the
-    // cached order is source->destination only when the source tile is the
-    // lower id. Flip it when it is not. Skipping this puts a convoy's head at
+    // THE ORIENTATION RULE (BL-458). intra_body_path stores its sequence lo->hi
+    // under its ordered (src, dst) key (BL-1126), so the cached order is
+    // source->destination only when the source tile is the lower id. Flip it
+    // when it is not. Skipping this puts a convoy's head at
     // the far end of its own lane about half the time, and the vision beam
     // renders identically either way, so nothing on screen would report it.
     if (st != std::min(st, dt))

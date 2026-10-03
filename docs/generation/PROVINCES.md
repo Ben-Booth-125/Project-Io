@@ -79,17 +79,30 @@ and Ben overruled it, 2026-08-21: *"packing each province perfectly looks nice, 
 how borders were defined in history."* What a province *is*, and everything downstream, is
 independent of how the shapes are drawn.
 
+**A province is its centre's ground (Ben, 2026-09-26; BL-1133).** The fill no longer stops at a
+growth budget: every centre's province grows until its nation's land is covered, across the settled
+line as well as within it (§ Colonisation seeds the partition), so every province holds a
+centre and no centre's ground goes unclaimed. A world has at most as many provinces as centres,
+not exactly as many: a centre its stronger neighbours hem to its own tile is absorbed into one of
+theirs, counted rather than hidden (NR-954). The budget becomes a **weight on reach** (delegated reading,
+NR-953): a centre's scale divides its step cost, so a metropolis still draws the larger province
+(ruling 1) and competition still decides the border. The 20-tile cap and the preferred 12 retire
+(§ The size band); leftover ground, and the anchor founding it needs, exist only where no centre
+of the nation can reach at all — an uncentred island — counted rather than hidden. This is what
+lets a world of ~500 centres (`../economy/POPULATION.md` § Generation) be a world of at most ~500
+provinces rather than of thousands of villages founded on empty ground.
+
 **The five rulings the algorithm implements:**
 
 1. **Provinces grow from population centres**, and seed strength scales with the centre's scale
-   (1–5): *a metropolis draws a larger province than a village does* — a growth budget of 7
-   tiles at scale 1 up to 12 at scale 5, with every centre growing simultaneously as one
-   multi-source fill. **The budget is what scales; the finished size need not.** Because the fill
-   is simultaneous, and a large centre stands in a denser neighbourhood than a village does,
-   competition can take back what the budget granted. The harness measures the mean province size
-   by seed scale and **asserts the ordering** (`P9c`, over the seed set only — an anchor founding
-   under ruling 3 is not a seed), so any divergence between the ruling's wording and what the fill
-   produces is loud rather than reported away.
+   (1–5): *a metropolis draws a larger province than a village does.* On settled land the
+   strength is a **weight on reach**, not a budget (NR-953): a centre's step costs are multiplied
+   by 60 ÷ its scale (60 / 30 / 20 / 15 / 12), every centre growing simultaneously as one
+   multi-source fill until the land is covered. Competition decides the border, so a village
+   hemmed by a larger neighbour's reach can end on its own tile and is absorbed (the counted
+   exception to provinces = centres). The harness **asserts the ordering** of mean province size
+   by the anchor's scale (`P9c`, each province read once, by its anchor), so a divergence between
+   the ruling's wording and what the fill produces is loud.
 2. **Boundaries are rivers and elevation difference.** *Superseded half (Ben, 2026-08-25;
    BL-623, provinces before roads): roads were a binding input — tiles a road links tended to
    share a province, never divide one. Overturned with the ordering: the partition now runs
@@ -101,14 +114,26 @@ independent of how the shapes are drawn.
    demography), dense enough that every province seeds from a centre of *some* scale; the
    centre is the province's **political decider** — its nation is the province's nation, and
    under BL-567 (province is the conquest unit) taking the centre takes the province, making
-   every anchor a strategic objective. *Superseded original ruling, kept for the record:*
+   every anchor a strategic objective. In play a province can outlive its centre (Ben, 2026-09-27,
+   NR-952): an abandoned centre with no neighbour of its nation to merge into leaves its province
+   standing without one, held and taken through its recorded holder. *Superseded original ruling,
+   kept for the record:*
    country no centre reaches became hinterland, seeded from the least-accessible tile.
-4. **Size is a growth budget, not a clamp.** *"Don't reject tiny provinces"* — nothing is merged
-   away to satisfy a floor, and **boundaries win ties.**
+4. **Size is not clamped.** *"Don't reject tiny provinces"* — nothing is merged away to satisfy a
+   floor, **boundaries win ties**, and on settled land nothing stops the fill before the land is
+   covered (a province is its centre's ground). The band below still draws the water domains and
+   an unsettled body's hinterland.
 5. **A national border is a hard edge.** Seeds are placed per nation and the terrain cost function
    operates only *within* a nation's territory, so a region's frontier is the border wherever it
    reaches one (Ben, 2026-08-22; BL-563, province respects nation). Regions grown to fit the border
    need no cutting, so there is no scatter of one- and two-tile offcuts and no merge pass.
+
+**SETTLED (Ben, 2026-10-01, NR-962): a river divides its banks.** The fill pays the river's cost
+to CROSS a course — to step from one bank onto the river and off it to the other — not to travel
+along it, so a province holds one bank and its border follows the water. The cost as first built
+was charged on the step along a course, so it braked travel down a river and let the fill cross from
+bank to bank for nothing; on the shipped worlds a river edge was a border only 1.19 times as often
+as plain ground.
 
 The cost model that makes an edge a border lives in `province.hpp`, and it is integer arithmetic
 throughout: base 10 (`k_province_edge_base_cost`) + river 40 (`k_province_river_edge_cost`) +
@@ -125,21 +150,26 @@ land — and it is the spacing, not the budget, that sets hinterland size.
 **nation-locked**: a region — centre-seeded or leftover — claims only tiles of its seed's
 nation, and singleton absorption honours the same lock, so a land province is single-nation by
 construction and its anchor's nation *is* its tile-derived nation. On a settled body the spaced
-hinterland seeding is retired; ground no centre's budget reaches (ice caps, deep desert, the far
-side of a border no centre stands behind) is mopped up by the leftover pass, and every leftover
-province then receives a **scale-1 anchor founding** on its best ground
+hinterland seeding is retired; the fill covers the land, so the only ground left over is an
+**uncentred island** — land no centre of its nation can reach under the nation lock — which grows
+whole into one province and receives a **scale-1 anchor founding** on its best
+ground
 (`ensure_province_anchor_centres`, `population_generation.cpp`) before the holder is derived —
 a pure-ice province gets its anchor on its least-bad tile, counted rather than hidden. The
 **anchor** is derived, never stored: the highest summed centre scale in the province, ties to
 the lowest tile id. The spaced hinterland survives for the water domains and for the land of an
 unsettled body (no centres anywhere), where there is nothing else to seed from.
 
-### The settled cells are a binding input (Ben, 2026-09-09)
+### Colonisation seeds the partition (Ben, 2026-09-09; narrowed 2026-09-27)
 
 **Colonisation seeds the partition; this pass still draws it.** The colonisation span
-([COLONISATION.md](COLONISATION.md)) leaves a set of settled cells and their anchors, and the
-partition takes them as a **hard input** the way it already takes the national assignment — the
-ordering is unchanged (after the sim, before roads), and so is the nation lock.
+([COLONISATION.md](COLONISATION.md)) leaves the centres the fill grows from — the ordering is
+unchanged (after the sim, before roads), and so is the nation lock, which stays the one hard input.
+
+**SETTLED (Ben, 2026-09-27, NR-954): a centre's fill crosses the settled line.** The settled cells
+no longer bound the fill: a centre's region grows from settled ground into never-settled ground of
+its own nation, so never-settled country joins the province of the centre that reaches it, and no
+anchor village is founded only to hold ground that the settled line cut off.
 
 The alternative was considered and not taken: colonisation drawing the real partition, with the
 nation carve then assigning whole provinces rather than tiles, which would make ruling 5's
@@ -148,11 +178,14 @@ chain, so it stays the road not taken and is recorded rather than rediscovered.
 
 ### The size band, and why it has three numbers
 
+*Retired by "a province is its centre's ground" (Ben, 2026-09-26): nothing stops the fill before
+the land is covered, so the band below no longer binds; kept for the record of what it was.*
+
 | Constant | Value | Meaning |
 |---|---|---|
 | `k_province_min_tiles` | **7** | Soft floor. Past it, a region annexes only ground **no harder to reach than the ground it already holds** — the mean of its own step costs. |
 | `k_province_max_tiles` | **12** | *Preferred* ceiling; the clamp **growth** obeys. Not what a finished province is guaranteed to satisfy, because singleton absorption can push past it. |
-| `k_province_hard_cap_tiles` | **20** | The bound that really is absolute, and **the only size claim the harness asserts.** |
+| `k_province_hard_cap_tiles` | **20** | The bound that really is absolute where the band still draws (water, an unsettled body's hinterland); the harness asserts it there only. |
 
 A fourth constant, `k_province_hard_min_tiles` = **3**, is the hard-target floor: a region takes
 its first three tiles whatever they cost. It can still be missed — an island of two tiles ships at
@@ -326,11 +359,16 @@ gets an order that does not depend on container internals, tile-map iteration or
 bodies were created in. The id is the province's **lowest-id member tile** — derived, never
 allocated, so ascending id order is ascending lowest-member-tile order and an id cannot be
 handed out in the wrong order. **Province id 0 is a real province**, so any seam needing a
-sentinel must not use zero (NR-412).
+sentinel must not use zero (NR-412). **In play the id is recorded, not derived (Ben, 2026-09-27,
+NR-952):** the id a province carries when generation ends is kept for its life, so the merge an
+abandoned centre makes in play (`POPULATION.md` § Growth, decline and razing) keeps the surviving
+province's id, and a province that loses its centre keeps its own. Ids stay in ascending order,
+because a merge only removes one.
 
 **2. The partition is part of world generation and versions with it.** It is **never patched in
 place**: a change to the algorithm re-rolls every battle in every world, so partition fixtures do
-not survive a repartition, and that is correct rather than a defect (NR-422).
+not survive a repartition, and that is correct rather than a defect (NR-422). A merge in play is
+not a patch to the partition: it is a play event over recorded ids, and it re-rolls nothing.
 
 ### Storage and determinism
 

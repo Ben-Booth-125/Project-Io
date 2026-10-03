@@ -13,6 +13,8 @@
 #include "world/hex_neighbors.hpp" // the odd-r side offsets the river bits are keyed by
 #include "world/era_minus_one.hpp" // exploration_sim_params: the span's decision band, the renewal slack (BL-1095)
 #include "world/history_sim.hpp"   // history_sim_params::treaty_term_years, the term an arc stands for (BL-1095)
+#include "world/ocean_currents.hpp"  // the current field a lane's walk is priced with
+#include "world/road_generation.hpp" // sea_lane_port / sea_lane_walk: the lane's sea path, the stamp's own walk
 
 #include <imgui.h>
 
@@ -20,6 +22,9 @@
 #include <cmath>
 #include <cstdio>
 #include <deque>
+#include <iterator>
+#include <limits>
+#include <map>
 
 namespace ui {
 
@@ -213,6 +218,172 @@ bool lapse_corridor_over_water(const std::vector<uint8_t>& band, int gw, int gh,
     return total > 0 && water * 2 > total;
 }
 
+/// THE BRIDGE CAP ON THE LAPSE'S ROADS (Ben, 2026-10-03: "bridges can cross a
+/// further distance than I expected -- let's put a cap on that"; two tiles). A
+/// lapse road is a corridor drawn STRAIGHT from anchor to anchor, with no tile
+/// chain, so nothing upstream stops its line crossing a bay or a strait the
+/// stamped road (which caps every crossing at `kMaxCrossingTiles`) would never
+/// bridge. This walks the line in tile units (a tile spans [col, col + 1)) and
+/// returns the longest run of consecutive WATER tiles it passes over, in
+/// distinct tiles; the bake drops a corridor whose run exceeds the cap rather
+/// than drawing a bridge the world does not carry.
+int lapse_line_water_run(const std::vector<uint8_t>& band, int gw, int gh,
+                         float c0, float r0, float c1, float r1)
+{
+    if (band.empty() || gw <= 0 || gh <= 0) return 0;
+    const float dc = c1 - c0, dr = r1 - r0;
+    const int steps = std::max(1, static_cast<int>(std::ceil(std::sqrt(dc * dc + dr * dr) * 20.0f)));
+    int run = 0, longest = 0;
+    long long last = -1;
+    for (int i = 0; i <= steps; ++i)
+    {
+        const float t = static_cast<float>(i) / static_cast<float>(steps);
+        const int row = static_cast<int>(std::floor(r0 + dr * t));
+        int col = static_cast<int>(std::floor(c0 + dc * t)) % gw;
+        if (col < 0) col += gw;
+        if (row < 0 || row >= gh) continue;
+        const long long cell = static_cast<long long>(row) * gw + col;
+        if (cell == last) continue;
+        last = cell;
+        if (band[static_cast<std::size_t>(cell)] == 0xFFu) longest = std::max(longest, ++run);
+        else run = 0;
+    }
+    return longest;
+}
+
+/// Is the point (@p c, @p r), in TILE units (a tile spans [col, col + 1)), on
+/// a sea tile of @p sea? Columns fold back into range (a lane's path is
+/// unwrapped along its walk); rows off the map are not sea.
+bool lapse_point_on_sea(const std::vector<std::uint8_t>& sea, int gw, int gh, float c, float r)
+{
+    const int row = static_cast<int>(std::floor(r));
+    if (row < 0 || row >= gh) return false;
+    int col = static_cast<int>(std::floor(c)) % gw;
+    if (col < 0) col += gw;
+    return sea[static_cast<std::size_t>(row) * gw + col] != 0;
+}
+
+/// Does the straight run @p a -> @p b stay on the sea, sampled every tenth of
+/// a tile? With @p clear > 0 each sample's four points that far off it must
+/// be sea too, so a band of that half-width keeps off the shore.
+bool lapse_run_on_sea(const std::vector<std::uint8_t>& sea, int gw, int gh,
+                      ImVec2 a, ImVec2 b, float clear)
+{
+    const float dx = b.x - a.x, dy = b.y - a.y;
+    const int steps = std::max(1, static_cast<int>(std::ceil(std::sqrt(dx * dx + dy * dy) * 10.0f)));
+    for (int i = 0; i <= steps; ++i)
+    {
+        const float t = static_cast<float>(i) / static_cast<float>(steps);
+        const float c = a.x + dx * t, r = a.y + dy * t;
+        if (!lapse_point_on_sea(sea, gw, gh, c, r)) return false;
+        if (clear > 0.0f
+            && (!lapse_point_on_sea(sea, gw, gh, c + clear, r) || !lapse_point_on_sea(sea, gw, gh, c - clear, r)
+             || !lapse_point_on_sea(sea, gw, gh, c, r + clear) || !lapse_point_on_sea(sea, gw, gh, c, r - clear)))
+            return false;
+    }
+    return true;
+}
+
+/// A LANE'S DRAWN LINE, from the tile-centre chain of its water-only walk (Ben,
+/// 2026-10-03: "sea lanes should always go over ocean, never over ground"). The
+/// walk takes four cardinal steps, so its chain is a staircase of long straight
+/// runs and right-angle turns; drawn as it stands it reads as a box, not a lane.
+/// Two passes make it the smooth, gently curved band Ben picked (2026-09-25):
+///
+///  1. STRING-PULL over the water: from each kept point, jump to the farthest
+///     later point the straight run to which stays on the sea with a third of a
+///     tile of clearance (`lapse_run_on_sea`), looking at most 48 points ahead.
+///     The adjacent point is always reachable, its run lying inside two sea
+///     tiles, so the pass never fails -- at worst it keeps the chain.
+///  2. CHAIKIN corner-cutting, three rounds, CHECKED: each cut that would
+///     carry the line onto land keeps its corner instead.
+///
+/// Every segment of the result is therefore on the sea, the ends are the two
+/// port tiles' centres, and nothing here reads the record: it is the ground
+/// and the walk, drawn.
+std::vector<ImVec2> lapse_smooth_sea_path(const std::vector<ImVec2>& chain,
+                                          const std::vector<std::uint8_t>& sea, int gw, int gh)
+{
+    if (chain.size() < 3) return chain;
+    constexpr float k_clear     = 0.33f;
+    constexpr std::size_t k_look = 48;
+
+    std::vector<ImVec2> pulled;
+    pulled.push_back(chain.front());
+    std::size_t i = 0;
+    while (i + 1 < chain.size())
+    {
+        std::size_t best = i + 1;
+        const std::size_t far = std::min(chain.size() - 1, i + k_look);
+        for (std::size_t j = far; j > i + 1; --j)
+            if (lapse_run_on_sea(sea, gw, gh, chain[i], chain[j], k_clear)) { best = j; break; }
+        pulled.push_back(chain[best]);
+        i = best;
+    }
+
+    std::vector<ImVec2> a = pulled, b;
+    for (int round = 0; round < 3 && a.size() >= 3; ++round)
+    {
+        b.clear();
+        b.reserve(a.size() * 2);
+        b.push_back(a.front());
+        for (std::size_t k = 0; k + 1 < a.size(); ++k)
+        {
+            const ImVec2 p = a[k], q = a[k + 1];
+            const ImVec2 near_p = {0.75f * p.x + 0.25f * q.x, 0.75f * p.y + 0.25f * q.y};
+            const ImVec2 near_q = {0.25f * p.x + 0.75f * q.x, 0.25f * p.y + 0.75f * q.y};
+            // The cut across corner p runs from the last point laid (on the run
+            // into p) to near_p (on the run out of it). If it would cross land,
+            // keep the corner: both legs then lie on runs already on the sea.
+            // The first run has no corner at its start (the port is kept).
+            if (k > 0 && !lapse_run_on_sea(sea, gw, gh, b.back(), near_p, 0.0f))
+                b.push_back(p);
+            b.push_back(near_p);
+            b.push_back(near_q);
+        }
+        b.push_back(a.back());
+        a.swap(b);
+    }
+    return a;
+}
+
+/// BL-917 / BL-1134: apply a record's `road_promoted` events to a road network
+/// -- the one walk both the bake and `lapse_roads_at_close` take, so the
+/// network a round hands on is the one it drew. A pair the network does not
+/// hold yet opens at the event's year; a pair it holds only ever moves a tier
+/// year EARLIER (`std::min`), so a road carried in at Road never drops back to
+/// Track and a Post Road never re-pulses. A Post Road event is also a Road
+/// event (the ladder has no gap). Touches the tier years and `promoted_here`
+/// only; geometry is the bake's. Pairs outside [0, @p region_count) are skipped.
+void apply_road_promotions(std::vector<lapse_road_seg>& segs, const era_timelapse& t,
+                           std::size_t region_count)
+{
+    for (lapse_road_seg& s : segs) s.promoted_here = false;
+    for (const lapse_event& e : t.events)
+    {
+        if (e.kind != static_cast<uint8_t>(lapse_event_kind::road_promoted)) continue;
+        if (e.region == lapse_event_none || e.other == lapse_event_none) continue;
+        const uint16_t a = e.region, b = e.other; // note_corridor: region = lo, other = hi
+        if (static_cast<std::size_t>(a) >= region_count
+         || static_cast<std::size_t>(b) >= region_count) continue;
+        auto it = std::find_if(segs.begin(), segs.end(),
+                               [&](const lapse_road_seg& s) { return s.region_a == a && s.region_b == b; });
+        if (it == segs.end())
+        {
+            lapse_road_seg seg;
+            seg.region_a   = a;
+            seg.region_b   = b;
+            seg.year_track = e.year;
+            segs.push_back(std::move(seg));
+            it = std::prev(segs.end());
+        }
+        it->year_track = std::min(it->year_track, e.year);
+        if (e.polity >= 2) it->year_road      = std::min(it->year_road, e.year);      // BL-917
+        if (e.polity >= 3) it->year_post_road = std::min(it->year_post_road, e.year); // BL-940/BL-943
+        it->promoted_here = true;
+    }
+}
+
 /// BL-1092: the KIN arrow's dash threshold -- how many INTERIOR water tiles the
 /// straight line between two foundings' anchors must sample before the arrow is
 /// dashed as a crossing. The sampler is `finish_history_lapse`'s own
@@ -280,13 +451,517 @@ ImU32 owner_colour(const history_lapse& h, uint16_t owner, int year = 0x7FFFFFFF
     return polity_colour(h, owner, year);
 }
 
+/// The tie's hue: ROSE, against the lane's pale-blue dashes, the trade link's
+/// green and the road's ochre, so a dashed line over water still says which
+/// of the two water layers it is. The arc: lilac, thin. The harbour's two
+/// tones: stone for a kept port, sand for one silting.
+constexpr ImU32 col_tie           = IM_COL32(236, 128, 152, 225);
+constexpr ImU32 col_treaty        = IM_COL32(196, 172, 244, 205);
+constexpr ImU32 col_harbour_stone = IM_COL32(226, 224, 212, 240);
+constexpr ImU32 col_harbour_silt  = IM_COL32(176, 138,  92, 240);
+constexpr int32_t lapse_never = 0x7FFFFFFF;
+
+ImU32 lerp_col(ImU32 a, ImU32 b, float u)
+{
+    const auto ch = [&](int shift) {
+        const int lo = static_cast<int>((a >> shift) & 0xFFu), hi = static_cast<int>((b >> shift) & 0xFFu);
+        return static_cast<ImU32>(std::clamp(lo + static_cast<int>(static_cast<float>(hi - lo) * u), 0, 255));
+    };
+    return (ch(IM_COL32_R_SHIFT) << IM_COL32_R_SHIFT) | (ch(IM_COL32_G_SHIFT) << IM_COL32_G_SHIFT)
+         | (ch(IM_COL32_B_SHIFT) << IM_COL32_B_SHIFT) | (ch(IM_COL32_A_SHIFT) << IM_COL32_A_SHIFT);
+}
+
+// ---------------------------------------------------------------------------
+// THE GLYPHS (BL-1118): every mark the map makes, one function each, in
+// SCREEN coordinates at the map's own scale. The map's passes call these and
+// the legend's swatches call the same functions, so a swatch is the painter's
+// own drawing and cannot drift from the mark it names. Nothing here knows the
+// raster; the passes do the tile-to-pixel mapping and hand the pixels in.
+// ---------------------------------------------------------------------------
+
+void paint_sea(ImDrawList* dl, ImVec2 a, ImVec2 b)
+{
+    dl->AddRectFilled(a, b, col_sea);
+}
+
+/// One run of the terrain base, band @p kind (`lapse_base_run::kind`).
+void paint_ground(ImDrawList* dl, float x0, float y0, float x1, float y1, uint8_t kind)
+{
+    dl->AddRectFilled({x0, y0}, {x1, y1}, col_base[kind]);
+}
+
+/// A range's rim: lit on its north edge, shadowed on its south.
+void paint_relief_rim(ImDrawList* dl, float x0, float x1, float y, bool lit)
+{
+    dl->AddLine({x0, y}, {x1, y}, lit ? col_relief_lit : col_relief_dark, 1.0f);
+}
+
+void paint_river(ImDrawList* dl, ImVec2 a, ImVec2 b, float scale)
+{
+    dl->AddLine(a, b, col_river, std::max(1.0f, scale * 0.28f));
+}
+
+/// A translucent tint over the ground: the owner fill, the culture base and
+/// the carried ground are all this, at their own colour and alpha.
+void paint_tint(ImDrawList* dl, float x0, float y0, float x1, float y1, ImU32 col, int alpha)
+{
+    dl->AddRectFilled({x0, y0}, {x1, y1}, with_alpha(col, alpha));
+}
+
+/// The soft frontier on a vertical tile edge at pixel column @p x: a 1 px line
+/// centred ON the column (+0.5), not anti-aliased across two.
+void paint_frontier_v(ImDrawList* dl, float x, float y0, float y1)
+{
+    dl->AddLine({x + 0.5f, y0}, {x + 0.5f, y1}, col_frontier, 1.0f);
+}
+
+/// The soft frontier on a horizontal tile edge at pixel row @p y.
+void paint_frontier_h(ImDrawList* dl, float x0, float x1, float y)
+{
+    dl->AddLine({x0, y + 0.5f}, {x1, y + 0.5f}, col_frontier, 1.0f);
+}
+
+/// BL-1090: A HARD BORDER on a vertical edge. 2 px of dark centred on the tile
+/// edge, then a 1 px stroke one pixel INSIDE each hard side in its own colour,
+/// so the weight reads as the realm's, not the edge's, and two hard neighbours
+/// each keep their own stroke on their own side. Returns the primitives drawn.
+int paint_hard_v(ImDrawList* dl, float x, float y0, float y1,
+                 bool east_hard, ImU32 east, bool west_hard, ImU32 west)
+{
+    dl->AddLine({x, y0}, {x, y1}, col_frontier_hard, 2.0f);
+    int prims = 1;
+    if (east_hard) { dl->AddLine({x + 1.5f, y0}, {x + 1.5f, y1}, east, 1.0f); ++prims; }
+    if (west_hard) { dl->AddLine({x - 1.5f, y0}, {x - 1.5f, y1}, west, 1.0f); ++prims; }
+    return prims;
+}
+
+/// The same hard rule on a horizontal edge: the inner stroke one pixel into
+/// whichever side is hard.
+int paint_hard_h(ImDrawList* dl, float x0, float x1, float y,
+                 bool south_hard, ImU32 south, bool north_hard, ImU32 north)
+{
+    dl->AddLine({x0, y}, {x1, y}, col_frontier_hard, 2.0f);
+    int prims = 1;
+    if (south_hard) { dl->AddLine({x0, y + 1.5f}, {x1, y + 1.5f}, south, 1.0f); ++prims; }
+    if (north_hard) { dl->AddLine({x0, y - 1.5f}, {x1, y - 1.5f}, north, 1.0f); ++prims; }
+    return prims;
+}
+
+/// A dashed stroke: the tie's idiom and the kin line's over water.
+void fleet_dashed(ImDrawList* dl, float x0, float y0, float x1, float y1,
+                  ImU32 col, float w, float dash, int& prims)
+{
+    const float dx = x1 - x0, dy = y1 - y0;
+    const float len = std::sqrt(dx * dx + dy * dy);
+    if (len <= 0.0f) return;
+    const float ux = dx / len, uy = dy / len;
+    for (float t = 0.0f; t < len; t += dash * 2.0f)
+    {
+        const float e = std::min(t + dash, len);
+        dl->AddLine({x0 + ux * t, y0 + uy * t}, {x0 + ux * e, y0 + uy * e}, col, w);
+        ++prims;
+    }
+}
+
+/// BL-1092: ONE KIN LINE, a founding's route from the people's previous region:
+/// solid over land, DASHED where it crossed water, with a small arrowhead at the
+/// new region saying which way the people went, sized to the tile so it
+/// survives a narrow pane without swallowing the seat dot beneath it.
+void paint_kin(ImDrawList* dl, float x0, float y0, float x1, float y1, ImU32 col, ImU32 head,
+               bool over_water, float scale, int& prims)
+{
+    const float w    = std::max(1.25f, scale * 0.22f);
+    const float dash = std::max(3.0f, scale * 1.2f);
+    const float dx = x1 - x0, dy = y1 - y0;
+    const float len = std::sqrt(dx * dx + dy * dy);
+    if (len <= 0.0f) return;
+    const float ux = dx / len, uy = dy / len;
+    if (over_water)
+    {
+        for (float t = 0.0f; t < len; t += dash * 2.0f)
+        {
+            const float e = std::min(t + dash, len);
+            dl->AddLine({x0 + ux * t, y0 + uy * t}, {x0 + ux * e, y0 + uy * e}, col, w);
+            ++prims;
+        }
+    }
+    else
+    {
+        dl->AddLine({x0, y0}, {x1, y1}, col, w);
+        ++prims;
+    }
+    const float hl = std::clamp(scale * 0.9f, 3.0f, 6.0f);
+    const ImVec2 tip{x1, y1};
+    const ImVec2 base{x1 - ux * hl, y1 - uy * hl};
+    dl->AddTriangleFilled(tip, {base.x - uy * hl * 0.5f, base.y + ux * hl * 0.5f},
+                          {base.x + uy * hl * 0.5f, base.y - ux * hl * 0.5f}, head);
+    ++prims;
+}
+
+/// BL-917: one promoted corridor's stroke -- Track a faint scratch, Road the
+/// same hue brightened and widened, so a corridor THICKENS as it climbs.
+/// @p pulse in [0, 1] is BL-1094's Post Road pulse: heavier, with a bright
+/// core, decaying over the marker window to the steady Road stroke.
+void paint_road(ImDrawList* dl, ImVec2 a, ImVec2 b, bool at_road, float pulse, float scale,
+                int& prims)
+{
+    float w = at_road ? std::max(1.5f, scale * 0.30f)
+                      : std::max(1.0f, scale * 0.16f);
+    const ImU32 col = at_road ? col_road : col_road_track;
+    w += w * 1.5f * pulse;
+    dl->AddLine(a, b, col, w);
+    ++prims;
+    if (pulse > 0.0f)
+    {
+        const ImU32 core = with_alpha(col_bright, static_cast<int>(230.0f * pulse));
+        const float cw   = std::max(1.0f, w * 0.45f);
+        dl->AddLine(a, b, core, cw);
+        ++prims;
+    }
+}
+
+/// A bridge: a small bright mark ON the road where its line crosses a river.
+void paint_bridge(ImDrawList* dl, ImVec2 at, float scale)
+{
+    dl->AddCircleFilled(at, std::clamp(scale * 0.35f, 1.5f, 3.5f), col_bridge, 8);
+}
+
+/// BL-925: an open cross-border trade link -- and the line a freed colony's
+/// treaty leaves where its tie was (BL-1095), which is the same fact drawn
+/// the same way. @p alpha 220 is the link at full strength.
+void paint_trade_line(ImDrawList* dl, ImVec2 a, ImVec2 b, float scale, int alpha)
+{
+    dl->AddLine(a, b, with_alpha(col_trade_link, alpha), std::max(1.25f, scale * 0.22f));
+}
+
+/// BL-1097 / BL-1124: ONE SEA LANE, a to b, as a BOWED ARC (Ben, 2026-09-25,
+/// picked at the live app from three forms; STARTUP.md § Round 5, "The lane"):
+/// a soft sea-blue band bent SOUTH off the straight capital-to-capital line.
+/// Most lane uses come from the tribute leg, so a lane nearly always runs the
+/// same line as its colonial tie, and a straight band hid under the tie's
+/// dashes; the tie keeps the straight line and the lane curves off it. South,
+/// because treaty arcs bow north and the two arcs must never meet. Opaque
+/// enough to read on its own, since it no longer lies under the tie.
+/// 2026-10-03: the MAP no longer draws this chord-bowed arc -- a lane is laid
+/// on its sea path (`paint_lane_path`), which a straight chord between seats
+/// never was. The legend swatch keeps it, a short curved stroke being what a
+/// smoothed sea path reads as. Returns the primitives drawn.
+int paint_lane(ImDrawList* dl, ImVec2 a, ImVec2 b, float scale)
+{
+    const float w = std::max(5.0f, scale * 1.4f);
+    const float dx = b.x - a.x, dy = b.y - a.y;
+    const float len = std::max(1.0f, std::sqrt(dx * dx + dy * dy));
+    float nx = -dy / len, ny = dx / len;
+    if (ny < 0.0f) { nx = -nx; ny = -ny; } // bow south
+    // A quadratic's apex sits HALF its control offset off the chord, so a
+    // floor of three band widths keeps the apex a band and a half clear of
+    // the tie on the shortest lane; the ceiling stops a long lane swinging
+    // into the next coast.
+    const float bulge = std::clamp(len * 0.30f, 3.0f * w, 60.0f);
+    const ImVec2 c{(a.x + b.x) * 0.5f + nx * bulge, (a.y + b.y) * 0.5f + ny * bulge};
+    constexpr int segs = 18;
+    ImVec2 pts[segs + 1];
+    for (int i = 0; i <= segs; ++i)
+    {
+        const float u = static_cast<float>(i) / static_cast<float>(segs);
+        const float v = 1.0f - u;
+        pts[i] = {v * v * a.x + 2.0f * v * u * c.x + u * u * b.x,
+                  v * v * a.y + 2.0f * v * u * c.y + u * u * b.y};
+    }
+    dl->AddPolyline(pts, segs + 1, with_alpha(col_sea_lane, 130), ImDrawFlags_None, w);
+    return 1;
+}
+
+/// THE LANE'S BAND WIDTH ON ITS SEA PATH, in pixels at @p scale (pixels per
+/// tile). Under a tile wide: its half-width (0.4) is about the clearance the
+/// path keeps off the shore (`lapse_smooth_sea_path`, 0.33), so the band stays
+/// on the water. The floor keeps a lane legible on the smallest pane.
+float lane_path_width(float scale) { return std::max(3.0f, scale * 0.8f); }
+
+/// ONE SEA LANE ALONG ITS SEA PATH (Ben, 2026-10-03: "sea lanes should always
+/// go over ocean, never over ground"). @p pts are the screen points of the
+/// lane's drawn line, already smoothed on the water at the bake
+/// (`lapse_smooth_sea_path`). The FORM is the one Ben picked on 2026-09-25 --
+/// a soft sea-blue band, gently curved -- laid on the water instead of bowed
+/// off the chord. Returns the primitives drawn.
+int paint_lane_path(ImDrawList* dl, const std::vector<ImVec2>& pts, float scale)
+{
+    if (pts.size() < 2) return 0;
+    dl->AddPolyline(pts.data(), static_cast<int>(pts.size()), with_alpha(col_sea_lane, 130),
+                    ImDrawFlags_None, lane_path_width(scale));
+    return 1;
+}
+
+/// BL-1080: one spark of the industry heat -- a dark ring under a bright core,
+/// as the ember marks and the seats wear, so it reads on a yellow realm as
+/// well as a blue one.
+void paint_spark(ImDrawList* dl, ImVec2 at, float scale)
+{
+    const float half = std::clamp(scale * 0.40f, 1.0f, 2.4f);
+    dl->AddRectFilled({at.x - half - 1.0f, at.y - half - 1.0f},
+                      {at.x + half + 1.0f, at.y + half + 1.0f}, col_seat_ring);
+    dl->AddRectFilled({at.x - half, at.y - half}, {at.x + half, at.y + half}, col_heat);
+}
+
+/// BL-1080 / BL-1100: the ember square -- a region's furnace, or a realm's
+/// crossing into industry at its capital.
+void paint_ember(ImDrawList* dl, ImVec2 at, float scale)
+{
+    const float r_out = std::clamp(scale * 0.55f, 1.6f, 3.4f);
+    dl->AddRectFilled({at.x - r_out - 1.0f, at.y - r_out - 1.0f},
+                      {at.x + r_out + 1.0f, at.y + r_out + 1.0f}, col_seat_ring);
+    dl->AddRectFilled({at.x - r_out, at.y - r_out}, {at.x + r_out, at.y + r_out}, col_furnace);
+}
+
+/// THE WORKS (BL-1099): the one glyph here that is a building -- a low BRIGHT
+/// block with a furnace-toned stack rising from its right shoulder, over a dark
+/// underline. The stack ties it to the ember squares as the same family of
+/// fact (industry); the bright block is what tells it from them and from the
+/// heat sparks. A specialist's stands a little taller. Returns 4.
+int paint_works(ImDrawList* dl, ImVec2 at, float scale, int alpha, bool specialist)
+{
+    const float s   = std::clamp(scale * (specialist ? 0.9f : 0.75f), 2.5f, 5.5f);
+    const float bw  = s * 1.4f, bh = s * 0.8f;                         // the block
+    const float sw  = s * 0.45f, sh = s * (specialist ? 2.4f : 2.0f);  // the stack
+    const ImU32 under = with_alpha(col_seat_ring, alpha);
+    const ImU32 block = with_alpha(col_bright, alpha);
+    const ImU32 stack = with_alpha(col_furnace, alpha);
+    dl->AddRectFilled({at.x - bw - 1.0f, at.y - bh - 1.0f}, {at.x + bw + 1.0f, at.y + bh + 1.0f}, under);
+    dl->AddRectFilled({at.x + bw - sw - 1.0f, at.y - sh - 1.0f}, {at.x + bw + 1.0f, at.y + 1.0f}, under);
+    dl->AddRectFilled({at.x - bw, at.y - bh}, {at.x + bw, at.y + bh}, block);
+    dl->AddRectFilled({at.x + bw - sw, at.y - sh}, {at.x + bw, at.y}, stack);
+    return 4;
+}
+
+/// BL-1094: THE DIAMOND -- two tones, two peoples settling one way of life:
+/// the coining realm's colour @p west on the west half, a pale tone on the
+/// east, under one dark outline. Returns 3.
+int paint_diamond(ImDrawList* dl, ImVec2 at, float scale, ImU32 west)
+{
+    const float d_half = std::clamp(scale * 1.1f, 4.0f, 7.5f);
+    const ImVec2 top{at.x, at.y - d_half}, bot{at.x, at.y + d_half};
+    const ImVec2 lft{at.x - d_half, at.y}, rgt{at.x + d_half, at.y};
+    constexpr ImU32 east = IM_COL32(238, 226, 196, 255);
+    dl->AddTriangleFilled(top, lft, bot, west);
+    dl->AddTriangleFilled(top, bot, rgt, east);
+    dl->AddQuad(top, rgt, bot, lft, col_seat_ring, 1.5f);
+    return 3;
+}
+
+/// BL-1094: a SEAT CAPTURED -- a ring in the winner's colour @p col at the
+/// fallen seat, widening a little as it fades (@p t through the window).
+void paint_capture_ring(ImDrawList* dl, ImVec2 at, float scale, float t, ImU32 col, int alpha)
+{
+    const float ring_r = std::clamp(scale * 1.7f, 5.0f, 11.0f);
+    const float r      = ring_r * (1.0f + 0.35f * t);
+    dl->AddCircle(at, r + 1.0f, with_alpha(col_seat_ring, alpha), 16, 3.5f);
+    dl->AddCircle(at, r, with_alpha(col, alpha), 16, 2.0f);
+}
+
+/// BL-1094: a BREAK-AWAY OR SCHISM -- a crack from the parent's seat @p s0 to
+/// the successor's @p s1: a jagged pale line over a dark underline, its jag a
+/// fixed hash @p key of the event so it never shimmers frame to frame. Stroked
+/// again @p shift px away when @p twice (the seam). Returns the primitives.
+int paint_crack(ImDrawList* dl, ImVec2 s0, ImVec2 s1, uint32_t key, float scale, int alpha,
+                bool twice, float shift)
+{
+    const float crack_amp = std::clamp(scale * 0.6f, 2.0f, 5.0f);
+    constexpr int segs = 6;
+    ImVec2 pts[segs + 1];
+    const float dx = s1.x - s0.x, dy = s1.y - s0.y;
+    const float len = std::max(1.0f, std::sqrt(dx * dx + dy * dy));
+    const float nx = -dy / len, ny = dx / len; // the perpendicular
+    uint32_t k = key;
+    for (int i = 0; i <= segs; ++i)
+    {
+        const float u = static_cast<float>(i) / static_cast<float>(segs);
+        k ^= k >> 13; k *= 2246822519u; k ^= k >> 16;
+        const float off = (i == 0 || i == segs) ? 0.0f
+                        : (static_cast<float>(k & 0xFFFFu) / 32768.0f - 1.0f) * crack_amp;
+        pts[i] = {s0.x + dx * u + nx * off, s0.y + dy * u + ny * off};
+    }
+    const ImU32 under = with_alpha(col_seat_ring, alpha);
+    const ImU32 over  = with_alpha(col_bright, alpha);
+    int prims = 0;
+    for (int pass = 0; pass < (twice ? 2 : 1); ++pass)
+    {
+        const float sx = pass == 0 ? 0.0f : shift;
+        for (int i = 0; i < segs; ++i)
+            dl->AddLine({pts[i].x + sx, pts[i].y}, {pts[i + 1].x + sx, pts[i + 1].y}, under, 3.0f);
+        for (int i = 0; i < segs; ++i)
+            dl->AddLine({pts[i].x + sx, pts[i].y}, {pts[i + 1].x + sx, pts[i + 1].y}, over, 1.25f);
+        prims += 2 * segs;
+    }
+    return prims;
+}
+
+/// A realm's SEAT (a people's homeland on the Culture round): a dot in its
+/// colour under a dark ring. Returns 2.
+int paint_seat(ImDrawList* dl, ImVec2 at, float scale, ImU32 col)
+{
+    const float rad = std::clamp(scale * 0.7f, 2.0f, 4.5f);
+    dl->AddCircleFilled(at, rad, col, 10);
+    dl->AddCircle(at, rad, col_seat_ring, 10, 1.0f);
+    return 2;
+}
+
+/// BL-932 / BL-943: THE CONSOLIDATION -- eight short gold rays round a seat,
+/// the one-time flow of every seat's stores into the capital at 1200 CE.
+void paint_burst(ImDrawList* dl, ImVec2 at, float scale, int alpha)
+{
+    const float r = std::clamp(scale * 1.1f, 3.5f, 7.0f);
+    const ImU32 gold = with_alpha(IM_COL32(230, 190, 90, 255), alpha);
+    for (int k = 0; k < 8; ++k)
+    {
+        const float ang = static_cast<float>(k) * (3.14159265f / 4.0f);
+        const ImVec2 p0{at.x + std::cos(ang) * r * 0.6f, at.y + std::sin(ang) * r * 0.6f};
+        const ImVec2 p1{at.x + std::cos(ang) * r,        at.y + std::sin(ang) * r};
+        dl->AddLine(p0, p1, gold, 1.5f);
+    }
+}
+
+/// BL-1095: A COLONIAL TIE -- dashed overlord -> subject, rose, an arrowhead at
+/// the subject's end so the direction reads; @p tie_a its strength (fading
+/// after the bond ends).
+void paint_tie(ImDrawList* dl, float x0, float y0, float x1, float y1, float scale, float tie_a,
+               int& prims)
+{
+    const float w    = std::max(1.25f, scale * 0.22f);
+    const float dash = std::max(3.0f, scale * 1.1f);
+    const ImU32 col = with_alpha(col_tie, static_cast<int>(225.0f * tie_a));
+    fleet_dashed(dl, x0, y0, x1, y1, col, w, dash, prims);
+    const float dx = x1 - x0, dy = y1 - y0;
+    const float len = std::max(1.0f, std::sqrt(dx * dx + dy * dy));
+    const float ux = dx / len, uy = dy / len;
+    const float ah = std::max(4.0f, w * 3.5f);
+    const ImVec2 tip{x1, y1};
+    const ImVec2 base{x1 - ux * ah, y1 - uy * ah};
+    dl->AddTriangleFilled(tip, {base.x - uy * ah * 0.5f, base.y + ux * ah * 0.5f},
+                          {base.x + uy * ah * 0.5f, base.y - ux * ah * 0.5f}, col);
+    ++prims;
+}
+
+/// BL-1095: A TREATY -- a quadratic arc between the two capitals, bowed toward
+/// the map's north so every arc bows the same way. FAINT BY DESIGN (dozens
+/// stand at once); at a break (@p snap > 0) it SNAPS, its halves drawing back
+/// toward their capitals as they fade, at full contrast.
+void paint_treaty_arc(ImDrawList* dl, ImVec2 q0, ImVec2 q2, float scale, float snap, int& prims)
+{
+    const ImU32 col = with_alpha(col_treaty, static_cast<int>(
+        (snap > 0.0f ? 190.0f : 80.0f) * (1.0f - snap)));
+    const float w   = snap > 0.0f ? std::max(1.25f, scale * 0.22f) : 1.0f;
+    constexpr int segs = 14;
+    const float dx = q2.x - q0.x, dy = q2.y - q0.y;
+    const float len = std::max(1.0f, std::sqrt(dx * dx + dy * dy));
+    float nx = -dy / len, ny = dx / len;
+    if (ny > 0.0f) { nx = -nx; ny = -ny; } // bow north
+    const float  bulge = std::clamp(len * 0.18f, 4.0f, 28.0f);
+    const ImVec2 q1{(q0.x + q2.x) * 0.5f + nx * bulge, (q0.y + q2.y) * 0.5f + ny * bulge};
+    const auto at = [&](float u) {
+        const float v = 1.0f - u;
+        return ImVec2{v * v * q0.x + 2.0f * v * u * q1.x + u * u * q2.x,
+                      v * v * q0.y + 2.0f * v * u * q1.y + u * u * q2.y};
+    };
+    // Whole: u over [0, 1]. Snapped: [0, 1/2 - gap] and [1/2 + gap, 1].
+    const float gap = snap * 0.5f;
+    for (int half = 0; half < (snap > 0.0f ? 2 : 1); ++half)
+    {
+        const float u0 = snap > 0.0f && half == 1 ? 0.5f + gap : 0.0f;
+        const float u1 = snap > 0.0f && half == 0 ? 0.5f - gap : 1.0f;
+        if (u1 <= u0) continue;
+        ImVec2 prev = at(u0);
+        for (int i = 1; i <= segs; ++i)
+        {
+            const ImVec2 cur = at(u0 + (u1 - u0) * static_cast<float>(i) / static_cast<float>(segs));
+            dl->AddLine(prev, cur, col, w);
+            prev = cur;
+        }
+        prims += segs;
+    }
+}
+
+/// BL-1095: THE HARBOUR -- a breakwater under the seat, its sweep the capital's
+/// port stock (@p port_q per-mille), stone at full stock and sand as it silts.
+void paint_harbour(ImDrawList* dl, ImVec2 at, float scale, int port_q)
+{
+    const float dot_r = std::clamp(scale * 0.7f, 2.0f, 4.5f);
+    const float q     = static_cast<float>(port_q) / 1000.0f;
+    const float r     = dot_r + 3.0f;
+    const float sweep = 3.14159265f * (0.15f + 0.8f * q);
+    const float a0 = 1.5707963f - sweep * 0.5f, a1 = 1.5707963f + sweep * 0.5f;
+    dl->PathArcTo(at, r, a0, a1, 12);
+    dl->PathStroke(col_seat_ring, 0, 3.5f);
+    dl->PathArcTo(at, r, a0, a1, 12);
+    dl->PathStroke(lerp_col(col_harbour_silt, col_harbour_stone, q), 0, 2.0f);
+}
+
+/// BL-1095: THE NAVY -- a hull east of the seat dot at @p at, its width the
+/// navy over the record's peak (@p size_q, square-rooted), a mast over it.
+void paint_hull(ImDrawList* dl, ImVec2 at, float scale, float size_q, ImU32 col)
+{
+    const float dot_r = std::clamp(scale * 0.7f, 2.0f, 4.5f);
+    const float hw = 2.0f + 5.0f * size_q; // half width
+    const float hh = 1.0f + 0.9f * hw;
+    const float cx = at.x + dot_r + 2.0f + hw, cy = at.y + 1.0f;
+    const ImVec2 q0{cx - hw, cy - hh * 0.35f}, q1{cx + hw, cy - hh * 0.35f};
+    const ImVec2 q2{cx + hw * 0.55f, cy + hh * 0.65f}, q3{cx - hw * 0.55f, cy + hh * 0.65f};
+    dl->AddQuad(q0, q1, q2, q3, col_seat_ring, 2.5f);
+    dl->AddQuadFilled(q0, q1, q2, q3, col);
+    dl->AddLine({cx, cy - hh * 0.35f}, {cx, cy - hh * 0.35f - hw * 1.1f}, col_bright, 1.0f);
+}
+
+/// The ship glyph: a sail, apex up, over a short hull line, in the realm's
+/// colour under a dark outline -- the corridor exemplar's sail (3d) grown a
+/// hull, so a crossing reads as a ship and not as a road's fleet mark.
+void fleet_ship(ImDrawList* dl, ImVec2 at, float r, ImU32 fill, int alpha, int& prims)
+{
+    const ImVec2 apex{at.x, at.y - r * 1.3f};
+    const ImVec2 lft{at.x - r * 0.9f, at.y + r * 0.5f};
+    const ImVec2 rgt{at.x + r * 0.9f, at.y + r * 0.5f};
+    dl->AddTriangle(apex, lft, rgt, with_alpha(col_seat_ring, alpha), 2.5f);
+    dl->AddTriangleFilled(apex, lft, rgt, with_alpha(fill, alpha));
+    dl->AddLine({at.x - r * 1.1f, at.y + r * 0.8f}, {at.x + r * 1.1f, at.y + r * 0.8f},
+                with_alpha(col_bright, alpha), std::max(1.0f, r * 0.35f));
+    prims += 3;
+}
+
+/// A crossing's faint wake, from where the ship set out to where it is.
+void paint_wake(ImDrawList* dl, ImVec2 a, ImVec2 b, int alpha)
+{
+    dl->AddLine(a, b, with_alpha(col_bright, alpha / 3), 1.0f);
+}
+
+/// BL-1095: A LANDING's beach-head -- three short strokes fanning out from the
+/// fallen seat, pointing inland (@p ux, @p uy) from the sea it came by, grown
+/// by @p g over the window's second half.
+void paint_beachhead(ImDrawList* dl, ImVec2 seat, float ux, float uy, float scale, float g,
+                     ImU32 col, ImU32 under, int& prims)
+{
+    const float dot_r = std::clamp(scale * 0.7f, 2.0f, 4.5f);
+    const float reach = dot_r + 4.0f + 8.0f * g;
+    for (int k = -1; k <= 1; ++k)
+    {
+        const float ang = static_cast<float>(k) * 0.6f;
+        const float ca = std::cos(ang), sa = std::sin(ang);
+        const float rx = ux * ca - uy * sa, ry = ux * sa + uy * ca;
+        const ImVec2 p0{seat.x + rx * dot_r, seat.y + ry * dot_r};
+        const ImVec2 p1{seat.x + rx * reach, seat.y + ry * reach};
+        dl->AddLine(p0, p1, under, 3.0f);
+        dl->AddLine(p0, p1, col, 1.5f);
+        prims += 2;
+    }
+}
+
 // --- BL-1095 (fleets and ties): the bake and the pass, defined in the block
 // below the sample-lookup helpers they read; declared here so
 // `finish_history_lapse` and `draw_lapse_map` can call them without a change
 // to their own order. ---
 void bake_lapse_fleets(history_lapse& h, const std::vector<uint8_t>& band);
-int  draw_lapse_fleets(const history_lapse& h, const std::vector<uint16_t>& slice,
+int  draw_lapse_fleets(const history_lapse& h, const lapse_layer_set& L,
+                       const std::vector<uint16_t>& slice,
                        ImDrawList* dl, ImVec2 tl, float scale, int year);
+lapse_fleet_frame fleets_at(const history_lapse& h, const lapse_layer_set& L,
+                            const std::vector<uint16_t>& slice, int year);
 
 } // namespace
 
@@ -440,6 +1115,14 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
             h.polity_seat[c.owner] = static_cast<int32_t>(c.region);
     }
 
+    // BL-1118: which event kinds the record carries -- the layer predicates
+    // that hang on a kind read one bit per frame (`lapse_layers_drawn`).
+    static_assert(static_cast<unsigned>(lapse_event_kind::count) <= 32,
+                  "event_kinds is a 32-bit mask over lapse_event_kind");
+    h.event_kinds = 0;
+    for (const lapse_event& e : h.lapse.events)
+        if (e.kind < 32) h.event_kinds |= 1u << e.kind;
+
     // --- The terrain base, baked once (BL-915) -------------------------------
     //
     // Run-merged along each row by base KIND, land only, in tile units. This is
@@ -553,52 +1236,56 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
     // era only walked never gets an event and never gets a segment here — see
     // `lapse_road_seg`. The Culture round's record carries no such events, so
     // this loop leaves `road_segs` empty there without a round flag to check.
-    h.road_segs.clear();
-    for (const lapse_event& e : h.lapse.events)
+    // BL-1134: the network STARTS from the roads the rounds before this one
+    // laid (`road_carry`), and this record's promotions land on top of it --
+    // one walk, shared with `lapse_roads_at_close`, so the network a round
+    // hands on is the network it drew. The geometry is then drawn for every
+    // corridor alike against THIS round's regions and rivers.
+    h.road_segs = h.road_carry;
+    apply_road_promotions(h.road_segs, h.lapse, h.region_col.size());
+    h.road_segs.erase(std::remove_if(h.road_segs.begin(), h.road_segs.end(),
+                                     [&](const lapse_road_seg& s) {
+                                         return static_cast<std::size_t>(s.region_a) >= h.region_col.size()
+                                             || static_cast<std::size_t>(s.region_b) >= h.region_col.size();
+                                     }),
+                      h.road_segs.end());
+    for (lapse_road_seg& seg : h.road_segs)
     {
-        if (e.kind != static_cast<uint8_t>(lapse_event_kind::road_promoted)) continue;
-        if (e.region == lapse_event_none || e.other == lapse_event_none) continue;
-        const uint16_t a = e.region, b = e.other; // note_corridor: region = lo, other = hi
-        if (static_cast<std::size_t>(a) >= h.region_col.size()
-         || static_cast<std::size_t>(b) >= h.region_col.size()) continue;
-
-        auto it = std::find_if(h.road_segs.begin(), h.road_segs.end(),
-                               [&](const lapse_road_seg& s) { return s.region_a == a && s.region_b == b; });
-        if (it == h.road_segs.end())
+        const uint16_t a = seg.region_a, b = seg.region_b;
+        seg.c0 = static_cast<float>(h.region_col[a]) + 0.5f;
+        seg.r0 = static_cast<float>(h.region_row[a]) + 0.5f;
+        seg.c1 = lapse_unwrap_col(seg.c0, static_cast<float>(h.region_col[b]) + 0.5f, gw);
+        seg.r1 = static_cast<float>(h.region_row[b]) + 0.5f;
+        seg.over_water = lapse_corridor_over_water(band, gw, gh, seg.c0, seg.r0, seg.c1, seg.r1);
+        // Bridges: where this corridor's straight line crosses a river
+        // edge — a pure geometric fact, tested once against every river
+        // segment already baked above.
+        seg.bridges.clear();
+        for (const lapse_river_seg& r : h.river_segs)
         {
-            lapse_road_seg seg;
-            seg.region_a = a;
-            seg.region_b = b;
-            seg.c0 = static_cast<float>(h.region_col[a]) + 0.5f;
-            seg.r0 = static_cast<float>(h.region_row[a]) + 0.5f;
-            seg.c1 = lapse_unwrap_col(seg.c0, static_cast<float>(h.region_col[b]) + 0.5f, gw);
-            seg.r1 = static_cast<float>(h.region_row[b]) + 0.5f;
-            seg.year_track = e.year;
-            if (e.polity >= 2) seg.year_road      = e.year; // robust to a corridor's first event already being Road
-            if (e.polity >= 3) seg.year_post_road = e.year; // ...or already Post Road (BL-940/BL-943)
-            seg.over_water = lapse_corridor_over_water(band, gw, gh, seg.c0, seg.r0, seg.c1, seg.r1);
-            // Bridges: where this corridor's straight line crosses a river
-            // edge — a pure geometric fact, tested once against every river
-            // segment already baked above.
-            for (const lapse_river_seg& r : h.river_segs)
-            {
-                float ix = 0.0f, iy = 0.0f;
-                if (lapse_segments_cross(seg.c0, seg.r0, seg.c1, seg.r1,
-                                         static_cast<float>(r.c0), static_cast<float>(r.r0),
-                                         static_cast<float>(r.c1), static_cast<float>(r.r1),
-                                         ix, iy))
-                    seg.bridges.push_back({ix, iy});
-            }
-            h.road_segs.push_back(std::move(seg));
+            float ix = 0.0f, iy = 0.0f;
+            if (lapse_segments_cross(seg.c0, seg.r0, seg.c1, seg.r1,
+                                     static_cast<float>(r.c0), static_cast<float>(r.r0),
+                                     static_cast<float>(r.c1), static_cast<float>(r.r1),
+                                     ix, iy))
+                seg.bridges.push_back({ix, iy});
         }
-        else if (e.polity >= 3)
-        {
-            it->year_post_road = e.year; // BL-940/BL-943: a later crossing to Post Road
-        }
-        else if (e.polity >= 2)
-        {
-            it->year_road = e.year; // the second crossing this pair can ever get
-        }
+    }
+    // The bridge cap (Ben, 2026-10-03; `lapse_line_water_run` above): a corridor
+    // whose straight line would bridge more than `kMaxCrossingTiles` of water is
+    // not drawn. SKIPPED, not re-routed -- the corridor has only its two anchors,
+    // and the stamped world road it stands for went round by land or was never
+    // laid. Geometry only: the hand-over (`lapse_roads_at_close`) reads the carry
+    // and the events, so a skipped corridor still carries to the next round.
+    {
+        const std::size_t before = h.road_segs.size();
+        h.road_segs.erase(std::remove_if(h.road_segs.begin(), h.road_segs.end(),
+                                         [&](const lapse_road_seg& s) {
+                                             return lapse_line_water_run(band, gw, gh, s.c0, s.r0,
+                                                                         s.c1, s.r1) > kMaxCrossingTiles;
+                                         }),
+                          h.road_segs.end());
+        h.road_segs_over_cap = static_cast<int>(before - h.road_segs.size());
     }
 
     // --- Amicable cross-border trade corridors (BL-925), baked once --------
@@ -680,6 +1367,112 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
         seg.r1 = static_cast<float>(h.region_row[b]) + 0.5f;
         seg.year_open = e.year;
         h.lane_segs.push_back(seg);
+    }
+
+    // --- The lanes' SEA PATHS (Ben, 2026-10-03: "sea lanes should always go
+    // over ocean, never over ground"). A lane was drawn as an arc between the
+    // two seats, which crossed whatever land lay between them. It is now drawn
+    // along the walk the campaign stamp lays (`stamp_sea_lanes`, LOGISTICS.md
+    // sec 4b), restated here on the lapse's own sea mask with the stamp's own
+    // pure pieces: each seat's port is its nearest sea tile within
+    // `kSeaLanePortRadius` (an inland seat takes its realm's nearest coastal
+    // seat, the realm read as the region's holder at this record's close);
+    // the walk is `sea_lane_walk` over ocean and coast on four cardinal steps,
+    // priced with the current at the span's own weight; and it runs toward
+    // the port more of this round's lanes land on, a tie from the lower
+    // raster index. A REPLAY, NEVER A RE-RUN still holds: this reads the
+    // record's ends and the ground, and decides nothing the record did not.
+    // It can differ from the campaign field in one way only -- the stamp
+    // counts the busier port over the LAST span's legs and realms, the lapse
+    // over its own round's -- and either way every tile it draws on is sea.
+    if (!h.lane_segs.empty())
+    {
+        std::vector<terrain_substrate> substrate(n);
+        std::vector<std::uint8_t>      sea(n, 0);
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            substrate[i] = preview_substrate(packed[i]);
+            sea[i] = is_sea(substrate[i]) ? 1 : 0;
+        }
+        const history_sim_params lp = exploration_sim_params(world_params{});
+        const ocean_current_field currents =
+            (ocean_current_weight_valid(lp.sea_current_weight_q) && lp.sea_current_weight_q > 0)
+                ? build_ocean_currents(substrate, gw, gh, lp.sea_current_rotation_sense)
+                : ocean_current_field{};
+
+        // Each region's holder at the record's close: the last change wins
+        // (`changes` is in year order). -1 for unheld.
+        const std::size_t rc = h.region_col.size();
+        std::vector<int> realm(rc, -1);
+        for (const owner_change& c : h.lapse.changes)
+            if (c.region < rc)
+                realm[c.region] = (c.owner == owner_none) ? -1 : static_cast<int>(c.owner);
+
+        std::vector<int> own_port(rc, -2); // -2: not looked up yet
+        const auto port_of = [&](std::size_t ri) {
+            int& p = own_port[ri];
+            if (p == -2)
+                p = sea_lane_port(sea, gw, gh, h.region_col[ri], h.region_row[ri], kSeaLanePortRadius);
+            return p;
+        };
+        const auto pick_port = [&](std::size_t ri) {
+            if (port_of(ri) >= 0) return port_of(ri);
+            if (realm[ri] < 0) return -1;
+            int best = -1, best_d = std::numeric_limits<int>::max();
+            for (std::size_t rj = 0; rj < rc; ++rj) // ascending: a tie keeps the lower region
+            {
+                if (realm[rj] != realm[ri] || port_of(rj) < 0) continue;
+                int dc = std::abs(h.region_col[ri] - h.region_col[rj]);
+                if (dc > gw / 2) dc = gw - dc;
+                const int d = std::max(dc, std::abs(h.region_row[ri] - h.region_row[rj]));
+                if (d < best_d) { best_d = d; best = port_of(rj); }
+            }
+            return best;
+        };
+
+        std::vector<std::pair<int, int>> ports(h.lane_segs.size(), {-1, -1});
+        std::map<int, int> degree;
+        for (std::size_t li = 0; li < h.lane_segs.size(); ++li)
+        {
+            const int pa = pick_port(h.lane_segs[li].region_a);
+            const int pb = pick_port(h.lane_segs[li].region_b);
+            if (pa < 0 || pb < 0 || pa == pb) continue;
+            ports[li] = {pa, pb};
+            ++degree[pa];
+            ++degree[pb];
+        }
+        std::map<std::pair<int, int>, std::vector<int>> walked;
+        for (std::size_t li = 0; li < h.lane_segs.size(); ++li)
+        {
+            auto [pa, pb] = ports[li];
+            if (pa < 0) continue;
+            const int da = degree[pa], db = degree[pb];
+            const bool from_a = (da != db) ? (da < db) : (pa < pb);
+            const std::pair<int, int> key = from_a ? std::make_pair(pa, pb) : std::make_pair(pb, pa);
+            auto wit = walked.find(key);
+            if (wit == walked.end())
+                wit = walked.emplace(key, sea_lane_walk(sea, gw, gh, currents.empty() ? nullptr : &currents,
+                                                        lp.sea_current_weight_q, key.first, key.second)).first;
+            lapse_lane_seg& s = h.lane_segs[li];
+            s.path_c.clear();
+            s.path_r.clear();
+            std::vector<ImVec2> chain;
+            chain.reserve(wit->second.size());
+            float prev_c = 0.0f;
+            for (const int idx : wit->second)
+            {
+                float c = static_cast<float>(idx % gw) + 0.5f;
+                if (!chain.empty()) c = lapse_unwrap_col(prev_c, c, gw); // one continuous run over the seam
+                chain.push_back({c, static_cast<float>(idx / gw) + 0.5f});
+                prev_c = c;
+            }
+            const std::vector<ImVec2> smooth = lapse_smooth_sea_path(chain, sea, gw, gh);
+            for (const ImVec2& p : smooth)
+            {
+                s.path_c.push_back(p.x);
+                s.path_r.push_back(p.y);
+            }
+        }
     }
 
     // --- BL-1092: the kin arrows, baked once ---------------------------------
@@ -930,6 +1723,593 @@ float lapse_carry_fade(const history_lapse& h, int year)
     return 1.0f - gone / over;
 }
 
+static_assert(static_cast<unsigned>(lapse_layer::count) <= 64,
+              "lapse_layer_set is one 64-bit word");
+
+lapse_layer_set lapse_layers_drawn(const history_lapse& h)
+{
+    using L = lapse_layer;
+    lapse_layer_set s;
+    if (!h.derived()) return s;
+    const auto kind = [&](lapse_event_kind k) {
+        return ((h.event_kinds >> static_cast<unsigned>(k)) & 1u) != 0;
+    };
+
+    // THE EMPIRES CUT (Ben, 2026-09-25, walking round 4: "the Empires round
+    // shows too much"; STARTUP.md § Round 4), made HERE and nowhere else: the
+    // caravan glyphs, the seat-captured ring, the capital slide, and the
+    // fleets, harbours and treaty arcs are the later rounds' subjects. The
+    // polity record that closes at 1200 CE is the Empires record; the Culture
+    // record's owners are peoples.
+    const bool empires_round = !h.owners_are_cultures
+                            && h.lapse.start_year + h.lapse.years <= lapse_exploration_epoch_year;
+    const bool at_sea = !empires_round; // the fleets-and-ties pass (BL-1095)
+
+    // The ground.
+    s.set(L::sea);
+    s.set(L::ground, !h.base_runs.empty());
+    s.set(L::rivers, !h.river_segs.empty());
+
+    // Who holds it. The carry draws from the round's first year while it
+    // fades, wherever the round before left a colour.
+    s.set(L::carry, h.lapse.years > 0
+                 && std::any_of(h.carry_colour.begin(), h.carry_colour.end(),
+                                [](uint32_t c) { return c != 0u; }));
+    s.set(L::people_fill,  h.owners_are_cultures);
+    s.set(L::realm_fill,  !h.owners_are_cultures);
+    s.set(L::culture_base, !h.owners_are_cultures && h.family_count > 0
+                        && !h.lapse.culture_changes.empty());
+    s.set(L::frontier);    // between any two holders, and along every coast
+    s.set(L::hard_border, !h.owners_are_cultures && h.hard_recorded);
+    s.set(L::seats, std::any_of(h.polity_seat.begin(), h.polity_seat.end(),
+                                [](int32_t r) { return r >= 0; }));
+    s.set(L::capital_slide, !empires_round && kind(lapse_event_kind::capital_moved));
+
+    // Routes. A corridor exists only where the record promoted or opened it,
+    // so a bake that is not empty is a layer that draws.
+    const auto any_kin = [&](bool water) {
+        return std::any_of(h.kin_segs.begin(), h.kin_segs.end(),
+                           [&](const lapse_kin_seg& k) { return k.over_water == water; });
+    };
+    s.set(L::kin_line,       any_kin(false));
+    s.set(L::kin_line_water, any_kin(true));
+    // THE ROAD RUNGS, read over the round's own span (BL-1134): a corridor
+    // carried in from an earlier round may already stand at Road on the first
+    // frame, so "the record holds a corridor" no longer means "a Track is
+    // drawn". A rung is listed when some year of the span shows it:
+    // `shows(from, until)` is "some y in [first, last] with from <= y < until".
+    {
+        const int64_t y0 = h.lapse.start_year, y1 = int64_t{h.lapse.start_year} + h.lapse.years;
+        const int64_t never = int64_t{lapse_never} + 1;
+        const auto shows = [&](int64_t from, int64_t until) {
+            return std::max(y0, from) < std::min(y1 + 1, until);
+        };
+        const auto any_road = [&](auto pred) {
+            return std::any_of(h.road_segs.begin(), h.road_segs.end(), pred);
+        };
+        const int window = lapse_marker_window_years(h);
+        s.set(L::track, any_road([&](const lapse_road_seg& r) {
+            return shows(r.year_track, r.year_road == lapse_never ? never : r.year_road); }));
+        s.set(L::road, any_road([&](const lapse_road_seg& r) {
+            return r.year_road != lapse_never && shows(std::max(r.year_track, r.year_road), never); }));
+        // The Post Road the legend names is its PULSE (a steady Post Road is
+        // drawn as a Road), so it is listed when a pulse falls in the span.
+        s.set(L::post_road, any_road([&](const lapse_road_seg& r) {
+            return r.year_post_road != lapse_never
+                && shows(r.year_post_road, int64_t{r.year_post_road} + window); }));
+        s.set(L::bridge, any_road([&](const lapse_road_seg& r) {
+            return !r.bridges.empty() && shows(r.year_track, never); }));
+    }
+    // The trade line a freed colony's treaty leaves is the trade link's own
+    // stroke (`paint_trade_line`), so it is the same row.
+    const bool tie_trade = at_sea && std::any_of(h.tie_segs.begin(), h.tie_segs.end(),
+        [](const lapse_tie_seg& t) { return t.year_trade != lapse_never; });
+    s.set(L::trade_link, !h.trade_segs.empty() || tie_trade);
+    // The corridor exemplar: a caravan over land, a sail over water. It reads
+    // this record's own promotions, so a corridor only carried in (BL-1134)
+    // carries no exemplar and does not list one.
+    const auto any_exemplar = [&](bool water) {
+        return std::any_of(h.road_segs.begin(), h.road_segs.end(),
+                           [&](const lapse_road_seg& r) { return r.promoted_here && r.over_water == water; })
+            || std::any_of(h.trade_segs.begin(), h.trade_segs.end(),
+                           [&](const lapse_trade_seg& t) { return t.over_water == water; });
+    };
+    s.set(L::caravan,    !empires_round && any_exemplar(false));
+    s.set(L::trade_sail, !empires_round && any_exemplar(true));
+
+    // Marks. The 1200 burst fires for one marker window from 1200 CE, so it
+    // draws only on a record whose playhead can stand inside that window.
+    {
+        const int first = std::max(h.lapse.start_year, lapse_exploration_epoch_year);
+        const int last  = h.lapse.start_year + h.lapse.years;
+        s.set(L::consolidation, last > lapse_exploration_epoch_year && first <= last
+                             && first - lapse_exploration_epoch_year < lapse_marker_window_years(h));
+    }
+    s.set(L::seat_captured, !empires_round && kind(lapse_event_kind::seat_captured));
+    s.set(L::crack, kind(lapse_event_kind::broke_away) || kind(lapse_event_kind::schism));
+    s.set(L::diamond, !h.civ_carry.empty() || kind(lapse_event_kind::civilisation_formed));
+    s.set(L::works, !h.works_close.empty() || kind(lapse_event_kind::works_chartered));
+    s.set(L::furnace, std::any_of(h.region_lit_year.begin(), h.region_lit_year.end(),
+                                  [](int32_t y) { return y != INT32_MAX; }));
+    s.set(L::heat, h.industry_recorded && h.industry_density_peak > 0.0);
+
+    // At sea.
+    s.set(L::sea_lane,      !h.lane_segs.empty());
+    s.set(L::colonial_tie,  at_sea && !h.tie_segs.empty());
+    s.set(L::treaty,        at_sea && !h.treaty_arcs.empty());
+    s.set(L::navy,          at_sea && h.navy_peak > 0);
+    s.set(L::harbour,       at_sea && h.port_recorded);
+    s.set(L::sail_crossing, at_sea && !h.sails.empty());
+    s.set(L::landing,       at_sea && !h.landings.empty());
+    return s;
+}
+
+const char* lapse_layer_label(const history_lapse& h, lapse_layer l)
+{
+    switch (l)
+    {
+    case lapse_layer::sea:            return "Sea";
+    case lapse_layer::ground:         return "Ground and relief";
+    case lapse_layer::rivers:         return "River";
+    case lapse_layer::carry:          return "Last round's ground, fading";
+    case lapse_layer::people_fill:    return "People; kin share a hue";
+    case lapse_layer::culture_base:   return "Culture base";
+    case lapse_layer::realm_fill:     return "Realm";
+    case lapse_layer::frontier:       return "Frontier";
+    case lapse_layer::hard_border:    return "Hard border";
+    case lapse_layer::seats:          return h.peoples ? "Homeland" : "Seat";
+    case lapse_layer::capital_slide:  return "Seat moves to a new capital";
+    case lapse_layer::kin_line:       return "Kin line";
+    case lapse_layer::kin_line_water: return "Kin line across water";
+    case lapse_layer::track:          return "Track";
+    case lapse_layer::road:           return "Road";
+    case lapse_layer::post_road:      return "Post Road";
+    case lapse_layer::bridge:         return "Bridge";
+    case lapse_layer::trade_link:     return "Trade link";
+    case lapse_layer::caravan:        return "Caravan";
+    case lapse_layer::trade_sail:     return "Merchant sail";
+    case lapse_layer::consolidation:  return "Treasury, 1200 CE";
+    case lapse_layer::seat_captured:  return "Seat captured";
+    case lapse_layer::crack:          return "Break-away or schism";
+    case lapse_layer::diamond:        return "Civilisation formed";
+    case lapse_layer::works:          return "Works chartered";
+    case lapse_layer::furnace:        return "Furnaces lit";
+    case lapse_layer::heat:           return "Industry points";
+    case lapse_layer::sea_lane:       return "Sea lane";
+    case lapse_layer::colonial_tie:   return "Colonial tie";
+    case lapse_layer::treaty:         return "Treaty";
+    case lapse_layer::navy:           return "Navy";
+    case lapse_layer::harbour:        return "Harbour";
+    case lapse_layer::sail_crossing:  return "Sail crossing";
+    case lapse_layer::landing:        return "Landing";
+    case lapse_layer::count:          break;
+    }
+    return "";
+}
+
+namespace {
+
+// ---------------------------------------------------------------------------
+// THE LEGEND (BL-1118): what `lapse_layers_drawn` says this round draws, each
+// row a swatch painted by the map's own glyph function at the map's own scale,
+// under a label in STARTUP.md's words. Draw list only, like the map.
+// ---------------------------------------------------------------------------
+
+/// The colours a swatch is painted in: the round's own largest holders at the
+/// playhead (a realm swatch in a realm's real colour, not a stand-in), and a
+/// culture base and a carried ground sampled off the regions the same way.
+struct legend_palette
+{
+    ImU32 owner[3] = {col_dim, col_dim, col_dim};
+    ImU32 base[3]  = {col_dim, col_dim, col_dim};
+    ImU32 carry    = col_dim;
+    /// The corridor exemplar is drawn in its corridor's idiom -- a road's warm
+    /// hue and rung rings, or a trade link's green -- so each swatch wears the
+    /// idiom the record's own corridors give it: a road's where a road carries
+    /// that exemplar, else a trade link's.
+    bool caravan_on_road = true;
+    bool sail_on_road    = true;
+};
+
+legend_palette legend_colours(const history_lapse& h, const std::vector<uint16_t>& slice,
+                              const std::vector<uint32_t>& base_colour, int year)
+{
+    legend_palette p;
+    // Owners by ground held -- the fill the eye meets first.
+    std::vector<int64_t> area;
+    for (std::size_t r = 0; r < slice.size() && r < h.region_area.size(); ++r)
+    {
+        const uint16_t o = slice[r];
+        if (o == owner_none) continue;
+        if (area.size() <= o) area.resize(static_cast<std::size_t>(o) + 1, 0);
+        area[o] += h.region_area[r];
+    }
+    std::vector<uint16_t> order;
+    for (std::size_t o = 0; o < area.size(); ++o)
+        if (area[o] > 0) order.push_back(static_cast<uint16_t>(o));
+    std::sort(order.begin(), order.end(), [&](uint16_t a, uint16_t b) {
+        return area[a] != area[b] ? area[a] > area[b] : a < b;
+    });
+    for (int i = 0; i < 3 && !order.empty(); ++i)
+        p.owner[i] = owner_colour(h, order[std::min<std::size_t>(i, order.size() - 1)], year);
+
+    // Regions by area, for the two per-region tints.
+    std::vector<uint32_t> regs(h.region_area.size());
+    for (std::size_t r = 0; r < regs.size(); ++r) regs[r] = static_cast<uint32_t>(r);
+    std::sort(regs.begin(), regs.end(), [&](uint32_t a, uint32_t b) {
+        return h.region_area[a] != h.region_area[b] ? h.region_area[a] > h.region_area[b] : a < b;
+    });
+    int nb = 0;
+    bool carried = false;
+    for (const uint32_t r : regs)
+    {
+        if (nb < 3 && r < base_colour.size() && base_colour[r] != 0u)
+        {
+            const ImU32 c = static_cast<ImU32>(base_colour[r]);
+            if (std::find(p.base, p.base + nb, c) == p.base + nb) p.base[nb++] = c;
+        }
+        if (!carried && r < h.carry_colour.size() && h.carry_colour[r] != 0u)
+        {
+            p.carry = static_cast<ImU32>(h.carry_colour[r]);
+            carried = true;
+        }
+        if (nb >= 3 && carried) break;
+    }
+    for (int i = nb; i < 3 && nb > 0; ++i) p.base[i] = p.base[i - 1];
+
+    const auto road_over = [&](bool water) {
+        return std::any_of(h.road_segs.begin(), h.road_segs.end(),
+                           [&](const lapse_road_seg& r) { return r.promoted_here && r.over_water == water; });
+    };
+    p.caravan_on_road = road_over(false);
+    p.sail_on_road    = road_over(true);
+    return p;
+}
+
+/// One swatch, in the cell [a, b]: the layer's own glyph over the ground it
+/// sits on on the map -- land for the things on land, sea for the things at
+/// sea -- so a mark reads on the key as it reads on the map.
+int legend_swatch(ImDrawList* dl, lapse_layer l, ImVec2 a, ImVec2 b, float scale,
+                  const legend_palette& p)
+{
+    const float cx = (a.x + b.x) * 0.5f, cy = (a.y + b.y) * 0.5f;
+    const float w = b.x - a.x;
+    int prims = 0;
+    const auto land = [&]() { paint_ground(dl, a.x, a.y, b.x, b.y, 0); ++prims; };
+    const auto sea  = [&]() { paint_sea(dl, a, b); ++prims; };
+    const auto held = [&](ImU32 c) { land(); paint_tint(dl, a.x, a.y, b.x, b.y, c, tint_alpha); ++prims; };
+    const auto thirds = [&](const ImU32* c, int alpha) {
+        land();
+        for (int i = 0; i < 3; ++i)
+        {
+            const float x0 = std::floor(a.x + w * static_cast<float>(i) / 3.0f);
+            const float x1 = std::floor(a.x + w * static_cast<float>(i + 1) / 3.0f);
+            paint_tint(dl, x0, a.y, x1, b.y, c[i], alpha);
+            ++prims;
+        }
+    };
+    const auto halves = [&]() {
+        land();
+        paint_tint(dl, a.x, a.y, std::floor(cx), b.y, p.owner[0], tint_alpha);
+        paint_tint(dl, std::floor(cx), a.y, b.x, b.y, p.owner[1], tint_alpha);
+        prims += 2;
+    };
+    switch (l)
+    {
+    case lapse_layer::sea:
+        sea();
+        break;
+    case lapse_layer::ground:
+    {
+        // Flat, highland and a range, the range rimmed as the map rims one.
+        const float x1 = std::floor(a.x + w / 3.0f), x2 = std::floor(a.x + w * 2.0f / 3.0f);
+        paint_ground(dl, a.x, a.y, x1, b.y, 0);
+        paint_ground(dl, x1, a.y, x2, b.y, 2);
+        paint_ground(dl, x2, a.y, b.x, b.y, 3);
+        paint_relief_rim(dl, x2, b.x, a.y + 0.5f, true);
+        paint_relief_rim(dl, x2, b.x, b.y - 0.5f, false);
+        prims += 5;
+        break;
+    }
+    case lapse_layer::rivers:
+        land();
+        paint_river(dl, {a.x + 2.0f, b.y - 3.0f}, {cx, cy}, scale);
+        paint_river(dl, {cx, cy}, {b.x - 2.0f, a.y + 3.0f}, scale);
+        prims += 2;
+        break;
+    case lapse_layer::carry:
+        land();
+        paint_tint(dl, a.x, a.y, b.x, b.y, p.carry, tint_alpha / 2); // mid-fade
+        ++prims;
+        break;
+    case lapse_layer::people_fill:
+    case lapse_layer::realm_fill:
+        thirds(p.owner, tint_alpha);
+        break;
+    case lapse_layer::culture_base:
+        thirds(p.base, 110); // the map's base_alpha
+        break;
+    case lapse_layer::frontier:
+        halves();
+        paint_frontier_v(dl, std::floor(cx), a.y, b.y);
+        ++prims;
+        break;
+    case lapse_layer::hard_border:
+        // Both sides hard, so each realm's inner stroke shows beside the dark
+        // -- the one thing that tells a hard edge from a soft one.
+        halves();
+        prims += paint_hard_v(dl, std::floor(cx), a.y, b.y, true, p.owner[1], true, p.owner[0]);
+        break;
+    case lapse_layer::seats:
+        held(p.owner[0]);
+        prims += paint_seat(dl, {cx, cy}, scale, p.owner[0]);
+        break;
+    case lapse_layer::kin_line:
+    case lapse_layer::kin_line_water:
+    {
+        const bool water = l == lapse_layer::kin_line_water;
+        if (water) sea(); else land();
+        paint_kin(dl, a.x + 3.0f, cy, b.x - 3.0f, cy, with_alpha(p.owner[0], 240),
+                  with_alpha(col_bright, 240), water, scale, prims);
+        break;
+    }
+    case lapse_layer::track:
+    case lapse_layer::road:
+    case lapse_layer::post_road:
+        land();
+        paint_road(dl, {a.x + 2.0f, cy}, {b.x - 2.0f, cy}, l != lapse_layer::track,
+                   l == lapse_layer::post_road ? 1.0f : 0.0f, scale, prims);
+        break;
+    case lapse_layer::bridge:
+        land();
+        paint_river(dl, {cx - 3.0f, a.y}, {cx + 3.0f, b.y}, scale);
+        paint_road(dl, {a.x + 2.0f, cy}, {b.x - 2.0f, cy}, true, 0.0f, scale, prims);
+        paint_bridge(dl, {cx, cy}, scale);
+        prims += 2;
+        break;
+    case lapse_layer::trade_link:
+        land();
+        paint_trade_line(dl, {a.x + 2.0f, cy}, {b.x - 2.0f, cy}, scale, 220);
+        ++prims;
+        break;
+    case lapse_layer::caravan:
+    case lapse_layer::trade_sail:
+    {
+        // On the corridor it marks: a Road (the middle rung, one ring) or a
+        // trade link, per the palette's reading of the record.
+        const bool water   = l == lapse_layer::trade_sail;
+        const bool on_road = water ? p.sail_on_road : p.caravan_on_road;
+        if (water) sea(); else land();
+        if (on_road) paint_road(dl, {a.x + 2.0f, cy}, {b.x - 2.0f, cy}, true, 0.0f, scale, prims);
+        else       { paint_trade_line(dl, {a.x + 2.0f, cy}, {b.x - 2.0f, cy}, scale, 220); ++prims; }
+        draw_lapse_exemplar(dl, {cx, cy}, scale, water, on_road ? 2 : 1, !on_road, 255);
+        ++prims;
+        break;
+    }
+    case lapse_layer::consolidation:
+        held(p.owner[0]);
+        prims += paint_seat(dl, {cx, cy}, scale, p.owner[0]);
+        paint_burst(dl, {cx, cy}, scale, 255);
+        ++prims;
+        break;
+    case lapse_layer::seat_captured:
+        held(p.owner[1]);
+        paint_capture_ring(dl, {cx, cy}, scale, 0.0f, p.owner[0], 255);
+        prims += 2;
+        break;
+    case lapse_layer::crack:
+        halves();
+        prims += paint_crack(dl, {a.x + 3.0f, cy}, {b.x - 3.0f, cy}, 0x9E3779B9u, scale, 255, false, 0.0f);
+        break;
+    case lapse_layer::diamond:
+        held(p.owner[0]);
+        prims += paint_diamond(dl, {cx, cy}, scale, p.owner[0]);
+        break;
+    case lapse_layer::works:
+        held(p.owner[0]);
+        prims += paint_works(dl, {cx, cy + 2.0f}, scale, 255, false);
+        break;
+    case lapse_layer::furnace:
+        held(p.owner[0]);
+        paint_ember(dl, {cx, cy}, scale);
+        prims += 2;
+        break;
+    case lapse_layer::heat:
+        held(p.owner[0]);
+        for (int i = 0; i < 3; ++i)
+            paint_spark(dl, {a.x + w * (0.2f + 0.3f * static_cast<float>(i)),
+                             i == 1 ? cy - 2.0f : cy + 2.0f}, scale);
+        prims += 6;
+        break;
+    case lapse_layer::sea_lane:
+    {
+        sea();
+        // The arc bows south, so its chord sits high in the cell.
+        const float ly = a.y + 3.5f;
+        prims += paint_lane(dl, {a.x + 2.0f, ly}, {b.x - 2.0f, ly}, scale);
+        break;
+    }
+    case lapse_layer::colonial_tie:
+        sea();
+        paint_tie(dl, a.x + 2.0f, cy, b.x - 2.0f, cy, scale, 1.0f, prims);
+        break;
+    case lapse_layer::treaty:
+        sea();
+        paint_treaty_arc(dl, {a.x + 2.0f, cy + 3.0f}, {b.x - 2.0f, cy + 3.0f}, scale, 0.0f, prims);
+        break;
+    case lapse_layer::navy:
+        sea();
+        prims += paint_seat(dl, {a.x + 8.0f, cy}, scale, p.owner[0]);
+        paint_hull(dl, {a.x + 8.0f, cy}, scale, 0.7f, p.owner[0]);
+        prims += 3;
+        break;
+    case lapse_layer::harbour:
+        sea();
+        prims += paint_seat(dl, {cx, cy - 2.0f}, scale, p.owner[0]);
+        paint_harbour(dl, {cx, cy - 2.0f}, scale, 700);
+        prims += 2;
+        break;
+    case lapse_layer::sail_crossing:
+    {
+        sea();
+        const float r = std::clamp(scale * 0.8f, 2.5f, 4.5f); // the pass's ship_r
+        paint_wake(dl, {a.x + 2.0f, cy + 1.0f}, {cx + 4.0f, cy + 1.0f}, 255);
+        fleet_ship(dl, {cx + 4.0f, cy + 1.0f}, r, p.owner[0], 255, prims);
+        ++prims;
+        break;
+    }
+    case lapse_layer::landing:
+    {
+        sea();
+        paint_ground(dl, std::floor(cx + 2.0f), a.y, b.x, b.y, 0);
+        const float r = std::clamp(scale * 0.8f, 2.5f, 4.5f) * 1.25f;
+        fleet_ship(dl, {a.x + 7.0f, cy + 1.0f}, r, p.owner[0], 255, prims);
+        paint_beachhead(dl, {cx + 5.0f, cy}, 1.0f, 0.0f, scale, 1.0f, p.owner[0], col_seat_ring, prims);
+        ++prims;
+        break;
+    }
+    case lapse_layer::capital_slide:
+    case lapse_layer::count:
+        break;
+    }
+    return prims;
+}
+
+/// The legend's rows, grouped into its columns, read off @p L alone. The seat
+/// row carries the capital slide in its words, since the slide has no glyph of
+/// its own -- it is the seat dot moving.
+struct legend_column
+{
+    const char* heading = "";
+    std::vector<std::pair<lapse_layer, std::string>> rows;
+};
+
+std::vector<legend_column> legend_columns(const history_lapse& h, const lapse_layer_set& L)
+{
+    using ll = lapse_layer;
+    const auto column = [&](const char* heading, std::initializer_list<ll> layers) {
+        legend_column c;
+        c.heading = heading;
+        for (const ll l : layers)
+        {
+            if (!L.has(l)) continue;
+            std::string label = lapse_layer_label(h, l);
+            if (l == ll::seats && L.has(ll::capital_slide)) label += "; slides if moved";
+            c.rows.emplace_back(l, std::move(label));
+        }
+        return c;
+    };
+    std::vector<legend_column> cols = {
+        column("The ground",   {ll::sea, ll::ground, ll::rivers}),
+        column(h.owners_are_cultures ? "Who lives here" : "Who holds it",
+               {ll::carry, ll::people_fill, ll::culture_base, ll::realm_fill, ll::frontier,
+                ll::hard_border, ll::seats}),
+        column("Routes",       {ll::kin_line, ll::kin_line_water, ll::track, ll::road, ll::post_road,
+                                ll::bridge, ll::trade_link, ll::caravan, ll::trade_sail}),
+        column("Marks",        {ll::consolidation, ll::seat_captured, ll::crack, ll::diamond,
+                                ll::works, ll::furnace, ll::heat}),
+        column("At sea",       {ll::sea_lane, ll::colonial_tie, ll::treaty, ll::navy, ll::harbour,
+                                ll::sail_crossing, ll::landing}),
+    };
+    cols.erase(std::remove_if(cols.begin(), cols.end(),
+                              [](const legend_column& c) { return c.rows.empty(); }),
+               cols.end());
+    return cols;
+}
+
+/// The legend's measured shape: its columns, each column's offset and width,
+/// and the whole block's size, before it is placed. Measured FIRST, so the map
+/// can leave the band the key needs (`draw_lapse_map`).
+struct legend_layout
+{
+    std::vector<legend_column> cols;
+    std::vector<ImVec2> at;     ///< Each column's offset inside the block.
+    float w = 0.0f, h = 0.0f;   ///< The block, padding excluded.
+    float line = 0.0f, row_h = 0.0f;
+};
+
+constexpr float legend_pad     = 8.0f;  ///< The backing's inset round the block.
+constexpr float legend_gap_top = 10.0f; ///< Map bottom to the backing's top.
+constexpr float legend_sw      = 34.0f; ///< The swatch cell's width.
+constexpr float legend_label   = 7.0f;  ///< Swatch to label.
+constexpr float legend_col_gap = 18.0f; ///< Column to column.
+
+/// Flow the columns left to right inside @p wrap_w, wrapping to a second band
+/// only where the pane runs out.
+legend_layout measure_lapse_legend(const history_lapse& h, const lapse_layer_set& L, float wrap_w)
+{
+    legend_layout g;
+    g.cols = legend_columns(h, L);
+    if (g.cols.empty()) return g;
+    g.line  = ImGui::GetTextLineHeight();
+    g.row_h = std::max(18.0f, g.line + 4.0f);
+    g.at.resize(g.cols.size());
+    float bx = 0.0f, by = 0.0f, band_h = 0.0f;
+    for (std::size_t i = 0; i < g.cols.size(); ++i)
+    {
+        float cw = ImGui::CalcTextSize(g.cols[i].heading).x;
+        for (const auto& r : g.cols[i].rows)
+            cw = std::max(cw, legend_sw + legend_label + ImGui::CalcTextSize(r.second.c_str()).x);
+        const float ch = g.row_h * static_cast<float>(1 + g.cols[i].rows.size());
+        if (bx > 0.0f && bx + cw > wrap_w) { by += band_h + 6.0f; bx = 0.0f; band_h = 0.0f; }
+        g.at[i] = {bx, by};
+        bx += cw + legend_col_gap;
+        band_h = std::max(band_h, ch);
+        g.w = std::max(g.w, bx - legend_col_gap);
+    }
+    g.h = by + band_h;
+    return g;
+}
+
+/// The band under the map the legend needs, backing and gap included.
+float legend_band_h(const legend_layout& g)
+{
+    return g.cols.empty() ? 0.0f : g.h + 2.0f * legend_pad + legend_gap_top + 4.0f;
+}
+
+/// Paint the measured legend with its block's top-left at @p o, on a dark
+/// backing. Returns the primitives drawn; @p listed gets the labels in order,
+/// for the capture log.
+int paint_lapse_legend(const history_lapse& h, const legend_layout& g, ImDrawList* dl, ImVec2 o,
+                       float scale, int year, const std::vector<uint16_t>& slice,
+                       const std::vector<uint32_t>& base_colour, std::string* listed)
+{
+    if (g.cols.empty()) return 0;
+    const legend_palette pal = legend_colours(h, slice, base_colour, year);
+    const float sh = g.row_h - 4.0f; // the swatch cell's height
+    dl->AddRectFilled({o.x - legend_pad, o.y - legend_pad},
+                      {o.x + g.w + legend_pad, o.y + g.h + legend_pad}, IM_COL32(12, 14, 19, 220), 4.0f);
+    dl->AddRect({o.x - legend_pad, o.y - legend_pad}, {o.x + g.w + legend_pad, o.y + g.h + legend_pad},
+                IM_COL32(60, 66, 80, 170), 4.0f, 0, 1.0f);
+    int prims = 2;
+
+    constexpr ImU32 col_label = IM_COL32(196, 202, 214, 255);
+    for (std::size_t i = 0; i < g.cols.size(); ++i)
+    {
+        const float x = o.x + g.at[i].x;
+        float y = o.y + g.at[i].y;
+        dl->AddText({x, y + (g.row_h - g.line) * 0.5f}, col_dim, g.cols[i].heading); // fit-exempt: legend heading; its column is sized by CalcTextSize
+        y += g.row_h;
+        for (const auto& r : g.cols[i].rows)
+        {
+            const ImVec2 a{x, std::floor(y + (g.row_h - sh) * 0.5f)};
+            const ImVec2 b{x + legend_sw, a.y + sh};
+            prims += legend_swatch(dl, r.first, a, b, scale, pal);
+            dl->AddText({x + legend_sw + legend_label, y + (g.row_h - g.line) * 0.5f}, col_label, r.second.c_str()); // fit-exempt: legend label; its column is sized by CalcTextSize
+            prims += 2;
+            if (listed)
+            {
+                if (!listed->empty()) *listed += ", ";
+                *listed += r.second;
+            }
+            y += g.row_h;
+        }
+    }
+    return prims;
+}
+
+} // namespace
+
 void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                     int year)
 {
@@ -950,6 +2330,12 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
 
     const int gw = h.grid_w, gh = h.grid_h;
 
+    // BL-1118: WHAT THIS ROUND DRAWS, decided once. Every pass below gates on
+    // it and the legend at the end lists it, so the map and its key cannot
+    // disagree -- the Empires cut is made inside `lapse_layers_drawn` and
+    // nowhere here.
+    const lapse_layer_set L = lapse_layers_drawn(h);
+
     // Fit the raster into the pane, aspect preserved: a political map stretched
     // to a pane is a map of a different world's shape.
     //
@@ -969,11 +2355,24 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     // one framing shared beats two that agree by luck.
     float fx = 0.0f, fy = 0.0f, scale = 0.0f;
     lapse_map_frame(gw, gh, avail.x, avail.y, fx, fy, scale);
+
+    // BL-1118: THE LEGEND'S BAND. The key is measured before the map is
+    // framed: where the pane's band under the map already holds it (1920x1080
+    // leaves ~290 px) nothing moves; where it does not, the map is framed in
+    // the height left above the key rather than the key being laid over the
+    // map, which is the subject.
+    const legend_layout legend = measure_lapse_legend(h, L, avail.x - 2.0f * legend_pad - 4.0f);
+    {
+        const float need  = legend_band_h(legend);
+        const float below = avail.y - (fy + scale * static_cast<float>(gh));
+        if (need > 0.0f && below < need && avail.y - need > 40.0f)
+            lapse_map_frame(gw, gh, avail.x, avail.y - need, fx, fy, scale);
+    }
     const float mw = scale * static_cast<float>(gw);
     const float mh = scale * static_cast<float>(gh);
     const ImVec2 tl{origin.x + fx, origin.y + fy};
 
-    dl->AddRectFilled(tl, {tl.x + mw, tl.y + mh}, col_sea);
+    paint_sea(dl, tl, {tl.x + mw, tl.y + mh});
 
     // TILE EDGES SNAP TO WHOLE PIXELS. At ~4.6 px per tile a rect edge lands on
     // a fraction, and the rasteriser's anti-aliasing then either leaves a
@@ -990,23 +2389,26 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    Nothing here depends on the slice, and nothing here is merged per
     //    frame — see finish_history_lapse. ──
     int prims = 0;
-    for (const lapse_base_run& b : h.base_runs)
+    if (L.has(lapse_layer::ground))
     {
-        const float x0 = px(static_cast<float>(b.c0));
-        const float x1 = px(static_cast<float>(b.c1));
-        const float y0 = py(static_cast<float>(b.row));
-        const float y1 = py(static_cast<float>(b.row + 1));
-        dl->AddRectFilled({x0, y0}, {x1, y1}, col_base[b.kind]);
-        ++prims;
-    }
-    for (const lapse_relief_seg& s : h.relief_segs)
-    {
-        const float x0 = px(static_cast<float>(s.c0));
-        const float x1 = px(static_cast<float>(s.c1));
-        const float y  = s.lit ? py(static_cast<float>(s.row)) + 0.5f
-                               : py(static_cast<float>(s.row + 1)) - 0.5f;
-        dl->AddLine({x0, y}, {x1, y}, s.lit ? col_relief_lit : col_relief_dark, 1.0f);
-        ++prims;
+        for (const lapse_base_run& b : h.base_runs)
+        {
+            const float x0 = px(static_cast<float>(b.c0));
+            const float x1 = px(static_cast<float>(b.c1));
+            const float y0 = py(static_cast<float>(b.row));
+            const float y1 = py(static_cast<float>(b.row + 1));
+            paint_ground(dl, x0, y0, x1, y1, b.kind);
+            ++prims;
+        }
+        for (const lapse_relief_seg& s : h.relief_segs)
+        {
+            const float x0 = px(static_cast<float>(s.c0));
+            const float x1 = px(static_cast<float>(s.c1));
+            const float y  = s.lit ? py(static_cast<float>(s.row)) + 0.5f
+                                   : py(static_cast<float>(s.row + 1)) - 0.5f;
+            paint_relief_rim(dl, x0, x1, y, s.lit != 0);
+            ++prims;
+        }
     }
 
     // ── 2. THE FILL, as a translucent TINT over the ground. One owner per tile,
@@ -1026,13 +2428,11 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     const float carry_fade = lapse_carry_fade(h, year);
 
     // THE EMPIRES ROUND DRAWS LESS (Ben, 2026-09-25, walking round 4: "the
-    // Empires round shows too much"; STARTUP.md § Round 4). Cut from this
-    // round only: the caravan glyphs, the seat-captured ring, the capital
-    // slide (the dot sits at the current capital, it does not travel), and
-    // the fleets, harbours and treaty arcs. The polity record that closes at
-    // 1200 CE is the Empires record; the Culture record's owners are peoples.
-    const bool empires_round = !h.owners_are_cultures
-                            && h.lapse.start_year + h.lapse.years <= lapse_exploration_epoch_year;
+    // Empires round shows too much"; STARTUP.md § Round 4): the caravan
+    // glyphs, the seat-captured ring, the capital slide (the dot sits at the
+    // current capital, it does not travel), and the fleets, harbours and
+    // treaty arcs. The cut is made in `lapse_layers_drawn` (BL-1118), so the
+    // passes below read it off `L` and the legend drops the same layers.
 
     // THE CULTURE BASE (BL-1087 R3; Ben, 2026-09-24, R7 "both"): on the
     // polity rounds a dull lineage-hue tint of each region's plurality people
@@ -1043,7 +2443,7 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     // slice already pays), then a colour per region. Nothing on the Culture
     // round, whose fill IS the culture, and nothing without a lineage tree.
     std::vector<uint32_t> base_colour;
-    if (!h.owners_are_cultures && h.family_count > 0 && !h.lapse.culture_changes.empty())
+    if (L.has(lapse_layer::culture_base))
     {
         const std::vector<int32_t> plural = culture_plurality_at(h.lapse, year);
         base_colour.assign(plural.size(), 0u);
@@ -1066,8 +2466,9 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     // lookup is one binary search over the steps; cached because a frontier
     // asks it per edge and a political map has thousands of edges.
     std::vector<int8_t> hard_cache; // -1 unread, 0 soft, 1 hard
+    const bool hard_layer = L.has(lapse_layer::hard_border);
     const auto hard_of = [&](int32_t key) -> bool {
-        if (key < 0) return false; // sea and wild ground carry no share
+        if (key < 0 || !hard_layer) return false; // sea and wild ground carry no share
         const std::size_t o = static_cast<std::size_t>(key);
         if (hard_cache.size() <= o) hard_cache.resize(o + 1, -1);
         if (hard_cache[o] < 0)
@@ -1122,15 +2523,14 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                 }
                 if (col != 0u)
                 {
-                    dl->AddRectFilled({px(static_cast<float>(k)), y0},
-                                      {px(static_cast<float>(k2)), y1},
-                                      with_alpha(static_cast<ImU32>(col), base_alpha));
+                    paint_tint(dl, px(static_cast<float>(k)), y0, px(static_cast<float>(k2)), y1,
+                               static_cast<ImU32>(col), base_alpha);
                     ++prims;
                 }
                 k = k2;
             }
         }
-        if (carry_fade > 0.0f)
+        if (L.has(lapse_layer::carry) && carry_fade > 0.0f)
         {
             int k = 0;
             while (k < gw)
@@ -1149,10 +2549,8 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                 }
                 if (col != 0u)
                 {
-                    dl->AddRectFilled({px(static_cast<float>(k)), y0},
-                                      {px(static_cast<float>(k2)), y1},
-                                      with_alpha(static_cast<ImU32>(col),
-                                                 static_cast<int>(tint_alpha * carry_fade)));
+                    paint_tint(dl, px(static_cast<float>(k)), y0, px(static_cast<float>(k2)), y1,
+                               static_cast<ImU32>(col), static_cast<int>(tint_alpha * carry_fade));
                     ++prims;
                 }
                 k = k2;
@@ -1177,10 +2575,9 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                 // round with nothing behind it (the migration, and any round
                 // whose predecessor was never run) reads a fade of 0 from the
                 // first frame, so it draws at full strength as it always did.
-                dl->AddRectFilled({px(static_cast<float>(c)), y0},
-                                  {px(static_cast<float>(e)), y1},
-                                  with_alpha(owner_colour(h, o, year), // BL-1087: the ratchet at this year
-                                             static_cast<int>(tint_alpha * (1.0f - carry_fade))));
+                paint_tint(dl, px(static_cast<float>(c)), y0, px(static_cast<float>(e)), y1,
+                           owner_colour(h, o, year), // BL-1087: the ratchet at this year
+                           static_cast<int>(tint_alpha * (1.0f - carry_fade)));
                 ++prims;
             }
             // The VERTICAL frontier: between this run and the one to its west.
@@ -1192,34 +2589,16 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                     const bool hk = hard_of(key), hw = hard_of(west);
                     if ((hk || hw) && key >= 0 && west >= 0) // realm against realm only
                     {
-                        // BL-1090: A HARD BORDER. 2 px of dark centred on the
-                        // tile edge (pixel columns c-1 and c), then a 1 px
-                        // stroke one pixel INSIDE each hard realm's ground in
-                        // its own colour -- so the weight reads as the realm's,
-                        // not the edge's, and two hard neighbours each keep
-                        // their own stroke on their own side.
-                        const float x = px(static_cast<float>(c));
-                        dl->AddLine({x, y0}, {x, y1}, col_frontier_hard, 2.0f);
-                        ++prims;
-                        if (hk)
-                        {
-                            dl->AddLine({x + 1.5f, y0}, {x + 1.5f, y1},
-                                        owner_colour(h, static_cast<uint16_t>(key)), 1.0f);
-                            ++prims;
-                        }
-                        if (hw)
-                        {
-                            dl->AddLine({x - 1.5f, y0}, {x - 1.5f, y1},
-                                        owner_colour(h, static_cast<uint16_t>(west)), 1.0f);
-                            ++prims;
-                        }
+                        // BL-1090: A HARD BORDER on pixel columns c-1 and c
+                        // (`paint_hard_v`), each hard realm's stroke on its
+                        // own side.
+                        prims += paint_hard_v(dl, px(static_cast<float>(c)), y0, y1,
+                                              hk, hk ? owner_colour(h, static_cast<uint16_t>(key)) : 0u,
+                                              hw, hw ? owner_colour(h, static_cast<uint16_t>(west)) : 0u);
                     }
                     else
                     {
-                        // +0.5: a 1 px line centred ON the pixel column, not
-                        // anti-aliased across two.
-                        dl->AddLine({px(static_cast<float>(c)) + 0.5f, y0},
-                                    {px(static_cast<float>(c)) + 0.5f, y1}, col_frontier, 1.0f);
+                        paint_frontier_v(dl, px(static_cast<float>(c)), y0, y1);
                         ++prims;
                     }
                 }
@@ -1258,24 +2637,13 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                     const float x1 = px(static_cast<float>(e)) + 1.0f;
                     if ((hs || hn) && south >= 0 && north >= 0) // realm against realm only
                     {
-                        dl->AddLine({x0, y0}, {x1, y0}, col_frontier_hard, 2.0f);
-                        ++prims;
-                        if (hs)
-                        {
-                            dl->AddLine({x0, y0 + 1.5f}, {x1, y0 + 1.5f},
-                                        owner_colour(h, static_cast<uint16_t>(south)), 1.0f);
-                            ++prims;
-                        }
-                        if (hn)
-                        {
-                            dl->AddLine({x0, y0 - 1.5f}, {x1, y0 - 1.5f},
-                                        owner_colour(h, static_cast<uint16_t>(north)), 1.0f);
-                            ++prims;
-                        }
+                        prims += paint_hard_h(dl, x0, x1, y0,
+                                              hs, hs ? owner_colour(h, static_cast<uint16_t>(south)) : 0u,
+                                              hn, hn ? owner_colour(h, static_cast<uint16_t>(north)) : 0u);
                     }
                     else
                     {
-                        dl->AddLine({x0, y0 + 0.5f}, {x1, y0 + 0.5f}, col_frontier, 1.0f);
+                        paint_frontier_h(dl, x0, x1, y0);
                         ++prims;
                     }
                 }
@@ -1302,11 +2670,10 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    a realm's ground that sparks IS its heat, and a spark lit at one heat
     //    stays lit at every higher one: the heat grows across the span rather
     //    than flickering. Empty on every record with no points. ──
-    if (h.industry_recorded && h.industry_density_peak > 0.0)
+    if (L.has(lapse_layer::heat))
     {
         std::vector<float> heat_of; // owner -> heat this frame; -1 = not yet read
         const float fade_in = 1.0f - carry_fade;
-        const float half    = std::clamp(scale * 0.40f, 1.0f, 2.4f);
         constexpr int cell  = 3;
         for (int r = 0; r < gh; r += cell)
         {
@@ -1333,10 +2700,7 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                 // A dark ring under a bright core, as the ember marks and the
                 // seats wear: a spark must read on a yellow realm as well as a
                 // blue one, and a bare pale square vanished on the warm hues.
-                dl->AddRectFilled({at.x - half - 1.0f, at.y - half - 1.0f},
-                                  {at.x + half + 1.0f, at.y + half + 1.0f}, col_seat_ring);
-                dl->AddRectFilled({at.x - half, at.y - half}, {at.x + half, at.y + half},
-                                  col_heat);
+                paint_spark(dl, at, scale);
                 prims += 2;
             }
         }
@@ -1345,14 +2709,14 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     // ── 3. RIVERS, over the fill: a river is what a frontier stops at, so it
     //    reads best on top of the tint rather than dimmed under it. Tile centre
     //    to downstream centre, baked once. ──
+    if (L.has(lapse_layer::rivers))
     {
         const float half = scale * 0.5f;
-        const float w    = std::max(1.0f, scale * 0.28f);
         for (const lapse_river_seg& s : h.river_segs)
         {
-            dl->AddLine({px(static_cast<float>(s.c0)) + half, py(static_cast<float>(s.r0)) + half},
-                        {px(static_cast<float>(s.c1)) + half, py(static_cast<float>(s.r1)) + half},
-                        col_river, w);
+            paint_river(dl, {px(static_cast<float>(s.c0)) + half, py(static_cast<float>(s.r0)) + half},
+                            {px(static_cast<float>(s.c1)) + half, py(static_cast<float>(s.r1)) + half},
+                        scale);
         }
         prims += static_cast<int>(h.river_segs.size());
     }
@@ -1376,13 +2740,11 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     const int marker_window = lapse_marker_window_years(h);
     dl->PushClipRect({tl.x, tl.y}, {tl.x + static_cast<float>(gw) * scale,
                                     tl.y + static_cast<float>(gh) * scale}, true);
+    if (L.has(lapse_layer::track) || L.has(lapse_layer::road)) // BL-1134: a carried Road draws with no Track frame
     for (const lapse_road_seg& s : h.road_segs)
     {
-        if (year < s.year_track) continue; // not promoted yet at this playhead
+        if (!lapse_road_drawn(s, year)) continue; // not promoted yet at this playhead
         const bool at_road = year >= s.year_road;
-        float w = at_road ? std::max(1.5f, scale * 0.30f)
-                          : std::max(1.0f, scale * 0.16f);
-        const ImU32 col = at_road ? col_road : col_road_track;
         const bool  wrapped = s.c1 < 0.0f || s.c1 > static_cast<float>(gw);
         const float shift   = s.c1 < 0.0f ? world_w : -world_w;
 
@@ -1398,31 +2760,14 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
          && year - s.year_post_road < marker_window)
             pulse = 1.0f - static_cast<float>(year - s.year_post_road)
                          / static_cast<float>(marker_window);
-        w += w * 1.5f * pulse;
 
-        dl->AddLine({px(s.c0), py(s.r0)}, {px(s.c1), py(s.r1)}, col, w);
-        ++prims;
+        paint_road(dl, {px(s.c0), py(s.r0)}, {px(s.c1), py(s.r1)}, at_road, pulse, scale, prims);
         if (wrapped)
-        {
-            dl->AddLine({px(s.c0) + shift, py(s.r0)}, {px(s.c1) + shift, py(s.r1)}, col, w);
-            ++prims;
-        }
-        if (pulse > 0.0f)
-        {
-            const ImU32 core = with_alpha(col_bright, static_cast<int>(230.0f * pulse));
-            const float cw   = std::max(1.0f, w * 0.45f);
-            dl->AddLine({px(s.c0), py(s.r0)}, {px(s.c1), py(s.r1)}, core, cw);
-            ++prims;
-            if (wrapped)
-            {
-                dl->AddLine({px(s.c0) + shift, py(s.r0)}, {px(s.c1) + shift, py(s.r1)}, core, cw);
-                ++prims;
-            }
-        }
+            paint_road(dl, {px(s.c0) + shift, py(s.r0)}, {px(s.c1) + shift, py(s.r1)},
+                       at_road, pulse, scale, prims);
         for (const lapse_bridge& br : s.bridges)
         {
-            const ImVec2 at{px(br.col), py(br.row)};
-            dl->AddCircleFilled(at, std::clamp(scale * 0.35f, 1.5f, 3.5f), col_bridge, 8);
+            paint_bridge(dl, {px(br.col), py(br.row)}, scale);
             ++prims;
         }
     }
@@ -1433,6 +2778,7 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    brackets it, where a road corridor only ever ratchets forward. A
     //    grudge closing a border stops drawing the stroke; it does not erase
     //    the corridor, which can reopen once the grudge decays. ──
+    if (L.has(lapse_layer::trade_link))
     for (const lapse_trade_seg& s : h.trade_segs)
     {
         bool open_here = false;
@@ -1441,14 +2787,13 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
             if (year >= sp.year_open && year < sp.year_close) { open_here = true; break; }
         }
         if (!open_here) continue;
-        const float w = std::max(1.25f, scale * 0.22f);
-        dl->AddLine({px(s.c0), py(s.r0)}, {px(s.c1), py(s.r1)}, col_trade_link, w);
+        paint_trade_line(dl, {px(s.c0), py(s.r0)}, {px(s.c1), py(s.r1)}, scale, 220);
         ++prims;
         if (s.c1 < 0.0f || s.c1 > static_cast<float>(gw)) // the seam, drawn off the other edge
         {
             const float shift = s.c1 < 0.0f ? world_w : -world_w;
-            dl->AddLine({px(s.c0) + shift, py(s.r0)}, {px(s.c1) + shift, py(s.r1)},
-                        col_trade_link, w);
+            paint_trade_line(dl, {px(s.c0) + shift, py(s.r0)}, {px(s.c1) + shift, py(s.r1)},
+                             scale, 220);
             ++prims;
         }
     }
@@ -1456,27 +2801,37 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     // ── 3c'. SEA LANES (BL-1097), its own water layer beside the two above:
     //    a lane is drawn from the frame its leg earned the tier to the
     //    round's end, and never before — the crossings that fell short stay
-    //    invisible, as the walked-once settle tree does on land. Drawn as a
-    //    WIDE, SOFT SEA-BLUE BAND (Ben, 2026-09-25): most lane uses come from
-    //    the tribute leg, so a lane nearly always runs the same capital-to-
-    //    capital line as its colonial tie, and a thin dashed lane vanished
-    //    under the tie's dashes at the live click. A shipping lane is a swath;
-    //    the tie, drawn later, reads as dashes on top of it. The width scales
-    //    with the map. Seam-crossing lanes are stroked twice like the
-    //    corridors above. ──
+    //    invisible, as the walked-once settle tree does on land. Most lane
+    //    uses come from the tribute leg, so a lane nearly always runs the same
+    //    capital-to-capital line as its colonial tie: a thin dashed lane and
+    //    then a straight soft band both vanished under the tie at the live
+    //    click. So the lane was given a CURVED FORM (BL-1124; Ben, 2026-09-25,
+    //    picked from three forms at the live app). It is now laid ON ITS SEA
+    //    PATH (Ben, 2026-10-03: "sea lanes should always go over ocean, never
+    //    over ground"; `paint_lane_path`): the stamp's own water-only walk,
+    //    port to port, smoothed -- which leaves the straight capital-to-capital
+    //    tie by construction, since it starts at the coast and goes round the
+    //    land. A lane with no water path draws nothing, as it lays nothing.
+    //    Seam-crossing lanes are stroked twice like the corridors above. ──
+    if (L.has(lapse_layer::sea_lane))
+    {
+    std::vector<ImVec2> lane_pts;
     for (const lapse_lane_seg& s : h.lane_segs)
     {
         if (year < s.year_open) continue; // not yet a lane at this playhead
-        const float w    = std::max(5.0f, scale * 1.4f);
-        const ImU32 band = with_alpha(col_sea_lane, 80);
-        dl->AddLine({px(s.c0), py(s.r0)}, {px(s.c1), py(s.r1)}, band, w);
-        ++prims;
-        if (s.c1 < 0.0f || s.c1 > static_cast<float>(gw)) // the seam, drawn off the other edge
-        {
-            const float shift = s.c1 < 0.0f ? world_w : -world_w;
-            dl->AddLine({px(s.c0) + shift, py(s.r0)}, {px(s.c1) + shift, py(s.r1)}, band, w);
-            ++prims;
-        }
+        if (s.path_c.size() < 2) continue; // no water joins its ports: nothing laid
+        float lo = s.path_c.front(), hi = lo;
+        for (const float c : s.path_c) { lo = std::min(lo, c); hi = std::max(hi, c); }
+        const auto stroke = [&](float shift) {
+            lane_pts.clear();
+            for (std::size_t i = 0; i < s.path_c.size(); ++i)
+                lane_pts.push_back({px(s.path_c[i]) + shift, py(s.path_r[i])});
+            prims += paint_lane_path(dl, lane_pts, scale);
+        };
+        stroke(0.0f);
+        if (lo < 0.0f)                      stroke(world_w);  // the seam, drawn off the other edge
+        if (hi > static_cast<float>(gw))    stroke(-world_w);
+    }
     }
 
     // ── 3c''. THE KIN ARROWS (BL-1092; Ben, 2026-09-24, rulings R11), the
@@ -1490,11 +2845,9 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    arrowhead at the new region says which way the people went. Seam
     //    crossers are stroked twice like every corridor above. Empty on the
     //    polity rounds by construction (finish_history_lapse). ──
-    if (!h.kin_segs.empty())
+    if (L.has(lapse_layer::kin_line) || L.has(lapse_layer::kin_line_water))
     {
         const int   kin_window = std::max(1, marker_window * 3);
-        const float w    = std::max(1.25f, scale * 0.22f);
-        const float dash = std::max(3.0f, scale * 1.2f);
         for (const lapse_kin_seg& s : h.kin_segs)
         {
             if (year < s.year || year - s.year >= kin_window) continue;
@@ -1503,40 +2856,12 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
             const int   alpha = static_cast<int>(40.0f + 200.0f * fade);
             const ImU32 col   = with_alpha(owner_colour(h, s.culture, year), alpha);
             const ImU32 head  = with_alpha(col_bright, alpha);
-            const auto stroke = [&](float x0, float y0, float x1, float y1) {
-                const float dx = x1 - x0, dy = y1 - y0;
-                const float len = std::sqrt(dx * dx + dy * dy);
-                if (len <= 0.0f) return;
-                const float ux = dx / len, uy = dy / len;
-                if (s.over_water)
-                {
-                    for (float t = 0.0f; t < len; t += dash * 2.0f)
-                    {
-                        const float e = std::min(t + dash, len);
-                        dl->AddLine({x0 + ux * t, y0 + uy * t}, {x0 + ux * e, y0 + uy * e}, col, w);
-                        ++prims;
-                    }
-                }
-                else
-                {
-                    dl->AddLine({x0, y0}, {x1, y1}, col, w);
-                    ++prims;
-                }
-                // The head: a small filled triangle pointing along the line
-                // at the new region, sized to the tile so it survives a
-                // narrow pane without swallowing the seat dot beneath it.
-                const float hl = std::clamp(scale * 0.9f, 3.0f, 6.0f);
-                const ImVec2 tip{x1, y1};
-                const ImVec2 base{x1 - ux * hl, y1 - uy * hl};
-                dl->AddTriangleFilled(tip, {base.x - uy * hl * 0.5f, base.y + ux * hl * 0.5f},
-                                      {base.x + uy * hl * 0.5f, base.y - ux * hl * 0.5f}, head);
-                ++prims;
-            };
-            stroke(px(s.c0), py(s.r0), px(s.c1), py(s.r1));
+            paint_kin(dl, px(s.c0), py(s.r0), px(s.c1), py(s.r1), col, head, s.over_water, scale, prims);
             if (s.c1 < 0.0f || s.c1 > static_cast<float>(gw)) // the seam, drawn off the other edge
             {
                 const float shift = s.c1 < 0.0f ? world_w : -world_w;
-                stroke(px(s.c0) + shift, py(s.r0), px(s.c1) + shift, py(s.r1));
+                paint_kin(dl, px(s.c0) + shift, py(s.r0), px(s.c1) + shift, py(s.r1),
+                          col, head, s.over_water, scale, prims);
             }
         }
     }
@@ -1552,8 +2877,8 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    filter; nothing here re-derives a number. One exemplar per crossing,
     //    fading exactly like the event ring below, never a mark per cargo unit
     //    and never a continuous animation. Not on the Empires round (Ben,
-    //    2026-09-25). ──
-    if (!empires_round)
+    //    2026-09-25; the cut is `L`'s). ──
+    if (L.has(lapse_layer::caravan) || L.has(lapse_layer::trade_sail))
     {
         const int window = lapse_marker_window_years(h);
         for (const lapse_event& e : h.lapse.events)
@@ -1587,6 +2912,7 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                 my = (it->r0 + it->r1) * 0.5f;
                 over_water = it->over_water;
             }
+            if (!L.has(over_water ? lapse_layer::trade_sail : lapse_layer::caravan)) continue;
 
             // The midpoint of a seam-crossing corridor sits off the map by
             // construction (the bake stored the short way round), so fold it
@@ -1610,19 +2936,15 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    2026-09-16 ruling below retired the pings): it appears at the
     //    crossing and stays. Drawn under the seats, so a seat reads over it.
     //    Empty on the three earlier rounds, whose records carry no crossing. ──
-    if (!h.region_lit_year.empty())
+    if (L.has(lapse_layer::furnace))
     {
-        const float r_out = std::clamp(scale * 0.55f, 1.6f, 3.4f);
         for (std::size_t ri = 0; ri < h.region_lit_year.size() && ri < h.region_col.size(); ++ri)
         {
             if (h.region_lit_year[ri] > year) continue;
             if (ri < slice.size() && slice[ri] == owner_none) continue; // nobody's ground: no works
             const ImVec2 at{px(static_cast<float>(h.region_col[ri]) + 0.5f),
                             py(static_cast<float>(h.region_row[ri]) + 0.5f)};
-            dl->AddRectFilled({at.x - r_out - 1.0f, at.y - r_out - 1.0f},
-                              {at.x + r_out + 1.0f, at.y + r_out + 1.0f}, col_seat_ring);
-            dl->AddRectFilled({at.x - r_out, at.y - r_out}, {at.x + r_out, at.y + r_out},
-                              col_furnace);
+            paint_ember(dl, at, scale);
             prims += 2;
         }
     }
@@ -1654,29 +2976,13 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    to change, `seat_region_of` below. ──
     struct seat_slide { uint16_t polity; float c0, r0, c1, r1, t; };
     std::vector<seat_slide> slides;
-    // THE WORKS (BL-1099): the one glyph here that is a building -- a low
-    // BRIGHT block with a furnace-toned stack rising from its right shoulder,
-    // over a dark underline. The stack ties it to the ember squares as the
-    // same family of fact (industry); the bright block is what tells it from
-    // them and from the heat sparks, which are plain furnace-hued squares (the
-    // first capture drew it all in the furnace tone and it vanished into the
-    // stipple: a flash must read apart from the ground it lands on). A
-    // specialist's stands a little taller. Shared by the in-span note in 3f
-    // and the close's real charters in 3g, so the two read as one kind of
-    // thing.
+    // THE WORKS (BL-1099; `paint_works`): the first capture drew it all in the
+    // furnace tone and it vanished into the heat stipple, which is why the
+    // block is bright -- a flash must read apart from the ground it lands on.
+    // Shared by the in-span note in 3f and the close's real charters in 3g,
+    // so the two read as one kind of thing.
     const auto draw_works = [&](ImVec2 at, int alpha, bool specialist) {
-        const float s   = std::clamp(scale * (specialist ? 0.9f : 0.75f), 2.5f, 5.5f);
-        const float bw  = s * 1.4f, bh = s * 0.8f;          // the block
-        const float sw  = s * 0.45f, sh = s * (specialist ? 2.4f : 2.0f); // the stack
-        const ImU32 under = with_alpha(col_seat_ring, alpha);
-        const ImU32 block = with_alpha(col_bright, alpha);
-        const ImU32 stack = with_alpha(col_furnace, alpha);
-        // the underline first, one pixel proud all round
-        dl->AddRectFilled({at.x - bw - 1.0f, at.y - bh - 1.0f}, {at.x + bw + 1.0f, at.y + bh + 1.0f}, under);
-        dl->AddRectFilled({at.x + bw - sw - 1.0f, at.y - sh - 1.0f}, {at.x + bw + 1.0f, at.y + 1.0f}, under);
-        dl->AddRectFilled({at.x - bw, at.y - bh}, {at.x + bw, at.y + bh}, block);
-        dl->AddRectFilled({at.x + bw - sw, at.y - sh}, {at.x + bw, at.y}, stack);
-        prims += 4;
+        prims += paint_works(dl, at, scale, alpha, specialist);
     };
     // THE REST SEAT (BL-1094, the review's fix round): where a polity's dot
     // SITS between moves -- the region of its last `capital_moved` at or
@@ -1719,32 +3025,20 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
             const int32_t moved = rest_seat[polity];
             return moved >= 0 ? moved : h.polity_seat[polity];
         };
-        const float d_half   = std::clamp(scale * 1.1f, 4.0f, 7.5f);  // the diamond
-        const float ring_r   = std::clamp(scale * 1.7f, 5.0f, 11.0f); // the fallen seat
-        const float crack_amp = std::clamp(scale * 0.6f, 2.0f, 5.0f); // the crack's jag
-
-        // THE DIAMOND: two tones -- two peoples settling one way of life: the
-        // coining realm's colour on the west half, a pale tone on the east,
-        // under one dark outline. One drawing for the carried marks and for
-        // this record's own.
+        // THE DIAMOND (`paint_diamond`): the coining realm's colour on the
+        // west half. One drawing for the carried marks and this record's own.
         const auto draw_diamond = [&](uint16_t region, uint16_t polity) {
             if (!region_ok(region)) return;
             const ImVec2 a  = anchor(region);
-            const ImVec2 at{px(a.x), py(a.y)};
-            const ImVec2 top{at.x, at.y - d_half}, bot{at.x, at.y + d_half};
-            const ImVec2 lft{at.x - d_half, at.y}, rgt{at.x + d_half, at.y};
             const ImU32 west = polity == lapse_event_none ? col_bright : owner_colour(h, polity);
-            constexpr ImU32 east = IM_COL32(238, 226, 196, 255);
-            dl->AddTriangleFilled(top, lft, bot, west);
-            dl->AddTriangleFilled(top, bot, rgt, east);
-            dl->AddQuad(top, rgt, bot, lft, col_seat_ring, 1.5f);
-            prims += 3;
+            prims += paint_diamond(dl, {px(a.x), py(a.y)}, scale, west);
         };
         dl->PushClipRect({tl.x, tl.y}, {tl.x + static_cast<float>(gw) * scale,
                                         tl.y + static_cast<float>(gh) * scale}, true);
         // THE DIAMONDS THAT CAME BEFORE (BL-1094): coined on an earlier round
         // and carried by id, drawn from this record's first frame.
-        for (const history_lapse::civ_mark& m : h.civ_carry) draw_diamond(m.region, m.polity);
+        if (L.has(lapse_layer::diamond))
+            for (const history_lapse::civ_mark& m : h.civ_carry) draw_diamond(m.region, m.polity);
         for (const lapse_event& e : h.lapse.events)
         {
             if (e.year > year) break; // ascending by year
@@ -1771,14 +3065,12 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                 // A ring in the winner's colour at the fallen seat, widening a
                 // little as it fades -- the one glyph here that is a ring, so
                 // "a seat fell" reads as itself. Not on the Empires round
-                // (Ben, 2026-09-25): the border moving is the story there.
-                if (empires_round) continue;
+                // (Ben, 2026-09-25; the cut is `L`'s): the border moving is
+                // the story there.
+                if (!L.has(lapse_layer::seat_captured)) continue;
                 if (!region_ok(e.region) || e.polity == lapse_event_none) continue;
                 const ImVec2 an = anchor(e.region);
-                const ImVec2 at{px(an.x), py(an.y)};
-                const float  r  = ring_r * (1.0f + 0.35f * t);
-                dl->AddCircle(at, r + 1.0f, with_alpha(col_seat_ring, a), 16, 3.5f);
-                dl->AddCircle(at, r, with_alpha(owner_colour(h, e.polity), a), 16, 2.0f);
+                paint_capture_ring(dl, {px(an.x), py(an.y)}, scale, t, owner_colour(h, e.polity), a);
                 prims += 2;
                 break;
             }
@@ -1790,6 +3082,7 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                 // event so it never shimmers frame to frame. Drawn the short
                 // way round the seam and again a world width away, inside the
                 // map's clip, as the corridors are.
+                if (!L.has(lapse_layer::crack)) continue;
                 const int32_t ps = seat_region_of(e.other);
                 if (ps < 0 || !region_ok(e.region)) continue;
                 const ImVec2 p0 = anchor(static_cast<uint16_t>(ps));
@@ -1797,41 +3090,20 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                 p1.x = lapse_unwrap_col(p0.x, p1.x, gw);
                 const bool  wrapped = p1.x < 0.0f || p1.x > static_cast<float>(gw);
                 const float shift   = p1.x < 0.0f ? world_w : -world_w;
-                constexpr int segs = 6;
-                ImVec2 pts[segs + 1];
-                const float dx = px(p1.x) - px(p0.x), dy = py(p1.y) - py(p0.y);
-                const float len = std::max(1.0f, std::sqrt(dx * dx + dy * dy));
-                const float nx = -dy / len, ny = dx / len; // the perpendicular
-                uint32_t k = static_cast<uint32_t>(e.year) * 2654435761u
-                           ^ (static_cast<uint32_t>(e.region) << 16) ^ e.other;
-                for (int i = 0; i <= segs; ++i)
-                {
-                    const float u = static_cast<float>(i) / static_cast<float>(segs);
-                    k ^= k >> 13; k *= 2246822519u; k ^= k >> 16;
-                    const float off = (i == 0 || i == segs) ? 0.0f
-                                    : (static_cast<float>(k & 0xFFFFu) / 32768.0f - 1.0f) * crack_amp;
-                    pts[i] = {px(p0.x) + dx * u + nx * off, py(p0.y) + dy * u + ny * off};
-                }
-                const ImU32 under = with_alpha(col_seat_ring, a);
-                const ImU32 over  = with_alpha(col_bright, a);
-                for (int pass = 0; pass < (wrapped ? 2 : 1); ++pass)
-                {
-                    const float sx = pass == 0 ? 0.0f : shift;
-                    for (int i = 0; i < segs; ++i)
-                        dl->AddLine({pts[i].x + sx, pts[i].y}, {pts[i + 1].x + sx, pts[i + 1].y}, under, 3.0f);
-                    for (int i = 0; i < segs; ++i)
-                        dl->AddLine({pts[i].x + sx, pts[i].y}, {pts[i + 1].x + sx, pts[i + 1].y}, over, 1.25f);
-                    prims += 2 * segs;
-                }
+                const uint32_t key = static_cast<uint32_t>(e.year) * 2654435761u
+                                   ^ (static_cast<uint32_t>(e.region) << 16) ^ e.other;
+                prims += paint_crack(dl, {px(p0.x), py(p0.y)}, {px(p1.x), py(p1.y)}, key, scale, a,
+                                     wrapped, shift);
                 break;
             }
             case lapse_event_kind::capital_moved:
             {
                 // The seat dot slides from the OLD capital (`other`) to the new
                 // (`region`) over the window; the seats pass reads this table.
-                // Not on the Empires round (Ben, 2026-09-25): the dot sits at
-                // the current capital, read off `rest_seat`, without travelling.
-                if (empires_round) continue;
+                // Not on the Empires round (Ben, 2026-09-25; the cut is
+                // `L`'s): the dot sits at the current capital, read off
+                // `rest_seat`, without travelling.
+                if (!L.has(lapse_layer::capital_slide)) continue;
                 if (!region_ok(e.region) || !region_ok(e.other) || e.polity == lapse_event_none) continue;
                 const ImVec2 from = anchor(e.other);
                 ImVec2 to = anchor(e.region);
@@ -1845,7 +3117,7 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                 // fading over the window (STARTUP.md § Round 6, "Company
                 // creation flashes"). A ping in the sense the 2026-09-16 ruling
                 // allows: its own glyph for its own kind, never a ring.
-                if (!region_ok(e.region)) continue;
+                if (!L.has(lapse_layer::works) || !region_ok(e.region)) continue;
                 const ImVec2 an = anchor(e.region);
                 draw_works({px(an.x), py(an.y)}, a, /*specialist=*/false);
                 break;
@@ -1867,7 +3139,8 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    read off the world-gen roster. Frozen under --verify. ──
     if (!h.works_close.empty() && year < h.lapse.start_year + h.lapse.years)
         h.works_close_t0 = -1.0; // off the close: the next arrival flashes again (cold review)
-    if (!h.works_close.empty() && year >= h.lapse.start_year + h.lapse.years)
+    if (L.has(lapse_layer::works) && !h.works_close.empty()
+     && year >= h.lapse.start_year + h.lapse.years)
     {
         constexpr double stagger_s = 0.04; // per charter, in report order
         constexpr double ramp_s    = 0.5;  // to full strength
@@ -1895,17 +3168,17 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    hull and harbour at each capital, the sail on every wet campaign and
     //    the landing on every seat taken across water — its own pass, under
     //    the seats, defined with its bake below the sample helpers. Empty on
-    //    every record that carries none of it. ──
-    if (!empires_round) // Ben, 2026-09-25: cut from the Empires round
-        prims += draw_lapse_fleets(h, slice, dl, tl, scale, year);
+    //    every record that carries none of it, and cut from the Empires round
+    //    (Ben, 2026-09-25) through `L`, each of its six layers on its own bit. ──
+    prims += draw_lapse_fleets(h, L, slice, dl, tl, scale, year);
 
     // ── 4. SEATS: one dot per polity HOLDING GROUND in this slice, at the
     //    region it first held. Seats only, not every region — the in-game Ages
     //    view draws a dot per region, and at blob granularity that is a rash;
     //    a seat per power is what makes a fragmentation into successors legible
     //    when two of them happen to sit in neighbouring hues. ──
+    if (L.has(lapse_layer::seats))
     {
-        const float rad = std::clamp(scale * 0.7f, 2.0f, 4.5f);
         for (std::size_t o = 0; o < present.size() && o < h.polity_seat.size(); ++o)
         {
             if (!present[o]) continue;
@@ -1932,9 +3205,7 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                 at = {px(cx), py(cy)};
                 break;
             }
-            dl->AddCircleFilled(at, rad, owner_colour(h, static_cast<uint16_t>(o), year), 10);
-            dl->AddCircle(at, rad, col_seat_ring, 10, 1.0f);
-            prims += 2;
+            prims += paint_seat(dl, at, scale, owner_colour(h, static_cast<uint16_t>(o), year));
         }
     }
 
@@ -1951,7 +3222,7 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     //    wizard's own Exploration round (BL-946) is exactly the record this
     //    was written for: its `h.lapse` IS the Exploration span (1200 ->
     //    1660), so this fires on every arrival at that round. ──
-    if (h.lapse.start_year + h.lapse.years > lapse_exploration_epoch_year)
+    if (L.has(lapse_layer::consolidation))
     {
         const int window = lapse_marker_window_years(h);
         if (year >= lapse_exploration_epoch_year
@@ -1960,8 +3231,6 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
             const float t = static_cast<float>(year - lapse_exploration_epoch_year)
                           / static_cast<float>(window);
             const int   a = static_cast<int>(255.0f * (1.0f - t));
-            const float r = std::clamp(scale * 1.1f, 3.5f, 7.0f);
-            const ImU32 gold = with_alpha(IM_COL32(230, 190, 90, 255), a);
             for (std::size_t o = 0; o < present.size() && o < h.polity_seat.size(); ++o)
             {
                 if (!present[o]) continue;
@@ -1974,27 +3243,10 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                 // A BURST, not a dot: eight short rays around the seat, so a
                 // one-time inflow reads differently from an ongoing corridor
                 // exemplar or the seat's own steady ring.
-                for (int k = 0; k < 8; ++k)
-                {
-                    const float ang = static_cast<float>(k) * (3.14159265f / 4.0f);
-                    const ImVec2 p0{at.x + std::cos(ang) * r * 0.6f, at.y + std::sin(ang) * r * 0.6f};
-                    const ImVec2 p1{at.x + std::cos(ang) * r,        at.y + std::sin(ang) * r};
-                    dl->AddLine(p0, p1, gold, 1.5f);
-                }
+                paint_burst(dl, at, scale, a);
                 ++prims;
             }
         }
-    }
-
-    // The draw cost, reported once per record under the capture harness so the
-    // bound is a measured number rather than an assumption. Never in play.
-    if (!h.prim_report_done)
-    {
-        h.prim_report_done = true;
-        std::fprintf(stderr, "history_lapse: %zu base runs, %zu relief rims, %zu river segments, "
-                             "%zu road corridors, %zu trade corridors, %d primitives this frame\n",
-                     h.base_runs.size(), h.relief_segs.size(), h.river_segs.size(),
-                     h.road_segs.size(), h.trade_segs.size(), prims);
     }
 
     // The year, over the map's own corner. It is the one thing a watcher needs
@@ -2036,6 +3288,57 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     // transition marked on the thing. `realm_ended`, `creed_preached` and
     // every other kind draw nothing. Adding a kind here means asking whether
     // it earns a glyph of its own, never restoring the blanket.
+
+    // ── 6. THE LEGEND (BL-1118; Ben, 2026-09-25): every layer `L` says this
+    //    round draws, each by its own glyph, and nothing else. ──
+    //    Under the map, left-aligned to it where the block fits the pane, else
+    //    moved left until it does.
+    std::string listed;
+    {
+        const float right = origin.x + avail.x - legend_pad - legend.w;
+        const ImVec2 o{std::max(origin.x + legend_pad, std::min(tl.x + legend_pad, right)),
+                       tl.y + mh + legend_gap_top + legend_pad};
+        prims += paint_lapse_legend(h, legend, dl, o, scale, year, slice, base_colour,
+                                    h.prim_report_done ? nullptr : &listed);
+    }
+
+    // The draw cost, reported once per record under the capture harness so the
+    // bound is a measured number rather than an assumption. Never in play.
+    // BL-1118: with the legend's rows, so a capture log says what the key named.
+    if (!h.prim_report_done)
+    {
+        h.prim_report_done = true;
+        // BL-1124: how many lanes draw shorter than a band is wide at this
+        // scale -- a lane joining two neighbouring regions is a dot whatever
+        // its form, which the pick has to know.
+        int short_lanes = 0;
+        for (const lapse_lane_seg& s : h.lane_segs)
+        {
+            const float dx = (s.c1 - s.c0) * scale, dy = (s.r1 - s.r0) * scale;
+            if (dx * dx + dy * dy < 64.0f) ++short_lanes;
+        }
+        // 2026-10-03: how many lanes have no sea path (no port in reach, one
+        // port, no water joining them) and so draw nothing, and how many sea
+        // points the drawn ones carry -- the reading that says the lanes went
+        // over the water rather than vanishing.
+        int pathless = 0;
+        std::size_t path_points = 0;
+        for (const lapse_lane_seg& s : h.lane_segs)
+        {
+            if (s.path_c.size() < 2) ++pathless;
+            path_points += s.path_c.size();
+        }
+        std::fprintf(stderr, "history_lapse: %zu base runs, %zu relief rims, %zu river segments, "
+                             "%zu road corridors, %zu trade corridors, %zu sea lanes (%d under 8 px, "
+                             "%d with no sea path, %zu drawn points), %d primitives this frame\n",
+                     h.base_runs.size(), h.relief_segs.size(), h.river_segs.size(),
+                     h.road_segs.size(), h.trade_segs.size(), h.lane_segs.size(), short_lanes,
+                     pathless, path_points, prims);
+        std::fprintf(stderr, "history_lapse legend (%d-%d): %s\n", h.lapse.start_year,
+                     h.lapse.start_year + h.lapse.years, listed.c_str());
+        std::fprintf(stderr, "history_lapse pane: origin %.0f,%.0f avail %.0fx%.0f map %.0f,%.0f %.0fx%.0f\n",
+                     origin.x, origin.y, avail.x, avail.y, tl.x, tl.y, mw, mh);
+    }
 
     ImGui::Dummy(avail);
 }
@@ -2316,15 +3619,6 @@ int lapse_treaty_term_years()
 
 namespace {
 
-/// The tie's hue: ROSE, against the lane's pale-blue dashes, the trade link's
-/// green and the road's ochre, so a dashed line over water still says which
-/// of the two water layers it is. The arc: lilac, thin. The harbour's two
-/// tones: stone for a kept port, sand for one silting.
-constexpr ImU32 col_tie           = IM_COL32(236, 128, 152, 225);
-constexpr ImU32 col_treaty        = IM_COL32(196, 172, 244, 205);
-constexpr ImU32 col_harbour_stone = IM_COL32(226, 224, 212, 240);
-constexpr ImU32 col_harbour_silt  = IM_COL32(176, 138,  92, 240);
-constexpr int32_t lapse_never = 0x7FFFFFFF;
 
 /// THE RENEWAL SLACK IS ONE DECISION BAND, the sim's own. The sim expires a
 /// treaty at the top of a decision round and its formation pass runs in that
@@ -2353,16 +3647,6 @@ int32_t year_after(int32_t year, int years)
 {
     const int64_t y = static_cast<int64_t>(year) + years;
     return y >= lapse_never ? lapse_never : static_cast<int32_t>(y);
-}
-
-ImU32 lerp_col(ImU32 a, ImU32 b, float u)
-{
-    const auto ch = [&](int shift) {
-        const int lo = static_cast<int>((a >> shift) & 0xFFu), hi = static_cast<int>((b >> shift) & 0xFFu);
-        return static_cast<ImU32>(std::clamp(lo + static_cast<int>(static_cast<float>(hi - lo) * u), 0, 255));
-    };
-    return (ch(IM_COL32_R_SHIFT) << IM_COL32_R_SHIFT) | (ch(IM_COL32_G_SHIFT) << IM_COL32_G_SHIFT)
-         | (ch(IM_COL32_B_SHIFT) << IM_COL32_B_SHIFT) | (ch(IM_COL32_A_SHIFT) << IM_COL32_A_SHIFT);
 }
 
 void bake_lapse_fleets(history_lapse& h, const std::vector<uint8_t>& band)
@@ -2616,47 +3900,23 @@ void bake_lapse_fleets(history_lapse& h, const std::vector<uint8_t>& band)
         h.landings.push_back(l);
     }
 
-    // THE HULL'S SCALE: the largest navy any sample holds.
+    // THE HULL'S SCALE: the largest navy any sample holds -- and, in the same
+    // walk, whether any sample holds a built port (the harbour layer, BL-1118).
+    h.port_recorded = false;
     for (const polity_sample& s : h.lapse.samples)
-        h.navy_peak = std::max(h.navy_peak, s.navy_stock);
-}
-
-/// A dashed stroke: the lane layer's idiom (3c'), restated here so this pass
-/// touches nothing there.
-void fleet_dashed(ImDrawList* dl, float x0, float y0, float x1, float y1,
-                  ImU32 col, float w, float dash, int& prims)
-{
-    const float dx = x1 - x0, dy = y1 - y0;
-    const float len = std::sqrt(dx * dx + dy * dy);
-    if (len <= 0.0f) return;
-    const float ux = dx / len, uy = dy / len;
-    for (float t = 0.0f; t < len; t += dash * 2.0f)
     {
-        const float e = std::min(t + dash, len);
-        dl->AddLine({x0 + ux * t, y0 + uy * t}, {x0 + ux * e, y0 + uy * e}, col, w);
-        ++prims;
+        h.navy_peak = std::max(h.navy_peak, s.navy_stock);
+        if (s.port_stock_q > 0) h.port_recorded = true;
     }
 }
 
-/// The ship glyph: a sail, apex up, over a short hull line, in the realm's
-/// colour under a dark outline -- the corridor exemplar's sail (3d) grown a
-/// hull, so a crossing reads as a ship and not as a road's fleet mark.
-void fleet_ship(ImDrawList* dl, ImVec2 at, float r, ImU32 fill, int alpha, int& prims)
-{
-    const ImVec2 apex{at.x, at.y - r * 1.3f};
-    const ImVec2 lft{at.x - r * 0.9f, at.y + r * 0.5f};
-    const ImVec2 rgt{at.x + r * 0.9f, at.y + r * 0.5f};
-    dl->AddTriangle(apex, lft, rgt, with_alpha(col_seat_ring, alpha), 2.5f);
-    dl->AddTriangleFilled(apex, lft, rgt, with_alpha(fill, alpha));
-    dl->AddLine({at.x - r * 1.1f, at.y + r * 0.8f}, {at.x + r * 1.1f, at.y + r * 0.8f},
-                with_alpha(col_bright, alpha), std::max(1.0f, r * 0.35f));
-    prims += 3;
-}
-
-int draw_lapse_fleets(const history_lapse& h, const std::vector<uint16_t>& slice,
+int draw_lapse_fleets(const history_lapse& h, const lapse_layer_set& L,
+                      const std::vector<uint16_t>& slice,
                       ImDrawList* dl, ImVec2 tl, float scale, int year)
 {
-    const lapse_fleet_frame f = lapse_fleets_at(h, slice, year);
+    // BL-1118: the frame is derived through the layer set, so a layer the
+    // round does not draw (the Empires cut) arrives here empty.
+    const lapse_fleet_frame f = fleets_at(h, L, slice, year);
     if (f.ties.empty() && f.arcs.empty() && f.hulls.empty() && f.harbours.empty()
      && f.sails.empty() && f.landings.empty()) return 0;
     const int gw = h.grid_w, gh = h.grid_h;
@@ -2674,7 +3934,6 @@ int draw_lapse_fleets(const history_lapse& h, const std::vector<uint16_t>& slice
         if (c >= static_cast<float>(gw)) return c - static_cast<float>(gw);
         return c;
     };
-    const float dot_r = std::clamp(scale * 0.7f, 2.0f, 4.5f); // the seat dot's radius (pass 4)
     int prims = 0;
     dl->PushClipRect({tl.x, tl.y}, {tl.x + world_w, tl.y + static_cast<float>(gh) * scale}, true);
 
@@ -2689,32 +3948,17 @@ int draw_lapse_fleets(const history_lapse& h, const std::vector<uint16_t>& slice
         p1.x = lapse_unwrap_col(p0.x, p1.x, gw);
         const bool  wrapped = p1.x < 0.0f || p1.x > static_cast<float>(gw);
         const float shift   = p1.x < 0.0f ? world_w : -world_w;
-        const float w    = std::max(1.25f, scale * 0.22f);
-        const float dash = std::max(3.0f, scale * 1.1f);
         for (int pass = 0; pass < (wrapped ? 2 : 1); ++pass)
         {
             const float sx = pass == 0 ? 0.0f : shift;
             const float x0 = px(p0.x) + sx, y0 = py(p0.y), x1 = px(p1.x) + sx, y1 = py(p1.y);
             if (t.trade_a > 0.0f)
             {
-                dl->AddLine({x0, y0}, {x1, y1},
-                            with_alpha(col_trade_link, static_cast<int>(220.0f * t.trade_a)), w);
+                paint_trade_line(dl, {x0, y0}, {x1, y1}, scale, static_cast<int>(220.0f * t.trade_a));
                 ++prims;
             }
             if (t.tie_a > 0.0f)
-            {
-                const ImU32 col = with_alpha(col_tie, static_cast<int>(225.0f * t.tie_a));
-                fleet_dashed(dl, x0, y0, x1, y1, col, w, dash, prims);
-                const float dx = x1 - x0, dy = y1 - y0;
-                const float len = std::max(1.0f, std::sqrt(dx * dx + dy * dy));
-                const float ux = dx / len, uy = dy / len;
-                const float ah = std::max(4.0f, w * 3.5f);
-                const ImVec2 tip{x1, y1};
-                const ImVec2 base{x1 - ux * ah, y1 - uy * ah};
-                dl->AddTriangleFilled(tip, {base.x - uy * ah * 0.5f, base.y + ux * ah * 0.5f},
-                                      {base.x + uy * ah * 0.5f, base.y - ux * ah * 0.5f}, col);
-                ++prims;
-            }
+                paint_tie(dl, x0, y0, x1, y1, scale, t.tie_a, prims);
         }
     }
 
@@ -2735,42 +3979,12 @@ int draw_lapse_fleets(const history_lapse& h, const std::vector<uint16_t>& slice
         // borders under lilac (the first capture on seed 13). A hairline at a
         // third of the tie's alpha keeps the arcs a texture the eye can read
         // through; the snap, which is the moment, keeps its full contrast
-        // against that quiet.
-        const ImU32 col = with_alpha(col_treaty, static_cast<int>(
-            (a.snap > 0.0f ? 190.0f : 80.0f) * (1.0f - a.snap)));
-        const float w   = a.snap > 0.0f ? std::max(1.25f, scale * 0.22f) : 1.0f;
-        constexpr int segs = 14;
+        // against that quiet (`paint_treaty_arc`).
         for (int pass = 0; pass < (wrapped ? 2 : 1); ++pass)
         {
             const float sx = pass == 0 ? 0.0f : shift;
-            const ImVec2 q0{px(p0.x) + sx, py(p0.y)}, q2{px(p1.x) + sx, py(p1.y)};
-            const float dx = q2.x - q0.x, dy = q2.y - q0.y;
-            const float len = std::max(1.0f, std::sqrt(dx * dx + dy * dy));
-            float nx = -dy / len, ny = dx / len;
-            if (ny > 0.0f) { nx = -nx; ny = -ny; } // bow north
-            const float  bulge = std::clamp(len * 0.18f, 4.0f, 28.0f);
-            const ImVec2 q1{(q0.x + q2.x) * 0.5f + nx * bulge, (q0.y + q2.y) * 0.5f + ny * bulge};
-            const auto at = [&](float u) {
-                const float v = 1.0f - u;
-                return ImVec2{v * v * q0.x + 2.0f * v * u * q1.x + u * u * q2.x,
-                              v * v * q0.y + 2.0f * v * u * q1.y + u * u * q2.y};
-            };
-            // Whole: u over [0, 1]. Snapped: [0, 1/2 - gap] and [1/2 + gap, 1].
-            const float gap = a.snap * 0.5f;
-            for (int half = 0; half < (a.snap > 0.0f ? 2 : 1); ++half)
-            {
-                const float u0 = a.snap > 0.0f && half == 1 ? 0.5f + gap : 0.0f;
-                const float u1 = a.snap > 0.0f && half == 0 ? 0.5f - gap : 1.0f;
-                if (u1 <= u0) continue;
-                ImVec2 prev = at(u0);
-                for (int i = 1; i <= segs; ++i)
-                {
-                    const ImVec2 cur = at(u0 + (u1 - u0) * static_cast<float>(i) / static_cast<float>(segs));
-                    dl->AddLine(prev, cur, col, w);
-                    prev = cur;
-                }
-                prims += segs;
-            }
+            paint_treaty_arc(dl, {px(p0.x) + sx, py(p0.y)}, {px(p1.x) + sx, py(p1.y)}, scale, a.snap,
+                             prims);
         }
     }
 
@@ -2780,15 +3994,7 @@ int draw_lapse_fleets(const history_lapse& h, const std::vector<uint16_t>& slice
     for (const lapse_fleet_frame::harbour& hb : f.harbours)
     {
         const ImVec2 a = anchor(hb.seat);
-        const ImVec2 at{px(a.x), py(a.y)};
-        const float q     = static_cast<float>(hb.port_q) / 1000.0f;
-        const float r     = dot_r + 3.0f;
-        const float sweep = 3.14159265f * (0.15f + 0.8f * q);
-        const float a0 = 1.5707963f - sweep * 0.5f, a1 = 1.5707963f + sweep * 0.5f;
-        dl->PathArcTo(at, r, a0, a1, 12);
-        dl->PathStroke(col_seat_ring, 0, 3.5f);
-        dl->PathArcTo(at, r, a0, a1, 12);
-        dl->PathStroke(lerp_col(col_harbour_silt, col_harbour_stone, q), 0, 2.0f);
+        paint_harbour(dl, {px(a.x), py(a.y)}, scale, hb.port_q);
         prims += 2;
     }
 
@@ -2799,15 +4005,7 @@ int draw_lapse_fleets(const history_lapse& h, const std::vector<uint16_t>& slice
     for (const lapse_fleet_frame::hull& hl : f.hulls)
     {
         const ImVec2 a = anchor(hl.seat);
-        const ImVec2 at{px(a.x), py(a.y)};
-        const float hw = 2.0f + 5.0f * hl.size_q; // half width
-        const float hh = 1.0f + 0.9f * hw;
-        const float cx = at.x + dot_r + 2.0f + hw, cy = at.y + 1.0f;
-        const ImVec2 q0{cx - hw, cy - hh * 0.35f}, q1{cx + hw, cy - hh * 0.35f};
-        const ImVec2 q2{cx + hw * 0.55f, cy + hh * 0.65f}, q3{cx - hw * 0.55f, cy + hh * 0.65f};
-        dl->AddQuad(q0, q1, q2, q3, col_seat_ring, 2.5f);
-        dl->AddQuadFilled(q0, q1, q2, q3, owner_colour(h, hl.polity, year));
-        dl->AddLine({cx, cy - hh * 0.35f}, {cx, cy - hh * 0.35f - hw * 1.1f}, col_bright, 1.0f);
+        paint_hull(dl, {px(a.x), py(a.y)}, scale, hl.size_q, owner_colour(h, hl.polity, year));
         prims += 3;
     }
 
@@ -2821,13 +4019,12 @@ int draw_lapse_fleets(const history_lapse& h, const std::vector<uint16_t>& slice
         const float cy = r0 + (r1 - r0) * ez;
         const ImVec2 at{px(fold_c(cu)), py(cy)};
         const float wx0 = px(c0), wy0 = py(r0), wx1 = px(cu), wy1 = py(cy);
-        const ImU32 wake = with_alpha(col_bright, alpha / 3);
-        dl->AddLine({wx0, wy0}, {wx1, wy1}, wake, 1.0f);
+        paint_wake(dl, {wx0, wy0}, {wx1, wy1}, alpha);
         ++prims;
         if (c1 < 0.0f || c1 > static_cast<float>(gw))
         {
             const float shift = c1 < 0.0f ? world_w : -world_w;
-            dl->AddLine({wx0 + shift, wy0}, {wx1 + shift, wy1}, wake, 1.0f);
+            paint_wake(dl, {wx0 + shift, wy0}, {wx1 + shift, wy1}, alpha);
             ++prims;
         }
         fleet_ship(dl, at, r, owner_colour(h, polity, year), alpha, prims);
@@ -2856,30 +4053,19 @@ int draw_lapse_fleets(const history_lapse& h, const std::vector<uint16_t>& slice
         const float dx = px(l.c1) - px(l.c0), dy = py(l.r1) - py(l.r0);
         const float len = std::max(1.0f, std::sqrt(dx * dx + dy * dy));
         const float ux = dx / len, uy = dy / len; // inland: on past the seat
-        const float reach = dot_r + 4.0f + 8.0f * g;
-        const ImU32 col   = with_alpha(owner_colour(h, l.polity, year), alpha);
-        const ImU32 under = with_alpha(col_seat_ring, alpha);
-        for (int k = -1; k <= 1; ++k)
-        {
-            const float ang = static_cast<float>(k) * 0.6f;
-            const float ca = std::cos(ang), sa = std::sin(ang);
-            const float rx = ux * ca - uy * sa, ry = ux * sa + uy * ca;
-            const ImVec2 p0{seat.x + rx * dot_r, seat.y + ry * dot_r};
-            const ImVec2 p1{seat.x + rx * reach, seat.y + ry * reach};
-            dl->AddLine(p0, p1, under, 3.0f);
-            dl->AddLine(p0, p1, col, 1.5f);
-            prims += 2;
-        }
+        paint_beachhead(dl, seat, ux, uy, scale, g, with_alpha(owner_colour(h, l.polity, year), alpha),
+                        with_alpha(col_seat_ring, alpha), prims);
     }
 
     dl->PopClipRect();
     return prims;
 }
 
-} // namespace
-
-lapse_fleet_frame lapse_fleets_at(const history_lapse& h, const std::vector<uint16_t>& slice,
-                                  int year)
+/// The derivation behind `lapse_fleets_at` and the pass: what one playhead
+/// shows, each of the six lists only when its layer is in @p L (BL-1118), so
+/// the pass and the verify read share the Empires cut with the legend.
+lapse_fleet_frame fleets_at(const history_lapse& h, const lapse_layer_set& L,
+                            const std::vector<uint16_t>& slice, int year)
 {
     lapse_fleet_frame f;
     if (!h.derived()) return f;
@@ -2900,6 +4086,7 @@ lapse_fleet_frame lapse_fleets_at(const history_lapse& h, const std::vector<uint
         return t >= 1.0f ? 1.0f : t;
     };
 
+    if (L.has(lapse_layer::colonial_tie))
     for (const lapse_tie_seg& t : h.tie_segs)
     {
         if (year < t.year_bound) continue;
@@ -2912,6 +4099,7 @@ lapse_fleet_frame lapse_fleets_at(const history_lapse& h, const std::vector<uint
         if (!seat_ok(sa) || !seat_ok(sb) || sa == sb) continue;
         f.ties.push_back({t.overlord, t.subject, sa, sb, tie_a, trade_a});
     }
+    if (L.has(lapse_layer::treaty))
     for (const lapse_treaty_arc& a : h.treaty_arcs)
     {
         if (year < a.year_formed) continue;
@@ -2933,7 +4121,8 @@ lapse_fleet_frame lapse_fleets_at(const history_lapse& h, const std::vector<uint
     // its sample at the step at or before the playhead -- the board's own
     // rule, so the hull and the People column read one step.
     const int step = step_at_or_before(h.lapse, year);
-    if (step >= 0 && static_cast<std::size_t>(step) < h.lapse.steps.size())
+    const bool hulls = L.has(lapse_layer::navy), harbours = L.has(lapse_layer::harbour);
+    if ((hulls || harbours) && step >= 0 && static_cast<std::size_t>(step) < h.lapse.steps.size())
     {
         std::vector<char> present;
         for (const uint16_t o : slice)
@@ -2952,23 +4141,25 @@ lapse_fleet_frame lapse_fleets_at(const history_lapse& h, const std::vector<uint
             if (s.navy_stock <= 0 && s.port_stock_q <= 0) continue;
             const int32_t seat = lapse_polity_capital(h, s.polity, year);
             if (!seat_ok(seat)) continue;
-            if (s.navy_stock > 0 && h.navy_peak > 0)
+            if (hulls && s.navy_stock > 0 && h.navy_peak > 0)
             {
                 const double q = std::clamp(static_cast<double>(s.navy_stock)
                                                 / static_cast<double>(h.navy_peak), 0.0, 1.0);
                 f.hulls.push_back({s.polity, seat, static_cast<float>(std::sqrt(q))});
             }
-            if (s.port_stock_q > 0)
+            if (harbours && s.port_stock_q > 0)
                 f.harbours.push_back({s.polity, seat, std::clamp<int>(s.port_stock_q, 1, 1000)});
         }
     }
 
+    if (L.has(lapse_layer::sail_crossing))
     for (const lapse_sail& s : h.sails)
     {
         if (year < s.year || year - s.year >= window) continue;
         f.sails.push_back({s.polity, s.c0, s.r0, s.c1, s.r1,
                            static_cast<float>(year - s.year) / static_cast<float>(window)});
     }
+    if (L.has(lapse_layer::landing))
     for (const lapse_landing& l : h.landings)
     {
         if (year < l.year || year - l.year >= window) continue;
@@ -2978,9 +4169,29 @@ lapse_fleet_frame lapse_fleets_at(const history_lapse& h, const std::vector<uint
     return f;
 }
 
+} // namespace
+
+lapse_fleet_frame lapse_fleets_at(const history_lapse& h, const std::vector<uint16_t>& slice,
+                                  int year)
+{
+    return fleets_at(h, lapse_layers_drawn(h), slice, year);
+}
+
 void lapse_hard_walk(history_lapse& h)
 {
     hard_walk_record(h.lapse, h.hard_carry, h.polity_hard, h.hard_stride);
+    // BL-1118: the hard-border layer is drawn when `lapse_polity_hard` can
+    // answer true at some playhead: a realm hard at a recorded step, or a
+    // carried-hard realm read off the carry -- which it is before the first
+    // step, and always for a realm past the bitmap's stride.
+    h.hard_recorded = std::any_of(h.polity_hard.begin(), h.polity_hard.end(),
+                                  [](uint8_t b) { return b != 0; });
+    const bool carry_read_early = h.lapse.steps.empty() || h.hard_stride <= 0
+                               || h.lapse.steps.front().year > h.lapse.start_year;
+    for (std::size_t p = 0; p < h.hard_carry.size() && !h.hard_recorded; ++p)
+        if (h.hard_carry[p] != 0
+         && (carry_read_early || p >= static_cast<std::size_t>(h.hard_stride)))
+            h.hard_recorded = true;
 }
 
 bool lapse_polity_hard(const history_lapse& h, uint16_t polity, int year)
@@ -3024,6 +4235,31 @@ std::vector<history_lapse::civ_mark> lapse_civ_marks_at_close(const history_laps
         if (!have(e.polity, e.region)) marks.push_back({e.polity, e.region});
     }
     return marks;
+}
+
+std::vector<lapse_road_seg> lapse_roads_at_close(const history_lapse& h)
+{
+    std::vector<lapse_road_seg> roads = h.road_carry;
+    apply_road_promotions(roads, h.lapse, h.region_col.size());
+    // The pairs and the tier years are the hand-over; the geometry and the
+    // "promoted on this record" flag are the successor's to draw and to set.
+    for (lapse_road_seg& s : roads)
+    {
+        s.c0 = s.r0 = s.c1 = s.r1 = 0.0f;
+        s.over_water    = false;
+        s.promoted_here = false;
+        s.bridges.clear();
+    }
+    return roads;
+}
+
+std::vector<std::pair<uint16_t, uint16_t>> lapse_roads_drawn_at(const history_lapse& h, int year)
+{
+    std::vector<std::pair<uint16_t, uint16_t>> out;
+    if (!h.derived()) return out;
+    for (const lapse_road_seg& s : h.road_segs)
+        if (lapse_road_drawn(s, year)) out.emplace_back(s.region_a, s.region_b);
+    return out;
 }
 
 float lapse_industry_heat(const history_lapse& h, uint16_t polity, int year)
@@ -3291,12 +4527,14 @@ void draw_lapse_scoreboard(const history_lapse& h,
     // people from one region to another by this year (the kin arrows drawn
     // so far, `lapse_kin_arrows_at`). The counts are the settlement's own
     // census, read at the record's construction, never re-derived here.
+    // BL-1135: worded as the record, not the route (STARTUP.md § Round 3) --
+    // the same four counts, named as what the record keeps.
     if (h.peoples && (h.peoples_cradles > 0 || h.peoples_coined > 0))
     {
         ImGui::Spacing();
         ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
-        ImGui::TextWrapped("%d cradles; %d peoples coined on the march, %d of them folded "
-                           "back into an ancestor; %d migrations so far.",
+        ImGui::TextWrapped("%d cradles; %d peoples named in the record, %d of them folded "
+                           "back into an ancestor; %d foundings so far.",
                            h.peoples_cradles, h.peoples_coined, h.peoples_folded,
                            lapse_kin_arrows_at(h, year));
         ImGui::PopStyleColor();

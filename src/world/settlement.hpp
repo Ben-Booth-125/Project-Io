@@ -619,17 +619,76 @@ struct region
     // cities in it.
 
     /// Population centres standing in this region. Promoted as
-    /// `urban_population` crosses `region_centre_heads`, cut by a sack.
+    /// `urban_population` reaches a village's worth — ONE while settled (BL-1141)
+    /// (`region_centres_wanted`), held to what its cell's land holds
+    /// (`region_centres_fit`, BL-1130), cut by a sack.
     int centres = 0;
 
     /// Centres history DESTROYED here — cumulative, never decremented. A
     /// region that was sacked and rebuilt still records that it was sacked,
     /// which is what makes the ruin legible rather than merely absent.
+    /// Counted IN PEOPLE (BL-1130 round 4): a village's worth of urban heads a
+    /// sack destroys is one razing, whether or not the centre count stepped
+    /// down, uncapped (`sack_region_urban`, `region_village_equivalents`).
     int centres_razed = 0;
 
     /// Heads living in this region's centres, a subset of `population`. The
     /// quantity the campaign-era centre count and scale carve reads.
     int64_t urban_population = 0;
+
+    /// BL-1130 (POPULATION.md § Generation, "Growth consolidates") — the
+    /// GROUND of this region's own cell of the settlement partition: the tiles
+    /// `nearest_region` gives this region on which a centre can stand (the
+    /// carve's own placement gate, `sim_terrain_view::standable`; every
+    /// non-water tile when a caller has no gate). The ground its centres' urban
+    /// footprints must fit inside, so `centres` never exceeds what it holds
+    /// (`region_centres_fit`), and a region whose cell holds none carries no
+    /// centre — and so earns no industry point — exactly as the carve gives it
+    /// none. -1 is UNMEASURED — the opening draw runs before any partition is
+    /// read, and a synthetic fixture with no terrain never measures one — and
+    /// caps nothing.
+    ///
+    /// Written by `update_urban_ground`, which `run_history_sim` calls once a
+    /// year before the urban step, at every polity's turn after a founding, at
+    /// the round's end and at the span's close, holding every region's centres
+    /// to it each time the partition changed — so no read, and no close, sees a
+    /// cell a founding cut and the record never outlives it. GENERATION SCRATCH, NOT SAVED, on
+    /// `network_supply_q`'s precedent below: a fact the Era -1 sim maintains
+    /// about ground it is simulating, not one the campaign era reads — the
+    /// carve re-reads the final partition itself.
+    int urban_ground = -1;
+
+    /// BL-1137 (INDUSTRIALISATION.md § Beat 2, the urbanisation stream) —
+    /// heads who came to this region's centres to WORK. A subset of both
+    /// `population` and `urban_population`: they live in the centres (the
+    /// urban target counts them whole, `advance_region_urban`) and they are fed
+    /// by the capacity they carried with them (`capacity_carried`), never by
+    /// this region's farmland, so they do not breed against it
+    /// (`advance_region_demography`). Written by the stream
+    /// (`settle_urban_migrants`); a sack turns the ones its walls no longer hold
+    /// out into the countryside (`sack_region_urban`). GENERATION SCRATCH, NOT
+    /// SAVED, on `network_supply_q`'s precedent: the campaign reads the urban
+    /// heads they are part of, never this split. A save taken mid-span, or
+    /// any play-side demography, must carry this and `capacity_carried`
+    /// before it may clamp a region to a ceiling: without them a works city
+    /// reads as a region over its farmland, and the clamp deletes the people
+    /// the stream moved there.
+    int64_t industrial_heads = 0;
+
+    /// NR-958 (A MIGRANT CARRIES ITS FOOD WITH IT, 2026-09-26) — the ceiling
+    /// the urbanisation stream moved: + the capacity migrants carried INTO this
+    /// region, - the capacity its countryside carried OUT. Every move adds to
+    /// the destination exactly what it takes from the source
+    /// (`take_countryside`, `settle_urban_migrants`), so the world's carrying
+    /// capacity is conserved by the stream and an emptied countryside cannot
+    /// regrow into the ceiling that left with its people. The region's ceiling
+    /// is its farmland's plus this (`region_ceiling`); a sack never touches it.
+    /// Zero everywhere the stream has not run. GENERATION SCRATCH, NOT SAVED,
+    /// as `industrial_heads`: only the Era -1 demography reads it. THE TRAP:
+    /// any play-side demography (or a save taken mid-span) must read this
+    /// before it may clamp a region to a ceiling — `region_ceiling` without
+    /// it is the farmland's alone, and a destination sits far above that.
+    int64_t capacity_carried = 0;
 
     /// BL-872 (CIVILISATION.md "Centres are derived by supply and
     /// governance") — 0-1000, how well THIS region's own seat can still
@@ -856,6 +915,15 @@ struct settlement_state
     /// directly, set where they are derived.
     std::vector<std::pair<int, int64_t>> cradle_coined_year;
 
+    /// The GROUND PROFILE each CRADLE culture was coined with, as (culture id,
+    /// profile) pairs (BL-1107; COLONISATION.md § The ground profile) — the
+    /// third record in `cradle_origin_class`'s round-trip, for the same
+    /// reason. Daughters carry theirs on the culture record directly,
+    /// inherited whole from the parent where they are derived. Not on the save
+    /// seam, like the two records above: the roster is regenerated from the
+    /// seed, never loaded.
+    std::vector<std::pair<int, ground_profile>> cradle_profile;
+
     /// THE CRADLE IS ANNOUNCED (BL-1091; Ben, 2026-09-24, rulings R12;
     /// COLONISATION.md § The domestication package). Each cradle culture's
     /// own NAME and the domestication PACKAGE its stream carried, as (culture
@@ -917,12 +985,14 @@ struct settlement_state
     /// record, it is "did anybody's stream actually live here".
     ///
     /// WHY IT IS CARRIED HERE RATHER THAN LEFT INSIDE `run_settlement`: the
-    /// province partition (`docs/generation/PROVINCES.md` § The settled cells
-    /// are a binding input) needs it as a HARD INPUT, the way it already takes
-    /// the national assignment, and the partition runs long after this call has
-    /// returned and `col_field` has gone out of scope. The caller
-    /// (`hard_coded_world.cpp`) turns this into `world::tile_settled` before
-    /// `build_province_partition` runs.
+    /// caller (`hard_coded_world.cpp`) turns it into `world::tile_settled`, the
+    /// settled line's record, long after this call has returned and `col_field`
+    /// has gone out of scope. The province partition took it as a HARD INPUT
+    /// (BL-849's settlement lock) until the lock retired (Ben, 2026-09-27,
+    /// NR-954 B; BL-1150, a centre's fill crosses the settled line —
+    /// `docs/generation/PROVINCES.md` § The settled cells are a binding input):
+    /// the settled cells now seed the partition through the centres standing on
+    /// them, and no longer bound it.
     ///
     /// EMPTY for a caller that never asked for a schedule (`sim_start_year`
     /// still at its `INT64_MAX` default runs the walk exactly as before and
@@ -1014,6 +1084,12 @@ struct endowment
 /// then re-weighs. `ids` is the body's raster-order tile list.
 endowment survey_endowment(const world& w, const std::vector<entity_id>& ids,
                            int col, int row, int gw, int gh);
+
+/// BL-1107 — `survey_endowment` over a window of radius @p win rather than the
+/// founding survey's own (`max(3, gw / 45)`). The cradle's ground profile reads
+/// the package's window (`colonisation_cradle_window`) through it.
+endowment survey_endowment_window(const world& w, const std::vector<entity_id>& ids,
+                                  int col, int row, int gw, int gh, int win);
 
 /// BL-1051 — THE SPAN-OPEN SURVEY (INDUSTRY_TREE.md sec The scorer, "Forest is
 /// surveyed"). Survey EVERY region in @p regions once, over the window
@@ -1121,12 +1197,24 @@ std::vector<int> derive_national_protection(const settlement_state& ss, int nati
 ///
 /// @param nation_ids  Nation entity ids in generation order (generate_nations'
 ///                    return value); regions store indices into this list.
+/// @param polity_industrial_years  BL-1159 (Ben, 2026-10-03; POPULATION.md
+///                    § Qualification, "Seeded from history"): indexed by POLITY
+///                    id, each polity's own industrial crossing year at the last
+///                    span's close (`polity::industrial_year`; INT64_MIN — the
+///                    sim's `k_never_industrialised` — for a polity that never
+///                    crossed). When non-null and non-empty, a nation's
+///                    QUALIFICATION reads it through the polity holding each of
+///                    its regions (`region::nation` still holds that polity id on
+///                    entry), not the regional furnace flags, which a generated
+///                    world never lights. Null or empty (no span ran): the
+///                    regional flags, as before. Focus and ideology are unchanged.
 void derive_national_character(settlement_state& ss,
                                const creed_state& cs,
                                world& w,
                                const std::vector<entity_id>& nation_ids,
                                const std::vector<entity_id>& tile_ids,
-                               int gw, int gh);
+                               int gw, int gh,
+                               const std::vector<int64_t>* polity_industrial_years = nullptr);
 
 /// Index of the region whose anchor is nearest (col,row), or -1 when there
 /// are none. Column-wrapped; ties break on the lowest region index.
@@ -1178,6 +1266,17 @@ int64_t region_carrying_capacity(int farm_q);
 /// drive the ceiling under the subsistence floor.
 int64_t region_carrying_capacity(int farm_q, int capacity_mod_q);
 
+/// A DIRECT CUT TO A REGION'S PEOPLE — @p heads dead of a famine, a plague, or
+/// any future cause that kills rather than moves (clamped to the population).
+/// The loss falls on the INDUSTRIAL and the FARM-FED heads in proportion, so a
+/// cut never empties the farmland under a works city (a cut taken wholly from
+/// the farm-fed heads would leave the farmland unworked at 50%, and the
+/// logistic term grows nothing from zero). The urban headcount is held to the
+/// survivors. The ceiling is untouched: the dead leave their food behind. The
+/// ONE helper every such mechanism uses (`resolve_plague_event` does). Returns
+/// the heads removed.
+int64_t remove_region_people(region& p, int64_t heads);
+
 /// Advance one region's population by `years` simulated years: logistic
 /// growth toward `region_carrying_capacity(p.farm_q)`, war drawdown scaled
 /// by `war_pressure_q`, then a manpower-stock replenishment pass. Integer
@@ -1196,6 +1295,20 @@ int64_t region_carrying_capacity(int farm_q, int capacity_mod_q);
 ///                         checkpoint records — this function only spends it.
 void advance_region_demography(region& p, int years, int war_pressure_q);
 
+/// THE CEILING region @p p's people are held to: its farmland's
+/// (`region_carrying_capacity`, works-aware) plus the capacity the
+/// urbanisation stream carried in, minus what it carried out
+/// (`region::capacity_carried`, NR-958). Never below zero. Exactly the
+/// farmland's ceiling wherever the stream has not run.
+int64_t region_ceiling(const region& p);
+
+/// The ceiling left for region @p p's FARM-FED people — `region_ceiling` less
+/// the industrial heads the carried capacity feeds — and what their births
+/// grow toward (`advance_region_demography`). Never below zero. On a
+/// destination whose industrial heads all came with their food it is the
+/// farmland's own ceiling: MOVED CAPACITY NEVER INFLATES THE DENSITY TERM.
+int64_t region_farm_fed_ceiling(const region& p);
+
 // ---------------------------------------------------------------------------
 // The urban record (BL-766) — cities at sim grain
 // ---------------------------------------------------------------------------
@@ -1212,6 +1325,113 @@ inline constexpr int64_t region_centre_heads = 10000;
 /// campaign-era carve caps the body total at 65,536 and a runaway region
 /// should hit a named bound rather than eat that budget silently.
 inline constexpr int region_centre_limit = 32;
+
+// --- A region deepens into one place (BL-1141; POPULATION.md § Generation) ---
+// Ben, 2026-09-26, superseding BL-1130's in-region hierarchy: a region stands
+// ONE centre while it is settled and none once it is abandoned, and growth makes
+// that one place bigger, never more numerous — its scale is the rung its urban
+// heads have reached (`scale_reached`, population_generation.hpp), read by the
+// carve. Pouring people into a city widened it into as many as thirty-two
+// centres under the hierarchy; under this rule it becomes one larger city.
+// Readers that ask how BIG a place is read its heads (`region_settlement_size`,
+// below), never the count, so the count's collapse to 0/1 moves none of them.
+//
+// PURE INTEGER FUNCTIONS of the region record: no RNG, no floats, no world.
+
+/// A PLACE'S SIZE IS ITS PEOPLE (Ben, 2026-09-25; POPULATION.md § Generation,
+/// BL-1130 round 3). The size a history reader values a region by — the
+/// campaign prize, the reach relay — in CENTRE-EQUIVALENTS of its urban heads:
+/// one per `region_centre_heads`, capped at `region_centre_limit`. It is the
+/// pre-consolidation promotion rung read backwards (that rule stood exactly
+/// this many centres on these heads), so a reader calibrated per centre keeps
+/// its constants and gives the same heads the same value it always did,
+/// however the places they live in are counted.
+/// Pure: heads in, count out; never reads `region::centres`.
+inline int region_centre_equivalents(int64_t urban_heads)
+{
+    if (urban_heads <= 0) return 0;
+    const int64_t n = urban_heads / region_centre_heads;
+    return static_cast<int>(n < region_centre_limit ? n : region_centre_limit);
+}
+
+/// A SETTLED PLACE IS WORTH AT LEAST A VILLAGE (Ben, 2026-09-25; POPULATION.md
+/// § Generation, BL-1130 round 4). The size the prize and the relay read: the
+/// centre-equivalents of the region's urban heads, and never less than one
+/// while the region stands a settlement (`centres > 0`) — the opening draw
+/// stands a town on ground that farms before its heads reach a village's
+/// worth, and that town is a place. CAPPED at `region_centre_limit`, because
+/// the readers it serves were calibrated per centre; a razing is counted in
+/// the uncapped reading below.
+inline int region_settlement_size(const region& p)
+{
+    const int eq = region_centre_equivalents(p.urban_population);
+    return (eq < 1 && p.centres > 0) ? 1 : eq;
+}
+
+/// A RAZING IS COUNTED IN PEOPLE, UNCAPPED (Ben, 2026-09-25; the centres cold
+/// review, 2026-09-26). The region's urban heads in VILLAGE EQUIVALENTS — one
+/// per `region_centre_heads`, never less than one while it stands a settlement
+/// — with no ceiling: the capped size above saturates at 320,000 heads, so a
+/// sack that cut a ten-million city in half recorded no razing at all. This is
+/// the unit `sack_region_urban` records `centres_razed` in; the prize and the
+/// relay keep the capped reading they were calibrated on.
+inline int64_t region_village_equivalents(const region& p)
+{
+    const int64_t n = (p.urban_population > 0) ? p.urban_population / region_centre_heads : 0;
+    return (n < 1 && p.centres > 0) ? 1 : n;
+}
+
+/// How many centres a region's urban heads stand up: ONE once they reach a
+/// village's worth (`region_centre_heads`), none below it (BL-1141, a region
+/// deepens into one place). Non-decreasing in @p urban_heads.
+int region_centres_wanted(int64_t urban_heads);
+
+/// The centres, at most @p want (clamped to [0, 1]), a region's ground holds:
+///   * @p ground == 0 — a cell with no ground a centre can stand on — holds
+///     none (Ben, 2026-09-25): nothing spills into a neighbour's cell;
+///   * @p ground > 0 holds the one centre — its footprint the coast or the
+///     cell's edge cuts short stays short (`stamp_urban_land_use`), it never
+///     unbuilds the town;
+///   * @p ground < 0 is unmeasured and caps nothing.
+/// The ONE ground rule: growth, the sack and the campaign-era carve read it.
+int region_centres_fit(int want, int ground);
+
+/// THE CELL LAND OF EVERY REGION, maintained incrementally (BL-1130). The
+/// settlement partition is the Voronoi `nearest_region` reads (Chebyshev,
+/// columns wrapping, ties to the lower region index); regions are only ever
+/// APPENDED, so a new region takes exactly the tiles strictly nearer its
+/// anchor than their current owner's, and every earlier cell can only shrink.
+/// This keeps the owner raster and each tile's distance to it, so a founding
+/// costs one pass over the ground rather than a rebuild of the whole partition.
+/// The GROUND is the tiles a centre can stand on (BL-1130 review fix: the
+/// carve's placement gate), so a cell of land no centre can stand on counts 0.
+struct urban_ground_field
+{
+    std::vector<int32_t> land_tiles; ///< Raster indices of the body's ground tiles, ascending.
+    std::vector<int32_t> owner;      ///< Per ground tile: the region whose cell holds it, -1 none.
+    std::vector<int32_t> owner_dist; ///< Per ground tile: Chebyshev distance to that region's anchor.
+    std::vector<int32_t> land;       ///< Per region: ground tiles in its cell.
+    std::size_t          raster_size = 0; ///< gw*gh the ground list was taken on.
+    std::size_t          measured = 0;    ///< Regions [0, measured) are in the partition.
+};
+
+/// Bring @p f up to date with @p ss (every region appended since the last call
+/// claims its cell) and write each region's `urban_ground`. @p substrate is the
+/// body's substrate in raster order and @p standable (may be null) its
+/// placement gate, both gw*gh: a tile is GROUND when `standable` marks it, or,
+/// with no gate, when it is not water. A size mismatch measures nothing and
+/// leaves every region unmeasured. The result equals a fresh `nearest_region`
+/// pass over the ground, tile for tile. Returns true when any region's
+/// `urban_ground` changed.
+bool update_urban_ground(settlement_state& ss, urban_ground_field& f,
+                         const std::vector<terrain_substrate>& substrate,
+                         const std::vector<std::uint8_t>* standable, int gw, int gh);
+
+/// Hold region @p p's `centres` to what its measured ground holds
+/// (`region_centres_fit`, never promoting): the merge a newer neighbour's
+/// founding forces, or none at all where the cell kept no ground. Not a
+/// razing — `centres_razed` is untouched. Returns true when the count moved.
+bool hold_region_to_ground(region& p);
 
 /// The headcount `run_history_sim` seeds an unpopulated region with, and the
 /// figure `draw_urban_map` sizes its seed cities against. ONE derivation, read
@@ -1245,29 +1465,90 @@ void draw_region_urban(region& p);
 void draw_urban_map(settlement_state& s);
 
 /// Advance one region's urban headcount by one simulated year: converge a
-/// fraction of the gap toward `population * region_urban_share_q(farm_q)`,
-/// then promote `centres` to whatever the surviving heads stand up —
-/// PROVIDED the network still reaches this ground.
+/// fraction of the gap toward its target — the farm-fed people times
+/// `region_urban_share_q(farm_q)`, plus every industrial head (BL-1137: they
+/// all live in the centres) — then let `centres` follow the heads.
 ///
 /// @param network_ok  BL-872 (CIVILISATION.md "Centres are derived by supply
 ///                    and governance") — whether `region::network_supply_q`
 ///                    is still above the caller's sustainable-settlement
-///                    floor. True is the old behaviour unchanged. False
-///                    FREEZES `centres`: it neither grows nor shrinks here,
-///                    because a network cut is not the deliberate act of
-///                    history `sack_region_urban` exists for.
+///                    floor. False FREEZES GROWTH: no new centre stands on
+///                    ground the network no longer reaches.
 ///
-/// GROWTH ONLY PROMOTES, and only while the network holds. A shrinking city
-/// keeps its centre and a cut-off one keeps its centres too — POPULATION.md's
-/// asymmetry, now covering both kinds of passive failure. Destruction is
-/// `sack_region_urban` alone, a deliberate act of history.
+/// CENTRES FOLLOW THE HEADS BOTH WAYS (Ben, 2026-09-25; POPULATION.md
+/// § Generation, superseding "growth only promotes"; BL-1137). Growing heads
+/// stand the region's one centre once they reach a village's worth, while the
+/// network holds (BL-1141, a region deepens into one place: growth past that
+/// makes the place bigger, never more numerous). SHRINKING heads — this year's
+/// step took the urban headcount down — below a village's worth ABANDON it,
+/// whether or not the network holds. Abandonment is people leaving, not a
+/// sack: `centres_razed` is untouched, and the points it earned pass to the
+/// realm's nearest centre (`rehome_stranded_points`). Only a SHRINKING count
+/// abandons ("we can destroy shrinking centres below a threshold", Ben): the
+/// settlement the draw stands on farmland before its heads reach a village's
+/// worth is kept while it grows.
+///
+/// The count never exceeds `region_centres_fit` for the region's cell: none on
+/// a cell with no ground a centre can stand on, whether or not the network
+/// holds — a merge into the neighbour a founding gave that ground, not a
+/// loss, so `centres_razed` is untouched and the heads stay.
 void advance_region_urban(region& p, bool network_ok);
 
 /// SACK a region's cities. `population_loss_q` is the per-mille the
 /// countryside lost; the city loses a multiple of it, because a sack falls on
 /// the walls and not the fields. Centres fall to what the surviving heads can
-/// stand, and every one lost is recorded in `centres_razed`.
+/// stand, and the destruction is recorded in `centres_razed` COUNTED IN PEOPLE
+/// (Ben, 2026-09-25): the fall in `region_village_equivalents` — a village's
+/// worth of urban heads per razing, uncapped, plus the last settlement's one
+/// when it falls — whether or not the centre count stepped down.
+///
+/// A SACK NEVER LOWERS A REGION'S CEILING (NR-958, 2026-09-26). The heads the
+/// walls lose scatter into the region's own countryside: `population` and
+/// `capacity_carried` are untouched, and industrial heads the walls no longer
+/// hold become farm-fed heads of the same region, still fed by the capacity
+/// they carried. Nobody leaves the count, this year or after.
 void sack_region_urban(region& p, int population_loss_q);
+
+// ---------------------------------------------------------------------------
+// The urbanisation stream (BL-1137; INDUSTRIALISATION.md § Beat 2)
+// ---------------------------------------------------------------------------
+// "The urbanisation stream empties the countryside and its villages into the
+// towns and cities that industrialise." Pure functions of the region record;
+// the ROUTE — which towns, in which polity, along which held ground, shared by
+// which pull — is `run_urbanisation_stream` (history_sim.hpp), since it reads
+// ownership and the neighbour graph.
+//
+// A MIGRANT CARRIES ITS FOOD WITH IT (NR-958): every head the stream moves
+// takes one head of ceiling out of its source (`take_countryside`) and lands it
+// in its destination (`settle_urban_migrants`). Paired, as the stream always
+// pairs them, a move conserves both the world's people and its carrying
+// capacity.
+
+/// Per mille of a fully strained countryside that leaves for the towns each
+/// year. A CHOSEN CONSTANT, 12 (the centres cold review, 2026-09-26): set equal
+/// in value to the demography's low-density growth rate as a first cut, but
+/// derived from nothing — neither from that rate nor from a centre count.
+int urbanisation_rate_q();
+
+/// The heads region @p p's countryside sends to the towns over one decision
+/// round of @p step_years years: its countryside (people outside its centres)
+/// x the rate x the STRAIN on its ground (its farm-fed people over what its
+/// farmland feeds, per mille — the push; the sim carries no depletion, so
+/// strain is the whole push, and it falls as the countryside empties) x the
+/// years. 0 for an empty region.
+int64_t urbanisation_outflow(const region& p, int step_years);
+
+/// Take @p heads from region @p p's countryside (never more than it has), and
+/// the same ceiling with them (`capacity_carried` falls by the heads taken):
+/// the emptied countryside is left at its lowered ceiling and regrows nothing
+/// into what left. Returns the heads actually taken.
+int64_t take_countryside(region& p, int64_t heads);
+
+/// Land @p heads in region @p p's centres as INDUSTRIAL heads, with the ceiling
+/// they carried: they join its population and its urban headcount, and
+/// `capacity_carried` rises by exactly as many, so they are fed and the
+/// farm-fed people's ceiling is unchanged.
+void settle_urban_migrants(region& p, int64_t heads);
 
 /// The manpower ceiling a region's CURRENT population can support — a
 /// bounded fraction (`manpower_ceiling`'s own constant), not additive, so a

@@ -765,6 +765,67 @@ target_link_libraries(player_seed_sweep PRIVATE io_world_obj lua54)
 target_compile_features(player_seed_sweep PRIVATE cxx_std_20)
 target_compile_options(player_seed_sweep PRIVATE ${IO_WARNING_FLAGS})
 
+# world_cursor_equivalence (BL-1084, 2026-09-25) — live-Lua for player_seed_sweep's
+# reason: it builds worlds from the app's generation inputs (the PARSED
+# scripts/world_gen.lua and scripts/works.lua, harness_params.hpp's
+# load_app_generation_inputs), so it names the same Lua TUs.
+add_executable(world_cursor_equivalence
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/world_cursor_equivalence.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/works_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(world_cursor_equivalence PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(world_cursor_equivalence PRIVATE io_world_obj lua54)
+target_compile_features(world_cursor_equivalence PRIVATE cxx_std_20)
+target_compile_options(world_cursor_equivalence PRIVATE ${IO_WARNING_FLAGS})
+
+# market_census (BL-1125 M1, BL-1003 R6; sprint 48) — live-Lua for exactly
+# player_seed_sweep's reason: it builds the shipped 1960 world in app order
+# (harness_params.hpp's builder, which parses world_gen.lua and works.lua and
+# loads recipes/economy), so it names the same four Lua TUs. A research sweep
+# (a full world, the search and a settle per curated seed), labelled below.
+add_executable(market_census
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/market_census.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/works_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(market_census PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(market_census PRIVATE io_world_obj lua54)
+target_compile_features(market_census PRIVATE cxx_std_20)
+target_compile_options(market_census PRIVATE ${IO_WARNING_FLAGS})
+
+# centre_census (BL-1130; sprint 48) — live-Lua for market_census's reason: it
+# builds the shipped world in app order (harness_params.hpp's
+# build_app_base_world parses world_gen.lua and works.lua and loads
+# recipes/economy), so it names the same four Lua TUs. A research sweep (a full
+# world per curated seed), labelled below.
+add_executable(centre_census
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/centre_census.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/works_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(centre_census PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(centre_census PRIVATE io_world_obj lua54)
+target_compile_features(centre_census PRIVATE cxx_std_20)
+target_compile_options(centre_census PRIVATE ${IO_WARNING_FLAGS})
+
 # tier_margin (BL-436, 2026-08-16) — live-Lua for the same reason: it asks
 # whether REFINING PAYS in the shipped economy, so it must read the authored
 # prices, rates and recipes rather than a hand-built mirror of them. It also
@@ -1137,6 +1198,10 @@ file(GLOB IO_VERIFY_HARNESSES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/too
 set(IO_TEST_TIMEOUT_DEFAULT 60)
 set(IO_TEST_TIMEOUT_LONG 240)
 
+# Per-harness ctest arguments (BL-1159): IO_TEST_ARGS_<name> is appended to the test
+# command. Unset for every harness but those named here.
+set(IO_TEST_ARGS_road_generation_harness --seeds 0,28)
+
 # RE-TIERED AGAIN 2026-08-13. Wiring the Era -1 year-tick sim into generation
 # added ~23 s to every generated world. Harnesses that do not test the era now
 # say so (tools/verify/harness_params.hpp, `no_prehistory()`) and pay nothing.
@@ -1195,6 +1260,10 @@ set(IO_TEST_LONG_HARNESSES
     # cost of guessing the tier wrong is a Timeout, which reads as noise rather
     # than as a check that has never verified anything.
     water_ownership_census
+    # road_generation_harness moved 2026-10-02 (BL-1159): its R2s rows build the SHIPPED
+    # world per seed. Under ctest it runs seeds 0 and 28 only (IO_TEST_ARGS_road_generation_harness above); the
+    # default, with no --seeds, is the full 16-seed library for manual and sweep use.
+    road_generation_harness
 )
 
 # EXCLUDED FROM THE ROUTINE GATE - labelled `sweep`. TWO REASONS live here, and
@@ -1217,6 +1286,25 @@ set(IO_TEST_SWEEP_HARNESSES
     # CATEGORY (1), added 2026-09-16 (BL-982): a full shipped world plus the
     # landscape search per curated seed, sixteen of them. Reports, never gates.
     industrialisation_sim_harness
+    # CATEGORY (1), added 2026-09-25 (BL-1125 M1, BL-1003 R6): the market
+    # census — the shipped world, the search, the settle, the seat and a play
+    # year per curated seed. It reports; its only failing rows are its own
+    # identification checks and the search's own invariants.
+    market_census
+    # CATEGORY (1), added 2026-09-25 (BL-1130): the centre census — a full
+    # shipped world per curated seed, read for centre density, scale and fit.
+    # It reports; its only failing row is its own "could it see a carve" check.
+    centre_census
+
+    # Added 2026-09-25 (BL-1084): the generation cursor's proof -- per curated
+    # seed, the composition in place, the staged build on faithful copies and
+    # the one call, compared at every round boundary. Three full shipped worlds
+    # per seed, sixteen seeds: an hour-scale run in Release, so it cannot sit in
+    # the 240 s tier. Its breadth IS the check (the sixteen worlds are the
+    # library's), so it is not thinned to fit; run it by name whenever
+    # hard_coded_world's stages or world/generation_cursor.hpp change
+    # (`--seeds 0 --no-one-call` is the one-world smoke form).
+    world_cursor_equivalence
 
     # CATEGORY (1), added 2026-09-08 with BL-825. history_span_cost prices the
     # Era -1 span: it builds a world per seed and then re-runs the era at 400 /
@@ -1320,6 +1408,7 @@ set(IO_TEST_SCRIPT_ROOTED_HARNESSES
     era_roster
     haulage_measure
     player_seed_sweep
+    world_cursor_equivalence # BL-1084: scripts/*.lua and docs/generation/seed_library.json
     interbody_pull_harness
     pregame_balance_harness
     persona_counsel_harness
@@ -1370,6 +1459,13 @@ set(IO_TEST_SCRIPT_ROOTED_HARNESSES
     # docs/generation/seed_library.json by relative path; from build/ it finds
     # no seed library and FATALs.
     industrialisation_sim_harness
+    # ADDED 2026-09-25 (BL-1125 M1). The same four scripts and the seed library
+    # by relative path, for the same reason.
+    market_census
+    # ADDED 2026-09-25 (BL-1130). The same four scripts and the seed library by
+    # relative path, for the same reason.
+    centre_census
+    road_generation_harness # BL-1159: R2s builds the shipped worlds (scripts/*.lua, the seed library)
 )
 
 foreach(harness_src ${IO_VERIFY_HARNESSES})
@@ -1428,10 +1524,10 @@ foreach(harness_src ${IO_VERIFY_HARNESSES})
             LABELS "sweep"
             SKIP_REGULAR_EXPRESSION "sweep harness skipped")
     elseif(harness_name IN_LIST IO_TEST_LONG_HARNESSES)
-        add_test(NAME ${harness_name} COMMAND ${harness_name})
+        add_test(NAME ${harness_name} COMMAND ${harness_name} ${IO_TEST_ARGS_${harness_name}})
         set_tests_properties(${harness_name} PROPERTIES TIMEOUT ${IO_TEST_TIMEOUT_LONG})
     else()
-        add_test(NAME ${harness_name} COMMAND ${harness_name})
+        add_test(NAME ${harness_name} COMMAND ${harness_name} ${IO_TEST_ARGS_${harness_name}})
         set_tests_properties(${harness_name} PROPERTIES TIMEOUT ${IO_TEST_TIMEOUT_DEFAULT})
     endif()
     if(harness_name IN_LIST IO_TEST_BENCH_HARNESSES)

@@ -274,6 +274,17 @@ struct nation_garrison_params
 /// @param params Sizing and roster tuning.
 void seed_nation_garrisons(world& w, const nation_garrison_params& params = {});
 
+/// A BORDER garrison's post (Ben, 2026-10-03; BL-1145): the tile of @p pr
+/// facing @p guarded — the member tile (not itself @p guarded's) with the most
+/// hex sides onto @p guarded's ground, ties to the lowest tile id. Facing is
+/// what the nation scorer reads (nation_ai.cpp build_force counts a unit as
+/// border force only through its own tile's hex neighbours), so a garrison
+/// posted here is one its nation's threat term can see. `null_entity` when no
+/// member tile touches @p guarded — never for a province seed_nation_garrisons
+/// picked as a border province, which it picks by that same adjacency.
+/// Exposed so centre_census C16 asserts the rule against the same function.
+entity_id garrison_border_post(world& w, const province& pr, entity_id guarded);
+
 /// Summed `unit_strength` (BL-459, unit_roster.hpp) of every nation-owned
 /// unit standing in the province with id @p province_id — the garrison-
 /// strength-per-province query this item provides (alongside the units

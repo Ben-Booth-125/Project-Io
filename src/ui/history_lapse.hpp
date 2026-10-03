@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 // ---------------------------------------------------------------------------
@@ -185,6 +186,13 @@ struct lapse_road_seg
     /// glyph would.
     bool over_water = false;
 
+    /// BL-1134: THIS record noted a promotion on the corridor. A corridor
+    /// carried in from an earlier round (`history_lapse::road_carry`) and never
+    /// promoted here is drawn but has no event, so the caravan exemplar -- which
+    /// reads the events -- never marks it; the legend's "Caravan" row reads
+    /// this flag so it names only what the round draws.
+    bool promoted_here = false;
+
     /// Where this corridor's straight line crosses a river edge — a pure
     /// geometric fact, computed once against `history_lapse::river_segs`.
     std::vector<lapse_bridge> bridges;
@@ -238,6 +246,17 @@ struct lapse_lane_seg
     float c0 = 0.0f, r0 = 0.0f; ///< Region A's anchor tile centre.
     float c1 = 0.0f, r1 = 0.0f; ///< Region B's anchor tile centre.
     int32_t year_open = 0;      ///< The year the leg's uses crossed the lane tier.
+
+    /// THE LANE'S SEA PATH (Ben, 2026-10-03: "sea lanes should always go over
+    /// ocean, never over ground"): the tile centres of the water-only walk the
+    /// campaign stamp lays (`sea_lane_port` + `sea_lane_walk`, LOGISTICS.md
+    /// sec 4b), port to port, in TILE units, columns unwrapped along the walk
+    /// so a seam-crossing lane is one continuous run (it may sit outside
+    /// [0, grid_w); the draw strokes a shifted copy). The lane is DRAWN along
+    /// this chain, smoothed, never between the anchors. Empty when the stamp
+    /// would lay nothing (no port in reach, one port, no water joining them):
+    /// such a lane draws nothing, as it lays nothing on the campaign map.
+    std::vector<float> path_c, path_r;
 };
 
 /// ONE KIN ARROW (BL-1092; Ben, 2026-09-24, rulings R11; COLONISATION.md sec
@@ -560,10 +579,27 @@ struct history_lapse
     std::vector<lapse_river_seg>  river_segs;
     std::vector<lapse_relief_seg> relief_segs;
 
-    /// The promoted road network (BL-917), baked from `lapse.events` once at
-    /// record time — see `lapse_road_seg`. Empty on the Culture round, whose
-    /// record carries no `road_promoted` events.
+    /// The promoted road network (BL-917), baked once at record time from the
+    /// roads the rounds before this one laid (`road_carry`) and this record's
+    /// own `road_promoted` events — see `lapse_road_seg`. Empty on the Culture
+    /// round, which has nothing behind it and promotes nothing.
     std::vector<lapse_road_seg> road_segs;
+    /// Corridors the bake dropped because their straight line bridges more than
+    /// `kMaxCrossingTiles` water tiles (the bridge cap; Ben, 2026-10-03).
+    int road_segs_over_cap = 0;
+
+    /// BL-1134 (roads carried across rounds; Ben, 2026-09-25, walking round 6:
+    /// "we lost every road between Exploration and Industrialisation";
+    /// STARTUP.md § Round 6, "Every round draws the roads the rounds before it
+    /// laid"). A resumed span notes only the promotions IT makes, so a record
+    /// read alone opened every round with no road the earlier rounds laid. The
+    /// round before hands its whole network over at the seam
+    /// (`lapse_roads_at_close`), exactly as the civilisation diamonds are
+    /// (`civ_carry`): the pairs and the years each reached Track, Road and Post
+    /// Road, which are calendar years and so mean the same on every round. The
+    /// bake re-derives the geometry against this round's own regions and
+    /// rivers. Empty when nothing came before.
+    std::vector<lapse_road_seg> road_carry;
 
     /// Amicable cross-border trade corridors (BL-925), baked from
     /// `lapse.events` once at record time — see `lapse_trade_seg`. Empty on
@@ -595,6 +631,23 @@ struct history_lapse
     std::vector<lapse_sail>       sails;
     std::vector<lapse_landing>    landings;
     int64_t navy_peak = 0;
+    /// BL-1118: any sample in the record holds a built port (`port_stock_q > 0`)
+    /// -- the harbour layer's "is drawn" fact, taken in the same sample walk
+    /// that finds `navy_peak`, so the legend reads it without a walk per frame.
+    bool port_recorded = false;
+
+    /// BL-1118: bit k set when the record carries at least one event of
+    /// `lapse_event_kind` k. Baked once at record time (the events are the
+    /// record and never change after it lands), so the layer predicates that
+    /// hang on a kind -- a seat captured, a crack, a diamond, a slide, a works
+    /// -- are a bit test per frame rather than a walk of the change list.
+    uint32_t event_kinds = 0;
+
+    /// BL-1118: `lapse_polity_hard` can answer true at some playhead -- a realm
+    /// hard at a recorded step, or carried hard where the carry is read -- the
+    /// hard-border layer's "is drawn" fact, set by `lapse_hard_walk` beside the
+    /// bitmap it summarises.
+    bool hard_recorded = false;
 
     // --- The industry layer (BL-1080), baked once at record time ------------
     //
@@ -750,7 +803,9 @@ int32_t lapse_polity_capital(const history_lapse& h, uint16_t polity, int year);
 /// tie with its fade and its trade line's fade, every arc with its snap, the
 /// hull and harbour of every realm holding ground in @p slice, and the sails
 /// and landings inside the marker window. ONE pure derivation, so the verify
-/// API counts exactly what the pass drew. Empty before the record is derived.
+/// API counts exactly what the pass drew -- through the round's layer set
+/// (BL-1118), so each list is empty on a round whose key does not name its
+/// layer (the Empires cut). Empty before the record is derived.
 struct lapse_fleet_frame
 {
     /// `tie_a` is the dashed tie's strength (1 while bound, falling to 0 over
@@ -811,6 +866,74 @@ int lapse_treaty_term_years();
 void build_lineage_palette(history_lapse& h, const std::vector<int32_t>& parent,
                            const std::vector<int32_t>* folded_into = nullptr);
 
+// ---------------------------------------------------------------------------
+// The layers, and the legend that names them (BL-1118; Ben, 2026-09-25)
+// ---------------------------------------------------------------------------
+//
+// EVERY LAPSE ROUND CARRIES A LEGEND (STARTUP.md § Round 4): a key naming each
+// layer its map draws, so what is on the map never has to be guessed. The key
+// is honest BY CONSTRUCTION rather than by care: `lapse_layers_drawn` is the
+// ONE place each layer's "does this round draw it" decision lives. The map's
+// passes gate on it, and the legend lists what it returns. So a layer cut
+// from a round (the Empires cut, 2026-09-25) is cut once, in that function,
+// and leaves the map and its key together; and a layer the record carries
+// nothing for (a world whose span opened no sea lane) is named by neither.
+//
+// THE GRAIN IS THE ROUND, NOT THE FRAME. A layer is listed when the round
+// draws it at SOME frame of its span. A key that re-flowed each time a mark
+// faded would be a second ticker, and a layer that opens late (the lanes) is
+// still the round's layer at 1200. The swatches are drawn by the painter's own
+// glyph functions at the map's own scale -- never a re-drawn icon -- so a
+// swatch cannot drift from the mark it names.
+
+/// Every layer the lapse map can draw, in the legend's order. The groups are
+/// the legend's columns: the ground, who holds it, the routes, the marks, and
+/// what is at sea.
+enum class lapse_layer : uint8_t
+{
+    // The ground
+    sea, ground, rivers,
+    // Who holds it
+    carry, people_fill, culture_base, realm_fill, frontier, hard_border, seats,
+    capital_slide, ///< Not a legend row of its own: the seat row names it.
+    // Routes
+    kin_line, kin_line_water, track, road, post_road, bridge, trade_link,
+    caravan, trade_sail,
+    // Marks
+    consolidation, seat_captured, crack, diamond, works, furnace, heat,
+    // At sea
+    sea_lane, colonial_tie, treaty, navy, harbour, sail_crossing, landing,
+    count
+};
+
+/// A set of layers, one bit each.
+struct lapse_layer_set
+{
+    uint64_t bits = 0;
+    bool has(lapse_layer l) const
+    {
+        return ((bits >> static_cast<unsigned>(l)) & 1u) != 0;
+    }
+    void set(lapse_layer l, bool on = true)
+    {
+        const uint64_t b = uint64_t{1} << static_cast<unsigned>(l);
+        bits = on ? (bits | b) : (bits & ~b);
+    }
+};
+
+/// THE ONE PLACE each layer's "is it drawn on this round" decision lives
+/// (BL-1118). `draw_lapse_map` gates every pass on it and the legend lists
+/// it, so the two cannot disagree. A function of the record alone -- the
+/// round it plays, what it carries, the carries it was handed -- never of the
+/// playhead. Empty before the record is derived.
+lapse_layer_set lapse_layers_drawn(const history_lapse& h);
+
+/// The legend's name for @p l on @p h, in the words STARTUP.md § Rounds and
+/// docs/GLOSSARY.md use ("Sea lane", "Colonial tie", "Post Road"). Rounds
+/// differ only where the thing differs: the Culture round's seat is a people's
+/// "Homeland", as its board says.
+const char* lapse_layer_label(const history_lapse& h, lapse_layer l);
+
 /// Paint the political map for one already-materialised ownership slice into the
 /// current window's remaining content region.
 ///
@@ -818,6 +941,11 @@ void build_lineage_palette(history_lapse& h, const std::vector<int32_t>& parent,
 /// it replaces takes none by design (STARTUP.md § The globe — and why it does not
 /// take input), and BL-829 does not lift the rule. Pure draw-list painting, no
 /// widgets, so there is nothing here for a click to land on.
+///
+/// THE LEGEND (BL-1118) is painted here too, in the pane's band under the map
+/// -- draw list only, like the map. Where the band is too shallow for it, the
+/// map is framed in the height left above the key; the key never covers the
+/// map.
 void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
                     int year);
 
@@ -881,6 +1009,24 @@ std::vector<uint8_t> lapse_hard_at_close(const history_lapse& h);
 /// plus every `civilisation_formed` it recorded -- for the next round's
 /// `civ_carry` (BL-1094). Deduplicated by (polity, region).
 std::vector<history_lapse::civ_mark> lapse_civ_marks_at_close(const history_lapse& h);
+
+/// BL-1134: the road network standing at a record's close -- its own
+/// `road_carry` with every `road_promoted` it recorded applied on top -- for
+/// the next round's `road_carry`. The pairs and their tier years only (the
+/// successor's bake draws the geometry). A pure function of the record and its
+/// carry, so it needs no derivation and reads an undrawn round as well as a
+/// drawn one. Deduplicated by (region_a, region_b); a tier year is only ever
+/// moved EARLIER, so a carried Road never drops back to Track.
+std::vector<lapse_road_seg> lapse_roads_at_close(const history_lapse& h);
+
+/// BL-1134: is @p s drawn at @p year -- the road pass's own test, from the
+/// year the corridor first reached Track. One predicate for the pass and for
+/// `lapse_roads_drawn_at`, so the verify read counts what the map draws.
+inline bool lapse_road_drawn(const lapse_road_seg& s, int year) { return year >= s.year_track; }
+
+/// BL-1134: the (region_a, region_b) pairs the road pass draws at @p year, in
+/// bake order. Empty before the record is derived. For the verify API.
+std::vector<std::pair<uint16_t, uint16_t>> lapse_roads_drawn_at(const history_lapse& h, int year);
 
 /// The colour @p owner is drawn in on @p h — a culture's lineage hue on the
 /// Culture round, a polity's identity slot elsewhere. Public so one round can
@@ -1027,6 +1173,14 @@ std::string lapse_year_label(int year);
 /// formula would be the drift a header exists to prevent. Pure geometry;
 /// `draw_lapse_map` calls it for its own frame.
 inline constexpr float lapse_map_nudge_x = 120.0f;
+///
+/// THE NUDGE NEVER PUSHES THE MAP OFF THE PANE (BL-1118, 2026-09-25). A map
+/// that fills the pane's width was nudged 120 px past its right edge, where the
+/// pane's clip cut the world's eastern 120 px off (measured at 1920x1080: pane
+/// 944 px wide, map 944 px wide at x+120). Where the nudged map would overrun,
+/// it is scaled into the width the nudge leaves and kept inside the pane, so
+/// the box on screen is the one the nudge ruling framed and the whole world is
+/// in it. A map with room to spare frames exactly as before.
 inline void lapse_map_frame(int gw, int gh, float avail_w, float avail_h,
                             float& tl_x, float& tl_y, float& scale)
 {
@@ -1039,7 +1193,12 @@ inline void lapse_map_frame(int gw, int gh, float avail_w, float avail_h,
     const float sx = avail_w / static_cast<float>(gw);
     const float sy = avail_h / static_cast<float>(gh);
     scale = sx < sy ? sx : sy;
-    tl_x  = (avail_w - scale * static_cast<float>(gw)) * 0.5f + lapse_map_nudge_x;
+    const float nudge = lapse_map_nudge_x < avail_w * 0.5f ? lapse_map_nudge_x : avail_w * 0.5f;
+    const float s_fit = (avail_w - nudge) / static_cast<float>(gw);
+    if (scale > s_fit) scale = s_fit;
+    const float mw = scale * static_cast<float>(gw);
+    const float centred = (avail_w - mw) * 0.5f + nudge;
+    tl_x  = centred < avail_w - mw ? centred : avail_w - mw;
     tl_y  = (avail_h - scale * static_cast<float>(gh)) * 0.5f;
 }
 

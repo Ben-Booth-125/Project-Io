@@ -70,6 +70,17 @@ property the derivation must hold, in consistent units: a few years of upkeep on
 stays under the batch's own hire price. Scale both halves of the vector by one factor when
 retuning, so the equipment-to-wage ratio the roster is anchored on survives.
 
+**SETTLED (Ben, 2026-10-03): an army eats what its owner can buy at a fair price.** A unit's
+rations and ordnance are bought at most at their reservation price; above it the unit draws less
+and fights weaker, so a supply shortage weakens an army rather than bankrupting the firm that keeps
+it. Measured on the curated seeds, a 50-head unit cost about 970 a year at the prices the market
+actually charged (rations ~3.5x and ordnance ~6x their base) against a hire price near 120, and
+standing-force upkeep was what wound most of the field up.
+
+**SETTLED (Ben, 2026-10-03), for the next sprint: hiring answers a threat.** A firm's standing force
+follows the hostility it faces — hostile stance or contested ground — rather than filling a flat
+cap. It widens the AI-behaviour grant and is recorded in `../ai/AI_OPPONENT.md` § 11 when built.
+
 **A short pool BUYS before it goes short (Ben, 2026-08-26, BL-654).** Before the shortfall rule
 below fires, the draw bids the missing quantity onto the market and pays for what it gets — so
 wanting a good becomes a price signal and somebody has a reason to supply it. It bids only below a
@@ -200,7 +211,9 @@ times before the seat (×1.20 at 0.015) and the pre-game spiral that motivated t
 shallower; the rate is the same constant either way. Ben's framing for
 the cut: *"it's not fun to see an inevitable loss."* Paired with a
 non-zero opening capital (`corporation_params::base_capital`, 400), which is the buffer that stops
-a survivable bad quarter starting the spiral at all. The constant is the single
+a survivable bad quarter starting the spiral at all. **Every firm opens with it (Ben, 2026-10-03):**
+a background firm opens with working capital priced from its opening stock, not at zero, so the
+buffer exists for the whole field and not only for the seat and the specialists. The constant is the single
 source of truth: the live loop and the `econ_bankruptcy` harness read the same value.
 Interest is a pure function of balance × rate — deterministic. Design: BL-073 (debt
 interest).

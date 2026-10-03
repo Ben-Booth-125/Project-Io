@@ -236,7 +236,10 @@ spawn_seat_result rank_spawn_candidates(const world& w, const landscape_score& l
 entity_id draw_spawn_seat(const spawn_seat_result& ranked, std::uint32_t seed);
 
 /// Re-point `is_player` / `world::player_entity` onto @p corp, clearing every
-/// other `is_player` flag first (world.hpp's one-flag invariant). Returns false
-/// and mutates NOTHING when @p corp is not a corporation of @p w. The one
-/// mutation the seat makes, whether it was drawn or picked.
+/// other `is_player` flag first (world.hpp's one-flag invariant), and move the
+/// opening force with the seat (BL-1154, `move_seat_force`): @p corp is
+/// disarmed and the corporation it leaves is armed — new entity ids, at Begin,
+/// after the settle. Returns false and mutates NOTHING when @p corp is not a
+/// corporation of @p w. The pick path (`corp_verb::take_seat`) applies the
+/// same rule through the same function.
 bool repoint_player(world& w, entity_id corp);

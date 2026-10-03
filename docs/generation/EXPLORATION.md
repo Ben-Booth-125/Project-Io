@@ -373,6 +373,17 @@ grudge, a taste and a sea lane.
 
 ## The colonial tie is a sea lane, and the map reads it
 
+**SETTLED (Ben, 2026-10-03, overturning NR-888 for this age): the Exploration age grounds
+international trade.** Far realms across water meet and bind in this age, not only in
+Industrialisation — but only where the seller's fleet can reach the partner's port, its power
+halving over sea distance as a fleet's does (§ the stocks table), so navies decide how many far
+pairs trade, not a dial. **Reach means out-projecting (Ben, 2026-10-03):** the seller binds a far
+partner only where its fleet out-projects the partner's own fleet at the partner's port — the same
+defender comparison a crossing faces — because a fleet keeps some power for a long way and mere
+reach gated almost nothing. **Goods between landmasses go by sea, in every span (Ben, 2026-10-03):**
+a road carries goods only between seats on one landmass, so trade between landmasses rides a fleet, writes sea lanes, and grounds the
+long lanes the age is remembered for. Measured on the curated seeds before it is set.
+
 *(Folded from `../research/COLONIAL_ERA.md` on 2026-09-16, NR-884.)*
 
 **A tie is a force on the map, never a preference inside an actor.** An earlier design seeded the
@@ -400,6 +411,17 @@ earned leg onto the water as a **sea lane**: a lane level on each water tile the
 which traversal cost reads as one more multiplier, the water analogue of the ancient road. Purely
 additive; land tiles are untouched.
 
+**A lane is a route of the ocean's currents and of trade between continents, not only a coastal
+hop (Ben, 2026-09-25; BL-1140, sea lanes from trade).** A **fourth writer** of a sea-leg use:
+trade between realms whose goods cross water — the span's trade links between realms on different
+landmasses whose goods go to sea: the seller's fleet between the two seats' ports carries them
+further than any dry road joining the two realms (a road is a corridor walked over land; one
+walked across a strait is a crossing, not a road), and on a tie the road carries them — writes
+one use per decision round it runs, so a world's lanes follow where its trade
+goes, not only where its tribute flows. And every sea leg is priced with its current (§ Currents
+are a force, not a picture), so a lane bends along the currents the planet generates rather than
+hugging the shortest line between two shores.
+
 **What reads it is everything that reads traversal cost**, because traversal cost is one weight
 function (`../economy/LOGISTICS.md` § 1). A convoy between a colony's market and its metropole's
 is cheaper than one to a stranger's, so a colony's chains close through its metropole *first*
@@ -422,9 +444,22 @@ landscape search. Whether a lane *decays* once its traffic stops is this doc's o
 
 The reading is structural rather than a tuning miss, and the figures say so: at a tenth of the rate the median still ends at 181k, because a cap-sized army over 115 rounds costs about one median hoard. **The caps were hiding a 600x treasury spread** — so what looks like a new failure is an old one becoming visible, which is the whole point of putting the cost in the world. The visible consequence to watch is displacement: its median fell to 0.85 on this arm while the pooled figure held at 1.64. If a later reading shows the spent purse suppressing displacement rather than differentiating realms, that is the evidence that reopens this call.
 
-**SETTLED (Ben, 2026-09-11): `army_stock` CARRIES across the handoff; the navy is NEW and starts
-at zero, everywhere.** No polity inherits a fleet, which means the first ocean-capable power in a
-world built its fleet inside this phase and the sweep can see when.
+**SETTLED (Ben, 2026-09-11): `army_stock` CARRIES across the handoff.**
+
+**SETTLED (Ben, 2026-09-26, superseding "the navy is new and starts at zero, everywhere" of
+2026-09-11): the navy CARRIES too, as a starting fleet earned at sea in the Empires age.** A
+polity accrues **naval points** through the Empires span from three deeds: the coastal provinces
+it holds, counted per year held; the sea crossings it makes, the sea legs it walks; and the
+coastal sea techs it takes (Deep-Hull Sail and on, `trees/EMPIRE_TREE.md`). At the handoff its
+points become its opening `navy_stock`, so the coastal empires open the age already at sea and
+the Exploration age's first crossings, purchases and lanes follow who held the sea before it.
+**The points pass to the polity that earned them:** a polity that lost its coast keeps its
+sailors, and they are never read off the regions it holds at the handoff. The fleet is then a
+stock like any other (the table below): upkeep from the first round, decay when underfunded,
+staged from a port. The conversion from points to fleet is one named constant, read on a
+measured ladder over the curated seeds, never set to hit a count. `port_q` stays endowment and
+no port carries (§ `port_q` is endowment, not a port): a fleet is earned by deeds, a harbour is
+still built in this age. BL-1147 (naval points carry over) owns the build.
 
 **Ben, 2026-09-11:** *"Spending capital on ports within the Exploration round enables cheaper
 overseas skirmishes. So building a navy and standing army that persists is important — these
@@ -435,8 +470,35 @@ Three objects, and each is a stock the treasury maintains:
 | Stock | Built from | What it buys | If underfunded |
 |---|---|---|---|
 | **Port** | Capital, on a region with a port window | Lowers the cost of every crossing staged from it | Silts: its discount decays toward nothing |
-| **Navy** | Capital, staged from a port | Crossing capacity, and contest of a crossing | Decays; a fleet is a running cost, not a purchase |
+| **Navy** | Capital, staged from a port, on top of the fleet its naval points carried | Crossing capacity, and contest of a crossing | Decays; a fleet is a running cost, not a purchase |
 | **Standing army** | Capital, on top of inherited `army_stock` | Force that is *already raised* when a skirmish opens | Falls back toward what muster alone provides |
+
+**SET (Ben, 2026-09-27):** *"Fleets should project power so allies with large fleets stop enemy
+fleets before they move."* A navy's contest of a crossing is **projected**: a fleet's power reaches
+out over the sea from the ports it stages from, and a crossing against a realm meets the power its
+allies project over that sea as well as its own. Where the defenders' projected power outweighs the
+attacker's fleet, the crossing is stopped before it sails.
+
+**SETTLED (Ben, 2026-09-27, NR-961): the fleet decides who crosses, in the Exploration and
+Industrialisation spans.** The Empires round stays gated by the military band alone.
+
+- **A fleet bounds the army it carries.** A campaign that crosses water carries no more of its
+  army than the fleet staged from its hub's port can lift.
+- **The defenders are the target realm and its mutual-defence partners** — the treaty clause under
+  which an attack on one draws the other in.
+- **A fleet's power falls with sea distance from its own ports,** halving over a fixed run of sea
+  tiles, and the distance is priced by the currents, so a fleet reaches less far against them.
+- **A crossing the defenders out-project never sails.** Where, anywhere along its sea leg, the
+  power the defenders project outweighs the attacker's fleet there, the crossing is not made,
+  and the attacker keeps its army and its fleet for another verb that round. Nothing is fought and nothing dies: the
+  crossing is stopped before it moves.
+- **A crossing the rule would refuse is never a candidate (Ben, 2026-10-01, NR-965).** The fleet
+  test is part of what makes a crossing legal, like every other gate on a verb, so a realm with no
+  fleet to lift its army is never offered the crossing and spends its round on something it can do.
+
+How many men a hull lifts and how far a fleet's power runs before it halves are named constants,
+read on a measured ladder over the curated seeds and set by Ben, never set to hit a count. The
+naval carry-over's conversion is read again once the fleet has this job.
 
 **Decay is what makes the choice a choice.** A purchase the treasury never revisits is a one-time
 score; a stock with upkeep means a polity that over-builds is poorer every round afterwards and a
@@ -465,8 +527,35 @@ real option and the lane record reads wet campaigns as well as the tribute leg.
 
 **Currents are a force, not a picture (Ben, 2026-09-25).** The sea carries currents generated
 from the planet, and a leg that runs with one costs less than a leg run against it, so routes,
-lanes and staging follow them; the Exploration round charts them. How they are generated and
-how much they weigh is BL-1120's (ocean currents).
+lanes and staging follow them; the Exploration round charts them. **They are generated from the planet (delegated reading,
+NR-949; BL-1120, ocean currents):** each ocean region's current follows its latitude band's
+prevailing wind (easterly in the tropics, westerly in the mid-latitudes, its sense set by the
+body's rotation) and is turned along the coasts the continents present, so a basin circulates; a
+leg run with its current costs less and against it more, by one weight measured on the curated
+seeds.
+
+**The field is a stream function over the sea (BL-1120).** Each sea tile carries a value set by
+its latitude band's wind profile (a smooth rise and fall within each 30-degree band: westward in
+the tropics, eastward in the mid-latitudes, westward near the poles, calm at the band edges) and
+scaled down toward the shore, so every coast is a streamline and the water between two continents
+circulates — one sense in the north, the other in the south, and both reversed on a body that
+spins the other way (the rotation sense is a body property, `PLANETOLOGY.md`'s). The current is
+read per ocean region of seven by seven tiles, one arrow each. A leg's alignment is its line
+sampled tile by tile against the current, so the return leg reads exactly the negation of the
+outbound; its cost is scaled by `1 - weight x alignment`, the weight 500 per mille, the knee of the
+measured ladder (the share of crossings that run with the current stops rising there, and heavier
+weights start to swing whole worlds).
+
+**Where currents bite.** A wet campaign's crossing is priced with its current in the Exploration
+and Industrialisation spans; the Empires span is not (its record is the round-4 map, fixed before
+currents). Tribute is standing traffic, not a choice, so a current cannot decide it; it decides
+trade instead — which trades across water are worth making (§ The colonial tie is a sea lane, the
+fourth writer) — and where a lane physically runs, because the lane stamp's water walker prices
+its path with the current, so a lane bends along it rather than hugging the straight line.
+**A leg run against its current delivers less (Ben, 2026-09-26; BL-1142):** a trade across water
+loses part of its cargo in proportion to how hard it ran against the current, applied after the
+flow is sized, so the current shapes how much actually arrives even where the seller's stock or the
+buyer's want, not the sea, limits the trade.
 
 **The record keeps the fleet and the harbour, year by year (Ben, 2026-09-24).** Each polity's
 sample on the round's record carries its standing navy and its capital's port stock at every
@@ -494,6 +583,14 @@ than about who rules there.
 preference for a good follows from what its ground never held and what its route exposed it to —
 the same two inputs the want table already uses, read at culture grain instead of polity grain. A
 people that walked past a good and never held it is the people that pays most for it.
+
+**SETTLED (Ben, 2026-10-03): the cradle's ground is remembered.** Beside exposure, a culture's
+preference reads its cradle's ground profile (`COLONISATION.md` § The ground profile), inherited by
+every daughter: a good the cradle held below the cradles' mean is remembered as a lack, and a strong
+amenity in the cradle leans its people toward one good — forest toward energy, coastal grass toward
+port, valley marsh toward farm. Only a culture that is the plurality of some region carries the
+profile into a preference, since a people with no ground has nowhere to want from. The size of both
+terms is a named parameter, read on the curated seeds before it is set.
 
 **What the preference does in this phase is weight a want, not set a price.** The want table
 (`CIVILISATION.md` § The directed want) is directed and unpriced; preference makes some directed
@@ -524,6 +621,12 @@ long-known neighbour lacks and holds the same goods as often as a stranger does,
 relieves the wants a bound neighbour can meet without pointing the rest outward. So the want
 decides between campaigns a polity could already win and reach; **where** it fights is decided by
 cost — treaties at home, ports abroad, and deterrence (§ The shape of the age).
+
+**SETTLED (Ben, 2026-10-03): what a good is worth wanting changes with the age.** A per-age weight
+table scales each good's want: in the Industrialisation span energy and ore weigh more than they
+did in the Exploration age, so an industrialising realm's campaigns lean toward coal and iron
+country. The want stays a lean on a winnable prize; the table changes which good leans it hardest.
+The weights are read on the curated seeds before they are set.
 
 ---
 

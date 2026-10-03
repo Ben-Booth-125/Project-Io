@@ -31,7 +31,10 @@
 // Kept outside src/ so the CMake game glob does not pull it into the build.
 
 #include "world/components.hpp"
+#include "world/corp_command.hpp"
 #include "world/corporation_generation.hpp"
+#include "world/recipe_registry.hpp"
+#include "world/stockpile_budget.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/world_gen_config.hpp"
 #include "harness_params.hpp"
@@ -39,6 +42,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <string>
 #include <vector>
 
 namespace {
@@ -117,37 +121,97 @@ int main()
     // does not open with a standing army (Ben; the seeded unit cost 7.5 cr/qtr from
     // turn one, 16.5% of the seated corp's operating outgoings). The seeding itself
     // is unchanged, so this harness's subject is unchanged too; it just has to ask
-    // for it now. R0 below pins the new default so the flag cannot flip back
-    // unnoticed.
+    // for it now. Since BL-1154 (NR-963 A) rivals are armed whatever the flag;
+    // it now arms the SEAT too. R0 below pins the shipped default.
     world_gen_config force_on{};
     force_on.seed_starting_force = true;
 
     // -------------------------------------------------------------------
-    // R0 — the SHIPPED default seeds no force at all.
+    // R0 — THE SHIPPED DEFAULT (BL-1154, Ben 2026-10-01, NR-963 A): RIVALS
+    //      START ARMED, the seat and background firms do not. Every
+    //      non-background corporation but the player owns exactly one
+    //      military base and one seeded unit; the player owns neither.
     // -------------------------------------------------------------------
     {
         const world w = make_hard_coded_world(no_prehistory());
-        int bases = 0;
-        for (const auto& [bid, bc] : w.buildings)
-            if (bc.type == building_type::military_base) ++bases;
-        // CORP-owned units only. The world legitimately holds NATION garrisons
-        // (MILITARY.md § Nation garrisons, funded by the military_research budget
-        // line), and this property is about CORPORATIONS: a new charter does not
-        // open with a standing army. An earlier cut of this row asserted over
-        // w.units wholesale and went red on 287 nation soldiers — it was claiming
-        // nations have no army either, which is a different claim and a false one.
-        std::size_t corp_units = 0;
-        for (const auto& [uid, uc] : w.units)
-            if (w.corporations.count(uc.owner) != 0) ++corp_units;
+        int rivals = 0, rivals_armed = 0;
+        for (const entity_id cid : non_background_corp_ids(w))
+        {
+            if (cid == w.player_entity) continue;
+            ++rivals;
+            if (count_military_bases(w, w.corporations.at(cid)) == 1
+                && count_generation_seeded_units(w, cid) == 1)
+                ++rivals_armed;
+        }
+        const bool seat_bare = w.player_entity != null_entity
+            && count_military_bases(w, w.corporations.at(w.player_entity)) == 0
+            && count_generation_seeded_units(w, w.player_entity) == 0;
+        bool bg_bare = true;
+        for (const entity_id bid : background_corp_ids(w))
+            if (count_military_bases(w, w.corporations.at(bid)) != 0
+                || count_generation_seeded_units(w, bid) != 0)
+                bg_bare = false;
+        std::printf("\n=== R0: shipped default — %d of %d rivals armed; seat %s ===\n",
+                    rivals_armed, rivals, seat_bare ? "unarmed" : "ARMED");
+        check(rivals > 0 && rivals_armed == rivals,
+              "R0 the shipped default arms EVERY rival (one military base and one seeded unit)");
+        check(seat_bare, "R0 the shipped default leaves the SEAT unarmed (no base, no unit)");
+        check(bg_bare, "R0 no background firm owns a base or a seeded unit");
+    }
 
-        std::printf("\n=== R0: shipped default — %d military base(s), %zu CORP unit(s)"
-                    " (%zu total; the rest are nation garrisons) ===\n",
-                    bases, corp_units, w.units.size());
-        check(bases == 0, "R0 the shipped default seeds NO military base");
-        check(corp_units == 0, "R0 the shipped default seeds NO corp-owned standing unit");
-        check(!w.units.empty(),
-              "R0 ANTI-VACUITY: nation garrisons still exist, so the row above is not "
-              "passing merely because the world has no units at all");
+    // -------------------------------------------------------------------
+    // R0b — A PICKED SEAT OPENS UNARMED (the BL-1154 review). The pick path
+    //       (`corp_verb::take_seat`) and the draw share `move_seat_force`:
+    //       the corporation picked loses its opening force, and the seat it
+    //       left is armed. On a LEGACY world (no budget) and a BUDGET world
+    //       (the shipped arc, the charter web spent on the seed candidate).
+    // -------------------------------------------------------------------
+    {
+        const auto pick_row = [&](world& w, const char* label) {
+            const entity_id old_seat = w.player_entity;
+            entity_id pick = null_entity;
+            for (const entity_id cid : non_background_corp_ids(w))
+                if (cid != old_seat && count_military_bases(w, w.corporations.at(cid)) == 1)
+                {
+                    pick = cid;
+                    break;
+                }
+            const recipe_registry reg;
+            corp_command cmd;
+            cmd.corp = pick;
+            cmd.verb = corp_verb::take_seat;
+            const bool applied = pick != null_entity
+                && apply_corp_command(w, reg, cmd) == corp_command_result::applied;
+            int pick_units = 0;
+            for (const auto& [uid, uc] : w.units)
+                if (uc.owner == pick) ++pick_units;
+            const int pick_bases = pick != null_entity
+                ? count_military_bases(w, w.corporations.at(pick)) : -1;
+            const bool old_armed = old_seat != null_entity
+                && count_military_bases(w, w.corporations.at(old_seat)) == 1
+                && count_generation_seeded_units(w, old_seat) == 1;
+            std::printf("  %s: picked %u (was armed) over seat %u -> picked holds %d units, %d bases; "
+                        "the seat it left %s\n", label, static_cast<unsigned>(pick),
+                        static_cast<unsigned>(old_seat), pick_units, pick_bases,
+                        old_armed ? "is armed" : "is NOT armed");
+            check(applied && w.player_entity == pick && pick_units == 0 && pick_bases == 0,
+                  (std::string("R0b ") + label + ": a picked seat owns 0 units and 0 military bases").c_str());
+            check(old_armed, (std::string("R0b ") + label + ": the seat it left is armed").c_str());
+        };
+        std::printf("\n=== R0b: a picked seat opens unarmed ===\n");
+        {
+            world w = make_hard_coded_world(no_prehistory());
+            pick_row(w, "legacy world");
+        }
+        {
+            world_params p{};                // the shipped arc: the budget's own world
+            world w = make_hard_coded_world(p);
+            const recipe_registry reg;      // Lua-free: the web charters its specialists
+            const seed_candidate_spend scs =
+                spend_stockpile_on_seed_candidate(w, reg, p.seed, world_gen_config{}.corporation_count);
+            check(scs.spent, "R0b budget world: the charter budget was spent (a budget world)");
+            pick_row(w, "budget world");
+        }
     }
 
     {

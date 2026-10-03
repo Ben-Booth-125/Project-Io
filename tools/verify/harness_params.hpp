@@ -406,6 +406,27 @@ struct app_start_world
     shipped_landscape land;
 };
 
+/// BL-1084 — app::begin_new_game's two generation inputs, and nothing else: the
+/// world-gen config PARSED from scripts/world_gen.lua and the works table, exactly
+/// as `build_app_base_world` hands them to generation (it calls this). For an
+/// instrument that drives generation's stage functions itself
+/// (world/generation_cursor.hpp) rather than through make_hard_coded_world, so it
+/// still builds the app's world.
+inline void load_app_generation_inputs(lua_state& lua, world_gen_config& cfg,
+                                       works_registry& works)
+{
+    // app.cpp:504-506 — the world-gen config is PARSED and passed, not merely loaded.
+    lua.load("scripts/world_gen.lua");
+    cfg = world_gen_config{};
+    cfg.load_from_lua(lua);
+    // app.cpp:546 -> app::ensure_works_loaded (app.cpp:1140-1148), loaded once.
+    if (works.size() == 0)
+    {
+        lua.load("scripts/works.lua");
+        works.load_from_lua(lua);
+    }
+}
+
 /// The first half of `build_app_start_world`: everything up to the landscape
 /// search — app::begin_new_game and app::start_new_game_prelude as far as
 /// load_economy's recipe pass (app.cpp:1193). Split out (BL-1033) so an
@@ -429,16 +450,7 @@ inline void build_app_base_world(lua_state& lua, const world_params& params,
     out.params = params;
 
     // --- app::begin_new_game (app.cpp:502-557) -----------------------------
-    // app.cpp:504-506 — the world-gen config is PARSED and passed, not merely loaded.
-    lua.load("scripts/world_gen.lua");
-    out.cfg = world_gen_config{};
-    out.cfg.load_from_lua(lua);
-    // app.cpp:546 -> app::ensure_works_loaded (app.cpp:1140-1148), loaded once.
-    if (out.works.size() == 0)
-    {
-        lua.load("scripts/works.lua");
-        out.works.load_from_lua(lua);
-    }
+    load_app_generation_inputs(lua, out.cfg, out.works);
     // app.cpp:553-554 — the worker: report, config and works all passed. The
     // progress sink is atomics the loading screen reads, never an input.
     out.report = generation_report{};

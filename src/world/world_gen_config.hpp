@@ -24,6 +24,25 @@ struct market_carving_params
     /// a commercially-contested territory toward fracture on top of raw
     /// geology. 0 = corp presence has no effect (the pre-BL-132 formula).
     float corp_presence_gain = 0.15f;
+    /// BL-1125 (markets can die), the GRAVITY FOLD's reach: a market whose
+    /// centre lies within this traversal cost of a larger market's centre
+    /// (travel toward the larger, over the edge weights intra_body_path's flood
+    /// relaxes: landform x road x river, water at the sea weight -- a path
+    /// cost, not a convoy's bill; water only between two ported centres, as a
+    /// convoy's sea leg requires) folds into it. A COST THRESHOLD, never a
+    /// count cap. CALIBRATED: set so a 1960 world
+    /// carries roughly 20-40 markets, about one per major city, measured on the
+    /// curated seeds (MARKETS.md § Market centres and seeding). 0 = no gravity
+    /// fold. Not authored in Lua: one named constant, here.
+    ///
+    /// MEASURED 2026-10-02 (tools/verify/market_gravity_ladder.cpp, the 16
+    /// curated seeds, rungs 0/6/8/10/12/14/16/20, with the port gate on water
+    /// and the catchment passing whole to the absorber): the median seed
+    /// carries 394 markets unfolded, 42 at 12, 34 at 14, 31 at 16, 26 at 20;
+    /// 16 is the rung with the most seeds inside 20-40 (15 of 16; seed 43
+    /// reads 17). Ungated water put 14 there instead -- the gate refuses most
+    /// of the folds across water, so the reach that hits the aim grew.
+    float gravity_reach = 16.0f;
 };
 
 /// Endemic-good distance pricing tunables (BL-191), authored in scripts/world_gen.lua
@@ -67,27 +86,30 @@ struct world_gen_config
     /// Default false: every existing caller builds a whole world, exactly as
     /// before. Authored nowhere in Lua — this is a call-site scope knob, not a
     /// balance value, and it is the one field here that is not.
+    ///
+    /// BL-1084: ALL FOUR STOP FLAGS NAME A STAGE. `make_hard_coded_world` is a
+    /// composition of stage functions over one `generation_cursor`
+    /// (world/generation_cursor.hpp), and a flag says which stage it runs up to
+    /// (`generation_stop_stage`: the earliest flag set wins) before the stopped
+    /// ending (`close_stopped_generation`). No flag gates a pass from inside it.
     bool stop_after_ancient_era = false;
 
     /// STOP GENERATION ONCE THE EXPLORATION SPAN HAS RUN, before borders,
     /// roads and companies are built (BL-946) -- the Exploration round's own
     /// sibling to `stop_after_ancient_era` above, same contract, one round
-    /// later. Also gates the Exploration span ITSELF off whenever
-    /// `stop_after_ancient_era` is set, so the Empires round's own launch
-    /// (which stops right after the ancient era) never pays for a span it
-    /// will discard.
+    /// later. When both are set the earlier stop wins, so the Empires round's
+    /// own launch (which stops right after the ancient era) never pays for a
+    /// span it will discard.
     ///
     /// THE WORLD IS NOT USABLE WHEN THIS IS SET, for the same reason
     /// `stop_after_ancient_era` is not.
     ///
     /// Default false: every existing caller is unaffected.
     ///
-    /// BL-1040: IT ALSO STOPS BEFORE THE INDUSTRIALISATION SPAN. The span sits
-    /// between the Exploration fold and population centres, which is ahead of
-    /// this knob's own return, so the call site gates the span on this knob
-    /// directly -- the Exploration round's launch, `exploration_sweep` and the
-    /// seed-library fingerprints never pay for a span they would discard, and
-    /// never read a world it moved.
+    /// BL-1040: IT ALSO STOPS BEFORE THE INDUSTRIALISATION SPAN, which is the
+    /// next stage (BL-1084) -- the Exploration round's launch,
+    /// `exploration_sweep` and the seed-library fingerprints never pay for a
+    /// span they would discard, and never read a world it moved.
     bool stop_after_exploration = false;
 
     /// STOP GENERATION ONCE THE INDUSTRIALISATION SPAN HAS RUN (BL-1040), before
@@ -117,7 +139,7 @@ struct world_gen_config
     /// be fused into the same run. Mutually exclusive with
     /// `stop_after_ancient_era` in practice: a caller wants one stop point or
     /// the other, never both, though nothing here enforces that (the earlier
-    /// check wins if both are set).
+    /// stop wins if both are set, `generation_stop_stage`).
     ///
     /// THE WORLD IS NOT USABLE WHEN THIS IS SET, for the same reason
     /// `stop_after_ancient_era` is not: `run_history_sim` has not run at all,

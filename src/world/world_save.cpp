@@ -82,6 +82,7 @@ void w_tile(std::ostream& o, const tile_component& t)
     w_u8(o, t.river_edges);
     w_u8(o, t.river_downstream);
     w_f32(o, t.height);
+    w_u8(o, t.lane_level); // BL-1098 (v28): the sea-lane tier, at the record's tail
 }
 
 bool r_tile(std::istream& i, tile_component& t)
@@ -92,7 +93,8 @@ bool r_tile(std::istream& i, tile_component& t)
         && r_f32_array(i, t.resource_deposit) && r_f32_array(i, t.resource_remaining)
         && r_f32(i, t.hazard_level) && r_f32(i, t.habitability)
         && r_f32(i, t.substrate_density) && r_u8(i, t.road_level)
-        && r_u8(i, t.river_edges) && r_u8(i, t.river_downstream) && r_f32(i, t.height);
+        && r_u8(i, t.river_edges) && r_u8(i, t.river_downstream) && r_f32(i, t.height)
+        && r_u8(i, t.lane_level); // BL-1098 (v28)
 }
 
 void w_body(std::ostream& o, const body_component& b)
@@ -678,13 +680,15 @@ void w_battle(std::ostream& o, const active_battle& b)
     w_ids(o, b.defender_units);
     w_battle_state(o, b.state);
     w_enum(o, b.withdraw_requested);
+    w_id(o, b.ground_tile); // BL-1145 review: world_save_version 30
 }
 
 bool r_battle(std::istream& i, active_battle& b)
 {
     return r_u32(i, b.province) && r_id(i, b.attacker) && r_id(i, b.defender)
         && r_ids(i, b.attacker_units) && r_ids(i, b.defender_units)
-        && r_battle_state(i, b.state) && r_enum(i, b.withdraw_requested, max_withdraw);
+        && r_battle_state(i, b.state) && r_enum(i, b.withdraw_requested, max_withdraw)
+        && r_id(i, b.ground_tile);
 }
 
 // ---------------------------------------------------------------------------
@@ -772,10 +776,14 @@ void clear_derived_state(world& w)
     w.astar_cost_cache.clear();
     w.logistics_flood_fields.clear();
     w.body_reach_cost.clear();
+    w.lp_anchor_fields.clear(); // BL-1117: the nearest-anchor field, same footing
 
     // The market index carries its own staleness stamps; zeroing them is what
     // makes the next `market_for_tile` rebuild rather than trust an empty index.
     w.body_market_index.clear();
+    w.body_folded_index.clear(); // BL-1125: rebuilt with the market index
+    w.body_market_sig.clear();   // BL-1125: likewise
+    w.body_route_index.clear();  // BL-1125: the catchment raster, rebuilt on first read
     w.body_market_index_count  = 0;
     w.body_market_index_cursor = 0; // not an id: the allocator cursor at build (BL-1079)
 
@@ -931,6 +939,17 @@ void write_world_snapshot(const world& w, std::ostream& out)
     w_vec(out, w.exchanges.entries, w_exchange);
     w_u32(out, static_cast<uint32_t>(w.exchanges.next));
     w_u64(out, static_cast<uint64_t>(w.exchanges.total));
+
+    // BL-1125 (world_save_version 29): the fold map -- every market folded at
+    // generation, by old id, with its body, centre and absorber. ROUTING STATE:
+    // `market_for_tile` reads it every tick, and it cannot be derived from the
+    // standing markets. A `std::map`, written ascending as held.
+    w_map(out, w.folded_markets, [](std::ostream& s, const entity_id& k) { w_id(s, k); },
+          [](std::ostream& s, const folded_market& f) {
+              w_id(s, f.body);
+              w_id(s, f.centre_tile);
+              w_id(s, f.into);
+          });
 }
 
 bool read_world_snapshot(world& w, std::istream& in)
@@ -1128,6 +1147,26 @@ bool read_world_snapshot(world& w, std::istream& in)
             return false;
         s.exchanges.next  = static_cast<std::size_t>(next_slot);
         s.exchanges.total = static_cast<std::size_t>(total);
+    }
+
+    // BL-1125 (v29): the fold map. Untrusted on the same footing as the ring
+    // above: a record must name a body, a tile on that body, and an absorber
+    // that is a STANDING market on that body, and its own id must not be a
+    // standing market -- the writer can produce none of those violations, and
+    // a record that broke one would route tiles to a market that is not there.
+    if (!r_map(in, s.folded_markets,
+               [](std::istream& st, entity_id& k) { return r_id(st, k) && k != null_entity; },
+               [](std::istream& st, folded_market& f) {
+                   return r_id(st, f.body) && r_id(st, f.centre_tile) && r_id(st, f.into);
+               }))
+        return false;
+    for (const auto& [fid, fm] : s.folded_markets)
+    {
+        if (s.markets.count(fid) != 0) return false;
+        const auto into = s.markets.find(fm.into);
+        if (into == s.markets.end() || into->second.body != fm.body) return false;
+        const auto tile = s.tiles.find(fm.centre_tile);
+        if (tile == s.tiles.end() || tile->second.body != fm.body) return false;
     }
 
     clear_derived_state(s);

@@ -97,6 +97,25 @@ bool era_minus_one_enabled(const world_params& params);
 /// the span and the clock were ever overridden.
 history_sim_params era_minus_one_sim_params(const world_params& params);
 
+/// BL-1132 — THE SETTLE SPACING generation's spans found at, in tiles: the
+/// value `era_minus_one_sim_params` and `exploration_sim_params` write into
+/// `history_sim_params::settle_min_spacing_tiles` (which says why tiles), and
+/// so the Industrialisation span too, which is built on Exploration's params.
+/// ONE value for all three, so a re-settlement is spaced alike in every span.
+///
+/// FIXED AT 3 (Ben, 2026-09-26; CIVILISATION.md § The unit is the city state),
+/// from a candidate ladder (1, 2, 3, 4, 5, 7, 10) measured on the sixteen
+/// curated seeds (tools/verify/centre_census.cpp, its C9 row; C10 checks the
+/// spacing itself holds). 3 is the smallest spacing that guarantees a
+/// Settle region a cell of its own beyond its anchor tile (every tile one step
+/// from the anchor is strictly nearer it than any other), and the ladder's knee:
+/// one-tile cells 26,232 -> 231 pooled, where 4 and above only trade regions
+/// and carved centres for the province anchors' backfill. 1 is the old SITE
+/// rule (any tile no region stands on); the room check in the Settle scorer is
+/// unconditional, so a spacing-1 world is not the pre-BL-1132 one
+/// (history_sim.hpp `settle_min_spacing_tiles`).
+inline constexpr int generation_settle_spacing_tiles = 3;
+
 /// The seed generation hands the era. A per-pass fold off the master seed, in
 /// the same shape as every other pass in `make_hard_coded_world`.
 uint32_t era_minus_one_sim_seed(const world_params& params);
@@ -358,6 +377,13 @@ struct era_minus_one_fixture
     /// each consumer's own input rather than inferring one from the other.
     std::vector<int64_t>          setup_polity_treasuries;
     std::vector<history_corridor> setup_junction_corridors;
+
+    /// BL-1153: the per-region realm world setup handed `stamp_sea_lanes`
+    /// (the polity holding each region at the last close, -1 for none --
+    /// `generation_cursor::kepler_region_polity`), captured at that site on
+    /// the same terms, so a harness re-stamping the lane record hands the
+    /// stamp the realms it was handed rather than re-deriving them.
+    std::vector<int>              setup_lane_realms;
 
     // --- BL-1040: the Industrialisation span's own capture ---------------------
     //

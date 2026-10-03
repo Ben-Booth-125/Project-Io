@@ -31,6 +31,43 @@
 #include <string>
 #include <vector>
 
+/// THE GROUND PROFILE OF A PEOPLE'S CRADLE (BL-1107; COLONISATION.md § The
+/// ground profile). What the country a culture was coined on was MADE OF and
+/// FELT LIKE: the deposits its cradle window held, summed in the four classes
+/// the founding survey reads, plus the one amenity class its cover read as
+/// (TILES.md § Amenity tiles). Coined once at the cradle, beside the package,
+/// from the same window; a daughter inherits it whole. A fact about where a
+/// people BEGAN, never about where it now stands.
+///
+/// Plain integers so this header (hundreds of includers) takes no dependency
+/// on `colonisation.hpp` or `settlement.hpp`: `amenity` is an
+/// `amenity_class` (colonisation.hpp) and the four sums are an `endowment`'s
+/// four classes (settlement.hpp), each read over the cradle window.
+struct ground_profile
+{
+    /// Per-tile mean x1000 over the cradle window, in `survey_endowment`'s
+    /// shape: agricultural produce; iron + copper + rare-earth ore; coal +
+    /// petroleum; and the window's water share (per mille of its cells).
+    int32_t farm = 0, ore = 0, energy = 0, water = 0;
+
+    /// The window's amenity class, an `amenity_class` value; -1 = not coined.
+    /// `open` (0) is a real class -- country with no high-amenity cover.
+    int8_t amenity = -1;
+
+    /// Per mille of the window's LAND cells under `amenity`'s cover (0 for
+    /// `open`), so a reader can tell a forest people from a people of one wood.
+    int16_t amenity_share = 0;
+
+    bool coined() const { return amenity >= 0; }
+
+    bool operator==(const ground_profile& o) const
+    {
+        return farm == o.farm && ore == o.ore && energy == o.energy && water == o.water
+            && amenity == o.amenity && amenity_share == o.amenity_share;
+    }
+    bool operator!=(const ground_profile& o) const { return !(*this == o); }
+};
+
 /// One god of a culture's pantheon.
 struct culture_god
 {
@@ -143,6 +180,13 @@ struct culture
     /// disagreement rather than a stated one (BL-864 made a daughter a people OF
     /// the country it settled).
     int8_t origin_farm_class = -1;
+
+    /// The ground profile of the cradle this people descends from (BL-1107).
+    /// A cradle culture's is coined from its own window; a daughter's is its
+    /// parent's, inherited whole (`derive_daughter_culture`) -- unlike
+    /// `origin_farm_class`, which a daughter re-reads off the ground it split
+    /// on. Read by `derive_culture_preference`.
+    ground_profile profile;
 
     /// The calendar year this culture was coined — a cradle culture at the span's
     /// start (`colonisation_start_year`), a daughter at the year its stream

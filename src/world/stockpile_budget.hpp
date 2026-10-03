@@ -73,7 +73,8 @@ enum class stockpile_unspent_reason : std::uint8_t
     carve_dropped    = 0, ///< its slot's carved centre was never founded: the body was built out
     carve_no_tile    = 1, ///< its slot's carved centre resolved to no tile (defensive; unreached)
     razed            = 2, ///< the region carved no centre because history razed its towns
-                          ///< (`centres_razed` > 0): the works went with the towns (NR-901)
+                          ///< (`centres_razed` > 0): the points went with the towns (NR-901;
+                          ///< the works themselves stand, Ben 2026-09-27)
     no_carved_centre = 3, ///< RESIDUAL: the region carved no centre and records no razing
     rejected         = 4, ///< the whole budget was REJECTED (a domain violation or an
                           ///< inconsistent world; see `rejection`)
@@ -233,7 +234,8 @@ inline constexpr std::int32_t k_stockpile_density_ceiling = 120;
 
 /// The spend @p sb is charged at: its own DERIVED firm price (BL-1064), the
 /// ruled `sqrt_capital` cap rule under the constants above, window 4, the
-/// province cap on (§ 1: "the per-province cap stays at 2 on a budget world").
+/// province cap on (§ 1: the per-province cap scales with the province's centre,
+/// two firms per rung — BL-1146, Ben 2026-09-27, NR-960, superseding the flat 2).
 /// On an empty or rejected budget the price is 0 — never read, since an empty
 /// budget takes the legacy branch before any spend param is.
 charter_spend_params stockpile_charter_spend(const stockpile_budget& sb);

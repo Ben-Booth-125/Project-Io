@@ -3,6 +3,7 @@
 #include "continents.hpp"
 #include "era_timelapse.hpp" // the recorded Era -1 ownership replay (NR-733)
 #include "planetology.hpp"
+#include "road_generation.hpp" // BL-1138: market_road_stats / market_road_trace in the report
 #include "settlement.hpp"
 #include "world.hpp"
 #include "world_gen_config.hpp"
@@ -237,6 +238,21 @@ struct world_params
     /// On the save seam with `industrialisation_span_enabled` (envelope 20).
     bool resume_seeds_corridor_tier = true;
 
+    /// BL-1107 — the ground profile's two magnitudes
+    /// (`history_sim_params::culture_profile_lack_max_q` / `_amenity_div`),
+    /// copied into BOTH resumed spans' params by `exploration_sim_params`
+    /// (Industrialisation's are built on Exploration's). Defaults are the
+    /// history_sim_params defaults. FIELDS HERE so an instrument can read
+    /// them on a ladder over the shipped worlds (Ben, 2026-10-03).
+    ///
+    /// NOT ON THE SAVE SEAM, deliberately for now, and flagged: the envelope's
+    /// descriptor would need a version bump shared with the sprint's other
+    /// lanes. At the defaults a saved descriptor rebuilds the identical
+    /// world; a world built with a non-default value is a tuning world and
+    /// does NOT round-trip through a save until the two join the envelope.
+    int culture_profile_lack_max_q  = 250;
+    int culture_profile_amenity_div = 4;
+
     int             body_count = 0;                        ///< Reserved — the body-count knob is PHASED to a follow-on (bodies are still hard-coded profiles).
     // Note: there is no nation-count knob. The number of nations on the home body is a
     // *consequence* of its habitable land area and the minimum-viable-territory floor
@@ -450,8 +466,13 @@ struct generation_progress
     /// one would make the map lie.
     static constexpr int max_asset_marks = 512;
 
-    /// Corporation ledger rows. `corporation_count` is 8; background firms
-    /// (BL-365) generate outside make_hard_coded_world and are not published.
+    /// Corporation ledger rows. On a world with no charter budget,
+    /// `generate_corporations` publishes its roster (`corporation_count` is 8);
+    /// background firms (BL-365) generate outside make_hard_coded_world and are
+    /// not published. On a budget world generation lays no roster (BL-1086), and
+    /// `finish_campaign_world` publishes the search winner's SPECIALISTS once
+    /// its web is applied (`publish_charter_web`) — 22-88 of them on the curated
+    /// seeds, so a world past 64 shows its first 64 (charter order, richest first).
     static constexpr int max_corp_slots = 64;
 
     std::atomic<int> grid_w{0}; ///< 0 until begin_carve; 0 also means "no carve to draw".
@@ -846,6 +867,17 @@ struct generation_report
     int64_t industrialisation_battles   = 0; ///< Battles fought in that span.
     int64_t industrialisation_conquests = 0; ///< Regions that changed hands.
     int64_t industrialisation_foundings = 0; ///< Regions founded in that span.
+    /// BL-1149 (the review fix) — the span's INDUSTRY and MIGRATION, read off the
+    /// same run: points credited by scale, heads the urbanisation stream moved,
+    /// and the decision rounds the scale accrual ran with NO works table (with
+    /// none, no work stands, no region earns scale credit and the stream moves
+    /// no one — inert, and said so here and on stderr). NOT SAVED, on the
+    /// footing `grudge_sentiment_rows` is: a generation-time reading for the
+    /// build that made it; a loaded game's report carries them zero.
+    int64_t industrialisation_points_from_scale = 0;
+    int64_t industrialisation_stream_moved      = 0;
+    int64_t industrialisation_stream_within     = 0; ///< ...of which filled from a centre's own countryside
+    int64_t industrialisation_scale_inert_rounds = 0;
 
     // --- What the grudge record seeded (BL-898) -----------------------------
     //
@@ -877,6 +909,81 @@ struct generation_report
     /// share a settlement pattern, so subtracting their market counts would
     /// measure the whole era rather than this term.
     int64_t markets_from_trade   = 0;
+
+    // --- Markets that died at the carve (BL-1125, markets can die) ----------
+    //
+    // MARKETS.md § Market centres and seeding: twins fold, then the gravity
+    // fold, both on the whole home-body set after the junction rule. Write-only
+    // like every report field. The conservation pair is what the census checks:
+    // every unit of inventory and pooled goods a folded market held arrives in
+    // its absorber, so the body-wide totals agree before and after.
+    int64_t markets_folded_twins    = 0; ///< Twins folded into the lowest-id market on their tile.
+    int64_t markets_folded_gravity  = 0; ///< Folded into a larger market within reach.
+    int64_t shells_folded           = 0; ///< Of both, how many were capital shells.
+    double  market_fold_goods_before = 0.0; ///< Inventory + pools on the body before the folds.
+    double  market_fold_goods_after  = 0.0; ///< ...and after them.
+    /// The catchment half: tiles whose market folded, and of every tile on the
+    /// body, those NOT routed to their market's absorber after the folds (must
+    /// be 0 -- a folded market's catchment passes whole).
+    int64_t market_fold_tiles_moved  = 0;
+    int64_t market_fold_misrouted    = 0;
+    /// Gravity folds whose reach crossed water (both markets ported).
+    int64_t markets_folded_across_water = 0;
+    /// The centre tiles of the home markets the port gate counted as ported
+    /// (their seeding population tile's region holds a port), ascending.
+    std::vector<entity_id> ported_market_centres;
+    /// Every capital shell spawned (BL-910), in spawn order, with its REGION ANCHOR
+    /// tile (BL-1138 review: a shell on a water anchor stands on land, so its centre
+    /// is no longer its anchor; the anchor is what binds it to its region).
+    std::vector<std::pair<entity_id, entity_id>> capital_shell_anchors;
+    /// Of them, shells whose region and whole polity held no land, stood on the
+    /// nearest land of anyone's (BL-1138 review): a polity seated wholly at sea.
+    int64_t capital_shells_off_realm = 0;
+
+    // --- Roads pull toward markets (BL-1138; LOGISTICS.md § 4) --------------
+    // What `lay_market_roads` did on the home body, after the folds. Write-only.
+    market_road_stats market_roads;
+    market_road_trace market_road_links;
+    // What `stamp_history_roads` did on the home body (the bridge cap's row reads
+    // every corridor laid, whole). Write-only.
+    history_road_stats history_roads;
+    history_road_trace history_road_links;
+    /// Markets destroyed by conquest in the history (BL-1125 cause 3), per
+    /// span -- [0] Empires (to 1200), [1] Exploration (to 1660), [2]
+    /// Industrialisation (to 1960): a capital market whose region a rival took.
+    /// [0] is STRUCTURALLY 0: no market is marked before the 1200 close, so
+    /// the Empires span has none to destroy.
+    int64_t markets_destroyed_by_conquest[3] = {0, 0, 0};
+    /// The regions those markets stood on, per span, in the order destroyed.
+    std::vector<int32_t> markets_destroyed_regions[3];
+
+    // --- The carve ledger: what the carve counted as competitors (BL-1086) --
+    //
+    // The nation gate's competitor term (BL-132 change 3) reads, per nation, how
+    // many corporations compete in its territory. On a world whose firms come
+    // from the charter budget that is the budget's PLANNED charters — the
+    // specialists and firms each nation's centres will charter, richest first
+    // under each body's density ceiling (`plan_charters_by_nation`), before any
+    // placement — because such a world lays no roster before the carve (Ben,
+    // 2026-09-26, option A); on any
+    // other world it is the laid roster's distinct corporations. Recorded here
+    // because the roster the carve read is otherwise unrecoverable once the
+    // search has chartered its own (tools/verify/market_census.cpp said so).
+    //
+    // NOT SAVED, on the footing `grudge_sentiment_rows` is: a generation-time
+    // reading for the build that made it; a loaded game's report carries it
+    // empty. Nothing in generation or play reads it back.
+    struct carve_competitor_row
+    {
+        entity_id nation              = null_entity;
+        int64_t   competitors         = 0; ///< what the gate counted
+        int64_t   planned_specialists = 0; ///< budget worlds: centres affording a specialist
+        int64_t   planned_firms       = 0; ///< budget worlds: firms under each body's ceiling
+    };
+    /// True: the carve counted the budget's planned charters; false: the laid roster.
+    bool                              carve_competitors_from_budget = false;
+    /// Ascending nation id; a nation with no competitor is absent.
+    std::vector<carve_competitor_row> carve_competitors;
 
     // --- The handoff validators' verdict (BL-969) ---------------------------
     //
@@ -933,6 +1040,29 @@ world make_hard_coded_world(world_params params = {}, generation_report* report 
                             generation_progress* progress = nullptr,
                             const works_registry* works = nullptr,
                             era_minus_one_fixture* fixture = nullptr);
+
+/// BL-1084 — THE STAGES `make_hard_coded_world` IS COMPOSED OF, one per wizard
+/// round boundary, in order. The call above is `begin_generation` then
+/// `run_generation_to(tail)` over one `generation_cursor`; a caller that wants
+/// to stop, hold and resume a build uses those directly. The cursor, the stage
+/// functions and what each stage holds are in world/generation_cursor.hpp,
+/// which this header does not include (it carries history_sim.hpp, and this
+/// header's includers should not pay for it).
+enum class generation_stage : uint8_t
+{
+    none = 0,          ///< Nothing has run.
+    life_gate,         ///< The star, the system, the homeworld's tiles and deposits, its rivers.
+    culture,           ///< The ladder, the creeds, the migration.
+    empires,           ///< The Empires span, 400 BCE -> 1200.
+    exploration,       ///< The exploration age, 1200 -> 1660.
+    industrialisation, ///< The Industrialisation span, 1660 -> 1960.
+    tail,              ///< The history's close, borders, roads, companies, finishing.
+};
+
+/// The stage a `make_hard_coded_world` call on @p cfg runs up to: the earliest
+/// `stop_after_*` flag set (the earlier stop wins, as it always did), or
+/// `tail` when none is.
+generation_stage generation_stop_stage(const world_gen_config& cfg);
 
 /// The homeworld's tile grid dimensions — one authority the build and the
 /// wizard preview both read.

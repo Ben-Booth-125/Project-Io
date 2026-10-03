@@ -139,6 +139,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -430,6 +431,8 @@ struct seed_result
     int    field_holdings_open = 0;
     int    field_holdings_close = 0;
     int    rival_units = 0, rival_heads = 0;
+    int    rivals_armed = 0;      ///< rivals holding a military base at close (BL-1154: one seeded unit each)
+    int    rival_max_units = 0;   ///< the most units any one rival holds (the hire cap is 3)
     output_probe probe;
     bool   filed_ok = true;       ///< every corp filed, and flows reconstruct the net
 };
@@ -442,8 +445,7 @@ double median_of(std::vector<double> v)
     return v[v.size() / 2];
 }
 
-seed_result run_seed(uint32_t seed, recipe_registry& reg, bool prehistory,
-                    const world_gen_config& gen_cfg)
+seed_result run_seed(uint32_t seed, lua_state& lua, bool prehistory)
 {
     seed_result out;
     out.seed = seed;
@@ -453,8 +455,21 @@ seed_result run_seed(uint32_t seed, recipe_registry& reg, bool prehistory,
     if (!prehistory)
         p = no_prehistory(p);
 
-    // app::setup_world -> load_economy -> generate_background_firms ->
-    // assign_default_recipes, in that order (app.cpp § start_new_game_prelude).
+    // THE SHIPPED START (BL-1086 review, 2026-09-26): `build_app_start_world`,
+    // harness_params.hpp's app-order mirror — generation with the parsed config
+    // and the works table, the genesis bridge and survey states, the banded
+    // registry and its recipe pass, then the landscape SEARCH and its winner
+    // applied with the world's own charter budget, then the second recipe pass.
+    // It replaced a bare make_hard_coded_world + generate_background_firms: on a
+    // budget world generation lays no roster any more (BL-1086), so that path
+    // handed this harness no seated corporation at all, and even before it the
+    // bare path measured a world-gen roster beside Pass 6 firms, which is not the
+    // web the player is handed. The corporation probed is `w.player_entity` as
+    // the winner's apply leaves it — the charter web's seeded pick among its
+    // specialists on a budget world, generate_corporations' player otherwise.
+    // (The app then settles in spectate and re-draws the seat at Begin,
+    // `seat_player_corporation`; this harness settles with that corporation
+    // seated, as it always has.)
     //
     // THE GENERATION CONFIG MUST BE PARSED AND PASSED (fixed 2026-08-26, found by
     // material_floor.cpp). Omitting it does not fall back to something close: the
@@ -468,15 +483,21 @@ seed_result run_seed(uint32_t seed, recipe_registry& reg, bool prehistory,
     // made exactly that mistake: the 2026-08-26 loader fix added the load and not
     // the parse, so the numbers it produced afterwards were still of the wrong
     // world. app.cpp:488-490 loads AND parses AND passes; a harness must do all
-    // three or it is not measuring the shipped spawn.
-    world w = make_hard_coded_world(p, nullptr, gen_cfg);
+    // three or it is not measuring the shipped spawn. `build_app_start_world`
+    // does all three (load_app_generation_inputs).
+    auto start = std::make_unique<app_start_world>();
+    build_app_start_world(lua, p, *start);
+    world&           w   = start->w;
+    recipe_registry& reg = start->reg;
     // BL-1101: the band is the world's own, applied after generation as
-    // app::load_economy applies it — never a probe descriptor's epoch.
-    std::printf("  band: %s (the world's own, derived at the 1960 fold)\n",
-                era_band_name(band_registry_from_world(reg, w)));
-    assign_default_recipes(w, reg);
-    generate_background_firms(w, reg, seed ^ 0x8A21F00Du);
-    assign_default_recipes(w, reg);
+    // app::load_economy applies it (inside the mirror) — never a probe
+    // descriptor's epoch.
+    std::printf("  band: %s (the world's own, derived at the 1960 fold); %s; seated corp %u\n",
+                era_band_name(w.campaign_band),
+                start->land.stockpile_path && !start->land.stockpile.budget.empty()
+                    ? "a BUDGET world (the winner's charter web)"
+                    : "no charter budget (the searched roster)",
+                static_cast<unsigned>(w.player_entity));
 
     for (const auto& kv : w.corporations)
         out.field_holdings_open += static_cast<int>(kv.second.assets.size());
@@ -564,7 +585,15 @@ seed_result run_seed(uint32_t seed, recipe_registry& reg, bool prehistory,
             {
                 out.rival_units += f->second.first;
                 out.rival_heads += f->second.second;
+                out.rival_max_units = std::max(out.rival_max_units, f->second.first);
             }
+            for (const entity_id bid : cc.assets)
+                if (const auto bit = w.buildings.find(bid);
+                    bit != w.buildings.end() && bit->second.type == building_type::military_base)
+                {
+                    ++out.rivals_armed;
+                    break;
+                }
             if (cc.balance > 0.0f)
                 ++out.rivals_solvent;
             rival_balances.push_back(cc.balance);
@@ -641,11 +670,10 @@ int main(int argc, char** argv)
     recipe_registry reg;
     reg.load_from_lua(lua);
 
-    // Parsed, not merely loaded — see the note in run_seed. This one line is the
-    // difference between measuring the shipped spawn and measuring a world where
-    // most of the ancient roster cannot be sold at all.
-    world_gen_config gen_cfg{};
-    gen_cfg.load_from_lua(lua);
+    // Parsed, not merely loaded — see the note in run_seed: each seed's world is
+    // built by `build_app_start_world`, which parses and passes world_gen.lua's
+    // config itself (load_app_generation_inputs), so the registry here is only
+    // the vacuity guard's.
 
     // The band is set per world inside run_seed (BL-1101), not here from a
     // probe descriptor: it is the world's own verdict.
@@ -669,7 +697,7 @@ int main(int argc, char** argv)
     rows.reserve(static_cast<std::size_t>(seed_count));
     for (int i = 0; i < seed_count; ++i)
     {
-        rows.push_back(run_seed(seed0 + static_cast<uint32_t>(i), reg, prehistory, gen_cfg));
+        rows.push_back(run_seed(seed0 + static_cast<uint32_t>(i), lua, prehistory));
         std::printf("  ... seed %u done\n", rows.back().seed);
         std::fflush(stdout);
     }
@@ -931,9 +959,11 @@ int main(int argc, char** argv)
     // ---------------------------------------------------------------------
     std::printf("\n=== R4  THE BACKGROUND FIELD SURVIVES ===\n");
     int total_rivals = 0, total_solvent = 0, holdings_open = 0, holdings_close = 0;
-    int total_rival_units = 0, total_rival_heads = 0;
+    int total_rival_units = 0, total_rival_heads = 0, total_armed = 0, max_units = 0;
     for (const seed_result& r : rows)
     {
+        total_armed       += r.rivals_armed;
+        max_units          = std::max(max_units, r.rival_max_units);
         total_rivals      += r.rivals;
         total_solvent     += r.rivals_solvent;
         holdings_open     += r.field_holdings_open;
@@ -953,6 +983,13 @@ int main(int argc, char** argv)
     std::printf("  rival standing force: %d units / %d heads   "
                 "[pre-BL-635 baseline: %.1f units per seed]\n",
                 total_rival_units, total_rival_heads, k_baseline_rival_units_per_seed);
+    // BL-1154 review: since rivals start armed (one seeded unit each), the units
+    // standing are not evidence of hiring. HIRED = units less one seeded unit per
+    // armed rival (a seeded unit lost in battle makes this an undercount, never
+    // an overcount).
+    const int hired = total_rival_units - total_armed;
+    std::printf("  rivals armed at close: %d; units HIRED in the settle: %d; the most units any "
+                "one rival holds: %d (the hire cap is 3)\n", total_armed, hired, max_units);
 
     // R4's requirement reads "solvent enough to KEEP ACTING, so the seed's data
     // is not poisoned by dead corps" — it is a test that the fix did not starve
@@ -965,8 +1002,9 @@ int main(int argc, char** argv)
           total_rivals > 0 && solvent_pct >= k_baseline_rival_solvent_pct - 1.0, "R4",
           "the fix did not starve the field — rival solvency is at or above its "
           "pre-BL-635 baseline");
-    check(total_rival_units > 0, "R4",
-          "the field still fields a standing force (rivals can still afford to hire)");
+    check(hired > 0, "R4",
+          "the field still fields a standing force (rivals can still afford to HIRE: "
+          "units beyond the one each armed rival was seeded with)");
 
     std::printf("\n%s (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES ABOVE",
                 g_failures, g_failures == 1 ? "" : "s");

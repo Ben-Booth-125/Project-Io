@@ -52,21 +52,58 @@ RNG anywhere on the path:
   easy-farming country towns a larger fraction of itself — and a settlement to stand them in.
   The same rule applies at **every** founding, including the ones the sim makes mid-era, so a
   frontier region settled in year 300 gets its town on the same terms as an ancient core.
-- **Growth only promotes.** Each simulated year a region's urban headcount converges a
-  fraction of the way toward its target, and centres are promoted as the heads cross a rung.
-  A shrinking city keeps its centre — the same asymmetry § Growth, decline and razing states
-  for play: passive failure shrinks a centre and never destroys one.
+- **Centres follow the heads both ways (Ben, 2026-09-25, superseding "growth only
+  promotes").** Each simulated year a region's urban headcount converges a fraction of the way
+  toward its target; centres are promoted as the heads cross a rung, and **a centre whose share
+  falls below a village's worth — the smallest rung — is abandoned**, its people joining the
+  region's countryside or the stream that emptied it (the threshold reading is delegated,
+  NR-947). This is how the map thins: the Industrialisation span's migration empties villages
+  into the towns and cities that industrialise (`../generation/INDUSTRIALISATION.md` § Beat 2),
+  and an emptied village stops being a place. It holds in the history; whether play follows is
+  NR-947's other half.
+- **Growth consolidates (Ben, 2026-09-25; BL-1130, centres consolidate).** As a region's
+  urban heads rise, its villages **merge into a town** rather than a new village standing beside
+  them, and a region never carries more centres than its ground holds: their urban footprints
+  (§ Generation, urban ground) fit inside the region's own cell. So growth deepens a place
+  before it widens it — a few cities over many towns over a train of villages — and a region whose
+  cell is built out promotes a centre it already has instead of spilling a new one. The streets
+  and the markets that follow the centres thin with them.
+  **A region deepens into one place (Ben, 2026-09-26, superseding the in-region hierarchy of
+  2026-09-25):** it stands **one** centre, whose scale is the rung its urban heads have reached —
+  village, town, city, metropolis, megacity — so growth makes a place bigger, never more numerous.
+  Pouring people into a city widened it into as many as thirty-two centres under the hierarchy;
+  under this rule it becomes one larger city. A region's centre count is therefore one while it
+  stands a settlement and zero once it is abandoned. **Points a place earned go with its people
+  (Ben, 2026-09-26):** industry points a region earned before losing its ground or its settlement
+  pass to the nearest centre of the same realm, never vanish. **A
+  region whose cell holds no land carries no centre** (Ben, 2026-09-25): it has no ground to stand
+  one on, so nothing spills. "Land" here is ground a centre can stand on — the carve's own
+  placement gate — so a cell of land no centre can stand on counts as none (delegated reading,
+  NR-951).
+  **A place's size is its people, never how many centres they are split into (Ben,
+  2026-09-25).** A history reader that asks how big or how valuable a region is — the campaign
+  prize, the reach relay — reads its urban heads, so the same people make the same prize however
+  the hierarchy divides them into villages and towns. **A settled place is worth at least a
+  village (Ben, 2026-09-25):** a region that stands a settlement counts as one however few its
+  heads, and its heads count above that.
+  **A 1960 world carries what its forces leave, about 850 centres on the curated seeds (Ben,
+  2026-10-02, superseding the 2026-09-25 aim of roughly 500):** settle spacing, consolidation,
+  one centre a region, the fill crossing the settled line, industrial urbanisation and abandonment
+  are what set it, and the count follows each world's land (about 340 to 1,200 a world). It is a
+  reading, never a count any rule enforces.
 - **The sack destroys.** A conquest costs the taken region's cities a multiple of what it
   costs its countryside, because a sack falls on the walls and not the fields. Centres fall to
-  what the surviving heads can stand up, and every one lost is recorded in `centres_razed` —
-  so a razed city that is later rebuilt still says it was razed. Razing stays **rare**, as
+  what the surviving heads can stand up, and **a razing is counted in people (Ben, 2026-09-25)**:
+  a sack that costs the region a village's worth of urban heads records a razing, whether or not
+  the centre count steps down — so a razed city that is later rebuilt still says it was razed,
+  and the size hierarchy's coarse steps do not hide a sack. Razing stays **rare**, as
   § Growth, decline and razing requires: an occupier almost always prefers to occupy.
 
 - **A centre stands in the region that grew it.** Each carved centre is **bound to its source
   region** and placed inside that region's own cell of the settlement partition
   (`nearest_region` — the same partition city naming already reads, so a centre's name and its
-  ground now agree by construction rather than by luck). A region whose cell is built out
-  spills to its nearest neighbour rather than losing the settlement.
+  ground now agree by construction rather than by luck). A region never wants more centres than
+  its cell holds (§ Growth consolidates), so no centre spills into a neighbour's cell.
 
   Without the binding the causal chain died at its last step: history grew and sacked *specific*
   regions, and an undifferentiated body-wide scatter then threw that away, so a player could not
@@ -100,10 +137,11 @@ RNG anywhere on the path:
   thousand heads remains the scale→headcount mapping. The carve is a pure integer function of
   the region record, no RNG: the **count** is the sum of the living regions' own `centres` —
   the settlements the era drew, grew and left standing, so a razed region contributes nothing
-  and a sacked one contributes fewer; the **scales** are a rank-size share-out of the body's
-  whole urban headcount, banded to the nearest `k_population_for_scale` rung in log space — a
-  few cities over many towns over a train of villages, real settlement concentration as
-  mechanism, never a name. A body whose urban map was never drawn falls back to the flat urban
+  and a sacked one contributes fewer; each region's **scale** is the `k_population_for_scale`
+  rung its own urban heads have reached (a region deepens into one place, above; Ben,
+  2026-09-26, superseding the body-wide rank-size share-out) — a few cities over many towns over
+  a train of villages, because regions differ in how many people they hold, never because a
+  ranking was imposed on them. A body whose urban map was never drawn falls back to the flat urban
   share of population the carve used before it, and a body with no settlement record at all
   keeps the land-area fallback.
 - **Every province is anchored by a centre** (Ben, 2026-08-25; BL-611, province centre anchor).
@@ -112,14 +150,21 @@ RNG anywhere on the path:
   the centre takes the province (`docs/generation/PROVINCES.md` § The partition; BL-567,
   province is the conquest unit). This retires the centre-less hinterland province. The
   guarantee is structural: after the partition ships, any land province the centre-seeded fill
-  left without one receives a **scale-1 anchor founding** on its best ground
-  (`ensure_province_anchor_centres` — argmax of habitability × richness, the placement gate
-  preferred and relaxed only where no tile passes it, counted rather than hidden).
+  left without one is anchored by **a centre that already stands** (Ben, 2026-09-25; BL-1133):
+  since 2026-09-26 a province **is** its centre's ground — the fill covers the land, so no
+  centre-less province is left to anchor (`../generation/PROVINCES.md` § The partition). Only
+  ground no centre of the nation can reach at all (an uncentred island) receives a **scale-1
+  anchor founding** on its
+  best ground (`ensure_province_anchor_centres` — argmax of habitability × richness, the placement
+  gate preferred and relaxed only where no tile passes it, counted rather than hidden). Founding a
+  village for every uncovered province had grown the anchors to a fifth to two fifths of all
+  centres.
 - **Urban ground is stamped at generation** (Ben, 2026-08-25; BL-612, urban ground stamped).
   A centre arrives with an urban land-use footprint scaled by its tier, so city ground is
   scarce and contested from turn one rather than notionally open (§ Land use). The footprint
   is the centre's own tile plus its most-livable land neighbours — 1/1/2/4/7 tiles by scale
-  (`k_urban_footprint_tiles`); a footprint the coast cuts short stays short, and a tile two
+  (`k_urban_footprint_tiles`); a footprint the coast cuts short stays short, and so does one its
+  own region's cell edge cuts short (delegated reading, NR-951), and a tile two
   cities share is stamped once. Extraction already standing is grandfathered
   (`docs/economy/TILES.md` § Urban transform).
 
@@ -197,16 +242,34 @@ promotion and decline) — sustained met supply, habitability, and population ab
 tier's threshold. Since centres anchor provinces, promotion changes the political map's value
 during play.
 
+**SETTLED (Ben, 2026-10-03): a centre grows on its people's own supply, judged at its market.** The
+supply that lets a centre grow, or makes it shrink, is a household basket — food, water and consumer
+goods — read against the people's own demand, not against every want on the body, and judged per
+market rather than once for the whole body. So a shortage is local and a player can see and answer it
+where it is, and one market's shortage never shrinks every centre on the world at once. What the
+basket holds, good by good, is settled before it is built.
+
 Decline is asymmetric by design: **passive failure only shrinks a centre — it never destroys
 one.** Outright destruction is a deliberate agent action (razing, in occupation), and it should
-be rare because the occupier almost always prefers to occupy.
+be rare because the occupier almost always prefers to occupy. **This rule is play's.** In the
+history the centre follows its heads both ways and is abandoned below a village's worth (Ben,
+2026-09-25; § Generation), and **play follows it too (Ben, 2026-09-25, NR-947; BL-1139,
+centres abandoned in play)**: a centre whose population falls below a village's worth is
+abandoned. **In play an abandoned centre is deleted, and its province merges into a neighbour
+(Ben, 2026-09-26, NR-948):** it joins the adjacent province of its own nation whose centre is
+nearest, the same join generation makes for a centre-less province (§ Generation), so the merged
+province's centre is its capture anchor. **No ruin is kept (Ben, 2026-09-27, NR-952):** a province
+with no such neighbour loses its centre and stands without one, held by its recorded holder and
+taken as any province is, by a battle decided on it. That holds because a province's id is recorded
+rather than derived from its tiles (`PROVINCES.md` § Two contracts), so neither the merge nor a
+lost centre renumbers what a battle, a march order or a save holds. Abandonment is not razing:
+razing stays a deliberate act and stays a tier.
 
 **A razed settlement is a TIER, not an erasure** (Ben, 2026-08-25; BL-624, razed settlement
 tier). Razing demotes the centre to the **razed** state: population zeroed, no labour, no
 demand, no agglomeration — but the entity, its name, its tile, and its urban ground all
 persist. Two consequences are the point: the province **keeps its capture anchor** (a ruin can
-still be taken, so razing never deletes a conquest handle — the province-settlement invariant
-survives play), and **rebuilding there is cheap** — the urban ground and the entity already
+still be taken, so razing never deletes a conquest handle), and **rebuilding there is cheap** — the urban ground and the entity already
 exist, so the ordinary growth pass re-settles a razed centre at a reduced gate rather than
 anyone founding from nothing. A shrunk or razed centre reads as historied, not deleted. Razing
 is a `corp_verb` under the ordinary command seam; no rival-AI grant covers it, so only a human
@@ -383,9 +446,17 @@ avoids per-centre bookkeeping the prototype does not need.
   requires that many **qualified** workers from the pool alongside ordinary labour; the
   qualified pool is the scarcer one, and is what gates organically scaling building levels —
   a deeper facility costs qualified heads, not only credits.
-- **Seeded from history.** A region's Era −1 industrialisation timing — the same scalar that
-  sets corp focus (`docs/generation/CORPORATION_GENERATION.md` § Pass 2) — aggregates into the
-  nation's opening fraction: early industrialisers open qualified, late ones raw.
+- **Seeded from history.** Era −1 industrialisation timing aggregates into the nation's opening
+  fraction: early industrialisers open qualified, late ones raw. **On a generated world the timing
+  read is the polity's own industrial crossing year (Ben, 2026-10-03)**, the one the sim records:
+  the earliest crossing among the polities holding the nation's regions sets the base, and the
+  share of its regions held by a polity that crossed adds breadth; a polity that never crossed
+  reads as never industrialised. The regional furnace flags are never lit on a generated world,
+  so reading them would tie every nation at the floor and no Highway would ever qualify.
+  **Corp focus reads a different scalar** (`docs/generation/CORPORATION_GENERATION.md` § Pass 2):
+  a region's own furnace year against the world median of those years — on a generated world
+  that median is 0, so focus takes its never-industrialised rung while qualification reads the
+  polity crossing.
 - **Scales generated infrastructure.** A low-qualification nation generates fewer, lower-tier
   roads (`docs/economy/LOGISTICS.md` § Roads; BL-618, roads scale with qualification).
 - **Moves with people.** Migration carries qualification — brain drain is real (§ Migration).

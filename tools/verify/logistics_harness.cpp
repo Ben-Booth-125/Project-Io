@@ -10,11 +10,14 @@
 #include "world/construction.hpp"
 #include "world/logistics.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/river_generation.hpp" // river_edge_discount (BL-1126 T4b-T4d)
 #include "world/supply_system.hpp"
 #include "world/world.hpp"
 
 #include <cmath>
 #include <cstdio>
+#include <tuple>
+#include <unordered_map>
 
 static int g_failures = 0;
 
@@ -96,15 +99,99 @@ int main()
         check(approx(c2, 2.0f), "road_level 2 halves the plains column cost (4.0 -> 2.0)");
     }
 
-    // T4 — route-cache idempotence: the same query returns an identical cost.
+    // T4 — route-cache idempotence: the same query returns an identical cost, and
+    // the cache keys the ORDERED pair. RETIRED HERE (BL-1126, path cost reads the
+    // cache): the old "the path cost is symmetric in its endpoints" assertion. It
+    // passed only because this grid has no river; a path is directed (LOGISTICS.md
+    // § 1), and T4b-T4d below pin the direction on grids that do carry one.
     {
         world w; const entity_id b = make_grid(w, 4, 4, terrain_landform::highland);
         const entity_id s = tile_at(w,b,0,0), d = tile_at(w,b,3,3);
         const float first  = intra_body_path(w, b, s, d).cost;
         const float second = intra_body_path(w, b, s, d).cost;
-        const float rev    = intra_body_path(w, b, d, s).cost; // symmetric
+        (void)intra_body_path(w, b, d, s);
         check(approx(first, second), "re-querying the same lane returns an identical cost (cache)");
-        check(approx(first, rev), "the path cost is symmetric in its endpoints");
+        check(w.astar_cost_cache.count(std::make_tuple(b, s, d)) == 1
+                  && w.astar_cost_cache.count(std::make_tuple(b, d, s)) == 1,
+              "the pair cache keys the ORDERED pair: s->d and d->s are two entries (BL-1126)");
+    }
+
+    // T4b-T4d — THE DIRECTION (BL-1126; LOGISTICS.md § 1). A river discounts an
+    // edge one way only: river_edge_discount(from, side) reads the tile a hop
+    // LEAVES, downstream cheaper than upstream. So intra_body_path(A, B) must price
+    // the hop A -> B by A's side toward B, and (B, A) by B's side toward A. The two
+    // factors are read through river_edge_discount itself, never written out, and
+    // must be two distinct discounts below 1 so a flat function cannot pass.
+    {
+        tile_component probe{};
+        probe.river_edges = 1u; probe.river_downstream = 1u;   // side 0, flowing out
+        const float down = river_edge_discount(probe, 0);
+        probe.river_downstream = 0u;                            // side 0, flowing in
+        const float up   = river_edge_discount(probe, 0);
+        check(down < up && up < 1.0f, "river_edge_discount: downstream < upstream < 1 (the two factors differ)");
+
+        // T4b — an EAST-WEST hop on a 3x2 grid. A = (0,0) plains, B = (1,0)
+        // highland; the river runs A -> B: A's side 0 (E) downstream, B's side 3
+        // (W) upstream. Every other route is at least two edges.
+        {
+            world w; const entity_id b = make_grid(w, 3, 2);
+            const entity_id ta = tile_at(w, b, 0, 0), tb = tile_at(w, b, 1, 0);
+            w.tiles[tb].landform = terrain_landform::highland;
+            w.tiles[ta].river_edges |= 1u << 0; w.tiles[ta].river_downstream |= 1u << 0;
+            w.tiles[tb].river_edges |= 1u << 3; // bit 3 of river_downstream clear: upstream
+            const float mean = 0.5f * (tile_traversal_cost(w.tiles[ta]) + tile_traversal_cost(w.tiles[tb]));
+            const logistics_path ab = intra_body_path(w, b, ta, tb);
+            const logistics_path ba = intra_body_path(w, b, tb, ta);
+            check(ab.reachable && approx(ab.cost, mean * down),
+                  "T4b east-west: cost(A,B) = mean x the downstream factor (A leaves by its side 0)");
+            check(ba.reachable && approx(ba.cost, mean * up),
+                  "T4b east-west: cost(B,A) = mean x the upstream factor (B leaves by its side 3)");
+        }
+
+        // T4c — a ROW-CROSSING hop pins the parity. A = (0,0) on an EVEN row,
+        // C = (0,1) on an ODD row, straight below. A's southward hop is side 5 (SE)
+        // on an even row; C's northward hop is side 2 (NW) on an odd row. The river
+        // runs A -> C. Reading the wrong tile's row parity lands on a side with no
+        // river (4 for A, 1 for C) and prices the hop at the full mean.
+        {
+            world w; const entity_id b = make_grid(w, 3, 2);
+            const entity_id ta = tile_at(w, b, 0, 0), tc = tile_at(w, b, 0, 1);
+            w.tiles[tc].landform = terrain_landform::mountain;
+            w.tiles[ta].river_edges |= 1u << 5; w.tiles[ta].river_downstream |= 1u << 5;
+            w.tiles[tc].river_edges |= 1u << 2; // upstream
+            const float mean = 0.5f * (tile_traversal_cost(w.tiles[ta]) + tile_traversal_cost(w.tiles[tc]));
+            const logistics_path ac = intra_body_path(w, b, ta, tc);
+            const logistics_path ca = intra_body_path(w, b, tc, ta);
+            check(ac.reachable && approx(ac.cost, mean * down),
+                  "T4c row crossing: cost(A even,C odd) = mean x downstream (A's side 5, even-row parity)");
+            check(ca.reachable && approx(ca.cost, mean * up),
+                  "T4c row crossing: cost(C odd,A even) = mean x upstream (C's side 2, odd-row parity)");
+        }
+
+        // T4d — the NEAREST ANCHOR is decided by the direction. One row of five:
+        // origin O = col 2, anchors at col 1 (the LOWER tile id) and col 3, both one
+        // plains edge away. The river leaves O eastward downstream (O side 0) and
+        // westward upstream (O side 3; col 1's side 0 flows into O), so travel O ->
+        // col 3 is the cheaper hop and col 3 is nearest. Priced the other way
+        // (anchor -> O) col 1 would win, and on a riverless row the tie would go to
+        // col 1 too, so only the direction can make col 3 the answer.
+        {
+            world w; const entity_id b = make_grid(w, 5, 1);
+            const entity_id t1 = tile_at(w, b, 1, 0), to = tile_at(w, b, 2, 0),
+                            t3 = tile_at(w, b, 3, 0);
+            w.tiles[to].river_edges |= (1u << 0) | (1u << 3);
+            w.tiles[to].river_downstream |= 1u << 0;               // O -> col 3 downstream
+            w.tiles[t3].river_edges |= 1u << 3;                    // col 3 -> O upstream
+            w.tiles[t1].river_edges |= 1u << 0;
+            w.tiles[t1].river_downstream |= 1u << 0;               // col 1 -> O downstream
+            const std::unordered_map<entity_id, float> pool = { { t1, 1.0f }, { t3, 1.0f } };
+            const entity_id nearest = nearest_lp_anchor(w, b, to, pool);
+            check(t1 < t3, "T4d setup: the col-1 anchor holds the lower tile id (a tie would pick it)");
+            check(nearest == t3,
+                  "T4d nearest anchor: O's downstream neighbour (col 3) wins, priced O -> anchor");
+            check(intra_body_path(w, b, to, t3).cost < intra_body_path(w, b, to, t1).cost,
+                  "T4d agrees with intra_body_path: cost(O, col 3) < cost(O, col 1)");
+        }
     }
 
     // T5 — mode selection: a path forced through ocean reports crosses_ocean (=> sea);

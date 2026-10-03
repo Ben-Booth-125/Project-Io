@@ -40,17 +40,18 @@ struct asteroid_belt
 
 /// Result of an intra-body pathfind (BL-077): the terrain-weighted path cost, whether the
 /// cheapest path crosses ocean (=> sea mode, else land), and whether the endpoints connect.
-/// Symmetric in its endpoints (edge cost is the average of the two tiles), so it caches under
-/// a canonicalised (body, lo_tile, hi_tile) key.
+/// DIRECTED (BL-1126): a river discounts an edge in one direction, so the cost is the
+/// origin -> destination travel cost, read from the destination's flood field and cached under
+/// the ORDERED (body, src, dst) key -- never whichever direction a cache happens to hold.
 struct logistics_path
 {
     float cost          = 0.0f;
     bool  crosses_ocean = false;
     bool  reachable     = false;
-    /// The tile sequence of the best path, in canonical (lo→hi) endpoint order —
-    /// i.e. from min(src,dst) to max(src,dst), since the weighted path is symmetric
-    /// and cached on the unordered pair. A caller that dispatched src→dst reverses
-    /// this when src != lo. Empty when unreachable; a single tile when src == dst.
+    /// The tile sequence of the best path, stored in lo→hi endpoint order — i.e. from
+    /// min(src,dst) to max(src,dst) — even though the cost is directed (BL-1126): the
+    /// storage order is kept so every reader's orientation step still holds. A caller that
+    /// dispatched src→dst reverses this when src != lo. Empty when unreachable; a single tile when src == dst.
     /// Populated by intra_body_path (BL-152, for the convoy vision beam); the cost
     /// fields above stand alone for callers that ignore it.
     std::vector<entity_id> tiles;
@@ -61,15 +62,34 @@ struct logistics_path
 /// many-to-one layer beneath the per-pair path cache (2026-08-25 warm-start
 /// stall): dispatch prices hundreds of origins against the same few destination
 /// centres, so one flood per centre answers every pair that touches it at
-/// path-reconstruction cost instead of a fresh grid search. Byte-identical to
-/// the per-pair search's answers — same relaxation order, same tie-breaks, and
-/// a settled node's parent is final whether or not the search stopped early.
+/// path-reconstruction cost instead of a fresh grid search. A DESTINATION'S
+/// field (BL-1126, path cost reads the cache): every edge is priced as the hop
+/// TOWARD the anchor, so it answers `intra_body_path(cell, anchor)` for every
+/// cell and nothing else — never the reverse route, which a river prices
+/// differently. A settled node's parent is final.
 struct logistics_flood_field
 {
     int                anchor_idx = -1;   ///< Raster index of the anchor tile.
-    std::vector<float> dist;              ///< Weighted cost anchor -> cell; 1e30f unreached.
-    std::vector<int>   came_from;         ///< Parent raster index on the best path, -1 at anchor/unreached.
-    std::vector<char>  crossed;           ///< Best path anchor -> cell touches ocean?
+    std::vector<float> dist;              ///< Weighted travel cost cell -> anchor; 1e30f unreached.
+    std::vector<int>   came_from;         ///< The cell's next hop toward the anchor, -1 at anchor/unreached.
+    std::vector<char>  crossed;           ///< Best path cell -> anchor touches ocean?
+};
+
+/// A body's NEAREST-ANCHOR FIELD (BL-1117, settle tick one): for every cell, the
+/// Logistic Point anchor nearest it and that anchor's cost, from ONE multi-source
+/// Dijkstra seeded at every anchor in `anchors`. It answers `nearest_lp_anchor`
+/// for every tile of the body at once; the per-pair loop it replaces flooded the
+/// whole body once per anchor (9,038 floods, ~90 s, on seed 0's first convoy).
+///
+/// A PURE FUNCTION of the body's tiles and of `anchors`: the edges are the flood
+/// field's own (each hop priced toward the anchor, BL-1126), so `cost[i]` is exactly
+/// the smallest cell-i -> anchor travel cost, and `nearest[i]` an anchor at that least
+/// cost, a fixed choice among exact ties (see logistics.cpp § build_lp_anchor_field).
+struct lp_anchor_field
+{
+    std::vector<entity_id> anchors; ///< The anchor tile set it was built over, ascending.
+    std::vector<entity_id> nearest; ///< Per raster cell: the nearest anchor tile; null_entity unreached.
+    std::vector<float>     cost;    ///< Per raster cell: that anchor's cost; 1e30f unreached.
 };
 
 // ---------------------------------------------------------------------------
@@ -250,6 +270,13 @@ struct world
     faithful_unordered_map<entity_id, building_component>  buildings;
     faithful_unordered_map<entity_id, stockpile_component> stockpiles;
     faithful_unordered_map<entity_id, market_component>    markets;
+    /// BL-1125 (markets can die): every market folded away at generation, by
+    /// its old id, ascending (`folded_market`). ROUTING STATE, saved: a tile
+    /// routes to its nearest original centre and a folded one hands it to its
+    /// absorber (`market_for_tile`), so the catchments a world was handed
+    /// survive a load. Written only by `fold_market_into`; empty on a body
+    /// whose markets never folded.
+    std::map<entity_id, folded_market>                     folded_markets;
     faithful_unordered_map<entity_id, unit_component>             units;
 
     /// Population centre entities keyed by their entity ID. Populated by
@@ -313,10 +340,16 @@ struct world
     /// WRITTEN BEFORE `build_province_partition` RUNS, from
     /// `settlement_state::settled_cells` (`run_settlement`'s colonisation field,
     /// `colonisation_field::farmable` — see `hard_coded_world.cpp`). Nothing
-    /// downstream of the partition writes it, and it is NOT SERIALISED: like the
-    /// reverse index `tile_to_nation` is, it is a generation-time index with no
-    /// committed record to rebuild it from — the colonisation field itself is
-    /// discarded once the partition has read it.
+    /// downstream writes it, and it is NOT SERIALISED: like the reverse index
+    /// `tile_to_nation` is, it is a generation-time index with no committed
+    /// record to rebuild it from — the colonisation field itself is discarded
+    /// once this is written.
+    ///
+    /// NO LONGER A PARTITION INPUT (Ben, 2026-09-27, NR-954 B; BL-1150, a
+    /// centre's fill crosses the settled line): BL-849's settlement lock, which
+    /// held a province to one side of this line, retired. The record stays the
+    /// settled line's one index, read by the instruments that measure it
+    /// (province_partition_harness P2d, centre_census C7b).
     ///
     /// A `std::set` so a deterministic walk over it needs no sort of its own.
     std::set<entity_id>                                 tile_settled;
@@ -538,8 +571,8 @@ struct world
     /// a pure function of the body's tiles (independent of tiles-map iteration order).
     faithful_unordered_map<entity_id, std::vector<entity_id>> body_tile_index;
 
-    /// Route-cost cache for intra-body A* (BL-077), keyed by (body, lo_tile, hi_tile) with the
-    /// tile pair canonicalised (the weighted path is symmetric). A derived cache; invalidated
+    /// Route-cost cache for intra-body A* (BL-077), keyed by the ORDERED (body, src, dst) --
+    /// a path is directed (BL-1126). A derived cache; invalidated
     /// when road_level changes (road placement, BL-147). Keeps per-Tick per-lane A* off the
     /// dispatch hot path.
     std::map<std::tuple<entity_id, entity_id, entity_id>, logistics_path> astar_cost_cache;
@@ -563,6 +596,15 @@ struct world
     /// asks this question for every tile under the cursor, and the armed-build tint asks it
     /// for the whole visible grid at once, so a per-query search would be the wrong shape.
     faithful_unordered_map<entity_id, std::vector<float>> body_reach_cost;
+
+    /// Per-body NEAREST LOGISTIC POINT ANCHOR (BL-1117) — see lp_anchor_field. A
+    /// derived cache on the same footing as the three above: built lazily by
+    /// `nearest_lp_anchor`, cleared by invalidate_logistics_caches and by
+    /// clear_derived_state, never serialised. Rebuilt in place when a caller's
+    /// anchor pool names a different anchor set than the one it was built over,
+    /// so no answer ever depends on what was cached. std::map: ordered, so a copy
+    /// or a load cannot reorder it (and it is never iterated by the sim).
+    std::map<entity_id, lp_anchor_field> lp_anchor_fields;
 
     /// Techs each corporation has EARNED, by tech id (BL-344). Per-corp, never
     /// global: two corporations research independently, and a gate that read a
@@ -654,6 +696,19 @@ struct world
     mutable faithful_unordered_map<entity_id, std::vector<entity_id>> body_market_index;
     mutable std::size_t   body_market_index_count  = 0; ///< markets.size() at build.
     mutable std::uint32_t body_market_index_cursor = 0; ///< next_entity_id() at build.
+    /// BL-1125: body -> its FOLDED markets' ids, ascending; rebuilt with
+    /// `body_market_index` (same stamp; `fold_market_into` resets it).
+    mutable faithful_unordered_map<entity_id, std::vector<entity_id>> body_folded_index;
+    /// BL-1125: body -> a digest of what routing reads on it (its standing
+    /// markets' ids and centres, its folded markets' ids, centres and
+    /// absorbers), recomputed with `body_market_index`. The route raster below
+    /// rebuilds only when this moves, so an unrelated entity creation (which
+    /// restamps the index) costs O(markets), never a re-route of every tile.
+    mutable faithful_unordered_map<entity_id, std::uint64_t> body_market_sig;
+    /// BL-1125: body -> its catchment raster (`body_route_cache`), so
+    /// `market_for_tile` is O(1) in play. Derived, never saved; cleared by
+    /// clear_derived_state.
+    mutable faithful_unordered_map<entity_id, body_route_cache> body_route_index;
 
     /// Per-body population-centre index (BL-1050): body -> its centres in
     /// ASCENDING ID ORDER. The same derived cache as `body_market_index` above

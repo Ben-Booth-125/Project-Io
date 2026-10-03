@@ -782,6 +782,15 @@ struct tile_component
     ///
     /// 0.0 on any tile not produced by `generate_body_tiles` (hand-built harness fixtures).
     float height = 0.0f;
+
+    /// Sea-lane tier on this tile (BL-1098; LOGISTICS.md § 4b, EXPLORATION.md § The colonial
+    /// tie is a sea lane). 0 = no lane; 1 = a lane -- the ONE rung a sea leg earns by traffic
+    /// (`history_sim_params::sea_lane_tier1_uses`), never bought. Only ever set on SEA tiles
+    /// (ocean or coast; a lake is not part of the ocean), by `stamp_sea_lanes` after the
+    /// history spans, along the water-only path each earned lane takes. Read by exactly one
+    /// line in `tile_traversal_cost` (`sea_lane_traversal_multiplier`), so a lane discounts
+    /// the sea leg for every consumer of traversal cost. 0 everywhere a world ran no spans.
+    std::uint8_t lane_level = 0;
 };
 
 /// Survey lifecycle of a body (BL-067, docs/ui/SOLAR.md § Survey badge).
@@ -1030,6 +1039,38 @@ struct market_component
     std::array<float, resource_count> inventory = {};
 };
 
+/// BL-1125 (markets can die) — a market folded away at generation, kept as a
+/// ROUTING record only (MARKETS.md § Market centres and seeding: "a folded
+/// market's catchment passes to the market that absorbs it"). A tile routes to
+/// its nearest ORIGINAL market centre — standing and folded alike — and a
+/// folded one hands it to `into`, the standing market that absorbed it. `into`
+/// is always a standing market: a fold that absorbs an earlier absorber
+/// re-points every record that named it. Held in `world::folded_markets`.
+struct folded_market
+{
+    entity_id body        = null_entity;
+    entity_id centre_tile = null_entity;
+    entity_id into        = null_entity;
+
+    bool operator==(const folded_market& o) const
+    {
+        return body == o.body && centre_tile == o.centre_tile && into == o.into;
+    }
+};
+
+/// BL-1125 — a body's catchment raster: the market every tile routes to, in
+/// raster order (grid_y * grid_width + grid_x). A DERIVED CACHE behind
+/// `market_for_tile`, never saved: a pure function of the body's standing
+/// markets' centres and its fold map, rebuilt whenever `sig` (a digest of
+/// exactly those) no longer matches.
+struct body_route_cache
+{
+    std::uint64_t          sig = 0;
+    int                    gw  = 0;
+    int                    gh  = 0;
+    std::vector<entity_id> route;
+};
+
 /// A standing sell order — the manual side of the market. Each economy tick the
 /// order lists up to `quantity` of `resource` from the (corp, body) pool for sale
 /// at no less than `floor_price` (the order clears at `max(resolved_price,
@@ -1167,7 +1208,7 @@ struct land_use_component
 /// See docs/economy/POPULATION.md.
 struct population_centre_component
 {
-    int   scale              = 1;    ///< 1–5 (village → metropolis).
+    int   scale              = 1;    ///< 1–5: village, town, city, metropolis, megacity (POPULATION.md).
     int   population         = 0;    ///< Absolute headcount in thousands.
     float habitability       = 1.0f; ///< 0–1 scalar inherited from the tile.
     int   growth_accumulator = 0;    ///< Ticks of qualifying growth; resets on level-up.

@@ -16,6 +16,8 @@
 // machine, and it asserts nothing about them. It prints a breakdown.
 // ---------------------------------------------------------------------------
 
+#include "harness_params.hpp"          // build_app_start_world (BL-1086 review)
+#include "scripting/lua_state.hpp"
 #include "world/budget_system.hpp"
 #include "world/corp_ai.hpp"
 #include "world/economy_system.hpp"
@@ -29,6 +31,7 @@
 #include <chrono>
 #include <cstdio>
 #include <map>
+#include <memory>
 #include <unordered_map>
 #include <string>
 
@@ -58,12 +61,26 @@ int main(int argc, char* argv[])
 
     std::printf("tick_profile — real generated world, %d ticks\n", ticks);
 
+    // THE SHIPPED START (BL-1086 review, 2026-09-26): `build_app_start_world`,
+    // harness_params.hpp's app-order mirror — the parsed world_gen config and the
+    // works table into generation, the banded registry loaded from Lua, the
+    // landscape search and its winner applied with the world's own charter
+    // budget. It replaced a bare `make_hard_coded_world(world_params{})` with a
+    // DEFAULT-CONSTRUCTED registry and the fallback config: on a budget world
+    // generation lays no roster any more (BL-1086), so that world carried no
+    // corporation at all, and even before it the tick ran against an empty
+    // registry — every recipe absent, so the profile timed a tick with nothing
+    // to produce. No bare mode is kept: nothing reads one. GENERATION below
+    // includes the search, which is now part of the start.
     const auto gen_t0 = clock_t_::now();
-    generation_report gen_report;
-    world w = make_hard_coded_world(world_params{}, &gen_report);
+    lua_state lua;
+    auto start = std::make_unique<app_start_world>();
+    build_app_start_world(lua, world_params{}, *start);
+    world& w = start->w;
+    const generation_report& gen_report = start->report;
+    const recipe_registry& reg = start->reg;
     const double gen_ms = std::chrono::duration<double, std::milli>(clock_t_::now() - gen_t0).count();
-    std::printf("  WORLD GENERATION: %.0f ms\n", gen_ms);
-    recipe_registry reg;
+    std::printf("  WORLD GENERATION + THE SHIPPED START (search, winner): %.0f ms\n", gen_ms);
 
     std::size_t tile_count = w.tiles.size();
     std::printf("  PRE-EPOCH ERA: %lld years, %lld battles, %lld conquests, %lld foundings\n",

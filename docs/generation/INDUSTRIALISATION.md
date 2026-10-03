@@ -318,8 +318,11 @@ none. Affording is not placing: a centre that affords a specialist and finds no 
 charters none, so a world whose every affording centre does so opens with no player. **That residual
 is reported and counted, not patched (Ben, 2026-09-22, NR-911)** — the app says so on its seat
 line and the seat sweep fails such a world — and it is fixed only if a library world is ever
-measured there. **The per-province cap stays at 2** on a budget world, and **the square root's base is 8**,
-the legacy per-good cap, so a body at the legacy spend keeps the legacy cap.
+measured there. **The per-province cap scales with the province's centre (Ben, 2026-09-27, NR-960,
+superseding NR-910's flat 2):** two firms per rung the centre reaches — a village 2, a town 4, a
+city 6, a metropolis 8, a megacity 10. A province is its centre's whole ground (`PROVINCES.md`), so
+a flat 2 pushed a city's industry out into its villages. **The square root's base is 8**, the legacy
+per-good cap, so a body at the legacy spend keeps the legacy cap.
 
 **SETTLED (Ben, 2026-09-18, wave 1 form, reversing the same morning's ruling): a budget
 specialist opens on TODAY'S STARTING CAPITAL**, the seeded 400 ±40% draw with the focus premium
@@ -335,8 +338,8 @@ ground there is counted unspent rather than scattered across the nation, because
 is capital that left the city that built it. **No budget and an empty budget are the same world as
 today's**: the population-blind placement stands until a budget with something in it arrives.
 
-PROPOSED (listed to Ben 2026-09-18, not overturned; the cap SETTLED at 2 by NR-910): **the per-province cap stays at 2** on a
-budget world until real budgets show whether they concentrate; and **a budget world does not read
+PROPOSED (listed to Ben 2026-09-18, not overturned; the cap since scaled with the centre, NR-960, above):
+**a budget world does not read
 the Works charter terms** (`trees/INDUSTRY_TREE.md` § What the tree hands the 1960 campaign), because
 a specialist stands wherever its centre can afford one.
 
@@ -541,17 +544,27 @@ points. No polity scores it, so it adds no verb to the grant register (`../ai/AI
 It is also the one input that is neither headcount nor fixed ground: points from scale and fuel
 alone would be headcount by another name, which § 1 forbids. **SETTLED (Ben, 2026-09-19, NR-897):
 the points spread over the polity's regions that hold centres, in proportion to their urban
-scale** — a treasury builds its realm's works where its people are. The capital still leads
+scale** — a treasury builds its realm's works where its people are. **AMENDED (Ben, 2026-10-01,
+NR-964): in proportion to the heads their works employ**, so every point, the treasury's and the
+scale credit's alike, follows the works rather than the crowd. The capital still leads
 because it is usually the largest centre. Landing them all on the capital's own region let one
 region hold up to 65% of a world's points, so charters would have followed capitals, not cities.
-The constants stand: 1000 points per million urban heads per year; fuel factor
+The constants stand: 1000 points per million employed urban heads per year; fuel factor
 250 + 750 × reading/1000; a 250‰ share of the round's surplus, debited; 1000 points per
-treasury unit. **A polity that holds no town converts nothing (Ben, 2026-09-19, NR-901):** there is
+treasury unit. **SETTLED (Ben, 2026-09-27): a head earns scale credit only where a work employs
+it — the works, not the crowd.** Each work a region holds employs a stated number of heads, authored
+on its row of the works table, and the centre-scale input counts the region's urban heads up to what
+its works employ; the heads beyond them are a crowd and earn nothing. So points follow the works a
+city built, and the stream draws people toward open work rather than toward a crowd (Beat 2).
+Without it the stream moved people in proportion to the urban heads a city already had and
+then paid them scale credit for arriving, and the points read headcount by another name. **A polity that holds no town converts nothing (Ben, 2026-09-19, NR-901):** there is
 nowhere for its works to stand, so its treasury keeps the round's share rather than paying for
 points on townless ground that no campaign centre can receive. **Points on a region whose towns
 were razed are lost with them:** a region earns points only while it holds centres, and if war
-later takes its towns while people remain, the works went with the towns; the handoff counts those
-points unspent as razed, a cause the map shows.
+later takes its towns while people remain, the points went with the towns; the handoff counts those
+points unspent as razed, a cause the map shows. **The works themselves stand (Ben, 2026-09-27):** a
+work is physical, so a town that regrows on the region employs in them again. Clearing them would
+lower the ceiling they raised, and a sack never lowers a ceiling (Beat 2).
 
 **PROPOSED (listed to Ben 2026-09-18, not overturned): the stock sits on each region that holds
 centres.** The sim holds a city as counts on its region, not as an entity, so *one number per
@@ -628,12 +641,30 @@ NEEDS_REVIEW).
 **SET (Ben, 2026-09-15):** *"mass migration and growth of larger centres (either within or to
 another polity), causing technological innovation centred around larger population centres."*
 
+**SET (Ben, 2026-09-25, after Begin opened on "massive road networks with population centres on
+every tile"): this span encourages more migration, and migration is how the map thins.** The
+urbanisation stream empties the countryside and its villages into the towns and cities that
+industrialise, and a village emptied below a village's worth is abandoned
+(`../economy/POPULATION.md` § Generation, "Centres follow the heads both ways"), so the 1960 world
+carries far fewer, larger centres than the ages before it left. BL-1137 (industrial urbanisation)
+owns the build.
+
+**SETTLED (Ben, 2026-09-27, NR-958): the stream conserves.** A migrant carries its food with it:
+whatever carrying capacity a destination gains, its source loses, so a move never creates capacity
+and an emptied village does not regrow. Only the heads a region's own farmland feeds bear children.
+A sack never lowers a region's ceiling: the heads its walls can no longer hold scatter into the same
+region's countryside, and the razing is counted in the heads lost. People move only along a held
+corridor whose line between the two centres stays on land; a centre anchored on a shore or a lake
+still joins it. **The stream's rate is a chosen number, and Ben sets it from a ladder (2026-09-27)**
+— the share of a strained countryside that moves each year, read at several rungs for urban share,
+centres and points before one is set.
+
 **PROPOSED: migration moves people and culture shares along a line, toward work.** Two streams on
 one rule:
 
 | Stream | From → to | Pull | Push | Line |
 |---|---|---|---|---|
-| **Urbanisation** | A region's countryside → a centre in the same polity | Industry-point output at the centre | Depleted or strained ground | Held corridors |
+| **Urbanisation** | A region's countryside → a centre in the same polity | Open work at the centre: the jobs its works offer beyond the heads already there | Depleted or strained ground | Held corridors |
 | **Emigration** | A centre → a centre in another polity | The same pull, larger | War, a lost colony, strain | Contact, a line that can carry people, no war between them |
 
 #### Far pairs meet and bind, and this phase makes them
@@ -648,8 +679,15 @@ a frozen network.
 Emigration's line needs contact, far trade (property 7) needs relationships between distant
 polities, and a world war spreads only through bindings that reach across the map. So this phase
 raises contact and binds far pairs itself — through trade, migration and alliance — rather than
-inheriting a treaty graph that never reached past the old neighbourhood. Exploration is not
-revisited for it.
+inheriting a treaty graph that never reached past the old neighbourhood. *Exploration was not
+revisited for it until Ben's 2026-10-03 ruling* (`EXPLORATION.md` § The colonial tie is a sea lane):
+far realms across water now meet and bind there too, where a fleet reaches. **Far pairs bind across water, not only across a border (Ben, 2026-09-26;
+BL-1142, far pairs across water):** the binding reaches realms on other landmasses, so the
+inter-continental trade the sea lanes carry is common rather than a handful of pairs — seven realm
+pairs on six of sixteen curated worlds before it. **A far pair across water reads a penalty of 300
+against a land pair's 700 (Ben, 2026-09-27, NR-959):** 300 sits where the pair's own aggression,
+grudges and trade decide whether it binds, so the number does not choose the count, and distance
+still reads across water. A leg against the current delivers less, at the current's own weight (500).
 
 **Migration carries culture.** A stream moves culture shares into its destination centre, so a
 destination becomes mixed while its countryside stays plain. **This is what produces property 4's
@@ -666,8 +704,37 @@ may not carry a term that grows with size (`trees/TREES.md` § State, and where 
 from). It also gives the leaderboard a research column that no longer restates population — the
 reason Empires refused one.
 
-**The pull is industry-point output, because the sim holds no wage.** The campaign carries wages;
-the sim does not, and industry points at the destination are the nearest thing it holds.
+**SETTLED (Ben, 2026-09-27): the pull is open work, because the sim holds no wage.** A destination
+pulls by the jobs its works offer beyond the heads already there, so people go where jobs are
+unfilled, and a city whose works are full stops drawing. Points could not carry this: a city's points
+stop at the heads its works employ, so a crowded city pulled like a full town and its arrivals earned
+nothing. The campaign carries wages; open work is the nearest thing the sim holds. **Any centre with open work draws (Ben, 2026-10-02):** a village whose works hire takes migrants and grows into a town, rather than the stream reaching only towns. With towns alone the stream moved almost no one, because the open work sat in villages.
+
+### Industry spreads beyond its heartland
+
+**SET (Ben, 2026-10-03):** *"There should at least be a large rival far away. This prevents the
+player from simply choosing the favourite to win, and being totally free of competition from a
+unified front on the rest of the planet."* And: *"We should be trying to make exploration into
+industrialisation create something like America. We don't see these crowded heartlands conquer and
+exploit polities far away."*
+
+**SETTLED (Ben, 2026-10-03): a charter is priced by the capital in its own trade reach.** A
+centre's charters are priced as a share of the stock within its trade reach — its landmass, or its
+market's catchment — not of the whole world's. Capital is dear where it is scarce and cheap where it
+is all that is around, so a far landmass with little capital still charters its own firms rather
+than being priced out by a richer continent's stock.
+
+**SETTLED (Ben, 2026-10-03): a crowded heartland yields less.** A treasury's points convert at a
+lower rate where a region is already crowded with capital — industry points standing on it per
+thousand heads its works employ (Ben, 2026-10-03; works per head is flat everywhere, so it cannot
+find a heartland) — so a
+heartland's lead stops compounding on itself and the next-best ground catches up. Its size is a
+named parameter, read on the curated seeds before it is set.
+
+**PROPOSED (Ben's direction, 2026-10-03): crowded heartlands reach overseas.** A heartland short of
+ground and long on people and capital colonises and exploits distant polities, and what it plants
+grows: a settler colony that industrialises becomes the distant rival of the age, and may break away
+(Beat 3). The mechanism is designed before it is built.
 
 ### Beat 3 — Decolonisation, and wars over empire
 
@@ -840,6 +907,7 @@ Readings taken at **1960 CE** over a **seed spread**, never per world — the di
 | **World war** | Present in some worlds and absent in others — never all, never none |
 | **War dead** | Every war lowers population somewhere; no region emptied by one |
 | **Catastrophe lean** | Worlds that fought a world war open with higher aggregate Alarm against Ceiling than worlds that did not |
+| **A rival far away** (Ben, 2026-10-03) | The strongest industrial nation has a rival on another landmass, or a quarter of the world away, holding at least a quarter of its industry points — so the player is never handed a favourite free of competition |
 
 **A reading is a requirement, not a target.** A seed that refuses one is a legitimate world; a
 spread that refuses one is a phase that did not do its job.

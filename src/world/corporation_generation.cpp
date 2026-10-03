@@ -1460,6 +1460,90 @@ void seed_starting_military(world& w, entity_id corp_id,
 
 } // namespace
 
+bool corporation_has_opening_force(const world& w, entity_id corp)
+{
+    const auto it = w.corporations.find(corp);
+    if (it == w.corporations.end())
+        return false;
+    for (const entity_id bid : it->second.assets)
+    {
+        const auto b = w.buildings.find(bid);
+        if (b != w.buildings.end() && b->second.type == building_type::military_base)
+            return true;
+    }
+    return false;
+}
+
+void arm_rivals(world& w)
+{
+    // Ascending corporation id (std::map), so the bases claim ground in one
+    // order on every machine; occupancy from every building standing.
+    std::map<entity_id, bool> rivals;
+    for (const auto& [cid, cc] : w.corporations)
+        if (!cc.is_background && cid != w.player_entity)
+            rivals[cid] = true;
+    std::unordered_set<entity_id> occupied;
+    occupied.reserve(w.buildings.size() * 2);
+    for (const auto& [bid, bc] : w.buildings)
+        occupied.insert(bc.tile);
+    for (const auto& [cid, _] : rivals)
+        if (!corporation_has_opening_force(w, cid))
+            seed_starting_military(w, cid, occupied);
+}
+
+void arm_corporation(world& w, entity_id corp)
+{
+    const auto it = w.corporations.find(corp);
+    if (it == w.corporations.end() || it->second.is_background
+        || corporation_has_opening_force(w, corp))
+        return;
+    std::unordered_set<entity_id> occupied;
+    occupied.reserve(w.buildings.size() * 2);
+    for (const auto& [bid, bc] : w.buildings)
+        occupied.insert(bc.tile);
+    seed_starting_military(w, corp, occupied);
+}
+
+void move_seat_force(world& w, entity_id previous, entity_id corp)
+{
+    if (previous == corp)
+        return;
+    disarm_corporation(w, corp);
+    if (previous != null_entity)
+        arm_corporation(w, previous);
+}
+
+void disarm_corporation(world& w, entity_id corp)
+{
+    auto it = w.corporations.find(corp);
+    if (it == w.corporations.end())
+        return;
+    // Its units first (ascending id, so the erase order is fixed), then its
+    // military bases with their stockpiles, out of its asset list too.
+    std::vector<entity_id> units;
+    for (const auto& [uid, uc] : w.units)
+        if (uc.owner == corp)
+            units.push_back(uid);
+    std::sort(units.begin(), units.end());
+    for (const entity_id uid : units)
+        w.units.erase(uid);
+    std::vector<entity_id>& assets = it->second.assets;
+    std::vector<entity_id> kept;
+    kept.reserve(assets.size());
+    for (const entity_id bid : assets)
+    {
+        const auto b = w.buildings.find(bid);
+        if (b != w.buildings.end() && b->second.type == building_type::military_base)
+        {
+            w.buildings.erase(bid);
+            w.stockpiles.erase(bid);
+            continue;
+        }
+        kept.push_back(bid);
+    }
+    assets = std::move(kept);
+}
+
 // ---------------------------------------------------------------------------
 // Pass 2b — ownership class (BL-631, re-pointed by BL-638). One more mapping
 // over an existing signal — and BL-638 is the story of which one.
@@ -2072,14 +2156,21 @@ std::vector<entity_id> generate_corporations(
     // is a nearest-valid-tile search — so a world generated with the flag off is
     // identical to one generated with it on minus the bases and units, and every
     // downstream RNG stream is untouched.
-    if (params.seed_starting_force)
+    //
+    // BL-1154 (Ben, 2026-10-01, NR-963 A; MILITARY.md § "BL-476 rivals start
+    // armed"): RIVALS ARE ALWAYS ARMED; the flag now governs the SEAT only. The
+    // player keeps opening unarmed (BL-635's cause stays off for the player);
+    // `seed_starting_force` still arms it too, for
+    // rival_military_seeding_harness. Order unchanged: the player (when armed)
+    // first, then the rivals in corp_ids order.
     {
         std::unordered_set<entity_id> military_occupied_tiles;
         military_occupied_tiles.reserve(w.buildings.size());
         for (const auto& [bld_id, bc] : w.buildings)
             military_occupied_tiles.insert(bc.tile);
 
-        seed_starting_military(w, w.player_entity, military_occupied_tiles);
+        if (params.seed_starting_force)
+            seed_starting_military(w, w.player_entity, military_occupied_tiles);
 
         for (entity_id corp_id : corp_ids)
             if (corp_id != w.player_entity)
@@ -2215,6 +2306,10 @@ std::vector<entity_id> generate_background_firms(
     // the shape is agreed.
     constexpr int   max_firms_per_body      = 200;  // anti-runaway only
     constexpr int   per_resource_firm_cap   = 8;    // provisional - measure, then pin
+    // A FLAT 2, AND IT STAYS FLAT (BL-1146 review, 2026-09-27): the cap that
+    // scales with the province's centre (NR-960, `province_firm_cap`) is a
+    // BUDGET-WORLD ruling (INDUSTRIALISATION.md § 1). This pass runs on every
+    // world without a budget, whose bytes are BL-1031's pinned contract.
     constexpr int   per_province_firm_cap   = 2;    // provisional - measure, then pin
     constexpr int   max_iterations_per_body = 3 * max_firms_per_body; // slack for placement misses
 
@@ -2626,12 +2721,14 @@ constexpr uint32_t k_charter_salt_player       = 0x2E97A3F1u;
 // 6's function-local constants in `generate_background_firms` — which stay
 // exactly as they are for every world without a budget.
 //
-// The per-province cap is the one number still held here. It is the budget
-// path's own constant, NOT a copy that tracks Pass 6's. RULED at 2 on a budget
-// world (Ben, 2026-09-21, NR-910; INDUSTRIALISATION.md § 1), read on real budgets:
-// BL-1043 stage 2 found it binding on 7 of 16 library worlds at 650:4, up to
-// 24.6% of one world's budget, and the ruling keeps it there.
-constexpr int k_charter_per_province_firm_cap = 2;
+// The per-province cap is NOT a number held here any more (BL-1146, Ben,
+// 2026-09-27, NR-960 B, superseding NR-910's flat 2 on a budget world): it
+// scales with the province's centre, two firms per rung (`province_firm_cap`,
+// corporation_generation.hpp). It is the budget path's own rule, NOT a copy
+// that tracks Pass 6's: Pass 6 keeps its flat 2 in `generate_background_firms`
+// for every world without a budget, as above. The flat 2 was ruled against
+// provinces of <= 20 tiles; a province is now its centre's whole ground, and a
+// flat 2 pushed a city's industry out into its villages.
 
 /// A fresh std::mt19937 for one (centre, role): a KEYED draw, the checkpoint
 /// idiom — the (seed ^ role salt, centre id) pair keys a splitmix64 state, one
@@ -2764,11 +2861,14 @@ const std::vector<entity_id>& charter_region_window(const world& w, const nation
 /// @p window minus every tile standing in a province already at the firm cap —
 /// Pass 6's per-province cap, applied to where the ANCHOR may stand (the anchor's
 /// province is the firm's province, exactly the tile Pass 6 reads the cap at).
+/// The cap is the province's own (BL-1146): `province_firm_cap_of` its centre
+/// rung in @p province_rungs, the table `province_centre_rungs` builds once.
 /// Filtering before placement rather than refusing after it keeps a capped
 /// province from consuming draws; the admissible set is the same.
 std::vector<entity_id> charter_under_province_cap(const world& w,
                                                   const std::vector<entity_id>& window,
-                                                  const std::map<uint32_t, int>& by_province)
+                                                  const std::map<uint32_t, int>& by_province,
+                                                  const std::map<uint32_t, int>& province_rungs)
 {
     std::vector<entity_id> out;
     out.reserve(window.size());
@@ -2777,8 +2877,10 @@ std::vector<entity_id> charter_under_province_cap(const world& w,
         const uint32_t prov = w.provinces.province_of(tid);
         if (prov != 0)
         {
+            // BL-1146: the province's cap is its centre's rung x 2.
             const auto it = by_province.find(prov);
-            if (it != by_province.end() && it->second >= k_charter_per_province_firm_cap)
+            if (it != by_province.end()
+                && it->second >= province_firm_cap_of(province_rungs, prov))
                 continue;
         }
         out.push_back(tid);
@@ -2871,14 +2973,15 @@ std::vector<entity_id> charter_place(world& w, const nation_component& nc,
                                      const settlement_state* settle,
                                      const charter_spend_params& spend,
                                      const std::map<uint32_t, int>* by_province,
+                                     const std::map<uint32_t, int>* province_rungs,
                                      charter_rung& rung_out,
                                      charter_unspent_reason& fail_out)
 {
     for (const charter_rung rung : k_charter_rungs)
     {
         const std::vector<entity_id>& base = charter_rung_window(w, nc, cc, settle, spend, rung);
-        std::vector<entity_id> window = (by_province != nullptr)
-            ? charter_under_province_cap(w, base, *by_province)
+        std::vector<entity_id> window = (by_province != nullptr && province_rungs != nullptr)
+            ? charter_under_province_cap(w, base, *by_province, *province_rungs)
             : base;
         if (window.empty())
             continue;
@@ -3317,6 +3420,168 @@ bool charter_budget_affords_specialist(const world& w, const charter_budget& bud
     return false;
 }
 
+std::map<uint32_t, int> province_centre_rungs(const world& w)
+{
+    // THE ANCHOR IS province.cpp's (`province_anchors`), the one derivation
+    // `seed_province_holders` reads too; the rung is its summed scale on the
+    // ladder's 1-5.
+    std::map<uint32_t, int> rungs;
+    for (const auto& [prov, anchor] : province_anchors(w))
+        rungs[prov] = std::clamp(anchor.scale, 1, 5);
+    return rungs;
+}
+
+int province_firm_cap_of(const std::map<uint32_t, int>& rungs, uint32_t province)
+{
+    const auto it = rungs.find(province);
+    return province_firm_cap(it == rungs.end() ? 1 : it->second);
+}
+
+budget_world_reading read_budget_world(const world& w, const charter_budget* budget,
+                                       const charter_spend_params& spend,
+                                       const recipe_registry* reg)
+{
+    budget_world_reading r;
+    // 1. No budget, or an empty one: today's world, nothing else read.
+    if (budget == nullptr || budget->empty())
+        return r;
+    // 2 and 3. The params' refusal, then the world's — the latter only with a
+    // registry (bump 11 has none; see the header for why that cannot mislead it).
+    r.refusal = charter_spend_refusal(*budget, spend);
+    if (r.refusal == nullptr && reg != nullptr)
+        r.refusal = charter_spend_world_refusal(w, *reg, *budget, spend);
+    if (r.refusal != nullptr)
+    {
+        r.kind = budget_world_kind::refused;
+        return r;
+    }
+    // 4. The no-specialist world (NR-910).
+    if (!charter_budget_affords_specialist(w, *budget, spend))
+    {
+        r.kind = budget_world_kind::no_specialist;
+        return r;
+    }
+    r.kind = budget_world_kind::budget;
+    return r;
+}
+
+bool is_budget_world(const world& w, const charter_budget* budget,
+                     const charter_spend_params& spend, const recipe_registry* reg)
+{
+    return read_budget_world(w, budget, spend, reg).budget_world();
+}
+
+std::map<entity_id, charter_nation_plan> plan_charters_by_nation(
+    const world& w, const charter_budget& budget, const charter_spend_params& spend)
+{
+    std::map<entity_id, charter_nation_plan> out;   // std::map: ascending nation id
+    const int64_t fp = spend.firm_price_points;
+    if (budget.empty() || fp <= 0)
+        return out;
+    const int64_t specialist_price = spend.specialist_price_points();
+
+    // The walk's resolution of every budgeted centre: its tile, its body and the
+    // nation owning the tile. A centre without one charters nothing.
+    struct planned_centre
+    {
+        entity_id centre = null_entity;
+        int32_t   points = 0;
+        entity_id body   = null_entity;
+        entity_id nation = null_entity;
+    };
+    std::vector<planned_centre> centres;
+    centres.reserve(budget.points().size());
+    for (const auto& [centre_id, pts] : budget.points())
+    {
+        const auto tile_it = w.population_centre_tile.find(centre_id);
+        if (tile_it == w.population_centre_tile.end())
+            continue;
+        const auto t = w.tiles.find(tile_it->second);
+        if (t == w.tiles.end())
+            continue;
+        const auto own = w.tile_to_nation.find(tile_it->second);
+        if (own == w.tile_to_nation.end() || w.nations.count(own->second) == 0)
+            continue;
+        centres.push_back({ centre_id, pts, t->second.body, own->second });
+    }
+
+    // The walk's spend order: budget DESCENDING, ties to the lower centre id.
+    std::sort(centres.begin(), centres.end(), [](const planned_centre& a, const planned_centre& b) {
+        if (a.points != b.points)
+            return a.points > b.points;
+        return a.centre < b.centre;
+    });
+
+    // The walk's stop per body: the runaway guard, and under `sqrt_capital` the
+    // density ceiling below it (`charter_fix_body_rules` sets the ceiling only
+    // there). A body at its stop charters no further firm.
+    int64_t body_stop = spend.max_firms_per_body;
+    if (spend.resource_cap_rule == charter_cap_rule::sqrt_capital && spend.density_ceiling > 0)
+        body_stop = std::min<int64_t>(body_stop, spend.density_ceiling);
+    body_stop = std::max<int64_t>(0, body_stop);
+
+    // NR-913: the walk's own pooled-remainder plan (empty under `none`).
+    const charter_pool_plan pool = plan_charter_pool(w, budget, spend);
+
+    std::map<entity_id, int64_t> firms_on_body;   // planned so far, per body
+    for (const planned_centre& pc : centres)
+    {
+        int64_t after_specialist = pc.points;
+        int64_t specialists      = 0;
+        if (static_cast<int64_t>(pc.points) >= specialist_price)
+        {
+            specialists       = 1;
+            after_specialist -= specialist_price;
+        }
+        int64_t firm_budget = after_specialist;
+        if (const auto o = pool.out.find(pc.centre); o != pool.out.end())
+            firm_budget -= o->second;
+        if (const auto i = pool.in.find(pc.centre); i != pool.in.end())
+            firm_budget += i->second;
+        int64_t firms = firm_budget > 0 ? firm_budget / fp : 0;
+        int64_t& on_body = firms_on_body[pc.body];
+        firms = std::clamp<int64_t>(firms, 0, std::max<int64_t>(0, body_stop - on_body));
+        on_body += firms;
+        if (specialists == 0 && firms == 0)
+            continue;
+        charter_nation_plan& p = out[pc.nation];
+        p.specialists += specialists;
+        p.firms       += firms;
+    }
+    return out;
+}
+
+void publish_charter_web(generation_progress* progress, const world& w,
+                         const charter_spend_report& rep)
+{
+    if (progress == nullptr)
+        return;
+    // `rep.charters` is sorted by corporation id, and the walk hands ids out
+    // monotonically, richest centre first — so this is charter order.
+    int slot = 0;
+    for (const charter_record& cr : rep.charters)
+    {
+        if (!cr.specialist)
+            continue;
+        if (slot >= generation_progress::max_corp_slots)
+            break;   // overflow dropped, as the tap's own bound says
+        const auto cit = w.corporations.find(cr.corp);
+        if (cit == w.corporations.end())
+            continue;
+        for (const entity_id tile : cr.holdings)
+        {
+            const auto tit = w.tiles.find(tile);
+            if (tit == w.tiles.end() || tit->second.body != w.home_body)
+                continue;   // the carve is published over the home body's grid
+            progress->mark_asset(tit->second.grid_x, tit->second.grid_y, slot);
+        }
+        progress->add_corp_row(slot, static_cast<int>(cit->second.focus),
+                               static_cast<int>(cr.holdings.size()),
+                               cit->second.starting_capital);
+        ++slot;
+    }
+}
+
 std::vector<entity_id> charter_web_from_budget(world& w,
                                                const recipe_registry& reg,
                                                const charter_budget& budget,
@@ -3473,6 +3738,10 @@ std::vector<entity_id> charter_web_from_budget(world& w,
     for (const auto& kv : w.buildings)
         occupied.insert(kv.second.tile);
 
+    // BL-1146: each province's centre rung, read ONCE — the walk charters
+    // buildings, never centres, so no rung moves under it.
+    const std::map<uint32_t, int> province_rungs = province_centre_rungs(w);
+
     // --- EACH BODY'S DENSITY RULE, FIXED BEFORE THE WALK (BL-1039) -----------
     // Every body holding a nation-resolved budgeted centre gets its state here,
     // before any charter lands, and three things are read ONCE:
@@ -3602,7 +3871,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             charter_unspent_reason why = charter_unspent_reason::window_exhausted;
             std::vector<entity_id> assets = charter_place(w, nc, focus, occupied, asset_rng, cc,
                                                           settle, spend, /*by_province=*/nullptr,
-                                                          rung, why);
+                                                          /*province_rungs=*/nullptr, rung, why);
             if (assets.empty())
             {
                 // No ground in either window: the specialist's price stays
@@ -3975,7 +4244,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                 else
                 {
                     assets = charter_place(w, nc, focus, occupied, asset_rng, cc, settle, spend,
-                                           by_province, rung, why);
+                                           by_province, &province_rungs, rung, why);
                     if (!assets.empty())
                         break;
                     focus_failed[fi] = true;
@@ -4161,6 +4430,13 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         w.player_entity = seat;
         rep.player = seat;
     }
+
+    // BL-1154 (Ben, 2026-10-01, NR-963 A): every chartered SPECIALIST but the
+    // seat opens armed — a muster base beside its HQ and a 50-head unit
+    // (`seed_starting_military`, MILITARY.md § "BL-476 rivals start armed").
+    // Background firms stay unarmed. After the pick and every placement, so no
+    // charter's ground or draw moves; the seeding draws no randomness.
+    arm_rivals(w);
 
     // --- unspent, by (centre, reason) ----------------------------------------
     // `centres` is in budget-map order, i.e. ascending centre id, and the reasons

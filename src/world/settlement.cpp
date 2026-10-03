@@ -1,11 +1,13 @@
 #include "settlement.hpp"
 
 #include "colonisation.hpp" // BL-846/848: the diffusion that dates and colours a founding
+#include "population_generation.hpp" // BL-1130: the scale bands and footprint table the ground fit reads
 #include "tongue.hpp"       // BL-348: quarter words are coined, not borrowed
 
 #include <algorithm>
 #include <array>
 #include <cstdlib>
+#include <limits>
 #include <unordered_map>
 #include <utility>
 
@@ -296,7 +298,14 @@ bool touches_ocean(const world& w, const std::vector<entity_id>& ids,
 endowment survey_endowment(const world& w, const std::vector<entity_id>& ids,
                            int col, int row, int gw, int gh)
 {
-    const int win = std::max(3, gw / 45);
+    return survey_endowment_window(w, ids, col, row, gw, gh, std::max(3, gw / 45));
+}
+
+// BL-1107: the survey body, over a window of the caller's radius. The founding
+// survey above passes its own radius, so its arithmetic is exactly what it was.
+endowment survey_endowment_window(const world& w, const std::vector<entity_id>& ids,
+                                  int col, int row, int gw, int gh, int win)
+{
     float farm = 0.0f, ore = 0.0f, energy = 0.0f;
     int cells = 0, water = 0, forest = 0;
 
@@ -629,9 +638,16 @@ namespace
 /// Earth proper noun (.claude/rules/io-standing-rules.md § Terms & docs).
 culture derive_daughter_culture(const culture& parent, int parent_id, int8_t origin_class,
                                 uint32_t seed, int spawn_index, int64_t coined_year,
-                                bool crossed_water)
+                                bool crossed_water, const ground_profile& inherited_profile)
 {
     culture d = parent;                 // Pantheon, cradle and speech inherited whole.
+    // THE GROUND PROFILE IS INHERITED WHOLE (BL-1107; COLONISATION.md § The
+    // ground profile): a fact about where the people began, never re-read off
+    // the ground the daughter split on. Passed explicitly because a cradle
+    // parent is read off the const roster, which carries no profile yet; the
+    // caller resolves it (`cradle_prof` for a cradle, the parent's own field
+    // for a daughter).
+    d.profile = inherited_profile;
     // DESCENT (BL-865). The tree the migration builds is retained rather than
     // discarded, because kinship is what the empire phase reads for how alike
     // two peoples are (CIVILISATION.md § Culture relations).
@@ -893,6 +909,42 @@ settlement_state run_settlement(const planetology_state& pl,
                     col_lf [static_cast<std::size_t>(src0.tile)],
                     /*shoreline=*/false)));
 
+    // THE GROUND PROFILE (BL-1107; COLONISATION.md § The ground profile):
+    // beside the package, from the same window -- the deposits it holds, summed
+    // in the founding survey's four classes, and the amenity class its cover
+    // reads as (TILES.md § Amenity tiles). Coined once per cradle, no die.
+    // Kept per culture id here too, because the daughters below are derived
+    // from `cs.cultures`, which cannot carry it yet (it is const here; the
+    // caller copies `cradle_profile` back onto the roster).
+    std::vector<ground_profile> cradle_prof(cs.cultures.size());
+    for (const colonisation_source& src0 : col_sources)
+    {
+        if (src0.culture < 0 || static_cast<std::size_t>(src0.culture) >= cs.cultures.size()
+            || src0.tile < 0 || src0.tile >= total)
+            continue;
+        const int ccol = src0.tile % gw, crow = src0.tile / gw;
+        const endowment e = survey_endowment_window(w, tile_ids, ccol, crow, gw, gh,
+                                                    colonisation_cradle_window);
+        const amenity_reading am = read_window_amenity(col_sub, col_cov, col_lf, gw, gh,
+                                                       ccol, crow, colonisation_cradle_window);
+        ground_profile gp;
+        gp.farm          = e.farm;
+        gp.ore           = e.ore;
+        gp.energy        = e.energy;
+        gp.water         = e.water;
+        gp.amenity       = static_cast<int8_t>(am.cls);
+        gp.amenity_share = static_cast<int16_t>(am.share);
+        cradle_prof[static_cast<std::size_t>(src0.culture)] = gp;
+        out.cradle_profile.emplace_back(src0.culture, gp);
+    }
+    // The profile a daughter of @p parent_id inherits: a cradle's from the
+    // coining above, a daughter's from the field it already carries.
+    const auto inherited_profile = [&](int parent_id, const ::culture& par) -> ground_profile {
+        if (parent_id >= 0 && static_cast<std::size_t>(parent_id) < cradle_prof.size())
+            return cradle_prof[static_cast<std::size_t>(parent_id)];
+        return par.profile;
+    };
+
     // THE CRADLE IS ANNOUNCED (BL-1091): the people's own name off the roster
     // and the package just coined on its source, retained as pure outputs
     // beside the two records above. Written once, here, and read by nothing
@@ -980,7 +1032,8 @@ settlement_state run_settlement(const planetology_state& pl,
         culture daughter =
             derive_daughter_culture(*par, pid, static_cast<int8_t>(sp.origin_class),
                                     seed ^ 0xC0DAu, static_cast<int>(si),
-                                    sp.coined_year, sp.crossed_water);
+                                    sp.coined_year, sp.crossed_water,
+                                    inherited_profile(pid, *par));
         out.spawned_cultures.push_back(std::move(daughter));
     }
 
@@ -1154,7 +1207,8 @@ settlement_state run_settlement(const planetology_state& pl,
             if (par == nullptr) { out.spawned_cultures.push_back(culture{}); continue; }
             culture daughter = derive_daughter_culture(
                 *par, sp.parent, static_cast<int8_t>(sp.origin_class), seed ^ 0xC0DAu,
-                static_cast<int>(walk_spawns + si), sp.coined_year, sp.crossed_water);
+                static_cast<int>(walk_spawns + si), sp.coined_year, sp.crossed_water,
+                inherited_profile(sp.parent, *par));
             out.spawned_cultures.push_back(std::move(daughter));
         }
         // The regions that changed people take the daughter's shares and her
@@ -1502,7 +1556,8 @@ void derive_national_character(settlement_state& ss,
                                world& w,
                                const std::vector<entity_id>& nation_ids,
                                const std::vector<entity_id>& tile_ids,
-                               int gw, int gh)
+                               int gw, int gh,
+                               const std::vector<int64_t>* polity_industrial_years)
 {
     if (ss.regions.empty() || nation_ids.empty() || gw <= 0 || gh <= 0)
         return;
@@ -1511,6 +1566,19 @@ void derive_national_character(settlement_state& ss,
     const std::vector<int> owner = owner_map_of(w, tile_ids, nidx, gw, gh);
     const int nations = static_cast<int>(nation_ids.size());
     const int total = gw * gh;
+
+    // BL-1159: each region's holder POLITY id, read before the attribution below
+    // overwrites `region::nation` with the nation index (until here it is the polity
+    // the last span closed on). The qualification axis reads that polity's own
+    // industrial crossing through it.
+    const bool polity_timing = polity_industrial_years != nullptr && !polity_industrial_years->empty();
+    std::vector<int> region_polity;
+    if (polity_timing)
+    {
+        region_polity.reserve(ss.regions.size());
+        for (const region& p : ss.regions)
+            region_polity.push_back(p.nation);
+    }
 
     // --- Attribute every region to whoever ended up holding it ---------------
     for (region& p : ss.regions)
@@ -1628,6 +1696,46 @@ void derive_national_character(settlement_state& ss,
     const int64_t early_cut = ranked.empty() ? 0 : ranked[ranked.size() / 3];
     const int64_t late_cut  = ranked.empty() ? 0 : ranked[(ranked.size() * 2) / 3];
 
+    // --- BL-1159: the QUALIFICATION timing, off the polity's own crossing --------
+    // Ben, 2026-10-03 (POPULATION.md § Qualification, "Seeded from history"): on a
+    // generated world the timing qualification reads is the polity's own industrial
+    // crossing year, the one the sim records; the regional furnace flags above are
+    // never lit there, so reading them left every nation tied at the floor and no
+    // Highway ever qualified. The same two terms as the regional rule, re-sourced:
+    //   * WHEN — the EARLIEST crossing among the polities holding the nation's
+    //     regions (the regional rule's own min over first furnaces), ranked in
+    //     terciles over the nations that crossed at all;
+    //   * HOW MUCH — the REGION-WEIGHTED share of the nation's regions held by a
+    //     polity that crossed (the regional rule's ind_share).
+    // A polity that never crossed (INT64_MIN) reads as never industrialised. Integer
+    // years; ties fall to the sorted ranking, as above. Focus and ideology keep the
+    // regional record: the ruling moves qualification alone.
+    std::vector<int64_t> q_first(static_cast<std::size_t>(nations), never);
+    std::vector<int>     q_crossed_regions(static_cast<std::size_t>(nations), 0);
+    int64_t q_early_cut = early_cut, q_late_cut = late_cut;
+    if (polity_timing)
+    {
+        const std::vector<int64_t>& years = *polity_industrial_years;
+        for (std::size_t ri = 0; ri < ss.regions.size(); ++ri)
+        {
+            const int ni  = ss.regions[ri].nation;
+            const int pol = region_polity[ri];
+            if (ni < 0 || pol < 0 || static_cast<std::size_t>(pol) >= years.size()) continue;
+            const int64_t y = years[static_cast<std::size_t>(pol)];
+            if (y == std::numeric_limits<int64_t>::min()) continue; // never crossed
+            ++q_crossed_regions[static_cast<std::size_t>(ni)];
+            int64_t& f = q_first[static_cast<std::size_t>(ni)];
+            f = std::min(f, y);
+        }
+        std::vector<int64_t> q_ranked;
+        for (int ni = 0; ni < nations; ++ni)
+            if (q_first[static_cast<std::size_t>(ni)] != never)
+                q_ranked.push_back(q_first[static_cast<std::size_t>(ni)]);
+        std::sort(q_ranked.begin(), q_ranked.end());
+        q_early_cut = q_ranked.empty() ? 0 : q_ranked[q_ranked.size() / 3];
+        q_late_cut  = q_ranked.empty() ? 0 : q_ranked[(q_ranked.size() * 2) / 3];
+    }
+
     // --- Write the four axes ----------------------------------------------------
     for (int ni = 0; ni < nations; ++ni)
     {
@@ -1687,17 +1795,25 @@ void derive_national_character(settlement_state& ss,
         // that never industrialised opens at a floor, not zero: some literate
         // administration exists anywhere a nation does. First-cut constants,
         // tune-not-restructure (the NR-600 idiom).
+        //
+        // BL-1159: on a world the spans closed, the timing is the polity crossing
+        // (q_first / q_crossed_regions above), not the regional furnace record.
         {
+            const int64_t qf      = polity_timing ? q_first[static_cast<std::size_t>(ni)] : ff;
+            const int     q_inds  = polity_timing ? q_crossed_regions[static_cast<std::size_t>(ni)]
+                                                  : ind_regions;
+            const int64_t q_early = polity_timing ? q_early_cut : early_cut;
+            const int64_t q_late  = polity_timing ? q_late_cut : late_cut;
             const float ind_share =
                 region_count[static_cast<std::size_t>(ni)] > 0
-                    ? static_cast<float>(ind_regions)
+                    ? static_cast<float>(q_inds)
                       / static_cast<float>(region_count[static_cast<std::size_t>(ni)])
                     : 0.0f;
             float base = 0.05f;                    // never industrialised
-            if (ff != never)
-                base = ff <= early_cut ? 0.35f
-                     : ff <= late_cut  ? 0.22f
-                                       : 0.12f;
+            if (qf != never)
+                base = qf <= q_early ? 0.35f
+                     : qf <= q_late  ? 0.22f
+                                     : 0.12f;
             const float q = base + 0.25f * ind_share;
             nc.qualification = q < 0.0f ? 0.0f : (q > 1.0f ? 1.0f : q);
         }
@@ -1769,6 +1885,10 @@ namespace {
 constexpr int64_t demog_capacity_floor    = 5000;  // Headcount at farm_q = 0.
 constexpr int64_t demog_capacity_per_q    = 500;   // Extra headcount per farm_q point.
 constexpr int64_t demog_growth_rate_q     = 12;     // ~1.2%/yr logistic rate, low-density.
+/// BL-1137: per mille a year of a fully strained countryside that leaves for
+/// the towns. A CHOSEN CONSTANT (the centres cold review, 2026-09-26): equal in
+/// value to `demog_growth_rate_q` as a first cut, derived from nothing.
+constexpr int64_t urbanisation_rate_per_mille = 12;
 constexpr int64_t demog_war_drawdown_q    = 40;     // Up to ~4%/yr loss at war_pressure_q = 1000.
 constexpr int64_t demog_manpower_frac_q   = 50;     // Ceiling: 5% of population under arms at once.
 constexpr int64_t demog_manpower_recover_q = 250;   // Stock closes 25% of the ceiling gap per step.
@@ -1953,27 +2073,132 @@ int region_urban_share_q(int farm_q)
     return urban_share_floor_q + (q * urban_share_farm_q) / 1000;
 }
 
+// ---------------------------------------------------------------------------
+// A region deepens into one place (BL-1141) — one centre while settled, held to
+// its own ground (BL-1130)
+// ---------------------------------------------------------------------------
+
 namespace {
 
-/// Promote `centres` to whatever `urban_population` now stands up, never
-/// demote. POPULATION.md's asymmetry: passive failure shrinks a centre and
-/// never destroys one, so only `sack_region_urban` takes a centre off the map.
+/// Let `centres` follow what `urban_population` now stands up.
 ///
-/// BL-872 — `network_ok` false FREEZES this outright: the ground the network
-/// can no longer feed or govern stands up no NEW centre, but nothing already
-/// standing is touched here either. Freeze, not raze — `sack_region_urban`
-/// stays the only place `centres` goes down, and a supply cut is not the
-/// deliberate act of history that function represents.
-void promote_centres(region& p, bool network_ok)
+/// BL-1137 — CENTRES FOLLOW THE HEADS BOTH WAYS (Ben, 2026-09-25, superseding
+/// "growth only promotes"): growing heads promote; @p shrinking heads (this
+/// year's step took the headcount down) hold the count to what they still
+/// stand, so a centre whose heads fell below a village's worth is ABANDONED —
+/// people leaving, not a sack, so `centres_razed` is untouched.
+///
+/// BL-1141 — A REGION DEEPENS INTO ONE PLACE: what the heads stand up is one
+/// centre once they reach a village's worth (`region_centres_wanted`), held to
+/// what the cell's ground holds (`region_centres_fit`: none on a cell with no
+/// ground). Growth past that makes the one place bigger — its scale is read
+/// off the heads at the carve — never more numerous.
+///
+/// BL-872 — `network_ok` false FREEZES growth: the ground the network can no
+/// longer feed or govern stands up no NEW centre. The ground hold and the
+/// abandonment still apply — a cell that lost its ground holds none, and heads
+/// that left are gone, whether or not the seat reaches it — and
+/// `sack_region_urban` stays the only place a centre is DESTROYED (razed).
+void promote_centres(region& p, bool network_ok, bool shrinking)
 {
-    if (!network_ok) return;
-    const int stood = static_cast<int>(
-        clampi64(p.urban_population / region_centre_heads, 0, region_centre_limit));
-    if (stood > p.centres)
-        p.centres = stood;
+    int c = p.centres;
+    const int wanted = region_centres_wanted(p.urban_population);
+    if (network_ok)
+        c = std::max(c, wanted);
+    if (shrinking)
+        c = std::min(c, wanted);
+    p.centres = region_centres_fit(c, p.urban_ground);
 }
 
 } // namespace
+
+int region_centres_wanted(int64_t urban_heads)
+{
+    return urban_heads >= region_centre_heads ? 1 : 0;
+}
+
+int region_centres_fit(int want, int ground)
+{
+    const int m = clampi(want, 0, 1);
+    if (ground < 0) return m;
+    if (ground == 0) return 0;
+    return m;
+}
+
+bool update_urban_ground(settlement_state& ss, urban_ground_field& f,
+                         const std::vector<terrain_substrate>& substrate,
+                         const std::vector<std::uint8_t>* standable, int gw, int gh)
+{
+    if (gw <= 0 || gh <= 0
+     || substrate.size() != static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh)
+     || (standable != nullptr && standable->size() != substrate.size()))
+        return false;
+    const std::size_t n = ss.regions.size();
+
+    // A fresh field, a different body, or a table that SHRANK (regions are
+    // only ever appended during a run, so this is defensive): measure again
+    // from nothing. Adding the regions one at a time in index order with a
+    // strict `<` IS `nearest_region`'s argmin with its lowest-index tie-break.
+    if (f.raster_size != substrate.size() || f.measured > n)
+    {
+        // THE GROUND (BL-1130 review fix): the tiles a centre can stand on,
+        // by the carve's own placement gate where the caller has it, so the
+        // sim and the carve agree which cells hold none.
+        f.land_tiles.clear();
+        for (std::size_t t = 0; t < substrate.size(); ++t)
+        {
+            const bool ground = (standable != nullptr) ? ((*standable)[t] != 0)
+                                                       : !is_water(substrate[t]);
+            if (ground) f.land_tiles.push_back(static_cast<int32_t>(t));
+        }
+        f.owner.assign(f.land_tiles.size(), -1);
+        f.owner_dist.assign(f.land_tiles.size(), std::numeric_limits<int32_t>::max());
+        f.land.clear();
+        f.raster_size = substrate.size();
+        f.measured    = 0;
+    }
+    if (f.measured < n)
+    {
+        f.land.resize(n, 0);
+        for (std::size_t ri = f.measured; ri < n; ++ri)
+        {
+            const region& p = ss.regions[ri];
+            for (std::size_t li = 0; li < f.land_tiles.size(); ++li)
+            {
+                const int t = f.land_tiles[li];
+                const int d = grid_dist(t % gw, t / gw, p.col, p.row, gw);
+                if (d >= f.owner_dist[li]) continue;
+                if (f.owner[li] >= 0) --f.land[static_cast<std::size_t>(f.owner[li])];
+                f.owner[li]      = static_cast<int32_t>(ri);
+                f.owner_dist[li] = d;
+                ++f.land[ri];
+            }
+        }
+        f.measured = n;
+    }
+
+    bool changed = false;
+    for (std::size_t ri = 0; ri < n; ++ri)
+    {
+        if (ss.regions[ri].urban_ground == f.land[ri]) continue;
+        ss.regions[ri].urban_ground = f.land[ri];
+        changed = true;
+    }
+    return changed;
+}
+
+bool hold_region_to_ground(region& p)
+{
+    if (p.centres <= 0) return false;
+    const int held = region_centres_fit(p.centres, p.urban_ground);
+    if (held == p.centres) return false;
+    p.centres = held;
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// The urban record's three rules (BL-766): the draw, growth, the sack
+// ---------------------------------------------------------------------------
 
 void draw_region_urban(region& p)
 {
@@ -2016,7 +2241,7 @@ void draw_region_urban(region& p)
     // (`advance_region_urban`), never on the one-centre opening seed every
     // farmable region gets regardless of network, above.
     p.centres = 1;
-    promote_centres(p, /*network_ok=*/true);
+    promote_centres(p, /*network_ok=*/true, /*shrinking=*/false);
 }
 
 void draw_urban_map(settlement_state& s)
@@ -2034,18 +2259,27 @@ void advance_region_urban(region& p, bool network_ok)
         // touched here: nobody sacked these walls, the people simply went.
         p.urban_population = 0;
         p.centres          = 0;
+        p.industrial_heads = 0;
         return;
     }
 
-    const int64_t target =
-        clampi64((p.population * region_urban_share_q(p.farm_q)) / 1000, 0, 1LL << 40);
+    // BL-1137: the industrial heads are people this region holds (a plague
+    // that took them leaves fewer), and they all live in its centres, so the
+    // target is the farm-fed people's urban share PLUS every industrial head.
+    // With none — every span before the Industrialisation span's stream — the
+    // target is exactly `population * share`, as it always was.
+    p.industrial_heads = clampi64(p.industrial_heads, 0, p.population);
+    const int64_t farm_fed = p.population - p.industrial_heads;
+    const int64_t target = clampi64(
+        (farm_fed * region_urban_share_q(p.farm_q)) / 1000 + p.industrial_heads, 0, 1LL << 40);
+    const int64_t before = p.urban_population;
     const int64_t gap = target - p.urban_population;
     // Integer division truncates toward zero in both directions, so the step is
     // symmetric and a gap smaller than 1000/urban_converge_q simply stalls —
     // which is the correct behaviour for a town already at its ground's size.
     p.urban_population = clampi64(p.urban_population + (gap * urban_converge_q) / 1000,
                                   0, 1LL << 40);
-    promote_centres(p, network_ok);
+    promote_centres(p, network_ok, /*shrinking=*/p.urban_population < before);
 }
 
 void sack_region_urban(region& p, int population_loss_q)
@@ -2053,22 +2287,151 @@ void sack_region_urban(region& p, int population_loss_q)
     if (p.centres <= 0 && p.urban_population <= 0)
         return;
 
+    // BL-1130 round 4 (Ben, 2026-09-25: "a razing is counted in people"): the
+    // settlement's size before the walls fall, in village equivalents, UNCAPPED
+    // (the centres cold review: the capped size the prize reads saturates at
+    // 320,000 heads, so a sacked metropolis recorded nothing).
+    const int64_t size_before = region_village_equivalents(p);
+
     const int64_t loss_q =
         clampi64((static_cast<int64_t>(clampi(population_loss_q, 0, 1000))
                   * urban_sack_multiple_q) / 1000, 0, 1000);
     p.urban_population = clampi64(
         p.urban_population - (p.urban_population * loss_q) / 1000, 0, 1LL << 40);
+    // NR-958 — A SACK NEVER LOWERS A REGION'S CEILING. The works' people are
+    // city people, and the ones the walls no longer hold scatter into the
+    // region's own countryside, where the capacity they carried still feeds
+    // them: `industrial_heads` falls to what the walls hold and every head it
+    // loses is a farm-fed head of the same region. `population` and
+    // `capacity_carried` are untouched, so the ceiling stands where it stood and
+    // nobody leaves the count — the first build cut the ceiling with the heads
+    // and the next year's clamp deleted ~40% of a sacked city (the centres cold
+    // review). War does not consume people (BL-835).
+    p.industrial_heads = clampi64(p.industrial_heads, 0, p.urban_population);
 
-    // What the survivors can still stand up. The difference is destruction, and
-    // it is RECORDED — a razed city that is later rebuilt still says it was
-    // razed, which is the only way the epoch map can read as historied.
-    const int stands = static_cast<int>(
-        clampi64(p.urban_population / region_centre_heads, 0, region_centre_limit));
+    // What the survivors can still stand up. BL-1130: "stand up" is the same
+    // rule growth builds by (one centre, BL-1141), on the same ground, so a sack and a promotion
+    // read one rule in both directions.
+    const int stands = region_centres_fit(region_centres_wanted(p.urban_population),
+                                          p.urban_ground);
     if (stands < p.centres)
-    {
-        p.centres_razed += p.centres - stands;
         p.centres = stands;
-    }
+
+    // The destruction is RECORDED — a razed city that is later rebuilt still
+    // says it was razed, which is the only way the epoch map can read as
+    // historied. BL-1130 round 4: it is COUNTED IN PEOPLE, a village's worth of
+    // urban heads per razing, whether or not the centre count steps down, so
+    // the centre count's coarse steps (one place standing for any number of heads)
+    // do not hide a sack. The unit is `region_village_equivalents`: heads over
+    // the village rung, uncapped, and the last settlement's one when it falls —
+    // so a sack records the village-worths of heads it cost, however large the
+    // city. Saturates at the field's range rather than wrapping.
+    const int64_t size_after = region_village_equivalents(p);
+    if (size_after < size_before)
+        p.centres_razed = static_cast<int>(clampi64(
+            static_cast<int64_t>(p.centres_razed) + (size_before - size_after),
+            0, std::numeric_limits<int>::max()));
+}
+
+// ---------------------------------------------------------------------------
+// The urbanisation stream (BL-1137; INDUSTRIALISATION.md § Beat 2)
+// ---------------------------------------------------------------------------
+
+int64_t region_ceiling(const region& p)
+{
+    return clampi64(region_carrying_capacity(p.farm_q, p.work_capacity_mod) + p.capacity_carried,
+                    0, 1LL << 40);
+}
+
+int64_t region_farm_fed_ceiling(const region& p)
+{
+    return clampi64(region_ceiling(p) - clampi64(p.industrial_heads, 0, 1LL << 40), 0, 1LL << 40);
+}
+
+int urbanisation_rate_q()
+{
+    return static_cast<int>(urbanisation_rate_per_mille);
+}
+
+int64_t urbanisation_outflow(const region& p, int step_years)
+{
+    if (p.population <= 0 || step_years <= 0) return 0;
+    const int64_t countryside = clampi64(p.population - p.urban_population, 0, 1LL << 40);
+    if (countryside <= 0) return 0;
+    // THE PUSH: the strain on the ground — its farm-fed people over what its
+    // farmland feeds, per mille. The industrial heads are fed by the capacity
+    // they carried, so they strain nothing; a countryside the stream has
+    // thinned is less strained and pushes less.
+    const int64_t K_farm   = region_carrying_capacity(p.farm_q, p.work_capacity_mod);
+    const int64_t farm_fed = clampi64(p.population - p.industrial_heads, 0, 1LL << 40);
+    const int64_t strain_q = (K_farm > 0) ? clampi64((farm_fed * 1000) / K_farm, 0, 1000) : 1000;
+    // countryside x rate x strain x years, staged so nothing leaves int64:
+    // countryside <= 2^40, rate x strain <= 12,000, years clamped to 1000.
+    const int64_t years = clampi64(step_years, 0, 1000);
+    const int64_t per_year = (countryside * urbanisation_rate_per_mille * strain_q) / 1000000;
+    return clampi64(per_year * years, 0, countryside);
+}
+
+int64_t take_countryside(region& p, int64_t heads)
+{
+    if (heads <= 0 || p.population <= 0) return 0;
+    // The countryside is farm-fed by construction (the industrial heads live in
+    // the centres); both bounds are read so a record that broke it cannot hand
+    // the stream an industrial head as a farmer.
+    const int64_t countryside = clampi64(p.population - p.urban_population, 0, 1LL << 40);
+    const int64_t farm_fed    = clampi64(p.population - p.industrial_heads, 0, 1LL << 40);
+    const int64_t taken = clampi64(heads, 0, std::min(countryside, farm_fed));
+    p.population -= taken;
+    // NR-958: the migrant carries its food with it — the ceiling leaves too.
+    p.capacity_carried = clampi64(p.capacity_carried - taken, -(1LL << 40), 1LL << 40);
+    return taken;
+}
+
+void settle_urban_migrants(region& p, int64_t heads)
+{
+    if (heads <= 0) return;
+    p.population       = clampi64(p.population + heads, 0, 1LL << 40);
+    p.urban_population = clampi64(p.urban_population + heads, 0, 1LL << 40);
+    p.industrial_heads = clampi64(p.industrial_heads + heads, 0, p.population);
+    // NR-958: ...and arrives with it, so the heads are fed and the farm-fed
+    // people's ceiling (`region_farm_fed_ceiling`) is exactly what it was.
+    p.capacity_carried = clampi64(p.capacity_carried + heads, -(1LL << 40), 1LL << 40);
+}
+
+namespace {
+
+/// The logistic term dP = r * P * (K - P) / K, all integer. EXACT, as it always
+/// was, on ground whose numbers fit 30 bits — every ceiling farmland and works
+/// alone can raise — and staged so nothing leaves int64 on ground whose
+/// ceiling the stream carried past that. The bound is 2^30, not 2^31 (the
+/// rebuild's review): r * P * (K - P) <= 12 * K^2 / 4, which is under 2^63 for
+/// K < 2^30 and over it from K of about 1.75e9.
+int64_t logistic_growth(int64_t P, int64_t K)
+{
+    if (P <= 0 || K <= 0) return 0;
+    if (P < (1LL << 30) && K < (1LL << 30))
+        return (demog_growth_rate_q * P * (K - P)) / (K * 1000);
+    const int64_t gap_ppm = clampi64(((K - P) * 1000000) / K, -1000000, 1000000);
+    return ((demog_growth_rate_q * P) / 1000) * gap_ppm / 1000000;
+}
+
+} // namespace
+
+int64_t remove_region_people(region& p, int64_t heads)
+{
+    if (heads <= 0 || p.population <= 0) return 0;
+    const int64_t P = p.population;
+    const int64_t h = clampi64(heads, 0, P);
+    p.industrial_heads = clampi64(p.industrial_heads, 0, P);
+    // The industrial heads' share of the dead, in parts per million of the
+    // population (h * 10^6 and I * 10^6 both stay under 2^61 at P <= 2^40).
+    const int64_t frac_ppm = (h * 1000000) / P;
+    const int64_t ind_loss = (p.industrial_heads * frac_ppm) / 1000000;
+    p.population = P - h;
+    // Rounding can leave an industrial head over the survivors; it is one of the dead.
+    p.industrial_heads = clampi64(p.industrial_heads - ind_loss, 0, p.population);
+    p.urban_population = clampi64(p.urban_population, 0, p.population);
+    return h;
 }
 
 void advance_region_demography(region& p, int years, int war_pressure_q)
@@ -2080,24 +2443,37 @@ void advance_region_demography(region& p, int years, int war_pressure_q)
     // one-off population grant: it lifts the asymptote the logistic term is
     // growing toward, which is a permanent change in trajectory rather than a
     // step that growth would simply re-flatten.
-    const int64_t K = region_carrying_capacity(p.farm_q, p.work_capacity_mod);
-
+    //
+    // NR-958 — A MIGRANT CARRIES ITS FOOD WITH IT. The ceiling is the
+    // farmland's plus the capacity the urbanisation stream carried in, minus
+    // what it carried out (`region_ceiling`), so a move conserves the world's
+    // ceiling. And ONLY THE FARM-FED PEOPLE BREED: births are the logistic term
+    // on the people the ceiling feeds once its industrial heads are fed
+    // (`region_farm_fed_ceiling`), so moved capacity never inflates the density
+    // term — a destination's natives grow against exactly their farmland's
+    // ceiling, and a source's thinned countryside sits AT its lowered ceiling
+    // and regrows nothing into what left. With no stream (every span before
+    // the Industrialisation span's) both are zero and this is the old step,
+    // term for term.
     for (int y = 0; y < years; ++y)
     {
-        if (p.population <= 0) { p.population = 0; continue; } // Nothing to grow from.
+        if (p.population <= 0) { p.population = 0; p.industrial_heads = 0; continue; } // Nothing to grow from.
 
-        const int64_t P = p.population;
-        // Logistic growth term: dP = r * P * (K - P) / K, all integer.
-        const int64_t delta = (demog_growth_rate_q * P * (K - P)) / (K * 1000);
-        int64_t next = P + delta;
+        p.industrial_heads = clampi64(p.industrial_heads, 0, p.population);
+        int64_t ind = p.industrial_heads;
+        const int64_t F  = p.population - ind;
+        const int64_t Kf = region_farm_fed_ceiling(p);
+        int64_t next = F + logistic_growth(F, Kf);
 
         if (wq > 0)
         {
             const int64_t loss = (next * static_cast<int64_t>(wq) * demog_war_drawdown_q) / (1000 * 1000);
             next -= loss;
+            ind  -= (ind * static_cast<int64_t>(wq) * demog_war_drawdown_q) / (1000 * 1000);
         }
 
-        p.population = clampi64(next, 0, K);
+        p.industrial_heads = ind;
+        p.population = clampi64(next, 0, Kf) + ind;
     }
 
     p.last_demography_year += years;
@@ -2157,7 +2533,9 @@ bool resolve_plague_event(std::vector<region>& regions,
                 if (loss_q <= 0) continue;
 
                 const int64_t loss = (p.population * loss_q) / 1000;
-                p.population = clampi64(p.population - loss, 0, p.population);
+                // The one direct cut (the rebuild's review): the dead fall on
+                // the industrial and the farm-fed heads in proportion.
+                remove_region_people(p, loss);
                 replenish_manpower(p); // The ceiling just fell with the population.
             }
             applied = true;

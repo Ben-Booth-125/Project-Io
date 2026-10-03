@@ -1464,21 +1464,24 @@ entity_id garrison_neighbour_tile(world& w, entity_id tile, int side)
 }
 
 /// Create the one static garrison unit for @p nation in @p province_id, on
-/// the province's own anchor tile (`province::tiles.front()`, which IS
-/// `province::id` by that struct's own contract — province.hpp). No-op on a
+/// @p post — the capital province's anchor centre, or a border province's
+/// tile facing the neighbour it guards (seed_nation_garrisons says which,
+/// Ben 2026-10-03). The lowest-id tile was the first post, and since BL-1150
+/// a province's fill crosses the settled line, so that tile could be
+/// never-settled wilderness far from anything the garrison holds. No-op on a
 /// province id the partition does not resolve (defensive; provinces are
 /// never empty by the partition's own contract, so this should not fire).
-void place_garrison(world& w, entity_id nation, uint32_t province_id, int count,
-                    uint16_t roster_row)
+void place_garrison(world& w, entity_id nation, uint32_t province_id, entity_id post,
+                    int count, uint16_t roster_row)
 {
     const province* pr = w.provinces.find(province_id);
-    if (pr == nullptr || pr->tiles.empty())
+    if (pr == nullptr || pr->tiles.empty() || post == null_entity)
         return;
 
     const entity_id u = w.create_entity();
     unit_component uc{};
     uc.owner                  = nation;               // a nation, not a corp — the fourth writer
-    uc.position                = pr->tiles.front();
+    uc.position                = post;
     uc.count                   = count;
     uc.type                    = roster_row;
     uc.supply_factor_permille  = 1000;
@@ -1495,10 +1498,46 @@ void place_garrison(world& w, entity_id nation, uint32_t province_id, int count,
 
 } // namespace
 
+entity_id garrison_border_post(world& w, const province& pr, entity_id guarded)
+{
+    if (guarded == null_entity)
+        return null_entity;
+    // Ascending tile order (the partition's contract) with a strictly-greater
+    // scan: the most sides facing `guarded` wins, the lowest tile id a tie.
+    entity_id best       = null_entity;
+    int       best_sides = 0;
+    for (const entity_id tile : pr.tiles)
+    {
+        const auto own = w.tile_to_nation.find(tile);
+        if (own != w.tile_to_nation.end() && own->second == guarded)
+            continue; // a tile of the guarded nation is not a post against it
+        int sides = 0;
+        for (int side = 0; side < 6; ++side)
+        {
+            const entity_id nb = garrison_neighbour_tile(w, tile, side);
+            if (nb == null_entity)
+                continue;
+            const auto tnit = w.tile_to_nation.find(nb);
+            if (tnit != w.tile_to_nation.end() && tnit->second == guarded)
+                ++sides;
+        }
+        if (sides > best_sides)
+        {
+            best_sides = sides;
+            best       = tile;
+        }
+    }
+    return best;
+}
+
 void seed_nation_garrisons(world& w, const nation_garrison_params& params)
 {
     if (w.nations.empty() || w.provinces.provinces.empty())
         return; // no nations, or called before the partition exists
+
+    // The anchors, derived once for every province (BL-1145): the post a
+    // garrison takes when its province does not hold the capital.
+    const std::map<uint32_t, province_anchor> anchors = province_anchors(w);
 
     // Ascending nation id — `w.nations` is an unordered_map.
     std::vector<entity_id> nation_ids;
@@ -1600,8 +1639,34 @@ void seed_nation_garrisons(world& w, const nation_garrison_params& params)
             }
         }
 
+        // --- The post (Ben, 2026-10-03; BL-1145) ------------------------------
+        // The CAPITAL garrison stands on the capital province's anchor centre
+        // — its chief city — not on `nc.capital_tile`, Pass 5's seed tile,
+        // which on the shipped worlds mostly holds no centre. A BORDER
+        // garrison stands on its province's tile facing the neighbour it
+        // guards (`garrison_border_post`), because the nation scorer reads a
+        // garrison as border force only through its own tile's hex neighbours
+        // (nation_ai.cpp build_force): on the anchor, deep inside the
+        // province, it faces no one. A capital province that is ALSO a border
+        // province takes the capital rule — the one set holds it once.
+        //
+        // A centreless province (it can outlive its centre in play, NR-952 —
+        // never at generation, which centre_census C7 gates) falls back to its
+        // lowest-id tile inside `province_anchor_tile`, stated there.
+        const uint32_t cap_prov = (nc.capital_tile != null_entity)
+                                ? w.provinces.province_of(nc.capital_tile) : 0u;
         for (const uint32_t prov : target_provinces) // ascending: deterministic creation order
-            place_garrison(w, nid, prov, count, params.roster_row);
+        {
+            const province* pr = w.provinces.find(prov);
+            if (pr == nullptr)
+                continue;
+            entity_id post = null_entity;
+            if (prov != cap_prov && best_neighbour != null_entity)
+                post = garrison_border_post(w, *pr, best_neighbour);
+            if (post == null_entity) // the capital province, or (defensively) no facing tile
+                post = province_anchor_tile(anchors, *pr);
+            place_garrison(w, nid, prov, post, count, params.roster_row);
+        }
     }
 }
 

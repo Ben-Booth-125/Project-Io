@@ -789,7 +789,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `target` | `entity` | The entity under the cursor. WITH NO LENS ACTIVE, overlapping candidates resolve to one entity: the stack UNIT > building > market > TILE > body is walked most-specific first (BL-575 put the unit marker ahead of the building marker — a unit standing on a built tile must be reachable on the FIRST click), and nearest-to-cursor (entity id breaking ties) picks a single stable winner. The ground itself resolves to the TILE, which carries its province as a set of sections in the Selection element (BL-598 dissolved the separate province rung: a rung of its own selected the same ground twice). A unit marker is drawn once per (province, owner) GROUP at the province's anchor tile — the group's lowest-id unit is what a click on it resolves to. WATER IS GROUND FOR THIS PURPOSE (BL-785): a press on coastal water, a lake or open ocean resolves to that TILE like any other, and the Selection band's centre column answers OWNER and DOMAIN rather than the five ground sections — the owning nation on owned water, and the word 'Unowned' on water no nation holds (open ocean is unowned structurally). No deposit, workforce, population or building reading is offered there, because those questions are about ground. UNDER A LENS none of this stack applies; see the press field. |
+| `target` | `entity` | The entity under the cursor. WITH NO LENS ACTIVE, overlapping candidates resolve to one entity: the stack UNIT > building > market > TILE > body is walked most-specific first (BL-575 put the unit marker ahead of the building marker — a unit standing on a built tile must be reachable on the FIRST click), and nearest-to-cursor (entity id breaking ties) picks a single stable winner. The ground itself resolves to the TILE, which carries its province as a set of sections in the Selection element (BL-598 dissolved the separate province rung: a rung of its own selected the same ground twice). A unit marker is drawn once per (province, owner) GROUP on the tile its lowest-id unit stands on (BL-1145; formerly the province's lowest-id tile, which in a large province could lie far from every unit) — that lowest-id unit is what a click on it resolves to. WATER IS GROUND FOR THIS PURPOSE (BL-785): a press on coastal water, a lake or open ocean resolves to that TILE like any other, and the Selection band's centre column answers OWNER and DOMAIN rather than the five ground sections — the owning nation on owned water, and the word 'Unowned' on water no nation holds (open ocean is unowned structurally). No deposit, workforce, population or building reading is offered there, because those questions are about ground. UNDER A LENS none of this stack applies; see the press field. |
 
 **Valid when:**
 - The app is in-game (not the main menu or New World wizard).
@@ -2140,7 +2140,7 @@ TRADES shows FOUR headed sections, each bounded and scrolling inside itself so a
 **Valid when:**
 - App is on the wizard screen.
 
-**Expected output.** On rounds 2-3: steps back one round (a plain revision — there is no per-round snapshot, since rounds are causal). On round 1: returns to the main menu. Leaving costs nothing (nothing is generated until Begin), and preferences survive the trip, so re-entering resumes the same leans from round 1.
+**Expected output.** On any round after the first: steps back one round, keeping every round's record and world it passes (STARTUP.md section The world cache), so Back then Next recomputes nothing. On round 1: returns to the main menu and releases every world the wizard held. Preferences survive the trip, so re-entering resumes the same leans from round 1.
 
 **Reason to select.** To revise an earlier round's preferences, or to abandon world setup and return to the menu.
 
@@ -2157,12 +2157,13 @@ TRADES shows FOUR headed sections, each bounded and scrolling inside itself so a
 
 ### `chrome.wizard_continue` — New World wizard, footer button row (right edge)
 
-**Press.** Click Continue.
+**Press.** Click Next.
 
 **Valid when:**
-- App is on the wizard screen, on round 1 or 2 (any round except the last).
+- App is on the wizard screen, on any round except the last (the last round carries Begin).
+- Next is enabled: on the Life round, its world has finished building; on a pass round (Culture, Empires, Exploration), that round's run has landed. While it is disabled its hover names what it waits on (Ben, 2026-09-25: Next waits for the round on screen).
 
-**Expected output.** Advances to the next round. The button reads Continue on non-final rounds and Begin on the last; this press generates nothing.
+**Expected output.** Advances to the next round. Arriving on a pass round starts its run on the world the round before closed (nothing is rebuilt; STARTUP.md section The world cache), and Next stays disabled until that run lands. Back then Next onto a round that has already landed recomputes nothing.
 
 **Reason to select.** To accept this round's roll and preferences and move to the next batch of decisions.
 
@@ -2269,7 +2270,7 @@ TRADES shows FOUR headed sections, each bounded and scrolling inside itself so a
 - Applies to a NEW world only. --load carries the save's own epoch, which overrides this flag.
 - Does NOT reach --verify, --verify-all or --serve: those dispatch above the parse and their goldens are all taken against the default world.
 
-**Expected output.** Sets world_params::epoch_year — the calendar the clock rebases to at Begin — and nothing else. Default 1960. Generation runs the history 2400 BCE → 1960 whatever the epoch (the migration, the Empires, the Exploration and Industrialisation spans on one engine), so every epoch builds the same world; the flag names the date it is met on. The recipe band is NOT the epoch's: it is derived per nation from the history's industry state at the 1960 fold — a nation is industrial iff the realm it grew from reaches the industrial rung, ancient otherwise (docs/economy/ERAS.md § Where the ladder starts; NR-929) — persisted on the nation and applied on a new game and a loaded save alike. Epoch 0 is retired (Ben, 2026-09-25, NR-920): no band override and no ancient-roster sandbox; a nation opens ancient only where its own history never crossed the rung (the band is per nation, NR-929) (docs/generation/INDUSTRIALISATION.md). The UI calendar follows it: ui::fmt::campaign_epoch_year() is published from the live world_params, so a 1960 campaign renders 1960-based dates and a 0 CE campaign renders 0 CE ones. That is display only and never enters `world` — the serialised history datum (::history_datum_year) is a separate fixed constant and does not move with the epoch.
+**Expected output.** Sets world_params::epoch_year — the calendar the clock rebases to at Begin — and nothing else. Default 1960. Generation runs the history 2400 BCE → 1960 whatever the epoch (the migration, the Empires, the Exploration and Industrialisation spans on one engine), so every epoch builds the same world; the flag names the date it is met on. The recipe band is NOT the epoch's: it is derived per nation from the history's industry state at the 1960 fold — a nation is industrial iff the realm it grew from reaches the industrial rung, ancient otherwise (docs/economy/ERAS.md § Where the ladder starts; NR-929) — persisted on the nation and applied on a new game and a loaded save alike. Epoch 0 is retired (Ben, 2026-09-25, NR-920): no band override and no ancient-roster sandbox; a nation opens ancient only where its own history never crossed the rung (the band is per nation, NR-929) (docs/generation/INDUSTRIALISATION.md). The UI calendar follows it: ui::fmt::campaign_epoch_year() is published from the live world_params, so a 1960 campaign renders 1960-based dates and a 1900 campaign renders 1900-based ones. That is display only and never enters `world` — the serialised history datum (::history_datum_year) is a separate fixed constant and does not move with the epoch.
 
-**Reason to select.** To play or watch the era whose catastrophe is nuclear war (docs/economy/ERAS.md § The point of an Era) rather than the 0 CE ancient start. Ben, 2026-08-31: "we will be working on the 1960s start."
+**Reason to select.** To date the campaign in a year other than 1960: the world is the same, only the calendar moves. The default 1960 start, the era whose catastrophe is nuclear war (docs/economy/ERAS.md § The point of an Era), needs no flag.
 

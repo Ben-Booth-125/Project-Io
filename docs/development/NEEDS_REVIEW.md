@@ -24,13 +24,26 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*47 entries — 0 open, 47 resolved.*
+*70 entries — 1 open, 69 resolved.*
 
 ---
 
 ## Open
 
-*Nothing open.*
+### NR-966 — NOVEL WORK: a both-trees shape probe for re-blesses (rebless_shape_probe)
+*novel-work · raised 2026-10-03 · from the sprint 48 re-bless lane*
+
+tools/verify/rebless_shape_probe.cpp measures the world's shape (centres, scales, provinces, markets, roads, wars, sea, firms, seats, haulage) on two source trees so a re-bless can be described in shape, as DELIVERY.md asks. It is new tooling with no saved skill. Also new this sprint with no skill: culture_preference_census, centre_abandonment_census, centre_decline_trace, garrison_border_probe, market_gravity_ladder.
+
+**Why it matters.** Tool creation is skill creation (CLAUDE.md); a skill wrapper needs your permission.
+
+- A: wrap rebless_shape_probe as a re-bless skill (the one each sprint's re-bless uses)
+- B: leave them as ad hoc tools in tools/verify
+- C: other
+
+> **Recommendation:** A for rebless_shape_probe; B for the rest.
+
+*Files: `tools/verify/rebless_shape_probe.cpp`*
 
 ---
 
@@ -806,4 +819,387 @@ The harness gate (industrialisation_sim_harness --fidelity, the BL-1049 section)
 > **RESOLVED.** RULED (Ben, 2026-09-25, the sprint-47 close form): B, range-check the civilisation and creed indices in both validators, conditional on a non-empty table, and fill the exploration_sim_harness fixtures' tables. The work is BL-1116 (handoff validators range-check), Light.
 
 *Files: `src/world/history_sim.cpp`, `tools/verify/exploration_sim_harness.cpp`*
+
+### NR-944 — CALL: a nation with no town and no spurring village now gets no border link at all - off the continental network. Accept, fall back, or read after centres consolidate?
+*question · raised 2026-09-25 · from BL-1119 (roads tree and detour) round 2, 2026-09-25, following Ben's density-form ruling that a border link ends only on a town or a spurring village*
+
+The ruling removed every border link that ended on a bare village street (seed 46: 106 -> 0; seed 28: 26 -> 0). But a nation pair where one side has NO centre on its network now lays no link at all: 49 of 174 pairs on seed 46, 13 of 48 on seed 28, 30 of 94 on seed 0. Such a nation is off the continental network entirely; earlier road work (every centre gets a street, the border link) existed to keep every nation connected. Border links fell 151 -> 118 (seed 46), 46 -> 33 (seed 28), 91 -> 62 (seed 0). UPDATED 2026-09-25 after round 3 (on the network now means a road that reaches a town; 25-40% of villages the pass had called on-network never did): pairs with no network endpoint seed 0 30 -> 37 of 94, seed 28 13 of 48, seed 46 49 -> 83 of 174; border links laid seed 0 62 -> 55, seed 46 118 -> 83. A nation with no town now has no road network at all, so no border link.
+
+**Why it matters.** A nation with no link cannot be reached by road across the border: its trade and any march into or out of it price as off-road. BL-1130 (centres consolidate) merges villages into towns this sprint, which should give many of these nations a town and so a network endpoint.
+
+- A: accept - a nation with nothing on its network lays no border road
+- B: fall back - such a nation links from its largest centre even if it is a bare street, so every nation stays connected
+- C: read after BL-1130 lands, then choose between A and B on the consolidated worlds
+
+> **Recommendation:** C, leaning B: the ruling was about links that join nothing, and a nation left wholly off the network is the opposite case.
+
+> **RESOLVED.** RULED (Ben, 2026-09-25, the open-calls form): C, read after BL-1130 (centres consolidate) and its follow-ons land, leaning B (a nation with nothing on its network links from its largest centre). The reading and the fallback are BL-1119 (roads tree and detour) follow-up work.
+
+*Files: `src/world/road_generation.cpp`, `docs/economy/LOGISTICS.md`*
+
+### NR-945 — DECISION TAKEN: only a road that can be laid enters the roads tree and the detour test, so a nation the sea divides builds one tree per landmass
+*decision · raised 2026-09-25 · from BL-1119 (roads tree and detour) cold review, 2026-09-25, finding 1*
+
+The tree and the detour test took every town pair the path flood could reach, and that flood crosses water at the sea-leg cost. Road rasterisation then refuses any open-ocean route. So a tree link across a bay was never laid (stranding a town from its nation's road), and an admitted sea loop sat in the test network refusing real land loops near it. Taken on your behalf: a route that crosses open sea (other than a strait) is not a road candidate at all -- it never enters the Kruskal tree or the detour test, so a nation the sea divides builds one tree per landmass. Also written down: the detour test reads the town graph (cheapest chain of accepted links, each at its own direct cost), not the raster. LOGISTICS.md § 4 states both.
+
+**Why it matters.** It changes which links form a divided nation's tree, so it moves the road digests (inside the sprint's one re-bless). The alternative keeps sea pairs in the tree and accepts stranded towns.
+
+- A: keep the reading (layable links only; one tree per landmass)
+- B: keep sea pairs as candidates but skip them in the detour test only
+- C: something else
+
+> **Recommendation:** A: a road that cannot be built should not decide which roads are built.
+
+> **RESOLVED.** RULED (Ben, 2026-09-25, the open-calls form): A, keep -- only a layable link enters the tree; a sea-divided nation builds one tree per landmass. LOGISTICS.md § 4 states it.
+
+*Files: `src/world/road_generation.cpp`, `docs/economy/LOGISTICS.md`*
+
+### NR-946 — DECISION TAKEN: "province anchors reuse a centre" is read as a centre-less province joining its nearest neighbouring province of the same nation
+*decision · raised 2026-09-25 · from Ben's open-calls form, 2026-09-25 (BL-1133, anchors reuse a centre)*
+
+A centre already stands in exactly one province, so a province without one cannot "take" another's. Taken on your behalf: a centre-less land province JOINS the adjacent province of its own nation whose centre is nearest, and the merged province's centre anchors it; a scale-1 founding happens only where no such neighbour exists. POPULATION.md § Generation states it; PROVINCES.md § The partition owns the merge.
+
+**Why it matters.** It lowers the province count as well as the centre count, so conquest units get larger in thinly settled country.
+
+- A: keep the reading (join the nearest neighbouring province)
+- B: keep provinces, and anchor the empty one on the nearest centre across its border (a province anchored outside itself)
+- C: other
+
+> **Recommendation:** A: a province is the ground a centre can hold; one with nothing to hold it is hinterland of its neighbour.
+
+> **RESOLVED.** RULED (Ben, 2026-09-25, the centres-and-routes form): A, keep -- a centre-less province joins its nearest neighbouring province of the same nation. BL-1133 builds it. SUPERSEDED (Ben, 2026-09-26, the province form): a province is its centre's ground -- the fill covers the land, so no centre-less province is left to join; the join branch (232cf4db) is not merged.
+
+*Files: `src/world/population_generation.cpp`, `docs/economy/POPULATION.md`, `docs/generation/PROVINCES.md`*
+
+### NR-947 — DECISION TAKEN + CALL: the threshold below which a shrinking centre is abandoned is a village's worth; and does play follow the history?
+*decision · raised 2026-09-25 · from Ben, 2026-09-25: "Let's supersede that POPULATION.md rule, we can destroy shrinking centres below a threshold"*
+
+Taken on your behalf: the threshold is the smallest rung, a village's worth -- the size hierarchy (BL-1130) already sizes a region's centres from its heads with the smallest a village's worth, so a centre whose share falls below it is abandoned, no new number. Written for the HISTORY (POPULATION.md § Generation). OPEN: play keeps "passive failure never destroys a centre" (§ Growth, decline and razing), because a centre is its province's capture anchor and razing is a tier, not an erasure; superseding it in play too would need an anchor hand-off.
+
+**Why it matters.** The history rule is what thins the generated map (with BL-1137, industrial urbanisation). The play rule decides whether a campaign's villages can empty and vanish too.
+
+- A: keep both readings (village threshold; history only, play unchanged)
+- B: village threshold, and play follows (with an anchor hand-off to the nearest centre)
+- C: a different threshold (say which)
+
+> **Recommendation:** A for this sprint; B is its own item if wanted.
+
+> **RESOLVED.** RULED (Ben, 2026-09-25, the centres-and-routes form): the threshold stays a village's worth, AND play follows too (he picked both "history only" and "play follows too"; read together: the village threshold, applied in play as well). The play half is BL-1139 (centres abandoned in play), with the anchor hand-off read as the razed tier (NR-948).
+
+*Files: `docs/economy/POPULATION.md`, `src/world/history_sim.cpp`*
+
+### NR-948 — DECISION TAKEN: in play an abandoned centre drops to the razed tier (a ruin that keeps its province anchor) rather than vanishing
+*decision · raised 2026-09-25 · from Ben's centres-and-routes form, 2026-09-25*
+
+Play follows the history's abandonment rule (NR-947). But a centre is its province's capture anchor, and razing is already a tier, not an erasure. Taken on your behalf: a centre whose population falls below a village's worth in play drops to the razed tier (population zero, no labour or demand, entity/name/tile/urban ground persist, cheap to re-settle), so no province loses its anchor. POPULATION.md § Growth, decline and razing states it.
+
+**Why it matters.** The alternative -- deleting the centre and handing the province to a neighbour at runtime -- changes ownership and conquest mid-campaign.
+
+- A: keep (abandoned = razed tier)
+- B: delete the centre and merge its province into its nearest neighbour at runtime
+- C: other
+
+> **Recommendation:** A.
+
+> **RESOLVED.** OVERTURNED (Ben, 2026-09-26, the review form): B -- in play an abandoned centre is DELETED and its province merges into the adjacent province of its own nation whose centre is nearest (the NR-946 join, at runtime). A province with no such neighbour falls back to the razed tier so it keeps an anchor (NR-952, a delegated fallback). POPULATION.md § Growth, decline and razing states it; BL-1139 builds it.
+
+*Files: `docs/economy/POPULATION.md`*
+
+### NR-949 — DECISION TAKEN: ocean currents follow each latitude band's prevailing wind and turn along the coasts, so a basin circulates
+*decision · raised 2026-09-25 · from Ben's centres-and-routes form, 2026-09-25*
+
+Ben ruled currents are built this sprint and shape the lanes (BL-1120). The generation was open. Taken on your behalf: each ocean region's current follows its latitude band's prevailing wind (easterly in the tropics, westerly in the mid-latitudes, its sense set by the body's rotation) and is turned along the coasts the continents present; a leg with its current costs less, against it more, by one measured weight. Real ocean circulation is the mechanism reference, never a name source. EXPLORATION.md § Currents states it.
+
+**Why it matters.** It decides where every lane bends and how far trade across water reaches.
+
+- A: keep the wind-band-and-coast reading
+- B: a simpler field (one prevailing current per hemisphere)
+- C: other
+
+> **Recommendation:** A: it gives basins that circulate, which is what makes a return route differ from the outbound.
+
+> **RESOLVED.** RULED (Ben, 2026-09-26, the review form): A, keep the wind-band-and-coast field (built, BL-1120 stage 1, weight 500).
+
+*Files: `docs/generation/EXPLORATION.md`, `src/world/history_sim.cpp`*
+
+### NR-950 — DECISION TAKEN: the market trunk links each market centre to its nearest neighbouring market centres, at Road tier
+*decision · raised 2026-09-25 · from Ben's centres-and-routes form, 2026-09-25*
+
+Ben ruled roads pull toward market centres and bridge across markets (BL-1138). The trunk's shape was open. Taken on your behalf: each market centre is joined to its nearest neighbouring market centres by traversal cost (a Delaunay-like neighbour set, never all pairs), over a border where the neighbour lies across one, laid at Road tier; the detour test still refuses a trunk link a serviceable route already gives. LOGISTICS.md § 4 states it.
+
+**Why it matters.** It decides how connected the world's markets are by road and so how far a large trade reaches.
+
+- A: keep (nearest neighbours, Road tier)
+- B: a spanning tree over market centres only (fewer links)
+- C: Highway tier for the trunk
+
+> **Recommendation:** A.
+
+> **RESOLVED.** RULED (Ben, 2026-09-26, the review form): A, keep -- the market trunk links each market centre to its nearest neighbouring market centres at Road tier. BL-1138 builds it after the market folds.
+
+*Files: `docs/economy/LOGISTICS.md`, `src/world/road_generation.cpp`*
+
+### NR-951 — DECISION TAKEN: a centre's urban footprint stops at its region's cell edge, and "no land" means no ground a centre can stand on
+*decision · raised 2026-09-26 · from BL-1130 (centres consolidate) cold review, 2026-09-26*
+
+Two readings taken on your behalf to make your rulings hold as written. (1) The sim sizes a region's centres by its own hierarchy, but the carve gives them body-wide rank-size scales and paves their footprints from those, so a large region could pave its neighbours' cells. Reading: a footprint is cut short at its own region's cell edge, exactly as it already is at a coast; scales unchanged. (2) A region whose cell has land but no tile a centre can stand on kept centres in the sim and earned industry points the carve could never spend. Reading: your water ruling ("a cell that holds no land carries no centre") counts ground a centre can stand on, so such a region carries none and earns nothing. POPULATION.md states both.
+
+**Why it matters.** (1) keeps "footprints fit inside the region's own cell" true by construction; (2) stops industry points vanishing into regions with nowhere to stand a centre.
+
+- A: keep both readings
+- B: for (1), size the carve's centres by each region's own hierarchy instead (overturns the body-wide rank-size)
+- C: other
+
+> **Recommendation:** A: both are the smallest change that makes the ruled rules true.
+
+> **RESOLVED.** RULED (Ben, 2026-09-26, the review form): A, keep both -- a footprint stops at its region's cell edge, and "no land" means no ground a centre can stand on.
+
+*Files: `docs/economy/POPULATION.md`, `src/world/population_generation.cpp`, `src/world/settlement.cpp`*
+
+### NR-952 — DECISION TAKEN: a province whose abandoned centre has no same-nation neighbour to merge into keeps it as a ruin (the razed tier)
+*decision · raised 2026-09-26 · from Ben's review form, 2026-09-26 (NR-948 overturned to delete-and-merge)*
+
+Ben ruled that in play an abandoned centre is deleted and its province merges into its nearest neighbouring province of the same nation. A province with no such neighbour (an island province, or the last province of a nation) would then have no capture anchor, which breaks the conquest unit. Taken on your behalf: only in that case the centre stays as a ruin at the razed tier.
+
+**Why it matters.** It keeps every province takeable; the alternatives are merging across a national border (an ownership change no one decided) or deleting a nation's last province.
+
+- A: keep the ruin fallback
+- B: merge into the nearest province of any nation (ownership passes)
+- C: other
+
+> **Recommendation:** A.
+
+> **RESOLVED.** RULED (Ben, 2026-09-27, the open calls form): OTHER: "No ruins, record province ids using another method." No ruin fallback: a province with no same-nation neighbour loses its centre and stands without one, held by its recorded holder (province_holder, which battles already move) and taken by a battle decided on it. READING TAKEN (say if meant otherwise): 'another method' = a province's id is recorded for its life once generation ends, instead of derived from its lowest member tile, so the runtime merge and a lost centre renumber nothing a battle, march order or save holds (province.hpp ~388-392 assumes borders move in generation only). The razed tier (BL-624) stays for deliberate razing. Written into POPULATION.md and PROVINCES.md; BL-1139 (abandonment in play) carries the work.
+
+*Files: `docs/economy/POPULATION.md`*
+
+### NR-953 — DECISION TAKEN: with the budget gone, a centre's scale weights its reach, so a metropolis still draws the larger province
+*decision · raised 2026-09-26 · from Ben's province form, 2026-09-26 (A: a province is its centre's ground)*
+
+The partition grew each centre by a budget of 7 tiles (village) to 12 (metropolis); ruling A removes the stop, so the budget can no longer carry "a metropolis draws a larger province than a village does" (PROVINCES.md ruling 1). Taken on your behalf: the centre's scale divides its step cost in the multi-source fill (a weighted fill), so bigger centres claim more ground before competition meets them.
+
+**Why it matters.** Without a weight, every province would be a plain nearest-centre cell and a metropolis would hold no more ground than a village beside it.
+
+- A: keep the scale weight on reach
+- B: an unweighted fill (plain nearest-centre cells)
+- C: other
+
+> **Recommendation:** A.
+
+> **RESOLVED.** RULED (Ben, 2026-09-27, the open calls form): A, keep: a centre's scale divides its step cost, so a metropolis draws the larger province.
+
+*Files: `docs/generation/PROVINCES.md`, `src/world/province.cpp`*
+
+### NR-954 — CALL: three consequences of "a province is its centre's ground" (hemmed villages absorbed; anchors kept by the settled-ground lock; giant provinces)
+*question · raised 2026-09-26 · from BL-1133 as merged (5cab560b), 2026-09-26*
+
+Merged: provinces 45,199 -> 30,894 pooled, anchor foundings 20,505 -> 6,856, every province invariant green. Three consequences. (1) 21,457 seed centres (47%) end on their own tile, hemmed by a larger neighbour's reach, and singleton absorption (the 2026-08-21 ruling) folds each into its cheapest neighbour, so provinces = centres holds with that counted exception. (2) 3,753 of the 6,856 remaining anchor villages exist only because the settlement lock (BL-849) stops the fill crossing from settled into never-settled ground. (3) Provinces now reach 1,315 tiles (a lone village over lightly settled land); p90 stays 7-13. COLD REVIEW CAUTION (2026-09-26): centre_census C8 buckets anchor-only provinces (the uncentred leftovers) as villages, so (3)'s 1,315-tile 'lone village' may be leftover ground, not a village's draw; read C7b's anchor-only maximum before ruling on option C (the fix is BL-1145). PROVINCES.md now says a world has at most as many provinces as centres, with the hemmed ones counted.
+
+**Why it matters.** (2) is the remaining gap to a world without villages founded on empty ground; (3) decides whether a province can be a continent-sized conquest unit.
+
+- A: keep all three as built
+- B: let the fill cross the settled line (relaxes BL-849; removes most of (2))
+- C: bound a province's size again on sparsely settled land (a cap that splits a giant into anchored pieces)
+- D: other
+
+> **Recommendation:** A for (1); read (2) and (3) again after BL-1137 (industrial urbanisation) and BL-1132 (settle spacing) land, since both change what is settled and how many centres stand.
+
+> **RESOLVED.** RULED (Ben, 2026-09-27, the density calls form): B -- a centre's fill crosses the settled line (the settlement lock, BL-849, retires on land), so never-settled ground joins the province of the centre that reaches it; measured before it is built. Written into PROVINCES.md; BL-1150 (province fill crosses the settled line) builds it. Parts (1) hemmed villages and (3) giant provinces were not asked: (1) stands as built, and (3) is read in BL-1150's report, since crossing the line grows provinces.
+
+*Files: `src/world/province.cpp`, `docs/generation/PROVINCES.md`*
+
+### NR-955 — DECISION TAKEN + CALL: how a sea lane is laid (ports, direction), and whether a lane should compete with land
+*decision · raised 2026-09-26 · from BL-1098 (the sea-lane tier stamped), merged 7238f8ef, 2026-09-26*
+
+Taken on your behalf by the lane: a seat's port is its nearest sea tile within nine tiles (the sim's neighbour radius); the walk runs toward the busier end (the lane record carries no direction), as the old-road stamp does; a laned sea tile costs x0.50. Two consequences: (1) 41 of 137 earned lanes (30%) are not laid because a seat has no sea within nine tiles; (2) a laned sea tile (2.5 -> 1.25) is still dearer than plains (1.0) or a road (0.5-0.67), so a lane carries traffic only between landmasses, never along a coast a road already serves. The market junction degree was not extended with lanes (it would add markets at lane ports). LOGISTICS.md § 4b states the rules. COLD REVIEW (2026-09-26): the walk was eight-way while every traversal reader is four-way, so a diagonal lane had no two laned tiles side by side and realised about x0.75 (a leg (10,10) -> (20,20): 37.5 against 50 unlaned), not x0.50. The walk is being made four-way in the sea lane, and LOGISTICS.md § 4b says so; after it, part (2)'s 1.25 a tile holds on every bearing. ALSO FOUND: a seat's port is picked north-then-west, never toward its partner, so a seat on an isthmus can send its lane through the wrong ocean (option E); B alone does not fix it.
+
+**Why it matters.** Your vision is lanes as the routes of inter-continental trade; (1) drops a third of them and (2) decides whether the sea ever beats the road.
+
+- A: keep all as built
+- B: a realm's port is its nearest coastal region's seat (lays the lost 30%)
+- C: B, and a deeper lane discount so a lane can beat a coastal road (sea was the faster medium: ~130 km/day against ~25)
+- E: a seat's port is its sea tile nearest its partner's (combines with B or C)
+- D: other
+
+> **Recommendation:** B and E now; C read against the haulage baseline before it is set.
+
+> **RESOLVED.** RULED (Ben, 2026-09-27, the open calls form): B: a realm's port is its nearest coastal region's seat, so a seat with no sea within nine tiles lays its lane from the nearest coastal seat of its realm. E (the port faces the partner) was not taken, so an isthmus seat may still face the far ocean; C (a deeper discount) not taken. Written into LOGISTICS.md § 4b; BL-1153 (lane port at a coastal seat) builds it.
+
+*Files: `src/world/road_generation.cpp`, `src/world/logistics.cpp`, `docs/economy/LOGISTICS.md`*
+
+### NR-956 — DECISION TAKEN: a scheduled founding keeps its ground, and every region counts for the spacing
+*decision · raised 2026-09-26 · from BL-1132 (settle spacing) cold review, 2026-09-26; merged 89d3bb4b*
+
+The review found the three-tile rule bound only Settle. A founding the migration stream schedules (pending, dated -400 to 0 CE) could arrive 0-1 tiles from a Settle daughter founded in the same years. Taken on your behalf: a pending founding keeps its ground, so Settle refuses any tile within three tiles of it (option a). The other option was to test the spacing when a scheduled founding arrives and drop or defer it (option b), which changes the migration playback. Also taken: the spacing counts every region, held or not, because each still anchors a cell (the doc said "standing"). CIVILISATION.md states both. The fix is in the spacing lane, with a census count of too-close pairs that must read 0.
+
+**Why it matters.** Option a reserves ground for the migration stream over the realms; option b lets realms take it first and thins the stream.
+
+- A: keep as taken (pending ground reserved; every region counts)
+- B: test at arrival and drop or defer a blocked scheduled founding
+- C: other
+
+> **Recommendation:** A: it honours the rule without changing the migration playback.
+
+> **RESOLVED.** RULED (Ben, 2026-09-27, the open calls form): A, keep: a pending founding keeps its ground, and every region counts for the spacing.
+
+*Files: `src/world/history_sim.cpp`, `docs/generation/CIVILISATION.md`, `tools/verify/centre_census.cpp`*
+
+### NR-957 — CALL: what the carve counts as a competitor on a budget world (planned firms, specialists, or both), and at what scale
+*question · raised 2026-09-26 · from BL-1086 (the carve counts the budget's planned firms), merged 15da1bd2, 2026-09-26*
+
+You ruled the carve reads the budget's planned firms (MARKETS.md). As built, it counts each centre's specialist as well as its whole firms, since both are corporations the budget buys, so the doc and code disagree. The scale changed too: the carve used to count at most 8 laid corporations a world; it now counts 147-313 planned charters (specialists alone would be 22-88), under the same gain (0.15). On the spaced world (after BL-1132) this moves markets 5,784 -> 5,800 (+0.3%, every seed within 3%); before the spacing, the same change swung seeds +62% (seed 28) to -35% (seed 40). The winner keeps its candidate on 13 of 16 seeds. COLD REVIEW (2026-09-26): the plan also counts firms above the walk's ceiling (120 a body, spent richest first), so on a world planning more than 120 on a body the carve counts firms never chartered, and inflates exactly the poorer nations the walk starves. The lane is making the plan honour the ceiling and will report planned against chartered per nation; read that before ruling. THE PLAN NOW HONOURS THE CEILING (fix round, merged b92165e4): all 16 seeds plan exactly 120 firms a body; chartered 806 specialists + 1,721 firms against planned 861 + 1,920 (shortfall is placements that find no ground; seed 28 places 59 of 84 planned specialists). Markets 5,800 -> 5,803. So option A (firms only) counts 120 a world, B (both) 142-208.
+
+**Why it matters.** The market folds (BL-1125) are calibrated next on this carve; its input should be settled first. The small move now may be luck of the spaced world, given the swings before it.
+
+- A: planned firms only, as the doc says; the gain unchanged
+- B: firms and specialists, as built; the doc widened to say so
+- C: specialists only (22-88 a world, nearest the old scale)
+- D: re-tune the gain for the new scale (measured, never to a count)
+
+> **Recommendation:** A: the doc as ruled, gain unchanged until the folds are calibrated; D only if the folds' reading shows the count dominating.
+
+> **RESOLVED.** RULED (Ben, 2026-09-27, the density calls form): B -- the carve counts the budget's planned firms AND specialists (142-208 a world), as built; MARKETS.md widened to say so. No code change; BL-1086 stands.
+
+*Files: `src/world/corporation_generation.cpp`, `src/world/hard_coded_world.cpp`, `docs/economy/MARKETS.md`*
+
+### NR-958 — DECISION TAKEN: a migrant carries its food with it, and a sack never lowers a region's ceiling (BL-1137 reverted and rebuilt)
+*decision · raised 2026-09-26 · from BL-1137 (industrial urbanisation) cold review, 2026-09-26; merged b591d1e9, reverted 8cbdbc9d*
+
+The first build of the urbanisation stream raised each destination's carrying capacity by every migrant it took while the source kept its own, so every move created capacity and the emptied countryside regrew by births: population 6.08B -> 10.92B pooled, urban share ~15% -> 70-72%, and centres fell only 3% (carved 7%). A sack then cut a city's industrial heads, the ceiling fell with them, and the next year deleted about 40% of the city with no record. Both break the docs: the displacement row (the count is conserved), Beat 2 (the countryside empties, far fewer centres) and BL-835 (war does not consume people). I reverted it on main and took two readings for the rebuild: (1) a migrant carries its food with it -- whatever ceiling a destination gains, its source loses, so a move conserves the world's carrying capacity and an emptied village cannot regrow; (2) a sack never lowers a ceiling -- a sacked city's people scatter into its countryside. Also: a razing is counted in heads lost, uncapped (a sacked 10M city recorded none).
+
+**Why it matters.** The alternative reading is that industry raises what the land can feed (a real historical effect), which would be a new mechanism with no doc and a population near double; the conserving reading is what makes the stream thin the map to your ~500 aim.
+
+- A: keep as taken (the move conserves capacity; a sack moves no one out)
+- B: industry raises carrying capacity, designed and bounded in INDUSTRIALISATION.md as its own mechanism
+- C: other
+
+> **Recommendation:** A: it is the doc as written; B only as its own designed beat.
+
+> **RESOLVED.** RULED (Ben, 2026-09-27, the density calls form): A, keep -- a migrant carries its food with it and a sack never lowers a ceiling. Written into INDUSTRIALISATION.md Beat 2 with the land-line reading of held corridors.
+
+*Files: `src/world/settlement.cpp`, `src/world/history_sim.cpp`, `docs/generation/INDUSTRIALISATION.md`, `docs/economy/POPULATION.md`*
+
+### NR-959 — CALL: far pairs across water bind almost wholesale (the sea far-penalty set to 0), and a leg against the current loses cargo at weight 500
+*question · raised 2026-09-26 · from BL-1142 (far pairs bind across water; cargo against the current), branch 1a00072e, 2026-09-26; not merged until its cold review returns*
+
+Found first: the far-pair force NR-888 ruled on was never built, so far realms across water never met (contact came only from campaigns within nine tiles) and none ever cleared the 700 far penalty. Built: realms on different landmasses meet when a trade across water is open between them (a good one holds and the other wants, a navy and two ports to carry it), and a far pair across water reads its own penalty. The penalty ladder: 0 far pairs bound at 700 and 500, 9 at 450, 166 at 400, then 489 / 484 / 479 at 350 / 300 / 0. The lane SET 0, the plateau: between 450 and 350 the dial would choose the count; below 350 the pair's own aggression, grudges and trade decide. Result at 1960, 16 seeds: cross-water pairs bound 53 -> 538 (485 far), trade-written lanes 27 -> 297, Industrialisation battles -4%; six seeds with no water between realms unchanged. Cargo loss: linear, no knee (0.9 / 1.5 / 2.9% of volume across water at 250 / 500 / 1000); SET 500, the current's own weight, so a leg against a full current loses half its cargo -- a choice, not a measurement. COLD REVIEW (2026-09-26): every ladder number above predates the four-way landmass change that decides which pairs count as across water, so the ladder is being re-run before you rule. It also found a pair bound across water breaks, and brands the lower side a treaty-breaker, when a fallen capital moves its seat onto the other landmass; the fix records a pair's across-water class at first contact, as near-home already is. And with the penalty at 0, 'far pairs bind across water' reads as 'far pairs bind only across water': a far land pair still faces 700. RE-RUN LADDER on the final tree (merged e5be22bf, 16 seeds, Industrialisation span, loss 500): far pairs bound at 1960 -- 0 / 0 / 10 / 191 / 530 / 526 / 518 at penalty 700 / 500 / 450 / 400 / 350 / 300 / 0; subjections 96 / 96 / 95 / 62 / 56 / 43 / 56; battles 9,266 -> 8,520. The plateau is still 350 to 0. Loss ladder: cargo lost 0 / 0.53% / 0.86% / 1.55% of trade across water at 0 / 250 / 500 / 1000; bound pairs and battles flat across it. The Exploration span loses no cargo at any rung: every cross-landmass trade there that runs against a current has a road at least as wide. The seat-move break is fixed (the class is recorded at first contact).
+
+**Why it matters.** A far pair across water now binds more easily than a far pair on land (still 700). The sea was the faster medium, which supports it, but 0 removes distance from the sea treaty entirely.
+
+- A: keep both as set (sea penalty 0 at the plateau; loss 500)
+- B: a sea penalty inside the plateau but above 0 (e.g. 300), so distance still reads across water
+- C: tie the sea penalty to the land one by the speed ratio of the media
+- D: other
+
+> **Recommendation:** B at 300: inside the plateau (526 bound, against 518 at 0), so the dial does not choose the count, and distance still reads across water; the loss at 500 as set.
+
+> **RESOLVED.** RULED (Ben, 2026-09-27, the open calls form): B: the sea far-penalty is 300 (inside the plateau), the land far pair keeps 700, and the cargo loss stays 500. Written into INDUSTRIALISATION.md. The sea lane sets it first on its BL-1152 branch, so the fleet work measures on the ruled world.
+
+*Files: `src/world/history_sim.cpp`, `src/world/history_sim.hpp`, `docs/generation/INDUSTRIALISATION.md`, `docs/generation/EXPLORATION.md`*
+
+### NR-960 — CALL: the two-firms-per-province cap on provinces that are now a centre's whole ground
+*question · raised 2026-09-26 · from BL-1146 (the firm cap on grown provinces), re-read after BL-1141 (one centre a region), 2026-09-26*
+
+You set two firms a province (NR-910) when provinces were at most ~20 tiles. A province is now its centre's ground (BL-1133) and a region stands one centre (BL-1141), so a city's province holds the whole city. Re-read on main: the cap refuses 5.2% of the pooled charter budget (1.0% before BL-1141, 4.7% before BL-1133), binds on 16 of 16 worlds, and takes 29.5% of seed 28's budget. The total barely moves: budget firms reach the 120-per-body ceiling on 15 of 16 worlds (1,909 of 1,920). So the cap decides WHERE firms stand -- away from the big cities, into smaller centres -- not how many. ALSO FOUND (the centres lane, stockpile_budget_check --seat-curve 650:2, 2026-09-26): main already opens a median of 81.5 seats (61-111 a seed; centres affording a specialist), not the nine the NR-910 divisor of 650 was pinned to give; the price rises with the stock, so the BL-1137 rebuild barely moves it (88). The cap and the divisor were both set on a world that no longer exists.
+
+**Why it matters.** Industry that gathers where people gather (Beat 2) is pushed out of the cities by a cap sized for a different province.
+
+- A: keep two a province
+- B: the cap scales with the province's centre (e.g. two per rung: a village 2, a city 6)
+- C: retire the province cap; the 120-per-body ceiling bounds the total
+- D: other
+
+> **Recommendation:** B: it keeps the spread NR-910 wanted on small ground and lets a city's province hold a city's industry; read it on the census before it is set.
+
+> **RESOLVED.** RULED (Ben, 2026-09-27, the density calls form): B -- the cap scales with the province's centre, two firms per rung: village 2, town 4, city 6 (the form's reading), metropolis 8, megacity 10 (extended by the same rule; say if the top two should differ). Written into INDUSTRIALISATION.md § 1; BL-1146 builds it. The seat-menu finding (81.5 seats against the nine the price was anchored to) is filed as BL-1151 (seat menu re-anchored).
+
+*Files: `src/world/corporation_generation.cpp`, `src/world/stockpile_budget.cpp`, `docs/generation/CORPORATION_GENERATION.md`*
+
+### NR-961 — CALL: should a fleet gate sea crossings (the doc says it does; the code never reads it), and at what rung does the naval carry-over open?
+*question · raised 2026-09-26 · from BL-1147 (naval points carry over), merged 5f734c76 with the conversion at 0; its cold review, 2026-09-26*
+
+Built as you ruled: an Empires polity earns naval points (coastal province-years, crossings, coastal sea techs; weighted about a third each) and opens the Exploration age with points x rate / 1000 hulls. Left at rate 0 (today's world, byte-identical). The ladder moves little: at 50 / 250 / 1000 the largest opening fleet is 10k / 52k / 207k hulls, Exploration purchases 30 / 21 / 38 (21 today), subjections 42 / 31 / 65 (32), purchase-written lanes 0-1 at every rung. WHY: a sea crossing never reads the fleet. The crossing gate (history_sim.cpp ~6736-6739) is the hub's army and can_field_naval (the military band at a port window); navy_stock is read only by upkeep, the sea trade line, meeting by sea, a sea-legs ration bonus (at most +400 per mille) and the Alarm a visible fleet raises. The first Exploration crossing is at 1200 on 13 of 16 seeds with no fleet. And the navy bill is under 0.1% of the treasuries at every rung, so upkeep does not bite. EXPLORATION.md's stocks table says a navy buys "crossing capacity, and contest of a crossing": the code disagrees. Also: 15,395 polities dead by 1200 held 16.7M points (more than the living's 14.1M) and carry nothing, as ruled. AFTER THE REVIEW FIXES (merged 572a0afb; a corridor walked across sea is no longer a road, and the coastal deed reads the terrain, not the inherited port window): weights re-derived to 1 / 280 / 9,600 (still a third each); 7,841 dead polities held 7.0M points; the ladder at 10 / 50 / 250 / 1000 gives a largest opening fleet of 1k / 5k / 25k / 101k hulls, Exploration purchases 35 / 23 / 26 / 17 (20 at 0), subjections 61 / 50 / 38 / 31 (46), purchase-written lanes 0 at every rung, the navy bill under 0.05% of the treasuries. The shape is unchanged: no rung decides who crosses. BEN'S STEER (2026-09-27, mid-session): "Fleets should project power so allies with large fleets stop enemy fleets before they move." Written into EXPLORATION.md under the stocks table as SET; the mechanics (who defends, how power falls with distance, what a stopped crossing costs, whether a fleet also bounds its army, which spans) are put to Ben in a form.
+
+**Why it matters.** Your aim for the carry-over (coastal empires open the age already at sea) can only happen if a fleet decides who crosses; as built it only prices trade and raises Alarm.
+
+- A: make the doc true -- a wet campaign's size is bounded by the navy staged from its hub's port, so fleets gate crossings; then read the carry-over ladder again and pick a rung
+- B: correct the doc -- a navy prices trade and raises Alarm, crossings stay band-gated; pick a rung now from the ladder above
+- C: leave the carry-over at 0 until the fleet has a job
+- D: other
+
+> **Recommendation:** A: it is what the stocks table says and what your ruling needs; the upkeep that does not bite today becomes a real cost once a fleet is used. A world-mover and its own build.
+
+> **RESOLVED.** RULED (Ben, 2026-09-27, the fleet projection form, after his steer "fleets should project power so allies with large fleets stop enemy fleets before they move"): A, make the doc true, in the Exploration and Industrialisation spans. A fleet bounds the army a sea campaign carries (staged from its hub's port); the defenders are the target and its mutual-defence partners; a fleet's power falls with sea distance from its own ports, priced by the currents; a crossing out-projected anywhere on its leg never sails, and the attacker keeps its army and fleet. Build this sprint, measured first: BL-1152 (fleets project power). The carry-over rung is NOT yet chosen: it is read again once fleets have this job, and put to Ben then.
+
+*Files: `src/world/history_sim.cpp`, `src/world/combat.cpp`, `docs/generation/EXPLORATION.md`*
+
+### NR-962 — CALL: rivers divide provinces much less once the fill crosses the settled line, and the river cost never made a river divide its banks
+*question · raised 2026-09-27 · from BL-1150 (province fill crosses the settled line), lane adc45b16, cold review 2026-09-27*
+
+Ruling 2 (PROVINCES.md): 'Boundaries are rivers and elevation difference.' After BL-1150, on the home body a river edge is a province border 14.92% of the time against 12.13% for plain ground (1.23x), down from 44.52% vs 27.73% (1.61x); on 3 of 16 shipped seeds rivers divide no more than plain ground. Mechanism (review, from the code): the settled line used to be a 100% border, and river courses cross that line more than plain ground does (colonisation prices river tiles as corridors, and streams cross unfarmable ground), so removing the lock removed borders that happened to sit on rivers. DEEPER, PRE-EXISTING: the river cost (+40, k_province_river_edge_cost) is charged on the step ALONG a course, from a course tile to its downstream neighbour (river_generation.cpp ~223-230, province.cpp ~212-213). So the fill pays to travel along a river, and crossing from one bank to the other through a course tile over two plain edges costs nothing. A river never divided its banks; borders 'on river edges' cut the river across. The river row (C2a) likely passes even with the river cost at 0 -- the lane is running that mutation now. ON THE SHIPPED WORLDS (fix round 67118846, 16 seeds pooled, home body): rivers were already weak before BL-1150 -- a river edge is a border 1.19x as often as plain ground on main (41.61% vs 34.87%) and 1.18x after (29.63% vs 25.15%); the 1.61 -> 1.23 drop is the harness world only. Per seed, rivers divide no more than plain on 1 seed on main (38) and 3 after (12, 37, 38). The river cost does matter on shipped worlds: at cost 0, 7 of 16 go red (the harness world still passes, so its row never tested the cost). The geometry is confirmed from the code: the +40 is paid travelling along a course; crossing bank to bank costs nothing extra.
+
+**Why it matters.** Rivers as borders is a named property of the map, and as built it holds only by accident of where centres and the settled line fall.
+
+- A: accept the weaker river borders as the cost of a centre holding its whole ground
+- B: make a river divide its banks -- the fill pays to CROSS a course (stepping onto or off it across the flow), not to travel along it; measured first
+- C: raise the river cost on today's geometry
+- D: other
+
+> **Recommendation:** B: rivers divide banks as ruling 2 says -- on shipped worlds they barely divide at all today (1.19x plain), with or without BL-1150. BL-1150 can merge first; the red C13 river row is this call.
+
+> **RESOLVED.** RULED (Ben, 2026-10-01, the open calls form): B: a river divides its banks -- the fill pays to cross a course, not to travel along it; measured first, with a row that fails at river cost 0. PROVINCES.md; BL-1156 (rivers divide banks).
+
+*Files: `src/world/province.cpp`, `src/world/province.hpp`, `tools/verify/province_partition_harness.cpp`, `docs/generation/PROVINCES.md`*
+
+### NR-963 — CALL: the rival corporations open unarmed and cannot arm inside the settle -- should they start with a force?
+*question · raised 2026-09-27 · from BL-1154 (rivals field no force), traced by the BL-1146 cold review, 2026-09-27*
+
+spawn_solvency R4 ('the field still fields a standing force') reads 0 rival units over 12 seeds (baseline 15-20 a seed in 2026-08; 0 since the settle went from 80 ticks to 12). The chain, from the code: a hire needs a completed military base the corp owns (corp_ai.cpp ~1808-1832); the charter web never builds one; the opening force (seed_starting_military, BL-331/BL-476 'rivals start armed') has been OPT-IN since 2026-08-26 (corporation_params::seed_starting_force, default false), turned off when the seated corp's standing-force upkeep was 90% of its outgoings (BL-635); a base needs tech E0-ML-01, which needs two extraction sites and a Cr 2,000 balance, and rivals open at Cr 0 (budget firms) or at most Cr 644 (specialists); the settle is 12 ticks, a corp evaluates 3 times in it, and a base takes 4 ticks to build. So no rival can arm before play. MILITARY.md still says every non-background corp starts with a unit beside its base -- the doc and the code disagree either way.
+
+**Why it matters.** Every system should feed Trade or Conflict; a field that opens unarmed has no conflict until a rival earns Cr 2,000 and a tech, and the seat's rivals read as traders only.
+
+- A: rivals start armed again (BL-476 as MILITARY.md says); the seat keeps opening unarmed as BL-635 left it; measure rival solvency with the upkeep back
+- B: rivals earn their force in play -- the E0-ML-01 gate or the base's cost is re-read against what a rival holds at the start
+- C: accept an unarmed opening field; MILITARY.md corrected, and R4 retired as a requirement of the settle
+- D: other
+
+> **Recommendation:** A: it is the doc as written and restores conflict from the first tick; the seat's opt-out stays, so BL-635's cause does not return for the player. It costs rival solvency (upkeep was the dominant outgoing when armed) -- read that before it ships.
+
+> **RESOLVED.** RULED (Ben, 2026-10-01, the open calls form): A: the rivals start armed again (MILITARY.md as written); the seat keeps opening unarmed; rival solvency measured with the upkeep back. BL-1154 builds it.
+
+*Files: `src/world/corporation_generation.cpp`, `src/world/corporation_generation.hpp`, `src/world/corp_ai.cpp`, `docs/military/MILITARY.md`, `tools/verify/spawn_solvency.cpp`*
+
+### NR-964 — CALL: should a treasury's share of industry points spread by employed heads, now that scale credit does?
+*question · raised 2026-09-27 · from BL-1149 (scale credit from the works), its lane report and cold review, 2026-09-27*
+
+NR-897 spreads a treasury's share of industry points over its realm's centre-holding regions by urban heads. BL-1149 made scale credit read only the heads a work employs (min(urban heads, employed)); the treasury half still reads urban heads (history_sim.cpp ~10344-10348), so part of every region's points still follows the crowd. On the lane's reading 94% of 1960 urban heads are employed by no work.
+
+**Why it matters.** Whether all industry points follow the works, or the treasury still builds where the people are.
+
+- A: spread by employed heads, so every point follows the works
+- B: keep urban heads (a treasury builds where its people are)
+- C: other
+
+> **Recommendation:** A: one rule for both halves of the points; read after BL-1155 (every centre a work candidate) raises the employed share.
+
+> **RESOLVED.** RULED (Ben, 2026-10-01, the open calls form): A: the treasury share spreads by the heads a region's works employ. INDUSTRIALISATION.md § 1; the centres lane builds it on the BL-1137 branch.
+
+*Files: `src/world/history_sim.cpp`, `docs/generation/INDUSTRIALISATION.md`*
+
+### NR-965 — CALL: the campaign scorer cannot see the fleet rule, so a realm with no fleet picks the same failing crossing every round
+*question · raised 2026-09-27 · from BL-1152 (fleets project power), lane checkpoint c4b5027e, 2026-09-27*
+
+With the fleet rule on, a crossing whose fleet cannot lift the army, or which the defenders out-project, never sails. But the campaign scorer does not read either test, so a realm without a fleet scores the same crossing best every round and fails it every round: at 1 man per hull, on 7 seeds, 4,161 such failures against 672 real crossings. Most crossings today launch from a hub with no built port (88-90%) and with no fleet (69-77%).
+
+**Why it matters.** A realm that wastes every round on a crossing it cannot make stops acting; the fleet rule would freeze overseas realms rather than make fleets matter.
+
+- A: the candidate list drops a crossing the rule would refuse (a legality filter, like the other gates on a verb, not a scorer term)
+- B: a refused crossing is remembered and not re-scored for a term (a cooldown)
+- C: other
+
+> **Recommendation:** A: the scorer already only scores legal verbs; the fleet test becomes part of legality. Check it against the grant register (AI_OPPONENT.md § 11) first.
+
+> **RESOLVED.** RULED (Ben, 2026-10-01, the open calls form): A: a crossing the fleet rule would refuse is not a candidate -- a legality filter, like every other verb gate, not a scorer term. EXPLORATION.md; BL-1152 builds it.
+
+*Files: `src/world/history_sim.cpp`, `docs/generation/EXPLORATION.md`*
 

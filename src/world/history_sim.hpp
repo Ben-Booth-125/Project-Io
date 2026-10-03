@@ -62,7 +62,10 @@
 #include <array>
 #include <atomic>
 #include <cstdint>
+#include <functional>
+#include <unordered_map>
 #include <limits>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -96,6 +99,14 @@ struct sim_terrain_view
     /// May be null independently of the rest, in which case a caller (e.g.
     /// `run_colonisation`) treats every tile as riverless.
     const std::vector<std::uint8_t>*      river     = nullptr;
+
+    /// Non-zero where a population centre can stand on the tile — the carve's
+    /// own placement gate (`placement_rules::can_place_population_centre`:
+    /// land, habitable). BL-1130 (review fix): the ground a region's cell holds
+    /// is counted in THESE tiles, so a region whose cell holds none carries no
+    /// centre in the sim, exactly as the carve gives it none. Null counts every
+    /// non-water tile instead (a caller with geology only).
+    const std::vector<std::uint8_t>*      standable = nullptr;
 };
 
 // ---------------------------------------------------------------------------
@@ -142,6 +153,8 @@ struct polity;
 struct grudge;
 struct contact;
 struct history_corridor;
+struct ocean_current_field; // BL-1120/BL-1140: ocean_currents.hpp
+struct sea_field;           // BL-1152: ocean_currents.hpp
 struct dated_object;    // BL-1036's resume pointers, on the same footing.
 struct universal_creed; // (`civilisation` is complete already: creeds.hpp.)
 
@@ -518,11 +531,17 @@ struct history_sim_params
     //   SCALE (`accrue_industry_points`), on EVERY region with `centres > 0`,
     //   credited to that region itself:
     //
-    //     points = urban_population * industry_points_per_million_urban_heads_year
+    //     points = min(urban_population, employed heads)
+    //                       * industry_points_per_million_urban_heads_year
     //                                                   * step_years / 1000000
     //              * fuel_factor_q / 1000
     //              * (1000 + industry industrial per-mille) / 1000
     //
+    //     employed heads = the heads the region's works employ
+    //                      (`works_registry::employed_heads_mask`, BL-1149: the
+    //                      works, not the crowd; Ben 2026-09-27). No works
+    //                      table: none, so no scale credit and no stream
+    //                      (`history_sim_state::industry_scale_inert_rounds`)
     //     fuel_factor_q = floor + (1000 - floor) * fuel_reading_q / 1000
     //     fuel_reading_q = `industry_fuel_reading_q(region)` (the span-open
     //                      survey, or energy_q where nothing was surveyed)
@@ -540,7 +559,8 @@ struct history_sim_params
     //   treasury and lands as points, `industry_points_per_treasury_unit` to
     //   the unit. RULED a consequence (Ben, 2026-09-18): no polity scores it,
     //   so it is no verb. The points SPREAD over the polity's held regions
-    //   that stand centres, by urban scale (`industry_points_apportion_by_scale`;
+    //   that stand centres, by the heads their works employ (NR-964, amending
+    //   NR-897's urban scale; `industry_points_apportion_by_scale`;
     //   BL-1056, Ben 2026-09-19, NR-897): a treasury builds its realm's works
     //   where its people are. A realm with no held centre carrying heads
     //   converts NOTHING (NR-901, Ben 2026-09-19): no debit, no credit, the
@@ -596,6 +616,41 @@ struct history_sim_params
     /// to buy ports, fleets and standing men with, so the round's own spend
     /// is not starved; a quarter is paid into the works.
     int     industry_points_treasury_share_q = 250;
+
+    /// BL-1169 -- A CROWDED HEARTLAND YIELDS LESS (INDUSTRIALISATION.md sec
+    /// Industry spreads beyond its heartland; Ben, 2026-10-03). Each region a
+    /// treasury conversion lands on converts its share at K / (K + crowding),
+    /// crowding being the points already standing on it per thousand heads its
+    /// works employ (`industry_points_crowding_q`), so a heartland's lead
+    /// stops compounding and the next-best ground catches up. The whole
+    /// treasury units withheld STAY IN THE PURSE (the debit falls by them;
+    /// `history_sim_state::treasury_kept_by_crowding`). K is the crowding at
+    /// which a region converts half its share. Points exist only from
+    /// `industry_open_year`, so the brake is inert before it.
+    ///
+    /// 0 = OFF, the identity (no factor applied; every output bit for bit the
+    /// unbraked run). Domain 0..`industry_points_crowding_k_max` (10^9);
+    /// outside it the run converts nothing and says so
+    /// (`industry_points_params_valid`) -- rejected, never clamped.
+    ///
+    /// UNSET, read on a 16-seed ladder before it is pinned. Measured
+    /// 2026-10-03 at K off: receiving regions' crowding at 1800 / 1900 / 1955
+    /// runs median 279 / 411 / 499, p90 1,120 / 1,375 / 1,621, max ~25k-62k,
+    /// while the treasury's points land at a share-weighted median of
+    /// 878 / 1,159 / 1,243 and p90 15,900 / 19,913 / 8,031 -- the crowded
+    /// regions take the bulk of the conversion.
+    ///
+    /// THE LADDER (16 curated seeds, 2026-10-03; off / 16000 / 4000 / 1000):
+    /// treasury points over the library 710M / 647M / 561M / 430M (scale
+    /// credit flat at 266M); median lead-nation share of points 0.106 /
+    /// 0.099 / 0.087 / 0.077; median top-landmass share 0.839 / 0.854 /
+    /// 0.850 / 0.838 (geography, which the brake does not move); far rival
+    /// at >= 25% of the leader 14 / 14 / 14 / 14 of 16; Industrialisation
+    /// battles 8073 / 8063 / 8068 / 8048, conquests 6751 / 6740 / 6688 /
+    /// 6657; pre-1660 spans identical at every rung; urban 25.46-25.48%;
+    /// markets 429-432; C15 16/16 at every rung. Off is bit-identical to the
+    /// unbraked run.
+    int64_t industry_points_crowding_k = 0;
 
     /// BL-1099 -- WORKS CHARTERED, A RECORD-ONLY NOTE (INDUSTRIALISATION.md sec
     /// Beat 1 "Works chartered"; Ben, 2026-09-24, R15; STARTUP.md sec Round 6).
@@ -1026,9 +1081,12 @@ struct history_sim_params
     // every field below so the two models can be A/B'd on one build.
     bool centre_chain_reach = false;
 
-    /// Per-mille of accrued cost a SINGLE centre refunds. The LP analogy's
-    /// "bigger node, more throughput": the fraction scales with how many
-    /// centres stand in the region, up to `centre_reach_rebate_cap_q`.
+    /// Per-mille of accrued cost one village's worth of settlement refunds. The
+    /// LP analogy's "bigger node, more throughput": the fraction scales with the
+    /// region's settlement size -- its urban heads read as village equivalents,
+    /// at least one while it stands a settlement (`region_settlement_size`;
+    /// POPULATION.md, a place's size is its people, BL-1130) -- up to
+    /// `centre_reach_rebate_cap_q`.
     /// A placeholder magnitude on the same footing as the w_* weights --
     /// the SHAPE is the design, `history_sweep` tunes the number.
     int centre_reach_rebate_q = 150;
@@ -1120,6 +1178,44 @@ struct history_sim_params
     /// EMPIRE-era round. A settled map with a fixed region count is this
     /// phase's premise (`CIVILISATION.md` § The arc the phase must produce).
     bool settle_requires_razed_ground = false;
+
+    /// BL-1132 — SETTLE SPACING: THE MINIMUM DISTANCE, IN TILES, BETWEEN A
+    /// REGION THE SETTLE VERB FOUNDS AND THE ANCHOR OF EVERY REGION ALREADY ON
+    /// THE MAP OR STILL TO BE FOUNDED BY THE SCHEDULE (`CIVILISATION.md` § The
+    /// unit is the city state, "A new region founds at a distance, not on the
+    /// nearest free tile"; Ben, 2026-09-25, fixed at 3 on 2026-09-26).
+    ///
+    /// TILES, CHEBYSHEV, COLUMNS WRAPPING — `region_distance`'s own metric, and
+    /// that is the reason it is tiles rather than traversal cost. What the
+    /// finding measured is a CELL: a region's ground is the tiles nearer its
+    /// anchor than any other's by exactly this metric (`nearest_region`, which
+    /// the carve, city naming and the census all partition by). A spacing of D
+    /// guarantees every region the Settle verb founds a cell reaching at least
+    /// (D - 1) / 2 tiles in each direction from its anchor, so the parameter
+    /// controls the quantity the finding is about directly. A traversal-cost
+    /// spacing would space founding parties by how hard the walk is, which is a
+    /// different claim (a hinterland over a mountain is still a hinterland on
+    /// the partition) and would leave the cell size uncontrolled wherever the
+    /// ground is cheap — which is where the cores are. The settlement pass's own
+    /// separation rule (`run_settlement`, `sep`) is the same metric.
+    ///
+    /// EVERY REGION COUNTS, HELD OR NOT (the reading CIVILISATION.md names):
+    /// another realm's ground, unorganised ground, an emptied region and a
+    /// scheduled founding not yet arrived all refuse a site alike, because each
+    /// anchors a cell of the partition whoever holds it.
+    ///
+    /// A FIELD, PER PARAMS. Generation's three spans set theirs from
+    /// `generation_settle_spacing_tiles` (era_minus_one.hpp) in
+    /// `era_minus_one_sim_params` / `exploration_sim_params` (the same idiom as
+    /// `settle_requires_razed_ground` above); a harness that hand-builds a
+    /// span's params copies it from there. The struct default 1 keeps the old
+    /// SITE rule for the synthetic fixtures — "any tile no region stands on",
+    /// the nearest ring first. It does not keep the old WORLD: the Settle
+    /// scorer's room check (a realm settles only where there is room; Ben,
+    /// 2026-09-26) is unconditional, so a spacing-1 run no longer spends a round
+    /// on a Settle that finds no site, and moves slightly for it — under 2%
+    /// pooled on every structural column of the curated seeds.
+    int settle_min_spacing_tiles = 1;
 
     // --- BL-920: the opening seeds culture ground, not polities -----------
     //
@@ -1246,6 +1342,37 @@ struct history_sim_params
     /// is what stops an ancient people out-raiding a realm that has actually
     /// reached the naval rung.
     int sea_legs_port_q = 0;
+
+    /// OCEAN CURRENTS PRICE A SEA LEG (BL-1120; EXPLORATION.md sec Currents
+    /// are a force, not a picture). The ONE weight: a leg run fully with its
+    /// current costs `1000 - w` per mille of still water and fully against it
+    /// `1000 + w` (`ocean_current_leg_cost_q`), read off a field the span
+    /// builds once from the terrain it runs on (`build_ocean_currents`:
+    /// latitude band, the body's rotation sense below, the land mask).
+    ///
+    /// WHAT IT PRICES, AND IN WHICH CURRENCY. The legs a current can decide:
+    /// a wet campaign's last hop onto its target, which is the step
+    /// `campaign_supply` adds to the hub's reach (so the scorer and execute
+    /// ask the identical question, the file's standing thesis), and a trade's
+    /// sea line (`trade_context::currents`, BL-1140). A leg is "wet" by the
+    /// record's own test (`line_crosses_sea`), and a leg with no sea along
+    /// its line reads no current and pays still-water price. The colonial
+    /// distance gates (subjection's reach, a subject's secession distance)
+    /// read the RAW distance: tribute and its binding are standing traffic a
+    /// current cannot decide (EXPLORATION.md sec Currents, "Where currents
+    /// bite").
+    ///
+    /// Zero by default -- still water, no field built, every fixture
+    /// unchanged. Domain [0, 999]: outside it the run prices nothing and says
+    /// so (`history_sim_state::sea_current_params_rejected`), never clamped.
+    /// Set for the spans the lane record belongs to (`era_minus_one.cpp`).
+    int sea_current_weight_q = 0;
+    /// The body's rotation sense the current field is built with: +1
+    /// prograde, -1 retrograde (every wind, so every current, reversed). The
+    /// data model records no spin for a body, so this is an input rather than
+    /// a reading; +1 is the ordinary case. Any other value is rejected with
+    /// the weight above.
+    int sea_current_rotation_sense = 1;
 
     /// TRADE INCOME FROM THE NETWORK (BL-895; Ben, 2026-09-11: "we also need a
     /// simple cost for war, and this cost can be sourced by rich trade").
@@ -1570,6 +1697,26 @@ struct history_sim_params
     /// scored utility with a richer input, same idiom as `w_fear_q`/`w_aggr_q`.
     int w_want_q = 0;
 
+    // --- BL-1107: the ground profile's two magnitudes ----------------------
+    // EXPLORATION.md sec A good acquires a cultural preference: the profile
+    // is the first of the preference's two inputs (`derive_culture_preference`
+    // says how it is read). Named and validated here so they can be read on a
+    // ladder before they are set (Ben, 2026-10-03); the defaults are the
+    // values the reader shipped with. REJECT, NEVER CLAMP
+    // (`culture_profile_params_valid`): a run whose two constants leave their
+    // domain reads NO profile term for the whole run and says so
+    // (`history_sim_state::culture_profile_params_rejected`).
+
+    /// The remembered lack a cradle that held NONE of a good carries, in
+    /// preference weight units (0-1000); falls linearly to 0 at the cradle
+    /// mean. Domain 0-1000; 0 switches the lack term off. 250 = one
+    /// contacted holder's worth of exposure.
+    int culture_profile_lack_max_q = 250;
+    /// The amenity lean is `amenity_share / culture_profile_amenity_div`
+    /// toward the good the cradle's amenity class lived by. Domain 1-1000;
+    /// 4 = a window wholly under its amenity cover leans by 250.
+    int culture_profile_amenity_div = 4;
+
     /// The grudge total, summed across D's aggrieved kin, that counts as FULL
     /// fear -- the denominator that turns an unbounded ledger sum into the
     /// 0-1000 currency every other lean in this file speaks.
@@ -1778,11 +1925,20 @@ struct history_sim_params
     /// which is what keeps BL-224's non-hegemony emergent.
     int work_reach_relief_cap_q = 800;
 
-    /// How many held regions a polity considers building on per round. Two:
-    /// its capital, and one rotated deterministically through its holdings.
-    /// Scoring every holding would be O(held x rows) inside a pass already
-    /// costing ~23 s of a ~25 s world; rotating spreads works across the empire
-    /// over a run without paying for a full scan every round.
+    /// BL-1155 (Ben, 2026-09-27; HISTORY.md sec The verb): EVERY REGION A POLITY
+    /// HOLDS THAT STANDS A CENTRE IS A CANDIDATE for `build_work`, still one work
+    /// a round and the same scorer, walked in region order. True everywhere by
+    /// default -- the rule as ruled applies in every span. False is the rule it
+    /// replaces, kept as the switch's other reading: `work_candidate_regions`
+    /// candidates, the capital plus ones rotated through the holdings by a hash
+    /// of (polity, year, slot). Each span's params carry their own value, so the
+    /// switch is per span.
+    bool work_candidates_every_centre = true;
+
+    /// With `work_candidates_every_centre` false: how many held regions a
+    /// polity considers building on per round. Two: its capital, and one
+    /// rotated deterministically through its holdings (the bounded rule that
+    /// kept industry to ~110 of ~15,000 regions on the curated seeds).
     int work_candidate_regions = 2;
 
     // --- BL-929: SUPPLY SITES BOUGHT FROM THE STOCKPILE ---------------------
@@ -2199,6 +2355,132 @@ struct history_sim_params
     /// half that quiets neighbours.
     int treaty_far_penalty_q = 700;
 
+    // --- BL-1142: far realms across water meet and bind ---------------------
+    // INDUSTRIALISATION.md sec Far pairs meet and bind, and this phase makes
+    // them ("far pairs bind across water, not only across a border"). Two
+    // halves, both the Industrialisation span's alone (`industrialisation_sim_
+    // params`); the struct defaults are Exploration's world, unchanged.
+
+    /// MEETING BY SEA. Contact otherwise comes only from a campaign crossing
+    /// onto the other's ground (a water-blind 9-tile neighbourhood) or from
+    /// inheriting a victim's contacts, so realms on other landmasses meet only
+    /// across a narrow sea. With this on, each decision round every pair of
+    /// living realms whose seats stand on different landmasses (`landmass_at`)
+    /// and have never met MEETS when a trade BY SEA is open between them in
+    /// either direction: the seller holds a navy, both seats hold built ports,
+    /// and the seller holds a good the buyer's market wants
+    /// (`trade_sea_volume_q` > 0 -- the sea line alone, never a land
+    /// corridor): the fleet that could carry the cargo finds the market.
+    /// Recorded as `contact_kind::trade`, across water. Off by default.
+    bool far_pairs_meet_by_sea = false;
+
+    /// THE FAR PENALTY FOR A PAIR ACROSS WATER, per mille, in place of
+    /// `treaty_far_penalty_q` for a far pair (met after the near-home cutoff)
+    /// that met ACROSS WATER -- the class its contact recorded at the meeting
+    /// (`contact_event::across_water`), never the seats' landmasses read
+    /// again, so a pair whose capital later moves reads the same penalty it
+    /// bound on. Read by formation and by the break re-score alike
+    /// (`treaty_far_penalty_for`). The one measured dial of the binding half:
+    /// at 700 (the default, = the land penalty) nothing changes.
+    int treaty_far_sea_penalty_q = 700;
+
+    /// A LEG RUN AGAINST ITS CURRENT DELIVERS LESS (EXPLORATION.md sec
+    /// Currents, "Where currents bite"; BL-1142). Per mille: a trade between
+    /// realms on different landmasses WHOSE GOODS THE SEA CARRIES (its sea
+    /// line beats its land line, the best DRY corridor between them -- a flow
+    /// a road carries has no current)
+    /// delivers
+    ///     volume x (1000 - loss x max(0, -alignment) / 1000) / 1000
+    /// of what was sized, alignment the current along the leg from the
+    /// seller's seat to the buyer's (`ocean_current_alignment_q`). Applied
+    /// AFTER the flow is sized (after the want and the holding are shared),
+    /// so it bites where the seller's stock or the buyer's want, not the sea,
+    /// limits the trade; a leg with its current delivers what was sized, never
+    /// more. The binding's trade value reads the delivered amount too.
+    /// 0 = no loss (the default). Domain [0, 1000]: outside it the run loses
+    /// no cargo and says so (`history_sim_state::sea_cargo_loss_rejected`),
+    /// never clamped. Needs the current field.
+    int sea_current_cargo_loss_q = 0;
+
+    // --- BL-1147: naval points carry over -----------------------------------
+    // EXPLORATION.md sec Force persists now (Ben, 2026-09-26): "the navy
+    // CARRIES too, as a starting fleet earned at sea in the Empires age." A
+    // polity tallies its naval DEEDS through the Empires span
+    // (`polity::naval_coastal_years`, `naval_crossings`, `naval_sea_techs`);
+    // at a resumed span's open its NAVAL POINTS -- the deeds weighted below --
+    // become its opening `navy_stock` (`naval_opening_fleet`). The points pass
+    // to the polity that earned them: nothing is read off the regions it holds
+    // at the handoff, and a polity dead by then carries nothing.
+
+    /// Tally the naval deeds in this span. The Empires round's alone
+    /// (`era_minus_one_sim_params`); off by default, so no later span adds to
+    /// a ledger it did not earn.
+    bool naval_points_accrue = false;
+
+    /// THE THREE DEEDS' WEIGHTS, naval points per deed -- a coastal province
+    /// held for a year, a sea crossing made, a coastal sea tech taken. How the
+    /// deeds weigh against each other is a READING FOR BEN (BL-1147); these
+    /// make each deed comparable in magnitude on the 16 curated seeds. MEASURED
+    /// (`ocean_currents_harness --naval`, 2026-09-26, coastal by the terrain):
+    /// the 1,665 polities living at 1200 did 2,212,520 coastal province-years,
+    /// 7,819 crossings and took 230 coastal sea techs, so at 1 / 280 / 9600 the
+    /// three pooled shares are 2.21M / 2.19M / 2.21M points -- a third each.
+    /// Per polity the deeds spread very differently (coastal years: 877
+    /// polities, median 200, max 61,744; crossings: 424 polities, median 4,
+    /// max 333; techs: 134 polities, at most 3), which is the reading.
+    /// Domain [0, 100000] each.
+    int64_t naval_points_per_coastal_year = 1;
+    int64_t naval_points_per_crossing     = 280;
+    int64_t naval_points_per_sea_tech     = 9600;
+
+    /// THE CONVERSION, the one named constant: navy hulls per 1000 naval
+    /// points, applied ONCE at a resumed span's open to every LIVING polity
+    /// (`naval_opening_fleet`), on top of the fleet it resumed with -- only at
+    /// the open `naval_points_convert_at_open` marks (the Exploration open's
+    /// alone). 0 = no fleet carries, today's world
+    /// byte for byte. Read on a measured ladder over the curated seeds; Ben
+    /// picks the rung. Domain [0, 100000]: outside it, or with a weight
+    /// outside its own, no fleet opens and the run says so
+    /// (`history_sim_state::naval_points_params_rejected`), never clamped.
+    int64_t naval_points_navy_per_1000 = 0;
+
+    /// THE SPAN FLAG: this span's open is where the Empires age's deeds become
+    /// fleets. The Exploration open's alone (`exploration_sim_params`;
+    /// `industrialisation_sim_params` clears it, since its polities already
+    /// sail the fleet 1200 carried). Off, a resumed open converts nothing
+    /// whatever `naval_points_navy_per_1000` reads -- the conversion rate is a
+    /// measured dial a sweep may set on any span, and this is not.
+    bool naval_points_convert_at_open = false;
+
+    // --- BL-1152: a fleet decides who crosses -------------------------------
+    // EXPLORATION.md, the SETTLED paragraph under the stocks table (Ben,
+    // 2026-09-27, NR-961): in the Exploration and Industrialisation spans a
+    // campaign that crosses water carries no more of its army than its fleet
+    // lifts, and a crossing its target's side out-projects at sea never
+    // sails. The Empires round keeps the band gate alone. READINGS TAKEN
+    // (BL-1152, flagged for Ben): the fleet embarks at the staging hub's
+    // coast whether or not a port is built there (ports stand at seats, and
+    // 88% of crossings launch from a hub with none); a defending fleet
+    // projects from its realm's built ports, or from its seat's coast where
+    // none stands; the attacker's fleet decays from the hub's coast by the
+    // same rule; a partner that holds non-aggression with the attacker
+    // abstains (`crossing_defenders`).
+
+    /// The spans' switch (`exploration_sim_params`; Industrialisation inherits
+    /// it). Off in the Empires round, whatever the two constants read.
+    bool fleet_decides_crossings = false;
+    /// MEN A HULL LIFTS: a wet campaign carries at most the attacker's
+    /// `navy_stock` x this; the rest stay ashore at the staging hub, and a
+    /// realm with no fleet lifts no one. 0 = no bound (this half off).
+    /// Domain [0, 1000000]; outside it the rule reads nothing and the run
+    /// says so (`history_sim_state::fleet_params_rejected`), never clamped.
+    int64_t fleet_men_per_hull = 0;
+    /// THE REACH: the still-water sea tiles over which a fleet's projected
+    /// power halves (`fleet_power_at`), the distance priced by the currents
+    /// (`sea_cost_field`). 0 = no projection (this half off). Domain
+    /// [0, 100000], judged with the one above.
+    int64_t fleet_power_halving_tiles = 0;
+
     // --- BL-934: colonies ----------------------------------------------------
     // EXPLORATION.md sec A colony is a subject, and it wants things of its own.
 
@@ -2419,6 +2701,14 @@ struct trade_flow
     uint16_t buyer    = 0;
     uint8_t  good     = 0;
     int32_t  volume_q = 0;
+    /// 1 when the flow's CARRYING LINE is the sea one -- its sea line (the
+    /// seller's navy, both seats' ports, priced with the current) beat its
+    /// land line, the best DRY corridor joining the two realms (a corridor
+    /// walked across sea is none, `history_corridor::wet`), when it was sized;
+    /// a tie goes to the road. The test the cargo loss reads; 0 where a road
+    /// carries it. Set by `compute_trade_flows`; what the fourth sea-leg
+    /// writer reads, so only trade that goes to sea earns a lane.
+    uint8_t  by_sea   = 0;
 };
 
 /// THE UPKEEP STEP ITSELF (BL-931/BL-932), called once per decision round
@@ -2462,6 +2752,14 @@ struct exploration_upkeep_spend
     int64_t navy_upkeep     = 0;
     int64_t army_unpaid     = 0; ///< polities whose army bill was not met in full
     int64_t navy_unpaid     = 0; ///< polities whose navy bill was not met in full
+    /// BL-1152 diagnosis, REPORT ONLY (read by nothing in the sim): hulls lost
+    /// to the unpaid bill's decay; the round's spend pick by option
+    /// (hold/army/port/navy); and, of the polity-rounds not navy-eligible, how
+    /// many fell short on the treasury, on the seat's built port, and on both.
+    int64_t navy_hulls_decayed = 0;
+    int64_t pick_counts[4]     = { 0, 0, 0, 0 };
+    int64_t navy_short_treasury = 0, navy_short_port = 0, navy_short_both = 0;
+    int64_t navy_eligible_outbid = 0; ///< navy-eligible, another option won
     /// BL-972: the LEVY. Heads drawn from a seat's `manpower_stock` by an
     /// army step this call, and heads returned to a region's pool by the
     /// unpaid decay this call.
@@ -2477,6 +2775,8 @@ struct exploration_upkeep_spend
     int64_t industry_points_paid_in  = 0;
     int64_t industry_treasury_debited = 0;
     int64_t industry_points_refused  = 0;
+    /// BL-1169: treasury units the crowding brake kept in the purse this call.
+    int64_t industry_treasury_kept_by_crowding = 0;
 };
 
 struct history_sim_state;       // defined further down
@@ -2502,6 +2802,19 @@ struct exploration_spend_context
     const history_sim_state*                    state  = nullptr;
     const creed_state*                          creeds = nullptr;
     const std::vector<culture_good_preference>* prefs  = nullptr;
+    /// BL-1140: the span's current field, which the round's trade context
+    /// prices its sea lines with (`trade_context::currents`); null is still
+    /// water.
+    const ocean_current_field*                  currents = nullptr;
+    /// BL-1142: each polity's seat landmass for the round (by id, -1
+    /// unknown), which the round's trade context reads to find the trades
+    /// across water that run against their current
+    /// (`trade_context::seat_landmass`), and the loss to apply (already
+    /// judged in domain by the sim); the cargo lost is added to
+    /// `*cargo_lost_out` when set.
+    const std::vector<int32_t>*                 seat_landmass  = nullptr;
+    int                                         cargo_loss_q   = 0;
+    int64_t*                                    cargo_lost_out = nullptr;
 };
 
 ///
@@ -2529,7 +2842,8 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
                             exploration_upkeep_spend*              spend = nullptr,
                             const std::vector<dated_object>*       treaties = nullptr,
                             std::vector<trade_flow>*               flows_out = nullptr,
-                            const exploration_spend_context*       spend_ctx = nullptr);
+                            const exploration_spend_context*       spend_ctx = nullptr,
+                            const works_registry*                  works = nullptr);
 
 // ---------------------------------------------------------------------------
 // Actors
@@ -2855,7 +3169,30 @@ struct polity
     /// fleet). A headcount-like scalar, built from a funded port's treasury
     /// spend and decaying every round regardless — "a fleet is a running
     /// cost, not a purchase." NOT SERIALISED, same footing as `overlord`.
+    /// BL-1147 (Ben, 2026-09-26, superseding "the navy is new and starts at
+    /// zero"): a resumed span opens it at the fleet the polity's naval points
+    /// carry (`naval_opening_fleet`), zero where the conversion is 0.
     int64_t navy_stock = 0;
+
+    /// BL-1147 -- THE NAVAL LEDGER: what this polity did at sea in the Empires
+    /// span, deed by deed, tallied where `history_sim_params::naval_points_accrue`
+    /// is on and never after. `naval_coastal_years`: the coastal provinces it
+    /// held, counted per year held -- a held region whose CELL TOUCHES THE SEA
+    /// (`coast_cells`, the terrain; never `port_q`, which a settled daughter
+    /// inherits at 70% wherever it lands, inland or not), per decision round
+    /// times the round's years.
+    /// `naval_crossings`: the sea crossings it made (its wet campaigns
+    /// launched, staging hub to target across water). `naval_sea_techs`: the
+    /// coastal sea techs it took (EM-RD-2b Deep-Hull Sail, EM-RD-3b Lateen &
+    /// Long-Range Rig, EM-RD-4a Ocean-Rated Hulls; at most 3). The deeds stay
+    /// on the polity that did them -- a polity that loses its coast keeps its
+    /// sailors -- and cross every handoff unchanged with the polity table.
+    /// Weighted into naval points (`naval_points_of`) they are why a polity
+    /// has the fleet it opens the Exploration age with. NOT SERIALISED, same
+    /// footing as `navy_stock`.
+    int64_t naval_coastal_years = 0;
+    int64_t naval_crossings     = 0;
+    int64_t naval_sea_techs     = 0;
 
     /// BL-933 — HOW MANY TREATIES THIS POLITY HAS BROKEN, ever. The smallest
     /// quantity that makes "the cost lands on every OTHER party's willingness
@@ -3280,15 +3617,23 @@ int industry_points_fuel_factor_q(int fuel_reading_q, const history_sim_params& 
 int industry_tree_industrial_q(uint64_t industry_mask);
 
 /// One region's scale credit for one round, or -1 when the credit is REFUSED
-/// (its urban headcount or the step is outside the accrual's domain). 0 for a
-/// region with no centres. `industrial_q` is its holder's
+/// (its urban headcount, its employed heads or the step is outside the
+/// accrual's domain). 0 for a region with no centres.
+///
+/// THE WORKS, NOT THE CROWD (BL-1149; Ben, 2026-09-27, INDUSTRIALISATION.md
+/// sec 1): the heads credited are the region's urban heads UP TO @p
+/// employed_heads, the heads its works employ
+/// (`works_registry::employed_heads_mask` of `works_built`); the heads beyond
+/// earn nothing, and a region with no works earns no scale credit.
+/// `industrial_q` is its holder's
 /// `industry_tree_industrial_q` (0 for unheld ground); the tree multiplier
 /// `1000 + industrial_q` is held to [100, 5000] per mille -- a DOMAIN, not a
 /// tuning clamp: the table's industrial nodes sum to well inside it, and a
 /// holder whose tree left it would be a table defect, refused (-1) like any
 /// other out-of-domain input. Integer, staged so no intermediate overflows.
 int64_t industry_points_scale_credit(const region& r, int industrial_q,
-                                     const history_sim_params& p, int step_years);
+                                     const history_sim_params& p, int step_years,
+                                     int64_t employed_heads);
 
 /// The most urban heads one polity's apportionment weighs in total. Keeps
 /// the exact integer apportionment inside int64: a remainder under this times
@@ -3311,8 +3656,45 @@ inline constexpr int64_t industry_points_apportion_heads_max = 1LL << 32;
 /// @p out is empty and the result true: the caller converts NOTHING (NR-901,
 /// Ben 2026-09-19 -- a polity that holds no town has nowhere for its works to
 /// stand, so its treasury keeps the round's share).
+///
+/// AMENDED (Ben, 2026-10-01, NR-964): the weight is the heads the region's
+/// works EMPLOY -- min(urban heads, `works_registry::employed_heads_mask` of
+/// `works_built`) off @p works -- not its urban heads, so the treasury's points
+/// follow the works as the scale credit's do. A polity whose centred regions
+/// employ nobody (or no table at all) has no weighed region: it converts
+/// nothing, NR-901's rule.
 bool industry_points_apportion_by_scale(const std::vector<region>& regions, int holder, int64_t credit,
-                                        std::vector<std::pair<int, int64_t>>& out);
+                                        std::vector<std::pair<int, int64_t>>& out,
+                                        const works_registry* works);
+
+/// BL-1169: the largest crowding `industry_points_crowding_k` may be set to.
+inline constexpr int64_t industry_points_crowding_k_max = 1000000000LL;
+/// BL-1169: where `industry_points_crowding_q` saturates. EXACT, not a clamp:
+/// at or past it the brake's factor K x 10^6 / (K + crowding) is 0 for every
+/// K in domain (K x 10^6 <= 10^15 < 2^50), as it is at the true value.
+inline constexpr int64_t industry_points_crowding_saturation_q = 1LL << 50;
+
+/// BL-1169 (Ben, 2026-10-03; INDUSTRIALISATION.md sec Industry spreads beyond
+/// its heartland): HOW CROWDED a region's works are -- the industry points
+/// standing on it per THOUSAND heads its works employ (min(urban heads,
+/// `works_registry::employed_heads_mask` of `works_built`)). The works the
+/// stock stands for, over the labour that works them: capital per worker.
+/// -1 when the region employs nobody or its stock is out of domain.
+int64_t industry_points_crowding_q(const region& r, const works_registry* works);
+
+/// BL-1169: THE BRAKE on one treasury conversion. Each row of @p spread (the
+/// apportion's output) is rescaled to its share x K / (K + crowding), in
+/// parts per million, exact integer. The points the brake withholds are
+/// returned to the caller in WHOLE treasury units (@p points_per_unit points
+/// each), which stay in the purse; the sub-unit residue converts on the least
+/// crowded receiver (ties to the lower row), so no point is deleted and
+/// sum(spread) + units x points_per_unit equals the credit apportioned.
+/// Returns the units kept, or -1 (a row out of domain, or @p k outside
+/// 1..`industry_points_crowding_k_max`): the caller refuses the conversion.
+int64_t industry_points_crowd_brake(const std::vector<region>& regions,
+                                    std::vector<std::pair<int, int64_t>>& spread,
+                                    int64_t k, int64_t points_per_unit,
+                                    const works_registry* works);
 
 /// What one round's scale accrual did.
 struct industry_points_round
@@ -3323,14 +3705,17 @@ struct industry_points_round
 
 /// THE ROUND'S SCALE ACCRUAL: every region with `centres > 0` is credited, ON
 /// ITSELF, `industry_points_scale_credit` against its holder's Industry-tree
-/// industrial capacity. ORDER-INDEPENDENT BY CONSTRUCTION: each region's credit
-/// reads only its own fields and its holder's mask, and writes only its own
-/// stock, so walking the table in any order gives the same table. The caller
-/// gates it (the switch, the open year, and `industry_points_params_valid`).
+/// industrial capacity and the heads its works employ (@p works; BL-1149 —
+/// with no works table no work stands, so no region earns scale credit).
+/// ORDER-INDEPENDENT BY CONSTRUCTION: each region's credit reads only its own
+/// fields, its holder's mask and the table, and writes only its own stock, so
+/// walking the table in any order gives the same table. The caller gates it
+/// (the switch, the open year, and `industry_points_params_valid`).
 industry_points_round accrue_industry_points(std::vector<region>&       regions,
                                              const std::vector<polity>& polities,
                                              const history_sim_params&  p,
-                                             int                        step_years);
+                                             int                        step_years,
+                                             const works_registry*      works);
 
 /// Every scorer term's value for one polity, indexed by the generated
 /// `io::industry_tree::scorer_term` (never positionally — see the guard in
@@ -3533,6 +3918,20 @@ struct battle_trace
     int  decisiveness   = 0;
     int  transfer_needed = 0;  ///< The bar decisiveness had to clear this time.
     bool conquered      = false;
+
+    // --- BL-1152: the fleets at a crossing's launch (trace only) ---------
+    // Written for every traced battle, read by nothing in the sim: what the
+    // fleet rule reads (EXPLORATION.md, the SETTLED paragraph under the stocks
+    // table), measured before it binds.
+    int      hub_port_q                 = 0; ///< the staging hub's built port (`port_stock_q`)
+    int64_t  attacker_navy              = 0; ///< the attacker's `navy_stock` at launch
+    int64_t  realm_navy                 = 0; ///< the target realm's `navy_stock` (0 where unowned)
+    int16_t  realm_partners             = 0; ///< the realm's living mutual-defence partners
+    int16_t  partners_with_fleet        = 0; ///< of them, holding any fleet
+    int16_t  partners_bound_to_attacker = 0; ///< of them, holding non-aggression with the attacker
+    int64_t  partner_navy               = 0; ///< the partners' fleets, summed
+    int64_t  army_carried               = 0; ///< the army the crossing sailed with (after any lift bound)
+    int64_t  scored_men                 = 0; ///< BL-1152 review: the army the scorer priced the odds on
 };
 
 /// ONE DECISION ROUND IN WHICH CAMPAIGN CLEARED ITS THRESHOLD — Sprint 28's
@@ -3650,8 +4049,9 @@ enum class contact_kind : uint8_t
 {
     campaign  = 0, ///< A campaign crossed onto the other's ground (won or not).
     inherited = 1, ///< Carried forward from a conquered polity's own contacts.
+    trade     = 2, ///< BL-1142: met by sea, a trade across water open between them.
 };
-inline constexpr int contact_kind_count = 2;
+inline constexpr int contact_kind_count = 3;
 
 /// The event that FIRST joined the pair. Unlike a grudge, contact does not
 /// decay and does not accumulate a score — meeting is a fact, not a magnitude
@@ -3661,6 +4061,13 @@ struct contact_event
     int32_t      year   = 0;
     uint16_t     region = 0xFFFFu; ///< `owner_none` where the event has no place.
     contact_kind kind   = contact_kind::campaign;
+    /// BL-1142: 1 when the two seats stood on DIFFERENT landmasses at the
+    /// meeting (`landmass_at`), recorded once beside the year and never
+    /// re-read off the seats -- a capital that later moves does not change
+    /// what kind of pair met. 0 where either seat's landmass is unknown (a
+    /// span run with no terrain). Every span run on terrain records it, the
+    /// Empires round included, so a pair met there carries its class on.
+    uint8_t      across_water = 0;
 };
 
 /// A directed pair, IN THE GRUDGE TABLE'S SHAPE (BL-908): "who has met whom"
@@ -3752,6 +4159,66 @@ struct history_sim_capture
     std::vector<sea_leg> sea_legs;
 };
 
+/// BL-1120 -- one sea leg's uses this span, by the writer that noted them
+/// (EXPLORATION.md sec The colonial tie is a sea lane names the writers).
+/// `a < b`, as `sea_leg`.
+struct sea_leg_writer_row
+{
+    uint16_t a        = 0;
+    uint16_t b        = 0;
+    int32_t  campaign = 0; ///< a wet campaign's crossing, at its launch
+    int32_t  purchase = 0; ///< a purchase party's crossing
+    int32_t  tribute  = 0; ///< a metropole's standing traffic, one per round
+    int32_t  trade    = 0; ///< BL-1140: a trade link across water, one per round it runs
+};
+
+/// The writer column a sea-leg note lands in (`sea_leg_writer_row`).
+enum class sea_leg_writer : uint8_t { campaign = 0, purchase = 1, tribute = 2, trade = 3 };
+
+/// BL-1152 -- ONE CROSSING THAT NEVER SAILED: the defenders out-projected the
+/// attacker's fleet somewhere on its sea leg. Who tried, against whose realm
+/// and which region; the realm whose fleet projected the most power where it
+/// was stopped; both powers there (`fleet_power_at` units); and what the
+/// attacker still held, untouched -- the staging hub's army and its fleet.
+struct crossing_stop
+{
+    int32_t  year     = 0;
+    uint16_t attacker = 0;
+    uint16_t realm    = 0; ///< the target's realm
+    uint16_t stopper  = 0; ///< the realm whose fleet out-projected most (the realm or a partner)
+    uint16_t region   = 0; ///< the target region
+    uint16_t hub      = 0; ///< the staging hub
+    int64_t  attacker_power = 0, defender_power = 0;
+    int64_t  hub_army = 0, realm_army = 0, navy = 0; ///< the attacker's, left as they stood
+};
+
+/// BL-1152 -- WHAT THE FLEET DID TO THE SPAN'S CROSSINGS. The rule is a
+/// LEGALITY FILTER on the campaign verb (NR-965): a crossing it would refuse
+/// is never a candidate. So `read` counts wet (hub, target) CANDIDATES the
+/// rule examined; `stopped` the candidates it refused as out-projected (and of
+/// them `stopped_by_partner`, where the stopper is a mutual-defence partner
+/// rather than the realm); `unlifted` the candidates it refused because the
+/// attacker's fleet lifts no one (no fleet); `no_leg` the candidates it refused
+/// because no sea walk joins any of the hub's coast tiles to any of the
+/// target's -- not wet-capable, refused (fail closed). A refusal repeats each
+/// round the candidate stands. `exec_failed` (GUARD, BY CONSTRUCTION -- not a
+/// measurement): execute picks its staging hub through the same gate, so a
+/// chosen crossing it would refuse cannot occur; the counter exists only so a
+/// break in that construction is loud. `clipped`: sailed with fewer men than
+/// it gathered, `men_ashore` the difference, returned to the regions the
+/// muster drew them from; `partners_abstained`: partners bound by
+/// non-aggression to the attacker; `seat_coast_fleets`: defending fleets that
+/// projected from their seat's coast, having no built port (both per
+/// candidate examined). Carried in each span's handoff and the generation
+/// cursor. NOT SERIALISED.
+struct fleet_ledger
+{
+    int64_t read = 0, stopped = 0, stopped_by_partner = 0, unlifted = 0, clipped = 0, men_ashore = 0;
+    int64_t no_leg = 0, partners_abstained = 0, seat_coast_fleets = 0;
+    int64_t exec_failed = 0; ///< guard, by construction: reads 0
+    std::vector<crossing_stop> stops; ///< one per refused-as-out-projected candidate
+};
+
 struct history_sim_state
 {
     std::vector<polity> polities;
@@ -3794,7 +4261,12 @@ struct history_sim_state
     /// New contact PAIRS raised during the run, by `contact_kind`
     /// ([0] campaign -- a crossing onto the other's ground, [1] inherited
     /// from a conquered polity). The span's first-contact count.
-    int64_t contacts_raised_trace[2] = {};
+    int64_t contacts_raised_trace[3] = {}; // BL-1142: [2] met by sea
+    /// BL-1152 (trace only): mutual-defence pairs standing at each decision
+    /// round's open, summed, and the rounds counted -- the mean is the pairs a
+    /// span keeps standing.
+    int64_t mutual_defence_pair_rounds_trace = 0;
+    int64_t mutual_defence_rounds_trace      = 0;
     /// Per contact class (as `campaign_class_trace`), over candidates that
     /// passed every gate and were scored: [0] count, and sums of [1] the
     /// ground's worth before odds (after `campaign_gain_q`), [2] `p_win_q`,
@@ -3915,8 +4387,17 @@ struct history_sim_state
     /// campaign's launch (beside the land note, so the land record is
     /// unchanged), a purchase party's crossing (BL-1096), and once per
     /// decision round per standing tribute clause, overlord capital to
-    /// subject seat. Not gated on `trace_battles`, for the same reason.
+    /// subject seat -- and a fourth (BL-1140): once per decision round per
+    /// trade link between seats on different landmasses. Not gated on
+    /// `trace_battles`, for the same reason.
     std::vector<sea_leg> sea_legs;
+
+    /// BL-1120 -- WHO WROTE THIS SPAN'S SEA-LEG USES, per leg: the notes the
+    /// span itself made (never the inherited `resume_sea_legs` count), split
+    /// by writer, sorted by (a, b). Summed over the three columns a row equals
+    /// the uses this span added to that leg in `sea_legs`. The observation a
+    /// report reads to say which writer earned a lane; nothing reads it back.
+    std::vector<sea_leg_writer_row> sea_leg_writers;
 
     /// THE SPARSE, DIRECTED, DECAYING GRUDGE TABLE (BL-827).
     ///
@@ -3979,6 +4460,13 @@ struct history_sim_state
     // --- Counters, for the harness and BL-275's sweep metrics -------------
     int64_t battles     = 0;
     int64_t conquests   = 0;
+    /// BL-1125 (markets can die), cause 3 -- CONQUEST CONSOLIDATES: markets
+    /// destroyed because a rival took the region they stood on. Cleared at the
+    /// conquest itself (`region::has_market`), so the close never spawns them.
+    int64_t markets_destroyed = 0;
+    /// ...and the region each one stood on, in the order destroyed. A region is
+    /// destroyed at most once a span: the mark is set only at a close.
+    std::vector<int32_t> markets_destroyed_regions;
     int64_t foundings   = 0;
     /// BL-920 -- unorganised ground the ORGANISE verb actually took.
     int64_t organised          = 0;
@@ -4213,6 +4701,17 @@ struct history_sim_state
     /// priced, nothing moved. REJECTED, never clamped.
     bool    subjection_purchase_params_rejected = false;
 
+    /// BL-1107: `culture_profile_params_valid` said no at the run's open, so
+    /// the preference read NO profile term for the whole run (exposure
+    /// alone). REJECTED, never clamped.
+    bool    culture_profile_params_rejected = false;
+    /// BL-1107: the two profile magnitudes this run's preference was read
+    /// with (both 0 when rejected), carried so the span's handoff
+    /// (`make_exploration_output`) re-derives its close table on the same
+    /// footing the rounds did.
+    int     culture_profile_lack_max_q  = 250;
+    int     culture_profile_amenity_div = 4;
+
     /// BL-1097: sea legs noted this run, by site -- the wet campaign launch,
     /// the purchase crossing, the standing tribute-round traffic -- and how
     /// many legs crossed `sea_lane_tier1_uses` (each noting `sea_lane_opened`).
@@ -4220,6 +4719,77 @@ struct history_sim_state
     int64_t sea_legs_noted_purchase = 0;
     int64_t sea_legs_noted_tribute  = 0;
     int64_t sea_lanes_opened        = 0;
+    /// BL-1140: the FOURTH writer -- a trade link between realms whose seats
+    /// stand on different landmasses (`landmass_labels`), one use per
+    /// decision round it carries a flow BY SEA (`trade_flow::by_sea`; a road
+    /// carries none across water), seller seat to buyer seat. Beside
+    /// it, how those uses ran against the current field (the net direction
+    /// of the round's volume, seller seat to buyer seat): with it, against
+    /// it, across slack water, and the alignment sum -- counted whenever the
+    /// field is built. Pure observation.
+    int64_t sea_legs_noted_trade          = 0;
+    int64_t sea_trade_with_current        = 0;
+    int64_t sea_trade_against_current     = 0;
+    int64_t sea_trade_slack_current       = 0;
+    int64_t sea_trade_alignment_sum_q     = 0;
+    /// BL-1140: the VOLUME those links moved, summed over the rounds (both
+    /// directions), and how much of it sailed with / against the current
+    /// (each direction read on its own, seller seat to buyer seat) -- the
+    /// reading that says whether more trade runs with the water than against
+    /// it. The split is counted whenever the field is built. Only flows that
+    /// go to sea count (`trade_flow::by_sea`): a road between two realms on
+    /// different landmasses carries no volume across water -- that volume is
+    /// `cross_landmass_volume_by_road_q` below, so the two together are all
+    /// trade between realms seated on different landmasses.
+    int64_t sea_trade_volume_q            = 0;
+    int64_t sea_trade_volume_with_q       = 0;
+    int64_t sea_trade_volume_against_q    = 0;
+    int64_t cross_landmass_volume_by_road_q = 0; ///< BL-1147 review: the same pairs' volume a dry corridor carried
+    /// BL-1142: the cargo trades across water LOST running against their
+    /// current (`sea_current_cargo_loss_q`), summed over the rounds; the pairs
+    /// that met by sea (`contact_kind::trade`); the treaties formed between
+    /// realms that MET across water (the class the contact recorded,
+    /// `contact_event::across_water`); and, for the latter, how many of them
+    /// were far pairs (met after the near-home cutoff).
+    int64_t sea_trade_cargo_lost_q        = 0;
+    /// BL-1142: `sea_current_cargo_loss_q` left [0, 1000] at the run's open,
+    /// so the run lost no cargo. REJECTED, never clamped.
+    bool    sea_cargo_loss_rejected       = false;
+    int64_t contacts_met_by_sea           = 0;
+    int64_t treaties_formed_across_water  = 0;
+    int64_t far_treaties_formed_across_water = 0;
+    /// BL-1147: at a resumed open whose conversion is on, the naval points the
+    /// LIVING polities carried into fleets, the points held by polities
+    /// already dead (which carry nothing), the fleets opened and their hulls;
+    /// and whether the constants left their domain (rejected whole: no fleet
+    /// opens, never clamped).
+    int64_t naval_points_carried   = 0;
+    int64_t naval_points_died      = 0;
+    int64_t naval_fleets_opened    = 0;
+    int64_t naval_hulls_opened     = 0;
+    bool    naval_points_params_rejected = false;
+    /// BL-1152: the fleet's work on this span's crossings, and whether its
+    /// constants left their domain (rejected whole: the rule read nothing).
+    fleet_ledger fleet;
+    bool    fleet_params_rejected = false;
+
+    /// BL-1120: how the wet campaigns LAUNCHED this run ran against the
+    /// current field -- with it (alignment > 0), against it (< 0) or across
+    /// slack water (0), counted at launch beside `sea_legs_noted_campaign`
+    /// whenever the field is built, in every span that builds it. The sum of
+    /// the launched legs' alignments (per mille each) rides beside, so a
+    /// report can read the mean. Pure observation.
+    int64_t sea_campaigns_with_current    = 0;
+    int64_t sea_campaigns_against_current = 0;
+    int64_t sea_campaigns_slack_current   = 0;
+    int64_t sea_campaign_alignment_sum_q  = 0;
+    /// BL-1120: the current's weight or rotation sense left its domain at the
+    /// run's open, so the run priced every sea leg at still water. REJECTED,
+    /// never clamped.
+    bool    sea_current_params_rejected   = false;
+    /// BL-1120: the digest of the field this run priced its legs with (0 when
+    /// none was built), so a report can say which ocean it measured.
+    uint64_t sea_current_field_digest     = 0;
 
     /// BL-935: treasury actually spent building each stock, this run — the
     /// observable that separates "the mechanism never fires" from "no polity
@@ -4234,6 +4804,16 @@ struct history_sim_state
     int64_t treasury_spent_on_navy_upkeep = 0;
     int64_t army_upkeep_unpaid_rounds     = 0;
     int64_t navy_upkeep_unpaid_rounds     = 0;
+    /// BL-1152 diagnosis, REPORT ONLY: the upkeep's navy readout summed over
+    /// the span (`exploration_upkeep_spend`'s fields of the same names), and
+    /// the fleet gate's wet candidates by whether their staging hub has a
+    /// built port ([0] none, [1] built), all read and refused-for-no-fleet.
+    int64_t navy_hulls_decayed_trace = 0;
+    int64_t spend_pick_trace[4]      = { 0, 0, 0, 0 };
+    int64_t navy_short_treasury_trace = 0, navy_short_port_trace = 0, navy_short_both_trace = 0;
+    int64_t navy_eligible_outbid_trace = 0;
+    int64_t fleet_read_by_hub_port[2]     = { 0, 0 };
+    int64_t fleet_unlifted_by_hub_port[2] = { 0, 0 };
     /// BL-972: the LEVY -- heads drawn from seats' manpower pools by army
     /// steps, and heads sent home to a pool by the unpaid decay, all rounds.
     int64_t levy_heads_raised   = 0;
@@ -4246,10 +4826,29 @@ struct history_sim_state
     /// reader can hold the region table to that. Zero off the span.
     int64_t industry_points_from_scale    = 0;
     int64_t industry_points_from_treasury = 0;
+    /// BL-1149 (the review fix): decision rounds the scale accrual ran with NO
+    /// works table, or an EMPTY one. With none, no work stands, so no region
+    /// earns scale credit and no work is open, so the urbanisation stream, whose
+    /// pull is open work, moves no one: the whole span's migration is inert,
+    /// and this says so rather than leaving a quiet zero. 0 on every run a
+    /// non-empty table was handed to.
+    int64_t industry_scale_inert_rounds   = 0;
+    /// BL-1137: heads the urbanisation stream moved over the run, every round
+    /// summed (`run_urbanisation_stream`). Report-only. Includes
+    /// `urbanisation_heads_within`.
+    int64_t urbanisation_heads_moved      = 0;
+    /// ... of which a destination took from its OWN countryside (its works'
+    /// open work filled at home, a conversion, not a move along a corridor).
+    int64_t urbanisation_heads_within     = 0;
     /// ... and the TREASURY UNITS that conversion took out of capitals (the
     /// points above divided by `industry_points_per_treasury_unit`): the
     /// observable for how hard paying in draws on the round's other spend.
     int64_t treasury_spent_on_industry    = 0;
+    /// BL-1169: TREASURY UNITS the crowding brake left in capitals' purses
+    /// (`history_sim_params::industry_points_crowding_k`): the round's share
+    /// a crowded receiver did not convert, kept, never deleted. Report-only,
+    /// in no digest; 0 with the brake off.
+    int64_t treasury_kept_by_crowding     = 0;
     /// Credits REFUSED rather than truncated: a region whose stock would pass
     /// `industry_points_ceiling`, or whose urban headcount left the accrual's
     /// stated domain. Must be 0; nothing moves on a refusal.
@@ -4466,6 +5065,145 @@ history_sim_state run_history_sim(settlement_state&         ss,
 /// way would be testing its own arithmetic rather than the sim's.
 int region_distance(const region& a, const region& b, int gw);
 
+/// POINTS GO WITH THEIR PEOPLE (Ben, 2026-09-26; POPULATION.md § Generation;
+/// BL-1141). Region @p i of @p regions, standing no settlement, hands the
+/// industry points it earned — and their report-only treasury tally, so the
+/// world's paid-in share holds — to the NEAREST region of the same realm
+/// (`owner[i]`, by `region_distance`, ties to the lower region index) that
+/// stands a centre and has people. Nothing moves, and the call returns false,
+/// where the region has no points, still stands a centre, is held by no realm,
+/// where its realm stands no other centre, or where the receiving stock would
+/// pass `industry_points_ceiling` (refused, never clamped). Pure over the
+/// region table: the sim calls it for every settlement that ends without a
+/// sack, and once more for every point still stranded at the span's close.
+bool rehome_stranded_points(std::vector<region>& regions, const std::vector<int>& owner,
+                            std::size_t i, int gw);
+
+/// THE CLOSE'S RETRY (the centres cold review, 2026-09-26). Every region of
+/// @p regions still holding points on no settlement is offered once more to
+/// its realm's nearest centre (`rehome_stranded_points`), in region order, as
+/// the map stands at the span's close — the handoff made when a settlement
+/// ended can have found nothing then. SKIPPED ONLY WHERE THE POINTS SIT ON A
+/// RUIN: @p on_ruin[i] != 0 when the event that last ended region i's
+/// settlement was a SACK (NR-901: the points went with the towns; the works
+/// themselves stand, Ben 2026-09-27). A razing in
+/// a region's PAST is not a ruin — every conquest sacks, so "ever razed" is
+/// near "ever conquered" (the rebuild's review, 2026-09-26): a region sacked
+/// in one century whose settlement survived, and ended by ground loss in
+/// another, hands its points on like any other. A region past the end of
+/// @p on_ruin is not a ruin. Returns how many regions' points moved.
+int rehome_stranded_at_close(std::vector<region>& regions, const std::vector<int>& owner,
+                             const std::vector<uint8_t>& on_ruin, int gw);
+
+/// BL-1137 (the centres cold review, 2026-09-26) — THE STREAM'S LINE STAYS ON
+/// LAND. True when no water tile lies BETWEEN two regions' anchors on the
+/// straight line joining them: Chebyshev steps, the short way round the
+/// cylinder, the anchors themselves not tested. The supply graph
+/// (`supply_neighbours`) joins every region within its radius whatever lies
+/// between, so without this a colony across a strait sits in one piece with
+/// its home towns; people walk, and this is the line they walk.
+///
+/// THE ANCHORS ARE NOT TESTED (the rebuild's review, 2026-09-26): a region
+/// anchored on a shoreline or lake tile (`region_domain::coastal_water`, which
+/// a founding can land on) stands its people there, and a line that tested its
+/// own first tile would cut it out of the stream entirely — never sending,
+/// never receiving. Its line to an inland neighbour walks; its line across the
+/// water does not. THE LIMIT, accepted: a region anchored IN a one-tile strait
+/// has land on both sides one step away, so it joins both shores — the one
+/// way a strait is bridged, and only by a settlement standing on it.
+///
+/// SYMMETRIC: the line is drawn from the endpoint earlier in (row, col) order,
+/// so (a, b) and (b, a) walk the same tiles, including the half-way-round tie
+/// on an even-width cylinder. Pure. A substrate of the wrong size refuses
+/// nothing; a line leaving the grid's rows is refused.
+bool anchors_joined_by_land(const std::vector<terrain_substrate>& sub,
+                            const region& a, const region& b, int gw, int gh);
+
+/// `anchors_joined_by_land`, memoised per corridor — the sim's own line test,
+/// exposed so a harness exercises the same object the sim does. Anchors never
+/// move and terrain is fixed for a run, so a corridor (keyed by its lower and
+/// higher region index) is measured once. Lookups only: the map's layout never
+/// reaches a result. No substrate: every corridor walks.
+struct stream_land_lines
+{
+    const std::vector<terrain_substrate>* substrate = nullptr;
+    int gw = 0;
+    int gh = 0;
+    std::unordered_map<uint64_t, bool> memo;
+    std::size_t measured = 0; ///< corridors actually walked (memo misses)
+
+    bool joined(const std::vector<region>& regions, int a, int b);
+};
+
+/// One round of the urbanisation stream's outcome (`run_urbanisation_stream`).
+struct urbanisation_round
+{
+    int64_t          moved = 0;    ///< heads that left a countryside for a centre this round
+    /// ... of which a destination took from its own countryside: the least of
+    /// what its countryside sent and what it received. The rest, `moved -
+    /// moved_within`, travelled along a held corridor.
+    int64_t          moved_within = 0;
+    std::vector<int> destinations; ///< regions that took any, ascending
+};
+
+/// THE URBANISATION STREAM, ONE DECISION ROUND (BL-1137; INDUSTRIALISATION.md
+/// § Beat 2: "a region's countryside -> a centre in the same polity; pull:
+/// industry-point output at the centre; push: depleted or strained ground;
+/// line: held corridors").
+///
+///   THE LINE. Each realm's held ground (`owner`) splits into the pieces its
+///   own corridors join: edges of @p neighbours between two regions it holds
+///   that @p linked accepts (the sim passes a line that stays on land, so the
+///   supply graph's reach across a strait is not a road people walk). People
+///   move only inside one piece.
+///   THE DESTINATIONS. The piece's regions that hold a centre and whose works
+///   offer OPEN WORK (@p open_work > 0: the heads its works employ beyond the
+///   urban heads already there, `region_open_work`). ANY CENTRE, not towns only
+///   (Ben, 2026-10-02; INDUSTRIALISATION.md Beat 2): a village whose works hire
+///   takes people and grows into a town.
+///   THE PUSH. Every region of the piece would send its countryside at
+///   `urbanisation_outflow` over @p step_years.
+///   THE PULL IS OPEN WORK (Ben, 2026-09-27; INDUSTRIALISATION.md Beat 2: "a
+///   destination pulls by the jobs its works offer beyond the heads already
+///   there ... a city whose works are full stops drawing"). The piece's
+///   destinations take at most the open work they offer, so the countryside
+///   sends what they can take: when the push is larger, each countryside sends
+///   its share of the open work in proportion to its push. The migrants are
+///   shared over the destinations in proportion to their open work, so none
+///   receives more than it offers, and land as industrial heads
+///   (`settle_urban_migrants`). Both splits are largest remainder, exact, ties
+///   to the lower region index.
+///
+/// A piece with no open work sends nobody. CONSERVING (NR-958): every
+/// head is taken whole from a countryside with its ceiling (`take_countryside`)
+/// and landed whole in a town with it, so the world's people and its carrying
+/// capacity are both unchanged by the round. Pure and deterministic over its
+/// arguments: pieces are walked from the lowest region index, members sorted.
+urbanisation_round run_urbanisation_stream(std::vector<region>& regions,
+                                           const std::vector<int>& owner,
+                                           const std::vector<std::vector<int>>& neighbours,
+                                           const std::function<bool(int, int)>& linked,
+                                           const std::vector<int64_t>& open_work,
+                                           int step_years);
+
+/// BL-1155 (Ben, 2026-09-27; HISTORY.md sec The verb): the regions polity
+/// holdings @p held (ascending) scores `build_work` on this round, in order.
+/// With `work_candidates_every_centre`: the CAPITAL ALWAYS (a capital standing
+/// no centre still builds), then every other held region that stands a
+/// centre, in region order. Without it: `work_candidate_regions` slots, the
+/// capital and regions rotated through the holdings by a hash of (@p
+/// polity_salt, @p year, slot) -- the old bounded rule, unchanged. Scoring
+/// uses a strict `>`, so an earlier candidate wins a tie.
+std::vector<int> work_candidates(const std::vector<region>& regions, const std::vector<int>& held,
+                                 int capital, const history_sim_params& p, uint32_t polity_salt,
+                                 int64_t year);
+
+/// THE OPEN WORK a region's works offer (Ben, 2026-09-27; INDUSTRIALISATION.md
+/// Beat 2): the heads its works employ (@p employed_heads,
+/// `works_registry::employed_heads_mask` of `works_built`) beyond the urban
+/// heads already there, never below zero. The urbanisation stream's pull.
+int64_t region_open_work(const region& r, int64_t employed_heads);
+
 /// Years between decision rounds at calendar year @p y, read from @p p's band
 /// table. Returns the first band whose `until_year` exceeds @p y, falling back
 /// to the last live band; never returns less than 1.
@@ -4617,6 +5355,12 @@ bool has_contact(const history_sim_state& s, int from, int to);
 /// recorded contact should never reach a caller that treats it as either.
 int64_t contact_first_year(const history_sim_state& s, int from, int to);
 
+/// BL-1142 -- whether @p from and @p to MET ACROSS WATER: the class their
+/// contact recorded at the meeting (`contact_event::across_water`), false
+/// where the pair has no contact entry. The break re-score's read of the fact
+/// formation reads off the contact row it walks.
+bool contact_met_across_water(const history_sim_state& s, int from, int to);
+
 // ---------------------------------------------------------------------------
 // Treaty scoring (BL-933) — EXPLORATION.md sec Diplomacy becomes real:
 // "nobody negotiates... evaluated against the same seeded world state."
@@ -4663,7 +5407,8 @@ int treaty_value_q(const history_sim_params& p,
                     int grudge_against_other_q, int grudge_from_other_q,
                     int counterpart_treaties_broken, int decider_aggression_q,
                     int alarm_from_other_q, bool near_home,
-                    int trade_value_q);
+                    int trade_value_q,
+                    int far_penalty_q = -1); // BL-1142: >= 0 replaces p.treaty_far_penalty_q
 
 /// BL-941 — VISIBLE CAPABILITY, 0-1000. What a neighbour reads of
 /// `polity_id`'s capital `region::army_stock` plus its own `polity::navy_stock`,
@@ -4845,13 +5590,40 @@ struct culture_good_preference
 /// `derive_wants` holds itself to. @p culture_count bounds which culture
 /// indices are read, same convention `pass_one_output::culture_count` sets.
 ///
-/// A culture with no plurality-held ground and no contacted polity holding a
-/// good it lacks contributes nothing for that good — an absence with no
-/// route yet is not a preference (EXPLORATION.md sec A good acquires a
-/// cultural preference: "derived... from what its route exposed it to").
+/// TWO INPUTS (EXPLORATION.md sec A good acquires a cultural preference; BL-1107):
+///
+///  1. THE GROUND PROFILE (@p cultures, `culture::profile`; COLONISATION.md sec
+///     The ground profile) -- what the culture's cradle held. Each of the four
+///     profile classes (farm, ore, energy, water -> port) is scored against
+///     the mean over the CRADLE cultures on `score_against`'s scale (500 at
+///     the mean; 500 for every cradle where no cradle held any); a good the
+///     cradle held below the mean carries a REMEMBERED LACK of up to
+///     @p lack_max_q (at a score of 0). The cradle's amenity class leans
+///     toward the good its country lived by (forest -> energy, coastal grass
+///     -> port, marsh in a valley -> farm), by `amenity_share / @p amenity_div`
+///     (no lean where @p amenity_div <= 0). The two magnitudes are
+///     `history_sim_params::culture_profile_lack_max_q` / `_amenity_div`; the
+///     defaults below are theirs. Read only for a living
+///     (unfolded) culture that is the plurality somewhere -- a people standing
+///     on ground, polity or none.
+///  2. ROUTE EXPOSURE -- 250 per distinct contacted foreign polity holding the
+///     good, as before.
+///
+/// The weight is their sum, capped at 1000. A good the culture's ground holds
+/// NOW is never preferred, whatever the profile says. With @p cultures null
+/// (or a culture with no coined profile) term 1 is absent and the table is
+/// exposure alone: a culture with no route then contributes nothing for a
+/// good -- an absence with no route yet is not a preference.
 std::vector<culture_good_preference> derive_culture_preference(
     const std::vector<region>& regions, const std::vector<contact>& contacts,
-    const std::vector<polity>& polities, int culture_count);
+    const std::vector<polity>& polities, int culture_count,
+    const std::vector<culture>* cultures = nullptr,
+    int lack_max_q = 250, int amenity_div = 4);
+
+/// BL-1107: the two profile magnitudes in their domains
+/// (`culture_profile_lack_max_q` 0-1000, `culture_profile_amenity_div`
+/// 1-1000). Out of domain, the run reads no profile term at all.
+bool culture_profile_params_valid(const history_sim_params& p);
 
 // ---------------------------------------------------------------------------
 // The scarcity signal (BL-939) — EXPLORATION.md sec There is no price here,
@@ -4913,6 +5685,32 @@ struct trade_context
         int32_t  line_q = 0;
     };
     std::vector<land_line> land_lines;
+
+    /// BL-1140 -- THE SEA LINE IS PRICED WITH ITS CURRENT (EXPLORATION.md sec
+    /// Currents are a force, not a picture: the current decides "which
+    /// trades across water are worth making"). When set, a flow's sea line
+    /// is divided by the cost of the leg from the seller's seat to the
+    /// buyer's (`ocean_current_leg_cost_q` at `current_weight_q`), so goods
+    /// that run with the current arrive in greater volume than goods beating
+    /// against it, and the pair's binding is worth more in the direction the
+    /// water carries. Null -- every caller that builds a context and sets
+    /// nothing -- is still water, the line exactly as it was. Not owned: the
+    /// sim points it at the span's field for the round.
+    const ocean_current_field* currents = nullptr;
+    int                        current_weight_q = 0;
+
+    /// BL-1142 -- THE CARGO A LEG AGAINST ITS CURRENT LOSES
+    /// (`history_sim_params::sea_current_cargo_loss_q`). When `seat_landmass`
+    /// is set with `currents` and a loss in (0, 1000], a flow between realms
+    /// on different landmasses whose sea line carries it delivers only its
+    /// share (`compute_trade_flows`, after the sharing; `pair_trade_value_q`
+    /// alike). `seat_landmass` is each polity's seat landmass by id, read
+    /// once per round by the caller (-1 unknown). A loss outside [0, 1000]
+    /// delivers every flow as sized. `cargo_lost`, when set, adds the volume
+    /// lost. Not owned; null is no loss.
+    const std::vector<int32_t>* seat_landmass = nullptr;
+    int                         cargo_loss_q  = 0;
+    int64_t*                    cargo_lost    = nullptr;
 };
 
 trade_context build_trade_context(const std::vector<region>&           regions,
@@ -4926,9 +5724,149 @@ trade_context build_trade_context(const std::vector<region>&           regions,
 /// `port_stock_q`, buyer seat `port_stock_q`) while the seller holds a navy
 /// (`navy_stock > 0`), else 0. 0 for a dead or out-of-range party, the same
 /// polity on both sides, a capital out of range, or @p good outside 0..3.
+/// BL-1140: with `ctx.currents` set, sea is priced with the current along
+/// the leg from the seller's seat to the buyer's -- divided by the leg's
+/// cost and held to 1000 -- before the max; land is never priced.
 int trade_flow_volume_q(const trade_context& ctx, const std::vector<region>& regions,
                         const std::vector<polity>& polities,
                         int seller, int buyer, int good);
+
+/// BL-1142 -- THE SAME VOLUME CARRIED BY SEA ALONE: min(want, holding, sea
+/// line), 0 where the seller holds no navy or either seat no built port. What
+/// meeting by sea reads: a trade the sea could carry, never a land corridor.
+int trade_sea_volume_q(const trade_context& ctx, const std::vector<region>& regions,
+                       const std::vector<polity>& polities,
+                       int seller, int buyer, int good);
+
+/// BL-1142 -- THE FAR PENALTY A PAIR READS, per mille: the sea's own
+/// (`treaty_far_sea_penalty_q`) for a pair whose contact recorded it met
+/// across water, the land's (`treaty_far_penalty_q`) otherwise. Formation and
+/// the break re-score both read it, off the same recorded class.
+int treaty_far_penalty_for(const history_sim_params& p, bool met_across_water);
+
+/// BL-1152 -- ONE REALM DEFENDING A CROSSING AT SEA: its fleet, and the sea
+/// tiles it projects from (sorted, distinct). `seat_coast` marks a fleet with
+/// no built port, projecting from its seat's coast.
+struct fleet_defender
+{
+    int              polity = -1;
+    int64_t          navy   = 0;
+    std::vector<int> ports;
+    bool             seat_coast = false;
+};
+
+/// The defenders of a crossing against @p realm by @p attacker: the realm
+/// itself and every living polity holding a `treaty_clause::mutual_defence`
+/// clause with it, each with a fleet (`navy_stock` > 0). A partner that ALSO
+/// holds `non_aggression` with the attacker ABSTAINS -- it is bound not to
+/// fight the attacker -- and is counted in @p abstained. Each projects from
+/// its BUILT PORTS (every region it holds, `region::nation`, with
+/// `port_stock_q` > 0, at the nearest sea tile within @p radius); a fleet with
+/// no built port projects from its SEAT'S COAST (its capital's nearest sea
+/// tile). Sorted by polity id. Empty for @p realm < 0.
+std::vector<fleet_defender> crossing_defenders(const history_sim_state& s, const std::vector<region>& regions,
+                                               int realm, int attacker,
+                                               const std::vector<std::uint8_t>& sea, int gw, int gh,
+                                               int radius, int64_t* abstained);
+
+/// BL-1152 -- IS A CROSSING OUT-PROJECTED AT SEA? The leg is the sea walk from
+/// @p hub_tile (the attacker's staging coast) to @p landing_tile (the target's
+/// coast), priced with the current. At each tile of it, in walk order, the
+/// attacker's power is its fleet decayed from the hub's coast and the
+/// defenders' is the SUM of their fleets decayed from their own ports
+/// (`fleet_power_at`, one halving distance). The first tile where the
+/// defenders' power outweighs the attacker's stops the crossing; `stopper` is
+/// the defender projecting the most there (ties to the lower id). No leg, no
+/// defender with a fleet, or @p halving_tiles <= 0: never stopped.
+struct crossing_verdict
+{
+    bool    leg       = false; ///< a sea walk joined the two coasts
+    bool    stopped   = false;
+    int     stopper   = -1;
+    int     stop_tile = -1;
+    int64_t attacker_power = 0, defender_power = 0; ///< at the stop tile
+    int     leg_tiles = 0;
+};
+/// The sea fields the fleet gate reads, memoised for the SPAN. Each is keyed
+/// by exactly what it is a function of -- a staging coast tile, or a
+/// defender's sorted port tiles -- over a sea mask and a current field that do
+/// not move in a span, so an entry can never go stale and no answer depends on
+/// whether it is found or rebuilt. Bounded first-in-first-out (`cap_*`, set by
+/// the sim from the grid's size); eviction changes cost, never a result.
+struct fleet_field_cache
+{
+    std::vector<std::pair<int, std::shared_ptr<const sea_field>>> hub; ///< (coast tile, field + walk)
+    std::vector<std::pair<std::vector<int>, std::shared_ptr<const std::vector<int64_t>>>> ports;
+    std::size_t cap_hub = 32, cap_ports = 64;
+    int64_t built_hub = 0, built_ports = 0, hits = 0; ///< cost readout only
+};
+crossing_verdict judge_crossing(const std::vector<std::uint8_t>& sea, int gw, int gh,
+                                const ocean_current_field* currents, int weight_q, int64_t halving_tiles,
+                                int hub_tile, int landing_tile, int64_t attacker_navy,
+                                const std::vector<fleet_defender>& defenders,
+                                fleet_field_cache* cache = nullptr);
+
+/// BL-1152 review -- THE COASTS A CROSSING SAILS BETWEEN. @p comp labels each
+/// sea tile's water (`sea_components`); @p hub_ring and @p tgt_ring are the
+/// staging region's and the target's coast tiles in ring order
+/// (`sea_tiles_by_ring`). The landing is the first target tile whose water any
+/// hub tile shares, the embarkation the first hub tile in that water. False
+/// (no leg: the crossing is not wet-capable) when no water joins them.
+bool fleet_coasts(const std::vector<int>& comp, const std::vector<int>& hub_ring, const std::vector<int>& tgt_ring,
+                  int* hub_tile, int* landing);
+
+/// BL-1152 review -- @p total split in proportion to @p weights (each >= 0),
+/// floors first, the remainder one each to the largest remainders, ties to the
+/// lower @p index (a region index per weight). Sums to @p total whenever any
+/// weight is positive; integer and exact over a 128-bit product.
+std::vector<int64_t> split_by_largest_remainder(int64_t total, const std::vector<int64_t>& weights,
+                                                const std::vector<int>& index);
+
+/// BL-1152 -- the men a fleet lifts: `navy x men_per_hull` (0 with no
+/// fleet), or -1 = unbounded where @p men_per_hull <= 0.
+int64_t fleet_lift_capacity(int64_t navy, int64_t men_per_hull);
+
+/// BL-1147 (review) -- WHICH REGIONS' CELLS TOUCH THE SEA, kept incrementally.
+/// A region's cell is the settlement partition's (the tiles nearest its
+/// anchor, Chebyshev with columns wrapping, ties to the lower region index --
+/// `update_urban_ground`'s rule); it touches the sea where one of its LAND
+/// tiles has a sea tile (`is_sea`; a lake is not sea) among its four cardinal
+/// neighbours. Only those shore tiles are kept, so appending a region costs one
+/// pass over the shore. Regions are only ever appended; a table that shrank,
+/// or another raster, is measured again from nothing. Pure bookkeeping: reads
+/// the anchors and the ground, writes nothing a region carries.
+struct coast_cells
+{
+    std::vector<int32_t> shore;       ///< raster indices of land tiles 4-adjacent to sea, ascending
+    std::vector<int32_t> owner, dist; ///< per shore tile: the region whose cell holds it, its distance
+    std::vector<int32_t> count;       ///< per region: shore tiles in its cell
+    std::size_t raster_size = 0, measured = 0;
+};
+void update_coast_cells(coast_cells& c, const std::vector<region>& regions,
+                        const std::vector<terrain_substrate>& substrate, int gw, int gh);
+inline bool cell_touches_sea(const coast_cells& c, std::size_t ri)
+{
+    return ri < c.count.size() && c.count[ri] > 0;
+}
+
+/// BL-1147 -- A POLITY'S NAVAL POINTS, deed by deed: its ledger
+/// (`polity::naval_coastal_years`, `naval_crossings`, `naval_sea_techs`) times
+/// the three weights, and their sum. What a reader reads to see why a polity
+/// has its fleet. Assumes the weights in domain (`naval_points_params_valid`).
+struct naval_points_split
+{
+    int64_t coast = 0, crossings = 0, techs = 0, total = 0;
+};
+naval_points_split naval_points_of(const polity& q, const history_sim_params& p);
+
+/// BL-1147: the three weights and the conversion each in [0, 100000].
+bool naval_points_params_valid(const history_sim_params& p);
+
+/// BL-1147 -- THE FLEET A POLITY'S POINTS CARRY: points x
+/// `naval_points_navy_per_1000` / 1000 hulls for a LIVING polity; 0 for a
+/// dead one, at a conversion of 0, or with the constants out of domain. Pure;
+/// the resumed open adds exactly this to each polity's `navy_stock`.
+int64_t naval_opening_fleet(const polity& q, const history_sim_params& p);
 
 /// THE MARGINAL TRADE A BINDING WOULD OPEN, ignoring the clause gate —
 /// computable before the pair binds, which is what `treaty_value_q` needs.
@@ -5331,6 +6269,10 @@ struct exploration_output
     /// for them. Copied from `history_sim_state`, never re-derived.
     int64_t provinces_bought            = 0;
     int64_t treasury_spent_on_purchases = 0;
+
+    /// BL-1152 -- the span's fleet ledger (`history_sim_state::fleet`), copied:
+    /// the crossings the fleet stopped, by whom, and the men it left ashore.
+    fleet_ledger fleet;
 
     /// BL-1036 -- the civilisation and universal-creed records this span's
     /// run held at its close, in index order: the tables the carried

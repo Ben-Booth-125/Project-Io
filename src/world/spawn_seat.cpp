@@ -2,6 +2,7 @@
 
 #include "components.hpp"
 #include "market_clearing.hpp" // market_for_tile — the score's own catchment partition
+#include "corporation_generation.hpp" // BL-1154: the seat opens unarmed
 
 #include <algorithm>
 #include <random>
@@ -82,6 +83,10 @@ double seat_landscape_score(const world& w, const landscape_score& landscape,
         const auto bit = w.buildings.find(bid);
         if (bit == w.buildings.end())
             continue;
+        // BL-1154 review: a military base is not a holding the seat keeps (the
+        // seat opens unarmed, `move_seat_force`), so it is never scored.
+        if (bit->second.type == building_type::military_base)
+            continue;
         if (w.tiles.find(bit->second.tile) == w.tiles.end())
             continue;
         ++sited;
@@ -157,6 +162,10 @@ spawn_seat_result rank_spawn_candidates(const world& w, const landscape_score& l
         {
             const auto bit = w.buildings.find(bid);
             if (bit == w.buildings.end())
+                continue;
+            // BL-1154 review: the menu ranks what the seat will HOLD, and the
+            // seat opens unarmed — a rival's muster base is not counted.
+            if (bit->second.type == building_type::military_base)
                 continue;
             if (bit->second.type == building_type::processing_facility)
                 c.has_processor = true;
@@ -269,10 +278,17 @@ bool repoint_player(world& w, entity_id corp)
 {
     if (corp == null_entity || w.corporations.find(corp) == w.corporations.end())
         return false;
+    const entity_id previous = w.player_entity;
     for (auto& [id, cc] : w.corporations)
         cc.is_player = false;
     w.corporations[corp].is_player = true;
     w.player_entity                = corp;
+    // BL-1154 (Ben, 2026-10-01, NR-963 A): THE SEAT OPENS UNARMED, WHICHEVER
+    // CORPORATION IT IS. Rivals were armed at chartering and the generation-time
+    // pick was not; when the seat moves, the new seat's opening force goes and
+    // the corporation it leaves takes the one every rival has. Deterministic and
+    // draw-free: the seeding is a nearest-valid-tile search.
+    move_seat_force(w, previous, corp);   // the rule the pick path shares
     return true;
 }
 

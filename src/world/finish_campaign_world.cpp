@@ -2,6 +2,7 @@
 
 #include "world/campaign_settle.hpp"
 #include "world/corporation_generation.hpp" // assign_default_recipes
+#include "world/economy_system.hpp"        // economy_step_phase_clock (BL-1117)
 #include "world/hard_coded_world.hpp"       // generation_progress, generation_step_cost_ms
 #include "world/history_log.hpp"            // seed_genesis_history
 #include "world/recipe_registry.hpp"
@@ -9,6 +10,7 @@
 #include "world/world.hpp"
 #include "world/world_gen_config.hpp"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdio>
@@ -84,6 +86,16 @@ landscape_search_params campaign_search_params(std::uint32_t world_seed, int cor
     sp.seed                    = world_seed ^ 0x8A21F00Du;
     sp.start.placement_seed    = sp.seed;
     sp.start.corporation_count = corporation_count;
+    // BL-1136 (Ben, 2026-09-26; GENERATION_STRATEGY.md § Phase 6, "The round
+    // count is kept at six"): a round's proposals are scored on two threads.
+    // A budget world proposes two per round (placement and road tier), so two
+    // threads halve the search's wall time; the winner, every scored term and
+    // the whole path are the serial walk's, bit for bit (the determinism
+    // clauses in landscape_search.hpp; `landscape_search_harness --curve
+    // --check-k 6 --check-threads 2` proves it on the curated seeds, all six
+    // rounds -- --check-k defaults to 3, which compares only half the walk --
+    // and the harness's default run holds a threaded budget-world row, R6).
+    sp.thread_count            = k_campaign_search_threads;
     return sp;
 }
 
@@ -152,6 +164,12 @@ finish_campaign_result finish_campaign_world(world& w, const generation_report& 
     out.search    = search_landscape(w, reg, sp);
     apply_landscape_candidate(w, reg, out.search.winner, /*regenerate_specialists=*/true,
                               &out.stockpile.budget, out.spend, &out.charter);
+    // BL-1086 (the review's R4): a budget world laid no roster in generation,
+    // so the loading screen's charter ledger is published HERE, from the
+    // winner's web as it was just chartered. Write-only; a report the legacy
+    // branch left untouched holds no charter and publishes nothing, so a world
+    // with no budget keeps the rows generation published.
+    publish_charter_web(progress, w, out.charter);
     // BL-1099: THE CHARTERS ARE DATED against the Industrialisation record --
     // the cradle's own, the one body the span ran for (every other entry is
     // empty, and an empty record dates every firm at the epoch). Once, on the
@@ -234,19 +252,68 @@ finish_campaign_result finish_campaign_world(world& w, const generation_report& 
     // so the slowest tick can be named below (see the result's field).
     // The lap clock rides the same hook (BL-1117, NR-932): each tick's six lap
     // times are kept so the slowest tick's line names the lap that costs it.
+    //
+    // BL-1117, THE PHASE CLOCK: lap 1 split by run_economy_step's own phases
+    // (`economy_step_phase_clock`, economy_system.hpp) plus the dispatch
+    // that closes the lap, and the count of logistics flood fields lap 1 built
+    // (a size read of a const world). Reported only.
+    //
+    // WHAT THESE CLOCKS FOUND (2026-09-25, Release, seeds 0 and 28), kept so a
+    // regression reads against it. The slow tick WAS the first tick in which any
+    // convoy is committed (tick 0 commits none: no market has cleared, so every
+    // destination's room is zero). That commit's passive-LP gate asked
+    // `nearest_lp_anchor` for the origin's nearest anchor by a per-pair loop over
+    // every city on the body, and each pair flooded a whole-body Dijkstra: ~6,000-
+    // 9,000 floods, 65-88 s, landing in `corp_strategic` when a rival's directed
+    // dispatch committed first (seed 28), in `dispatch` when the auto-dispatcher
+    // did (seed 0). BL-1117 S2 answers it from one field per body; tick 1 now
+    // costs about what the others do. If a tick again runs 30x its neighbours,
+    // read both columns and the flood count first.
+    using econ_row = std::array<std::int64_t, k_economy_step_phase_count + 1>; // + dispatch, us
     struct tick_clock
     {
         fin_clock::time_point      last;
         std::vector<std::int64_t>* ms;
         std::array<fin_clock::time_point, k_campaign_settle_lap_count + 1> laps{};
         std::vector<std::array<std::int64_t, k_campaign_settle_lap_count>> lap_ms;
+        economy_step_phase_clock   econ{};
+        std::vector<econ_row>      econ_us;
+        std::size_t                floods_before = 0;
+        std::vector<std::size_t>   floods_built;
+        std::vector<std::size_t>   floods_alive; ///< After each tick: the memory the fields hold.
     } tc{t_settle, &out.settle_tick_ms};
     settle_tick_hooks hooks;
     hooks.ctx       = &tc;
     hooks.lap_clock = &tc.laps;
-    hooks.after_lap = [](const world&, int lap, void* ctx) {
-        if (lap != k_campaign_settle_lap_count - 1) return;
+    hooks.after_lap = [](const world& hw, int lap, void* ctx) {
         auto* c = static_cast<tick_clock*>(ctx);
+        if (lap == 0)
+        {
+            c->floods_before = hw.logistics_flood_fields.size();
+            return;
+        }
+        if (lap == 1)
+        {
+            const auto us = [](fin_clock::time_point a, fin_clock::time_point b) {
+                return static_cast<std::int64_t>(
+                    std::chrono::duration_cast<std::chrono::microseconds>(b - a).count());
+            };
+            econ_row row{};
+            for (int i = 0; i < k_economy_step_phase_count; ++i)
+                row[static_cast<std::size_t>(i)] =
+                    us(c->econ.stamps[static_cast<std::size_t>(i)],
+                       c->econ.stamps[static_cast<std::size_t>(i) + 1]);
+            row[k_economy_step_phase_count] =
+                us(c->econ.stamps[k_economy_step_phase_count], c->laps[2]); // dispatch
+            c->econ_us.push_back(row);
+            const std::size_t now_floods = hw.logistics_flood_fields.size();
+            // A cache clear inside the lap shrinks the map: then report what stands.
+            c->floods_built.push_back(now_floods >= c->floods_before ? now_floods - c->floods_before
+                                                                     : now_floods);
+            return;
+        }
+        if (lap != k_campaign_settle_lap_count - 1) return;
+        c->floods_alive.push_back(hw.logistics_flood_fields.size());
         const fin_clock::time_point now = fin_clock::now();
         c->ms->push_back(ms_between(c->last, now));
         c->last = now;
@@ -256,7 +323,19 @@ finish_campaign_result finish_campaign_world(world& w, const generation_report& 
                 ms_between(c->laps[static_cast<std::size_t>(i)], c->laps[static_cast<std::size_t>(i) + 1]);
         c->lap_ms.push_back(row);
     };
-    run_settle(w, reg, k_campaign_settle_ticks, &hooks, progress);
+    {
+        // Armed for the settle only, and disarmed on every exit: the sink is
+        // thread-local and `tc` is this frame's, so a throw must not leave a
+        // later tick on this thread stamping into a dead frame.
+        struct arm_guard
+        {
+            explicit arm_guard(economy_step_phase_clock* c) { economy_step_phase_clock_sink() = c; }
+            ~arm_guard() { economy_step_phase_clock_sink() = nullptr; }
+            arm_guard(const arm_guard&)            = delete;
+            arm_guard& operator=(const arm_guard&) = delete;
+        } armed{&tc.econ};
+        run_settle(w, reg, k_campaign_settle_ticks, &hooks, progress);
+    }
     out.ms_settle = ms_between(t_settle, fin_clock::now());
     report_step_ms(progress, k_label_settle, out.ms_settle);
     close_steps(progress);
@@ -282,6 +361,45 @@ finish_campaign_result finish_campaign_world(world& w, const generation_report& 
                         static_cast<long long>(tc.lap_ms[static_cast<std::size_t>(slowest)]
                                                         [static_cast<std::size_t>(i)]),
                         i + 1 < k_campaign_settle_lap_count ? ";" : "");
+        std::printf("\n");
+    }
+    // BL-1117: lap 1 by phase for the slowest tick and for the median one (the
+    // typical tick the slow one is read against).
+    const auto print_phases = [&](int t, const char* which) {
+        if (t < 0 || static_cast<std::size_t>(t) >= tc.econ_us.size()) return;
+        const econ_row& r = tc.econ_us[static_cast<std::size_t>(t)];
+        std::printf("[finish_campaign_world] %s tick %d lap 1 by phase:", which, t);
+        for (int i = 0; i < k_economy_step_phase_count; ++i)
+            std::printf(" %s %lld ms;", k_economy_step_phase_names[i],
+                        static_cast<long long>(r[static_cast<std::size_t>(i)] / 1000));
+        std::printf(" dispatch %lld ms; flood fields built %zu\n",
+                    static_cast<long long>(r[k_economy_step_phase_count] / 1000),
+                    tc.floods_built[static_cast<std::size_t>(t)]);
+    };
+    print_phases(slowest, "slowest");
+    {
+        std::vector<int> order(out.settle_tick_ms.size());
+        for (std::size_t i = 0; i < order.size(); ++i) order[i] = static_cast<int>(i);
+        std::sort(order.begin(), order.end(), [&](int a, int b) {
+            const std::int64_t ma = out.settle_tick_ms[static_cast<std::size_t>(a)];
+            const std::int64_t mb = out.settle_tick_ms[static_cast<std::size_t>(b)];
+            return ma != mb ? ma < mb : a < b;
+        });
+        if (!order.empty() && order[order.size() / 2] != slowest)
+            print_phases(order[order.size() / 2], "median");
+    }
+    std::printf("[finish_campaign_world] each settle tick, ms:");
+    for (const std::int64_t ms : out.settle_tick_ms)
+        std::printf(" %lld", static_cast<long long>(ms));
+    std::printf("\n[finish_campaign_world] each settle tick's lap 1 dispatch, ms:");
+    for (const econ_row& r : tc.econ_us)
+        std::printf(" %lld", static_cast<long long>(r[k_economy_step_phase_count] / 1000));
+    std::printf("\n");
+    if (!tc.floods_alive.empty())
+    {
+        std::printf("[finish_campaign_world] flood fields alive after each settle tick:");
+        for (const std::size_t n : tc.floods_alive)
+            std::printf(" %zu", n);
         std::printf("\n");
     }
     std::fflush(stdout);

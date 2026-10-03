@@ -10,6 +10,32 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-09-25 (evening) — Sprint 48 cut: the world moves forward
+
+**Runtime:** in progress (from ~17:30); modes Design (the cut form), then Delivery Full (wave 1:
+five worktree lanes plus one main-session item).
+
+### The cut
+- **Ben's form** (`b03fd52e`): all seven tagged items; BL-1117 (settle tick one) in with its fix, so
+  round 6's 35 s is judged on the whole tail; the lane form chosen now on today's lanes; Next waits
+  for its round (STARTUP.md); BL-1077 (village roads cost) folded into BL-1119 (roads tree); BL-1003
+  (pools per market) closes on its one pending row; BL-1114 (epoch 0 retired) in.
+- **Ben's note filed BL-1125 (markets can die)**: "making sure markets can be destroyed, so that the
+  end result never has too many markets". MARKETS.md says a market never disappears; a shell stands
+  at every capital alive in 1200 and nothing un-marks one that falls later. The mechanism is his,
+  against a census the census lane is taking.
+- **Found at the cut:** STARTUP.md said round 6's time goes to the road pass. BL-1117's reading says
+  the settle costs about as much (seed 0: ~56 s, tick 1 38.5 s), so the doc now names both.
+
+### What landed
+- **BL-1114 (epoch 0 retired)** (`a723f25e`): `--epoch 0` exits with a message; the band path was
+  already gone with BL-1101; two harnesses moved to 1960; `world_determinism` R3.8 now compares 1900
+  with 1960; digests unmoved.
+
+### In flight
+- Wave 1 lanes: the cursor (BL-1084 K1-K3), roads (BL-1119 tree and floor table), settle (BL-1117
+  reading), UI (BL-1118 legends, BL-1124 three lane forms), census (BL-1125, BL-1003 R6).
+
 ## 2026-09-25 (afternoon) — Sprint 47 closed: the re-bless applied, every call ruled, two live walks, v0.1.26 — version 0.1.26
 
 **Runtime:** ~6 h wall clock (12:15–18:00), one main session, no agents; modes Delivery (the

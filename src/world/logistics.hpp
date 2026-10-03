@@ -49,16 +49,38 @@ float tile_traversal_cost(const tile_component& tc);
 /// an empty vector for an unknown body.
 const std::vector<entity_id>& body_tile_grid(world& w, entity_id body);
 
-/// Terrain-weighted A* between two tiles on the same body, with cylinder wrap and the
-/// road discount; caches on world.astar_cost_cache under a canonicalised endpoint key
-/// (edge cost is the average of the two tiles' costs, so the path is symmetric). Returns
-/// {reachable=false} if either tile is unknown or not on `body`.
+/// Terrain-weighted least-cost path between two tiles on the same body, with cylinder
+/// wrap, the road discount and the river discount. Returns {reachable=false} if either
+/// tile is unknown or not on `body`.
+///
+/// DIRECTED, AND A PURE FUNCTION OF THE ORDERED PAIR (BL-1126, path cost reads the
+/// cache; LOGISTICS.md § 1). A river discounts an edge one way only, so the cost is
+/// always the travel cost @p src_tile -> @p dst_tile, read from @p dst_tile's flood
+/// field (built if absent) and never from @p src_tile's, and cached on
+/// world.astar_cost_cache under the ORDERED key (body, src, dst). The answer is the
+/// same warm or cold, before or after a load. `tiles` stays stored lo -> hi (a
+/// reader wanting travel order flips it when src is the higher id).
 ///
 /// Returns a reference into the cache (BL-362: a cache hit used to copy the whole tile
 /// vector). Valid until invalidate_logistics_caches clears the map — read or copy it
 /// before any call that can invalidate; never mutate it through a cast.
 const logistics_path& intra_body_path(world& w, entity_id body, entity_id src_tile,
                                       entity_id dst_tile);
+
+/// Every cell of @p body whose travel cost TO @p anchor_tile is at most
+/// @p max_cost, as (raster index, cost) pairs in settle order (cost
+/// ascending). The same directed edge weights `intra_body_path`'s flood
+/// relaxes (landform x road x river, a water cell at the sea weight, cylinder
+/// wrap), so with @p land_only false a cell's cost here equals
+/// intra_body_path(cell, anchor).cost wherever both are within reach. That is
+/// a PATH cost, not a convoy's bill: a convoy also needs a port at both ends to
+/// cross water and is billed per mode. @p land_only true never enters a water
+/// cell (the anchor itself is always settled). A bounded Dijkstra, NOT cached
+/// and touching no cache but the raster index (`body_tile_grid`). BL-1125: the
+/// gravity fold's reach.
+std::vector<std::pair<int, float>> bounded_cost_to_tile(world& w, entity_id body,
+                                                        entity_id anchor_tile, float max_cost,
+                                                        bool land_only);
 
 // ---------------------------------------------------------------------------
 // Logistics reach (BL-323 S2 — the placement-side "breadth must cost something")
@@ -125,6 +147,8 @@ inline void invalidate_logistics_caches(world& w)
     w.astar_cost_cache.clear();
     w.logistics_flood_fields.clear(); // same contract: any traversal/anchor change stales it
     w.body_reach_cost.clear();
+    w.lp_anchor_fields.clear();       // BL-1117: road-weighted and anchor-keyed, so it stales
+                                      // on exactly the events the three above do
 }
 
 /// True when a state change on this building TYPE can alter a cached logistics
@@ -192,17 +216,36 @@ using lp_pool_map = std::unordered_map<entity_id, std::unordered_map<entity_id, 
 std::unordered_map<entity_id, float>& lp_pool_for_body(lp_pool_map& pools_by_body, world& w,
                                                         entity_id body, float lp_per_anchor_tick);
 
-/// The anchor tile in @p pool (a body's per-anchor LP pool) nearest to
-/// @p from_tile by `intra_body_path` cost — deterministic tiebreak: lowest
-/// cost, then lowest tile id, so hash-map iteration over @p pool cannot
+/// An anchor tile in @p pool (a body's per-anchor LP pool) at least
+/// intra-body path cost from @p from_tile (`intra_body_path(from_tile, anchor)`,
+/// origin -> anchor), with a FIXED CHOICE among exact ties — usually the lowest
+/// tile id, not always (logistics.cpp § build_lp_anchor_field: rounding can
+/// fold a one-ulp gap into a tie) — so hash-map iteration over @p pool cannot
 /// matter. Returns `null_entity` if none of @p pool's anchors is reachable
 /// from @p from_tile. Factored out of BL-596's `run_unit_march` (its own
 /// inline nearest-anchor reduction over a marching unit's current position)
 /// so BL-597's `commit_convoy` reuses it for a convoy's dispatch tile rather
 /// than inventing a second anchor-selection rule (LOGISTICS.md rule 2: adopt
 /// the node half, refuse a second distance model).
+///
+/// ONE FIELD PER BODY (BL-1117, settle tick one). Answered from the body's
+/// `lp_anchor_field` — one multi-source Dijkstra over @p pool's anchors, built
+/// on first use and cached on `world::lp_anchor_fields` — never from the
+/// per-pair path cache. The cost is the anchor's own flood distance at
+/// @p from_tile — the from_tile -> anchor travel cost `intra_body_path` reads
+/// for this pair — so the answer is a pure function of the body's tiles and
+/// @p pool's KEY SET: identical warm or cold, before or after a load. Builds no
+/// `logistics_flood_fields` entry.
 entity_id nearest_lp_anchor(world& w, entity_id body, entity_id from_tile,
                             const std::unordered_map<entity_id, float>& pool);
+
+/// The nearest-anchor field @p nearest_lp_anchor answers from, over @p pool's
+/// key set (built or rebuilt as needed). Exposed for the purity/exactness
+/// harness (tools/verify/lp_anchor_field_check.cpp) and for a future
+/// Throughput lens; the reference is valid until the next logistics-cache clear
+/// or the next call for this body with a different anchor set.
+const lp_anchor_field& body_lp_anchor_field(world& w, entity_id body,
+                                            const std::unordered_map<entity_id, float>& pool);
 
 // ---------------------------------------------------------------------------
 // Physical scale and travel time (Ben, 2026-08-12)
@@ -279,10 +322,11 @@ int convoy_travel_ticks(const world& w, entity_id body, const logistics_path& pa
 // and the picture cannot disagree about where a convoy is.
 //
 // THE ORIENTATION RULE LIVES HERE, and that is the point of the move.
-// `intra_body_path` caches on a canonicalised (lo, hi) endpoint key and
-// canonicalises its reconstructed tile sequence to lo->hi to match — so the
-// cached path runs source->destination only when the source tile happens to be
-// the numerically lower id. Every reader therefore owes a conditional reverse.
+// `intra_body_path` caches on the ORDERED (src, dst) key (BL-1126: a path is
+// directed) but stores its reconstructed tile sequence lo->hi whichever way the
+// pair was asked — so the cached path runs source->destination only when the
+// source tile happens to be the numerically lower id. Every reader therefore
+// owes a conditional reverse.
 // A reader that forgets it puts the head at the WRONG END of the lane roughly
 // half the time, and on screen the beam looks fine either way, so nothing
 // catches it. One owner of the rule, asserted in both directions by

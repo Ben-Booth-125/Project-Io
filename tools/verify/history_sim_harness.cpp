@@ -33,6 +33,7 @@
 
 #include "world/hard_coded_world.hpp"
 #include "world/history_sim.hpp"
+#include "world/population_generation.hpp"
 #include "world/sim_terrain_build.hpp"
 #include "world/unit_roster.hpp"
 #include "world/settlement.hpp"
@@ -1829,12 +1830,41 @@ int main()
         check(outpost_near.network_supply_q > params.sustainable_settlement_floor_q,
               "BL872a1 the near case actually lands above the settlement floor (not vacuous)");
 
-        check(outpost_near.centres > 1,
-              "BL872a2 well-supplied ground grows PAST its opening seed as population arrives");
+        // BL-1141 (Ben, 2026-09-26: a region deepens into one place) SUPERSEDES
+        // the reading these two rows were written to: growth now makes the one
+        // place bigger, never more numerous, so "grows past its opening seed"
+        // is read in HEADS and the network gate is read where it still bites —
+        // whether a settlement STANDS on ground that holds none (a4, below).
+        // NOT A SUPPLY TEST (the centres cold review, 2026-09-26): cut-off
+        // ground grows its heads too (a6), so this row cannot tell supplied
+        // from cut-off ground and says only what it checks. a4 is the supply test.
+        check(outpost_near.centres == 1 && outpost_near.urban_population > region_centre_heads,
+              "BL872a2 supplied ground grows past its opening seed in HEADS and stays ONE place "
+              "(not a supply test: a4 is)");
         check(outpost_far.centres == 1,
               "BL872a3 CUT OFF ground stops growing centres — it keeps its opening seed, no more");
-        check(outpost_near.centres > outpost_far.centres,
-              "BL872a4 the SAME ground grows strictly more centres well-supplied than cut off");
+        {
+            // The same two runs with each outpost's seed razed before the run
+            // began: supplied ground stands its settlement again once its heads
+            // reach a village's worth; cut-off ground stands none.
+            settlement_state z_near = one_polity_two_regions(5);
+            settlement_state z_far  = one_polity_two_regions(5);
+            for (settlement_state* w : {&z_near, &z_far})
+            {
+                for (region& r : w->regions)
+                    draw_region_urban(r);
+                w->regions[1].centres = 0;
+            }
+            run_history_sim(z_near, nullptr, no_terrain, syn_gw, syn_gh, near, 812u);
+            run_history_sim(z_far,  nullptr, no_terrain, syn_gw, syn_gh, far,  812u);
+            std::printf("      razed seed: near centres=%d urban=%lld | far centres=%d urban=%lld\n",
+                        z_near.regions[1].centres,
+                        static_cast<long long>(z_near.regions[1].urban_population),
+                        z_far.regions[1].centres,
+                        static_cast<long long>(z_far.regions[1].urban_population));
+            check(z_near.regions[1].centres == 1 && z_far.regions[1].centres == 0,
+                  "BL872a4 the SAME ground stands a settlement again well-supplied, and none cut off");
+        }
 
         // FREEZE, NOT RAZE (this item's other open question). The cut-off
         // Outpost's `centres_razed` must stay zero — nobody sacked these
@@ -1851,6 +1881,552 @@ int main()
         check(outpost_far.population > 0 && outpost_far.urban_population > region_centre_heads,
               "BL872a6 population and urban share still grow on cut-off ground — only NEW "
               "centres are gated, not the demography the gate reads");
+    }
+
+    // ---------------------------------------------------------------------
+    // BL-1141 — a region deepens into one place, and its points go with its
+    // people (POPULATION.md § Generation). Pure fixtures on the region record
+    // and the two points rules the sim calls: no run, no terrain.
+    // ---------------------------------------------------------------------
+    {
+        // D1 THE RUNGS. A place's scale is the rung its heads reached, read off
+        // `k_population_for_scale` (thousands): one head short of a rung is the
+        // rung below, the rung's own count is the rung.
+        bool rungs = scale_reached(0) == 1;
+        for (int i = 1; i < 5; ++i)
+        {
+            const int64_t at = static_cast<int64_t>(k_population_for_scale[i]) * 1000;
+            rungs = rungs && scale_reached(at - 1) == i && scale_reached(at) == i + 1;
+        }
+        rungs = rungs && scale_reached(int64_t{1} << 40) == 5;
+        std::printf("      rungs at %d / %d / %d / %d thousand heads\n", k_population_for_scale[1],
+                    k_population_for_scale[2], k_population_for_scale[3], k_population_for_scale[4]);
+        check(rungs, "BL1141d1 scale_reached steps at each rung's own headcount, and not a head before");
+        check(region_centres_wanted(region_centre_heads - 1) == 0
+              && region_centres_wanted(region_centre_heads) == 1
+              && region_centres_wanted(int64_t{1} << 40) == 1,
+              "BL1141d2 a village's worth of heads stands ONE centre, and no number of heads stands two");
+
+        // D3 THE HANDOFF. Region 0 of realm 0 lost its settlement holding
+        // points. Its realm's centres stand at distance 10 (region 1), 3
+        // (region 2) and 3 (region 4); region 3, at distance 1, is another
+        // realm's. The points go to region 2: the nearest of its own realm, the
+        // tie with region 4 to the lower index.
+        const int tgw = 64;
+        std::vector<region> t(5);
+        const int cols[5] = { 10, 20, 13, 11, 7 };
+        for (int k = 0; k < 5; ++k)
+        {
+            t[static_cast<std::size_t>(k)].col = cols[k];
+            t[static_cast<std::size_t>(k)].row = 5;
+            t[static_cast<std::size_t>(k)].population = 50000;
+            t[static_cast<std::size_t>(k)].urban_population = 20000;
+            t[static_cast<std::size_t>(k)].centres = 1;
+        }
+        t[0].centres = 0;
+        t[0].industry_points = 700;
+        t[0].industry_points_from_treasury = 300;
+        const std::vector<int> owner = { 0, 0, 0, 1, 0 };
+        const bool moved = rehome_stranded_points(t, owner, 0, tgw);
+        std::printf("      handoff: points on 0..4 = %lld %lld %lld %lld %lld\n",
+                    static_cast<long long>(t[0].industry_points), static_cast<long long>(t[1].industry_points),
+                    static_cast<long long>(t[2].industry_points), static_cast<long long>(t[3].industry_points),
+                    static_cast<long long>(t[4].industry_points));
+        check(moved && t[2].industry_points == 700 && t[2].industry_points_from_treasury == 300
+              && t[0].industry_points == 0 && t[1].industry_points == 0 && t[3].industry_points == 0
+              && t[4].industry_points == 0,
+              "BL1141d3 a settlement's points pass whole to its realm's NEAREST centre "
+              "(never a nearer foreign one; a tie to the lower index)");
+        // ...and nowhere at all where the realm stands no other centre.
+        t[3].centres = 0;
+        t[3].industry_points = 400;
+        check(!rehome_stranded_points(t, owner, 3, tgw) && t[3].industry_points == 400,
+              "BL1141d4 a realm with no other centre keeps the points where they are (never dropped)");
+
+        // D5 THE CLOSE'S RETRY, AND A SACK KEEPS ITS POINTS. Region 3's realm
+        // stands a centre by the close (region 4 changes hands), so the retry
+        // hands region 3's points on. Region 1 is SACKED to nothing holding
+        // points: the sack moves none of them, and the sim records that a sack
+        // ended it (`on_ruin`, as `run_history_sim` does at the conquest), so
+        // the retry skips the ruin (NR-901: the points went with the towns).
+        //
+        // D8 THE REVIEW'S SCENARIO: region 5 was conquered and SACKED long ago
+        // (its razings stand in the record) but its settlement survived that;
+        // it lost it later to ground loss, when its realm stood no other
+        // centre, and by the close its realm holds a town again. A razing in
+        // its PAST is not a ruin: the close hands its points on.
+        t[1].industry_points = 900;
+        sack_region_urban(t[1], /*population_loss_q=*/1000);
+        region old_sack;
+        old_sack.col = 30;
+        old_sack.row = 5;
+        old_sack.population = 40000;
+        old_sack.urban_population = 8000;
+        old_sack.centres = 0;        // its ground was taken (not a sack)
+        old_sack.centres_razed = 3;  // sacked centuries before, and survived it
+        old_sack.industry_points = 250;
+        t.push_back(old_sack);
+        const std::vector<int>     owner_at_close = { 0, 0, 0, 1, 1, 0 };
+        const std::vector<uint8_t> on_ruin        = { 0, 1, 0, 0, 0, 0 }; // region 1: a sack ended it
+        const int retried = rehome_stranded_at_close(t, owner_at_close, on_ruin, tgw);
+        std::printf("      close: retried %d; region 1 centres %d razed %d points %lld; "
+                    "region 3 points %lld; region 4 points %lld; old-sack region 5 points %lld -> "
+                    "region 2 %lld\n",
+                    retried, t[1].centres, t[1].centres_razed,
+                    static_cast<long long>(t[1].industry_points),
+                    static_cast<long long>(t[3].industry_points),
+                    static_cast<long long>(t[4].industry_points),
+                    static_cast<long long>(t[5].industry_points),
+                    static_cast<long long>(t[2].industry_points));
+        check(retried == 2 && t[3].industry_points == 0 && t[4].industry_points == 400,
+              "BL1141d5 points left behind are retried at the span's close, to the realm's centre as the map then stands");
+        check(t[1].centres == 0 && t[1].centres_razed > 0 && t[1].industry_points == 900,
+              "BL1141d6 a SACK keeps its points on the ruin: the sack moves none and the close skips it");
+        check(t[5].industry_points == 0 && t[2].industry_points == 950,
+              "BL1141d8 a razing in a region's PAST is not a ruin: a settlement a sack survived, "
+              "lost later to ground loss, hands its points on at the close");
+
+        // D7 A RAZING IS COUNTED IN PEOPLE, UNCAPPED. A sack that halves a
+        // ten-million city costs it 500 village-worths of heads; the capped
+        // size the prize reads saturates at 32 and would have recorded none.
+        region big;
+        big.farm_q = 800;
+        big.population = 12000000;
+        big.urban_population = 10000000;
+        big.centres = 1;
+        sack_region_urban(big, /*population_loss_q=*/250); // the city loses twice that: 500 per mille
+        std::printf("      sacked metropolis: urban %lld, razed %d\n",
+                    static_cast<long long>(big.urban_population), big.centres_razed);
+        check(big.urban_population == 5000000 && big.centres_razed == 500,
+              "BL1141d7 a razing is counted in village-worths of heads lost, uncapped (a halved ten-million city: 500)");
+    }
+
+    // ---------------------------------------------------------------------
+    // BL-1137 — the urbanisation stream, rebuilt under NR-958 (a migrant
+    // carries its food with it; a sack never lowers a region's ceiling).
+    // Fixtures on the region record. The conservation rows (s3, s4) are
+    // written on the move and sack primitives alone, so the same rows build
+    // against the first build and show what it broke; the rows between the
+    // [rebuild-api] markers read functions only the rebuild has.
+    // ---------------------------------------------------------------------
+    {
+        const auto make_region = [](int farm_q, int64_t population, int64_t urban) {
+            region r;
+            r.farm_q = farm_q;
+            r.population = population;
+            r.urban_population = urban;
+            r.centres = urban >= region_centre_heads ? 1 : 0;
+            return r;
+        };
+        const auto ceiling_of = [](int farm_q) { return region_carrying_capacity(farm_q, 0); };
+
+        // S5 CENTRES FOLLOW THE HEADS BOTH WAYS. A village whose heads shrink
+        // below a village's worth is ABANDONED — people leaving, not a sack, so
+        // nothing is razed. A seed below a village's worth that is GROWING is
+        // kept: only a shrinking count abandons.
+        region shrinking = make_region(500, 50000, region_centre_heads + 400); // target 6,000 heads
+        region growing   = make_region(500, 50000, 2000);
+        growing.centres  = 1; // the draw's seed, standing before its heads reach a village's worth
+        int years_to_abandon = -1;
+        for (int y = 0; y < 20; ++y)
+        {
+            advance_region_urban(shrinking, /*network_ok=*/true);
+            advance_region_urban(growing,   /*network_ok=*/true);
+            if (years_to_abandon < 0 && shrinking.centres == 0) years_to_abandon = y + 1;
+        }
+        std::printf("      both ways: shrinking village abandoned after %d years at %lld heads (razed %d); "
+                    "growing seed centres=%d at %lld heads\n",
+                    years_to_abandon, static_cast<long long>(shrinking.urban_population),
+                    shrinking.centres_razed, growing.centres,
+                    static_cast<long long>(growing.urban_population));
+        check(years_to_abandon > 0 && shrinking.urban_population < region_centre_heads
+              && shrinking.centres_razed == 0,
+              "BL1137s5 a centre whose heads shrink below a village's worth is ABANDONED, never razed");
+        check(growing.centres == 1,
+              "BL1137s6 a seed below a village's worth that is GROWING keeps its centre");
+
+        // S3 THE CEILING IS CONSERVED BY A MOVE. Two regions at their ceilings;
+        // 50,000 of the source's countryside move to the town's works. Three
+        // centuries later the world holds exactly the people it held: the
+        // source's emptied countryside has NOT regrown into the ceiling that
+        // left with its people, and the town has not lost them.
+        {
+            region src = make_region(600, ceiling_of(600), 36000);
+            region dst = make_region(800, ceiling_of(800), 60000);
+            const int64_t world_before = src.population + dst.population;
+            const int64_t moved = take_countryside(src, 50000);
+            settle_urban_migrants(dst, moved);
+            const int64_t src_after_move = src.population;
+            for (int y = 0; y < 300; ++y)
+            {
+                advance_region_demography(src, 1, 0);
+                advance_region_demography(dst, 1, 0);
+            }
+            const int64_t world_after = src.population + dst.population;
+            std::printf("      move: %lld heads; world %lld -> %lld after 300 years; source %lld -> %lld\n",
+                        static_cast<long long>(moved), static_cast<long long>(world_before),
+                        static_cast<long long>(world_after), static_cast<long long>(src_after_move),
+                        static_cast<long long>(src.population));
+            check(moved == 50000 && world_after == world_before,
+                  "BL1137s3 a move conserves the world's people for good: the emptied countryside "
+                  "does not regrow into the ceiling that left with it");
+            check(src.population == src_after_move,
+                  "BL1137s3b the source sits AT its lowered ceiling: it regrows nothing into what left");
+        }
+
+        // S4 A SACK MOVES NO ONE OUT OF THE REGION'S COUNT. A town that took
+        // 200,000 of a neighbour's countryside is sacked (its walls lose half
+        // their heads, more than it has works people left inside them). The
+        // turned-out heads scatter into its own countryside: its people are
+        // unchanged by the sack and fifty years after it.
+        {
+            region src  = make_region(600, ceiling_of(600), 36000);
+            region city = make_region(800, ceiling_of(800), 60000);
+            settle_urban_migrants(city, take_countryside(src, 200000));
+            const int64_t before = city.population;
+            sack_region_urban(city, /*population_loss_q=*/250); // the walls lose 500 per mille
+            const int64_t right_after = city.population;
+            for (int y = 0; y < 50; ++y)
+            {
+                advance_region_demography(city, 1, 0);
+                advance_region_urban(city, /*network_ok=*/true);
+            }
+            std::printf("      sacked works town: people %lld -> %lld at the sack -> %lld fifty years on "
+                        "(urban %lld)\n",
+                        static_cast<long long>(before), static_cast<long long>(right_after),
+                        static_cast<long long>(city.population),
+                        static_cast<long long>(city.urban_population));
+            check(right_after == before && city.population == before,
+                  "BL1137s4 a sack moves no one out of the region's count, at the sack or after it");
+        }
+        // [rebuild-api]
+        // S1/S2 THE STREAM ITSELF, one round of `run_urbanisation_stream` over
+        // THE SIM'S OWN LINE TEST (`stream_land_lines`, the object the sim
+        // builds) on a 24 x 6 cylinder of land cut by two one-tile straits
+        // (columns 12 and 19), so the island between them is reached from
+        // nowhere by land. Realm 0 holds a town (0, col 3), a village at its
+        // ceiling (1, col 6), a colony on the island (2, col 16) and a village
+        // at col 22 (4), whose only land line to the town runs the SHORT way
+        // round the cylinder; realm 1 holds region 3 (col 5). The round
+        // conserves the world's people and its ceiling exactly, the colony
+        // sends nobody, the foreign region is untouched, and the far village
+        // sends across the wrap.
+        const int sgw = 24, sgh = 6;
+        std::vector<terrain_substrate> strait_sub(static_cast<std::size_t>(sgw * sgh),
+                                                  terrain_substrate::sedimentary);
+        for (int r = 0; r < sgh; ++r)
+        {
+            strait_sub[static_cast<std::size_t>(r * sgw + 12)] = terrain_substrate::coast;
+            strait_sub[static_cast<std::size_t>(r * sgw + 19)] = terrain_substrate::coast;
+        }
+        const auto at = [](region r, int col, int row) { r.col = col; r.row = row; return r; };
+        {
+            std::vector<region> w;
+            w.push_back(at(make_region(800, 300000, 60000), 3, 2));           // 0: an industrialising town
+            w.push_back(at(make_region(600, ceiling_of(600), 30000), 6, 2));  // 1: a village at its ceiling
+            w.push_back(at(make_region(600, 200000, 10000), 16, 2));          // 2: the colony on the island
+            w.push_back(at(make_region(700, 300000, 40000), 5, 3));           // 3: another realm's
+            w.push_back(at(make_region(600, ceiling_of(600), 30000), 22, 2)); // 4: over the wrap
+            const std::vector<int> own = { 0, 0, 0, 1, 0 };
+            const std::vector<std::vector<int>> nbr = {
+                { 1, 2, 3, 4 }, { 0, 2, 3, 4 }, { 0, 1, 3, 4 }, { 0, 1, 2, 4 }, { 0, 1, 2, 3 } };
+            stream_land_lines lines;
+            lines.substrate = &strait_sub;
+            lines.gw = sgw;
+            lines.gh = sgh;
+            const auto on_land = [&](int a, int b) { return lines.joined(w, a, b); };
+            // The pull is OPEN WORK (Ben, 2026-09-27): jobs beyond the heads already there.
+            const std::vector<int64_t> credit = { 1000, 0, 0, 500, 0 };
+            int64_t people_before = 0, ceiling_before = 0;
+            for (const region& r : w) { people_before += r.population; ceiling_before += region_ceiling(r); }
+            const region colony = w[2], foreign = w[3], far_village = w[4];
+            const urbanisation_round ur = run_urbanisation_stream(w, own, nbr, on_land, credit, 10);
+            int64_t people_after = 0, ceiling_after = 0;
+            for (const region& r : w) { people_after += r.population; ceiling_after += region_ceiling(r); }
+            std::printf("      stream round: moved %lld to %d town(s); people %lld -> %lld; ceiling %lld -> %lld; "
+                        "town industrial %lld\n",
+                        static_cast<long long>(ur.moved), static_cast<int>(ur.destinations.size()),
+                        static_cast<long long>(people_before), static_cast<long long>(people_after),
+                        static_cast<long long>(ceiling_before), static_cast<long long>(ceiling_after),
+                        static_cast<long long>(w[0].industrial_heads));
+            check(ur.destinations.size() == 2 && ur.destinations[0] == 0 && ur.destinations[1] == 3
+                  && people_after == people_before,
+                  "BL1137s1 a stream round conserves the world's people (world total before = after)");
+            check(ceiling_after == ceiling_before && w[1].capacity_carried < 0
+                  && w[0].capacity_carried + w[1].capacity_carried + w[4].capacity_carried == 0,
+                  "BL1137s1b a stream round conserves the world's ceiling: what the town gains the countryside lost");
+            check(w[2].population == colony.population && w[2].capacity_carried == 0
+                  && w[3].population == foreign.population && w[3].capacity_carried == 0,
+                  "BL1137s2 the stream's line stays on land and in the realm: the colony over the strait "
+                  "and the foreign region send nobody across");
+            // Region 3, alone in its realm, fills its 500 jobs from its OWN
+            // countryside: what it gained is exactly what its countryside sent,
+            // counted as moved WITHIN a region, not along a corridor.
+            const int64_t sent3 = foreign.population - (w[3].population - w[3].industrial_heads);
+            check(w[3].industrial_heads == 500 && sent3 == 500 && ur.moved_within >= 500,
+                  "BL1137s2c a centre alone in its realm fills its open work from its own countryside, "
+                  "and that is counted as moved within, not along a corridor");
+            check(w[4].population < far_village.population && w[4].capacity_carried < 0,
+                  "BL1137s2b the line runs the SHORT way round the cylinder: the village over the wrap sends");
+            check(w[0].industrial_heads == 1000 && ur.moved == 1500,
+                  "BL1137s10 the pull is open work: a push past it sends only the 1,000 jobs the town offers");
+        }
+        // S11 OPEN WORK IS SHARED BY OPEN WORK, AND A FULL TOWN DRAWS NOBODY.
+        // Two towns of one realm: A offers 3,000 jobs, B none (its works full);
+        // a village at its ceiling pushes far more. A takes exactly 3,000, B
+        // nothing, and the open work a region's works leave is employed minus urban.
+        {
+            std::vector<region> w;
+            w.push_back(at(make_region(800, 300000, 60000), 3, 2));           // A
+            w.push_back(at(make_region(800, 300000, 60000), 5, 2));           // B
+            w.push_back(at(make_region(600, ceiling_of(600), 30000), 6, 2));  // the village
+            const std::vector<int> own = { 0, 0, 0 };
+            const std::vector<std::vector<int>> nbr = { { 1, 2 }, { 0, 2 }, { 0, 1 } };
+            const std::vector<int64_t> open = { 3000, 0, 0 };
+            const urbanisation_round ur =
+                run_urbanisation_stream(w, own, nbr, [](int, int) { return true; }, open, 10);
+            std::printf("      open work: A took %lld, B took %lld, moved %lld\n",
+                        static_cast<long long>(w[0].industrial_heads),
+                        static_cast<long long>(w[1].industrial_heads), static_cast<long long>(ur.moved));
+            check(w[0].industrial_heads == 3000 && w[1].industrial_heads == 0 && ur.moved == 3000,
+                  "BL1137s11 a destination takes at most its open work, and a town whose works are full draws nobody");
+            // S12 ANY CENTRE WITH OPEN WORK DRAWS (Ben, 2026-10-02): a village of
+            // 20,000 urban heads whose works hire 5,000 more takes them; a region
+            // standing no centre takes nobody, whatever its open work.
+            std::vector<region> v;
+            v.push_back(at(make_region(600, 200000, 20000), 3, 2));           // the village, a centre
+            v.push_back(at(make_region(600, ceiling_of(600), 30000), 4, 2));  // a pushing countryside
+            v.push_back(at(make_region(600, 200000, 5000), 5, 2));            // no centre
+            v[2].centres = 0;
+            const std::vector<int> vown = { 0, 0, 0 };
+            const std::vector<std::vector<int>> vnbr = { { 1, 2 }, { 0, 2 }, { 0, 1 } };
+            const std::vector<int64_t> vopen = { 5000, 0, 4000 };
+            run_urbanisation_stream(v, vown, vnbr, [](int, int) { return true; }, vopen, 10);
+            check(v[0].industrial_heads == 5000 && v[2].industrial_heads == 0,
+                  "BL1137s12 any centre with open work draws the stream (a village too); ground with no centre draws nobody");
+            region full = make_region(800, 300000, 60000);
+            check(region_open_work(full, 80000) == 20000 && region_open_work(full, 50000) == 0
+                  && region_open_work(full, 0) == 0,
+                  "BL1137s11b open work is the heads a region's works employ beyond its urban heads, never below zero");
+        }
+        // S7 THE LINE ITSELF, and its memo. The same cylinder: the strait
+        // refuses, the wrap walks, the line is symmetric, a repeated or
+        // reversed query is answered from the memo, and a region anchored ON a
+        // strait tile (a shoreline or lake anchor, `coastal_water`) is not cut
+        // out of the stream by its own tile — its line to land on either side
+        // walks, which is also what lets such a region bridge a one-tile strait.
+        {
+            std::vector<region> q;
+            q.push_back(at(region{}, 3, 2));   // 0: mainland
+            q.push_back(at(region{}, 16, 2));  // 1: the island
+            q.push_back(at(region{}, 22, 2));  // 2: mainland, over the wrap from 0
+            q.push_back(at(region{}, 12, 4));  // 3: anchored ON the strait
+            q.push_back(at(region{}, 10, 4));  // 4: mainland beside it
+            q.push_back(at(region{}, 12, 0));  // 5: ON the strait, its line to 3 runs down the water
+            stream_land_lines lines;
+            lines.substrate = &strait_sub;
+            lines.gw = sgw;
+            lines.gh = sgh;
+            const bool strait   = lines.joined(q, 0, 1);
+            const bool wrap     = lines.joined(q, 0, 2);
+            const std::size_t after_two = lines.measured;
+            const bool again    = lines.joined(q, 1, 0) == strait && lines.joined(q, 2, 0) == wrap;
+            const bool memo_hit = lines.measured == after_two;
+            const bool sym = anchors_joined_by_land(strait_sub, q[0], q[2], sgw, sgh)
+                          == anchors_joined_by_land(strait_sub, q[2], q[0], sgw, sgh)
+                          && anchors_joined_by_land(strait_sub, q[0], q[1], sgw, sgh)
+                          == anchors_joined_by_land(strait_sub, q[1], q[0], sgw, sgh);
+            const bool water_anchor = lines.joined(q, 3, 4);
+            const bool down_water   = lines.joined(q, 3, 5);
+            std::printf("      line: strait %d, wrap %d, memo %zu walked after the repeats (%s), "
+                        "strait-anchored to land %d, along the strait %d\n",
+                        strait ? 1 : 0, wrap ? 1 : 0, lines.measured, memo_hit ? "hit" : "MISSED",
+                        water_anchor ? 1 : 0, down_water ? 1 : 0);
+            check(!strait && wrap && sym,
+                  "BL1137s7 the line refuses a strait, walks the short way round the cylinder, and is symmetric");
+            check(again && memo_hit,
+                  "BL1137s7b a repeated or reversed corridor is answered from the memo, never walked twice");
+            check(water_anchor && !down_water,
+                  "BL1137s7c a region anchored on water is not cut out by its own tile; a line along the water is");
+        }
+
+        // S8 A DIRECT CUT FALLS IN PROPORTION. A works city of 600,000 (400,000
+        // industrial, 450,000 urban) loses half its people to a plague. The
+        // dead fall on the industrial and the farm-fed heads alike, so its
+        // farmland keeps 100,000 of its 200,000 (a cut taken wholly from the
+        // farm-fed heads would leave none, and the logistic term grows nothing
+        // from zero); the urban heads are held to the survivors; the ceiling
+        // is untouched.
+        {
+            region city = make_region(800, 600000, 450000);
+            city.industrial_heads = 400000;
+            city.capacity_carried = 400000;
+            const int64_t ceiling_before = region_ceiling(city);
+            const int64_t removed = remove_region_people(city, 300000);
+            const int64_t farm_fed = city.population - city.industrial_heads;
+            std::printf("      plague: removed %lld; people %lld, industrial %lld, farm-fed %lld, urban %lld\n",
+                        static_cast<long long>(removed), static_cast<long long>(city.population),
+                        static_cast<long long>(city.industrial_heads), static_cast<long long>(farm_fed),
+                        static_cast<long long>(city.urban_population));
+            check(removed == 300000 && city.industrial_heads == 200000 && farm_fed == 100000,
+                  "BL1137s8 a direct cut falls on the industrial and the farm-fed heads in proportion");
+            check(city.industrial_heads <= city.urban_population && city.urban_population <= city.population
+                  && region_ceiling(city) == ceiling_before,
+                  "BL1137s8b the cut keeps industrial <= urban <= population and leaves the ceiling where it stood");
+        }
+
+        // S9 THE LOGISTIC TERM AT A CARRIED CEILING. A destination whose
+        // carried ceiling reaches two billion, its farm-fed people at half of
+        // it: r * P * (K - P) is 1.2e19 there, past int64, so the exact branch
+        // must not take it (its bound is 2^30). One year grows about 12 per
+        // mille of P times the half-empty gap: 6,000,000.
+        {
+            region big = make_region(500, 1000000000, 0);
+            big.centres = 0;
+            big.capacity_carried = 2000000000 - region_carrying_capacity(500, 0);
+            const int64_t before = big.population;
+            advance_region_demography(big, 1, 0);
+            const int64_t grew = big.population - before;
+            std::printf("      carried ceiling 2e9, farm-fed 1e9: one year grew %lld\n",
+                        static_cast<long long>(grew));
+            check(grew >= 5990000 && grew <= 6010000,
+                  "BL1137s9 the logistic term stays exact past the old 31-bit bound (no overflow at K = 2e9)");
+        }
+        // [/rebuild-api]
+    }
+
+    // ---------------------------------------------------------------------
+    // BL-1149 — a head earns scale credit only where a work employs it (Ben,
+    // 2026-09-27; INDUSTRIALISATION.md sec 1: the works, not the crowd). The
+    // scale credit and the round's accrual, on hand-built regions and a
+    // hand-built works table.
+    // ---------------------------------------------------------------------
+    {
+        history_sim_params ip = params;
+        ip.industry_points_per_million_urban_heads_year = 1000;
+        region town;
+        town.centres = 1;
+        town.urban_population = 500000;
+        town.energy_q = 500;
+        region small = town;
+        small.urban_population = 30000;
+        const int64_t crowd   = industry_points_scale_credit(town, 0, ip, 10, 60000);
+        const int64_t worked  = [&] { region r = town; r.urban_population = 60000;
+                                      return industry_points_scale_credit(r, 0, ip, 10, 60000); }();
+        const int64_t loose   = [&] { region r = town; r.urban_population = 60000;
+                                      return industry_points_scale_credit(r, 0, ip, 10, 1000000); }();
+        const int64_t none    = industry_points_scale_credit(town, 0, ip, 10, 0);
+        const int64_t few     = industry_points_scale_credit(small, 0, ip, 10, 60000);
+        const int64_t few_ref = [&] { region r = small;
+                                      return industry_points_scale_credit(r, 0, ip, 10, 30000); }();
+        const int64_t bad     = industry_points_scale_credit(town, 0, ip, 10, -1);
+        std::printf("      scale credit: 500k heads / 60k employed %lld; 60k / 60k %lld; 60k / 1M %lld; "
+                    "no works %lld; 30k / 60k %lld\n",
+                    static_cast<long long>(crowd), static_cast<long long>(worked),
+                    static_cast<long long>(loose), static_cast<long long>(none),
+                    static_cast<long long>(few));
+        check(crowd > 0 && crowd == worked && worked == loose,
+              "BL1149a the heads beyond what its works employ earn nothing: a 500,000-head city whose "
+              "works employ 60,000 earns exactly a 60,000-head town's credit");
+        check(none == 0,
+              "BL1149b a region with no works earns no scale credit, whatever its crowd");
+        check(few == few_ref && few > 0 && few < crowd,
+              "BL1149c below its works' employment a town earns on the heads it has");
+        check(bad == -1,
+              "BL1149d an employment outside the domain is refused, never clamped");
+
+        // The accrual reads the heads a region's BUILT works employ, off the table.
+        works_registry wr;
+        work_row mill;  mill.name = "Mill";  mill.effect.industrial_mod = 1; mill.employs = 40000; mill.weight = 1;
+        work_row wall;  wall.name = "Wall";  wall.effect.defence_mod = 1;    wall.employs = 0;     wall.weight = 1;
+        work_row forge; forge.name = "Forge"; forge.effect.industrial_mod = 1; forge.employs = 20000; forge.weight = 1;
+        wr.add_row(mill); wr.add_row(wall); wr.add_row(forge);
+        std::vector<region> rs(3, town);
+        for (region& r : rs) r.nation = -1;
+        rs[0].works_built = 0b101; // mill + forge: 60,000 employed
+        rs[1].works_built = 0b010; // the wall alone: none
+        rs[2].works_built = 0;     // no works: none
+        const std::vector<polity> no_polities;
+        const industry_points_round round = accrue_industry_points(rs, no_polities, ip, 10, &wr);
+        std::printf("      accrual: mill+forge %lld, wall %lld, bare %lld (credited %lld)\n",
+                    static_cast<long long>(rs[0].industry_points), static_cast<long long>(rs[1].industry_points),
+                    static_cast<long long>(rs[2].industry_points), static_cast<long long>(round.credited));
+        check(wr.employed_heads_mask(0b101) == 60000 && rs[0].industry_points == crowd
+              && rs[1].industry_points == 0 && rs[2].industry_points == 0,
+              "BL1149e the round's accrual credits each region on the heads its built works employ");
+        std::vector<region> no_table(1, town);
+        no_table[0].works_built = 0b101;
+        accrue_industry_points(no_table, no_polities, ip, 10, nullptr);
+        check(no_table[0].industry_points == 0,
+              "BL1149f with no works table no work stands, so no region earns scale credit");
+    }
+
+    // ---------------------------------------------------------------------
+    // The BL-1137/1149/1155 review fixes (2026-10-02).
+    // ---------------------------------------------------------------------
+    {
+        // R-a BL-1155: the candidates. Realm holdings 2 (capital, NO centre),
+        // 4 (a centre), 5 (none), 7 (a centre). Every centre: the capital
+        // first, then 4 and 7 in region order; 5 is not scored. Off: the
+        // capital and rotated slots, the old rule.
+        std::vector<region> rr(8);
+        rr[4].centres = 1; rr[7].centres = 1;
+        const std::vector<int> held = { 2, 4, 5, 7 };
+        history_sim_params cp = params;
+        cp.work_candidates_every_centre = true;
+        const std::vector<int> every = work_candidates(rr, held, 2, cp, 99u, 1700);
+        cp.work_candidates_every_centre = false;
+        cp.work_candidate_regions = 2;
+        const std::vector<int> old = work_candidates(rr, held, 2, cp, 99u, 1700);
+        std::printf("      candidates: every centre {%s}; old rule %zu slots, capital %d\n",
+                    [&] { std::string s; for (int v : every) s += std::to_string(v) + " "; return s; }().c_str(),
+                    old.size(), old.empty() ? -1 : old[0]);
+        check(every == std::vector<int>({ 2, 4, 7 }),
+              "BL1155a every centred holding is a candidate, the capital always (even standing no centre), "
+              "a centreless non-capital one never, in walk order (the capital first, then region order)");
+        check(old.size() == 2 && old[0] == 2 && (old[1] == 2 || old[1] == 4 || old[1] == 5 || old[1] == 7),
+              "BL1155b with the switch off the old rule stands: the capital and one rotated holding");
+
+        // R-b NR-901 under NR-964: a polity whose centres' works employ nobody
+        // has no weighed region, so the treasury share has nowhere to land: an
+        // empty spread, which the upkeep reads as "converts nothing, the purse
+        // keeps the share" (the no_town branch).
+        std::vector<region> tp(3);
+        for (region& r : tp) { r.nation = 5; r.centres = 1; r.urban_population = 40000; r.works_built = 0b10; }
+        works_registry wn;
+        work_row wall; wall.name = "Wall"; wall.effect.defence_mod = 1; wall.employs = 0; wall.weight = 1;
+        work_row mill; mill.name = "Mill"; mill.effect.industrial_mod = 1; mill.employs = 9000; mill.weight = 1;
+        wn.add_row(mill); wn.add_row(wall);
+        std::vector<std::pair<int, int64_t>> spread;
+        const bool ok_none = industry_points_apportion_by_scale(tp, 5, 1000, spread, &wn);
+        const bool none_empty = spread.empty();
+        tp[1].works_built = 0b01; // one region's works now employ
+        const bool ok_one = industry_points_apportion_by_scale(tp, 5, 1000, spread, &wn);
+        check(ok_none && none_empty && ok_one && spread.size() == 1 && spread[0].first == 1
+              && spread[0].second == 1000,
+              "BL1149g a polity whose centres employ nobody converts nothing (NR-901 under NR-964); "
+              "once one employs, every point lands there");
+
+        // R-c two destinations with uneven remainders: neither receives more
+        // than its open work, and the shares sum to what was sent.
+        std::vector<region> u;
+        const auto mk = [](int col, int64_t pop, int64_t urban) {
+            region r; r.farm_q = 600; r.population = pop; r.urban_population = urban; r.centres = 1;
+            r.col = col; r.row = 2; return r; };
+        u.push_back(mk(3, 300000, 60000));
+        u.push_back(mk(4, 300000, 60000));
+        u.push_back(mk(5, region_carrying_capacity(600, 0), 30000));
+        const std::vector<int> uo = { 0, 0, 0 };
+        const std::vector<std::vector<int>> un = { { 1, 2 }, { 0, 2 }, { 0, 1 } };
+        const std::vector<int64_t> uopen = { 7000003, 5000001, 0 };
+        const urbanisation_round ur = run_urbanisation_stream(u, uo, un, [](int, int) { return true; }, uopen, 10);
+        std::printf("      uneven: moved %lld -> %lld / %lld (open 7000003 / 5000001)\n",
+                    static_cast<long long>(ur.moved), static_cast<long long>(u[0].industrial_heads),
+                    static_cast<long long>(u[1].industrial_heads));
+        check(ur.moved > 0 && u[0].industrial_heads <= 7000003 && u[1].industrial_heads <= 5000001
+              && u[0].industrial_heads + u[1].industrial_heads == ur.moved,
+              "BL1137s13 uneven remainders: no destination receives more than its open work, and the "
+              "shares sum to what was sent");
     }
 
     // --- M1  over-muster starves industry (BL-867) --------------------------

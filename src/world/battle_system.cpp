@@ -34,6 +34,7 @@ struct terrain_pick
     terrain_cover     cov     = terrain_cover::grass;
     std::uint8_t      density = 150u;
     terrain_landform  lf      = terrain_landform::plains;
+    entity_id         tile    = null_entity; ///< the picked tile (BL-1145: the card frames it)
     bool              found   = false;
 };
 
@@ -69,6 +70,7 @@ terrain_pick defender_ground(const world& w, const std::vector<entity_id>& defen
             best.cov      = tc.cover;
             best.density  = tc.cover_density;
             best.lf       = tc.landform;
+            best.tile     = tid;
             best.found    = true;
         }
     }
@@ -443,6 +445,7 @@ bool open_battle(world& w, int tick, uint32_t province, entity_id attacker, enti
     nb.defender        = defender;
     nb.attacker_units   = attacker_units;
     nb.defender_units   = defender_units;
+    nb.ground_tile      = g.tile; // the ground the fight is ON, fixed at open (BL-1145 review)
     nb.state = begin_campaign_battle(
         id,
         atk_stack, doctrine_row{},
@@ -557,6 +560,7 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
                 continue;
 
             const terrain_pick g = defender_ground(w, nb.defender_units);
+            nb.ground_tile = g.tile; // the ground the fight is ON, fixed at open (BL-1145 review)
 
             campaign_battle_identity id;
             id.attacker   = c.attacker;

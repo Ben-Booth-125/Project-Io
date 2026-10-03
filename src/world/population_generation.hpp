@@ -27,11 +27,12 @@ inline constexpr int k_land_tiles_per_centre = 410;
 inline constexpr int k_population_for_scale[5] = { 10, 50, 200, 1000, 5000 };
 
 /// URBAN heads per population centre on the CAMPAIGN path (BL-610, centres
-/// from demography). A living region's urban headcount (its simulated
-/// population times the urban share, population_generation.cpp
-/// § k_demography_urban_share_q) divided by this figure is how many centres
-/// it contributes, floored at one — density is history's consequence, not a
-/// land-area divisor.
+/// from demography): the village rung. Since BL-1130 (centres consolidate) it
+/// is the heads a region needs to STAND its one centre (BL-1141, a region
+/// deepens into one place: `region_centres_wanted`, settlement.hpp), not the
+/// size of the centre — its scale is the rung its heads reached (`scale_reached`),
+/// held to what its cell's land holds — density is history's consequence, not
+/// a land-area divisor.
 ///
 /// The figure is scale 1's own headcount (`k_population_for_scale[0]` = 10
 /// thousand heads): one centre per village's-worth of townsfolk, so the
@@ -41,6 +42,41 @@ inline constexpr int k_population_for_scale[5] = { 10, 50, 200, 1000, 5000 };
 /// tiles the province-anchor ruling needs (BL-611; measured by
 /// tools/verify/settlement_density.cpp — run it before moving this).
 inline constexpr int k_demography_heads_per_centre = 10000;
+
+/// Scale banding thresholds in RAW HEADS: the geometric midpoints between the
+/// `k_population_for_scale` rungs (10k/50k/200k/1M/5M heads), so a share lands
+/// on the NEAREST rung in log space rather than always rounding down.
+/// sqrt(10k*50k)=22,360; sqrt(50k*200k)=100,000; sqrt(200k*1M)=447,213;
+/// sqrt(1M*5M)=2,236,067. Constants, so no float sqrt runs in a gate path.
+/// Read only by the FIXTURE fallback's rank-size share-out now; the campaign
+/// carve reads `scale_reached` (BL-1141).
+inline constexpr int64_t k_scale_band_heads[4] = { 22360, 100000, 447213, 2236067 };
+
+/// The scale (1-5) a share of @p share_heads raw heads bands to.
+inline constexpr int scale_for_heads(int64_t share_heads)
+{
+    int s = 1;
+    for (int i = 0; i < 4; ++i)
+        if (share_heads >= k_scale_band_heads[i])
+            s = i + 2;
+    return s;
+}
+
+/// A REGION DEEPENS INTO ONE PLACE (Ben, 2026-09-26; POPULATION.md § Generation,
+/// BL-1141): the scale (1-5) of a region's one centre is the
+/// `k_population_for_scale` rung its @p urban_heads have REACHED — village below
+/// a town's 50,000, town from 50,000, city from 200,000, metropolis from
+/// 1,000,000, megacity from 5,000,000. "Reached" is read as crossed (the rung's
+/// own headcount, never the log-space midpoint the fixture banding uses): a
+/// place is a town once it holds a town's people (delegated reading, reported).
+inline constexpr int scale_reached(int64_t urban_heads)
+{
+    int s = 1;
+    for (int i = 1; i < 5; ++i)
+        if (urban_heads >= static_cast<int64_t>(k_population_for_scale[i]) * 1000)
+            s = i + 1;
+    return s;
+}
 
 /// Generates initial population centres for the given body and attaches them
 /// to the world as entities with a `population_centre_component` on the chosen
@@ -110,8 +146,18 @@ inline constexpr int k_urban_footprint_tiles[5] = { 1, 1, 2, 4, 7 };
 /// once. A footprint the coast cuts short stays short: an island city paves
 /// what it has.
 ///
+/// BL-1130 (review fix): with @p settlement, a footprint also STOPS AT THE
+/// CENTRE'S OWN CELL of the settlement partition (`nearest_region`), exactly as
+/// it stops at the coast — POPULATION.md "their urban footprints fit inside the
+/// region's own cell". The carve's body-wide rank-size can give a large region's
+/// centres scales whose footprints its own ground never sized, and without
+/// the cut they paved into a neighbour's cell. Scales are unchanged; only the
+/// paving is cut short. Null keeps the coast-only rule (a caller with no
+/// settlement record).
+///
 /// @returns the number of tiles stamped urban.
-int stamp_urban_land_use(world& w, entity_id body_id);
+int stamp_urban_land_use(world& w, entity_id body_id,
+                         const settlement_state* settlement = nullptr);
 
 /// Founds one scale-1 population centre in every LAND province on @p body_id
 /// that holds none (BL-611, province centre anchor) — the structural half of
@@ -119,9 +165,14 @@ int stamp_urban_land_use(world& w, entity_id body_id);
 /// nation" (docs/generation/PROVINCES.md § The partition, ruling 3).
 ///
 /// Runs AFTER `build_province_partition` and BEFORE `seed_province_holders`,
-/// so every land province the fill produced — the leftover pockets included —
-/// has an anchor by the time the holder is derived from it. The same shape as
+/// so every land province the fill produced has an anchor by the time the
+/// holder is derived from it. The same shape as
 /// `ensure_national_population_centres`: a guarantee pass, not a tuned top-up.
+///
+/// THE LAST RESORT (BL-1133, a province is its centre's ground): the centre
+/// fill covers its nation's land, across the settled line (BL-1150), so the
+/// only centre-less province left is an UNCENTRED ISLAND — ground no centre of
+/// its nation can reach — and that is all this founds in.
 ///
 /// The founding site is a pure argmax over the province's own tiles
 /// (ascending, the partition's contract) on habitability weighted by

@@ -86,9 +86,8 @@ struct calendar_date
 /// defaulted to 0 (the ancient refocus, NR-177), and no UI site read it — so a
 /// 0 CE campaign rendered 1960-based dates on every clock in the shell. The
 /// default is 1960 again since the epoch flip (BL-1047); the value still has to
-/// be read, because `--epoch 0` remains a supported start.
-/// Both starts are supported (`docs/economy/ERAS.md` § Where the ladder starts),
-/// so a constant is wrong for one of them whichever value it holds.
+/// be read, because `--epoch <year>` dates a campaign in any year but 0 (epoch 0
+/// is retired, NR-920) and a loaded save carries its own epoch.
 ///
 /// The app publishes the live world's epoch through `set_campaign_epoch_year`
 /// at the two points `app::m_active_world_params` is assigned — after

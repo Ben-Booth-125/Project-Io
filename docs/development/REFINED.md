@@ -1,5 +1,301 @@
 # REFINED — active worklist
 
+## Sprint 48 — the world moves forward (opened 2026-09-25)
+
+**Goal.** The world is built once at the Life gate and moves forward through the rounds; Next waits
+for its round and nothing is built twice; roads are a tree and round 6's tail lands inside 35 s; a
+legend on every lapse round and sea lanes a player can find; a world that never hands the player
+too many markets. The sprint row in `sprints.json` carries the waves, the risk and the done-when.
+Wave 2's tasks are written here when its lanes open, behind BL-1084's merge.
+
+**Lanes, by file (keep them disjoint):**
+- **Cursor** — `hard_coded_world.*`, `world_gen_config.hpp`, `harness_params.hpp`, a new
+  `tools/verify/world_cursor_equivalence.cpp`; then the wizard: `app.*`, `startup_screens.cpp`,
+  `generation_preview.cpp`. BL-1084 (world built once and moved). Serial inside the lane.
+- **Roads** — `road_generation.cpp`, `road_generation_harness.cpp`, `gen_step_costs.cpp`:
+  BL-1119 (roads tree and detour), BL-1077's target folded in.
+- **Settle** — the economy step's clocks (`economy_system.cpp`, `finish_campaign_world.*`), then
+  wherever S1 points: BL-1117 (settle tick one).
+- **UI** — `history_lapse.*`, `scripts/verify/sea_lanes.lua`, new legend scripts,
+  `question_log.json`: BL-1118 (round legends) + BL-1124 (sea lanes seen).
+- **Census** — a new `tools/verify/market_census.cpp`, read-only over `world/*`: BL-1125 (markets
+  can die) R1, BL-1003 (pools per market) R6.
+- **Main session** — BL-1114 (epoch 0 retired): the flag, `era_band.hpp`, `era_roster.cpp`, the
+  harness rows.
+
+**Gates.** Every merge: Release build, `world_determinism` twice (bit-identical),
+`save_roundtrip`, the item's harnesses, a cold `code-reviewer` pass, then Ben's live click for
+any UI item. World-movers measure their own before/after in their worktree and land behind the
+sprint's ONE re-bless, taken last. Save versions: one world bump for the sprint (BL-1098's
+`lane_level`, and BL-1125's if its rule reaches the save), claimed by the first lane that needs it
+(`next_save_version.js --kind world --claim`). Check `BUILD_REL_EXIT` and `tasklist` before trusting
+a Release script's result (a running app locks `build_rel`).
+
+### Wave 1
+
+**Cursor — BL-1084 (world built once and moved).** The item's line anchors predate sprint 47;
+the file is 3,027 lines now. Re-read before trusting any `:NNN`.
+- [ ] K1 The cursor. `make_hard_coded_world` becomes the composition of resumable stage functions
+  over one `generation_cursor` holding what the tail reads as locals today (world, report, naming,
+  the Kepler tiles/planet/history/creeds/settlement, corridors, grudges, region polity, treasuries,
+  capital market shells, the last span's resume struct). The `stop_after_*` flags become "run the
+  composition up to stage N". Byte-identical: every pin holds (R1).
+  provides: `generation_cursor`, `gen_life_gate`, `gen_culture`, `gen_empires`,
+  `gen_exploration`, `gen_industrialisation`, `gen_tail`, `run_generation_to(stage)`.
+  consumes: —.
+- [ ] K2 The staged proof. `world_cursor_equivalence`: on the 16 curated seeds, run each stage on a
+  faithful copy of the previous stage's cursor and compare to the one-call composition at every
+  round boundary (owner_changes, polities, world digest) (R2). consumes: K1's cursor and a cursor
+  copy (the world's faithful copy, BL-1034).
+- [ ] K3 The reroll path, measured. Release, seeds 0 and 28: holding and copying a closed round's
+  cursor against replaying from the Life gate with the fixed span seeds. The cheaper ships (R3).
+  consumes: K1.
+- [x] K4 The wizard moves the world. The Life round builds the real gate world into slot 0;
+  `launch_wizard_history_run(i)` runs only stage i from slot i-1; `invalidate_wizard_rounds_below`
+  drops and stale-marks; **Next waits** (disabled while the round runs, a hover naming what it waits
+  on); Begin adopts round 6's slot; round 6 plays at the tap's final publish (R4-R7). Selene and
+  Pallas move into Finishing; report any digest that shift moves. consumes: K1, K3's choice.
+  DONE 2026-09-25 (a0e9c9a2, merged b7aeee9a): held-copy slots [0..3] (gate + each round's close),
+  one build at a time, Next disabled with a hover while a round builds, one reroll function;
+  the cursor review's three fixes folded in (per-run progress plan, no in-stage flag reads,
+  resume_sea_legs nulled, content folds + negative controls). Lane readings: autostart-adopt
+  state hash EF627D3AA20F98C8 == cold; peak memory 3.4 GB, dominated by round 6's settled world
+  (slots ~118 MB). Selene/Pallas were already in the tail: no shift. begin_adopts_check's two
+  "finished ONCE" rows failed on main too (it counted every finish log line) — the checker now
+  counts the summary line only. Owed: a question_log entry for round 6's tail caption; the live
+  click (R4-R7). Main-session gates and a cold review running.
+- [x] D5 BL-1119 round 3 (6177cb83, merged 2775ef57): only layable links enter the tree (NR-945);
+  a village is on the network only when its road reaches a town (25-40% had not); R5f live, R5g
+  new; road_generation_harness 21 of 21. NR-944 grew (seed 46: 83 of 174 pairs lay no border
+  link). Loading-bar weights applied in the main session: roads 38,000 -> 7,500, old-road stamp
+  5,500 -> 8,000, the settle 90,000 -> 18,000, `kBorderUnitsPerNation` 12 -> 24.
+- [ ] K5 Cold review and its fix round (R8).
+
+**Roads — BL-1119 (roads tree and detour).**
+- [x] D1 The floor, measured. Road tiles, spur count and road pass time per village-size floor
+  candidate on the 16 curated seeds, Release (R1). The lane stops and reports; the main session
+  fixes the floor.
+  DONE 2026-09-25 (branch commit e0267b2b; table in scratchpad lane-roads/d1_table.md): THE
+  "LATTICE" IS STREET TILES. Population centres cover 49-100% of land (seed 46: 15,240 centres on
+  15,240 land tiles) and every centre is a street, so road tiles barely move under any rule (tree
+  at floor 0 = old lattice on 15 of 16 seeds). The floor removes the spur mesh (off-street road
+  tiles, median 470 -> 25 at 40,000 heads). Size is the population step's key in heads (every
+  village's `population` is exactly 10k when roads are laid). Pass time, indicative: old 82 s
+  median; tree @40,000 18 s (1 of 16 seeds under 10 s); no spurs 13 s (4 of 16). Border-link
+  probes are 56-68% of the remaining searches. Provisional floor 40,000 (~p90). Digests move
+  (world_determinism seedA/on 0570E3900D0BD53F -> D356F1A2E9148EDE). road_generation_harness:
+  connectivity and determinism pass; "R2 highway tier reachable when qualified" FAILS (0 of 8
+  seeds), identically on unmodified b03fd52e — pre-existing, not weakened.
+  CALLS FOR BEN: street density (below-floor villages lose their street / the lens draws streets
+  apart / fix centre density upstream in POPULATION.md); the floor; border links ending on a
+  bare village street (106 of 151 on seed 46 at 40,000).
+- [ ] D2 The tree. Kruskal MST, then the detour test (`kDetourRatio`, 2.0: a link only where the
+  network route costs more than twice the direct A* route); the percentile rationing applies to the
+  loops it admits; the border link rule unchanged; spurs above the fixed floor only (R2, R3).
+  provides: `kDetourRatio`, the floor constant. consumes: D1's floor.
+- [ ] D3 Old -> new per seed: road tiles, pass time, spurs; `generate_roads` under ~10 s Release,
+  else BL-1077's bound as a second step; haulage read against the baseline (R4, R6).
+- R5 (the whole tail inside 35 s) closes in the main session with S2.
+
+**Settle — BL-1117 (settle tick one).**
+- [x] S1 Time tick 1 by phase inside `run_economy_step` (write-only clocks; the corp AI cadence is
+  the first suspect), seeds 0 and 28, Release. Name the phase with its milliseconds (R1). The lane
+  stops and reports.
+  DONE 2026-09-25 (branch commit 4e7d3cb4, indicative on a loaded machine): NOT the corp AI. Tick
+  1 is the settle's FIRST CONVOY COMMIT: `passive_lp_admit` -> `nearest_lp_anchor` loops every LP
+  anchor on the body and, on a double miss, floods the whole body from each one (9,038 floods on
+  seed 0, 6,079 on seed 28, ~10 ms each; lap 1 ~93 s and ~70 s). Tick 0 commits nothing (no clear
+  yet); ticks 2-11 reuse the fields. The fields stay on the world: ~1.7 GB on seed 28, est. ~2.5 GB
+  on seed 0. A loaded game's first commit should pay it again (caches clear on load; inferred).
+- [ ] S2 The fix (Ben's cut: in this sprint). One per-body multi-source field answers
+  `nearest_lp_anchor` (nearest anchor and cost per tile), cached and cleared with the other
+  logistics caches, a pure function of tiles and anchors (a harness row asserts warm = cold); the
+  clock declaration moves to `economy_system.hpp`. Measure tick 1, the fields alive, and digest
+  movement (a named re-bless cause). Check, not fix: whether cache-dependent path costs make a
+  save/load continuation diverge. Then the whole-tail reading with D3 (BL-1119 R5).
+  provides: the per-body nearest-anchor field. consumes: —.
+
+**UI — BL-1118 (round legends) + BL-1124 (sea lanes seen).**
+- [x] U1 A legend per lapse round (Culture, Empires, Exploration, Industrialisation) listing the
+  layers that round draws, read from the painter's own predicates, glyphs by the painter's calls;
+  its question-log entry; a capture per round (BL-1118 R1, R2).
+  provides: the legend's layer predicates. consumes: —.
+  DONE 2026-09-25 (736a38aa, merged e4a6370b): one `lapse_layers_drawn(h)` decides per record
+  what each round draws; every map pass, the fleets reading and the legend read it; swatches are
+  the map's own `paint_*` calls. The Empires cut moved into it. Seed 32 keys: Culture 8 rows,
+  Empires 16, Exploration 25, Industrialisation 26. Also fixed: every lapse map clipped its east
+  120 px at 1920x1080 (`lapse_map_frame`). round_legends.lua and sea_lanes.lua re-run on main's
+  Release build (19:31): exit 0, 0 golden failures. UI-121 catalogued in ui_elements.json.
+  FOR BEN: the Empires map draws "Furnaces lit" squares that STARTUP.md § Round 4 neither lists
+  nor cuts; four labels drafted where the glossary is silent ("Merchant sail", "Treasury, 1200
+  CE", "Seat; slides if moved", "Kin line across water").
+- [x] U2 Three lane forms on seed 32's close frame: a brighter core line inside the band, a
+  shipping glyph at each end, an arc bowed away from the tie; one capture each, and a temporary
+  selector so the live app can show each (BL-1124 R1). The legend names the lane. consumes: U1.
+  DONE 2026-09-25 (same commit): a radio row above the Exploration and Industrialisation maps,
+  "Sea lane form (temporary, for the pick)", default (a). FOR BEN BEFORE HE PICKS: 13 of seed 32's
+  16 lanes draw under 8 px (short hops inside one archipelago); only three are long (136, 81, 36
+  px), and only form (b) marks the short ones.
+- [x] U3 Ben picks at the live app; the other two forms and the selector are removed; the walk
+  (BL-1124 R2, R3; BL-1118 R3).
+  DONE 2026-09-25 (70cb329d, merged 9313e35a): Ben picked the bowed arc; (a), (b) and the
+  selector removed. Same commit: BL-1134 (roads carried at both seams; roads_carried.lua) and
+  BL-1135 (the Culture round's words as the record — a draft for the next walk). BL-1124 R3
+  ("finds a lane without a pointer") is read at the next walk.
+
+**Census — BL-1125 (markets can die), BL-1003 (pools per market).**
+- [ ] M1 `market_census` on the flipped 1960 world, 16 curated seeds: markets by source (capital
+  shell, carve, junction-lowered), shells standing where the polity died after 1200, catchment
+  tiles and population per market, the share that clear nothing in the first play year. Read-only
+  over `world/*` (BL-1125 R1).
+- [ ] M2 BL-1003 R6: generated firms that straddle a catchment line, and whether the landscape
+  search winner still validates, on the same world.
+- [ ] M3 Ben rules BL-1125's mechanism against M1 (BL-1125 R2); its build joins wave 2.
+
+**Main session — BL-1114 (epoch 0 retired).**
+- [x] E1 `--epoch 0` refused with a message; no path maps an epoch to a band; harnesses, verify
+  scripts and the seed library moved to 1960; `world_determinism`'s epoch row re-scoped (R1-R3).
+  DONE 2026-09-25: refused with exit 1 and a message (Release, 18:00 build); the band path was
+  already gone (BL-1101); centre_region_bind and chain_conversion_probe moved to 1960; R3.8 now
+  compares epoch 1900 to 1960; world_determinism ALL PASS twice, digests unmoved; save_roundtrip OK.
+
+### Wave 2a (opened 2026-09-25, after Ben's density form)
+
+Ben ruled: markets die by twins, gravity (aim ~20-40 a world) and conquest; centres consolidate
+upstream this sprint (BL-1130); the spur floor 40,000 and border links on the network (BL-1119);
+the path-cost cache dependence fixed this sprint (BL-1126). Docs: MARKETS.md, POPULATION.md,
+LOGISTICS.md §§ 1, 4, 6.
+
+- [x] P1 BL-1126 (path cost reads the cache): `intra_body_path` pure in the ordered pair, the
+  destination's field only; L1 matches without the control; plus BL-1117's S2 review fix round
+  (tie contract restated, F1 non-vacuous, stale comments). Files: `logistics.*`,
+  `lp_anchor_field_check.cpp`. The settle lane.
+  DONE 2026-09-25 (a2b3e948, merged f6c87707): L1 MATCHES on ticks 2-11, seeds 0 and 28, no
+  control. Each hop is priced toward the anchor, so a destination's field holds O -> D. F2
+  reports 2 exact-tie cells on seed 28 (costs identical; within the restated contract).
+  Generation floods +50% on seed 0, step 15 doubled -> D6. Cold review running.
+- [x] D6 BL-1119 round 4: road generation asks its directed path queries so each destination's
+  flood is reused (one deterministic direction per unordered town pair, stated). The roads lane.
+  DONE 2026-09-25 (8b921ee6, merged 1364a0ba): town pairs lower tile id -> higher (n-1 floods
+  per nation), spurs village -> target, border probes toward the side with fewer endpoints,
+  history corridors toward their busier end. History-corridor floods 2,531 -> 288 (seed 0);
+  step 15 21.7 -> 2.0 s (seed 0), 37.7 -> 4.2 s (seed 46), indicative; road tiles unchanged
+  within 4; harness 21 of 21; its weight 8,000 -> 1,500. Finish on seed 0 (loaded): search 19 s
+  + settle 24.5 s — the whole-tail 35 s reading (R5) is owed quiet.
+- [x] D4 BL-1119 round 2: the floor constant; border links only on towns and spurring villages;
+  `invalidate_logistics_caches` in road generation; the loading-bar weights measured (applied by
+  the main session after K4); the highway-tier row's cause. Files: `road_generation.*`, its
+  harness, `gen_step_costs.cpp`. The roads lane.
+  DONE 2026-09-25 (15ef577a, merged bbf89652): road_generation_harness ALL OK (the Highway row's
+  cause was the harness banding nations by id); border links on a bare street 106 -> 0 (seed
+  46), but 49 of 174 pairs now have no network endpoint and lay no link -> NR-944. Road pass
+  (indicative) seed 0 10.1 s, 28 6.6 s, 46 21.7 s. TO APPLY AFTER K4 MERGES (hard_coded_world.cpp
+  progress weights): roads step 38,000 -> ~7,500; step 15 (history roads) 5,500 -> ~8,000;
+  `kBorderUnitsPerNation` 12 -> ~24. Cold review running.
+- [ ] C1 BL-1130 (centres consolidate): a committed centre census old -> new; villages merge into
+  towns; no region carries more centres than its cell holds. Files: `settlement.*`,
+  `population_generation.*`, `history_sim.cpp` (urban growth only). A new lane.
+  BUILT, NOT MERGED (ad38e422, stopped for Ben 2026-09-25): a rank-size hierarchy inside each
+  region, capped to its cell's land; two-pass placement. Pooled over 16 seeds: land under centres
+  70.4% -> 31.2% (seed 46 100% -> 40.2%), centres 164,982 -> 73,115, road tiles 168,050 ->
+  87,243, markets 4,984 -> 5,643 (more towns pass the carve's gate). What remains: settled cores
+  packed one region per tile, province anchors grown 2-3x. THE HISTORY MOVED (synthetic R1 battles
+  7 -> 98; seed 40 regions 1,461 -> 2,703), cause not isolated. Calls put to Ben (the BL-1130
+  form).
+  ROUND 2 (db75a1c2, not merged): the move is three readers of region::centres, measured by
+  switching each back to main's count — the campaign prize's centres x 200 term (P) and the
+  reach relay's 150/centre rebate (R) look like scale artefacts (sized for the old count); the
+  re-settlement gate on razed centres (Z) is a legitimate consequence; the four "stands a centre"
+  gates are inert. Water-anchored regions carry no centre: spills 127,226 -> 0. Pooled 16 seeds:
+  centres 164,982 -> 69,447, land under centres 70.4% -> 29.6%, road tiles 168,582 -> 86,383,
+  markets 4,984 -> 5,329. P and R's reading put to Ben before the merge.
+  ROUNDS 3-4 and MERGED (fa6de123, merged 85fc03a1): Ben ruled P and R read urban heads, a
+  settled place is worth at least a village, and a razing is counted in people. Seed 40 then
+  reproduces main exactly and the synthetic run is 8 battles against 7; the rest is the
+  groundless and freeze classes, both from rulings. Pooled: centres 164,982 -> 66,034, land under
+  centres 70.4% -> 28.2%, spills 127,226 -> 0, road tiles 168,582 -> 82,543, markets 4,984 ->
+  5,180. Still ~4,100 a seed against the ~500 aim: BL-1137, BL-1132 and BL-1133 now running on it.
+  Cold review and main's gates running.
+- [ ] M4 BL-1125 build, after C1 lands: twins fold and gravity fold at the carve (the reach
+  calibrated on the consolidated world), conquest consolidates in the history (`history_sim.cpp`,
+  the market marking). The markets lane, opened when C1 reports.
+
+### Wave 3 — the chains (opened 2026-09-25, after the live walk and Ben's two forms)
+
+Ben at the app and after Begin: "massive road networks with population centres on every tile";
+centres aim at ~500 a world; more migration in the Industrialisation span; shrinking centres
+abandoned below a village's worth (history and play); roads pull toward markets; sea lanes as
+currents and inter-continental trade; the lane a bowed arc. The chains run in this order; items
+slip to sprint 49 from the END of a chain, never the middle.
+
+- **Density (serial on `settlement.*` / `history_sim.cpp` / `population_generation.*`):**
+  C2 BL-1130 round 2 (explain the history move; water regions carry no centre) -> merge ->
+  BL-1137 (industrial urbanisation + abandonment; the ~500 lever) with BL-1132 (settle spacing)
+  and BL-1133 (anchors join a neighbour) [BL-1133 RE-RULED and MERGED 2026-09-26, 5cab560b: a
+  province is its centre's ground; provinces 45,199 -> 30,894, anchors 20,505 -> 6,856; NR-954
+  open. BL-1136 two threads MERGED fc884257. BL-1120 + BL-1140 MERGED; BL-1098 MERGED 7238f8ef.
+  BL-1132 MERGED 2026-09-26 (89d3bb4b; group `settle-spacing`): spacing 3 tiles and Settle
+  scored only where there is room. Pooled: regions 43,130 -> 15,194, one-tile cells 26,290 ->
+  371, centres 52,552 -> 42,251, land under centres 22.4% -> 18.0%, land provinces 31,029 ->
+  33,749; Settle picks with no room 624/2,161/3,274 -> 0/0/0. War rises (Empires battles
+  155,226 -> 247,547, conquests +66%, foundings -65%; Exploration and Industrialisation battles
+  about double): a consequence of the freed Settle rounds, a named cause in the re-bless. Main's
+  gates and the cold review running. BL-1141 (deepen) and BL-1142 (far pairs) told to merge
+  main before measuring] -> BL-1125 (markets: twins, gravity, conquest,
+  calibrated on the thinned world) -> BL-1138 (roads pull to markets) -> NR-944's re-read ->
+  BL-1107 (culture ground profile) -> BL-1139 (centres abandoned in play).
+  BL-1141 (centres deepen) MERGED b591d1e9 (group `centres-deepen`): centres 42,251 -> 22,521
+  pooled, land under centres 18.0% -> 9.6%, the history identical. BL-1137 (urbanisation) merged
+  with it and REVERTED on main 8cbdbc9d after its cold review (the stream created carrying
+  capacity: population 6.08B -> 10.92B; a sack deleted ~40% of a city silently). Rebuild in the
+  centres lane under NR-958 (a migrant carries its food; a sack never lowers a ceiling), with
+  BL-1141's fixes. BL-1125 (the market folds) waits for it: it calibrates on the thinned world.
+  From the 2026-09-26 cold reviews: BL-1146 (the two-firm cap on the grown provinces) is being
+  MEASURED now (before BL-1133 -> main; re-read after BL-1141), then Ben's call on the cap;
+  BL-1145 (readers of a province's lowest-id tile take its centre's; the census gate) runs after
+  BL-1141 lands. Review fix rounds queued in their lanes: spacing (pending ground, a too-close
+  count, the cost), search (the six-round proof, sweep labels, the bar weight), sea (a four-way
+  lane walk, harness gates, unpriced colonial gates, the cursor digest). Filed for later sprints:
+  BL-1143 (the asymmetric hex table) and BL-1144 (the colonial distance gates never bind).
+- **Sea (`ocean_currents.*`, history_sim's sea-leg cost and trade record):** BL-1120 (ocean
+  currents) -> BL-1140 (sea lanes from trade) -> BL-1098 (the lane tier stamped).
+  BL-1120 stage 1 MERGED 2026-09-26 (b80a5b5d): the field, weight 500, wet crossings priced;
+  lanes barely move because tribute writes ~90% of uses -- currents bite through trade (BL-1140,
+  running) and the stamp's walker (BL-1098). BL-1142 (far pairs across water, cargo against the
+  current) and the sea review fixes (a four-way lane walk) BUILT on the lane branch, NOT MERGED:
+  cross-water pairs bound 53 -> 538, trade lanes 27 -> 297; its cold review found the ladder
+  stale after the landmass change and a seat move that breaks a bound pair -- fix round running
+  (NR-959 waits on its ladder). THEN BL-1147 (naval points carry over; Ben 2026-09-26: the
+  navy carries, superseding "starts at zero") in the same lane. realm_identity's ratchet expect failed after
+  BL-1130 moved the history -> the UI lane is finding whether script or ratchet.
+- **UI (`history_lapse.*`, text in `startup_screens.cpp`):** U3 (the bowed arc only), BL-1134
+  (roads carried across rounds), BL-1135 (the Culture round worded as the record).
+- **Search (`landscape_search.*`):** BL-1136's curve -> Ben picks the round count -> BL-1086
+  (search inside generation). BL-1086 and the BL-1136 review fixes MERGED 2026-09-26
+  (15da1bd2; group `carve-counts-planned-firms`): markets +0.3% on the spaced world, the six-round
+  proof 16/16 with two negative controls, the search bar weight 20000 -> 6000 ms. Open: NR-957
+  (firms, specialists or both), the loading screen's charter list now empty on a budget world
+  (R4, a UI fix after the cold review). THE SETTLE WEIGHT IS STALE: gen_step_costs read settle
+  49.6 s on seed 0 and 10.9 s on seed 28 under load, against ~18 s after BL-1117 -- a quiet
+  re-read is owed with BL-1119 R5 (the 35 s tail) before anything is concluded.
+
+### Wave 3b (opened 2026-09-27, after Ben's density calls and fleet forms)
+
+- **Density:** BL-1149 (scale credit from the works) on the centres lane's branch -> BL-1137's
+  rate ladder (6 / 9 / 12 / 18 per mille) -> Ben picks the rung -> BL-1137 merges. Parallel on
+  main: BL-1150 (a centre's province fill crosses the settled line, NR-954 B; measured first).
+  Then BL-1125 (market folds) on the thinned world, and the chain as above.
+- **Firms:** BL-1146 (the firm cap scales with the centre's rung, NR-960 B). NR-957 ruled B (the
+  carve counts firms and specialists, as built; doc only). After it and BL-1137: BL-1151 (the
+  seat menu re-anchored; not this sprint unless Ben pulls it).
+- **Sea:** BL-1142 and BL-1147 MERGED and gated (572a0afb; carry-over at 0). BL-1152 (fleets
+  project power, NR-961): a fleet bounds its army, the target and its mutual-defence partners
+  project power that falls with distance from their ports, and an out-projected crossing never
+  sails; measured first; then the carry-over ladder again and Ben picks its rung.
+
+Then the one re-bless, each cause named with its own before/after (split it before any cause
+goes unmeasured).
+
 ## Sprint 47 — one history, told through the rounds (opened 2026-09-24)
 
 **CLOSED 2026-09-25 (Ben: "I'll accept this as sprint 47 complete"; v0.1.26).** Every task below

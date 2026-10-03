@@ -587,11 +587,14 @@ int main(int argc, char* argv[])
                 spectate = true;
 
         // --epoch <year>  (BL-705): the calendar year play opens on in every
-        // world this process generates — world_params::epoch_year. It moves the
-        // calendar and the recipe band only (BL-1047, the epoch flip): 1960 is
-        // the default and the industrial band; below 1700 (0 CE) opens the same
-        // generated world on the ancient band. Both starts are supported
-        // (docs/economy/ERAS.md § Where the ladder starts).
+        // world this process generates — world_params::epoch_year — and nothing
+        // else. Generation reads no epoch, and the recipe band is derived per
+        // nation from the history, never from a year (BL-1101, NR-929). EPOCH 0
+        // IS RETIRED (Ben, 2026-09-25, NR-920; BL-1114): it once selected the
+        // ancient roster, and a flag that silently kept meaning something else
+        // would be worse than a refusal. There is no band override; a nation
+        // opens ancient only where its own history never crossed the rung
+        // (docs/generation/INDUSTRIALISATION.md § The epoch and the band).
         //
         // Applies to a NEW world. --load carries the save's own epoch. It is
         // parsed here, below the --verify / --verify-all / --serve dispatch, so
@@ -623,6 +626,14 @@ int main(int argc, char* argv[])
                 std::fprintf(stderr,
                              "ProjectIo: --epoch expects a calendar year in "
                              "-100000..100000 (got \"%s\")\n", arg.c_str());
+                return 1;
+            }
+            if (y == 0)
+            {
+                std::fprintf(stderr,
+                             "ProjectIo: --epoch 0 is retired. It no longer selects the "
+                             "ancient roster: the band comes from each nation's own "
+                             "history. Omit --epoch for the 1960 start.\n");
                 return 1;
             }
             epoch_year = y;

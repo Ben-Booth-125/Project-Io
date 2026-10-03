@@ -14,6 +14,7 @@
 #include "workforce.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <limits>
 #include <string>
@@ -892,9 +893,24 @@ recipe_switch_result try_switch_recipe(world& w, const recipe_registry& reg,
     return recipe_switch_result::applied;
 }
 
+economy_step_phase_clock*& economy_step_phase_clock_sink()
+{
+    thread_local economy_step_phase_clock* sink = nullptr;
+    return sink;
+}
+
 economy_report run_economy_step(world& w, const recipe_registry& reg, bool spectating,
                                 lp_pool_map* shared_lp_pools)
 {
+    // BL-1117: the phase clock, WRITE-ONLY (economy_system.hpp). Null
+    // outside a finish's settle; nothing below reads a stamp back.
+    economy_step_phase_clock* const phase_clock = economy_step_phase_clock_sink();
+    const auto phase_stamp = [phase_clock](int i) {
+        if (phase_clock != nullptr)
+            phase_clock->stamps[static_cast<std::size_t>(i)] = std::chrono::steady_clock::now();
+    };
+    phase_stamp(0);
+
     economy_report report;
 
     // BL-545/BL-546: one tick of the relational substrate's DECAY half, before
@@ -920,6 +936,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // pays for its materials as real market demand and progresses only as fast as
     // the local market can supply them (full / stretched / paused).
     run_construction(w, reg, report);
+    phase_stamp(1); // construction (sentiment decay included)
 
     // BL-430: tick down every building's player-recipe-switch cooldown. Order-
     // independent (each building's counter is decremented against itself only),
@@ -1110,6 +1127,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         for (auto it = completed.rbegin(); it != completed.rend(); ++it)
             w.procurement_contracts.erase(w.procurement_contracts.begin() + static_cast<long>(*it));
     }
+    phase_stamp(2); // credits+contracts (cooldowns, research, education, procurement)
 
     // BL-042: Derive per-body workforce supply from population centres.
     // Scale → labour-force table (units available to industry on this body).
@@ -1443,6 +1461,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         const auto cit = report.workforce_contention.find({corp, body});
         return (cit != report.workforce_contention.end()) ? cit->second : 1.0f;
     };
+    phase_stamp(3); // labour (supply, pass 1, pass 1b)
 
     // ── Pass 2: BL-193 stack grouping — who shares a deposit, and at what rank.
     //
@@ -1617,6 +1636,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             }
         }
     }
+    phase_stamp(4); // stacks+solve (passes 2-4)
 
     // ── Pass 5: production.
     for (const entity_id corp : corp_ids)
@@ -1678,6 +1698,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     report.building_row.reserve(report.buildings.size());
     for (std::size_t i = 0; i < report.buildings.size(); ++i)
         report.building_row.emplace(report.buildings[i].building, i);
+    phase_stamp(5); // production (pass 5, the row index)
 
     // Population food demand (BL-190) is injected by inject_population_demand,
     // called from clear_markets AFTER its per-tick demand reset — injected here
@@ -1900,6 +1921,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             }
         }
     }
+    phase_stamp(6); // growth (habitability, growth/decline)
 
     // BL-617: the migration pass (docs/economy/POPULATION.md § Migration) —
     // after growth/decline so a tick's flows act on this tick's populations,
@@ -1912,6 +1934,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                 clearing_wage[key] = acc.first / acc.second;
         run_population_migration(w, reg, clearing_wage);
     }
+    phase_stamp(7); // migration
 
     // BL-079: scoped background-corp agency (SCOPED RULE EXCEPTION — narrow, local,
     // deterministic; recorded in .claude/rules/io-standing-rules.md on landing). After
@@ -2030,6 +2053,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             }
         }
     }
+    phase_stamp(8); // reflex_agency (BL-079)
 
     // BL-202: strategic tier — the scored utility layer. Runs AFTER the BL-079
     // reflex tier (tier 0, unchanged above): due non-player corps evaluate a
@@ -2047,6 +2071,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         p.spectating = spectating;
         run_corp_strategic_step(w, reg, report, w.current_econ_tick, p);
     }
+    phase_stamp(9); // corp_strategic (BL-202)
 
     // BL-470: the march pass. Runs where BL-467's battle-discovery phase will
     // sit once it exists — "a unit that marched into a hostile province this
@@ -2079,14 +2104,17 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         // a surface. See economy_report::battle_dispatches.
         report.battle_dispatches = std::move(bt.dispatches);
     }
+    phase_stamp(10); // battles
 
     run_unit_march(w, reg, shared_lp_pools);
+    phase_stamp(11); // march
 
     // BL-454: the unit pass — goods draw, the decay rule, orphan cleanup. LAST,
     // deliberately: the strategic tier above demolishes at tick rate, so running
     // after it means a muster base torn down THIS tick orphans its units in the
     // same tick rather than leaving them live for one. See run_unit_upkeep.
     run_unit_upkeep(w, reg, report);
+    phase_stamp(12); // unit_upkeep
 
     // BL-641: the building pass — the goods half of a building's upkeep and the
     // same decay rule, on the other kind of asset. Beside the unit pass rather
@@ -2096,6 +2124,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // building may consume what it just made, which is the honest ordering — a
     // workshop's tools come out of stock, not out of next quarter's.
     run_building_upkeep(w, reg, report);
+    phase_stamp(13); // building_upkeep
 
     return report;
 }
@@ -2849,16 +2878,17 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg,
             std::unordered_map<entity_id, float>& pools =
                 lp_pool_for_body(lp_pools_by_body, w, body, mil.active_lp_per_anchor_tick);
 
-            // Nearest anchor by intra_body_path cost from the unit's CURRENT
-            // position — reasoned interpretation (LOGISTICS.md does not name
-            // the mid-route locus rule), reusing the same cost function/cache
-            // every other consumer of this pathing does. Deterministic
-            // regardless of `pools`' hash-map iteration order: this is a pure
-            // min-with-tiebreak reduction over (cost, then lowest tile id).
-            // BL-597 factored this reduction into `nearest_lp_anchor`
-            // (logistics.hpp/cpp) so `commit_convoy`'s passive draw
-            // (supply_system.cpp) reuses this exact rule for a convoy's
-            // dispatch tile rather than a second copy of it.
+            // Nearest anchor by path cost from the unit's CURRENT position to
+            // the anchor — reasoned interpretation (LOGISTICS.md does not name
+            // the mid-route locus rule), on the same cost function every other
+            // consumer of this pathing uses. Deterministic regardless of
+            // `pools`' hash-map iteration order: an anchor at least cost with a
+            // fixed choice among exact ties, answered from the body's one
+            // nearest-anchor field (BL-1117), never from the pair cache, so it
+            // is the same warm or cold. BL-597 factored this into
+            // `nearest_lp_anchor` (logistics.hpp/cpp) so `commit_convoy`'s
+            // passive draw (supply_system.cpp) reuses this exact rule for a
+            // convoy's dispatch tile rather than a second copy of it.
             const entity_id nearest_anchor = nearest_lp_anchor(w, body, u.position, pools);
 
             if (nearest_anchor == null_entity)

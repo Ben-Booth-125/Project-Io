@@ -47,6 +47,11 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
     // keeps the rule it was written against.
     hp.settle_requires_razed_ground = true;
 
+    // BL-1132: a re-settlement founds at a distance from the regions standing
+    // (history_sim.hpp `settle_min_spacing_tiles`; one value for all three
+    // spans, era_minus_one.hpp `generation_settle_spacing_tiles`).
+    hp.settle_min_spacing_tiles = generation_settle_spacing_tiles;
+
     // BL-920: generation's own round opens on culture ground, growing city
     // states by ORGANISE and by the population-threshold rise check, rather
     // than one polity per founding culture holding everything (BL-826). See
@@ -295,6 +300,12 @@ history_sim_params era_minus_one_sim_params(const world_params& params)
     // `terrain_reach_cost_q` currency alone, and its 4000 was measured on THIS
     // round (history_sweep --epoch 0, the BL-922 block), so the struct default
     // is the calibrated value and is not restated here.
+
+    // BL-1147 -- THE NAVAL LEDGER IS THIS ROUND'S (EXPLORATION.md sec Force
+    // persists now: "a polity accrues naval points through the Empires span").
+    // A tally of deeds read by nothing in this round, so switching it on moves
+    // nothing here; the Exploration open converts it (`exploration_sim_params`).
+    hp.naval_points_accrue = true;
     return hp;
 }
 
@@ -363,12 +374,21 @@ history_sim_params exploration_sim_params(const world_params& params)
     // is the lean deciding rather than ranking.
     hp.w_want_q = 1000;
 
+    // BL-1107 — the ground profile's two magnitudes, off the descriptor
+    // (defaults equal the struct's), so a ladder over the shipped worlds
+    // moves both resumed spans together.
+    hp.culture_profile_lack_max_q  = params.culture_profile_lack_max_q;
+    hp.culture_profile_amenity_div = params.culture_profile_amenity_div;
+
     // Carried opening behaviour from the Empires round, unchanged: a founding
     // that arrives inside this span (there are none scheduled — the migration
     // ends long before 1200 — but the flag is a property of the WORLD's rule
     // set, not of the span) still resolves as unorganised culture ground.
     hp.city_states_by_population_threshold = true;
     hp.settle_requires_razed_ground         = true;
+    // BL-1132: the same spacing as the Empires round; Industrialisation
+    // inherits it with these params.
+    hp.settle_min_spacing_tiles             = generation_settle_spacing_tiles;
 
     // BL-1037 — a resumed corridor reopens at the rung it was bought to. This
     // span resumes the Empires round's record at 1200, and the Industrialisation
@@ -376,6 +396,68 @@ history_sim_params exploration_sim_params(const world_params& params)
     // from `world_params` (on by default, BL-1044) so the legacy arc can
     // switch it off.
     hp.resume_seeds_corridor_tier = params.resume_seeds_corridor_tier;
+
+    // BL-1120 -- OCEAN CURRENTS PRICE EVERY SEA LEG, in this span and the
+    // Industrialisation span built on these params (EXPLORATION.md sec
+    // Currents are a force, not a picture). The one weight: a leg run fully
+    // with its current costs half of still water, fully against it half as
+    // much again; real legs read a fraction of that, because land along the
+    // line carries no current. The Empires round is NOT given it: the lane
+    // record belongs to these two spans, and a force moving round 4 is a
+    // separate call.
+    //
+    // MEASURED, `ocean_currents_harness --sweep` on the 16 curated seeds,
+    // 2026-09-25, weights 0/150/300/500/700/900 (both spans re-run from the
+    // fixture, weight 0 reproducing generation's own run on all 16): the
+    // share of wet battles run WITH their current climbs 0.27 -> 0.28 ->
+    // 0.32 -> 0.35 -> 0.35 -> 0.36 and the launched legs' mean alignment
+    // -58 -> -55 -> -40 -> -31 -> -28 -> -28, so the mix stops moving at
+    // 500; 900 begins to swing whole seeds (seed 9's wet launches 9 -> 1, its
+    // Industrialisation battles 44 -> 102). Displacement's pooled reading is
+    // flat across the ladder (2.96 at 0, 2.95 at 500) and lanes at 1960 move
+    // 105 -> 102. 500 is the knee: the smallest weight at which the current
+    // has done what it can to where fleets sail.
+    hp.sea_current_weight_q       = 500;
+    hp.sea_current_rotation_sense = 1; // the data model records no spin; prograde
+
+    // BL-1142 -- A LEG RUN AGAINST ITS CURRENT DELIVERS LESS (EXPLORATION.md sec
+    // Currents, "Where currents bite"), in this span and Industrialisation's,
+    // on the flows the SEA carries: a trade whose road beats its sea line has
+    // no current to lose cargo to.
+    // 500, THE CURRENT'S OWN WEIGHT: a trade leg against a full current costs
+    // half as much again (`sea_current_weight_q` above) and loses half its
+    // cargo, so the extra cost and the cargo lost read on one scale.
+    // MEASURED, `ocean_currents_harness --sweep --rung` on the 16 curated seeds
+    // (2026-09-26, four-way landmasses, the loss on sea-carried flows only):
+    // the Industrialisation span loses 0.53% / 0.86% / 1.55% of its volume
+    // across water at 250 / 500 / 1000 -- no knee -- and its far pairs bound
+    // at 1960 (525 / 518 / 519), battles (8,509 / 8,520 / 8,517) and
+    // subjections (56 at each) do not move with it. THIS SPAN LOSES NONE AT ANY
+    // RUNG, on any of the 16: every trade in it between realms seated on
+    // different landmasses that runs against its current has a road at least
+    // as wide as its sea line -- the two realms' ground meets -- so here the
+    // setting changes nothing. Nothing in the ladder argued for a value off
+    // the weight's own.
+    hp.sea_current_cargo_loss_q = 500;
+
+    // BL-1147 -- THE FLEET THE EMPIRE AGE CARRIES: navy hulls per 1000 naval
+    // points at this span's open. 50 (Ben, 2026-10-02, option D), read off
+    // BL-1152's review-fixed 16-seed ladder at 20 men a hull and a halving of
+    // 10 sea tiles: Exploration's wet crossings 958 sailed against 1,174 with
+    // the rule off, 11 of 16 seeds first crossing by 1220, the navy bill
+    // 0.0068% of treasuries at 1300.
+    hp.naval_points_navy_per_1000   = 50;
+    hp.naval_points_convert_at_open = true; // the open where the deeds become fleets
+
+    // BL-1152 -- A FLEET DECIDES WHO CROSSES (EXPLORATION.md, the SETTLED
+    // paragraph under the stocks table; Ben, 2026-09-27, NR-961). Ben's
+    // constants for the Exploration age (2026-10-02, option D): a hull lifts
+    // 20 men, and a fleet's power halves over 10 sea tiles. The
+    // Industrialisation span inherits this block and sets both back to 0
+    // (`industrialisation_sim_params`), so its crossings stay band-gated.
+    hp.fleet_decides_crossings   = true;
+    hp.fleet_men_per_hull        = 20;
+    hp.fleet_power_halving_tiles = 10;
 
     return hp;
 }
@@ -438,6 +520,51 @@ history_sim_params industrialisation_sim_params(const world_params& params)
     hp.industry_points_enabled              = true;
     hp.industry_survey_inherits_at_founding = true; // DEFAULT A
     hp.industry_fuel_gate_reads_survey      = true; // DEFAULT B
+
+    // BL-1142 -- FAR REALMS ACROSS WATER MEET AND BIND (INDUSTRIALISATION.md sec
+    // Far pairs meet and bind, and this phase makes them: "far pairs bind across
+    // water, not only across a border"). This span's own force, never
+    // Exploration's: realms on different landmasses meet when a trade BY SEA is
+    // open between them (the seller's navy and both seats' ports carry it), and
+    // a far pair that met across water binds without the stranger's penalty --
+    // its doctrine, grudges, broken promises and trade decide, as they decide a
+    // near pair's without the alarm. "Met across water" is the class the
+    // pair's contact recorded at the meeting, never its seats read again.
+    //
+    // 300 (Ben, 2026-09-27, NR-959 B; INDUSTRIALISATION.md sec Far pairs bind
+    // across water): the far penalty a pair that met across water reads,
+    // against a land pair's 700 -- where the pair's own aggression, grudges and
+    // trade decide whether it binds, so the number does not choose the count,
+    // and distance still reads across water. The re-run ladder it was chosen
+    // from (16 curated seeds, 2026-09-26, four-way landmasses, meeting on the
+    // sea line alone, the penalty read off the recorded class; PRE-FIX-ROUND
+    // numbers, before the wet-corridor and coastal-deed fixes): far cross-water
+    // pairs bound at 1960 read 0 at 700 and 500, 10 at 450, 191 at 400, then
+    // 530 / 526 / 518 at 350 / 300 / 0 -- 526 bound at 300 against 518 at 0 --
+    // with 492-523 pairs met by sea at every rung; down the same ladder the
+    // span's subjections read 96 / 96 / 95 / 62 / 56 / 43 / 56 and its battles
+    // 9,266 / 9,266 / 9,215 / 8,920 / 8,670 / 8,657 / 8,520. Above 450 the
+    // penalty forbids every such binding; at or below 350 it decides none of
+    // them and the pair's own facts do. Without BL-1142 at all (no meeting,
+    // the land's 700, no loss) no far pair across water binds.
+    hp.far_pairs_meet_by_sea    = true;
+    hp.treaty_far_sea_penalty_q = 300;
+
+    // BL-1147: THE CONVERSION IS THE EXPLORATION OPEN'S ALONE. This span's
+    // polities already sail the fleet 1200 carried (it crossed the 1660
+    // handoff in `navy_stock`); converting their ledger again would pay the
+    // Empires age's deeds twice. The span flag is the guard, whatever rate
+    // this span inherits or a sweep sets.
+    hp.naval_points_convert_at_open = false;
+
+    // BL-1152 (Ben, 2026-10-02, option D): THE FLEET RULE IS EXPLORATION'S FOR
+    // NOW. At 20 / 10 / 50 this span's realms field too few fleets -- on the
+    // review-fixed ladder six seeds first crossed between 1720 and 1868 and two
+    // never did -- so its crossings stay gated by the band alone until Ben
+    // rules on why (BL-1152's diagnosis). Both constants 0 = the rule reads
+    // nothing here.
+    hp.fleet_men_per_hull        = 0;
+    hp.fleet_power_halving_tiles = 0;
 
     // `resume_seeds_corridor_tier` (BL-1037) is Exploration's, set in
     // `exploration_sim_params` from `world_params` (on by default, BL-1044).

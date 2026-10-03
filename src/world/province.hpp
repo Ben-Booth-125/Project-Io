@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <iosfwd>
+#include <map>
 #include <unordered_map>
 #include <vector>
 
@@ -74,6 +75,18 @@
 //      to 20 is permitted in rare cases"); the absolute bound is 20, and it is
 //      the only size claim the harness asserts.
 //
+// A PROVINCE IS ITS CENTRE'S GROUND (Ben, 2026-09-26; BL-1133) — superseding
+// rulings 3 and 4 ON THE LAND OF A BODY THAT HAS CENTRES ("covered land"): the
+// centre fill runs until its nation's land is covered, across the settled line
+// as well as within it (Ben, 2026-09-27, NR-954 B; BL-1150), so provinces =
+// centres and none is left without one; the budget becomes a
+// WEIGHT ON REACH (delegated reading NR-953: scale divides step cost), which
+// is what keeps ruling 1 true; the 20-tile cap and the preferred 12 no longer
+// bind there. Leftover ground exists only where no centre of the nation can
+// reach at all — an uncentred island — and gets an anchor founding, counted.
+// The size band below still binds the two water domains and the land of an
+// UNSETTLED body (no centre anywhere), where rulings 3 and 4 still stand.
+//
 // THE ID ORDER IS STILL THE CONTRACT. Downstream code walks provinces in
 // ascending `province::id` and gets an order that does not depend on container
 // internals, tile-map iteration order, or the order bodies were created in.
@@ -89,6 +102,14 @@ struct world;
 // ---------------------------------------------------------------------------
 // The size band — a GROWTH BUDGET, not a clamp (Ben's ruling, 2026-08-21)
 // ---------------------------------------------------------------------------
+// RETIRED ON COVERED LAND (Ben, 2026-09-26; BL-1133, a province is its
+// centre's ground; PROVINCES.md § The size band): nothing stops a body's centre
+// fill before its land is covered, so none of the four numbers below binds a
+// province there. They are KEPT because two things still read them — the
+// coastal-water domain, which Ben gave land's band ("3-12 size coastal tile
+// provinces"), hard cap included; and the spaced hinterland of an UNSETTLED
+// body's land (no centre anywhere), which is still drawn by the band. Every
+// size claim the harness makes is scoped to those two.
 
 /// Soft floor of the target band, and the growth budget a hinterland seed is
 /// given. SOFT: a region grows freely until it holds this many tiles, and past
@@ -112,7 +133,9 @@ inline constexpr std::size_t k_province_max_tiles = 12;
 /// HARD CAP — the bound that really is absolute, and the only size assertion
 /// the harness makes (Ben, 2026-08-21, NR-438). Nothing in the partition may
 /// ship a province larger than this; `province_partition_harness` § P5a fails
-/// if one does.
+/// if one does. SCOPED since BL-1133 (a province is its centre's ground) to
+/// what the band still draws: coastal water and an unsettled body's
+/// hinterland. Covered land has no cap.
 ///
 /// It is not enforced by a clamp, and deliberately so. Absorption picks a
 /// singleton's CHEAPEST neighbour, and choosing a costlier one to respect a
@@ -229,8 +252,12 @@ inline constexpr std::size_t k_sea_province_soft_target = 42;
 /// changing it rescales the whole model rather than shifting one term.
 inline constexpr int k_province_edge_base_cost = 10;
 
-/// Crossing a river edge (`tile_component::river_edges`, a per-side bitmask —
-/// already the right shape for a border). Four times plain ground: a river is
+/// Crossing a river: charged on a step ONTO or OFF a LAND course tile
+/// (`tile_component::river_edges != 0`; a river's water mouth charges nothing,
+/// so the water domains are unaffected) that is not a step the river flows
+/// through (Ben, 2026-10-01, NR-962 B; BL-1156, a river divides its banks), so
+/// bank to bank pays it twice and travel along a course pays nothing extra.
+/// Four times plain ground: a river is
 /// the strongest single boundary signal the terrain offers, and this is the
 /// anchor the elevation coefficient is then pinned AGAINST rather than a
 /// number chosen on its own.
@@ -251,8 +278,11 @@ inline constexpr int k_province_river_edge_cost = 40;
 ///   implied k = k_province_river_edge_cost / p90 = 40 / 0.0586 = 682.7
 ///
 /// The value below is that implied coefficient, rounded. What it makes true, in
-/// the terms the ruling is written in: the steepest tenth of edges are borders
-/// as strong as rivers, the median edge (0.0186 -> 13) costs a shade over plain
+/// the terms the ruling is written in: PER STEP, a p90 gradient costs what one
+/// step onto or off a river course costs (40). Since BL-1156 (a river divides
+/// its banks) a crossing from bank to bank is TWO such steps, so crossing a
+/// river costs twice a p90 slope; the pin is per step and was not re-tuned.
+/// The median edge (0.0186 -> 13) costs a shade over plain
 /// ground, and a cliff (p99, 0.1406 -> 96) is nearly impassable to growth.
 ///
 /// It is measured on TERRAIN ALONE, so re-pinning it does not chase its own
@@ -308,7 +338,28 @@ struct province_absorption_stats
     /// headroom. Ben's 80-tile sea ceiling is the one number he chose for the
     /// water, and it carries no separate hard cap, so it needs a check that
     /// cannot be satisfied by accident.
+    ///
+    /// COVERED LAND COUNTS NOTHING HERE (BL-1133): a body whose centres seed
+    /// its land grows with no ceiling, so it has no breach to count, and the
+    /// land identity is asserted over an UNSETTLED body's hinterland only.
     int over_ceiling_by_domain[3] = { 0, 0, 0 };
+
+    // --- Covered land (BL-1133, a province is its centre's ground) ----------
+
+    /// Bodies whose land the centres seeded, so the fill ran unbounded.
+    int covered_bodies = 0;
+
+    /// Leftover provinces on covered land: each an UNCENTRED ISLAND — ground
+    /// of a nation that no centre of it can reach at all under the nation lock
+    /// (the settled line is not a lock, BL-1150) — grown whole, and the ones
+    /// `ensure_province_anchor_centres` founds a village in.
+    int uncentred_regions = 0;
+
+    /// Centre singletons absorbed on covered land: a centre whose province
+    /// was only its own tile (hemmed in by larger reach) joins its cheapest
+    /// neighbour under pass 3, so its province holds two centres. The one way
+    /// covered land ends with fewer provinces than seeded centre tiles.
+    int covered_centre_singletons_absorbed = 0;
 };
 
 /// One province — a contiguous run of land tiles on a single body.
@@ -329,30 +380,39 @@ enum class province_kind : uint8_t
 
 struct province
 {
-    /// Stable derived identity: THE LOWEST ENTITY ID AMONG `tiles`.
+    /// Stable identity. DERIVED WHILE GENERATION DRAWS THE PARTITION, RECORDED
+    /// FOR THE PROVINCE'S LIFE ONCE GENERATION ENDS (Ben, 2026-09-27, NR-952;
+    /// PROVINCES.md § Two contracts; BL-1139, centres abandoned in play).
     ///
-    /// DERIVED, NEVER ALLOCATED (Ben, 2026-08-21, revising the allocated-id
-    /// answer). This dissolves the determinism hazard rather than guarding
-    /// against it — an id that is not handed out cannot be handed out in the
-    /// wrong order. Nothing new is serialised: no allocator state, no next-id
-    /// counter, no save-format surface. And it is unique by construction, since
-    /// every tile belongs to exactly one province.
+    /// AT BUILD: THE LOWEST ENTITY ID AMONG `tiles` — derived, never allocated
+    /// (Ben, 2026-08-21, revising the allocated-id answer), so an id that is not
+    /// handed out cannot be handed out in the wrong order, and it is unique by
+    /// construction because every tile belongs to exactly one province. While
+    /// generation redraws borders (the Era -1 sim, BL-518) a rebuilt partition
+    /// re-derives every id, and that is safe because nothing outside generation
+    /// holds one yet.
     ///
-    /// IT IS NEVER 0, because `null_entity` is 0 and no tile carries that id.
-    /// That makes `province_of`'s 0-for-absent return structurally safe rather
-    /// than merely unlikely — it was a real-id collision under the old block
-    /// layout, and is not one now.
+    /// IN PLAY: RECORDED, NOT DERIVED. A battle record, a march order,
+    /// `world::province_holder`'s positional alignment and a save all hold
+    /// this number, and in play a province can change shape — an abandoned
+    /// centre's province merges into a neighbour (POPULATION.md § Growth,
+    /// decline and razing; `abandon_population_centre`). The merge KEEPS the
+    /// survivor's id and removes the absorbed province from the run, so nothing
+    /// is renumbered and ascending order survives (a merge only removes). After
+    /// a merge the survivor's id is still ONE OF ITS TILES (its own lowest tile
+    /// at build, which a merge never removes), but no longer necessarily the
+    /// lowest: `tiles.front()` IS NOT THE ID once a merge has happened, and no
+    /// reader may treat it as one. `read_province_section` enforces exactly the
+    /// recorded contract: ids strictly ascending, each id a member of its own
+    /// tiles, tiles strictly ascending, no tile in two provinces.
     ///
-    /// The cost it carries: a derived id CHANGES when the province changes
-    /// shape. Acceptable because borders move during GENERATION ONLY — ids
-    /// churn while the Era -1 sim redraws them (BL-518) and are frozen before
-    /// anything outside generation can hold one. A battle record, a march order
-    /// or a save only ever sees the settled id.
+    /// IT IS NEVER 0 in a built partition, because `null_entity` is 0 and no
+    /// tile carries that id — so `province_of`'s 0-for-absent return is
+    /// structurally safe.
     ///
-    /// Ascending id order is therefore ascending lowest-member-tile order. It
-    /// is a stable spatial walk, but it is NO LONGER guaranteed body-major:
-    /// that was a property of the old body-rank bit field, and nothing depends
-    /// on it (`province::body` names the body explicitly).
+    /// Ascending id order is a stable spatial walk, but it is NOT guaranteed
+    /// body-major: that was a property of the old body-rank bit field, and
+    /// nothing depends on it (`province::body` names the body explicitly).
     uint32_t id = 0;
 
     /// The body every tile in this province sits on. A LAND province never
@@ -362,8 +422,9 @@ struct province
     /// never spans bodies and never touches land.)
     entity_id body = null_entity;
 
-    /// Member land tiles, ASCENDING entity id. Non-empty for every province in
-    /// a built partition — so `tiles.front()` IS `id`.
+    /// Member tiles, ASCENDING entity id. Non-empty for every province in a
+    /// built partition. At build `tiles.front()` equals `id`; after an in-play
+    /// merge it need not (see `id`), so read the id from `id`, never from here.
     std::vector<entity_id> tiles;
 };
 
@@ -416,35 +477,39 @@ province_kind province_kind_of(const world& w, uint32_t id);
 ///
 /// Pure in everything but its inputs: the result is a function of (@p seed, each
 /// body's grid dimensions, its land mask, its tiles' height / river edges, its
-/// nation assignment, its non-anchor population centres, and `w.tile_settled`)
-/// alone — the PRE-ROAD world (BL-623, provinces before roads: road_level is
+/// nation assignment, and its non-anchor population centres) alone — the PRE-ROAD world (BL-623, provinces before roads: road_level is
 /// deliberately not an input, so a recompute on a world whose roads have since
 /// been stamped reproduces the partition exactly). NO RNG STREAM IS CONSUMED —
 /// every draw is a stateless fold from @p seed, the campaign_battle identity
 /// idiom, so the partition can never perturb another generation pass's draws no
 /// matter where it is called.
 ///
-/// THE SETTLED CELLS ARE A HARD INPUT TOO (BL-849; docs/generation/PROVINCES.md
-/// § The settled cells are a binding input), the same way the nation assignment
-/// already is: on LAND, a region is locked to `w.tile_settled`'s verdict on its
-/// seed tile exactly as it is locked to the seed's nation — a province anchored
-/// on settled ground claims only settled ground, and ground the colonisation
-/// span never reached partitions into its own hinterland, never blending into a
-/// settled neighbour's shape. Colonisation still only SEEDS the partition; this
-/// pass still DRAWS it — the lock changes which tiles a region MAY claim, not
-/// who claims first or how the cost model prices an edge.
+/// THE SETTLED CELLS SEED THE PARTITION; THEY DO NOT BOUND IT (Ben, 2026-09-27,
+/// NR-954 B; BL-1150; docs/generation/PROVINCES.md § The settled cells are a
+/// binding input). Colonisation's settled cells are where the centres stand, so
+/// they seed the fill through the centre set; but a centre's region grows from
+/// settled ground into the never-settled ground of its own nation, so
+/// never-settled country joins the province of the centre that reaches it.
+/// BL-849's settlement lock — a region held to its seed tile's colonisation
+/// verdict the way it is held to its nation — retired; the nation lock is the
+/// one lock left, and `w.tile_settled` is not read here.
 ///
-/// Two passes (BL-515's settled algorithm):
+/// The passes (BL-515's settled algorithm, as BL-1133 re-ruled pass 1):
 ///
-///   1. SETTLEMENT GROWTH. Every population centre on the body is a seed, in
-///      ascending tile id, with a growth budget scaled by its centre scale
-///      (1 -> 7 tiles .. 5 -> 12). All seeds grow SIMULTANEOUSLY as one
+///   1. SETTLEMENT GROWTH — A PROVINCE IS ITS CENTRE'S GROUND (Ben,
+///      2026-09-26; BL-1133). Every population centre on the body is a seed, in
+///      ascending tile id, and all seeds grow SIMULTANEOUSLY as one
 ///      cost-weighted multi-source fill, so neighbouring centres meet on the
-///      terrain between them rather than in the order they were listed. Every
-///      region takes its first `k_province_hard_min_tiles` whatever they cost,
-///      grows freely to its budget, then annexes only ground no harder to reach
-///      than what it already holds, and stops at `k_province_max_tiles`
-///      outright.
+///      terrain between them rather than in the order they were listed. NOTHING
+///      STOPS IT but the nation lock: it runs until its nation's land is
+///      covered, across the settled line (BL-1150) — no budget, no brake, no 12,
+///      no 20. The budget
+///      that used to scale with the centre (1 -> 7 tiles .. 5 -> 12) becomes a
+///      WEIGHT ON REACH (delegated reading NR-953): a region's path cost is its
+///      step costs times 60 / scale, so a metropolis reaches five times as far
+///      as a village over the same ground and still draws the larger province.
+///      A body with centres is COVERED LAND; its leftovers (below) are only the
+///      uncentred islands, each grown whole.
 ///
 ///   2. HINTERLAND. Land no centre reached is partitioned under the SAME cost
 ///      rules. Seeds are chosen from the LEAST-ACCESSIBLE unclaimed tile
@@ -460,6 +525,12 @@ province_kind province_kind_of(const world& w, uint32_t id);
 ///      regions that hit the ceiling — is seeded in the same fixed order
 ///      afterwards. That is where a genuinely tiny province comes from, and it
 ///      is KEPT.
+///
+///      ON COVERED LAND the spaced pass never runs, and the leftover pass meets
+///      only UNCENTRED ISLANDS — a nation's ground that no centre of it can
+///      reach under the nation lock — and grows each one unbounded,
+///      so it becomes one province, counted (`uncentred_regions`), and the
+///      province `ensure_province_anchor_centres` founds its village in.
 ///
 ///   3. SINGLETON ABSORPTION (Ben, 2026-08-21, a NARROW retraction of "don't
 ///      reject tiny provinces", made on seeing the organic borders rendered:
@@ -495,6 +566,13 @@ province_kind province_kind_of(const world& w, uint32_t id);
 ///      falling back to a full one) was measured, reported and then DELETED under
 ///      this ruling: it bought a tighter distribution by deliberately choosing a
 ///      costlier neighbour, and the ceiling breach was its only justification.
+///
+///      ON COVERED LAND there is no ceiling to exceed, and the only singleton
+///      with a neighbour it may join is a CENTRE hemmed to its own tile by a
+///      larger centre's reach; it joins its cheapest neighbour like any other
+///      (`covered_centre_singletons_absorbed`), and its province then holds two
+///      centres, the larger its anchor. It is the one way covered land ends
+///      with fewer provinces than seeded centre tiles.
 ///
 /// There is still NO merge-to-floor repair pass, by ruling: nothing else is
 /// merged away to satisfy a floor, and a province that ran out of land at two
@@ -565,8 +643,11 @@ int province_edge_cost(const world& w, uint32_t seed, entity_id a, entity_id b, 
 //     bare habitability, a Highway tile gets twice it.
 //   * POPULATION is the province-level multiplier, 1 + SUM(centre scale) / 5,
 //     again over the scale's own defined domain (1 = village .. 5 = metropolis,
-//     population_centre_component). A province with a metropolis sustains twice
-//     what the same empty land would.
+//     population_centre_component). A province with ONE metropolis sustains
+//     twice what the same empty land would; the sum is over every centre in
+//     the province and is not capped, so since provinces became a centre's
+//     whole ground (BL-1133, BL-1150) a province holding several centres can
+//     pass 2 — the domain bounds each centre's scale, not the sum.
 //
 // Every band above is read off a domain the codebase already defines. That
 // leaves exactly ONE free scalar — `k_province_buildings_per_sustain_unit` —
@@ -620,6 +701,23 @@ inline constexpr float k_population_scale_max = 5.0f;
 ///
 /// Re-pin by running `province_capacity_probe`, which prints the ratio and its
 /// spread on every run for exactly this purpose.
+///
+/// RE-READ 2026-10-02 (BL-1145) — THE ANCHOR HAS MOVED; NOT RE-PINNED, Ben's
+/// call. The world total it was pinned to moved with the partition: provinces
+/// are now a centre's whole ground (BL-1133, BL-1150), so far fewer of them each
+/// carry a larger population factor. `province_capacity_probe 8`, same seeds
+/// 0-7, same instrument:
+///
+///   seed 0  7.7076      seed 4  8.6828
+///   seed 1  6.5421      seed 5  7.0146
+///   seed 2  9.3589      seed 6  7.4423
+///   seed 3 10.5468      seed 7  9.0301
+///
+///   aggregate 8.0256, spread 6.5421 .. 10.5468 (46.87% of the mean)
+///
+/// So at 12.6468 the ceilings total 157.58% of the pooled per-tile capacity —
+/// no longer a redistribution of it. Still binding on nothing: 5,631 buildings
+/// against 1,433,325 ceiling slots (0.393%).
 inline constexpr float k_province_buildings_per_sustain_unit = 12.6468f;
 
 /// The heuristic's working, kept whole so the probe can report each term rather
@@ -755,6 +853,53 @@ private:
 ///          replaced.
 void seed_province_holders(world& w);
 
+/// THE PROVINCE ANCHOR, ONE DERIVATION (BL-611; shared since the BL-1146 review,
+/// 2026-09-27). A province's anchor is the tile carrying the highest SUMMED
+/// centre scale standing in it — the scales of every `population_centres` entry
+/// whose `population_centre_tile` is that tile, added — ties to the LOWEST tile
+/// id; a province with no centre (no tile with a positive sum) has none. Derived
+/// on the spot, never stored.
+///
+/// THE ONE PLACE IT IS COMPUTED: `seed_province_holders` (the holder is the
+/// anchor's nation), the charter budget's per-province firm cap (the cap is 2 x
+/// the anchor's scale rung, BL-1146 — `province_centre_rungs`,
+/// corporation_generation.hpp) and the instruments that report it read this, so
+/// the three cannot drift apart.
+///
+/// Every province in `w.provinces.provinces`, land or not, walked in its own
+/// ascending `province::tiles` order (the partition's contract) with a
+/// strictly-greater scan over an ordered per-tile sum, so no unordered
+/// container's layout reaches the pick. Keyed by province id.
+struct province_anchor
+{
+    entity_id tile  = null_entity;   ///< the anchor tile
+    int       scale = 0;             ///< the summed centre scale standing on it (> 0)
+};
+std::map<uint32_t, province_anchor> province_anchors(const world& w);
+
+/// THE TILE THAT STANDS FOR A PROVINCE (BL-1145, a province's readers take its
+/// anchor). Where a reader needs ONE tile for a whole province — a marker on the
+/// map, a garrison's post, a card's frame — it takes the province's ANCHOR
+/// (`province_anchors`' pick, the same derivation), never `tiles.front()`: the
+/// lowest-id tile is the province's id, not its place, and in a province of a
+/// thousand tiles it can sit at the far edge in never-settled country.
+///
+/// A province can outlive its centre in play (PROVINCES.md ruling 3, NR-952), and
+/// a water province never holds one, so the fallback is stated rather than
+/// hidden: with no centre standing in it, the LOWEST-ID member tile
+/// (`tiles.front()` — the id at build, though not necessarily after an in-play
+/// merge, `province::id`) — deterministic, and a tile every province carries. Returns `null_entity` only for an empty
+/// province (never built by the partition).
+///
+/// The single-province form scans every centre once (O(centres)), cheap enough
+/// for a card drawn every frame; the map form reads a `province_anchors` result a
+/// caller already holds, for a pass over many provinces. The two agree by
+/// construction: same sum per tile, same strictly-greater scan in ascending tile
+/// order.
+entity_id province_anchor_tile(const world& w, const province& pr);
+entity_id province_anchor_tile(const std::map<uint32_t, province_anchor>& anchors,
+                               const province& pr);
+
 /// The current holder of the province with id @p province_id, or `null_entity`
 /// if there is no such province or no holder is recorded. O(log n): binary
 /// search for the province (mirroring `province_partition::find`), then a
@@ -784,12 +929,15 @@ inline constexpr uint32_t province_section_version = 1;
 /// against a corrupt or malicious length prefix.
 inline constexpr uint32_t province_section_max_provinces = 1u << 24;
 
-/// Sanity ceiling on one province's declared tile count. A built province is a
-/// handful of tiles — `k_province_max_tiles` (12) is the PREFERRED size and the
-/// clamp growth obeys, `k_province_hard_cap_tiles` (20) is the absolute bound,
-/// and the floor is whatever land was there — so this is orders of magnitude
-/// clear of all three. It stays generous rather than tight to either constant so
-/// a future algorithm change is a format-compatible one.
+/// Sanity ceiling on one province's declared tile count. RE-READ 2026-10-02
+/// (BL-1145): `k_province_max_tiles` (12) and `k_province_hard_cap_tiles` (20)
+/// bound only the water domains and an unsettled body's hinterland now; on
+/// settled land the fill is unclamped (PROVINCES.md ruling 4) and a centre's
+/// province reaches 2,541 tiles on the shipped worlds (centre_census C7, the 16
+/// curated seeds: seed 28; every other seed's largest is under 1,000). 65,536 is
+/// still ~25x clear of that.
+/// It stays generous rather than tight so a future algorithm change is a
+/// format-compatible one.
 inline constexpr uint32_t province_section_max_tiles = 1u << 16;
 
 /// Append @p p to @p out as: magic, version, seed, province count, then per

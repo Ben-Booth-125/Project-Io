@@ -1077,6 +1077,93 @@ reading under the rows when it sees it; whether the migration should carry dice 
 node tools/verify/build_harness.js span_seed_isolation --run
 ```
 
+## world_cursor_equivalence — BL-1084, does a stage run on a COPY build what the single call builds?
+
+`make_hard_coded_world` is a composition of six stage functions over one `generation_cursor`
+(`src/world/generation_cursor.hpp`): life_gate, culture, empires, exploration, industrialisation,
+tail. The wizard moves one world forward by running each round's stage on the slot the round before
+it closed, so a stage on a copy must build exactly what the single call builds. Per curated seed
+(`docs/generation/seed_library.json`), with the app's generation inputs (the parsed world_gen.lua and
+works.lua): **(a)** the composition in place, digested at every boundary; **(b)** the staged build — at
+every boundary the cursor, report and fixture are copied, the copy rebound, the ORIGINAL FREED, and the
+next stage run on the copy; **(c)** `make_hard_coded_world` itself against (a)'s tail. (a) and (b) must
+agree at every boundary on the ownership records (every span's `era_timelapse`), the polity tables, the
+world (world_determinism's deep digest, shared through `world_deep_digest.hpp`), the cursor's own
+members (by content, not size, wherever the tail or a later span reads them), and the report. A
+non-vacuity row asserts the digests can see every stage, and two **negative controls** perturb one
+member of a copied cursor (a settlement history line at culture, an Exploration sea leg at
+exploration) and assert the same comparison reports the difference.
+
+`--measure` (default seeds 0 and 28, no tail) prices the reroll path: copying a closed stage's cursor
+against replaying to it from a held Life-gate cursor and from the params, and asserts each replay lands
+on the walk's own digests. Timings are wall clock, reported and never asserted.
+
+Three full shipped worlds per seed: an hour-scale run in Release on the sixteen seeds, so it is a
+`sweep`-labelled ctest. `--seeds 0 --no-one-call` is the one-world smoke form.
+
+```
+bash tools/verify/build_lua_harness.sh world_cursor_equivalence
+build_gen/verify/world_cursor_equivalence.exe                       # K2: the 16 library seeds
+build_gen/verify/world_cursor_equivalence.exe --measure --seeds 0,28 # K3: copy vs replay
+
+## market_census (BL-1125 M1, BL-1003 R6)
+
+The market census on the world the player is handed: the shipped arc, built in app order as
+`player_seed_sweep` builds it (the search, the settle, the seat), then a four-tick play year. Per
+curated seed: markets per body by source (capital shell / carve, and the carve's junction-lowered
+count from the report); which close marked each shell and whether its maker still holds it at
+1960; catchment tiles and population per market (`market_for_tile`), the distribution and the
+smallest ten; the share that clear nothing over the play year (the exchange record, read after
+every clear); nearest-neighbour spacing in tiles and traversal cost. Then BL-1003 R6: corporations
+whose home-body buildings route to two or more markets, and the search's own invariants (V1-V5)
+on this world's walk, with V6 reporting whether the handed-over world re-scores as the search
+scored it.
+
+**A report.** Its failing rows are its own identification checks (a shell is identified three
+ways: id order and anchor tile, the capital price premium, and the has_market region table) and
+the search's invariants. The header states how every reading is taken. It prints D_land and
+D_settle for comparison against `player_seed_sweep`'s shipped pins: the one departure from that
+path is an `era_minus_one_fixture` handed to generation, which generation only writes.
+
+Registered as a **`sweep`**: a full world, a search and a settle per seed.
+
+```
+bash tools/verify/build_lua_harness.sh market_census
+./build_gen/verify/market_census.exe [--seeds 46,28] [--live-ticks 4] [--no-traversal] [--list 10]
+```
+
+## centre_census (BL-1130)
+
+The population-centre census on the world generation hands the landscape search: the shipped
+arc, built by `build_app_base_world` (generation, setup, recipes; no search — the search founds
+no centre). Per curated seed, on the home body: the history (battles, conquests and foundings
+per span, from the generation report — the Era −1 sim reads `region::centres`); urbanisation
+(population, urban heads and share, the industrial heads where the tree carries them, the
+largest region's heads); the sim record (regions, the sum of `region::centres`, the per-region
+count histogram); every centre, the land tiles hosting one and the land stamped urban; the scale
+mix by `k_population_for_scale` rung; the fit of the carve against each region's cell of the
+settlement partition (`nearest_region`) — spills out of the source cell, the NOMINAL footprints
+by the carve's scale against the cell, the urban tiles PAVED ACROSS a cell edge (no centre of
+their own cell stands on or beside them), regions with no placeable tile, and groundless regions
+(and whether they still carry a centre); where the density is (regions packed one to a land tile,
+and the carved centres standing in such cells); road tiles (streets vs the network) and markets;
+the count against the ~500 aim (a reading, never a gate); and the BL-1042 stockpile — points, to
+carved centres, and unspent by reason. `--map DIR` writes one road-field PPM per seed in
+`gen_step_costs --roads-map`'s colours, and one centre map per seed coloured by origin (carved by
+scale, province anchor, national coverage).
+
+**A report on density; two rows FAIL.** The instrument's own (a world with no urban map or no
+carved centre, which would make every fit row vacuous), and **the cap**: the saved sim record
+against its final cells by `region_centres_fit` on the cells' standable ground — no living
+region carries more centres than its ground holds, and none on a cell with no ground carries one.
+
+Registered as a **`sweep`**: a full world per seed.
+
+```
+bash tools/verify/build_lua_harness.sh centre_census
+./build_gen/verify/centre_census.exe [--seeds 46,28] [--map DIR]
+```
+
 ## Which builder?
 
 Do not guess. `build_harness.js` **derives** it and refuses with the reason and the exact command:

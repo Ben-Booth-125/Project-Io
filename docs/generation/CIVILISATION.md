@@ -96,6 +96,21 @@ changes hands when its seat does.
 city state that holds other settlements. That is the whole political ladder for this phase, and
 it needs no new actor type — the sim's `polity` already is one.
 
+**A new region founds at a distance, not on the nearest free tile (Ben, 2026-09-25; BL-1132,
+settle spacing).** Founding on the nearest free ground packed the settled cores one region to a
+tile (seed 46: 3,304 of 4,682 regions held a one-tile cell), so every tile of a core was a seat and
+its streets paved it solid — the opposite of sparse. A founding party goes far enough from the
+regions already standing that the new one can grow a hinterland of its own: **three tiles** from
+any region's seat, held or not, since each still anchors a cell (Ben, 2026-09-26, from the
+measured ladder — the knee where one-tile cells fall from 26,232 to 231 pooled). The rule binds
+every founding, not only Settle's: a founding the migration stream has scheduled but not yet
+made keeps its ground, so no Settle founds within three tiles of it and it arrives clear.
+**A realm chooses to settle only where a site with room exists (Ben, 2026-09-26):** Settle is
+scored only when the realm's site search finds a site that passes the spacing — the same search
+the founding then runs — so no decision round is spent on a founding that cannot happen, and the
+rounds that would have been wasted go to the realm's other choices. The search samples the rings
+round the source rather than walking every tile, so "room" means room the search found that year.
+
 **SETTLED (Ben, 2026-09-09, elicitation): a settlement is a SEAT FLAG ON A REGION, and every
 region points at the seat it feeds.** No new table and no new id space. The region already carries
 everything a seat needs to be worth taking — population, `manpower_stock`, `army_stock`, the four

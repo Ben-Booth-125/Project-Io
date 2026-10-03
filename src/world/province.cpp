@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <istream>
+#include <limits>
 #include <map>
 #include <ostream>
 #include <queue>
@@ -84,26 +85,27 @@ struct domain_spec
     std::size_t   hard_min    = k_province_hard_min_tiles; ///< Taken whatever it costs.
     int           spacing     = k_province_seed_spacing;   ///< Minimum seed separation.
     bool          settled     = true;                      ///< Population centres seed it (land only).
-    /// BL-849: does this domain lock growth to the seed's SETTLED verdict, the
-    /// way land already locks to the seed's nation? Land only — water carries
-    /// no colonisation record (`w.tile_settled` is a land-only set), so the
-    /// lock would be a no-op there and is not worth asking the question of.
-    bool          settlement_lock = false;
+    // No settlement lock (Ben, 2026-09-27, NR-954 B; BL-1150, a centre's fill
+    // crosses the settled line). BL-849 locked land growth to the seed's
+    // colonisation verdict the way it is locked to the seed's nation; the lock
+    // retired, so a centre's region grows from settled ground into the
+    // never-settled ground of its own nation, and the nation lock is the one
+    // lock left. `w.tile_settled` is no longer an input to this file.
 };
 
 /// The domains IN THE ORDER THEY ARE PARTITIONED, land first. The order is not
 /// load-bearing — the sets are disjoint, so no domain can take a tile another
 /// wanted — but it is fixed anyway so a reader never has to prove that.
 const domain_spec k_domains[3] = {
-    // Land: the pre-BL-516 band and rules, unchanged, plus the settlement lock.
+    // Land: the pre-BL-516 band and rules (covered land re-ruled by BL-1133).
     { province_kind::land, k_province_min_tiles, k_province_max_tiles,
-      k_province_hard_min_tiles, k_province_seed_spacing, true, true },
+      k_province_hard_min_tiles, k_province_seed_spacing, true },
     // Coastal water: Ben named the land band for it, and nothing settles it.
     { province_kind::coastal_water, k_province_min_tiles, k_province_max_tiles,
-      k_province_hard_min_tiles, k_province_seed_spacing, false, false },
+      k_province_hard_min_tiles, k_province_seed_spacing, false },
     // Open ocean: much larger, growth capped at 80.
     { province_kind::open_ocean, k_sea_province_soft_target, k_sea_province_max_tiles,
-      k_province_hard_min_tiles, k_sea_province_seed_spacing, false, false },
+      k_province_hard_min_tiles, k_sea_province_seed_spacing, false },
 };
 
 /// Per-body, per-domain working state for the fill. Everything is keyed by tile
@@ -137,21 +139,33 @@ struct region
     /// nation. Water is never locked — nations own no water.
     entity_id nation = null_entity;
 
-    /// The seed tile's colonisation verdict (BL-849): true if `w.tile_settled`
-    /// holds it. On LAND the fill is SETTLEMENT-LOCKED exactly as it is
-    /// nation-locked: growth, leftover seeding and singleton absorption all
-    /// keep a region's tiles on one side of the settled/unsettled line, so
-    /// ground the colonisation span never reached forms its own hinterland
-    /// rather than blending into a settled neighbour's shape. Meaningless off
-    /// land (water carries no colonisation record) and always false there.
-    bool settled = false;
+    // The nation is the region's ONLY lock key. The seed's colonisation verdict
+    // was a second one (BL-849) and retired with BL-1150: a centre's region
+    // crosses the settled line, so never-settled ground of its nation joins the
+    // province of the centre that reaches it.
 
     /// Sum of the edge costs of the steps that claimed `tiles`, and how many
     /// there were (the seed itself was not stepped to). Their mean is what the
     /// SOFT brake reads — see grow_regions.
     long long   step_cost_sum = 0;
     std::size_t step_count    = 0;
+
+    /// THE WEIGHT ON REACH (Ben, 2026-09-26; BL-1133, a province is its
+    /// centre's ground — delegated reading NR-953). What one step of edge cost
+    /// adds to this region's path cost. On COVERED land (a body whose centres
+    /// seed its land, see build_province_partition) a centre's scale DIVIDES
+    /// its step cost, so a metropolis reaches five times as far for the same
+    /// ground as a village and still draws the larger province once the budget
+    /// no longer stops anyone. Kept integral and exact by scaling every step by
+    /// `k_reach_scale_lcm` (60 = lcm(1..5)): the multiplier is 60 / scale, so
+    /// 60 / 30 / 20 / 15 / 12 for scales 1-5 and no division ever rounds.
+    /// 1 everywhere else — the water domains, an unsettled body's hinterland
+    /// and a covered body's leftover ground grow exactly as before.
+    long long   reach_mult = 1;
 };
+
+/// lcm(1..5): the common scale that keeps the reach weight's division exact.
+constexpr long long k_reach_scale_lcm = 60;
 
 /// A frontier entry: reaching @p tile from @p seed's region at total @p cost,
 /// where the LAST edge crossed cost @p step. `step` is what the soft-target
@@ -159,7 +173,7 @@ struct region
 /// is a property of the edge itself, not of the path that got there.
 struct frontier_entry
 {
-    int         cost   = 0;
+    long long   cost   = 0; ///< Path cost, the step costs times the region's `reach_mult`.
     int         step   = 0;
     entity_id   seed   = null_entity;
     entity_id   tile   = null_entity;
@@ -195,7 +209,22 @@ int edge_cost_impl(uint32_t seed, entity_id a_id, const tile_component& a, entit
 
     int c = k_province_edge_base_cost;
 
-    if (((a.river_edges >> side) & 1u) != 0u || ((b.river_edges >> opposite) & 1u) != 0u)
+    // A RIVER DIVIDES ITS BANKS (Ben, 2026-10-01, NR-962 B; BL-1156). A river
+    // is a run of course tiles (`river_edges != 0`) joined by the steps its
+    // bits mark, from each course tile to the next downstream. The fill pays
+    // the river's cost to step ONTO or OFF a course sideways — one end a
+    // course tile, the step not one the river flows through — so crossing
+    // from bank to bank costs it twice, and stepping along the course pays
+    // nothing extra. Symmetric: both ends' course-ness and either side's bit.
+    // LAND COURSE TILES ONLY: the river's last step sets an inflow bit on the
+    // water tile it reaches (its mouth), and the ruling is about banks on land,
+    // so a mouth tile charges water-to-water steps nothing and the water
+    // domains partition exactly as before (BL-1156 review).
+    const bool along = ((a.river_edges >> side) & 1u) != 0u
+                       || ((b.river_edges >> opposite) & 1u) != 0u;
+    const bool a_course = a.river_edges != 0u && !is_water(a.substrate);
+    const bool b_course = b.river_edges != 0u && !is_water(b.substrate);
+    if (!along && (a_course || b_course))
         c += k_province_river_edge_cost;
 
     const float dh = std::fabs(a.height - b.height);
@@ -217,17 +246,6 @@ entity_id nation_of_tile(const world& w, entity_id tile)
     return (it == w.tile_to_nation.end()) ? null_entity : it->second;
 }
 
-/// Did the colonisation span settle @p tile (BL-849)? One lookup, shared by
-/// seeding, growth and absorption for the same reason `nation_of_tile` is —
-/// the lock cannot disagree with itself. `w.tile_settled` holds land tiles
-/// only, so this is unconditionally false for water and for any body the
-/// migration never ran on, which is the correct "no colonisation record"
-/// answer rather than a special case.
-bool settled_of_tile(const world& w, entity_id tile)
-{
-    return w.tile_settled.find(tile) != w.tile_settled.end();
-}
-
 /// Grow every region named in @p active SIMULTANEOUSLY as one cost-weighted
 /// multi-source fill, claiming into @p bw.owner. Neighbouring seeds therefore
 /// meet on the terrain between them rather than in the order they were listed.
@@ -235,8 +253,9 @@ bool settled_of_tile(const world& w, entity_id tile)
 /// On LAND the fill is NATION-LOCKED (BL-611; ruling 5 — a national border is
 /// a hard edge): a region claims only tiles of its seed's nation, so the
 /// terrain cost function operates only within a nation's territory and a
-/// region's frontier is the border wherever it reaches one. Water domains are
-/// never locked.
+/// region's frontier is the border wherever it reaches one. The settled line
+/// is NOT a border (BL-1150): a region crosses from settled into never-settled
+/// ground of its nation like any other edge. Water domains are never locked.
 void grow_regions(body_work& bw, const world& w, uint32_t seed, const domain_spec& dom,
                   std::vector<region>& regions, const std::vector<std::size_t>& active)
 {
@@ -264,7 +283,9 @@ void grow_regions(body_work& bw, const world& w, uint32_t seed, const domain_spe
         region& r = regions[f.region_index];
 
         // The one hard clamp in the file. Per DOMAIN since BL-516: 12 on land
-        // and in the shallows, 80 on the open ocean.
+        // and in the shallows, 80 on the open ocean — and NONE on covered land
+        // (BL-1133: a province is its centre's ground, so the caller hands a
+        // covered body's land an unbounded ceiling and unbounded targets).
         if (r.tiles.size() >= dom.max_tiles)
             continue;
 
@@ -318,18 +339,14 @@ void grow_regions(body_work& bw, const world& w, uint32_t seed, const domain_spe
             // tile's nation is null and the lock never bites.
             if (dom.kind == province_kind::land && nation_of_tile(w, n) != r.nation)
                 continue;
-            // BL-849: the settlement lock, the same shape as the nation lock
-            // above — a region stays on its seed's side of the settled /
-            // unsettled line. On a body the colonisation span never ran on
-            // every tile reads unsettled, so `r.settled` is false for every
-            // seed there and the lock never bites, exactly as the nation lock
-            // does not bite on an unsettled body.
-            if (dom.settlement_lock && settled_of_tile(w, n) != r.settled)
-                continue;
+            // No settlement lock here (BL-1150; it was BL-849's): the settled
+            // / unsettled line is priced like any other edge, by the cost
+            // model alone, so never-settled ground joins the centre that
+            // reaches it first.
 
             frontier_entry e;
             e.step         = edge_cost_impl(seed, f.tile, tc, n, nit->second, s);
-            e.cost         = f.cost + e.step;
+            e.cost         = f.cost + static_cast<long long>(e.step) * r.reach_mult; // BL-1133
             e.seed         = f.seed;
             e.tile         = n;
             e.region_index = f.region_index;
@@ -365,17 +382,10 @@ province_kind province_kind_of(const world& w, uint32_t id)
 // The province holder (BL-569, province holder)
 // ---------------------------------------------------------------------------
 
-void seed_province_holders(world& w)
+std::map<uint32_t, province_anchor> province_anchors(const world& w)
 {
-    w.province_holder.assign(w.provinces.provinces.size(), null_entity);
-
-    // BL-611 (province centre anchor): the ANCHOR is the political decider —
-    // the province's nation is its anchor centre's nation, and taking the
-    // centre takes the province (BL-567's mechanism). The anchor is DERIVED,
-    // never stored: the highest summed centre scale standing in the province,
-    // ties to the lowest tile id — so it cannot desynchronise from the
-    // centres it describes. Gathered into an ORDERED map so no unordered
-    // iteration order reaches the pick.
+    // Gathered into an ORDERED map so no unordered iteration order reaches the
+    // pick: the scales of every centre standing on a tile, summed.
     std::map<entity_id, int> centre_scale_by_tile;
     for (const auto& [centre_id, tile_id] : w.population_centre_tile)
     {
@@ -385,12 +395,9 @@ void seed_province_holders(world& w)
         centre_scale_by_tile[tile_id] += pit->second.scale;
     }
 
-    for (std::size_t i = 0; i < w.provinces.provinces.size(); ++i)
+    std::map<uint32_t, province_anchor> out;
+    for (const province& pr : w.provinces.provinces)
     {
-        const province& pr = w.provinces.provinces[i];
-        if (province_kind_of(w, pr) != province_kind::land)
-            continue; // no_entity for a non-land province (already the default)
-
         // The anchor pick: walk `pr.tiles` in its own ascending order (the
         // partition's contract) with a strictly-greater scan, so the lowest
         // tile id to reach a given scale wins ties for free.
@@ -408,8 +415,77 @@ void seed_province_holders(world& w)
             }
         }
         if (anchor != null_entity)
+            out[pr.id] = province_anchor{ anchor, anchor_scale };
+    }
+    return out;
+}
+
+entity_id province_anchor_tile(const world& w, const province& pr)
+{
+    if (pr.tiles.empty())
+        return null_entity;
+
+    // The same per-tile sum `province_anchors` builds, narrowed to this
+    // province's tiles, in an ORDERED map so the scan below walks ascending
+    // tile id exactly as that function walks `pr.tiles`.
+    std::map<entity_id, int> scale_on_tile;
+    for (const auto& [centre_id, tile_id] : w.population_centre_tile)
+    {
+        if (w.provinces.province_of(tile_id) != pr.id)
+            continue;
+        if (!std::binary_search(pr.tiles.begin(), pr.tiles.end(), tile_id))
+            continue; // guards province id 0, which province_of also returns for "none"
+        const auto pit = w.population_centres.find(centre_id);
+        if (pit == w.population_centres.end())
+            continue;
+        scale_on_tile[tile_id] += pit->second.scale;
+    }
+
+    entity_id anchor       = null_entity;
+    int       anchor_scale = 0;
+    for (const auto& [tile, scale] : scale_on_tile) // ascending: strict > keeps the lowest id
+    {
+        if (scale > anchor_scale)
         {
-            const auto nit = w.tile_to_nation.find(anchor);
+            anchor_scale = scale;
+            anchor       = tile;
+        }
+    }
+    return (anchor != null_entity) ? anchor : pr.tiles.front(); // centreless: the lowest-id tile
+}
+
+entity_id province_anchor_tile(const std::map<uint32_t, province_anchor>& anchors,
+                               const province& pr)
+{
+    if (pr.tiles.empty())
+        return null_entity;
+    const auto it = anchors.find(pr.id);
+    return (it != anchors.end()) ? it->second.tile : pr.tiles.front(); // centreless: the lowest-id tile
+}
+
+void seed_province_holders(world& w)
+{
+    w.province_holder.assign(w.provinces.provinces.size(), null_entity);
+
+    // BL-611 (province centre anchor): the ANCHOR is the political decider —
+    // the province's nation is its anchor centre's nation, and taking the
+    // centre takes the province (BL-567's mechanism). The anchor is DERIVED,
+    // never stored: the highest summed centre scale standing in the province,
+    // ties to the lowest tile id — so it cannot desynchronise from the
+    // centres it describes. ONE DERIVATION (`province_anchors`, shared since
+    // the BL-1146 review with the charter budget's per-province cap).
+    const std::map<uint32_t, province_anchor> anchors = province_anchors(w);
+
+    for (std::size_t i = 0; i < w.provinces.provinces.size(); ++i)
+    {
+        const province& pr = w.provinces.provinces[i];
+        if (province_kind_of(w, pr) != province_kind::land)
+            continue; // no_entity for a non-land province (already the default)
+
+        const auto ait = anchors.find(pr.id);
+        if (ait != anchors.end())
+        {
+            const auto nit = w.tile_to_nation.find(ait->second.tile);
             w.province_holder[i] =
                 (nit == w.tile_to_nation.end()) ? null_entity : nit->second;
             continue;
@@ -557,17 +633,33 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
         std::vector<region>    regions;
         std::vector<entity_id> centre_seeds; ///< Ascending; pass 2 spaces itself off these.
 
-        // --- Pass 1: SETTLEMENT GROWTH.
+        // THE EFFECTIVE DOMAIN. Identical to `dom` everywhere but COVERED LAND
+        // (BL-1133, below): the land of a body whose centres seed it, where no
+        // ceiling stops the fill. Every later pass reads `eff`, so the water
+        // domains and an unsettled body's land see exactly the band they did.
+        domain_spec eff = dom;
+        bool covered = false;
+
+        // --- Pass 1: SETTLEMENT GROWTH — A PROVINCE IS ITS CENTRE'S GROUND.
         //
         // Every population centre on this body is a seed, in ascending tile id,
-        // with a growth budget scaled by its centre scale (1 = village ..
-        // 5 = metropolis): a metropolis draws a larger province than a village.
-        // The budget spans the soft band over the scale's own defined domain,
-        // so nothing here is a tuned number — scale 1 gets k_province_min_tiles
-        // and scale 5 gets k_province_max_tiles.
-        //
-        // All seeds grow SIMULTANEOUSLY, as one multi-source fill, so two
+        // and all of them grow SIMULTANEOUSLY, as one multi-source fill, so two
         // centres meet on the terrain between them rather than in list order.
+        //
+        // Ben, 2026-09-26 (BL-1133; PROVINCES.md § The partition): the fill no
+        // longer stops at a growth budget. Every centre's province grows until
+        // its nation's land is covered — across the settled line as well as
+        // within it (Ben, 2026-09-27, NR-954 B; BL-1150) — the nation lock
+        // still bounds it, nothing else does — so a body has as many provinces
+        // as seeded centres and none is left without one. The 20-tile cap and
+        // the preferred 12 retire here (they still bind the water domains and
+        // an unsettled body's hinterland).
+        //
+        // THE BUDGET BECOMES A WEIGHT ON REACH (delegated reading NR-953): a
+        // centre's scale divides its step cost (`region::reach_mult`), so a
+        // metropolis claims ground five times as far off as a village does for
+        // the same terrain and still draws the larger province (ruling 1),
+        // while competition still decides every border.
         if (dom.settled) // BL-516: only land is settled; water is all hinterland.
         {
             std::vector<std::size_t> active;
@@ -583,15 +675,19 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                 region    r;
                 r.seed   = tile_id;
                 r.nation = nation_of_tile(w, tile_id); // BL-611: the lock's key
-                r.settled = settled_of_tile(w, tile_id); // BL-849: the settlement lock's key
-                r.target = k_province_min_tiles
-                           + static_cast<std::size_t>((clamped - 1))
-                                 * (k_province_max_tiles - k_province_min_tiles) / 4u;
+                r.target     = std::numeric_limits<std::size_t>::max(); // no budget
+                r.reach_mult = k_reach_scale_lcm / clamped;             // 60 / scale, exact
                 centre_seeds.push_back(tile_id);
                 active.push_back(regions.size());
                 regions.push_back(std::move(r));
             }
-            grow_regions(bw, w, seed, dom, regions, active);
+            if (!centre_seeds.empty())
+            {
+                covered       = true;
+                eff.max_tiles = std::numeric_limits<std::size_t>::max(); // no ceiling
+                tally.covered_bodies += 1;
+            }
+            grow_regions(bw, w, seed, eff, regions, active);
         }
 
         // --- Pass 2: HINTERLAND — water's primary mechanism, land's retired one.
@@ -715,7 +811,6 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                     region r;
                     r.seed    = t;
                     r.nation  = nation_of_tile(w, t);
-                    r.settled = settled_of_tile(w, t); // BL-849
                     r.target  = dom.soft_target;
                     active.push_back(regions.size());
                     regions.push_back(std::move(r));
@@ -725,17 +820,23 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
             }
 
             // --- Leftovers. Ground the primary fill could not reach —
-            // enclosed by regions that hit the hard ceiling, cut off behind a
-            // border too expensive to cross, or (on settled land, BL-611)
-            // simply farther from every centre than any budget stretches: ice
-            // caps, deep deserts, the far side of a nation border no centre
-            // stands behind. Seeded in the same fixed least-accessible-first
-            // order and grown one at a time, because by now they are pockets
-            // rather than open country. This is where a genuinely tiny
-            // province comes from, and it is KEPT. On settled land these are
-            // the provinces the anchor-founding pass
-            // (ensure_province_anchor_centres, population_generation.cpp)
-            // gives their centre AFTER the partition ships.
+            // enclosed by regions that hit the hard ceiling, or cut off behind
+            // a border too expensive to cross. Seeded in the same fixed
+            // least-accessible-first order and grown one at a time, because by
+            // now they are pockets rather than open country. This is where a
+            // genuinely tiny province comes from, and it is KEPT.
+            //
+            // ON COVERED LAND (BL-1133) nothing stops the centre fill, so the
+            // only ground left is ground NO CENTRE OF ITS NATION CAN REACH AT
+            // ALL under the nation lock — an UNCENTRED ISLAND: a nation's
+            // island or enclave with no centre on it, or land no nation holds.
+            // (Never-settled ground a centre of its nation can reach is no
+            // longer left here: the settled line is not a lock, BL-1150.) Each
+            // is grown unbounded, so one leftover province covers one such
+            // island whole, and it is the province the anchor-founding pass
+            // (ensure_province_anchor_centres, population_generation.cpp) gives
+            // its centre AFTER the partition ships — counted in
+            // `uncentred_regions`, never hidden.
             for (const auto& [neg_walls, t] : ranked)
             {
                 (void)neg_walls;
@@ -744,11 +845,12 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                 region r;
                 r.seed    = t;
                 r.nation  = nation_of_tile(w, t);
-                r.settled = settled_of_tile(w, t); // BL-849
-                r.target  = dom.soft_target;
+                r.target  = covered ? std::numeric_limits<std::size_t>::max() : dom.soft_target;
                 const std::size_t ri = regions.size();
                 regions.push_back(std::move(r));
-                grow_regions(bw, w, seed, dom, regions, { ri });
+                grow_regions(bw, w, seed, eff, regions, { ri });
+                if (covered)
+                    ++tally.uncentred_regions;
             }
         }
 
@@ -844,13 +946,8 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                         if (dom.kind == province_kind::land
                             && regions[nri].nation != regions[ri].nation)
                             continue;
-                        // BL-849: and the settlement lock, the same reasoning —
-                        // a singleton on one side of the settled/unsettled line
-                        // joins only a province on the same side, or the lock
-                        // grow_regions enforced would dissolve at absorption.
-                        if (dom.settlement_lock
-                            && regions[nri].settled != regions[ri].settled)
-                            continue;
+                        // No settlement lock (BL-1150): the settled line is not
+                        // a border in growth, so it is not one here either.
 
                         const int       cost = edge_cost_impl(seed, t, tc, n, nit->second, s);
                         const entity_id key  = region_id(nri);
@@ -882,7 +979,15 @@ void build_province_partition(world& w, uint32_t seed, province_absorption_stats
                     bw.owner[t] = static_cast<uint32_t>(best_index) + 1u;
                     ++absorbed_here;
                     ++tally.absorbed;
-                    if (regions[best_index].tiles.size() > dom.max_tiles)
+                    // BL-1133: on covered land the only singleton with a
+                    // neighbour it may join is a CENTRE's — a leftover covers
+                    // its whole uncentred island, so it has none — and the
+                    // absorption is the one route by which covered land ends
+                    // with fewer provinces than seeded centres. Counted.
+                    if (covered)
+                        ++tally.covered_centre_singletons_absorbed;
+                    // No ceiling on covered land (`eff`), so no breach to count.
+                    if (regions[best_index].tiles.size() > eff.max_tiles)
                     {
                         ++tally.over_ceiling_created;
                         ++tally.over_ceiling_by_domain[static_cast<std::size_t>(dom.kind)];
@@ -1019,12 +1124,29 @@ bool read_province_section(province_partition& out, std::istream& in)
             if (!read_u32(in, pr.tiles[t]))
                 return false;
 
+        // THE RECORDED-ID CONTRACT (BL-1139; province.hpp § province::id). In
+        // play the id is recorded rather than derived, so the reader can no
+        // longer recompute it from the tiles — but it can still hold the
+        // stream to what every write path guarantees: member tiles strictly
+        // ascending, and the id one of them (a province's own lowest tile at
+        // build, which an in-play merge never removes). A stream that breaks
+        // either was not written by this code; refused whole.
+        for (uint32_t t = 1; t < tiles; ++t)
+            if (pr.tiles[t] <= pr.tiles[t - 1])
+                return false;
+        if (!std::binary_search(pr.tiles.begin(), pr.tiles.end(), static_cast<entity_id>(pr.id)))
+            return false;
+
         out.provinces.push_back(std::move(pr));
     }
 
+    // No tile in two provinces: the partition is a PARTITION, and a merge moves
+    // a tile rather than copying it. A duplicate would let `province_of` answer
+    // whichever province was read last.
     for (const province& pr : out.provinces)
         for (const entity_id t : pr.tiles)
-            out.tile_province[t] = pr.id;
+            if (!out.tile_province.emplace(t, pr.id).second)
+                return false;
 
     return true;
 }
