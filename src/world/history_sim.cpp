@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <limits>
+#include <map>
 #include <queue>
 #include <unordered_map>
 
@@ -1131,6 +1132,7 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             trade_ctx.current_weight_q = params.sea_current_weight_q;
             // BL-1142: the cargo a leg against its current loses.
             trade_ctx.seat_landmass = spend_ctx->seat_landmass;
+            trade_ctx.road_joins_one_landmass = params.trade_road_joins_one_landmass; // BL-1171
             trade_ctx.cargo_loss_q  = spend_ctx->cargo_loss_q;
             trade_ctx.cargo_lost    = spend_ctx->cargo_lost_out;
         }
@@ -1183,7 +1185,10 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
             if (gi >= 0) reachable[n][static_cast<std::size_t>(gi)] = true;
         }
         for (const trade_flow& f : flows)
-            if (f.good < good_count && trade_land_line_q(trade_ctx, f.seller, f.buyer) > 0)
+            if (f.good < good_count
+             && (params.trade_road_joins_one_landmass
+                     ? f.by_sea == 0 // BL-1171: the road that carries it, not a road between the realms
+                     : trade_land_line_q(trade_ctx, f.seller, f.buyer) > 0))
                 reachable[f.buyer][f.good] = true;
 
         // The preference weight is only filled when `w_want_q` != 0 (generation
@@ -1703,6 +1708,16 @@ static bool trade_lines(const trade_context& ctx, const std::vector<region>& reg
     // LINE: the better of land (a corridor joining the two realms) and sea
     // (both seats' built ports, carried by the SELLER's navy).
     land_q = trade_land_line_q(ctx, seller, buyer);
+    // BL-1171 -- GOODS BETWEEN LANDMASSES GO BY SEA: a road joins two seats on
+    // one landmass only, so a pair across water has no land line to ride.
+    if (ctx.road_joins_one_landmass && ctx.seat_landmass != nullptr
+     && static_cast<std::size_t>(seller) < ctx.seat_landmass->size()
+     && static_cast<std::size_t>(buyer) < ctx.seat_landmass->size())
+    {
+        const int32_t ms = (*ctx.seat_landmass)[static_cast<std::size_t>(seller)];
+        const int32_t mb = (*ctx.seat_landmass)[static_cast<std::size_t>(buyer)];
+        if (ms >= 0 && mb >= 0 && ms != mb) land_q = 0;
+    }
     sea_q = ps.navy_stock > 0
           ? clampi(std::min(seller_seat.port_stock_q, buyer_seat.port_stock_q), 0, 1000)
           : 0;
@@ -2406,6 +2421,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
     std::vector<std::vector<int>> fleet_ring;
     std::vector<std::uint8_t> fleet_ring_built;
     fleet_field_cache fleet_fields;
+    // BL-1171 -- A FAR PAIR READS THE SEA'S PENALTY WHERE A FLEET REACHES. The
+    // rule reads the fleet's own power curve, so it needs the fleet rule on
+    // with a halving; otherwise it reads nothing and BL-1142 stands as ruled.
+    // The cost field from each seat's coast tile is memoised for the span,
+    // keyed by the tile (content: the sea never moves), cleared whole when it
+    // grows past a bound -- which moves the cost of the read, never its answer.
+    const bool far_reach_rule_on = params.far_sea_bind_needs_fleet_reach && fleet_rule_on
+                                && params.fleet_power_halving_tiles > 0;
+    std::map<int, std::vector<int64_t>> far_reach_fields;
     if (fleet_rule_on)
     {
         fleet_comp = sea_components(fleet_sea, gw, gh);
@@ -5362,10 +5386,51 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     t.current_weight_q = params.sea_current_weight_q;
                     // BL-1142: a binding is worth what arrives.
                     t.seat_landmass = landmass.empty() ? nullptr : &seat_landmass;
+                    t.road_joins_one_landmass = params.trade_road_joins_one_landmass; // BL-1171
                     t.cargo_loss_q  = cargo_loss_q;
                 }
                 return t;
             }();
+
+            // BL-1171 -- WHETHER ONE SIDE'S FLEET REACHES THE OTHER'S PORT, read
+            // off this round's opening stocks (the same facts formation and the
+            // break re-score read): the seller's fleet sails from its seat's
+            // coast tile to the partner seat's, priced with the current, and
+            // reaches when its power there (`fleet_power_at`, halving over the
+            // fleet's own tiles) is at least the stated minimum. Either side's
+            // fleet will do -- either side can be the seller.
+            const auto seat_coast_tile = [&](int pid) -> int {
+                if (pid < 0 || static_cast<std::size_t>(pid) >= out.polities.size()) return -1;
+                const int cap = out.polities[static_cast<std::size_t>(pid)].capital;
+                if (cap < 0 || static_cast<std::size_t>(cap) >= ss.regions.size()) return -1;
+                const region& seat = ss.regions[static_cast<std::size_t>(cap)];
+                return nearest_sea_tile(fleet_sea, gw, gh, seat.col, seat.row, kFleetCoastRadius);
+            };
+            const auto fleet_reaches = [&](int x, int y) -> bool {
+                const polity& px = out.polities[static_cast<std::size_t>(x)];
+                if (!px.alive || px.navy_stock <= 0) return false;
+                const int from = seat_coast_tile(x), to = seat_coast_tile(y);
+                if (from < 0 || to < 0) return false;
+                auto it = far_reach_fields.find(from);
+                if (it == far_reach_fields.end())
+                {
+                    if (far_reach_fields.size() >= 128) far_reach_fields.clear();
+                    it = far_reach_fields.emplace(from, sea_cost_field(fleet_sea, gw, gh,
+                             currents_on ? &currents : nullptr, params.sea_current_weight_q, { from })).first;
+                }
+                const int64_t power = fleet_power_at(px.navy_stock, it->second[static_cast<std::size_t>(to)],
+                                                     params.fleet_power_halving_tiles);
+                return power > 0 && power >= params.far_sea_bind_min_fleet_power;
+            };
+            // The class a pair reads its far penalty by: met across water, and
+            // (with the rule on) a fleet that reaches.
+            const auto sea_far_class = [&](int a, int b, bool met_across_water) -> bool {
+                if (!met_across_water) return false;
+                if (!far_reach_rule_on) return true;
+                const bool reach = fleet_reaches(a, b) || fleet_reaches(b, a);
+                if (!reach) ++out.far_pairs_out_of_fleet_reach;
+                return reach;
+            };
 
             // BL-1142 -- REALMS ACROSS WATER MEET BY SEA (INDUSTRIALISATION.md
             // sec Far pairs meet and bind). Two living realms whose seats
@@ -5462,7 +5527,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const int trade_ab = pair_trade_value_q(treaty_trade_ctx, ss.regions, out.polities, a, b,
                                                              out.trade_flows);
                 const bool met_across_water = c.first.across_water != 0; // BL-1142: recorded at the meeting
-                const int far_pen = treaty_far_penalty_for(params, met_across_water);
+                const int far_pen = near_home ? treaty_far_penalty_for(params, met_across_water)
+                                              : treaty_far_penalty_for(params, sea_far_class(a, b, met_across_water));
                 const int value_a = treaty_value_q(params, ga, gb, pb.treaties_broken, pa.aggression_q,
                                                     alarm_a, near_home, trade_ab, far_pen);
                 const int value_b = treaty_value_q(params, gb, ga, pa.treaties_broken, pb.aggression_q,
@@ -5532,7 +5598,9 @@ history_sim_state run_history_sim(settlement_state&         ss,
                                                              out.trade_flows);
                     // BL-1142 -- the class the pair's contact recorded, the
                     // same fact formation read off the row it walked.
-                    const int far_pen = treaty_far_penalty_for(params, contact_met_across_water(out, a, b));
+                    const bool across = contact_met_across_water(out, a, b);
+                    const int far_pen = near_home ? treaty_far_penalty_for(params, across)
+                                                  : treaty_far_penalty_for(params, sea_far_class(a, b, across)); // BL-1171
                     const int value_a = treaty_value_q(params, ga, gb, pb.treaties_broken, pa.aggression_q,
                                                         alarm_a, near_home, trade_ab, far_pen);
                     const int value_b = treaty_value_q(params, gb, ga, pa.treaties_broken, pb.aggression_q,
