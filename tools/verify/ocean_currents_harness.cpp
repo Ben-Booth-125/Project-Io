@@ -2046,6 +2046,16 @@ void real_body_rows(shipped_inputs& shipped, uint32_t seed, int weight)
               fx.exploration_params.far_pairs_meet_by_sea
                   ? "W9  Exploration, meeting by sea on, meets realms across water by sea"
                   : "W9  Exploration, meeting by sea off, meets no one by sea");
+        // F9 (BL-1171, Ben 2026-10-03): GOODS BETWEEN LANDMASSES GO BY SEA, in
+        // every span -- no cross-landmass volume rides a dry corridor in either
+        // of generation's spans, and both spans' shipped params say so.
+        std::printf("      cross-landmass volume by road: Exploration %lld, Industrialisation %lld\n",
+                    static_cast<long long>(fx.exploration_state.cross_landmass_volume_by_road_q),
+                    static_cast<long long>(hi.cross_landmass_volume_by_road_q));
+        check(fx.exploration_params.trade_road_joins_one_landmass && dp.trade_road_joins_one_landmass
+              && fx.exploration_state.cross_landmass_volume_by_road_q == 0
+              && hi.cross_landmass_volume_by_road_q == 0,
+              "F9  goods between landmasses never ride a road, in the Exploration span or the Industrialisation span");
         check(dp.sea_current_cargo_loss_q <= 0 || hi.sea_trade_cargo_lost_q > 0,
               "W9  with a loss set, the Industrialisation span's trades across water lose cargo against the current");
         // The Exploration span's loss is PRINTED above, not bound: it is lost

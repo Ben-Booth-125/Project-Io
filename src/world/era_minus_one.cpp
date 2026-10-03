@@ -471,12 +471,18 @@ history_sim_params exploration_sim_params(const world_params& params)
     // The Industrialisation span inherits all three; with its halving at 0 the
     // out-project read is inert there and BL-1142's class rule stands.
     // MEASURED, ocean_currents_harness --sweep on the 16 curated seeds
-    // (2026-10-03, with the road rule of the next commit): lanes at 1660 79 -> 130 (trade
+    // (2026-10-03, with the road rule below): lanes at 1660 79 -> 130 (trade
     // 12 -> 49), eight seeds gaining 1-12 and eight unchanged, none flooded --
     // where mere reach laid 550.
     hp.far_pairs_meet_by_sea          = true;
     hp.treaty_far_sea_penalty_q       = 300;
     hp.far_sea_bind_needs_fleet_reach = true;
+
+    // BL-1171 -- GOODS BETWEEN LANDMASSES GO BY SEA, IN EVERY SPAN (Ben,
+    // 2026-10-03): a road joins seats on one landmass only, so a trade between
+    // seats on different landmasses sails (the seller's navy, both seats'
+    // ports) or does not move. Industrialisation inherits it.
+    hp.trade_road_joins_one_landmass = true;
 
     return hp;
 }
@@ -568,6 +574,10 @@ history_sim_params industrialisation_sim_params(const world_params& params)
     // the land's 700, no loss) no far pair across water binds.
     hp.far_pairs_meet_by_sea    = true;
     hp.treaty_far_sea_penalty_q = 300;
+    // BL-1171: goods between landmasses go by sea in this span too -- set in
+    // `exploration_sim_params` and inherited; stated here so the span's own
+    // rule set reads whole.
+    hp.trade_road_joins_one_landmass = true;
 
     // BL-1147: THE CONVERSION IS THE EXPLORATION OPEN'S ALONE. This span's
     // polities already sail the fleet 1200 carried (it crossed the 1660
