@@ -1419,6 +1419,24 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
                 const int64_t credit = paid_in * params.industry_points_per_treasury_unit;
                 std::vector<std::pair<int, int64_t>> spread;
                 bool refuse = !industry_points_apportion_by_scale(regions, q.id, credit, spread, works);
+                // BL-1169 -- A CROWDED HEARTLAND CONVERTS AT A LOWER RATE
+                // (INDUSTRIALISATION.md sec Industry spreads beyond its
+                // heartland; Ben, 2026-10-03). Each receiving region converts
+                // its share at K / (K + its crowding), and the whole treasury
+                // units the brake leaves unconverted STAY IN THE PURSE (the
+                // debit below falls by them). Off (K = 0) the spread and the
+                // debit are untouched.
+                int64_t debit = paid_in;
+                if (!refuse && !spread.empty() && params.industry_points_crowding_k > 0)
+                {
+                    const int64_t kept = industry_points_crowd_brake(
+                        regions, spread, params.industry_points_crowding_k,
+                        params.industry_points_per_treasury_unit, works);
+                    if (kept < 0) refuse = true; // out of the brake's domain: refused whole
+                    else debit -= kept;
+                }
+                int64_t credited = 0;
+                for (const auto& part : spread) credited += part.second;
                 // NR-901: no town, no conversion. Not a refusal (nothing was out
                 // of domain) and not a debit: the purse keeps the share.
                 const bool no_town = !refuse && spread.empty();
@@ -1433,13 +1451,13 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
                 {
                     // Nothing moves: the treasury keeps the round's share.
                 }
-                else if (refuse || paid_in > seat.treasury)
+                else if (refuse || debit > seat.treasury)
                 {
                     if (spend) ++spend->industry_points_refused;
                 }
                 else
                 {
-                    seat.treasury -= paid_in;
+                    seat.treasury -= debit;
                     for (const auto& part : spread)
                     {
                         region& rr = regions[static_cast<std::size_t>(part.first)];
@@ -1448,8 +1466,9 @@ void run_exploration_upkeep(std::vector<region>&                 regions,
                     }
                     if (spend)
                     {
-                        spend->industry_points_paid_in   += credit;
-                        spend->industry_treasury_debited += paid_in;
+                        spend->industry_points_paid_in   += credited;
+                        spend->industry_treasury_debited += debit;
+                        spend->industry_treasury_kept_by_crowding += paid_in - debit; // BL-1169
                     }
                 }
             }
@@ -5272,6 +5291,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // BL-1041: the treasury paid into industry points on capitals.
             out.industry_points_from_treasury += upkeep_spend.industry_points_paid_in;
             out.treasury_spent_on_industry    += upkeep_spend.industry_treasury_debited;
+            out.treasury_kept_by_crowding     += upkeep_spend.industry_treasury_kept_by_crowding;
             out.industry_points_refused       += upkeep_spend.industry_points_refused;
             out.port_steps_bought += upkeep_spend.port_steps;
             out.navy_steps_bought += upkeep_spend.navy_steps;
@@ -10883,7 +10903,8 @@ bool industry_points_params_valid(const history_sim_params& p)
         && p.industry_points_per_million_urban_heads_year <= 1000000
         && p.industry_points_per_treasury_unit >= 1 && p.industry_points_per_treasury_unit <= 10000
         && p.industry_points_fuel_floor_q     >= 0 && p.industry_points_fuel_floor_q     <= 1000
-        && p.industry_points_treasury_share_q >= 0 && p.industry_points_treasury_share_q <= 1000;
+        && p.industry_points_treasury_share_q >= 0 && p.industry_points_treasury_share_q <= 1000
+        && p.industry_points_crowding_k >= 0 && p.industry_points_crowding_k <= industry_points_crowding_k_max;
 }
 
 bool works_event_params_valid(const history_sim_params& p)
@@ -11008,6 +11029,54 @@ bool industry_points_apportion_by_scale(const std::vector<region>& regions, int 
         for (std::size_t k = 0; k < order.size() && left > 0; ++k, --left) ++out[order[k]].second;
     }
     return true;
+}
+
+int64_t industry_points_crowding_q(const region& r, const works_registry* works)
+{
+    const int64_t employed = (works != nullptr) ? works->employed_heads_mask(r.works_built) : 0;
+    const int64_t heads = std::min(r.urban_population, employed);
+    if (heads <= 0 || r.industry_points < 0 || r.industry_points > industry_points_ceiling) return -1;
+    // Points per THOUSAND employed heads, staged so nothing leaves int64:
+    // the whole part saturates at industry_points_crowding_saturation_q,
+    // which (the header says why) moves no factor the brake can compute.
+    const int64_t whole = r.industry_points / heads;
+    if (whole >= industry_points_crowding_saturation_q / 1000) return industry_points_crowding_saturation_q;
+    return whole * 1000 + ((r.industry_points % heads) * 1000) / heads;
+}
+
+int64_t industry_points_crowd_brake(const std::vector<region>& regions,
+                                    std::vector<std::pair<int, int64_t>>& spread,
+                                    int64_t k, int64_t points_per_unit,
+                                    const works_registry* works)
+{
+    if (k < 1 || k > industry_points_crowding_k_max || points_per_unit < 1) return -1;
+    // Each receiving region converts its share at f = K / (K + crowding),
+    // held in parts per million (K <= 10^9, so K x 10^6 < 2^60), and the
+    // share times f is staged (s / 10^6) x f + ((s % 10^6) x f) / 10^6.
+    constexpr int64_t ppm = 1000000;
+    int64_t   kept_points = 0;
+    std::size_t best      = 0;     // the least crowded receiver (ties: lower index)
+    int64_t   best_f      = -1;
+    for (std::size_t i = 0; i < spread.size(); ++i)
+    {
+        const int ri = spread[i].first;
+        if (ri < 0 || static_cast<std::size_t>(ri) >= regions.size()) return -1;
+        const int64_t c = industry_points_crowding_q(regions[static_cast<std::size_t>(ri)], works);
+        if (c < 0) return -1; // a receiver employs nobody: the apportion never sends one
+        const int64_t f = (k * ppm) / (k + c);
+        const int64_t s = spread[i].second;
+        const int64_t conv = (s / ppm) * f + ((s % ppm) * f) / ppm;
+        kept_points += s - conv;
+        spread[i].second = conv;
+        if (f > best_f) { best_f = f; best = i; }
+    }
+    // WHOLE UNITS STAY IN THE PURSE; the sub-unit residue (under one unit's
+    // worth of points a round) still converts, on the least crowded receiver,
+    // so every unit either stays or lands at the full exchange rate -- no
+    // point is deleted.
+    const int64_t kept_units = kept_points / points_per_unit;
+    spread[best].second += kept_points - kept_units * points_per_unit;
+    return kept_units;
 }
 
 industry_points_round accrue_industry_points(std::vector<region>&       regions,
