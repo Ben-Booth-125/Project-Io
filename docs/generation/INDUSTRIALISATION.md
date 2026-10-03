@@ -725,7 +725,9 @@ is all that is around, so a far landmass with little capital still charters its 
 than being priced out by a richer continent's stock.
 
 **SETTLED (Ben, 2026-10-03): a crowded heartland yields less.** A treasury's points convert at a
-lower rate where a region's works already crowd its labour and land (works per employed head), so a
+lower rate where a region is already crowded with capital — industry points standing on it per
+thousand heads its works employ (Ben, 2026-10-03; works per head is flat everywhere, so it cannot
+find a heartland) — so a
 heartland's lead stops compounding on itself and the next-best ground catches up. Its size is a
 named parameter, read on the curated seeds before it is set.
 
