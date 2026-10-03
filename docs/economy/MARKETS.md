@@ -901,7 +901,11 @@ nothing to sell, so its own buyers cannot drive its price to the ceiling against
 **The shelf counts only as far as it can sell (Ben, 2026-10-03):** the shelf's share of `supply` is
 at most what the market's demand would take off it within k ticks, `min(inventory, k × demand)`.
 Counted whole, a market that buys every surplus as the buyer of last resort grows a glut that
-floors its own prices; measured on seeds 0/10/28 the field fell to 1/1/11 firms.
+floors its own prices; measured on seeds 0/10/28 the field fell to 1/1/11 firms. **k is 0 until
+the shelf spoils (Ben, 2026-10-03):** measured at k = 1 to 16, every k above 0 left fewer firms
+than listings-only supply (seeds 0/10/28: 43/48/32 at 0, 16/5/21 at 1, 5/2/19 at 4), because a
+glut the market cannot shed floors prices. So `supply` is listings only for now, and k is set again
+once shelf spoilage (BL-1179) lets a glut drain.
 
 Target and result are clamped to the band **[0.25×, 10×] of base**. Prices are therefore
 *anchored*: no scarcity can push a good past 10× its authored base, and no glut below a quarter
