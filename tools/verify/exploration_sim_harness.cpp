@@ -24,8 +24,10 @@
 //        affordable native is bought, an interior or unaffordable one is
 //        taken; both constants at zero is OFF; out of domain is REJECTED
 //   R3d  BL-1096 CONTROL: the fork switched off through its constants
-//        reproduces the pre-BL-1096 R3b pins exactly (and the BL-1097 sea-leg
-//        record, noted beside the land record, moves nothing there)
+//        reproduces its pinned counters exactly (the pre-BL-1096 R3b pins
+//        until sprint 48's re-bless, 2026-10-03; since then the fixture holds
+//        no subject, so off == R3b's on) (and the BL-1097 sea-leg record,
+//        noted beside the land record, moves nothing there)
 //   R3e  BL-1096/BL-1097 on the real span: bought <= formed, one event per
 //        binding by verb, kinds are verbs; the leg table sorted, non-empty
 //        where subjects were held, one sea_lane_opened per lane (reported)
@@ -738,10 +740,26 @@ int main()
         // fires once. Read on the merged sprint-47 tree (894e736e) from a rebuilt
         // harness; the sea-leg record (BL-1097), the band (BL-1101) and the tariff
         // posture (BL-1102) touch nothing this fixture counts.
-        check(ex1.battles == 30 && ex1.conquests == 27 && ex1.foundings == 816
-           && ex1.subjections_formed == 3 && ex1.subjections_freed == 0
-           && ex1.tribute_remitted == 228427744 && ex1.treaties_formed == 354
-           && ex1.treaties_broken == 1 && ex1.owner_changes.size() == 2061,
+        // RE-PINNED 2026-10-03 (sprint 48's one re-bless, PREPARED for Ben's
+        // authorisation; docs/development/drafts/sprint-48-rebless.md):
+        // 30/27/816 battles/conquests/foundings, subjections 3, tribute
+        // 228427744, treaties 354, broken 1, owner changes 2061 ->
+        // 239/150/134, subjections 0, freed 0, tribute 0, treaties 496, broken
+        // 4, owner changes 864. Read on main a899bb2a. This fixture's 1200
+        // close is rebuilt by sprint 48's settlement chain (BL-1130/1132/1133/
+        // 1141: polities(1200) 457 on far fewer, deeper regions), so the span
+        // resumes on a different map: it fights more and founds far less
+        // (settle spacing leaves no room; BL-1132 recorded foundings -65% on
+        // the 16 seeds), and on this w_want_q = 0 fixture no realm holds a
+        // subject at all, so the purchase verb and tribute read 0. The sea
+        // chain (BL-1120/1140/1142/1147/1152/1153) is inside the same span.
+        // Not attributed per cause on this fixture: the items measured their
+        // own moves on the 16 seeds, and this pin only catches an
+        // unexplained move from here.
+        check(ex1.battles == 239 && ex1.conquests == 150 && ex1.foundings == 134
+           && ex1.subjections_formed == 0 && ex1.subjections_freed == 0
+           && ex1.tribute_remitted == 0 && ex1.treaties_formed == 496
+           && ex1.treaties_broken == 4 && ex1.owner_changes.size() == 864,
               "R3b  REGRESSION PIN: the w_want_q = 0 Exploration span matches its pinned counters "
               "exactly (battles, conquests, foundings, subjections, tribute, treaties, owner record)");
 
@@ -803,20 +821,30 @@ int main()
                && subjects_all_taken,
                   "R3d.0 with both purchase constants at zero the fork is off: nothing bought, nothing "
                   "spent, not rejected, every subject TAKEN");
-            check(off.battles == 30 && off.conquests == 27 && off.foundings == 816
-               && off.subjections_formed == 3 && off.subjections_freed == 0
-               && off.tribute_remitted == 228427344 && off.treaties_formed == 354
-               && off.treaties_broken == 1 && off.owner_changes.size() == 2061,
-                  "R3d.1 CONTROL: the fork-off span matches the pre-BL-1096 pins exactly (battles, "
+            // RE-PINNED 2026-10-03 (sprint 48's one re-bless, PREPARED for Ben's
+            // authorisation; see R3b's note for the cause): 30/27/816, 3, 0,
+            // 228427344, 354, 1, 2061 -> 239/150/134, 0, 0, 0, 496, 4, 864, read
+            // on main a899bb2a. The pre-BL-1096 world these pins first named
+            // is no longer reproducible; on the re-blessed fixture no realm
+            // holds a subject, so the fork-off span equals R3b's fork-on span
+            // counter for counter -- the control now pins that equality.
+            check(off.battles == 239 && off.conquests == 150 && off.foundings == 134
+               && off.subjections_formed == 0 && off.subjections_freed == 0
+               && off.tribute_remitted == 0 && off.treaties_formed == 496
+               && off.treaties_broken == 4 && off.owner_changes.size() == 864,
+                  "R3d.1 CONTROL: the fork-off span matches its pinned counters exactly (battles, "
                   "conquests, foundings, subjections, tribute, treaties, owner record)");
             std::printf("      control (purchase off): battles=%lld conquests=%lld foundings=%lld "
-                        "subjections=%lld tribute=%lld treaties=%lld owner_changes=%zu "
+                        "subjections=%lld freed=%lld tribute=%lld treaties=%lld broken=%lld "
+                        "owner_changes=%zu "
                         "sea_legs=%zu (campaign %lld, tribute-round %lld, lanes %lld)\n",
                         static_cast<long long>(off.battles), static_cast<long long>(off.conquests),
                         static_cast<long long>(off.foundings),
                         static_cast<long long>(off.subjections_formed),
+                        static_cast<long long>(off.subjections_freed),
                         static_cast<long long>(off.tribute_remitted),
-                        static_cast<long long>(off.treaties_formed), off.owner_changes.size(),
+                        static_cast<long long>(off.treaties_formed),
+                        static_cast<long long>(off.treaties_broken), off.owner_changes.size(),
                         off.sea_legs.size(), static_cast<long long>(off.sea_legs_noted_campaign),
                         static_cast<long long>(off.sea_legs_noted_tribute),
                         static_cast<long long>(off.sea_lanes_opened));
