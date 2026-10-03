@@ -342,6 +342,17 @@ uint64_t deep_digest(const world& w, const era_minus_one_fixture& fx)
                 fold_u32(h, centre);
                 fold_i32(h, pts);
             }
+            // BL-1168: the reach prices, folded only off the world reading so a
+            // world-priced budget digests as it did before the reach existed.
+            if (sb.reach != charter_price_reach::world)
+            {
+                fold_u32(h, 0x11680000u | static_cast<uint32_t>(sb.reach));
+                for (const auto& [centre, fp] : sb.centre_firm_price)   // ascending id
+                {
+                    fold_u32(h, centre);
+                    fold_i32(h, fp);
+                }
+            }
         }
     }
 

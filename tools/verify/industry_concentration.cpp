@@ -16,7 +16,13 @@
 // NATION = `region::nation` on world::gen_settlement at the close (the span's
 // polity id); a firm's nation and landmass are its `origin_region`'s.
 //
-// REPORTS; DOES NOT GATE.
+// REPORTS, AND GATES ON ONE THING (BL-1168): the close's landmass reach
+// (`stockpile_region_reach`, off the world's tiles) must equal the sim's (off
+// the fixture's raster) region for region, since the span's works notes and the
+// close's charter price read one reach. A STRADDLE line counts carved centres
+// whose own tile stands on a different landmass from their region's anchor, and
+// a DATING line splits the charters' founding years by source (note, furnace,
+// epoch), heartland vs far landmass.
 //
 // Build: bash tools/verify/build_lua_harness.sh industry_concentration
 // Run from the repo root: build_gen/verify/industry_concentration.exe [--seeds a,b]
@@ -44,6 +50,7 @@
 #include "world/ocean_currents.hpp"
 #include "world/settlement.hpp"
 #include "world/spawn_seat.hpp"
+#include "world/stockpile_budget.hpp"
 #include "world/world.hpp"
 #include "world/works_roster.hpp"
 
@@ -109,6 +116,7 @@ int main(int argc, char** argv)
         }
 
     lua_state lua;
+    int failures = 0;
     for (uint32_t seed : seeds)
     {
         world_params p = arc_params(world_arc::shipped);
@@ -133,7 +141,29 @@ int main(int argc, char** argv)
         out->reg.load_from_lua(lua);
         band_registry_from_world(out->reg, out->w);
         assign_default_recipes(out->w, out->reg);
-        apply_app_start_landscape(*out);
+        // The winner's spend report, kept so the charters can be dated as
+        // finish_campaign_world dates them (an output only: the search and
+        // the apply read nothing from it).
+        charter_spend_report charter_rep;
+        {
+            harness_charter_input in;
+            in.report = &charter_rep;
+            apply_app_start_landscape(*out, in);
+        }
+        // BL-1099/BL-1168: date the charters against the span's record, as
+        // finish_campaign_world does after the apply and before the settle.
+        const std::vector<lapse_event>* span_events = nullptr;
+        for (const generation_report::body_entry& be : out->report.bodies)
+            if (!be.industrialisation_timelapse.events.empty())
+            {
+                span_events = &be.industrialisation_timelapse.events;
+                break;
+            }
+        {
+            static const std::vector<lapse_event> none;
+            date_chartered_firms(out->w, charter_rep, span_events ? *span_events : none,
+                                 static_cast<int32_t>(p.epoch_year));
+        }
         run_app_validation_settle(out->w, out->reg);
         const spawn_seat_result seat =
             seat_player_corporation(out->w, seed, out->land.search.winner_score);
@@ -165,6 +195,27 @@ int main(int argc, char** argv)
         std::vector<int> reg_lm(R.size(), -1);
         for (std::size_t i = 0; i < R.size(); ++i)
             reg_lm[i] = landmass_at(labels, gw, gh, R[i].col, R[i].row);
+        {
+            // BL-1168: the charter price reads the landmass off the world's own
+            // tiles (`stockpile_region_reach`); it must agree with the sim's.
+            const std::vector<std::int64_t> reach = stockpile_region_reach(w, charter_price_reach::landmass);
+            int differ = 0;
+            for (std::size_t i = 0; i < R.size() && i < reach.size(); ++i)
+                if (reach[i] != reg_lm[i]) ++differ;
+            std::printf("REACH seed=%u regions=%zu landmass_differs_from_sim=%d\n", seed, R.size(),
+                        reach.size() == R.size() ? differ : -1);
+            // A GATE, not a reading: the span's works notes and the close's
+            // price must read one reach (NR-907's one-divisor rule, carried to
+            // the reach by BL-1168), so a region the two place on different
+            // landmasses is a defect.
+            if (reach.size() != R.size() || differ != 0)
+            {
+                std::printf("FAIL  REACH seed=%u: the close's landmass reach and the sim's disagree "
+                            "(%d regions differ, %zu reach keys for %zu regions)\n",
+                            seed, differ, reach.size(), R.size());
+                ++failures;
+            }
+        }
         auto tile_lm = [&](entity_id tid) -> int {
             const auto t = w.tiles.find(tid);
             if (t == w.tiles.end() || t->second.body != home) return -2;
@@ -173,6 +224,96 @@ int main(int argc, char** argv)
             const int l = labels[static_cast<std::size_t>(y * gw + x)];
             return l >= 0 ? l : landmass_at(labels, gw, gh, x, y);
         };
+
+        // STRADDLE (BL-1168 review, item 4): a carved centre's own tile against
+        // its region's anchor. The close prices a centre by its REGION's reach
+        // (the anchor's landmass); a centre standing on another landmass would
+        // be priced by ground it cannot walk to.
+        {
+            int carved = 0, straddle = 0, no_tile = 0;
+            for (const auto& [cid, cs] : w.gen_carve_centres)
+            {
+                if (cs.region < 0 || cs.region >= static_cast<int>(R.size())) continue;
+                const auto t = w.population_centre_tile.find(cid);
+                if (t == w.population_centre_tile.end()) { ++no_tile; continue; }
+                ++carved;
+                const int l = tile_lm(t->second);
+                if (l != reg_lm[static_cast<std::size_t>(cs.region)])
+                {
+                    if (straddle < 5)
+                        std::printf("STRADDLE seed=%u centre=%llu region=%d anchor_lm=%d centre_lm=%d\n", seed,
+                                    static_cast<unsigned long long>(cid), cs.region,
+                                    reg_lm[static_cast<std::size_t>(cs.region)], l);
+                    ++straddle;
+                }
+            }
+            std::printf("STRADDLE seed=%u carved_centres=%d on_another_landmass=%d no_tile=%d\n", seed, carved,
+                        straddle, no_tile);
+        }
+
+        // DATING (BL-1168 review, item 1): where each charter's founding year
+        // came from, recounted from the record independently of
+        // `date_chartered_firms` (a region's k-th charter, in report order,
+        // takes its k-th note, else its furnace year, else the epoch), split by
+        // whether its origin region stands on the HEARTLAND (the landmass
+        // holding most points) or a far landmass. The founded year the world
+        // carries must agree with the recount.
+        {
+            std::map<int, std::vector<int32_t>> notes_of;
+            std::map<int, int32_t>              lit;
+            if (span_events != nullptr)
+                for (const lapse_event& e : *span_events)
+                {
+                    if (e.region == lapse_event_none) continue;
+                    const int rg = static_cast<int>(e.region);
+                    if (e.kind == static_cast<uint8_t>(lapse_event_kind::works_chartered))
+                        notes_of[rg].push_back(e.year);
+                    else if (e.kind == static_cast<uint8_t>(lapse_event_kind::furnace_lit))
+                        lit.try_emplace(rg, e.year);
+                }
+            std::map<int, long long> lm_ip;
+            for (std::size_t i = 0; i < R.size(); ++i)
+                if (reg_lm[i] >= 0) lm_ip[reg_lm[i]] += R[i].industry_points;
+            int heart = -1;
+            long long heart_ip = -1;
+            for (const auto& [l, v] : lm_ip)
+                if (v > heart_ip) { heart = l; heart_ip = v; }
+            int src[2][4] = {};   // [far][note, furnace, epoch, no origin]
+            int disagree = 0;
+            std::map<int, std::size_t> taken;
+            for (const charter_record& c : charter_rep.charters)
+            {
+                const auto cit = w.corporations.find(c.corp);
+                if (cit == w.corporations.end()) continue;
+                const int org = cit->second.origin_region;
+                const int far = (org >= 0 && static_cast<std::size_t>(org) < R.size()
+                                 && reg_lm[static_cast<std::size_t>(org)] != heart) ? 1 : 0;
+                int32_t want = static_cast<int32_t>(p.epoch_year);
+                if (org < 0) ++src[far][3];
+                else
+                {
+                    const std::size_t k = taken[org]++;
+                    const auto nit = notes_of.find(org);
+                    const auto fit = lit.find(org);
+                    if (nit != notes_of.end() && k < nit->second.size()) { ++src[far][0]; want = nit->second[k]; }
+                    else if (fit != lit.end()) { ++src[far][1]; want = fit->second; }
+                    else ++src[far][2];
+                }
+                if (cit->second.founded_year != want) ++disagree;
+            }
+            int span_notes = 0;
+            for (const auto& [rg, v] : notes_of) span_notes += static_cast<int>(v.size());
+            std::printf("DATING seed=%u notes=%d heartland_lm=%d heartland note=%d furnace=%d epoch=%d | "
+                        "far note=%d furnace=%d epoch=%d | no_origin=%d disagree=%d\n",
+                        seed, span_notes, heart, src[0][0], src[0][1], src[0][2], src[1][0], src[1][1], src[1][2],
+                        src[0][3] + src[1][3], disagree);
+            if (disagree != 0)
+            {
+                std::printf("FAIL  DATING seed=%u: %d charters carry a year the record does not pair them with\n",
+                            seed, disagree);
+                ++failures;
+            }
+        }
 
         std::map<int, agg> LM, NAT;
         for (int32_t l : labels)
@@ -508,5 +649,6 @@ int main(int argc, char** argv)
         }
         std::fflush(stdout);
     }
-    return 0;
+    std::printf("%s (%d failure%s)\n", failures ? "FAIL" : "PASS", failures, failures == 1 ? "" : "s");
+    return failures ? 1 : 0;
 }

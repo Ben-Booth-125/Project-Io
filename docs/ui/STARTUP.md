@@ -322,8 +322,8 @@ over empire flare, and on some worlds one becomes general).
 
 - **Company creation flashes.** A `works_chartered` event at a region's anchor, in-span, each
   time the region's industry points cross the next multiple of a fixed fraction of the
-  **running** price — the world's stock so far over the charter divisor, the same price the
-  close settles on, so an early charter and a late one are priced by one rule — capped per
+  **running** price — the stock so far within the region's trade reach (its landmass) over the
+  charter divisor, the same price the close settles on, so an early charter and a late one are priced by one rule — capped per
   region per round and gated exactly as a furnace crossing is. **Each is a real charter (Ben,
   2026-09-25, NR-925):** the firm is founded at that crossing and its points are debited, so a
   flash in 1720 is a firm that exists from 1720 (INDUSTRIALISATION.md § Beat 1 — Industry: cities

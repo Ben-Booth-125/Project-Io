@@ -211,7 +211,7 @@ void disarm_corporation(world& w, entity_id corp);
 ///    own nearest region to the centre; with none, or no settlement, the
 ///    national-character fallback. ANCHORING (rung 2) is `nearest_region` only
 ///    when that region is the centre nation's own, and otherwise nothing.
-///  * A centre whose budget >= the specialist price (`firm_price_points x
+///  * A centre whose budget >= its specialist price (`firm_price_of(centre) x
 ///    specialist_firm_charters`) charters EXACTLY ONE specialist: focus and
 ///    ownership from the character region (Passes 2 and 2b), today's capital
 ///    (400 +/- 40%, the focus premium included), stockpile, name and HQ. NO
@@ -298,7 +298,7 @@ const char* charter_spend_world_refusal(const world& w, const recipe_registry& r
 /// it would have built with no budget, exactly as a refused spend does, decided
 /// from the budget before anything is chartered"). True when some budgeted
 /// centre stands on a tile a nation owns and its points cover the specialist's
-/// price (`spend.specialist_price_points()`) — the walk's own test for chartering
+/// price at its own reach (`spend.specialist_price_of`, BL-1168) — the walk's own test for chartering
 /// one, on the walk's own resolution of the centre. False for an empty budget.
 ///
 /// READ-ONLY. It reads the centre tiles, their ownership and the nations, none
@@ -417,7 +417,7 @@ bool is_budget_world(const world& w, const charter_budget* budget,
 /// walk stops at). Per budgeted centre, on the walk's resolution (the centre's
 /// tile, its body, and the nation owning it; a centre without one plans
 /// nothing), spent BUDGET DESCENDING, TIES TO THE LOWER CENTRE ID:
-///   * one SPECIALIST when its points cover `spend.specialist_price_points()`;
+///   * one SPECIALIST when its points cover `spend.specialist_price_of(centre)`;
 ///   * then its FIRMS — the points left, less any pooled remainder it sends plus
 ///     any it receives (NR-913, `plan_charter_pool`, the walk's own plan; zero
 ///     under the shipped `charter_pool::none`), in whole firm charters — each

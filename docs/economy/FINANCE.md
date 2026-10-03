@@ -83,7 +83,10 @@ price it checked against the ceiling — with one exchange row at that price. Th
 the market, whose suppliers were paid when they listed, so the posted price leaves no unpaid gap,
 and a unit beside a full shelf is never refused by a price its own want drove up. **The same
 ceiling governs every goods draw (Ben, 2026-10-03):** unit and building upkeep, processor inputs
-and construction alike buy only at or under it. Measured on the curated seeds, a 50-head unit cost about 970 a year at the prices the market
+and construction alike buy only at or under it, and a draw over it does not bid either, so its
+want leaves the price and the price can ease back. **Nations' draws too (Ben, 2026-10-03):** a
+nation's network upkeep and its space programme draw a shelf under the same ceiling and the same
+posted price. Measured on the curated seeds, a 50-head unit cost about 970 a year at the prices the market
 actually charged (rations ~3.5x and ordnance ~6x their base) against a hire price near 120, and
 standing-force upkeep was what wound most of the field up.
 

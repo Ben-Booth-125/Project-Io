@@ -902,6 +902,10 @@ target = base_price × √(demand / supply)     — damped elasticity
 price  = prior + 0.5 × (target − prior)       — EMA smoothing
 ```
 
+**The shelf is supply (Ben, 2026-10-03):** `supply` is this tick's listings plus the stock
+standing on the market's shelf (`inventory`). A market fed only by deliveries is not a market with
+nothing to sell, so its own buyers cannot drive its price to the ceiling against a full shelf.
+
 Target and result are clamped to the band **[0.25×, 10×] of base**. Prices are therefore
 *anchored*: no scarcity can push a good past 10× its authored base, and no glut below a quarter
 of it. Untradeable resources (`base_price ≤ 0`) keep their prior price. A resource pegged at the
