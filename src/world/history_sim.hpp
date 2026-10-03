@@ -2420,8 +2420,10 @@ struct history_sim_params
     /// binding (the side's power at the other's seat coast tile, at least
     /// `far_sea_bind_min_fleet_power` and at least what the other side and
     /// its mutual-defence partners project there; a tie to the side sailing).
-    /// A contact the sea forbids is never made, rather than made and left
-    /// unbound. Reads nothing unless the fleet rule is on with a halving above
+    /// A contact the sea forbids is never made BY SAILING, rather than made and
+    /// left unbound; conquest's inheritance (`extinguish_polity`) still passes
+    /// the conquered's contacts on, ungated (Ben, 2026-10-03: conquest inherits
+    /// what the conquered knew). Reads nothing unless the fleet rule is on with a halving above
     /// 0 (then every open pair meets, as BL-1142 rules). Off by default; the
     /// Exploration span's own.
     bool far_sea_meet_needs_fleet_out_projection = false;

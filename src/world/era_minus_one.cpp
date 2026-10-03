@@ -480,7 +480,8 @@ history_sim_params exploration_sim_params(const world_params& params)
     // MEETING BY SEA IS GATED TOO (Ben, 2026-10-03): realms across water
     // first meet only where one side's fleet out-projects the other's at its
     // port -- the comparison above, so a contact the sea forbids is never
-    // made. Inherited by Industrialisation, inert there (its halving of 0).
+    // made by sailing (conquest still inherits what the conquered knew,
+    // ungated). Inherited by Industrialisation, inert there (its halving of 0).
     // MEASURED, the 16 curated seeds (2026-10-03, with the rules above): the
     // span's meetings by sea 1,125 -> 234, far pairs bound across water at
     // 1660 81 -> 51, lanes at 1660 130 -> 119.
