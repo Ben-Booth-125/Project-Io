@@ -459,6 +459,31 @@ history_sim_params exploration_sim_params(const world_params& params)
     hp.fleet_men_per_hull        = 20;
     hp.fleet_power_halving_tiles = 10;
 
+    // BL-1171 -- FAR REALMS ACROSS WATER MEET AND BIND IN THIS AGE, WHERE THE
+    // SELLER'S FLEET OUT-PROJECTS THE PARTNER'S (EXPLORATION.md sec The
+    // colonial tie is a sea lane; Ben, 2026-10-03). Realms on different
+    // landmasses meet by sea as the Industrialisation span's do, and a far pair
+    // that met across water reads the sea's 300 -- but only while one side's
+    // fleet, at the other's seat coast tile, is at least the power the other
+    // side (it and its mutual-defence partners, `crossing_defenders`) projects
+    // there; elsewhere the land's 700. The fleet's own curve (the halving of 10
+    // above) is the whole gate: no threshold of its own (minimum power 1).
+    // The Industrialisation span inherits all three; with its halving at 0 the
+    // out-project read is inert there and BL-1142's class rule stands.
+    // MEASURED, ocean_currents_harness --sweep on the 16 curated seeds
+    // (2026-10-03, with the road rule below): lanes at 1660 79 -> 130 (trade
+    // 12 -> 49), eight seeds gaining 1-12 and eight unchanged, none flooded --
+    // where mere reach laid 550.
+    hp.far_pairs_meet_by_sea          = true;
+    hp.treaty_far_sea_penalty_q       = 300;
+    hp.far_sea_bind_needs_fleet_reach = true;
+
+    // BL-1171 -- GOODS BETWEEN LANDMASSES GO BY SEA, IN EVERY SPAN (Ben,
+    // 2026-10-03): a road joins seats on one landmass only, so a trade between
+    // seats on different landmasses sails (the seller's navy, both seats'
+    // ports) or does not move. Industrialisation inherits it.
+    hp.trade_road_joins_one_landmass = true;
+
     return hp;
 }
 
@@ -523,8 +548,8 @@ history_sim_params industrialisation_sim_params(const world_params& params)
 
     // BL-1142 -- FAR REALMS ACROSS WATER MEET AND BIND (INDUSTRIALISATION.md sec
     // Far pairs meet and bind, and this phase makes them: "far pairs bind across
-    // water, not only across a border"). This span's own force, never
-    // Exploration's: realms on different landmasses meet when a trade BY SEA is
+    // water, not only across a border"). Exploration carries it too since
+    // BL-1171, gated there by the fleet: realms on different landmasses meet when a trade BY SEA is
     // open between them (the seller's navy and both seats' ports carry it), and
     // a far pair that met across water binds without the stranger's penalty --
     // its doctrine, grudges, broken promises and trade decide, as they decide a
@@ -549,6 +574,10 @@ history_sim_params industrialisation_sim_params(const world_params& params)
     // the land's 700, no loss) no far pair across water binds.
     hp.far_pairs_meet_by_sea    = true;
     hp.treaty_far_sea_penalty_q = 300;
+    // BL-1171: goods between landmasses go by sea in this span too -- set in
+    // `exploration_sim_params` and inherited; stated here so the span's own
+    // rule set reads whole.
+    hp.trade_road_joins_one_landmass = true;
 
     // BL-1147: THE CONVERSION IS THE EXPLORATION OPEN'S ALONE. This span's
     // polities already sail the fleet 1200 carried (it crossed the 1660
