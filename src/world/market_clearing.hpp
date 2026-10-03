@@ -237,10 +237,16 @@ float price_target(float base, float supply, float demand,
 /// shelf_supply_ticks` — the stock this market's demand would take off the
 /// shelf within k ticks. A shelf larger than that is a glut, and counting it
 /// whole floors the market's prices (measured: the field fell to 1/1/11 firms
-/// on seeds 0/10/28). k <= 0 is listings only, the law before the ruling.
+/// on seeds 0/10/28). k <= 0 is listings only, the law before the ruling —
+/// and the shipped k is 0 until shelf spoilage (BL-1179).
 /// Every caller of `price_target` passes this, never `supply` alone:
 /// clearing's resolution and dispatch's haul sizing (`dispatch_absorbable`)
-/// aim at the same law.
+/// aim at the same law. TWO OTHER READERS OF THE PRICE LAW STILL READ
+/// LISTINGS ONLY (`market_component::supply`): the workforce scorer's
+/// `wf_target_price` (economy_system.cpp) and corp_ai's glut forecast
+/// (corp_ai.cpp, the projected-supply / demand ratio). At the shipped k = 0
+/// they agree with this; if k is raised they diverge, and should be moved
+/// onto `pricing_supply` with it.
 ///
 /// WHICH INVENTORY, WHICH DEMAND. Each is read off `m` as it stands when the
 /// caller asks, and both callers ask at the same point of the tick: after the

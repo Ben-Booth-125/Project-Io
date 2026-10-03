@@ -1373,7 +1373,7 @@ economy = {
     --
     -- AND THE DRAW PAYS THE POSTED PRICE (Ben, 2026-10-03). A shelf draw
     -- checks the price standing on the shelf against this ceiling and is
-    -- billed at that same price (economy_system.hpp posted_price /
+    -- billed at that same price (components.hpp posted_price /
     -- shelf_admits; clear_markets) - never the price its own want resolves.
     --
     -- Read by EVERY goods draw: unit and building upkeep, processor inputs
