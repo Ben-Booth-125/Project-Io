@@ -370,7 +370,10 @@ building_report run_processing(world& w, const recipe_registry& reg,
         // the BID to the market for the comparison to mean anything — a corp
         // feeding its smelter from its own mine is not bidding for the input and
         // must not push its price. NR-281 records this reading of the item.
-        wanted[r] += std::max(0.0f, need - pool.quantities[r]);
+        // BL-1172: a draw over the ceiling does not bid either (FINANCE.md,
+        // Ben 2026-10-03) — its want leaves the price so the price can ease.
+        if (mc == nullptr || shelf)
+            wanted[r] += std::max(0.0f, need - pool.quantities[r]);
 
         if (cov < coverage)
         {
@@ -785,7 +788,8 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
             for (std::size_t r = 0; r < resource_count; ++r)
             {
                 const float need = need_row[r];
-                if (need > 0.0f)
+                // BL-1172: a material over the ceiling does not bid either.
+                if (need > 0.0f && (m == nullptr || admitted(r)))
                     want[r] += need;
             }
         }
@@ -808,10 +812,16 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
                     continue;
                 if (m != nullptr && !admitted(r))
                     continue; // BL-1172: over the ceiling — not bought, not billed
-                const float drawn = need * rate;
+                // BL-1172: bill only what the shelf actually gave. Materials are
+                // covered by construction (rate <= avail / need); capacity is
+                // not — it stretches at a floored rate past an empty yard — so
+                // its draw is capped by the shelf rather than billing goods
+                // that were never there.
+                const float drawn = m ? std::min(need * rate, std::max(0.0f, m->inventory[r]))
+                                      : need * rate;
                 bought[r] += drawn;
                 if (m)
-                    m->inventory[r] = std::max(0.0f, m->inventory[r] - drawn);
+                    m->inventory[r] -= drawn;
             }
             const auto cit = w.corporations.find(corp);
             if (cit != w.corporations.end())

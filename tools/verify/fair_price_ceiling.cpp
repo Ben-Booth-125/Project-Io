@@ -21,6 +21,12 @@
 //       at posted, one row each, the shelf drained by both
 //   Z   reservation_mult 0 (the hand-built default): a processor buys as it
 //       did before the ceiling existed — the OFF switch
+//   M   MULTI-TICK (ten ticks of run_economy_step -> clear_markets each):
+//       M1/M2 a processor and a construction site keep buying, every tick, on
+//       a shelf-only market under the ceiling (the shelf is supply, MARKETS.md
+//       § Price resolution); M3/M4 over the ceiling on an empty shelf they do
+//       not bid, and the price eases after every such tick (Ben, 2026-10-03:
+//       "a draw over it does not bid either, so its want leaves the price")
 //
 // Every case runs the real tick (`run_economy_step`, then `clear_markets`), and
 // every price is placed either side of the shipped 2.0 multiple. The resolved
@@ -321,6 +327,31 @@ void c_construction()
         check(near(spent(flows, c), 0.0f) && buyer_rows(s.w, c, STEEL).n == 0,
               "C2 nothing billed, no exchange row");
     }
+
+    // C3: construction capacity STRETCHES past a thin yard rather than pausing
+    // (BL-709) — and is billed only for what the shelf actually held, never for
+    // capacity that was not there. Need 0.5 a tick, shelf 0.1.
+    {
+        uint16_t sid = 0;
+        recipe_registry reg = make_registry(k_shipped_reservation, sid);
+        construction_params cp = reg.construction();
+        cp.capacity_per_build_tick = 0.5f;
+        reg.set_construction(cp);
+        scene s = make_scene(k_iron_base, under, 1000.0f);
+        const std::size_t cap = ri(resource_type::construction_capacity);
+        s.w.markets.at(s.market).base_price[cap] = 4.0f;
+        s.w.markets.at(s.market).price[cap]      = 4.0f;
+        s.w.markets.at(s.market).inventory[cap]  = 0.1f;
+        const entity_id b = site(s);
+        const entity_id c = add_corp(s, b, 0.0f);
+        economy_report rep = run_economy_step(s.w, reg);
+        check(s.w.buildings.at(b).construction_progress > 0.0f || s.w.buildings.at(b).ticks_remaining < 3,
+              "C3 a thin yard stretches the build, it does not pause it");
+        check(near(fill_of(rep, c, s.market, resource_type::construction_capacity), 0.1f),
+              "C3 capacity drawn is what the shelf held (0.1), not the 0.5 the tick wanted",
+              fill_of(rep, c, s.market, resource_type::construction_capacity), 0.1);
+        check(near(s.w.markets.at(s.market).inventory[cap], 0.0f), "C3 the capacity shelf is emptied, never negative");
+    }
 }
 
 void s_shared_shelf()
@@ -381,6 +412,150 @@ void s_shared_shelf()
     }
 }
 
+// ---------------------------------------------------------------------------
+// M — multi-tick: the price law and the bid, over ten ticks
+// ---------------------------------------------------------------------------
+
+float want_of(const economy_report& rep, entity_id corp, entity_id market, resource_type r)
+{
+    const auto it = rep.wants.find(std::make_pair(corp, market));
+    return it == rep.wants.end() ? 0.0f : it->second[ri(r)];
+}
+
+/// A long build: 240 steel over 30 ticks (8 a tick), so ten ticks never finish it.
+void lengthen_build(recipe_registry& reg)
+{
+    building_economics pr = reg.economics(building_type::processing_facility);
+    pr.build_cost = 3000.0f;
+    pr.build_duration_ticks = 30.0f;
+    pr.resource_build_cost[ri(STEEL)] = 240.0f;
+    reg.set_economics(building_type::processing_facility, pr);
+}
+
+entity_id add_site(scene& s, entity_id tile)
+{
+    const entity_id b = s.w.create_entity();
+    building_component bc{};
+    bc.tile = tile;
+    bc.type = building_type::processing_facility;
+    bc.ticks_remaining = 30;
+    s.w.buildings[b] = bc;
+    return b;
+}
+
+void m_multi_tick()
+{
+    std::printf("\n--- M  ten ticks: shelf-only markets keep buying; over the ceiling nothing bids ---\n");
+    constexpr int ticks = 10;
+
+    // M1: a processor on a shelf-only iron market (nobody lists iron), under.
+    {
+        uint16_t sid = 0;
+        recipe_registry reg = make_registry(k_shipped_reservation, sid);
+        scene s = make_scene(k_iron_base * 1.5f, k_steel_base, 1000.0f);
+        const entity_id b = add_processor(s, sid, s.tile);
+        const entity_id c = add_corp(s, b, 0.0f);
+        int full = 0, over = 0;
+        for (int t = 0; t < ticks; ++t)
+        {
+            if (s.w.markets.at(s.market).price[ri(IRON)] > k_iron_base * k_shipped_reservation)
+                ++over;
+            economy_report rep = run_economy_step(s.w, reg);
+            if (near(fill_of(rep, c, s.market, IRON), 8.0f) && near(output_of(rep, b), 4.0f))
+                ++full;
+            clear_markets(s.w, reg, rep);
+        }
+        check(full == ticks, "M1 the processor buys a full run's iron off the shelf EVERY tick", full, ticks);
+        check(over == 0, "M1 its own want never prices the full shelf over the ceiling", over, 0);
+        check(near(s.w.markets.at(s.market).inventory[ri(IRON)], 1000.0f - 8.0f * ticks),
+              "M1 the shelf gave up exactly ten runs of iron");
+    }
+
+    // M2: a construction site on a shelf-only steel market, under.
+    {
+        uint16_t sid = 0;
+        recipe_registry reg = make_registry(k_shipped_reservation, sid);
+        lengthen_build(reg);
+        scene s = make_scene(k_iron_base, k_steel_base * 1.5f, 1000.0f);
+        const entity_id b = add_site(s, s.tile);
+        const entity_id c = add_corp(s, b, 0.0f);
+        int drew = 0, over = 0;
+        for (int t = 0; t < ticks; ++t)
+        {
+            if (s.w.markets.at(s.market).price[ri(STEEL)] > k_steel_base * k_shipped_reservation)
+                ++over;
+            economy_report rep = run_economy_step(s.w, reg);
+            if (near(fill_of(rep, c, s.market, STEEL), 8.0f))
+                ++drew;
+            clear_markets(s.w, reg, rep);
+        }
+        check(drew == ticks, "M2 the site draws a tick of steel off the shelf EVERY tick", drew, ticks);
+        check(over == 0, "M2 its own want never prices the full shelf over the ceiling", over, 0);
+        check(s.w.buildings.at(b).ticks_remaining == 30 - ticks, "M2 ... and advances a whole tick each time",
+              s.w.buildings.at(b).ticks_remaining, 30 - ticks);
+    }
+
+    // M3: a processor over the ceiling on an EMPTY iron shelf. On every tick
+    // the posted price is over, it registers no want and draws nothing, and
+    // the price the tick resolves is lower than the one it saw.
+    {
+        uint16_t sid = 0;
+        recipe_registry reg = make_registry(k_shipped_reservation, sid);
+        scene s = make_scene(k_iron_base * 2.5f, k_steel_base, 0.0f);
+        const entity_id b = add_processor(s, sid, s.tile);
+        const entity_id c = add_corp(s, b, 0.0f);
+        int over = 0, bid_over = 0, rose_after_over = 0;
+        for (int t = 0; t < ticks; ++t)
+        {
+            const float before = s.w.markets.at(s.market).price[ri(IRON)];
+            const bool  is_over = before > k_iron_base * k_shipped_reservation;
+            economy_report rep = run_economy_step(s.w, reg);
+            if (is_over)
+            {
+                ++over;
+                if (want_of(rep, c, s.market, IRON) > 0.0f || fill_of(rep, c, s.market, IRON) > 0.0f)
+                    ++bid_over;
+            }
+            clear_markets(s.w, reg, rep);
+            if (is_over && !(s.w.markets.at(s.market).price[ri(IRON)] < before))
+                ++rose_after_over;
+        }
+        check(over > 0, "M3 the run met the ceiling (non-vacuous)", over, 1);
+        check(bid_over == 0, "M3 over the ceiling the processor neither bids nor buys", bid_over, 0);
+        check(rose_after_over == 0, "M3 ... and the price eases after every tick it sat over", rose_after_over, 0);
+    }
+
+    // M4: a construction site over the ceiling on an EMPTY steel shelf.
+    {
+        uint16_t sid = 0;
+        recipe_registry reg = make_registry(k_shipped_reservation, sid);
+        lengthen_build(reg);
+        scene s = make_scene(k_iron_base, k_steel_base * 2.5f, 0.0f);
+        const entity_id b = add_site(s, s.tile);
+        const entity_id c = add_corp(s, b, 0.0f);
+        int over = 0, bid_over = 0, rose_after_over = 0;
+        for (int t = 0; t < ticks; ++t)
+        {
+            const float before = s.w.markets.at(s.market).price[ri(STEEL)];
+            const bool  is_over = before > k_steel_base * k_shipped_reservation;
+            economy_report rep = run_economy_step(s.w, reg);
+            if (is_over)
+            {
+                ++over;
+                if (want_of(rep, c, s.market, STEEL) > 0.0f || fill_of(rep, c, s.market, STEEL) > 0.0f)
+                    ++bid_over;
+            }
+            clear_markets(s.w, reg, rep);
+            if (is_over && !(s.w.markets.at(s.market).price[ri(STEEL)] < before))
+                ++rose_after_over;
+        }
+        check(over > 0, "M4 the run met the ceiling (non-vacuous)", over, 1);
+        check(bid_over == 0, "M4 over the ceiling the site neither bids nor draws", bid_over, 0);
+        check(rose_after_over == 0, "M4 ... and the price eases after every tick it sat over", rose_after_over, 0);
+        check(s.w.buildings.at(b).ticks_remaining == 30, "M4 an empty shelf never advances the build");
+    }
+}
+
 } // namespace
 
 int main()
@@ -389,6 +564,7 @@ int main()
     p_processor();
     c_construction();
     s_shared_shelf();
+    m_multi_tick();
     std::printf("\n%s — %d failure(s)\n", g_failures == 0 ? "PASS" : "FAIL", g_failures);
     return g_failures == 0 ? 0 : 1;
 }
