@@ -8061,6 +8061,50 @@
      "result_metric": "Main 175ed49e (with BL-1139 part 1): world_determinism, save_roundtrip, province_partition_harness, colonisation_harness, culture_preference_fixture, world_cursor_equivalence, spawn_solvency, centre_census pass; only R3b/R3d.1 and R3a2/R3a3."
     }
    ]
+  },
+  {
+   "brief": "roads-pull-to-markets",
+   "title": "BL-1138 - Roads pull toward markets, and a trunk joins neighbouring markets",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1138 - sprint 48",
+   "batch": "sprint-48",
+   "resolved": "2026-10-03",
+   "resolution": "merged 75c1a4e5",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: road_generation_harness R6a-R6g (16 seeds), market_census I1/I1b"
+     ],
+     "requirement": "Every market centre on its own nation's backbone; a trunk joins neighbouring markets; each tile's tier follows the land it crosses; market centres stand on land.",
+     "notes": "",
+     "result_metric": "20d1f2bd, 6a9e44bd, 841d2deb, a9593d15: markets off the backbone 128 -> 19 at first build; the cost model shared (tile_traversal_cost); phantom links removed; joins on own land; the Road cliff per tile (Ben 2026-10-03)."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer agent (cold), two fix rounds"
+     ],
+     "requirement": "Cold reviews.",
+     "notes": "",
+     "result_metric": "Phantom trunk links, foreign joins, the tier, a second cost model, the ladder's roads, rows by construction, the shell port binding, mojibake -- fixed."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: gates on main"
+     ],
+     "requirement": "Gated on main.",
+     "notes": "",
+     "result_metric": "Main 75c1a4e5: world_determinism ALL PASS twice; save_roundtrip, road_generation_harness (AUDIT OK), market_census (0 failures), world_cursor_equivalence, spawn_solvency, landscape_search_harness pass; history_sim only R3a2/R3a3."
+    }
+   ]
   }
  ]
 }
