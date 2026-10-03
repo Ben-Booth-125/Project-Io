@@ -910,6 +910,10 @@ price  = prior + 0.5 × (target − prior)       — EMA smoothing
 **The shelf is supply (Ben, 2026-10-03):** `supply` is this tick's listings plus the stock
 standing on the market's shelf (`inventory`). A market fed only by deliveries is not a market with
 nothing to sell, so its own buyers cannot drive its price to the ceiling against a full shelf.
+**The shelf counts only as far as it can sell (Ben, 2026-10-03):** the shelf's share of `supply` is
+at most what the market's demand would take off it within k ticks, `min(inventory, k × demand)`.
+Counted whole, a market that buys every surplus as the buyer of last resort grows a glut that
+floors its own prices; measured on seeds 0/10/28 the field fell to 1/1/11 firms.
 
 Target and result are clamped to the band **[0.25×, 10×] of base**. Prices are therefore
 *anchored*: no scarcity can push a good past 10× its authored base, and no glut below a quarter
