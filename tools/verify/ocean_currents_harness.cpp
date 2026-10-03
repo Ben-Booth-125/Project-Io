@@ -719,6 +719,57 @@ void far_pair_rows()
     check(f8.treaties_formed == 0 && !bound(f8) && f8.far_pairs_out_of_fleet_reach > 0,
           "F8  a seller whose fleet is out-projected at the partner's port by the partner's own does not bind");
 
+    // F11 (BL-1171 review): EXPLORATION'S SHIPPED PARAMS CARRY THE RULINGS, and
+    // the gates are live there: realms across water meet and bind by sea, the
+    // sea's penalty is below the land's, binding AND meeting are gated by fleet
+    // out-projection, and the fleet rule they read is on with a halving.
+    {
+        const history_sim_params ep = exploration_sim_params(world_params{});
+        std::printf("      Exploration shipped: meet by sea %d, sea penalty %d (land %d), bind gate %d, meet gate %d,"
+                    " men per hull %d, halving %d\n", ep.far_pairs_meet_by_sea ? 1 : 0, ep.treaty_far_sea_penalty_q,
+                    ep.treaty_far_penalty_q, ep.far_sea_bind_needs_fleet_reach ? 1 : 0,
+                    ep.far_sea_meet_needs_fleet_out_projection ? 1 : 0, ep.fleet_men_per_hull,
+                    ep.fleet_power_halving_tiles);
+        check(ep.far_pairs_meet_by_sea && ep.treaty_far_sea_penalty_q < ep.treaty_far_penalty_q
+              && ep.far_sea_bind_needs_fleet_reach && ep.far_sea_meet_needs_fleet_out_projection
+              && ep.fleet_decides_crossings && ep.fleet_men_per_hull > 0 && ep.fleet_power_halving_tiles > 0,
+              "F11 Exploration's shipped params meet and bind realms across water, both gated by fleet out-projection, the gate live");
+    }
+
+    // F12 (BL-1171 review): A MUTUAL-DEFENCE ALLY'S FLEET TIPS THE COMPARISON.
+    // F7's pair (polity 0 sails 5000, polity 1 none) binds; give polity 1 an
+    // ally on its own island (polity 2, seated at column 40, sailing 20000)
+    // bound to it by mutual defence alone, and the ally's power at polity 1's
+    // port out-projects polity 0's, so the pair reads the land's penalty and
+    // does not bind. The control is the same three realms without the clause.
+    {
+        const auto with_ally = [](bool mutual_defence) {
+            far_world w = make_far_world(36, -1, true, false);
+            w.polities[0].navy_stock = 5000;
+            region r;
+            r.col = 40; r.row = 10; r.anchor = 10 * far_world::gw + 40;
+            r.culture = culture_shares::pure(2); r.founding_culture = 2;
+            r.farm_q = 600; r.ore_q = 300; r.energy_q = 200; r.port_q = 0;
+            r.settle_score_q = 800; r.population = 120000;
+            r.nation = 2; r.is_seat = true; r.seat_region = static_cast<int>(w.ss.regions.size());
+            r.has_market = true; r.name = "Isle ally";
+            w.ss.regions.push_back(r);
+            polity q;
+            q.id = 2; q.culture = 2; q.capital = static_cast<int>(w.ss.regions.size()) - 1;
+            q.aggression_q = 600; q.alive = true; q.navy_stock = 20000;
+            w.polities.push_back(q);
+            if (mutual_defence)
+                w.objects.push_back(dated_object{ 1800, static_cast<int32_t>(treaty_clause::mutual_defence), 1, 2 });
+            return w;
+        };
+        const history_sim_state f12 = run_far(with_ally(true), 700, 0, 0, true);
+        const history_sim_state f12c = run_far(with_ally(false), 700, 0, 0, true);
+        say("F12 polity 0 sails 5000; polity 1's ally (mutual defence) 20000:", f12);
+        say("F12 control -- the same ally, no mutual-defence clause:", f12c);
+        check(!bound(f12) && f12.far_pairs_out_of_fleet_reach > 0 && bound(f12c) && f12c.far_pairs_out_of_fleet_reach == 0,
+              "F12 a partner's mutual-defence ally out-projecting the seller at the partner's port stops the binding (unbound without the clause)");
+    }
+
     // F13 (BL-1171, Ben 2026-10-03): MEETING BY SEA IS GATED TOO. Two realms on
     // two islands, never met, both seats with a built port, polity 0
     // farm-dominant and polity 1 ore-dominant (each wants the other's good):
@@ -2093,6 +2144,9 @@ void real_body_rows(shipped_inputs& shipped, uint32_t seed, int weight)
         std::printf("      cross-landmass volume by road: Exploration %lld, Industrialisation %lld\n",
                     static_cast<long long>(fx.exploration_state.cross_landmass_volume_by_road_q),
                     static_cast<long long>(hi.cross_landmass_volume_by_road_q));
+        check(fx.exploration_params.far_pairs_meet_by_sea && fx.exploration_params.far_sea_bind_needs_fleet_reach
+              && fx.exploration_params.far_sea_meet_needs_fleet_out_projection,
+              "F11 generation's own Exploration span ran meeting and binding by sea, both gated by fleet out-projection");
         check(fx.exploration_params.trade_road_joins_one_landmass && dp.trade_road_joins_one_landmass
               && fx.exploration_state.cross_landmass_volume_by_road_q == 0
               && hi.cross_landmass_volume_by_road_q == 0,
