@@ -433,10 +433,15 @@ void stamp_history_roads(world& w, entity_id body,
 // and entrepots, and what a lane carries (tribute, trade) flows to them, so the walk
 // runs the way the cargo does.
 //
-// Deterministic: the legs arrive sorted, the Dijkstra orders its frontier on the pair
-// (cost, raster index), which is unique, and the stamp takes the max per tile, so
-// neither walk order nor overlap order can vary the field. Purely additive and purely
-// water: no land tile, and no road, is touched.
+// TRUNKS: lanes reuse lanes (`kSeaLaneReuseCostQ`). The walkable lanes are walked
+// busiest first -- most uses, ties by the leg's (a, b) -- and each walk enters a tile
+// an earlier lane laid at a discount, so a later lane into a port the busier one
+// already reaches joins its water and rides it in. The field therefore depends on the
+// walk order, which is a pure function of the record.
+//
+// Deterministic: the order above is total, the Dijkstra orders its frontier on the
+// pair (cost, raster index), which is unique, and the stamp takes the max per tile.
+// Purely additive and purely water: no land tile, and no road, is touched.
 
 struct ocean_current_field; // ocean_currents.hpp
 
@@ -444,6 +449,15 @@ struct ocean_current_field; // ocean_currents.hpp
 /// neighbour radius, `history_sim_params::neighbour_radius` = 9: a seat's region
 /// reaches that far).
 inline constexpr int kSeaLanePortRadius = 9;
+
+/// LANES REUSE LANES, as roads reuse roads: a sea tile an earlier lane of the same
+/// call already carries is walked at this many per mille of its priced step. The
+/// lanes are walked busiest first (most uses; ties by the leg's (a, b)), so the
+/// busier trade lays the trunk and a later lane into the same port rides it in --
+/// lanes into one port share their water near it and fan out far from it. 500 is
+/// the lane's own traversal discount (x 0.50, LOGISTICS.md § 4b): the stamp reads
+/// a laid lane as a traveller does. 1000 is no reuse: every lane walked alone.
+inline constexpr int kSeaLaneReuseCostQ = 500;
 
 /// What one `stamp_sea_lanes` call did. WRITE-ONLY.
 struct sea_lane_stats
@@ -508,4 +522,5 @@ void stamp_sea_lanes(world& w, entity_id body,
                      const std::vector<int>&               region_realm,
                      int lane_tier_uses, int current_weight_q, int rotation_sense,
                      sea_lane_stats* stats = nullptr,
-                     sea_lane_trace* trace = nullptr);
+                     sea_lane_trace* trace = nullptr,
+                     int reuse_cost_q = kSeaLaneReuseCostQ);

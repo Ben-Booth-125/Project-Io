@@ -340,7 +340,8 @@ namespace
 void sea_dijkstra(const std::vector<std::uint8_t>& sea, int gw, int gh,
                   const ocean_current_field* currents, int weight_q,
                   const std::vector<int>& sources, int to,
-                  std::vector<int64_t>& dist, std::vector<int>* prev)
+                  std::vector<int64_t>& dist, std::vector<int>* prev,
+                  const std::vector<std::uint8_t>* laned = nullptr, int laned_cost_q = 1000)
 {
     const int n = gw * gh;
     constexpr int64_t kInf = std::numeric_limits<int64_t>::max();
@@ -348,6 +349,10 @@ void sea_dijkstra(const std::vector<std::uint8_t>& sea, int gw, int gh,
     if (prev != nullptr) prev->assign(static_cast<std::size_t>(n), -1);
     const bool priced = currents != nullptr && !currents->empty() && weight_q > 0
                      && currents->gw == gw && currents->gh == gh;
+    // A laned tile is entered at laned_cost_q per mille of its priced step; 1000
+    // (or no mask) is the plain walk, byte for byte.
+    const bool reuse = laned != nullptr && laned->size() == static_cast<std::size_t>(n)
+                    && laned_cost_q >= 0 && laned_cost_q < 1000;
     using node = std::pair<int64_t, int>;
     std::priority_queue<node, std::vector<node>, std::greater<node>> frontier;
     for (const int s : sources)
@@ -398,6 +403,12 @@ void sea_dijkstra(const std::vector<std::uint8_t>& sea, int gw, int gh,
                 if (step < 1)
                     step = 1; // no step is ever free
             }
+            if (reuse && (*laned)[static_cast<std::size_t>(v)])
+            {
+                step = (step * laned_cost_q) / 1000;
+                if (step < 1)
+                    step = 1;
+            }
             const int64_t cand = dist[static_cast<std::size_t>(u)] + step;
             if (cand < dist[static_cast<std::size_t>(v)])
             {
@@ -414,6 +425,13 @@ void sea_dijkstra(const std::vector<std::uint8_t>& sea, int gw, int gh,
 std::vector<int> sea_walk(const std::vector<std::uint8_t>& sea, int gw, int gh,
                           const ocean_current_field* currents, int weight_q, int from, int to)
 {
+    return sea_walk_laned(sea, gw, gh, currents, weight_q, nullptr, 1000, from, to);
+}
+
+std::vector<int> sea_walk_laned(const std::vector<std::uint8_t>& sea, int gw, int gh,
+                                const ocean_current_field* currents, int weight_q,
+                                const std::vector<std::uint8_t>* laned, int laned_cost_q, int from, int to)
+{
     std::vector<int> path;
     const int n = gw * gh;
     if (gw <= 0 || gh <= 0 || sea.size() != static_cast<std::size_t>(n))
@@ -428,7 +446,7 @@ std::vector<int> sea_walk(const std::vector<std::uint8_t>& sea, int gw, int gh,
     }
     std::vector<int64_t> dist;
     std::vector<int>     prev;
-    sea_dijkstra(sea, gw, gh, currents, weight_q, { from }, to, dist, &prev);
+    sea_dijkstra(sea, gw, gh, currents, weight_q, { from }, to, dist, &prev, laned, laned_cost_q);
     if (dist[static_cast<std::size_t>(to)] == std::numeric_limits<int64_t>::max())
         return path;
     for (int t = to; t >= 0; t = prev[static_cast<std::size_t>(t)])

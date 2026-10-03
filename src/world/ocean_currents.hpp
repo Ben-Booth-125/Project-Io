@@ -182,6 +182,15 @@ int nearest_sea_tile(const std::vector<std::uint8_t>& sea, int gw, int gh, int c
 std::vector<int> sea_walk(const std::vector<std::uint8_t>& sea, int gw, int gh,
                           const ocean_current_field* currents, int weight_q, int from, int to);
 
+/// `sea_walk`, with tiles already carrying a lane (@p laned: one byte per tile,
+/// raster order, non-zero on a lane) entered at @p laned_cost_q per mille of
+/// their priced step, at least 1 -- so a walk prefers water a lane already uses,
+/// as a road prefers road. Null @p laned, or @p laned_cost_q 1000 or more, is
+/// `sea_walk` exactly. The Era -1 fleets never read it: only the lane stamp does.
+std::vector<int> sea_walk_laned(const std::vector<std::uint8_t>& sea, int gw, int gh,
+                                const ocean_current_field* currents, int weight_q,
+                                const std::vector<std::uint8_t>* laned, int laned_cost_q, int from, int to);
+
 /// The cost of the cheapest walk from any of @p sources to every tile, by the
 /// same steps (a multi-source Dijkstra); INT64_MAX where no water reaches.
 /// Sources off the sea, or out of range, are skipped.

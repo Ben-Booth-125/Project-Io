@@ -1559,7 +1559,7 @@ void stamp_sea_lanes(world& w, entity_id body,
                      const std::vector<sea_leg>&           legs,
                      const std::vector<int>&               region_realm,
                      int lane_tier_uses, int current_weight_q, int rotation_sense,
-                     sea_lane_stats* stats, sea_lane_trace* trace)
+                     sea_lane_stats* stats, sea_lane_trace* trace, int reuse_cost_q)
 {
     sea_lane_stats st{};
     if (legs.empty() || nodes.empty())
@@ -1740,9 +1740,28 @@ void stamp_sea_lanes(world& w, entity_id body,
         ++degree[le.b.port];
     }
 
+    // BUSIEST FIRST (kSeaLaneReuseCostQ): the lane with the most uses lays its
+    // water first and later lanes reuse it; ties by the leg's (a, b), the record's
+    // own order, so the order is total whatever order the record arrives in.
+    std::sort(walkable.begin(), walkable.end(), [](const leg_ends& x, const leg_ends& y) {
+        if (x.leg->uses != y.leg->uses) return x.leg->uses > y.leg->uses;
+        if (x.leg->a != y.leg->a) return x.leg->a < y.leg->a;
+        return x.leg->b < y.leg->b;
+    });
+
+    // The water lanes already lie on, as the walk reads it: whatever the tiles carry
+    // on entry, then every lane this call lays, as it lays it.
+    std::vector<std::uint8_t> laned(static_cast<std::size_t>(gw) * gh, 0);
+    for (int i = 0; i < gw * gh; ++i)
+    {
+        const auto it = w.tiles.find(grid[static_cast<std::size_t>(i)]);
+        if (it != w.tiles.end() && it->second.lane_level > 0 && sea[static_cast<std::size_t>(i)])
+            laned[static_cast<std::size_t>(i)] = 1;
+    }
+
     // PASS 2 -- walk and stamp. A directed port pair walked once is not walked
-    // again: the walk is a pure function of its two ends, so a second leg between
-    // the same ports would find the same path.
+    // again: its lane is already laid, and a second leg between the same ports
+    // would ride it end to end.
     std::map<std::pair<int, int>, std::vector<int>> walked;
     for (const leg_ends& le : walkable)
     {
@@ -1757,8 +1776,9 @@ void stamp_sea_lanes(world& w, entity_id body,
         const std::pair<int, int> key{ from_port, to_port };
         auto wit = walked.find(key);
         if (wit == walked.end())
-            wit = walked.emplace(key, sea_lane_walk(sea, gw, gh, currents.empty() ? nullptr : &currents,
-                                                    current_weight_q, from_port, to_port)).first;
+            wit = walked.emplace(key, sea_walk_laned(sea, gw, gh, currents.empty() ? nullptr : &currents,
+                                                     current_weight_q, &laned, reuse_cost_q,
+                                                     from_port, to_port)).first;
         const std::vector<int>& path = wit->second;
         if (path.empty())
         {
@@ -1771,6 +1791,7 @@ void stamp_sea_lanes(world& w, entity_id body,
             if (it == w.tiles.end() || !is_sea(it->second.substrate))
                 continue; // the walk is water-only; belt and braces
             it->second.lane_level = std::max<std::uint8_t>(it->second.lane_level, 1);
+            laned[static_cast<std::size_t>(idx)] = 1;
         }
         ++st.laid;
         st.path_tiles += static_cast<long long>(path.size());
