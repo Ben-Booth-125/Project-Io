@@ -316,7 +316,10 @@ knob takes it: **44 charters**, the first whole number at which the median libra
 no-budget world's 8 seats, with the divisor held at 650 for live-play cost. The spread runs 1 to 29
 seats; a world of one landmass whose capital towers offers one. Seats move off the heartland: at
 44 charters almost no centre on a world's richest landmass affords one, because there the reach is
-dearest.
+dearest. **A centre is priced by its region's anchor (Ben, 2026-10-03):** the reach is the landmass
+the region's anchor tile stands on, even where the centre itself stands on an islet off that
+coast; priced by its own islet, a lone centre is the whole stock of its reach and always affords a
+specialist, a seat made by geometry rather than by capital.
 
 **SETTLED (Ben, 2026-09-21, NR-910): the pins.** *The charter pin is OVERTURNED (Ben, 2026-10-03,
 option a, above): a specialist costs 44 firm charters, not two; the divisor pin of 650 and the
@@ -325,7 +328,9 @@ charter count moves in whole charters, which is too coarse to land the anchor on
 divisor takes the last step, inside the band live-play cost allows: it is **the divisor at which
 the median library world, at the charters then pinned, opens the anchor's nine seats**. The rule is read on the
 world that ships (Ben, 2026-09-22, NR-914): **650**, the first divisor at which the median library
-world opens nine and none opens none, at about 0.91 of the legacy world's tick. (Read on a world
+world opens nine and none opens none. Under the reach price at 44 charters the live tick reads a
+median ×1.12 the legacy world's (`live_tick_cost_probe --quick`, 16 library seeds, per seed ×0.77 to
+×1.61; one seed's legacy tick read 286 and 395 ms on two runs, so the figure is noisy). (Read on a world
 without BL-1037's corridor tier the same rule gave 580; the tier moves every stockpile.) The step
 past it is steep — at 660 the median jumps to thirteen and a half, as a world of near-equal cities
 crosses the price together. **The seat spread is accepted:** the anchor is a median, and a world

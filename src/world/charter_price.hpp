@@ -45,7 +45,9 @@
 /// 7.5 / 7.5 / 8 / 8.5 / 8.5 / 9 / 13.5 at d = 600 / 610 / 620 / 630 / 640 /
 /// 650 / 660, the library spread 4 to 98 seats at 650. Live-play cost: the
 /// divisor alone sets the tick (BL-1043 stage 2: x0.43 / x0.91 / x1.70 the
-/// legacy world at 325 / 650 / 1300), so 650 runs near x0.91 the legacy tick.
+/// legacy world at 325 / 650 / 1300, world price). Under the reach price at 44
+/// charters, 650 reads a median x1.12 the legacy tick (live_tick_cost_probe
+/// --quick, 16 library seeds, x0.77 to x1.61 per seed, noisy).
 ///
 /// THE SEAT MENU NO LONGER TURNS ON THIS (Ben, 2026-10-03, option a, BL-1168
 /// folding BL-1151): under the reach price the anchor is carried by the
