@@ -27,65 +27,29 @@ Known reds on main:
 The play build (build_rel) is from 969d2abe and lacks the bridge cap. Rebuild it before Ben's
 next look (`main_session_build_rel.bat`; check BUILD_REL_EXIT and that the app is closed).
 
-## Three branches NOT merged — each waits on Ben, then a cold review
+## Merged 2026-10-03/04 (session 2) — every branch cold-reviewed, then gated on main
 
-Verified with `git branch --contains` at close.
+All four merged on main, each green except main's known reds:
+- **BL-1168 charter by reach** (option a, 44 charters). Islet commit reverted: a centre is priced
+  by its region's ANCHOR. Works notes price by reach. Live tick reads x1.12 legacy (noisy).
+- **BL-1171 far trade** + meeting by sea gated by fleet out-projection; either side's fleet binds;
+  a bridged strait still parts two landmasses; conquest inherits overseas contacts ungated.
+  Sea-lane trunks are shared only WITH the current (align >= 0 keeps the discount) — row B passes
+  16/16. Lane field moved; drawn trunks look different (eyeball on the live walk).
+- **BL-1172/1173 fair-price army + working capital.** A draw pays the POSTED price; the 2x
+  ceiling governs every draw (upkeep, processors, construction, nations' pool and shelf); a draw
+  over it does not bid. Shelf-as-supply is built but k = 0 until shelf spoilage (BL-1179): every
+  k > 0 cost survivors. Known cost at k = 0, stated in FINANCE.md and bounded by U13/M5: a unit or
+  processor beside a full, unlisted shelf is fed one tick in four.
+- **BL-1169 K = 1000** in Industrialisation only: far rival 12 -> 14 of 16, industry -29%.
 
-**1. BL-1168 charter priced by trade reach.** Branch `worktree-agent-aca5141d2e1b745e1`:
-- efecc62c prices by reach.
-- bc4b12a7 re-anchors the specialist count, 2 → 44 charters. HOLD.
+Filed: BL-1176..1178 (charter review leftovers), BL-1179 shelf spoilage, BL-1180 construction
+rate panel drift. BL-1166 already covers the industrialisation_sim_harness self-check red.
+Also red on main, not on the old list: resource_chain_harness 4 R1 rows (identical before these
+merges).
 
-Ben's call, one of:
-- (a) Accept 44. Seats move off the heartland: 6 of 190 on the top landmasses, and seed 11
-  keeps one seat.
-- (b) Anchor at 8 rather than 12.
-- (c) Price specialists at the world's stock and firms by reach.
-
-The shipped digest pins move. Still owed: the Industrialisation works-chartered notes price
-world-wide. BL-1169's K is set only after this lands, read together.
-
-**2. BL-1171 far trade.** Branch `worktree-agent-a55addb838a362e72`, ab60a34a and c1c05c87. The
-switches are ON. Readings:
-- 1660 lanes 79 → 130.
-- Lanes 31+ tiles long 21 → 50.
-- Far-bound realms 0 → 81.
-- Cross-landmass trade −56% / −53%.
-- Industrialisation subjections 70 → 16.
-
-sea_lane_stamp_harness row B fails on seed 28: mean current 70 against 124. That is a call for
-Ben; do not weaken the row. Open question for him: should meeting by sea be gated too? Needs a
-cold review.
-
-**3. BL-1172 army eats at a fair price, BL-1173 working capital.** Branch
-`worktree-agent-a4454709fec7f62e0`, c570b1cf and 9ae9e0c1. The lane reported a wrong branch
-name. What changed:
-- reservation_mult 9.0 → 2.0 in `scripts/economy.lua`.
-- A billing cap in clear_markets via `economy_report::upkeep_purchases`.
-- The supply share floors unit strength.
-- Working capital at 0.25 × opening stock value.
-
-With both fixes, out of 462 firms, survivors read 56 / 34 / 27, against a baseline of 25 / 22 / 5.
-
-Ben's calls:
-- The billing cap goes beyond the ruling's wording.
-- Building upkeep is affected too.
-- BL-1173 alone is harmful, so ship both fixes or neither.
-
-R0b fails on main too. The pss pins move. Needs a cold review.
-
-**Held for sprint 49:** BL-1139 part 2 (abandonment), 2f719556 on
-`worktree-agent-ae9978d9141f0dc73`. It sits behind BL-1163 (growth basket).
-
-## Then
-
-1. Ben's calls on the three branches.
-2. Cold reviews.
-3. Merge each branch, then gate it on main.
-4. Set BL-1169's K.
-5. BL-1170 (heartlands reach overseas, "something like America"): a design form first.
-6. The second re-bless, with every cause named.
-7. Ben's live walk (checklist given; BL-1145 RD owed; confirm lane merge 500 by eye).
-8. The sprint close: retro and version cut.
+exploration_sweep.json is modified, uncommitted: regenerate it at the second re-bless, after the
+last mover.
 
 ## Rulings this session (in their docs)
 
