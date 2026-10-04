@@ -1,8 +1,26 @@
 # Sprint 48's second re-bless — the shape, the causes, the pins
 
-Prepared 2026-10-04 on the re-bless lane's branch, on main 9171c2ef. **Not authorised.** Ben
-authorises against the SHAPE below (DELIVERY.md § The digest re-bless is one act per WAVE, rule 4),
-never against the hashes. Nothing merges until he has.
+**AUTHORISED by Ben, 2026-10-04** ("re-bless now"), against the SHAPE below (DELIVERY.md § The
+digest re-bless is one act per WAVE, rule 4), never against the hashes. Prepared the same day on
+the re-bless lane's branch, on main 9171c2ef; re-checked after merging main b856c4d9, which moved
+no `src/world` file and no generation script (`git diff --stat 9171c2ef HEAD -- src/world
+scripts/*.lua` is empty).
+
+**Follow-ups, filed or in flight:**
+- **BL-1183 (the fair-price ceiling stalls construction)**, filed for sprint 49: Ben re-blessed
+  first and the fix follows. It is the campaign-economy side of BL-1172 that this shape reads only
+  through the settle digests and the spawn_solvency red.
+- **acquisition_viability R1** (the seated corporation accumulates) is being re-windowed,
+  harness-only. The red attributed to BL-1173 below is a gate, not a pin; re-windowing it moves no
+  digest.
+- **spawn_solvency R4 is GREEN on the merged tree.** Main's harness-only fix counts hires by
+  provenance (seeded survivors + hires = rival units at close). Re-run here: 152 seeded, 152
+  standing, 304 hired, ALL PASS. The "-732 hired" below was the old count's artefact, not a field
+  that stopped hiring.
+
+**Re-checked on the merged tree (main b856c4d9 merged in):** player_seed_sweep `--digest-check`
+16/16 PASS on both arcs; world_determinism ALL PASS with the digests below unchanged;
+spawn_solvency ALL PASS.
 
 ## Baseline
 
