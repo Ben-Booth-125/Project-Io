@@ -501,8 +501,14 @@ single-resource** (no highest-value mode, no Single toggle): the player picks a
 good from the shared selector and the lens fills the **whole contiguous deposit**
 of that good as a **flat, uniform colour** — the *shape* of the deposit, not a
 magnitude gradient. Every tile carrying any of the resource (deposit > 0) takes the
-resource's identity colour at a fixed 0.8 opacity (composited over terrain); a tile
-without it keeps its terrain hue. Intensity lives in tile detail, not the lens. A
+resource's identity colour at a fixed 0.92 opacity (composited over terrain). Every
+other tile is **washed toward white** at 0.78 — land to a warm off-white, water to a
+cooler pale blue-grey so the coastline survives (Ben, 2026-10-04: the map goes clear
+and the deposit is the only saturated thing on it). The intra-body **activity fog is
+lifted** under this lens: a deposit is survey knowledge, not activity, so surveyed
+ground reads clear while the survey mask still owns unsurveyed tiles
+([DISCOVERY.md](DISCOVERY.md) § the two fogs). Intensity lives in tile detail, not the
+lens. A
 deposit is the 8-connected (diagonals included) blob of tiles with the good;
 because the fill is uniform, the per-tile threshold is visually identical to a
 flood-fill grouping, so no flood-fill pass is built.

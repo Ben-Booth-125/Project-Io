@@ -2193,6 +2193,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // of the tile loop's fill block for BL-185, because the road pass now needs the same
     // number for a *neighbour* tile — the fog must size identically wherever it is read.
     auto tile_vision = [&](entity_id tid) -> float {
+        // The Resource lens reads SURVEY knowledge, not activity: a deposit is known
+        // wherever the ground is surveyed, so the activity fog is lifted under it and
+        // the washed-clear map reads clear (Ben, 2026-10-04). The survey mask still
+        // owns unsurveyed tiles.
+        if (state.overlay == overlay_mode::resource)
+            return 1.0f;
         if (state.permanent_vision.find(tid) != state.permanent_vision.end())
             return 1.0f;
         const auto bi = beam_intensity.find(tid);
@@ -2487,13 +2493,19 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // Resource lens (BL-019): flat, uniform fill over the contiguous deposit of
         // the selected resource — the *shape* of the deposit, no magnitude gradient.
         // Any tile carrying the resource (deposit > 0) is part of the deposit and
-        // takes the resource's identity colour at a fixed opacity; a tile without it
-        // keeps its terrain hue. Intensity lives in tile detail, not the lens.
+        // takes the resource's identity colour near-solid; every other tile is washed
+        // toward white so the deposit is the only saturated thing on the map (Ben,
+        // 2026-10-04). Water takes a cooler wash than land so the coastline survives.
+        // Intensity lives in tile detail, not the lens.
         else if (state.overlay == overlay_mode::resource)
         {
             const std::size_t sel = static_cast<std::size_t>(state.lens_resource);
             if (tile.resource_deposit[sel] > 0.0f)
-                fill = lerp_colour(fill, presentation_of(state.lens_resource).colour, 0.8f);
+                fill = lerp_colour(fill, presentation_of(state.lens_resource).colour, 0.92f);
+            else if (placement_rules::is_water_tile(tile.substrate))
+                fill = lerp_colour(fill, IM_COL32(214, 222, 232, 255), 0.78f);
+            else
+                fill = lerp_colour(fill, IM_COL32(242, 242, 238, 255), 0.78f);
         }
         // Market lens (BL-015): tint each tile with its catchment market's colour
         // so the boundary between markets reads as a colour boundary. Same visual
