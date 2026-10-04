@@ -283,6 +283,16 @@ not a broad presence across the nation.
   history (§ Open items).
 - **Validity-gated.** Every placement is gated by `placement_rules::can_place` (the shared
   placement seam), so no asset lands on invalid terrain or a zero-deposit tile.
+- **Chain-feasible — a processor needs a reachable producer of every input (Ben, 2026-10-04;
+  a HARD RULE, not a search score).** No processor is placed, by any pass — the specialists
+  here, the background field (Pass 6), the seat's kit (§ Player corporation) — unless every
+  input of its recipe has a producer **within reach** of its market: an extractor on a deposit
+  of that good, or a processor making it. "Within reach" is the reach goods actually travel
+  between markets (`../economy/SUPPLY.md`), not grid distance. A processor with no feasible site
+  is **not placed**; a chain with no feasible site is absent from that world rather than present
+  as idle plant. The reason is legibility: an idle building the player inherits reads as a
+  broken economy, where an absent chain reads as a world that lacks it. BL-1185
+  (chain-feasible placement) owns the work.
 
 Placement is collision-checked against already-placed assets from other corporations.
 No two corporations begin on the same tile.
