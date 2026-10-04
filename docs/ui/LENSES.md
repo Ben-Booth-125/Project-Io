@@ -505,15 +505,21 @@ deposit **shape**, never a magnitude gradient. Only **extractable** goods
 (`placement_rules::k_extractable`) can be toggled: a manufactured good — computers —
 is never on a body's surface, so it is not offered.
 
-- **One toggled good on a tile** — the tile takes that good's identity colour at a
-  fixed 0.92 opacity, composited over terrain.
+- **One toggled good on a tile** — the tile takes that good's identity colour,
+  solid.
 - **Two or more** — the hex splits into **equal pie wedges from the centre**, one per
   good, in toggle order. Each wedge spans 6/n of the perimeter, so two goods halve the
   hex and three or six land on its vertices. Below the coarse level of detail the hex
   is a few pixels across, and it shows the first good only.
-- **None** — the tile is **washed toward white** at 0.78: land to a warm off-white,
-  water to a cooler pale blue-grey so the coastline survives. The map goes clear and
-  the deposits are the only saturated thing on it.
+- **None** — the tile keeps its terrain, **muted**: desaturated 60% toward its own
+  luma and darkened to 0.82. The map stays the map; the deposits carry the contrast
+  (Ben, 2026-10-04 — "use the default lens, and just up the contrast"; it replaced a
+  white wash that lost the terrain).
+- **Outline** — every deposit blob is ringed with a light stroke on each side facing
+  ground that carries no toggled good. Several identity colours are greys and darks
+  (coal, petroleum, stone, peat) that muted terrain cannot set off by hue alone; the
+  ring is colour-independent and draws the deposit's shape. Like the split, it is
+  skipped below the coarse level of detail.
 
 The intra-body **activity fog is lifted** under this lens: a deposit is survey
 knowledge, not activity, so surveyed ground reads clear while the survey mask still

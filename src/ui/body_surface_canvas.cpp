@@ -181,6 +181,24 @@ inline ImU32 muted_nation_colour(ImU32 nc)
     return IM_COL32(ch(r), ch(g), ch(b), 255);
 }
 
+/// Resource lens ground (Ben, 2026-10-04): the terrain under the deposits is kept
+/// but muted — desaturated toward its own luma and sat down — so the solid deposit
+/// colours carry the contrast. Replaces the earlier white wash, which lost the map.
+constexpr float k_resource_ground_desat  = 0.60f;
+constexpr float k_resource_ground_darken = 0.82f;
+
+inline ImU32 muted_resource_ground(ImU32 c)
+{
+    const float r = static_cast<float>((c >> IM_COL32_R_SHIFT) & 0xFFu);
+    const float g = static_cast<float>((c >> IM_COL32_G_SHIFT) & 0xFFu);
+    const float b = static_cast<float>((c >> IM_COL32_B_SHIFT) & 0xFFu);
+    const float luma = 0.2126f * r + 0.7152f * g + 0.0722f * b;
+    auto ch = [&](float v) {
+        return static_cast<int>((v + (luma - v) * k_resource_ground_desat) * k_resource_ground_darken);
+    };
+    return IM_COL32(ch(r), ch(g), ch(b), 255);
+}
+
 /// Scale applied to the whole treatment — wash AND stroke — where the frontier
 /// faces UNCLAIMED ground rather than another nation (Ben, 2026-08-24: "reduce
 /// the border band on edges facing unclaimed ground").
@@ -2691,24 +2709,19 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (has_owner && is_background_firm(corp_it->second))
                 fill = owner_col;
         }
-        // Resource lens (BL-019): flat, uniform fill over the contiguous deposit of
-        // the selected resource — the *shape* of the deposit, no magnitude gradient.
-        // Any tile carrying the resource (deposit > 0) is part of the deposit and
-        // takes the resource's identity colour near-solid; every other tile is washed
-        // toward white so the deposit is the only saturated thing on the map (Ben,
-        // 2026-10-04). Water takes a cooler wash than land so the coastline survives.
-        // Intensity lives in tile detail, not the lens.
+        // Resource lens (BL-1182): a toggled set of goods. A tile carrying one takes
+        // its identity colour SOLID; every other tile keeps its terrain, muted, so the
+        // deposits carry the contrast (Ben, 2026-10-04: "use the default lens, and just
+        // up the contrast" — the white wash is gone). A split tile's wedges draw over
+        // this in the tile loop; the fill here is its first good, which is also what a
+        // coarse-LOD rect shows. Intensity lives in tile detail, not the lens.
         else if (state.overlay == overlay_mode::resource)
         {
-            // A split tile's wedges draw over this in the tile loop; the fill here
-            // is its first resource, which is also what a coarse-LOD rect shows.
             resource_type on_tile[ui_state::k_lens_resource_cap];
             if (lens_resources_on_tile(state, tile, on_tile) > 0)
-                fill = lerp_colour(fill, presentation_of(on_tile[0]).colour, 0.92f);
-            else if (placement_rules::is_water_tile(tile.substrate))
-                fill = lerp_colour(fill, IM_COL32(214, 222, 232, 255), 0.78f);
+                fill = presentation_of(on_tile[0]).colour | IM_COL32_A_MASK;
             else
-                fill = lerp_colour(fill, IM_COL32(242, 242, 238, 255), 0.78f);
+                fill = muted_resource_ground(fill);
         }
         // Market lens (BL-015): tint each tile with its catchment market's colour
         // so the boundary between markets reads as a colour boundary. Same visual
@@ -3361,10 +3374,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 const int n = lens_resources_on_tile(state, tile, on_tile);
                 if (n >= 2)
                 {
-                    const ImU32 base = terrain_colour(tile.substrate, tile.cover, tile.cover_density);
                     ImU32 cols[ui_state::k_lens_resource_cap];
                     for (int q = 0; q < n; ++q)
-                        cols[q] = lerp_colour(base, presentation_of(on_tile[q]).colour, 0.92f);
+                        cols[q] = presentation_of(on_tile[q]).colour | IM_COL32_A_MASK;
                     draw_lens_wedges(dl, { cx, cy }, shade.blend ? draw_r + 1.0f : draw_r, cols, n);
                 }
             }
@@ -3445,6 +3457,41 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     else
                     {
                         dl->AddConvexPolyFilled(verts, 6, wash);
+                    }
+                }
+            }
+
+            // Resource lens deposit outline (Ben, 2026-10-04: "up the contrast"). Several
+            // identity colours are greys and darks (coal, petroleum, stone, peat) that a
+            // muted terrain cannot set off by hue alone, so every deposit blob is ringed
+            // with a light stroke on each side facing ground that carries no toggled good.
+            // Colour-independent, and it reads as the deposit's SHAPE, which is the lens.
+            if (state.overlay == overlay_mode::resource && surveyed && !coarse_fill && raster_ok)
+            {
+                resource_type tmp[ui_state::k_lens_resource_cap];
+                if (lens_resources_on_tile(state, tile, tmp) > 0)
+                {
+                    const ImVec2* ev = shade.blend ? blend_verts : verts;
+                    const float   lw = std::max(1.0f, draw_r * 0.08f);
+                    for (int side = 0; side < 6; ++side)
+                    {
+                        const auto nc = hex_neighbors::neighbour(t_col, t_row, side);
+                        bool nb_on = false;
+                        if (nc.gy >= 0 && nc.gy < gh)
+                        {
+                            const int ncol = ((nc.gx % gw) + gw) % gw; // cylinder wrap
+                            const entity_id nid =
+                                raster[static_cast<std::size_t>(nc.gy) * gw + ncol];
+                            if (nid != null_entity)
+                            {
+                                const auto nit = w.tiles.find(nid);
+                                nb_on = nit != w.tiles.end()
+                                     && lens_resources_on_tile(state, nit->second, tmp) > 0;
+                            }
+                        }
+                        if (!nb_on)
+                            dl->AddLine(ev[k_side_verts[side][0]], ev[k_side_verts[side][1]],
+                                        IM_COL32(240, 238, 228, 210), lw);
                     }
                 }
             }
