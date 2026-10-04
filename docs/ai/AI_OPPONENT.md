@@ -459,9 +459,9 @@ where a processor genuinely differs from a mine:
   travels **with** the command, because `construct_building` substitutes steel for `no_recipe`.
 - **Reachability.** Two gates a mine never needs: the **tech** gate (asked here rather than
   discovered as a seam rejection — a candidate that can only ever be refused costs a build slot to
-  learn nothing), and **input access** — pool + local market inventory measured against the
-  production tick's own coverage threshold, since a processor with no reachable input is an
-  immediate loss-maker. The scorer asks exactly what the seam asks and no more: mirroring a lock
+  learn nothing), and **input access** — every input must be **obtainable** at the candidate's
+  market (§ Build only what runs), since a processor with no reachable input is an immediate
+  loss-maker. The scorer asks exactly what the seam asks and no more: mirroring a lock
   the seam does not apply would make the rival stricter than the rules it plays by.
 - **Pricing.** Priced by `estimate_prospective_profit` rather than the extraction candidate's
   inline revenue-minus-wages sum. The inline model survives on the extraction side because
@@ -471,6 +471,40 @@ where a processor genuinely differs from a mine:
 The candidate exposes the economy it runs in: processors realise far less than the estimator
 predicts on the same buildings, which is a substrate defect owned by BL-436 (processing
 under-earns extraction) and deliberately not hidden by the scorer.
+
+### Build only what runs (BL-1187)
+
+**A processor decision — build, recipe switch, resume — is taken only on inputs the building can
+obtain, and its margin is priced on what those inputs would cost it, not on a posted price it may
+not be able to pay.**
+
+An input *r* is **obtainable** at market *C* when either holds:
+
+1. **Stock.** The corp's own (corp, *C*) pool plus *C*'s shelf — the shelf only where the fair-price
+   ceiling admits it — covers the run at the idle threshold. This is the production tick's own
+   coverage question.
+2. **Supply.** A producer of *r* stands **within reach** of *C* — the same reach chain-feasible
+   placement uses (BL-1185): the same market, or the dispatcher's own market leg viable with a
+   per-unit haul of at most `(reservation_mult − 1 − dispatch_margin) × base` — and its unit lands
+   at *C* at a price the ceiling admits. In play, a processor counts as a producer only if it
+   produced on the tick being scored: a starved mill supplies nothing.
+
+The obtainable cost is the posted price where the stock clause holds, else the cheapest landed
+cost (producer market's price plus haul) over the producers within reach. One definition serves
+the scorer and generation's placement (`src/world/input_reach.hpp`), so they cannot disagree.
+
+- **Build** asks both clauses. Construction takes ticks; supply has that long to arrive.
+- **Recipe switch** proposes a sibling only when each of its inputs is obtainable, and prices the
+  incumbent and the siblings alike on obtainable cost. The incumbent is priced but not gated: a
+  facility whose own inputs are out of reach may still move to a sibling that runs.
+- **Resume** asks the **stock** clause alone. A resumed plant runs on the next tick, and it was
+  idled because the producers in reach were not delivering; a producer in reach is evidence that
+  a chain *could* run, not that this plant *will* run tomorrow. Admitting supply here left the
+  idle/resume churn standing.
+
+This prices existing verbs better and adds none; it sits inside the scored-utility grant (§ 11).
+Reach makes a chain *possible*, not *running*: goods still have to cross markets, which is the
+shipping layer's question, not the scorer's.
 
 ### Selection must be scale-free (Ben, 2026-08-31)
 

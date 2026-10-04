@@ -5,6 +5,7 @@
 #include "building_profit.hpp"
 #include "decision_trace.hpp"  // BL-704: opt-in streaming decision sink
 #include "economy_system.hpp"  // economy_report, agency_event, solve_workforce_target
+#include "input_reach.hpp"     // BL-1187: obtainable inputs (the BL-1185 reach)
 #include "logistics.hpp"       // body_reach_field (BL-379: warm before the reach-checked muster scan)
 #include "market_clearing.hpp" // market_for_tile
 #include "nation_budget.hpp"   // budget_claim (Sprint N3 T5: the cash-gated survey asks its nation)
@@ -23,6 +24,7 @@
 #include <cstdio>
 #include <limits>
 #include <map>
+#include <memory> // BL-1187: the lazily-built reach context
 #include <set> // BL-1003: the trade candidate's per-(body, resource) seen set
 #include <ostream>
 #include <string>
@@ -163,7 +165,7 @@ float local_price(const world& w, entity_id tile, std::size_t r)
 /// too, so the scorer's spend and the gate's refusal can no longer disagree.
 
 /// Per-batch margin of `recipe_id` at the prices of the market serving `tile`.
-float recipe_margin(const world& w, const recipe_registry& reg,
+[[maybe_unused]] float recipe_margin(const world& w, const recipe_registry& reg,
                     entity_id tile, uint16_t recipe_id)
 {
     const recipe* rc = reg.get_recipe(recipe_id);
@@ -176,6 +178,36 @@ float recipe_margin(const world& w, const recipe_registry& reg,
         if (rc->inputs[r]  > 0.0f) m -= rc->inputs[r]  * local_price(w, tile, r);
     }
     return m;
+}
+
+/// BL-1187 (build only what runs) — per-batch margin of `recipe_id` at the
+/// market serving `tile`, its INPUTS priced at what the processor would actually
+/// pay for them (input_reach.hpp § OBTAINABLE: the posted price where the stock
+/// is at hand, the landed cost from a producer within reach otherwise). Outputs
+/// at the posted price, as `recipe_margin`. Returns whether EVERY input is
+/// obtainable; the margin is written either way (an unobtainable input priced
+/// at the posted price, which is `recipe_margin`'s figure for it).
+///
+/// `pool` is the corp's (corp, market) pool; `batches` sizes the run the stock
+/// clause must cover; `self` is the building asking (never its own producer).
+bool recipe_margin_obtainable(world& w, const recipe_registry& reg, input_reach& ir,
+                              entity_id tile, uint16_t recipe_id,
+                              const stockpile_component* pool, float batches,
+                              entity_id self, float& margin)
+{
+    margin = 0.0f;
+    const recipe* rc = reg.get_recipe(recipe_id);
+    if (!rc)
+        return false;
+    std::array<float, resource_count> cost{};
+    const bool ok = recipe_inputs_obtainable(w, reg, ir, market_for_tile(w, tile), pool,
+                                             *rc, batches, self, cost);
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        if (rc->outputs[r] > 0.0f) margin += rc->outputs[r] * local_price(w, tile, r);
+        if (rc->inputs[r]  > 0.0f) margin -= rc->inputs[r]  * cost[r];
+    }
+    return ok;
 }
 
 /// The resource a recipe mostly makes — its largest output. Names what a
@@ -860,6 +892,25 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
     const std::vector<extraction_site> ranked_sites =
         rank_extraction_sites(w, p.top_k_sites_per_resource, demand_weight);
 
+    // BL-1187 (build only what runs): the reach context every processor
+    // decision below asks "is this input obtainable here?" of — build, recipe
+    // switch and resume alike. Built on first use and shared by every corp this
+    // tick: the producer index is a snapshot of the buildings standing when the
+    // first question is asked (a fixed point in the sorted corp walk, so it is
+    // replayable), and the haul memo is per market pair. A world fact, hoisted
+    // as BL-253 hoisted the site ranking.
+    std::unique_ptr<input_reach> reach_ctx;
+    const auto reach = [&]() -> input_reach& {
+        if (!reach_ctx)
+        {
+            reach_ctx = std::make_unique<input_reach>(make_input_reach(w, reg));
+            // This tick's production: a processor that made nothing supplies
+            // nothing (input_reach.hpp § report).
+            reach_ctx->report = &report;
+        }
+        return *reach_ctx;
+    };
+
     for (std::size_t index = 0; index < corp_ids.size(); ++index)
     {
         const entity_id              corp = corp_ids[index];
@@ -1107,8 +1158,8 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 //
                 // What it still does NOT model is input STARVATION — it prices a
                 // full run. Measured at 30.9% of processing building-ticks
-                // (NR-266), so this remains an over-estimate; the `reachable`
-                // gate below is the coarse guard against the worst of it.
+                // (NR-266), so this remains an over-estimate; the INPUT ACCESS
+                // gate below (BL-1187) is the guard against the worst of it.
                 //
                 // BL-712: the best is kept PER GROUP, not once. A single argmax
                 // over net margin is a category exclusion rather than a ranking
@@ -1147,34 +1198,26 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     if (!recipe_unlocked(w, reg, corp, rid))
                         continue;
 
-                    // INPUT ACCESS. A processor with no reachable input is an
-                    // immediate loss-maker, so this asks the production tick's
-                    // own question: does pool + market inventory cover a full
-                    // run at the idle threshold? Below it the building would not
-                    // even bootstrap on the tick it completed.
-                    bool  reachable = true;
-                    for (std::size_t r = 0; r < resource_count && reachable; ++r)
-                    {
-                        const float in = abs->inputs[r];
-                        if (in <= 0.0f)
-                            continue;
-                        const float need  = in * batches;
-                        // BL-1172: the tick counts the shelf only where the
-                        // fair-price ceiling admits it (run_processing); the
-                        // prediction asks the same question, no more.
-                        const bool  shelf = mkt && shelf_admits(*mkt, r, reg.price_band().reservation_mult,
-                                                                /*off_buys=*/true);
-                        const float avail = (pool ? pool->quantities[r] : 0.0f)
-                                          + (shelf ? std::max(0.0f, mkt->inventory[r]) : 0.0f);
-                        if (need > 0.0f && avail / need < reg.t_idle())
-                            reachable = false;
-                    }
-                    if (!reachable)
+                    // INPUT ACCESS (BL-1187, build only what runs). A processor
+                    // with an input it cannot obtain is an immediate loss-maker, so
+                    // each input must be OBTAINABLE here (input_reach.hpp): the
+                    // production tick's own coverage question — pool + the shelf
+                    // the fair-price ceiling admits, at the idle threshold — OR a
+                    // producer of it standing within reach (the BL-1185 reach:
+                    // same market, or the dispatcher's own market leg with a haul
+                    // the ceiling leaves room for). Opening stock alone used to
+                    // pass this gate for a chain nothing feeds.
+                    std::array<float, resource_count> input_cost{};
+                    if (!recipe_inputs_obtainable(w, reg, reach(), mid, pool, *abs, batches,
+                                                  null_entity, input_cost))
                         continue;
 
                     const resource_type    rt = primary_output(*abs);
+                    // Priced on what the inputs would COST it here (BL-1187),
+                    // not on the posted price of a shelf it may not draw.
                     const building_profit  bp = estimate_prospective_profit(
-                        w, reg, tile, building_type::processing_facility, rt, rid);
+                        w, reg, tile, building_type::processing_facility, rt, rid,
+                        nullptr, &input_cost);
                     if (!bp.has_data)
                         continue;
                     const float n = bp.net();
@@ -1450,8 +1493,42 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 // profit grounds, exactly as before this change; that it also
                 // cannot be resumed on REACH grounds is a real gap, but an older
                 // and separate one.
-                const building_profit pp = estimate_prospective_profit(
-                    w, reg, b.tile, b.type, b.target_resource, b.recipe, &b);
+                // BL-1187 (build only what runs): a processor resumes only when
+                // every input is AT HAND at its market — input_reach.hpp's STOCK
+                // clause (pool + the shelf the fair-price ceiling admits, at the
+                // idle threshold) — and its estimate prices those inputs at what
+                // they cost there. The price-only estimate read a starved plant's
+                // dear OUTPUT and resumed it into the same starvation the reflex
+                // had idled it for (seed 0 ticks 100-200: 73 consumer-goods plants
+                // built or resumed against 85 idled).
+                //
+                // STOCK ONLY, NOT SUPPLY — the one place the scorer asks less
+                // than the full OBTAINABLE test, and measured, not assumed. A
+                // build has its construction ticks for supply to arrive; a resume
+                // runs NEXT tick, and the plant was idled precisely because the
+                // producers in reach were not delivering. With the supply clause
+                // admitted here, 239 of 263 consumer-goods resume candidates on
+                // seed 10 passed on a steel producer in reach whose steel never
+                // landed, and the churn stood (household_supply_probe, seed 10,
+                // ticks 50-200, consumer-goods makers built or resumed against
+                // idled: 237/251 on the price-only scorer, 237/268 with supply
+                // admitted here, 28/58 stock-only).
+                bool                              inputs_ok = true;
+                std::array<float, resource_count> input_cost{};
+                const recipe* res_rc = (b.type == building_type::processing_facility)
+                                           ? reg.get_recipe(b.recipe) : nullptr;
+                if (res_rc != nullptr)
+                {
+                    const float res_batches = reg.economics(b.type).base_rate * b.workforce_assigned;
+                    inputs_ok = recipe_inputs_obtainable(
+                        w, reg, reach(), market_for_tile(w, b.tile),
+                        w.find_pool(corp, pool_key_for_tile(w, b.tile)),
+                        *res_rc, res_batches, bid, input_cost, /*allow_supply=*/false);
+                }
+                const building_profit pp = inputs_ok
+                    ? estimate_prospective_profit(w, reg, b.tile, b.type, b.target_resource, b.recipe, &b,
+                                                  res_rc != nullptr ? &input_cost : nullptr)
+                    : building_profit{};
                 if (pp.has_data)
                 {
                     // Exact mirror of the idle gain below. An idled building is
@@ -1562,7 +1639,23 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                                        ? reg.get_recipe(b.recipe) : nullptr;
             if (cur_rc != nullptr)
             {
-                const float cur_margin = recipe_margin(w, reg, b.tile, b.recipe);
+                // BL-1187 (build only what runs): every margin in this chase is
+                // priced on OBTAINABLE input cost (input_reach.hpp), and a recipe
+                // is proposed only when each of its inputs is obtainable here.
+                // The base-price chase moved plants onto siblings whose inputs
+                // nothing supplied (coal-route mills onto iron-nickel ore no
+                // body digs; the BL-1186 diagnosis). The INCUMBENT is priced the
+                // same way but not gated: a building whose own inputs are out of
+                // reach may still move to one that runs — which is why seed 0's
+                // clean-water plants still leave for consumer goods at tick 3
+                // (no water is dug on that seed, so clean water is the recipe
+                // that cannot run; BL-1193 H5 is that fix, not this one).
+                const stockpile_component* sw_pool =
+                    w.find_pool(corp, pool_key_for_tile(w, b.tile));
+                const float sw_batches = reg.economics(b.type).base_rate * b.workforce_assigned;
+                float cur_margin = 0.0f;
+                (void)recipe_margin_obtainable(w, reg, reach(), b.tile, b.recipe, sw_pool,
+                                               sw_batches, bid, cur_margin);
                 const int   n          = reg.recipe_count(building_type::processing_facility);
                 uint16_t best_id = b.recipe;
                 float    best_m  = cur_margin;
@@ -1608,7 +1701,12 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // one, above.
                     if (rc.group != cur_rc->group)
                         continue;
-                    const float m = recipe_margin(w, reg, b.tile, rid);
+                    if (rid == b.recipe)
+                        continue; // the incumbent is best_m's starting point
+                    float m = 0.0f;
+                    if (!recipe_margin_obtainable(w, reg, reach(), b.tile, rid, sw_pool,
+                                                  sw_batches, bid, m))
+                        continue; // BL-1187: never switch onto inputs it cannot get
                     if (m > best_m) { best_m = m; best_id = rid; }
                 }
                 if (best_id != b.recipe)

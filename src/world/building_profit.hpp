@@ -3,6 +3,7 @@
 #include "economy_system.hpp" // economy_report
 #include "entity.hpp"
 
+#include <array>
 #include <cstdint>
 
 struct world;
@@ -90,8 +91,18 @@ building_profit estimate_building_profit(const world& w, const recipe_registry& 
 ///                  Pass `nullptr` (the default) for a genuinely hypothetical
 ///                  building; that is the construction ledger's case and its
 ///                  numbers are unchanged.
+///
+/// @param input_unit_cost Optional (BL-1187, build only what runs). Per-unit cost
+///                  of each recipe INPUT, overriding the posted price at the
+///                  tile's market — the OBTAINABLE cost `input_reach.hpp`
+///                  answers (the posted price where the stock is at hand, the
+///                  landed cost from a producer within reach otherwise). Outputs
+///                  are still valued at the posted price. Pass `nullptr` (the
+///                  default) to price inputs at the posted price, as the
+///                  construction ledger does.
 building_profit estimate_prospective_profit(const world& w, const recipe_registry& reg,
                                             entity_id tile_id, building_type type,
                                             resource_type target,
                                             std::uint16_t recipe_id = no_recipe,
-                                            const building_component* existing = nullptr);
+                                            const building_component* existing = nullptr,
+                                            const std::array<float, resource_count>* input_unit_cost = nullptr);
