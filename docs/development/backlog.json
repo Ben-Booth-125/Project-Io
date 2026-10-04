@@ -1408,7 +1408,7 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": null,
+   "sprint": 49,
    "written": "2026-10-04",
    "requires": [
     "BL-1186"
@@ -1419,14 +1419,14 @@
    "short_name": "CONVOY_LANE_FOLLOWS_LEGS",
    "author": "Claude (the BL-1186 routing lane, 2026-10-04)",
    "category": "Economy",
-   "priority": "B",
+   "priority": "A",
    "difficulty": 2,
    "title": "A convoy is drawn, seen and interdicted along the legs it actually travels",
    "authority_doc": "docs/economy/SUPPLY.md",
    "files": [
     "src/world/supply_system.cpp"
    ],
-   "design": "After BL-1186 routes water crossings as land -> port -> sea -> port -> land, convoy_route_tiles still lays the lane as the direct centre-to-centre path, so the vision beam, the convoy's drawn position and interdiction all read a route the cargo does not take. Make convoy_route_tiles return the leg route."
+   "design": "PULLED INTO SPRINT 49 (2026-10-04, the BL-1186 cold review): not only drawing - position, vision and interdiction read the unconfined centre-to-centre path, so a land-fallback convoy is interdicted on water it never enters and immune on the land it crosses, a capture credits the pool of a water tile, and a hostile unit on a sea route's inland leg never intercepts. A gameplay error until fixed.\n\nAfter BL-1186 routes water crossings as land -> port -> sea -> port -> land, convoy_route_tiles still lays the lane as the direct centre-to-centre path, so the vision beam, the convoy's drawn position and interdiction all read a route the cargo does not take. Make convoy_route_tiles return the leg route."
   },
   {
    "status": "designed",
