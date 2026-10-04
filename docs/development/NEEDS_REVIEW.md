@@ -45,18 +45,21 @@ tools/verify/rebless_shape_probe.cpp measures the world's shape (centres, scales
 
 *Files: `tools/verify/rebless_shape_probe.cpp`*
 
-### NR-967 — DECISION TAKEN: the growth basket is the household basket, no second list (BL-1163)
-*decision · raised 2026-10-04 · from the sprint 49 main session (Ben: "I'll also trust your judgement")*
+### NR-967 — CALL (was a decision taken): the household growth basket is right, and households are unserved - merge, hold, or reweight? (BL-1163)
+*question · raised 2026-10-04 · from the sprint 49 main session (Ben: "I'll also trust your judgement")*
 
 Your 2026-10-03 ruling left the basket's contents to a short design pass. Taken: the goods and weights a centre grows on are exactly the basket it already bids into its market (shared tranche food rations 0.60 / agricultural produce 0.20 / water 0.30, plus the industrial tranche clean water 0.35 / consumer goods 0.25 / medical supplies 0.15, or the ancient tranche). The met ratio is the share of the centre's own population bid its market filled. economy.lua population_growth.demand_basket (food, agri, steel, water, refined fuel, iron ore, petroleum) retires. Threshold stays 0.50. Written into POPULATION.md.
 
+BUILT AND HELD UNMERGED (2026-10-04, 26cb6cbe on worktree-agent-a7a4ad16f983163e4; population_mvp ALL PASS 16): the per-market household gate reads the world correctly and the world fails it. centre_decline_trace, 400 play ticks: before, every centre declines from ~t180-260 (seed 0 heads 64.1M -> 76.7M -> 44.7M); after, every centre declines from the settle (seed 0 61.8M -> 32.4M -> 14.9M; seeds 10/41/43 alike), median met 0.10-0.11 at t400, never more than 70 centres at >= 0.50. Cause: water, clean water and medical supplies are supplied 0 on every seed (one exception, gone by t400), consumer goods fall to ~0 by t~100, food rations run 25-45% of demand. Those three zero goods carry 0.80 of the basket's 1.85 weight, so the best reachable ratio is 0.57 even with food and consumer goods met. The lane also defined the household fill as PRO-RATA (households get min(1, supply/demand) like every bidder; no new saved field) - a decision taken, alternatives being households first or last, each needing a saved per-market household record.
+
 **Why it matters.** One basket is legible (what a city eats is what makes it grow) and cannot drift from the bid. The cost: a good that is in the bid but rarely made (medical supplies on some seeds) now weighs on growth; if it pins centres low, the weights are the dial.
 
-- A: keep it (one basket, the bid's own weights)
-- B: one basket but its own weights (food heavier)
-- C: other
+- A: HOLD BL-1163 unmerged until households are supplied (BL-1193, household goods unsupplied, diagnoses why first); the old body-wide gate stays live meanwhile
+- B: merge now with weights on food only until BL-1193 lands (honest about what is made; reweight later)
+- C: merge as built - centres shrink from day 1 and the shortage is the signal the market should answer
+- D: other
 
-> **Recommendation:** A.
+> **Recommendation:** A. The gate is right and the world is wrong; merging it now would shrink every world from the settle and move the start, before the supply side is even diagnosed. Pro-rata fill: keep it (no new saved field, and no doc states a priority).
 
 *Files: `docs/economy/POPULATION.md`, `scripts/economy.lua`, `src/world/economy_system.cpp`*
 
