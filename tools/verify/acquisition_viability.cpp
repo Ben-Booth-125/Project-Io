@@ -1182,13 +1182,14 @@ int main(int argc, char** argv)
                 "gen -> close | rival units | mean rival net\n");
     std::printf("  -----+--------+-----------------------------+----------------"
                 "---------------+-------------+---------------\n");
-    int tot_rivals = 0, tot_solv_seat = 0, tot_solv_close = 0;
+    int tot_rivals = 0, tot_rivals_seat = 0, tot_solv_seat = 0, tot_solv_close = 0;
     int tot_hold_gen = 0, tot_hold_close = 0, tot_units = 0;
     for (const seed_row& r : rows)
     {
         if (r.seated == null_entity)
             continue;
         tot_rivals     += r.field_close.rivals;
+        tot_rivals_seat += r.field_seat.rivals;
         tot_solv_seat  += r.field_seat.solvent;
         tot_solv_close += r.field_close.solvent;
         tot_hold_gen   += r.field_holdings_gen;
@@ -1204,7 +1205,12 @@ int main(int argc, char** argv)
                     r.field_close.rivals > 0
                         ? r.field_close.net_sum / r.field_close.rivals : 0.0);
     }
-    const double solv_seat_pct  = tot_rivals > 0 ? 100.0 * tot_solv_seat  / tot_rivals : 0.0;
+    // Each share over its OWN moment's rival count. The seat share used to be
+    // divided by the CLOSE count, and acquisitions (the only way a corp leaves,
+    // see CONSOLIDATION below) shrink the field between the two, so it printed
+    // above 100% (100.9% on seeds 0-7, 2026-10-04) - a bookkeeping slip, not a
+    // definition. R4's assertion reads the close count and is unaffected.
+    const double solv_seat_pct  = tot_rivals_seat > 0 ? 100.0 * tot_solv_seat / tot_rivals_seat : 0.0;
     const double solv_close_pct = tot_rivals > 0 ? 100.0 * tot_solv_close / tot_rivals : 0.0;
     std::printf("\n  rival solvency %.1f%% at the seat -> %.1f%% at the close\n",
                 solv_seat_pct, solv_close_pct);
