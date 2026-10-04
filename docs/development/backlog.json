@@ -1178,14 +1178,16 @@
    "files": [
     "tools/verify/"
    ],
-   "design": "Sprint 49 wave 0. One instrument over the 16 curated seeds on the shipped start, reporting per seed and pooled: processors running and input-starved at handoff and at tick 50; field income per tick at tick 50 against the settle close (the run-rate, not the stock auction); the seat corp's operating net and whether its processors run; firms alive at tick 400; markets clearing nothing in the first play year. It reads and reports; the targets are Ben's (the sprint 49 form). Built from the harnesses the reading used, so it is one command, not five; wrapping it as a skill needs Ben's permission. Every other sprint 49 item is judged against it.\n\nREADING (2026-10-04, main a56e4ce3, 16 curated seeds, shipped 1960 start, 12 settle + 400 play ticks; spawn_solvency, firm_attrition_trace, centre_decline_trace, market_census, recipe_margin, and steel_chain_probe on seeds 0/43/37): recipe_margin is green in both bands. Day 1 looks solvent (99-100% of firms, +94..+211/qtr each) but the settle is opening stock being auctioned: field income 54-74k/tick at the settle close, 10-19k by tick 50 on every seed. At handoff 119-141 of ~225 processors are input-starved (copper refining, alloys, machinery, electronics, spacecraft never run); 10k steel sits on shelves against demand of 12 while 0 shipments go (135 pairs unroutable, 52 refused by the price gate); by tick 20 steel is 6 supply vs 5,187 demand with coal unbought one market away. Processors grow 225 -> 390 while those running fall to 44-67. 1,457 of 2,074 firms are insolvent by tick 400 (corps 121-149 -> 19-77). Insolvent firms per tick: income 75, maintenance+wages 46, upkeep 19; survivors 229 / 63 / 21. The seat is handed a steel mill (recipe 0) that idles on every seed; seat median operating net ~+66/qtr, four seeds under +7."
+   "design": "RULED (Ben, the sprint 49 form, 2026-10-04): the targets, pooled over the 16 curated seeds: at least 70% of processors running at handoff; field income per tick at tick 50 at least 50% of the settle close; at least 70% of firms alive at tick 400. The sweep becomes a skill (permission given).\n\nSprint 49 wave 0. One instrument over the 16 curated seeds on the shipped start, reporting per seed and pooled: processors running and input-starved at handoff and at tick 50; field income per tick at tick 50 against the settle close (the run-rate, not the stock auction); the seat corp's operating net and whether its processors run; firms alive at tick 400; markets clearing nothing in the first play year. It reads and reports; the targets are Ben's (the sprint 49 form). Built from the harnesses the reading used, so it is one command, not five; wrapping it as a skill needs Ben's permission. Every other sprint 49 item is judged against it.\n\nREADING (2026-10-04, main a56e4ce3, 16 curated seeds, shipped 1960 start, 12 settle + 400 play ticks; spawn_solvency, firm_attrition_trace, centre_decline_trace, market_census, recipe_margin, and steel_chain_probe on seeds 0/43/37): recipe_margin is green in both bands. Day 1 looks solvent (99-100% of firms, +94..+211/qtr each) but the settle is opening stock being auctioned: field income 54-74k/tick at the settle close, 10-19k by tick 50 on every seed. At handoff 119-141 of ~225 processors are input-starved (copper refining, alloys, machinery, electronics, spacecraft never run); 10k steel sits on shelves against demand of 12 while 0 shipments go (135 pairs unroutable, 52 refused by the price gate); by tick 20 steel is 6 supply vs 5,187 demand with coal unbought one market away. Processors grow 225 -> 390 while those running fall to 44-67. 1,457 of 2,074 firms are insolvent by tick 400 (corps 121-149 -> 19-77). Insolvent firms per tick: income 75, maintenance+wages 46, upkeep 19; survivors 229 / 63 / 21. The seat is handed a steel mill (recipe 0) that idles on every seed; seat median operating net ~+66/qtr, four seeds under +7."
   },
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": null,
+   "sprint": 49,
    "written": "2026-10-04",
-   "requires": [],
+   "requires": [
+    "BL-1186"
+   ],
    "blocked_on": null,
    "parked": false,
    "id": "BL-1185",
@@ -1200,7 +1202,7 @@
     "src/world/landscape_search.cpp",
     "src/world/corporation_generation.cpp"
    ],
-   "design": "GENERATION CHANGE, offered for a later sprint (Ben, 2026-10-04: generation changes are considered separately). The landscape search's winner hands play 119-141 input-starved processors of ~225 (seeds 0/43/37): whole chains (copper refining, alloys, machinery, electronics, spacecraft) have no input producer anywhere reachable, and coal is extracted in one market while steel mills stand in ten. Design question for Ben: a HARD placement rule (no processor without a reachable producer of each input) or a heavier chain-completeness term in the search score (which keeps viable-but-uneven). Reach is the same reach BL-1186 (goods cross markets) settles, so that diagnosis comes first.\n\nREADING (2026-10-04, main a56e4ce3, 16 curated seeds, shipped 1960 start, 12 settle + 400 play ticks; spawn_solvency, firm_attrition_trace, centre_decline_trace, market_census, recipe_margin, and steel_chain_probe on seeds 0/43/37): recipe_margin is green in both bands. Day 1 looks solvent (99-100% of firms, +94..+211/qtr each) but the settle is opening stock being auctioned: field income 54-74k/tick at the settle close, 10-19k by tick 50 on every seed. At handoff 119-141 of ~225 processors are input-starved (copper refining, alloys, machinery, electronics, spacecraft never run); 10k steel sits on shelves against demand of 12 while 0 shipments go (135 pairs unroutable, 52 refused by the price gate); by tick 20 steel is 6 supply vs 5,187 demand with coal unbought one market away. Processors grow 225 -> 390 while those running fall to 44-67. 1,457 of 2,074 firms are insolvent by tick 400 (corps 121-149 -> 19-77). Insolvent firms per tick: income 75, maintenance+wages 46, upkeep 19; survivors 229 / 63 / 21. The seat is handed a steel mill (recipe 0) that idles on every seed; seat median operating net ~+66/qtr, four seeds under +7."
+   "design": "RULED (Ben, the sprint 49 form, 2026-10-04): pulled INTO sprint 49, and a HARD RULE, not a search score: no processor is placed without a producer of each of its inputs within reach. \"Within reach\" is the reach BL-1186 (goods cross markets) diagnoses, so BL-1186's diagnosis lands first.\n\nGENERATION CHANGE, pulled into sprint 49 (Ben, 2026-10-04: generation changes are considered separately). The landscape search's winner hands play 119-141 input-starved processors of ~225 (seeds 0/43/37): whole chains (copper refining, alloys, machinery, electronics, spacecraft) have no input producer anywhere reachable, and coal is extracted in one market while steel mills stand in ten. Design question for Ben: a HARD placement rule (no processor without a reachable producer of each input) or a heavier chain-completeness term in the search score (which keeps viable-but-uneven). Reach is the same reach BL-1186 (goods cross markets) settles, so that diagnosis comes first.\n\nREADING (2026-10-04, main a56e4ce3, 16 curated seeds, shipped 1960 start, 12 settle + 400 play ticks; spawn_solvency, firm_attrition_trace, centre_decline_trace, market_census, recipe_margin, and steel_chain_probe on seeds 0/43/37): recipe_margin is green in both bands. Day 1 looks solvent (99-100% of firms, +94..+211/qtr each) but the settle is opening stock being auctioned: field income 54-74k/tick at the settle close, 10-19k by tick 50 on every seed. At handoff 119-141 of ~225 processors are input-starved (copper refining, alloys, machinery, electronics, spacecraft never run); 10k steel sits on shelves against demand of 12 while 0 shipments go (135 pairs unroutable, 52 refused by the price gate); by tick 20 steel is 6 supply vs 5,187 demand with coal unbought one market away. Processors grow 225 -> 390 while those running fall to 44-67. 1,457 of 2,074 firms are insolvent by tick 400 (corps 121-149 -> 19-77). Insolvent firms per tick: income 75, maintenance+wages 46, upkeep 19; survivors 229 / 63 / 21. The seat is handed a steel mill (recipe 0) that idles on every seed; seat median operating net ~+66/qtr, four seeds under +7."
   },
   {
    "status": "proposed",
@@ -1252,7 +1254,7 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": null,
+   "sprint": 49,
    "written": "2026-10-04",
    "requires": [],
    "blocked_on": null,
@@ -1268,12 +1270,12 @@
    "files": [
     "src/world/corporation_generation.cpp"
    ],
-   "design": "GENERATION CHANGE, offered for a later sprint. On every seed the seat is handed one processing facility on recipe 0, the steel mill (iron ore + coal); it idles every quarter on seeds 46, 43, 32, 25 and 9 and most quarters elsewhere, because coal is produced in one market. Seat median operating net ~+66/qtr against the field's ~+130; seeds 40, 13, 32 and 46 sit between +0.7 and +6.9. Pick the seat's recipe (or site) so its inputs are produced within reach, or hand it the input extraction beside it. A special case of BL-1185, cheap enough to land first."
+   "design": "RULED (Ben, the sprint 49 form, 2026-10-04): pulled into sprint 49.\n\nGENERATION CHANGE, pulled into sprint 49. On every seed the seat is handed one processing facility on recipe 0, the steel mill (iron ore + coal); it idles every quarter on seeds 46, 43, 32, 25 and 9 and most quarters elsewhere, because coal is produced in one market. Seat median operating net ~+66/qtr against the field's ~+130; seeds 40, 13, 32 and 46 sit between +0.7 and +6.9. Pick the seat's recipe (or site) so its inputs are produced within reach, or hand it the input extraction beside it. A special case of BL-1185, cheap enough to land first."
   },
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": null,
+   "sprint": 49,
    "written": "2026-10-04",
    "requires": [],
    "blocked_on": null,
@@ -1289,7 +1291,7 @@
    "files": [
     "src/world/corporation_generation.cpp"
    ],
-   "design": "GENERATION CHANGE, offered for a later sprint. The settle closes at 54-74k field income per tick and play runs at 10-19k by tick 50: the difference is opening pools sold into no demand (seed 0 settle: 12k steel per tick at 0.86x base against local demand of 12). It flatters day 1, floods shelves, and BL-1173 prices working capital off the same pools. Size opening stock to a few ticks of the pooled market's demand, then re-read BL-1173's fraction."
+   "design": "RULED (Ben, the sprint 49 form, 2026-10-04): pulled into sprint 49.\n\nGENERATION CHANGE, pulled into sprint 49. The settle closes at 54-74k field income per tick and play runs at 10-19k by tick 50: the difference is opening pools sold into no demand (seed 0 settle: 12k steel per tick at 0.86x base against local demand of 12). It flatters day 1, floods shelves, and BL-1173 prices working capital off the same pools. Size opening stock to a few ticks of the pooled market's demand, then re-read BL-1173's fraction."
   },
   {
    "status": "proposed",
@@ -1311,6 +1313,27 @@
     "src/world/market_generation.cpp"
    ],
    "design": "GENERATION CHANGE, offered for a later sprint. market_census (16 seeds): 180 of 436 markets (41%) have no building in their catchment at handoff and 83 (19%) clear nothing over the first play year (shells 27.5%, carve 15.4%). Either the carve accounts for where firms stand, or placement seeds every market. Re-read after BL-1185 and BL-1186, which may shrink it on their own."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 49,
+   "written": "2026-10-04",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1191",
+   "short_name": "UPKEEP_RETUNE_STOPGAP",
+   "author": "Claude (Ben's sprint 49 form, 2026-10-04)",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 2,
+   "title": "Retune standing-force upkeep so a firm under no threat is not bled by its own guard",
+   "authority_doc": "docs/economy/FINANCE.md",
+   "files": [
+    "scripts/economy.lua"
+   ],
+   "design": "RULED (Ben, the sprint 49 form, 2026-10-04): retune the upkeep rates as a STOPGAP; BL-1174 (hiring answers a threat) stays the real fix and waits on its AI grant (sprint 50). READING (2026-10-04, 16 seeds, 400 play ticks): standing-force upkeep is ~20 per tick for every firm, survivor or not (insolvent 19.2, alive 21.3 per corp-tick), against income of 75 for firms that go insolvent (a quarter of it) and 229 for survivors; seed 43 field upkeep 4,350 per tick at tick 100 against income 12,573. Constants only (economy.military.unit_upkeep, the credit and goods halves, the hire cap of 3), no scorer change, so no grant is touched. Measure the retune on BL-1184 (market viability gate) in isolation; a world-mover, so it reports its digest movement and leaves the re-bless to the wave."
   }
  ]
 }
