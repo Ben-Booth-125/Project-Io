@@ -187,7 +187,23 @@ constexpr int k_settle_ticks = 12;
 // Whether R1 should read a pre-buy window longer than one quarter is this
 // harness's question, not the settle's; it is reported, not changed.
 
-constexpr int k_r1_window  = 8;   ///< Quarters R1 reads for its trend. Two years.
+/// Quarters R1 reads for its trend. Two years. A FIXED window of live play,
+/// and no buy fires before it closes (Ben, 2026-10-04, ruling option A).
+///
+/// WHY FIXED. R1 used to read "the pre-buy segment", whose length was however
+/// long the seat took to afford gate A. On 4 of 8 seeds that was ONE quarter,
+/// so the row was the sign of a single quarter's net - and a single quarter
+/// is noise: on seed 0 a ~46 cr input purchase lands every fourth quarter, and
+/// whether it fell in quarter 1 decided the seed. BL-1173 (working capital)
+/// shifted which quarter that was on two seeds and turned R1 red (5/8 -> 3/8)
+/// while the 8- and 24-quarter verdicts were 5/8 with and without it. A row
+/// that flips on where a periodic purchase lands measures nothing.
+///
+/// WHAT IT COSTS. The buy waits for the window: R2's "quarters to afford" is
+/// still the first quarter each gate became affordable (recorded every
+/// quarter, unchanged), but the VERB fires at quarter k_r1_window at the
+/// earliest, so R3's run-on starts later than it did.
+constexpr int k_r1_window  = 8;
 
 /// BL-573: run_nation_step's template registry. Empty is correct — nothing in
 /// this sweep opens a mercenary contract, so the walk is vacuous.
@@ -657,6 +673,10 @@ seed_row run_seed(uint32_t seed, recipe_registry& reg, bool prehistory,
         }
 
         // --- fire the verb on the selected gate ------------------------------
+        // Not before R1's fixed window has closed (k_r1_window, Ben 2026-10-04):
+        // R1 reads k_r1_window quarters of live play that no buy has touched.
+        if (q + 1 < k_r1_window)
+            continue;
         const target_quote& fire = (mode == buy_mode::priced) ? qp : qc;
         if (!fire.found || cc.balance < fire.price)
             continue;
@@ -686,13 +706,17 @@ seed_row run_seed(uint32_t seed, recipe_registry& reg, bool prehistory,
         r.holdings_before = static_cast<int>(cc.assets.size());
     }
 
-    // R1's trend, over the whole pre-buy segment of the trajectory. "Climbing"
-    // is a comparison of two ends, not a sign test at one instant.
+    // R1's trend, over the FIXED window: the seat against the close of quarter
+    // k_r1_window (or the last quarter run, if --search is shorter). No buy can
+    // fall inside it (see the fire guard above). "Climbing" is a comparison of
+    // two ends, not a sign test at one instant.
     if (!r.balance_trace.empty())
     {
+        const std::size_t n_read = std::min<std::size_t>(r.balance_trace.size(),
+                                                         static_cast<std::size_t>(k_r1_window));
         r.r1_open  = r.seat_balance;
-        r.r1_close = r.balance_trace.back();
-        const double n = static_cast<double>(r.balance_trace.size());
+        r.r1_close = r.balance_trace[n_read - 1];
+        const double n = static_cast<double>(n_read);
         r.r1_per_qtr = static_cast<float>((r.r1_close - r.r1_open) / n);
         r.accumulates = r.r1_close > r.r1_open;
     }
@@ -960,8 +984,9 @@ int main(int argc, char** argv)
     // R1 — does the seated corp accumulate?
     // =====================================================================
     std::printf("\n=== R1  DOES THE SEATED CORPORATION ACCUMULATE? ===\n");
-    std::printf("  The balance at the seat against the balance at the end of the "
-                "pre-buy segment.\n"
+    std::printf("  The balance at the seat against the balance after a FIXED %d quarters "
+                "of live play, no buy inside it (Ben, 2026-10-04).\n", k_r1_window);
+    std::printf(""
                 "  Climbing is the claim; a positive number at one instant is not.\n\n");
     std::printf("  seed  seated corporation          hold  short/spec |     at seat"
                 "    at close   cr/qtr | climbs\n");
@@ -1009,7 +1034,7 @@ int main(int argc, char** argv)
           "every seed seated a corporation (the reading is non-vacuous)");
     check_on_real_spawn(seated_ok > 0 && climbing * 2 > seated_ok, "R1",
           "the seated corporation ACCUMULATES on a majority of seeds — its balance "
-          "at the close of the pre-buy segment is above its balance at the seat");
+          "after the fixed 8-quarter pre-buy window is above its balance at the seat");
 
     // =====================================================================
     // R2 — THE GATE
@@ -1182,13 +1207,14 @@ int main(int argc, char** argv)
                 "gen -> close | rival units | mean rival net\n");
     std::printf("  -----+--------+-----------------------------+----------------"
                 "---------------+-------------+---------------\n");
-    int tot_rivals = 0, tot_solv_seat = 0, tot_solv_close = 0;
+    int tot_rivals = 0, tot_rivals_seat = 0, tot_solv_seat = 0, tot_solv_close = 0;
     int tot_hold_gen = 0, tot_hold_close = 0, tot_units = 0;
     for (const seed_row& r : rows)
     {
         if (r.seated == null_entity)
             continue;
         tot_rivals     += r.field_close.rivals;
+        tot_rivals_seat += r.field_seat.rivals;
         tot_solv_seat  += r.field_seat.solvent;
         tot_solv_close += r.field_close.solvent;
         tot_hold_gen   += r.field_holdings_gen;
@@ -1204,7 +1230,12 @@ int main(int argc, char** argv)
                     r.field_close.rivals > 0
                         ? r.field_close.net_sum / r.field_close.rivals : 0.0);
     }
-    const double solv_seat_pct  = tot_rivals > 0 ? 100.0 * tot_solv_seat  / tot_rivals : 0.0;
+    // Each share over its OWN moment's rival count. The seat share used to be
+    // divided by the CLOSE count, and acquisitions (the only way a corp leaves,
+    // see CONSOLIDATION below) shrink the field between the two, so it printed
+    // above 100% (100.9% on seeds 0-7, 2026-10-04) - a bookkeeping slip, not a
+    // definition. R4's assertion reads the close count and is unaffected.
+    const double solv_seat_pct  = tot_rivals_seat > 0 ? 100.0 * tot_solv_seat / tot_rivals_seat : 0.0;
     const double solv_close_pct = tot_rivals > 0 ? 100.0 * tot_solv_close / tot_rivals : 0.0;
     std::printf("\n  rival solvency %.1f%% at the seat -> %.1f%% at the close\n",
                 solv_seat_pct, solv_close_pct);
