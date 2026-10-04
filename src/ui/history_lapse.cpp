@@ -384,6 +384,38 @@ void apply_road_promotions(std::vector<lapse_road_seg>& segs, const era_timelaps
     }
 }
 
+/// The lane sibling of `apply_road_promotions`: apply a record's
+/// `sea_lane_opened` events to a lane set -- the one walk both the bake and
+/// `lapse_lanes_at_close` take, so the lanes a round hands on are the lanes it
+/// drew. A pair the set does not hold yet opens at the event's year; a pair it
+/// holds (carried in, or a second note) only ever moves its year EARLIER. The
+/// pairs and years only; geometry is the bake's. Pairs outside
+/// [0, @p region_count) are skipped.
+void apply_lane_openings(std::vector<lapse_lane_seg>& segs, const era_timelapse& t,
+                         std::size_t region_count)
+{
+    for (const lapse_event& e : t.events)
+    {
+        if (e.kind != static_cast<uint8_t>(lapse_event_kind::sea_lane_opened)) continue;
+        if (e.region == lapse_event_none || e.other == lapse_event_none) continue;
+        const uint16_t a = e.region, b = e.other; // note_sea_leg: region = lo, other = hi
+        if (static_cast<std::size_t>(a) >= region_count
+         || static_cast<std::size_t>(b) >= region_count) continue;
+        auto it = std::find_if(segs.begin(), segs.end(),
+                               [&](const lapse_lane_seg& s) { return s.region_a == a && s.region_b == b; });
+        if (it == segs.end())
+        {
+            lapse_lane_seg seg;
+            seg.region_a  = a;
+            seg.region_b  = b;
+            seg.year_open = e.year;
+            segs.push_back(std::move(seg));
+        }
+        else
+            it->year_open = std::min(it->year_open, e.year);
+    }
+}
+
 /// BL-1092: the KIN arrow's dash threshold -- how many INTERIOR water tiles the
 /// straight line between two foundings' anchors must sample before the arrow is
 /// dashed as a crossing. The sampler is `finish_history_lapse`'s own
@@ -1341,32 +1373,30 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
 
     // --- Sea lanes (BL-1097), baked once -------------------------------------
     //
-    // Built from `sea_lane_opened` events alone, one segment per DISTINCT
-    // (a, b) pair, anchor centre to anchor centre — the road bake's idiom on
-    // the water. A leg the era only crossed once or twice never gets an event
-    // and never gets a segment. The lane tier has one rung, so the first event
-    // for a pair is the whole story and a second (a resumed span re-noting
-    // would be a sim bug, not a fixture case) is ignored.
-    h.lane_segs.clear();
-    for (const lapse_event& e : h.lapse.events)
+    // Built from `sea_lane_opened` events, one segment per DISTINCT (a, b)
+    // pair, anchor centre to anchor centre -- the road bake's idiom on the
+    // water. A leg the era only crossed once or twice never gets an event and
+    // never gets a segment. The lanes START from the ones the rounds before
+    // this one opened (`lane_carry`; a resumed span never re-notes a lane it
+    // inherited), and this record's openings land on top -- one walk, shared
+    // with `lapse_lanes_at_close`, so the lanes a round hands on are the lanes
+    // it drew. Anchors are then drawn for every lane alike against THIS
+    // round's regions.
+    h.lane_segs = h.lane_carry;
+    apply_lane_openings(h.lane_segs, h.lapse, h.region_col.size());
+    h.lane_segs.erase(std::remove_if(h.lane_segs.begin(), h.lane_segs.end(),
+                                     [&](const lapse_lane_seg& s) {
+                                         return static_cast<std::size_t>(s.region_a) >= h.region_col.size()
+                                             || static_cast<std::size_t>(s.region_b) >= h.region_col.size();
+                                     }),
+                      h.lane_segs.end());
+    for (lapse_lane_seg& seg : h.lane_segs)
     {
-        if (e.kind != static_cast<uint8_t>(lapse_event_kind::sea_lane_opened)) continue;
-        if (e.region == lapse_event_none || e.other == lapse_event_none) continue;
-        const uint16_t a = e.region, b = e.other; // note_sea_leg: region = lo, other = hi
-        if (static_cast<std::size_t>(a) >= h.region_col.size()
-         || static_cast<std::size_t>(b) >= h.region_col.size()) continue;
-        const bool seen = std::any_of(h.lane_segs.begin(), h.lane_segs.end(),
-                                      [&](const lapse_lane_seg& s) { return s.region_a == a && s.region_b == b; });
-        if (seen) continue;
-        lapse_lane_seg seg;
-        seg.region_a  = a;
-        seg.region_b  = b;
+        const uint16_t a = seg.region_a, b = seg.region_b;
         seg.c0 = static_cast<float>(h.region_col[a]) + 0.5f;
         seg.r0 = static_cast<float>(h.region_row[a]) + 0.5f;
         seg.c1 = lapse_unwrap_col(seg.c0, static_cast<float>(h.region_col[b]) + 0.5f, gw);
         seg.r1 = static_cast<float>(h.region_row[b]) + 0.5f;
-        seg.year_open = e.year;
-        h.lane_segs.push_back(seg);
     }
 
     // --- The lanes' SEA PATHS (Ben, 2026-10-03: "sea lanes should always go
@@ -1379,12 +1409,13 @@ void finish_history_lapse(history_lapse& h, const uint8_t* packed, std::size_t p
     // seat, the realm read as the region's holder at this record's close);
     // the walk is `sea_lane_walk` over ocean and coast on four cardinal steps,
     // priced with the current at the span's own weight; and it runs toward
-    // the port more of this round's lanes land on, a tie from the lower
-    // raster index. A REPLAY, NEVER A RE-RUN still holds: this reads the
+    // the port more of this round's lanes (carried ones included) land on, a
+    // tie from the lower raster index. A REPLAY, NEVER A RE-RUN still holds: this reads the
     // record's ends and the ground, and decides nothing the record did not.
     // It can differ from the campaign field in one way only -- the stamp
     // counts the busier port over the LAST span's legs and realms, the lapse
-    // over its own round's -- and either way every tile it draws on is sea.
+    // over the lanes this round draws -- and either way every tile it draws
+    // on is sea.
     if (!h.lane_segs.empty())
     {
         std::vector<terrain_substrate> substrate(n);
@@ -2818,8 +2849,7 @@ void draw_lapse_map(const history_lapse& h, const std::vector<uint16_t>& slice,
     std::vector<ImVec2> lane_pts;
     for (const lapse_lane_seg& s : h.lane_segs)
     {
-        if (year < s.year_open) continue; // not yet a lane at this playhead
-        if (s.path_c.size() < 2) continue; // no water joins its ports: nothing laid
+        if (!lapse_lane_drawn(s, year)) continue; // not yet a lane, or no water joins its ports
         float lo = s.path_c.front(), hi = lo;
         for (const float c : s.path_c) { lo = std::min(lo, c); hi = std::max(hi, c); }
         const auto stroke = [&](float shift) {
@@ -4253,12 +4283,36 @@ std::vector<lapse_road_seg> lapse_roads_at_close(const history_lapse& h)
     return roads;
 }
 
+std::vector<lapse_lane_seg> lapse_lanes_at_close(const history_lapse& h)
+{
+    std::vector<lapse_lane_seg> lanes = h.lane_carry;
+    apply_lane_openings(lanes, h.lapse, h.region_col.size());
+    // The pairs and the opening years are the hand-over; the anchors and the
+    // sea path are the successor's to draw.
+    for (lapse_lane_seg& s : lanes)
+    {
+        s.c0 = s.r0 = s.c1 = s.r1 = 0.0f;
+        s.path_c.clear();
+        s.path_r.clear();
+    }
+    return lanes;
+}
+
 std::vector<std::pair<uint16_t, uint16_t>> lapse_roads_drawn_at(const history_lapse& h, int year)
 {
     std::vector<std::pair<uint16_t, uint16_t>> out;
     if (!h.derived()) return out;
     for (const lapse_road_seg& s : h.road_segs)
         if (lapse_road_drawn(s, year)) out.emplace_back(s.region_a, s.region_b);
+    return out;
+}
+
+std::vector<std::pair<uint16_t, uint16_t>> lapse_lanes_drawn_at(const history_lapse& h, int year)
+{
+    std::vector<std::pair<uint16_t, uint16_t>> out;
+    if (!h.derived()) return out;
+    for (const lapse_lane_seg& s : h.lane_segs)
+        if (lapse_lane_drawn(s, year)) out.emplace_back(s.region_a, s.region_b);
     return out;
 }
 

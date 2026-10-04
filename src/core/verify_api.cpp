@@ -2000,6 +2000,23 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["keys"]    = keys;
         return out;
     });
+    // The sea lanes the CURRENT lapse round's map draws at its playhead --
+    // `ui::lapse_lanes_drawn_at`, the lane pass's own predicate -- as
+    // `history_roads` reads roads: { count, carried, keys }, `carried` how many
+    // lanes the round before handed over (`lane_carry`). Region indices only.
+    v.set_function("history_lanes", [this]() {
+        sol::table out = m_lua.state().create_table();
+        sol::table keys = m_lua.state().create_table();
+        const int i = wizard_lapse_index();
+        const ui::history_lapse& h = m_wiz_history[i];
+        const auto drawn = ui::lapse_lanes_drawn_at(h, m_wiz_history_year[i]);
+        for (const auto& p : drawn)
+            keys[std::to_string(p.first) + "-" + std::to_string(p.second)] = true;
+        out["count"]   = static_cast<int>(drawn.size());
+        out["carried"] = static_cast<int>(h.lane_carry.size());
+        out["keys"]    = keys;
+        return out;
+    });
     v.set_function("history_kin", [this]() {
         const int i = wizard_lapse_index();
         const ui::history_lapse& h = m_wiz_history[i];

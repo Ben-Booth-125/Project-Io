@@ -605,6 +605,7 @@ void app::launch_wizard_history_run(int lapse_index, bool live_under_verify)
         cur.hard_carry = ui::lapse_hard_at_close(prev);
         cur.civ_carry  = ui::lapse_civ_marks_at_close(prev); // BL-1094
         cur.road_carry = ui::lapse_roads_at_close(prev);     // BL-1134: the roads the rounds before laid
+        cur.lane_carry = ui::lapse_lanes_at_close(prev);     // and the sea lanes they opened
     };
     inherit_hard();
     // Sentinel, not 0: a signed calendar year of 0 is a real year (0 CE), so
@@ -1255,6 +1256,7 @@ void app::land_wizard_record(int i, ui::history_lapse record)
             cur.hard_carry = ui::lapse_hard_at_close(prev);
             cur.civ_carry  = ui::lapse_civ_marks_at_close(prev); // BL-1094: the diamonds stay
             cur.road_carry = ui::lapse_roads_at_close(prev);     // BL-1134: and the roads
+            cur.lane_carry = ui::lapse_lanes_at_close(prev);     // and the sea lanes
             cur.tile_region.clear();
         }
     }
@@ -1286,6 +1288,7 @@ void app::land_wizard_record(int i, ui::history_lapse record)
         nxt.hard_carry = ui::lapse_hard_at_close(prev);
         nxt.civ_carry  = ui::lapse_civ_marks_at_close(prev);
         nxt.road_carry = ui::lapse_roads_at_close(prev); // BL-1134: the roads carry too
+        nxt.lane_carry = ui::lapse_lanes_at_close(prev); // and the sea lanes
         nxt.tile_region.clear();
         std::printf("[identity] round %d re-pinned from round %d's landing (it was already open)\n",
                     i + 1 + wizard_planetology_round_count + 1, i + wizard_planetology_round_count + 1);
