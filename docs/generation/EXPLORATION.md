@@ -254,6 +254,12 @@ determinism rule intact and keeps the phase free of a bargaining layer it cannot
 
 ## A colony is a subject, and it wants things of its own
 
+**A crowded sea power reaches overseas (Ben, 2026-10-04).** The Exploration age is where a crowded
+heartland first sails: its push — land crowding (people per unit of farmland) times navy, in this age — sends voyages, plants settler colonies
+beside natives, launches expeditions past the neighbour horizon and binds far peoples with the
+sea-legs test and sphere of claim eased. `INDUSTRIALISATION.md` § Industry spreads beyond its
+heartland owns the design; this age plants, the next grows.
+
 **SETTLED (Ben, 2026-09-11): a colony is a LIVE POLITY with an overlord link.** Not a region
 annotation and not a new actor class. The polity table already holds everything a colony needs —
 a capital, a culture, cohesion, held ground, a tree mask — and the colony's whole distinction is

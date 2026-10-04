@@ -1825,11 +1825,13 @@
    "design": "MERGED OFF (a339437f, K = 0); Ben (2026-10-03): accept capital per worker as the crowding measure; set K after BL-1168 lands, read together.\n\nSETTLED (Ben, 2026-10-03): INDUSTRIALISATION.md § Industry spreads beyond its heartland, a crowded heartland yields less. Treasury conversion is 70-99% of each leader's points; scale credit is near-flat. BUILD (measured first): in the treasury apportion loop (history_sim.cpp ~1446), points per unit fall with the region's works per employed head; one named parameter read on a ladder for Ben. Read industry_concentration (top-landmass share, the far-rival property) and the history counters before/after."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 48,
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 49,
    "written": "2026-10-03",
-   "requires": [],
+   "requires": [
+    "BL-1148"
+   ],
    "blocked_on": null,
    "parked": false,
    "id": "BL-1170",
@@ -1841,7 +1843,7 @@
    "title": "Crowded heartlands colonise and exploit distant polities, and a settler colony can grow into the age's distant rival",
    "authority_doc": "docs/generation/INDUSTRIALISATION.md",
    "files": [],
-   "design": "BEN'S DIRECTION (2026-10-03): \"make exploration into industrialisation create something like America. We don't see these crowded heartlands conquer and exploit polities far away.\" INDUSTRIALISATION.md § Industry spreads beyond its heartland (PROPOSED). DESIGN FIRST with Ben, reading the sea lane's Exploration diagnosis (why few long lanes) and BL-1152's fleets: which push (land shortage, population, capital) sends a heartland overseas; colony vs conquest vs settlement; how a colony's people and works grow; how it breaks away (Beat 3). Measure how often heartlands hold overseas ground at 1660 and 1960 today."
+   "design": "SETTLED (Ben, 2026-10-04): INDUSTRIALISATION.md § Industry spreads beyond its heartland, 'crowded heartlands reach overseas' owns the design; EXPLORATION.md § A colony is a subject points at it. Measured 2026-10-04 (16 seeds): 119 overseas regions at 1960, all within 8 water tiles, 0.36% of industry; the probe is tools/verify/overseas_reach_probe.cpp in worktree agent-a8c46e4ae96c8a006 (uncommitted; its history_sim counters must not merge). BUILD SLICES, each measured on the curated seeds before its magnitude is set: (1) the push (land crowding x navy before industry_open_year, capital crowding x navy after); (2) voyages: push over a threshold seeks contact where the fleet out-projects; (3) plant: settle overseas beside natives; (4) expedition: conquest by sea past the 9-tile horizon, fleet-gated; (5) exploit: sea-legs and sphere of claim ease with the push; (6) settlers flow from the metropole (requires BL-1148); (7) chartered company: DESIGN FIRST (post = region/market/building? inherited as a firm? seat and charter price by reach). Judged property: a far rival holds >= 25% of the leader's industry."
   },
   {
    "status": "designed",

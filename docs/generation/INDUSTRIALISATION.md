@@ -766,10 +766,53 @@ purse. It loosens a leader's grip on its own landmass but not the landmass's gri
 top landmass holds about 0.89 of industry either way); a rival on another landmass is the overseas
 reach's to make (§ crowded heartlands reach overseas).
 
-**PROPOSED (Ben's direction, 2026-10-03): crowded heartlands reach overseas.** A heartland short of
-ground and long on people and capital colonises and exploits distant polities, and what it plants
-grows: a settler colony that industrialises becomes the distant rival of the age, and may break away
-(Beat 3). The mechanism is designed before it is built.
+**SETTLED (Ben, 2026-10-04): crowded heartlands reach overseas.** A heartland crowded with capital
+and able to sail colonises and exploits distant polities, and what it plants grows: a settler colony
+that industrialises becomes the distant rival of the age, and may break away (Beat 3).
+
+*Why (measured on the 16 curated seeds, 2026-10-04):* heartlands held 119 overseas regions at 1960,
+every one within 8 water tiles of their coast, carrying 0.36% of the world's industry. No verb
+reached a far landmass: conquest sees 9 tiles; subjection was refused at the sea-legs test on
+93–98% of a heartland's turns; 96–99% of far peoples were never met; the sphere of claim refused
+nearly every far people that was. The one colony that became the leading power (seed 40) did it by
+being freed, not by being planted.
+
+- **The push is crowding times navy.** A polity's push is the crowding of its home regions times the
+  power of its fleet. Crowding is the cause and the navy is the means; a crowded realm with no fleet
+  stays home. **Crowding is measured by the age (Ben, 2026-10-04):** before industry opens it is
+  land crowding — people per unit of farmland on the home regions — and from `industry_open_year` it
+  is capital crowding, BL-1169's measure (industry points per thousand heads its works employ), which
+  is higher on the heartland than on any other landmass on every seed that reads it. One push, its
+  measure changing with what the age piles up. Heartlands are not
+  short of land per head, nor richer per head, so neither is the push. A consequence of upstream
+  scalars, never a roll.
+- **The push sends voyages.** A polity whose push clears a threshold seeks contact over water: it
+  meets far peoples where its fleet out-projects theirs at their port (EXPLORATION.md § The colonial
+  tie is a sea lane — the same comparison that gates meeting and binding by sea), so the push decides
+  that it sails and the fleet decides how far.
+- **What it does on the far shore — four verbs, all read off the same push and the same fleet
+  comparison:**
+  - **Plant.** A settlement founded overseas beside natives, not only on razed ground: a settler
+    colony carrying the metropole's culture, owned by it.
+  - **Expedition.** Conquest by sea past the 9-tile neighbour horizon, against a far target the
+    fleet out-projects, the crossing judged as any wet campaign is.
+  - **Exploit.** Subjection reaches far: the sea-legs test and the sphere of claim ease in
+    proportion to the push, so a crowded sea power can bind a far people as a tribute colony.
+  - **Charter.** In Industrialisation a heartland charters an overseas company that holds trading
+    posts. *Open, to design before it is built:* whether a post is a region, a market or a
+    building; whether the company is a firm the campaign inherits; how it relates to the
+    seat and the charter price by reach (§ 1).
+- **Exploration plants; Industrialisation grows.** Voyages, planting, expeditions and far
+  subjection begin in the Exploration age; Industrialisation continues them, adds the chartered
+  company, and grows what was planted.
+- **Settlers flow from the crowded heartland.** A colony grows by migration from its metropole,
+  carrying the metropole's culture (BL-1148, migration carries culture), so a planted colony
+  becomes populous enough to industrialise on its own ground, and so to pay for itself and stop
+  paying (Beat 3).
+
+Every magnitude — the push threshold, how far the gates ease, the migration rate — is read on the
+curated seeds before it is set. The judged property stands: a rival far away holds at least 25% of
+the leader's industry, and the overseas reach is its lever, not a stronger crowding brake.
 
 ### Beat 3 — Decolonisation, and wars over empire
 
