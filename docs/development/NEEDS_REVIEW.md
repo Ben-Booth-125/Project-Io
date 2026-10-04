@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*71 entries — 2 open, 69 resolved.*
+*72 entries — 3 open, 69 resolved.*
 
 ---
 
@@ -59,6 +59,22 @@ Your 2026-10-03 ruling left the basket's contents to a short design pass. Taken:
 > **Recommendation:** A.
 
 *Files: `docs/economy/POPULATION.md`, `scripts/economy.lua`, `src/world/economy_system.cpp`*
+
+### NR-968 — CALL: how to break the price cycle that silences consuming markets three ticks in four (BL-1186)
+*question · raised 2026-10-04 · from the BL-1186 diagnosis (3a353f82)*
+
+With nothing listed (the shelf is not counted as supply: shelf_supply_ticks = 0), a bid aims at 10x base and the price moves halfway; above the 2x reservation ceiling BL-1172 removes the want entirely so the price can ease. Together every market on a landmass cycles 1.6x -> 5.8x -> 3.4x -> 2.2x in step: a consuming market bids one tick in four, so a hauler sees zero demand at the destination and ships nothing, and a site whose own shelf holds steel may not draw it (BL-1183). Routing fixes (ports, partial LP sends) are going ahead regardless; this is the price half.
+
+**Why it matters.** Without it, even routable surplus moves one tick in four; with it, shortages price into shipments. Option B partly reverses your 2026-10-03 ruling (BL-1172), so it is yours.
+
+- A: count the shelf as supply (shelf supply k > 0) - your 2026-10-03 path - which brings BL-1179 (shelf spoilage) forward into wave 1, since k was to follow it
+- B: an over-ceiling draw still registers its want (the price sees it) but does not buy - a partial reversal of BL-1172
+- C: haulers read a separate unmet-want register over several clears; the price still eases as BL-1172 wants (a new saved field)
+- D: other
+
+> **Recommendation:** A. It honours both of your rulings (the ceiling stays, the k cap is the mechanism you chose), and a listed shelf takes the target off 10x at the root. BL-1179 is designed first (which goods spoil, at what rate, who loses the value), then k is set off a measured reading.
+
+*Files: `src/world/market_clearing.cpp`, `scripts/economy.lua`, `src/world/economy_system.cpp`*
 
 ---
 
