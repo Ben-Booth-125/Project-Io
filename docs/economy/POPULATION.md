@@ -246,8 +246,19 @@ during play.
 supply that lets a centre grow, or makes it shrink, is a household basket — food, water and consumer
 goods — read against the people's own demand, not against every want on the body, and judged per
 market rather than once for the whole body. So a shortage is local and a player can see and answer it
-where it is, and one market's shortage never shrinks every centre on the world at once. What the
-basket holds, good by good, is settled before it is built.
+where it is, and one market's shortage never shrinks every centre on the world at once.
+
+**The growth basket IS the household basket (settled 2026-10-04, on Ben's delegation; BL-1163,
+play villages decline).** There is no second list. The goods, and their weights, are exactly the
+basket the centre bids into its market (§ Population demand): the shared tranche (food rations,
+agricultural produce, water) plus its era band's tranche — clean water, consumer goods and
+medical supplies in the industrial band; cloth, ceramics, leather, dressed stone, the fuels and
+the woods in the ancient. A centre's **met ratio** is the weight-averaged share of its own
+population bid that its market filled (`MARKETS.md` § Want and fill records the bid), each good
+capped at 1, read from the market's last clear. Steel, ore, fuel and every other industrial want
+are out: they are firms' wants, and a city does not shrink because a mill is short. The grow
+threshold is unchanged at one half. A good the band does not make is never in the basket, because
+the basket is era-masked as the bid is.
 
 Decline is asymmetric by design: **passive failure only shrinks a centre — it never destroys
 one.** Outright destruction is a deliberate agent action (razing, in occupation), and it should

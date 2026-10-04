@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*70 entries — 1 open, 69 resolved.*
+*71 entries — 2 open, 69 resolved.*
 
 ---
 
@@ -44,6 +44,21 @@ tools/verify/rebless_shape_probe.cpp measures the world's shape (centres, scales
 > **Recommendation:** A for rebless_shape_probe; B for the rest.
 
 *Files: `tools/verify/rebless_shape_probe.cpp`*
+
+### NR-967 — DECISION TAKEN: the growth basket is the household basket, no second list (BL-1163)
+*decision · raised 2026-10-04 · from the sprint 49 main session (Ben: "I'll also trust your judgement")*
+
+Your 2026-10-03 ruling left the basket's contents to a short design pass. Taken: the goods and weights a centre grows on are exactly the basket it already bids into its market (shared tranche food rations 0.60 / agricultural produce 0.20 / water 0.30, plus the industrial tranche clean water 0.35 / consumer goods 0.25 / medical supplies 0.15, or the ancient tranche). The met ratio is the share of the centre's own population bid its market filled. economy.lua population_growth.demand_basket (food, agri, steel, water, refined fuel, iron ore, petroleum) retires. Threshold stays 0.50. Written into POPULATION.md.
+
+**Why it matters.** One basket is legible (what a city eats is what makes it grow) and cannot drift from the bid. The cost: a good that is in the bid but rarely made (medical supplies on some seeds) now weighs on growth; if it pins centres low, the weights are the dial.
+
+- A: keep it (one basket, the bid's own weights)
+- B: one basket but its own weights (food heavier)
+- C: other
+
+> **Recommendation:** A.
+
+*Files: `docs/economy/POPULATION.md`, `scripts/economy.lua`, `src/world/economy_system.cpp`*
 
 ---
 
