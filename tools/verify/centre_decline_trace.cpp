@@ -14,7 +14,8 @@
 // exactly what the next tick's growth pass reads). Alongside: centres, heads
 // (k), centres on a negative streak, the distribution of per-centre met ratios
 // (min / p25 / median / max, and how many sit below the threshold), and each
-// household good's body-summed supply/demand.
+// household good's body-summed supply/demand, and (BL-1196) the households'
+// fill / bid and the shelf left after their draw.
 //
 // Usage (repo root): centre_decline_trace [--seeds a,b] [--ticks N] [--every K]
 // Lua harness: bash tools/verify/build_lua_harness.sh centre_decline_trace
@@ -63,7 +64,7 @@ void sample(const world& w, const recipe_registry& reg, int tick, const economy_
     }
     const float thr = reg.growth().growth_met_threshold;
     const std::array<float, resource_count>& basket = reg.population_demand_basket();
-    std::map<entity_id, std::array<float, resource_count>> sup, dem;
+    std::map<entity_id, std::array<float, resource_count>> sup, dem, shelf, hbid, hfill;
     std::vector<entity_id> mids;
     for (const auto& kv : w.markets) mids.push_back(kv.first);
     std::sort(mids.begin(), mids.end());
@@ -72,7 +73,15 @@ void sample(const world& w, const recipe_registry& reg, int tick, const economy_
         const market_component& mc = w.markets.at(m);
         auto& s = sup[mc.body];
         auto& d = dem[mc.body];
-        for (std::size_t r = 0; r < resource_count; ++r) { s[r] += mc.supply[r]; d[r] += mc.demand[r]; }
+        auto& sh = shelf[mc.body];
+        auto& hb = hbid[mc.body];
+        auto& hf = hfill[mc.body];
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            s[r] += mc.supply[r]; d[r] += mc.demand[r];
+            // BL-1196: the shelf after the households' draw, and the draw itself.
+            sh[r] += mc.inventory[r]; hb[r] += mc.household_bid[r]; hf[r] += mc.household_fill[r];
+        }
     }
     struct acc { int n = 0, pop = 0, neg = 0, v = 0, below = 0; float hs = 0, hw = 0; std::vector<float> met; std::map<entity_id, int> mkts; };
     std::map<entity_id, acc> by_body;
@@ -110,8 +119,13 @@ void sample(const world& w, const recipe_registry& reg, int tick, const economy_
             if (basket[r] <= 0.0f) continue;
             const float s = (di != dem.end()) ? sup[body][r] : 0.0f;
             const float d = (di != dem.end()) ? di->second[r] : 0.0f;
-            char buf[96];
-            std::snprintf(buf, sizeof buf, " %s %.0f/%.0f", resource_names::name_of(static_cast<resource_type>(r)).c_str(), s, d);
+            const float sh = (di != dem.end()) ? shelf[body][r] : 0.0f;
+            const float hb = (di != dem.end()) ? hbid[body][r] : 0.0f;
+            const float hf = (di != dem.end()) ? hfill[body][r] : 0.0f;
+            char buf[160];
+            // listed/demand, then BL-1196's household fill/bid and the shelf left.
+            std::snprintf(buf, sizeof buf, " %s %.0f/%.0f fill %.0f/%.0f shelf %.0f",
+                          resource_names::name_of(static_cast<resource_type>(r)).c_str(), s, d, hf, hb, sh);
             goods += buf;
         }
         std::printf("  t%4d body %llu | centres %4d villages %4d heads %7dk declining %4d | hab %.3f | met min %.2f p25 %.2f med %.2f max %.2f, %d centres below %.2f over %zu markets |%s\n",

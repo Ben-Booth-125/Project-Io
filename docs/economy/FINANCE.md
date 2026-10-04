@@ -33,6 +33,10 @@ balance += income − expenditure − maintenance − wages − interest − lev
 - **Upkeep** — standing-force upkeep (below). Its authored rates are all `0.0`, so the
   term is present and carried but contributes nothing at the authored values.
 
+**Household consumption is not a flow.** A household draws its basket off the market's shelf and
+pays nothing for it (`MARKETS.md` § The clearing tick, step 12). The maker was already paid when
+the market bought the stock as buyer of last resort, so consumption moves goods, never credits.
+
 The seven flows are retained per corp in `corp_budget` (BL-072, budget breakdown); its
 `net()` is exactly the delta applied to the balance, so the ledger can never disagree with
 the loop. The breakdown sink is optional — the headless harnesses skip it and take only

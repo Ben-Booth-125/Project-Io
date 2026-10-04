@@ -111,6 +111,22 @@ int main()
     // dropped it. Pin it to the value the fold writes on a crossed history.
     w.campaign_band = era_band::industrial;
 
+    // BL-1196 (households consume): the market record's two new arrays, the
+    // household bid and fill the growth gate reads before the next clear. A
+    // freshly generated world has never cleared, so both are zero everywhere
+    // and P1's byte-equality would pass over a reader that dropped them. Pin
+    // the lowest market's food slot to distinctive values (bid 12.5, fill 7.25).
+    entity_id hh_market = null_entity;
+    for (const auto& [mid, mc] : w.markets)
+        if (hh_market == null_entity || mid < hh_market)
+            hh_market = mid;
+    const std::size_t hh_food = static_cast<std::size_t>(resource_type::food_rations);
+    if (hh_market != null_entity)
+    {
+        w.markets.at(hh_market).household_bid[hh_food]  = 12.5f;
+        w.markets.at(hh_market).household_fill[hh_food] = 7.25f;
+    }
+
     // BL-614: same treatment for the building record's newest field — the
     // default is 0 everywhere (nothing sets a wage bid yet), so give one
     // building a distinctive bid before the round trip. Lowest building id.
@@ -240,6 +256,16 @@ int main()
     // earned, which is the whole reason the field is persisted.
     check(read_ok && loaded.campaign_band == era_band::industrial,
           "P1 world campaign_band (BL-1101) round-trips at its written value");
+
+    // BL-1196: the household bid and fill survive by VALUE (world_save_version 32).
+    if (hh_market != null_entity)
+    {
+        const auto mit = loaded.markets.find(hh_market);
+        check(read_ok && mit != loaded.markets.end()
+                  && mit->second.household_bid[hh_food] == 12.5f
+                  && mit->second.household_fill[hh_food] == 7.25f,
+              "P1 market household_bid / household_fill (BL-1196) round-trip at their written values");
+    }
 
     // BL-614: likewise for the wage bid.
     if (bid_building != null_entity)

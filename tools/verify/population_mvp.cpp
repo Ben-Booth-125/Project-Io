@@ -33,9 +33,13 @@
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <initializer_list>
+#include <memory>
 #include <utility>
+#include <vector>
 
 static int g_failures = 0;
 static int g_passes   = 0;
@@ -480,8 +484,9 @@ static void test_population_growth()
 // clears elsewhere, and another market's plenty must not grow one that starves.
 // Two markets on one body, each anchored on its own tile; the centre stands on
 // A's anchor, so it clears at A. Market state is set by hand each tick (no
-// clear_markets — the growth step reads supply/demand as the previous clearing
-// left them).
+// clear_markets — the growth step reads the household bid and fill as the
+// previous clearing left them; BL-1196 made the fill a real draw, so the
+// registers are `household_bid` / `household_fill`, not supply / demand).
 //   Run 1: A met (10/10), B starved (0/10)          -> grows (B is not its market)
 //   Run 2: A starved (0/10), B met (10/10)          -> does NOT grow (the old
 //          aggregate read 10/20 = 0.5 and grew it)
@@ -559,8 +564,10 @@ static void test_multi_market_growth_aggregate()
         {
             market_component& a = w.markets.at(mkt_a);
             market_component& b = w.markets.at(mkt_b);
-            a.demand[food]  = 10.0f; a.supply[food]  = a_food;
-            b.demand[food]  = 10.0f; b.supply[food]  = b_food;
+            a.household_bid[food]  = 10.0f; a.household_fill[food]  = a_food;
+            b.household_bid[food]  = 10.0f; b.household_fill[food]  = b_food;
+            // Steel: a firm's want on the ordinary registers. Never a household
+            // bid, so it never reaches the gate (run 3).
             a.demand[steel] = 10.0f; a.supply[steel] = a_steel;
             run_economy_step(w, reg);
         }
@@ -584,6 +591,176 @@ static void test_multi_market_growth_aggregate()
 }
 
 // ---------------------------------------------------------------------------
+// BL-1196 (households consume): MULTI-TICK. The households a market serves draw
+// their bid off its shelf at the end of every clear, and the next tick's growth
+// gate reads what they received (household_fill / household_bid). A one-tick
+// row cannot see a shelf drain, so every row here runs the real tick pair
+// (run_economy_step + clear_markets) for 60 ticks.
+//
+// The fixture pins the bid: elasticity exponent 0 (factor 1 at any price) and
+// demand_scale 10, so a scale-1 centre bids exactly 10 food a tick. Population
+// 20 sits between the scale-1 and scale-2 rungs (10 / 50), so no promotion or
+// demotion changes the bid mid-run; a growth or shed step is max(1, 20/25) = 1.
+// No corporation exists, so nothing is ever LISTED — supply stays 0 every tick.
+// Under the pro-rata stand-in (supply / demand) such a centre read met 0 and
+// could never grow beside a full shelf; under the draw it eats the shelf.
+//
+//   Row D1 (draw down): shelf 300. Every clear takes min(10, shelf) — the shelf
+//          falls by exactly the fill, to 0 after 30 clears, 300 drawn in all.
+//          While it lasts the centre grows; once it is bare the centre sheds.
+//   Row D2 (threshold): the shelf is restocked by hand before every tick (a
+//          stand-in seller) with 0.6 x the bid: met 0.6 -> grows. With 0.4 x
+//          the bid: met 0.4 -> sheds. The draw, not the stock, decides.
+//   Row D3 (pooled, pro rata): two centres (scale 1 and 2 -> bids 10 and 20)
+//          share one market restocked with 15 a tick: the pooled bid is 30,
+//          the fill 15, and both centres read met 0.5.
+// ---------------------------------------------------------------------------
+static void test_household_draw_multi_tick()
+{
+    std::printf("--- BL-1196: households draw their basket off the shelf; growth reads the fill ---\n");
+
+    const std::size_t food = ri(resource_type::agricultural_produce);
+
+    struct fixture
+    {
+        world w;
+        entity_id mkt = null_entity;
+        std::vector<entity_id> pops;
+        recipe_registry reg;
+    };
+    auto make = [&](std::initializer_list<int> scales) {
+        auto f = std::make_unique<fixture>();
+        world& w = f->w;
+        const entity_id body = w.create_entity();
+        {
+            body_component bc{};
+            bc.name        = "Shelf";
+            bc.grid_width  = 4;
+            bc.grid_height = 4;
+            w.bodies[body] = bc;
+        }
+        const entity_id tile = w.create_entity();
+        {
+            tile_component tc{};
+            tc.body = body;
+            w.tiles[tile] = tc;
+        }
+        f->mkt = w.create_entity();
+        {
+            market_component mc{};
+            mc.body            = body;
+            mc.base_price[food] = 1.0f;
+            w.markets[f->mkt]  = mc;
+        }
+        for (const int sc : scales)
+        {
+            const entity_id pop = w.create_entity();
+            population_centre_component pcc{};
+            pcc.scale        = sc;
+            pcc.population   = (sc == 1) ? 20 : 120; // each between its rungs
+            pcc.habitability = 0.9f;
+            w.population_centres[pop]     = pcc;
+            w.population_centre_tile[pop] = tile;
+            f->pops.push_back(pop);
+        }
+        population_demand_params pd;
+        pd.demand_basket[food] = 1.0f;
+        pd.demand_elasticity   = 0.0f;  // factor 1 at every price
+        pd.demand_scale        = 10.0f; // 10 a tick per scale point
+        f->reg.set_population_demand(pd);
+        return f;
+    };
+    auto tick = [](fixture& f) {
+        const economy_report rep = run_economy_step(f.w, f.reg);
+        clear_markets(f.w, f.reg, rep);
+    };
+
+    // ---- D1: a 300-unit shelf drawn down over 60 clears -------------------
+    {
+        auto f = make({ 1 });
+        f->w.markets.at(f->mkt).inventory[food] = 300.0f;
+        float drawn = 0.0f, max_err = 0.0f, max_supply = 0.0f;
+        int pop_at_empty = -1, tick_empty = -1;
+        for (int t = 1; t <= 60; ++t)
+        {
+            const float before = f->w.markets.at(f->mkt).inventory[food];
+            tick(*f);
+            const market_component& mc = f->w.markets.at(f->mkt);
+            const float fill = mc.household_fill[food];
+            drawn += fill;
+            max_err = std::max(max_err, std::fabs((before - fill) - mc.inventory[food]));
+            max_err = std::max(max_err, std::fabs(fill - std::min(mc.household_bid[food], before)));
+            max_supply = std::max(max_supply, mc.supply[food]);
+            if (tick_empty < 0 && mc.inventory[food] <= 0.0f)
+            {
+                tick_empty   = t;
+                // The growth pass of the NEXT tick still reads this full fill,
+                // so the fed streak ends one tick later; read pop here anyway.
+                pop_at_empty = f->w.population_centres.at(f->pops[0]).population;
+            }
+        }
+        const market_component& mc = f->w.markets.at(f->mkt);
+        const int pop_end = f->w.population_centres.at(f->pops[0]).population;
+        std::printf("  D1 bid %.2f/tick, nothing listed (max supply %.2f); shelf bare after clear %d, %.2f drawn in all\n",
+                    mc.household_bid[food], max_supply, tick_empty, drawn);
+        std::printf("     population 20 -> %d at the empty shelf -> %d at tick 60 (met now %.2f)\n",
+                    pop_at_empty, pop_end, population_met_ratio(f->w, f->reg, f->mkt));
+        check(std::fabs(mc.household_bid[food] - 10.0f) < 1e-4f, "D1 the pinned bid is 10 a tick",
+              mc.household_bid[food], 10.0f);
+        check(max_err < 1e-3f, "D1 every clear: fill = min(bid, shelf) and the shelf falls by exactly the fill",
+              max_err, 0.0f);
+        check(tick_empty == 30, "D1 the 300 shelf is bare after exactly 30 clears", static_cast<float>(tick_empty), 30.0f);
+        check(std::fabs(drawn - 300.0f) < 1e-2f, "D1 households drew the whole shelf and nothing more", drawn, 300.0f);
+        check(max_supply == 0.0f, "D1 nothing was listed: the fill came off the shelf, not off listings");
+        check(pop_at_empty > 20, "D1 the centre GREW while its draw met the bid (supply was 0 the whole time)",
+              static_cast<float>(pop_at_empty), 21.0f);
+        check(pop_end < pop_at_empty, "D1 the centre SHED once the shelf was bare",
+              static_cast<float>(pop_end), static_cast<float>(pop_at_empty));
+    }
+
+    // ---- D2: restocked at 0.6 / 0.4 of the bid -----------------------------
+    auto restocked = [&](float share, float& met_out) {
+        auto f = make({ 1 });
+        for (int t = 1; t <= 60; ++t)
+        {
+            f->w.markets.at(f->mkt).inventory[food] += share * 10.0f; // the stand-in seller
+            tick(*f);
+        }
+        met_out = population_met_ratio(f->w, f->reg, f->mkt);
+        return f->w.population_centres.at(f->pops[0]).population;
+    };
+    {
+        float met_hi = 0.0f, met_lo = 0.0f;
+        const int pop_hi = restocked(0.6f, met_hi);
+        const int pop_lo = restocked(0.4f, met_lo);
+        std::printf("  D2 restocked 0.6 x bid: met %.2f, population 20 -> %d; 0.4 x bid: met %.2f, 20 -> %d\n",
+                    met_hi, pop_hi, met_lo, pop_lo);
+        check(std::fabs(met_hi - 0.6f) < 1e-4f && pop_hi > 20, "D2 a draw meeting 0.6 of the bid grows the centre",
+              static_cast<float>(pop_hi), 21.0f);
+        check(std::fabs(met_lo - 0.4f) < 1e-4f && pop_lo < 20, "D2 a draw meeting 0.4 of the bid sheds it",
+              static_cast<float>(pop_lo), 19.0f);
+    }
+
+    // ---- D3: two centres, one market, pooled pro rata ----------------------
+    {
+        auto f = make({ 1, 2 });
+        for (int t = 1; t <= 5; ++t)
+        {
+            f->w.markets.at(f->mkt).inventory[food] += 15.0f;
+            tick(*f);
+        }
+        const market_component& mc = f->w.markets.at(f->mkt);
+        const float met = population_met_ratio(f->w, f->reg, f->mkt);
+        std::printf("  D3 pooled bid %.2f, fill %.2f, shelf %.2f, met %.2f (both centres read it)\n",
+                    mc.household_bid[food], mc.household_fill[food], mc.inventory[food], met);
+        check(std::fabs(mc.household_bid[food] - 30.0f) < 1e-3f && std::fabs(mc.household_fill[food] - 15.0f) < 1e-3f
+                  && mc.inventory[food] < 1e-3f,
+              "D3 two centres' bids pool (10 + 20) and draw the 15 restocked", mc.household_fill[food], 15.0f);
+        check(std::fabs(met - 0.5f) < 1e-4f, "D3 every centre on the market reads the same share, 0.5", met, 0.5f);
+    }
+}
+
+// ---------------------------------------------------------------------------
 int main()
 {
     test_population_on_kepler();
@@ -591,6 +768,7 @@ int main()
     test_habitability_scalar();
     test_population_growth();
     test_multi_market_growth_aggregate();
+    test_household_draw_multi_tick();
 
     if (g_failures == 0)
         std::printf("\nALL PASS (%d assertions)\n", g_passes);

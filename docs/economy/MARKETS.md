@@ -198,7 +198,8 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
      `heads / heads_per_demand_unit × basket[r] × elasticity(price)`, with rungs 4–5 scaled by the
      nation's qualification and every rung weighted by the catchment's culture
      (`POPULATION.md` § The stratum ladder). Population is a pure **consumer** — no supply term.
-     Tunables in `scripts/economy.lua` § `population_demand`.
+     The bid is also kept on the market's own household register (`household_bid`), because
+     the households draw it in step 12. Tunables in `scripts/economy.lua` § `population_demand`.
    - `inject_background_demand` — **a labelled STOPGAP**: the offstage economy's own pull on the
      mid-chain processing goods (silicon, refined copper, REE alloy, machinery, alloys — **not**
      `spacecraft_components`, which stays procurement-only so the militia's contracts remain its
@@ -249,7 +250,18 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
     unbounded income, not a simplification of a market but the absence of one (BL-386, floor is a
     reservation price). The auto-surplus path (step 9) clears at the market's own resolved price,
     which is the defensible prototype simplification.
-12. **Price update** — where explicit trades occurred, the price eases toward their VWAP;
+12. **Household draw** — the households clearing at each market take their pooled bid off its
+    shelf: `household_fill[r] = min(household_bid[r], inventory[r])`, and that much leaves
+    `inventory` for good. It runs after every sale this tick has credited the shelf, so a unit
+    made this tick can feed a household this tick. The household is the shelf's last claimant
+    in a tick: processors and construction drew before the clear. **No money moves** — the
+    market paid the maker when it bought the stock (step 9 or 11), so the draw moves goods, not
+    credits. **The fair-price ceiling does not apply**: it is a processor's reservation price,
+    and a household's reservation is already in its elastic bid. Several centres on one market
+    bid one pooled quantity, so a short shelf fills each of them in the same share. Markets
+    ascending, resources ascending. The fill is what the growth gate reads
+    (`POPULATION.md` § Growth, decline and razing).
+13. **Price update** — where explicit trades occurred, the price eases toward their VWAP;
     otherwise it takes the reference price.
 
 Cash flows accrue per corp and are applied to balances by `apply_budget`
@@ -612,6 +624,13 @@ bidding for the input and must not push its price. (Delegated call: NR-281.)
 **Determinism.** Both registers are `std::map`, so accumulation runs over a **sorted** key set —
 the same seam where an `unordered_map` float accumulation is a latent nondeterminism.
 
+**The household channel keeps the same pair, on the market.** `household_bid` is the population
+channel's want — its share of `demand`, summed over the centres clearing there. `household_fill`
+is its receipt — what those households drew off the shelf at the end of the clear (§ The clearing
+tick, step 12). A centre's met ratio is `fill / bid`, never `supply / demand`: a shelf standing
+full beside a tick with no listings still feeds the people. Both arrays are saved with the market,
+because the growth pass reads them before the next clear rewrites them.
+
 ## Real market inventory
 
 `market_component.inventory` is **real, persistent stock** — not reset each tick, unlike
@@ -656,6 +675,10 @@ dispatch step, after the corporations' own dispatch has claimed what room it wan
 (`docs/economy/SUPPLY.md` § Dispatch trigger). **A market export moves no money:** the shelf
 belongs to no corporation, so there is nobody to charge for the haul and nobody to pay for the
 goods — the haul is the margin given up, taken off what the cargo realises where it lands.
+
+**The shelf's fourth drain is the households.** At the end of every clear the people take their
+bid off the shelf (§ The clearing tick, step 12). It is the Household channel's terminal sink:
+what they draw is consumed and never returns. Like the export, it moves no money.
 
 **The sell side has no volume cap.** `market_component.supply` is a derived per-tick flow for
 pricing, and the market absorbs any quantity a seller is willing to release at the resolved price.

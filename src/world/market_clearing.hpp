@@ -46,16 +46,27 @@ void inject_population_demand(world& w, const recipe_registry& reg);
 /// tranche + the band's tranche, era-masked by the registry's fold), less any
 /// good the market leaves unpriced (`base_price <= 0`, which the bid skips).
 ///
-/// THE FILL. A market clear serves its bidders PRO RATA — every bid on a good
-/// is filled in the share `min(1, supply / demand)` the clear's listings cover
-/// — so the population channel's fill of good r is `bid_r × min(1, supply_r /
-/// demand_r)`, and `fill / bid` is that share. It is read from the persistent
-/// `supply`/`demand` the last clear left (both serialised), so no separate
-/// per-channel record is needed and a save/load replays it exactly.
+/// THE FILL (BL-1196, households consume). The households clearing at a market
+/// physically draw their pooled bid off its shelf at the end of each clear
+/// (`draw_household_basket`): `household_fill[r] = min(household_bid[r],
+/// inventory[r])`. The share is `household_fill / household_bid` — what the
+/// people received over what they bid — read from the last clear's two
+/// registers (both serialised, world_save_version 32, because the growth pass
+/// reads them before the next clear rewrites them).
 ///
 /// Returns the basket-weighted mean of the per-good share; 1.0 when nothing
 /// was bid (no market, or no clear yet) — nothing unmet. Pure; deterministic.
 float population_met_ratio(const world& w, const recipe_registry& reg, entity_id market);
+
+/// BL-1196 (households consume; POPULATION.md § Population demand): every
+/// market's households TAKE their bid off its shelf — `household_fill[r] =
+/// min(household_bid[r], inventory[r])`, decremented from `inventory`. No money
+/// moves (the market paid the maker when it bought the stock). Ignores the
+/// processor fair-price ceiling: the household's reservation is its elastic
+/// bid. Called by clear_markets after every sale has credited the shelf and
+/// before the price update. Ascending market id, ascending resource; pure
+/// per-market arithmetic. Deterministic.
+void draw_household_basket(world& w);
 
 /// Inject background-industrial demand into body markets (BL-340/BL-365). A
 /// world-scale pull for the mid-chain processing goods (silicon, refined_copper,
