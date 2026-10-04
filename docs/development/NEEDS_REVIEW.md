@@ -68,6 +68,8 @@ BUILT AND HELD UNMERGED (2026-10-04, 26cb6cbe on worktree-agent-a7a4ad16f983163e
 
 With nothing listed (the shelf is not counted as supply: shelf_supply_ticks = 0), a bid aims at 10x base and the price moves halfway; above the 2x reservation ceiling BL-1172 removes the want entirely so the price can ease. Together every market on a landmass cycles 1.6x -> 5.8x -> 3.4x -> 2.2x in step: a consuming market bids one tick in four, so a hauler sees zero demand at the destination and ships nothing, and a site whose own shelf holds steel may not draw it (BL-1183). Routing fixes (ports, partial LP sends) are going ahead regardless; this is the price half.
 
+UPDATE (2026-10-04, the BL-1193 diagnosis): the household bid is a pricing pull that never takes goods off a shelf, so household-good shelves only grow - the premise behind holding k at 0 until spoilage. BL-1196 (households consume) makes households drain the shelf as POPULATION.md already says. The same diagnosis finds the cycle's worst case: households bid water nobody lists, water sits at 10x everywhere, and the makers of clean water and medical supplies may not draw their own input. Option B (keep the over-ceiling want visible) would make that lock worse.
+
 **Why it matters.** Without it, even routable surplus moves one tick in four; with it, shortages price into shipments. Option B partly reverses your 2026-10-03 ruling (BL-1172), so it is yours.
 
 - A: count the shelf as supply (shelf supply k > 0) - your 2026-10-03 path - which brings BL-1179 (shelf spoilage) forward into wave 1, since k was to follow it
@@ -75,7 +77,7 @@ With nothing listed (the shelf is not counted as supply: shelf_supply_ticks = 0)
 - C: haulers read a separate unmet-want register over several clears; the price still eases as BL-1172 wants (a new saved field)
 - D: other
 
-> **Recommendation:** A. It honours both of your rulings (the ceiling stays, the k cap is the mechanism you chose), and a listed shelf takes the target off 10x at the root. BL-1179 is designed first (which goods spoil, at what rate, who loses the value), then k is set off a measured reading.
+> **Recommendation:** A, built together with BL-1196 (households consume from the shelf): with households draining shelves, a shelf counted as supply no longer only grows, so k > 0 is safe without waiting for spoilage; BL-1179 (shelf spoilage) stays as the drain for goods no household eats. Not B.
 
 *Files: `src/world/market_clearing.cpp`, `scripts/economy.lua`, `src/world/economy_system.cpp`*
 

@@ -1251,7 +1251,7 @@
     "src/world/corp_ai.cpp",
     "src/world/building_profit.cpp"
    ],
-   "design": "SCOPE WIDENED (2026-10-04, from the BL-1186 diagnosis): the same scorer switches recipes to routes whose inputs the body lacks - coal-drawing processors fall 27 -> 1 by tick 3 on seed 0 as mills switch to steel_from_iron_nickel with no iron-nickel ore on the body. \"Build only what runs\" covers switch as well as build. Obtainable = BL-1185's reach (same market, or a viable price_market_export_leg).\n\nSprint 49 wave 1, after BL-1186 (what 'obtainable' means depends on whether goods move). Firms keep building processors that never run: processors 225 -> 390 on seed 0 while those running fall 80 -> 52; seed 41 holds 1,241 buildings under construction against 263 live. The build score (estimate_prospective_profit) should price the inputs a building can actually obtain at its market, not their nominal price. Read AI_OPPONENT.md sec 11 first: this is the existing build decision priced better, not a new subject, so no new grant is expected; if the reading says otherwise, raise it.\n\nREADING (2026-10-04, main a56e4ce3, 16 curated seeds, shipped 1960 start, 12 settle + 400 play ticks; spawn_solvency, firm_attrition_trace, centre_decline_trace, market_census, recipe_margin, and steel_chain_probe on seeds 0/43/37): recipe_margin is green in both bands. Day 1 looks solvent (99-100% of firms, +94..+211/qtr each) but the settle is opening stock being auctioned: field income 54-74k/tick at the settle close, 10-19k by tick 50 on every seed. At handoff 119-141 of ~225 processors are input-starved (copper refining, alloys, machinery, electronics, spacecraft never run); 10k steel sits on shelves against demand of 12 while 0 shipments go (135 pairs unroutable, 52 refused by the price gate); by tick 20 steel is 6 supply vs 5,187 demand with coal unbought one market away. Processors grow 225 -> 390 while those running fall to 44-67. 1,457 of 2,074 firms are insolvent by tick 400 (corps 121-149 -> 19-77). Insolvent firms per tick: income 75, maintenance+wages 46, upkeep 19; survivors 229 / 63 / 21. The seat is handed a steel mill (recipe 0) that idles on every seed; seat median operating net ~+66/qtr, four seeds under +7."
+   "design": "WIDENED AGAIN (2026-10-04, the BL-1193 diagnosis): the strategic recipe switch (corp_ai.cpp:1553-1630) compares base-price margins within a group without checking inputs, unlike the build candidate (:1150-1172) - clean water (4.7/batch) loses to consumer goods (31.3) every time; and an idled plant RESUMES on a price-only estimate (building_profit.cpp:113ff), so consumer-goods plants churn (seed 0, ticks 100-200: 73 built or resumed, 85 idled). Build, switch AND resume all check that inputs are obtainable (H6). Also consider splitting the \"Welfare Goods\" group (H7). The diagnosis reads this as inside the existing scorer grant (refines existing verbs, adds none); confirm against AI_OPPONENT.md sec 11 before building.\n\nSCOPE WIDENED (2026-10-04, from the BL-1186 diagnosis): the same scorer switches recipes to routes whose inputs the body lacks - coal-drawing processors fall 27 -> 1 by tick 3 on seed 0 as mills switch to steel_from_iron_nickel with no iron-nickel ore on the body. \"Build only what runs\" covers switch as well as build. Obtainable = BL-1185's reach (same market, or a viable price_market_export_leg).\n\nSprint 49 wave 1, after BL-1186 (what 'obtainable' means depends on whether goods move). Firms keep building processors that never run: processors 225 -> 390 on seed 0 while those running fall 80 -> 52; seed 41 holds 1,241 buildings under construction against 263 live. The build score (estimate_prospective_profit) should price the inputs a building can actually obtain at its market, not their nominal price. Read AI_OPPONENT.md sec 11 first: this is the existing build decision priced better, not a new subject, so no new grant is expected; if the reading says otherwise, raise it.\n\nREADING (2026-10-04, main a56e4ce3, 16 curated seeds, shipped 1960 start, 12 settle + 400 play ticks; spawn_solvency, firm_attrition_trace, centre_decline_trace, market_census, recipe_margin, and steel_chain_probe on seeds 0/43/37): recipe_margin is green in both bands. Day 1 looks solvent (99-100% of firms, +94..+211/qtr each) but the settle is opening stock being auctioned: field income 54-74k/tick at the settle close, 10-19k by tick 50 on every seed. At handoff 119-141 of ~225 processors are input-starved (copper refining, alloys, machinery, electronics, spacecraft never run); 10k steel sits on shelves against demand of 12 while 0 shipments go (135 pairs unroutable, 52 refused by the price gate); by tick 20 steel is 6 supply vs 5,187 demand with coal unbought one market away. Processors grow 225 -> 390 while those running fall to 44-67. 1,457 of 2,074 firms are insolvent by tick 400 (corps 121-149 -> 19-77). Insolvent firms per tick: income 75, maintenance+wages 46, upkeep 19; survivors 229 / 63 / 21. The seat is handed a steel mill (recipe 0) that idles on every seed; seat median operating net ~+66/qtr, four seeds under +7."
   },
   {
    "status": "proposed",
@@ -1359,8 +1359,8 @@
    "design": "Found by the BL-1186 diagnosis (2026-10-04): market catchments are assigned by grid distance and ignore water, so a tile can belong to a market across a strait it cannot ship over; local draws treat it as the same market. Measure how many tiles and buildings sit across water from their market centre on the 16 seeds before designing. Read beside BL-1190 (markets meet firms)."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "designed",
+   "glyph": "◐",
    "sprint": 49,
    "written": "2026-10-04",
    "requires": [],
@@ -1379,7 +1379,7 @@
     "src/world/corp_ai.cpp",
     "src/world/corporation_generation.cpp"
    ],
-   "design": "Sprint 49, diagnosis first. On every seed water, clean water and medical supplies are supplied 0 at market across 400 play ticks, consumer goods fall to ~0 by tick ~100, and food rations run 25-45% of demand (the BL-1163 lane's centre_decline_trace, 2026-10-04). Yet steel_chain_probe sees 15 of 16 clean-water processors running at tick 0 on seed 0, so the output goes somewhere: name where (own pools, reservation, the shelf, a buyer of last resort, a household bid that is a pricing pull only and never fills). Then: is household demand a market a firm can PROFIT from (who pays, at what price)? If it is not, no placement or scorer change will make firms serve it. Read beside NR-968 (the price cycle) and BL-1185 (chain-feasible placement): household goods are the demand endpoints the chains exist for. Unblocks BL-1163 (NR-967)."
+   "design": "DIAGNOSED (2026-10-04, a6eee332; docs/development/drafts/sprint-49-household-supply-diagnosis.md). (1) Household-good output is listed whole and bought by the market as buyer of last resort at the reference price with minted money (market_clearing.cpp:1418-1427); nothing ever takes it off the shelf, so shelves only grow (food rations 25-49k, consumer goods 1.8-3.5k, water ~8k by tick 200). (2) The household bid is a PRICING PULL ONLY (inject_population_demand adds to mc.demand, market_clearing.cpp:585); POPULATION.md:293 says a centre consumes its basket from the local market - the code is behind its doc. (3) A maker earns while it can run. (4) THE LOCK: households bid water nobody lists, the bid floors at 30% (elasticity_min), the shelf is not supply (k = 0), so water sits at 10x base from tick 2-3 everywhere, above the 2x ceiling, and clean-water/medical makers may not draw their own input; THE SWITCH: the strategic scorer moves clean-water plants (16 -> 0 by tick 3, seed 0) to consumer goods on base-price margin within \"Welfare Goods\" without checking inputs (corp_ai.cpp:1553-1630); THE CHURN: consumer-goods plants starve on food rations (over the ceiling in 19-22 of 24 markets) and steel, idle, then resume on a price-only estimate (building_profit.cpp:113ff). Food rations run but cover only 25-60% of the bid in 2-7 markets. (5) No water extractors on seeds 0 and 10: a firm opened for the water gap is placed on whatever its tile holds most (corporation_generation.cpp:476/548) yet counted against water's cap (:2667). FIXES FILED: BL-1196 (households consume from the shelf, H1+H4), BL-1197 (gap firm digs the gap resource, H5), BL-1187 widened (H6 + H7), NR-968 (H2).\n\nSprint 49, diagnosis first. On every seed water, clean water and medical supplies are supplied 0 at market across 400 play ticks, consumer goods fall to ~0 by tick ~100, and food rations run 25-45% of demand (the BL-1163 lane's centre_decline_trace, 2026-10-04). Yet steel_chain_probe sees 15 of 16 clean-water processors running at tick 0 on seed 0, so the output goes somewhere: name where (own pools, reservation, the shelf, a buyer of last resort, a household bid that is a pricing pull only and never fills). Then: is household demand a market a firm can PROFIT from (who pays, at what price)? If it is not, no placement or scorer change will make firms serve it. Read beside NR-968 (the price cycle) and BL-1185 (chain-feasible placement): household goods are the demand endpoints the chains exist for. Unblocks BL-1163 (NR-967)."
   },
   {
    "status": "designed",
@@ -1427,6 +1427,50 @@
     "src/world/supply_system.cpp"
    ],
    "design": "After BL-1186 routes water crossings as land -> port -> sea -> port -> land, convoy_route_tiles still lays the lane as the direct centre-to-centre path, so the vision beam, the convoy's drawn position and interdiction all read a route the cargo does not take. Make convoy_route_tiles return the leg route."
+  },
+  {
+   "status": "designed",
+   "glyph": "◐",
+   "sprint": 49,
+   "written": "2026-10-04",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1196",
+   "short_name": "HOUSEHOLDS_CONSUME",
+   "author": "Claude (the BL-1193 diagnosis, 2026-10-04)",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 4,
+   "title": "A population centre consumes its basket off its market's shelf, as the doc says, and grows on what it received",
+   "authority_doc": "docs/economy/POPULATION.md",
+   "files": [
+    "src/world/market_clearing.cpp",
+    "src/world/economy_system.cpp",
+    "src/world/world_save.cpp"
+   ],
+   "design": "DOC-MANDATED (POPULATION.md sec Population demand: \"Each Tick, a population centre consumes a basket of goods drawn from the local market\"; MARKETS.md sec Three properties: every resource needs a TERMINAL sink). Today the household bid only moves the price (market_clearing.cpp:585) and nothing leaves a shelf, so household-good shelves grow forever and the market's last-resort buy is the only buyer. BUILD: each clear, households draw their basket from the market's shelf (inventory), up to their bid, in a deterministic order; what they received is the household FILL (MARKETS.md sec Want and fill) and the growth gate reads it (BL-1163's met ratio = received / bid, replacing the pro-rata stand-in). Money: the market already paid the maker when it bought the stock, so consumption moves goods, not credits - state that in FINANCE.md's money loop if it is silent. A seam change (economy + save if a new record is persisted): Full mode, cold review, a multi-tick row (a one-tick row cannot see the shelf drain). Measure on BL-1184. Unblocks BL-1163 and removes NR-968's premise that inventory only grows."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 49,
+   "written": "2026-10-04",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1197",
+   "short_name": "GAP_FIRM_DIGS_THE_GAP",
+   "author": "Claude (the BL-1193 diagnosis, 2026-10-04)",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 2,
+   "title": "A firm generated to fill a resource gap extracts that resource",
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "files": [
+    "src/world/corporation_generation.cpp"
+   ],
+   "design": "GENERATION CHANGE (sprint 49 generation lane, after BL-1185). Seeds 0 and 10 have no water extractor at all; seed 43 has 2 in 1 of 18 markets. A firm opened to fill the water gap is placed on whatever its tile holds most of (corporation_generation.cpp:476, :548) yet still counted against water's per-resource cap (:2667), so the cap fills with firms digging something else. Place the gap firm on a tile of the gap resource, or do not count it. Measure water extractors per seed and BL-1184."
   }
  ]
 }
