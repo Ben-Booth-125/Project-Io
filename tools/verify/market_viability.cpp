@@ -49,12 +49,13 @@
 //      wording; it matches the 2026-10-04 reading's "~225 processors".)
 //      TARGET: pooled share running at the handoff >= 70%.
 //   G2 field income per tick: the sum of `quarterly_return::income` over every
-//      corporation's return filed that tick, at the settle's last tick and at
-//      tick 50, and the ratio tick50 / settle-close. Pooled = sum / sum.
-//      TARGET: pooled ratio >= 50%. For context only, the settle's 12-tick
-//      MEAN and the play 26-50 mean are printed: the 2026-10-04 reading's
-//      "54-74k at the settle close, 10-19k by tick 50" were those window means
-//      (firm_attrition_trace's rows), not single ticks.
+//      corporation's return filed that tick, as WINDOW MEANS: play ticks 26-50
+//      over the 12 settle ticks. Pooled = sum / sum. TARGET: pooled >= 50%.
+//      WINDOWS, NOT SINGLE TICKS (main session, 2026-10-04): the settle's last
+//      tick swings 12k-45k across seeds as the opening stock auctions out, so a
+//      single-tick ratio passed the broken baseline at 64.8% (seed 12: 204%)
+//      while the window form read 27.5% -- the stock auction this gate exists
+//      to look past. The single ticks are still printed per seed, as context.
 //   G3 firms alive at the last play tick that existed at the handoff, over the
 //      firms at the handoff (corporations, seat included). Pooled = sum / sum.
 //      TARGET: pooled >= 70%. (A firm that appears after the handoff is not in
@@ -570,7 +571,7 @@ int main(int argc, char** argv)
         if (!r.fail.empty()) ++honesty_fail;
         if (!r.built) { std::printf(" %4u | FAILED: %s\n", r.seed, r.fail.c_str()); continue; }
         ph.add(r.g1_handoff); p50.add(r.g1_t50);
-        ic += r.inc_close; i50 += r.inc_t50; fh += r.firms_handoff; fs += r.firms_survived;
+        ic += r.inc_settle_mean; i50 += r.inc_t26_50_mean; fh += r.firms_handoff; fs += r.firms_survived;
         double sm = 0; for (const double x : r.seat_opnet) sm += x;
         int sran = 0; for (const auto& sp : r.seat_procs) if (sp.ran > 0) ++sran;
         const auto oth = [](const proc_tally& t) { return t.built() - t.n[ps_run] - t.n[ps_input]; };
@@ -592,7 +593,7 @@ int main(int argc, char** argv)
     print_tally("tick 50", p50);
     std::printf(" %s  G1 processors running at handoff  %5.1f%%  (target >= %.0f%%)\n",
                 g1 >= k_target_g1_running_at_handoff ? "PASS" : "FAIL", pct(g1), pct(k_target_g1_running_at_handoff));
-    std::printf(" %s  G2 field income t%d / settle close  %5.1f%%  (%.0f / %.0f; target >= %.0f%%)\n",
+    std::printf(" %s  G2 field income play 26-%d mean / settle mean  %5.1f%%  (%.0f / %.0f; target >= %.0f%%)\n",
                 g2 >= k_target_g2_income_ratio ? "PASS" : "FAIL", k_g1_g2_play_tick, pct(g2), i50, ic,
                 pct(k_target_g2_income_ratio));
     std::printf(" %s  G3 firms alive t%d / handoff       %5.1f%%  (%lld / %lld; target >= %.0f%%)\n",

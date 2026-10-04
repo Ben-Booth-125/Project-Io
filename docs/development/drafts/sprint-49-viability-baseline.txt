@@ -1,3 +1,5 @@
+NOTE (main session, 2026-10-04): G2 is now the WINDOW form (play 26-50 mean / settle mean). On this baseline the gate reads G2 27.5% (FAIL), not the single-tick 64.8% printed below, which predates the switch.
+
 market_viability — sprint 49 baseline reading (BL-1184, market viability gate)
 ==============================================================================
 Taken 2026-10-04 on base 3b74a5ce (main; src/ untouched by this item), harness

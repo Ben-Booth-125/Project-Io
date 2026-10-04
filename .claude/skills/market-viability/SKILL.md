@@ -53,12 +53,12 @@ keep-awake (`tools/session/keepawake.ps1 -Process market_viability`) on an unatt
   **Share running = run / built processors** (every state but `build`). The share over all
   processors, construction included, is printed beside it. Target: pooled >= 70% at handoff.
 - **G2, field income per tick** — the sum of every corporation's filed `quarterly_return::income`,
-  at the settle's last tick and at tick 50, and their ratio. Pooled = sum / sum.
-  Target: pooled >= 50%. The settle's 12-tick mean and the play 26-50 mean print as context;
-  the 2026-10-04 reading's "54-74k / 10-19k" were those window means.
-  **Read G2 with care.** The settle's last tick comes after the opening stock is auctioned, and
-  it swings 12k-45k across seeds. On the baseline the single-tick gate PASSES (64.8%) while the
-  window form reads 27.5%. Which form is the gate is Ben's call (flagged with BL-1184).
+  as WINDOW MEANS: the play 26-50 mean over the 12-tick settle mean. Pooled = sum / sum.
+  Target: pooled >= 50%. The single ticks (settle close, tick 50) print per seed as context.
+  **Why windows (main session, 2026-10-04).** The settle's last tick comes after the opening
+  stock is auctioned and swings 12k-45k across seeds, so the single-tick ratio PASSED the broken
+  baseline (64.8%, seed 12 at 204%) while the window form read 27.5%. The baseline file's
+  pooled G2 line predates the switch; its window line (27.5%) is the gate's number.
 - **G3, firm survival** — of the corporations present at the handoff (seat included), how many
   stand at the last play tick. Pooled = sum / sum. Target: pooled >= 70%. Firms born later are
   not in the cohort; the end count prints beside it.
