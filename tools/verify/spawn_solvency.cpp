@@ -140,6 +140,7 @@
 #include <cstring>
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -431,7 +432,11 @@ struct seed_result
     int    field_holdings_open = 0;
     int    field_holdings_close = 0;
     int    rival_units = 0, rival_heads = 0;
-    int    rivals_armed = 0;      ///< rivals holding a military base at close (BL-1154: one seeded unit each)
+    int    rivals_armed = 0;      ///< rivals holding a military base at close, ANY state (the retired proxy; printed only)
+    int    rivals_base_unbuilt = 0; ///< of those, rivals whose only base is still under construction
+    int    rival_units_seeded = 0;  ///< rival units alive at close that already stood at the settle's open
+    int    rival_units_hired  = 0;  ///< rival units alive at close that did NOT — raised in the settle
+    int    rival_units_open   = 0;  ///< rival units standing at the settle's open (BL-1154's seeded force)
     int    rival_max_units = 0;   ///< the most units any one rival holds (the hire cap is 3)
     output_probe probe;
     bool   filed_ok = true;       ///< every corp filed, and flows reconstruct the net
@@ -502,6 +507,19 @@ seed_result run_seed(uint32_t seed, lua_state& lua, bool prehistory)
     for (const auto& kv : w.corporations)
         out.field_holdings_open += static_cast<int>(kv.second.assets.size());
 
+    // R4's hire count is read by PROVENANCE: the units standing at the open are
+    // the seeded force (BL-1154), so a rival unit at close that is not among
+    // them was raised in the settle. Entity ids are never reused, so the set is
+    // exact. See the R4 note in main() for the proxy this replaced.
+    std::set<entity_id> units_at_open;
+    for (const auto& kv : w.units)
+    {
+        units_at_open.insert(kv.first);
+        if (kv.second.owner != w.player_entity
+            && w.corporations.find(kv.second.owner) != w.corporations.end())
+            ++out.rival_units_open;
+    }
+
     output_probe probe;
     probe.corp = w.player_entity;
     g_probe = &probe;
@@ -529,6 +547,8 @@ seed_result run_seed(uint32_t seed, lua_state& lua, bool prehistory)
         auto& f = force[u.owner];
         f.first  += 1;
         f.second += u.count;
+        if (u.owner != w.player_entity && w.corporations.find(u.owner) != w.corporations.end())
+            ++(units_at_open.count(uid) ? out.rival_units_seeded : out.rival_units_hired);
     }
 
     for (const entity_id id : ids)
@@ -587,13 +607,18 @@ seed_result run_seed(uint32_t seed, lua_state& lua, bool prehistory)
                 out.rival_heads += f->second.second;
                 out.rival_max_units = std::max(out.rival_max_units, f->second.first);
             }
+            bool any_base = false, built_base = false;
             for (const entity_id bid : cc.assets)
                 if (const auto bit = w.buildings.find(bid);
                     bit != w.buildings.end() && bit->second.type == building_type::military_base)
                 {
-                    ++out.rivals_armed;
-                    break;
+                    any_base = true;
+                    built_base = built_base || bit->second.ticks_remaining <= 0;
                 }
+            if (any_base)
+                ++out.rivals_armed;
+            if (any_base && !built_base)
+                ++out.rivals_base_unbuilt;
             if (cc.balance > 0.0f)
                 ++out.rivals_solvent;
             rival_balances.push_back(cc.balance);
@@ -960,9 +985,14 @@ int main(int argc, char** argv)
     std::printf("\n=== R4  THE BACKGROUND FIELD SURVIVES ===\n");
     int total_rivals = 0, total_solvent = 0, holdings_open = 0, holdings_close = 0;
     int total_rival_units = 0, total_rival_heads = 0, total_armed = 0, max_units = 0;
+    int total_unbuilt = 0, total_seeded_alive = 0, total_hired = 0, total_open = 0;
     for (const seed_result& r : rows)
     {
         total_armed       += r.rivals_armed;
+        total_unbuilt     += r.rivals_base_unbuilt;
+        total_seeded_alive += r.rival_units_seeded;
+        total_hired       += r.rival_units_hired;
+        total_open        += r.rival_units_open;
         max_units          = std::max(max_units, r.rival_max_units);
         total_rivals      += r.rivals;
         total_solvent     += r.rivals_solvent;
@@ -984,12 +1014,26 @@ int main(int argc, char** argv)
                 "[pre-BL-635 baseline: %.1f units per seed]\n",
                 total_rival_units, total_rival_heads, k_baseline_rival_units_per_seed);
     // BL-1154 review: since rivals start armed (one seeded unit each), the units
-    // standing are not evidence of hiring. HIRED = units less one seeded unit per
-    // armed rival (a seeded unit lost in battle makes this an undercount, never
-    // an overcount).
-    const int hired = total_rival_units - total_armed;
-    std::printf("  rivals armed at close: %d; units HIRED in the settle: %d; the most units any "
-                "one rival holds: %d (the hire cap is 3)\n", total_armed, hired, max_units);
+    // standing are not evidence of hiring.
+    //
+    // HIRED IS COUNTED BY PROVENANCE (2026-10-04). It was `units - rivals holding
+    // a military base`, on the premise that every such rival was seeded with one
+    // unit. That premise was false from the start: only SPECIALISTS are seeded
+    // (`arm_rivals` skips background firms), and the scorer's muster-base
+    // candidate has background firms BUILD bases — which sit under construction,
+    // unit-less, through a 12-tick settle. Every one subtracted a unit that never
+    // existed. BL-1172's fair-price ceiling roughly tripled how many background
+    // firms hold such an unbuilt base (seeds 0-7: 345 -> 793 proxy-armed against
+    // 125 seeded), and the proxy went from +36 to -418 while the units actually
+    // raised moved 256 -> 250. A negative hire count was the tell: the row read a
+    // bookkeeping artefact, not the field's ability to hire. The proxy is still
+    // printed so the movement stays visible.
+    const int hired = total_hired;
+    std::printf("  units at the open: %d seeded; at close %d of them stand + %d HIRED in the settle "
+                "= %d; the most units any one rival holds: %d (the hire cap is 3)\n",
+                total_open, total_seeded_alive, hired, total_rival_units, max_units);
+    std::printf("  retired proxy: %d rivals hold a military base (%d of them only an UNBUILT one); "
+                "units - that = %d\n", total_armed, total_unbuilt, total_rival_units - total_armed);
 
     // R4's requirement reads "solvent enough to KEEP ACTING, so the seed's data
     // is not poisoned by dead corps" — it is a test that the fix did not starve
@@ -1005,6 +1049,12 @@ int main(int argc, char** argv)
     check(hired > 0, "R4",
           "the field still fields a standing force (rivals can still afford to HIRE: "
           "units beyond the one each armed rival was seeded with)");
+    // The pin on the count itself: every rival unit at close is either one that
+    // stood at the open or one raised since, and no more survive than were
+    // seeded. A count that does not reconcile is the proxy's failure back again.
+    check(total_seeded_alive + hired == total_rival_units && total_seeded_alive <= total_open,
+          "R4", "the hire count reconciles by provenance: seeded survivors + hires == rival "
+                "units at close, and no more seeded units survive than stood at the open");
 
     std::printf("\n%s (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES ABOVE",
                 g_failures, g_failures == 1 ? "" : "s");
