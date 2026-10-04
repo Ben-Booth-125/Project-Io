@@ -702,7 +702,7 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": null,
+   "sprint": 50,
    "written": "2026-09-26",
    "requires": [
     "BL-1137"
@@ -721,7 +721,7 @@
     "src/world/settlement.cpp",
     "src/world/history_sim.cpp"
    ],
-   "design": "FOUND 2026-09-26 by the BL-1137 rebuild's cold review: INDUSTRIALISATION.md Beat 2 (PROPOSED) says \"a stream moves culture shares into its destination centre ... This is what produces property 4's checkered provinces\", and settle_urban_migrants moves people and capacity but no culture share. The Beat 2 paragraph is PROPOSED, not SETTLED, so this is design-then-build: Ben settles whether migrants carry their culture share, then the stream moves shares in proportion to the heads it moves, with the same largest-remainder rounding and conservation. Measure the checkered-province reading (property 4) before and after. Runs after BL-1137 (industrial urbanisation) merges."
+   "design": "FOUND 2026-09-26 by the BL-1137 rebuild's cold review: INDUSTRIALISATION.md Beat 2 (PROPOSED) says \"a stream moves culture shares into its destination centre ... This is what produces property 4's checkered provinces\", and settle_urban_migrants moves people and capacity but no culture share. The Beat 2 paragraph is PROPOSED, not SETTLED, so this is design-then-build: Ben settles whether migrants carry their culture share, then the stream moves shares in proportion to the heads it moves, with the same largest-remainder rounding and conservation. Measure the checkered-province reading (property 4) before and after. Runs after BL-1137 (industrial urbanisation) merges.\n\nMOVED TO SPRINT 50 with BL-1170 (2026-10-04)."
   },
   {
    "status": "designed",
@@ -950,7 +950,7 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": 49,
+   "sprint": 50,
    "written": "2026-10-03",
    "requires": [
     "BL-1148"
@@ -966,12 +966,12 @@
    "title": "Crowded heartlands colonise and exploit distant polities, and a settler colony can grow into the age's distant rival",
    "authority_doc": "docs/generation/INDUSTRIALISATION.md",
    "files": [],
-   "design": "SETTLED (Ben, 2026-10-04): INDUSTRIALISATION.md § Industry spreads beyond its heartland, 'crowded heartlands reach overseas' owns the design; EXPLORATION.md § A colony is a subject points at it. Measured 2026-10-04 (16 seeds): 119 overseas regions at 1960, all within 8 water tiles, 0.36% of industry; the probe is tools/verify/overseas_reach_probe.cpp in worktree agent-a8c46e4ae96c8a006 (uncommitted; its history_sim counters must not merge). BUILD SLICES, each measured on the curated seeds before its magnitude is set: (1) the push (land crowding x navy before industry_open_year, capital crowding x navy after); (2) voyages: push over a threshold seeks contact where the fleet out-projects; (3) plant: settle overseas beside natives; (4) expedition: conquest by sea past the 9-tile horizon, fleet-gated; (5) exploit: sea-legs and sphere of claim ease with the push; (6) settlers flow from the metropole (requires BL-1148); (7) chartered company: DESIGN FIRST (post = region/market/building? inherited as a firm? seat and charter price by reach). Judged property: a far rival holds >= 25% of the leader's industry."
+   "design": "SETTLED (Ben, 2026-10-04): INDUSTRIALISATION.md § Industry spreads beyond its heartland, 'crowded heartlands reach overseas' owns the design; EXPLORATION.md § A colony is a subject points at it. Measured 2026-10-04 (16 seeds): 119 overseas regions at 1960, all within 8 water tiles, 0.36% of industry; the probe is tools/verify/overseas_reach_probe.cpp in worktree agent-a8c46e4ae96c8a006 (uncommitted; its history_sim counters must not merge). BUILD SLICES, each measured on the curated seeds before its magnitude is set: (1) the push (land crowding x navy before industry_open_year, capital crowding x navy after); (2) voyages: push over a threshold seeks contact where the fleet out-projects; (3) plant: settle overseas beside natives; (4) expedition: conquest by sea past the 9-tile horizon, fleet-gated; (5) exploit: sea-legs and sphere of claim ease with the push; (6) settlers flow from the metropole (requires BL-1148); (7) chartered company: DESIGN FIRST (post = region/market/building? inherited as a firm? seat and charter price by reach). Judged property: a far rival holds >= 25% of the leader's industry.\n\nMOVED TO SPRINT 50 (2026-10-04): sprint 49 is cut on market viability."
   },
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": 49,
+   "sprint": 50,
    "written": "2026-10-03",
    "requires": [],
    "blocked_on": null,
@@ -987,7 +987,7 @@
    "files": [
     "src/world/corp_ai.cpp"
    ],
-   "design": "SETTLED (Ben, 2026-10-03, for sprint 49): FINANCE.md, \"hiring answers a threat\". Today rivals hire to max_units_per_corp = 3 with a flat weight x jitter. WIDENS THE AI GRANT: record the grant in AI_OPPONENT.md § 11 with Ben's date when built; pure, seeded, deterministic, legal verbs only, never a planner."
+   "design": "SETTLED (Ben, 2026-10-03, for sprint 49): FINANCE.md, \"hiring answers a threat\". Today rivals hire to max_units_per_corp = 3 with a flat weight x jitter. WIDENS THE AI GRANT: record the grant in AI_OPPONENT.md § 11 with Ben's date when built; pure, seeded, deterministic, legal verbs only, never a planner.\n\nOUT OF SPRINT 49 (2026-10-04): it widens the AI grant, which Ben has not given; an upkeep retune is the sprint 49 stopgap if he wants one."
   },
   {
    "status": "proposed",
@@ -1120,7 +1120,7 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 49,
+   "sprint": 50,
    "written": "2026-10-04",
    "requires": [],
    "blocked_on": null,
@@ -1136,7 +1136,7 @@
    "files": [
     "src/world/history_sim.cpp"
    ],
-   "design": "Measured on the 16 curated seeds at main b427aed0: 92 of 128 Exploration bindings (72%) and 15 of 30 Industrialisation bindings are freed the same year they are made, mostly seeds 32 and 40. Each cycle moves a purchase price and writes a grudge. Distance cannot cause it (bind needs <= 400, free needs > 500), which leaves cohesion <= 260 or a missing contact. Separate the two, then decide with Ben whether the bind test should read what the free test reads."
+   "design": "Measured on the 16 curated seeds at main b427aed0: 92 of 128 Exploration bindings (72%) and 15 of 30 Industrialisation bindings are freed the same year they are made, mostly seeds 32 and 40. Each cycle moves a purchase price and writes a grudge. Distance cannot cause it (bind needs <= 400, free needs > 500), which leaves cohesion <= 260 or a missing contact. Separate the two, then decide with Ben whether the bind test should read what the free test reads.\n\nMOVED TO SPRINT 50 (2026-10-04): not a market-viability item."
   },
   {
    "status": "proposed",
@@ -1158,6 +1158,159 @@
     "src/world/economy_system.cpp"
    ],
    "design": "Found 2026-10-04 diagnosing acquisition_viability R1: under BL-1172 (fair-price army) a material posted over the 2x ceiling pauses a build, and a site that does not bid cannot lower the price, so background firms' muster bases almost never finish (1,040 of 1,192 such firms on 12 seeds hold only an unbuilt base) and on seeds 0 and 4 the seat's processors started in the settle produced nothing in 24 quarters. Ben (2026-10-04): re-bless first, fix in sprint 49. Diagnose which materials sit over the ceiling and why (listings-only supply at k = 0; BL-1179 shelf spoilage may be the lever), then bring Ben the fix. Also: whether background firms should start muster bases at all is a scorer question (AI grant register)."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 49,
+   "written": "2026-10-04",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1184",
+   "short_name": "MARKET_VIABILITY_GATE",
+   "author": "Claude (the sprint 49 market viability sweep, 2026-10-04)",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 2,
+   "title": "One 16-seed reading says whether the market economy is viable from day 1, against targets Ben sets",
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "tools/verify/"
+   ],
+   "design": "Sprint 49 wave 0. One instrument over the 16 curated seeds on the shipped start, reporting per seed and pooled: processors running and input-starved at handoff and at tick 50; field income per tick at tick 50 against the settle close (the run-rate, not the stock auction); the seat corp's operating net and whether its processors run; firms alive at tick 400; markets clearing nothing in the first play year. It reads and reports; the targets are Ben's (the sprint 49 form). Built from the harnesses the reading used, so it is one command, not five; wrapping it as a skill needs Ben's permission. Every other sprint 49 item is judged against it.\n\nREADING (2026-10-04, main a56e4ce3, 16 curated seeds, shipped 1960 start, 12 settle + 400 play ticks; spawn_solvency, firm_attrition_trace, centre_decline_trace, market_census, recipe_margin, and steel_chain_probe on seeds 0/43/37): recipe_margin is green in both bands. Day 1 looks solvent (99-100% of firms, +94..+211/qtr each) but the settle is opening stock being auctioned: field income 54-74k/tick at the settle close, 10-19k by tick 50 on every seed. At handoff 119-141 of ~225 processors are input-starved (copper refining, alloys, machinery, electronics, spacecraft never run); 10k steel sits on shelves against demand of 12 while 0 shipments go (135 pairs unroutable, 52 refused by the price gate); by tick 20 steel is 6 supply vs 5,187 demand with coal unbought one market away. Processors grow 225 -> 390 while those running fall to 44-67. 1,457 of 2,074 firms are insolvent by tick 400 (corps 121-149 -> 19-77). Insolvent firms per tick: income 75, maintenance+wages 46, upkeep 19; survivors 229 / 63 / 21. The seat is handed a steel mill (recipe 0) that idles on every seed; seat median operating net ~+66/qtr, four seeds under +7."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "written": "2026-10-04",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1185",
+   "short_name": "CHAIN_FEASIBLE_PLACEMENT",
+   "author": "Claude (the sprint 49 market viability sweep, 2026-10-04)",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 4,
+   "title": "Generation places a processor only where its inputs are produced within reach",
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "files": [
+    "src/world/landscape_search.cpp",
+    "src/world/corporation_generation.cpp"
+   ],
+   "design": "GENERATION CHANGE, offered for a later sprint (Ben, 2026-10-04: generation changes are considered separately). The landscape search's winner hands play 119-141 input-starved processors of ~225 (seeds 0/43/37): whole chains (copper refining, alloys, machinery, electronics, spacecraft) have no input producer anywhere reachable, and coal is extracted in one market while steel mills stand in ten. Design question for Ben: a HARD placement rule (no processor without a reachable producer of each input) or a heavier chain-completeness term in the search score (which keeps viable-but-uneven). Reach is the same reach BL-1186 (goods cross markets) settles, so that diagnosis comes first.\n\nREADING (2026-10-04, main a56e4ce3, 16 curated seeds, shipped 1960 start, 12 settle + 400 play ticks; spawn_solvency, firm_attrition_trace, centre_decline_trace, market_census, recipe_margin, and steel_chain_probe on seeds 0/43/37): recipe_margin is green in both bands. Day 1 looks solvent (99-100% of firms, +94..+211/qtr each) but the settle is opening stock being auctioned: field income 54-74k/tick at the settle close, 10-19k by tick 50 on every seed. At handoff 119-141 of ~225 processors are input-starved (copper refining, alloys, machinery, electronics, spacecraft never run); 10k steel sits on shelves against demand of 12 while 0 shipments go (135 pairs unroutable, 52 refused by the price gate); by tick 20 steel is 6 supply vs 5,187 demand with coal unbought one market away. Processors grow 225 -> 390 while those running fall to 44-67. 1,457 of 2,074 firms are insolvent by tick 400 (corps 121-149 -> 19-77). Insolvent firms per tick: income 75, maintenance+wages 46, upkeep 19; survivors 229 / 63 / 21. The seat is handed a steel mill (recipe 0) that idles on every seed; seat median operating net ~+66/qtr, four seeds under +7."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 49,
+   "written": "2026-10-04",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1186",
+   "short_name": "GOODS_CROSS_MARKETS",
+   "author": "Claude (the sprint 49 market viability sweep, 2026-10-04)",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "A surplus in one market reaches a shortage in the next: find why shipments are zero",
+   "authority_doc": "docs/economy/SUPPLY.md",
+   "files": [
+    "src/world/supply_system.cpp",
+    "src/world/market_clearing.cpp",
+    "src/world/logistics.cpp"
+   ],
+   "design": "Sprint 49 wave 1, diagnosis before any constant moves. At handoff on seed 0, 10,329 steel sits on 9 markets' shelves against local demand of 12, and the next dispatch would send 0: 135 market pairs unroutable, 52 refused by the price gate, 0 market exports, 0 corp dispatches. By tick 20 steel is 6 supply against 5,187 demand and coal (149 supply, 6 demand) sits one market away from the mills that want it. Name, per pair, why it is unroutable (reach, the passive-LP cap, the road tree, the bridge cap) and why the gate refuses. Levers on record: the export price gate, dispatch_margin (0.05), the passive-LP cap. Read beside BL-1183 (ceiling stalls construction) and BL-1165's haulage reading, which overlap. A world-mover: re-bless at the wave close.\n\nREADING (2026-10-04, main a56e4ce3, 16 curated seeds, shipped 1960 start, 12 settle + 400 play ticks; spawn_solvency, firm_attrition_trace, centre_decline_trace, market_census, recipe_margin, and steel_chain_probe on seeds 0/43/37): recipe_margin is green in both bands. Day 1 looks solvent (99-100% of firms, +94..+211/qtr each) but the settle is opening stock being auctioned: field income 54-74k/tick at the settle close, 10-19k by tick 50 on every seed. At handoff 119-141 of ~225 processors are input-starved (copper refining, alloys, machinery, electronics, spacecraft never run); 10k steel sits on shelves against demand of 12 while 0 shipments go (135 pairs unroutable, 52 refused by the price gate); by tick 20 steel is 6 supply vs 5,187 demand with coal unbought one market away. Processors grow 225 -> 390 while those running fall to 44-67. 1,457 of 2,074 firms are insolvent by tick 400 (corps 121-149 -> 19-77). Insolvent firms per tick: income 75, maintenance+wages 46, upkeep 19; survivors 229 / 63 / 21. The seat is handed a steel mill (recipe 0) that idles on every seed; seat median operating net ~+66/qtr, four seeds under +7."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 49,
+   "written": "2026-10-04",
+   "requires": [
+    "BL-1186"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1187",
+   "short_name": "BUILD_ONLY_WHAT_RUNS",
+   "author": "Claude (the sprint 49 market viability sweep, 2026-10-04)",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "A firm does not start a building whose inputs it cannot obtain",
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "files": [
+    "src/world/corp_ai.cpp",
+    "src/world/building_profit.cpp"
+   ],
+   "design": "Sprint 49 wave 1, after BL-1186 (what 'obtainable' means depends on whether goods move). Firms keep building processors that never run: processors 225 -> 390 on seed 0 while those running fall 80 -> 52; seed 41 holds 1,241 buildings under construction against 263 live. The build score (estimate_prospective_profit) should price the inputs a building can actually obtain at its market, not their nominal price. Read AI_OPPONENT.md sec 11 first: this is the existing build decision priced better, not a new subject, so no new grant is expected; if the reading says otherwise, raise it.\n\nREADING (2026-10-04, main a56e4ce3, 16 curated seeds, shipped 1960 start, 12 settle + 400 play ticks; spawn_solvency, firm_attrition_trace, centre_decline_trace, market_census, recipe_margin, and steel_chain_probe on seeds 0/43/37): recipe_margin is green in both bands. Day 1 looks solvent (99-100% of firms, +94..+211/qtr each) but the settle is opening stock being auctioned: field income 54-74k/tick at the settle close, 10-19k by tick 50 on every seed. At handoff 119-141 of ~225 processors are input-starved (copper refining, alloys, machinery, electronics, spacecraft never run); 10k steel sits on shelves against demand of 12 while 0 shipments go (135 pairs unroutable, 52 refused by the price gate); by tick 20 steel is 6 supply vs 5,187 demand with coal unbought one market away. Processors grow 225 -> 390 while those running fall to 44-67. 1,457 of 2,074 firms are insolvent by tick 400 (corps 121-149 -> 19-77). Insolvent firms per tick: income 75, maintenance+wages 46, upkeep 19; survivors 229 / 63 / 21. The seat is handed a steel mill (recipe 0) that idles on every seed; seat median operating net ~+66/qtr, four seeds under +7."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "written": "2026-10-04",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1188",
+   "short_name": "SEAT_KIT_RUNS",
+   "author": "Claude (the sprint 49 market viability sweep, 2026-10-04)",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 2,
+   "title": "The seat corp's starting processor can run on day 1",
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "files": [
+    "src/world/corporation_generation.cpp"
+   ],
+   "design": "GENERATION CHANGE, offered for a later sprint. On every seed the seat is handed one processing facility on recipe 0, the steel mill (iron ore + coal); it idles every quarter on seeds 46, 43, 32, 25 and 9 and most quarters elsewhere, because coal is produced in one market. Seat median operating net ~+66/qtr against the field's ~+130; seeds 40, 13, 32 and 46 sit between +0.7 and +6.9. Pick the seat's recipe (or site) so its inputs are produced within reach, or hand it the input extraction beside it. A special case of BL-1185, cheap enough to land first."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "written": "2026-10-04",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1189",
+   "short_name": "OPENING_STOCK_SIZED",
+   "author": "Claude (the sprint 49 market viability sweep, 2026-10-04)",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "Opening stock is sized to what the market can take, so the settle shows the run-rate, not an auction",
+   "authority_doc": "docs/economy/FINANCE.md",
+   "files": [
+    "src/world/corporation_generation.cpp"
+   ],
+   "design": "GENERATION CHANGE, offered for a later sprint. The settle closes at 54-74k field income per tick and play runs at 10-19k by tick 50: the difference is opening pools sold into no demand (seed 0 settle: 12k steel per tick at 0.86x base against local demand of 12). It flatters day 1, floods shelves, and BL-1173 prices working capital off the same pools. Size opening stock to a few ticks of the pooled market's demand, then re-read BL-1173's fraction."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "written": "2026-10-04",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1190",
+   "short_name": "MARKETS_MEET_FIRMS",
+   "author": "Claude (the sprint 49 market viability sweep, 2026-10-04)",
+   "category": "Generation",
+   "priority": "C",
+   "difficulty": 3,
+   "title": "A carved market has someone to trade in it",
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "src/world/market_generation.cpp"
+   ],
+   "design": "GENERATION CHANGE, offered for a later sprint. market_census (16 seeds): 180 of 436 markets (41%) have no building in their catchment at handoff and 83 (19%) clear nothing over the first play year (shells 27.5%, carve 15.4%). Either the carve accounts for where firms stand, or placement seeds every market. Re-read after BL-1185 and BL-1186, which may shrink it on their own."
   }
  ]
 }

@@ -59,7 +59,23 @@ and/or a version goal (v0.1.1 etc.).
 
 ## Open now
 
-*Nothing open.*
+### Sprint 49 — market viability
+*Open · opened 2026-10-04 · Ben (2026-10-04, the focus and 'file them'); Claude (the 16-seed reading and the cut)*
+
+**Goal.** The market economy is profitable from day 1 at its run-rate, not on its opening stock: processors get their inputs, surplus reaches shortage, firms stop building plant that cannot run, and the field and the seat stay solvent through 400 play ticks, judged on one 16-seed reading (BL-1184) against targets Ben sets.
+
+**Planned.**
+- WAVE 0 - BEFORE ANYTHING MOVES THE WORLD. Merge the second re-bless once Ben authorises its shape (worktree-agent-abbae79fe78c0aa2c; drafts/sprint-48-rebless-2.md), then the v0.1.27 cut. BL-1184 (market viability gate): one 16-seed instrument, read on the post-re-bless tree as the baseline. Short design passes: BL-1163 (play villages decline) basket contents; BL-1175 (firm entry); BL-1179 (shelf spoilage).
+- WAVE 1 - THE PLAY-SIDE LEVERS. BL-1186 (goods cross markets): diagnosis of the zero shipments first, then the fix. BL-1187 (build only what runs), after BL-1186. BL-1163 (play villages decline): the household basket. BL-1183 (ceiling stalls construction) read beside BL-1186.
+- WAVE 2 - REFILL AND DRAIN. BL-1175 (firm entry), BL-1179 (shelf spoilage) then shelf supply k re-read, BL-1180 (construction rate panel drift). One re-bless after the world-movers of waves 1-2.
+- CARRIED / SMALL. BL-1119 (roads tree and detour) R4/R6/R7; BL-1165 (untraced re-bless movements), its haulage half read with BL-1186; BL-1166 (industrialisation harness self-check); BL-1176-1178 (works-note leftovers).
+- OUT. BL-1170 (heartlands reach overseas) and BL-1148 (migration carries culture) to sprint 50; BL-1174 (hiring answers a threat) waits on its AI grant; BL-1181 (bind-and-free churn) to sprint 50. Generation changes offered for a later sprint: BL-1185 (chain-feasible placement), BL-1188 (seat kit runs), BL-1189 (opening stock sized), BL-1190 (markets meet firms).
+
+**Done when.** BL-1184 reads at or past the targets Ben sets on the 16 curated seeds, after one re-bless.
+
+**Risk.** The biggest lever, chain-feasible placement, is generation and sits outside this sprint by Ben's choice, so the play-side levers may lift the gate's numbers only part of the way; the gate says how far. Every wave-1 fix is a world-mover on the economy seam: brief each rule with a MULTI-TICK row (BL-1172's lesson).
+
+THE READING (2026-10-04, main a56e4ce3, 16 seeds, shipped 1960 start): recipe_margin green in both bands; day 1 solvent but the settle is opening stock auctioned (field income 54-74k/tick at the settle close, 10-19k by tick 50); 119-141 of ~225 processors input-starved at handoff (seeds 0/43/37); 0 shipments between markets; processors 225 -> 390 while those running fall; 70% of firms insolvent by tick 400; the seat's steel mill idles on every seed. Full numbers in BL-1184. OPEN CALLS (the sprint 49 form, 2026-10-04): the gate's targets; whether to retune standing-force upkeep as a stopgap; whether the sweep becomes a skill; BL-1185's rule-or-score question when generation is taken up.
 
 ## Where things stand
 
@@ -132,9 +148,10 @@ and/or a version goal (v0.1.1 etc.).
 | 46 | the generation reaches the game | CLOSED EARLY 2026-09-24 (Ben: cut v0.1.25, move to sprint 47). The core landed — the wizard plays the whole arc, Begin keeps the world it built, the player chooses the corporation — and the economy thread it exposed was rebuilt; the carry rows and the draft's unfiled rows go to the sprint 47 cut. |
 | 47 | one history, told through the rounds | CLOSED 2026-09-25 (Ben: "I'll accept this as sprint 47 complete"; cut v0.1.26). The identity wave and each round's flair landed and passed two live-click walks; the one re-bless was taken once; BL-1084 (the world built once and moved) and the wave-3 stretch carried to sprint 48. |
 | 48 | the world moves forward | CLOSED 2026-10-04 (Ben: "close out this sprint"). The world is built once and moves forward; roads are a tree, markets can die, centres consolidate and deepen, sea lanes ride currents and trade, fleets project power, and three late branches (charter by reach, far trade, the fair-price army) were ruled, cold-reviewed and merged. Ben walked every owed live click. BL-1119 (roads tree and detour) carries three rows to sprint 49. The second re-bless is PREPARED, awaiting Ben's authorisation against its shape; the version cut follows it. |
+| 49 | market viability | OPEN 2026-10-04 (Ben: "a solid focus on market viability"). Wave 0: the second re-bless merges, then the day-1 viability gate (BL-1184). Generation changes are offered separately (BL-1185, BL-1188-1190), not in this sprint. |
 
-**Next up.** SPRINT 47 OPEN (2026-09-24): wave 0 first — BL-1083 then BL-1084 in one generation lane, BL-1085 in a core lane, BL-1101/BL-1096/BL-1097/BL-1102 as world-mover lanes; the identity wave opens as soon as BL-1083 lands. Re-bless once after wave 0's world-movers.
+**Next up.** SPRINT 49 OPEN (2026-10-04), market viability: wave 0 first - the second re-bless merges on Ben's authorisation, then BL-1184 (market viability gate) reads the baseline; BL-1186 (goods cross markets) diagnosis opens wave 1.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*67 sprints archived cold; 0 open/gated in the hot store.*
+*67 sprints archived cold; 1 open/gated in the hot store.*
