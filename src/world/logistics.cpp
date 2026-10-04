@@ -456,6 +456,13 @@ const logistics_flood_field& leg_flood_field_for(world& w, entity_id body, entit
         const auto tit = w.tiles.find(tid);
         return (tit != w.tiles.end()) ? &tit->second : nullptr;
     };
+    // What counts as WATER for this domain. A land leg never enters water of any
+    // kind; a sea leg sails the SEA only — ports gate on `is_coastal`, which reads
+    // is_sea, so a lake is no sea lane (a lake cell is to a sea leg what land is:
+    // somewhere it may end, never a cell it crosses).
+    const auto wet = [domain](const tile_component& t) {
+        return domain == leg_domain::sea ? is_sea(t.substrate) : is_water(t.substrate);
+    };
 
     const int ac = anchor_tc.grid_x, ar = anchor_tc.grid_y;
     f.anchor_idx = raster_idx(ac, ar, gw);
@@ -477,7 +484,7 @@ const logistics_flood_field& leg_flood_field_for(world& w, entity_id body, entit
         const tile_component* cur_tc = tile_at(idx);
         if (!cur_tc)
             continue;
-        const bool cur_water = is_water(cur_tc->substrate);
+        const bool cur_water = wet(*cur_tc);
         // A sea leg crosses land only at its two ends: a land cell that is not
         // the anchor is where a leg ENDS, never a cell it passes through.
         if (domain == leg_domain::sea && !cur_water && idx != f.anchor_idx)
@@ -496,7 +503,7 @@ const logistics_flood_field& leg_flood_field_for(world& w, entity_id body, entit
             const tile_component* n_tc = tile_at(nidx);
             if (!n_tc)
                 continue;
-            const bool n_water = is_water(n_tc->substrate);
+            const bool n_water = wet(*n_tc);
             if (domain == leg_domain::land && n_water)
                 continue; // a land leg never enters water
             if (domain == leg_domain::sea && !cur_water && !n_water)
@@ -539,7 +546,7 @@ const logistics_flood_field& leg_flood_field_for(world& w, entity_id body, entit
                 const tile_component* n_tc = tile_at(nidx);
                 if (!n_tc)
                     continue;
-                const bool n_water = is_water(n_tc->substrate);
+                const bool n_water = wet(*n_tc);
                 if (cur_water == n_water)
                     continue; // only the port <-> water hop
                 const float edge = 0.5f * (cur_cost + tile_traversal_cost(*n_tc))

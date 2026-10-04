@@ -94,7 +94,7 @@ std::vector<std::pair<int, float>> bounded_cost_to_tile(world& w, entity_id body
 enum class leg_domain : std::uint8_t
 {
     land = 1, ///< never enters a water cell
-    sea  = 2, ///< water only, between two endpoints that may be land (the ports)
+    sea  = 2, ///< SEA only (is_sea: never a lake), between two endpoints that may be land (the ports)
 };
 
 /// The least-cost path @p src_tile -> @p dst_tile confined to @p domain: one LEG.
@@ -103,7 +103,7 @@ enum class leg_domain : std::uint8_t
 /// unconfined path costs over the same tiles.
 ///   land: never enters water; a water endpoint is unreachable. src == dst on land
 ///         is a reachable zero-cost leg (an origin standing on its port).
-///   sea:  leaves @p dst_tile's flood (the destination PORT) by water only, crosses
+///   sea:  leaves @p dst_tile's flood (the destination PORT) by SEA only (a lake is no lane), crosses
 ///         water, and may END on a land cell touching that water (the origin port)
 ///         but never continues overland — port -> water -> port and nothing else.
 ///         Never zero-length: one port is no crossing. The port <-> water hop is

@@ -492,11 +492,12 @@ bool route_intra_body(world& w, const recipe_registry& reg, const logistics_node
     const float sea_rate  = reg.logistics_cost(convoy_mode::sea);
     const float handling  = reg.port_handling();
 
-    // The unconfined cheapest path. Unreachable here means unreachable by any route (every
-    // leg-confined path is also an unconfined one), so nothing below can find one.
+    // The unconfined cheapest path. NOT an early exit when unreachable: a sea leg also
+    // makes the port <-> water hop across the two hex diagonals the four-way flood never
+    // steps (logistics.cpp, leg_flood_field_for), so a pair the unconfined flood cannot
+    // join may still have a port route. No LAND route exists then, though: a land leg
+    // walks the same four-way edges and never enters water, so it is a subset.
     const logistics_path& path = intra_body_path(w, body, origin, dest);
-    if (!path.reachable)
-        return false;
 
     bool        have = false;
     float       best = 0.0f;
@@ -504,7 +505,7 @@ bool route_intra_body(world& w, const recipe_registry& reg, const logistics_node
 
     // LAND. Read before anything can touch the caches the reference points into
     // (std::map nodes stay put on insert; only a clear would move them).
-    if (!path.crosses_ocean)
+    if (path.reachable && !path.crosses_ocean)
     {
         route.n_legs       = 1;
         route.legs[0]      = {convoy_mode::land, land_rate, path.cost,
@@ -514,7 +515,7 @@ bool route_intra_body(world& w, const recipe_registry& reg, const logistics_node
         best = route_leg_per_unit(route.legs[0]);
         have = true;
     }
-    else
+    else if (path.reachable)
     {
         const logistics_path& land = intra_body_leg_path(w, body, origin, dest, leg_domain::land);
         if (land.reachable)
@@ -531,8 +532,16 @@ bool route_intra_body(world& w, const recipe_registry& reg, const logistics_node
 
     // SEA. Every ordered pair of distinct active ports, ascending. The legs out of the
     // origin and into the destination are each priced once per port.
+    //
+    // THE CHEAP EXIT. Every sea route pays both handling fees on top of three
+    // non-negative legs, so its per-unit cost is at least 2 x handling — in float too:
+    // adding a non-negative term never rounds a sum below an addend. When a land route
+    // already costs no more than that, no port pair can beat it, and the whole search
+    // (its per-port land floods and node-discount passes) is skipped. The answer is the
+    // one the full search gives; only the work differs.
+    const float fees = 2.0f * handling; // loading at A, unloading at B
     const std::vector<entity_id> ports = body_active_port_tiles(w, body); // copy: a plain value
-    if (ports.size() >= 2)
+    if (ports.size() >= 2 && !(have && !(fees < best)))
     {
         struct end_leg
         {
@@ -540,7 +549,6 @@ bool route_intra_body(world& w, const recipe_registry& reg, const logistics_node
             route_leg leg;
             float per_unit = 0.0f;
         };
-        const float fees = 2.0f * handling; // loading at A, unloading at B
         std::vector<end_leg> to_port(ports.size());
         for (std::size_t i = 0; i < ports.size(); ++i)
         {

@@ -79,6 +79,7 @@
 #include "harness_params.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -781,8 +782,15 @@ void run_seed(lua_state& lua, const options& o, std::uint32_t seed)
             refusal_breakdown(w, reg, G, home, home_markets, when.c_str(),
                               o.detail_ticks.count(step) > 0);
         }
+        // BL-1186 review: the dispatch pass's wall time (a harness reading, never
+        // fed back into the sim). Run with --no-breakdown to time it cold: the
+        // breakdown above prices every pair first and warms the caches it reads.
+        const auto dispatch_t0 = std::chrono::steady_clock::now();
         const convoy_dispatch_tick dt = dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
                          reg.logistics_cost(convoy_mode::space), &tick_lp_pools);
+        std::printf("  [timing] seed %u tick %d dispatch_convoys %.1f ms\n", seed, step,
+                    std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now()
+                                                              - dispatch_t0).count());
         const auto flows = clear_markets(w, reg, report);
         apply_budget(w, reg, flows, report.workforce_contention, &report.budgets,
                      &report.buildings, &report.building_labour);

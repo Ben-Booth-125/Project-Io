@@ -452,6 +452,23 @@ std::string run_sequence(const recipe_registry& reg)
             check(false, "R8.2 exactly one convoy is created");
     }
 
+    // R9 — a LAKE is no sea lane. R5's fixture with the crossing (columns 3-4)
+    // turned to lake: ports gate on the SEA (`is_coastal` reads is_sea), so a sea
+    // leg may not sail a lake, a land leg may not swim it, and the ocean bands at
+    // 16-17 close the detour. Refused, nothing mutated.
+    {
+        scenario s = make_world({3, 4, 16, 17}, 0, 8, {{2, 0}, {5, 0}});
+        for (auto& [tid, tc] : s.w.tiles)
+            if (tc.body == s.body && (tc.grid_x == 3 || tc.grid_x == 4))
+                tc.substrate = terrain_substrate::lake;
+        const std::string before = fingerprint(s.w);
+        const corp_command_result r = apply_corp_command(s.w, reg, dispatch_cmd(s, 25.0f));
+        const std::string after = fingerprint(s.w);
+        check(r == corp_command_result::rejected_placement && before == after,
+              "R9 a crossing by LAKE is no sea leg: refused, nothing mutated");
+        trace << "R9:" << static_cast<int>(r) << ';';
+    }
+
     return trace.str();
 }
 

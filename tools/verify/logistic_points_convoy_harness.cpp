@@ -573,6 +573,98 @@ void p7_default_is_private_and_fresh()
           "from the first call (each call rebuilds the full rate fresh)");
 }
 
+// ---------------------------------------------------------------------------
+// P8 — BL-1186 E1: the auto-dispatch sends what the anchor admits.
+// ---------------------------------------------------------------------------
+
+void p8_partial_lp_sends()
+{
+    std::printf("\n-- P8  BL-1186 E1: a cargo over the pool is trimmed, not refused (auto-dispatch) --\n");
+
+    // P8.1 A MARKET'S OWN SHELF EXPORT is trimmed to the anchor's pool. No corp
+    // stock, so only the shelf ships: 100 on the source shelf, the destination
+    // short 30 at twice the price, the anchor (the city at (1,0)) holds 20.
+    {
+        scenario s = make_scenario(/*stock=*/0.0f, 1000.0f);
+        recipe_registry reg = make_registry(20.0f);
+        s.w.markets.at(s.src_market).inventory[r_iron] = 100.0f;
+        s.w.markets.at(s.dst_market).price[r_iron]     = 10.0f;
+        s.w.markets.at(s.dst_market).demand[r_iron]    = 30.0f;
+        s.w.markets.at(s.dst_market).supply[r_iron]    = 0.0f;
+        const convoy_dispatch_tick ct = dispatch_convoys(
+            s.w, reg, reg.logistics_cost(convoy_mode::land), reg.logistics_cost(convoy_mode::space));
+        float cargo = 0.0f;
+        bool  owned_by_market = !s.w.convoys.empty();
+        for (const convoy_component& c : s.w.convoys)
+        {
+            cargo += c.cargo_qty;
+            owned_by_market = owned_by_market && c.corp == null_entity;
+        }
+        check(ct.market_exports == 1 && ct.trimmed_by_lp == 1 && ct.refused_no_lp == 0
+                  && owned_by_market && approx(cargo, 20.0f)
+                  && approx(s.w.markets.at(s.src_market).inventory[r_iron], 80.0f),
+              "P8.1 a market's own shelf export sized 30 leaves at the anchor's 20, shelf 100 -> 80");
+    }
+
+    // The direct commit_convoy rows: one leg of `qty` priced, committed with
+    // allow_partial_lp, no shared pool (each call a fresh pool at the rate).
+    struct outcome
+    {
+        bool  ok;
+        bool  refused_lp;
+        float sent;
+        float spent;
+        std::size_t convoys;
+    };
+    const auto commit = [](float lp, float qty, float balance, bool partial) -> outcome {
+        scenario s = make_scenario(100.0f, balance);
+        recipe_registry reg = make_registry(lp);
+        const logistics_nodes nodes = nodes_of(s.w);
+        const convoy_leg leg = price_convoy_leg(s.w, reg, nodes, s.corp, s.src_market,
+                                                s.dst_market, r_iron, qty,
+                                                reg.logistics_cost(convoy_mode::space));
+        bool  refused = false;
+        float sent    = 0.0f;
+        const float before = s.w.corporations.at(s.corp).balance;
+        const bool ok = commit_convoy(s.w, reg, s.corp, s.body, s.src_market, s.dst_market,
+                                      r_iron, qty, leg, nullptr, &refused, partial, &sent);
+        return {ok, refused, sent, before - s.w.corporations.at(s.corp).balance,
+                s.w.convoys.size()};
+    };
+
+    // P8.2 THE ONE-UNIT FLOOR: an anchor holding 0.5 does not make a convoy of a
+    // 30-unit cargo — refused for want of LP, nothing mutated.
+    {
+        const outcome o = commit(0.5f, 30.0f, 1000.0f, true);
+        check(!o.ok && o.refused_lp && o.convoys == 0 && o.spent == 0.0f,
+              "P8.2 pool 0.5, cargo 30: under the one-unit floor -> refused for LP, nothing spent");
+    }
+
+    // P8.3 A CARGO UNDER ONE UNIT: the floor is min(cargo, 1), so a 0.8 cargo needs
+    // the whole 0.8 — a 0.5 pool refuses it, a 0.9 pool sends it whole.
+    {
+        const outcome short_pool = commit(0.5f, 0.8f, 1000.0f, true);
+        check(!short_pool.ok && short_pool.refused_lp && short_pool.convoys == 0,
+              "P8.3a cargo 0.8, pool 0.5: refused (a sub-unit cargo is not trimmed further)");
+        const outcome enough = commit(0.9f, 0.8f, 1000.0f, true);
+        check(enough.ok && approx(enough.sent, 0.8f),
+              "P8.3b cargo 0.8, pool 0.9: sent whole");
+    }
+
+    // P8.4 THE SOLVENCY GATE WEIGHS THE TRIMMED COST. Cargo 30 down the 3-edge
+    // plains column costs 0.02 x 3 x 30 = 1.8; the pool admits 10, a third, 0.6.
+    // A balance of 1.0 affords the trimmed convoy but not the whole one: the
+    // partial commit sends 10 for 0.6; the whole commit is refused as insolvent.
+    {
+        const outcome partial = commit(10.0f, 30.0f, 1.0f, true);
+        check(partial.ok && approx(partial.sent, 10.0f) && approx(partial.spent, 0.6f),
+              "P8.4a balance 1.0 between trimmed (0.6) and full (1.8) cost: sends 10 for 0.6");
+        const outcome whole = commit(10.0f, 30.0f, 1.0f, false);
+        check(!whole.ok && whole.convoys == 0 && whole.spent == 0.0f,
+              "P8.4b the same cargo committed WHOLE (a commanded leg) is refused, nothing spent");
+    }
+}
+
 int main()
 {
     std::printf("=== logistic_points_convoy_harness (BL-597, LP_PASSIVE_CONVOYS) ===\n");
@@ -584,6 +676,7 @@ int main()
     p5_dispatch_counters();
     p6_shared_pool_contention();
     p7_default_is_private_and_fresh();
+    p8_partial_lp_sends();
 
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;
