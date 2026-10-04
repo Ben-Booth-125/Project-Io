@@ -2478,6 +2478,229 @@ bool bl1056_self_check()
     return ok;
 }
 
+/// BL-1169 (A CROWDED HEARTLAND YIELDS LESS; INDUSTRIALISATION.md sec Industry
+/// spreads beyond its heartland, K = 1000 Ben 2026-10-04) -- five synthetic rows,
+/// run in EVERY mode before any world generates, GATING like BL-1056's above.
+/// Each row reads the SHIPPED K off `industrialisation_sim_params`, so a moved K
+/// fails the hand-worked numbers, not only the pin.
+///
+/// THE FIXTURE (worked by hand; `run_exploration_upkeep`, the loop that owns the
+/// treasury conversion). One living polity (id 0), capital region 0, holding
+/// regions 0 and 1. Each region: one centre, 1000 urban heads, one work that
+/// employs more than any region holds (so the employed heads are the urban
+/// 1000), farm 1000 / ore 1000 / energy 1200 / port 0 (no port window, no
+/// manpower, no fleet: the round buys nothing). Treasury 0.
+///   EARN: endowment per region (1000+1000+1200+0)/4 = 800, mean 800;
+///         income = 800 x 1000/1000 x 1 year = 800 (treasury_endowment_income_q
+///         1000, step 1). No army, no navy: SURPLUS = 800.
+///   PAID IN = 800 x 250 / 1000 = 200 treasury units; credit = 200 x 1000 =
+///         200000 points. Equal employed heads: the apportion gives 100000 each.
+///   CROWDING (points x 1000 / employed heads): region 0 stands 2000 points ->
+///         2000; region 1 stands 1000 -> 1000.
+///   K = 1000: f0 = 1000 x 10^6 / (1000 + 2000) = 333333 ppm,
+///             f1 = 1000 x 10^6 / (1000 + 1000) = 500000 ppm.
+///         conv0 = (100000 / 10^6) x f0 + ((100000 % 10^6) x f0) / 10^6
+///               = 0 + 33333300000 / 10^6 = 33333   (withheld 66667)
+///         conv1 = 0 + 50000000000 / 10^6 = 50000   (withheld 50000)
+///         withheld 116667 points = 116 whole units (kept in the purse) and a
+///         residue of 667 points, which converts on the least crowded receiver
+///         (region 1, the larger f): region 1 gets 50667.
+///   RESULT: region 0 +33333, region 1 +50667 (84000 points = 84 units);
+///         debit 200 - 116 = 84; treasury_kept_by_crowding 116; the purse
+///         closes at 800 - 84 = 716, against 800 - 200 = 600 with K off.
+bool bl1169_self_check()
+{
+    bool ok = true;
+    const auto fail = [&ok](const char* what) { std::printf("FAIL  BL-1169 %s\n", what); ok = false; };
+
+    // ---- (1) THE PIN ------------------------------------------------------
+    const int64_t k_shipped = industrialisation_sim_params(world_params{}).industry_points_crowding_k;
+    const int64_t k_struct  = history_sim_params{}.industry_points_crowding_k;
+    std::printf("BL-1169 self-check (1): shipped Industrialisation K = %lld (ruled 1000), struct default K = %lld"
+                " (ruled 0, off)\n", (long long)k_shipped, (long long)k_struct);
+    if (k_shipped != 1000 || k_struct != 0) fail("(1): K is not the ruled 1000 on the span, or the struct is not off");
+
+    works_registry w;
+    {
+        work_row row; row.name = "Works"; row.effect.industrial_mod = 1;
+        row.employs = work_employs_max; row.weight = 1;
+        w.add_row(row);
+    }
+    const auto fixture = [](std::vector<region>& rg, std::vector<polity>& qs) {
+        rg.assign(2, region{});
+        const int64_t pts[2] = { 2000, 1000 };
+        for (std::size_t i = 0; i < 2; ++i)
+        {
+            region& r = rg[i];
+            r.nation = 0; r.centres = 1; r.urban_population = 1000; r.works_built = 1u;
+            r.farm_q = 1000; r.ore_q = 1000; r.energy_q = 1200; r.port_q = 0;
+            r.industry_points = pts[i];
+        }
+        qs.assign(1, polity{});
+        qs[0].id = 0; qs[0].capital = 0;
+    };
+    const auto params_at = [](int64_t k) {
+        history_sim_params p;
+        p.start_year = 9999; p.consolidation_year = 9999; p.near_home_cutoff_year = 9999; // no fold
+        p.treasury_endowment_income_q = 1000;
+        p.industry_points_enabled = true;
+        p.industry_open_year = 1660;
+        p.industry_points_per_treasury_unit = 1000;
+        p.industry_points_treasury_share_q = 250;
+        p.industry_points_crowding_k = k;
+        return p;
+    };
+    struct run_out { std::vector<region> rg; exploration_upkeep_spend sp; };
+    const auto run_at = [&](int64_t k) {
+        run_out o;
+        std::vector<polity> qs;
+        fixture(o.rg, qs);
+        run_exploration_upkeep(o.rg, qs, /*corridors=*/{}, params_at(k), /*year=*/1700, /*step_years=*/1,
+                               &o.sp, nullptr, nullptr, nullptr, &w);
+        return o;
+    };
+
+    // ---- (2) IDENTITY: K = 0 IS THE UNBRAKED CONVERSION, BIT FOR BIT ------
+    // The unbraked conversion is computed here, independently: the apportion's
+    // own output for the round's credit, landed whole, the whole share debited.
+    const run_out off = run_at(0);
+    std::vector<region> pre; std::vector<polity> pre_q;
+    fixture(pre, pre_q);
+    std::vector<std::pair<int, int64_t>> unbraked;
+    const bool ap_ok = industry_points_apportion_by_scale(pre, 0, 200 * 1000, unbraked, &w);
+    bool off_same = ap_ok && unbraked.size() == 2;
+    for (const auto& part : unbraked)
+    {
+        const std::size_t i = static_cast<std::size_t>(part.first);
+        if (off.rg[i].industry_points - pre[i].industry_points != part.second
+            || off.rg[i].industry_points_from_treasury != part.second)
+            off_same = false;
+    }
+    std::printf("BL-1169 self-check (2): K = 0 -> regions +%lld/+%lld (unbraked apportion %lld/%lld), debited %lld"
+                " of 200 paid in, kept %lld, purse %lld (expect 600)\n",
+                (long long)(off.rg[0].industry_points - 2000), (long long)(off.rg[1].industry_points - 1000),
+                unbraked.size() > 0 ? (long long)unbraked[0].second : -1LL,
+                unbraked.size() > 1 ? (long long)unbraked[1].second : -1LL,
+                (long long)off.sp.industry_treasury_debited, (long long)off.sp.industry_treasury_kept_by_crowding,
+                (long long)off.rg[0].treasury);
+    if (!off_same || off.sp.industry_treasury_debited != 200 || off.sp.industry_points_paid_in != 200000
+        || off.sp.industry_treasury_kept_by_crowding != 0 || off.rg[0].treasury != 600
+        || off.sp.industry_points_refused != 0)
+        fail("(2): K = 0 is not the unbraked conversion");
+
+    // ---- (3) THE RULE, on the hand-worked fixture at the shipped K ---------
+    const run_out on = run_at(k_shipped);
+    const int64_t d0 = on.rg[0].industry_points - 2000, d1 = on.rg[1].industry_points - 1000;
+    // The brake alone, on the same spread, says the same thing.
+    std::vector<std::pair<int, int64_t>> spread = unbraked;
+    const int64_t kept_direct = industry_points_crowd_brake(pre, spread, k_shipped, 1000, &w);
+    std::printf("BL-1169 self-check (3): K = %lld, crowding 2000/1000, share 100000/100000 -> converted %lld/%lld"
+                " (expect 33333/50667), debited %lld (expect 84), kept in the purse %lld (expect 116), purse %lld"
+                " (expect 716); the brake alone kept %lld units\n",
+                (long long)k_shipped, (long long)d0, (long long)d1, (long long)on.sp.industry_treasury_debited,
+                (long long)on.sp.industry_treasury_kept_by_crowding, (long long)on.rg[0].treasury,
+                (long long)kept_direct);
+    if (industry_points_crowding_q(pre[0], &w) != 2000 || industry_points_crowding_q(pre[1], &w) != 1000)
+        fail("(3): the fixture's crowding is not the hand-worked 2000/1000");
+    if (d0 != 33333 || d1 != 50667 || on.sp.industry_points_paid_in != 84000
+        || on.sp.industry_treasury_debited != 84 || on.sp.industry_treasury_kept_by_crowding != 116
+        || on.rg[0].treasury != 716
+        // the withheld units stay in the purse: the debit and the purse move by exactly them
+        || off.sp.industry_treasury_debited - on.sp.industry_treasury_debited != on.sp.industry_treasury_kept_by_crowding
+        || on.rg[0].treasury - off.rg[0].treasury != on.sp.industry_treasury_kept_by_crowding
+        || kept_direct != 116 || spread.size() != 2 || spread[0].second != 33333 || spread[1].second != 50667)
+        fail("(3): the conversion is not share x K / (K + crowding) with the withheld units kept in the purse");
+
+    // ---- (4) MONOTONE: more crowding converts no more, at the same share ----
+    // One receiver per call, share 100000, crowding walked up a ladder; the
+    // converted points (residue included) may never rise, must fall strictly
+    // somewhere, and at crowding = K convert exactly half.
+    const int64_t ladder[] = { 0, 1, 500, 999, 1000, 1001, 2000, 5000, 100000, 10000000, 1LL << 40 };
+    int64_t prev = -1, at_k = -1, at_zero = -1;
+    int rises = 0, falls = 0;
+    for (int64_t c : ladder)
+    {
+        std::vector<region> one(1);
+        one[0].nation = 0; one[0].centres = 1; one[0].urban_population = 1000; one[0].works_built = 1u;
+        one[0].industry_points = c; // crowding = points x 1000 / 1000 heads = c
+        std::vector<std::pair<int, int64_t>> s1 = { { 0, 100000 } };
+        if (industry_points_crowd_brake(one, s1, k_shipped, 1000, &w) < 0) { ++rises; continue; }
+        const int64_t conv = s1[0].second;
+        if (prev >= 0 && conv > prev) ++rises;
+        if (prev >= 0 && conv < prev) ++falls;
+        if (c == 0) at_zero = conv;
+        if (c == 1000) at_k = conv;
+        prev = conv;
+    }
+    // And two receivers at one share in one call: the more crowded takes no more.
+    std::vector<region> two(2);
+    for (std::size_t i = 0; i < 2; ++i)
+    { two[i].nation = 0; two[i].centres = 1; two[i].urban_population = 1000; two[i].works_built = 1u; }
+    two[0].industry_points = 4000; two[1].industry_points = 3000;
+    std::vector<std::pair<int, int64_t>> s2 = { { 0, 100000 }, { 1, 100000 } };
+    const int64_t k2 = industry_points_crowd_brake(two, s2, k_shipped, 1000, &w);
+    // And in the loop itself (row 3's run): the region at crowding 2000 took
+    // less than the one at 1000 from the same 100000-point share.
+    std::printf("BL-1169 self-check (4): share 100000 over crowding 0..2^40 -> %d rises, %d falls; at 0 %lld"
+                " (expect 100000), at K %lld (expect 50000), last %lld; crowding 4000 vs 3000 at one share -> %lld vs"
+                " %lld; in the loop, crowding 2000 vs 1000 -> %lld vs %lld\n", rises, falls, (long long)at_zero,
+                (long long)at_k, (long long)prev, (long long)s2[0].second, (long long)s2[1].second,
+                (long long)d0, (long long)d1);
+    if (rises != 0 || falls == 0 || at_zero != 100000 || at_k != 50000 || prev != 0
+        || k2 < 0 || s2[0].second >= s2[1].second || d0 >= d1)
+        fail("(4): conversion is not monotone in crowding, or not exactly half the share at crowding = K");
+
+    // ---- (5) DOMAIN: rejected, never clamped -------------------------------
+    // K = max is in domain and converts; K = max + 1 and K = -1 are rejected by
+    // `industry_points_params_valid` (the span's run sets
+    // `industry_points_params_rejected` off the same predicate) and convert
+    // NOTHING -- a clamp would convert as K = max or K = 0 does.
+    const int64_t kmax = industry_points_crowding_k_max;
+    history_sim_params pv = params_at(kmax);
+    const bool max_valid = industry_points_params_valid(pv);
+    pv.industry_points_crowding_k = kmax + 1;
+    const bool over_valid = industry_points_params_valid(pv);
+    pv.industry_points_crowding_k = -1;
+    const bool neg_valid = industry_points_params_valid(pv);
+    const run_out at_max = run_at(kmax), over = run_at(kmax + 1), neg = run_at(-1);
+    const auto converted = [](const run_out& o) {
+        return (o.rg[0].industry_points - 2000) + (o.rg[1].industry_points - 1000);
+    };
+    // The low boundary K = 1 is IN domain and brakes hard (worked by hand):
+    // f0 = 10^6 / 2001 = 499 ppm -> conv0 = 100000 x 499 / 10^6 = 49;
+    // f1 = 10^6 / 1001 = 999 ppm -> conv1 = 99; withheld 99951 + 99901 =
+    // 199852 points = 199 units kept and a residue of 852 onto region 1
+    // (951): 1000 points converted, 1 unit debited.
+    const run_out at_one = run_at(1);
+    std::printf("BL-1169 self-check (5): K = 1 converts %lld (expect 1000), debits %lld (expect 1), keeps %lld"
+                " (expect 199)\n", (long long)converted(at_one), (long long)at_one.sp.industry_treasury_debited,
+                (long long)at_one.sp.industry_treasury_kept_by_crowding);
+    if (converted(at_one) != 1000 || at_one.rg[0].industry_points - 2000 != 49
+        || at_one.sp.industry_treasury_debited != 1 || at_one.sp.industry_treasury_kept_by_crowding != 199)
+        fail("(5): K = 1, the domain's low boundary, did not brake as the rule says");
+    std::vector<std::pair<int, int64_t>> s3 = unbraked, s4 = unbraked, s5 = unbraked;
+    const int64_t b_over = industry_points_crowd_brake(pre, s3, kmax + 1, 1000, &w);
+    const int64_t b_zero = industry_points_crowd_brake(pre, s4, 0, 1000, &w);
+    const int64_t b_max  = industry_points_crowd_brake(pre, s5, kmax, 1000, &w);
+    std::printf("BL-1169 self-check (5): K = 10^9 valid %s, converts %lld, debits %lld; K = 10^9+1 valid %s, converts"
+                " %lld, debits %lld, purse %lld; K = -1 valid %s, converts %lld; the brake at 10^9+1 / 0 / 10^9 returns"
+                " %lld / %lld / %lld\n",
+                max_valid ? "yes" : "NO", (long long)converted(at_max), (long long)at_max.sp.industry_treasury_debited,
+                over_valid ? "YES" : "no", (long long)converted(over), (long long)over.sp.industry_treasury_debited,
+                (long long)over.rg[0].treasury, neg_valid ? "YES" : "no", (long long)converted(neg),
+                (long long)b_over, (long long)b_zero, (long long)b_max);
+    if (!max_valid || over_valid || neg_valid
+        || converted(at_max) <= 0 || at_max.sp.industry_treasury_debited <= 0
+        || converted(over) != 0 || over.sp.industry_treasury_debited != 0 || over.sp.industry_treasury_kept_by_crowding != 0
+        || over.rg[0].treasury != 800
+        || converted(neg) != 0 || neg.sp.industry_treasury_debited != 0 || neg.rg[0].treasury != 800
+        || b_over != -1 || b_zero != -1 || b_max < 0 || s3 != unbraked)
+        fail("(5): K outside 0..10^9 was not rejected whole");
+
+    std::printf("%s\n", ok ? "BL-1169 SELF-CHECK PASS" : "BL-1169 SELF-CHECK FAIL");
+    return ok;
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -2649,7 +2872,11 @@ int main(int argc, char** argv)
                     "searches from 8; the landscape measured is not the app's\n", cfg.corporation_count);
 
     // BL-1056: the item's synthetic invariants, in every mode, gating.
-    if (!bl1056_self_check()) return 1;
+    // BL-1169: the crowding brake's rows, in every mode, gating. Both checks
+    // always run and print, so one's red never hides the other's verdict.
+    const bool self_1056 = bl1056_self_check();
+    const bool self_1169 = bl1169_self_check();
+    if (!self_1056 || !self_1169) return 1;
 
     // BL-1036: the resume-fidelity check is its own mode -- it reads the 1660
     // handoff and nothing past it, so it neither builds a campaign world nor

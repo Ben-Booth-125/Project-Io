@@ -351,7 +351,9 @@ over empire flare, and on some worlds one becomes general).
 - **Every round draws the roads the rounds before it laid (Ben, 2026-09-25, walking round 6:
   "we lost every road between Exploration and Industrialisation").** A road is carried forward
   like a realm's name and colour: laid in one span, it stays drawn on every later round, and no
-  seam drops it.
+  seam drops it. **A sea lane is carried the same way (Ben, 2026-10-04: "sea lanes don't get
+  carried across from exploration to industrialisation").** Opened in one span, it is drawn from
+  the first frame of every later round, on that round's own sea path.
 - **Roads pulse when promoted; rail only if laid.** A corridor the treasury promotes to Post
   Road pulses once along its length — a mark on the thing, not a ping over it (§ Identity
   across the rounds). Rail is drawn only if the span lays it; the span's corridors are the

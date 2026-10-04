@@ -15,37 +15,6 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-09-15",
-   "author": "Ben (2026-09-15, trade and demand design form); Claude (written into POPULATION, MARKETS, SUPPLY, PRODUCTION); restored 2026-09-23 by Ben's ruling on BL-1066",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1003",
-   "short_name": "POOLS_PER_MARKET",
-   "category": "Economy",
-   "priority": "S",
-   "difficulty": 5,
-   "title": "Goods pools are keyed per (corp, market), so a same-body haul delivers and sells where it arrives",
-   "authority_doc": "docs/economy/PRODUCTION.md",
-   "files": [
-    "src/world/world.hpp",
-    "src/world/market_clearing.cpp",
-    "src/world/economy_system.cpp",
-    "src/world/supply_system.cpp",
-    "src/world/world_save.cpp",
-    "src/world/landscape_score.cpp",
-    "src/world/corp_command.cpp",
-    "src/world/corp_ai.cpp",
-    "src/world/corporation_generation.cpp",
-    "src/ui/selection_panel.cpp",
-    "src/core/verify_api.cpp"
-   ],
-   "design": "SPRINT 48 CUT (Ben, 2026-09-25, the cut form): IN for the close-out. R6 (how many generated firms straddle a catchment line, and whether the landscape search winner still stands) is the group's one pending row. Take it on the flipped 1960 world, record it here and in the group, then close the group and the item. BL-1125 (markets can die) reads the same catchments; if both land this sprint, R6 is read before BL-1125 moves the market set, so the reading is attributable.\n\nRESTORED 2026-09-23 (Ben, BL-1066 form: \"Restore BL-1003 pools per market\"). It is the structural cause of BL-1066 (the player cannot build): on the shipped home body (255 markets) a build draws from its TILE's market, but wants, fills, pools and auto-surplus book at the corp's representative market, and a same-body convoy credits the seller's own (corp, body) pool. So steel at 10x base price at a build market induced nothing, and a market no steel seller calls home is empty forever. Measured: the player's base at tile (45,97), market 56211, drew 0 steel for 100 ticks while 558 steel sat in 5 of 255 markets. PRODUCTION.md § Stockpile and output flow already states the rule; the prose below is 2026-09-15 and its file:line anchors predate sprint 45 — re-read before trusting them. BL-1006 (far trade reading), its old prerequisite, is complete. The re-pin of every world digest this moves is a re-bless and is Ben's to authorise; it should ride sprint 46's single re-bless with BL-1049.\n\n--- THE ORIGINAL ITEM (2026-09-15) ---\nSETTLED (Ben, 2026-09-15, form: pools per market over a consignment). PRODUCTION.md § Stockpile and output flow owns it; MARKETS.md § Market centres and seeding and SUPPLY.md § Convoy entity amended.\n\nDEFECT IT FIXES (found 2026-09-15): pools are keyed (corp, body) (world.hpp:272, :701-703); commit_convoy debits pool_for(corp, src_body) (supply_system.cpp:660) and arrival credits pool_for(corp, dest_body) (:182-183) — the same pool on one body — and auto-surplus then sells through market_for_corp_on_body, the lowest-id building's market (market_clearing.cpp:206-221). Every same-body market-to-market haul paid haulage and sold back at home. haulage_measure's 1614 same-body hauls measured dispatch, never trade.\n\nTHE RULE: a building's output enters the pool of market_for_tile(building tile); its inputs draw that pool plus that market's inventory; wants, purchases, auto-surplus, standing orders and the running remainder key (corp, market). A body with no market keeps one body-level pool until its first building spawns one. Labour pools stay (corp, body).\n\nCOSTS, STATED: save format (save_game_version moves, round-trip assertion owed per NR-708); state_hash folds the new key in sorted order; a roster straddling a catchment line now needs hauls, so the landscape search must score it — measure how many generated firms straddle before and after.\n\nDONE WHEN: a harness hauls a good between two markets on one body and the goods sell at the destination price; world_determinism bit-identical across runs; save round-trips pools; the landscape search winner still validates.\n\nCARRIED 2026-09-24: sprint 46 closed early; unscheduled pending the sprint 47 cut."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
    "sprint": null,
    "written": "2026-09-18",
    "author": "Ben (2026-09-18, sprint 45 elicitation); Claude (item text, from a five-lane engine read with an adversarial check per lane)",
@@ -236,64 +205,6 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-09-24",
-   "requires": [
-    "BL-1083"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1084",
-   "short_name": "WORLD_BUILT_ONCE_AND_MOVED",
-   "author": "Ben (2026-09-24, the sprint 47 design form); Claude",
-   "category": "Generation",
-   "priority": "S",
-   "difficulty": 5,
-   "title": "The world is built once at the Life gate, with its deposits, and moves forward through every wizard round instead of being rebuilt",
-   "authority_doc": "docs/ui/STARTUP.md",
-   "files": [
-    "src/world/hard_coded_world.hpp",
-    "src/world/hard_coded_world.cpp",
-    "src/world/world_gen_config.hpp",
-    "src/core/app.hpp",
-    "src/core/app.cpp",
-    "src/ui/startup_screens.cpp",
-    "src/ui/generation_preview.cpp",
-    "tools/verify/world_determinism.cpp",
-    "tools/verify/harness_params.hpp"
-   ],
-   "design": "SPRINT 48 CUT (Ben, 2026-09-25, the cut form): NEXT WAITS (NR-936 closed). The wizard's Next is disabled while the round on screen is running and enables the moment its world lands; its hover names what it waits on (STARTUP.md § The wait, then the lapse). So no two pass rounds build at once and the peak NR-936 observed cannot occur. The done-when's first clause reads under it: Next on round 4 is live only once round 4 has landed, round 5's wait caption names only the Exploration span, and its elapsed count is the Exploration span's own cost.\n\nCARRIED TO SPRINT 48 (Ben, 2026-09-25, the sprint-47 close form): sprint 47 closes on the identity wave and its flair; this item opens sprint 48. NR-936 rides with it: the wizard's Next press does not wait for the running round, so a fast player can have rounds 3-6 building at once; with one world moved forward, round N+1 cannot start before round N lands, so decide here whether Next waits.\n\nRULED (Ben, 2026-09-24: \"move the whole half-built world\"; \"we don't want to do the work twice, so seed actual materials at the Life gate and pass tiles through the whole phase\"; docs/development/drafts/sprint-47-rulings.md R1, R2).\n\nWHY. Every lapse round's worker runs make_hard_coded_world from params to its own stop (startup_screens.cpp:375-379): stages 0-7 (Helios, Cinder, the Kepler chain, tiles with deposits, rivers, creeds, settlement) run again on every seam, and round 5 re-runs Empires, round 6 re-runs Empires and Exploration (hard_coded_world.cpp:550-916, :1158, :1313, :1497). Rounds 0-1 build a scratch world for the globe and discard it. Deposits already land at stage 4 (tile_generation.cpp Pass 6, generate_life_deposits_over :2284-2298), downstream of S8 Legacy and S9 Spend (planetology.cpp:1533-1555), so the ruling changes OWNERSHIP, not pass order.\n\nTHE WORK. (1) make_hard_coded_world becomes the composition of resumable stage functions over one generation_cursor carrying what the tail reads as locals today (world, report, naming, rw, deposit_scalar, kepler_tiles/pl/hist/creeds/settlement/np/corridors/grudges/region_polity/polity_treasuries/capital_market_shells, the last span's resume struct): gen_life_gate (bumps 0-5), gen_culture (:826-1138), gen_empires (:1158-1300), gen_exploration (:1313-1470), gen_industrialisation (:1488-1640) then the tail (bumps 9-12). The composition is BYTE-IDENTICAL to the monolith: every harness, fixture, gen_step_costs and the 16 seed-library pins keep one invocation. The stop_after_* flags stop being early returns and become 'run the composition up to stage N'. (2) The wizard: the Life round builds the REAL Life-gate world into slot 0 (the globe rasters pack off it; a planetology move relaunches it and drops every slot below); launch_wizard_history_run(i) takes slot i-1 and runs only stage i into slot i; invalidate_wizard_rounds_below(r) drops every slot below r and stale-marks in-flight ones (a stale landing drops record AND world, the pattern at startup_screens.cpp:439-449); Begin adopts slot 3 exactly as BL-1073 does. (3) The reroll path (delegated reading, NEEDS_REVIEW): the predecessor's closed world is HELD by a faithful copy at landing (BL-1034; world_copy_determinism proves a copy ticks as its original) and a copy is moved into the worker; a reroll re-copies; when the predecessor is not held, REPLAY from the Life gate with the fixed per-span seeds — bit-identical by determinism, ~0.5 s + 1.6 s + 1.5 s in Release (hard_coded_world.cpp:360-398). Measure the copy cost first (Rule 0b); if it exceeds the replay it saves, ship pure replay. Back keeps every record and world. (4) The gate world is Helios + Cinder + Kepler; Selene and Pallas stay in Finishing (an entity-id shift for two bodies no round shows — NEEDS_REVIEW). (5) Round 6 starts playing at the tap's final publish (history_sim.cpp:7899; the record is whole there); landing only swaps the world slot; poll_wizard_history_tap's snapshot path and the landed path must not fight over m_wiz_history[3]. (6) Proof: world_determinism twice; a cursor-vs-monolith check (owner_changes, polities, world digest) at EVERY round boundary on the 16 curated seeds, extending run_autostart_adopt's round-6 proof; begin_adopts_check.js green.\n\nDONE WHEN (live). Press Next on rounds 4 and 5: the wait caption never names an earlier span ('Running the ancient era' never appears on round 5) and the elapsed count is shorter by the predecessor's measured cost; Back then Next on any round recomputes nothing; reroll round 5 and it opens on round 4's exact 1200 frame. Harness: the resumed build equals the monolithic build on the 16 seeds; digests unchanged."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-09-24",
-   "requires": [
-    "BL-1085"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1086",
-   "short_name": "SEARCH_INSIDE_GENERATION",
-   "author": "Ben (2026-09-24, the sprint 47 design form); Claude",
-   "category": "Generation",
-   "priority": "A",
-   "difficulty": 4,
-   "title": "The landscape search runs inside generation at the companies stage, so markets carve on the searched roster and no world-gen roster is laid then removed",
-   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
-   "files": [
-    "src/world/hard_coded_world.cpp",
-    "src/world/landscape_search.cpp",
-    "src/world/corporation_generation.cpp",
-    "src/core/verify_api.cpp",
-    "src/main.cpp"
-   ],
-   "design": "SETTLED (Ben, 2026-09-26, the density-and-trade form): option A -- on a budget world the carve counts the charter budget's planned firms; no roster is laid at stage 11 to be discarded; the search stays after the carve in finish_campaign_world (MARKETS.md). The bump-11 move is superseded: the carve and the search were circular (the carve read the roster; the search scores the carve's markets).\n\nCARRIED TO SPRINT 48 (Ben, 2026-09-25, the sprint-47 close form): sprint 47 closes on the identity wave and its flair; this item opens sprint 48.\n\nFILED (delegated reading, 2026-09-24, NEEDS_REVIEW; docs/development/drafts/sprint-47-rulings.md R4). Stretch item in sprint 47: rides the sprint's one re-bless if the relocation (BL-1085) lands with time; otherwise slips.\n\nWHY. Even with Begin's work inside the round-6 worker, stage 11 lays a world-gen roster that the search removes and re-charters (landscape_search.cpp:296-298), and the market carve at stage 12 reads that roster's clusters (hard_coded_world.cpp:2097-2103) — the work is done twice, which is what Ben's brief forbids.\n\nTHE WORK. Fold finish_campaign_world's search into make_hard_coded_world at bump(11) so the carve reads the searched roster; retire the laid-then-removed roster; every pin, golden, --verify and --serve world moves (a design change to what the carve reads, not a move), so it lands in the re-bless with the other world-movers or not at all this sprint.\n\nDONE WHEN. The carve ledger lists the searched roster; no roster is generated and discarded in a Release build log; the re-bless records the movement."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
    "sprint": null,
    "written": "2026-09-24",
    "requires": [],
@@ -315,38 +226,6 @@
     "src/ui/history_lapse.cpp"
    ],
    "design": "FILED (Ben, 2026-09-24: region-grain arrows now, the true record as its own item; docs/development/drafts/sprint-47-rulings.md R11). Not in sprint 47.\n\nTHE WORK. Record true hops (origin, destination, year, coastal/overseas, lineage) and a per-tile route tree in run_colonisation; copy to settlement_state as a pure-output record (~4-8 B/tile); bake real polylines in the lapse. Digests unmoved if the record is write-only.\n\nDONE WHEN. A route line follows the coast where the walk did, and an overseas hop is drawn across the water it crossed, on the seed BL-1092's check used."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-09-24",
-   "requires": [
-    "BL-1097",
-    "BL-1120",
-    "BL-1140"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1098",
-   "short_name": "SEA_LANE_TIER_STAMPED",
-   "author": "Ben (2026-09-24, the sprint 47 design form); Claude",
-   "category": "Generation",
-   "priority": "A",
-   "difficulty": 4,
-   "title": "Sea lanes are stamped onto the water as a tier that discounts sea-leg traversal cost for every consumer of it",
-   "authority_doc": "docs/generation/EXPLORATION.md",
-   "files": [
-    "src/world/road_generation.cpp",
-    "src/world/road_generation.hpp",
-    "src/world/components.hpp",
-    "src/world/world_save.cpp",
-    "src/world/world_save.hpp",
-    "src/world/logistics.cpp",
-    "src/world/hard_coded_world.cpp",
-    "tools/verify/world_determinism.cpp"
-   ],
-   "design": "SETTLED (Ben, 2026-09-25, the centres-and-routes form): the lane tier is RESHAPED by the lanes-as-currents-and-trade vision -- it stamps a world whose lanes come from BL-1140 (trade writes a use) priced by BL-1120 (currents), so it lands after both. The stamp design below is unchanged.\n\nCARRIED TO SPRINT 48 (Ben, 2026-09-25, the sprint-47 close form): sprint 47 closes on the identity wave and its flair; this item opens sprint 48.\n\nRULED (Ben, 2026-09-24: the sea-lane tier this sprint; the stamp is its own item behind the record, BL-1097; docs/development/drafts/sprint-47-rulings.md R14). Stretch in sprint 47: lands in the re-bless if BL-1097 lands with time.\n\nTHE WORK. stamp_sea_lanes(w, body, nodes, legs) beside stamp_history_roads (road_generation.cpp:626): a water-only walker (stamp_edge skips water and the strait rule refuses open ocean — a straight-line raster crosses land on a concave coast, so an A* restricted to water is the honest walker) writing a NEW tile_component::lane_level (world save bump, claimed through next_save_version.js --kind world), read by one multiplier line in tile_traversal_cost (logistics.cpp:96-99: water base × lane multiplier), folded into world_determinism's deep digest beside road_level, stamped at hard_coded_world.cpp:2063-2070 with junction degree extended for the search's seed candidate.\n\nDONE WHEN. Lane tiles on a 1960 world > 0 and counted in the report; A* cost between two lane-joined ports falls below the unlaned cost; reach crosses the lane; the road lens draws no road on water."
   },
   {
    "status": "designed",
@@ -395,32 +274,6 @@
     "docs/ui/question_log.json"
    ],
    "design": "FILED (Ben, 2026-09-24: the Ages view later; docs/development/drafts/sprint-47-rulings.md R21). Not in sprint 47. A campaign surface with its own question_log entry: the four records (migration, Empires, Exploration, Industrialisation) selectable and replayable in play on the same lapse drawer the wizard uses, colours from the nation slot table (BL-1089).\n\nDONE WHEN (live). In play, open the Ages view and replay the Culture round from a loaded save; the realm colours match the Country lens."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-09-24",
-   "requires": [
-    "BL-1084"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1107",
-   "short_name": "CULTURE_GROUND_PROFILE",
-   "author": "Ben (2026-09-24, the sprint 47 design form); Claude",
-   "category": "Generation",
-   "priority": "B",
-   "difficulty": 3,
-   "title": "Materials shape culture: a per-culture ground profile coined at the cradle from its window's deposits and cover, inherited by daughters",
-   "authority_doc": "docs/generation/COLONISATION.md",
-   "files": [
-    "src/world/settlement.cpp",
-    "src/world/settlement.hpp",
-    "src/world/creeds.hpp",
-    "src/world/creeds.cpp"
-   ],
-   "design": "RULED (Ben, 2026-10-03): lack 250, amenity divisor 4 (the default), from the ladder. Merged 175ed49e.\n\nRULED (Ben, 2026-10-03): keep the amenity mapping (forest->energy, coastal grass->port, valley marsh->farm); both magnitudes become named params read on a small ladder before they are set; only cultures standing on ground carry the profile. EXPLORATION.md § A good acquires a cultural preference.\n\nWIDENED (Ben, the delegated-decision form, 2026-09-25, NR-926 overturned): the profile gets its READER this item -- derive_culture_preference (EXPLORATION.md § A good acquires a cultural preference) reads it as the first of its two inputs, which needs an amenity classifier over cover first (TILES.md § Amenity tiles). A sim beat now, not record-only: read the preference tables on the 16 seeds before and after, and take its re-bless.\n\nCARRIED TO SPRINT 48 (Ben, 2026-09-25, the sprint-47 close form): sprint 47 closes on the identity wave and its flair; this item opens sprint 48.\n\nFILED (Ben's note, 2026-09-24: \"materials shaped culture, and even primitive cultures can gain a preference towards certain amenities\"; record-only this sprint, no consumer — delegated reading, NEEDS_REVIEW; docs/development/drafts/sprint-47-rulings.md R24). Stretch in sprint 47: built if BL-1084's cursor lands early.\n\nTHE WORK. Beside the package at the cradle (settlement.cpp:859-875), a ground profile read off the cradle window's tiles: a survey_endowment-shaped sum over deposits plus an amenity class of cover (forest, coastal grass, marsh-in-valley per TILES.md; a classify function in the shape of classify_farm_class — no amenity field exists today), stored on culture beside origin_farm_class (creeds.hpp:145), inherited through derive_daughter_culture (creeds.cpp:630-641). Its later reader is derive_culture_preference (history_sim.hpp:4637). Digests unmoved while nothing reads it.\n\nDONE WHEN. Every culture on the 16 seeds carries a non-empty profile, daughters inherit their parent's, and the profile is printed per cradle by colonisation_harness."
   },
   {
    "status": "designed",
@@ -591,51 +444,6 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-09-25",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "author": "Ben (2026-09-25, the sprint-47 close form); filed by Claude",
-   "id": "BL-1117",
-   "short_name": "SETTLE_TICK_ONE_COST",
-   "category": "Economy",
-   "priority": "B",
-   "difficulty": 2,
-   "title": "Settle tick 1 costs 44-62 s against ~1.5 s for the other eleven: instrument it by phase and hand the cause to the economy lane",
-   "authority_doc": "docs/ui/STARTUP.md",
-   "files": [
-    "src/world/campaign_settle.cpp",
-    "src/world/finish_campaign_world.cpp"
-   ],
-   "design": "S2 COLD REVIEW (2026-09-25): no crash or determinism break; the multi-source cost equals the old per-anchor minimum exactly in float. Fix round: (1) the tie contract is overstated -- round-half-to-even can collapse a gap inside one binade, so on rare cells the field's anchor is a higher-id anchor at the SAME minimum cost; restate the contract as \"an anchor at least cost, a fixed choice among exact ties\" (logistics.hpp ~198, the comment at logistics.cpp ~600-606; LOGISTICS.md already says so) and have lp_anchor_field_check F2 gate or honestly report tie_cells; (2) F1 can pass vacuously -- compare the cached field's anchor set to the pool keys before the call and report a rebuild; (3) three stale comments (finish_campaign_world.cpp ~246-253, economy_system.cpp ~2881-2884, logistics.cpp ~288); (4) built_over walks the whole pool per call -- read the march and dispatch columns before deciding it matters.\n\nSPRINT 48 CUT (Ben, 2026-09-25, the cut form): IN, the reading AND the fix. Round 6's 35 s is judged on the whole tail jointly with BL-1119 (roads tree), so this item's done-when extends: the phase that costs tick 1 is named with its milliseconds on seeds 0 and 28, then cut, and the tail lands within 35 s of round 6's arrival on both seeds in Release. If the fix moves the settled world it is a named cause in the sprint's one re-bless; if it only moves time, the digests hold and that is asserted.\n\nFILED 2026-09-25 from NR-932 (Ben: C, both; the progress tap is sprint 47's, this is the other half). Not in sprint 47.\n\nTHE READING. Inside the twelve-tick settle in round 6's worker, tick 1 runs 44-62 s (seed 0: settle 113,922 ms, tick 1 56,881 ms; seed 28: 68,832 ms) while ticks 2-12 cost ~1.5 s each.\n\nFIRST READING (2026-09-25, gen_step_costs --finish 0, Release, the lap timing now printed by finish_campaign_world): settle 55,962 ms; slowest tick 1 at 38,487 ms, of which run_economy_step 38,453 ms (lap 1: the economy step and dispatch), clear_markets 24, apply_budget+nation_step 9, the other three 0. So the cost is inside run_economy_step on econ step 1 -- the corp AI cadence (half the slots per step) is the first suspect, not a cold pool. Seed 28 not yet read.\n\nTHE WORK. Time tick 1 by phase (the first clearing over cold pools? the first dispatch?) on seeds 0 and 28 in Release, record the split here, and file the fix against the owning economy work -- NR-915 (the tick tail) may already own the cause. Measure, do not reshape.\n\nDONE WHEN. The phase that costs tick 1 is named with its milliseconds on two seeds and the fix is filed where it belongs."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "written": "2026-09-25",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "author": "Ben (2026-09-25, the round-feedback form after the sprint-47 live clicks); filed by Claude",
-   "id": "BL-1118",
-   "short_name": "ROUND_LEGENDS",
-   "sprint": 48,
-   "category": "UI",
-   "priority": "A",
-   "difficulty": 2,
-   "title": "Every lapse round carries a legend naming each layer its map draws",
-   "authority_doc": "docs/ui/STARTUP.md",
-   "files": [
-    "src/ui/history_lapse.cpp",
-    "src/ui/startup_screens.cpp",
-    "docs/ui/question_log.json"
-   ],
-   "design": "SETTLED (Ben, 2026-09-25, the open-calls form at the live app): the key is decided once per round (built; STARTUP.md § Round 4), and the Empires map KEEPS \"Furnaces lit\" (written into § Round 4). The four drafted labels stand.\n\nFILED 2026-09-25 (Ben: \"we also probably need a legend for each round, just in case it isn't clear what is shown on the map\"; timing: sprint 48, AFTER the Empires cut). STARTUP.md § Round 4 states the ruling.\n\nTHE WORK. A key per lapse round (Culture, Empires, Exploration, Industrialisation) listing exactly the layers that round draws -- read from the same predicates the painter uses, so a layer cut from a round (the Empires cut, 2026-09-25) drops from its legend by construction and a legend can never name a layer the round does not draw. Glyphs drawn by the painter's own calls, not re-drawn icons. The question log gains the surface.\n\nDONE WHEN. Each round's legend lists its layers and only those; a capture per round; Ben's live click. BL-1097's lane line was not found at the 2026-09-25 click -- the legend is where a player finds it."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
    "written": "2026-09-25",
    "requires": [],
    "blocked_on": null,
@@ -643,7 +451,7 @@
    "author": "Ben (2026-09-25, the round-feedback form after the sprint-47 live clicks); filed by Claude",
    "id": "BL-1119",
    "short_name": "ROADS_TREE_AND_DETOUR",
-   "sprint": 48,
+   "sprint": 49,
    "category": "Generation",
    "priority": "S",
    "difficulty": 3,
@@ -655,30 +463,7 @@
     "tools/verify/gen_step_costs.cpp",
     "tools/verify/player_seed_sweep.cpp"
    ],
-   "design": "SETTLED (Ben, 2026-09-25, the density form): the village spur floor is 40,000 heads (the ladder's ~p90; median road pass 18 s loaded, 1 of 16 seeds under 10 s), size read as the population step's headcount; a border link ends ONLY on a town or a spurring village (LOGISTICS.md § 4). The street carpet is not this item's: BL-1130 (centres consolidate) thins the centres upstream, and this item's \"no lattice on the densest seed\" is read after it.\n\nROUND 2 (the lane's own findings and the settle review): fix the floor at 40,000 as the constant; border endpoints restricted to towns and spurring villages; road_generation.cpp's two hand-written cache clears (~616-619, ~689-691) replaced by invalidate_logistics_caches so the new nearest-anchor field is never missed; the loading bar's roads weight (hard_coded_world.cpp ~495, 38,000 ms) and kBorderUnitsPerNation re-measured; road_generation_harness's \"R2 highway tier reachable when qualified\" FAILS on 0 of 8 seeds, identically on b03fd52e -- find why (the percentile gate, the two-major-endpoints rule, or the harness's qualified regen) and fix the cause or split it to its own item with the reading; never weaken the row.\n\nSPRINT 48 CUT (Ben, 2026-09-25, the cut form): BL-1077 (village roads cost) is FOLDED IN. Its target joins this done-when: generate_roads under ~10 s Release on the library seeds, read after the spur floor; if the floor alone does not reach it, BL-1077's bound (one multi-source search per centre, or a shared reach field, digest-neutral by itself) is this item's second step. THE 35 s IS JUDGED ON THE WHOLE TAIL, jointly with BL-1117 (settle tick one), which joins the sprint with its fix: on seed 0 the settle is ~56 s Release, tick 1 alone 38.5 s, so roads alone cannot meet it.\n\nFILED 2026-09-25 (Ben, walking round 6: \"we also need many fewer roads... it should be heavily discouraged to build a lattice of roads\"; he chose the tree plus a detour test over \"no second path\", and spurs only for villages above a size). LOGISTICS.md § 4 carries the rule; STARTUP.md § Round 6 carries the 35 s target.\n\nTHE WORK. (1) Replace the relative-neighbour redundancy edges with the DETOUR TEST: after the Kruskal MST, a candidate link between two centres is laid only when the network's route between them costs more than 2x the direct A* route (one constant, named). The percentile rationing of loops applies to the loops the test admits (a delegated reading that keeps BL-618/BL-621 intact; Ben may overturn). (2) A village lays a spur only above a size floor, MEASURED on the 16 curated seeds first (Rule 0b: road tiles, spur count and pass time per floor candidate). (3) The border link rule is unchanged.\n\nA WORLD-MOVER: every road digest and the sweep pins move -- read road tile counts, pass time (gen_step_costs --finish) and the haulage baseline (memory: goldens cannot see trade) on the 16 seeds before and after, then ONE re-bless.\n\nDONE WHEN. No lattice on a capture of the densest seed; road pass time and tile count recorded old -> new per seed; round 6's tail lands within 35 s of arrival on seeds 0 and 28 in Release (gen_step_costs); one re-bless; road_generation_harness green (connectivity held)."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "written": "2026-09-25",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "author": "Ben (2026-09-25, the round-feedback form after the sprint-47 live clicks); filed by Claude",
-   "id": "BL-1120",
-   "short_name": "OCEAN_CURRENTS",
-   "sprint": 48,
-   "category": "Generation",
-   "priority": "A",
-   "difficulty": 4,
-   "title": "Ocean currents: generated from the planet, they cheapen sea legs that run with them, and the Exploration round charts them",
-   "authority_doc": "docs/generation/EXPLORATION.md",
-   "files": [
-    "src/world/planetology.cpp",
-    "src/world/history_sim.cpp",
-    "src/ui/history_lapse.cpp"
-   ],
-   "design": "STAGE 1 LANDED (cf8cfca3, merged b80a5b5d, 2026-09-26): src/world/ocean_currents.* -- a stream function per sea tile (latitude-band wind profile x distance to ground, curl by integer centred differences; coasts are streamlines; basins circulate, reversed by a retrograde spin), read per 7x7 ocean region; a leg's alignment sampled tile by tile, exactly antisymmetric; cost x (1 - w x align), w = 500 per mille (the measured knee). Applied to wet campaigns' crossings in Exploration and Industrialisation (Empires unpriced), and the inert subjection/secession gates. ocean_currents_harness 28 rows ALL PASS. Reading: currents barely move lanes (105 -> 102 at 1960) because tribute writes ~90% of lane uses and a current cannot decide standing traffic -- they bite through trade (BL-1140) and the lane stamp's water walker (BL-1098). Rotation sense is a param (+1 prograde) because the data model records no spin: PLANETOLOGY.md owns it as a body property (to file). 5 of 16 fingerprints move; world_determinism unmoved.\n\nSETTLED (Ben, 2026-09-25, the centres-and-routes form): BUILD THIS SPRINT, reshaping the lane tier now. EXPLORATION.md § Currents are a force, not a picture, now states the generation as a DELEGATED READING (NR-949): each ocean region's current follows its latitude band's prevailing wind (easterly in the tropics, westerly in the mid-latitudes, sense set by the body's rotation) and is turned along the coasts the continents present, so a basin circulates; a leg with its current costs less and against it more, by one weight measured on the curated seeds. PLANETOLOGY.md / CONTINENTS.md own the inputs. Measure first: legs, lanes and displacement on the 16 seeds before and after, and the weight's ladder. A sim beat and a world-mover.\n\nCONTINUITY PASS (Ben, 2026-09-25): filed from the round-feedback form -- \"chart ocean currents as part of the exploration stage\"; Ben chose a FORCE over a drawing (\"currents shape sea legs\"). EXPLORATION.md § Currents are a force, not a picture.\n\nOPEN DESIGN (a design pass before build): what generates a current (latitude bands and the body's rotation, the continents' shape -- PLANETOLOGY.md / CONTINENTS.md own the inputs), its grain (per ocean region), and its weight on a sea leg's cost with and against. A sim beat: it moves sea legs, lanes, displacement and every pin -- read on the 16 seeds first, one re-bless. Pairs with BL-1115 (sea legs in the later spans), which should land first so currents act on legs that run."
+   "design": "SETTLED (Ben, 2026-09-25, the density form): the village spur floor is 40,000 heads (the ladder's ~p90; median road pass 18 s loaded, 1 of 16 seeds under 10 s), size read as the population step's headcount; a border link ends ONLY on a town or a spurring village (LOGISTICS.md § 4). The street carpet is not this item's: BL-1130 (centres consolidate) thins the centres upstream, and this item's \"no lattice on the densest seed\" is read after it.\n\nROUND 2 (the lane's own findings and the settle review): fix the floor at 40,000 as the constant; border endpoints restricted to towns and spurring villages; road_generation.cpp's two hand-written cache clears (~616-619, ~689-691) replaced by invalidate_logistics_caches so the new nearest-anchor field is never missed; the loading bar's roads weight (hard_coded_world.cpp ~495, 38,000 ms) and kBorderUnitsPerNation re-measured; road_generation_harness's \"R2 highway tier reachable when qualified\" FAILS on 0 of 8 seeds, identically on b03fd52e -- find why (the percentile gate, the two-major-endpoints rule, or the harness's qualified regen) and fix the cause or split it to its own item with the reading; never weaken the row.\n\nSPRINT 48 CUT (Ben, 2026-09-25, the cut form): BL-1077 (village roads cost) is FOLDED IN. Its target joins this done-when: generate_roads under ~10 s Release on the library seeds, read after the spur floor; if the floor alone does not reach it, BL-1077's bound (one multi-source search per centre, or a shared reach field, digest-neutral by itself) is this item's second step. THE 35 s IS JUDGED ON THE WHOLE TAIL, jointly with BL-1117 (settle tick one), which joins the sprint with its fix: on seed 0 the settle is ~56 s Release, tick 1 alone 38.5 s, so roads alone cannot meet it.\n\nFILED 2026-09-25 (Ben, walking round 6: \"we also need many fewer roads... it should be heavily discouraged to build a lattice of roads\"; he chose the tree plus a detour test over \"no second path\", and spurs only for villages above a size). LOGISTICS.md § 4 carries the rule; STARTUP.md § Round 6 carries the 35 s target.\n\nTHE WORK. (1) Replace the relative-neighbour redundancy edges with the DETOUR TEST: after the Kruskal MST, a candidate link between two centres is laid only when the network's route between them costs more than 2x the direct A* route (one constant, named). The percentile rationing of loops applies to the loops the test admits (a delegated reading that keeps BL-618/BL-621 intact; Ben may overturn). (2) A village lays a spur only above a size floor, MEASURED on the 16 curated seeds first (Rule 0b: road tiles, spur count and pass time per floor candidate). (3) The border link rule is unchanged.\n\nA WORLD-MOVER: every road digest and the sweep pins move -- read road tile counts, pass time (gen_step_costs --finish) and the haulage baseline (memory: goldens cannot see trade) on the 16 seeds before and after, then ONE re-bless.\n\nDONE WHEN. No lattice on a capture of the densest seed; road pass time and tile count recorded old -> new per seed; round 6's tail lands within 35 s of arrival on seeds 0 and 28 in Release (gen_step_costs); one re-bless; road_generation_harness green (connectivity held). CARRIED to sprint 49 at the sprint 48 close (2026-10-04): owed R4 a quiet Release gen_step_costs run on 16 seeds (road tiles and pass time per seed, old -> new, against ~10 s); R6 an isolated haulage reading of this change (or fold into BL-1165); R7 a cold review of round 4 (8b921ee6, directed paths)."
   },
   {
    "status": "designed",
@@ -755,53 +540,6 @@
    "design": "FILED 2026-09-25 from NR-929 (Ben: B, per nation, overturning the per-world reading of 2026-09-24 and the BL-692 reasoning that per-nation banding is a second gate over tech). ERAS.md § Where the ladder starts owns the rule.\n\nTHE WORK. (1) Derive each nation's band at the 1960 fold from the realm it grew from (roster_band_for_capacity) -- DELEGATED READING: \"the realm it grew from\" rather than any realm folded into the nation; Ben may overturn. (2) Persist it on nation_component (a world save bump) and retire the world-wide world::campaign_band. (3) Make the registry actor-aware: every consumer of the band -- the browse roster, construction validity, the recipe pass, corp_ai's build choices, --serve/MCP validation -- asks for the acting corporation's nation's band. (4) The Industry mask (BL-1109) still seeds earned_techs within a band.\n\nREAD FIRST (Rule 0b): per seed, how many nations derive ancient -- NR-934 found every library seed industrial at WORLD grain, which says nothing of the spread per nation.\n\nDONE WHEN. Two nations on one world can open on different bands; a firm in an ancient nation is refused an industrial building through every front door (UI, command, MCP); save round trip carries the per-nation band; one re-bless if any digest moves."
   },
   {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-09-25",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1124",
-   "short_name": "SEA_LANES_SEEN",
-   "author": "Ben (2026-09-25, second live look at the sprint-47 build); filed by Claude",
-   "category": "UI",
-   "priority": "A",
-   "difficulty": 2,
-   "title": "A player sees the sea lanes on the Exploration round without being told where to look",
-   "authority_doc": "docs/ui/STARTUP.md",
-   "files": [
-    "src/ui/history_lapse.cpp",
-    "scripts/verify/sea_lanes.lua"
-   ],
-   "design": "SETTLED (Ben, 2026-09-25, the open-calls form at the live app): Ben picked (c) the BOWED ARC at the live app (form (a) core line and (b) end anchors are removed with the temporary selector; STARTUP.md § Round 5 states it). R2 done. R3 (\"finds a lane without a pointer\") is read at the next walk.\n\nSPRINT 48 CUT (Ben, 2026-09-25, the cut form): the form is chosen NOW, on today's lanes (seed 32: 16); BL-1115 (sea legs in later spans) stays unscheduled and the form may be revisited when it lands. Delegated reading: the UI lane builds the three candidates (a brighter core line inside the band, a shipping glyph at each end, an arc bowed away from the tie), captures each at seed 32's close frame, and Ben picks with the live app open; the two not picked are removed before the commit.\n\nFILED 2026-09-25 from BL-1097 R3 (moved here; Ben: \"I don't clearly see the sea lanes on exploration. Perhaps that is for sprint 48?\"). The record is built and the lane draws (sea_lanes.lua, seed 32: 16 lanes), first as a thin dashed line that hid under the colonial ties, then as a wide soft sea-blue band under them -- and the band was still not clearly seen at the live app.\n\nWHY IT HIDES. The tribute leg writes most lane uses (seed 46: 619 of 663), so almost every lane runs the same capital-to-capital line as its tie, and the lanes open late in the span.\n\nTHE WORK, with BL-1118 (round legends) beside it: the legend names the lane; the lane gets a form of its own that reads at a glance (candidates: a brighter core line inside the band, a shipping-route glyph at each end, or an arc bowed away from the tie). Once BL-1115 (sea legs in the later spans) lands, wet campaigns write lanes off the ties too -- read how many before choosing.\n\nDONE WHEN. Ben finds a lane at the live app without a pointer."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-09-25",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1125",
-   "short_name": "MARKETS_CAN_DIE",
-   "author": "Ben (2026-09-25, the sprint 48 cut form's notes); filed by Claude",
-   "category": "Economy",
-   "priority": "A",
-   "difficulty": 4,
-   "title": "A market can be destroyed, so the world handed to the player never carries too many markets",
-   "authority_doc": "docs/economy/MARKETS.md",
-   "files": [
-    "src/world/history_sim.cpp",
-    "src/world/hard_coded_world.cpp",
-    "src/world/market_clearing.cpp",
-    "tools/verify/market_census.cpp",
-    "docs/economy/MARKETS.md"
-   ],
-   "design": "RULED (Ben, 2026-10-03): the port gate stands (a fold crosses water only where both cities' regions hold a port, as a convoy needs) and the reach is 16 (15 of 16 seeds in 20-40).\n\nRULED (Ben, 2026-10-03): haulage halving accepted pending a re-read after BL-1138; keep 20-40 and drop the per-city phrasing; capitals fold like any market.\n\nSETTLED (Ben, 2026-09-25, the density form): three causes destroy a market, written into MARKETS.md § Market centres and seeding. (1) TWINS FOLD: a market centred on the same tile as another folds into the lower-id one. (2) GRAVITY FOLD: a market inside a larger market's reach (traversal cost) folds into it; larger = catchment population; the reach constant is CALIBRATED so a 1960 world carries roughly 20-40 markets, about one per major city (Ben picked \"20-40, a market per major city\" over the recommended 50-100) -- an aim for the constant measured on the curated seeds, never a count the rule enforces. (3) CONQUEST CONSOLIDATES (Ben's note: \"when an empire conquers territory, it would destroy the market to consolidate strength\"): conquering the region a rival's market stands on destroys that market. Not chosen: capital death as a separate rule (conquest covers the dead-maker case), the junction tightened, a runtime death in play. A folded market's catchment, inventory and pools pass to its absorber.\n\nSEQUENCE. BL-1130 (centres consolidate) lands first: the carve follows centre density, so the gravity constant is calibrated on the consolidated world, not today's. Conquest is history-grain (history_sim.cpp, where region::has_market is marked at each span close) and independent of the carve, so it can run beside BL-1130. The twins fold and the gravity fold run at the carve, after the junction rule, on the whole set.\n\nCENSUS READ 2026-09-25 (market_census, 16 curated seeds, the handed-over 1960 world; tools/verify/market_census.cpp). 4,984 markets, 311.5 a seed (148-538; seed 0's 255 is ordinary). By source: capital shells 1,246 (25%), carve 3,738 (75%), of which 2,532 (68% of the carve) exist only because the junction rule lowered the gate. Shells are marked at EVERY span close, not only 1200 (1,168 at 1200, 68 at 1660, 10 at 1960; the mark is sticky); at 1960 the maker still holds 829, holds its capital elsewhere 98, is dead 319 -- 417 lost, 392 of them standing on no living capital. TWINS: 1,043 markets (21%) are centred on the same tile as a lower-id market and can never win a tile (market_for_tile breaks ties to the lowest id): 826 carve under carve, 217 carve under a shell. Catchment median 15 tiles (carve 9, shells 100); nearest other market centre median 1.0 tile (0.4 traversal cost). 4,442 of 4,984 have no building in their catchment at the handoff; 3,523 (71%) clear nothing across the first play year (shells 41%, carve 81%). The count is the carve, and the carve follows population-centre density (the roads lane found centres on 49-100% of land). Also found and filed: BL-1127 (market_for_tile ignores the column wrap, 3.1% of tiles misroute).\n\nFILED 2026-09-25 (Ben, the sprint 48 cut form's notes: \"We should also work on making sure markets can be destroyed, so that the end result never has too many markets\"). In sprint 48. The intent is ruled; the mechanism is Ben's, against a census.\n\nWHAT STANDS TODAY. MARKETS.md says a market never disappears: nothing removes an entry from world::markets, the BL-768 junction rule only ever lowers the gate, and an idle off-world market goes dormant. The home body's markets come from two sources: a shell at the capital of every polity alive at the 1200 close (history_sim.cpp ~8262-8281 marks region::has_market at every span close, not only 1200; hard_coded_world.cpp ~1882-1915 spawns it; the capital premium prices it, ~2695-2716), and the carve over population centres (~2574-2617). Nothing after 1200 un-marks a capital that fell in a later span. BL-1003's reading (2026-09-23) found 255 markets on the shipped home body; MARKETS.md § Market centres still says nine on seed 0.\n\nTHE WORK, measure first (Rule 0b). (1) A census per curated seed on the flipped 1960 world: markets by source (capital shell, carve, junction-lowered), how many shells stand where the polity died after 1200, catchment tiles and population per market, and the share that clear nothing in the first play year. Built as a committed harness, not a probe. (2) Ben rules the mechanism against it. Candidates, not exclusive: a capital's market dies with its capital unless the carve would place one there; a market inside a larger one's reach folds into it (a gravity rule over traversal cost); a runtime death for a market that clears nothing for a span, which moves save format, per-market pools, convoys, standing orders and trades onto a successor. Whatever the rule, it is an in-world cause a player could read, never a count cap. (3) Build it, write the rule into MARKETS.md (retiring \"a market never disappears\" wherever it stops holding), and correct the stale nine.\n\nA WORLD-MOVER: a named cause in the sprint's one re-bless.\n\nDONE WHEN. The census is committed and recorded per seed; the ruled mechanism runs; the 1960 market count per seed is recorded old -> new; MARKETS.md states the rule; every harness that reads markets is green."
-  },
-  {
    "glyph": "✓",
    "written": "2026-09-25",
    "requires": [],
@@ -869,32 +607,6 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-09-25",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1130",
-   "short_name": "CENTRES_CONSOLIDATE",
-   "author": "Ben (2026-09-25, the density form: \"Upstream, this sprint\"); filed by Claude",
-   "category": "Generation",
-   "priority": "S",
-   "difficulty": 4,
-   "title": "Villages consolidate into towns as a region grows, and no region carries more centres than its ground holds",
-   "authority_doc": "docs/economy/POPULATION.md",
-   "files": [
-    "src/world/settlement.cpp",
-    "src/world/settlement.hpp",
-    "src/world/history_sim.cpp",
-    "src/world/population_generation.cpp",
-    "tools/verify/market_census.cpp",
-    "tools/verify/road_generation_harness.cpp"
-   ],
-   "design": "ROUND 2 READING RULED (Ben, 2026-09-25): the campaign prize (campaign_prize_q's centres x 200) and the reach relay (150 per centre, capped 500) READ URBAN HEADS, calibrated so the same heads give the same value as the old centre count did (POPULATION.md: a place's size is its people). Round 3 builds it; then merge. CORRECTION (2026-09-25): the re-settlement gate (a region re-settles only after a recorded razing) was judged a legitimate consequence by the lane, not ruled by Ben; round 3 measured that it moves the history substantially on its own, and with the sub-village floor it is put to Ben (the settlement-value form). ROUND 3 (c2548e1b): the heads mapping (min(heads/10,000, 32)) reproduces main for 91-94% of Empires-span prize/relay evaluations; the rest is the floor (main valued every settled region at one centre even under 10k heads) and a freeze class; synthetic R1 180 battles (main 7); floor candidate + the gate at main's reading reproduces main exactly on seed 40 (R1 8). Census: centres 164,982 -> 66,867, land 70.4% -> 28.5%.\n\nSETTLED (Ben, 2026-09-25, the open-calls form at the live app): EXPLAIN FIRST, THEN MERGE -- find why the history moved (a synthetic run's battles 7 -> 98; seed 40's regions 1,461 -> 2,703; candidates: campaign_prize_q's centres x 200 term, the relay rule centres >= relay_min) before the branch merges. Keep the per-region size hierarchy; a region whose cell holds no land carries NO centre (POPULATION.md). Follow-ons this sprint: BL-1132 (settle spacing), BL-1133 (anchors reuse a centre), BL-1137 (industrial urbanisation, the \"dramatically fewer\" lever), with the market folds (BL-1125) calibrated after them.\n\nSETTLED (Ben, 2026-09-25, the density form) (POPULATION.md § Generation, \"Growth consolidates\"). FOUND BY THE ROADS LANE (BL-1119 D1, 2026-09-25): population centres cover 49-100% of land on the 16 curated seeds (seed 46: 15,240 centres on 15,240 land tiles), every centre is a street, so the \"lattice\" Ben saw is streets and no road rule can thin it; the carve markets (75% of ~311 a world, BL-1125's census) follow the same density. POPULATION.md already wants \"a few cities over many towns over a train of villages\" and records that the remaining displacements are regions \"wanting more cities than it has ground\".\n\nTHE RULE. As a region's urban heads rise, its villages merge into a town rather than a new village standing beside them; a region never carries more centres than its ground holds (their urban footprints fit inside its own cell); a built-out cell promotes a centre it already has instead of spilling one into a neighbour's cell. Pure integer functions of the region record, no RNG, as the rest of the demography.\n\nTHE WORK, measure first (Rule 0b). (1) Read where the region's `centres` integer grows (the history's urban growth and promotion) and where generate_population_centres spills; report centres per seed, land share covered by centres, scale distribution, spills -- old. (2) Build the rule. (3) Report the same -- new -- plus the carve's market count (market_census) and road tiles (gen_step_costs --roads), because both follow. Tune nothing to hit a count; if the rule as written leaves density far from the doc's shape, report and stop for Ben.\n\nA WORLD-MOVER AND A SIM BEAT: a named cause in the sprint's one re-bless, measured in its own worktree. DONE WHEN the rule runs, POPULATION.md states it (done at the ruling), the per-seed centre count and land share are recorded old -> new, and the densest seed's road lens shows land that is not street."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
    "sprint": null,
    "written": "2026-09-25",
    "requires": [],
@@ -912,173 +624,6 @@
     "tools/verify/logistics_harness.cpp"
    ],
    "design": "FOUND 2026-09-25 by the settle lane (BL-1126 review fixes): six logistics_harness T7-T10 rows FAIL on main and identically on the pre-sprint logistics code (b03fd52e) -- \"intra-body shortfall dispatches one convoy\" and the cost, city-discount and hub-discount rows. Their fixture has no Logistic Point anchor, so the passive-LP gate (LOGISTICS.md § the LP split) refuses the convoy before any cost is priced, and the rows read a refusal as a failed dispatch. logistics_harness therefore exits 1 (35 PASS, 6 FAIL) and cannot gate anything. THE WORK: give the fixture an anchor (a city on the origin's body, or a built hub) and re-derive the expected discounts from the doc, not from the output; keep one row that asserts the refusal on an anchorless body. DONE WHEN logistics_harness exits 0 on main."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-09-25",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1132",
-   "short_name": "SETTLE_SPACING",
-   "author": "Ben (2026-09-25, the open-calls form: \"Settle spacing, this sprint\"); filed by Claude",
-   "category": "Generation",
-   "priority": "S",
-   "difficulty": 3,
-   "title": "A new region founds at a distance from the regions already standing, so the settled cores are not paved one region to a tile",
-   "authority_doc": "docs/generation/CIVILISATION.md",
-   "files": [
-    "src/world/history_sim.cpp",
-    "src/world/settlement.cpp",
-    "tools/verify/centre_census.cpp"
-   ],
-   "design": "SETTLED (Ben, 2026-09-26, the density-and-trade form): SPACING 3 TILES (the ladder's knee), and a realm scores Settle only where a site with room exists (the room-aware scorer). CIVILISATION.md states both.\n\nSETTLED (Ben, 2026-09-25, the open-calls form at the live app). CIVILISATION.md § The unit is the city state, and settlements are sparse states the rule. FOUND by the centres lane (BL-1130): the settle verb founds each new region on the nearest free tile, so on seed 46 3,304 of 4,682 regions hold a one-tile cell and 3,012 centres (49%) stand in such cells -- each rightly one centre, so the cores stay solid street. THE WORK, measure first: find every path that founds a region (the settlement pass and the sims' Settle verb); a spacing candidate ladder (minimum distance from standing regions, in tiles or traversal cost) on the 16 curated seeds -- regions, one-tile cells, centres, land under centres, the history's battles/conquests/foundings; then Ben fixes the spacing. A sim beat and a world-mover (the one re-bless). DONE WHEN the spacing is fixed and recorded old -> new per seed with the history readings."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-09-25",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1133",
-   "short_name": "PROVINCE_IS_ITS_CENTRES_GROUND",
-   "author": "Ben (2026-09-25, the open-calls form); filed by Claude",
-   "category": "Generation",
-   "priority": "S",
-   "difficulty": 3,
-   "title": "A province is its centre's ground: the fill covers the land, so no province is left without a centre",
-   "authority_doc": "docs/generation/PROVINCES.md",
-   "files": [
-    "src/world/population_generation.cpp",
-    "src/world/province.cpp",
-    "tools/verify/centre_census.cpp"
-   ],
-   "design": "RE-RULED (Ben, 2026-09-26, the province form: A). The join (232cf4db, on its branch, NOT merged) cut anchors only 9% (20,467 -> 18,622) because the fill's budget and the 20-tile cap leave ~2,700 provinces a world, every one needing a centre -- a floor far above the ~500 aim; 12,181 anchors stood on ground the history never settled. PROVINCES.md § The partition now states: every centre's province grows until its nation's land within its settled cell is covered; the budget becomes a weight on reach (NR-953: scale divides step cost); the 20-tile cap and the preferred 12 retire; an anchor founding survives only for ground no centre of the nation can reach (an uncentred island). THE WORK: rebuild the fill; the size-band harness rows re-scoped to the ruling (P9c ordering kept under the weight); provinces = centres per seed recorded old -> new; the conquest invariant holds. A world-mover.\n\nSETTLED (Ben, 2026-09-25, the open-calls form at the live app). POPULATION.md § Generation, \"Every province is anchored by a centre\". FOUND by the centres lane (BL-1130): ensure_province_anchor_centres founds a village for every centre-less province, which grew to 22-39% of all centres after consolidation (seed 46: 0 -> 1,320). DELEGATED READING (NR-946): a centre-less land province JOINS the adjacent province of its own nation whose centre is nearest, so the merged province's centre anchors it; a scale-1 founding only where no such neighbour exists. PROVINCES.md § The partition owns the merge. THE WORK: read the anchors founded per seed (old); build the join; record provinces, anchors founded and centres old -> new; the conquest unit invariant (every province has a centre) holds. A world-mover."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-09-25",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1134",
-   "short_name": "ROADS_CARRIED_ACROSS_ROUNDS",
-   "author": "Ben (2026-09-25, walking round 6: \"we lost every road between Exploration and Industrialisation\"); filed by Claude",
-   "category": "UI",
-   "priority": "S",
-   "difficulty": 2,
-   "title": "Every lapse round draws the roads the rounds before it laid; no seam drops them",
-   "authority_doc": "docs/ui/STARTUP.md",
-   "files": [
-    "src/ui/history_lapse.cpp",
-    "src/world/history_sim.cpp",
-    "src/world/era_timelapse.hpp"
-   ],
-   "design": "A DEFECT Ben saw at the live walk (2026-09-25): every road on the Exploration round is gone on the Industrialisation round. STARTUP.md § Round 6 (roads carried forward like a realm's name and colour) states the rule. THE WORK: find where the carry breaks -- the Industrialisation record not carrying the corridor/road set it inherited, the painter drawing only its own span's corridors, or the K4 wizard handing round 6 a record without the prior roads -- fix it at the cause, and add a --verify expect that a road present at the close of round 5 is drawn on round 6's first frame. DONE WHEN the expect passes and Ben sees the roads carry at the walk."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-09-25",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1135",
-   "short_name": "CULTURE_ROUND_WORDED_AS_THE_RECORD",
-   "author": "Ben (2026-09-25, the open-calls form notes); filed by Claude",
-   "category": "UI",
-   "priority": "B",
-   "difficulty": 1,
-   "title": "The Culture round's words describe how writing and the keeping of a culture's record emerge, not the migration routes",
-   "authority_doc": "docs/ui/STARTUP.md",
-   "files": [
-    "src/ui/startup_screens.cpp",
-    "src/ui/history_lapse.cpp",
-    "docs/ui/question_log.json"
-   ],
-   "design": "Ben, 2026-09-25: \"change the cultures wording to describe how written records are stored, so the idea is less to trace migration routes (which happened millennia earlier), and more to show how writing and preservation of culture emerges.\" STARTUP.md § Round 3 states it. THE WORK: the round's question (today \"Who reached this ground first, and by which routes?\"), its wait caption and description, its ticker framing and a footer, reworded in GLOSSARY.md terms; the map and its record unchanged. Draft for Ben's read at the walk. DONE WHEN the words are in and Ben reads them at the app."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-09-25",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1136",
-   "short_name": "SEARCH_FEWER_EVALUATIONS",
-   "author": "Ben (2026-09-25, the open-calls form: \"Fewer search evaluations\"); filed by Claude",
-   "category": "Generation",
-   "priority": "A",
-   "difficulty": 2,
-   "title": "The landscape search's fixed round count is cut, from a measured curve, to fit round 6's wait",
-   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
-   "files": [
-    "src/world/landscape_search.cpp",
-    "tools/verify/landscape_search_harness.cpp",
-    "tools/verify/gen_step_costs.cpp"
-   ],
-   "design": "RULED (Ben, 2026-09-26, the review form): A -- keep 6 rounds; score each round's proposals on 2 threads (thread_count 2 in campaign_search_params; the lane measured -8.6 s on seed 0, -5.8 s on seed 28, winners bit-identical); re-read the count after the market folds (scoring is ~90% of an evaluation and grows with the market count). GENERATION_STRATEGY.md § Phase 6 states it.\n\nSETTLED (Ben, 2026-09-25, the open-calls form at the live app). GENERATION_STRATEGY.md § Phase 6 states the rule. The quiet reading (2026-09-25): seed 0's round 6 lands in ~48 s against 35 s; the search is 13 evaluations, ~17.3 s (1.33 s each). THE WORK, measure first: the search's score per round count (1..6 rounds) on the 16 curated seeds -- the winner's composite and whether it validates -- and the time per evaluation; recommend the smallest count whose curve has flattened; Ben fixes it. Re-read after BL-1130 and BL-1137 land (fewer centres shrink the charter budget). A world-mover if a winner changes."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-09-25",
-   "requires": [
-    "BL-1141"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1137",
-   "short_name": "INDUSTRIAL_URBANISATION",
-   "author": "Ben (2026-09-25, after Begin: \"reduce the number of population centres dramatically, and we should encourage more migration in the industrialisation round\"; \"we can destroy shrinking centres below a threshold\"); filed by Claude",
-   "category": "Generation",
-   "priority": "S",
-   "difficulty": 4,
-   "title": "The Industrialisation span's migration empties the countryside into the towns and cities that industrialise, and an emptied village is abandoned",
-   "authority_doc": "docs/generation/INDUSTRIALISATION.md",
-   "files": [
-    "src/world/history_sim.cpp",
-    "src/world/settlement.cpp",
-    "tools/verify/centre_census.cpp",
-    "tools/verify/industrialisation_sim_harness.cpp"
-   ],
-   "design": "RULED (Ben, 2026-10-02): the stream rate stays 12 per mille (the 6-18 ladder is flat once any centre with open work draws: urban 15.4% at every rung; ~66M heads moved; the jobs works offer bind). NEXT: a ladder on the jobs works offer (industrial rows x1/x2/x4/x8, all rows x2/x4), then Ben picks.\n\nSETTLED (Ben, 2026-10-02): any centre with open work is a destination, not towns only (region_stands_a_town). Diagnosis: 19.7M-24.3M of open work stood on villages the stream never reached; towns filled theirs in the first round. Then re-read the 6/9/12/18 ladder.\n\nRE-READ AFTER IT LANDS (2026-09-27): road_generation_harness R2 (the Highway tier reachable) fails on main 19629dac, having passed at BL-1119 round 2 (bbf89652). Probable cause: BL-1141 left 148 cities pooled, and a Highway needs a nation with two City+ centres. The rebuild restores cities (4,000+ and ~1,100 metropolises at rung 18), so re-run it when this merges; if still red, it becomes its own item.\n\nSETTLED (Ben, 2026-09-27, the works and pull form): THE PULL IS OPEN WORK -- a destination pulls by the jobs its works offer beyond the heads already there (INDUSTRIALISATION.md Beat 2), replacing the points delta. The rate ladder is RE-READ after the open-work pull and BL-1155 (works built where centres stand) land on the branch; Ben then picks the rung. The treasury-spread call (employed vs urban heads) is still open with him.\n\nRATE LADDER READ (2026-09-27, on the BL-1149 tree, 16 seeds): rate 6 / 9 / 12 / 18 per mille -> urban share 56.0 / 62.5 / 66.8 / 72.0%; centres 21,820 / 21,449 / 21,040 / 20,323 (main 22,550); carved 11,145 / 10,586 / 10,114 / 9,119; metropolises 541 / 745 / 897 / 1,132; abandonments 834 / 1,390 / 1,877 / 2,810; Industrialisation battles 9,234 / 10,098 / 10,512 / 10,881; points per world 55.5M / 57.8M / 57.5M / 60.6M; C13 16/16 at every rung. No rung nears ~500 a world; province anchors (~11,000) were over half of all centres -- BL-1150 cuts them to 1,430. Put to Ben.\n\nSETTLED (Ben, 2026-09-27, the density calls form): READ A RATE LADDER, THEN BEN PICKS AND IT MERGES. The rebuild (dccf7e05 + fixes d79e0c81, on the centres lane's branch) passed its cold review with no conservation bug; it thins centres 7.1%, not 'far fewer', at the chosen 12 per mille. Build BL-1149 (scale credit from the works) on the branch first, since the pull reads points; then read 6 / 9 / 12 / 18 per mille for urban share, centres (and carved), points per world, rho(points, heads), markets, battles and the C13 conservation ledger. Ben picks the rung; the branch merges at it. NR-958 ruled A (keep the conserving reading).\n\nSETTLED (Ben, 2026-09-26, the density-and-trade form): REBUILD on the deepen rule (BL-1141) and read again -- as built (997b8b52, not merged) it raised centres +8%, markets 5,269 -> 24,123 and industry points ~4x because the in-region hierarchy widened growing cities.\n\nSETTLED (Ben, 2026-09-25, the centres-and-routes form): THE AIM IS ~500 CENTRES a 1960 world (POPULATION.md), about a dozen per market -- an aim the forces are calibrated against, never a count enforced. \"Dramatically fewer\" is read against it; report the per-seed count after the stream and stop for Ben if it is far from the aim.\n\nSET (Ben, 2026-09-25): INDUSTRIALISATION.md § Beat 2 (the urbanisation stream, now set) and POPULATION.md § Generation (\"Centres follow the heads both ways\": a centre below a village's worth is abandoned in the history; NR-947 holds the threshold reading and whether play follows). THE WORK: build Beat 2's URBANISATION stream (a region's countryside and villages -> a centre in the same polity, pulled by industry-point output at the centre, pushed by depleted or strained ground, along held corridors); let a centre's count follow its heads both ways so an emptied village is abandoned. Emigration (between polities) is Beat 2's other stream and is NOT in this item unless the reading shows urbanisation alone cannot thin the map. Measure first and after on the 16 seeds: centres per seed by scale, land under centres, the history's counters. Tune nothing to hit a count; report and stop for Ben if the stream leaves the map far from \"dramatically fewer\". A sim beat and a world-mover."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-09-25",
-   "blocked_on": null,
-   "parked": false,
-   "requires": [
-    "BL-1125"
-   ],
-   "id": "BL-1138",
-   "short_name": "ROADS_PULL_TO_MARKETS",
-   "author": "Ben (2026-09-25, the open-calls notes and the centres-and-routes form: \"B, build this sprint, after the market folds\"); filed by Claude",
-   "category": "Generation",
-   "priority": "A",
-   "difficulty": 4,
-   "title": "Roads pull toward each nation's market centres, and a trunk bridges neighbouring markets for larger trades",
-   "authority_doc": "docs/economy/LOGISTICS.md",
-   "files": [
-    "src/world/road_generation.cpp",
-    "src/world/road_generation.hpp",
-    "tools/verify/road_generation_harness.cpp",
-    "tools/verify/gen_step_costs.cpp"
-   ],
-   "design": "RULED (Ben, 2026-10-03): each tile of a trunk or pull takes the tier of the nation whose land it crosses (the Road cliff holds everywhere); the three readings accepted (min-percentile end tier, the roads-only network route, the unrationed pull).\n\nHAULAGE NOTE (2026-10-03): haulage_measure's default mode builds no-prehistory worlds, so the market folds' \"2,809 -> 1,468\" reading is that thin world, not play. The shipped reading is 'haulage_measure --far-trade', one run per curated seed (BL-1159 lane: same-body convoys delivered 13,954 / 11,277 per window pooled on main before the folds). Read --far-trade on the 16 seeds before and after BL-1125 and after this item.\n\nNOTE (Ben, 2026-10-03, the market folds form): haulage halved with the folds (intra-body dispatches 2,809 -> 1,438 before the fold fix round); accepted as fewer, longer hauls -- RE-READ haulage_measure after this item lands.\n\nSETTLED (Ben, 2026-09-25, the centres-and-routes form). LOGISTICS.md § 4, \"Roads pull toward markets\", states it: within a nation every market centre is on the backbone and a town's road is weighed by how much nearer it brings the town to its market; across markets a trunk joins each market centre to its neighbouring market centres (over a border where the neighbour lies across one), at Road tier or above, the detour test still refusing a trunk link a serviceable route already gives. DELEGATED READING (NR-950): the trunk's neighbours are each market centre's nearest market centres by traversal cost (a Delaunay-like neighbour set, not all pairs), and its tier is Road. SEQUENCE: after BL-1125 (markets can die) leaves the world its tens of markets. Measure old -> new: road tiles, trunk links, market-to-market traversal cost and haulage. A world-mover."
   },
   {
    "status": "designed",
@@ -1109,85 +654,6 @@
     "src/world/battle_system.cpp"
    ],
    "design": "RULED (Ben, 2026-10-03): merge the recorded ids (a7b8a294, merged 3e99033f); HOLD the abandonment (2f719556) until BL-1163 (play villages decline) is diagnosed and fixed. The lane's five readings accepted: the merge target shares the holder; a non-sole centre is deleted without a merge; a live battle defers; it fires on the decline step; nearest = hex distance to the anchor.\n\nAMENDED (Ben, 2026-09-27, NR-952): NO RUIN FALLBACK. An abandoned centre is always deleted; a province with no same-nation neighbour stands without a centre, held by its recorded holder and taken by a battle decided on it. A province's id is RECORDED for its life once generation ends (PROVINCES.md § Two contracts), not derived from its lowest member tile, because the runtime merge would otherwise renumber provinces under battle records, march orders, province_holder's positional alignment and saves (province.hpp ~388-392 states the derived id is safe only because borders move in generation). THE WORK adds: the id recorded at generation's end and saved; the merge keeps the surviving province's id and removes the other in order; every reader of a province's centre (the holder derivation, BL-1145's front-tile readers, the province lens, selection) handles a centreless province. A save round-trips a merge and a centreless province.\n\nOVERTURNED (Ben, 2026-09-26, the review form, NR-948): in play an abandoned centre is DELETED and its province merges into the adjacent province of its own nation whose centre is nearest (the BL-1133 join, at runtime); only a province with no such neighbour keeps its centre as a ruin at the razed tier (NR-952). THE WORK now: the runtime decline check abandons a centre below a village's worth; the province join at runtime moves ownership records, provinces, anchors, any buildings on the centre's tile and the map's province lens consistently; a save round-trips it. Heavier than the ruin reading: it touches the province partition in play, so it waits for BL-1133 and slips first.\n\nSETTLED (Ben, 2026-09-25, the centres-and-routes form). POPULATION.md § Growth, decline and razing states it: play follows the history's abandonment rule. DELEGATED READING (NR-948): in play an abandoned centre drops to the existing RAZED tier (population zero, no labour or demand, entity/name/tile/urban ground persist, cheap to re-settle) rather than vanishing, because a centre is its province's capture anchor. THE WORK: the runtime decline check (the ordinary growth pass) demotes a centre below a village's worth to razed; no province loses its anchor; a save round-trips it. The last item in the sprint's order; the first to slip if the wave runs long. Not a generation world-mover (play only), but it moves every settled world whose centres decline in the settle -- measure the settle digests."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-09-25",
-   "blocked_on": null,
-   "parked": false,
-   "requires": [
-    "BL-1120"
-   ],
-   "id": "BL-1140",
-   "short_name": "SEA_LANES_FROM_TRADE",
-   "author": "Ben (2026-09-25, the open-calls notes: \"sea lanes as more than just coastal change - ocean currents, and inter-continental trade\"; the form: \"B, this sprint\"); filed by Claude",
-   "category": "Generation",
-   "priority": "A",
-   "difficulty": 3,
-   "title": "Trade between realms across water earns sea lanes, so a world's lanes follow its inter-continental trade",
-   "authority_doc": "docs/generation/EXPLORATION.md",
-   "files": [
-    "src/world/history_sim.cpp",
-    "src/world/history_sim.hpp",
-    "tools/verify/exploration_sim_harness.cpp",
-    "scripts/verify/sea_lanes.lua"
-   ],
-   "design": "SETTLED (Ben, 2026-09-25, the centres-and-routes form). EXPLORATION.md § The colonial tie is a sea lane, \"A lane is a route of the ocean's currents and of trade between continents\": a fourth writer of a sea-leg use -- trade between realms whose goods cross water writes one use per decision round it runs -- and every leg is priced with its current (BL-1120). THE WORK, measure first: find the spans' trade links between realms on different landmasses (Exploration and Industrialisation), read how many legs and lanes trade would write on the 16 seeds, then write them; the lane record (BL-1097) and the lapse draw them unchanged. Lanes old -> new per seed (count, tribute-written vs trade-written). A sim beat and a world-mover. Pairs with BL-1098 (the lane tier stamped), which then stamps a world whose lanes are trade routes."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-09-26",
-   "blocked_on": null,
-   "parked": false,
-   "requires": [
-    "BL-1130"
-   ],
-   "id": "BL-1141",
-   "short_name": "CENTRES_DEEPEN",
-   "author": "Ben (2026-09-26, the density-and-trade form: \"Deepen\"); filed by Claude",
-   "category": "Generation",
-   "priority": "S",
-   "difficulty": 3,
-   "title": "A region deepens into one place: one centre whose scale is the rung its heads have reached",
-   "authority_doc": "docs/economy/POPULATION.md",
-   "files": [
-    "src/world/settlement.cpp",
-    "src/world/settlement.hpp",
-    "src/world/population_generation.cpp",
-    "src/world/stockpile_budget.cpp",
-    "tools/verify/centre_census.cpp"
-   ],
-   "design": "SETTLED (Ben, 2026-09-26, the density-and-trade form). POPULATION.md § Generation (\"A region deepens into one place\"; the carve's scale sentence) states it, superseding BL-1130's in-region hierarchy and the body-wide rank-size share-out: a region stands ONE centre while settled (zero once abandoned), its scale the k_population_for_scale rung its own urban heads reached. Also ruled: points go with their people -- industry points a region earned before losing its ground or its settlement pass to the nearest centre of the same realm. FOUND by BL-1137: under the hierarchy a growing city widened into up to 32 centres, so urbanisation RAISED centres (+8%) and markets (5,269 -> 24,123). THE WORK: the count and the carve as ruled; stranded points re-homed; census old -> new against the ~500 aim. A world-mover."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-09-26",
-   "blocked_on": null,
-   "parked": false,
-   "requires": [
-    "BL-1140"
-   ],
-   "id": "BL-1142",
-   "short_name": "FAR_PAIRS_ACROSS_WATER",
-   "author": "Ben (2026-09-26, the density-and-trade form: \"Both\"); filed by Claude",
-   "category": "Generation",
-   "priority": "A",
-   "difficulty": 3,
-   "title": "Far realms across water bind in the Industrialisation span, and a trade leg run against its current delivers less",
-   "authority_doc": "docs/generation/INDUSTRIALISATION.md",
-   "files": [
-    "src/world/history_sim.cpp",
-    "src/world/history_sim.hpp",
-    "tools/verify/ocean_currents_harness.cpp",
-    "tools/verify/industrialisation_sim_harness.cpp"
-   ],
-   "design": "SETTLED (Ben, 2026-09-26, the density-and-trade form). INDUSTRIALISATION.md § Far pairs meet and bind (far pairs bind across water, not only a border) and EXPLORATION.md § Currents (\"A leg run against its current delivers less\") state it. FOUND by BL-1140: inter-continental trade was 7 realm pairs on 6 of 16 worlds, limited by the seller's stock or the buyer's want, never the sea, so pricing the sea line was nearly inert. THE WORK, measure first: extend the span's far-pair binding to realms on other landmasses; apply a cargo loss after the flow is sized, in proportion to running against the current, one named weight on a ladder. Report cross-water pairs, flows and volume, trade-written lanes, with/against shares. A sim beat and a world-mover."
   },
   {
    "status": "designed",
@@ -1236,85 +702,6 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "written": "2026-09-26",
-   "requires": [
-    "BL-1150"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "sprint": 48,
-   "id": "BL-1145",
-   "short_name": "PROVINCE_FRONT_TILE_READERS",
-   "author": "Claude (sprint 48, the BL-1133 cold review, 2026-09-26)",
-   "category": "Generation",
-   "priority": "A",
-   "difficulty": 2,
-   "title": "Code that stands for a province by its lowest-id tile reads its centre's tile instead, now that a province can span a thousand tiles",
-   "authority_doc": "docs/generation/PROVINCES.md",
-   "files": [
-    "src/ui/body_surface_canvas.cpp",
-    "src/ui/selection_panel.cpp",
-    "src/world/nation_generation.cpp",
-    "tools/verify/centre_census.cpp",
-    "src/world/province.hpp"
-   ],
-   "design": "RULED (Ben, 2026-10-03): border garrisons stand on their province's tile nearest the neighbour they guard; the capital garrison stands on the capital province's anchor centre.\n\nSEQUENCE AMENDED (2026-09-27, the BL-1150 cold review): runs after BL-1150 (province fill crosses the settled line) too -- a capital's province can now reach into never-settled wilderness, so a garrison on tiles.front() (nation_generation.cpp ~1466-1481) can land there; the sustain coefficient k_province_buildings_per_sustain_unit (province.hpp ~651-683) was pinned to a world total BL-1150 moves (an absorbed hinterland's population factor can reach 2.0 where the old anchor island had 1.2) -- re-read it.\n\nFOUND 2026-09-26 by the BL-1133 cold review. Provinces now reach 1,315 tiles, and several readers still stand for a province by `tiles.front()`, its lowest-id tile: unit markers and the battle glyph draw only on that tile (body_surface_canvas.cpp ~3791, ~3817), so an army on screen can show no marker; garrisons are placed there (nation_generation.cpp ~1481) rather than at the capital; the battle card frames its neighbourhood round it (selection_panel.cpp ~2423). Battles resolve per province, so outcomes are unmoved, except where the garrison's tile is read.\n\nTHE WORK: (1) each reader takes the province's centre tile (its seed), or the unit's own tile where one exists; (2) centre_census C8 stops bucketing anchor-only provinces as villages, and C7's `unanchored` becomes a gate over the 16 seeds (every settled-land province holds a centre); (3) the stale comments on k_province_buildings_per_sustain_unit and province_section_max_tiles (province.hpp ~650-682, ~846-851) are re-read against the grown provinces. Runs after BL-1141 (centres deepen) lands, because the provinces change again. A UI requirement: a live click that a marker shows on an army in a large province."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "written": "2026-09-26",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "sprint": 48,
-   "id": "BL-1146",
-   "short_name": "FIRM_CAP_ON_GROWN_PROVINCES",
-   "author": "Claude (sprint 48, the BL-1133 cold review, 2026-09-26)",
-   "category": "Economy",
-   "priority": "S",
-   "difficulty": 2,
-   "title": "The two-firms-per-province cap is re-read on the grown provinces, where one province now holds a whole large centre",
-   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
-   "files": [
-    "src/world/corporation_generation.cpp",
-    "src/world/stockpile_budget.cpp",
-    "tools/verify/charter_refusal_probe.cpp",
-    "tools/verify/stockpile_budget_check.cpp"
-   ],
-   "design": "SETTLED (Ben, 2026-09-27, NR-960 B): the per-province cap scales with the province's centre, two firms per rung -- village 2, town 4, city 6, metropolis 8, megacity 10 (INDUSTRIALISATION.md § 1). BUILD: both cap sites in corporation_generation.cpp (per_province_firm_cap ~2218, k_charter_per_province_firm_cap ~2634) read the anchor centre's scale. Measure with stockpile_budget_check --firm-census before and after: the province_cap share of the budget, firms by the scale of the centre they stand in, budget firms against the 120 body ceiling, specialists chartered, markets.\n\nRE-READ AFTER BL-1141 (2026-09-26, main 8cbdbc9d, stockpile_budget_check --firm-census): province_cap now binds on 16 of 16 worlds, 60.8M points pooled (5.2% of the budget, up from 1.0%), 181 bookings, about 756 firms' worth; largest 29.5% of a budget (seed 28, whose largest province is 1,383 tiles). But budget firms reach the 120-per-body ceiling on 15 of 16 worlds (1,909 of 1,920) and density_ceiling itself now books 123.5M (10.5%), so the cap mostly moves firms from the richest centres to poorer ones rather than cutting the total. NR-960 puts the cap to Ben.\n\nMEASURED 2026-09-26 (stockpile_budget_check --firm-census, merged ae9111e8; 16 curated seeds, the shipped path): BL-1133 alone did make the cap bind harder (province_cap 4.7% -> 5.6% of the pooled budget, 11 -> 14 worlds, seed 11 at 25.4%), but on main the later merges (BL-1132 spacing, BL-1098 lanes, the BL-1130 footprint fixes) spread the budget so it concentrates far less: province_cap 1.0% pooled, 11 of 16 worlds, largest 8.0% (seed 32); budget firms 1,169 -> 1,721; no province holds more than 2; Pass 6 lays no firm on any shipped world. Weighted by budget a window still spans 9-13 provinces. Unspent points are lost (charter_pool::none; nothing credits them). The larger loss is `remainder`, 63.7% of the pooled budget: most centres have under one firm price left after their specialist. NO CALL FOR BEN YET: re-read after BL-1141 (centres deepen) lands, since ~500 centres a world means far larger provinces.\n\nFOUND 2026-09-26 by the BL-1133 cold review. The per-province firm cap of 2 (corporation_generation.cpp ~2218, Pass 6; ~2634, the charter budget; applied ~2440, ~2769-2787) was ruled by Ben on NR-910 against provinces of <= 20 tiles, where it bound on 7 of 16 worlds. The charter spend's window is ~49 tiles round each centre (stockpile_budget.cpp ~266-267): a large centre's window used to span 4-6 provinces (8-12 firms); now it sits inside one province, so after 2 firms every window tile is refused and the rest is booked unspent[province_cap] or never placed. The merge measured provinces, not firms. The same pattern as the readers of region::centres sized for the old count.\n\nTHE WORK, measure only: firms placed and unspent by reason (province_cap above all) per seed on the 16 curated seeds, at 5cab560b^1 (before BL-1133) and at main; re-read after BL-1141. Then Ben rules on the cap (NR-910 was his). A named cause in the re-bless if it moves."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-09-26",
-   "requires": [
-    "BL-1142"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1147",
-   "short_name": "NAVAL_POINTS_CARRY_OVER",
-   "author": "Ben (2026-09-26, the naval carry-over form: \"accumulate naval points in empires with many coastal provinces in the empire age and pass them over\"); filed by Claude",
-   "category": "Generation",
-   "priority": "A",
-   "difficulty": 3,
-   "title": "Empires earn naval points at sea, and carry them into the Exploration age as a starting fleet",
-   "authority_doc": "docs/generation/EXPLORATION.md",
-   "files": [
-    "src/world/history_sim.cpp",
-    "src/world/history_sim.hpp",
-    "src/world/era_minus_one.cpp",
-    "src/world/generation_cursor.hpp",
-    "tools/verify/exploration_sim_harness.cpp",
-    "tools/verify/world_cursor_equivalence.cpp"
-   ],
-   "design": "SETTLED (Ben, 2026-09-26, the naval carry-over form), written into EXPLORATION.md § the stocks (superseding the 2026-09-11 \"the navy is new and starts at zero, everywhere\"). A polity accrues NAVAL POINTS through the Empires span from three deeds: coastal provinces held, counted per year held (a held region with a port window, the empire tree's coastal_holdings reading); sea crossings made (the sea legs it walks); and coastal sea techs taken (EM-RD-2b Deep-Hull Sail, EM-RD-3b Lateen & Long-Range Rig, EM-RD-4a Ocean-Rated Hulls). At the handoff its points become its opening navy_stock. THE POINTS PASS TO THE POLITY THAT EARNED THEM: a polity that lost its coast keeps its sailors; nothing is read off the regions held at the handoff. The fleet is then an ordinary stock: upkeep from the first round, decay when underfunded, staged from a port; port_q stays endowment and no port carries.\n\nEVIDENCE FOR IT (the sea lane, 2026-09-26): purchase-written lanes at 1960 are 0 of 444 on the 16 seeds (campaign 118, tribute 29, trade 297), consistent with a sea the Exploration age starts empty.\n\nTHE WORK, measure first: (1) today's first-crossing years, purchases and navy_stock by 1300 per seed; (2) the points ledger (the three deeds' shares per polity at 1200) and its conservation across the handoff (the cursor must carry it; world_cursor_equivalence folds it); (3) the conversion constant (points -> navy_stock) read on a ladder over the 16 seeds, reporting the opening fleets, the Exploration counters (crossings, purchases, subjections, battles, lanes by writer) at each rung; Ben picks the rung. Readings to name for Ben, not take silently: what a polity that dies before 1200 carries (nothing, as the ruling reads); how the three deeds are weighted against each other. A world-mover: a named cause in the re-bless. RUNS AFTER BL-1142 (far pairs across water) merges, in the sea lane."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
    "sprint": null,
    "written": "2026-09-26",
    "requires": [
@@ -1335,56 +722,6 @@
     "src/world/history_sim.cpp"
    ],
    "design": "FOUND 2026-09-26 by the BL-1137 rebuild's cold review: INDUSTRIALISATION.md Beat 2 (PROPOSED) says \"a stream moves culture shares into its destination centre ... This is what produces property 4's checkered provinces\", and settle_urban_migrants moves people and capacity but no culture share. The Beat 2 paragraph is PROPOSED, not SETTLED, so this is design-then-build: Ben settles whether migrants carry their culture share, then the stream moves shares in proportion to the heads it moves, with the same largest-remainder rounding and conservation. Measure the checkered-province reading (property 4) before and after. Runs after BL-1137 (industrial urbanisation) merges."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-09-27",
-   "requires": [
-    "BL-1137"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1149",
-   "short_name": "SCALE_CREDIT_FROM_WORKS",
-   "author": "Claude (sprint 48, Ben's density calls form, 2026-09-27)",
-   "category": "Generation",
-   "priority": "A",
-   "difficulty": 3,
-   "title": "A head earns industry scale credit only where a work employs it, so points follow the works a city built and not its crowd",
-   "authority_doc": "docs/generation/INDUSTRIALISATION.md",
-   "files": [
-    "scripts/works.lua",
-    "src/world/works_roster.hpp",
-    "src/world/works_registry.cpp",
-    "src/world/history_sim.cpp"
-   ],
-   "design": "RULED (Ben, 2026-10-02, the jobs ladder): every works row employs x4. Ladder (16 seeds, rate 12): all x4 -> urban 26.0%, 968M heads moved, 2,908 cities / 12 metropolises, employed 88% of urban, markets 8,485, centres 13,374; industrial-only scaling barely moved the world (~74 regions hold an industrial work).\n\nSETTLED (Ben, 2026-09-27): works survive a sack -- a work is physical, so a town that regrows re-employs in it; INDUSTRIALISATION.md's 'the works went with the towns' narrowed to the points. No code change (works_built is never cleared, as built). Review fix round (ec5f2308's cold review): inert-without-a-works-table made loud, the call site pinned, the loader refusals tested, a works-table determinism run.\n\nSETTLED (Ben, 2026-09-27): INDUSTRIALISATION.md § 1, 'a head earns scale credit only where a work employs it'. The BL-1137 rebuild's cold review found the stream's pull is only the scale credit (urban heads x rate x fuel x tree), so migrants went in proportion to a city's existing heads and then earned credit for arriving: rho(points, urban heads) 0.83, near headcount by construction. BUILD: a new field on the works table, the heads a work employs (authored per row, validated by the loader like every other field); a region's scale credit counts its urban heads up to the sum its held works employ. Report rho(points, urban heads) and rho(points, employed heads) before and after, the share of urban heads employed, and how the stream's destinations change. The per-row magnitudes are authored by judgement and read on BL-1137's rate ladder; say which rows employ and why."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-09-27",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1150",
-   "short_name": "PROVINCE_FILL_CROSSES_SETTLED_LINE",
-   "author": "Claude (sprint 48, NR-954 ruled B, 2026-09-27)",
-   "category": "Generation",
-   "priority": "A",
-   "difficulty": 2,
-   "title": "A centre's province fill crosses the settled line, so never-settled ground joins the province that reaches it rather than an anchor village founded to hold it",
-   "authority_doc": "docs/generation/PROVINCES.md",
-   "files": [
-    "src/world/province.cpp",
-    "src/world/population_generation.cpp",
-    "tools/verify/province_partition_harness.cpp",
-    "tools/verify/centre_census.cpp"
-   ],
-   "design": "SETTLED (Ben, 2026-09-27, NR-954 B): PROVINCES.md § The settled cells are a binding input. The land fill's settlement lock (BL-849; province.cpp ~340-346, domain settlement_lock) retires for land; the nation lock stays. MEASURE FIRST on the 16 seeds and report before building: anchor foundings (6,856 pooled after BL-1133; 3,753 attributed to the lock), provinces, province size p50 / p90 / max (and C7b's anchor-only maximum, per the NR-954 caution), centres including anchors, uncentred islands left. Then build and read the same columns, plus the partition harness and centre_census. Report giant provinces explicitly: crossing the line lets one centre take a whole never-settled hinterland."
   },
   {
    "status": "designed",
@@ -1410,129 +747,6 @@
     "tools/verify/stockpile_budget_check.cpp"
    ],
    "design": "FOLDED INTO BL-1168 (charter priced by trade reach), which must re-anchor the seat menu anyway (2026-10-03).\n\nDOC AND CODE DISAGREE (found 2026-09-26): CORPORATION_GENERATION.md says a specialist's price is anchored to the seat menu, 'the median library world offers about as many seats as a world with no budget' (NR-907, NR-910; the 650 divisor was pinned for that). On main the median world charters 81.5 specialists (61-111 a seed), and the BL-1137 rebuild barely moves it (88), because the price rises with the stock. The anchor was pinned on a world that no longer exists (before BL-1130/1133/1141). WORK: re-read the seat curve (stockpile_budget_check --seat-curve) after BL-1137 and BL-1146 land, and re-pin the divisor to the doc's target, measured, never clamped to a count. If no divisor reaches it without starving the web, report that for Ben rather than forcing it."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-09-27",
-   "requires": [
-    "BL-1147"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1152",
-   "short_name": "FLEETS_PROJECT_POWER",
-   "author": "Claude (sprint 48, NR-961 ruled, 2026-09-27)",
-   "category": "Generation",
-   "priority": "A",
-   "difficulty": 4,
-   "title": "A fleet bounds the army it carries, and a crossing its target's side out-projects at sea never sails",
-   "authority_doc": "docs/generation/EXPLORATION.md",
-   "files": [
-    "src/world/history_sim.cpp",
-    "src/world/history_sim.hpp",
-    "src/world/ocean_currents.cpp",
-    "src/world/era_minus_one.cpp",
-    "tools/verify/ocean_currents_harness.cpp"
-   ],
-   "design": "RULED (Ben, 2026-10-02): the Industrialisation span stays rule-off; its values wait for BL-1157 (fleet upkeep bites).\n\nRULED (Ben, 2026-10-02, option D): 20 men a hull / halving 10 / conversion 50 for the EXPLORATION span; the Industrialisation span stays at 0 until the lane finds why industrial fleets fall short (on the fixed code at 20/10/50 only 7 seeds crossed by 1680, seeds 11 and 38 never) and Ben sets its values.\n\nPROVISIONAL PICK (Ben, 2026-10-02, the fleet constants form, read on the ladder later voided by the review): men per hull 20, halving 10 sea tiles, conversion 50 hulls per 1,000 naval points. Confirmed against the re-run ladder after the review fixes; committed at those values unless that point is degenerate, in which case it returns to Ben.\n\nSETTLED (Ben, 2026-09-27, NR-961): EXPLORATION.md, the SETTLED paragraph under the stocks table; MILITARY_HISTORY.md carries a pointer. Spans: Exploration and Industrialisation (the Empires round keeps the band gate). (1) CAPACITY: a campaign that crosses water carries no more of its army than the fleet staged from its hub's port lifts (men per hull, one named constant). (2) DEFENDERS: the target realm and its mutual-defence partners (treaty_clause::mutual_defence). (3) REACH: a fleet's power falls with sea distance from its own ports, halving over a fixed run of sea tiles (one named constant), the distance priced by the currents. (4) STOPPED: where anywhere on the crossing's sea leg the defenders' projected power outweighs the attacker's fleet there, the crossing never sails; the attacker keeps army and fleet; the round's campaign is lost. MEASURE FIRST: crossings per span, their hubs' ports, the attacker's fleet at launch, mutual-defence pairs, how often a target has a defending fleet in reach; then build; then read both constants on ladders and the BL-1147 conversion again. Ben sets all three."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-09-27",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1153",
-   "short_name": "LANE_PORT_AT_COASTAL_SEAT",
-   "author": "Claude (sprint 48, NR-955 ruled B, 2026-09-27)",
-   "category": "Generation",
-   "priority": "B",
-   "difficulty": 2,
-   "title": "A realm's sea lane starts at its nearest coastal region's seat, so a seat with no sea in reach still lays its lane",
-   "authority_doc": "docs/economy/LOGISTICS.md",
-   "files": [
-    "src/world/road_generation.cpp",
-    "tools/verify/sea_lane_stamp_harness.cpp"
-   ],
-   "design": "SETTLED (Ben, 2026-09-27, NR-955 B): LOGISTICS.md § 4b, 'A realm's port is its nearest coastal region's seat'. Today a seat's port is its nearest sea tile within nine tiles, and a seat with none lays no lane (about a quarter of earned lanes unlaid: 371 of 493 after the four-way walk). THE WORK: where a seat has no sea within nine tiles, its lane end moves to the nearest region of the same realm that has one (nearest by the same measure the sim uses; ties to the lower region), and starts at that seat's nearest sea tile. Report earned / laid / unlaid lanes before and after, and the walker's cost. E (a port facing the partner) was NOT taken. Find the port picker first (sea_lane_port; the file list is a guess)."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-09-27",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1154",
-   "short_name": "RIVALS_FIELD_NO_FORCE",
-   "author": "Claude (sprint 48, the BL-1146 lane's spawn_solvency reading, 2026-09-27)",
-   "category": "Economy",
-   "priority": "A",
-   "difficulty": 2,
-   "title": "On a budget world the rival corporations field almost no standing force, so the field cannot fight",
-   "authority_doc": "docs/military/MILITARY.md",
-   "files": [
-    "src/world/corp_ai.cpp",
-    "src/world/corp_command.cpp",
-    "src/world/corporation_generation.cpp",
-    "tools/verify/spawn_solvency.cpp"
-   ],
-   "design": "RULED (Ben, 2026-10-01, NR-963 A): rivals start armed again (seed_starting_military for every non-background rival corp); the seated corp keeps opening unarmed (BL-635's cause stays off for the player). Measure rival solvency and spawn_solvency R4 before and after.\n\nCAUSE TRACED (2026-09-27, the BL-1146 cold review): no base on the charter web; the opening force opt-in and off since 2026-08-26 (seed_starting_force, BL-635); E0-ML-01 needs Cr 2,000 against openings of Cr 0-644; a 12-tick settle. A design gap with the doc disagreeing (MILITARY.md: rivals start armed) -> NR-963 put to Ben; build waits on his call.\n\nFOUND 2026-09-27: spawn_solvency R4 'the field still fields a standing force' reads the rival field's units at the settle's close over 12 seeds. Baseline (BL-635, 2026-08-26): 15-20 units a seed. After BL-1008 (settle 12 ticks): 0 on 3 seeds. Budget arc: 3 units in all on 29b87817, 1 on 091401ad, 0 with BL-1146 (the scaled firm cap moved seed 1's last unit). The BL-1086 lane noted the charter web gives the seated corporation no standing force either (no upkeep). MILITARY.md: rivals hire through the same hire_unit verb at a military base (BL-324 grant). WORK: find the cause from the code (no base on the charter web? the rival scorer never chooses hire? the settle too short?) and fix whichever is the defect -- do not relax R4. If the cause is a design gap (the web never builds a base, and no doc says it should), report it for Ben rather than inventing a base. The BL-1146 cold review is asked for the cause first; read it before starting."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-09-27",
-   "requires": [
-    "BL-1149"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1155",
-   "short_name": "WORKS_BUILT_WHERE_CENTRES_STAND",
-   "author": "Claude (sprint 48, the works and pull form, 2026-09-27)",
-   "category": "Generation",
-   "priority": "A",
-   "difficulty": 3,
-   "title": "Every region a polity holds that stands a centre is a candidate for its next work, so industry is built where cities are",
-   "authority_doc": "docs/lore/HISTORY.md",
-   "files": [
-    "src/world/history_sim.cpp",
-    "src/world/history_sim.hpp"
-   ],
-   "design": "SETTLED (Ben, 2026-09-27): HISTORY.md § The verb, 'every region a polity holds that stands a centre is a candidate', still one work a round and the same scorer (work_score_q unchanged; no new scorer term). Today work_candidate_regions = 2 (history_sim.hpp ~1874; loop history_sim.cpp ~6882-6921): the capital plus one rotated region, and industry reached ~110 of ~15,000 regions. MEASURE FIRST and report: works built per span and band, industrial works by region, the employed share, points per world, and the span times (the old comment warns scoring every holding is O(held x rows) in the most expensive pass). READING TO REPORT FOR BEN: the rule applies in every span as written, so it also moves the Empires and Exploration histories (works raise capacity, manpower, reach and defence). Build it with a per-span switch, read both 'every span' and 'Industrialisation only', and commit the ruled reading (every span) unless Ben narrows it. Ordered iteration by region index; ties as the scorer already breaks them."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-10-01",
-   "requires": [
-    "BL-1150"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1156",
-   "short_name": "RIVERS_DIVIDE_BANKS",
-   "author": "Claude (sprint 48, NR-962 ruled B, 2026-10-01)",
-   "category": "Generation",
-   "priority": "A",
-   "difficulty": 3,
-   "title": "A river divides its banks: the province fill pays to cross a course, not to travel along it",
-   "authority_doc": "docs/generation/PROVINCES.md",
-   "files": [
-    "src/world/province.cpp",
-    "src/world/province.hpp",
-    "tools/verify/province_partition_harness.cpp",
-    "tools/verify/centre_census.cpp"
-   ],
-   "design": "SETTLED (Ben, 2026-10-01, NR-962 B): PROVINCES.md, 'a river divides its banks'. Today the river bit sits on the step between a course tile and its downstream neighbour (river_generation.cpp ~223-230) and province.cpp ~212-213 charges +40 there, so the fill pays to travel along a river and crosses bank to bank free. BUILD: the fill pays the river cost to step onto or off a course across the flow (or an equivalent that makes the banks two sides); stepping along a course pays nothing extra. MEASURE FIRST, then after, on the 16 shipped seeds: the river:plain border ratio (1.19 on main), C13's per-seed river rows (red on 12, 37, 38), province counts and sizes. A row: river cost 0 must turn the river row red on the harness world AND the shipped seeds."
   },
   {
    "status": "designed",
@@ -1579,30 +793,6 @@
     "tools/verify/centre_census.cpp"
    ],
    "design": "FOUND 2026-10-02: centre_census C13 C2b (\"elevation difference divides\", PROVINCES.md ruling 2) is red on main on seed 46 (steep 19.18% vs plain 25.79%); before BL-1150 it was red on 46 and 43. Rivers now divide (BL-1156); slopes do not on every world. WORK: measure the steep:plain border ratio per seed and find why a p90 slope (one step at 40, k_province_height_cost 683) fails to divide on seed 46 -- the same along/across question the river had, or the p90 cut. Report for Ben before any re-tune."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-10-03",
-   "requires": [
-    "BL-1137"
-   ],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1159",
-   "short_name": "HIGHWAYS_ON_SHIPPED_WORLDS",
-   "author": "Claude (sprint 48, the BL-1137 gate on main, 2026-10-03)",
-   "category": "Generation",
-   "priority": "B",
-   "difficulty": 2,
-   "title": "The Highway tier is read on the shipped worlds, and its harness row asks the world the player gets",
-   "authority_doc": "docs/economy/LOGISTICS.md",
-   "files": [
-    "tools/verify/road_generation_harness.cpp",
-    "src/world/road_generation.cpp"
-   ],
-   "design": "RULED (Ben, 2026-10-03): the Road cliff is accepted as the rule -- a tied pre-industrial block keeps its midpoint rank, and where it falls under 0.40 its roads stay Track. Haulage read before merge.\n\nRULED (Ben, 2026-10-03): qualification reads the polity's own industrial crossing year (q.industrial_year) on a generated world; measured first. POPULATION.md § Qualification.\n\nMEASURED (2026-10-03, 5aa6b7a9 + ea03e90e merged): shipped worlds carry Highway tiles only from the ancient-corridor works rule; the national rule qualifies 0 links on all 16 seeds, because every nation's qualification reads region::industrialised, which a generated world never sets (history_sim.cpp ~9080), so all tie at 0.05 (percentile 0.5, the all-tied shape). 13-37 nations a seed hold two or more City+; 35-179 City-City links laid. R2s-b red, put to Ben.\n\nFOUND 2026-10-03: road_generation_harness R2 (\"highway tier reachable\") is red on main a83e6188 and has been since BL-1141. It builds no_prehistory worlds, which run no industrial urbanisation, so a nation holds at most one City+ and a Highway (two City+ centres in one nation) never qualifies. The shipped worlds now carry ~2,700 cities pooled (BL-1137 at x4 jobs), so they may well carry Highways. WORK: read Highway tiles and City-City links per curated seed on the shipped path; move R2 to (or add) a shipped-world reading; if shipped worlds still lay no Highway, report why for Ben. Never weaken R2 to pass."
   },
   {
    "status": "designed",
@@ -1696,28 +886,6 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-10-03",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1164",
-   "short_name": "BACKGROUND_FIRM_ATTRITION",
-   "author": "Claude (the BL-1163 diagnosis, 2026-10-03)",
-   "category": "Economy",
-   "priority": "S",
-   "difficulty": 3,
-   "title": "Background firms exit until the economy is a ninth of its opening size: find why",
-   "authority_doc": "docs/economy/FINANCE.md",
-   "files": [
-    "src/world/economy_system.cpp",
-    "src/world/corp_ai.cpp"
-   ],
-   "design": "DIAGNOSED (2026-10-03, firm_attrition_trace merged 1fc1fea8): standing-force upkeep, mostly its goods half at market prices, winds up the field (every exit an insolvency); BL-1154 brought rival deaths to ticks 15-40; background firms open at 0; predates sprint 48 (v0.1.26 also 17 on seed 0). Fixes ruled: BL-1172, BL-1173 (sprint 48), BL-1174, BL-1175 (sprint 49).\n\nPULLED INTO SPRINT 48 (Ben, 2026-10-03): rivals exiting until no competition is left is part of the compounding he felt in play.\n\nFOUND 2026-10-03 (BL-1163 lane, centre_decline_trace, seed 0 shipped start): corps 196 -> 22 and live buildings 536 -> 167 over 440 ticks, with or without the growth gate; the economy shrinks ~9x. Ben (2026-10-03): diagnose it as its own item next, measured first. WORK: trace exits per firm (cause: insolvency, idle buildings, no demand, upkeep; which recipes; which markets), over ticks 0-450 on seeds 0, 10, 28; say whether it predates sprint 48; report options before any fix. Sprint 49."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
    "sprint": 49,
    "written": "2026-10-03",
    "requires": [],
@@ -1782,51 +950,6 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-10-03",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1168",
-   "short_name": "CHARTER_PRICED_BY_TRADE_REACH",
-   "author": "Claude (Ben's distant-rival form, 2026-10-03)",
-   "category": "Generation",
-   "priority": "A",
-   "difficulty": 3,
-   "title": "A charter is priced by the capital in its own trade reach, so a far landmass charters its own firms",
-   "authority_doc": "docs/generation/INDUSTRIALISATION.md",
-   "files": [
-    "src/world/stockpile_budget.cpp",
-    "src/world/corporation_generation.cpp",
-    "tools/verify/industry_concentration.cpp"
-   ],
-   "design": "SETTLED (Ben, 2026-10-03): INDUSTRIALISATION.md § Industry spreads beyond its heartland. Today one world-wide price, spent richest-first, adds 5-23 points to the top landmass's share (industry_concentration, 80079d80). Measured on the budget only: off-top centres able to afford a seat go 9: 7->132, 43: 9->100, 0: 29->165, 41: 4->36. BUILD: price a centre's charters by the stock in its trade reach (its landmass; say if market catchment reads better); the seat menu grows 2-3x, so re-anchor the specialist price to the seat-menu target in the same item (folds in BL-1151, seat menu re-anchored). Read industry_concentration before/after, and the A rival far away judged property (>= 25%). No effect on one-landmass worlds by design."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-10-03",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1169",
-   "short_name": "CROWDED_HEARTLAND_YIELDS_LESS",
-   "author": "Claude (Ben's distant-rival form, 2026-10-03)",
-   "category": "Generation",
-   "priority": "A",
-   "difficulty": 3,
-   "title": "A crowded heartland converts its treasury into industry at a lower rate, so its lead stops compounding",
-   "authority_doc": "docs/generation/INDUSTRIALISATION.md",
-   "files": [
-    "src/world/history_sim.cpp",
-    "tools/verify/industry_concentration.cpp"
-   ],
-   "design": "MERGED OFF (a339437f, K = 0); Ben (2026-10-03): accept capital per worker as the crowding measure; set K after BL-1168 lands, read together.\n\nSETTLED (Ben, 2026-10-03): INDUSTRIALISATION.md § Industry spreads beyond its heartland, a crowded heartland yields less. Treasury conversion is 70-99% of each leader's points; scale credit is near-flat. BUILD (measured first): in the treasury apportion loop (history_sim.cpp ~1446), points per unit fall with the region's works per employed head; one named parameter read on a ladder for Ben. Read industry_concentration (top-landmass share, the far-rival property) and the history counters before/after."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
    "sprint": 49,
    "written": "2026-10-03",
    "requires": [
@@ -1844,72 +967,6 @@
    "authority_doc": "docs/generation/INDUSTRIALISATION.md",
    "files": [],
    "design": "SETTLED (Ben, 2026-10-04): INDUSTRIALISATION.md § Industry spreads beyond its heartland, 'crowded heartlands reach overseas' owns the design; EXPLORATION.md § A colony is a subject points at it. Measured 2026-10-04 (16 seeds): 119 overseas regions at 1960, all within 8 water tiles, 0.36% of industry; the probe is tools/verify/overseas_reach_probe.cpp in worktree agent-a8c46e4ae96c8a006 (uncommitted; its history_sim counters must not merge). BUILD SLICES, each measured on the curated seeds before its magnitude is set: (1) the push (land crowding x navy before industry_open_year, capital crowding x navy after); (2) voyages: push over a threshold seeks contact where the fleet out-projects; (3) plant: settle overseas beside natives; (4) expedition: conquest by sea past the 9-tile horizon, fleet-gated; (5) exploit: sea-legs and sphere of claim ease with the push; (6) settlers flow from the metropole (requires BL-1148); (7) chartered company: DESIGN FIRST (post = region/market/building? inherited as a firm? seat and charter price by reach). Judged property: a far rival holds >= 25% of the leader's industry."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-10-03",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1171",
-   "short_name": "EXPLORATION_GROUNDS_FAR_TRADE",
-   "author": "Claude (Ben's Exploration trade form, 2026-10-03)",
-   "category": "Generation",
-   "priority": "A",
-   "difficulty": 3,
-   "title": "In the Exploration age far realms across water meet and bind where a fleet reaches, and goods between landmasses must sail",
-   "authority_doc": "docs/generation/EXPLORATION.md",
-   "files": [
-    "src/world/history_sim.cpp",
-    "src/world/era_minus_one.cpp",
-    "tools/verify/ocean_currents_harness.cpp"
-   ],
-   "design": "RULED (Ben, 2026-10-03, after B'+C flooded -- 79 -> 550 lanes at 1660, four seeds 52-150): the seller binds a far partner only where its fleet OUT-PROJECTS the partner's own fleet at the partner's port (judge_crossing's defender comparison); goods between landmasses sail in BOTH spans. Switches committed off at f9de3283 on the lane branch. Measure first; if it still floods or starves, report.\n\nSETTLED (Ben, 2026-10-03): EXPLORATION.md § The colonial tie is a sea lane (overturning NR-888 for Exploration). B': far pairs across water meet AND bind in Exploration only where the seller's fleet reaches the partner's port (fleet_power_at, halving over 10 sea tiles) -- navies set the count, not a dial. C: a road carries goods only between seats on one landmass; cross-landmass trade must sail. Baseline (16 seeds, 1660): 79 lanes (12 trade); 87 cross-landmass pairs in contact, 75 bound; 86% of cross-landmass trade by road. MEASURE FIRST, then build; report 1660/1960 lanes by writer and length, far pairs bound, battles, and trade lost for pairs with no navy or port."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-10-03",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1172",
-   "short_name": "ARMY_EATS_AT_A_FAIR_PRICE",
-   "author": "Claude (Ben's firm survival form, 2026-10-03)",
-   "category": "Economy",
-   "priority": "A",
-   "difficulty": 3,
-   "title": "An army eats what its owner can buy at a fair price: above it the unit draws less and fights weaker",
-   "authority_doc": "docs/economy/FINANCE.md",
-   "files": [
-    "src/world/economy_system.cpp",
-    "tools/verify/firm_attrition_trace.cpp"
-   ],
-   "design": "SETTLED (Ben, 2026-10-03): FINANCE.md § Standing-force upkeep. BL-1164 diagnosis (firm_attrition_trace): upkeep goods paid at resolved price (rations ~48 vs base 13.6, ordnance ~925 vs 155.8), ~970/yr a unit vs hire ~120; 73/91 rivals wound up by tick 40 on seed 0. BUILD (measured first): the unit draw buys up to the reservation price only (BL-654's ceiling, re-read: is it set at a fair multiple of base?), and a short-fed unit draws less and fights weaker (strength scaled by its supply share). Read firm_attrition_trace (corps alive at 12/40/100/450, exits by cause), spawn_solvency, battles in play."
-  },
-  {
-   "status": "designed",
-   "glyph": "✓",
-   "sprint": 48,
-   "written": "2026-10-03",
-   "requires": [],
-   "blocked_on": null,
-   "parked": false,
-   "id": "BL-1173",
-   "short_name": "BACKGROUND_FIRMS_WORKING_CAPITAL",
-   "author": "Claude (Ben's firm survival form, 2026-10-03)",
-   "category": "Economy",
-   "priority": "A",
-   "difficulty": 2,
-   "title": "Background firms open with working capital priced from their opening stock",
-   "authority_doc": "docs/economy/FINANCE.md",
-   "files": [
-    "src/world/corporation_generation.cpp"
-   ],
-   "design": "SETTLED (Ben, 2026-10-03): FINANCE.md § Debt interest (\"Every firm opens with it\"). Background firms open at 0 (corporation_generation.cpp ~2602, ~4301; 57% of the field). BUILD (measured first): opening capital priced from the firm's opening stock (state the rule), deterministic. Read firm_attrition_trace and spawn_solvency before/after; seat menu unaffected."
   },
   {
    "status": "designed",
@@ -2080,6 +1137,27 @@
     "src/world/history_sim.cpp"
    ],
    "design": "Measured on the 16 curated seeds at main b427aed0: 92 of 128 Exploration bindings (72%) and 15 of 30 Industrialisation bindings are freed the same year they are made, mostly seeds 32 and 40. Each cycle moves a purchase price and writes a grudge. Distance cannot cause it (bind needs <= 400, free needs > 500), which leaves cohesion <= 260 or a missing contact. Separate the two, then decide with Ben whether the bind test should read what the free test reads."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 49,
+   "written": "2026-10-04",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1183",
+   "short_name": "CEILING_STALLS_CONSTRUCTION",
+   "author": "Claude (sprint 48 second re-bless, Ben's blocker form 2026-10-04)",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "Construction is not stalled for good by the fair-price ceiling",
+   "authority_doc": "docs/economy/FINANCE.md",
+   "files": [
+    "src/world/economy_system.cpp"
+   ],
+   "design": "Found 2026-10-04 diagnosing acquisition_viability R1: under BL-1172 (fair-price army) a material posted over the 2x ceiling pauses a build, and a site that does not bid cannot lower the price, so background firms' muster bases almost never finish (1,040 of 1,192 such firms on 12 seeds hold only an unbuilt base) and on seeds 0 and 4 the seat's processors started in the settle produced nothing in 24 quarters. Ben (2026-10-04): re-bless first, fix in sprint 49. Diagnose which materials sit over the ceiling and why (listings-only supply at k = 0; BL-1179 shelf spoilage may be the lever), then bring Ben the fix. Also: whether background firms should start muster bases at all is a scorer question (AI grant register)."
   }
  ]
 }

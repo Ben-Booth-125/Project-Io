@@ -59,30 +59,7 @@ and/or a version goal (v0.1.1 etc.).
 
 ## Open now
 
-### Sprint 48 — the world moves forward
-*Open · opened 2026-09-25 · Ben (2026-09-25, the cut form); Claude (handoff and cut)*
-
-**Goal.** The world is built once and moves forward through the rounds, and each round reads at a glance: Next waits for its round and nothing is built twice, roads are a tree and round 6 lands inside 35 s, a legend on every round, sea lanes a player can find, and a world that never hands the player too many markets.
-
-**Planned.**
-- WAVE 1 - five lanes on disjoint files, plus one Light item in the main session. CURSOR: BL-1084 (world built once and moved), the cursor and its proof first, then the wizard (Next waits, the reroll path measured, round 6 plays at the final publish). ROADS: BL-1119 (roads tree and detour), with BL-1077 folded in: floor measured, then the detour test. SETTLE: BL-1117 (settle tick one), the reading, then the fix. UI: BL-1118 (round legends) + BL-1124 (sea lanes seen), three lane forms captured, Ben picks live. CENSUS: BL-1125 (markets can die) census + BL-1003 (pools per market) R6, read before anything moves the market set. MAIN: BL-1114 (epoch 0 retired).
-- RULING - BL-1125's mechanism, put to Ben against the census as soon as it lands.
-- WAVE 2a (Ben's density form, 2026-09-25) - BL-1126 (path cost reads the cache) with BL-1117's review fixes; BL-1119 round 2 (floor 40,000, border links on the network); BL-1130 (centres consolidate, a sim beat); then BL-1125's build (twins, gravity aimed at ~20-40 markets a world, conquest) on the consolidated world.
-- WAVE 2 - behind BL-1084's merge (and BL-1119's, for the stamp): BL-1086 (search inside generation), BL-1098 (sea-lane tier stamped), BL-1107 (culture ground profile, the sprint's one sim beat), BL-1125's build.
-- THE ONE RE-BLESS - last, after every world-mover, with each cause named and measured in isolation: roads (BL-1119), the search (BL-1086), the lane tier (BL-1098), the ground profile (BL-1107), markets (BL-1125), and any of BL-1084 (the Selene/Pallas shift), BL-1117 or BL-1114 that moves a digest.
-- WAVE 3 (2026-09-25, after the live walk) - four chains: density (BL-1130 -> BL-1137 + BL-1132 + BL-1133 -> BL-1125 -> BL-1138 -> BL-1107 -> BL-1139), sea (BL-1120 -> BL-1140 -> BL-1098), UI (BL-1124 U3, BL-1134, BL-1135), search (BL-1136 -> BL-1086). Items slip from the end of a chain.
-
-**Done when.** The world is built once at the Life gate: no round recomputes an earlier span, Next waits for its round, a reroll re-runs only its own span, and the staged build equals the composition on 16 seeds. Round 6's tail lands within 35 s of arrival on seeds 0 and 28 in Release; roads are a tree with detours. Every lapse round has a legend naming exactly its layers, and Ben finds a sea lane without a pointer. The search runs inside generation, the lane tier prices the water, cultures carry a ground profile their preference reads. A market can die, and the 1960 market count per seed is what the ruled rule leaves. Epoch 0 is refused. One re-bless, taken once.
-
-**Risk.** THE CURSOR again. BL-1084 splits a 3,000-line function whose locals thread through every stage; the composition must hold every pin, and the staged build must equal it at every round boundary, before any wave-2 lane or the wizard builds on it. SECOND: five or more world-movers share one re-bless, so each measures its own before/after in its worktree when it lands, or the description cannot attribute them. THIRD: BL-1125 has no mechanism yet; the census and Ben's ruling gate it, and it slips before anything else does. FOURTH (2026-09-25): the one re-bless now has eight named causes (roads, the nearest-anchor field, path cost, centres, markets, the search, the lane tier, the ground profile). Each measures its own before/after at merge, or the description cannot attribute them; if the wave runs long, the re-bless is split before any cause goes unmeasured. FIFTH (2026-09-25, after the walk): the sprint has grown to roughly thirty items, most of them world-movers on one density chain that is serial by file. The goal the walk set - a world of ~500 centres, tens of markets and a road network that is not a carpet - is the headline; the chains slip from their ends (BL-1139, BL-1107, BL-1138, BL-1098 first) before the density chain's head does.
-
-THE CUT (2026-09-25). Ben's form: scope C (all seven tagged), the lane form chosen now on today's lanes (BL-1115, sea legs later, stays unscheduled), Next waits (STARTUP.md), the 35 s judged on the whole tail with BL-1117's fix in, BL-1077 folded into BL-1119, plus BL-1003's close-out and BL-1114. His note filed BL-1125 (markets can die); its mechanism is ruled after the census.
-
-FOUND AT THE CUT: STARTUP.md said round 6's time goes to the road pass; BL-1117's reading (settle ~56 s on seed 0, tick 1 38.5 s) says half of it is the settle. The doc now names both.
-
-THE DENSITY FORM (2026-09-25). The census found ~311 markets a world (75% carve, two thirds of it junction-lowered; 21% twins; 71% idle) and the roads lane found centres on 49-100% of land. Ben: twins fold + gravity fold (aim ~20-40 markets, about one per major city) + conquest consolidates (his note); centres consolidate upstream this sprint (BL-1130); floor 40,000; border links on the network; path cost fixed this sprint (BL-1126).
-
-THE LIVE WALK (2026-09-25 evening). Ben picked the bowed-arc lane, kept Furnaces lit, kept one key per round; after Begin he saw "massive road networks with population centres on every tile" and ruled: centres aim ~500, more migration in the Industrialisation span, shrinking centres abandoned below a village's worth (history and play), settle spacing and anchors joining a neighbour this sprint, roads pulled toward markets and lanes from trade and currents this sprint, the Culture round worded as the record, every round carrying the roads before it.
+*Nothing open.*
 
 ## Where things stand
 
@@ -154,10 +131,10 @@ THE LIVE WALK (2026-09-25 evening). Ben picked the bowed-arc lane, kept Furnaces
 | 45 | industrialisation makes the web real | OPEN 2026-09-18. Ten items in three waves: world copies, the span boundary, the Industry tree and the charter rules first, all behind switches; then the span, Beat 1 and the stockpile budget; then the real-stockpile sweep and one re-bless that turns it all on at epoch 0. |
 | 46 | the generation reaches the game | CLOSED EARLY 2026-09-24 (Ben: cut v0.1.25, move to sprint 47). The core landed — the wizard plays the whole arc, Begin keeps the world it built, the player chooses the corporation — and the economy thread it exposed was rebuilt; the carry rows and the draft's unfiled rows go to the sprint 47 cut. |
 | 47 | one history, told through the rounds | CLOSED 2026-09-25 (Ben: "I'll accept this as sprint 47 complete"; cut v0.1.26). The identity wave and each round's flair landed and passed two live-click walks; the one re-bless was taken once; BL-1084 (the world built once and moved) and the wave-3 stretch carried to sprint 48. |
-| 48 | the world moves forward | OPENED 2026-09-25 (Ben's cut form): all seven tagged items, BL-1117 (settle tick one) with its fix, BL-1125 (markets can die) from Ben's note, BL-1003's close-out and BL-1114 (epoch 0 retired). Next waits; the lane form is chosen now; BL-1077 (village roads cost) folded into BL-1119. |
+| 48 | the world moves forward | CLOSED 2026-10-04 (Ben: "close out this sprint"). The world is built once and moves forward; roads are a tree, markets can die, centres consolidate and deepen, sea lanes ride currents and trade, fleets project power, and three late branches (charter by reach, far trade, the fair-price army) were ruled, cold-reviewed and merged. Ben walked every owed live click. BL-1119 (roads tree and detour) carries three rows to sprint 49. The second re-bless is PREPARED, awaiting Ben's authorisation against its shape; the version cut follows it. |
 
 **Next up.** SPRINT 47 OPEN (2026-09-24): wave 0 first — BL-1083 then BL-1084 in one generation lane, BL-1085 in a core lane, BL-1101/BL-1096/BL-1097/BL-1102 as world-mover lanes; the identity wave opens as soon as BL-1083 lands. Re-bless once after wave 0's world-movers.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*63 sprints archived cold; 1 open/gated in the hot store (3 completed and awaiting archive_sprints.js).*
+*67 sprints archived cold; 0 open/gated in the hot store.*

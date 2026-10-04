@@ -3389,6 +3389,42 @@
    ],
    "resolution": "Pooled 5,453 coined, 790 holding at the boundary (14.4%), 471 at 1200 CE (8.6%); the empty mass is 4,455 first-generation leaves against 208 interior nodes, and no cradle is ever empty. Holding falls a further 40% inside the Empires round, which neither candidate rule addresses."
   },
+  "epoch-zero-retired": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: ProjectIo --epoch 0 (and the harness flag)"
+     ],
+     "requirement": "--epoch 0 is refused with a clear message, never silently clamped.",
+     "notes": "",
+     "result_metric": "build_rel ProjectIo.exe (Release, BUILD_REL_EXIT 0, 18:00): `--epoch 0` prints \"ProjectIo: --epoch 0 is retired. It no longer selects the ancient roster: the band comes from each nation's own history. Omit --epoch for the 1960 start.\" and exits 1; a malformed year still exits 1 with the range message. No clamp."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "review: grep + compile"
+     ],
+     "requirement": "No code path maps an epoch to a band (industrial_band_from_year and its callers are gone); every harness, verify script and seed-library entry that used epoch 0 is moved to 1960 and named in the commit.",
+     "notes": "",
+     "result_metric": "No code path maps an epoch to a band: the year-to-band function was already removed by BL-1101 (era_band.hpp's note); the only src readers of epoch_year left are the calendar (app.cpp set_campaign_epoch_year, format.cpp), the save field and verify_api's founded-year read. Moved off epoch 0: centre_region_bind (two worlds, 0 -> 1960) and chain_conversion_probe (default 0 -> 1960); stale epoch-0 comments fixed in main.cpp, app.hpp, format.hpp, tile_inspector.cpp and steel_chain_probe.cpp. No verify script or seed-library entry used epoch 0 (grep). continent_drift's \"epoch 0\" is a geological drift epoch, a different concept, and stays. All five edited harnesses compile."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism twice",
+      "headless: save_roundtrip"
+     ],
+     "requirement": "world_determinism is bit-identical twice with its epoch row re-scoped to a non-zero epoch; save_roundtrip green.",
+     "notes": "",
+     "result_metric": "world_determinism (build_gen/verify, Release) run twice: ALL PASS (0 failures) both; digests seedA/on 0570E3900D0BD53F, seedB/on D5616442F561DDD3, seedA/off B89B87C393B06FC9 (unmoved from sprint 47's close), and the re-scoped R3.8 row seedA/on/epoch1900 = 0570E3900D0BD53F (equal to the 1960 world). save_roundtrip: SAVE ROUND TRIP OK."
+    }
+   ],
+   "resolution": "Complete 2026-09-25 in the main session (sprint 48 wave 1, task E1): --epoch 0 refused with a message, the harness rows re-scoped, digests unmoved."
+  },
   "era-banded-baskets": {
    "rows": [
     {
@@ -6361,6 +6397,42 @@
     }
    ],
    "resolution": "Complete 2026-08-26. 261/64 to 352/88 via the DEMAND lever; Pass 6 target_ratio untouched and the R4 oversupply fallback not taken. R3 held: no household good floored in any market, and the two nearest the ceiling came down. Stopped at 88 not 104 deliberately (NR-685). Its novelty flag corrected the Pass 6 doc: the 0.90 ratio never binds, per_resource_firm_cap does, so density is basket BREADTH times the cap."
+  },
+  "path-cost-reads-the-cache": {
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: lp_anchor_field_check L1, seeds 0 and 28"
+     ],
+     "requirement": "A save and load after settle tick 1 continues identically to the unsaved run on every tick 2-11, WITHOUT the --cold-original control.",
+     "notes": "",
+     "result_metric": "a2b3e948 (merged f6c87707): lp_anchor_field_check L1 MATCHES on every settle tick 2-11 on seeds 0 and 28 with NO --cold-original control (before: diverged at tick 2 / tick 3). intra_body_path(O, D) always reads D's flood field under the ordered key; flood_edge_cost prices each hop toward the anchor so the field holds O -> D (LOGISTICS.md section 1)."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: gen_step_costs --finish 0 28",
+      "headless: player_seed_sweep --digest-check"
+     ],
+     "requirement": "Flood count and settle time old -> new are recorded; the digest movement is named as a cause in the sprint's re-bless.",
+     "notes": "",
+     "result_metric": "Indicative, loaded: floods alive in the settle and a play year unchanged (217 / 119); generation floods 2,927 -> 4,401 (seed 0), 1,709 -> 2,086 (seed 28), all road generation's own queries (step 15 doubled on seed 0, 10 -> ~22 s; BL-1119 round 4 restructures them). Settle and play year no slower. Digests move on every row (world_determinism seedA/on D356F1A2E9148EDE -> C4494BD786F8197F; player_seed_sweep D_search/D_land/D_settle/D_seat on seeds 0 and 28): a named re-bless cause -- path costs read one way only, O -> D, the river discount taken in travel direction."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "review: code-reviewer agent (cold, author != reviewer)"
+     ],
+     "requirement": "A cold review of the merged change, fix round included, before the commit.",
+     "notes": "",
+     "result_metric": "Cold review of a2b3e948 (2026-09-25): no logic defect; the direction flip hand-checked on an east-west river hop and a row crossing; purity and every orientation reader confirmed. Fix round 5236d8fb (merged b82b0957): logistics_harness T4b/T4c/T4d test the direction (they FAIL when the flip is reverted; T4c alone fails a parity-only mutation), T4's symmetry assertion retired; lp_anchor_field_check L1 is a check (exits 1 on divergence, shown against 95bfb22a); F1 counts every anchored body (1 of 1 per seed); stale comments fixed. world_determinism unmoved by the fix round. Main: logistics_harness direction rows PASS."
+    }
+   ],
+   "resolution": "Complete 2026-09-25: a path is directed and read one way only; a save/load continues identically; the direction is tested."
   },
   "per-building-materials": {
    "rows": [

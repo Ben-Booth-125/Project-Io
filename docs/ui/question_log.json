@@ -896,6 +896,18 @@
     "docs/ui/RENDERING.md"
    ],
    "status": "drafted"
+  },
+  "resource_lens": {
+   "surface": "Resource lens (Planetary canvas) — the washed-clear map, the toggled deposit set with split tiles, and its search-and-checklist key",
+   "answers": "Where can the goods I care about be extracted on this body, and where do they share ground?",
+   "because": "Siting extraction is the first economic decision a player makes, and it needs no simulation — only the generated deposits. Ben, 2026-10-04: the map goes a shade of white so the deposits are the only saturated thing on it, and the lens toggles several resources at once, splitting a tile that carries more than one, with a search bar so the player finds a good quickly. A recipe takes more than one input, so the question is rarely 'where is iron' and usually 'where are iron and coal together' — one good at a time made the player hold the other map in their head. The set is capped at six (one wedge per hex edge) and offers only extractable goods present on the body, because a manufactured good is never on the surface and a box the player cannot use earns no row.",
+   "backlog_item": "BL-1182",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/hover_content.cpp",
+    "src/ui/ui_state.hpp"
+   ],
+   "status": "drafted"
   }
  }
 }

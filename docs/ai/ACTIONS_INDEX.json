@@ -183,7 +183,7 @@
   ],
   [
    "lens.good_selector",
-   "The lens chrome region — the minimap's header, top right (BL-602). One region hosts the selector and whichever key the active lens draws; the selector sits directly above that key while the Resource, Market, or Scarcity lens is active. One shared combo bound to a single shared lens_resource value, not three separate controls. It is NOT on the minimap's lens bar, which carries glyphs only."
+   "The lens chrome region — the minimap's header, top right (BL-602). One region hosts the selector and whichever key the active lens draws; the selector sits directly above that key while the Market or Scarcity lens is active. One shared combo bound to a single shared lens_resource value, not two separate controls. The Resource lens does NOT use it: it has its own toggled checklist (lens.resource_toggle). It is NOT on the minimap's lens bar, which carries glyphs only."
   ],
   [
    "lens.industry",
@@ -208,6 +208,10 @@
   [
    "lens.resource",
    "Minimap lens bar, slot 3 (the three-stacked-strata glyph)"
+  ],
+  [
+   "lens.resource_toggle",
+   "The Resource lens's key in the lens chrome region — the minimap's header, top right: a search box over a checklist of the extractable goods present on the active body."
   ],
   [
    "lens.scarcity",

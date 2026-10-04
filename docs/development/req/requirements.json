@@ -3801,30 +3801,11 @@
   {
    "brief": "stratum-placement-gates",
    "title": "BL-615 - placement gated by centre presence and stratum",
-   "status": "in-flight",
-   "resolved": null,
+   "status": "complete",
+   "resolved": "2026-10-04",
    "promoted_from": "backlog.json BL-615 (STRATUM_PLACEMENT_GATES) - Sprint 19, the world reads lived-in",
    "batch": "sprint-19-wave-1",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: placement harness rows"
-     ],
-     "requirement": "placement_rules::can_place refuses a university below a City (4) centre, refuses a schooling building outside any centre, and refuses a steel-mill-class processor beyond the centre-proximity radius - each with a distinguishable reason code.",
-     "notes": ""
-    },
-    {
-     "id": "R2",
-     "status": "pending",
-     "verification": [
-      "visual: live click, deferred to wave 3"
-     ],
-     "requirement": "The tile build door surfaces the new gates as reason-coded locks (the BL-589 idiom) - a live click at integration, not a capture.",
-     "notes": "Live click blocked: container cannot approve OS-level computer-use (NR-622 precedent). Render check owed via build_door capture; row stays pending until a session with access clicks the lock."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "centre-promotion-decline",
@@ -4109,57 +4090,11 @@
   {
    "brief": "rival-coalitions",
    "title": "BL-699 - rivals score stance against standing, so coalitions form against the leader",
-   "status": "deferred",
-   "resolved": null,
+   "status": "cancelled",
+   "resolved": "2026-10-04",
    "promoted_from": "backlog.json BL-699 - Sprint 26, watch the AI play",
    "batch": "carried out of sprint 26 - blocked on demand (NR-758)",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "pending",
-     "verification": [
-      "headless: corp_ai_harness"
-     ],
-     "requirement": "corp_ai scores the four BL-448 stance verbs (declare_hostile, offer_friendship, accept_friendship, return_to_neutral) and issues them through the corp-command seam. A run produces at least one stance change.",
-     "notes": "The verbs exist and the scorer names none of them today. No new verb is needed."
-    },
-    {
-     "id": "R2",
-     "status": "pending",
-     "verification": [
-      "headless: a harness row over a run where one corp leads"
-     ],
-     "requirement": "Stance scoring reads composite standing, so hostility concentrates on the leading corporation and friendship on the field - and it reads no player seat.",
-     "notes": "Uniform by construction. It must NOT read world::player_entity."
-    },
-    {
-     "id": "R3",
-     "status": "pending",
-     "verification": [
-      "visual: live click on the AI decisions ledger"
-     ],
-     "requirement": "A stance change is legible: it emits into the decision feed with its reason. A coalition the player cannot see is the hidden handicap the whole design rejects.",
-     "notes": "A requirement of this item, not a follow-up."
-    },
-    {
-     "id": "R4",
-     "status": "pending",
-     "verification": [
-      "headless: build counts do not fall to zero for a corp under coalition pressure"
-     ],
-     "requirement": "Coalition pressure never vetoes construction or extension - a pressured corp still builds (Ben, 2026-08-31).",
-     "notes": "AI_OPPONENT.md § The constraint on restraint."
-    },
-    {
-     "id": "R5",
-     "status": "pending",
-     "verification": [
-      "headless: ai_skill_harness R0"
-     ],
-     "requirement": "Deterministic: pure, seeded, replayable; two runs on one seed produce an identical state_hash.",
-     "notes": "The standing rule's condition for the whole grant."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "rival-trace-export",
@@ -4845,14 +4780,15 @@
     },
     {
      "id": "R4",
-     "status": "partial",
+     "status": "complete",
      "requirement": "Works raised is non-zero, and its roads are visible on the canvas.",
      "verification": [
       "headless: works raised > 0 in real generated worlds",
       "visual: roads render on the canvas"
      ],
      "notes": "BL-757 measured ZERO works raised across sixteen seeds because build_work never wins the scored contest, and wave 1 confirmed it still does at 16 seeds. If this item cannot move that, REPORT it - do not tune work_amortise_years further, it is already at its floor of 1.",
-     "evidence": " LIVE CHECK 2026-09-06, PARTIAL AND HONESTLY SO. Roads DO render: the Selection panel reads \"Tile [93, 52] - Road\", and road geometry is visible on the canvas as connected segments with node markers, present on land and absent on water. WHAT THE CANVAS CANNOT SHOW: an ancient history-derived road is indistinguishable by eye from a national-lattice road - they render with the same geometry - so a live look cannot separate them. The headless differential is strictly STRONGER evidence here: era ON vs OFF, 3146 -> 3466 roaded tiles at seed 0 (+320) with Road tier 173 -> 265, plus road_reach_census C7 pinning all five rungs of the tier rule. Recording the live look as done and the ancient-vs-national distinction as unshowable on the canvas, rather than claiming a look proved something it cannot. PARTIAL, AND BOTH HALVES SHORT FOR DIFFERENT REASONS. Works raised is STILL ZERO and the arithmetic says no weight closes it - Invest scores a SUM over held regions, a work scores ONE region plus the mean, so the gap widens with every conquest. That is BL-757 and it needs a SCORING change. The canvas half: roads DO render (Selection panel reads Tile [93,52] - Road) but an ancient road is indistinguishable by eye from a national one, so the headless differential is the stronger evidence. AND THE LIVE LOOK FOUND WHAT THE HARNESS COULD NOT - one nation with a complete road lattice, filed BL-784."
+     "evidence": " LIVE CHECK 2026-09-06, PARTIAL AND HONESTLY SO. Roads DO render: the Selection panel reads \"Tile [93, 52] - Road\", and road geometry is visible on the canvas as connected segments with node markers, present on land and absent on water. WHAT THE CANVAS CANNOT SHOW: an ancient history-derived road is indistinguishable by eye from a national-lattice road - they render with the same geometry - so a live look cannot separate them. The headless differential is strictly STRONGER evidence here: era ON vs OFF, 3146 -> 3466 roaded tiles at seed 0 (+320) with Road tier 173 -> 265, plus road_reach_census C7 pinning all five rungs of the tier rule. Recording the live look as done and the ancient-vs-national distinction as unshowable on the canvas, rather than claiming a look proved something it cannot. PARTIAL, AND BOTH HALVES SHORT FOR DIFFERENT REASONS. Works raised is STILL ZERO and the arithmetic says no weight closes it - Invest scores a SUM over held regions, a work scores ONE region plus the mean, so the gap widens with every conquest. That is BL-757 and it needs a SCORING change. The canvas half: roads DO render (Selection panel reads Tile [93,52] - Road) but an ancient road is indistinguishable by eye from a national one, so the headless differential is the stronger evidence. AND THE LIVE LOOK FOUND WHAT THE HARNESS COULD NOT - one nation with a complete road lattice, filed BL-784.",
+     "result_metric": "Ben confirmed at the live app, 2026-10-04 (sprint 48 close walk; build_rel rebuilt from main 9171c2ef). Ben: more lenses are wanted for visibility on some of these; he holds that for before sprint 50."
     },
     {
      "id": "R5",
@@ -5868,140 +5804,11 @@
    "difficulty": 4,
    "importance": "S",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1044 - sprint 45 (2026-09-22; integration plan in REFINED.md, rulings NR-908/909/910)",
    "batch": "sprint-45",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "code: git merge",
-      "headless: world_copy_determinism --copy-by snapshot (main session)"
-     ],
-     "requirement": "BL-1050 (order-independent reads) is merged into main unchanged (3c9c5792), and its owed --copy-by snapshot reproduction passes 16/16 on the integrated tree.",
-     "notes": "",
-     "result_metric": "BL-1050 merged unchanged at 6fddf614 (git merge-tree clean; its eight files untouched on main since the merge-base). world_copy_determinism --seeds all --copy-by snapshot on the integrated tree: 16 of 16 PASS, 0 fail (5383 s, 2026-09-22); its settle digests equal the sweep's D_settle per seed."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "code: hard_coded_world.hpp, history_sim.hpp, era_minus_one.cpp",
-      "headless: digitisation_sim_harness"
-     ],
-     "requirement": "The Digitisation span and BL-1037's corridor tier run ON by default at epoch 0 (the struct defaults, which also cover Exploration's resume); both 'OFF BY DEFAULT' comments and era_minus_one.cpp's are rewritten to say what is true now. The tier reaches both resumed spans through a world_params switch (default on, NOT on the save seam, on the footing of exploration_sim_enabled), so an instrument can still build the pre-BL-1044 world the BL-1031 pins were taken on. Harness guards that asserted the tier OFF are re-pointed to the shipped default.",
-     "notes": "",
-     "result_metric": "digitisation_span_enabled and resume_seeds_corridor_tier default true; world_params::resume_seeds_corridor_tier (not saved, on the footing of exploration_sim_enabled) reaches Exploration's params and so the Digitisation span's; harness_params gains world_arc/arc_params. Comments rewritten (hard_coded_world.hpp/.cpp, history_sim.hpp/.cpp, era_minus_one.*). EVIDENCE: --fidelity gate 3 (the shipped span IS the resume) 16/16 and --resume-tier 16/16 with the tier on; the span-params gate now checks the switch is the world's; player_seed_sweep --digest-check --arc legacy 16/16 PASS, so the legacy arc is the pre-BL-1044 world exactly."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "code: stockpile_budget.hpp",
-      "headless: stockpile_budget_check --r8"
-     ],
-     "requirement": "The ruled pins land where the budget is built, PROVISIONAL dropped from each: k_stockpile_specialist_firm_charters 2, k_stockpile_price_divisor 650 (NR-914: the nine-seat rule read on the shipped world; 580 was its tier-off reading), the per-province cap 2, the square root's base c = 8. Each cites NR-910 and the arithmetic it was read off (the seat curve at m = 2: the shipped curve: median 9 at 650, none falling back; spread 4 to 98 accepted).",
-     "notes": "",
-     "result_metric": "k_stockpile_specialist_firm_charters 2, k_stockpile_price_divisor 650, the per-province cap 2 (corporation_generation.cpp) and k_stockpile_per_resource_firm_cap 8, PROVISIONAL dropped from each, each citing NR-910 (and NR-914 for the number). 650 is the rule read on the SHIPPED world: the fine seat curve (stockpile_budget_check --seat-curve, m = 2, 16 seeds) reads median 7.5 / 7.5 / 8 / 8.5 / 8.5 / 9 / 13.5 at d = 600-660 by 10, none opening zero, spread 4 to 98. stockpile_budget_check ALL PASS including --r8 at 650 (the derived price 37,935 = the stock over 650, identical across two builds)."
-    },
-    {
-     "id": "R4",
-     "status": "complete",
-     "verification": [
-      "code: landscape_search.cpp, charter_budget.hpp, app.cpp",
-      "headless: player_seed_sweep (the invariant count)",
-      "headless: stockpile_budget_check"
-     ],
-     "requirement": "THE NO-SPECIALIST WORLD (NR-910): a budget on which no centre a nation owns affords a specialist falls back to the no-budget world exactly as a refused spend does — decided from the budget, on the world as the apply receives it, before anything is chartered; the search runs as with no budget, and the report says so under its own reason. The one-is_player invariant (world.hpp) is stated where it binds: printed on the app's seat line and counted per seed by player_seed_sweep, which FAILS a row that seats other than exactly one. A world that affords a specialist but places none (the walk's residual) is reported, not patched.",
-     "notes": "",
-     "result_metric": "charter_budget_affords_specialist decides the fallback from the budget on the world as it arrives, in search_landscape and apply_landscape_candidate alike; charter_fallback_report books every point as the new reason no_specialist, fell_back set and refused clear. charter_refusal_probe section 4: the predicate (five cases, including a centre on a tile no nation owns), and the fallback world equal to the no-budget world BY SNAPSHOT DIGEST (8d195ebcfd082dfe both ways, 24 corporations each) with nothing spent. The invariant: printed on app.cpp's seat line, counted per seed by player_seed_sweep (unbalanced on any row that seats other than one) and guard S7 — 16/16 shipped digest rows seated exactly one player, none fell back, and --guard 12 S1-S7 ALL PASS (S7: 0/12 break it). The walk's residual is reported, not patched (NR-911; DIGITISATION.md § 1)."
-    },
-    {
-     "id": "R5",
-     "status": "complete",
-     "verification": [
-      "code: verify_api.cpp, main.cpp",
-      "headless: ProjectIo --headless on a span world"
-     ],
-     "requirement": "NR-909: --verify, --serve and the headless run spend a NON-EMPTY stockpile budget on the search's seed candidate, as the harness's unsearched apply does; an EMPTY (or rejected) budget lays today's web byte for byte. The three 'this never fires' guards are replaced by the spend.",
-     "notes": "",
-     "result_metric": "spend_stockpile_on_seed_candidate (stockpile_budget.*) spends a non-empty budget on the seed candidate (placement seed world_seed ^ 0x8A21F00D, the config's corporation count, tier 1 — app::start_new_game_prelude's own, mirrored by shipped_search_params) through apply_landscape_candidate's budget overload, then the second recipe pass; an empty or rejected budget lays the old generate_background_firms call byte for byte and says so when rejected. RUN LIVE on the span world (Debug, 2026-09-22): --verify corporation_lens exit 0, 2,367,386 points spent, 8 specialists and 33 firms, six captures, 0 golden failures; --serve exit 0, 3,484,506 points, 19 and 45; --export-blackboard all --ticks 1 exit 0 (340 s), same, 64 blackboards written. The verify capture shows the seated player and its own HQ tile selected (the re-framing, cold review finding 5)."
-    },
-    {
-     "id": "R6",
-     "status": "complete",
-     "verification": [
-      "code: exploration_sim_harness.cpp, player_seed_sweep.cpp",
-      "headless: exploration_sim_harness",
-      "headless: player_seed_sweep --digest-check --arc legacy"
-     ],
-     "requirement": "Harness re-points: exploration_sim_harness R6.6/R6.7 read the tables setup actually consumed with the span on (the 1960 close, BL-1053); player_seed_sweep's pins gain an ARC — the legacy arc (span off, tier off) keeps BL-1031's D_search and D_land and checks them live; the shipped arc is what --digest and --digest-check build by default and gets its own rows; haulage_measure is run at --epoch 0.",
-     "notes": "",
-     "result_metric": "player_seed_sweep --arc shipped|legacy: the BL-1031 table is the legacy arc's, k_shipped_digest_pins the shipped arc's; every seam mode (empty/zero/synthetic/refused) is refused on the shipped arc and runs the legacy one; the sweep prints the arc and counts players per row. exploration_sim_harness R6.6/R6.7 bind the LAST close and R6.6b/R6.7b prove it is not the 1660 one (ALL PASS with the span on). era_world_harness R1b/R1/R7 read the last close (ALL PASS but R5, the BL-1010 baseline). digitisation_sim_harness: the 1660 and --continued modes switch the span off explicitly, --fidelity and --resume-tier carry the captured tier (16/16 each). exploration_sweep --arc legacy added as the control. haulage_measure run at --epoch 0 (far trade, 0 failures) beside its default mode: 2035 dispatches, 1627 market-to-market, against the 1055/802 baseline."
-    },
-    {
-     "id": "R7",
-     "status": "complete",
-     "verification": [
-      "code: DIGITISATION.md, CORPORATION_GENERATION.md"
-     ],
-     "requirement": "The rulings are in DIGITISATION.md § 1 and CORPORATION_GENERATION.md § Pass 1 and nowhere else; no doc gains a build-status line. A span world's save carries what it needs, or the code says why it need not (BL-1040).",
-     "notes": "",
-     "result_metric": "DIGITISATION.md § 1 and CORPORATION_GENERATION.md § Pass 1 already carried NR-909/NR-910 (0b2e42f4); BL-1044 added NR-911's residual to both, NR-914's number and its provenance to § 1, and NR-912's restated scales to NATION_GENERATION.md § Pass 7. No doc gained a build-status line. The span switch stays off the save seam, and hard_coded_world.hpp says why a loaded span world needs nothing from it."
-    },
-    {
-     "id": "R8",
-     "status": "complete",
-     "verification": [
-      "headless: world_determinism",
-      "headless: stockpile_budget_check --r8",
-      "headless: charter_refusal_probe",
-      "headless: player_seed_sweep --digest / --digest-check",
-      "headless: exploration_sweep + seed_library.js --check",
-      "headless: history_sim_harness, exploration_sim_harness, digitisation_sim_harness",
-      "headless: haulage_measure --epoch 0",
-      "headless: story_check",
-      "headless: ctest"
-     ],
-     "requirement": "THE MEASUREMENT (Release, serial, keep-awake, quiet machine): world_determinism old -> new (A/A records); stockpile_budget_check --r8; charter_refusal_probe; player_seed_sweep --digest then --digest-check on the shipped arc, and the legacy arc's check; exploration_sweep then seed_library.js --check (fingerprints move ONLY through BL-1037's tier); history_sim_harness (its 2-failure baseline), exploration_sim_harness, digitisation_sim_harness; haulage_measure --epoch 0 against 1055/802; story_check (2 pre-existing US-016 failures); setup cost per seed in Release and the Debug app; the nation treasury credit rate against its two stated scales (BL-1053 (1)); ctest (world-building rows against the 60 s default).",
-     "notes": "",
-     "result_metric": "RAN 2026-09-22, Release, serial, keep-awake (Step 2, 5 h 20, plus the re-bless runs). world_determinism A/A twice, ALL PASS at 650 (digests seedA/on 099530C9B7A211D7 -> 2DEF01474BF28DA5, seedB/on 3C348D569EEF30EB -> 9F8A8039817B0135; seedA/off and the 1960 arc unchanged). stockpile_budget_check --r8 ALL PASS; charter_refusal_probe ALL PASS; world_copy_determinism 16/16; --digest then --digest-check 16/16 on the shipped arc and 16/16 on the legacy arc; exploration_sweep + seed_library --check (6 of 16 moved) with the --arc legacy control reproducing all 16, so the tier is the only mover; history_sim_harness at its 2-failure baseline (R3a2/R3a3), exploration_sim_harness ALL PASS, digitisation_sim_harness readings + --fidelity 16/16 + --resume-tier 16/16; haulage_measure 2035/1627 and --far-trade --epoch 0 with 0 failures; story_check at its 2 US-016 failures. LIVE-PLAY COST at 650:2 (16 seeds, 7669 s): live tick a median x0.78 of the same seed's legacy world (4.5 s against 5.4 s), but a heavy tail — seeds 41, 31, 28 at x5.79, x4.12, x3.13 (30.9 s, 25.5 s, 12.8 s a tick) — raised as NR-915. SETUP COST per seed (Release): generation a median 53.3 s on the budget row against 42.5 s on the legacy row, max 93 s; in Debug a whole verify run is 376 s and the headless run 340 s. Treasury credit read against § Pass 7's scales (NR-912). CTEST (2026-09-23, Debug, serial, alone, 4941 s): 96 of 157 pass; 48 TIME OUT at the 60 s default — the world-building family (era_world_harness, exploration_sim_harness, colonisation_harness and kin), every one of which passes under the Release build_gen path, so the timeouts are the known Debug-vs-60 s problem that the span aggravates (generation +26% in Release), not a regression; 9 are NOT RUN because their targets do not build (BL-1065, three classes, list on the item); 4 FAIL and all four predate this item and cannot reach it — chain_depth (deliberately red, its named list), nation_scorer_harness (BL-731 rot, does not compile), logistics_harness (6 intra-body cost rows) and resource_chain_harness (4 R1 rows), the last two building NO generated world at all (no make_hard_coded_world, no world_params), so the span cannot touch them. A first ctest pass the same night read 67 failures and was discarded: two orphaned --verify-all processes from stopped chains ran beside it. VISUAL SUITE (2026-09-23, the RELEASE app, one pass over 114 scripts, 5885 s): 103 scripts ran, 8 captures differ from their goldens (click_injection, corp_dashboard, icon_silhouettes x2, sell_order, trades_tab x3 — the world moved, and goldens are demoted, ben-treats-goldens-as-disposable) and 12 scripts ERRORED. Eleven of the twelve share ONE cause and it is not the suite: scripts/verify/lib.lua's shared UI fixture cannot raise the player's force, because a placed military base never completes. Probed on the shipped verify world: tech_locked at tick 0, placeable after 12 econ ticks, still unfinished 100 ticks later with the corp holding 70,000 credits — so neither cash, gate nor the fixture's 40-tick bound, but construction itself. Filed as BL-1066 (the player cannot build), priority S, because the app lays the same web. The twelfth, battle_card.lua, calls verify.goto_surface() with no argument against a binding that has taken a body name since 2026-08-10 — pre-existing. A first suite pass was discarded: three orphaned --verify-all processes were competing."
-    },
-    {
-     "id": "R9",
-     "status": "complete",
-     "verification": [
-      "review: Ben (the re-bless authorised against the shape)",
-      "code: player_seed_sweep.cpp pins, seed_library.json"
-     ],
-     "requirement": "THE RE-BLESS: Ben authorises it against R8's shape before anything is re-pinned. Then the shipped arc's pins are taken, the legacy rows' D_settle/D_seat move to BL-1050's values (old -> new recorded, NR-894), seed_library is blessed, and nothing else is re-pinned.",
-     "notes": "",
-     "result_metric": "Ben authorised the re-bless at Gate 2 (2026-09-22, the first form) against Step 2's shape, and the pins land as authorised: k_shipped_digest_pins, the 16 library worlds at 650:2 from --digest (3383 s, every row one player, none fell back), re-checked 16/16 by --digest-check; the legacy rows' D_settle/D_seat moved to BL-1050's values (NR-894) with D_search/D_land untouched and old -> new recorded in the DEVLOG, re-checked 16/16; seed_library blessed (6 of 16 moved) and seed_library_sweep.json / exploration_sweep.json regenerated. Nothing else was re-pinned: exploration_sim_harness R3b holds its 2026-09-14 counters with the tier on."
-    },
-    {
-     "id": "R10",
-     "status": "complete",
-     "verification": [
-      "headless: the 1960 readings per library seed"
-     ],
-     "requirement": "THE READINGS at 1960 on the shipped world, per library seed, TAKEN AND REPORTED (restated, Ben 2026-09-22, NR-913 — not gated; the density knob is the sprint 46 item DENSITY_FOLLOWS_CITIES): density follows cities (rho(firms, urban) against rho(firms, goods), the BL-1029 baseline 0.431 vs 0.460) and industrialisation (points unevenly held, the fuel reading visible).",
-     "notes": "",
-     "result_metric": "TAKEN AND REPORTED (restated by NR-913, not gated). Density follows cities on the shipped world at 650:2, 16 seeds: rho(firms, urban) median 0.139 against rho(firms, goods) 0.167, urban ahead on 5 of 16 worlds, against BL-1029's legacy 0.431 / 0.460 — the web holds a median 65 firms over 148-538 markets because a firm costs 1/650 of the whole stock and ~85% of every stock goes unspent. Pooling measured (region 0.186/0.195, market 0.211/0.204, nation 0.156/0.213; the 120 ceiling binds and seats move) and not shipped. Industrialisation: points unevenly held (Gini over regions 0.539-0.841, median 0.741; over polities median 0.651), the largest region holding a median 2.9% of a world's points, the Fuel Doctrine split visible (coke 241 / charcoal 272 / neither 341 living polities; ground_fuel pulls coke 537 against charcoal 159 per mille)."
-    },
-    {
-     "id": "R11",
-     "status": "complete",
-     "verification": [
-      "review: code-reviewer (cold)"
-     ],
-     "requirement": "A cold review of the sprint's integrated diff (no authoring context), with a fix round budgeted; the reviewer reports from the diff and names confirming runs rather than running sweeps. It also closes BL-1043 R7.",
-     "notes": "",
-     "result_metric": "code-reviewer (cold, no authoring context), two rounds, no build or run. Round 1: no correctness hole in the shipped world/* path, six findings — the cost mode failed every fell-back row, exploration R3b took the tier from the struct default, the search-less paths were silent on a rejected budget, pooling could overflow the walk's int32 books, the launch view framed world-gen's player whom the search replaces (latent since BL-977, on every world under BL-1044), two stale comments. All six fixed (66d7876e). Round 2: all six hold; two residuals — a re-frame had to reset first (the NR-911 residual world would keep the removed player's frame) and the pin provenance cited a DEVLOG entry that did not exist yet — both fixed (31793063). It also closes BL-1043 R7: the cost mode measures the real builder at the stated matrix, and no pinned path moved that should not have."
-    }
-   ]
+   "resolved": "2026-10-04",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "pools-per-market",
@@ -6009,100 +5816,11 @@
    "difficulty": 5,
    "importance": "S",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1003 - sprint 46 (restored 2026-09-23 on Ben's BL-1066 ruling)",
    "batch": "sprint-46",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "code: world.hpp, economy_system.cpp",
-      "headless: pools_per_market (new)"
-     ],
-     "requirement": "The goods pool is keyed (corp, market): a building's output enters the pool of market_for_tile(its tile), and its inputs (processing, construction, upkeep) draw that pool and that market's inventory. A body with no market keeps ONE body-level pool, and the market that spawns there absorbs it whole. Labour pools stay (corp, body). The map is renamed so no caller can pass a body where a market is meant by accident.",
-     "notes": "",
-     "result_metric": "corp_market_pools keyed (corp, market), body-level fallback absorbed on spawn; pools_per_market ALL PASS 37/37 (8a41899d, fix round 6665d4d0)."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "code: economy_system.hpp, market_clearing.cpp",
-      "headless: pools_per_market"
-     ],
-     "requirement": "Wants, purchases, upkeep_wants, auto-surplus and standing orders book at the market the draw or sale happens in. A build's want lands on its own tile's market (BL-1066's probe read demand 0.00 there). market_for_corp_on_body no longer routes any goods flow.",
-     "notes": "",
-     "result_metric": "wants/purchases/upkeep_wants book at the draw market; a build want lands on its own market (probe: demand 8.75 at 56166, price 161). market_for_corp_on_body removed."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "code: supply_system.cpp",
-      "headless: pools_per_market",
-      "headless: convoy_command"
-     ],
-     "requirement": "A convoy debits its source market's pool and credits its destination market's pool, so a same-body haul sells at the destination price. The dispatcher sources from (corp, market) pools. A harness hauls a good between two markets on one body and reads the sale at the destination.",
-     "notes": "",
-     "result_metric": "convoys debit the source market pool and credit the destination market pool; far-trade: 0 of 3,040 same-body hauls landed in a pool that clears at home."
-    },
-    {
-     "id": "R4",
-     "status": "complete",
-     "verification": [
-      "code: every former corp_body_pools reader",
-      "code: grep"
-     ],
-     "requirement": "Every reader that wanted a body total (UI stockpile rows, header, corp_ai held stock, condition_set, unit-roster gate, acquisition transfer, network and space upkeep suppliers, verify_api) reads a named body-aggregate helper or a specific market by a stated rule. Generation seeds a corp's opening stock into its HQ tile's market pool. No pool is looked up by a body id where a market exists.",
-     "notes": "",
-     "result_metric": "every former reader rekeyed; contract delivery draws home then other pools (cold-review fix, pools_per_market (h)); opening stock rehomed after the carve."
-    },
-    {
-     "id": "R5",
-     "status": "complete",
-     "verification": [
-      "code: world_save.cpp, world.cpp",
-      "headless: world_determinism",
-      "headless: world_copy_determinism"
-     ],
-     "requirement": "Save format: save_game_version moves and the pools round-trip (asserted); the state hash folds the new key in sorted order; world_determinism and world_copy_determinism are bit-identical run to run. Digests MOVE, and are reported old -> new, not re-pinned (the re-bless is Ben's).",
-     "notes": "",
-     "result_metric": "world_save_version 23 -> 25; save_roundtrip exit 0; world_determinism bit-identical x2; digests moved and NOT re-pinned (commit messages carry old -> new)."
-    },
-    {
-     "id": "R6",
-     "status": "pending",
-     "verification": [
-      "headless: landscape search / player_seed_sweep --digest (one seed)"
-     ],
-     "requirement": "The cost stated in PRODUCTION.md is measured: how many generated firms straddle a catchment line, and whether the landscape search winner still validates.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R7",
-     "status": "complete",
-     "verification": [
-      "headless: BL-1066 probe (Release --verify)"
-     ],
-     "requirement": "The BL-1066 reading re-taken: a military base the player places in its home catchment, and one placed outside it, each read for steel want, arrivals and progress, beside the pre-change trace.",
-     "notes": "",
-     "result_metric": "BL-1066 probe re-taken three times (BL-1066 rounds 1-3 in its design): the want now prices the build market; the stall moved upstream to steel supply."
-    },
-    {
-     "id": "R8",
-     "status": "complete",
-     "verification": [
-      "review: code-reviewer (cold)"
-     ],
-     "requirement": "A cold review of the merged change, fix round included, before the commit.",
-     "notes": "",
-     "result_metric": "cold review: 5 findings, all fixed in 6665d4d0."
-    }
-   ]
+   "resolved": "2026-10-04",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "trade-reaches-for-price",
@@ -6467,98 +6185,11 @@
    "difficulty": 5,
    "importance": "S",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1084 - sprint 48 (cut 2026-09-25, Ben's cut form)",
    "batch": "sprint-48",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: world_determinism twice (bit-identical)",
-      "headless: player_seed_sweep --digest-check, both arcs",
-      "headless: seed_library.js --check"
-     ],
-     "requirement": "make_hard_coded_world is the composition of resumable stage functions over one generation_cursor, and the composition is byte-identical to the monolith it replaces: every digest and pin holds, or a moved digest is named as the Selene/Pallas entity-id shift and nothing else.",
-     "notes": "",
-     "result_metric": "Main-session gates on 4211090c (K1 abda25c6): world_determinism twice ALL PASS, digests unmoved (seedA/on 0570E3900D0BD53F, seedB/on D5616442F561DDD3, seedA/off B89B87C393B06FC9); player_seed_sweep --digest-check both arcs 16/16 PASS (shipped and legacy); the lane's exploration_sweep on 16 seeds byte-identical to the checked-in seed_library_sweep.json (seed_library.js --check 16 unchanged). The cold review's gap (no cross-tree evidence for the stop paths) closed by the new tools/verify/stop_path_digests: base b03fd52e vs HEAD, seeds 0/28/46 x {migration, ancient era, exploration, industrialisation, full}, world and report digests IDENTICAL on all 15 rows. Selene and Pallas were already built in the tail: no entity-id shift."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: a committed cursor-equivalence harness over the 16 curated seeds"
-     ],
-     "requirement": "A staged build, each stage run on a faithful copy of the previous stage's cursor, equals the one-call composition at EVERY round boundary (owner_changes, polities, world digest) on the 16 curated seeds.",
-     "notes": "",
-     "result_metric": "world_cursor_equivalence (K2 60ebd0ec) re-run by the main session on 4211090c: 16 curated seeds in two shards, ALL PASS (33 + 33 rows), each stage run on a faithful copy of the previous stage's cursor with the original freed. K4 strengthened it (content folds for the members folded by size; two negative controls per seed must FAIL)."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "headless: Release timing, copy vs replay, seeds 0 and 28"
-     ],
-     "requirement": "The reroll path is measured before it is chosen: the cost of holding and copying a closed round's world against replaying from the Life gate with the fixed span seeds; the cheaper ships and both numbers are recorded.",
-     "notes": "",
-     "result_metric": "K3 (world_cursor_equivalence --measure --seeds 0,28 --reps 5, indicative): a cursor copy costs a flat 30-40 ms at every boundary against a replay from the held gate of 49 ms (culture) to 9.2 s (industrialisation, seed 0). The held copy ships; replay from the Life gate is the fallback."
-    },
-    {
-     "id": "R4",
-     "status": "pending",
-     "verification": [
-      "live: Ben's walk, rounds 3-6"
-     ],
-     "requirement": "Next is disabled while the round on screen is running and enables the moment its world lands; its hover names what it waits on; no two pass rounds ever build at once (STARTUP.md, Next waits).",
-     "notes": "Built (K4). Live click owed. The cold review's fix round is in flight (round 6 pace, reroll mid-tail, slots freed at Begin, the report's lean, R6's frame assertion).",
-     "result_metric": ""
-    },
-    {
-     "id": "R5",
-     "status": "pending",
-     "verification": [
-      "live: Ben's walk",
-      "visual: a capture of round 5's wait"
-     ],
-     "requirement": "The wait caption on round 5 names only the Exploration span (never an earlier one), and round 5's elapsed count is the Exploration span's own cost; Back then Next on any round recomputes nothing.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R6",
-     "status": "pending",
-     "verification": [
-      "headless: verify.wizard_span_seed and a frame read",
-      "live: Ben's walk"
-     ],
-     "requirement": "Rerolling round 5 re-runs only span 5 and opens on round 4's exact 1200 frame; a planetology move drops every slot below it; a stale landing drops record and world.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R7",
-     "status": "complete",
-     "verification": [
-      "headless: begin_adopts_check.js",
-      "headless: run_autostart_adopt"
-     ],
-     "requirement": "Begin adopts round 6's slot exactly as before; round 6 starts playing at the tap's final publish and its landing swaps only the world slot, with the snapshot and landed paths never both writing the round's record.",
-     "notes": "",
-     "result_metric": "Main-session gates on 2775ef57 (K4 merged): begin_adopts_check.js 12/12 PASS (the checker now counts the finish summary line only), adopt state hash == cold; world_cursor_equivalence 16 seeds 49 + 49 PASS with the strengthened content folds and two negative controls per seed; span_seed_isolation ALL PASS; stop_path_digests: the 12 stop rows still identical to base b03fd52e after K4; the 11 wizard/lapse --verify scripts 0 FAIL. Round 6 plays from the span close (the lane's walk: record at ~3.2 s, world at 217 s loaded)."
-    },
-    {
-     "id": "R8",
-     "status": "pending",
-     "verification": [
-      "review: code-reviewer agent (cold, author != reviewer)"
-     ],
-     "requirement": "A cold review of the merged change, fix round included, before the commit.",
-     "notes": "",
-     "result_metric": ""
-    }
-   ]
+   "resolved": "2026-10-04",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "roads-tree-and-detour",
@@ -6594,13 +6225,13 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: a capture of the densest curated seed's road lens"
      ],
      "requirement": "No lattice: the densest seed's capture shows a tree with occasional detour loops.",
      "notes": "Read after BL-1130 (centres consolidate): the remaining street carpet is centre density, not roads.",
-     "result_metric": ""
+     "result_metric": "Ben confirmed at the live app, 2026-10-04 (sprint 48 close walk; build_rel rebuilt from main 9171c2ef). Ben: more lenses are wanted for visibility on some of these; he holds that for before sprint 50."
     },
     {
      "id": "R4",
@@ -6651,44 +6282,11 @@
    "difficulty": 3,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1117 - sprint 48 (cut 2026-09-25, Ben's cut form)",
    "batch": "sprint-48",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: gen_step_costs --finish, seeds 0 and 28, Release"
-     ],
-     "requirement": "Tick 1 of the settle is timed by phase on seeds 0 and 28 in Release and the phase that costs it is named with its milliseconds.",
-     "notes": "",
-     "result_metric": "S1 (4e7d3cb4), Release, indicative on a loaded machine, seeds 0 and 28 twice each: tick 1 is the settle's FIRST CONVOY COMMIT -- passive_lp_admit -> nearest_lp_anchor looped every LP anchor and, on a double miss, flooded the whole body from each (9,038 floods on seed 0, 6,079 on seed 28, ~10 ms each; lap 1 ~93 s and ~70 s). Not the corp AI. Tick 0 commits nothing; ticks 2-11 reuse the fields."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: gen_step_costs --finish",
-      "headless: world_determinism twice"
-     ],
-     "requirement": "The named phase is cut: tick 1's cost old -> new on both seeds; the digests hold, or the movement is named as a cause in the sprint's re-bless.",
-     "notes": "",
-     "result_metric": "S2 (1510870b, merged aed6c790): nearest_lp_anchor answers from one multi-source field per body. Tick 1 93 s -> 1.9 s (seed 0), 68-72 s -> 1.3 s (seed 28); settle 116 s -> 21 s and 85 s -> 14 s; flood fields alive 9,238 -> 217 and 6,181 -> 119 (~1.7 GB -> ~34 MB). 0 of 1,000+ answers changed (probe); world_determinism unmoved; D_settle/D_seat moved on seed 28 only (14DA34AB7D5E9719 -> 68E53E5123A0D55A), attributed to the flood fields no longer built -- a named cause in the re-bless. Main-session gates at 3d802dac: app builds, world_determinism ALL PASS, save_roundtrip OK, lp_anchor_field_check ALL PASS."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "review: code-reviewer agent (cold, author != reviewer)"
-     ],
-     "requirement": "A cold review of the merged change, fix round included, before the commit.",
-     "notes": "",
-     "result_metric": "Cold review of 4e7d3cb4 + 1510870b (2026-09-25): no crash or determinism break; the multi-source field equals the old per-anchor minimum in float. Fix round in a2b3e948 and 5236d8fb: tie contract restated, F1 non-vacuous and counting every body, F2 reporting tie cells, stale comments fixed; road generation's hand-cleared caches replaced by invalidate_logistics_caches (BL-1119 round 2)."
-    }
-   ]
+   "resolved": "2026-10-04",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "round-legends",
@@ -6696,43 +6294,11 @@
    "difficulty": 2,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1118 - sprint 48 (cut 2026-09-25, Ben's cut form)",
    "batch": "sprint-48",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "visual: a capture per lapse round (Culture, Empires, Exploration, Industrialisation)"
-     ],
-     "requirement": "Each lapse round's legend lists the layers that round draws and only those, read from the painter's own predicates, with glyphs drawn by the painter's calls.",
-     "notes": "",
-     "result_metric": "2026-09-25, main e4a6370b, build_rel Release 19:31: scripts/verify/round_legends.lua exit 0, 0 golden failures, one capture per lapse round (seed 32). Keys read from lapse_layers_drawn(h), the per-record decision every map pass gates on: Culture 8 rows, Empires 16 (no caravan, captured ring, capital slide or fleets: the cut), Exploration 25, Industrialisation 26. Swatches are the map's own paint_* calls."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "doc: docs/ui/question_log.json + render_question_log.js"
-     ],
-     "requirement": "The legend has its question-log entry.",
-     "notes": "",
-     "result_metric": "docs/ui/question_log.json gains wizard_round_legend (736a38aa); QUESTION_LOG.md regenerated; also catalogued as UI-121 in docs/ui/ui_elements.json."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "live: Ben's walk"
-     ],
-     "requirement": "Ben reads each round's legend at the live app.",
-     "notes": "",
-     "result_metric": "Ben read the legends at the live app, 2026-09-25: kept one key per round, kept Furnaces lit on Empires, kept the four drafted labels."
-    }
-   ]
+   "resolved": "2026-10-04",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "sea-lanes-seen",
@@ -6740,43 +6306,11 @@
    "difficulty": 2,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1124 - sprint 48 (cut 2026-09-25, Ben's cut form)",
    "batch": "sprint-48",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "visual: sea_lanes.lua, seed 32 close frame, one capture per candidate"
-     ],
-     "requirement": "Three candidate lane forms (a brighter core line inside the band, a shipping glyph at each end, an arc bowed away from the tie) are captured at seed 32's close frame.",
-     "notes": "",
-     "result_metric": "2026-09-25, main e4a6370b: scripts/verify/sea_lanes.lua exit 0, 0 golden failures; captures sea_lanes_form_a_core_line / _b_end_anchors / _c_bowed_arc at seed 32's 1660 close frame, each switched by a real click on the temporary selector. 13 of the 16 lanes draw under 8 px."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "live: Ben picks with the live app open"
-     ],
-     "requirement": "Ben picks one form; the other two are removed before the commit.",
-     "notes": "",
-     "result_metric": "Ben picked (c) the bowed arc at the live app, 2026-09-25 (the open-calls form). U3 (70cb329d, merged 9313e35a) removed forms (a) and (b), the enum and the selector; the legend swatch is the arc."
-    },
-    {
-     "id": "R3",
-     "status": "pending",
-     "verification": [
-      "live: Ben's walk"
-     ],
-     "requirement": "Ben finds a lane at the live app without a pointer.",
-     "notes": "",
-     "result_metric": ""
-    }
-   ]
+   "resolved": "2026-10-04",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "markets-can-die",
@@ -6788,79 +6322,7 @@
    "promoted_from": "backlog.json BL-1125 - sprint 48 (cut 2026-09-25, Ben's cut form)",
    "batch": "sprint-48",
    "resolved": "2026-10-03",
-   "resolution": "merged d0db9927",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: a committed market census harness, 16 curated seeds, the flipped 1960 world"
-     ],
-     "requirement": "A census per curated seed: markets by source (capital shell, carve, junction-lowered), shells standing where the polity died after 1200, catchment tiles and population per market, and the share that clear nothing in the first play year.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "design: Ben rules the mechanism against R1"
-     ],
-     "requirement": "The mechanism that destroys a market is ruled by Ben against the census and written into MARKETS.md; the rows that verify it are added then.",
-     "notes": "",
-     "result_metric": "Ruled by Ben 2026-09-25 (the density form): twins fold + gravity fold (calibrated to ~20-40 markets a 1960 world) + conquest consolidates (his note). Written into MARKETS.md § Market centres and seeding."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "headless: market_census on the 16 curated seeds"
-     ],
-     "requirement": "Twins fold: no two markets share a centre tile on any seed (the census's twin count reads 0), and a folded twin's catchment, inventory and pools pass to the market it folds into.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R4",
-     "status": "complete",
-     "verification": [
-      "headless: market_census, old -> new per seed"
-     ],
-     "requirement": "Gravity fold: a market inside a larger one's reach folds into it; the reach constant is named and its calibration recorded (markets per seed old -> new, on the world BL-1130 consolidated), aiming at roughly 20-40 a 1960 world without enforcing a count.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R5",
-     "status": "complete",
-     "verification": [
-      "headless: history_sim_harness or market_census's shell fate columns"
-     ],
-     "requirement": "Conquest consolidates: conquering the region a rival's market stands on destroys that market in the history; the census's \"maker dead\" shells fall to the markets the rule leaves, recorded old -> new.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R6",
-     "status": "complete",
-     "verification": [
-      "review: code-reviewer agent (cold, author != reviewer)"
-     ],
-     "requirement": "A cold review of the merged change, fix round included, before the commit.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "RG",
-     "status": "complete",
-     "verification": [
-      "headless: gates on main"
-     ],
-     "requirement": "Gated on main.",
-     "notes": "",
-     "result_metric": "Main d0db9927: world_determinism ALL PASS twice (3EE8DFAAA787E9D2 / C845D6D087EDC0B7 / F7A64F75026B029B); save_roundtrip, market_census (0 check failures), market_fold_fixture, world_cursor_equivalence, spawn_solvency, landscape_search_harness, haulage_measure, money_conservation pass; history_sim only R3a2/R3a3. Ben 2026-10-03: haulage accepted pending a shipped re-read (BL-1138); 20-40 without per-city; capitals fold; port gate, reach 16."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "epoch-zero-retired",
@@ -6872,40 +6334,7 @@
    "promoted_from": "backlog.json BL-1114 - sprint 48 (cut 2026-09-25, Ben's cut form)",
    "batch": "sprint-48",
    "resolved": "2026-09-25",
-   "resolution": "Complete 2026-09-25 in the main session (sprint 48 wave 1, task E1): --epoch 0 refused with a message, the harness rows re-scoped, digests unmoved.",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: ProjectIo --epoch 0 (and the harness flag)"
-     ],
-     "requirement": "--epoch 0 is refused with a clear message, never silently clamped.",
-     "notes": "",
-     "result_metric": "build_rel ProjectIo.exe (Release, BUILD_REL_EXIT 0, 18:00): `--epoch 0` prints \"ProjectIo: --epoch 0 is retired. It no longer selects the ancient roster: the band comes from each nation's own history. Omit --epoch for the 1960 start.\" and exits 1; a malformed year still exits 1 with the range message. No clamp."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "review: grep + compile"
-     ],
-     "requirement": "No code path maps an epoch to a band (industrial_band_from_year and its callers are gone); every harness, verify script and seed-library entry that used epoch 0 is moved to 1960 and named in the commit.",
-     "notes": "",
-     "result_metric": "No code path maps an epoch to a band: the year-to-band function was already removed by BL-1101 (era_band.hpp's note); the only src readers of epoch_year left are the calendar (app.cpp set_campaign_epoch_year, format.cpp), the save field and verify_api's founded-year read. Moved off epoch 0: centre_region_bind (two worlds, 0 -> 1960) and chain_conversion_probe (default 0 -> 1960); stale epoch-0 comments fixed in main.cpp, app.hpp, format.hpp, tile_inspector.cpp and steel_chain_probe.cpp. No verify script or seed-library entry used epoch 0 (grep). continent_drift's \"epoch 0\" is a geological drift epoch, a different concept, and stays. All five edited harnesses compile."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "headless: world_determinism twice",
-      "headless: save_roundtrip"
-     ],
-     "requirement": "world_determinism is bit-identical twice with its epoch row re-scoped to a non-zero epoch; save_roundtrip green.",
-     "notes": "",
-     "result_metric": "world_determinism (build_gen/verify, Release) run twice: ALL PASS (0 failures) both; digests seedA/on 0570E3900D0BD53F, seedB/on D5616442F561DDD3, seedA/off B89B87C393B06FC9 (unmoved from sprint 47's close), and the re-scoped R3.8 row seedA/on/epoch1900 = 0570E3900D0BD53F (equal to the 1960 world). save_roundtrip: SAVE ROUND TRIP OK."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "centres-consolidate",
@@ -6913,66 +6342,11 @@
    "difficulty": 4,
    "importance": "S",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1130 - sprint 48 (Ben's density form, 2026-09-25)",
    "batch": "sprint-48",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "pending",
-     "verification": [
-      "headless: a centre census per curated seed (centres, land share, scale distribution, spills)"
-     ],
-     "requirement": "The old density is recorded per seed before the rule changes it.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R2",
-     "status": "pending",
-     "verification": [
-      "headless: history_sim_harness",
-      "headless: world_determinism twice"
-     ],
-     "requirement": "Villages merge into towns as heads rise and no region carries more centres than its cell holds; pure integer functions of the region record, no RNG; world_determinism bit-identical run to run.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R3",
-     "status": "pending",
-     "verification": [
-      "headless: the census old -> new",
-      "headless: market_census",
-      "headless: gen_step_costs --roads"
-     ],
-     "requirement": "Centres per seed, land share, scale distribution, road tiles and the carve's market count are recorded old -> new on the 16 seeds.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R4",
-     "status": "pending",
-     "verification": [
-      "visual: a capture of the densest curated seed's road lens"
-     ],
-     "requirement": "The densest seed shows land that is not street.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R5",
-     "status": "pending",
-     "verification": [
-      "review: code-reviewer agent (cold, author != reviewer)"
-     ],
-     "requirement": "A cold review of the merged change, fix round included, before the commit.",
-     "notes": "",
-     "result_metric": ""
-    }
-   ]
+   "resolved": "2026-10-04",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "path-cost-reads-the-cache",
@@ -6984,40 +6358,7 @@
    "promoted_from": "backlog.json BL-1126 - sprint 48 (Ben's density form, 2026-09-25)",
    "batch": "sprint-48",
    "resolved": "2026-09-25",
-   "resolution": "Complete 2026-09-25: a path is directed and read one way only; a save/load continues identically; the direction is tested.",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: lp_anchor_field_check L1, seeds 0 and 28"
-     ],
-     "requirement": "A save and load after settle tick 1 continues identically to the unsaved run on every tick 2-11, WITHOUT the --cold-original control.",
-     "notes": "",
-     "result_metric": "a2b3e948 (merged f6c87707): lp_anchor_field_check L1 MATCHES on every settle tick 2-11 on seeds 0 and 28 with NO --cold-original control (before: diverged at tick 2 / tick 3). intra_body_path(O, D) always reads D's flood field under the ordered key; flood_edge_cost prices each hop toward the anchor so the field holds O -> D (LOGISTICS.md section 1)."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: gen_step_costs --finish 0 28",
-      "headless: player_seed_sweep --digest-check"
-     ],
-     "requirement": "Flood count and settle time old -> new are recorded; the digest movement is named as a cause in the sprint's re-bless.",
-     "notes": "",
-     "result_metric": "Indicative, loaded: floods alive in the settle and a play year unchanged (217 / 119); generation floods 2,927 -> 4,401 (seed 0), 1,709 -> 2,086 (seed 28), all road generation's own queries (step 15 doubled on seed 0, 10 -> ~22 s; BL-1119 round 4 restructures them). Settle and play year no slower. Digests move on every row (world_determinism seedA/on D356F1A2E9148EDE -> C4494BD786F8197F; player_seed_sweep D_search/D_land/D_settle/D_seat on seeds 0 and 28): a named re-bless cause -- path costs read one way only, O -> D, the river discount taken in travel direction."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "review: code-reviewer agent (cold, author != reviewer)"
-     ],
-     "requirement": "A cold review of the merged change, fix round included, before the commit.",
-     "notes": "",
-     "result_metric": "Cold review of a2b3e948 (2026-09-25): no logic defect; the direction flip hand-checked on an east-west river hop and a row crossing; purity and every orientation reader confirmed. Fix round 5236d8fb (merged b82b0957): logistics_harness T4b/T4c/T4d test the direction (they FAIL when the flip is reverted; T4c alone fails a parity-only mutation), T4's symmetry assertion retired; lp_anchor_field_check L1 is a check (exits 1 on divergence, shown against 95bfb22a); F1 counts every anchored body (1 of 1 per seed); stale comments fixed. world_determinism unmoved by the fix round. Main: logistics_harness direction rows PASS."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q3.json"
   },
   {
    "brief": "roads-carried-across-rounds",
@@ -7025,33 +6366,11 @@
    "difficulty": 2,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1134 - sprint 48 (the live walk, 2026-09-25)",
    "batch": "sprint-48",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "visual: scripts/verify/roads_carried.lua"
-     ],
-     "requirement": "Every road drawn at a round's close is drawn on the next round's first frame, at both seams (Empires -> Exploration, Exploration -> Industrialisation).",
-     "notes": "",
-     "result_metric": "70cb329d: the painter carries the predecessor's whole road network at the seam (road_carry, lapse_roads_at_close), a road's tier only moving earlier. roads_carried.lua 8/8 in the lane (seed 32: 480 carried into Exploration, 542 into Industrialisation); re-run on main pending the gate."
-    },
-    {
-     "id": "R2",
-     "status": "pending",
-     "verification": [
-      "live: Ben's walk"
-     ],
-     "requirement": "Ben sees the roads carry from round to round.",
-     "notes": "",
-     "result_metric": ""
-    }
-   ]
+   "resolved": "2026-10-04",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "culture-round-worded-as-the-record",
@@ -7059,33 +6378,11 @@
    "difficulty": 2,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1135 - sprint 48 (the live walk, 2026-09-25)",
    "batch": "sprint-48",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "visual: round_legends_3_culture capture"
-     ],
-     "requirement": "The question, captions, counters, census line and footer speak of the record, not the routes; map and record unchanged.",
-     "notes": "",
-     "result_metric": "70cb329d: question \"Which peoples first set down their names, their gods and their ground?\"; footer \"2400 to 400 BCE: the first peoples set down their names, their gods and their ground, and the ages after inherit what they kept.\"; counters/census/overrun/no-reroll lines reworded. The ticker's event prose (\"The X part from the Y at Z\") is the record's and was left unchanged -- Ben to say at the walk."
-    },
-    {
-     "id": "R2",
-     "status": "pending",
-     "verification": [
-      "live: Ben's walk"
-     ],
-     "requirement": "Ben reads the draft at the app and accepts or rewords it.",
-     "notes": "",
-     "result_metric": ""
-    }
-   ]
+   "resolved": "2026-10-04",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "settle-spacing",
@@ -7093,65 +6390,11 @@
    "difficulty": 3,
    "importance": "S",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1132 - sprint 48 (Ben, the open-calls form 2026-09-25; spacing and room ruled in the density-and-trade form 2026-09-26)",
    "batch": "sprint-48",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: centre_census C9 on the 16 curated seeds"
-     ],
-     "requirement": "A spacing ladder is read on the 16 seeds (regions, one-tile cells, centres, land under centres, the history's battles/conquests/foundings) before the spacing is fixed.",
-     "notes": "",
-     "result_metric": "Ladder read in round 1; Ben fixed 3 tiles (2026-09-26). Pooled main -> this: regions 43,130 -> 15,194; one-tile cells 26,290 -> 371; centres 52,552 -> 42,251; land under centres 22.4% -> 18.0%; land provinces 31,029 -> 33,749."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: centre_census with the lane's temporary pick counters (stripped)"
-     ],
-     "requirement": "A realm scores Settle only where find_settle_site finds a site that passes the spacing, so a chosen Settle always founds.",
-     "notes": "",
-     "result_metric": "Settle picks with no room: main 624 / 2,161 / 3,274 (Empires / Exploration / Industrialisation) -> 0 / 0 / 0. The room check alone at spacing 1 moves pooled structure under 2% (seed 31 most)."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "headless: world_determinism twice on main",
-      "headless: history_sim_harness on main (only R3a2/R3a3, pre-existing)",
-      "headless: save_roundtrip, province_partition_harness, centre_census on main"
-     ],
-     "requirement": "The merged change is deterministic run to run and moves no gate beyond the known pre-existing failures.",
-     "notes": "",
-     "result_metric": "Main at 89d3bb4b, 2026-09-26: world_determinism ALL PASS twice, seedA/on C811B1C4BD1C44F1 both runs (seedA/off 6A3141DE4AE18B4D unchanged); save_roundtrip OK; province_partition_harness only D A1 (pre-existing); history_sim_harness only R3a2/R3a3 (pre-existing); centre_census OK, pooled centres 42,251 (18.0% of land), road tiles 86,631, markets 5,784. Re-gated after the fix at 3392406d: world_determinism ALL PASS twice at 7F94AFDA0A85E26E (identical to 15da1bd2, so the fix moves no world); history_sim_harness only R3a2/R3a3 (R7 passes); exploration_sim_harness only R3b/R3d.1 (the known-moved pins); centre_census OK."
-    },
-    {
-     "id": "R4",
-     "status": "complete",
-     "verification": [
-      "review: code-reviewer agent (cold, author != reviewer)"
-     ],
-     "requirement": "A cold review of the merged change, fix round included, before the item closes.",
-     "notes": "Cold review 2026-09-26: claims 2, 3, 5 hold; claim 1 failed (scheduled foundings bypass the spacing) and claim 4 failed (the spacing is a per-params field and exploration_sim_harness ran 1). Fix round sent to the spacing lane: pending anchors reserved (NR-956), a too-close pair count in the census, the cohesion gate hoisted, the cost measured, comments. Re-gate after it.",
-     "result_metric": "Fix round 69834473, merged 3392406d: pending anchors refused by the site search (NR-956, option a); exploration_sim_harness copies the spacing; the cohesion gate hoisted (digests identical with the hoist alone); comments corrected. No world moves on the 16 seeds. The history step grew 1.5-2.2x from BL-1132 through the doubled war, not the site search (0.5-7% of the decision round), so no occupancy grid was built."
-    },
-    {
-     "id": "R5",
-     "status": "complete",
-     "verification": [
-      "headless: centre_census too-close pair count on the 16 seeds"
-     ],
-     "requirement": "No two region seats stand closer than the spacing where either was founded by the sim; the count reads 0.",
-     "notes": "",
-     "result_metric": "centre_census C10 on main 3392406d: 0 too-close pairs pooled over 11,862 sim-founded regions; negative control (one tile wider) fires 672 / 1,291 on seeds 28 / 40. Holds for scheduled foundings while the spacing stays at or under the settlement pass separation (7 tiles here)."
-    }
-   ]
+   "resolved": "2026-10-04",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "province-is-its-centres-ground",
@@ -7159,54 +6402,11 @@
    "difficulty": 3,
    "importance": "S",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1133 - sprint 48 (group recorded after the merge, from the cold review, 2026-09-26)",
    "batch": "sprint-48",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: province_partition_harness",
-      "headless: centre_census C7/C8"
-     ],
-     "requirement": "Every land tile ends in exactly one province, and every province on settled land holds a centre.",
-     "notes": "",
-     "result_metric": "Merged 5cab560b: provinces 45,199 -> 30,894 pooled, anchor foundings 20,505 -> 6,856; cold review found exactly-one-province, nation locks and the reach weight sound."
-    },
-    {
-     "id": "R2",
-     "status": "pending",
-     "verification": [
-      "headless: centre_census C7 unanchored as a gate on the 16 seeds"
-     ],
-     "requirement": "The centre invariant is a gate over the 16 curated seeds, not a reading on the default world (BL-1145).",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R3",
-     "status": "pending",
-     "verification": [
-      "headless: charter_refusal_probe or stockpile_budget_check, before -> after"
-     ],
-     "requirement": "The readers sized for the old province (the two-firm cap above all) are re-read on the grown provinces (BL-1146).",
-     "notes": "Measured 2026-09-26 on main 29a9a8e0: province_cap 1.0% of the pooled budget (4.7% before BL-1133, 5.6% with it alone); re-read after BL-1141.",
-     "result_metric": ""
-    },
-    {
-     "id": "R4",
-     "status": "complete",
-     "verification": [
-      "review: code-reviewer agent (cold, author != reviewer)"
-     ],
-     "requirement": "A cold review of the merged change.",
-     "notes": "",
-     "result_metric": "2026-09-26: no partition bug; findings filed as BL-1145 (front-tile readers, census gate) and BL-1146 (firm cap); PROVINCES.md corrected to \"at most as many provinces as centres\"."
-    }
-   ]
+   "resolved": "2026-10-04",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "search-on-two-threads",
@@ -7214,33 +6414,11 @@
    "difficulty": 2,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1136 - sprint 48 (group recorded after the merge, from the cold review, 2026-09-26)",
    "batch": "sprint-48",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "pending",
-     "verification": [
-      "headless: landscape_search_harness --curve --check-k 6 --check-threads 2 on the 16 seeds, with a negative control"
-     ],
-     "requirement": "The two-thread six-round search is byte-identical to the serial one on every curated seed, and the check is shown able to fail.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "review: code-reviewer agent (cold, author != reviewer)"
-     ],
-     "requirement": "A cold review of the merged change.",
-     "notes": "",
-     "result_metric": "2026-09-26: no shared mutable state, results gathered by proposal index, tie-break unchanged, thread count fixed at 2; the cited proof covered only 3 rounds; the sweep labels and the loading-bar weight are stale. Fixes queued in the search lane after BL-1086."
-    }
-   ]
+   "resolved": "2026-10-04",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "sea-chain-currents-trade-lanes",
@@ -7248,54 +6426,11 @@
    "difficulty": 4,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1120, BL-1140, BL-1098 - sprint 48 (group recorded after the merge, from the cold review, 2026-09-26)",
    "batch": "sprint-48",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: world_determinism",
-      "headless: save_roundtrip (world save v28)"
-     ],
-     "requirement": "Deterministic; the save carries lane_level and the deep digest folds it.",
-     "notes": "",
-     "result_metric": "Merged b80a5b5d, 83dd57bd, 7238f8ef; cold review found the save, direction and integer maths sound."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: sea_lane_stamp_harness realised-discount rows (straight and diagonal)"
-     ],
-     "requirement": "A laid lane discounts traversal x0.50 on every bearing, which the harness asserts and was shown to fail on the eight-way walker.",
-     "notes": "",
-     "result_metric": "sea chain review fixes 04a58f0c, merged e5be22bf: the walk is four-cardinal; S4 fails on the eight-way walker at 0.750 (37.50 vs 50.00) and passes at 0.500 (25.00); lanes earned 468 -> 493, laid 352 -> 371, unreachable 6 -> 6."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "headless: ocean_currents_harness weight-0 vs weight-500 row"
-     ],
-     "requirement": "The current price moves the sim, asserted, not only printed.",
-     "notes": "",
-     "result_metric": "ocean_currents_harness W5: the weight-500 sea-leg record differs from still water; the campaign call site prices hub -> target (192 = 192)."
-    },
-    {
-     "id": "R4",
-     "status": "complete",
-     "verification": [
-      "review: code-reviewer agent (cold, author != reviewer)"
-     ],
-     "requirement": "A cold review of the merged chain.",
-     "notes": "",
-     "result_metric": "2026-09-26: the walk eight-way against four-way readers (x0.75 on diagonals), the landmass labels likewise, harnesses that pass with zero lanes, two priced gates that cannot bind, the cursor digest missing kepler_sea_legs. Fixes queued in the sea lane after BL-1142; BL-1143 and BL-1144 filed; NR-955 amended."
-    }
-   ]
+   "resolved": "2026-10-04",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "carve-counts-planned-firms",
@@ -7303,65 +6438,11 @@
    "difficulty": 3,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1086 - sprint 48 (Ben, the density-and-trade form 2026-09-26: the carve reads the budget's planned firms)",
    "batch": "sprint-48",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: landscape_search_harness --curve (L1, L2) on the 16 seeds"
-     ],
-     "requirement": "On a budget world no roster is laid before the search, and the carve's planned charters equal the plan re-derived from the finished world's budget, nation for nation.",
-     "notes": "",
-     "result_metric": "Lane 02110de1: L1 and L2 pass 16/16; markets 5,784 -> 5,800 (+0.3%, every seed within 3%) on the spaced world; winner kept on 13 of 16 (28, 12, 9 change); search cost +0.8%."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: player_seed_sweep --digest --arc legacy",
-      "headless: stop_path_digests 0 28",
-      "headless: world_cursor_equivalence"
-     ],
-     "requirement": "The legacy arc and the four stop paths are byte-identical; only the full build moves.",
-     "notes": "",
-     "result_metric": "Lane: legacy digests identical, the migration/ancient/exploration/industrialisation stops identical, cursor equivalence passes (seeds 0, 28). Main re-gate running. Main 15da1bd2: world_determinism ALL PASS twice (seedA/on 7F94AFDA0A85E26E, seedB/on 85E60658180461EC, seedA/off 6A3141DE4AE18B4D); legacy digests identical to the lane's (seed 0 236E66CB/820A7B33/C3701FFD/92D9D0D9); cursor equivalence ALL PASS; landscape_search_harness PASS incl. R6 budget-world threads; save_roundtrip OK; history_sim_harness R3a2/R3a3 plus R7 (the runtime budget, 5,486 ms under load against 825 ms; the change does not touch the history)."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "review: code-reviewer agent (cold, author != reviewer)"
-     ],
-     "requirement": "A cold review of the merged change, fix round included.",
-     "notes": "Cold review 2026-09-26: one budget, the same nation resolution, deterministic. Findings: probes that skip the spend now see no corporations (spawn_solvency red on budget seeds); the plan ignores the walk's 120-firm body ceiling; the budget-world test written three times; L1/L2 can pass with no budget world. Fix round sent to the search lane with R4 (the loading screen's list).",
-     "result_metric": "Fix round 7a17afda, merged b92165e4: probes built on the shipped start (spawn_solvency ALL PASS 12/12, seated net +305.4 cr/qtr); the plan honours the 120 body ceiling (all 16 seeds plan exactly 120 firms; chartered 806 + 1,721 of planned 861 + 1,920); one is_budget_world predicate; L0/L1/L1b/L2 16/16; P1 16/16 with both negative controls; legacy digests byte-identical; markets 5,800 -> 5,803."
-    },
-    {
-     "id": "R4",
-     "status": "pending",
-     "verification": [
-      "visual: live click on the loading screen's charter list on a budget world"
-     ],
-     "requirement": "The loading screen's charter list (app::draw_building_carve) still shows what the carve counts on a budget world, not an empty list.",
-     "notes": "publish_charter_web now publishes the winner's specialists to the carve panel (cold path: --autostart, seed 0 should show 54 rows after \"Proving the field\"; the wizard's round 6 draws from another sink). Screen access declined 2026-09-26; the live click moves to the walk.",
-     "result_metric": ""
-    },
-    {
-     "id": "R5",
-     "status": "pending",
-     "verification": [
-      "decision: NR-957"
-     ],
-     "requirement": "What the carve counts as a competitor (planned firms, specialists, or both) matches the doc Ben rules.",
-     "notes": "",
-     "result_metric": ""
-    }
-   ]
+   "resolved": "2026-10-04",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "centres-deepen",
@@ -7369,44 +6450,11 @@
    "difficulty": 3,
    "importance": "S",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1141 - sprint 48 (Ben, the density-and-trade form 2026-09-26)",
    "batch": "sprint-48",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: centre_census on the 16 seeds (the cap, one centre a region)"
-     ],
-     "requirement": "A region stands exactly one centre once its urban heads reach a village's worth, none below and none where its cell has no standable ground; its scale is the rung its heads crossed.",
-     "notes": "",
-     "result_metric": "Lane e82feae5 on the spaced main: centres 42,251 -> 22,521 pooled; land under centres 18.0% -> 9.6%; scales 37,755/3,487/795/178/36 -> 15,624/6,749/148/0/0; the history identical on all 16 seeds; stockpile no_carved_centre 0 on every seed."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: world_determinism twice on main",
-      "headless: history_sim_harness, province_partition_harness, save_roundtrip on main"
-     ],
-     "requirement": "Deterministic run to run; no gate moves beyond the known failures.",
-     "notes": "",
-     "result_metric": "Main 8cbdbc9d (BL-1141 alone, BL-1137 reverted): world_determinism ALL PASS twice at D93FFC43226A89BE; save_roundtrip OK; province_partition_harness ALL PASS (0 failures: the pre-existing D A1 now passes); history_sim_harness only R3a2/R3a3; industrialisation_sim_harness exit 0 (report only); centre_census OK -- centres 22,521 on 9.6% of land, scales 15,624/6,749/148/0/0, road tiles 80,706, markets 7,002 (the lane's 6,826 before BL-1086), C10 0 pairs. The first gate run at 13:19 was discarded: an orphaned earlier script wrote pre-revert results into its folder."
-    },
-    {
-     "id": "R3",
-     "status": "pending",
-     "verification": [
-      "review: code-reviewer agent (cold, author != reviewer)"
-     ],
-     "requirement": "A cold review, including the two rewritten history_sim_harness rows (BL872a2, BL872a4) and the conservation of stranded points.",
-     "notes": "Cold review 2026-09-26: the deepen rule sound and deterministic; centre_region_bind R2 fails by construction (selects >= 2 centres a region); history_sim_harness a2 no longer tells supplied from cut-off ground (relabel); the census one-centre check is true by construction. The two rewritten BL872 rows were not weakened to pass. Fixes in the centres lane.",
-     "result_metric": ""
-    }
-   ]
+   "resolved": "2026-10-04",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "industrial-urbanisation",
@@ -7418,61 +6466,7 @@
    "promoted_from": "backlog.json BL-1137 - sprint 48 (Ben at the live app 2026-09-25: more migration in the Industrialisation span; rebuilt on the deepen rule 2026-09-26)",
    "batch": "sprint-48",
    "resolved": "2026-10-03",
-   "resolution": "merged a83e6188",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: centre_census old -> new",
-      "headless: industrialisation_sim_harness"
-     ],
-     "requirement": "The stream runs at the demography's own growth rate and centres follow heads both ways; centres per seed recorded against the ~500 aim.",
-     "notes": "",
-     "result_metric": "Lane fef61886: centres 22,521 -> 21,860 (600-1,879 a seed, 1.2x-3.8x the aim); regions' own centres 276-918 a seed; anchors and coverage about half of every world's centres (NR-954); population 6.08B -> 10.92B pooled; urban share ~15% -> 70-72%; points median 57M -> 131M, correlation with urban heads 0.598 -> 0.866; markets 6,826 -> 7,324."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: world_determinism twice on main",
-      "headless: history_sim_harness (R7 the runtime budget)"
-     ],
-     "requirement": "Deterministic run to run; the Industrialisation span stays inside its runtime budget.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "review: code-reviewer agent (cold)"
-     ],
-     "requirement": "A cold review: whether the population rise is the stream's consequence or a double count, and whether points have become headcount by another name (INDUSTRIALISATION.md § 1).",
-     "notes": "Cold review 2026-09-26: DO NOT MERGE as built. The stream adds each migrant to the destination ceiling (capacity created: the population rise); a sack clamps the ceiling and deletes ~40% of a sacked city silently; a razing above 320,000 heads is not recorded; the new rules asserted only in prose; points left behind never retried. It had been merged (b591d1e9) before the review returned; reverted on main (8cbdbc9d). Rebuild in the centres lane under NR-958.",
-     "result_metric": "Rebuild dccf7e05 + fixes d79e0c81 on the lane branch: the cold review found no conservation bug; census C13 gates carried capacity summing to 0 and farm-fed within its ceiling on all 16 seeds (it fails all 16 on the first build: 7.2B heads of ceiling created); the close retry skips only a ruin; the real water test exercised; R2 at the real sack; a direct cut proportional (remove_region_people); overflow bound 2^30. Centres 22,521 -> 20,922 (-7.1%), carved -17.6%, urban share 67.4%, population 6.077B -> 6.045B. NOT MERGED: Beat 2 wants far fewer centres; R4 is Ben's."
-    },
-    {
-     "id": "R4",
-     "status": "complete",
-     "verification": [
-      "decision: Ben, on the population, urban share and points readings"
-     ],
-     "requirement": "Ben reads the stream's consequences before the re-bless names it.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R9",
-     "status": "complete",
-     "verification": [
-      "headless: gates on main"
-     ],
-     "requirement": "Gated on main.",
-     "notes": "",
-     "result_metric": "Main a83e6188: world_determinism ALL PASS twice (962AF7EC3ED3FC89 / A746B4E88612A54C / EB15108A7192A842); save_roundtrip, centre_census (C13/C14/C15 OK), spawn_solvency, landscape_search_harness, works_loader_check, world_cursor_equivalence pass; history_sim only R3a2/R3a3; road_generation_harness R2 red (its no-prehistory world; BL-1159). At x4: urban 25.6%, centres 13,392, 2,704 cities, heads moved 962.8M (489.8M along corridors)."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "far-pairs-across-water",
@@ -7480,63 +6474,11 @@
    "difficulty": 3,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1142 - sprint 48 (Ben, the density-and-trade form 2026-09-26: \"intercontinental: both\")",
    "batch": "sprint-48",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: ocean_currents_harness W9, C7-C10, F1-F5 on the 16 seeds"
-     ],
-     "requirement": "Realms on different landmasses meet when a trade by sea is open (the seller's navy, two ports, the sea line) and far pairs across water read their own penalty; the class is fixed at first contact.",
-     "notes": "",
-     "result_metric": "Lane 1a00072e + a5d20a1a: cross-water pairs bound 53 -> ~538 at 1960, far 518 at penalty 0; the seat-move break fixed; every new row fails when its line is broken."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: ocean_currents_harness C7, C8, W10"
-     ],
-     "requirement": "A leg against its current delivers less, only on the sea line; an out-of-range loss is rejected, never clamped.",
-     "notes": "",
-     "result_metric": "Loss 500: 0.86% of Industrialisation trade across water; the Exploration span loses none (its against-current trade has a road at least as wide)."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "headless: world_determinism twice, history_sim_harness, exploration_sim_harness, world_cursor_equivalence on main"
-     ],
-     "requirement": "Deterministic on main; only the known failures.",
-     "notes": "",
-     "result_metric": "Main e5be22bf: world_determinism ALL PASS twice at DE356678C6844F9D (seedB 00DE77E01E029591, prehistory-off 69277979DF8A52E9 unmoved); save_roundtrip OK; ocean_currents_harness, sea_lane_stamp_harness, world_cursor_equivalence ALL PASS; history_sim_harness only R3a2/R3a3; exploration_sim_harness only R3b/R3d.1."
-    },
-    {
-     "id": "R4",
-     "status": "complete",
-     "verification": [
-      "review: code-reviewer agent (cold)"
-     ],
-     "requirement": "A cold review of the change, fix round included.",
-     "notes": "",
-     "result_metric": "2026-09-26: no crash or determinism break; the stale ladder, the seat-move break, loss on road-carried trade, meeting without the seller's navy, a clamp and vacuous rows -- all fixed in a5d20a1a."
-    },
-    {
-     "id": "R5",
-     "status": "pending",
-     "verification": [
-      "decision: NR-959"
-     ],
-     "requirement": "Ben sets the sea far-penalty and the loss weight from the re-run ladder.",
-     "notes": "",
-     "result_metric": ""
-    }
-   ]
+   "resolved": "2026-10-04",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "naval-points-carry-over",
@@ -7544,53 +6486,11 @@
    "difficulty": 3,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1147 - sprint 48 (Ben, the naval carry-over form 2026-09-26)",
    "batch": "sprint-48",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: ocean_currents_harness N1-N8 on the 16 seeds"
-     ],
-     "requirement": "A polity's ledger counts the three deeds in the Empires round only and opens its fleet from its own points; a lost coast keeps its sailors, a dead polity carries nothing.",
-     "notes": "",
-     "result_metric": "Lane 7fb62ee7: 1,665 living polities at 1200, 4.84M province-years / 7,819 crossings / 230 techs, weights 1 / 600 / 20,000 (about a third each)."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: world_determinism twice on main"
-     ],
-     "requirement": "At a conversion of 0 the world is byte-identical.",
-     "notes": "",
-     "result_metric": "Main 5f734c76: DE91F01AAAD0473E both runs, equal to the sea-trade commit alone; history_sim_harness R3a2/R3a3, exploration_sim_harness R3b/R3d.1 only; ocean_currents, sea_lane_stamp, world_cursor_equivalence ALL PASS."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "review: code-reviewer agent (cold)"
-     ],
-     "requirement": "A cold review, fix round included.",
-     "notes": "",
-     "result_metric": "Fix round 99b86768, merged 572a0afb: wet corridors are not roads (history_corridor::wet), the coastal deed reads the terrain (weights 1/280/9,600), the conversion guarded by a span flag (N9), the census reads by_sea, construction rows labelled. Main: world_determinism ALL PASS twice at 0C8A42270888B95C; ocean_currents, sea_lane_stamp, world_cursor_equivalence ALL PASS; only the known four failures."
-    },
-    {
-     "id": "R4",
-     "status": "pending",
-     "verification": [
-      "decision: NR-961"
-     ],
-     "requirement": "Ben rules whether a fleet gates crossings and sets the rung.",
-     "notes": "",
-     "result_metric": ""
-    }
-   ]
+   "resolved": "2026-10-04",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "province-fill-crosses-settled-line",
@@ -7598,43 +6498,11 @@
    "difficulty": 2,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1150 - sprint 48 (Ben, NR-954 B, 2026-09-27)",
    "batch": "sprint-48",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: province_partition_harness P2d, P5d, G1 (fail on the old code)"
-     ],
-     "requirement": "The land fill crosses the settled line; the nation lock holds; water and unsettled bodies keep their seeding.",
-     "notes": "",
-     "result_metric": "Lane adc45b16: anchors 10,381 -> 1,430 pooled; lock islands 9,295 -> 0; land provinces 21,972 -> 13,232; centres incl. anchors 22,550 -> 13,599; max province unchanged at 1,383 tiles; four new 767-1,077-tile provinces held by villages and towns."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: world_determinism twice, save_roundtrip, centre_census, history_sim_harness, world_cursor_equivalence on main"
-     ],
-     "requirement": "Deterministic on main; only the known failures.",
-     "notes": "",
-     "result_metric": "Main 9ec287f0: world_determinism ALL PASS twice (DB355D6BBD1156C0 / E6F431B1FEBA8085 / off C31DDE727D998BE7); save_roundtrip OK; province_partition_harness ALL PASS; world_cursor_equivalence ALL PASS; history_sim only R3a2/R3a3; centre_census FAIL only C13 (river on 12/37/38, slope on 46) -- owned by BL-1156 (NR-962 B)."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "review: code-reviewer agent (cold)"
-     ],
-     "requirement": "A cold review, including the re-scoped river rows C2a/C2b and the prehistory-off digest move.",
-     "notes": "",
-     "result_metric": "Review 2026-09-27: source correct and deterministic; the nation lock intact; the prehistory-off move expected (the lock was live there). HIGH: the re-scoped river row (C2a, per body) hides a real weakening (home-body river:plain 1.61 -> 1.23; 3 of 16 shipped seeds at or below plain) and runs only on a non-shipped world -> NR-962 raised; fix round: assert across the 16 shipped seeds, a river-cost-0 mutation. Also: the firm cap re-read after BL-1150 (provinces -40%); BL-1145 sequenced after it. Fix round 67118846: C13 per body on the 16 shipped seeds; river-cost-0 mutation red on 7 of 16 shipped (the harness world still passes)."
-    }
-   ]
+   "resolved": "2026-10-04",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "scale-credit-from-works",
@@ -7642,43 +6510,11 @@
    "difficulty": 3,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1149 - sprint 48 (Ben, the density calls form, 2026-09-27)",
    "batch": "sprint-48",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: history_sim_harness BL1149a-f, works_roster_harness R7, centre_census C14"
-     ],
-     "requirement": "Scale credit counts min(urban heads, heads the region's built works employ); every works row carries employs, validated by the loader.",
-     "notes": "",
-     "result_metric": "Lane ec5f2308 (on the BL-1137 branch): rho(points, urban heads) 0.846 -> 0.568, rho(points, employed) 0.480 -> 0.685, points per world 107.7M -> 57.5M; employed 6% of urban heads; pre-1660 identical."
-    },
-    {
-     "id": "R2",
-     "status": "pending",
-     "verification": [
-      "review: code-reviewer agent (cold)"
-     ],
-     "requirement": "A cold review.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R3",
-     "status": "pending",
-     "verification": [
-      "decision: the stream rate rung and the treasury spread"
-     ],
-     "requirement": "Ben picks the rate from the 6/9/12/18 ladder; the branch merges at it.",
-     "notes": "",
-     "result_metric": ""
-    }
-   ]
+   "resolved": "2026-10-04",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "firm-cap-scales-with-centre",
@@ -7686,53 +6522,11 @@
    "difficulty": 2,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1146 - sprint 48 (Ben, NR-960 B, 2026-09-27)",
    "batch": "sprint-48",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: charter_refusal_probe (rule pin 2/4/6/8/10, the town case), stockpile_budget_check --firm-census on 16 seeds"
-     ],
-     "requirement": "Both caps read two firms per rung of the province's centre.",
-     "notes": "Measured on main without BL-1150; provinces fall ~40% with it, so the firm census is re-read after BL-1150 merges (BL-1150 cold review, 2026-09-27).",
-     "result_metric": "Lane c6670be9: province_cap refused 6.0% -> 3.1% of the budget; budget firms 1,911 -> 1,914 of 1,920; the most in one province 2 -> 6 (a city); markets unchanged; the winner keeps its candidate on 5 of 16. Metropolis and megacity rungs unexercised on main (no such provinces before BL-1137)."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: spawn_solvency default (12 seeds)"
-     ],
-     "requirement": "The seat and the field stay solvent and acting.",
-     "notes": "",
-     "result_metric": "R1-R3 pass; R4 \"the field still fields a standing force\" FAILS: rival units 1 -> 0 (seed 1's last unit). Not relaxed; the thinning predates this item (baseline ~17 a seed; 3 on 29b87817) -- filed as BL-1154 (rivals field no force). On main after the merge spawn_solvency ALL PASS."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "review: code-reviewer agent (cold)"
-     ],
-     "requirement": "A cold review.",
-     "notes": "",
-     "result_metric": "Review 2026-09-27: the budget-world cap correct (no tile holds two centres; the reason path consistent). HIGH: Pass 6 (the no-budget legacy path) was changed outside NR-960 -- the main session's own brief extended it; seed 28's legacy pin moved -> reverted to a flat 2 in the fix round. Also: the town row passes by construction (cfg.c = 3 fix), the anchor rule in three copies (one helper), stale comments. R4's cause traced -> NR-963. Fix round 97cb0cce: Pass 6 flat 2, legacy byte-identical, one helper province_anchors."
-    },
-    {
-     "id": "R4",
-     "status": "complete",
-     "verification": [
-      "headless: world_determinism twice, landscape_search_harness, legacy digests on main"
-     ],
-     "requirement": "Gated on main.",
-     "notes": "",
-     "result_metric": "Main 6a/after the BL-1146 + BL-1153 merges: world_determinism ALL PASS twice (E005A311CEE6F037 / 1B6CF0A1CD1B6678 / C31DDE727D998BE7); save_roundtrip OK; sea_lane_stamp_harness, charter_refusal_probe, landscape_search_harness, spawn_solvency, world_cursor_equivalence ALL PASS; history_sim only R3a2/R3a3."
-    }
-   ]
+   "resolved": "2026-10-04",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "lane-port-at-coastal-seat",
@@ -7740,43 +6534,11 @@
    "difficulty": 2,
    "importance": "B",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1153 - sprint 48 (Ben, NR-955 B, 2026-09-27)",
    "batch": "sprint-48",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: sea_lane_stamp_harness R1-R3, W1 re-count, five mutations"
-     ],
-     "requirement": "An inland lane end takes its port at its realm's nearest coastal seat; a coastless realm lays nothing.",
-     "notes": "",
-     "result_metric": "Lane 80381678: laid 327 -> 382 of 446 earned; unlaid 119 -> 64 (58 coastless realms, 6 disconnected water); 61 ends moved; lane tiles 10,657 -> 11,902. The realm read as the polity at the last close (a reading; the nation reading gains 3)."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "review: code-reviewer agent (cold)"
-     ],
-     "requirement": "A cold review, fix round included.",
-     "notes": "",
-     "result_metric": "Review 2026-09-27: the pick correct and deterministic. Defects: same-port legs laid as one-tile lanes and counted; the busier-end direction read from the record end, not the picked seat (braids under currents). Gaps: the realm snapshot unbound, a silent fallback, the column wrap untested. Fix round running. Fix round 18442abe: same-port legs skipped, the busier end by port tile, the snapshot bound, loud fallback, wrap row; laid 377 of 446."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "headless: world_determinism twice, save_roundtrip, world_cursor_equivalence on main"
-     ],
-     "requirement": "Gated on main.",
-     "notes": "",
-     "result_metric": "Main 6a/after the BL-1146 + BL-1153 merges: world_determinism ALL PASS twice (E005A311CEE6F037 / 1B6CF0A1CD1B6678 / C31DDE727D998BE7); save_roundtrip OK; sea_lane_stamp_harness, charter_refusal_probe, landscape_search_harness, spawn_solvency, world_cursor_equivalence ALL PASS; history_sim only R3a2/R3a3."
-    }
-   ]
+   "resolved": "2026-10-04",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "rivers-divide-banks",
@@ -7788,39 +6550,7 @@
    "promoted_from": "backlog.json BL-1156 - sprint 48 (Ben, NR-962 B, 2026-10-01)",
    "batch": "sprint-48",
    "resolved": "2026-10-02",
-   "resolution": "merged 555d164f",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: centre_census C13 on 16 shipped seeds; mutation river cost 0"
-     ],
-     "requirement": "The fill pays to cross a course on land; a river divides its banks.",
-     "notes": "",
-     "result_metric": "b68e1474 + 74b9f923: crossing/plain 1.01 -> 1.52; river row red 9 -> 0 seeds; cost 0 turns it red on the harness world and 13 of 16 shipped; both banks in one province 76.1% -> 51.1% of course tiles (no centre on the far bank); water partition byte-identical to main (C14)."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "review: code-reviewer agent (cold)"
-     ],
-     "requirement": "A cold review, fix round included.",
-     "notes": "",
-     "result_metric": "Land geometry correct and symmetric; the new C2a a real, stricter test; water-domain side effect fixed; the height comment corrected."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "headless: world_determinism twice, save_roundtrip, province_partition_harness, centre_census, history_sim_harness, world_cursor_equivalence on main"
-     ],
-     "requirement": "Gated on main.",
-     "notes": "",
-     "result_metric": "Main 555d164f: world_determinism ALL PASS twice (786D425F7A58A1CB / 08222F6CDC07BFCA / 37B6059AC5803D6B); only R3a2/R3a3 and C13 C2b on seed 46 (pre-existing, BL-1158)."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "rivals-start-armed-again",
@@ -7832,39 +6562,7 @@
    "promoted_from": "backlog.json BL-1154 - sprint 48 (Ben, NR-963 A, 2026-10-01)",
    "batch": "sprint-48",
    "resolved": "2026-10-02",
-   "resolution": "merged cf2dc85c",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: spawn_solvency (12 seeds), rival_military_seeding_harness R0/R0b"
-     ],
-     "requirement": "Every rival opens with a base and a unit; the seat, drawn or picked, opens with none; background firms unarmed.",
-     "notes": "",
-     "result_metric": "ae65e193 + 168afa68: 1,113 rivals armed; 1,553 units hired in the settle (cap 3 holds); rivals solvent 88.5% -> 71.5%; R4 reads hired units; the seat ranking excludes military bases; the seat draw changes."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "review: code-reviewer agent (cold)"
-     ],
-     "requirement": "A cold review, fix round included.",
-     "notes": "",
-     "result_metric": "The pick path armed the seat (fixed: move_seat_force on both paths); R0 rewritten; bases out of the ranking; R4 by construction fixed."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "headless: gates on main"
-     ],
-     "requirement": "Gated on main.",
-     "notes": "",
-     "result_metric": "Main cf2dc85c: world_determinism ALL PASS twice (786D425F7A58A1CB / 08222F6CDC07BFCA / off EB15108A7192A842); spawn_solvency, rival_military_seeding_harness, landscape_search_harness, save_roundtrip, world_cursor_equivalence pass; history_sim only R3a2/R3a3. The legacy arc moves (rivals armed there too, per MILITARY.md): a named re-bless cause."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "fleets-project-power",
@@ -7872,53 +6570,11 @@
    "difficulty": 4,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1152 - sprint 48 (Ben, NR-961, NR-965, 2026-09-27/10-01)",
    "batch": "sprint-48",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: ocean_currents_harness P0-P10, 18 mutations"
-     ],
-     "requirement": "Capacity, mutual-defence projection by distance and current, out-projected crossings never sail, a refused crossing is never a candidate.",
-     "notes": "",
-     "result_metric": "c4b5027e, fe9cb980, e02f564c: the scorer prices the lifted army; embark at a coast that reaches the landing (fail closed); clipped men return to their regions; overflow and cost fixed (span time below the rule-off span)."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "review: code-reviewer agent (cold)"
-     ],
-     "requirement": "A cold review, fix round included.",
-     "notes": "",
-     "result_metric": "No break at 0; the uncapped-army scoring and the uncontested no-leg crossing fixed; rows strengthened."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "decision: Ben, the fleet constants forms"
-     ],
-     "requirement": "Ben sets the constants.",
-     "notes": "",
-     "result_metric": "Exploration age: 20 men a hull, halving 10 sea tiles, 50 hulls per 1,000 naval points (4f2fc181). Industrialisation: rule-off pending its call."
-    },
-    {
-     "id": "R4",
-     "status": "complete",
-     "verification": [
-      "headless: gates on main"
-     ],
-     "requirement": "Gated on main.",
-     "notes": "",
-     "result_metric": "Main 14babd92: world_determinism ALL PASS twice (C32FBDF09F66889A / DE8FDC4F8AB7658E / EB15108A7192A842); save_roundtrip, ocean_currents, sea_lane_stamp, world_cursor_equivalence pass; only R3b/R3d.1 and R3a2/R3a3."
-    }
-   ]
+   "resolved": "2026-10-04",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "highways-on-shipped-worlds",
@@ -7930,39 +6586,7 @@
    "promoted_from": "backlog.json BL-1159 - sprint 48 (2026-10-03)",
    "batch": "sprint-48",
    "resolved": "2026-10-03",
-   "resolution": "merged 205a1afa",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: road_generation_harness R2s0/R2s-a/R2s-b on 16 shipped seeds"
-     ],
-     "requirement": "A Highway is laid where the rule qualifies one on the shipped world.",
-     "notes": "",
-     "result_metric": "Qualification reads the polity crossing (Ben 2026-10-03): 209 qualifying links, all Highway, on 15 of 16 seeds; the tied pre-industrial block keeps its midpoint rank (the Road cliff, accepted); shipped haulage +1.0% / -1.4% by window."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "review: code-reviewer agent (cold)"
-     ],
-     "requirement": "A cold review.",
-     "notes": "",
-     "result_metric": "Correct; R2s-b tied to national Highway links; R2s-a labelled self-consistency; POPULATION.md reworded."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "headless: gates on main"
-     ],
-     "requirement": "Gated on main.",
-     "notes": "",
-     "result_metric": "Main 205a1afa: world_determinism ALL PASS twice (C9160AAFA0B80182 / 608B9CFF2E21DF8D / F7A64F75026B029B); road_generation_harness OK (the Highway row green for the first time this sprint); save_roundtrip, world_cursor_equivalence, spawn_solvency, landscape_search_harness pass; history_sim only R3a2/R3a3."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "province-front-tile-readers",
@@ -7970,53 +6594,11 @@
    "difficulty": 2,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1145 - sprint 48",
    "batch": "sprint-48",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "RA",
-     "status": "complete",
-     "verification": [
-      "headless: centre_census C7 FAIL, C16/C16b; garrison_border_probe; save_roundtrip P6"
-     ],
-     "requirement": "Readers take the anchor; border garrisons face their border; the capital garrison stands on the capital province's anchor; the battle card reads the battle's own ground (save v30).",
-     "notes": "",
-     "result_metric": "7d8bd45d + 8f706eec, merged 5e44897d: 0 garrisons off post; the nation-AI threat term within 2% of main (was -37%)."
-    },
-    {
-     "id": "RB",
-     "status": "complete",
-     "verification": [
-      "review: code-reviewer agent (cold)"
-     ],
-     "requirement": "A cold review.",
-     "notes": "",
-     "result_metric": "Border-force loss, the capital seed tile, battle_ground_tile re-derivation, C16 assertions -- fixed."
-    },
-    {
-     "id": "RC",
-     "status": "complete",
-     "verification": [
-      "headless: gates on main"
-     ],
-     "requirement": "Gated on main.",
-     "notes": "",
-     "result_metric": "Main 5e44897d: world_determinism ALL PASS twice; save_roundtrip, centre_census, world_cursor_equivalence, spawn_solvency, garrison_border_probe pass; history_sim only R3a2/R3a3."
-    },
-    {
-     "id": "RD",
-     "status": "pending",
-     "verification": [
-      "visual: live click"
-     ],
-     "requirement": "A marker shows on an army in a large province.",
-     "notes": "",
-     "result_metric": "Owed at the sprint's live walk (play build 22:42 2026-10-02)."
-    }
-   ]
+   "resolved": "2026-10-04",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "culture-ground-profile-reader",
@@ -8028,39 +6610,7 @@
    "promoted_from": "backlog.json BL-1107 - sprint 48",
    "batch": "sprint-48",
    "resolved": "2026-10-03",
-   "resolution": "merged 175ed49e",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: colonisation_harness C18, culture_preference_fixture P0-P6, culture_preference_census (16)"
-     ],
-     "requirement": "Every culture carries a non-empty profile, daughters inherit it, and the preference reads it (lack + amenity lean, ground-only).",
-     "notes": "",
-     "result_metric": "Cultures with a preference 224 -> 389 at 1660; shipped haulage +13.6% / +15.5% by window; Ben set lack 250 / divisor 4 from the ladder."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "review: code-reviewer agent (cold)"
-     ],
-     "requirement": "A cold review, fix round included.",
-     "notes": "",
-     "result_metric": "The sum == 0 lack fixed; reader rows with mutations."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "headless: gates on main"
-     ],
-     "requirement": "Gated on main.",
-     "notes": "",
-     "result_metric": "Main 175ed49e (with BL-1139 part 1): world_determinism, save_roundtrip, province_partition_harness, colonisation_harness, culture_preference_fixture, world_cursor_equivalence, spawn_solvency, centre_census pass; only R3b/R3d.1 and R3a2/R3a3."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "roads-pull-to-markets",
@@ -8072,39 +6622,7 @@
    "promoted_from": "backlog.json BL-1138 - sprint 48",
    "batch": "sprint-48",
    "resolved": "2026-10-03",
-   "resolution": "merged 75c1a4e5",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: road_generation_harness R6a-R6g (16 seeds), market_census I1/I1b"
-     ],
-     "requirement": "Every market centre on its own nation's backbone; a trunk joins neighbouring markets; each tile's tier follows the land it crosses; market centres stand on land.",
-     "notes": "",
-     "result_metric": "20d1f2bd, 6a9e44bd, 841d2deb, a9593d15: markets off the backbone 128 -> 19 at first build; the cost model shared (tile_traversal_cost); phantom links removed; joins on own land; the Road cliff per tile (Ben 2026-10-03)."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "review: code-reviewer agent (cold), two fix rounds"
-     ],
-     "requirement": "Cold reviews.",
-     "notes": "",
-     "result_metric": "Phantom trunk links, foreign joins, the tier, a second cost model, the ladder's roads, rows by construction, the shell port binding, mojibake -- fixed."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "headless: gates on main"
-     ],
-     "requirement": "Gated on main.",
-     "notes": "",
-     "result_metric": "Main 75c1a4e5: world_determinism ALL PASS twice; save_roundtrip, road_generation_harness (AUDIT OK), market_census (0 failures), world_cursor_equivalence, spawn_solvency, landscape_search_harness pass; history_sim only R3a2/R3a3."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   }
  ]
 }

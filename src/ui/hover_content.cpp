@@ -7,6 +7,7 @@
 #include "world/workforce.hpp"
 
 #include <imgui.h>
+#include <vector>
 
 namespace ui {
 
@@ -98,27 +99,31 @@ void hover_structure_plate(entity_id key)
 
 // --- Exemplar 1: tile × resource lens -------------------------------------------
 
-void hover_tile_resource(const tile_component& tile, resource_type res)
+void hover_tile_resource(const tile_component& tile, const std::vector<resource_type>& toggled)
 {
-    const resource_presentation& rp = presentation_of(res);
-
     // Title: composition terrain name.
     hover_terrain_header(tile);
 
-    // Stat line: deposit richness for the selected resource.
-    const float dep = tile.resource_deposit[static_cast<std::size_t>(res)];
-    ImGui::Text("%s deposit: %.2f", rp.name, static_cast<double>(dep));
-
-    // Why-line: interpret richness bands.
-    ImGui::Spacing();
-    if (dep <= 0.0f)
-        ImGui::TextDisabled("No deposit here");
-    else if (dep < 0.25f)
-        ImGui::TextDisabled("Trace deposit — low yield");
-    else if (dep < 0.75f)
-        ImGui::TextDisabled("Moderate deposit");
-    else
-        ImGui::TextDisabled("Rich deposit — high yield");
+    // One stat line per toggled resource this tile carries (Ben, 2026-10-04: the lens
+    // shows a toggled set, and a split tile carries several), with a richness band.
+    bool any = false;
+    for (const resource_type res : toggled)
+    {
+        const float dep = tile.resource_deposit[static_cast<std::size_t>(res)];
+        if (dep <= 0.0f)
+            continue;
+        any = true;
+        const char* band = dep < 0.25f ? "trace" : dep < 0.75f ? "moderate" : "rich";
+        ImGui::Text("%s deposit: %.2f", presentation_of(res).name, static_cast<double>(dep));
+        ImGui::SameLine();
+        ImGui::TextDisabled("(%s)", band);
+    }
+    if (!any)
+    {
+        ImGui::Spacing();
+        ImGui::TextDisabled(toggled.empty() ? "No resources toggled"
+                                            : "None of the toggled resources here");
+    }
 }
 
 // Fallback tile content (plain canvas or non-resource lens). This is the variant the
@@ -417,7 +422,7 @@ void draw_hover_content(const world& w, const ui_state& ui, entity_id eid)
     {
         const tile_component& tile = tile_it->second;
         if (ui.overlay == overlay_mode::resource)
-            hover_tile_resource(tile, ui.lens_resource);
+            hover_tile_resource(tile, ui.lens_resources);
         else if (ui.overlay == overlay_mode::population)
             hover_tile_population(w, tile);
         else

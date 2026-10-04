@@ -613,6 +613,18 @@ struct history_lapse
     /// leg's traffic reached the tier).
     std::vector<lapse_lane_seg> lane_segs;
 
+    /// The sea lanes the rounds before this one opened -- the lane sibling of
+    /// `road_carry` (Ben, 2026-10-04: sea lanes are not carried from
+    /// Exploration to Industrialisation). A resumed span seeds its legs from
+    /// the record it inherits and notes `sea_lane_opened` only for a CROSSING
+    /// it makes, so a record read alone opened with none of the earlier lanes.
+    /// The round before hands its lanes over at the seam
+    /// (`lapse_lanes_at_close`): the pairs and the year each opened, a
+    /// calendar year that means the same on every round. The bake re-derives
+    /// the anchors and the sea path against this round's own ground. Empty
+    /// when nothing came before.
+    std::vector<lapse_lane_seg> lane_carry;
+
     /// The kin arrows (BL-1092), baked from the change list and the
     /// `culture_split` parents once at record time -- see `lapse_kin_seg`.
     /// Empty on the polity rounds, whose owners are realms and whose record
@@ -1019,6 +1031,13 @@ std::vector<history_lapse::civ_mark> lapse_civ_marks_at_close(const history_laps
 /// moved EARLIER, so a carried Road never drops back to Track.
 std::vector<lapse_road_seg> lapse_roads_at_close(const history_lapse& h);
 
+/// The sea lanes standing at a record's close -- its own `lane_carry` plus
+/// every `sea_lane_opened` it recorded -- for the next round's `lane_carry`.
+/// The pairs and their opening years only (the successor's bake draws the sea
+/// path). Deduplicated by (region_a, region_b); a carried lane keeps the year
+/// it first opened. The lane sibling of `lapse_roads_at_close`.
+std::vector<lapse_lane_seg> lapse_lanes_at_close(const history_lapse& h);
+
 /// BL-1134: is @p s drawn at @p year -- the road pass's own test, from the
 /// year the corridor first reached Track. One predicate for the pass and for
 /// `lapse_roads_drawn_at`, so the verify read counts what the map draws.
@@ -1027,6 +1046,18 @@ inline bool lapse_road_drawn(const lapse_road_seg& s, int year) { return year >=
 /// BL-1134: the (region_a, region_b) pairs the road pass draws at @p year, in
 /// bake order. Empty before the record is derived. For the verify API.
 std::vector<std::pair<uint16_t, uint16_t>> lapse_roads_drawn_at(const history_lapse& h, int year);
+
+/// Is lane @p s drawn at @p year -- the lane pass's own test: open by then,
+/// and a sea path to stroke (a lane whose ports no water joins draws nothing).
+inline bool lapse_lane_drawn(const lapse_lane_seg& s, int year)
+{
+    return year >= s.year_open && s.path_c.size() >= 2;
+}
+
+/// The (region_a, region_b) pairs the lane pass draws at @p year, in
+/// `lane_segs` order -- the lane sibling of `lapse_roads_drawn_at`, so the
+/// verify read counts what the map draws. Empty until the record is derived.
+std::vector<std::pair<uint16_t, uint16_t>> lapse_lanes_drawn_at(const history_lapse& h, int year);
 
 /// The colour @p owner is drawn in on @p h — a culture's lineage hue on the
 /// Culture round, a polity's identity slot elsewhere. Public so one round can

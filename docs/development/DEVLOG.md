@@ -10,6 +10,41 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-10-04 — Sprint 48 closes: three branches ruled, reviewed and merged; the overseas reach designed
+
+**Runtime:** 2026-10-03 evening to 2026-10-04; modes Delivery Full (the three held branches), then
+Design (BL-1170), then the close.
+
+### Merged, each cold-reviewed and gated on main
+- **BL-1168 (charter by reach)**, option (a): 44 charters. Review: the works notes still priced
+  world-wide (fixed, far charters dated by a note 153 -> 281). A centre on an islet off its region
+  priced itself a seat by geometry; Ben ruled the region's anchor prices (islet commit reverted).
+- **BL-1171 (far trade)**. Ben ruled: either side's fleet binds; meeting by sea is gated too; a
+  bridged strait still parts two landmasses; conquest inherits contacts ungated. Seed 28's row B
+  failure was trunk reuse ignoring direction, not the branch: trunks are now shared only with the
+  current, and row B passes 16/16. Review caught a same-landmass want misread and a road rule dead
+  without currents (both fixed, both rowed).
+- **BL-1172/1173 (fair-price army, working capital)**, six review rounds. Each review found the
+  next hole: a below-ceiling bill that minted money; a refusal that starved units beside full
+  shelves; processors bidding the price to 10x and locking themselves out; then "the shelf is
+  supply" flooring every price (1/1/11 firms). Ben ruled the posted price, the ceiling on every
+  draw, no bid over it, and shelf supply k = 0 until shelf spoilage (BL-1179). The one-tick-in-four
+  pulse at k = 0 is a stated, bounded cost (U13/M5). Survivors at tick 462: 32/48/43 against main's
+  31/26/19.
+- **BL-1169 K = 1000** on a ladder read after the merges: far rival 12 -> 14 of 16, industry -29%.
+
+### Designed
+- **BL-1170 (heartlands reach overseas)**, measured first: 119 overseas regions at 1960, all within
+  8 water tiles, 0.36% of industry. Ben: push = crowding x navy (land crowding before industry,
+  capital after); voyages; plant, expedition, far subjection and a chartered company; settlers flow
+  (needs BL-1148). Sprint 49.
+
+### Learned
+- A cold review per round paid every time on the economy seam: four consecutive rounds of BL-1172
+  each passed their own harnesses and each held a real defect a multi-tick view exposed. A one-tick
+  row cannot see a price that its own buyer moves.
+- A sweep that ranks every k above 0 below k = 0 is a finding about the market's glut, not about k.
+
 ## 2026-09-25 (evening) — Sprint 48 cut: the world moves forward
 
 **Runtime:** in progress (from ~17:30); modes Design (the cut form), then Delivery Full (wave 1:

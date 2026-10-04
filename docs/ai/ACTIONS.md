@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*156 entries — 28 gameplay · 25 canvas · 15 lens · 53 ledger · 35 chrome.*
+*157 entries — 28 gameplay · 25 canvas · 16 lens · 53 ledger · 35 chrome.*
 
 ---
 
@@ -959,21 +959,21 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Who owns what: where do rival corporations operate, how does my footprint sit against theirs, and where do their HQ reach rings suggest they will grow? Use it to find uncontested ground to expand into or to size up a rival's holdings before competing.
 
-### `lens.good_selector` — The lens chrome region — the minimap's header, top right (BL-602). One region hosts the selector and whichever key the active lens draws; the selector sits directly above that key while the Resource, Market, or Scarcity lens is active. One shared combo bound to a single shared lens_resource value, not three separate controls. It is NOT on the minimap's lens bar, which carries glyphs only.
+### `lens.good_selector` — The lens chrome region — the minimap's header, top right (BL-602). One region hosts the selector and whichever key the active lens draws; the selector sits directly above that key while the Market or Scarcity lens is active. One shared combo bound to a single shared lens_resource value, not two separate controls. The Resource lens does NOT use it: it has its own toggled checklist (lens.resource_toggle). It is NOT on the minimap's lens bar, which carries glyphs only.
 
 **Press.** Open the combo in the lens legend and pick a good from the list.
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `good` | `resource name` | The good the active lens interrogates: whose deposits fill (Resource), which price line highlights in the Circumplanetary strip (Market), whose shortfall tints the catchments (Scarcity). |
+| `good` | `resource name` | The good the active lens interrogates: which price line highlights in the Circumplanetary strip (Market), whose shortfall tints the catchments (Scarcity). |
 
 **Valid when:**
-- One of the Resource, Market, or Scarcity lenses must be active — the combo only exists inside those lenses' chrome.
+- The Market or Scarcity lens must be active — the combo only exists inside those lenses' chrome.
 - This is a cross-cutting selector, exempt from the toggle rule: it switches a target rather than expressing an active state, so re-picking the current good is a no-op, not a clear.
 
-**Expected output.** The active lens's surface re-skins immediately for the newly selected good — new deposit fill (Resource), new highlighted price row (Market), or new shortfall blocks (Scarcity) — and the legend swatch/name update. The lens itself stays active. Because the value is shared, switching lenses afterwards carries the same good across all three. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour.
+**Expected output.** The active lens's surface re-skins immediately for the newly selected good — new highlighted price row (Market) or new shortfall blocks (Scarcity) — and the legend swatch/name update. The lens itself stays active. Because the value is shared, switching between the two lenses carries the same good across.
 
-**Reason to select.** Change the question's subject without changing the question: compare goods on the same surface — where is copper versus iron, which good is this market pricing high, what is each market short of — by flipping the good while the lens holds.
+**Reason to select.** Change the question's subject without changing the question: which good is this market pricing high, what is each market short of — by flipping the good while the lens holds.
 
 ### `lens.industry` — Off the lens bar (trimmed in BL-093 the day it shipped); the factory-silhouette glyph exists but is not on the strip
 
@@ -1050,15 +1050,33 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `resource` | `resource name (optional)` | The good whose deposits the lens fills. Set via the shared good selector in the on-canvas legend (lens.good_selector), not on this press; the lens opens showing the currently-set shared lens_resource. |
+| `resources` | `set of resource names (optional)` | The extractable goods whose deposits the lens draws — up to six at once. Set via the lens's own checklist in the on-canvas legend (lens.resource_toggle), not on this press; the lens opens showing the current toggled set. |
 
 **Valid when:**
 - Always pressable; Planetary-only. No simulation dependency — deposit data exists from tile generation, so it works from turn one.
 - Re-clicking while active clears the lens (see lens.clear).
 
-**Expected output.** Every tile carrying any deposit of the selected good (deposit > 0) fills flat and uniform with that resource's identity colour at fixed 0.8 opacity — the shape of the contiguous deposit, not a magnitude gradient. Tiles without the good keep their terrain hue. The key — in the lens chrome region, the minimap's header at top right — shows the selected resource's swatch + name, the note 'filled = deposit present', and hosts the shared good selector. Deposit magnitude lives in tile detail, not this surface. Pointer clicks are NOT lens-dependent: selection resolves the same way under every lens — marker hit-test (building outranks market centre), else the tile under the pointer, with a built tile resolving to its building. The lens changes what is drawn, never what a click selects. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour. HOVER AND SELECTION (BL-659, 2026-08-28): hovering any tile carrying the selected resource lights the whole DEPOSIT — every tile carrying it on this body, which is exactly what the lens fills, since the selection grain follows the drawing grain. Clicking selects the deposit and opens the Market Ledger on its Prices view, aimed at that resource. The deposit is not an entity: it travels in ui_state::selected_deposit_resource, not selected_entity. National borders are NOT drawn while any lens is active (2026-08-28) — neither the inward band nor the coloured frontier rule, and the border's click corridor goes with them. The plain canvas is the only place the national read appears.
+**Expected output.** Ground without a toggled good takes a white wash that keeps a ghost of its terrain (off-white on land, pale blue-grey on water so the coastline survives), and the intra-body activity fog is lifted (a deposit is survey knowledge); unsurveyed ground stays masked. Every surveyed tile carrying one toggled good fills solid with that good's identity colour, and each deposit blob is ringed with a dark outline on sides facing ground with no toggled good — the shape of the deposit, not a magnitude gradient. A tile carrying two or more toggled goods splits into equal pie wedges from the hex centre, one per good in toggle order (below the coarse level of detail it shows the first). The key — in the lens chrome region, the minimap's header at top right — is a search box over a checklist of the extractable goods present on this body, with a '(n/6)' count; a checked row shows its swatch. Deposit magnitude lives in tile detail and the hover card, which lists each toggled good on the tile with its richness. HOVER AND SELECTION (BL-659; split rule Ben 2026-10-04): the pointer resolves to the wedge under it, and hovering lights every tile carrying that good on this body. Clicking selects that deposit and opens the Market Ledger on its Prices view, aimed at that resource. The deposit is not an entity: it travels in ui_state::selected_deposit_resource, not selected_entity. National borders are NOT drawn while any lens is active (2026-08-28) — neither the inward band nor the coloured frontier rule, and the border's click corridor goes with them. The plain canvas is the only place the national read appears.
 
-**Reason to select.** Where can a chosen good be extracted? The pre-economy siting lens: find the deposit blobs of iron, copper, etc. before placing extraction. Answers 'where is the iron' by shape; how rich each tile is comes from clicking it.
+**Reason to select.** Where can chosen goods be extracted, and where do they coincide? The pre-economy siting lens: toggle iron and coal and read where they share ground before placing extraction. Answers 'where is the iron' by shape; how rich each tile is comes from hovering or clicking it.
+
+### `lens.resource_toggle` — The Resource lens's key in the lens chrome region — the minimap's header, top right: a search box over a checklist of the extractable goods present on the active body.
+
+**Press.** Type in the search box to filter the checklist by name; tick or untick a row's checkbox to add or remove that good.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `good` | `resource name (extractable, present on this body)` | The good to toggle in or out of the Resource lens's drawn set. |
+
+**Valid when:**
+- The Resource lens must be active — the checklist only exists inside its chrome.
+- Only extractable goods with a deposit somewhere on the active body are listed; a manufactured good is never on a body's surface and is not offered.
+- At most six goods may be toggled at once (one per hex edge). When six are on, the unchecked rows are greyed and cannot be ticked.
+- A toggle under the toggle rule: ticking a checked row unticks it.
+
+**Expected output.** The map re-draws for the new set at once: the good's deposits gain or lose their colour, and tiles shared with other toggled goods re-split into equal pie wedges. The header count '(n/6)' updates.
+
+**Reason to select.** Compare or overlay deposits: see where two inputs to one recipe sit together, or narrow the map back to one good, without leaving the lens.
 
 ### `lens.scarcity` — Off the lens bar; the hollow downward-triangle glyph exists but is not on the strip. Reached by the keyboard lens-cycle only — an off-strip status that is a width call, never a data gate.
 
