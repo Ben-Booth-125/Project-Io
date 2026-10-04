@@ -866,7 +866,9 @@
    "glyph": "✓",
    "sprint": 49,
    "written": "2026-10-03",
-   "requires": [],
+   "requires": [
+    "BL-1193"
+   ],
    "blocked_on": null,
    "parked": false,
    "id": "BL-1163",
@@ -881,7 +883,7 @@
     "src/world/economy_system.cpp",
     "tools/verify/centre_abandonment_census.cpp"
    ],
-   "design": "BASKET SETTLED (2026-10-04, on Ben's delegation; NR-967): the growth basket IS the household bid basket (POPULATION.md), met ratio = the share of the centre's own population bid its market filled, judged per market; population_growth.demand_basket retires; threshold 0.50. Ready to build in sprint 49 wave 1 (economy lane).\n\nDIAGNOSED (2026-10-03, ba86ce09 centre_decline_trace): the body-wide growth gate (habitability >= 0.5 AND basket met_ratio >= 0.50, economy_system.cpp ~1757-1920) fails at tick ~80-100 and every centre sheds 4% / 10 ticks together. The basket (economy.lua population_growth) is a stale industrial basket (steel ~1% met, water ~10%, food ~22%) over ALL body demand; the gate passed only on oversupplied ore/petroleum/produce, and fell as background firms exited (196 -> 22 corps). Older than this sprint: at v0.1.26 it failed from tick 12. RULED (Ben, 2026-10-03): A+B -- the basket is household goods only (food, water, consumer goods), read against people's own demand, judged per market (POPULATION.md SETTLED). A short design pass settles the basket's contents first. Sprint 49. Unblocks BL-1139's abandonment.\n\nFOUND 2026-10-03 (BL-1139 lane, centre_abandonment_census, 16 seeds, shipped start + 12 settle + 400 play ticks): with abandonment OFF, every centre on seed 0 (786) and seed 10 (879) is declining by tick 412 and villages fall to ~1k heads; on seed 0 none declines at tick 132, so the decline sets in between ticks 132 and 412. With abandonment ON all 4,544 scale-1 centres are deleted. Ben (2026-10-03): BL-1139's recorded ids merged; the abandonment itself (2f719556 on worktree-agent-ae9978d9141f0dc73) is HELD until this is diagnosed and fixed. WORK: trace the growth pass's decline inputs per centre over ticks 100-450 (labour demand, food, migration, habitability, wages, the play-side ceiling vs generation's carried capacity -- BL-1137's capacity_carried is generation scratch only and its note warns play-side demography must read it before clamping); name the cause; report for Ben before fixing."
+   "design": "SUPERSEDED IN BUILD by BL-1196 (2026-10-05), which carries this branch and replaces its pro-rata fill with what households received. Merge the two together, held as BL-1196 says.\n\nBUILT AND HELD UNMERGED (2026-10-04, 26cb6cbe on worktree-agent-a7a4ad16f983163e4; population_mvp ALL PASS 16): the per-market household gate reads the world correctly and the world fails it. centre_decline_trace, 400 play ticks: before, every centre declines from ~t180-260 (seed 0 heads 64.1M -> 76.7M -> 44.7M); after, every centre declines from the settle (seed 0 61.8M -> 32.4M -> 14.9M; seeds 10/41/43 alike), median met 0.10-0.11 at t400, never more than 70 centres at >= 0.50. Cause: water, clean water and medical supplies are supplied 0 on every seed (one exception, gone by t400), consumer goods fall to ~0 by t~100, food rations run 25-45% of demand. Those three zero goods carry 0.80 of the basket's 1.85 weight, so the best reachable ratio is 0.57 even with food and consumer goods met. The lane also defined the household fill as PRO-RATA (households get min(1, supply/demand) like every bidder; no new saved field) - a decision taken, alternatives being households first or last, each needing a saved per-market household record. HELD pending NR-967.\n\nBASKET SETTLED (2026-10-04, on Ben's delegation; NR-967): the growth basket IS the household bid basket (POPULATION.md), met ratio = the share of the centre's own population bid its market filled, judged per market; population_growth.demand_basket retires; threshold 0.50. Ready to build in sprint 49 wave 1 (economy lane).\n\nDIAGNOSED (2026-10-03, ba86ce09 centre_decline_trace): the body-wide growth gate (habitability >= 0.5 AND basket met_ratio >= 0.50, economy_system.cpp ~1757-1920) fails at tick ~80-100 and every centre sheds 4% / 10 ticks together. The basket (economy.lua population_growth) is a stale industrial basket (steel ~1% met, water ~10%, food ~22%) over ALL body demand; the gate passed only on oversupplied ore/petroleum/produce, and fell as background firms exited (196 -> 22 corps). Older than this sprint: at v0.1.26 it failed from tick 12. RULED (Ben, 2026-10-03): A+B -- the basket is household goods only (food, water, consumer goods), read against people's own demand, judged per market (POPULATION.md SETTLED). A short design pass settles the basket's contents first. Sprint 49. Unblocks BL-1139's abandonment.\n\nFOUND 2026-10-03 (BL-1139 lane, centre_abandonment_census, 16 seeds, shipped start + 12 settle + 400 play ticks): with abandonment OFF, every centre on seed 0 (786) and seed 10 (879) is declining by tick 412 and villages fall to ~1k heads; on seed 0 none declines at tick 132, so the decline sets in between ticks 132 and 412. With abandonment ON all 4,544 scale-1 centres are deleted. Ben (2026-10-03): BL-1139's recorded ids merged; the abandonment itself (2f719556 on worktree-agent-ae9978d9141f0dc73) is HELD until this is diagnosed and fixed. WORK: trace the growth pass's decline inputs per centre over ticks 100-450 (labour demand, food, migration, habitability, wages, the play-side ceiling vs generation's carried capacity -- BL-1137's capacity_carried is generation scratch only and its note warns play-side demography must read it before clamping); name the cause; report for Ben before fixing."
   },
   {
    "status": "designed",
@@ -902,7 +904,7 @@
    "files": [
     "tools/verify/rebless_shape_probe.cpp"
    ],
-   "design": "Ben authorised the sprint 48 re-bless (2026-10-03, merged 179615b8) with three untraced movements filed here: (1) world population 12.19B -> 6.27B (likeliest BL-1130/1132, the doubled war); (2) shipped haulage (--far-trade) 16,327 / 14,729 -> 14,434 / 11,917 per year (-11.6% / -19.1%), rising on 8 seeds and falling on 8, though every item that read it alone reported a rise or no change (likeliest BL-1125's folds); (3) nation units 414,404 -> 167,110. WORK: bisect each across the sprint's merge commits with rebless_shape_probe (v0.1.26 e50ab81c -> a899bb2a), name the cause, and report for Ben whether each is wanted. ADDED 2026-10-04 (sprint 48 second re-bless, blessed by Ben without a trace): seed 0's Exploration fingerprint moved treasury_median 8664 -> 162 (-98%), expl_battles 993 -> 899, flows 77 -> 72, living polities 75 -> 70; seed 9 moved the other way (battles 836 -> 1094, treasury_median 153 -> 233). The re-bless attributes every fingerprint move to BL-1171 (far trade), the only step that moves Exploration fields, but the mechanism is not traced. Also untraced there: road tiers flipping whole national networks Road/Highway on seeds 28, 31, 37 (Highway gate percentile tie, inferred); BL-1168's -35.6% haulage (a third fewer corporations, inferred). See docs/development/drafts/sprint-48-rebless-2.md."
+   "design": "ADDED (2026-10-04, the BL-1186 routing lane): haulage_measure.cpp (~line 1029) carries its own copy of the old per-leg pricing, so its haul table and the MARKETS.md price-ceiling derivation it feeds no longer match the router after BL-1186. Re-point it at price_market_export_leg rather than a copy.\n\nBen authorised the sprint 48 re-bless (2026-10-03, merged 179615b8) with three untraced movements filed here: (1) world population 12.19B -> 6.27B (likeliest BL-1130/1132, the doubled war); (2) shipped haulage (--far-trade) 16,327 / 14,729 -> 14,434 / 11,917 per year (-11.6% / -19.1%), rising on 8 seeds and falling on 8, though every item that read it alone reported a rise or no change (likeliest BL-1125's folds); (3) nation units 414,404 -> 167,110. WORK: bisect each across the sprint's merge commits with rebless_shape_probe (v0.1.26 e50ab81c -> a899bb2a), name the cause, and report for Ben whether each is wanted. ADDED 2026-10-04 (sprint 48 second re-bless, blessed by Ben without a trace): seed 0's Exploration fingerprint moved treasury_median 8664 -> 162 (-98%), expl_battles 993 -> 899, flows 77 -> 72, living polities 75 -> 70; seed 9 moved the other way (battles 836 -> 1094, treasury_median 153 -> 233). The re-bless attributes every fingerprint move to BL-1171 (far trade), the only step that moves Exploration fields, but the mechanism is not traced. Also untraced there: road tiers flipping whole national networks Road/Highway on seeds 28, 31, 37 (Highway gate percentile tie, inferred); BL-1168's -35.6% haulage (a third fewer corporations, inferred). See docs/development/drafts/sprint-48-rebless-2.md."
   },
   {
    "status": "designed",
@@ -1225,7 +1227,7 @@
     "src/world/market_clearing.cpp",
     "src/world/logistics.cpp"
    ],
-   "design": "DIAGNOSED (2026-10-04, 3a353f82; docs/development/drafts/sprint-49-shipment-diagnosis.md): two independent blocks. (1) THE PRICE CYCLE: with the shelf not counted as supply (shelf_supply_ticks = 0), a bid against nothing listed aims at 10x, the price moves halfway, and BL-1172 silences any draw above the 2x ceiling - so every market on a landmass runs 1.6x -> 5.8x -> 3.4x -> 2.2x in step and a consuming market bids one tick in four; from tick 10, 98-100% of price-gate refusals face zero demand. Same defect as BL-1183. (2) UNROUTABLE: every case is a cheapest path over water without a Port on BOTH market centre tiles (supply_system.cpp:476-489), refused whole; SUPPLY.md sec Logistical cost already says a water route is land -> port -> sea -> port -> land legs and retires the route-wide crosses_ocean bit, so the code is behind its doc. Also: the passive-LP pool refuses a cargo whole above 20 u per anchor (supply_system.cpp:721-730).\n\nBUILD (taken 2026-10-04, doc-mandated, no ruling needed): B1 route a water crossing as legs through ports as SUPPLY.md says; B2 a pair with no ported sea leg falls back to its land-only path where one exists; E1 a cargo over the LP pool sends what the pool allows instead of nothing. Re-measure haulage_measure against its baseline. THE PRICE CYCLE IS NR-968 (Ben's call), built after his verdict.\n\nSprint 49 wave 1, diagnosis before any constant moves. At handoff on seed 0, 10,329 steel sits on 9 markets' shelves against local demand of 12, and the next dispatch would send 0: 135 market pairs unroutable, 52 refused by the price gate, 0 market exports, 0 corp dispatches. By tick 20 steel is 6 supply against 5,187 demand and coal (149 supply, 6 demand) sits one market away from the mills that want it. Name, per pair, why it is unroutable (reach, the passive-LP cap, the road tree, the bridge cap) and why the gate refuses. Levers on record: the export price gate, dispatch_margin (0.05), the passive-LP cap. Read beside BL-1183 (ceiling stalls construction) and BL-1165's haulage reading, which overlap. A world-mover: re-bless at the wave close.\n\nREADING (2026-10-04, main a56e4ce3, 16 curated seeds, shipped 1960 start, 12 settle + 400 play ticks; spawn_solvency, firm_attrition_trace, centre_decline_trace, market_census, recipe_margin, and steel_chain_probe on seeds 0/43/37): recipe_margin is green in both bands. Day 1 looks solvent (99-100% of firms, +94..+211/qtr each) but the settle is opening stock being auctioned: field income 54-74k/tick at the settle close, 10-19k by tick 50 on every seed. At handoff 119-141 of ~225 processors are input-starved (copper refining, alloys, machinery, electronics, spacecraft never run); 10k steel sits on shelves against demand of 12 while 0 shipments go (135 pairs unroutable, 52 refused by the price gate); by tick 20 steel is 6 supply vs 5,187 demand with coal unbought one market away. Processors grow 225 -> 390 while those running fall to 44-67. 1,457 of 2,074 firms are insolvent by tick 400 (corps 121-149 -> 19-77). Insolvent firms per tick: income 75, maintenance+wages 46, upkeep 19; survivors 229 / 63 / 21. The seat is handed a steel mill (recipe 0) that idles on every seed; seat median operating net ~+66/qtr, four seeds under +7."
+   "design": "ROUTING BUILT (2026-10-04, baede06c on worktree-agent-a4366d1a52a945e1d; under cold review): B1 port-to-port legs, B2 land fallback, E1 auto-dispatch trims to the LP pool (commanded legs still refused whole - NR-969). Steel/coal unroutable pairs fall 6-17%; market exports 40/54/80 -> 69/69/129 and corp dispatches 494/606/1021 -> 575/781/1010 (seeds 0/43/37, ticks 0-20); the rest of the unroutable is port geography (one end reaches no port overland; seed 37 has under 2 active ports). D_settle and D_seat pins move on seeds 0/43/37; D_search and D_land hold. Follow-ons: BL-1194 (sea cheaper than highway), BL-1195 (convoy lane follows legs), BL-1165 (haulage_measure's stale pricing copy).\n\nDIAGNOSED (2026-10-04, 3a353f82; docs/development/drafts/sprint-49-shipment-diagnosis.md): two independent blocks. (1) THE PRICE CYCLE: with the shelf not counted as supply (shelf_supply_ticks = 0), a bid against nothing listed aims at 10x, the price moves halfway, and BL-1172 silences any draw above the 2x ceiling - so every market on a landmass runs 1.6x -> 5.8x -> 3.4x -> 2.2x in step and a consuming market bids one tick in four; from tick 10, 98-100% of price-gate refusals face zero demand. Same defect as BL-1183. (2) UNROUTABLE: every case is a cheapest path over water without a Port on BOTH market centre tiles (supply_system.cpp:476-489), refused whole; SUPPLY.md sec Logistical cost already says a water route is land -> port -> sea -> port -> land legs and retires the route-wide crosses_ocean bit, so the code is behind its doc. Also: the passive-LP pool refuses a cargo whole above 20 u per anchor (supply_system.cpp:721-730).\n\nBUILD (taken 2026-10-04, doc-mandated, no ruling needed): B1 route a water crossing as legs through ports as SUPPLY.md says; B2 a pair with no ported sea leg falls back to its land-only path where one exists; E1 a cargo over the LP pool sends what the pool allows instead of nothing. Re-measure haulage_measure against its baseline. THE PRICE CYCLE IS NR-968 (Ben's call), built after his verdict.\n\nSprint 49 wave 1, diagnosis before any constant moves. At handoff on seed 0, 10,329 steel sits on 9 markets' shelves against local demand of 12, and the next dispatch would send 0: 135 market pairs unroutable, 52 refused by the price gate, 0 market exports, 0 corp dispatches. By tick 20 steel is 6 supply against 5,187 demand and coal (149 supply, 6 demand) sits one market away from the mills that want it. Name, per pair, why it is unroutable (reach, the passive-LP cap, the road tree, the bridge cap) and why the gate refuses. Levers on record: the export price gate, dispatch_margin (0.05), the passive-LP cap. Read beside BL-1183 (ceiling stalls construction) and BL-1165's haulage reading, which overlap. A world-mover: re-bless at the wave close.\n\nREADING (2026-10-04, main a56e4ce3, 16 curated seeds, shipped 1960 start, 12 settle + 400 play ticks; spawn_solvency, firm_attrition_trace, centre_decline_trace, market_census, recipe_margin, and steel_chain_probe on seeds 0/43/37): recipe_margin is green in both bands. Day 1 looks solvent (99-100% of firms, +94..+211/qtr each) but the settle is opening stock being auctioned: field income 54-74k/tick at the settle close, 10-19k by tick 50 on every seed. At handoff 119-141 of ~225 processors are input-starved (copper refining, alloys, machinery, electronics, spacecraft never run); 10k steel sits on shelves against demand of 12 while 0 shipments go (135 pairs unroutable, 52 refused by the price gate); by tick 20 steel is 6 supply vs 5,187 demand with coal unbought one market away. Processors grow 225 -> 390 while those running fall to 44-67. 1,457 of 2,074 firms are insolvent by tick 400 (corps 121-149 -> 19-77). Insolvent firms per tick: income 75, maintenance+wages 46, upkeep 19; survivors 229 / 63 / 21. The seat is handed a steel mill (recipe 0) that idles on every seed; seat median operating net ~+66/qtr, four seeds under +7."
   },
   {
    "status": "proposed",
@@ -1249,7 +1251,7 @@
     "src/world/corp_ai.cpp",
     "src/world/building_profit.cpp"
    ],
-   "design": "SCOPE WIDENED (2026-10-04, from the BL-1186 diagnosis): the same scorer switches recipes to routes whose inputs the body lacks - coal-drawing processors fall 27 -> 1 by tick 3 on seed 0 as mills switch to steel_from_iron_nickel with no iron-nickel ore on the body. \"Build only what runs\" covers switch as well as build. Obtainable = BL-1185's reach (same market, or a viable price_market_export_leg).\n\nSprint 49 wave 1, after BL-1186 (what 'obtainable' means depends on whether goods move). Firms keep building processors that never run: processors 225 -> 390 on seed 0 while those running fall 80 -> 52; seed 41 holds 1,241 buildings under construction against 263 live. The build score (estimate_prospective_profit) should price the inputs a building can actually obtain at its market, not their nominal price. Read AI_OPPONENT.md sec 11 first: this is the existing build decision priced better, not a new subject, so no new grant is expected; if the reading says otherwise, raise it.\n\nREADING (2026-10-04, main a56e4ce3, 16 curated seeds, shipped 1960 start, 12 settle + 400 play ticks; spawn_solvency, firm_attrition_trace, centre_decline_trace, market_census, recipe_margin, and steel_chain_probe on seeds 0/43/37): recipe_margin is green in both bands. Day 1 looks solvent (99-100% of firms, +94..+211/qtr each) but the settle is opening stock being auctioned: field income 54-74k/tick at the settle close, 10-19k by tick 50 on every seed. At handoff 119-141 of ~225 processors are input-starved (copper refining, alloys, machinery, electronics, spacecraft never run); 10k steel sits on shelves against demand of 12 while 0 shipments go (135 pairs unroutable, 52 refused by the price gate); by tick 20 steel is 6 supply vs 5,187 demand with coal unbought one market away. Processors grow 225 -> 390 while those running fall to 44-67. 1,457 of 2,074 firms are insolvent by tick 400 (corps 121-149 -> 19-77). Insolvent firms per tick: income 75, maintenance+wages 46, upkeep 19; survivors 229 / 63 / 21. The seat is handed a steel mill (recipe 0) that idles on every seed; seat median operating net ~+66/qtr, four seeds under +7."
+   "design": "WIDENED AGAIN (2026-10-04, the BL-1193 diagnosis): the strategic recipe switch (corp_ai.cpp:1553-1630) compares base-price margins within a group without checking inputs, unlike the build candidate (:1150-1172) - clean water (4.7/batch) loses to consumer goods (31.3) every time; and an idled plant RESUMES on a price-only estimate (building_profit.cpp:113ff), so consumer-goods plants churn (seed 0, ticks 100-200: 73 built or resumed, 85 idled). Build, switch AND resume all check that inputs are obtainable (H6). Also consider splitting the \"Welfare Goods\" group (H7). The diagnosis reads this as inside the existing scorer grant (refines existing verbs, adds none); confirm against AI_OPPONENT.md sec 11 before building.\n\nSCOPE WIDENED (2026-10-04, from the BL-1186 diagnosis): the same scorer switches recipes to routes whose inputs the body lacks - coal-drawing processors fall 27 -> 1 by tick 3 on seed 0 as mills switch to steel_from_iron_nickel with no iron-nickel ore on the body. \"Build only what runs\" covers switch as well as build. Obtainable = BL-1185's reach (same market, or a viable price_market_export_leg).\n\nSprint 49 wave 1, after BL-1186 (what 'obtainable' means depends on whether goods move). Firms keep building processors that never run: processors 225 -> 390 on seed 0 while those running fall 80 -> 52; seed 41 holds 1,241 buildings under construction against 263 live. The build score (estimate_prospective_profit) should price the inputs a building can actually obtain at its market, not their nominal price. Read AI_OPPONENT.md sec 11 first: this is the existing build decision priced better, not a new subject, so no new grant is expected; if the reading says otherwise, raise it.\n\nREADING (2026-10-04, main a56e4ce3, 16 curated seeds, shipped 1960 start, 12 settle + 400 play ticks; spawn_solvency, firm_attrition_trace, centre_decline_trace, market_census, recipe_margin, and steel_chain_probe on seeds 0/43/37): recipe_margin is green in both bands. Day 1 looks solvent (99-100% of firms, +94..+211/qtr each) but the settle is opening stock being auctioned: field income 54-74k/tick at the settle close, 10-19k by tick 50 on every seed. At handoff 119-141 of ~225 processors are input-starved (copper refining, alloys, machinery, electronics, spacecraft never run); 10k steel sits on shelves against demand of 12 while 0 shipments go (135 pairs unroutable, 52 refused by the price gate); by tick 20 steel is 6 supply vs 5,187 demand with coal unbought one market away. Processors grow 225 -> 390 while those running fall to 44-67. 1,457 of 2,074 firms are insolvent by tick 400 (corps 121-149 -> 19-77). Insolvent firms per tick: income 75, maintenance+wages 46, upkeep 19; survivors 229 / 63 / 21. The seat is handed a steel mill (recipe 0) that idles on every seed; seat median operating net ~+66/qtr, four seeds under +7."
   },
   {
    "status": "proposed",
@@ -1355,6 +1357,124 @@
     "src/world/market_generation.cpp"
    ],
    "design": "Found by the BL-1186 diagnosis (2026-10-04): market catchments are assigned by grid distance and ignore water, so a tile can belong to a market across a strait it cannot ship over; local draws treat it as the same market. Measure how many tiles and buildings sit across water from their market centre on the 16 seeds before designing. Read beside BL-1190 (markets meet firms)."
+  },
+  {
+   "status": "designed",
+   "glyph": "◐",
+   "sprint": 49,
+   "written": "2026-10-04",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1193",
+   "short_name": "HOUSEHOLD_GOODS_UNSUPPLIED",
+   "author": "Claude (the BL-1163 lane, 2026-10-04)",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "Households are a market nobody supplies: find why water, clean water and medical supplies never reach a market",
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "src/world/market_clearing.cpp",
+    "src/world/corp_ai.cpp",
+    "src/world/corporation_generation.cpp"
+   ],
+   "design": "DIAGNOSED (2026-10-04, a6eee332; docs/development/drafts/sprint-49-household-supply-diagnosis.md). (1) Household-good output is listed whole and bought by the market as buyer of last resort at the reference price with minted money (market_clearing.cpp:1418-1427); nothing ever takes it off the shelf, so shelves only grow (food rations 25-49k, consumer goods 1.8-3.5k, water ~8k by tick 200). (2) The household bid is a PRICING PULL ONLY (inject_population_demand adds to mc.demand, market_clearing.cpp:585); POPULATION.md:293 says a centre consumes its basket from the local market - the code is behind its doc. (3) A maker earns while it can run. (4) THE LOCK: households bid water nobody lists, the bid floors at 30% (elasticity_min), the shelf is not supply (k = 0), so water sits at 10x base from tick 2-3 everywhere, above the 2x ceiling, and clean-water/medical makers may not draw their own input; THE SWITCH: the strategic scorer moves clean-water plants (16 -> 0 by tick 3, seed 0) to consumer goods on base-price margin within \"Welfare Goods\" without checking inputs (corp_ai.cpp:1553-1630); THE CHURN: consumer-goods plants starve on food rations (over the ceiling in 19-22 of 24 markets) and steel, idle, then resume on a price-only estimate (building_profit.cpp:113ff). Food rations run but cover only 25-60% of the bid in 2-7 markets. (5) No water extractors on seeds 0 and 10: a firm opened for the water gap is placed on whatever its tile holds most (corporation_generation.cpp:476/548) yet counted against water's cap (:2667). FIXES FILED: BL-1196 (households consume from the shelf, H1+H4), BL-1197 (gap firm digs the gap resource, H5), BL-1187 widened (H6 + H7), NR-968 (H2).\n\nSprint 49, diagnosis first. On every seed water, clean water and medical supplies are supplied 0 at market across 400 play ticks, consumer goods fall to ~0 by tick ~100, and food rations run 25-45% of demand (the BL-1163 lane's centre_decline_trace, 2026-10-04). Yet steel_chain_probe sees 15 of 16 clean-water processors running at tick 0 on seed 0, so the output goes somewhere: name where (own pools, reservation, the shelf, a buyer of last resort, a household bid that is a pricing pull only and never fills). Then: is household demand a market a firm can PROFIT from (who pays, at what price)? If it is not, no placement or scorer change will make firms serve it. Read beside NR-968 (the price cycle) and BL-1185 (chain-feasible placement): household goods are the demand endpoints the chains exist for. Unblocks BL-1163 (NR-967)."
+  },
+  {
+   "status": "designed",
+   "glyph": "◐",
+   "sprint": 49,
+   "written": "2026-10-04",
+   "requires": [
+    "BL-1186"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1194",
+   "short_name": "SEA_CHEAPER_THAN_HIGHWAY",
+   "author": "Claude (the BL-1186 routing lane, 2026-10-04)",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 2,
+   "title": "A sea leg costs less per distance than land on a highway, as ruled, so a long overseas haul beats a short overland one",
+   "authority_doc": "docs/economy/SUPPLY.md",
+   "files": [
+    "scripts/economy.lua",
+    "src/world/logistics.cpp"
+   ],
+   "design": "The ruling is already written (SUPPLY.md sec Logistical cost, Ben 2026-09-15): per distance, a sea leg costs less than land on a highway; every port charges handling per unit; the crossover distance is the design reading, reported whenever either term moves. The config inverts it: logistics.base_cost_per_unit_distance land 0.02, sea 0.05, and water tiles weigh 2.5, so a sea tile costs 0.125 against 0.02 for plains and sea never wins at any distance; BL-1186's port routes are taken only where no land path exists. WORK: retune so the ordering holds against a HIGHWAY tile (road multiplier included), measure and report the crossover distance with BL-1186's handling (0.10 per unit per port, a first cut), and re-derive anything priced off the haul (haulage_measure, the ceiling derivation - see BL-1165). Measure on BL-1184 (market viability gate)."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 49,
+   "written": "2026-10-04",
+   "requires": [
+    "BL-1186"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1195",
+   "short_name": "CONVOY_LANE_FOLLOWS_LEGS",
+   "author": "Claude (the BL-1186 routing lane, 2026-10-04)",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 2,
+   "title": "A convoy is drawn, seen and interdicted along the legs it actually travels",
+   "authority_doc": "docs/economy/SUPPLY.md",
+   "files": [
+    "src/world/supply_system.cpp"
+   ],
+   "design": "PULLED INTO SPRINT 49 (2026-10-04, the BL-1186 cold review): not only drawing - position, vision and interdiction read the unconfined centre-to-centre path, so a land-fallback convoy is interdicted on water it never enters and immune on the land it crosses, a capture credits the pool of a water tile, and a hostile unit on a sea route's inland leg never intercepts. A gameplay error until fixed.\n\nAfter BL-1186 routes water crossings as land -> port -> sea -> port -> land, convoy_route_tiles still lays the lane as the direct centre-to-centre path, so the vision beam, the convoy's drawn position and interdiction all read a route the cargo does not take. Make convoy_route_tiles return the leg route."
+  },
+  {
+   "status": "designed",
+   "glyph": "◐",
+   "sprint": 49,
+   "written": "2026-10-04",
+   "requires": [
+    "BL-1197",
+    "BL-1185",
+    "BL-1187"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1196",
+   "short_name": "HOUSEHOLDS_CONSUME",
+   "author": "Claude (the BL-1193 diagnosis, 2026-10-04)",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 4,
+   "title": "A population centre consumes its basket off its market's shelf, as the doc says, and grows on what it received",
+   "authority_doc": "docs/economy/POPULATION.md",
+   "files": [
+    "src/world/market_clearing.cpp",
+    "src/world/economy_system.cpp",
+    "src/world/world_save.cpp"
+   ],
+   "design": "BUILT AND HELD (2026-10-05, 53e6b219 on worktree-agent-a4c46e4ea6977dcd0, on top of BL-1163's 26cb6cbe; population_mvp ALL PASS 27 incl. 60-tick drain rows; save v32, save_roundtrip OK; world_determinism PASS). Households draw their pooled bid off the shelf each clear (markets ascending, goods ascending), no money moves, and the growth gate reads fill / bid. Shelves now drain (seed 0 water 6.1k -> 0, food rations 5.4k -> 0). Centres still shrink on every seed by tick 400 (seed 0 heads 65.2M -> 19.5M; BL-1163 alone 14.9M) because water, clean water and medical supplies are never made (fill 0 of bid on seeds 0/10/43) and food rations fill only 20-30%: food + produce weigh 0.80 of 1.85, under the 0.5 threshold even when met. market_viability (0/43/10): G2 26.4% (main) -> 20.6%, the consumer-goods makers having lived off the uneaten food pile. HELD with BL-1163 until households are supplied (BL-1197, BL-1185, BL-1187). DECISION TAKEN by the lane, accepted: the household draw ignores the fair-price ceiling (that is a firm's reservation; a household's elastic bid already falls with price). SAVE: v31 is claimed by BL-1139 on an unmerged branch; whichever merges second rechecks. OPEN: this lane's \"before\" on main shows centres GROWING (met 1.000, 0 declining) while BL-1163's \"before\" showed them declining from ~t200 - the two instruments disagree on main; resolve before either merges.\n\nDOC-MANDATED (POPULATION.md sec Population demand: \"Each Tick, a population centre consumes a basket of goods drawn from the local market\"; MARKETS.md sec Three properties: every resource needs a TERMINAL sink). Today the household bid only moves the price (market_clearing.cpp:585) and nothing leaves a shelf, so household-good shelves grow forever and the market's last-resort buy is the only buyer. BUILD: each clear, households draw their basket from the market's shelf (inventory), up to their bid, in a deterministic order; what they received is the household FILL (MARKETS.md sec Want and fill) and the growth gate reads it (BL-1163's met ratio = received / bid, replacing the pro-rata stand-in). Money: the market already paid the maker when it bought the stock, so consumption moves goods, not credits - state that in FINANCE.md's money loop if it is silent. A seam change (economy + save if a new record is persisted): Full mode, cold review, a multi-tick row (a one-tick row cannot see the shelf drain). Measure on BL-1184. Unblocks BL-1163 and removes NR-968's premise that inventory only grows."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 49,
+   "written": "2026-10-04",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1197",
+   "short_name": "GAP_FIRM_DIGS_THE_GAP",
+   "author": "Claude (the BL-1193 diagnosis, 2026-10-04)",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 2,
+   "title": "A firm generated to fill a resource gap extracts that resource",
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "files": [
+    "src/world/corporation_generation.cpp"
+   ],
+   "design": "GENERATION CHANGE (sprint 49 generation lane, after BL-1185). Seeds 0 and 10 have no water extractor at all; seed 43 has 2 in 1 of 18 markets. A firm opened to fill the water gap is placed on whatever its tile holds most of (corporation_generation.cpp:476, :548) yet still counted against water's per-resource cap (:2667), so the cap fills with firms digging something else. Place the gap firm on a tile of the gap resource, or do not count it. Measure water extractors per seed and BL-1184."
   }
  ]
 }

@@ -1,0 +1,495 @@
+NOTE (main session, 2026-10-04): G2 is now the WINDOW form (play 26-50 mean / settle mean). On this baseline the gate reads G2 27.5% (FAIL), not the single-tick 64.8% printed below, which predates the switch.
+
+market_viability — sprint 49 baseline reading (BL-1184, market viability gate)
+==============================================================================
+Taken 2026-10-04 on base 3b74a5ce (main; src/ untouched by this item), harness
+tools/verify/market_viability.cpp as committed with this file. 16 curated seeds
+(docs/generation/seed_library.json), shipped 1960 start, 12 settle + 400 play ticks.
+
+A DATED READING, NOT A PIN. Main moves and the baseline moves with it; a
+world-mover measures its own before/after on its own base.
+
+THE RUN WAS SPLIT. The first invocation (all 16 seeds) was stopped by the
+agent tool's 2-hour background cap after 10 seeds — the machine was heavily
+loaded (seeds took 82 s to 1,697 s; seed 37's play ticks alone 1,603 s). The
+remaining six ran as a second invocation (`--seeds 32,10,25,38,9,0`). The
+harness is deterministic per seed (seed 0's handoff and tick-50 rows were
+identical across an earlier 50-tick smoke run and this one), so a split run
+reads the same per-seed numbers; only the harness's own pooled block is per
+invocation. The 16-seed pool below was summed from the per-seed blocks of both
+logs by a scratch script (sum/sum, the harness's own pooling rule).
+
+POOLED OVER ALL 16 SEEDS
+------------------------
+POOLED FROM THE PER-SEED BLOCKS OF 2 INVOCATION(S): 16 seeds (46 28 11 31 40 12 37 13 41 43 32 10 25 38 9 0)
+ seed | built@h run inp+decom(inp) run% | built@50 run  run% | inc close  inc t50 ratio | settle-mean 26-50-mean ratio | firms h alive  % | seat op-net mean | idle mkts | secs
+   46 |    226   49  173      21.7 |     269   28  10.4 |     22897    10429  45.5 |       57114       17870  31.3 |     123    37  30.1 |             -7.5 | 6/30 | 309
+   28 |    232   47  182      20.3 |     256   45  17.6 |     12702    11285  88.8 |       59099       15671  26.5 |     132    48  36.4 |           -143.4 | 5/20 | 260
+   11 |    222   29  186      13.1 |     228   21   9.2 |     18062     5854  32.4 |       56571        9791  17.3 |     121    31  25.6 |             44.8 | 1/32 | 208
+   31 |    230   26  196      11.3 |     236   51  21.6 |     12143    13426 110.6 |       53633       12906  24.1 |     123    43  35.0 |             -7.6 | 9/31 | 198
+   40 |    252   42  204      16.7 |     274   37  13.5 |     12529     9721  77.6 |       63310       11888  18.8 |     142    23  16.2 |            -40.4 | 3/30 | 82
+   12 |    241   39  183      16.2 |     262   42  16.0 |     14002    28574 204.1 |       65306       18371  28.1 |     143    35  24.5 |            -54.3 | 4/27 | 102
+   37 |    223   49  152      22.0 |     229   32  14.0 |     45095    10461  23.2 |       64041       20165  31.5 |     123    76  61.8 |              3.1 | 0/26 | 1697
+   13 |    233   54  176      23.2 |     245   31  12.7 |     37022    12047  32.5 |       61011       19136  31.4 |     128    49  38.3 |            -62.9 | 7/31 | 929
+   41 |    233   45  182      19.3 |     233   36  15.5 |     30508    12957  42.5 |       55440       17980  32.4 |     134    34  25.4 |            -99.2 | 5/29 | 1635
+   43 |    232   37  194      15.9 |     297   49  16.5 |     11545    15593 135.1 |       53546       14831  27.7 |     128    18  14.1 |            -80.2 | 6/18 | 771
+   32 |    236   41  194      17.4 |     222   33  14.9 |     14490    10269  70.9 |       64317       19996  31.1 |     144    54  37.5 |            -53.6 | 10/35 | 896
+   10 |    227   33  192      14.5 |     241   33  13.7 |     12266    13319 108.6 |       57194       15022  26.3 |     126    33  26.2 |            -79.9 | 9/28 | 867
+   25 |    227   32  182      14.1 |     226   33  14.6 |     16421    16410  99.9 |       60550       16333  27.0 |     126    54  42.9 |            -67.5 | 1/23 | 522
+   38 |    262   52  206      19.8 |     257   46  17.9 |     17421    11568  66.4 |       74132       18294  24.7 |     149    50  33.6 |            -84.8 | 2/27 | 86
+    9 |    229   36  183      15.7 |     289   40  13.8 |     14267    10207  71.5 |       58427       20119  34.4 |     134    21  15.7 |            -47.2 | 8/24 | 140
+    0 |    226   45  177      19.9 |     235   35  14.9 |     22339    11276  50.5 |       58665       15834  27.0 |     126    51  40.5 |            -90.2 | 7/25 | 70
+ processors at handoff: built 3731, running 656, input-starved 587 + decommissioned-after-starving 2375 = 2962, decom 2457, under construction 2078
+ FAIL  G1 processors running at handoff  17.6%  (target >= 70%; over all incl. construction 11.3%; at tick 50 14.8%)
+ PASS  G2 field income t50 / settle close  64.8%  (203396 / 313709; target >= 50%)
+       G2 window form (context, not the gate): play 26-50 mean / settle 12-tick mean  27.5%  (264207 / 962356)
+ FAIL  G3 firms alive t400 / handoff       31.3%  (657 / 2102; target >= 70%)
+ idle markets (play 1-4): 83 of 436; runtime 8772 s summed
+market_viability (pooled 16): G1 17.6/70 G2 64.8/50 G3 31.3/70
+
+
+==== INVOCATION 1: market_viability.exe (16 library seeds; stopped by the 2 h cap after seed 43) ====
+
+market_viability — BL-1184 (market viability gate)
+targets (Ben, the sprint 49 form, 2026-10-04), pooled: G1 running at handoff >= 70%, G2 income t50/settle-close >= 50%, G3 firms alive t400/handoff >= 70%
+seeds (docs/generation/seed_library.json, 16): 46 28 11 31 40 12 37 13 41 43 32 10 25 38 9 0   play ticks 400 (tick N = play tick N after the 12-tick settle)
+[Lua] works.lua loaded  work_count=21
+[Lua] recipes.lua loaded  recipe_count=46
+[Lua] economy.lua loaded
+[landscape_search] charter budget: 728 centres, 63480362 points; roster axis SKIPPED (the budget decides the roster)
+[landscape_search] seed   corps=8 placement=8A21F023 tier=1  composite=0.002319  (642 ms)
+[landscape_search] round 0  placement TAKEN  corps=8 placement=603FC166 tier=1  composite=0.002319 vs incumbent 0.002319  (1395 ms, 698 ms/eval)
+[landscape_search] round 1  placement TAKEN  corps=8 placement=9B83B18D tier=1  composite=0.002855 vs incumbent 0.002319  (1365 ms, 682 ms/eval)
+[landscape_search] round 2  road_tier held   corps=8 placement=9B83B18D tier=1  composite=0.002855 vs incumbent 0.002855  (2040 ms, 1020 ms/eval)
+[landscape_search] round 3  road_tier TAKEN  corps=8 placement=9B83B18D tier=2  composite=0.002858 vs incumbent 0.002855  (1738 ms, 869 ms/eval)
+[landscape_search] round 4  road_tier held   corps=8 placement=9B83B18D tier=1  composite=0.002855 vs incumbent 0.002858  (1892 ms, 946 ms/eval)
+[landscape_search] round 5  road_tier TAKEN  corps=8 placement=9B83B18D tier=3  composite=0.002862 vs incumbent 0.002858  (1529 ms, 765 ms/eval)
+
+=== seed 46  (309 s: build 109, settle 10, play 189) ===
+ G1 processors  (as handed to the settle: 220, 0 of them decommissioned)
+  handoff    built  226: run   49  input   29  nolab    0  unsupplied    0  decom  147  other    1  -> running  21.7%  | + under construction  120 (running of all  14.2%)
+             decom by its last reported state: ran 0  input-starved 144  other 3  never reported 0
+  tick 50    built  269: run   28  input   68  nolab   21  unsupplied    0  decom  116  other   36  -> running  10.4%  | + under construction  136 (running of all   6.9%)
+             decom by its last reported state: ran 2  input-starved 96  other 18  never reported 0
+ G2 field income/tick  settle close      22897  tick 50      10429  ratio  45.5%   (context: settle mean 57114, play 26-50 mean 17870)
+ G3 firms  handoff 123  alive of those at tick 400: 37 ( 30.1%)  total corps then 37
+ G4 seat 53312 "Hualua Holdings"  operating net, last 8 settle quarters: 11.1 16.0 -22.3 6.2 -4.6 -5.3 -52.6 -8.5  (mean -7.5)
+    seat processor 53311 refined_copper           ran 0/8 settle ticks, input at handoff
+    seat processor 53410 ree_alloy                ran 0/8 settle ticks, build at handoff
+    seat processor 53535 ree_alloy                ran 0/8 settle ticks, build at handoff
+    home markets clearing nothing over play ticks 1-4: 6 of 30
+    buildings at tick 50: live 350  under construction 612  decommissioned 118
+[Lua] works.lua loaded  work_count=21
+[Lua] recipes.lua loaded  recipe_count=46
+[Lua] economy.lua loaded
+[landscape_search] charter budget: 247 centres, 19655900 points; roster axis SKIPPED (the budget decides the roster)
+[landscape_search] seed   corps=8 placement=8A21F011 tier=1  composite=0.003728  (1682 ms)
+[landscape_search] round 0  road_tier held   corps=8 placement=8A21F011 tier=2  composite=0.003618 vs incumbent 0.003728  (2339 ms, 1170 ms/eval)
+[landscape_search] round 1  road_tier held   corps=8 placement=8A21F011 tier=1  composite=0.003728 vs incumbent 0.003728  (1742 ms, 871 ms/eval)
+[landscape_search] round 2  road_tier held   corps=8 placement=8A21F011 tier=1  composite=0.003728 vs incumbent 0.003728  (634 ms, 317 ms/eval)
+[landscape_search] round 3  road_tier held   corps=8 placement=8A21F011 tier=2  composite=0.003618 vs incumbent 0.003728  (612 ms, 306 ms/eval)
+[landscape_search] round 4  road_tier held   corps=8 placement=8A21F011 tier=2  composite=0.003618 vs incumbent 0.003728  (800 ms, 400 ms/eval)
+[landscape_search] round 5  road_tier held   corps=8 placement=8A21F011 tier=2  composite=0.003618 vs incumbent 0.003728  (415 ms, 208 ms/eval)
+
+=== seed 28  (260 s: build 158, settle 4, play 98) ===
+ G1 processors  (as handed to the settle: 228, 0 of them decommissioned)
+  handoff    built  232: run   47  input   46  nolab    0  unsupplied    0  decom  138  other    1  -> running  20.3%  | + under construction  150 (running of all  12.3%)
+             decom by its last reported state: ran 0  input-starved 136  other 2  never reported 0
+  tick 50    built  256: run   45  input   68  nolab    0  unsupplied    0  decom  109  other   34  -> running  17.6%  | + under construction  153 (running of all  11.0%)
+             decom by its last reported state: ran 4  input-starved 84  other 21  never reported 0
+ G2 field income/tick  settle close      12702  tick 50      11285  ratio  88.8%   (context: settle mean 59099, play 26-50 mean 15671)
+ G3 firms  handoff 132  alive of those at tick 400: 48 ( 36.4%)  total corps then 48
+ G4 seat 51714 "Bryix Operations"  operating net, last 8 settle quarters: -156.2 -134.5 -132.4 -134.3 -164.6 -142.0 -142.1 -141.1  (mean -143.4)
+    seat processor 51713 steel_from_iron_nickel   ran 0/8 settle ticks, decom at handoff
+    seat processor 52255 ree_alloy                ran 0/8 settle ticks, build at handoff
+    seat processor 52397 ree_alloy                ran 0/8 settle ticks, build at handoff
+    home markets clearing nothing over play ticks 1-4: 5 of 20
+    buildings at tick 50: live 332  under construction 388  decommissioned 199
+[Lua] works.lua loaded  work_count=21
+[Lua] recipes.lua loaded  recipe_count=46
+[Lua] economy.lua loaded
+[landscape_search] charter budget: 726 centres, 57341812 points; roster axis SKIPPED (the budget decides the roster)
+[landscape_search] seed   corps=8 placement=8A21F006 tier=1  composite=0.002275  (749 ms)
+[landscape_search] round 0  placement TAKEN  corps=8 placement=671ABDED tier=1  composite=0.002925 vs incumbent 0.002275  (1368 ms, 684 ms/eval)
+[landscape_search] round 1  road_tier held   corps=8 placement=671ABDED tier=1  composite=0.002925 vs incumbent 0.002925  (1374 ms, 687 ms/eval)
+[landscape_search] round 2  road_tier TAKEN  corps=8 placement=671ABDED tier=2  composite=0.002930 vs incumbent 0.002925  (892 ms, 446 ms/eval)
+[landscape_search] round 3  road_tier held   corps=8 placement=671ABDED tier=1  composite=0.002925 vs incumbent 0.002930  (1346 ms, 673 ms/eval)
+[landscape_search] round 4  road_tier held   corps=8 placement=671ABDED tier=1  composite=0.002925 vs incumbent 0.002930  (1097 ms, 549 ms/eval)
+[landscape_search] round 5  road_tier held   corps=8 placement=671ABDED tier=1  composite=0.002925 vs incumbent 0.002930  (1438 ms, 719 ms/eval)
+
+=== seed 11  (208 s: build 117, settle 9, play 82) ===
+ G1 processors  (as handed to the settle: 221, 0 of them decommissioned)
+  handoff    built  222: run   29  input   44  nolab    0  unsupplied    0  decom  148  other    1  -> running  13.1%  | + under construction   92 (running of all   9.2%)
+             decom by its last reported state: ran 1  input-starved 142  other 5  never reported 0
+  tick 50    built  228: run   21  input   73  nolab    2  unsupplied    0  decom  101  other   31  -> running   9.2%  | + under construction  110 (running of all   6.2%)
+             decom by its last reported state: ran 1  input-starved 86  other 14  never reported 0
+ G2 field income/tick  settle close      18062  tick 50       5854  ratio  32.4%   (context: settle mean 56571, play 26-50 mean 9791)
+ G3 firms  handoff 121  alive of those at tick 400: 31 ( 25.6%)  total corps then 31
+ G4 seat 53457 "Saikai International"  operating net, last 8 settle quarters: 115.1 97.1 67.0 27.3 46.1 -5.8 13.9 -2.5  (mean 44.8)
+    seat processor 53455 steel_from_iron_nickel   ran 0/8 settle ticks, input at handoff
+    seat processor 53609 steel_frame_construction ran 0/8 settle ticks, build at handoff
+    seat processor 53730 iron_frame_construction  ran 0/8 settle ticks, build at handoff
+    home markets clearing nothing over play ticks 1-4: 1 of 32
+    buildings at tick 50: live 232  under construction 989  decommissioned 102
+[Lua] works.lua loaded  work_count=21
+[Lua] recipes.lua loaded  recipe_count=46
+[Lua] economy.lua loaded
+[landscape_search] charter budget: 900 centres, 94265237 points; roster axis SKIPPED (the budget decides the roster)
+[landscape_search] seed   corps=8 placement=8A21F012 tier=1  composite=0.004088  (382 ms)
+[landscape_search] round 0  road_tier held   corps=8 placement=8A21F012 tier=1  composite=0.004088 vs incumbent 0.004088  (527 ms, 263 ms/eval)
+[landscape_search] round 1  placement TAKEN  corps=8 placement=5647B6C9 tier=1  composite=0.004088 vs incumbent 0.004088  (441 ms, 220 ms/eval)
+[landscape_search] round 2  placement TAKEN  corps=8 placement=41B44494 tier=1  composite=0.004518 vs incumbent 0.004088  (440 ms, 220 ms/eval)
+[landscape_search] round 3  road_tier TAKEN  corps=8 placement=41B44494 tier=2  composite=0.004520 vs incumbent 0.004518  (568 ms, 284 ms/eval)
+[landscape_search] round 4  road_tier TAKEN  corps=8 placement=41B44494 tier=3  composite=0.004522 vs incumbent 0.004520  (458 ms, 229 ms/eval)
+[landscape_search] round 5  road_tier held   corps=8 placement=41B44494 tier=2  composite=0.004520 vs incumbent 0.004522  (441 ms, 221 ms/eval)
+
+=== seed 31  (198 s: build 95, settle 5, play 99) ===
+ G1 processors  (as handed to the settle: 226, 0 of them decommissioned)
+  handoff    built  230: run   26  input   40  nolab    0  unsupplied    0  decom  163  other    1  -> running  11.3%  | + under construction  127 (running of all   7.3%)
+             decom by its last reported state: ran 0  input-starved 156  other 7  never reported 0
+  tick 50    built  236: run   51  input   40  nolab    0  unsupplied    0  decom  106  other   39  -> running  21.6%  | + under construction  158 (running of all  12.9%)
+             decom by its last reported state: ran 2  input-starved 97  other 7  never reported 0
+ G2 field income/tick  settle close      12143  tick 50      13426  ratio 110.6%   (context: settle mean 53633, play 26-50 mean 12906)
+ G3 firms  handoff 123  alive of those at tick 400: 43 ( 35.0%)  total corps then 43
+ G4 seat 53736 "Athis-Paxex International"  operating net, last 8 settle quarters: 13.4 8.5 -0.9 -41.3 2.6 3.4 1.3 -47.8  (mean -7.6)
+    seat processor 53734 refined_copper           ran 0/8 settle ticks, input at handoff
+    seat processor 53835 food_rations             ran 0/8 settle ticks, build at handoff
+    home markets clearing nothing over play ticks 1-4: 9 of 31
+    buildings at tick 50: live 250  under construction 1000  decommissioned 154
+[Lua] works.lua loaded  work_count=21
+[Lua] recipes.lua loaded  recipe_count=46
+[Lua] economy.lua loaded
+[landscape_search] charter budget: 501 centres, 32753503 points; roster axis SKIPPED (the budget decides the roster)
+[landscape_search] seed   corps=8 placement=8A21F025 tier=1  composite=0.003132  (313 ms)
+[landscape_search] round 0  placement TAKEN  corps=8 placement=4C8F7D00 tier=1  composite=0.003133 vs incumbent 0.003132  (416 ms, 208 ms/eval)
+[landscape_search] round 1  road_tier TAKEN  corps=8 placement=4C8F7D00 tier=2  composite=0.003134 vs incumbent 0.003133  (802 ms, 401 ms/eval)
+[landscape_search] round 2  road_tier held   corps=8 placement=4C8F7D00 tier=1  composite=0.003133 vs incumbent 0.003134  (829 ms, 414 ms/eval)
+[landscape_search] round 3  road_tier held   corps=8 placement=4C8F7D00 tier=1  composite=0.003133 vs incumbent 0.003134  (1084 ms, 542 ms/eval)
+[landscape_search] round 4  placement TAKEN  corps=8 placement=A4998A1F tier=2  composite=0.003525 vs incumbent 0.003134  (889 ms, 445 ms/eval)
+[landscape_search] round 5  road_tier TAKEN  corps=8 placement=A4998A1F tier=3  composite=0.003527 vs incumbent 0.003525  (633 ms, 316 ms/eval)
+
+=== seed 40  (82 s: build 21, settle 5, play 56) ===
+ G1 processors  (as handed to the settle: 240, 0 of them decommissioned)
+  handoff    built  252: run   42  input   43  nolab    0  unsupplied    0  decom  166  other    1  -> running  16.7%  | + under construction  166 (running of all  10.0%)
+             decom by its last reported state: ran 0  input-starved 161  other 5  never reported 0
+  tick 50    built  274: run   37  input   77  nolab    1  unsupplied    0  decom  123  other   36  -> running  13.5%  | + under construction  176 (running of all   8.2%)
+             decom by its last reported state: ran 3  input-starved 87  other 33  never reported 0
+ G2 field income/tick  settle close      12529  tick 50       9721  ratio  77.6%   (context: settle mean 63310, play 26-50 mean 11888)
+ G3 firms  handoff 142  alive of those at tick 400: 23 ( 16.2%)  total corps then 23
+ G4 seat 52825 "CalexDynom-Genur Operations"  operating net, last 8 settle quarters: -23.4 -30.7 -31.1 -35.5 -62.8 -43.4 -48.2 -48.1  (mean -40.4)
+    seat processor 52823 refined_copper           ran 0/8 settle ticks, decom at handoff
+    seat processor 52948 iron_frame_construction  ran 0/8 settle ticks, build at handoff
+    home markets clearing nothing over play ticks 1-4: 3 of 30
+    buildings at tick 50: live 350  under construction 667  decommissioned 130
+[Lua] works.lua loaded  work_count=21
+[Lua] recipes.lua loaded  recipe_count=46
+[Lua] economy.lua loaded
+[landscape_search] charter budget: 443 centres, 19045975 points; roster axis SKIPPED (the budget decides the roster)
+[landscape_search] seed   corps=8 placement=8A21F001 tier=1  composite=0.002255  (636 ms)
+[landscape_search] round 0  placement TAKEN  corps=8 placement=3BE22CEC tier=1  composite=0.003197 vs incumbent 0.002255  (762 ms, 381 ms/eval)
+[landscape_search] round 1  road_tier TAKEN  corps=8 placement=3BE22CEC tier=2  composite=0.003232 vs incumbent 0.003197  (802 ms, 401 ms/eval)
+[landscape_search] round 2  road_tier TAKEN  corps=8 placement=3BE22CEC tier=3  composite=0.003233 vs incumbent 0.003232  (649 ms, 324 ms/eval)
+[landscape_search] round 3  placement TAKEN  corps=8 placement=05973C9B tier=3  composite=0.003423 vs incumbent 0.003233  (1183 ms, 591 ms/eval)
+[landscape_search] round 4  road_tier held   corps=8 placement=05973C9B tier=2  composite=0.003421 vs incumbent 0.003423  (627 ms, 313 ms/eval)
+[landscape_search] round 5  road_tier held   corps=8 placement=05973C9B tier=2  composite=0.003421 vs incumbent 0.003423  (1068 ms, 534 ms/eval)
+
+=== seed 12  (102 s: build 30, settle 5, play 67) ===
+ G1 processors  (as handed to the settle: 228, 0 of them decommissioned)
+  handoff    built  241: run   39  input   56  nolab    0  unsupplied    0  decom  145  other    1  -> running  16.2%  | + under construction  160 (running of all   9.7%)
+             decom by its last reported state: ran 0  input-starved 127  other 18  never reported 0
+  tick 50    built  262: run   42  input   87  nolab    5  unsupplied    0  decom  109  other   19  -> running  16.0%  | + under construction  129 (running of all  10.7%)
+             decom by its last reported state: ran 3  input-starved 88  other 18  never reported 0
+ G2 field income/tick  settle close      14002  tick 50      28574  ratio 204.1%   (context: settle mean 65306, play 26-50 mean 18371)
+ G3 firms  handoff 143  alive of those at tick 400: 35 ( 24.5%)  total corps then 35
+ G4 seat 52602 "QuaexSolon-Corel Systems"  operating net, last 8 settle quarters: -46.4 -50.3 -90.2 -124.0 -84.3 -86.8 182.0 -134.8  (mean -54.3)
+    seat processor 52601 refined_copper           ran 1/8 settle ticks, input at handoff
+    seat processor 52770 oil_power_plant          ran 0/8 settle ticks, build at handoff
+    seat processor 52934 steel                    ran 0/8 settle ticks, build at handoff
+    home markets clearing nothing over play ticks 1-4: 4 of 27
+    buildings at tick 50: live 353  under construction 1087  decommissioned 117
+[Lua] works.lua loaded  work_count=21
+[Lua] recipes.lua loaded  recipe_count=46
+[Lua] economy.lua loaded
+[landscape_search] charter budget: 706 centres, 49592199 points; roster axis SKIPPED (the budget decides the roster)
+[landscape_search] seed   corps=8 placement=8A21F028 tier=1  composite=0.002444  (424 ms)
+[landscape_search] round 0  placement TAKEN  corps=8 placement=53BD6927 tier=1  composite=0.002889 vs incumbent 0.002444  (602 ms, 301 ms/eval)
+[landscape_search] round 1  road_tier TAKEN  corps=8 placement=53BD6927 tier=2  composite=0.002893 vs incumbent 0.002889  (665 ms, 333 ms/eval)
+[landscape_search] round 2  road_tier held   corps=8 placement=53BD6927 tier=1  composite=0.002889 vs incumbent 0.002893  (564 ms, 282 ms/eval)
+[landscape_search] round 3  road_tier held   corps=8 placement=53BD6927 tier=1  composite=0.002889 vs incumbent 0.002893  (663 ms, 332 ms/eval)
+[landscape_search] round 4  road_tier TAKEN  corps=8 placement=53BD6927 tier=3  composite=0.002899 vs incumbent 0.002893  (672 ms, 336 ms/eval)
+[landscape_search] round 5  placement held   corps=8 placement=59B64B1A tier=3  composite=0.002899 vs incumbent 0.002899  (959 ms, 480 ms/eval)
+
+=== seed 37  (1697 s: build 51, settle 43, play 1603) ===
+ G1 processors  (as handed to the settle: 223, 0 of them decommissioned)
+  handoff    built  223: run   49  input    5  nolab    0  unsupplied    8  decom  160  other    1  -> running  22.0%  | + under construction  130 (running of all  13.9%)
+             decom by its last reported state: ran 0  input-starved 147  other 13  never reported 0
+  tick 50    built  229: run   32  input   51  nolab    0  unsupplied    0  decom  106  other   40  -> running  14.0%  | + under construction  151 (running of all   8.4%)
+             decom by its last reported state: ran 4  input-starved 90  other 12  never reported 0
+ G2 field income/tick  settle close      45095  tick 50      10461  ratio  23.2%   (context: settle mean 64041, play 26-50 mean 20165)
+ G3 firms  handoff 123  alive of those at tick 400: 76 ( 61.8%)  total corps then 76
+ G4 seat 53218 "Hexar Ventures"  operating net, last 8 settle quarters: -1.3 5.3 -7.8 -31.6 -12.6 -38.8 -26.4 138.3  (mean 3.1)
+    seat processor 53217 refined_copper           ran 1/8 settle ticks, run at handoff
+    seat processor 53316 ree_alloy                ran 0/8 settle ticks, build at handoff
+    seat processor 53441 refined_copper           ran 0/8 settle ticks, build at handoff
+    home markets clearing nothing over play ticks 1-4: 0 of 26
+    buildings at tick 50: live 253  under construction 550  decommissioned 166
+[Lua] works.lua loaded  work_count=21
+[Lua] recipes.lua loaded  recipe_count=46
+[Lua] economy.lua loaded
+[landscape_search] charter budget: 700 centres, 57554849 points; roster axis SKIPPED (the budget decides the roster)
+[landscape_search] seed   corps=8 placement=8A21F000 tier=1  composite=0.003202  (7902 ms)
+[landscape_search] round 0  placement TAKEN  corps=8 placement=366F44DF tier=1  composite=0.003390 vs incumbent 0.003202  (12771 ms, 6386 ms/eval)
+[landscape_search] round 1  road_tier held   corps=8 placement=366F44DF tier=1  composite=0.003390 vs incumbent 0.003390  (14387 ms, 7193 ms/eval)
+[landscape_search] round 2  road_tier held   corps=8 placement=366F44DF tier=1  composite=0.003390 vs incumbent 0.003390  (8809 ms, 4405 ms/eval)
+[landscape_search] round 3  road_tier held   corps=8 placement=366F44DF tier=1  composite=0.003390 vs incumbent 0.003390  (9863 ms, 4932 ms/eval)
+[landscape_search] round 4  road_tier TAKEN  corps=8 placement=366F44DF tier=2  composite=0.003394 vs incumbent 0.003390  (6356 ms, 3178 ms/eval)
+[landscape_search] round 5  road_tier TAKEN  corps=8 placement=366F44DF tier=3  composite=0.003399 vs incumbent 0.003394  (3572 ms, 1786 ms/eval)
+
+=== seed 13  (929 s: build 650, settle 31, play 249) ===
+ G1 processors  (as handed to the settle: 227, 0 of them decommissioned)
+  handoff    built  233: run   54  input   29  nolab    0  unsupplied    0  decom  149  other    1  -> running  23.2%  | + under construction  117 (running of all  15.4%)
+             decom by its last reported state: ran 0  input-starved 147  other 2  never reported 0
+  tick 50    built  245: run   31  input   96  nolab    0  unsupplied    6  decom   78  other   34  -> running  12.7%  | + under construction  146 (running of all   7.9%)
+             decom by its last reported state: ran 4  input-starved 56  other 18  never reported 0
+ G2 field income/tick  settle close      37022  tick 50      12047  ratio  32.5%   (context: settle mean 61011, play 26-50 mean 19136)
+ G3 firms  handoff 128  alive of those at tick 400: 49 ( 38.3%)  total corps then 49
+ G4 seat 53326 "Solar Operations"  operating net, last 8 settle quarters: -74.4 -49.6 -55.2 -59.8 -61.3 -65.1 -68.8 -68.8  (mean -62.9)
+    seat processor 53324 steel_from_iron_nickel   ran 0/8 settle ticks, decom at handoff
+    home markets clearing nothing over play ticks 1-4: 7 of 31
+    buildings at tick 50: live 341  under construction 701  decommissioned 118
+[Lua] works.lua loaded  work_count=21
+[Lua] recipes.lua loaded  recipe_count=46
+[Lua] economy.lua loaded
+[landscape_search] charter budget: 655 centres, 22606247 points; roster axis SKIPPED (the budget decides the roster)
+[landscape_search] seed   corps=8 placement=8A21F024 tier=1  composite=0.004940  (1055 ms)
+[landscape_search] round 0  road_tier TAKEN  corps=8 placement=8A21F024 tier=2  composite=0.004943 vs incumbent 0.004940  (1344 ms, 672 ms/eval)
+[landscape_search] round 1  road_tier held   corps=8 placement=8A21F024 tier=1  composite=0.004940 vs incumbent 0.004943  (1164 ms, 582 ms/eval)
+[landscape_search] round 2  road_tier held   corps=8 placement=8A21F024 tier=1  composite=0.004940 vs incumbent 0.004943  (1510 ms, 755 ms/eval)
+[landscape_search] round 3  road_tier TAKEN  corps=8 placement=8A21F024 tier=3  composite=0.004947 vs incumbent 0.004943  (1080 ms, 540 ms/eval)
+[landscape_search] round 4  road_tier held   corps=8 placement=8A21F024 tier=2  composite=0.004943 vs incumbent 0.004947  (1944 ms, 972 ms/eval)
+[landscape_search] round 5  road_tier held   corps=8 placement=8A21F024 tier=2  composite=0.004943 vs incumbent 0.004947  (1110 ms, 555 ms/eval)
+
+=== seed 41  (1635 s: build 182, settle 10, play 1443) ===
+ G1 processors  (as handed to the settle: 231, 0 of them decommissioned)
+  handoff    built  233: run   45  input   16  nolab    0  unsupplied    0  decom  171  other    1  -> running  19.3%  | + under construction  112 (running of all  13.0%)
+             decom by its last reported state: ran 1  input-starved 166  other 4  never reported 0
+  tick 50    built  233: run   36  input   72  nolab    0  unsupplied    0  decom   90  other   35  -> running  15.5%  | + under construction  152 (running of all   9.4%)
+             decom by its last reported state: ran 4  input-starved 78  other 8  never reported 0
+ G2 field income/tick  settle close      30508  tick 50      12957  ratio  42.5%   (context: settle mean 55440, play 26-50 mean 17980)
+ G3 firms  handoff 134  alive of those at tick 400: 34 ( 25.4%)  total corps then 34
+ G4 seat 52850 "JorarUlvax Logistics"  operating net, last 8 settle quarters: -62.1 -47.0 -51.8 -105.7 -132.0 -120.2 -122.1 -152.2  (mean -99.2)
+    seat processor 52849 refined_copper           ran 0/8 settle ticks, decom at handoff
+    seat processor 53319 steel_frame_construction ran 0/8 settle ticks, build at handoff
+    seat processor 53466 iron_frame_construction  ran 0/8 settle ticks, build at handoff
+    seat processor 53603 iron_frame_construction  ran 0/8 settle ticks, build at handoff
+    home markets clearing nothing over play ticks 1-4: 5 of 29
+    buildings at tick 50: live 280  under construction 1218  decommissioned 95
+[Lua] works.lua loaded  work_count=21
+[Lua] recipes.lua loaded  recipe_count=46
+[Lua] economy.lua loaded
+[landscape_search] charter budget: 430 centres, 12612727 points; roster axis SKIPPED (the budget decides the roster)
+[landscape_search] seed   corps=8 placement=8A21F026 tier=1  composite=0.001674  (5960 ms)
+[landscape_search] round 0  placement TAKEN  corps=8 placement=486C4BCD tier=1  composite=0.002232 vs incumbent 0.001674  (10267 ms, 5134 ms/eval)
+[landscape_search] round 1  placement TAKEN  corps=8 placement=B50F34C8 tier=1  composite=0.002790 vs incumbent 0.002232  (11213 ms, 5607 ms/eval)
+[landscape_search] round 2  road_tier held   corps=8 placement=B50F34C8 tier=2  composite=0.002738 vs incumbent 0.002790  (7619 ms, 3809 ms/eval)
+[landscape_search] round 3  road_tier held   corps=8 placement=B50F34C8 tier=1  composite=0.002790 vs incumbent 0.002790  (9316 ms, 4658 ms/eval)
+[landscape_search] round 4  road_tier held   corps=8 placement=B50F34C8 tier=1  composite=0.002790 vs incumbent 0.002790  (11555 ms, 5777 ms/eval)
+[landscape_search] round 5  road_tier held   corps=8 placement=B50F34C8 tier=1  composite=0.002790 vs incumbent 0.002790  (12445 ms, 6222 ms/eval)
+
+=== seed 43  (771 s: build 186, settle 78, play 508) ===
+ G1 processors  (as handed to the settle: 226, 0 of them decommissioned)
+  handoff    built  232: run   37  input   41  nolab    0  unsupplied    0  decom  153  other    1  -> running  15.9%  | + under construction  135 (running of all  10.1%)
+             decom by its last reported state: ran 0  input-starved 153  other 0  never reported 0
+  tick 50    built  297: run   49  input   99  nolab    0  unsupplied    8  decom   99  other   42  -> running  16.5%  | + under construction  107 (running of all  12.1%)
+             decom by its last reported state: ran 2  input-starved 83  other 14  never reported 0
+ G2 field income/tick  settle close      11545  tick 50      15593  ratio 135.1%   (context: settle mean 53546, play 26-50 mean 14831)
+ G3 firms  handoff 128  alive of those at tick 400: 18 ( 14.1%)  total corps then 18
+ G4 seat 52464 "LuxusAthel International"  operating net, last 8 settle quarters: -65.3 -52.3 -55.8 -83.9 -124.1 -82.5 -86.3 -91.3  (mean -80.2)
+    seat processor 52628 oil_power_plant          ran 0/8 settle ticks, build at handoff
+    seat processor 52763 oil_power_plant          ran 0/8 settle ticks, build at handoff
+    seat processor 52892 oil_power_plant          ran 0/8 settle ticks, build at handoff
+    home markets clearing nothing over play ticks 1-4: 6 of 18
+    buildings at tick 50: live 400  under construction 502  decommissioned 105
+[Lua] works.lua loaded  work_count=21
+[Lua] recipes.lua loaded  recipe_count=46
+[Lua] economy.lua loaded
+EXIT 1
+(the EXIT line above is the shell's, written after the cap terminated the process; no table or pool was printed)
+
+==== INVOCATION 2: market_viability.exe --seeds 32,10,25,38,9,0 ====
+
+market_viability — BL-1184 (market viability gate)
+targets (Ben, the sprint 49 form, 2026-10-04), pooled: G1 running at handoff >= 70%, G2 income t50/settle-close >= 50%, G3 firms alive t400/handoff >= 70%
+seeds (--seeds, 6): 32 10 25 38 9 0   play ticks 400 (tick N = play tick N after the 12-tick settle)
+[Lua] works.lua loaded  work_count=21
+[Lua] recipes.lua loaded  recipe_count=46
+[Lua] economy.lua loaded
+[landscape_search] charter budget: 530 centres, 48830967 points; roster axis SKIPPED (the budget decides the roster)
+[landscape_search] seed   corps=8 placement=8A21F02D tier=1  composite=0.001303  (1423 ms)
+[landscape_search] round 0  placement TAKEN  corps=8 placement=616F4C68 tier=1  composite=0.001955 vs incumbent 0.001303  (1818 ms, 909 ms/eval)
+[landscape_search] round 1  road_tier held   corps=8 placement=616F4C68 tier=1  composite=0.001955 vs incumbent 0.001955  (1840 ms, 920 ms/eval)
+[landscape_search] round 2  road_tier held   corps=8 placement=616F4C68 tier=1  composite=0.001955 vs incumbent 0.001955  (3201 ms, 1600 ms/eval)
+[landscape_search] round 3  road_tier held   corps=8 placement=616F4C68 tier=1  composite=0.001955 vs incumbent 0.001955  (2908 ms, 1454 ms/eval)
+[landscape_search] round 4  road_tier TAKEN  corps=8 placement=616F4C68 tier=2  composite=0.001956 vs incumbent 0.001955  (2664 ms, 1332 ms/eval)
+[landscape_search] round 5  road_tier held   corps=8 placement=616F4C68 tier=1  composite=0.001955 vs incumbent 0.001956  (2739 ms, 1369 ms/eval)
+
+=== seed 32  (896 s: build 295, settle 27, play 575) ===
+ G1 processors  (as handed to the settle: 236, 0 of them decommissioned)
+  handoff    built  236: run   41  input   40  nolab    0  unsupplied    0  decom  154  other    1  -> running  17.4%  | + under construction  136 (running of all  11.0%)
+             decom by its last reported state: ran 0  input-starved 154  other 0  never reported 0
+  tick 50    built  222: run   33  input   84  nolab    0  unsupplied    6  decom   68  other   31  -> running  14.9%  | + under construction  155 (running of all   8.8%)
+             decom by its last reported state: ran 2  input-starved 54  other 12  never reported 0
+ G2 field income/tick  settle close      14490  tick 50      10269  ratio  70.9%   (context: settle mean 64317, play 26-50 mean 19996)
+ G3 firms  handoff 144  alive of those at tick 400: 54 ( 37.5%)  total corps then 54
+ G4 seat 52861 "Tera Enterprises"  operating net, last 8 settle quarters: -47.1 -37.1 -45.5 -50.8 -53.2 -73.3 -60.9 -60.5  (mean -53.6)
+    seat processor 52859 steel_from_iron_nickel   ran 0/8 settle ticks, decom at handoff
+    home markets clearing nothing over play ticks 1-4: 10 of 35
+    buildings at tick 50: live 295  under construction 1145  decommissioned 69
+[Lua] works.lua loaded  work_count=21
+[Lua] recipes.lua loaded  recipe_count=46
+[Lua] economy.lua loaded
+[landscape_search] charter budget: 578 centres, 57496632 points; roster axis SKIPPED (the budget decides the roster)
+[landscape_search] seed   corps=8 placement=8A21F007 tier=1  composite=0.002167  (1790 ms)
+[landscape_search] round 0  road_tier TAKEN  corps=8 placement=8A21F007 tier=2  composite=0.002170 vs incumbent 0.002167  (2003 ms, 1002 ms/eval)
+[landscape_search] round 1  placement TAKEN  corps=8 placement=579751BA tier=2  composite=0.002314 vs incumbent 0.002170  (1677 ms, 838 ms/eval)
+[landscape_search] round 2  road_tier held   corps=8 placement=579751BA tier=1  composite=0.002312 vs incumbent 0.002314  (2002 ms, 1001 ms/eval)
+[landscape_search] round 3  road_tier TAKEN  corps=8 placement=579751BA tier=3  composite=0.002318 vs incumbent 0.002314  (1795 ms, 898 ms/eval)
+[landscape_search] round 4  placement held   corps=8 placement=1BDBB091 tier=3  composite=0.002318 vs incumbent 0.002318  (2297 ms, 1149 ms/eval)
+[landscape_search] round 5  road_tier held   corps=8 placement=579751BA tier=2  composite=0.002314 vs incumbent 0.002318  (1884 ms, 942 ms/eval)
+
+=== seed 10  (867 s: build 148, settle 18, play 701) ===
+ G1 processors  (as handed to the settle: 226, 0 of them decommissioned)
+  handoff    built  227: run   33  input   42  nolab    0  unsupplied    0  decom  151  other    1  -> running  14.5%  | + under construction   82 (running of all  10.7%)
+             decom by its last reported state: ran 1  input-starved 150  other 0  never reported 0
+  tick 50    built  241: run   33  input   65  nolab    0  unsupplied    0  decom  109  other   34  -> running  13.7%  | + under construction  152 (running of all   8.4%)
+             decom by its last reported state: ran 2  input-starved 99  other 8  never reported 0
+ G2 field income/tick  settle close      12266  tick 50      13319  ratio 108.6%   (context: settle mean 57194, play 26-50 mean 15022)
+ G3 firms  handoff 126  alive of those at tick 400: 33 ( 26.2%)  total corps then 33
+ G4 seat 53171 "ExoenOrbar Processing Group"  operating net, last 8 settle quarters: -42.9 -67.7 -41.6 -89.9 -97.3 -118.8 -93.6 -87.4  (mean -79.9)
+    seat processor 53170 refined_copper           ran 0/8 settle ticks, decom at handoff
+    home markets clearing nothing over play ticks 1-4: 9 of 28
+    buildings at tick 50: live 268  under construction 842  decommissioned 243
+[Lua] works.lua loaded  work_count=21
+[Lua] recipes.lua loaded  recipe_count=46
+[Lua] economy.lua loaded
+[landscape_search] charter budget: 777 centres, 67614378 points; roster axis SKIPPED (the budget decides the roster)
+[landscape_search] seed   corps=8 placement=8A21F014 tier=1  composite=0.005197  (25767 ms)
+[landscape_search] round 0  road_tier TAKEN  corps=8 placement=8A21F014 tier=2  composite=0.005202 vs incumbent 0.005197  (8703 ms, 4351 ms/eval)
+[landscape_search] round 1  road_tier TAKEN  corps=8 placement=8A21F014 tier=3  composite=0.005207 vs incumbent 0.005202  (7297 ms, 3648 ms/eval)
+[landscape_search] round 2  road_tier held   corps=8 placement=8A21F014 tier=2  composite=0.005202 vs incumbent 0.005207  (5748 ms, 2874 ms/eval)
+[landscape_search] round 3  placement held   corps=8 placement=42DEE8E3 tier=3  composite=0.005207 vs incumbent 0.005207  (7283 ms, 3641 ms/eval)
+[landscape_search] round 4  road_tier held   corps=8 placement=8A21F014 tier=3  composite=0.005207 vs incumbent 0.005207  (7968 ms, 3984 ms/eval)
+[landscape_search] round 5  placement held   corps=8 placement=6E08FF63 tier=3  composite=0.005207 vs incumbent 0.005207  (6993 ms, 3496 ms/eval)
+
+=== seed 25  (522 s: build 419, settle 32, play 71) ===
+ G1 processors  (as handed to the settle: 225, 0 of them decommissioned)
+  handoff    built  227: run   32  input   46  nolab    0  unsupplied    0  decom  148  other    1  -> running  14.1%  | + under construction  134 (running of all   8.9%)
+             decom by its last reported state: ran 4  input-starved 136  other 8  never reported 0
+  tick 50    built  226: run   33  input   76  nolab    0  unsupplied    0  decom   86  other   31  -> running  14.6%  | + under construction  176 (running of all   8.2%)
+             decom by its last reported state: ran 3  input-starved 67  other 16  never reported 0
+ G2 field income/tick  settle close      16421  tick 50      16410  ratio  99.9%   (context: settle mean 60550, play 26-50 mean 16333)
+ G3 firms  handoff 126  alive of those at tick 400: 54 ( 42.9%)  total corps then 54
+ G4 seat 53560 "Sezei Industries"  operating net, last 8 settle quarters: -51.1 -33.8 -37.7 -71.1 -95.3 -74.1 -97.0 -79.6  (mean -67.5)
+    seat processor 53559 steel                    ran 0/8 settle ticks, decom at handoff
+    seat processor 53708 iron_frame_construction  ran 0/8 settle ticks, build at handoff
+    seat processor 53839 oil_power_plant          ran 0/8 settle ticks, build at handoff
+    home markets clearing nothing over play ticks 1-4: 1 of 23
+    buildings at tick 50: live 264  under construction 741  decommissioned 177
+[Lua] works.lua loaded  work_count=21
+[Lua] recipes.lua loaded  recipe_count=46
+[Lua] economy.lua loaded
+[landscape_search] charter budget: 511 centres, 18985113 points; roster axis SKIPPED (the budget decides the roster)
+[landscape_search] seed   corps=8 placement=8A21F02B tier=1  composite=0.004224  (257 ms)
+[landscape_search] round 0  placement TAKEN  corps=8 placement=6BC1DF4E tier=1  composite=0.004487 vs incumbent 0.004224  (340 ms, 170 ms/eval)
+[landscape_search] round 1  placement TAKEN  corps=8 placement=D7ECCCD5 tier=1  composite=0.004751 vs incumbent 0.004487  (355 ms, 178 ms/eval)
+[landscape_search] round 2  placement TAKEN  corps=8 placement=B08904F0 tier=1  composite=0.005280 vs incumbent 0.004751  (322 ms, 161 ms/eval)
+[landscape_search] round 3  road_tier held   corps=8 placement=B08904F0 tier=1  composite=0.005280 vs incumbent 0.005280  (320 ms, 160 ms/eval)
+[landscape_search] round 4  road_tier held   corps=8 placement=B08904F0 tier=1  composite=0.005280 vs incumbent 0.005280  (323 ms, 161 ms/eval)
+[landscape_search] round 5  placement TAKEN  corps=8 placement=591A944F tier=1  composite=0.005543 vs incumbent 0.005280  (328 ms, 164 ms/eval)
+
+=== seed 38  (86 s: build 11, settle 3, play 72) ===
+ G1 processors  (as handed to the settle: 255, 0 of them decommissioned)
+  handoff    built  262: run   52  input   56  nolab    0  unsupplied    1  decom  152  other    1  -> running  19.8%  | + under construction  161 (running of all  12.3%)
+             decom by its last reported state: ran 0  input-starved 150  other 2  never reported 0
+  tick 50    built  257: run   46  input   85  nolab    4  unsupplied    0  decom   97  other   25  -> running  17.9%  | + under construction  199 (running of all  10.1%)
+             decom by its last reported state: ran 3  input-starved 67  other 27  never reported 0
+ G2 field income/tick  settle close      17421  tick 50      11568  ratio  66.4%   (context: settle mean 74132, play 26-50 mean 18294)
+ G3 firms  handoff 149  alive of those at tick 400: 50 ( 33.6%)  total corps then 50
+ G4 seat 52535 "Delen-UlvixNexon Dynamics"  operating net, last 8 settle quarters: -64.8 -77.0 -80.1 -82.2 -126.8 -83.3 -85.1 -79.6  (mean -84.8)
+    seat processor 52532 refined_copper           ran 0/8 settle ticks, decom at handoff
+    seat processor 52533 refined_copper           ran 0/8 settle ticks, decom at handoff
+    seat processor 52783 ree_alloy                ran 0/8 settle ticks, build at handoff
+    seat processor 52959 ree_alloy                ran 0/8 settle ticks, build at handoff
+    home markets clearing nothing over play ticks 1-4: 2 of 27
+    buildings at tick 50: live 376  under construction 570  decommissioned 143
+[Lua] works.lua loaded  work_count=21
+[Lua] recipes.lua loaded  recipe_count=46
+[Lua] economy.lua loaded
+[landscape_search] charter budget: 470 centres, 41948095 points; roster axis SKIPPED (the budget decides the roster)
+[landscape_search] seed   corps=8 placement=8A21F004 tier=1  composite=0.003072  (1135 ms)
+[landscape_search] round 0  road_tier held   corps=8 placement=8A21F004 tier=1  composite=0.003072 vs incumbent 0.003072  (1707 ms, 854 ms/eval)
+[landscape_search] round 1  road_tier held   corps=8 placement=8A21F004 tier=1  composite=0.003072 vs incumbent 0.003072  (1554 ms, 777 ms/eval)
+[landscape_search] round 2  placement TAKEN  corps=8 placement=5ECE3ED3 tier=1  composite=0.003264 vs incumbent 0.003072  (1371 ms, 685 ms/eval)
+[landscape_search] round 3  road_tier TAKEN  corps=8 placement=5ECE3ED3 tier=2  composite=0.003265 vs incumbent 0.003264  (1331 ms, 665 ms/eval)
+[landscape_search] round 4  road_tier TAKEN  corps=8 placement=5ECE3ED3 tier=3  composite=0.003268 vs incumbent 0.003265  (2180 ms, 1090 ms/eval)
+[landscape_search] round 5  road_tier held   corps=8 placement=5ECE3ED3 tier=2  composite=0.003265 vs incumbent 0.003268  (1926 ms, 963 ms/eval)
+
+=== seed 9  (140 s: build 53, settle 8, play 79) ===
+ G1 processors  (as handed to the settle: 226, 0 of them decommissioned)
+  handoff    built  229: run   36  input   32  nolab    0  unsupplied    6  decom  154  other    1  -> running  15.7%  | + under construction  130 (running of all  10.0%)
+             decom by its last reported state: ran 3  input-starved 151  other 0  never reported 0
+  tick 50    built  289: run   40  input   61  nolab    0  unsupplied    0  decom  150  other   38  -> running  13.8%  | + under construction   97 (running of all  10.4%)
+             decom by its last reported state: ran 3  input-starved 128  other 19  never reported 0
+ G2 field income/tick  settle close      14267  tick 50      10207  ratio  71.5%   (context: settle mean 58427, play 26-50 mean 20119)
+ G3 firms  handoff 134  alive of those at tick 400: 21 ( 15.7%)  total corps then 21
+ G4 seat 52785 "Mishar Resources"  operating net, last 8 settle quarters: 18.5 -57.8 -59.7 -24.4 -29.6 -84.6 -101.7 -38.4  (mean -47.2)
+    seat processor 52784 refined_copper           ran 0/8 settle ticks, decom at handoff
+    seat processor 52883 consumer_goods           ran 0/8 settle ticks, build at handoff
+    seat processor 53031 food_rations             ran 0/8 settle ticks, build at handoff
+    seat processor 53171 food_rations             ran 0/8 settle ticks, build at handoff
+    home markets clearing nothing over play ticks 1-4: 8 of 24
+    buildings at tick 50: live 334  under construction 866  decommissioned 153
+[Lua] works.lua loaded  work_count=21
+[Lua] recipes.lua loaded  recipe_count=46
+[Lua] economy.lua loaded
+[landscape_search] charter budget: 615 centres, 41768865 points; roster axis SKIPPED (the budget decides the roster)
+[landscape_search] seed   corps=8 placement=8A21F00D tier=1  composite=0.002498  (279 ms)
+[landscape_search] round 0  road_tier held   corps=8 placement=8A21F00D tier=1  composite=0.002498 vs incumbent 0.002498  (319 ms, 160 ms/eval)
+[landscape_search] round 1  placement TAKEN  corps=8 placement=54F27048 tier=1  composite=0.002966 vs incumbent 0.002498  (330 ms, 165 ms/eval)
+[landscape_search] round 2  placement TAKEN  corps=8 placement=3EE9ED87 tier=1  composite=0.003122 vs incumbent 0.002966  (315 ms, 158 ms/eval)
+[landscape_search] round 3  road_tier held   corps=8 placement=3EE9ED87 tier=1  composite=0.003122 vs incumbent 0.003122  (309 ms, 155 ms/eval)
+[landscape_search] round 4  road_tier held   corps=8 placement=3EE9ED87 tier=1  composite=0.003122 vs incumbent 0.003122  (313 ms, 156 ms/eval)
+[landscape_search] round 5  road_tier TAKEN  corps=8 placement=3EE9ED87 tier=2  composite=0.003124 vs incumbent 0.003122  (331 ms, 165 ms/eval)
+
+=== seed 0  (70 s: build 22, settle 2, play 46) ===
+ G1 processors  (as handed to the settle: 225, 0 of them decommissioned)
+  handoff    built  226: run   45  input   22  nolab    0  unsupplied    0  decom  158  other    1  -> running  19.9%  | + under construction  126 (running of all  12.8%)
+             decom by its last reported state: ran 0  input-starved 155  other 3  never reported 0
+  tick 50    built  235: run   35  input   90  nolab    0  unsupplied    1  decom   78  other   31  -> running  14.9%  | + under construction  156 (running of all   9.0%)
+             decom by its last reported state: ran 2  input-starved 63  other 13  never reported 0
+ G2 field income/tick  settle close      22339  tick 50      11276  ratio  50.5%   (context: settle mean 58665, play 26-50 mean 15834)
+ G3 firms  handoff 126  alive of those at tick 400: 51 ( 40.5%)  total corps then 51
+ G4 seat 53038 "Nukai Holdings"  operating net, last 8 settle quarters: -52.7 -53.9 -83.1 -135.8 -84.8 -83.8 -87.6 -140.1  (mean -90.2)
+    seat processor 53158 oil_power_plant          ran 0/8 settle ticks, build at handoff
+    seat processor 53289 iron_frame_construction  ran 0/8 settle ticks, build at handoff
+    home markets clearing nothing over play ticks 1-4: 7 of 25
+    buildings at tick 50: live 295  under construction 834  decommissioned 118
+
+ seed | built@h run  inp  oth  run% | built@50 run  inp  oth  run% |  inc close   inc t50  ratio | firms h  alive  % | seat opnet(mean8) procs ran | idle mkts | bld live/constr
+   32 |    236   41   40  155  17.4 |     222   33   84  105  14.9 |     14490     10269  70.9% |    144    54  37.5 |    -53.6   0/1   |  10/35  |  295/1145
+   10 |    227   33   42  152  14.5 |     241   33   65  143  13.7 |     12266     13319 108.6% |    126    33  26.2 |    -79.9   0/1   |   9/28  |  268/842
+   25 |    227   32   46  149  14.1 |     226   33   76  117  14.6 |     16421     16410  99.9% |    126    54  42.9 |    -67.5   0/3   |   1/23  |  264/741
+   38 |    262   52   56  154  19.8 |     257   46   85  126  17.9 |     17421     11568  66.4% |    149    50  33.6 |    -84.8   0/4   |   2/27  |  376/570
+    9 |    229   36   32  161  15.7 |     289   40   61  188  13.8 |     14267     10207  71.5% |    134    21  15.7 |    -47.2   0/4   |   8/24  |  334/866
+    0 |    226   45   22  159  19.9 |     235   35   90  110  14.9 |     22339     11276  50.5% |    126    51  40.5 |    -90.2   0/2   |   7/25  |  295/834
+
+ pooled over 6 seeds (2580 s)
+  handoff    built 1407: run  239  input  238  nolab    0  unsupplied    7  decom  917  other    6  -> running  17.0%  | + under construction  769 (running of all  11.0%)
+             decom by its last reported state: ran 8  input-starved 896  other 13  never reported 0
+  tick 50    built 1470: run  220  input  461  nolab    4  unsupplied    7  decom  588  other  190  -> running  15.0%  | + under construction  935 (running of all   9.1%)
+             decom by its last reported state: ran 15  input-starved 478  other 95  never reported 0
+ FAIL  G1 processors running at handoff   17.0%  (target >= 70%)
+ PASS  G2 field income t50 / settle close   75.1%  (73048 / 97205; target >= 50%)
+ FAIL  G3 firms alive t400 / handoff        32.7%  (263 / 805; target >= 70%)
+market_viability: G1 17.0/70 G2 75.1/50 G3 32.7/70
+EXIT 0

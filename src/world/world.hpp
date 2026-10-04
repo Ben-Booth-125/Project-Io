@@ -586,6 +586,22 @@ struct world
     /// placement (BL-599) from turning every tick into hundreds of grid searches.
     std::map<std::pair<entity_id, entity_id>, logistics_flood_field> logistics_flood_fields;
 
+    /// BL-1186 (goods cross markets): the LEG-confined siblings of the two caches above —
+    /// a land leg never enters water, a sea leg runs port -> water -> port (SUPPLY.md
+    /// § Logistical cost: mode is a property of the leg). Flood fields keyed (body, anchor
+    /// tile, leg_domain), pair paths keyed by the ORDERED (body, src, dst, leg_domain).
+    /// Derived caches with the SAME invalidation contract (invalidate_logistics_caches,
+    /// clear_derived_state); kept apart so the unconfined counts the warm-start probes read
+    /// stay theirs. Pure functions of the body's tiles.
+    std::map<std::tuple<entity_id, entity_id, std::uint8_t>, logistics_flood_field> leg_flood_fields;
+    std::map<std::tuple<entity_id, entity_id, entity_id, std::uint8_t>, logistics_path> leg_path_cache;
+
+    /// BL-1186: per body, the tiles carrying a BUILT, ACTIVE Port, ascending and unique —
+    /// the candidate ends of a sea leg. Derived; cleared with the logistics caches, whose
+    /// contract already covers a port completing, idling or being demolished
+    /// (building_affects_logistics).
+    std::map<entity_id, std::vector<entity_id>> body_port_tiles;
+
     /// Per-body LOGISTICS REACH FIELD (BL-323 S2): raster-indexed weighted cost from each
     /// tile to its nearest supply anchor — a city, a port, or an inland logistics hub.
     /// Infinity where no anchor is reachable. A derived cache like the two above, built on

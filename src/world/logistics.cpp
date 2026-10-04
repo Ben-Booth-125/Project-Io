@@ -1,5 +1,6 @@
 #include "logistics.hpp"
 #include "river_generation.hpp"
+#include "hex_neighbors.hpp" // BL-1186: a port reaches its sea across any hex side
 
 #include <algorithm>
 #include <cmath>
@@ -411,6 +412,258 @@ const logistics_path& intra_body_path(world& w, entity_id body, entity_id src_ti
         res.tiles = std::move(seq);
     }
     return w.astar_cost_cache.emplace(key, std::move(res)).first->second;
+}
+
+// ---------------------------------------------------------------------------
+// BL-1186 (goods cross markets): a route's LEGS
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/// Fetch or build @p domain's flood field anchored at @p anchor_tile — the
+/// leg-confined sibling of flood_field_for, over the SAME directed edge
+/// (`flood_edge_cost`), so a leg's cost is priced exactly as intra_body_path
+/// prices the same tiles. Kept on world.leg_flood_fields, apart from the
+/// unconfined fields, so the counts the warm-start probes read stay theirs.
+///
+///   land: never enters a water cell.
+///   sea:  the anchor (the destination PORT) expands into water only; a water
+///         cell expands anywhere; a land cell other than the anchor is settled
+///         (a sea leg may END there — the origin port) but never expanded. So
+///         every reached land cell is reached across water from the anchor and
+///         the leg is port -> water -> port, nothing else.
+const logistics_flood_field& leg_flood_field_for(world& w, entity_id body, entity_id anchor_tile,
+                                                 leg_domain domain, int gw, int gh,
+                                                 const std::vector<entity_id>& grid,
+                                                 const tile_component& anchor_tc)
+{
+    const auto key = std::make_tuple(body, anchor_tile, static_cast<std::uint8_t>(domain));
+    const auto fit = w.leg_flood_fields.find(key);
+    if (fit != w.leg_flood_fields.end())
+        return fit->second;
+
+    logistics_flood_field f;
+    const int total = gw * gh;
+    f.dist.assign(static_cast<std::size_t>(total), 1e30f);
+    f.came_from.assign(static_cast<std::size_t>(total), -1);
+    f.crossed.assign(static_cast<std::size_t>(total), 0);
+    std::vector<char> settled(static_cast<std::size_t>(total), 0);
+
+    const auto tile_at = [&](int idx) -> const tile_component* {
+        const entity_id tid = grid[static_cast<std::size_t>(idx)];
+        if (tid == null_entity)
+            return nullptr;
+        const auto tit = w.tiles.find(tid);
+        return (tit != w.tiles.end()) ? &tit->second : nullptr;
+    };
+    // What counts as WATER for this domain. A land leg never enters water of any
+    // kind; a sea leg sails the SEA only — ports gate on `is_coastal`, which reads
+    // is_sea, so a lake is no sea lane (a lake cell is to a sea leg what land is:
+    // somewhere it may end, never a cell it crosses).
+    const auto wet = [domain](const tile_component& t) {
+        return domain == leg_domain::sea ? is_sea(t.substrate) : is_water(t.substrate);
+    };
+
+    const int ac = anchor_tc.grid_x, ar = anchor_tc.grid_y;
+    f.anchor_idx = raster_idx(ac, ar, gw);
+    f.dist[static_cast<std::size_t>(f.anchor_idx)]    = 0.0f;
+    f.crossed[static_cast<std::size_t>(f.anchor_idx)] = is_water(anchor_tc.substrate) ? 1 : 0;
+
+    std::priority_queue<pq_entry, std::vector<pq_entry>, std::greater<pq_entry>> pq;
+    pq.push({ 0.0f, ac, ar });
+
+    while (!pq.empty())
+    {
+        const pq_entry cur = pq.top();
+        pq.pop();
+        const int idx = raster_idx(cur.col, cur.row, gw);
+        if (settled[static_cast<std::size_t>(idx)])
+            continue;
+        settled[static_cast<std::size_t>(idx)] = 1;
+
+        const tile_component* cur_tc = tile_at(idx);
+        if (!cur_tc)
+            continue;
+        const bool cur_water = wet(*cur_tc);
+        // A sea leg crosses land only at its two ends: a land cell that is not
+        // the anchor is where a leg ENDS, never a cell it passes through.
+        if (domain == leg_domain::sea && !cur_water && idx != f.anchor_idx)
+            continue;
+        const float cur_cost = tile_traversal_cost(*cur_tc);
+
+        for (int i = 0; i < 4; ++i)
+        {
+            const int nr = cur.row + k_flood_off_dr[i];
+            if (nr < 0 || nr >= gh)
+                continue;
+            const int nc = ((cur.col + k_flood_off_dc[i]) % gw + gw) % gw;
+            const int nidx = raster_idx(nc, nr, gw);
+            if (settled[static_cast<std::size_t>(nidx)])
+                continue;
+            const tile_component* n_tc = tile_at(nidx);
+            if (!n_tc)
+                continue;
+            const bool n_water = wet(*n_tc);
+            if (domain == leg_domain::land && n_water)
+                continue; // a land leg never enters water
+            if (domain == leg_domain::sea && !cur_water && !n_water)
+                continue; // the anchor port leaves by water, never overland
+
+            const float edge = flood_edge_cost(cur_cost, *n_tc, nr, i);
+            const float nd   = f.dist[static_cast<std::size_t>(idx)] + edge;
+            if (nd < f.dist[static_cast<std::size_t>(nidx)])
+            {
+                f.dist[static_cast<std::size_t>(nidx)] = nd;
+                f.crossed[static_cast<std::size_t>(nidx)] =
+                    (f.crossed[static_cast<std::size_t>(idx)] || n_water) ? 1 : 0;
+                f.came_from[static_cast<std::size_t>(nidx)] = idx;
+                pq.push({ nd, nc, nr });
+            }
+        }
+
+        // A PORT TOUCHES THE WATER IT IS COASTAL TO. Placement's `is_coastal` reads
+        // all six hex sides, the flood only four (the cardinal pair of each hex row
+        // misses two diagonals), so a Port whose sea lies only on a diagonal would be
+        // placeable yet never reachable by sea. The sea leg therefore also makes the
+        // port <-> water hop across the two diagonals the cardinal walk skips —
+        // land-to-water out of the anchor, water-to-land into the origin port — and
+        // nothing else: water-to-water stays cardinal, so the crossing itself is
+        // priced exactly as the unconfined flood prices it. Same node-mean edge and
+        // river side rule as flood_edge_cost (the hop leaves the neighbour by the
+        // side facing back, (side + 3) % 6).
+        if (domain == leg_domain::sea)
+        {
+            const auto& off = hex_neighbors::offsets(cur.row);
+            for (int side = 0; side < 6; ++side)
+            {
+                const int nr = cur.row + off[side][1];
+                if (nr < 0 || nr >= gh)
+                    continue;
+                const int nc   = ((cur.col + off[side][0]) % gw + gw) % gw;
+                const int nidx = raster_idx(nc, nr, gw);
+                if (settled[static_cast<std::size_t>(nidx)])
+                    continue;
+                const tile_component* n_tc = tile_at(nidx);
+                if (!n_tc)
+                    continue;
+                const bool n_water = wet(*n_tc);
+                if (cur_water == n_water)
+                    continue; // only the port <-> water hop
+                const float edge = 0.5f * (cur_cost + tile_traversal_cost(*n_tc))
+                                 * river_edge_discount(*n_tc, (side + 3) % 6);
+                const float nd = f.dist[static_cast<std::size_t>(idx)] + edge;
+                if (nd < f.dist[static_cast<std::size_t>(nidx)])
+                {
+                    f.dist[static_cast<std::size_t>(nidx)] = nd;
+                    f.crossed[static_cast<std::size_t>(nidx)] = 1;
+                    f.came_from[static_cast<std::size_t>(nidx)] = idx;
+                    pq.push({ nd, nc, nr });
+                }
+            }
+        }
+    }
+
+    return w.leg_flood_fields.emplace(key, std::move(f)).first->second;
+}
+
+} // namespace
+
+const logistics_path& intra_body_leg_path(world& w, entity_id body, entity_id src_tile,
+                                          entity_id dst_tile, leg_domain domain)
+{
+    logistics_path res;
+    const auto key = std::make_tuple(body, src_tile, dst_tile, static_cast<std::uint8_t>(domain));
+    const auto cit = w.leg_path_cache.find(key);
+    if (cit != w.leg_path_cache.end())
+        return cit->second;
+
+    const auto bit = w.bodies.find(body);
+    const auto sit = w.tiles.find(src_tile);
+    const auto dit = w.tiles.find(dst_tile);
+    if (bit == w.bodies.end() || sit == w.tiles.end() || dit == w.tiles.end()
+        || sit->second.body != body || dit->second.body != body)
+        return w.leg_path_cache.emplace(key, std::move(res)).first->second;
+
+    const int gw = bit->second.grid_width;
+    const int gh = bit->second.grid_height;
+    const std::vector<entity_id>& grid = body_tile_grid(w, body);
+    if (gw <= 0 || gh <= 0 || grid.empty())
+        return w.leg_path_cache.emplace(key, std::move(res)).first->second;
+
+    if (src_tile == dst_tile)
+    {
+        // A zero-length leg: the cargo is already where the leg would take it
+        // (an origin ON its port). A sea leg is never zero-length: one port is
+        // no crossing.
+        if (domain == leg_domain::land && !is_water(sit->second.substrate))
+        {
+            res.reachable = true;
+            res.cost      = 0.0f;
+            res.tiles     = { src_tile };
+        }
+        return w.leg_path_cache.emplace(key, std::move(res)).first->second;
+    }
+    if (domain == leg_domain::land
+        && (is_water(sit->second.substrate) || is_water(dit->second.substrate)))
+        return w.leg_path_cache.emplace(key, std::move(res)).first->second;
+
+    const logistics_flood_field& field =
+        leg_flood_field_for(w, body, dst_tile, domain, gw, gh, grid, dit->second);
+    const int src_idx = raster_idx(sit->second.grid_x, sit->second.grid_y, gw);
+    if (field.dist[static_cast<std::size_t>(src_idx)] < 1e30f)
+    {
+        res.reachable     = true;
+        res.cost          = field.dist[static_cast<std::size_t>(src_idx)];
+        res.crosses_ocean = field.crossed[static_cast<std::size_t>(src_idx)] != 0;
+        std::vector<entity_id> seq;
+        for (int i = src_idx; i != -1; i = field.came_from[static_cast<std::size_t>(i)])
+        {
+            const entity_id tid = grid[static_cast<std::size_t>(i)];
+            if (tid != null_entity) seq.push_back(tid);
+            if (i == field.anchor_idx) break;
+        }
+        if (src_tile > dst_tile) // seq runs src -> dst; stored lo -> hi like intra_body_path
+            std::reverse(seq.begin(), seq.end());
+        res.tiles = std::move(seq);
+    }
+    return w.leg_path_cache.emplace(key, std::move(res)).first->second;
+}
+
+const std::vector<entity_id>& body_active_port_tiles(world& w, entity_id body)
+{
+    const auto it = w.body_port_tiles.find(body);
+    if (it != w.body_port_tiles.end())
+        return it->second;
+    std::vector<entity_id> ports;
+    for (const auto& [bid, bc] : w.buildings)
+    {
+        (void)bid;
+        if (bc.type != building_type::port || bc.ticks_remaining > 0 || bc.decommissioned)
+            continue;
+        const auto tit = w.tiles.find(bc.tile);
+        if (tit != w.tiles.end() && tit->second.body == body)
+            ports.push_back(bc.tile);
+    }
+    // Ascending and unique: a fixed walk order however w.buildings hashes, and
+    // two ports on one tile are one port.
+    std::sort(ports.begin(), ports.end());
+    ports.erase(std::unique(ports.begin(), ports.end()), ports.end());
+    return w.body_port_tiles.emplace(body, std::move(ports)).first->second;
+}
+
+float leg_travel_days(const world& w, entity_id body, float path_cost, convoy_mode mode)
+{
+    const float km_per_tile = body_km_per_tile(w, body);
+    if (km_per_tile <= 0.0f || !(path_cost > 0.0f))
+        return 0.0f;
+    const float km_per_day = (mode == convoy_mode::sea) ? coastal_km_per_day : caravan_km_per_day;
+    return path_cost * km_per_tile / km_per_day;
+}
+
+int travel_ticks_for_days(float days)
+{
+    const int ticks = static_cast<int>(days / static_cast<float>(econ_tick_days_world) + 0.999f);
+    return ticks < 1 ? 1 : ticks;
 }
 
 // ---------------------------------------------------------------------------
