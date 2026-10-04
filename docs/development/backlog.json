@@ -1077,8 +1077,8 @@
    "design": "works_event_fraction_q = 2000 was pinned on readings taken under the world price (3233 notes, 894 of 1297 charters dated). Under the reach price far landmasses note more and start cheaper, so the NR-940 early clustering may worsen there. Re-measure with industry_concentration DATING on the 16 library seeds and record the readings beside the pin; report, do not retune silently."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "designed",
+   "glyph": "◐",
    "sprint": 49,
    "written": "2026-10-03",
    "requires": [],
@@ -1095,7 +1095,7 @@
    "files": [
     "src/world/market_clearing.cpp"
    ],
-   "design": "BEN (2026-10-03): backlogged in favour of the k-tick cap on the shelf's share of supply. The market buys every surplus as buyer of last resort, so inventory only grows; counted whole as supply it floored prices (1/1/11 firms on seeds 0/10/28). Spoilage treats the cause: design which goods spoil, at what rate, who loses the value, and whether the k cap then retires. Design first."
+   "design": "BROUGHT FORWARD and DESIGNED (2026-10-05; Ben NR-968 A; design NR-970, MARKETS.md sec The shelf spoils): per-good shelf spoilage by class (perishable / consumable / durable, never zero), shelf only, nobody charged, drains after the draws and before the shelf's supply share. THEN set k > 0 by measurement: sweep k on the market viability gate with households eating (BL-1196) and spoilage on, report, and the smallest k that keeps a consuming market's price off the ceiling against a stocked shelf is the value.\n\nBEN (2026-10-03): backlogged in favour of the k-tick cap on the shelf's share of supply. The market buys every surplus as buyer of last resort, so inventory only grows; counted whole as supply it floored prices (1/1/11 firms on seeds 0/10/28). Spoilage treats the cause: design which goods spoil, at what rate, who loses the value, and whether the k cap then retires. Design first."
   },
   {
    "status": "proposed",

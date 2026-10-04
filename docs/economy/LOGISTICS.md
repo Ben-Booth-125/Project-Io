@@ -598,6 +598,10 @@ LP is what makes that priority explicit, and it is the strongest argument for it
 - **A leg over the cap fails — refused outright, and the player is told why.** A refused leg is
   legible; a queued one is not. The cost is that LP reads as a wall, which is the honest trade.
   **Surfacing is non-optional** — a refusal nobody sees is silent interdiction again.
+  **The rule covers COMMANDED legs (Ben, 2026-10-05, NR-969):** a leg somebody named — the player's
+  verb, a rival's directed dispatch — is refused whole and told. The automatic dispatch has nobody
+  to tell, so a whole refusal there would be exactly the silent interdiction this rule forbids; it
+  sends what the pool admits instead (`SUPPLY.md` § Dispatch trigger).
 - **Throughput is a lens**, extending Reach. The Reach lens shows a binary field; throughput is
   that field with a magnitude, so it is a small step from an existing surface rather than a new one.
 - **Allocation under contention is order-independent** — a deterministic priority rule over a
