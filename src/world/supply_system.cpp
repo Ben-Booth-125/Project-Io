@@ -415,36 +415,14 @@ entity_id convoy_origin_tile(const world& w, const corporation_component& corp, 
 
 namespace {
 
-/// True when an active (built AND non-decommissioned) Port sits on `tile` —
-/// the sea-mode endpoint gate (BL-608, SUPPLY.md § Infrastructure gates:
-/// "Port building at both endpoints"). Ownership-agnostic like
-/// `is_supply_anchor` (logistics.cpp): a Port is body infrastructure, not a
-/// corp asset check — unlike `corp_has_launchpad_on` above, which is
-/// deliberately per-corp because a launchpad IS the corp's own pad. Same
-/// built+active test `is_supply_anchor` and `collect_logistics_nodes` already
-/// use for port/hub anchors, narrowed to Port only (a hub does not gate sea).
-bool tile_has_active_port(const world& w, entity_id tile)
-{
-    if (tile == null_entity)
-        return false;
-    for (const auto& [bid, bc] : w.buildings)
-    {
-        (void)bid;
-        if (bc.tile == tile && bc.type == building_type::port
-            && bc.ticks_remaining <= 0 && !bc.decommissioned)
-            return true;
-    }
-    return false;
-}
-
-/// Fraction in [0, cap] to discount an intra-body haul cost by — summed over the
-/// population-centre (scale-weighted) and hub (flat) tiles the path crosses, capped.
-/// Deterministic: a pure function of the path tiles and the node sets.
-float node_discount_fraction(const logistics_path& path, const logistics_nodes& nodes,
+/// Fraction in [0, cap] to discount one leg's haul cost by — summed over the
+/// population-centre (scale-weighted) and hub (flat) tiles the leg crosses, capped.
+/// Deterministic: a pure function of the tiles and the node sets.
+float node_discount_fraction(const std::vector<entity_id>& tiles, const logistics_nodes& nodes,
                              const logistics_node_params& np)
 {
     float disc = 0.0f;
-    for (const entity_id t : path.tiles)
+    for (const entity_id t : tiles)
     {
         if (const auto it = nodes.pop_tile_scale.find(t); it != nodes.pop_tile_scale.end())
             disc += np.city_discount_per_scale * static_cast<float>(it->second);
@@ -457,54 +435,226 @@ float node_discount_fraction(const logistics_path& path, const logistics_nodes& 
     return std::clamp(std::min(disc, np.discount_cap), 0.0f, 0.95f);
 }
 
-/// The intra-body half of a leg (BL-077 path, BL-608 sea gate, BL-148/149 node
-/// discount): route `origin` -> `dest_centre` on `src_body` and fill the leg's
-/// mode, distance, rate, travel time and discount. False when it cannot route.
-/// Split out of price_convoy_leg for BL-1071 (a market exports its own shelf),
-/// whose convoy has no corporation but routes by exactly the same road.
-bool route_intra_body_leg(world& w, const recipe_registry& reg, const logistics_nodes& nodes,
-                          entity_id src_body, entity_id origin, entity_id dest_centre,
-                          convoy_mode& mode, float& dist, float& unit_cost, int& travel_ticks,
-                          float& node_discount)
+/// One leg of an intra-body route (BL-1186): its mode and what it is priced from.
+struct route_leg
 {
-    const logistics_node_params& node_params = reg.logistics_nodes();
-    if (origin == null_entity || dest_centre == null_entity)
+    convoy_mode mode      = convoy_mode::land;
+    float       unit_cost = 0.0f; ///< reg.logistics_cost(mode)
+    float       dist      = 0.0f; ///< the leg's own path cost
+    float       discount  = 0.0f; ///< BL-148/149 node discount over the leg's own tiles
+};
+
+/// A routed intra-body haul (BL-1186, SUPPLY.md § Logistical cost): one land leg, or
+/// land -> port -> sea -> port -> land. Priced by finish_route.
+struct intra_route
+{
+    std::array<route_leg, 3> legs{};
+    int         n_legs       = 0;
+    int         ports        = 0; ///< ports the cargo passes through; handling is per port
+    int         travel_ticks = 1;
+    convoy_mode mode         = convoy_mode::land; ///< the convoy's mode: sea when any leg is
+};
+
+/// Credits per unit one leg costs: rate x distance x (1 - discount).
+float route_leg_per_unit(const route_leg& l)
+{
+    return l.unit_cost * l.dist * (1.0f - l.discount);
+}
+
+/// THE INTRA-BODY ROUTER (BL-1186, goods cross markets; SUPPLY.md § Logistical cost and
+/// § Infrastructure gates). Route `origin` -> `dest` on `body` as the cheapest of:
+///
+///   LAND   one land leg. The unconfined cheapest path when it stays on land (the BL-077
+///          path, unchanged — every land route prices exactly as it always did), else the
+///          cheapest LAND-ONLY path (B2: a pair whose cheapest path crosses water is no
+///          longer refused when a dearer overland road exists).
+///   SEA    land origin -> port A, sea A -> port B, land port B -> dest (B1). A and B range
+///          over every built, active Port on the body; the pair minimising the WHOLE route,
+///          both handling fees included, wins. A sea leg runs only port to port, so the
+///          markets may lie inland behind their land legs — the Port is no longer demanded
+///          on the market centre itself.
+///
+/// Cheapest by credits per unit (route_leg_per_unit, plus handling per port). Ties go to
+/// LAND, then to the lower (A, B) by tile id: a total order, independent of every hash.
+/// The choice does not depend on quantity (every term is linear in it), so a one-unit
+/// probe and the committed cargo route the same way. False when no route exists: no
+/// overland path and no port pair joining the two.
+///
+/// The route-wide `crosses_ocean` refusal (BL-608's "Port at both endpoints") is retired
+/// with this: that bit billed or refused a whole route for the water on any part of it.
+bool route_intra_body(world& w, const recipe_registry& reg, const logistics_nodes& nodes,
+                      entity_id body, entity_id origin, entity_id dest, intra_route& out)
+{
+    if (origin == null_entity || dest == null_entity)
         return false; // no production anchor / unanchored market: cannot route
-    const logistics_path& path = intra_body_path(w, src_body, origin, dest_centre);
+    const logistics_node_params& np = reg.logistics_nodes();
+    const float land_rate = reg.logistics_cost(convoy_mode::land);
+    const float sea_rate  = reg.logistics_cost(convoy_mode::sea);
+    const float handling  = reg.port_handling();
+
+    // The unconfined cheapest path. Unreachable here means unreachable by any route (every
+    // leg-confined path is also an unconfined one), so nothing below can find one.
+    const logistics_path& path = intra_body_path(w, body, origin, dest);
     if (!path.reachable)
         return false;
-    if (path.crosses_ocean)
+
+    bool        have = false;
+    float       best = 0.0f;
+    intra_route route;
+
+    // LAND. Read before anything can touch the caches the reference points into
+    // (std::map nodes stay put on insert; only a clear would move them).
+    if (!path.crosses_ocean)
     {
-        // BL-608: sea mode is gated on an active Port at BOTH endpoints
-        // (SUPPLY.md § Infrastructure gates). The cheapest A* path already
-        // crosses water — there is no cheaper land-only route BL-522's
-        // per-leg pricing would recover — so an ungated pair is refused
-        // outright rather than silently re-priced at the land rate: a
-        // cart cannot be billed for a lane it cannot physically cross.
-        // The caller's leg is still default-constructed (viable == false)
-        // here, so this mutates nothing; the caller's existing `!leg.viable`
-        // path (corp_command.cpp: dispatch_convoy -> rejected_placement)
-        // surfaces it.
-        if (!tile_has_active_port(w, origin) || !tile_has_active_port(w, dest_centre))
-            return false;
-        mode = convoy_mode::sea;
+        route.n_legs       = 1;
+        route.legs[0]      = {convoy_mode::land, land_rate, path.cost,
+                              node_discount_fraction(path.tiles, nodes, np)};
+        route.travel_ticks = convoy_travel_ticks(w, body, path);
+        route.mode         = convoy_mode::land;
+        best = route_leg_per_unit(route.legs[0]);
+        have = true;
     }
     else
     {
-        mode = convoy_mode::land;
+        const logistics_path& land = intra_body_leg_path(w, body, origin, dest, leg_domain::land);
+        if (land.reachable)
+        {
+            route.n_legs       = 1;
+            route.legs[0]      = {convoy_mode::land, land_rate, land.cost,
+                                  node_discount_fraction(land.tiles, nodes, np)};
+            route.travel_ticks = convoy_travel_ticks(w, body, land); // crosses_ocean false
+            route.mode         = convoy_mode::land;
+            best = route_leg_per_unit(route.legs[0]);
+            have = true;
+        }
     }
-    dist      = path.cost;
-    unit_cost = reg.logistics_cost(mode);
-    // Distance now costs TIME as well as money (Ben, 2026-08-12). Computed
-    // here because `path` is a reference into the A* cache and must be read
-    // before anything can invalidate it.
-    travel_ticks = convoy_travel_ticks(w, src_body, path);
-    // BL-148/149: discount the haul for the cities + hubs its path crosses.
-    node_discount = node_discount_fraction(path, nodes, node_params);
-    return true;
+
+    // SEA. Every ordered pair of distinct active ports, ascending. The legs out of the
+    // origin and into the destination are each priced once per port.
+    const std::vector<entity_id> ports = body_active_port_tiles(w, body); // copy: a plain value
+    if (ports.size() >= 2)
+    {
+        struct end_leg
+        {
+            bool  ok = false;
+            route_leg leg;
+            float per_unit = 0.0f;
+        };
+        const float fees = 2.0f * handling; // loading at A, unloading at B
+        std::vector<end_leg> to_port(ports.size());
+        for (std::size_t i = 0; i < ports.size(); ++i)
+        {
+            const logistics_path& a = intra_body_leg_path(w, body, origin, ports[i], leg_domain::land);
+            if (a.reachable)
+            {
+                to_port[i].ok       = true;
+                to_port[i].leg      = {convoy_mode::land, land_rate, a.cost,
+                                       node_discount_fraction(a.tiles, nodes, np)};
+                to_port[i].per_unit = route_leg_per_unit(to_port[i].leg);
+            }
+        }
+        // The leg on from each port, priced on first need: a pair the bound below already
+        // rules out never floods the destination's land field. The answer is the same
+        // either way (a pure function of the tiles); only the work differs.
+        std::vector<end_leg> from_port(ports.size());
+        std::vector<char>    from_done(ports.size(), 0);
+        const auto from = [&](std::size_t j) -> const end_leg& {
+            if (!from_done[j])
+            {
+                from_done[j] = 1;
+                const logistics_path& b =
+                    intra_body_leg_path(w, body, ports[j], dest, leg_domain::land);
+                if (b.reachable)
+                {
+                    from_port[j].ok       = true;
+                    from_port[j].leg      = {convoy_mode::land, land_rate, b.cost,
+                                             node_discount_fraction(b.tiles, nodes, np)};
+                    from_port[j].per_unit = route_leg_per_unit(from_port[j].leg);
+                }
+            }
+            return from_port[j];
+        };
+        for (std::size_t i = 0; i < ports.size(); ++i)
+        {
+            if (!to_port[i].ok)
+                continue;
+            // A lower bound on every route out through port i: its first leg and the fees.
+            if (have && !(to_port[i].per_unit + fees < best))
+                continue;
+            for (std::size_t j = 0; j < ports.size(); ++j)
+            {
+                if (j == i)
+                    continue;
+                const end_leg& on = from(j);
+                if (!on.ok)
+                    continue;
+                // A lower bound before the sea leg is routed: both land legs and the fees.
+                if (have && !(to_port[i].per_unit + on.per_unit + fees < best))
+                    continue;
+                const logistics_path& s =
+                    intra_body_leg_path(w, body, ports[i], ports[j], leg_domain::sea);
+                if (!s.reachable)
+                    continue;
+                // The sea leg carries no node discount: the BL-148/149 nodes are cities and
+                // hubs, land infrastructure, and a port city at either end already discounts
+                // the land leg it closes.
+                const route_leg sea{convoy_mode::sea, sea_rate, s.cost, 0.0f};
+                const float per_unit = to_port[i].per_unit + route_leg_per_unit(sea)
+                                     + on.per_unit + fees;
+                if (have && !(per_unit < best))
+                    continue;
+                route.n_legs  = 3;
+                route.legs[0] = to_port[i].leg;
+                route.legs[1] = sea;
+                route.legs[2] = on.leg;
+                route.ports   = 2;
+                route.mode    = convoy_mode::sea;
+                // Each leg at its own speed (SUPPLY.md): caravan overland, coastal by sea;
+                // summed, then quantised once.
+                route.travel_ticks = travel_ticks_for_days(
+                    leg_travel_days(w, body, to_port[i].leg.dist, convoy_mode::land)
+                    + leg_travel_days(w, body, sea.dist, convoy_mode::sea)
+                    + leg_travel_days(w, body, on.leg.dist, convoy_mode::land));
+                best = per_unit;
+                have = true;
+            }
+        }
+    }
+
+    if (have)
+        out = route;
+    return have;
 }
 
-/// The priced tail every leg shares: cost = rate x distance x qty x (1 - discount).
+/// The priced tail every intra-body route shares: each leg's rate x distance x qty x
+/// (1 - its discount), plus handling x ports x qty. A single land leg is exactly the
+/// pre-BL-1186 expression (0 + x is x), so a land route prices to the same bits.
+convoy_leg finish_route(const intra_route& route, float qty, float handling)
+{
+    convoy_leg leg;
+    float cost = 0.0f;
+    for (int i = 0; i < route.n_legs; ++i)
+    {
+        const route_leg& l = route.legs[static_cast<std::size_t>(i)];
+        cost += l.unit_cost * l.dist * qty * (1.0f - l.discount);
+    }
+    if (route.ports > 0)
+        cost += handling * static_cast<float>(route.ports) * qty;
+    // A cost that is not a finite, non-negative number is not a price. Reached
+    // by an absurd (but finite) quantity overflowing the product; refused here
+    // rather than debited, since `balance -= inf` is unrecoverable.
+    if (!std::isfinite(cost) || cost < 0.0f)
+        return leg;
+
+    leg.viable       = true;
+    leg.mode         = route.mode;
+    leg.cost         = cost;
+    leg.travel_ticks = route.travel_ticks < 1 ? 1 : route.travel_ticks;
+    return leg;
+}
+
+/// The space lane's priced tail: cost = rate x distance x qty x (1 - discount), the
+/// discount always 0 off the surface.
 convoy_leg finish_leg(convoy_mode mode, float unit_cost, float dist, float qty,
                       float node_discount, int travel_ticks)
 {
@@ -612,27 +762,27 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
     const market_component&      dest_market = mit->second;
     const entity_id              dest_body   = dest_market.body;
 
-    convoy_mode mode;
-    float       dist;
-    float       unit_cost;
-    int         travel_ticks  = 1;
-    float       node_discount = 0.0f; // BL-148/149: intra-body city/hub discount.
     if (src_body == dest_body)
     {
-        // Intra-body (BL-077): haul the source pool's stock from its origin
-        // tile (BL-1003: `convoy_origin_tile` — the corp's lowest-id building in
-        // the source catchment, else the source market's centre) to the short
-        // market's centre, terrain-weighted over the tile grid (land, or sea
-        // when the path must cross water).
+        // Intra-body (BL-077, BL-1186): haul the source pool's stock from its
+        // origin tile (BL-1003: `convoy_origin_tile` — the corp's lowest-id
+        // building in the source catchment, else the source market's centre) to
+        // the short market's centre — overland, or land -> port -> sea -> port
+        // -> land where that route is cheaper or the only one (route_intra_body).
         const entity_id origin      = known_origin != nullptr
                                           ? *known_origin // BL-1079: resolved once per pool
                                           : convoy_origin_tile(w, corp, src_key);
         const entity_id dest_centre = dest_market.centre_tile;
-        if (!route_intra_body_leg(w, reg, nodes, src_body, origin, dest_centre, mode, dist,
-                                  unit_cost, travel_ticks, node_discount))
+        intra_route route;
+        if (!route_intra_body(w, reg, nodes, src_body, origin, dest_centre, route))
             return leg;
+        return finish_route(route, qty, reg.port_handling());
     }
-    else
+
+    convoy_mode mode;
+    float       dist;
+    float       unit_cost;
+    int         travel_ticks = 1;
     {
         // Inter-body: straight-line space lane, launchpad-gated.
         if (!corp_has_launchpad_on(w, corp, src_body))
@@ -660,7 +810,7 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
         travel_ticks = (dist > 1.0f) ? static_cast<int>(dist + 0.999f) : 1;
     }
 
-    return finish_leg(mode, unit_cost, dist, qty, node_discount, travel_ticks);
+    return finish_leg(mode, unit_cost, dist, qty, 0.0f, travel_ticks);
 }
 
 convoy_leg price_market_export_leg(world& w, const recipe_registry& reg,
@@ -679,62 +829,55 @@ convoy_leg price_market_export_leg(world& w, const recipe_registry& reg,
     // BL-1071 CALL: the haul leaves from the market's own centre — where
     // convoyed and unsold stock sits (convoy_origin_tile's fallback for a pool
     // with no building in the catchment). Unanchored: no road to leave by.
-    convoy_mode mode      = convoy_mode::land;
-    float       dist      = 0.0f;
-    float       unit_cost = 0.0f;
-    float       discount  = 0.0f;
-    int         ticks     = 1;
-    if (!route_intra_body_leg(w, reg, nodes, body, sit->second.centre_tile,
-                              dit->second.centre_tile, mode, dist, unit_cost, ticks, discount))
+    // BL-1186: the same router a corporation's leg takes (route_intra_body), so a pair
+    // this answers viable for is one a convoy can actually run, and BL-1185's
+    // placement, asking this one function, can never disagree with the dispatcher.
+    intra_route route;
+    if (!route_intra_body(w, reg, nodes, body, sit->second.centre_tile,
+                          dit->second.centre_tile, route))
         return convoy_leg{};
-    return finish_leg(mode, unit_cost, dist, qty, discount, ticks);
+    return finish_route(route, qty, reg.port_handling());
 }
 
 namespace {
 
-/// BL-597's passive-LP admissibility gate, shared by a corporation's convoy
-/// (commit_convoy) and a market's own export (BL-1071): the nearest anchor to
-/// `origin` on `src_body` must hold `qty` of passive LP this tick, and on success
-/// draws it. On refusal mutates nothing and sets *out_refused_no_lp.
-bool passive_lp_admit(world& w, const recipe_registry& reg, entity_id src_body, entity_id origin,
-                      float qty, lp_pool_map* shared_lp_pools, bool* out_refused_no_lp)
+/// BL-597's passive-LP gate, shared by a corporation's convoy (commit_convoy) and a
+/// market's own export (BL-1071): the remaining passive LP this tick at the anchor
+/// NEAREST `origin` on `src_body`, as a slot the caller draws from — null when no
+/// anchor is reachable (no passive LP exists to draw against). Reading it builds the
+/// body's pool on first touch and mutates nothing else. The pointer stays valid for
+/// the pass: the per-body pools are node-based maps nothing below erases from.
+float* passive_lp_slot(world& w, const recipe_registry& reg, entity_id src_body,
+                       entity_id origin, lp_pool_map& pools_by_body)
 {
-    lp_pool_map local_pools;
-    lp_pool_map& pools_by_body = shared_lp_pools ? *shared_lp_pools : local_pools;
     const military_capability_params& mil = reg.military();
     std::unordered_map<entity_id, float>& pools =
         lp_pool_for_body(pools_by_body, w, src_body, mil.active_lp_per_anchor_tick);
-
     const entity_id nearest_anchor =
         (origin != null_entity) ? nearest_lp_anchor(w, src_body, origin, pools) : null_entity;
-
     if (nearest_anchor == null_entity)
-    {
-        // No reachable anchor on this body at all — no passive LP exists
-        // to draw against.
-        if (out_refused_no_lp)
-            *out_refused_no_lp = true;
-        return false;
-    }
+        return nullptr;
+    return &pools.at(nearest_anchor);
+}
 
-    float& pool = pools.at(nearest_anchor);
-    if (pool + 1e-6f < qty)
-    {
-        // The nearest anchor's pool is already exhausted (by a
-        // higher-priority draw earlier this tick — possibly THIS SAME
-        // TICK'S active march pass, if `shared_lp_pools` ties the two
-        // together — or simply too small).
-        if (out_refused_no_lp)
-            *out_refused_no_lp = true;
-        return false;
-    }
-
-    // Granted: consume the anchor's pool. LP is the CAP, not a second
-    // PRICE (LOGISTICS.md rule 1) — `leg.cost` (already debited below)
-    // is the only credit charge a passive draw pays; unlike BL-596's
-    // active draw, there is no separate LP-specific credit line here.
-    pool -= qty;
-    return true;
+/// How much of a `qty` cargo the anchor's remaining passive LP `pool` admits.
+///
+/// WHOLE (BL-597, `allow_partial` false): all of it when the pool holds it (the 1e-6
+/// slack is the original test's), else nothing — the commanded quantity of a player's
+/// verb or a rival's directed dispatch is sent whole or refused, mutating nothing.
+///
+/// PARTIAL (BL-1186 E1, the auto-dispatch passes): what the pool still holds, up to
+/// the cargo. LP stays the CAP (LOGISTICS.md rule 1); it no longer refuses a large
+/// surplus whole — before this no single convoy could carry more than one anchor's
+/// tick, so any cargo above it never moved at all. Not below one unit unless the
+/// cargo itself is smaller: an anchor's last crumbs do not make a convoy.
+float passive_lp_grant(float pool, float qty, bool allow_partial)
+{
+    if (pool + 1e-6f >= qty)
+        return qty;
+    if (!allow_partial)
+        return 0.0f;
+    return (pool >= std::min(qty, 1.0f)) ? pool : 0.0f;
 }
 
 } // namespace
@@ -742,7 +885,8 @@ bool passive_lp_admit(world& w, const recipe_registry& reg, entity_id src_body, 
 bool commit_convoy(world& w, const recipe_registry& reg, entity_id corp_id, entity_id src_body,
                    entity_id src_market, entity_id dest_market_id,
                    std::size_t ri, float qty, const convoy_leg& leg,
-                   lp_pool_map* shared_lp_pools, bool* out_refused_no_lp)
+                   lp_pool_map* shared_lp_pools, bool* out_refused_no_lp,
+                   bool allow_partial_lp, float* out_sent)
 {
     if (!leg.viable || ri >= resource_count)
         return false;
@@ -750,8 +894,11 @@ bool commit_convoy(world& w, const recipe_registry& reg, entity_id corp_id, enti
     if (cit == w.corporations.end())
         return false;
     corporation_component& corp = cit->second;
-    if (corp.balance < leg.cost)
-        return false; // the solvency gate, in ONE place for both callers
+    // The solvency gate, in ONE place for every caller. A whole cargo is weighed at its
+    // full cost before the LP gate (the BL-597 order); a cargo the LP cap may trim
+    // (BL-1186 E1) is weighed below at the cost of what will actually go.
+    if (!allow_partial_lp && corp.balance < leg.cost)
+        return false;
 
     // BL-1003: the pool the cargo leaves is the SOURCE MARKET's, or — when the
     // source body has no market — the body-level pool.
@@ -776,18 +923,42 @@ bool commit_convoy(world& w, const recipe_registry& reg, entity_id corp_id, enti
     // ever. Quantity is what "how much can move through HERE" actually
     // says: the anchor passes so many units of goods per tick, and credits
     // remain the sole price of distance.
+    float send = qty;
+    float cost = leg.cost;
     if (leg.mode != convoy_mode::space)
     {
         // Same locus as price_convoy_leg's own origin — `convoy_origin_tile`
         // of the source pool, the convoy's actual dispatch point.
         const entity_id origin = convoy_origin_tile(w, corp, src_key);
-        if (!passive_lp_admit(w, reg, src_body, origin, qty, shared_lp_pools, out_refused_no_lp))
+        lp_pool_map  local_pools;
+        float* const slot = passive_lp_slot(w, reg, src_body, origin,
+                                            shared_lp_pools ? *shared_lp_pools : local_pools);
+        send = slot ? passive_lp_grant(*slot, qty, allow_partial_lp) : 0.0f;
+        if (!(send > 0.0f))
+        {
+            if (out_refused_no_lp)
+                *out_refused_no_lp = true;
             return false;
+        }
+        // Cost is linear in quantity (rate x distance x qty, handling x qty), so a
+        // trimmed cargo pays its share of the priced leg and no more.
+        if (send < qty)
+            cost = leg.cost * (send / qty);
+        if (allow_partial_lp && corp.balance < cost)
+            return false;
+        // Granted: consume the anchor's pool. LP is the CAP, not a second PRICE
+        // (LOGISTICS.md rule 1) — `cost` is the only credit charge a passive draw
+        // pays; unlike BL-596's active draw, there is no LP-specific credit line.
+        *slot -= send;
+    }
+    else if (allow_partial_lp && corp.balance < cost)
+    {
+        return false;
     }
 
     // Debit cost and source pool; create the convoy.
-    corp.balance -= leg.cost;
-    w.pool_at(corp_id, src_key).quantities[ri] -= qty;
+    corp.balance -= cost;
+    w.pool_at(corp_id, src_key).quantities[ri] -= send;
 
     // BL-308: burn the launch's draw. Charged once per launch (not per unit,
     // not per AU) and only on the space lane; price_convoy_leg's availability
@@ -809,7 +980,7 @@ bool commit_convoy(world& w, const recipe_registry& reg, entity_id corp_id, enti
     c.dest_market    = dest_market_id;
     c.mode           = leg.mode;
     c.cargo_resource = static_cast<resource_type>(ri);
-    c.cargo_qty      = qty;
+    c.cargo_qty      = send;
     c.progress       = 0.0f;
     // Speed is progress-per-tick, so a leg taking N ticks advances 1/N each
     // tick (Ben, 2026-08-12).
@@ -823,8 +994,10 @@ bool commit_convoy(world& w, const recipe_registry& reg, entity_id corp_id, enti
     c.corp           = corp_id;
     c.arrived        = false;
     c.held           = false;
-    c.cost_paid      = leg.cost;
+    c.cost_paid      = cost;
     w.convoys.push_back(c);
+    if (out_sent)
+        *out_sent = send;
     return true;
 }
 
@@ -1084,13 +1257,21 @@ void export_market_shelves(world& w, const recipe_registry& reg, const logistics
 
                 // The passive-LP cap binds a market's export exactly as it binds
                 // a corporation's (BL-597): the anchor nearest the market centre.
-                bool refused_no_lp = false;
-                if (!passive_lp_admit(w, reg, src_body, origin, qty, shared_lp_pools,
-                                      &refused_no_lp))
+                // BL-1186 E1: it sends what the anchor still admits rather than
+                // refusing a cargo above it whole.
+                lp_pool_map  local_pools;
+                float* const slot = passive_lp_slot(
+                    w, reg, src_body, origin, shared_lp_pools ? *shared_lp_pools : local_pools);
+                const float send = slot ? passive_lp_grant(*slot, qty, /*allow_partial=*/true)
+                                        : 0.0f;
+                if (!(send > 0.0f))
                 {
                     ++out.refused_no_lp;
                     break;
                 }
+                *slot -= send;
+                if (send < qty)
+                    ++out.trimmed_by_lp;
 
                 // BL-1071 CALL (FINANCE.md): NO BALANCE MOVES. The market has no
                 // treasury — it is already the counterparty that pays auto-surplus
@@ -1102,7 +1283,7 @@ void export_market_shelves(world& w, const recipe_registry& reg, const logistics
                 // recorded on the convoy (cost_paid) so a reader can see it.
                 // Goods are conserved exactly: shelf debit = cargo = the
                 // destination shelf's credit on arrival.
-                w.markets.at(src).inventory[ri] -= qty;
+                w.markets.at(src).inventory[ri] -= send;
 
                 convoy_component cv;
                 cv.id             = w.allocate_convoy_id();
@@ -1110,7 +1291,7 @@ void export_market_shelves(world& w, const recipe_registry& reg, const logistics
                 cv.dest_market    = c.dest;
                 cv.mode           = leg.mode;
                 cv.cargo_resource = static_cast<resource_type>(ri);
-                cv.cargo_qty      = qty;
+                cv.cargo_qty      = send;
                 cv.progress       = 0.0f;
                 cv.speed          = 1.0f / static_cast<float>(leg.travel_ticks);
                 // BL-1071 CALL: owned by NO corporation — the sentinel
@@ -1120,7 +1301,7 @@ void export_market_shelves(world& w, const recipe_registry& reg, const logistics
                 cv.corp           = null_entity;
                 cv.arrived        = false;
                 cv.held           = false;
-                cv.cost_paid      = leg.cost;
+                cv.cost_paid      = (send < qty) ? leg.cost * (send / qty) : leg.cost;
                 w.convoys.push_back(cv);
                 ++out.market_exports;
                 break; // one destination per (market, good) per pass
@@ -1149,11 +1330,12 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
     // HANDLING AND DUTY. The design charges both: arrival duty at a border
     // (MARKETS.md § Tariffs — rate x price_d x qty, paid by the convoy on
     // arrival) and handling at every port a cargo passes (SUPPLY.md §
-    // Logistical cost). The code carries NEITHER yet — no per-port handling is
-    // charged, and the tariff is still the matched-trade charge clearing puts on
-    // the buyer — so both terms are zero here. When either is built it is a
-    // per-unit cost of the haul and MUST enter net(d) (and the landed cost the
-    // quantity is sized against) beside haul_per_unit.
+    // Logistical cost). Handling is IN the leg (BL-1186: finish_route adds
+    // port_handling x ports x qty to the priced cost), so haul_per_unit below
+    // already carries it into net(d) and the landed cost. Duty is not built —
+    // the tariff is still the matched-trade charge clearing puts on the buyer —
+    // so its term is zero here; when built it is a per-unit cost of the haul and
+    // MUST enter net(d) beside haul_per_unit.
     //
     // WHEN IT RUNS. After run_economy_step and BEFORE clear_markets (app.cpp
     // step_economy). Every market-side read below is therefore LAST tick's
@@ -1355,11 +1537,19 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                     // burn and the convoy itself all live there, so a rival's
                     // convoy and the player's are the same object built by the
                     // same code.
-                    bool refused_no_lp = false;
+                    // BL-1186 E1: the auto-dispatch sends what the passive-LP
+                    // cap admits, rather than refusing a cargo above it whole.
+                    bool  refused_no_lp = false;
+                    float sent          = 0.0f;
                     if (commit_convoy(w, reg, corp_id, src_body,
                                       src_is_market ? src_key : null_entity,
-                                      c.dest, ri, qty, leg, &pools_by_body, &refused_no_lp))
+                                      c.dest, ri, qty, leg, &pools_by_body, &refused_no_lp,
+                                      /*allow_partial_lp=*/true, &sent))
+                    {
                         ++out.dispatched;
+                        if (sent < qty)
+                            ++out.trimmed_by_lp;
+                    }
                     else if (refused_no_lp)
                         ++out.refused_no_lp;
                     break; // one destination per (pool, good) per pass

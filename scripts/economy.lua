@@ -1582,6 +1582,14 @@ logistics = {
     -- across a continent, and a haul chasing it would reverse on the next reprice. Never zero
     -- (the loader refuses a non-positive value and keeps the 0.05 default). First cut; measure.
     dispatch_margin = 0.05,
+
+    -- BL-1186 (goods cross markets; docs/economy/SUPPLY.md § Logistical cost): the HANDLING
+    -- fee, credits per unit of cargo at EACH port a cargo passes through -- at loading and
+    -- again at unloading, independent of distance -- so a route with a sea leg pays it twice.
+    -- It is what makes a short coastal hop lose to a road. 0.10 is a first cut: five plains
+    -- tiles of land haul (5 x 0.02) per port, so a crossing pays ten tiles' worth to start.
+    -- Measure; the loader refuses a negative or non-finite value and keeps 0.10.
+    port_handling = 0.10,
 }
 
 print("[Lua] economy.lua loaded")

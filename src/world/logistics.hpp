@@ -83,6 +83,46 @@ std::vector<std::pair<int, float>> bounded_cost_to_tile(world& w, entity_id body
                                                         bool land_only);
 
 // ---------------------------------------------------------------------------
+// A route's LEGS (BL-1186, goods cross markets — SUPPLY.md § Logistical cost)
+// ---------------------------------------------------------------------------
+// "Mode is a property of the leg, not of the whole route": a route that crosses
+// water is land -> port -> sea -> port -> land, each leg priced at its own mode.
+// These are the leg-confined paths that route is built from; supply_system.cpp's
+// router chooses the ports.
+
+/// The domain one leg of a route may cross.
+enum class leg_domain : std::uint8_t
+{
+    land = 1, ///< never enters a water cell
+    sea  = 2, ///< water only, between two endpoints that may be land (the ports)
+};
+
+/// The least-cost path @p src_tile -> @p dst_tile confined to @p domain: one LEG.
+/// The same directed edge weights intra_body_path relaxes (landform x road x river,
+/// water at the sea weight, cylinder wrap), so a land leg costs exactly what the
+/// unconfined path costs over the same tiles.
+///   land: never enters water; a water endpoint is unreachable. src == dst on land
+///         is a reachable zero-cost leg (an origin standing on its port).
+///   sea:  leaves @p dst_tile's flood (the destination PORT) by water only, crosses
+///         water, and may END on a land cell touching that water (the origin port)
+///         but never continues overland — port -> water -> port and nothing else.
+///         Never zero-length: one port is no crossing. The port <-> water hop is
+///         made across any of the six hex sides (placement's `is_coastal` reads
+///         six, the flood four), so every placeable Port is a reachable sea end;
+///         water-to-water stays cardinal, priced exactly as intra_body_path.
+/// Directed and cached like intra_body_path: the destination's leg flood on
+/// world.leg_flood_fields, the pair on world.leg_path_cache under the ORDERED key,
+/// both cleared by invalidate_logistics_caches and on load. `tiles` is stored lo -> hi
+/// (intra_body_path's orientation rule). A reference into the cache.
+const logistics_path& intra_body_leg_path(world& w, entity_id body, entity_id src_tile,
+                                          entity_id dst_tile, leg_domain domain);
+
+/// BL-1186: the tiles of @p body carrying a BUILT, ACTIVE Port (the sea leg's gate,
+/// SUPPLY.md § Infrastructure gates), ascending and unique. Cached on
+/// world.body_port_tiles; cleared with the logistics caches.
+const std::vector<entity_id>& body_active_port_tiles(world& w, entity_id body);
+
+// ---------------------------------------------------------------------------
 // Logistics reach (BL-323 S2 — the placement-side "breadth must cost something")
 // ---------------------------------------------------------------------------
 // Until this, placement had no distance rule of any kind: a corp could site a
@@ -146,6 +186,9 @@ inline void invalidate_logistics_caches(world& w)
 {
     w.astar_cost_cache.clear();
     w.logistics_flood_fields.clear(); // same contract: any traversal/anchor change stales it
+    w.leg_flood_fields.clear();       // BL-1186: the leg-confined floods and pairs, and the
+    w.leg_path_cache.clear();         // per-body port set (a port completing or idling moves
+    w.body_port_tiles.clear();        // it: building_affects_logistics), on the same contract
     w.body_reach_cost.clear();
     w.lp_anchor_fields.clear();       // BL-1117: road-weighted and anchor-keyed, so it stales
                                       // on exactly the events the three above do
@@ -310,6 +353,16 @@ inline constexpr int econ_tick_days_world = 90;
 /// a short one takes a single quarter, where previously every haul took exactly
 /// one regardless of length.
 int convoy_travel_ticks(const world& w, entity_id body, const logistics_path& path);
+
+/// BL-1186: days ONE leg of a multi-leg route takes — @p path_cost effective tiles at
+/// its own mode's speed (sea: coastal, otherwise caravan), on convoy_travel_ticks' scale.
+/// 0 for a zero-length leg or a body with no scale. A route sums its legs' days and
+/// quantises once (travel_ticks_for_days), so a short land leg is not rounded up to a
+/// whole quarter on its own.
+float leg_travel_days(const world& w, entity_id body, float path_cost, convoy_mode mode);
+
+/// Whole econ ticks for @p days, minimum 1 — convoy_travel_ticks' own quantisation.
+int travel_ticks_for_days(float days);
 
 // ---------------------------------------------------------------------------
 // Convoy position (BL-458 — a convoy already HAS a position)

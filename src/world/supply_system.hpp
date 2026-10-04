@@ -136,9 +136,11 @@ void credit_arrived_convoys(world& w, int tick = 0,
 /// the good high and this rule reaches it.
 ///
 /// Space-mode convoys require a building_type::launchpad in the source corp's assets
-/// on the source body. Land-mode is ungated. Sea mode is selected automatically when
-/// the intra-body path crosses ocean (path.crosses_ocean — see docs/economy/SUPPLY.md);
-/// air mode is not dispatched in the prototype.
+/// on the source body. Land-mode is ungated. An intra-body haul is ROUTED (BL-1186,
+/// SUPPLY.md § Logistical cost): overland, or land -> port -> sea -> port -> land
+/// through the pair of active Ports that makes the whole route cheapest, handling
+/// paid at both; a convoy with a sea leg carries `convoy_mode::sea`. Air mode is not
+/// dispatched in the prototype.
 ///
 /// @param w         World; convoys are appended and source pools debited.
 /// @param reg       Registry (for building type lookups).
@@ -167,6 +169,10 @@ struct convoy_dispatch_tick
     /// BL-1071: convoys a MARKET sent from its own shelf this pass (owner
     /// null_entity), counted apart — `dispatched` stays corporations' convoys.
     int market_exports = 0;
+    /// BL-1186 E1: convoys (corporations' and markets' alike) the passive-LP cap
+    /// TRIMMED — sent at what the anchor still admitted, short of the sized cargo.
+    /// Counted inside `dispatched` / `market_exports`, not beside them.
+    int trimmed_by_lp = 0;
 };
 
 convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
@@ -300,10 +306,15 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
 // two may move the corp's buildings or the market set.
 
 /// BL-1071: price a MARKET's own export leg of `qty` units from `src_market`'s
-/// centre to `dest_market`'s centre — the same intra-body routing, sea gate, node
-/// discount and cost a corporation's leg uses (price_convoy_leg), with no
+/// centre to `dest_market`'s centre — the same intra-body router, port gate, node
+/// discount, handling and cost a corporation's leg uses (price_convoy_leg), with no
 /// corporation, launchpad or propellant. Not viable across bodies, from or to an
 /// unanchored market, or to itself.
+///
+/// THE ONE QUESTION "is this pair viable" (BL-1186): viable exactly when the pair
+/// routes overland, or land -> port -> sea -> port -> land through two active Ports
+/// (SUPPLY.md § Logistical cost) — the ports need not sit on either market centre.
+/// BL-1185's placement asks this same call, so placement and shipping cannot disagree.
 convoy_leg price_market_export_leg(world& w, const recipe_registry& reg,
                                    const logistics_nodes& nodes, entity_id src_market,
                                    entity_id dest_market, float qty);
@@ -391,4 +402,15 @@ bool commit_convoy(world& w, const recipe_registry& reg, entity_id corp_id, enti
                    entity_id src_market, entity_id dest_market_id,
                    std::size_t ri, float qty, const convoy_leg& leg,
                    lp_pool_map* shared_lp_pools = nullptr,
-                   bool* out_refused_no_lp = nullptr);
+                   bool* out_refused_no_lp = nullptr,
+                   bool allow_partial_lp = false,
+                   float* out_sent = nullptr);
+// BL-1186 E1 — `allow_partial_lp`: when true, a cargo above what the nearest
+// anchor still holds is SENT AT THAT AMOUNT (never below one unit unless the cargo
+// is smaller) instead of refused whole; its cost is the leg's cost scaled by the
+// share sent (cost is linear in quantity), and the solvency gate weighs that
+// trimmed cost. The auto-dispatch passes (dispatch_convoys, and a market's own
+// export, which shares the rule) set it; a commanded quantity — the player's
+// dispatch_convoy verb, the rival scorer's directed dispatch — keeps the default:
+// whole or refused, mutating nothing. `out_sent`, when given, receives the units
+// actually sent on success.

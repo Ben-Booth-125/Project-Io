@@ -1010,5 +1010,11 @@ void recipe_registry::load_from_lua(lua_state& lua)
         sol::optional<float> margin = (*logistics)["dispatch_margin"];
         if (margin && std::isfinite(*margin) && *margin > 0.0f)
             m_dispatch_margin = *margin;
+
+        // BL-1186: the per-unit port handling fee (logistics.port_handling). Zero is a
+        // legal (free) fee; a non-finite or negative one is not a price and is refused.
+        sol::optional<float> handling = (*logistics)["port_handling"];
+        if (handling && std::isfinite(*handling) && *handling >= 0.0f)
+            m_port_handling = *handling;
     }
 }

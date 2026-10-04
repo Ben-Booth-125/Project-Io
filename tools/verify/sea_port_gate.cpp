@@ -1,4 +1,20 @@
-// Headless sea-port-gate harness (BL-608; no SDL / Lua / ImGui).
+// Headless sea-port-gate harness (BL-608, BL-1186; no SDL / Lua / ImGui).
+//
+// BL-1186 (goods cross markets) REWROTE THE RULE THIS FILE PINS. SUPPLY.md §
+// Logistical cost: a route that crosses water is land -> port -> sea -> port ->
+// land, each leg at its own mode, the ports chosen to minimise the whole route
+// with a HANDLING fee at each; the Port gates the sea LEG, not the market
+// centre; and a pair whose cheapest path crosses water but which has an overland
+// road is routed overland rather than refused. So:
+//   * R0 still dispatches by sea, and now pays two handling fees.
+//   * R1/R2 still refuse — on an ISLAND fixture (a second water band closes the
+//     overland detour round the cylinder), because no port PAIR exists.
+//   * R4 (new): with the detour open and no port pair, the haul goes overland.
+//   * R5 (new): both markets INLAND, ports on the coast between them — the route
+//     is three legs priced at their own modes plus two fees (the B1 case the old
+//     endpoint gate refused).
+//   * R6 (new): of two far-shore ports, the one minimising the WHOLE route wins.
+//   * R7 (new): a port off the water is no sea end; legs never change domain.
 //
 // SUPPLY.md § Infrastructure gates says sea mode requires "Port building at
 // both endpoints", but the mode-selection logic (`path.crosses_ocean` picking
@@ -81,11 +97,14 @@ entity_id tile_at(world& w, entity_id body, int c, int r)
                                    + static_cast<std::size_t>(c)];
 }
 
-/// `src_port` / `dst_port`: whether an active Port sits on the source anchor
-/// / destination centre tile respectively. `stock` iron ore in the corp's
-/// on-body pool.
-scenario make_scenario(bool src_port, bool dst_port, float stock = 100.0f,
-                       float balance = 1000.0f)
+/// The general fixture (BL-1186): water at every row of `water_cols`, the source
+/// market + the corp's extraction site at column `src_col`, the destination
+/// market at (`dst_col`, `dst_row`), an active Port on each (column, row) of
+/// `port_cells`.
+scenario make_world(const std::vector<int>& water_cols, int src_col, int dst_col,
+                    const std::vector<std::pair<int, int>>& port_cells, float stock = 100.0f,
+                    float balance = 1000.0f, int dst_row = 0,
+                    const std::vector<std::pair<int, int>>& land_cells = {})
 {
     scenario s;
 
@@ -114,15 +133,18 @@ scenario make_scenario(bool src_port, bool dst_port, float stock = 100.0f,
             // and A* correctly preferred the all-land route around it, so
             // `crosses_ocean` never fired — this fixture makes the crossing
             // genuinely unavoidable.
-            const bool water = (c == 1 || c == 2);
+            const bool water =
+                std::find(water_cols.begin(), water_cols.end(), c) != water_cols.end()
+                && std::find(land_cells.begin(), land_cells.end(), std::make_pair(c, r))
+                       == land_cells.end();
             tc.substrate     = water ? terrain_substrate::ocean : terrain_substrate::sedimentary;
             tc.cover         = terrain_cover::grass;
             tc.cover_density = water ? 0 : 150;
             s.w.tiles[t] = tc;
         }
 
-    s.src_tile = tile_at(s.w, s.body, 0, 0);
-    s.dst_tile = tile_at(s.w, s.body, 3, 0);
+    s.src_tile = tile_at(s.w, s.body, src_col, 0);
+    s.dst_tile = tile_at(s.w, s.body, dst_col, dst_row);
 
     s.corp = s.w.create_entity();
     corporation_component cc;
@@ -136,21 +158,13 @@ scenario make_scenario(bool src_port, bool dst_port, float stock = 100.0f,
     s.w.buildings[bld] = b;
     cc.assets.push_back(bld);
 
-    if (src_port)
+    for (const auto& [pc, pr] : port_cells)
     {
         const entity_id p = s.w.create_entity();
         building_component pb{};
-        pb.tile = s.src_tile;
+        pb.tile = tile_at(s.w, s.body, pc, pr);
         pb.type = building_type::port;
         s.w.buildings[p] = pb; // built + active: ticks_remaining=0, !decommissioned (defaults)
-    }
-    if (dst_port)
-    {
-        const entity_id p = s.w.create_entity();
-        building_component pb{};
-        pb.tile = s.dst_tile;
-        pb.type = building_type::port;
-        s.w.buildings[p] = pb;
     }
 
     s.w.corporations[s.corp] = cc;
@@ -174,6 +188,27 @@ scenario make_scenario(bool src_port, bool dst_port, float stock = 100.0f,
 
     s.w.pool_at(s.corp, pool_key_for_body(s.w, s.body)).quantities[r_iron] = stock;
     return s;
+}
+
+/// The original BL-608 fixture: water at columns 1-2, source at 0, destination at
+/// 3, a Port on either endpoint as asked. `island` (BL-1186) adds a second water
+/// band at columns 16-17, closing the overland detour round the cylinder, so a
+/// pair with no port PAIR has no route at all.
+scenario make_scenario(bool src_port, bool dst_port, float stock = 100.0f,
+                       float balance = 1000.0f, bool island = true)
+{
+    std::vector<int> water = {1, 2};
+    if (island)
+    {
+        water.push_back(16);
+        water.push_back(17);
+    }
+    std::vector<std::pair<int, int>> ports;
+    if (src_port)
+        ports.push_back({0, 0});
+    if (dst_port)
+        ports.push_back({3, 0});
+    return make_world(water, 0, 3, ports, stock, balance);
 }
 
 corp_command dispatch_cmd(const scenario& s, float qty)
@@ -241,15 +276,19 @@ std::string run_sequence(const recipe_registry& reg)
             // sea unit cost .05 (recipe_registry default) x A* cost. Path crosses
             // 3 edges: land(1.0)-ocean(2.5) = 1.75, ocean-ocean = 2.5,
             // ocean(2.5)-land(1.0) = 1.75, edge cost = average of the two
-            // endpoints (logistics.cpp): 1.75 + 2.5 + 1.75 = 6.0.
-            check(std::fabs(c.cost_paid - reg.logistics_cost(convoy_mode::sea) * 6.0f * 25.0f) < 1e-2f,
-                  "R0.5 cost = sea_unit_cost x A*(water-weighted) x qty");
+            // endpoints (logistics.cpp): 1.75 + 2.5 + 1.75 = 6.0. BL-1186: plus
+            // HANDLING at both ports (registry default 0.10 per unit per port);
+            // both land legs are zero-length (each market sits on its port).
+            check(std::fabs(c.cost_paid - (reg.logistics_cost(convoy_mode::sea) * 6.0f
+                                           + 2.0f * reg.port_handling()) * 25.0f) < 1e-2f,
+                  "R0.5 cost = (sea_unit_cost x A*(water-weighted) + 2 x handling) x qty");
             trace << "R0:" << static_cast<int>(c.mode) << ':' << c.cost_paid << ';';
         }
         check(std::fabs(pool_iron(s) - 75.0f) < 1e-4f, "R0.6 source pool debited by exactly 25");
     }
 
-    // R1 — missing a Port at either endpoint refuses, mutating nothing.
+    // R1 — missing a Port at either endpoint, on the island: no port PAIR and no
+    // overland road, so the haul is refused, mutating nothing.
     for (const auto& [src_port, dst_port, label] :
          { std::tuple{true, false, "dest missing"}, std::tuple{false, true, "source missing"},
            std::tuple{false, false, "neither present"} })
@@ -293,6 +332,126 @@ std::string run_sequence(const recipe_registry& reg)
         trace << "R2b:" << static_cast<int>(r) << ';';
     }
 
+    // R4 — BL-1186 B2: no port pair, but the overland detour round the cylinder
+    // is open (no second band). The cheapest path still crosses water; the haul
+    // is routed overland instead of refused. The source Port is there only as a
+    // passive-LP anchor (no anchor, no passive LP); one port is no crossing.
+    {
+        scenario s = make_scenario(/*src_port=*/true, /*dst_port=*/false, 100.0f, 1000.0f,
+                                   /*island=*/false);
+        const float bal_before = s.w.corporations.at(s.corp).balance;
+        const corp_command_result r = apply_corp_command(s.w, reg, dispatch_cmd(s, 25.0f));
+        check(r == corp_command_result::applied,
+              "R4.1 no port pair but an overland road: dispatch_convoy applies (B2)");
+        if (s.w.convoys.size() == 1)
+        {
+            const convoy_component& c = s.w.convoys.front();
+            check(c.mode == convoy_mode::land, "R4.2 the fallback route is LAND mode");
+            // Westward round the 32-column cylinder: columns 0 -> 31 -> ... -> 4 -> 3,
+            // 29 plains edges of 1.0, at the land rate, no handling.
+            check(std::fabs(c.cost_paid - reg.logistics_cost(convoy_mode::land) * 29.0f * 25.0f) < 1e-2f,
+                  "R4.3 cost = land_unit_cost x land-only path (29) x qty");
+            check(std::fabs((bal_before - s.w.corporations.at(s.corp).balance) - c.cost_paid) < 1e-4f,
+                  "R4.4 the land haul cost is recorded and debited");
+            trace << "R4:" << static_cast<int>(c.mode) << ':' << c.cost_paid << ';';
+        }
+        else
+            check(false, "R4.2 exactly one convoy is created");
+    }
+
+    // R5 — BL-1186 B1: both markets INLAND, Ports on the coast between them. Water
+    // at columns 3-4 (and 16-17, closing the detour); source at 0, Port at 2,
+    // Port at 5, destination at 8. The old gate demanded a Port on each market
+    // centre and refused this; the route is now three legs.
+    {
+        scenario s = make_world({3, 4, 16, 17}, 0, 8, {{2, 0}, {5, 0}});
+        const corp_command_result r = apply_corp_command(s.w, reg, dispatch_cmd(s, 25.0f));
+        check(r == corp_command_result::applied,
+              "R5.1 inland markets, coastal Ports: dispatch_convoy applies (B1)");
+        if (s.w.convoys.size() == 1)
+        {
+            const convoy_component& c = s.w.convoys.front();
+            check(c.mode == convoy_mode::sea, "R5.2 a route with a sea leg is SEA mode");
+            // land 0 -> 2: 2 plains edges = 2.0 at the land rate;
+            // sea 2 -> 5: 1.75 + 2.5 + 1.75 = 6.0 at the sea rate;
+            // land 5 -> 8: 3 plains edges = 3.0 at the land rate;
+            // plus handling at both ports.
+            const float want = (reg.logistics_cost(convoy_mode::land) * (2.0f + 3.0f)
+                                + reg.logistics_cost(convoy_mode::sea) * 6.0f
+                                + 2.0f * reg.port_handling()) * 25.0f;
+            check(std::fabs(c.cost_paid - want) < 1e-2f,
+                  "R5.3 cost = land legs at the land rate + sea leg at the sea rate + 2 x handling");
+            trace << "R5:" << static_cast<int>(c.mode) << ':' << c.cost_paid << ';';
+        }
+        else
+            check(false, "R5.2 exactly one convoy is created");
+    }
+
+    // R6 — the ports are CHOSEN to minimise the whole route. Water 3-4 (and 16-17);
+    // source (0,0), destination (8,3); Ports at (2,0) on the near shore and at (5,0)
+    // and (5,3) on the far one. Via (5,3): sea 2 -> (5,3) runs down the channel,
+    // 1.75 + 4 x 2.5 + 1.75 = 13.5, then land 3.0. Via (5,0): sea 6.0, then land
+    // (5,0) -> (8,3) = 6.0. At land 0.02 / sea 0.05 the second is cheaper
+    // (0.16 + 0.30 vs 0.10 + 0.675 per unit before fees), and it is taken.
+    {
+        scenario s = make_world({3, 4, 16, 17}, 0, 8, {{2, 0}, {5, 0}, {5, 3}}, 100.0f,
+                                1000.0f, /*dst_row=*/3);
+        const corp_command_result r = apply_corp_command(s.w, reg, dispatch_cmd(s, 25.0f));
+        check(r == corp_command_result::applied, "R6.1 two far-shore Ports: dispatch applies");
+        if (s.w.convoys.size() == 1)
+        {
+            const convoy_component& c = s.w.convoys.front();
+            const float want = (reg.logistics_cost(convoy_mode::land) * (2.0f + 6.0f)
+                                + reg.logistics_cost(convoy_mode::sea) * 6.0f
+                                + 2.0f * reg.port_handling()) * 25.0f;
+            check(c.mode == convoy_mode::sea && std::fabs(c.cost_paid - want) < 1e-2f,
+                  "R6.2 the port pair minimising the WHOLE route is taken, not the nearest "
+                  "to the destination");
+            trace << "R6:" << c.cost_paid << ';';
+        }
+        else
+            check(false, "R6.2 exactly one convoy is created");
+    }
+
+    // R7 — a sea leg never runs overland, and a land leg never swims. Water 3-4
+    // (and 16-17); source 0, destination 9; Ports at 2 and 7 — 7 is inland (columns
+    // 5-6 are land), so no sea leg reaches it. Refused, nothing mutated.
+    {
+        scenario s = make_world({3, 4, 16, 17}, 0, 9, {{2, 0}, {7, 0}});
+        const std::string before = fingerprint(s.w);
+        const corp_command_result r = apply_corp_command(s.w, reg, dispatch_cmd(s, 25.0f));
+        const std::string after = fingerprint(s.w);
+        check(r == corp_command_result::rejected_placement && before == after,
+              "R7 a Port off the water is no sea end: refused, nothing mutated");
+        trace << "R7:" << static_cast<int>(r) << ';';
+    }
+
+    // R8 — a Port coastal only across a hex DIAGONAL is a sea end. Water in column
+    // 4 and in column 3 except (3,1), which stays land (and 16-17). The Port at
+    // (2,1) — an odd row — touches water only at its NE (3,0) and SE (3,2) hex
+    // sides, which the four-way flood never steps; placement's six-side
+    // `is_coastal` accepts it. Route: land (0,0) -> (2,1) 3.0; sea (2,1) -> (3,0)
+    // -> (4,0) -> (5,0) = 1.75 + 2.5 + 1.75 = 6.0; land (5,0) -> (8,0) 3.0.
+    {
+        scenario s = make_world({3, 4, 16, 17}, 0, 8, {{2, 1}, {5, 0}}, 100.0f, 1000.0f,
+                                /*dst_row=*/0, /*land_cells=*/{{3, 1}});
+        const corp_command_result r = apply_corp_command(s.w, reg, dispatch_cmd(s, 25.0f));
+        check(r == corp_command_result::applied,
+              "R8.1 a Port whose sea lies only across a hex diagonal is a usable sea end");
+        if (s.w.convoys.size() == 1)
+        {
+            const convoy_component& c = s.w.convoys.front();
+            const float want = (reg.logistics_cost(convoy_mode::land) * (3.0f + 3.0f)
+                                + reg.logistics_cost(convoy_mode::sea) * 6.0f
+                                + 2.0f * reg.port_handling()) * 25.0f;
+            check(c.mode == convoy_mode::sea && std::fabs(c.cost_paid - want) < 1e-2f,
+                  "R8.2 the diagonal port hop is priced as an ordinary land<->water edge");
+            trace << "R8:" << c.cost_paid << ';';
+        }
+        else
+            check(false, "R8.2 exactly one convoy is created");
+    }
+
     return trace.str();
 }
 
@@ -300,7 +459,8 @@ std::string run_sequence(const recipe_registry& reg)
 
 int main()
 {
-    std::printf("=== sea_port_gate (BL-608: the Port building gates the sea leg) ===\n");
+    std::printf("=== sea_port_gate (BL-608 + BL-1186: the Port gates the sea LEG; routes are "
+                "legs) ===\n");
 
     recipe_registry reg;
     {

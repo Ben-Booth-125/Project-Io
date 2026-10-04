@@ -396,7 +396,8 @@ void p6_shared_pool_contention()
         // ready to march away — it draws BEFORE any convoy dispatch this
         // tick if the caller runs run_unit_march first, same as commit_convoy
         // if dispatch runs first: this test checks the OUTCOME is
-        // deterministic and mutually exclusive, not which side wins (that is
+        // deterministic and capped (BL-1186 E1: no longer mutually exclusive —
+        // the convoy takes what the march left), not which side wins (that is
         // the real driver's call order, reported separately).
         const entity_id rival = s.w.create_entity();
         corporation_component rc; rc.balance = 1000.0f;
@@ -447,8 +448,19 @@ void p6_shared_pool_contention()
         // exhausts the pool). The row that matters is that the SAME outcome
         // reproduces across two runs, proving determinism, not first-come by
         // iteration order.
-        check(ct.dispatched + mt.marching - mt.refused_no_lp <= 1,
-              ("at most one of {convoy, march} is granted this contested tick" + tag).c_str());
+        // BL-1186 E1: the auto-dispatch now SENDS what the anchor still admits
+        // rather than refusing a cargo above it whole, so "at most one side is
+        // granted" is no longer the rule. The rule the cap keeps is that the two
+        // draws together never exceed the pool: no anchor goes negative.
+        bool cap_held = true;
+        for (const auto& [body, pools] : shared_pool)
+            for (const auto& [anchor, left] : pools)
+                if (left < -1e-4f)
+                    cap_held = false;
+        (void)mt;
+        check(cap_held && ct.dispatched <= 1,
+              ("the convoy and the march together never draw past the pool (cap held)" + tag)
+                  .c_str());
 
         if (run == 0)
         {
@@ -502,9 +514,13 @@ void p6_shared_pool_contention()
         const convoy_dispatch_tick ct = dispatch_convoys(s.w, reg, reg.logistics_cost(convoy_mode::land),
                                                           reg.logistics_cost(convoy_mode::space),
                                                           &shared_pool);
-        // { march granted, convoy refused for want of LP }
+        // { march granted, convoy TRIMMED to what the march left (BL-1186 E1) }
+        float cargo = 0.0f;
+        for (const convoy_component& c : s.w.convoys)
+            cargo += c.cargo_qty;
         return { mt.marching == 1 && mt.refused_no_lp == 0,
-                 ct.dispatched == 0 && ct.refused_no_lp == 1 };
+                 ct.dispatched == 1 && ct.trimmed_by_lp == 1 && ct.refused_no_lp == 0
+                     && std::fabs(cargo - 28.0f) < 1e-3f };
     };
 
     const auto a = run_scenario();
@@ -516,11 +532,13 @@ void p6_shared_pool_contention()
     // -> arrivals -> economy (march inside) -> dispatch -> clear), so the
     // mobilised unit's 2.0-point march draws the anchor FIRST and is GRANTED,
     // leaving 28 of the 30.0 pool; the dest market is short 30 and the source
-    // holds 100, so the convoy's cargo is 30 — more than is left — and it is
-    // REFUSED for want of passive LP. Armies claim the anchor before goods:
-    // the goods-vs-force priority LOGISTICS.md says must be chosen.
+    // holds 100, so the convoy's cargo is sized 30 — more than is left. Armies
+    // still claim the anchor before goods (the goods-vs-force priority
+    // LOGISTICS.md says must be chosen); BL-1186 E1: the auto-dispatch then
+    // sends the 28 the march left, rather than refusing the cargo whole.
     check(a.first == true, "the march (drawn first, the real tick order) is granted");
-    check(a.second == true, "...leaving 28 of 30 LP, so the 30-unit convoy is refused for want of LP");
+    check(a.second == true,
+          "...leaving 28 of 30 LP, so the 30-unit convoy is TRIMMED to 28 (BL-1186 E1), not refused");
 }
 
 // ---------------------------------------------------------------------------

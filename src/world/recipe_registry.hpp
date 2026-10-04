@@ -1159,6 +1159,11 @@ public:
     /// (SUPPLY.md § Dispatch trigger). Never zero: see m_dispatch_margin.
     float dispatch_margin() const { return m_dispatch_margin; }
 
+    /// BL-1186: the per-unit HANDLING fee at each port a cargo passes through
+    /// (logistics.port_handling in Lua; SUPPLY.md § Logistical cost). A route with a
+    /// sea leg passes two ports and pays it twice per unit, independent of distance.
+    float port_handling() const { return m_port_handling; }
+
     /// Player road-placement cost for a tier (BL-172): 1=Track, 2=Road, 3=Highway; clamped to
     /// [1,3]. Authored in economy.roads.{track,road,highway}. Default arg keeps BL-147 callers
     /// (Track) unchanged.
@@ -1387,6 +1392,7 @@ public:
     }
     void set_logistics_nodes(const logistics_node_params& p) { m_logistics_nodes = p; }
     void set_dispatch_margin(float v) { m_dispatch_margin = v; }
+    void set_port_handling(float v) { m_port_handling = v; }
     void set_road_econ(std::uint8_t tier, const road_economics& r)
     {
         const std::size_t i = (tier < 1u ? 1u : (tier > 3u ? 3u : tier)) - 1u;
@@ -1663,6 +1669,12 @@ private:
     /// is "never zero". A non-finite or non-positive authored value is refused
     /// at load and this default stands.
     float m_dispatch_margin = 0.05f;
+
+    /// BL-1186 port handling (logistics.port_handling): credits per unit of cargo at EACH
+    /// port a cargo passes through (SUPPLY.md § Logistical cost) -- loading and again at
+    /// unloading, so a sea route pays it twice. The default mirrors economy.lua; a
+    /// non-finite or negative authored value is refused at load and this default stands.
+    float m_port_handling = 0.10f;
 
     /// Road-placement cost per tier (BL-172): index 0..2 = Track/Road/Highway (road_level 1/2/3).
     /// Credit defaults are used by the Lua-free harnesses; the material line is seeded from Lua

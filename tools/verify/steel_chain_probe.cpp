@@ -245,6 +245,11 @@ struct refusal_tally
          un_water_port_src_only = 0, un_water_port_dst_only = 0, un_water_endpoint_is_water = 0,
          un_water_land_path_exists = 0, un_water_land_path_would_pay = 0, un_cross_body = 0,
          un_cross_body_no_pad = 0, un_nonfinite = 0;
+    // BL-1186 (routing built): why a water pair still has no route — no active
+    // Port the origin reaches overland, none that reaches the destination
+    // overland, or both ends reach one but no sea leg joins any such pair.
+    long un_ports_none_on_body = 0, un_no_port_from_src = 0, un_no_port_to_dst = 0,
+         un_no_sea_leg_between = 0;
     // margin
     long margin = 0;
     // room
@@ -279,6 +284,11 @@ void print_tally(const char* who, const char* good, const refusal_tally& t, long
                 t.un_water_land_path_exists, t.un_water_land_path_would_pay,
                 t.un_water_land_path_exists ? t.un_land_haul_sum / t.un_water_land_path_exists : 0.0,
                 t.un_cross_body, t.un_cross_body_no_pad, t.un_nonfinite);
+    std::printf("    water & no route (BL-1186 legs): <2 active ports on the body %ld, no port "
+                "reached overland from the origin %ld, no port reaching the destination "
+                "overland %ld, both ends reach a port but no sea leg joins them %ld\n",
+                t.un_ports_none_on_body, t.un_no_port_from_src, t.un_no_port_to_dst,
+                t.un_no_sea_leg_between);
     std::printf("    net under margin %ld (mean haul/u %.2f vs mean gross gap p_d-p_src %.2f)\n",
                 t.margin, t.margin ? t.margin_haul_sum / t.margin : 0.0,
                 t.margin ? t.margin_gap_sum / t.margin : 0.0);
@@ -362,6 +372,29 @@ void classify_pair(world& w, const recipe_registry& reg, const logistics_nodes& 
             const float path_cost = path.cost;
             const std::size_t path_len = path.tiles.size();
             ++t.un_water_no_port;
+            {
+                // The router's own legs (logistics.hpp), read only.
+                const std::vector<entity_id> ports = body_active_port_tiles(w, src_body);
+                if (ports.size() < 2)
+                    ++t.un_ports_none_on_body;
+                else
+                {
+                    std::vector<entity_id> near_src, near_dst;
+                    for (const entity_id p : ports)
+                    {
+                        if (intra_body_leg_path(w, src_body, origin, p, leg_domain::land).reachable)
+                            near_src.push_back(p);
+                        if (intra_body_leg_path(w, src_body, p, dc, leg_domain::land).reachable)
+                            near_dst.push_back(p);
+                    }
+                    if (near_src.empty())
+                        ++t.un_no_port_from_src;
+                    else if (near_dst.empty())
+                        ++t.un_no_port_to_dst;
+                    else
+                        ++t.un_no_sea_leg_between;
+                }
+            }
             const bool po = probe_tile_has_active_port(w, origin);
             const bool pd = probe_tile_has_active_port(w, dc);
             if (po && !pd) ++t.un_water_port_src_only;
@@ -1055,6 +1088,31 @@ void run_seed(lua_state& lua, const options& o, std::uint32_t seed)
                         "dispatches %d, refused for passive LP %d\n",
                         rn(G).c_str(), mx_new, mx_new_q, mx_to_wanting, mx_flight_q,
                         dt.market_exports, dt.dispatched, dt.refused_no_lp);
+            // BL-1186: the followed good leaving CORPORATION pools this tick, by the
+            // mode its route took — the other sender, beside the shelf line above.
+            {
+                int   cx_new = 0, cx_sea = 0, mx_sea = 0;
+                float cx_new_q = 0.0f, cx_sea_q = 0.0f, mx_sea_q = 0.0f;
+                for (const convoy_component& cv : w.convoys)
+                {
+                    if (static_cast<std::size_t>(cv.cargo_resource) != G || cv.progress != 0.0f)
+                        continue;
+                    const bool sea = cv.mode == convoy_mode::sea;
+                    if (cv.corp == null_entity)
+                    {
+                        mx_sea += sea;
+                        mx_sea_q += sea ? cv.cargo_qty : 0.0f;
+                        continue;
+                    }
+                    ++cx_new;
+                    cx_new_q += cv.cargo_qty;
+                    cx_sea += sea;
+                    cx_sea_q += sea ? cv.cargo_qty : 0.0f;
+                }
+                std::printf("  %s corp dispatches: %d sent this tick (%.1f u); by sea: corp %d "
+                            "(%.1f u), market %d (%.1f u)\n",
+                            rn(G).c_str(), cx_new, cx_new_q, cx_sea, cx_sea_q, mx_sea, mx_sea_q);
+            }
 
             // WHY a shelf does or does not leave, read after this tick's clear
             // (the prices and demand the NEXT dispatch will act on): every
