@@ -775,6 +775,9 @@ void clear_derived_state(world& w)
     w.body_tile_index.clear();
     w.astar_cost_cache.clear();
     w.logistics_flood_fields.clear();
+    w.leg_flood_fields.clear(); // BL-1186: the leg-confined floods, same footing
+    w.leg_path_cache.clear();
+    w.body_port_tiles.clear();
     w.body_reach_cost.clear();
     w.lp_anchor_fields.clear(); // BL-1117: the nearest-anchor field, same footing
 
