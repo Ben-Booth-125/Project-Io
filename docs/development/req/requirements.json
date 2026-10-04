@@ -3817,12 +3817,13 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: live click, deferred to wave 3"
      ],
      "requirement": "The tile build door surfaces the new gates as reason-coded locks (the BL-589 idiom) - a live click at integration, not a capture.",
-     "notes": "Live click blocked: container cannot approve OS-level computer-use (NR-622 precedent). Render check owed via build_door capture; row stays pending until a session with access clicks the lock."
+     "notes": "Live click blocked: container cannot approve OS-level computer-use (NR-622 precedent). Render check owed via build_door capture; row stays pending until a session with access clicks the lock.",
+     "result_metric": "Ben confirmed at the live app, 2026-10-04 (sprint 48 close walk; build_rel rebuilt from main 9171c2ef). Ben: more lenses are wanted for visibility on some of these; he holds that for before sprint 50."
     }
    ]
   },
@@ -4134,12 +4135,13 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: live click on the AI decisions ledger"
      ],
      "requirement": "A stance change is legible: it emits into the decision feed with its reason. A coalition the player cannot see is the hidden handicap the whole design rejects.",
-     "notes": "A requirement of this item, not a follow-up."
+     "notes": "A requirement of this item, not a follow-up.",
+     "result_metric": "Ben confirmed at the live app, 2026-10-04 (sprint 48 close walk; build_rel rebuilt from main 9171c2ef). Ben: more lenses are wanted for visibility on some of these; he holds that for before sprint 50."
     },
     {
      "id": "R4",
@@ -4845,14 +4847,15 @@
     },
     {
      "id": "R4",
-     "status": "partial",
+     "status": "complete",
      "requirement": "Works raised is non-zero, and its roads are visible on the canvas.",
      "verification": [
       "headless: works raised > 0 in real generated worlds",
       "visual: roads render on the canvas"
      ],
      "notes": "BL-757 measured ZERO works raised across sixteen seeds because build_work never wins the scored contest, and wave 1 confirmed it still does at 16 seeds. If this item cannot move that, REPORT it - do not tune work_amortise_years further, it is already at its floor of 1.",
-     "evidence": " LIVE CHECK 2026-09-06, PARTIAL AND HONESTLY SO. Roads DO render: the Selection panel reads \"Tile [93, 52] - Road\", and road geometry is visible on the canvas as connected segments with node markers, present on land and absent on water. WHAT THE CANVAS CANNOT SHOW: an ancient history-derived road is indistinguishable by eye from a national-lattice road - they render with the same geometry - so a live look cannot separate them. The headless differential is strictly STRONGER evidence here: era ON vs OFF, 3146 -> 3466 roaded tiles at seed 0 (+320) with Road tier 173 -> 265, plus road_reach_census C7 pinning all five rungs of the tier rule. Recording the live look as done and the ancient-vs-national distinction as unshowable on the canvas, rather than claiming a look proved something it cannot. PARTIAL, AND BOTH HALVES SHORT FOR DIFFERENT REASONS. Works raised is STILL ZERO and the arithmetic says no weight closes it - Invest scores a SUM over held regions, a work scores ONE region plus the mean, so the gap widens with every conquest. That is BL-757 and it needs a SCORING change. The canvas half: roads DO render (Selection panel reads Tile [93,52] - Road) but an ancient road is indistinguishable by eye from a national one, so the headless differential is the stronger evidence. AND THE LIVE LOOK FOUND WHAT THE HARNESS COULD NOT - one nation with a complete road lattice, filed BL-784."
+     "evidence": " LIVE CHECK 2026-09-06, PARTIAL AND HONESTLY SO. Roads DO render: the Selection panel reads \"Tile [93, 52] - Road\", and road geometry is visible on the canvas as connected segments with node markers, present on land and absent on water. WHAT THE CANVAS CANNOT SHOW: an ancient history-derived road is indistinguishable by eye from a national-lattice road - they render with the same geometry - so a live look cannot separate them. The headless differential is strictly STRONGER evidence here: era ON vs OFF, 3146 -> 3466 roaded tiles at seed 0 (+320) with Road tier 173 -> 265, plus road_reach_census C7 pinning all five rungs of the tier rule. Recording the live look as done and the ancient-vs-national distinction as unshowable on the canvas, rather than claiming a look proved something it cannot. PARTIAL, AND BOTH HALVES SHORT FOR DIFFERENT REASONS. Works raised is STILL ZERO and the arithmetic says no weight closes it - Invest scores a SUM over held regions, a work scores ONE region plus the mean, so the gap widens with every conquest. That is BL-757 and it needs a SCORING change. The canvas half: roads DO render (Selection panel reads Tile [93,52] - Road) but an ancient road is indistinguishable by eye from a national one, so the headless differential is the stronger evidence. AND THE LIVE LOOK FOUND WHAT THE HARNESS COULD NOT - one nation with a complete road lattice, filed BL-784.",
+     "result_metric": "Ben confirmed at the live app, 2026-10-04 (sprint 48 close walk; build_rel rebuilt from main 9171c2ef). Ben: more lenses are wanted for visibility on some of these; he holds that for before sprint 50."
     },
     {
      "id": "R5",
@@ -6507,35 +6510,35 @@
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "live: Ben's walk, rounds 3-6"
      ],
      "requirement": "Next is disabled while the round on screen is running and enables the moment its world lands; its hover names what it waits on; no two pass rounds ever build at once (STARTUP.md, Next waits).",
      "notes": "Built (K4). Live click owed. The cold review's fix round is in flight (round 6 pace, reroll mid-tail, slots freed at Begin, the report's lean, R6's frame assertion).",
-     "result_metric": ""
+     "result_metric": "Ben confirmed at the live app, 2026-10-04 (sprint 48 close walk; build_rel rebuilt from main 9171c2ef). Ben: more lenses are wanted for visibility on some of these; he holds that for before sprint 50."
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "live: Ben's walk",
       "visual: a capture of round 5's wait"
      ],
      "requirement": "The wait caption on round 5 names only the Exploration span (never an earlier one), and round 5's elapsed count is the Exploration span's own cost; Back then Next on any round recomputes nothing.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Ben confirmed at the live app, 2026-10-04 (sprint 48 close walk; build_rel rebuilt from main 9171c2ef). Ben: more lenses are wanted for visibility on some of these; he holds that for before sprint 50."
     },
     {
      "id": "R6",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: verify.wizard_span_seed and a frame read",
       "live: Ben's walk"
      ],
      "requirement": "Rerolling round 5 re-runs only span 5 and opens on round 4's exact 1200 frame; a planetology move drops every slot below it; a stale landing drops record and world.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Ben confirmed at the live app, 2026-10-04 (sprint 48 close walk; build_rel rebuilt from main 9171c2ef). Ben: more lenses are wanted for visibility on some of these; he holds that for before sprint 50."
     },
     {
      "id": "R7",
@@ -6594,13 +6597,13 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: a capture of the densest curated seed's road lens"
      ],
      "requirement": "No lattice: the densest seed's capture shows a tree with occasional detour loops.",
      "notes": "Read after BL-1130 (centres consolidate): the remaining street carpet is centre density, not roads.",
-     "result_metric": ""
+     "result_metric": "Ben confirmed at the live app, 2026-10-04 (sprint 48 close walk; build_rel rebuilt from main 9171c2ef). Ben: more lenses are wanted for visibility on some of these; he holds that for before sprint 50."
     },
     {
      "id": "R4",
@@ -6768,13 +6771,13 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "live: Ben's walk"
      ],
      "requirement": "Ben finds a lane at the live app without a pointer.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Ben confirmed at the live app, 2026-10-04 (sprint 48 close walk; build_rel rebuilt from main 9171c2ef). Ben: more lenses are wanted for visibility on some of these; he holds that for before sprint 50."
     }
    ]
   },
@@ -6954,13 +6957,13 @@
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: a capture of the densest curated seed's road lens"
      ],
      "requirement": "The densest seed shows land that is not street.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Ben confirmed at the live app, 2026-10-04 (sprint 48 close walk; build_rel rebuilt from main 9171c2ef). Ben: more lenses are wanted for visibility on some of these; he holds that for before sprint 50."
     },
     {
      "id": "R5",
@@ -7043,13 +7046,13 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "live: Ben's walk"
      ],
      "requirement": "Ben sees the roads carry from round to round.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Ben confirmed at the live app, 2026-10-04 (sprint 48 close walk; build_rel rebuilt from main 9171c2ef). Ben: more lenses are wanted for visibility on some of these; he holds that for before sprint 50."
     }
    ]
   },
@@ -7077,13 +7080,13 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "live: Ben's walk"
      ],
      "requirement": "Ben reads the draft at the app and accepts or rewords it.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Ben confirmed at the live app, 2026-10-04 (sprint 48 close walk; build_rel rebuilt from main 9171c2ef). Ben: more lenses are wanted for visibility on some of these; he holds that for before sprint 50."
     }
    ]
   },
@@ -7343,13 +7346,13 @@
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: live click on the loading screen's charter list on a budget world"
      ],
      "requirement": "The loading screen's charter list (app::draw_building_carve) still shows what the carve counts on a budget world, not an empty list.",
      "notes": "publish_charter_web now publishes the winner's specialists to the carve panel (cold path: --autostart, seed 0 should show 54 rows after \"Proving the field\"; the wizard's round 6 draws from another sink). Screen access declined 2026-09-26; the live click moves to the walk.",
-     "result_metric": ""
+     "result_metric": "Ben confirmed at the live app, 2026-10-04 (sprint 48 close walk; build_rel rebuilt from main 9171c2ef). Ben: more lenses are wanted for visibility on some of these; he holds that for before sprint 50."
     },
     {
      "id": "R5",
@@ -8008,13 +8011,13 @@
     },
     {
      "id": "RD",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: live click"
      ],
      "requirement": "A marker shows on an army in a large province.",
      "notes": "",
-     "result_metric": "Owed at the sprint's live walk (play build 22:42 2026-10-02)."
+     "result_metric": "Owed at the sprint's live walk (play build 22:42 2026-10-02). Ben confirmed at the live app, 2026-10-04 (sprint 48 close walk; build_rel rebuilt from main 9171c2ef). Ben: more lenses are wanted for visibility on some of these; he holds that for before sprint 50."
     }
    ]
   },
