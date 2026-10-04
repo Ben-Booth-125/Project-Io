@@ -8,10 +8,13 @@
 //
 //   conditions_met = body habitability >= 0.5  AND  met_ratio >= threshold
 //
-// where met_ratio is the growth-basket-weighted mean of min(1, supply/demand)
-// over the body's markets, read from the markets the LAST clear left (exactly
-// what the next tick's growth pass reads). Alongside: centres, heads (k),
-// centres on a negative streak, and each basket good's supply/demand.
+// where met_ratio is, since BL-1163, PER CENTRE: the household met ratio at
+// the centre's own market (population_met_ratio — the share of the population
+// channel's bid the LAST clear filled, over the household basket it bids,
+// exactly what the next tick's growth pass reads). Alongside: centres, heads
+// (k), centres on a negative streak, the distribution of per-centre met ratios
+// (min / p25 / median / max, and how many sit below the threshold), and each
+// household good's body-summed supply/demand.
 //
 // Usage (repo root): centre_decline_trace [--seeds a,b] [--ticks N] [--every K]
 // Lua harness: bash tools/verify/build_lua_harness.sh centre_decline_trace
@@ -21,6 +24,7 @@
 #include "harness_params.hpp"
 #include "world/campaign_settle.hpp"
 #include "world/economy_system.hpp"
+#include "world/market_clearing.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/resource_names.hpp"
 #include "world/world.hpp"
@@ -57,7 +61,8 @@ void sample(const world& w, const recipe_registry& reg, int tick, const economy_
                     ng ? grant / ng : 0.0f, contended);
         (void)starved;
     }
-    const growth_params& gp = reg.growth();
+    const float thr = reg.growth().growth_met_threshold;
+    const std::array<float, resource_count>& basket = reg.population_demand_basket();
     std::map<entity_id, std::array<float, resource_count>> sup, dem;
     std::vector<entity_id> mids;
     for (const auto& kv : w.markets) mids.push_back(kv.first);
@@ -69,7 +74,7 @@ void sample(const world& w, const recipe_registry& reg, int tick, const economy_
         auto& d = dem[mc.body];
         for (std::size_t r = 0; r < resource_count; ++r) { s[r] += mc.supply[r]; d[r] += mc.demand[r]; }
     }
-    struct acc { int n = 0, pop = 0, neg = 0, v = 0; float hs = 0, hw = 0; };
+    struct acc { int n = 0, pop = 0, neg = 0, v = 0, below = 0; float hs = 0, hw = 0; std::vector<float> met; std::map<entity_id, int> mkts; };
     std::map<entity_id, acc> by_body;
     std::vector<entity_id> cids;
     for (const auto& kv : w.population_centres) cids.push_back(kv.first);
@@ -88,28 +93,31 @@ void sample(const world& w, const recipe_registry& reg, int tick, const economy_
         if (pc.scale == 1) ++a.v;
         const float ws = static_cast<float>(std::max(1, pc.scale));
         a.hs += pc.habitability * ws; a.hw += ws;
+        const entity_id mid = market_for_tile(w, ti->second);
+        const float m = (mid != null_entity) ? population_met_ratio(w, reg, mid) : 1.0f;
+        a.met.push_back(m);
+        if (m < thr) ++a.below;
+        ++a.mkts[mid];
     }
-    for (const auto& [body, a] : by_body)
+    for (auto& [body, a] : by_body)
     {
-        float met = 1.0f, ma = 0, mw = 0;
+        std::sort(a.met.begin(), a.met.end());
+        auto q = [&](float f) { return a.met.empty() ? 1.0f : a.met[std::min(a.met.size() - 1, static_cast<std::size_t>(f * static_cast<float>(a.met.size())))]; };
         std::string goods;
         const auto di = dem.find(body);
         for (std::size_t r = 0; r < resource_count; ++r)
         {
-            const float bw = gp.demand_basket[r];
-            if (bw <= 0.0f) continue;
+            if (basket[r] <= 0.0f) continue;
             const float s = (di != dem.end()) ? sup[body][r] : 0.0f;
             const float d = (di != dem.end()) ? di->second[r] : 0.0f;
             char buf[96];
             std::snprintf(buf, sizeof buf, " %s %.0f/%.0f", resource_names::name_of(static_cast<resource_type>(r)).c_str(), s, d);
             goods += buf;
-            if (d <= 0.0f) continue;
-            ma += bw * std::min(1.0f, s / d); mw += bw;
         }
-        if (mw > 0) met = ma / mw;
-        std::printf("  t%4d body %llu | centres %4d villages %4d heads %7dk declining %4d | hab %.3f met %.3f |%s\n",
+        std::printf("  t%4d body %llu | centres %4d villages %4d heads %7dk declining %4d | hab %.3f | met min %.2f p25 %.2f med %.2f max %.2f, %d centres below %.2f over %zu markets |%s\n",
                     tick, static_cast<unsigned long long>(body), a.n, a.v, a.pop, a.neg,
-                    a.hw > 0 ? a.hs / a.hw : 1.0f, met, goods.c_str());
+                    a.hw > 0 ? a.hs / a.hw : 1.0f, q(0.0f), q(0.25f), q(0.5f), a.met.empty() ? 1.0f : a.met.back(),
+                    a.below, thr, a.mkts.size(), goods.c_str());
     }
     std::fflush(stdout);
 }

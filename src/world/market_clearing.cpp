@@ -587,6 +587,29 @@ void inject_population_demand(world& w, const recipe_registry& reg)
     }
 }
 
+float population_met_ratio(const world& w, const recipe_registry& reg, entity_id market)
+{
+    const auto mit = w.markets.find(market);
+    if (mit == w.markets.end())
+        return 1.0f;
+    const market_component& mc = mit->second;
+    // The SAME vector inject_population_demand multiplies by — never
+    // pd.demand_basket (the shared tranche alone) and never a second list.
+    const std::array<float, resource_count>& basket = reg.population_demand_basket();
+    float acc = 0.0f, weight = 0.0f;
+    for (std::size_t r = 0; r < resource_count; ++r) // resource index ascending: fixed float order
+    {
+        const float bw = basket[r];
+        if (bw <= 0.0f || mc.base_price[r] <= 0.0f)
+            continue; // not in the bid (inject_population_demand's two skips)
+        if (mc.demand[r] <= 0.0f)
+            continue; // no clear has recorded the bid yet
+        acc    += bw * std::min(1.0f, mc.supply[r] / mc.demand[r]);
+        weight += bw;
+    }
+    return (weight > 0.0f) ? acc / weight : 1.0f;
+}
+
 void inject_background_demand(world& w, const recipe_registry& reg)
 {
     // BL-340/BL-365: the offstage economy's own pull on the mid-chain

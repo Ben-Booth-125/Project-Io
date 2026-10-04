@@ -38,6 +38,25 @@ struct corp_cash_flow
 /// @param w World; market demand arrays are mutated in place.
 void inject_population_demand(world& w, const recipe_registry& reg);
 
+/// BL-1163 (play villages decline): the household MET RATIO at `market` — the
+/// share of the population channel's own bid that the market's last clear
+/// filled (docs/economy/POPULATION.md § Growth, decline and razing, "The growth
+/// basket IS the household basket"). The goods and weights are exactly what
+/// `inject_population_demand` bids: `reg.population_demand_basket()` (shared
+/// tranche + the band's tranche, era-masked by the registry's fold), less any
+/// good the market leaves unpriced (`base_price <= 0`, which the bid skips).
+///
+/// THE FILL. A market clear serves its bidders PRO RATA — every bid on a good
+/// is filled in the share `min(1, supply / demand)` the clear's listings cover
+/// — so the population channel's fill of good r is `bid_r × min(1, supply_r /
+/// demand_r)`, and `fill / bid` is that share. It is read from the persistent
+/// `supply`/`demand` the last clear left (both serialised), so no separate
+/// per-channel record is needed and a save/load replays it exactly.
+///
+/// Returns the basket-weighted mean of the per-good share; 1.0 when nothing
+/// was bid (no market, or no clear yet) — nothing unmet. Pure; deterministic.
+float population_met_ratio(const world& w, const recipe_registry& reg, entity_id market);
+
 /// Inject background-industrial demand into body markets (BL-340/BL-365). A
 /// world-scale pull for the mid-chain processing goods (silicon, refined_copper,
 /// ree_alloy, machinery, alloys, electronics — deliberately NOT
