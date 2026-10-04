@@ -605,6 +605,24 @@ std::vector<entity_id> generate_background_firms(
 /// author a processor (`generate_corporations`, `generate_background_firms`).
 void assign_default_recipes(world& w, const recipe_registry& reg);
 
+/// BL-1185 (chain-feasible placement) — the AUDIT of Pass 3's rule on a built
+/// world: every standing processor (not decommissioned) checked against every
+/// producer standing NOW, with the same reach placement uses
+/// (`price_market_export_leg`). Weaker than the placement-time test, which sees
+/// only what stood before the processor; a processor counted infeasible here
+/// broke the rule outright. A measurement seam for harnesses — read-only on the
+/// simulation, but it WARMS the logistics caches, so a caller that goes on to
+/// tick should `invalidate_logistics_caches` after it.
+struct chain_feasibility_audit
+{
+    int processors        = 0; ///< standing processors
+    int no_recipe         = 0; ///< of which carry no recipe
+    int infeasible        = 0; ///< of which some input has no producer within reach
+    int infeasible_held   = 0; ///< of `infeasible`, held by a corporation
+    int processors_held   = 0; ///< standing processors held by a corporation
+};
+chain_feasibility_audit audit_chain_feasibility(world& w, const recipe_registry& reg);
+
 /// Measurement seam (2026-08-20) — the SHIPPED coverage arithmetic, readable
 /// from outside. `generate_background_firms` stops on its caps (per resource,
 /// per province, `max_firms_per_body`), never on a coverage target; the basket-

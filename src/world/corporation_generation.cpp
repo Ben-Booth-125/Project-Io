@@ -1597,6 +1597,11 @@ void chain_unplace(world& w, entity_id bid, std::unordered_set<entity_id>& occup
 /// A processor that already carries a recipe is re-decided all the same: the
 /// rule reads the ground, not what an earlier pass wrote.
 ///
+/// A corporation whose ANCHOR — its defining asset, the first placed — is a
+/// processor (the processing mix) is a processing corporation: left with no
+/// processor it is not that corporation, so it too is unplaced whole rather
+/// than handed on as a mine wearing a processing focus.
+///
 /// @return false when nothing is left placed (the caller treats the charter as
 ///         a placement that found no feasible ground).
 bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
@@ -1604,6 +1609,10 @@ bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
                          const std::vector<int>* serve)
 {
     const int n = reg.recipe_count(building_type::processing_facility);
+    bool processing_anchor = false;
+    if (!assets.empty())
+        if (const auto ait = w.buildings.find(assets.front()); ait != w.buildings.end())
+            processing_anchor = ait->second.type == building_type::processing_facility;
     std::vector<entity_id> kept;
     kept.reserve(assets.size());
     int serving = 0;
@@ -1656,7 +1665,7 @@ bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
     }
     assets = std::move(kept);
 
-    if ((serve != nullptr && serving == 0) || assets.empty())
+    if (((serve != nullptr || processing_anchor) && serving == 0) || assets.empty())
     {
         for (const entity_id bid : assets)
             chain_unplace(w, bid, occupied);
@@ -2217,7 +2226,8 @@ std::vector<entity_id> generate_corporations(
     // placement's processors are given a recipe whose inputs are produced within
     // reach, or are unplaced, and a rung left with nothing tries the next rung.
     // Without one (world generation's own call, which runs before any registry
-    // exists — the --verify world), processors keep `no_recipe` exactly as before.
+    // exists; a budget world's walk replaces that roster), processors keep
+    // `no_recipe` exactly as before.
     std::unique_ptr<chain_reach> chain;
     if (reg != nullptr)
         chain = std::make_unique<chain_reach>(make_chain_reach(w, *reg));
@@ -2647,6 +2657,10 @@ std::vector<entity_id> generate_background_firms(
     std::mt19937 name_rng(seed ^ 0x6E17C4B0u);
     std::mt19937 stock_rng(seed ^ 0x1A2B3C4Du);
 
+    // BL-1185: the reach every firm's processors are checked against (Pass 3
+    // "Chain-feasible"), its node set read once, here.
+    chain_reach chain = make_chain_reach(w, reg);
+
     for (const entity_id body_id : body_ids)
     {
         // Nations that actually own tiles on this body — a background firm only
@@ -2690,6 +2704,10 @@ std::vector<entity_id> generate_background_firms(
         // introduces an iteration-order dependence.
         std::array<int, resource_count> firms_by_resource = {};
         std::map<uint32_t, int>         firms_by_province;
+        // BL-1185: per good, the chain-rejected placements since the last firm
+        // landed, and whether the good is masked out of the selection for it.
+        std::array<int, resource_count>  chain_misses = {};
+        std::array<bool, resource_count> chain_masked = {};
         for (int iter = 0; iter < max_iterations_per_body && firms_this_body < max_firms_per_body; ++iter)
         {
             std::array<float, resource_count> production = {};
@@ -2731,7 +2749,7 @@ std::vector<entity_id> generate_background_firms(
             // selection rule to drift out of step with the first.
             std::array<float, resource_count> selectable = production;
             for (std::size_t r = 0; r < resource_count; ++r)
-                if (firms_by_resource[r] >= per_resource_firm_cap)
+                if (firms_by_resource[r] >= per_resource_firm_cap || chain_masked[r])
                     selectable[r] = std::max(selectable[r], demand[r]);
 
             // BL-709 — THE CONSTRUCTION SECTOR IS PROVISIONED FIRST, and this
@@ -2770,7 +2788,8 @@ std::vector<entity_id> generate_background_firms(
                 const std::size_t cap_i =
                     static_cast<std::size_t>(resource_type::construction_capacity);
                 const int ci = best_construction_recipe(reg);
-                if (ci >= 0 && firms_by_resource[cap_i] < per_resource_firm_cap)
+                if (ci >= 0 && firms_by_resource[cap_i] < per_resource_firm_cap
+                    && !chain_masked[cap_i])
                 {
                     // BOUNDED BY A COUNT OF YARDS, NOT BY MEASURED PRODUCTION,
                     // and that is the difference between a provisioning pass and
@@ -2886,17 +2905,38 @@ std::vector<entity_id> generate_background_firms(
             // called (see the header's ordering note), so a gap-targeted recipe
             // here is strictly better than losing every background processor to
             // the same steel default.
-            if (go_processing && recipe_i >= 0)
+            //
+            // BL-1185 (chain-feasible placement; Pass 3 "Chain-feasible"): the
+            // recipe must also have every input produced within reach of the
+            // processor's market — the gap selection's recipe first, then the
+            // good's other recipes by output; a processor with none is unplaced,
+            // and a firm none of whose processors can make its good is given back
+            // whole. An extraction firm's incidental processor takes the nearest
+            // feasible recipe or is unplaced (`make_chain_feasible`).
             {
-                const recipe&  chosen    = reg.recipe_at(building_type::processing_facility, recipe_i);
-                const uint16_t chosen_id = reg.recipe_id(chosen.name);
-                for (const entity_id bid : assets)
+                std::vector<int> serve;
+                if (go_processing)
                 {
-                    const auto bit = w.buildings.find(bid);
-                    if (bit != w.buildings.end()
-                        && bit->second.type == building_type::processing_facility)
-                        bit->second.recipe = chosen_id;
+                    serve.push_back(recipe_i);
+                    for (const int i : chain_recipes_for_good(reg, gap_r))
+                        if (i != recipe_i)
+                            serve.push_back(i);
                 }
+                if (!make_chain_feasible(w, reg, chain, assets, occupied_tiles,
+                                         go_processing ? &serve : nullptr))
+                {
+                    // Given back whole. Another nation's turn may anchor in reach,
+                    // so the good is masked only once every nation on the body has
+                    // missed it since the last firm landed (a landing can bring it
+                    // within reach, so it clears every count).
+                    if (++chain_misses[gap_r] >= static_cast<int>(nation_ids.size()))
+                        chain_masked[gap_r] = true;
+                    continue;
+                }
+                // An unplaced anchor moves the firm's home to its next holding.
+                const auto abit = w.buildings.find(assets.front());
+                if (abit != w.buildings.end())
+                    anchor_province = w.provinces.province_of(abit->second.tile);
             }
 
             // Financial profile: opened at zero here and handed its working
@@ -2944,6 +2984,8 @@ std::vector<entity_id> generate_background_firms(
             ++firms_by_resource[gap_r];
             if (anchor_province != 0)
                 ++firms_by_province[anchor_province];
+            chain_misses.fill(0);   // BL-1185: a new producer may bring a masked good in reach
+            chain_masked.fill(false);
 
             // Starting stockpile — the same BL-116 generator every generated
             // corp uses, so a background firm opens with materials from turn
@@ -2969,6 +3011,47 @@ std::vector<entity_id> generate_background_firms(
     }
 
     return firm_ids;
+}
+
+chain_feasibility_audit audit_chain_feasibility(world& w, const recipe_registry& reg)
+{
+    chain_feasibility_audit out;
+    std::unordered_set<entity_id> held;
+    for (const auto& [cid, corp] : w.corporations)
+    {
+        (void)cid;
+        for (const entity_id bid : corp.assets)
+            held.insert(bid);
+    }
+    chain_reach cr = make_chain_reach(w, reg);
+    // Ascending id: the leg memo fills in a fixed order (the counts are order-free).
+    std::vector<entity_id> procs;
+    for (const auto& [bid, b] : w.buildings)
+        if (b.type == building_type::processing_facility && !b.decommissioned)
+            procs.push_back(bid);
+    std::sort(procs.begin(), procs.end());
+    for (const entity_id bid : procs)
+    {
+        const building_component& b = w.buildings.at(bid);
+        const bool is_held = held.count(bid) != 0;
+        ++out.processors;
+        if (is_held)
+            ++out.processors_held;
+        const recipe* rc = reg.get_recipe(b.recipe);
+        if (rc == nullptr)
+        {
+            ++out.no_recipe;
+            continue;
+        }
+        if (chain_recipe_tier(w, reg, cr, bid, market_for_tile(w, b.tile), *rc, nullptr)
+            == chain_tier_none)
+        {
+            ++out.infeasible;
+            if (is_held)
+                ++out.infeasible_held;
+        }
+    }
+    return out;
 }
 
 void assign_default_recipes(world& w, const recipe_registry& reg)
@@ -4349,6 +4432,9 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         std::array<bool, resource_count> skipped{};
         std::array<charter_unspent_reason, resource_count> skip_reason{};
         std::array<bool, 2> focus_failed{};
+        // BL-1185: the goods `skipped` for want of a reachable input rather than
+        // for want of ground — cleared, and retried, at this centre's next charter.
+        std::array<bool, resource_count> chain_skipped{};
         std::array<charter_unspent_reason, 2> focus_reason{};
 
         for (int32_t k = 0; k < n_firms; ++k)
@@ -4497,6 +4583,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             charter_rung           rung          = charter_rung::centre_window;
             std::vector<entity_id> assets;
             bool                   stop          = false;
+            bool                   chain_masked_any = false; // BL-1185, legacy rules only
             for (;;)
             {
                 if (gap_r == resource_count && bs.in_turn)
@@ -4596,8 +4683,12 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                     if (gap_r == resource_count)
                     {
                         // Nothing on this body is short: the rest of this centre's
-                        // budget has nothing to buy.
-                        cc.unspent[static_cast<std::size_t>(charter_unspent_reason::no_gap)] += left;
+                        // budget has nothing to buy. BL-1185: unless a short good was
+                        // masked for want of a reachable input — then the windows
+                        // held ground and none of it could take the chain.
+                        cc.unspent[static_cast<std::size_t>(
+                            chain_masked_any ? charter_unspent_reason::window_exhausted
+                                             : charter_unspent_reason::no_gap)] += left;
                         stop = true;
                         break;
                     }
@@ -4625,14 +4716,53 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                 }
                 else
                 {
+                    // BL-1185 (chain-feasible placement): a firm for a good is
+                    // chartered only where some recipe for that good has every
+                    // input produced within reach — the gap selection's recipe
+                    // first, then the good's other recipes by output — and an
+                    // extraction firm's incidental processor takes the nearest
+                    // feasible recipe or is unplaced (`make_chain_feasible`).
+                    std::vector<int> serve;
+                    if (go_processing)
+                    {
+                        serve.push_back(recipe_i);
+                        for (const int i : chain_recipes_for_good(reg, gap_r))
+                            if (i != recipe_i)
+                                serve.push_back(i);
+                    }
                     bool chain_rejected = false;
                     assets = charter_place(w, nc, focus, occupied, asset_rng, cc, settle, spend,
                                            by_province, &province_rungs, rung, why,
-                                           reg, /*cr=*/nullptr, /*serve=*/nullptr, chain_rejected);
+                                           reg, &chain, go_processing ? &serve : nullptr,
+                                           chain_rejected);
                     if (!assets.empty())
                         break;
-                    focus_failed[fi] = true;
-                    focus_reason[fi] = why;
+                    if (chain_rejected)
+                    {
+                        // A failure of the GOOD, not of the focus: the windows
+                        // held ground, none of it within reach of the good's
+                        // chain. The focus is not marked failed — another good
+                        // of it may place — and the good is passed over until
+                        // this centre charters again (a new producer can bring
+                        // it within reach).
+                        if (!bs.in_turn)
+                        {
+                            // The legacy rules mask the good for this firm's
+                            // selection and choose again (as the per-good cap
+                            // masks: production lifted to demand).
+                            selectable[gap_r] = std::max(selectable[gap_r], demand[gap_r]);
+                            chain_masked_any  = true;
+                            gap_r    = resource_count;
+                            recipe_i = -1;
+                            continue;
+                        }
+                        chain_skipped[gap_r] = true;
+                    }
+                    else
+                    {
+                        focus_failed[fi] = true;
+                        focus_reason[fi] = why;
+                    }
                 }
 
                 if (!bs.in_turn)
@@ -4661,19 +4791,10 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             const entity_id anchor_tile = w.buildings.at(assets.front()).tile;
             const uint32_t anchor_province = w.provinces.province_of(anchor_tile);
 
-            // Recipe authoring onto the firm's processors, as Pass 6.
-            if (go_processing && recipe_i >= 0)
-            {
-                const recipe&  chosen    = reg.recipe_at(building_type::processing_facility, recipe_i);
-                const uint16_t chosen_id = reg.recipe_id(chosen.name);
-                for (const entity_id bid : assets)
-                {
-                    const auto b = w.buildings.find(bid);
-                    if (b != w.buildings.end()
-                        && b->second.type == building_type::processing_facility)
-                        b->second.recipe = chosen_id;
-                }
-            }
+            // The firm's processors already carry their recipes: `make_chain_feasible`
+            // authored each one inside `charter_place` (BL-1185) — the firm's good by
+            // the gap selection's preference, the first recipe feasible where that
+            // processor stands.
 
             // The company, as Pass 6 authors it: open by construction (BL-678),
             // a stockpile from the BL-116 generator, and working capital priced from
@@ -4708,6 +4829,14 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                 ++bs.firms_by_province[anchor_province];
             if (from_turn)   // the pass moves on past the good that was just served
                 bs.turn_cursor = (turn_at + 1) % bs.turn.size();
+            // BL-1185: a good passed over for want of a reachable input is retried
+            // now — this charter's holdings may be the producer it lacked.
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (chain_skipped[r])
+                {
+                    chain_skipped[r] = false;
+                    skipped[r]       = false;
+                }
 
             if (home_body != null_entity)
             {

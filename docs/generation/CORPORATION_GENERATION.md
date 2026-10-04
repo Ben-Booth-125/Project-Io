@@ -308,13 +308,15 @@ not a broad presence across the nation.
   - **The recipe bends before the building goes.** A specialist's processor (and the one processor
     in an extraction or trade mix) takes the feasible recipe nearest its feed: its **own** holdings
     first, then its own market, then reach, ties to the band's recipe order. A processor with no
-    feasible recipe is unplaced; a corporation left with nothing tries its next anchor rung, and with
-    none left it is not chartered — on a budget world its price books as `window_exhausted` (the
+    feasible recipe is unplaced; a corporation left with nothing — or a processing corporation
+    left with no processor, which would be a mine wearing a processing focus — tries its next
+    anchor rung, and with none left it is not chartered — on a budget world its price books as `window_exhausted` (the
     windows held ground, none of it within reach of a chain).
-  - **Which world it binds.** Every placement the landscape search lays (§ Pass 6), which is the
-    world play receives. World generation's own Pass 3 runs before a recipe registry exists, so the
-    unsearched seed-candidate world the `--verify` goldens read keeps its processors unconfigured
-    until the default recipe is applied.
+  - **Which world it binds.** Every placement made with the recipe registry in hand: the charter
+    walk (specialists and firms) and Pass 6 on every path that lays them, searched or not, and the
+    specialists the landscape search lays. World generation's own Pass 3 runs before a registry
+    exists; where that roster survives (a world with no charter budget, laid without the search),
+    its processors take the band's default recipe.
 
 Placement is collision-checked against already-placed assets from other corporations.
 No two corporations begin on the same tile.
@@ -445,6 +447,20 @@ road, hire, and trade decisions — identical to the corp_ai instance driving th
 (Ben, 2026-08-11, overriding a cheaper reduced-model recommendation). Nothing in `corp_ai.cpp`
 branches on `is_background`; the flag exists for generation, surfaces, and the AI-player
 blackboard export to read, not for the scorer to treat differently.
+
+**Chain-feasible, as Pass 3** (BL-1185, chain-feasible placement). A background firm chartered to
+make a good is placed only where some recipe for that good has every input produced within reach
+(§ Pass 3, "Chain-feasible", for reach and for which producers count). Its processors take the gap
+selection's recipe where that is feasible, and otherwise the good's next recipe by output that is;
+a processor with no feasible recipe is unplaced, and a firm none of whose processors can make its
+good is not chartered for it. An extraction firm's one processor follows the specialist rule. The
+walk is **ordered**, so a chain can be absent because its upstream had not landed yet. A good
+refused this way is therefore a failure of the good, not of the firm's focus: it is passed over
+at that centre only until the centre charters again, because the new firm may be the producer it
+lacked. Under the legacy cap rules the good is masked out of that firm's selection and the next
+gap is taken. Where nothing feasible is left, the points book as `window_exhausted`: the windows
+held ground, and none of it was within reach of a chain. The budget-less Pass 6 masks a good once
+every nation on the body has missed it since the last firm landed.
 
 **What Pass 6 does not do.** It does not seed any behavioural state, matching the contract the
 rest of this pipeline holds (§ Generation seeds no behaviour) — no sentiment, no diplomatic

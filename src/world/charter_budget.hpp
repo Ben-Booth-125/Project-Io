@@ -398,7 +398,9 @@ inline std::int64_t charter_centre_firm_points(std::int32_t points, const charte
 enum class charter_unspent_reason : std::uint8_t
 {
     no_nation        = 0, ///< the centre's tile belongs to no nation (or has no tile)
-    window_exhausted = 1, ///< no anchorable ground in the centre window nor its region window
+    window_exhausted = 1, ///< no anchorable ground in the centre window nor its region window,
+                          ///< or (BL-1185) ground with no chain-feasible charter on it: no
+                          ///< recipe whose inputs are produced within reach
     province_cap     = 2, ///< the windows HAD anchorable ground, but every such tile stands in
                           ///< a province already at the budget path's per-province firm cap
     no_gap           = 3, ///< the body had no resource short enough to charter a firm for
