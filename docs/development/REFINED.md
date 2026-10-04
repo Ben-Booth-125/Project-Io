@@ -1,6 +1,6 @@
 # REFINED — active worklist
 
-## Sprint 48 — the world moves forward (opened 2026-09-25)
+## Sprint 48 — the world moves forward (opened 2026-09-25, CLOSED 2026-10-04)
 
 **Goal.** The world is built once at the Life gate and moves forward through the rounds; Next waits
 for its round and nothing is built twice; roads are a tree and round 6's tail lands inside 35 s; a

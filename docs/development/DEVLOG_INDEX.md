@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 227 entries across 2 volume(s).
+One line per session, newest first — 228 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-10-04 | [Sprint 48 closes: three branches ruled, reviewed and merged; the overseas reach designed](DEVLOG.md) | BL-1148 BL-1168 BL-1169 BL-1170 BL-1171 BL-1172 BL-1179 | DEVLOG.md |
 | 2026-09-22 | [Beat 1 ships: the span and the charter budget on by default, one re-bless](DEVLOG.md) | BL-1037 BL-1044 BL-1050 BL-977 | DEVLOG.md |
 | 2026-09-21 | [The charter price becomes the world's own, and the seat menu is read off the budget](DEVLOG.md) | BL-1043 BL-1044 BL-1050 BL-1064 | DEVLOG.md |
 | 2026-09-20 | [Sprint 45's last builds: the charter spend hardened, a load that replays, and a refusal that would have gone quiet](DEVLOG.md) | BL-1043 BL-1044 BL-1050 BL-1060 BL-1061 BL-1062 BL-1063 BL-1064 | DEVLOG.md |
