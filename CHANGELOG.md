@@ -12,6 +12,64 @@ release.
 
 ## [Unreleased]
 
+## [0.1.27] — 2026-10-04
+
+*The world moves forward. The world is built once and carried through the six rounds rather
+than rebuilt at each; its roads are a tree, its markets can die, its villages consolidate into
+towns and deepen into one centre a region, and its sea lanes ride the ocean currents and the
+trade that crosses them. Late in the sprint three rulings reshaped the economy the player
+inherits: a charter is priced by the capital in its own trade reach, far realms across water
+trade and bind only where a fleet reaches, and an army eats what its owner can buy at a fair
+price. Sprint 48 closed on Ben's live walk and two re-blesses, each authorised against its shape.*
+
+### Added
+
+- **The world built once and moved** (BL-1084): the wizard builds one world and moves it forward;
+  Next waits for its round; a reroll re-runs only its own span. The landscape search runs inside
+  generation (BL-1086, BL-1136); the settle's first tick no longer costs ~40 s (BL-1117).
+- **A legend on every round** (BL-1118); **sea lanes a player finds** (BL-1124); roads and sea
+  lanes **carried across the rounds** (BL-1134).
+- **Markets can die** (BL-1125): about 20-40 markets a world, not hundreds. **Centres consolidate
+  and deepen** (BL-1130, BL-1141): one centre a region at the rung its heads reach, settled at a
+  spacing (BL-1132), a province its centre's ground (BL-1133, BL-1150), rivers dividing banks (BL-1156).
+- **Ocean currents** (BL-1120): sea legs with the current are cheaper. **Lanes from trade**
+  (BL-1140) and a **lane tier** on the water (BL-1098); lanes **merge into shared trunks**, shared
+  only where they run with the current.
+- **Fleets project power** (BL-1152, BL-1147, BL-1153): a crossing the defenders out-project never
+  sails. **Far trade** (BL-1142, BL-1171): far realms meet and bind across water where a fleet
+  out-projects the other's at its port, and goods between landmasses always sail.
+- **Industrial urbanisation** (BL-1137, BL-1149, BL-1155): the countryside empties into works towns;
+  scale credit is earned only where a work employs.
+- **Charter priced by trade reach** (BL-1168): a centre's charters are priced from the capital on
+  its own landmass, so a far landmass charters its own firms; a specialist costs 44 charters.
+- **A crowded heartland yields less** (BL-1169, K = 1000): the far rival holds a quarter of the
+  leader's industry on 14 of 16 curated seeds, up from 12.
+- **An army eats at a fair price** (BL-1172): every goods draw — upkeep, processors, construction,
+  nations' network and space programme — buys only at or under 2x base, pays the posted price, and
+  does not bid above it. **Every background firm opens with working capital** (BL-1173).
+
+### Changed
+
+- **Roads are a tree plus a detour test** (BL-1119), pulled toward market centres (BL-1138), drawn
+  as thinner curves, with bridges spanning at most two water tiles. The tier of each road tile is
+  the tier of the nation whose land it crosses.
+- **Two re-blesses**, each authorised against its shape: the first (one centre a region, ~30
+  markets a world, rivals armed); the second (the seat menu at its anchor of 8, lanes into trunks,
+  far trade by sea). `player_seed_sweep` 16/16 on both arcs; 11 library fingerprints blessed.
+
+### Known — recorded, not fixed
+
+- **The fair-price ceiling stalls construction**: a site over the ceiling pauses and, not bidding,
+  cannot bring its price down; background muster bases rarely finish (BL-1183, sprint 49).
+- **Beside a full, unlisted shelf a unit or processor is fed one tick in four**: shelf supply is 0
+  until shelf spoilage lands (BL-1179). Stated in FINANCE.md and bounded by a harness row.
+- **Haulage fell 41% / 33%** across the second re-bless, mostly with a third fewer corporations under
+  the reach price; seed 0's Exploration treasuries fell 98%. Both untraced (BL-1165).
+- **Heartlands do not yet reach overseas**: designed, not built (BL-1170, needs BL-1148).
+- **The CTest tier is still not a working gate** (BL-1065). This release was gated on the Release
+  build, `world_determinism` twice, both save round trips, and the harnesses named in each merge.
+- Save files from v0.1.26 are refused (`world_save_version` 30, envelope 22).
+
 ## [0.1.26] — 2026-09-25
 
 *One history, told through the rounds. The six wizard rounds now read as one past unfolding
@@ -1263,7 +1321,8 @@ Layer 2 finalisation.
 
 Initial prototype snapshot — application shell, canvases, and the hard-coded world.
 
-[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.26...HEAD
+[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.27...HEAD
+[0.1.27]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.26...v0.1.27
 [0.1.26]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.25...v0.1.26
 [0.1.25]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.24...v0.1.25
 [0.1.24]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.23...v0.1.24
