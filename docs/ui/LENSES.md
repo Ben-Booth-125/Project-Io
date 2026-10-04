@@ -166,10 +166,11 @@ captures too. Two shapes share the one region:
   thing it was ever for; a key with nothing to overflow gains nothing from a press
   that hides it.
 
-The resource/good selector shared by the Resource, Market and Scarcity lenses is
-one combo bound to `ui_state.lens_resource` (`draw_lens_resource_combo`), sitting
-directly above the active key in the same region — never on the minimap bar, which
-carries glyphs only (BL-134, lens selector in legend).
+The good selector shared by the Market and Scarcity lenses is one combo bound to
+`ui_state.lens_resource` (`draw_lens_resource_combo`), sitting directly above the
+active key in the same region — never on the minimap bar, which carries glyphs only
+(BL-134, lens selector in legend). The Resource lens has its own search-and-checklist
+key instead (§ Resource lens).
 
 ---
 
@@ -496,22 +497,30 @@ from generation (see [TILES.md](../economy/TILES.md) and
 [TILE_GENERATION.md](../generation/TILE_GENERATION.md)). The lens reads that
 profile directly at draw time; **no new data is generated**.
 
-**Single mode — flat contiguous fill (settled, BL-019, resource lens single mode).** The lens is **always
-single-resource** (no highest-value mode, no Single toggle): the player picks a
-good from the shared selector and the lens fills the **whole contiguous deposit**
-of that good as a **flat, uniform colour** — the *shape* of the deposit, not a
-magnitude gradient. Every tile carrying any of the resource (deposit > 0) takes the
-resource's identity colour at a fixed 0.92 opacity (composited over terrain). Every
-other tile is **washed toward white** at 0.78 — land to a warm off-white, water to a
-cooler pale blue-grey so the coastline survives (Ben, 2026-10-04: the map goes clear
-and the deposit is the only saturated thing on it). The intra-body **activity fog is
-lifted** under this lens: a deposit is survey knowledge, not activity, so surveyed
-ground reads clear while the survey mask still owns unsurveyed tiles
-([DISCOVERY.md](DISCOVERY.md) § the two fogs). Intensity lives in tile detail, not the
-lens. A
-deposit is the 8-connected (diagonals included) blob of tiles with the good;
-because the fill is uniform, the per-tile threshold is visually identical to a
-flood-fill grouping, so no flood-fill pass is built.
+**A toggled set — flat fill, split where goods coincide (Ben, 2026-10-04; owner
+BL-1182, resource lens multi-select).** The lens draws a **set** of resources at once,
+toggled on and off from its own checklist, at most **six** — one per hex edge. This
+replaces BL-019's single-select; it keeps that ruling's other half, that the lens shows
+deposit **shape**, never a magnitude gradient. Only **extractable** goods
+(`placement_rules::k_extractable`) can be toggled: a manufactured good — computers —
+is never on a body's surface, so it is not offered.
+
+- **One toggled good on a tile** — the tile takes that good's identity colour at a
+  fixed 0.92 opacity, composited over terrain.
+- **Two or more** — the hex splits into **equal pie wedges from the centre**, one per
+  good, in toggle order. Each wedge spans 6/n of the perimeter, so two goods halve the
+  hex and three or six land on its vertices. Below the coarse level of detail the hex
+  is a few pixels across, and it shows the first good only.
+- **None** — the tile is **washed toward white** at 0.78: land to a warm off-white,
+  water to a cooler pale blue-grey so the coastline survives. The map goes clear and
+  the deposits are the only saturated thing on it.
+
+The intra-body **activity fog is lifted** under this lens: a deposit is survey
+knowledge, not activity, so surveyed ground reads clear while the survey mask still
+owns unsurveyed tiles ([DISCOVERY.md](DISCOVERY.md) § the two fogs). Intensity lives in
+tile detail and the hover card, not the lens. A deposit is the 8-connected blob of tiles
+with the good; because the fill is uniform, the per-tile threshold is visually identical
+to a flood-fill grouping, so no flood-fill pass is built.
 
 **Rung.** Planetary only — deposits are per-tile and have no inter-body surface.
 The render pass is guarded behind `overlay_mode::resource` in
@@ -531,12 +540,22 @@ corporation seal-square; and distinct from the resource *pip* diamond (the
 `resource_type` overload) it shares a name with.
 
 **Legend.** Strip glyph highlight + tooltip ("Resource deposits"), plus a key in
-the shared lens chrome region: the selected resource's identity swatch + name and the note
-"filled = deposit present". Flat, not a gradient — the lens shows deposit *shape*.
+the shared lens chrome region: a header with the toggled count ("Resource deposits
+(n/6)"), a **search box**, and under it a **checklist** of the extractable goods present
+on the active body, filtered by name as the player types. A checked row shows the good's
+identity swatch; an unchecked row shows an empty one. With six on, the unchecked rows
+grey out. Goods absent from the body are not listed — a box the player cannot use
+earns no row.
 
-**Interaction notes.** Planetary-only, single-select. The resource selector is the
-shared combo (bound to `ui_state.lens_resource`) in the lens legend. No new data,
-no tick dependency. Verified by `scripts/verify/resource_lens.lua`.
+**Hover and selection.** A split tile belongs to every deposit it carries. The pointer
+resolves to the **wedge under it**, so hovering lights every tile carrying that good,
+and a press selects that deposit (the Market ledger route below is unchanged). The
+hover card lists each toggled good on the tile with its richness band.
+
+**Interaction notes.** Planetary-only. The Resource lens does **not** use the shared
+good combo; that stays with Market and Scarcity (`ui_state.lens_resource`). Its own set
+is `ui_state.lens_resources`. No new data, no tick dependency. Verified by
+`scripts/verify/resource_lens.lua`.
 
 ## Population lens
 
@@ -627,7 +646,7 @@ there *no* iron?" directly, which the density lens only shows by omission.
 **Data definition (settled, BL-018, scarcity lens).** Reads **market supply shortfall**, not tile deposits:
 `shortfall = max(0, market.demand[sel] − market.supply[sel])` — how much demand outran supply for
 the selected good last tick, independent of price. **Single-resource only** (scarcity *of what?*);
-the good is the shared `ui_state.lens_resource` (same combo as Resource and Market). Reads the
+the good is the shared `ui_state.lens_resource` (same combo as Market). Reads the
 existing `market_component` arrays — no new data; needs the economy to have ticked so supply/demand
 are populated.
 

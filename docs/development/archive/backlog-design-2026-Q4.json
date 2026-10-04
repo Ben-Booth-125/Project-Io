@@ -347,6 +347,52 @@
         "files",
         "design"
       ]
+    },
+    "BL-1182": {
+      "status": "complete",
+      "glyph": "●",
+      "sprint": 49,
+      "written": "2026-10-04",
+      "requires": [],
+      "blocked_on": null,
+      "parked": false,
+      "id": "BL-1182",
+      "short_name": "RESOURCE_LENS_MULTI_SELECT",
+      "author": "Claude (Ben's between-rounds lens request, 2026-10-04)",
+      "category": "UI",
+      "priority": "B",
+      "difficulty": 2,
+      "title": "Resource lens: washed-clear map, toggled set of up to six extractable goods, split tiles, search-and-checklist key",
+      "authority_doc": "docs/ui/LENSES.md",
+      "files": [
+        "src/ui/body_surface_canvas.cpp",
+        "src/ui/hover_content.cpp",
+        "src/ui/ui_state.hpp",
+        "src/core/verify_api.cpp",
+        "scripts/verify/resource_lens.lua",
+        "docs/ai/ACTIONS.json",
+        "docs/ui/question_log.json"
+      ],
+      "design": "SETTLED (Ben, 2026-10-04 form): LENSES.md § Resource lens. Non-deposit ground washes toward white (land off-white, water pale blue-grey) and the activity fog is lifted under the lens. The lens draws a toggled SET (ui_state.lens_resources, max 6, extractable only, listed only if present on the body); a tile with 2+ toggled goods splits into equal pie wedges from the centre in toggle order. The key is a search box over a checklist. Hover/press resolve to the wedge under the pointer; the hover highlight lights by membership. Market/Scarcity keep the single shared combo (lens_resource). Verify: resource_lens.lua (multi_split + search captures), lens_region_destinations.lua 0 FAIL.",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "written",
+        "requires",
+        "blocked_on",
+        "parked",
+        "id",
+        "short_name",
+        "author",
+        "category",
+        "priority",
+        "difficulty",
+        "title",
+        "authority_doc",
+        "files",
+        "design"
+      ]
     }
   }
 }

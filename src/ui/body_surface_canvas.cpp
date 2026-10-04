@@ -22,11 +22,13 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <iterator>
 #include <limits>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -466,9 +468,98 @@ void begin_lens_key(ImDrawList* dl, const ui_state& state,
     out_w = r.w - 2.0f * pad;
 }
 
-/// The lens-local resource/good selector for the Resource, Market, and Scarcity
-/// lenses (BL-134): all three pick "which resource" from the same `lens_resource`
-/// field (LENSES.md says the selectors share a form), so one combo serves them.
+/// --- Resource lens: the toggled set and the pie split (Ben, 2026-10-04) -------
+/// The lens shows a SET of extractable resources at once. A tile carrying one of
+/// them fills flat with its colour; a tile carrying several splits into equal pie
+/// wedges from the hex centre, in toggle order. The cap is six — one per hex edge.
+
+bool lens_resource_on(const ui_state& state, resource_type r)
+{
+    return std::find(state.lens_resources.begin(), state.lens_resources.end(), r)
+           != state.lens_resources.end();
+}
+
+/// Toggle @p r in the Resource lens set. Adding past the cap is refused, not
+/// wrapped: the checklist greys the unchecked rows when the set is full.
+void toggle_lens_resource(ui_state& state, resource_type r)
+{
+    auto& v = state.lens_resources;
+    const auto it = std::find(v.begin(), v.end(), r);
+    if (it != v.end())
+        v.erase(it);
+    else if (static_cast<int>(v.size()) < ui_state::k_lens_resource_cap)
+        v.push_back(r);
+}
+
+/// The toggled resources this tile carries (deposit > 0), in toggle order.
+int lens_resources_on_tile(const ui_state& state, const tile_component& tile,
+                           resource_type out[ui_state::k_lens_resource_cap])
+{
+    int n = 0;
+    for (const resource_type r : state.lens_resources)
+    {
+        const std::size_t i = static_cast<std::size_t>(r);
+        if (i < std::size(tile.resource_deposit) && tile.resource_deposit[i] > 0.0f
+            && n < ui_state::k_lens_resource_cap)
+            out[n++] = r;
+    }
+    return n;
+}
+
+/// A point on the hex perimeter at parameter @p t in [0, 6]: vertex i (in
+/// hex_vertices order) sits at t = i, and t walks the edges between them.
+ImVec2 hex_perimeter_point(ImVec2 c, float r, float t)
+{
+    const int   i  = static_cast<int>(std::floor(t)) % 6;
+    const float f  = t - std::floor(t);
+    const float a0 = kPi / 6.0f + kPi / 3.0f * static_cast<float>(i);
+    const float a1 = a0 + kPi / 3.0f;
+    return { c.x + r * ((1.0f - f) * std::cos(a0) + f * std::cos(a1)),
+             c.y + r * ((1.0f - f) * std::sin(a0) + f * std::sin(a1)) };
+}
+
+/// Which of @p n equal perimeter wedges the offset @p d (pointer minus hex centre)
+/// falls in — the inverse of the split draw, so a press lands on the wedge it sees.
+int lens_wedge_at(ImVec2 d, int n)
+{
+    if (n <= 1)
+        return 0;
+    float th = std::atan2(d.y, d.x) - kPi / 6.0f;
+    while (th < 0.0f) th += 2.0f * kPi;
+    const int i = std::min(5, static_cast<int>(th / (kPi / 3.0f)));
+    const float a0 = kPi / 6.0f + kPi / 3.0f * static_cast<float>(i);
+    const ImVec2 a{ std::cos(a0), std::sin(a0) };
+    const ImVec2 b{ std::cos(a0 + kPi / 3.0f), std::sin(a0 + kPi / 3.0f) };
+    const auto cross = [](ImVec2 p, ImVec2 q) { return p.x * q.y - p.y * q.x; };
+    const float den = cross(d, { b.x - a.x, b.y - a.y });
+    const float s   = (std::fabs(den) > 1e-6f) ? std::clamp(-cross(d, a) / den, 0.0f, 1.0f) : 0.0f;
+    const float t   = static_cast<float>(i) + s;
+    return std::min(n - 1, static_cast<int>(t * static_cast<float>(n) / 6.0f));
+}
+
+/// Draw @p n pie wedges over a hex of circumradius @p r, wedge k in @p cols[k].
+/// Each wedge spans 6/n of the perimeter; with n >= 2 that is at most half the
+/// hex, so every wedge is convex at the centre and one filled polygon.
+void draw_lens_wedges(ImDrawList* dl, ImVec2 c, float r, const ImU32* cols, int n)
+{
+    for (int k = 0; k < n; ++k)
+    {
+        const float t0 = 6.0f * static_cast<float>(k)     / static_cast<float>(n);
+        const float t1 = 6.0f * static_cast<float>(k + 1) / static_cast<float>(n);
+        ImVec2 pts[10];
+        int    m = 0;
+        pts[m++] = c;
+        pts[m++] = hex_perimeter_point(c, r, t0);
+        for (int v = static_cast<int>(std::floor(t0)) + 1; static_cast<float>(v) < t1; ++v)
+            pts[m++] = hex_perimeter_point(c, r, static_cast<float>(v));
+        pts[m++] = hex_perimeter_point(c, r, t1);
+        dl->AddConvexPolyFilled(pts, m, cols[k]);
+    }
+}
+
+/// The lens-local good selector for the Market and Scarcity lenses (BL-134): both
+/// pick "which good" from the same `lens_resource` field, so one combo serves them.
+/// The Resource lens left this combo for its own toggled checklist (Ben, 2026-10-04).
 /// Now lives at the top of the on-canvas legend (moved off the minimap strip,
 /// which the former popup button docked in) — a real scrollable ImGui::BeginCombo,
 /// hosted in a small borderless window since the legend itself paints on the
@@ -675,28 +766,131 @@ void draw_scroll_list_key(const char* id, const char* header,
     ImGui::PopStyleVar();
 }
 
-/// Legend for the Resource lens (BL-019): the selected resource's name
-/// and identity swatch, plus a note that the fill marks the contiguous deposit.
-/// Flat, not a gradient — the lens shows deposit *shape*, not magnitude.
-void draw_resource_key(ImDrawList* dl, ui_state& state)
+/// Legend for the Resource lens (Ben, 2026-10-04): a search box over a checklist of
+/// the extractable resources present on the active body. A checked row shows its
+/// identity swatch and is drawn on the map; the set holds at most six, so once full
+/// the unchecked rows grey out. A good that cannot be extracted (a manufactured good,
+/// computers) is never on a body's surface, so it is not offered at all.
+void draw_resource_key(const world& w, ui_state& state)
 {
+    // The goods present on this body, in k_extractable order. Recomputed only when
+    // the body changes: deposits are generation data and never move in play.
+    // Keyed on the world and its tile count too: a new game can reuse a body id.
+    static const world*               s_world = nullptr;
+    static std::size_t                s_tiles = 0;
+    static entity_id                  s_body  = null_entity;
+    static std::vector<resource_type> s_present;
+    if (s_body != state.active_body || s_world != &w || s_tiles != w.tiles.size())
+    {
+        s_world = &w;
+        s_tiles = w.tiles.size();
+        s_body  = state.active_body;
+        s_present.clear();
+        std::array<bool, resource_count> seen{};
+        for (const auto& [tid, t] : w.tiles)
+        {
+            if (t.body != state.active_body)
+                continue;
+            for (std::size_t i = 0; i < resource_count; ++i)
+                if (t.resource_deposit[i] > 0.0f)
+                    seen[i] = true;
+        }
+        for (const resource_type r : placement_rules::k_extractable)
+            if (seen[static_cast<std::size_t>(r)])
+                s_present.push_back(r);
+    }
+
+    // Case-insensitive substring filter on the display name.
+    const auto matches = [&](resource_type r) {
+        const char* q = state.lens_resource_filter;
+        if (q[0] == '\0')
+            return true;
+        std::string name   = presentation_of(r).name;
+        std::string needle = q;
+        for (char& ch : name)   ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+        for (char& ch : needle) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+        return name.find(needle) != std::string::npos;
+    };
+    std::vector<resource_type> rows;
+    for (const resource_type r : s_present)
+        if (matches(r))
+            rows.push_back(r);
+
     const float pad    = 8.0f;
     const float line_h = ImGui::GetTextLineHeight();
-    const float body_h = pad + kLensComboH + 4.0f + line_h + 4.0f + line_h + 4.0f + line_h + pad;
-    float x, y, bar_w;
-    begin_lens_key(dl, state, body_h, pad, x, y, bar_w);
+    const float row_h  = ImGui::GetFrameHeightWithSpacing();
+    const float head_h = line_h + 4.0f;
+    const float note_h = line_h + 2.0f;
+    const float want_h = pad + head_h + kLensComboH + 4.0f
+                       + static_cast<float>(std::max<std::size_t>(rows.size(), 1)) * row_h
+                       + note_h + pad;
 
-    draw_lens_resource_combo(state, {x, y}, bar_w);
-    y += kLensComboH + 4.0f;
+    ImDrawList* dl = ImGui::GetBackgroundDrawList();
+    const ui::shell_rect r = open_lens_chrome(dl, state, want_h, "##lens_key_blocker");
+    const float x  = r.x + pad;
+    const float bw = r.w - 2.0f * pad;
+    float       y  = r.y + pad * 0.5f;
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Resource deposit"); // fit-exempt: legend box sized to its measured entries (container 2)
-    y += line_h + 4.0f;
-    dl->AddRectFilled({x, y + 2.0f}, {x + 10.0f, y + 12.0f},
-                      presentation_of(state.lens_resource).colour);
-    dl->AddText({x + 14.0f, y}, IM_COL32(235, 235, 235, 255), // fit-exempt: legend box sized to its measured entries (container 2)
-                presentation_of(state.lens_resource).name);
-    y += line_h + 4.0f;
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "filled = deposit present"); // fit-exempt: legend box sized to its measured entries (container 2)
+    char head[64];
+    std::snprintf(head, sizeof head, "Resource deposits  (%d/%d)",
+                  static_cast<int>(state.lens_resources.size()), ui_state::k_lens_resource_cap);
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), head); // fit-exempt: legend box sized to its measured entries (container 2)
+    y += head_h;
+
+    const float note_y = r.y + r.h - pad * 0.5f - note_h;
+    const float list_h = std::max(0.0f, note_y - y);
+
+    ImGui::SetNextWindowPos({x, y}, ImGuiCond_Always);
+    ImGui::SetNextWindowSize({bw, list_h}, ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.0f);
+    constexpr ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoNav    | ImGuiWindowFlags_NoScrollbar |
+        ImGuiWindowFlags_NoSavedSettings;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0.0f, 0.0f});
+    ImGui::Begin("##lens_key_resource_list", nullptr, flags);
+    ImGui::SetNextItemWidth(bw);
+    ImGui::InputTextWithHint("##lens_resource_search", "Search resources",
+                             state.lens_resource_filter, sizeof state.lens_resource_filter);
+    ImGui::Dummy({bw, 2.0f});
+    ImGui::BeginChild("##rows", {bw, std::max(0.0f, list_h - kLensComboH - 4.0f)}, false,
+                      ImGuiWindowFlags_NoBackground);
+    const bool full = static_cast<int>(state.lens_resources.size()) >= ui_state::k_lens_resource_cap;
+    if (rows.empty())
+        ImGui::TextDisabled("%s", s_present.empty() ? "No deposits on this body" : "No match");
+    for (const resource_type res : rows)
+    {
+        const bool on      = lens_resource_on(state, res);
+        const bool blocked = full && !on;
+        ImGui::PushID(static_cast<int>(res));
+        ImGui::BeginDisabled(blocked);
+        bool v = on;
+        if (ImGui::Checkbox("##on", &v))
+            toggle_lens_resource(state, res);
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        const ImVec2 c   = ImGui::GetCursorScreenPos();
+        ImDrawList*  wdl = ImGui::GetWindowDrawList();
+        const float  sy  = c.y + (ImGui::GetFrameHeight() - 10.0f) * 0.5f;
+        if (on)
+            wdl->AddRectFilled({c.x, sy}, {c.x + 10.0f, sy + 10.0f}, presentation_of(res).colour);
+        else
+            wdl->AddRect({c.x, sy}, {c.x + 10.0f, sy + 10.0f}, IM_COL32(110, 115, 125, 255));
+        ImGui::Dummy({14.0f, ImGui::GetFrameHeight()});
+        ImGui::SameLine();
+        ImGui::AlignTextToFramePadding();
+        if (blocked)
+            ImGui::TextDisabled("%s", presentation_of(res).name);
+        else
+            ImGui::TextUnformatted(presentation_of(res).name);
+        ImGui::PopID();
+    }
+    ImGui::EndChild();
+    ImGui::End();
+    ImGui::PopStyleVar();
+
+    dl->AddText({x, note_y}, IM_COL32(170, 175, 185, 255), // fit-exempt: legend box sized to its measured entries (container 2)
+                full ? "Full: six at most" : "Split tile = several here");
 }
 
 /// On-canvas legend for the Market lens: a diverging cheap↔dear gradient bar plus
@@ -1230,7 +1424,8 @@ structure_kind lens_structure_of_tile(const world& w, const ui_state& state,
                                       const std::unordered_map<entity_id, entity_id>& tile_to_corp,
                                       entity_id* out_id,
                                       const continent_state* plates = nullptr,
-                                      int grid_w = 0)
+                                      int grid_w = 0,
+                                      const ImVec2* pointer = nullptr)
 {
     if (out_id != nullptr)
         *out_id = null_entity;
@@ -1261,15 +1456,20 @@ structure_kind lens_structure_of_tile(const world& w, const ui_state& state,
         // selection grain must follow the drawing or the highlight would disagree
         // with the wash under it. So the whole resource on this body is one
         // structure, and its key is the resource index.
+        //
+        // A SPLIT tile belongs to several deposits (Ben, 2026-10-04: a toggled set,
+        // pie wedges). The press resolves to the wedge under @p pointer (offset from
+        // the hex centre); with no pointer it takes the first in toggle order.
         const auto tit = w.tiles.find(tile);
         if (tit == w.tiles.end())
             return structure_kind::none;
-        const std::size_t sel = static_cast<std::size_t>(state.lens_resource);
-        if (sel >= std::size(tit->second.resource_deposit)
-            || tit->second.resource_deposit[sel] <= 0.0f)
+        resource_type on_tile[ui_state::k_lens_resource_cap];
+        const int n = lens_resources_on_tile(state, tit->second, on_tile);
+        if (n == 0)
             return structure_kind::none;
+        const int k = (pointer != nullptr) ? lens_wedge_at(*pointer, n) : 0;
         if (out_id != nullptr)
-            *out_id = static_cast<entity_id>(sel) + 1u; // synthetic; +1 keeps 0 = none
+            *out_id = static_cast<entity_id>(on_tile[k]) + 1u; // synthetic; +1 keeps 0 = none
         return structure_kind::deposit;
     }
     case overlay_mode::continent:
@@ -2233,6 +2433,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     bool      have_hover       = false;
     float     best_d2          = std::numeric_limits<float>::max();
     ImVec2    hover_verts[6]   = {};
+    ImVec2    hover_offset     = {};   // cursor minus hovered hex centre (Resource lens wedge)
 
     // Slightly shrink the drawn hex so the background shows through as a border.
     // Use the full circumradius for hit-testing so small hexes stay clickable.
@@ -2499,9 +2700,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // Intensity lives in tile detail, not the lens.
         else if (state.overlay == overlay_mode::resource)
         {
-            const std::size_t sel = static_cast<std::size_t>(state.lens_resource);
-            if (tile.resource_deposit[sel] > 0.0f)
-                fill = lerp_colour(fill, presentation_of(state.lens_resource).colour, 0.92f);
+            // A split tile's wedges draw over this in the tile loop; the fill here
+            // is its first resource, which is also what a coarse-LOD rect shows.
+            resource_type on_tile[ui_state::k_lens_resource_cap];
+            if (lens_resources_on_tile(state, tile, on_tile) > 0)
+                fill = lerp_colour(fill, presentation_of(on_tile[0]).colour, 0.92f);
             else if (placement_rules::is_water_tile(tile.substrate))
                 fill = lerp_colour(fill, IM_COL32(214, 222, 232, 255), 0.78f);
             else
@@ -3148,6 +3351,24 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             else
                 dl->AddConvexPolyFilled(verts, 6, fill);
 
+            // Resource lens split (Ben, 2026-10-04): a surveyed tile carrying two or
+            // more toggled resources is cut into equal pie wedges from the centre,
+            // one per resource in toggle order. Below the coarse LOD the hex is a
+            // few pixels across and the rect keeps the first resource's colour.
+            if (state.overlay == overlay_mode::resource && surveyed && !coarse_fill)
+            {
+                resource_type on_tile[ui_state::k_lens_resource_cap];
+                const int n = lens_resources_on_tile(state, tile, on_tile);
+                if (n >= 2)
+                {
+                    const ImU32 base = terrain_colour(tile.substrate, tile.cover, tile.cover_density);
+                    ImU32 cols[ui_state::k_lens_resource_cap];
+                    for (int q = 0; q < n; ++q)
+                        cols[q] = lerp_colour(base, presentation_of(on_tile[q]).colour, 0.92f);
+                    draw_lens_wedges(dl, { cx, cy }, shade.blend ? draw_r + 1.0f : draw_r, cols, n);
+                }
+            }
+
             // Terrain texture (BL-520). Immediately after the fill and BEFORE the
             // province edge stroke, so the stroke stays the topmost ground mark
             // and a province border is never broken up by a canopy tick.
@@ -3245,7 +3466,19 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 const structure_kind sk = lens_structure_of_tile(w, state, id,
                                                                  tile_to_corp, &tile_struct,
                                                                  plates, gw);
-                if (sk == state.hovered_structure_kind && tile_struct == state.hovered_structure)
+                // A deposit lights by MEMBERSHIP: a split tile resolves to one wedge,
+                // but it belongs to every toggled deposit it carries.
+                const bool member =
+                    (state.hovered_structure_kind == structure_kind::deposit)
+                        ? [&] {
+                              const std::size_t ri =
+                                  static_cast<std::size_t>(state.hovered_structure - 1u);
+                              return ri < std::size(tile.resource_deposit)
+                                  && tile.resource_deposit[ri] > 0.0f;
+                          }()
+                        : (sk == state.hovered_structure_kind
+                           && tile_struct == state.hovered_structure);
+                if (member)
                 {
                     constexpr ImU32 lit = IM_COL32(255, 255, 255, 34);
                     if (coarse_fill)
@@ -4114,6 +4347,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 {
                     best_d2          = d2;
                     hovered_tile     = id;
+                    hover_offset     = { dx, dy };
                     hovered_selected = selected;
                     have_hover       = true;
                     std::copy(std::begin(verts), std::end(verts), std::begin(hover_verts));
@@ -4151,7 +4385,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     {
         entity_id sid = null_entity;
         const structure_kind sk =
-            lens_structure_of_tile(w, state, hovered_tile, tile_to_corp, &sid, plates, gw);
+            lens_structure_of_tile(w, state, hovered_tile, tile_to_corp, &sid, plates, gw,
+                                   &hover_offset);
         state.hovered_structure      = sid;
         state.hovered_structure_kind = sk;
     }
@@ -4437,7 +4672,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // The Country row is absent rather than pending: BL-601 retired that lens in the
     // same sprint, and its key with it.
     if (state.overlay == overlay_mode::resource)
-        draw_resource_key(dl, state);
+        draw_resource_key(w, state);
     else if (state.overlay == overlay_mode::market)
         draw_market_key(w, state, market_catchment_colour);
     else if (state.overlay == overlay_mode::population)
@@ -4768,7 +5003,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 entity_id area_id = null_entity;
                 const structure_kind area_kind =
                     lens_structure_of_tile(w, state, hovered_tile, tile_to_corp, &area_id,
-                                           plates, gw);
+                                           plates, gw, &hover_offset);
                 // A DEPOSIT AND A PLATE ARE NOT ENTITIES, so they never reach
                 // `structure_hit` — that variable feeds `selected_entity` a few
                 // lines down, and a synthetic key landing there would read as a

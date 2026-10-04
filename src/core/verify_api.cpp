@@ -953,10 +953,28 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         m_ui.dbg_route_width_scale = static_cast<float>(s);
         return true;
     });
-    // Drive the Resource/Market/Scarcity lens-local selector headlessly so a golden
-    // can pick the displayed good.
+    // Drive the Market/Scarcity lens-local selector headlessly so a golden can pick
+    // the displayed good. It also resets the Resource lens's toggled set to that one
+    // good, so a script written for the single-select lens still shows one deposit.
     v.set_function("set_lens_resource", [this](const std::string& name) {
-        m_ui.lens_resource = resource_from_name(name);
+        m_ui.lens_resource  = resource_from_name(name);
+        m_ui.lens_resources = { m_ui.lens_resource };
+    });
+    // The Resource lens's toggled set (Ben, 2026-10-04): toggle one good in or out,
+    // as the legend checkbox does. Returns false (nothing changed) when adding past
+    // the six-resource cap.
+    v.set_function("toggle_lens_resource", [this](const std::string& name) {
+        const resource_type r = resource_from_name(name);
+        auto& set = m_ui.lens_resources;
+        const auto it = std::find(set.begin(), set.end(), r);
+        if (it != set.end()) { set.erase(it); return true; }
+        if (static_cast<int>(set.size()) >= ui_state::k_lens_resource_cap) return false;
+        set.push_back(r);
+        return true;
+    });
+    v.set_function("clear_lens_resources", [this]() { m_ui.lens_resources.clear(); });
+    v.set_function("set_lens_resource_filter", [this](const std::string& q) {
+        std::snprintf(m_ui.lens_resource_filter, sizeof m_ui.lens_resource_filter, "%s", q.c_str());
     });
     // Obsolete since BL-019 (the Resource lens is always single-resource); retained
     // as a no-op so existing verify scripts that call it keep loading.

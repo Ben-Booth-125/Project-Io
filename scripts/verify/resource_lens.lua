@@ -28,3 +28,19 @@ verify.capture("resource_lens_full_coal")
 verify.set_lens_resource("iron_ore")
 frame_tile(42, 63, 8)
 verify.capture("resource_lens_zoom_iron")
+
+-- Toggled set + pie split (Ben, 2026-10-04): several extractable resources at once.
+-- A tile carrying two or more toggled goods splits into equal wedges from the centre.
+verify.set_lens_resource("iron_ore")
+verify.toggle_lens_resource("coal")
+verify.toggle_lens_resource("stone")
+verify.toggle_lens_resource("timber")
+local coal_at = verify.find_deposit_tile("coal")
+verify.expect(coal_at.ok, "the home body carries coal to frame the split on")
+if coal_at.ok then frame_tile(coal_at.x, coal_at.y + 3, 3) end
+verify.capture("resource_lens_multi_split")
+
+-- The legend's search box filters the checklist.
+verify.set_lens_resource_filter("co")
+verify.capture("resource_lens_search")
+verify.set_lens_resource_filter("")

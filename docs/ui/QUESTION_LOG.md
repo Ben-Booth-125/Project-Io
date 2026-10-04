@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**59 surfaces** — 7 settled, 52 awaiting Ben's wording.
+**60 surfaces** — 7 settled, 53 awaiting Ben's wording.
 
 ---
 
@@ -293,6 +293,14 @@ EACH LONG SECTION IS BOUNDED AND SCROLLS INSIDE ITSELF -- measured, not preferre
 **Because:** BL-511 removed the tile as a click target, so the mixture, the deposits and the buildings of a locality became unreachable by the gesture that used to reach them, and a CARD OF ITS OWN was the answer. BL-598 (Ben, 2026-08-24) reversed the premise rather than the answer: the tile is a click target again, and the province readings are SECTIONS of the tile element's one accordion. The question is unchanged and still earns its space - a player deciding whether a locality is worth a mine asks about the locality, not one hex - but it no longer earns a second element to ask it in. Two surfaces asking about one piece of ground made the player choose a grain before knowing what they wanted to know; one accordion, ordered from what can be acted on to what the ground merely is, does not. What was dropped in the fold is the province's own Buildings ROLL-UP (the same question the Buildings section's Built column answers, at a grain the player does not build at) and its member-tile list (whose job was to give back a tile that is no longer taken away). What was gained is Population, which had no home on either surface.
 
 *Demanded by BL-511, BL-598 · `src/ui/selection_panel.cpp`, `src/ui/body_surface_canvas.cpp` · id `province_card`*
+
+### Resource lens (Planetary canvas) — the washed-clear map, the toggled deposit set with split tiles, and its search-and-checklist key
+
+**Answers:** Where can the goods I care about be extracted on this body, and where do they share ground?
+
+**Because:** Siting extraction is the first economic decision a player makes, and it needs no simulation — only the generated deposits. Ben, 2026-10-04: the map goes a shade of white so the deposits are the only saturated thing on it, and the lens toggles several resources at once, splitting a tile that carries more than one, with a search bar so the player finds a good quickly. A recipe takes more than one input, so the question is rarely 'where is iron' and usually 'where are iron and coal together' — one good at a time made the player hold the other map in their head. The set is capped at six (one wedge per hex edge) and offers only extractable goods present on the body, because a manufactured good is never on the surface and a box the player cannot use earns no row.
+
+*Demanded by BL-1182 · `src/ui/body_surface_canvas.cpp`, `src/ui/hover_content.cpp`, `src/ui/ui_state.hpp` · id `resource_lens`*
 
 ### Corporation selection canvas (Begin, before play)
 

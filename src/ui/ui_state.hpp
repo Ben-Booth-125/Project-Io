@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include <vector>
 
 /// Which rung of the canvas zoom ladder currently fills the primary viewport.
 /// The minimap shows the rung one step *out* (towards solar) from this.
@@ -383,7 +384,15 @@ struct ui_state
     // shortfall surface (LENSES.md says the selectors share a form). Only the
     // active lens reads it. The Resource lens is always single-resource (BL-019),
     // so it carries no highest-value toggle.
-    resource_type lens_resource = resource_type::iron_ore; ///< Selected resource (Resource deposit / Scarcity shortfall) / good (Market price surface).
+    resource_type lens_resource = resource_type::iron_ore; ///< Selected good for the Market price surface and the Scarcity shortfall surface.
+    /// The Resource lens's OWN selection (Ben, 2026-10-04): a toggled SET of
+    /// extractable resources, in toggle order, at most k_lens_resource_cap — one per
+    /// hex edge, since a tile carrying several splits into that many pie wedges. It
+    /// is separate from `lens_resource` because Market and Scarcity stay single-good.
+    static constexpr int k_lens_resource_cap = 6;
+    std::vector<resource_type> lens_resources{ resource_type::iron_ore };
+    /// The Resource lens legend's search box text (filters its goods checklist).
+    char lens_resource_filter[32] = {};
     /// Is the lens legend expanded? BL-533 (Ben, 2026-08-22) re-homed every
     /// legend into the right chrome column above the minimap and made it a
     /// dropdown that is COLLAPSED BY DEFAULT — so a lens switch no longer
