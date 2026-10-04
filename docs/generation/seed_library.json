@@ -80,12 +80,12 @@
    },
    "fingerprint": {
     "empire_battles": 5114,
-    "expl_battles": 382,
-    "flows": 27,
-    "treasury_median": 216,
+    "expl_battles": 350,
+    "flows": 29,
+    "treasury_median": 241,
     "living_polities": 32
    },
-   "fingerprint_blessed": "2026-10-03",
+   "fingerprint_blessed": "2026-10-04",
    "replaces": "seed 17 (Ben, 2026-09-17, NR-887: the old seed no longer answered this question)"
   },
   {
@@ -146,12 +146,12 @@
    },
    "fingerprint": {
     "empire_battles": 34221,
-    "expl_battles": 3388,
-    "flows": 99,
-    "treasury_median": 130,
-    "living_polities": 121
+    "expl_battles": 3504,
+    "flows": 109,
+    "treasury_median": 226,
+    "living_polities": 116
    },
-   "fingerprint_blessed": "2026-10-03"
+   "fingerprint_blessed": "2026-10-04"
   },
   {
    "seed": 40,
@@ -179,12 +179,12 @@
    },
    "fingerprint": {
     "empire_battles": 10184,
-    "expl_battles": 840,
-    "flows": 57,
-    "treasury_median": 83,
-    "living_polities": 52
+    "expl_battles": 933,
+    "flows": 59,
+    "treasury_median": 221,
+    "living_polities": 53
    },
-   "fingerprint_blessed": "2026-10-03",
+   "fingerprint_blessed": "2026-10-04",
    "replaces": "seed 6 (Ben, 2026-09-17, NR-887: the old seed no longer answered this question)"
   },
   {
@@ -212,12 +212,12 @@
    },
    "fingerprint": {
     "empire_battles": 4983,
-    "expl_battles": 208,
-    "flows": 24,
-    "treasury_median": 173,
+    "expl_battles": 140,
+    "flows": 22,
+    "treasury_median": 136,
     "living_polities": 42
    },
-   "fingerprint_blessed": "2026-10-03"
+   "fingerprint_blessed": "2026-10-04"
   },
   {
    "seed": 37,
@@ -244,12 +244,12 @@
    },
    "fingerprint": {
     "empire_battles": 20112,
-    "expl_battles": 1374,
+    "expl_battles": 1507,
     "flows": 72,
     "treasury_median": 102,
-    "living_polities": 73
+    "living_polities": 75
    },
-   "fingerprint_blessed": "2026-10-03"
+   "fingerprint_blessed": "2026-10-04"
   },
   {
    "seed": 13,
@@ -276,12 +276,12 @@
    },
    "fingerprint": {
     "empire_battles": 18772,
-    "expl_battles": 988,
+    "expl_battles": 985,
     "flows": 73,
     "treasury_median": 336,
     "living_polities": 73
    },
-   "fingerprint_blessed": "2026-10-03"
+   "fingerprint_blessed": "2026-10-04"
   },
   {
    "seed": 41,
@@ -308,12 +308,12 @@
    },
    "fingerprint": {
     "empire_battles": 10367,
-    "expl_battles": 281,
-    "flows": 57,
-    "treasury_median": 170,
+    "expl_battles": 207,
+    "flows": 53,
+    "treasury_median": 159,
     "living_polities": 48
    },
-   "fingerprint_blessed": "2026-10-03"
+   "fingerprint_blessed": "2026-10-04"
   },
   {
    "seed": 43,
@@ -374,12 +374,12 @@
    },
    "fingerprint": {
     "empire_battles": 14867,
-    "expl_battles": 1924,
-    "flows": 37,
-    "treasury_median": 169,
-    "living_polities": 65
+    "expl_battles": 1918,
+    "flows": 35,
+    "treasury_median": 411,
+    "living_polities": 62
    },
-   "fingerprint_blessed": "2026-10-03"
+   "fingerprint_blessed": "2026-10-04"
   },
   {
    "seed": 10,
@@ -473,11 +473,11 @@
    "fingerprint": {
     "empire_battles": 4822,
     "expl_battles": 153,
-    "flows": 33,
+    "flows": 29,
     "treasury_median": 196,
     "living_polities": 29
    },
-   "fingerprint_blessed": "2026-10-03",
+   "fingerprint_blessed": "2026-10-04",
    "replaces": "seed 19 (Ben, 2026-09-17, NR-887: the old seed no longer answered this question)"
   },
   {
@@ -506,12 +506,12 @@
    },
    "fingerprint": {
     "empire_battles": 9467,
-    "expl_battles": 836,
-    "flows": 39,
-    "treasury_median": 153,
+    "expl_battles": 1094,
+    "flows": 46,
+    "treasury_median": 233,
     "living_polities": 52
    },
-   "fingerprint_blessed": "2026-10-03",
+   "fingerprint_blessed": "2026-10-04",
    "replaces": "seed 4 (Ben, 2026-09-17, NR-887: the old seed no longer answered this question)"
   },
   {
@@ -539,12 +539,12 @@
    },
    "fingerprint": {
     "empire_battles": 16712,
-    "expl_battles": 993,
-    "flows": 77,
-    "treasury_median": 8664,
-    "living_polities": 75
+    "expl_battles": 899,
+    "flows": 72,
+    "treasury_median": 162,
+    "living_polities": 70
    },
-   "fingerprint_blessed": "2026-10-03"
+   "fingerprint_blessed": "2026-10-04"
   }
  ]
 }
