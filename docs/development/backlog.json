@@ -1137,6 +1137,27 @@
     "src/world/history_sim.cpp"
    ],
    "design": "Measured on the 16 curated seeds at main b427aed0: 92 of 128 Exploration bindings (72%) and 15 of 30 Industrialisation bindings are freed the same year they are made, mostly seeds 32 and 40. Each cycle moves a purchase price and writes a grudge. Distance cannot cause it (bind needs <= 400, free needs > 500), which leaves cohesion <= 260 or a missing contact. Separate the two, then decide with Ben whether the bind test should read what the free test reads."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 49,
+   "written": "2026-10-04",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1183",
+   "short_name": "CEILING_STALLS_CONSTRUCTION",
+   "author": "Claude (sprint 48 second re-bless, Ben's blocker form 2026-10-04)",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "Construction is not stalled for good by the fair-price ceiling",
+   "authority_doc": "docs/economy/FINANCE.md",
+   "files": [
+    "src/world/economy_system.cpp"
+   ],
+   "design": "Found 2026-10-04 diagnosing acquisition_viability R1: under BL-1172 (fair-price army) a material posted over the 2x ceiling pauses a build, and a site that does not bid cannot lower the price, so background firms' muster bases almost never finish (1,040 of 1,192 such firms on 12 seeds hold only an unbuilt base) and on seeds 0 and 4 the seat's processors started in the settle produced nothing in 24 quarters. Ben (2026-10-04): re-bless first, fix in sprint 49. Diagnose which materials sit over the ceiling and why (listings-only supply at k = 0; BL-1179 shelf spoilage may be the lever), then bring Ben the fix. Also: whether background firms should start muster bases at all is a scorer question (AI grant register)."
   }
  ]
 }
