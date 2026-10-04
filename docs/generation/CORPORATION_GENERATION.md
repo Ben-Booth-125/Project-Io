@@ -310,8 +310,9 @@ not a broad presence across the nation.
     first, then its own market, then reach, ties to the band's recipe order. A processor with no
     feasible recipe is unplaced; a corporation left with nothing — or a processing corporation
     left with no processor, which would be a mine wearing a processing focus — tries its next
-    anchor rung, and with none left it is not chartered — on a budget world its price books as `window_exhausted` (the
-    windows held ground, none of it within reach of a chain).
+    anchor rung, and with none left it is not chartered — on a budget world its price books under
+    its own unspent reason, `chain_infeasible` (the windows held ground, none of it within reach of
+    a chain), distinct from `window_exhausted` (no ground at all).
   - **Which world it binds.** Every placement made with the recipe registry in hand: the charter
     walk (specialists and firms) and Pass 6 on every path that lays them, searched or not, and the
     specialists the landscape search lays. World generation's own Pass 3 runs before a registry
@@ -458,7 +459,7 @@ walk is **ordered**, so a chain can be absent because its upstream had not lande
 refused this way is therefore a failure of the good, not of the firm's focus: it is passed over
 at that centre only until the centre charters again, because the new firm may be the producer it
 lacked. Under the legacy cap rules the good is masked out of that firm's selection and the next
-gap is taken. Where nothing feasible is left, the points book as `window_exhausted`: the windows
+gap is taken. Where nothing feasible is left, the points book as `chain_infeasible`: the windows
 held ground, and none of it was within reach of a chain. The budget-less Pass 6 masks a good once
 every nation on the body has missed it since the last firm landed.
 

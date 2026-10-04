@@ -398,9 +398,7 @@ inline std::int64_t charter_centre_firm_points(std::int32_t points, const charte
 enum class charter_unspent_reason : std::uint8_t
 {
     no_nation        = 0, ///< the centre's tile belongs to no nation (or has no tile)
-    window_exhausted = 1, ///< no anchorable ground in the centre window nor its region window,
-                          ///< or (BL-1185) ground with no chain-feasible charter on it: no
-                          ///< recipe whose inputs are produced within reach
+    window_exhausted = 1, ///< no anchorable ground in the centre window nor its region window
     province_cap     = 2, ///< the windows HAD anchorable ground, but every such tile stands in
                           ///< a province already at the budget path's per-province firm cap
     no_gap           = 3, ///< the body had no resource short enough to charter a firm for
@@ -432,6 +430,11 @@ enum class charter_unspent_reason : std::uint8_t
                            ///< centre on a nation's tile affords a specialist, so the shipped
                            ///< seam lays the no-budget world instead (`charter_fallback_report`);
                            ///< nothing chartered. Booked by the seam, never by the walk.
+    chain_infeasible = 11, ///< BL-1185 (chain-feasible placement; CORPORATION_GENERATION.md
+                           ///< § Pass 3): the windows HAD ground, but no charter on it was
+                           ///< chain-feasible — no recipe for the good (or, for a specialist,
+                           ///< for its processors) has every input produced within reach of
+                           ///< the ground's market.
 };
 
 inline const char* charter_unspent_reason_name(charter_unspent_reason r)
@@ -449,11 +452,12 @@ inline const char* charter_unspent_reason_name(charter_unspent_reason r)
     case charter_unspent_reason::late_shortfall:   return "late_shortfall";
     case charter_unspent_reason::share_unplaced:   return "share_unplaced";
     case charter_unspent_reason::no_specialist:    return "no_specialist";
+    case charter_unspent_reason::chain_infeasible: return "chain_infeasible";
     }
     return "?";
 }
 
-constexpr int charter_unspent_reason_count = 11;
+constexpr int charter_unspent_reason_count = 12;
 
 /// Which anchor rung a charter landed on. There is no third rung: a charter that
 /// finds no ground in either is UNSPENT, never scattered nation-wide.

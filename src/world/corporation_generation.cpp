@@ -3391,7 +3391,7 @@ charter_unspent_reason charter_place_failure_reason(const world& w, const nation
 /// charter left with nothing (or, with @p serve, a firm none of whose
 /// processors can make its good) is unplaced whole and the NEXT rung is tried.
 /// A rung that had ground but no feasible charter sets @p chain_rejected, and a
-/// charter that fails after one names `window_exhausted`: the windows held
+/// charter that fails after one names `chain_infeasible`: the windows held
 /// ground, none of it within reach of the chain's inputs. Such a failure is a
 /// property of the GOOD, not of the focus — the caller must not read it as the
 /// focus having no ground.
@@ -3437,7 +3437,7 @@ std::vector<entity_id> charter_place(world& w, const nation_component& nc,
     // everything it authored), and the reason reads the same ground the rungs
     // just did — unless a rung had ground and the chain refused it.
     fail_out = chain_rejected
-        ? charter_unspent_reason::window_exhausted
+        ? charter_unspent_reason::chain_infeasible
         : charter_place_failure_reason(w, nc, focus, occupied, cc, settle, spend, by_province);
     return {};
 }
@@ -4623,13 +4623,16 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                     if (gap_r == resource_count)
                     {
                         // No good in the turn can take a firm here. Name why.
-                        bool unplaceable = false, capped = false;
+                        bool unplaceable = false, capped = false, ground = false;
                         const auto still_wanted = [&](std::size_t r) {
                             if (!skipped[r])
                                 return;
                             unplaceable = true;
                             if (skip_reason[r] == charter_unspent_reason::province_cap)
                                 capped = true;
+                            // BL-1185: a skip for want of ground, not of a chain.
+                            if (skip_reason[r] != charter_unspent_reason::chain_infeasible)
+                                ground = true;
                         };
                         for (const std::uint16_t r : bs.turn)
                             if (bs.firms_by_resource[r] < bs.per_good_cap && demand[r] > production[r])
@@ -4642,7 +4645,8 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                         if (unplaceable)
                         {
                             stop_why = capped ? charter_unspent_reason::province_cap
-                                              : charter_unspent_reason::window_exhausted;
+                                     : ground ? charter_unspent_reason::window_exhausted
+                                              : charter_unspent_reason::chain_infeasible;
                             // NR-905: where the ceiling binds these points waited
                             // for shares this centre could not place; the walk's
                             // end decides how many of them are the share's gap.
@@ -4687,7 +4691,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                         // masked for want of a reachable input — then the windows
                         // held ground and none of it could take the chain.
                         cc.unspent[static_cast<std::size_t>(
-                            chain_masked_any ? charter_unspent_reason::window_exhausted
+                            chain_masked_any ? charter_unspent_reason::chain_infeasible
                                              : charter_unspent_reason::no_gap)] += left;
                         stop = true;
                         break;
