@@ -1070,22 +1070,17 @@ economy = {
     -- background corporations (corporation_generation.cpp's
     -- generate_background_firms), producing and consuming through the normal
     -- recipe/workforce/market pipeline like any corp. What survives here is
-    -- only the basket + threshold the population-growth gate in
+    -- only the threshold the population-growth gate in
     -- run_economy_step still needs, to test whether a centre's consumption is
     -- broadly met before it levels up.
     population_growth = {
-        -- Per-capita basket weight per resource, used only to weight the
-        -- growth gate's met-supply ratio. Unlisted resources get 0.
-        demand_basket = {
-            food_rations         = 0.70,  -- population primary
-            agricultural_produce = 0.55,  -- food processing + direct
-            steel                = 0.45,  -- construction / industry
-            water                = 0.40,  -- life support + industry
-            refined_fuel         = 0.40,  -- energy
-            iron_ore             = 0.35,  -- background smelting input
-            petroleum            = 0.30,  -- background refining input
-        },
-        growth_met_threshold = 0.50, -- basket met-supply ratio a centre needs to grow
+        -- BL-1163 (play villages decline): the gate's own demand_basket is
+        -- RETIRED. The growth basket IS the household basket each centre bids
+        -- (population_demand below: shared tranche + its band's tranche), read
+        -- at the centre's own market as the share of that bid the last clear
+        -- filled (POPULATION.md § Growth, decline and razing). Only the
+        -- threshold stays here.
+        growth_met_threshold = 0.50, -- household met ratio a centre needs to grow
     },
 
     -- BL-617 (population migration; docs/economy/POPULATION.md § Migration).
