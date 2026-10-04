@@ -904,7 +904,7 @@
    "files": [
     "tools/verify/rebless_shape_probe.cpp"
    ],
-   "design": "Ben authorised the sprint 48 re-bless (2026-10-03, merged 179615b8) with three untraced movements filed here: (1) world population 12.19B -> 6.27B (likeliest BL-1130/1132, the doubled war); (2) shipped haulage (--far-trade) 16,327 / 14,729 -> 14,434 / 11,917 per year (-11.6% / -19.1%), rising on 8 seeds and falling on 8, though every item that read it alone reported a rise or no change (likeliest BL-1125's folds); (3) nation units 414,404 -> 167,110. WORK: bisect each across the sprint's merge commits with rebless_shape_probe (v0.1.26 e50ab81c -> a899bb2a), name the cause, and report for Ben whether each is wanted. ADDED 2026-10-04 (sprint 48 second re-bless, blessed by Ben without a trace): seed 0's Exploration fingerprint moved treasury_median 8664 -> 162 (-98%), expl_battles 993 -> 899, flows 77 -> 72, living polities 75 -> 70; seed 9 moved the other way (battles 836 -> 1094, treasury_median 153 -> 233). The re-bless attributes every fingerprint move to BL-1171 (far trade), the only step that moves Exploration fields, but the mechanism is not traced. Also untraced there: road tiers flipping whole national networks Road/Highway on seeds 28, 31, 37 (Highway gate percentile tie, inferred); BL-1168's -35.6% haulage (a third fewer corporations, inferred). See docs/development/drafts/sprint-48-rebless-2.md."
+   "design": "ADDED (2026-10-04, the BL-1186 routing lane): haulage_measure.cpp (~line 1029) carries its own copy of the old per-leg pricing, so its haul table and the MARKETS.md price-ceiling derivation it feeds no longer match the router after BL-1186. Re-point it at price_market_export_leg rather than a copy.\n\nBen authorised the sprint 48 re-bless (2026-10-03, merged 179615b8) with three untraced movements filed here: (1) world population 12.19B -> 6.27B (likeliest BL-1130/1132, the doubled war); (2) shipped haulage (--far-trade) 16,327 / 14,729 -> 14,434 / 11,917 per year (-11.6% / -19.1%), rising on 8 seeds and falling on 8, though every item that read it alone reported a rise or no change (likeliest BL-1125's folds); (3) nation units 414,404 -> 167,110. WORK: bisect each across the sprint's merge commits with rebless_shape_probe (v0.1.26 e50ab81c -> a899bb2a), name the cause, and report for Ben whether each is wanted. ADDED 2026-10-04 (sprint 48 second re-bless, blessed by Ben without a trace): seed 0's Exploration fingerprint moved treasury_median 8664 -> 162 (-98%), expl_battles 993 -> 899, flows 77 -> 72, living polities 75 -> 70; seed 9 moved the other way (battles 836 -> 1094, treasury_median 153 -> 233). The re-bless attributes every fingerprint move to BL-1171 (far trade), the only step that moves Exploration fields, but the mechanism is not traced. Also untraced there: road tiers flipping whole national networks Road/Highway on seeds 28, 31, 37 (Highway gate percentile tie, inferred); BL-1168's -35.6% haulage (a third fewer corporations, inferred). See docs/development/drafts/sprint-48-rebless-2.md."
   },
   {
    "status": "designed",
@@ -1227,7 +1227,7 @@
     "src/world/market_clearing.cpp",
     "src/world/logistics.cpp"
    ],
-   "design": "DIAGNOSED (2026-10-04, 3a353f82; docs/development/drafts/sprint-49-shipment-diagnosis.md): two independent blocks. (1) THE PRICE CYCLE: with the shelf not counted as supply (shelf_supply_ticks = 0), a bid against nothing listed aims at 10x, the price moves halfway, and BL-1172 silences any draw above the 2x ceiling - so every market on a landmass runs 1.6x -> 5.8x -> 3.4x -> 2.2x in step and a consuming market bids one tick in four; from tick 10, 98-100% of price-gate refusals face zero demand. Same defect as BL-1183. (2) UNROUTABLE: every case is a cheapest path over water without a Port on BOTH market centre tiles (supply_system.cpp:476-489), refused whole; SUPPLY.md sec Logistical cost already says a water route is land -> port -> sea -> port -> land legs and retires the route-wide crosses_ocean bit, so the code is behind its doc. Also: the passive-LP pool refuses a cargo whole above 20 u per anchor (supply_system.cpp:721-730).\n\nBUILD (taken 2026-10-04, doc-mandated, no ruling needed): B1 route a water crossing as legs through ports as SUPPLY.md says; B2 a pair with no ported sea leg falls back to its land-only path where one exists; E1 a cargo over the LP pool sends what the pool allows instead of nothing. Re-measure haulage_measure against its baseline. THE PRICE CYCLE IS NR-968 (Ben's call), built after his verdict.\n\nSprint 49 wave 1, diagnosis before any constant moves. At handoff on seed 0, 10,329 steel sits on 9 markets' shelves against local demand of 12, and the next dispatch would send 0: 135 market pairs unroutable, 52 refused by the price gate, 0 market exports, 0 corp dispatches. By tick 20 steel is 6 supply against 5,187 demand and coal (149 supply, 6 demand) sits one market away from the mills that want it. Name, per pair, why it is unroutable (reach, the passive-LP cap, the road tree, the bridge cap) and why the gate refuses. Levers on record: the export price gate, dispatch_margin (0.05), the passive-LP cap. Read beside BL-1183 (ceiling stalls construction) and BL-1165's haulage reading, which overlap. A world-mover: re-bless at the wave close.\n\nREADING (2026-10-04, main a56e4ce3, 16 curated seeds, shipped 1960 start, 12 settle + 400 play ticks; spawn_solvency, firm_attrition_trace, centre_decline_trace, market_census, recipe_margin, and steel_chain_probe on seeds 0/43/37): recipe_margin is green in both bands. Day 1 looks solvent (99-100% of firms, +94..+211/qtr each) but the settle is opening stock being auctioned: field income 54-74k/tick at the settle close, 10-19k by tick 50 on every seed. At handoff 119-141 of ~225 processors are input-starved (copper refining, alloys, machinery, electronics, spacecraft never run); 10k steel sits on shelves against demand of 12 while 0 shipments go (135 pairs unroutable, 52 refused by the price gate); by tick 20 steel is 6 supply vs 5,187 demand with coal unbought one market away. Processors grow 225 -> 390 while those running fall to 44-67. 1,457 of 2,074 firms are insolvent by tick 400 (corps 121-149 -> 19-77). Insolvent firms per tick: income 75, maintenance+wages 46, upkeep 19; survivors 229 / 63 / 21. The seat is handed a steel mill (recipe 0) that idles on every seed; seat median operating net ~+66/qtr, four seeds under +7."
+   "design": "ROUTING BUILT (2026-10-04, baede06c on worktree-agent-a4366d1a52a945e1d; under cold review): B1 port-to-port legs, B2 land fallback, E1 auto-dispatch trims to the LP pool (commanded legs still refused whole - NR-969). Steel/coal unroutable pairs fall 6-17%; market exports 40/54/80 -> 69/69/129 and corp dispatches 494/606/1021 -> 575/781/1010 (seeds 0/43/37, ticks 0-20); the rest of the unroutable is port geography (one end reaches no port overland; seed 37 has under 2 active ports). D_settle and D_seat pins move on seeds 0/43/37; D_search and D_land hold. Follow-ons: BL-1194 (sea cheaper than highway), BL-1195 (convoy lane follows legs), BL-1165 (haulage_measure's stale pricing copy).\n\nDIAGNOSED (2026-10-04, 3a353f82; docs/development/drafts/sprint-49-shipment-diagnosis.md): two independent blocks. (1) THE PRICE CYCLE: with the shelf not counted as supply (shelf_supply_ticks = 0), a bid against nothing listed aims at 10x, the price moves halfway, and BL-1172 silences any draw above the 2x ceiling - so every market on a landmass runs 1.6x -> 5.8x -> 3.4x -> 2.2x in step and a consuming market bids one tick in four; from tick 10, 98-100% of price-gate refusals face zero demand. Same defect as BL-1183. (2) UNROUTABLE: every case is a cheapest path over water without a Port on BOTH market centre tiles (supply_system.cpp:476-489), refused whole; SUPPLY.md sec Logistical cost already says a water route is land -> port -> sea -> port -> land legs and retires the route-wide crosses_ocean bit, so the code is behind its doc. Also: the passive-LP pool refuses a cargo whole above 20 u per anchor (supply_system.cpp:721-730).\n\nBUILD (taken 2026-10-04, doc-mandated, no ruling needed): B1 route a water crossing as legs through ports as SUPPLY.md says; B2 a pair with no ported sea leg falls back to its land-only path where one exists; E1 a cargo over the LP pool sends what the pool allows instead of nothing. Re-measure haulage_measure against its baseline. THE PRICE CYCLE IS NR-968 (Ben's call), built after his verdict.\n\nSprint 49 wave 1, diagnosis before any constant moves. At handoff on seed 0, 10,329 steel sits on 9 markets' shelves against local demand of 12, and the next dispatch would send 0: 135 market pairs unroutable, 52 refused by the price gate, 0 market exports, 0 corp dispatches. By tick 20 steel is 6 supply against 5,187 demand and coal (149 supply, 6 demand) sits one market away from the mills that want it. Name, per pair, why it is unroutable (reach, the passive-LP cap, the road tree, the bridge cap) and why the gate refuses. Levers on record: the export price gate, dispatch_margin (0.05), the passive-LP cap. Read beside BL-1183 (ceiling stalls construction) and BL-1165's haulage reading, which overlap. A world-mover: re-bless at the wave close.\n\nREADING (2026-10-04, main a56e4ce3, 16 curated seeds, shipped 1960 start, 12 settle + 400 play ticks; spawn_solvency, firm_attrition_trace, centre_decline_trace, market_census, recipe_margin, and steel_chain_probe on seeds 0/43/37): recipe_margin is green in both bands. Day 1 looks solvent (99-100% of firms, +94..+211/qtr each) but the settle is opening stock being auctioned: field income 54-74k/tick at the settle close, 10-19k by tick 50 on every seed. At handoff 119-141 of ~225 processors are input-starved (copper refining, alloys, machinery, electronics, spacecraft never run); 10k steel sits on shelves against demand of 12 while 0 shipments go (135 pairs unroutable, 52 refused by the price gate); by tick 20 steel is 6 supply vs 5,187 demand with coal unbought one market away. Processors grow 225 -> 390 while those running fall to 44-67. 1,457 of 2,074 firms are insolvent by tick 400 (corps 121-149 -> 19-77). Insolvent firms per tick: income 75, maintenance+wages 46, upkeep 19; survivors 229 / 63 / 21. The seat is handed a steel mill (recipe 0) that idles on every seed; seat median operating net ~+66/qtr, four seeds under +7."
   },
   {
    "status": "proposed",
@@ -1380,6 +1380,53 @@
     "src/world/corporation_generation.cpp"
    ],
    "design": "Sprint 49, diagnosis first. On every seed water, clean water and medical supplies are supplied 0 at market across 400 play ticks, consumer goods fall to ~0 by tick ~100, and food rations run 25-45% of demand (the BL-1163 lane's centre_decline_trace, 2026-10-04). Yet steel_chain_probe sees 15 of 16 clean-water processors running at tick 0 on seed 0, so the output goes somewhere: name where (own pools, reservation, the shelf, a buyer of last resort, a household bid that is a pricing pull only and never fills). Then: is household demand a market a firm can PROFIT from (who pays, at what price)? If it is not, no placement or scorer change will make firms serve it. Read beside NR-968 (the price cycle) and BL-1185 (chain-feasible placement): household goods are the demand endpoints the chains exist for. Unblocks BL-1163 (NR-967)."
+  },
+  {
+   "status": "designed",
+   "glyph": "◐",
+   "sprint": 49,
+   "written": "2026-10-04",
+   "requires": [
+    "BL-1186"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1194",
+   "short_name": "SEA_CHEAPER_THAN_HIGHWAY",
+   "author": "Claude (the BL-1186 routing lane, 2026-10-04)",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 2,
+   "title": "A sea leg costs less per distance than land on a highway, as ruled, so a long overseas haul beats a short overland one",
+   "authority_doc": "docs/economy/SUPPLY.md",
+   "files": [
+    "scripts/economy.lua",
+    "src/world/logistics.cpp"
+   ],
+   "design": "The ruling is already written (SUPPLY.md sec Logistical cost, Ben 2026-09-15): per distance, a sea leg costs less than land on a highway; every port charges handling per unit; the crossover distance is the design reading, reported whenever either term moves. The config inverts it: logistics.base_cost_per_unit_distance land 0.02, sea 0.05, and water tiles weigh 2.5, so a sea tile costs 0.125 against 0.02 for plains and sea never wins at any distance; BL-1186's port routes are taken only where no land path exists. WORK: retune so the ordering holds against a HIGHWAY tile (road multiplier included), measure and report the crossover distance with BL-1186's handling (0.10 per unit per port, a first cut), and re-derive anything priced off the haul (haulage_measure, the ceiling derivation - see BL-1165). Measure on BL-1184 (market viability gate)."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "written": "2026-10-04",
+   "requires": [
+    "BL-1186"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1195",
+   "short_name": "CONVOY_LANE_FOLLOWS_LEGS",
+   "author": "Claude (the BL-1186 routing lane, 2026-10-04)",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "A convoy is drawn, seen and interdicted along the legs it actually travels",
+   "authority_doc": "docs/economy/SUPPLY.md",
+   "files": [
+    "src/world/supply_system.cpp"
+   ],
+   "design": "After BL-1186 routes water crossings as land -> port -> sea -> port -> land, convoy_route_tiles still lays the lane as the direct centre-to-centre path, so the vision beam, the convoy's drawn position and interdiction all read a route the cargo does not take. Make convoy_route_tiles return the leg route."
   }
  ]
 }

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*72 entries — 3 open, 69 resolved.*
+*73 entries — 4 open, 69 resolved.*
 
 ---
 
@@ -78,6 +78,21 @@ With nothing listed (the shelf is not counted as supply: shelf_supply_ticks = 0)
 > **Recommendation:** A. It honours both of your rulings (the ceiling stays, the k cap is the mechanism you chose), and a listed shelf takes the target off 10x at the root. BL-1179 is designed first (which goods spoil, at what rate, who loses the value), then k is set off a measured reading.
 
 *Files: `src/world/market_clearing.cpp`, `scripts/economy.lua`, `src/world/economy_system.cpp`*
+
+### NR-969 — CALL: does "a leg over the LP cap is refused outright" cover the automatic dispatch, or only commanded legs? (BL-1186 E1)
+*question · raised 2026-10-04 · from the BL-1186 routing lane (baede06c)*
+
+LOGISTICS.md sec Refusal, surface and determinism (Ben, 2026-08-22): "A leg over the cap fails - refused outright, and the player is told why ... a refusal nobody sees is silent interdiction again." The routing lane built E1: the AUTOMATIC dispatch passes (a market exporting its own shelf, the auto-surplus) now send what the nearest anchor's passive-LP pool still allows (minimum 1 unit, cost scaled), while the player's verb and the scorer's directed dispatch still send whole or are refused. It wrote that reading into SUPPLY.md sec Dispatch trigger. Before E1, a 20 u-per-anchor pool refused every larger cargo whole, so once routes open the passive cap would block nearly all automatic haulage.
+
+**Why it matters.** Your ruling's wording is general; the lane read it as covering commanded legs only. Narrowing a ruling is yours, not a lane's (the BL-1146 lesson).
+
+- A: confirm the reading - commanded legs are refused whole and told; the automatic dispatch trims to the pool
+- B: the ruling covers every leg - the automatic dispatch is refused whole too (E1 comes out; the passive pool size becomes the lever)
+- C: other
+
+> **Recommendation:** A. The ruling is about legibility of a press: a commanded leg the player chose is refused and told. An automatic dispatch has no one to tell, so a whole refusal there IS the silent interdiction the ruling exists to prevent; a trimmed send is visible as traffic.
+
+*Files: `docs/economy/LOGISTICS.md`, `docs/economy/SUPPLY.md`, `src/world/supply_system.cpp`*
 
 ---
 

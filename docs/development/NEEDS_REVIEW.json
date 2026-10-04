@@ -1598,6 +1598,28 @@
     "src/world/economy_system.cpp"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-969",
+   "title": "CALL: does \"a leg over the LP cap is refused outright\" cover the automatic dispatch, or only commanded legs? (BL-1186 E1)",
+   "raised": "2026-10-04",
+   "kind": "question",
+   "status": "open",
+   "source": "the BL-1186 routing lane (baede06c)",
+   "what": "LOGISTICS.md sec Refusal, surface and determinism (Ben, 2026-08-22): \"A leg over the cap fails - refused outright, and the player is told why ... a refusal nobody sees is silent interdiction again.\" The routing lane built E1: the AUTOMATIC dispatch passes (a market exporting its own shelf, the auto-surplus) now send what the nearest anchor's passive-LP pool still allows (minimum 1 unit, cost scaled), while the player's verb and the scorer's directed dispatch still send whole or are refused. It wrote that reading into SUPPLY.md sec Dispatch trigger. Before E1, a 20 u-per-anchor pool refused every larger cargo whole, so once routes open the passive cap would block nearly all automatic haulage.",
+   "why_it_matters": "Your ruling's wording is general; the lane read it as covering commanded legs only. Narrowing a ruling is yours, not a lane's (the BL-1146 lesson).",
+   "options": [
+    "A: confirm the reading - commanded legs are refused whole and told; the automatic dispatch trims to the pool",
+    "B: the ruling covers every leg - the automatic dispatch is refused whole too (E1 comes out; the passive pool size becomes the lever)",
+    "C: other"
+   ],
+   "recommendation": "A. The ruling is about legibility of a press: a commanded leg the player chose is refused and told. An automatic dispatch has no one to tell, so a whole refusal there IS the silent interdiction the ruling exists to prevent; a trimmed send is visible as traffic.",
+   "files": [
+    "docs/economy/LOGISTICS.md",
+    "docs/economy/SUPPLY.md",
+    "src/world/supply_system.cpp"
+   ],
+   "resolution": null
   }
  ]
 }
