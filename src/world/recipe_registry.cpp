@@ -282,9 +282,12 @@ void recipe_registry::load_from_lua(lua_state& lua)
     if (growth)
     {
         growth_params gp;
-        sol::optional<sol::table> basket = (*growth)["demand_basket"];
-        if (basket)
-            read_resource_map(*basket, gp.demand_basket, "economy.population_growth.demand_basket");
+        // BL-1163: `demand_basket` here is RETIRED — the growth basket is the
+        // household basket (population_demand). A leftover table is refused
+        // rather than silently ignored, so nobody tunes a list nothing reads.
+        if (sol::optional<sol::table> retired = (*growth)["demand_basket"]; retired)
+            throw std::runtime_error("recipe_registry: economy.population_growth.demand_basket is retired "
+                                     "(BL-1163) - the growth basket is economy.population_demand's");
         gp.growth_met_threshold = growth->get_or("growth_met_threshold", gp.growth_met_threshold);
         m_growth = gp;
     }

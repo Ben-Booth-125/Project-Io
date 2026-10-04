@@ -304,7 +304,16 @@ inline constexpr uint32_t world_save_magic =
 /// refused whole on the strict-equality contract, no migration (a pre-bump
 /// battle recorded no ground). Claimed through
 /// `tools/session/next_save_version.js --kind world --claim`.
-inline constexpr uint32_t world_save_version = 30;
+/// Bumped to 32 by BL-1196 (households consume): the market record gains two
+/// resource-indexed float arrays at its tail, after `inventory` --
+/// `household_bid` and `household_fill`, the population channel's bid and what
+/// it drew off the shelf at the last clear, which the growth gate reads before
+/// the next clear. A v30 stream is 2 x resource_count floats short per market,
+/// so its next market misreads; refused whole on the strict-equality contract,
+/// no migration. (v31 is claimed by BL-1139, centres abandoned in play, on an
+/// unmerged branch.) Claimed through
+/// `tools/session/next_save_version.js --kind world --claim`.
+inline constexpr uint32_t world_save_version = 32;
 
 /// Write @p w as a complete world snapshot.
 ///

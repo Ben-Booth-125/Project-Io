@@ -296,20 +296,13 @@ building_upkeep_goods(const building_upkeep_params& p, building_type bt, era_ban
 
 /// BL-365 population-growth-gate tunables, authored in scripts/economy.lua under
 /// `economy.population_growth`. Read only by the population-growth step in
-/// run_economy_step (economy_system.cpp) to test whether a centre's basket is
-/// broadly met before it levels up. This is the surviving remnant of the old
-/// BL-078 elastic nation-substrate model — that model's demand/supply INJECTION
-/// (capacity, clearing_fraction, elasticity) was deleted by BL-365, which
-/// replaced the abstract substrate with real background corporations
-/// (corporation_generation.cpp's generate_background_firms); the growth gate
-/// still needs *some* basket + threshold to test consumption against, so those
-/// two fields alone survive under a new name.
+/// run_economy_step (economy_system.cpp). BL-1163 (play villages decline)
+/// retired the gate's own `demand_basket`: the growth basket IS the household
+/// basket a centre bids (`population_demand_basket()`, read through
+/// `population_met_ratio`), so there is no second list — only the threshold.
 struct growth_params
 {
-    /// Per-capita basket weight per resource, used ONLY to weight the met-supply
-    /// ratio the growth gate reads. Indexed by static_cast<std::size_t>(resource_type).
-    std::array<float, resource_count> demand_basket = {};
-    float growth_met_threshold = 0.50f; ///< basket met-supply ratio a centre needs to grow.
+    float growth_met_threshold = 0.50f; ///< household met ratio a centre needs to grow.
 };
 
 /// BL-617 (population migration) tunables, authored in scripts/economy.lua
