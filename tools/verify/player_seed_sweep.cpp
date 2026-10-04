@@ -688,24 +688,38 @@ struct world_digest_pin
 // them on this arc too). BL-1086 and BL-1146's Pass 6 were measured
 // byte-identical on this arc in their own lanes. The 2026-09-25 values are one
 // commit back in git history.
+// RE-PINNED 2026-10-04 (sprint 48's second re-bless; PREPARED for Ben's
+// authorisation, docs/development/drafts/sprint-48-rebless-2.md carries the
+// shape, the old -> new rows and every named cause): taken by
+// player_seed_sweep --digest-check --arc legacy over the sixteen library seeds
+// on a build of main 9171c2ef, same toolchain; every row seated exactly one
+// player. All sixteen rows moved. Attributed by the same check run on a build
+// of every intermediate main: the sea-lane trunks (314e972b) move four rows
+// from D_search, the two-tile bridge cap (5c18bf8c) all sixteen from D_search,
+// far trade (BL-1171) twelve (eleven from D_search, one from D_land), and the
+// fair-price army with working capital (BL-1172/1173) all sixteen from D_land;
+// a knockout of working capital alone on 9171c2ef holds D_search and moves
+// D_land on every row. The charter priced by
+// reach (BL-1168) and the crowding brake (BL-1169) move no row on this arc.
+// The 2026-10-03 values are one commit back in git history.
 const std::vector<world_digest_pin> k_world_digest_pins = {
     //  seed  D_search               D_land                 D_settle               D_seat
-    { 46u, 0xC4F1975FD79F7FF0ull, 0x81726A7A8DD18CEFull, 0x3E78BB77321511EBull, 0xE542BB6C27BB5CACull },
-    { 28u, 0x2DBD979F692CAAF2ull, 0x3270D3EEA2D1896Cull, 0xE08CEDC067BA5EB9ull, 0x73844338F800F5B7ull },
-    { 11u, 0xBDA2F620C1A19B83ull, 0x7FFEF1057CB4FB1Eull, 0x90024714A1E34B97ull, 0x92272E9B87A1E1CBull },
-    { 31u, 0x9083FB07D36E90C2ull, 0x80A09F3731984D14ull, 0xC393850AC3B4671Aull, 0xAA6D93562F7CA134ull },
-    { 40u, 0x7078D86D3FC1E1A2ull, 0x310FFABAAB2A046Cull, 0x1B77C68ECDFE9422ull, 0xBA1D855B042977BAull },
-    { 12u, 0x87556FF4FAB1F552ull, 0x23EDAFA8AF9F67BDull, 0x09733A4728B1A5B9ull, 0xC0D93F4E1899FEFAull },
-    { 37u, 0x4A103A2F7B353759ull, 0xE4D9E90E977B97ACull, 0xB03B1918385F7C06ull, 0x46F8995C56F586F4ull },
-    { 13u, 0x13078D4571844958ull, 0xAFAEEA79198FC6FBull, 0x90C562285ED73155ull, 0x3B8451C70BACC87Cull },
-    { 41u, 0x676D62DB4C3F623Dull, 0xEF8CC28E8C157561ull, 0x55A1011E9CE5FD8Dull, 0xB9EEE4E515FD5ED0ull },
-    { 43u, 0x040B19E462A90C09ull, 0xEDAFAB2B229BD14Bull, 0x1B9614B54C95D664ull, 0x11FAB5454F90B848ull },
-    { 32u, 0x433F9A93F4B6E102ull, 0x44C375BAAE762B7Full, 0x1DBD6157A07661AEull, 0xB492817140D176C0ull },
-    { 10u, 0x5B2983E76540CA75ull, 0x62D3F3E0A4510F0Dull, 0xC5FC257141F03DADull, 0x632DC032DFE54305ull },
-    { 25u, 0x2B4F4CB745F3F8D1ull, 0xEC2056A676985C6Cull, 0xEB09A5BFF2A6411Full, 0xBAE3083C405D58FAull },
-    { 38u, 0x49AA47746AB1568Cull, 0xAA779F1CD016FACFull, 0x120B7EB8ED66B569ull, 0x2343D365E150D939ull },
-    {  9u, 0x1BE49E73EFD0B4A8ull, 0x6EB8F41B54773E10ull, 0xE0984466B957383Full, 0xABCD77E68ADF8C3Aull },
-    {  0u, 0x3F38C26E04995BEFull, 0xD903B49CDFF55AE4ull, 0x7C9575BF6CF612B3ull, 0x1BDC81725DAC4A58ull },
+    { 46u, 0xA49E43848C16DA35ull, 0x32AD7CD27862AA16ull, 0x88C9472BCF8BD3C9ull, 0x5670AEFEE01B241Full },
+    { 28u, 0xD6DC11ABCD55681Bull, 0xA7BE5CB2AF82D398ull, 0xCE0F9D914EB74996ull, 0x38C8B9737EEB016Bull },
+    { 11u, 0x25BFEBEA08464A81ull, 0xD09AF6EAD0DF3305ull, 0xD1A2D13238F2C66Eull, 0x7D02922FBC7FFD6Dull },
+    { 31u, 0x3D78CAD4E0A3FA0Bull, 0x179E2C9AA3966B32ull, 0x83F5C08BA8F63E39ull, 0x39EC4E4B7B244C33ull },
+    { 40u, 0x57762D5165544B1Cull, 0xC4D959FD27DFEC99ull, 0xBAF66EB09EFBC7AAull, 0x4E45801DCD3FE479ull },
+    { 12u, 0x699921965CFBBF2Cull, 0xC6C65AAE1836FEAFull, 0x4BEA2A9E46C92208ull, 0x418E63514703BEB7ull },
+    { 37u, 0xCCE7CB2BBC26F19Cull, 0x8A9F1C32D72A96E7ull, 0xA4DD3D3C92BFEE55ull, 0x7AE5C12D387A4B6Full },
+    { 13u, 0xB8569827D2340A15ull, 0x3BA624D1C6384463ull, 0xDB3992E1F0A31000ull, 0x00E6CFBD3E149FA2ull },
+    { 41u, 0xB60ACAB506456D8Dull, 0x09FDCF066B4A4CC2ull, 0x3558491A99B7B118ull, 0x0C4A3A06C04D6A37ull },
+    { 43u, 0xE94AEE911DFCEE24ull, 0x60B2A8437C3FF979ull, 0xDD2E9F27042EC7E0ull, 0x4C788BC5DC842A19ull },
+    { 32u, 0x8B3A4FB246FB9538ull, 0x451313D3995C4BD6ull, 0x918559433436DA0Eull, 0xCED19B7DFE3E7AE1ull },
+    { 10u, 0x00E6B5139CA88598ull, 0x793EE259BA588ECCull, 0xF9C272F3211233FDull, 0x011132288BF69287ull },
+    { 25u, 0x8425A84A9F0EF5C7ull, 0x4480190D102EF70Full, 0xD2FD5DFBA0F78744ull, 0xAB8F1B80E0CC767Cull },
+    { 38u, 0x7CF462189775B8ADull, 0xDB85D77BA6BE755Cull, 0x9DE0DB4271E3CA21ull, 0x5017794B129A0E87ull },
+    {  9u, 0x8759B4A4B9836475ull, 0x2A75D2CA9DF68502ull, 0xCEF48A28907D1FD9ull, 0x7DEEE7636002F0BDull },
+    {  0u, 0x802AF6CE63047E13ull, 0xD64AF3A739B65EC8ull, 0xBBF9407242D8F2B7ull, 0x0E6A8E93293437DAull },
 };
 
 // THE SHIPPED ARC'S PINS (BL-1044) — the same sixteen library worlds on the
@@ -754,24 +768,37 @@ const std::vector<world_digest_pin> k_world_digest_pins = {
 // the urbanisation stream, rivals armed, the sea chain and the fleet rule),
 // so no row could hold. The 2026-09-25 values are one commit back in git
 // history.
+// RE-PINNED 2026-10-04 (sprint 48's second re-bless; PREPARED for Ben's
+// authorisation, docs/development/drafts/sprint-48-rebless-2.md carries the
+// shape, the old -> new rows and every named cause): taken by
+// player_seed_sweep --digest-check over the sixteen library seeds on a build of
+// main 9171c2ef, same toolchain. Every row seated exactly one player and none
+// fell back. All sixteen rows moved. Attributed by the same check on a build of
+// every intermediate main: the sea-lane trunks (314e972b) move twelve rows from
+// D_search; the bridge cap (5c18bf8c), the charter priced by reach (BL-1168)
+// and the crowding brake at K = 1000 (BL-1169) each move all sixteen from
+// D_search; far trade (BL-1171) twelve from D_search; the fair-price army and
+// working capital (BL-1172/1173) all sixteen from D_land, never D_search. The
+// curved roads and BL-1169 merged off (K = 0) move nothing. The 2026-10-03
+// values are one commit back in git history.
 const std::vector<world_digest_pin> k_shipped_digest_pins = {
     //  seed  D_search               D_land                 D_settle               D_seat
-    { 46u, 0x74BE5522F38FEBCEull, 0xC2A75EC94251BAFFull, 0x7CA5CDC0DA7A6A29ull, 0xB6EA9782801343ADull },
-    { 28u, 0xD6AB1602D748AA6Full, 0xAF71059DB82123C6ull, 0x221DB67A043DE691ull, 0x69168B884DABA0FCull },
-    { 11u, 0xAF32371FEF8B3606ull, 0x81BB20A025B48785ull, 0xA491A5B1636517D5ull, 0xE33B34D787C369B2ull },
-    { 31u, 0x73BBC02EB2C9C120ull, 0x259973ACDA424BCAull, 0xE3E49E0F91AB6D89ull, 0x6C83C0389D6F1E6Cull },
-    { 40u, 0xAB43E1396EA45C4Aull, 0x6AFAF7354159C616ull, 0x44CB33648B0F1BF1ull, 0x439EC02481F29ECFull },
-    { 12u, 0xF1A17A78CAC966E6ull, 0xAEF427CFAF6C36F8ull, 0x5281AA30120BAF8Eull, 0x274963F6379BA4C4ull },
-    { 37u, 0xE8D9ABA85A646583ull, 0xF4A84A65DE8755E8ull, 0xF3052D47407C1983ull, 0xD003A2DD03A1EE48ull },
-    { 13u, 0x260196CE3FE02645ull, 0x48A7A9252B20B2BDull, 0x428EE6DE84AC42BCull, 0x4C26DC9E51E01F29ull },
-    { 41u, 0xC72D63F71EB8AEABull, 0x4FEAFD09295BE43Bull, 0x6A0295A6B1F6B199ull, 0x6941EEA85538A607ull },
-    { 43u, 0x852D7BFB0B8CBDE4ull, 0x7BA36C709B48BF23ull, 0xFF111A58441C8A49ull, 0x7079608617EC9485ull },
-    { 32u, 0x47B5645C92164CE6ull, 0xE5153D380117DAD5ull, 0x169E3C63D379983Aull, 0x9AD497B2641B1268ull },
-    { 10u, 0x7087A2B4F2C53AE6ull, 0x3B9036177D81ABCBull, 0x766762F955C40B04ull, 0x536FA6D5DA41A688ull },
-    { 25u, 0xF50E0E1138A7CACDull, 0x8448477D72617A04ull, 0x89B7C1B34832F3CDull, 0xE69C7622F0B73EB3ull },
-    { 38u, 0xEDACF79591AC3D4Eull, 0xD0EE0733E5A69C6Bull, 0xE5F4469D1F65C695ull, 0x1ACFC1D599ED5097ull },
-    {  9u, 0x03880872A7549AAEull, 0x0DF01729AAFAFD97ull, 0x500158A1F99F5A4Cull, 0xC2DC76F4FA79B98Aull },
-    {  0u, 0x64F157945F9219E0ull, 0xF014965E981977C4ull, 0x5DD2709164B25F75ull, 0x7346D517854A28F9ull },
+    { 46u, 0x34F2560905FFFCEBull, 0x6AAA5EDFAEF1CC4Full, 0xCC78E91673F77299ull, 0xC490CA6D45088DBFull },
+    { 28u, 0xB946CCD77067FCB0ull, 0xB931B36F6BDAADA2ull, 0x79730152B5DF08F0ull, 0x65DD23B5CA186BBEull },
+    { 11u, 0x8B214357D752EF9Full, 0x35B95760389162D3ull, 0xC88655EFAC6F804Cull, 0x8C5F017A4E3FB44Eull },
+    { 31u, 0x48C2F80E652AD0BEull, 0x2FEEE52FA7550BDCull, 0xA62B4A5CF1E58857ull, 0xC1E3C295572D03EEull },
+    { 40u, 0x9F518F9C3A3A676Aull, 0xA25F56E6A4BB684Cull, 0x1B190E2C86263750ull, 0x19870527DBBBCA93ull },
+    { 12u, 0x0B8C7AE7A903A3D6ull, 0x7DB6282732DF636Eull, 0x962C9E070F7C34D9ull, 0x6C60488E069619AAull },
+    { 37u, 0x06B39FF3A0CE6D12ull, 0xCCBBEF58479254E7ull, 0xCAE1EC9A0FC0AA44ull, 0xF88425B03E8111B0ull },
+    { 13u, 0x94802500676E33AAull, 0xF90535822F236D6Eull, 0x0EC6446D1598005Cull, 0x648C1746F6B241F4ull },
+    { 41u, 0x543F6539820F88A3ull, 0xE8F9BCED09684F38ull, 0x7F4706920E2DA870ull, 0xA837AFFC36BB1C09ull },
+    { 43u, 0xFAEFD54CDAF75337ull, 0xA710A1CBB06665BDull, 0x25FA4DB2E0216EE9ull, 0x44C32FA17F03C937ull },
+    { 32u, 0x2077BFB3B3A00BFAull, 0x465E25806F47DB4Full, 0xB72623095032DE33ull, 0x5D1E2671DC5BE1C1ull },
+    { 10u, 0xD6CFA0CF18873E35ull, 0x0EFAA3C393BA487Bull, 0x7DFEEE88B178FA69ull, 0x27A1C0BB0F550BADull },
+    { 25u, 0x46486AD6E44C5DCBull, 0xEA42931E03F76B84ull, 0x77E31977258700FBull, 0x8269E6EFFADB2395ull },
+    { 38u, 0x4F6FC306DFCF2145ull, 0x33F9B0D74CD39432ull, 0x2A72FB3D95483D17ull, 0x4C0A374EA083875Bull },
+    {  9u, 0xA4F8A159EABD95EEull, 0x3FA66D0EA2086E24ull, 0x6F3EAEED7E474880ull, 0x3BA449CA80DB1775ull },
+    {  0u, 0xC161F5F9B300B5C7ull, 0x812A4D7C4E67EC04ull, 0x6CADE285258EF691ull, 0x1C62BD83A29D77B6ull },
 };
 
 const std::vector<world_digest_pin>& digest_pins(world_arc arc)
