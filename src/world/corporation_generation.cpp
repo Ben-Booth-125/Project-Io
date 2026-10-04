@@ -10,10 +10,12 @@
 #include "world/placement_rules.hpp"
 #include "world/planetology.hpp"    // checkpoint_rng — charter_web_from_budget's keyed streams
 #include "world/settlement.hpp"
+#include "world/supply_system.hpp" // price_market_export_leg — BL-1185's reach
 
 #include <algorithm>
 #include <iterator>
 #include <map>
+#include <memory>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -1405,6 +1407,265 @@ int best_construction_recipe(const recipe_registry& reg)
     return best_i;
 }
 
+// ---------------------------------------------------------------------------
+// BL-1185 / BL-1188 — CHAIN-FEASIBLE PLACEMENT (CORPORATION_GENERATION.md
+// § Pass 3, "Chain-feasible"; Ben, 2026-10-04: a HARD RULE, not a search score)
+// ---------------------------------------------------------------------------
+// No processor is placed unless every input of its recipe has a producer WITHIN
+// REACH of the processor's market: an extractor on a deposit of that good, or a
+// processor whose recipe makes it.
+//
+// WITHIN REACH is the reach goods actually travel (the BL-1186 diagnosis): the
+// producer's market IS the consumer's market, or the dispatcher's own market
+// leg `price_market_export_leg(producer market, consumer market)` is viable and
+// its per-unit haul is at most `(reservation_mult - 1 - dispatch_margin) x base`
+// of the input at the consumer's market. The leg is CALLED, never restated, so
+// placement and shipping cannot disagree; whatever widens the dispatcher's
+// routing widens this reach with it.
+//
+// WHICH PRODUCERS COUNT: the buildings standing at the moment the processor's
+// recipe is decided — the base installations, every corporation placed before
+// this one, and this corporation's own holdings (a firm's assets are all placed
+// before any of its processors is checked, so its own feed mines count, and a
+// processor checked earlier in its own asset list counts for a later one).
+// Nothing placed later is foreseen.
+//
+// Deterministic: every answer is an existence test over a set (order-free), and
+// the leg memo is an ordered map. The leg calls warm the logistics caches; both
+// callers of the walks invalidate them after the apply.
+
+/// The reach context one placement pass shares: the node set the legs price
+/// against (read once, at the pass's start) and a memo of per-unit hauls.
+struct chain_reach
+{
+    logistics_nodes                                   nodes;
+    /// Per-unit haul of a market pair (src, dst); < 0 = no viable leg.
+    std::map<std::pair<entity_id, entity_id>, float>  haul;
+    /// `reservation_mult - 1 - dispatch_margin`: the share of base a haul may eat.
+    float                                             headroom = 0.0f;
+};
+
+chain_reach make_chain_reach(const world& w, const recipe_registry& reg)
+{
+    chain_reach cr;
+    cr.nodes    = collect_logistics_nodes(w);
+    cr.headroom = reg.price_band().reservation_mult - 1.0f - reg.dispatch_margin();
+    return cr;
+}
+
+float chain_haul_per_unit(world& w, const recipe_registry& reg, chain_reach& cr,
+                          entity_id src_market, entity_id dst_market)
+{
+    const auto key = std::make_pair(src_market, dst_market);
+    if (const auto it = cr.haul.find(key); it != cr.haul.end())
+        return it->second;
+    const convoy_leg leg = price_market_export_leg(w, reg, cr.nodes, src_market, dst_market, 1.0f);
+    const float h = leg.viable ? leg.cost : -1.0f;
+    cr.haul.emplace(key, h);
+    return h;
+}
+
+/// How near an input's nearest producer stands, best first.
+enum chain_tier : int
+{
+    chain_tier_own    = 0, ///< one of the consumer corporation's own holdings, same market
+    chain_tier_market = 1, ///< any producer in the consumer's market
+    chain_tier_reach  = 2, ///< a producer in another market within reach
+    chain_tier_none   = 3, ///< no producer within reach: infeasible
+};
+
+/// True when @p b produces resource @p r: an extraction site on a deposit of it
+/// (nominal output > 0), or a processor whose recipe outputs it.
+bool chain_produces(const world& w, const recipe_registry& reg, const building_component& b,
+                    std::size_t r)
+{
+    if (b.decommissioned)
+        return false;
+    if (b.type == building_type::extraction_site)
+        return static_cast<std::size_t>(b.target_resource) == r
+            && extraction_nominal(w, reg, b, 1.0f) > 0.0f;
+    if (b.type == building_type::processing_facility)
+    {
+        const recipe* rc = reg.get_recipe(b.recipe);
+        return rc != nullptr && rc->outputs[r] > 0.0f;
+    }
+    return false;
+}
+
+/// The tier of input @p r for a processor @p self in market @p consumer_market.
+/// @p own, when given, is the consumer corporation's holdings.
+int chain_input_tier(world& w, const recipe_registry& reg, chain_reach& cr, entity_id self,
+                     entity_id consumer_market, std::size_t r, const std::vector<entity_id>* own)
+{
+    if (consumer_market == null_entity)
+        return chain_tier_none;
+    int best = chain_tier_none;
+    std::vector<entity_id> far;
+    for (const auto& [bid, b] : w.buildings)
+    {
+        if (bid == self || !chain_produces(w, reg, b, r))
+            continue;
+        const entity_id mp = market_for_tile(w, b.tile);
+        if (mp == null_entity)
+            continue;
+        if (mp == consumer_market)
+        {
+            const bool mine = own != nullptr && std::find(own->begin(), own->end(), bid) != own->end();
+            best = std::min(best, mine ? static_cast<int>(chain_tier_own)
+                                       : static_cast<int>(chain_tier_market));
+        }
+        else
+            far.push_back(mp);
+    }
+    if (best != chain_tier_none)
+        return best;
+
+    const auto mit = w.markets.find(consumer_market);
+    if (mit == w.markets.end())
+        return chain_tier_none;
+    const float bound = cr.headroom * mit->second.base_price[r];
+    if (!(bound >= 0.0f) || !(mit->second.base_price[r] > 0.0f))
+        return chain_tier_none;
+    std::sort(far.begin(), far.end());
+    far.erase(std::unique(far.begin(), far.end()), far.end());
+    for (const entity_id mp : far)
+    {
+        const float h = chain_haul_per_unit(w, reg, cr, mp, consumer_market);
+        if (h >= 0.0f && h <= bound)
+            return chain_tier_reach;
+    }
+    return chain_tier_none;
+}
+
+/// A recipe's tier at a processor: its worst input's (a recipe with no inputs is
+/// `own`, it needs nothing).
+int chain_recipe_tier(world& w, const recipe_registry& reg, chain_reach& cr, entity_id self,
+                      entity_id consumer_market, const recipe& rc, const std::vector<entity_id>* own)
+{
+    int worst = chain_tier_own;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        if (!(rc.inputs[r] > 0.0f))
+            continue;
+        worst = std::max(worst, chain_input_tier(w, reg, cr, self, consumer_market, r, own));
+        if (worst == chain_tier_none)
+            break;
+    }
+    return worst;
+}
+
+/// Browse indices of the in-band processing recipes that output @p good, in the
+/// gap selection's own preference: most output of the good first, ties to
+/// registry order (`best_recipe_for_gaps` on that good alone ranks the same way).
+std::vector<int> chain_recipes_for_good(const recipe_registry& reg, std::size_t good)
+{
+    std::vector<int> out;
+    const int n = reg.recipe_count(building_type::processing_facility);
+    for (int i = 0; i < n; ++i)
+        if (reg.recipe_at(building_type::processing_facility, i).outputs[good] > 0.0f)
+            out.push_back(i);
+    std::stable_sort(out.begin(), out.end(), [&](int a, int b) {
+        return reg.recipe_at(building_type::processing_facility, a).outputs[good]
+             > reg.recipe_at(building_type::processing_facility, b).outputs[good];
+    });
+    return out;
+}
+
+/// Undo one authored building: `author_building` writes the building, its
+/// stockpile and the occupancy, and all three go.
+void chain_unplace(world& w, entity_id bid, std::unordered_set<entity_id>& occupied)
+{
+    const auto bit = w.buildings.find(bid);
+    if (bit != w.buildings.end())
+        occupied.erase(bit->second.tile);
+    w.buildings.erase(bid);
+    w.stockpiles.erase(bid);
+}
+
+/// Make one corporation's freshly placed holdings chain-feasible, in place.
+///
+/// Every processor in @p assets (in asset order) is given a recipe whose inputs
+/// are all within reach of its market, or is UNPLACED:
+///  * @p serve given (a firm chartered for one good): the first recipe of
+///    @p serve that is feasible there — the firm's good, by the gap selection's
+///    preference. A firm none of whose processors can serve its good is not a
+///    firm for that good: EVERY holding is unplaced and the call answers false.
+///  * @p serve null (a specialist's processors, and the incidental processor of
+///    an extraction or trade mix): the feasible recipe of the best tier — the
+///    corporation's own feed first, then its own market, then reach — ties to
+///    browse order (the band's default recipe is browse index 0).
+/// A processor that already carries a recipe is re-decided all the same: the
+/// rule reads the ground, not what an earlier pass wrote.
+///
+/// @return false when nothing is left placed (the caller treats the charter as
+///         a placement that found no feasible ground).
+bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
+                         std::vector<entity_id>& assets, std::unordered_set<entity_id>& occupied,
+                         const std::vector<int>* serve)
+{
+    const int n = reg.recipe_count(building_type::processing_facility);
+    std::vector<entity_id> kept;
+    kept.reserve(assets.size());
+    int serving = 0;
+    for (const entity_id bid : assets)
+    {
+        const auto bit = w.buildings.find(bid);
+        if (bit == w.buildings.end())
+            continue;
+        if (bit->second.type != building_type::processing_facility)
+        {
+            kept.push_back(bid);
+            continue;
+        }
+        const entity_id market = market_for_tile(w, bit->second.tile);
+        uint16_t chosen = no_recipe;
+        if (serve != nullptr)
+        {
+            for (const int i : *serve)
+            {
+                const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+                if (chain_recipe_tier(w, reg, cr, bid, market, rc, &assets) != chain_tier_none)
+                {
+                    chosen = reg.recipe_id(rc.name);
+                    break;
+                }
+            }
+        }
+        else
+        {
+            int best_tier = chain_tier_none;
+            for (int i = 0; i < n && best_tier != chain_tier_own; ++i)
+            {
+                const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+                const int t = chain_recipe_tier(w, reg, cr, bid, market, rc, &assets);
+                if (t < best_tier)
+                {
+                    best_tier = t;
+                    chosen    = reg.recipe_id(rc.name);
+                }
+            }
+        }
+        if (chosen == no_recipe)
+        {
+            chain_unplace(w, bid, occupied);
+            continue;
+        }
+        bit->second.recipe = chosen;
+        kept.push_back(bid);
+        ++serving;
+    }
+    assets = std::move(kept);
+
+    if ((serve != nullptr && serving == 0) || assets.empty())
+    {
+        for (const entity_id bid : assets)
+            chain_unplace(w, bid, occupied);
+        assets.clear();
+        return false;
+    }
+    return true;
+}
+
 /// BL-476 — seed one `military_base` + one starting `unit_component` for
 /// `corp_id`, exactly the logic BL-330 originally scoped to the player only.
 /// Placed on the nearest valid land tile to the corp's HQ (falling back to the
@@ -1691,7 +1952,8 @@ std::vector<entity_id> generate_corporations(
     const corporation_params& params,
     uint32_t seed,
     const settlement_state* settle,
-    generation_progress* progress)
+    generation_progress* progress,
+    const recipe_registry* reg)
 {
     if (w.nations.empty())
         return {};
@@ -1951,6 +2213,20 @@ std::vector<entity_id> generate_corporations(
     // corp_assets[c] = building entity ids placed for corp c (a clustered set).
     std::vector<std::vector<entity_id>> corp_assets(static_cast<std::size_t>(corp_count));
 
+    // BL-1188 (seat kit runs) — CHAIN-FEASIBLE (Pass 3). With a registry, every
+    // placement's processors are given a recipe whose inputs are produced within
+    // reach, or are unplaced, and a rung left with nothing tries the next rung.
+    // Without one (world generation's own call, which runs before any registry
+    // exists — the --verify world), processors keep `no_recipe` exactly as before.
+    std::unique_ptr<chain_reach> chain;
+    if (reg != nullptr)
+        chain = std::make_unique<chain_reach>(make_chain_reach(w, *reg));
+    const auto chain_kept = [&](std::vector<entity_id>& a) {
+        if (a.empty())
+            return false;
+        return chain == nullptr || make_chain_feasible(w, *reg, *chain, a, occupied_tiles, nullptr);
+    };
+
     for (int c = 0; c < corp_count; ++c)
     {
         const entity_id home_nid = nation_ids[static_cast<std::size_t>(
@@ -1995,7 +2271,7 @@ std::vector<entity_id> generate_corporations(
                     w, it->second,
                     corp_focuses[static_cast<std::size_t>(c)],
                     occupied_tiles, asset_rng, &window);
-                if (!assets.empty())
+                if (chain_kept(assets))
                     break;
             }
         }
@@ -2007,6 +2283,7 @@ std::vector<entity_id> generate_corporations(
                 corp_focuses[static_cast<std::size_t>(c)],
                 occupied_tiles,
                 asset_rng);
+            chain_kept(assets);
         }
 
         corp_assets[static_cast<std::size_t>(c)] = std::move(assets);
@@ -3024,6 +3301,17 @@ charter_unspent_reason charter_place_failure_reason(const world& w, const nation
 /// can place no extraction firm at all.
 ///
 /// On failure @p fail_out names why (`charter_place_failure_reason`).
+///
+/// CHAIN-FEASIBLE (BL-1185 / BL-1188; Pass 3 "Chain-feasible"): with @p cr
+/// given, a rung's placement is kept only if `make_chain_feasible` keeps it — every processor
+/// gets a recipe whose inputs are produced within reach, or is unplaced, and a
+/// charter left with nothing (or, with @p serve, a firm none of whose
+/// processors can make its good) is unplaced whole and the NEXT rung is tried.
+/// A rung that had ground but no feasible charter sets @p chain_rejected, and a
+/// charter that fails after one names `window_exhausted`: the windows held
+/// ground, none of it within reach of the chain's inputs. Such a failure is a
+/// property of the GOOD, not of the focus — the caller must not read it as the
+/// focus having no ground.
 std::vector<entity_id> charter_place(world& w, const nation_component& nc,
                                      industrial_focus focus,
                                      std::unordered_set<entity_id>& occupied,
@@ -3034,8 +3322,13 @@ std::vector<entity_id> charter_place(world& w, const nation_component& nc,
                                      const std::map<uint32_t, int>* by_province,
                                      const std::map<uint32_t, int>* province_rungs,
                                      charter_rung& rung_out,
-                                     charter_unspent_reason& fail_out)
+                                     charter_unspent_reason& fail_out,
+                                     const recipe_registry& reg,
+                                     chain_reach* cr,
+                                     const std::vector<int>* serve,
+                                     bool& chain_rejected)
 {
+    chain_rejected = false;
     for (const charter_rung rung : k_charter_rungs)
     {
         const std::vector<entity_id>& base = charter_rung_window(w, nc, cc, settle, spend, rung);
@@ -3047,14 +3340,22 @@ std::vector<entity_id> charter_place(world& w, const nation_component& nc,
         std::vector<entity_id> assets = place_starting_assets(w, nc, focus, occupied, rng, &window);
         if (!assets.empty())
         {
+            if (cr != nullptr && !make_chain_feasible(w, reg, *cr, assets, occupied, serve))
+            {
+                chain_rejected = true;
+                continue;
+            }
             rung_out = rung;
             return assets;
         }
     }
 
-    // Nothing placed, so nothing moved: `occupied` and the windows are as they
-    // were, and the reason reads the same ground the rungs just did.
-    fail_out = charter_place_failure_reason(w, nc, focus, occupied, cc, settle, spend, by_province);
+    // Nothing placed: `occupied` is as it was (a chain-rejected rung unplaced
+    // everything it authored), and the reason reads the same ground the rungs
+    // just did — unless a rung had ground and the chain refused it.
+    fail_out = chain_rejected
+        ? charter_unspent_reason::window_exhausted
+        : charter_place_failure_reason(w, nc, focus, occupied, cc, settle, spend, by_province);
     return {};
 }
 
@@ -3805,6 +4106,10 @@ std::vector<entity_id> charter_web_from_budget(world& w,
     // buildings, never centres, so no rung moves under it.
     const std::map<uint32_t, int> province_rungs = province_centre_rungs(w);
 
+    // BL-1185 / BL-1188: the reach every charter's processors are checked
+    // against (Pass 3 "Chain-feasible"), its node set read once, here.
+    chain_reach chain = make_chain_reach(w, reg);
+
     // --- EACH BODY'S DENSITY RULE, FIXED BEFORE THE WALK (BL-1039) -----------
     // Every body holding a nation-resolved budgeted centre gets its state here,
     // before any charter lands, and three things are read ONCE:
@@ -3940,9 +4245,15 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             std::mt19937 asset_rng = charter_stream(seed, k_charter_salt_spec_asset, cc.centre);
             charter_rung rung = charter_rung::centre_window;
             charter_unspent_reason why = charter_unspent_reason::window_exhausted;
+            // BL-1188 (seat kit runs): the specialist's processors are given a
+            // recipe whose inputs are produced within reach, or are not placed
+            // (Pass 3 "Chain-feasible") — the seat is one of these.
+            bool chain_rejected = false;
             std::vector<entity_id> assets = charter_place(w, nc, focus, occupied, asset_rng, cc,
                                                           settle, spend, /*by_province=*/nullptr,
-                                                          /*province_rungs=*/nullptr, rung, why);
+                                                          /*province_rungs=*/nullptr, rung, why,
+                                                          reg, &chain, /*serve=*/nullptr,
+                                                          chain_rejected);
             if (assets.empty())
             {
                 // No ground in either window: the specialist's price stays
@@ -4314,8 +4625,10 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                 }
                 else
                 {
+                    bool chain_rejected = false;
                     assets = charter_place(w, nc, focus, occupied, asset_rng, cc, settle, spend,
-                                           by_province, &province_rungs, rung, why);
+                                           by_province, &province_rungs, rung, why,
+                                           reg, /*cr=*/nullptr, /*serve=*/nullptr, chain_rejected);
                     if (!assets.empty())
                         break;
                     focus_failed[fi] = true;

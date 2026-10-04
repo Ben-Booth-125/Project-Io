@@ -209,7 +209,10 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
         remove_specialist_roster(w);
         corporation_params cp;
         cp.corporation_count = c.corporation_count;
-        generate_corporations(w, cp, c.placement_seed, w.gen_settlement.get());
+        // BL-1188: with the registry, so the specialists' processors are
+        // chain-feasible (Pass 3); world-gen's own call has none.
+        generate_corporations(w, cp, c.placement_seed, w.gen_settlement.get(),
+                              /*progress=*/nullptr, &reg);
     }
     generate_background_firms(w, reg, c.placement_seed);
 

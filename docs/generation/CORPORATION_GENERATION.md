@@ -293,6 +293,28 @@ not a broad presence across the nation.
   as idle plant. The reason is legibility: an idle building the player inherits reads as a
   broken economy, where an absent chain reads as a world that lacks it. BL-1185
   (chain-feasible placement) owns the work.
+  - **Within reach, exactly.** The producer's market is the processor's market, or the
+    dispatcher's own market leg (`price_market_export_leg`) from the producer's market to the
+    processor's is viable and its per-unit haul is at most
+    `(reservation_mult − 1 − dispatch_margin) × base` of the input at the processor's market.
+    Placement **calls** that function rather than restating it, so placement and shipping cannot
+    disagree, and whatever widens the dispatcher's routing widens this reach with it.
+  - **Which producers count.** The buildings standing when the processor's recipe is decided:
+    the base installations, every corporation placed before this one in its pass's own order, and
+    the corporation's own holdings. A corporation's whole holding set is placed before any of its
+    processors is checked, so its own feed counts; a processor decided earlier in its set counts for
+    a later one. Nothing placed afterwards is foreseen — a chain whose upstream lands later in the
+    walk does not count it.
+  - **The recipe bends before the building goes.** A specialist's processor (and the one processor
+    in an extraction or trade mix) takes the feasible recipe nearest its feed: its **own** holdings
+    first, then its own market, then reach, ties to the band's recipe order. A processor with no
+    feasible recipe is unplaced; a corporation left with nothing tries its next anchor rung, and with
+    none left it is not chartered — on a budget world its price books as `window_exhausted` (the
+    windows held ground, none of it within reach of a chain).
+  - **Which world it binds.** Every placement the landscape search lays (§ Pass 6), which is the
+    world play receives. World generation's own Pass 3 runs before a recipe registry exists, so the
+    unsearched seed-candidate world the `--verify` goldens read keeps its processors unconfigured
+    until the default recipe is applied.
 
 Placement is collision-checked against already-placed assets from other corporations.
 No two corporations begin on the same tile.
@@ -560,6 +582,14 @@ longer the default. `player_seed_sweep` is the instrument that says by how much.
 processing facility earns **less** per tick than the extraction site it replaces (BL-436,
 processing under-earns extraction). Nothing in the shortlist or its surfaces may call it the
 richer opening while that holds.
+
+**The seat's kit can run on day one** (BL-1188, seat kit runs). The seat is a specialist, so its
+holdings are placed under Pass 3's chain-feasible rule: a processor it is handed runs a recipe
+whose every input is produced within reach of its market, chosen nearest its own feed first. A
+processor is never handed on a recipe nothing within reach supplies. Reach makes the chain
+*possible*; whether the inputs arrive is the market's and the dispatcher's business
+(`../economy/SUPPLY.md`), which is why the own-feed and own-market recipes are preferred over
+a haul.
 
 ## Corporate seeding is watched — split by kind
 

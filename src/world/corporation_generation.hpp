@@ -116,6 +116,12 @@ struct corporation_params
 ///               nowhere on a map to be, so it goes to a ledger column). A pure
 ///               TAP: write-only, consumes no randomness, changes no branch.
 ///               Defined in world/hard_coded_world.hpp.
+/// @param reg    Optional recipe registry (BL-1188, seat kit runs). When given,
+///               Pass 3 is CHAIN-FEASIBLE (CORPORATION_GENERATION.md § Pass 3):
+///               each processor placed is given a recipe whose inputs are
+///               produced within reach of its market, or is unplaced, and a rung
+///               left with nothing widens. Null (world generation's own call,
+///               before any registry exists) leaves processors `no_recipe`.
 /// @return       Corporation entity IDs in generation order (one per corporation
 ///               created). The entry whose corporation_component::is_player is
 ///               true equals w.player_entity.
@@ -124,7 +130,8 @@ std::vector<entity_id> generate_corporations(
     const corporation_params& params,
     uint32_t seed,
     const struct settlement_state* settle = nullptr,
-    struct generation_progress* progress = nullptr);
+    struct generation_progress* progress = nullptr,
+    const recipe_registry* reg = nullptr);
 
 /// BL-977 — strip the SPECIALIST roster so a candidate can lay a fresh one.
 ///
