@@ -511,15 +511,15 @@ is never on a body's surface, so it is not offered.
   good, in toggle order. Each wedge spans 6/n of the perimeter, so two goods halve the
   hex and three or six land on its vertices. Below the coarse level of detail the hex
   is a few pixels across, and it shows the first good only.
-- **None** — the tile keeps its terrain, **muted**: desaturated 60% toward its own
-  luma and darkened to 0.82. The map stays the map; the deposits carry the contrast
-  (Ben, 2026-10-04 — "use the default lens, and just up the contrast"; it replaced a
-  white wash that lost the terrain).
-- **Outline** — every deposit blob is ringed with a light stroke on each side facing
-  ground that carries no toggled good. Several identity colours are greys and darks
-  (coal, petroleum, stone, peat) that muted terrain cannot set off by hue alone; the
-  ring is colour-independent and draws the deposit's shape. Like the split, it is
-  skipped below the coarse level of detail.
+- **None** — the tile takes a **white wash that keeps a ghost of its terrain**: it is
+  desaturated 80% toward its own luma, then pulled 72% of the way to a wash colour — a
+  warm off-white on land, a pale blue-grey on water so the coastline survives. The
+  deposits are the only saturated thing on the map (Ben, 2026-10-04: "the white wash
+  should still exist … push up the contrast").
+- **Outline** — every deposit blob is ringed with a dark stroke on each side facing
+  ground that carries no toggled good, so pale identities (silica, sand, rare earth)
+  still read against the wash. Like the split, it is skipped below the coarse level of
+  detail.
 
 The intra-body **activity fog is lifted** under this lens: a deposit is survey
 knowledge, not activity, so surveyed ground reads clear while the survey mask still
