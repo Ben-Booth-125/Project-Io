@@ -1731,6 +1731,29 @@
     "docs/economy/PRODUCTION.md"
    ],
    "resolution": "RULED (Ben, the lake and well form, 2026-10-05): option A - a lake is an enclosed water body below a measured size cap; larger enclosed bodies are seas (coast, ports and wharves; no Wells). Written into TILES.md sec Water kinds (replacing \"no size cut-off\"); the work is BL-1200 (lake size cap), the cap read off the 16 curated seeds."
+  },
+  {
+   "id": "NR-975",
+   "title": "DECISION TAKEN: the lake size cap is 150 tiles (BL-1200)",
+   "raised": "2026-10-05",
+   "kind": "decision",
+   "status": "open",
+   "source": "the sprint 49 main session, on Ben's delegation (NR-974 said: measured)",
+   "what": "lake_census (dff0abc1) measured 360 enclosed water bodies on the 16 curated seeds: no clean gap. The pooled dip is 89-143 tiles (3 bodies), with a dense cluster from 154 to 204 above it; 21 enclosed bodies exceed 1,000 tiles (seed 11: a 4,027-tile \"lake\" beside a 4,090-tile sea). Chosen: 150 - just under the cluster, keeping the near-twins 119 and 138 (seeds 25, 13) together as lakes. Pooled: 301 lakes (3,079 tiles, ~3,800 shore) and 59 seas; lakeshore falls from ~14,700 tiles to ~3,800.",
+   "why_it_matters": "Where the line falls decides which shores give Wells free fresh water and which get ports and wharves.",
+   "options": [
+    "A: keep 150",
+    "B: 100 (the pooled dip; splits seed 25s and 13s near-twins)",
+    "C: 300 (mid-size 150-300 bodies stay lakes)",
+    "D: other"
+   ],
+   "recommendation": "A.",
+   "files": [
+    "src/world/tile_generation.cpp",
+    "docs/economy/TILES.md",
+    "tools/verify/lake_census.cpp"
+   ],
+   "resolution": null
   }
  ]
 }

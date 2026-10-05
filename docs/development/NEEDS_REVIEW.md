@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*78 entries — 2 open, 76 resolved.*
+*79 entries — 3 open, 76 resolved.*
 
 ---
 
@@ -60,6 +60,22 @@ Settled in MARKETS.md sec The shelf spoils: every good on a market shelf loses a
 > **Recommendation:** A.
 
 *Files: `docs/economy/MARKETS.md`, `scripts/economy.lua`, `src/world/market_clearing.cpp`*
+
+### NR-975 — DECISION TAKEN: the lake size cap is 150 tiles (BL-1200)
+*decision · raised 2026-10-05 · from the sprint 49 main session, on Ben's delegation (NR-974 said: measured)*
+
+lake_census (dff0abc1) measured 360 enclosed water bodies on the 16 curated seeds: no clean gap. The pooled dip is 89-143 tiles (3 bodies), with a dense cluster from 154 to 204 above it; 21 enclosed bodies exceed 1,000 tiles (seed 11: a 4,027-tile "lake" beside a 4,090-tile sea). Chosen: 150 - just under the cluster, keeping the near-twins 119 and 138 (seeds 25, 13) together as lakes. Pooled: 301 lakes (3,079 tiles, ~3,800 shore) and 59 seas; lakeshore falls from ~14,700 tiles to ~3,800.
+
+**Why it matters.** Where the line falls decides which shores give Wells free fresh water and which get ports and wharves.
+
+- A: keep 150
+- B: 100 (the pooled dip; splits seed 25s and 13s near-twins)
+- C: 300 (mid-size 150-300 bodies stay lakes)
+- D: other
+
+> **Recommendation:** A.
+
+*Files: `src/world/tile_generation.cpp`, `docs/economy/TILES.md`, `tools/verify/lake_census.cpp`*
 
 ---
 
