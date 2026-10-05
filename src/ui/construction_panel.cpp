@@ -14,6 +14,7 @@
 #include "world/building_profit.hpp"   // estimate_building_profit — the per-building figure the roster sums
 #include "world/economy_system.hpp"    // economy_report (BL-143 status column)
 #include "world/market_clearing.hpp"   // market_for_tile (build-rate read, BL-095)
+#include "world/placement_rules.hpp"   // is_well_site - the Well's roster name (BL-1198)
 #include "world/recipe_registry.hpp"
 
 #include <cstdio>
@@ -271,7 +272,7 @@ void draw_building_levers(world& w, const recipe_registry& reg, ui_state& ui)
 
     ImGui::Separator();
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s",
-                       building_group_name(reg, bit->second).c_str());
+                       building_group_name(w, reg, bit->second).c_str());
     if (const auto tit = w.tiles.find(bit->second.tile); tit != w.tiles.end())
     {
         ImGui::SameLine();
@@ -402,7 +403,7 @@ void draw_buildings_view(world& w, const recipe_registry& reg,
 
 } // namespace
 
-std::string building_group_name(const recipe_registry& reg, const building_component& b)
+std::string building_group_name(const world& w, const recipe_registry& reg, const building_component& b)
 {
     if (b.type == building_type::extraction_site)
     {
@@ -410,6 +411,9 @@ std::string building_group_name(const recipe_registry& reg, const building_compo
         // the roster does too — one vocabulary (presentation.hpp).
         if (b.target_resource == resource_type::agricultural_produce)
             return "Farm";
+        // BL-1198: the Build door offers a Well by that name; the roster agrees.
+        if (placement_rules::is_well_site(w, b.tile, b.target_resource))
+            return "Well";
         return extraction_building_name(b.target_resource);
     }
     if (b.type == building_type::processing_facility)
@@ -436,7 +440,7 @@ std::vector<building_group> player_building_groups(const world& w,
     {
         if (!is_player_owned(w, id))
             continue;
-        const std::string name = building_group_name(reg, b);
+        const std::string name = building_group_name(w, reg, b);
         building_group& g = by_name[name];
         g.name = name;
         ++g.count;

@@ -49,6 +49,7 @@ enum class placement_reason : uint8_t
     needs_centre,      ///< BL-615: this building must stand ON a population-centre tile.
     centre_too_small,  ///< BL-615: the hosting centre is below the building's required stratum.
     far_from_centre,   ///< BL-615: no population centre within the building's proximity radius.
+    not_fresh_water,   ///< BL-1198: a Well (water, no deposit) must stand on a river or beside a lake.
 };
 
 /// Human-readable one-line explanation for a placement reason, for surfacing on
@@ -180,7 +181,9 @@ bool can_place_population_centre(const tile_component& tc);
 ///   be a prototype-extractable resource. **Exception (Fishing Wharf, BL-168):**
 ///   an `agricultural_produce` target with no deposit still passes this tile-only
 ///   check — its coastal requirement needs world access, so it is enforced by
-///   `can_place_in_world` instead of rejected here.
+///   `can_place_in_world` instead of rejected here. **Exception (Well, BL-1198):**
+///   a `water` target with no deposit passes for the same reason; its
+///   fresh-water gate (`is_fresh_water_adjacent`) is enforced by `can_place_in_world`.
 /// - processing_facility targeting `agricultural_produce` (Hydroponics Bay,
 ///   BL-166): only where the terrestrial Farm deposit was NOT seeded
 ///   (`resource_deposit[agricultural_produce] == 0`) — the mirror image of the
@@ -209,11 +212,34 @@ placement_result can_place(const tile_component& tc, building_type type, resourc
 /// @return        True if any of the 6 hex neighbours is sea (coast or ocean).
 bool is_coastal(const world& w, entity_id tile_id);
 
+/// BL-1198 (water where people live, NR-971): true if the tile at `tile_id` is
+/// LAND that fresh water touches — a river runs along one of its six sides
+/// (`tile_component::river_edges`, written by generate_rivers) or at least one
+/// hex neighbour is a lake (`is_lake`, never the sea). The Well's placement
+/// gate, the fresh-water mirror of `is_coastal`. A water tile is never
+/// fresh-water adjacent (nothing is built on water).
+bool is_fresh_water_adjacent(const world& w, entity_id tile_id);
+
+/// BL-1198: is an extraction site targeting `target` on `tile_id` a **Well** —
+/// a `water` site on a tile with no water deposit, standing on fresh water?
+/// The deposit-agnostic route to water (PRODUCTION.md § Extraction buildings).
+/// A Well's rate scalar is `k_well_rate_scalar` in place of the deposit's
+/// richness, and it draws no finite reserve (the river keeps running). Derived
+/// from tile state alone, so no persistent field carries it.
+bool is_well_site(const world& w, entity_id tile_id, resource_type target);
+
+/// BL-1198: the Well's richness->rate scalar — that of a TYPICAL deposit (1.0
+/// is what `richness_rate_scalar` hands the median deposit, the BL-436
+/// calibration's promise). A river or lake is neither rich nor poor ground.
+inline constexpr float k_well_rate_scalar = 1.0f;
+
 /// Full placement check including world-level constraints (BL-043):
 ///  1. Tile-level can_place (ocean / deposit / terrain).
 ///  2. Port: tile must be coastal (is_coastal).
 ///  3. Fishing Wharf (BL-168): an extraction_site targeting agricultural_produce
 ///     with no deposit on the tile must also be coastal (is_coastal).
+///  3b. Well (BL-1198): an extraction_site targeting water with no deposit on
+///     the tile must be fresh-water adjacent (is_fresh_water_adjacent).
 ///  4. Launchpad: at most 1 per body; returns false when one already exists.
 ///
 /// Use this at player construction time; generation uses can_place directly

@@ -1164,6 +1164,53 @@ bash tools/verify/build_lua_harness.sh centre_census
 ./build_gen/verify/centre_census.exe [--seeds 46,28] [--map DIR]
 ```
 
+## well_gate (BL-1198)
+
+The Well (PRODUCTION.md § Extraction buildings): an extraction_site targeting water with no ice
+deposit, gated on fresh-water adjacency. Placement rows on a hand-built 5x5 grid — river tile
+valid, lake-shore valid, sea-coast-only and dry inland refused `not_fresh_water`, the lake itself
+refused `ocean`, an icy deposit on a river stays an Ice Extractor, a lakeshore is still not a
+coast, `construct_building` places and refuses through the real seam — and the MULTI-TICK economy
+row: a staffed Well yields water every tick for six ticks at base_rate × `k_well_rate_scalar` ×
+labour, never exhausts and draws no reserve; the same site forced onto dry ground yields nothing.
+Exits non-zero on any FAIL.
+
+```
+node tools/verify/build_harness.js well_gate --run
+```
+
+## well_census (BL-1198)
+
+Per seed on the shipped start: the ground (habitable land tiles qualifying for a Well, by river /
+lake-only, unoccupied), the markets holding one, and the water sites built (Wells vs ice: placed,
+running, output, markets, water's mean px/base) at sample play ticks. Steps exactly as
+`market_viability` does (settle, seat, play with orbits/surveys), so `--income` reads the same G2
+window (play 26-50): field income split by water-site owners and the rest, water sold by Well
+vs ice owners, corp-sale revenue per good (diff two runs), and the handoff cohort alive at the
+last tick (G3). `--scorer` prints the scorer's top Well candidates with their reach verdict (it
+warms the reach cache, so leave it off for a reading). `--trace good,good` follows each good per
+play tick: produced, sold by corporations, pool holdings after the tick split into reserved (own
+processors) and order-held (a standing sell order takes the pool off auto-surplus), convoy cargo,
+and exchange-ring rows lost. A report; no gate.
+
+```
+bash tools/verify/build_lua_harness.sh well_census
+./build_gen/verify/well_census.exe [--seeds 0,43,10] [--ticks 400] [--samples 0,50,200,400] [--income] [--scorer] [--trace water,steel]
+```
+
+## scorer_clock (BL-1198 cold review)
+
+Milliseconds per PLAY tick of each economy-step phase on the shipped start (settle, seat, then
+play stepped as `market_viability` steps it), read from the BL-1117 phase clock armed per tick:
+the mean and max of `corp_strategic` — where the scorer and `rank_extraction_sites` run — and the
+whole step. Wall-clock is read for the report only. Trajectories differ between builds, so a
+phase total compares workloads as well as code; time a single function by instrumenting it.
+
+```
+bash tools/verify/build_lua_harness.sh scorer_clock
+./build_gen/verify/scorer_clock.exe [--seeds 11,0] [--ticks 50]
+```
+
 ## Which builder?
 
 Do not guess. `build_harness.js` **derives** it and refuses with the reason and the exact command:

@@ -208,7 +208,8 @@ rule with fresh water in place of ocean. It is how a habitable world drinks: ice
 poles, far from the people who bid for water, while the rivers and lakes generation already lays run
 where people settled. So water is cheap where the river runs, and a river city has an advantage a
 dry one must buy. The Ice Extractor stays the route on icy ground and off-world; a tile can satisfy
-either rule, both, or neither.
+either rule, both, or neither. Where it satisfies both, the deposit wins: a tile carrying any ice
+deposit takes the Ice Extractor route — even once that deposit is spent — and never offers a Well.
 
 The Mine covers all terrestrial hard-mineral deposits and adjusts its output to whatever the tile holds: the same building type on one volcanic tile yields rare earth ore and on another yields copper ore. The distinction between deposit types is in the tile data, not the building type. Off-world metallic deposits (iron-nickel ore, platinum group metals) are harvested by the Surface Extractor, the Era 1 airless-body counterpart to the Mine; both feed the same smelting chain, so the distinction is one of era and deployment environment, not of downstream product.
 
