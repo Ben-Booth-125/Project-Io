@@ -1388,19 +1388,19 @@ economy = {
         -- BL-1172 (Ben, 2026-10-03, MARKETS.md § Price resolution): the shelf
         -- counts as supply only as far as it can sell — min(inventory, k x
         -- demand), k in econ ticks (one tick is a quarter). 0 = listings only.
-        -- k > 0 once the shelf drains (Ben, 2026-10-05, NR-968): households eat
-        -- off it (BL-1196) and it spoils (BL-1179, shelf_spoilage below), and k
-        -- is the SMALLEST value that keeps a consuming market's price off the
-        -- ceiling against a stocked shelf, read on market_viability's G5 row
-        -- (seeds 0,43,10, spoilage on, households eating; pairs a market's
-        -- households bid, play ticks 20-50, priced against a shelf >= 1 unit):
+        -- k = 0 BY MEASUREMENT (Ben, 2026-10-05, NR-972): with the shelf
+        -- draining (households eat, BL-1196; it spoils, BL-1179), the sweep on
+        -- market_viability's G5 row (seeds 0,43,10; pairs a market's
+        -- households bid, play ticks 20-50, priced against a shelf >= 1 unit;
+        -- water then perishable) read:
         --     k            0     1     2     4     8   | 0, no spoilage
         --     ceil+stocked 0.1%  0.0%  0.0%  0.0%  0.0% | 5.2%
         --     at ceiling   76.2% 76.6% 75.5% 76.1% 74.5% | 76.6%
         --     G3 firms     38.2% 21.3% 22.9% 22.9% 22.4% | 26.3%
-        -- k = 1 is the smallest; the remaining ceiling is EMPTY shelves (goods
-        -- nobody makes enough of), which no k can reach. Ratification: Ben.
-        shelf_supply_ticks = 1,
+        -- Spoilage alone takes the stocked-shelf ceiling to ~0, and every k
+        -- above 0 cost firms; the remaining ceiling is EMPTY shelves, which no
+        -- k reaches. Re-sweep once water is supplied (BL-1198, the Well).
+        shelf_supply_ticks = 0,
     },
 
     -- ===================================================================
@@ -1416,17 +1416,17 @@ economy = {
     -- app names any priced good missing here at campaign start.
     --
     -- FIRST CUTS, BY CLASS (then measured):
-    --   perishable 0.25 / quarter — food, produce, water, medicine: about two
+    --   perishable 0.25 / quarter — food, produce, clean water, medicine: two
     --              thirds of a shelf is gone within a year (half-life ~2.4 q).
     --   consumable 0.10 / quarter — fuels, power-adjacent stocks, consumer and
     --              organic goods: a third lost a year (half-life ~6.6 q).
     --   durable    0.02 / quarter — ores, metals, alloys, materials,
-    --              components: ~8% a year (half-life ~34 q), never zero.
+    --              components, and raw WATER (stored water does not rot like
+    --              food; NR-972): ~8% a year (half-life ~34 q), never zero.
     -- ===================================================================
     shelf_spoilage = {
         -- perishable
         agricultural_produce  = 0.25,
-        water                 = 0.25,
         food_rations          = 0.25,
         clean_water           = 0.25,
         medical_supplies      = 0.25,
@@ -1451,6 +1451,8 @@ economy = {
         cloth                 = 0.10,
         leather               = 0.10,
         rigging               = 0.10,
+        -- durable: raw water (NR-972: stored water does not rot like food)
+        water                 = 0.02,
         -- durable: ores
         iron_ore              = 0.02,
         silica                = 0.02,

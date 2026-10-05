@@ -954,13 +954,18 @@ glut the market cannot shed floors prices. **k is set above 0, by measurement, o
 drains (Ben, 2026-10-05, NR-968):** a shelf now has two drains — households eat off it
 (`POPULATION.md` § Population demand) and it spoils (below) — so a glut no longer only grows, and k
 is the smallest value that keeps a consuming market's price off the ceiling against a stocked
-shelf, read on the market viability gate.
+shelf, read on the market viability gate. **By that measurement k = 0 (Ben, 2026-10-05, NR-972):**
+swept at k = 0/1/2/4/8 on seeds 0/43/10 with spoilage on and households eating, spoilage alone
+took the share of consuming prices at the ceiling against a stocked shelf from 5.2% to 0.1%, every
+k above 0 left fewer firms alive (38% at 0, 21–23% above), and the ceiling that remains is empty
+shelves no k can reach. It is re-swept once water is supplied (BL-1198, the Well).
 
 **The shelf spoils (settled 2026-10-05, on Ben's delegation; BL-1179).** Every good standing on a
 market's shelf loses a fixed share of itself each tick, its **spoilage rate**, authored per good in
-data by class: **perishable** (food rations, agricultural produce, water, clean water, medical
-supplies) fastest, **consumable** (consumer goods, fuels, chemicals, power-adjacent stocks) slower,
-**durable** (ores, metals, alloys, materials, components) slowest but never zero. The rates are
+data by class: **perishable** (food rations, agricultural produce, clean water, medical supplies)
+fastest, **consumable** (consumer goods, fuels, chemicals, power-adjacent stocks) slower,
+**durable** (ores, metals, alloys, materials, components, and raw water — stored water does not rot
+like food, NR-972) slowest but never zero. The rates are
 first cuts, then measured. Three rules hold whatever the numbers:
 
 - **Only the shelf spoils.** A corporation's own pool is stock it holds and answers for; the shelf

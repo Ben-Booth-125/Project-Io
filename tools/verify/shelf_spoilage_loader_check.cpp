@@ -91,13 +91,15 @@ int main()
         std::printf("    perishable %.3f  consumable %.3f  durable %.3f\n", per, con, dur);
         check(per > con && con > dur && dur > 0.0f,
               "S2 perishable > consumable > durable > 0 (food_rations, refined_fuel, steel)");
-        check(rate(r, resource_type::water) == per && rate(r, resource_type::clean_water) == per
+        check(rate(r, resource_type::clean_water) == per
                   && rate(r, resource_type::medical_supplies) == per
                   && rate(r, resource_type::agricultural_produce) == per,
-              "S2 the five perishables named by the ruling share the perishable rate");
+              "S2 the perishables named by the ruling share the perishable rate");
         check(rate(r, resource_type::iron_ore) == dur && rate(r, resource_type::alloys) == dur
                   && rate(r, resource_type::electronics) == dur,
               "S2 ores, alloys and components sit at the durable rate");
+        check(rate(r, resource_type::water) == dur,
+              "S2 raw water is durable (NR-972: stored water does not rot like food)");
     }
 
     refused("economy.shelf_spoilage.steel = 0", "never spoils at zero",
