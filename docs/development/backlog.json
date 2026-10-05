@@ -1626,7 +1626,29 @@
     "src/world/stockpile_budget.hpp",
     "src/world/corporation_generation.cpp"
    ],
-   "design": "RULED (Ben, 2026-10-05, the shelf and density form, option B): with derived demand (BL-1197) the walk serves ~23 goods and the fixed 120-firm ceiling trimmed each household good to 4-5 firms. The ceiling becomes 7.5 firms per good in G (120 at the 16 goods it was ruled on, NR-902), under the 200-per-body guard (INDUSTRIALISATION.md sec 1). At 23 goods that is ~172. MEASURE tick cost on the cost table (economy tick, scorer) before shipping; report firms per good, market_viability, and the unspent reasons (density_ceiling should fall). Digests move."
+   "design": "BUILT AND HELD (2026-10-05, b655acf0): economy tick +67%; G2 54.0% (passes) but G1 54.6 -> 49.5, G3 63.0 -> 61.0 on 5 seeds. Ben (2026-10-05): ship after BL-1205 makes the scorer cheaper. Open from the lane: the market carve plans at |G| = 49 (199 firms) vs 172 chartered; the bump-11 safety argument holds only for |G| >= 7; cap at 199 (one below the 200 guard).\n\nRULED (Ben, 2026-10-05, the shelf and density form, option B): with derived demand (BL-1197) the walk serves ~23 goods and the fixed 120-firm ceiling trimmed each household good to 4-5 firms. The ceiling becomes 7.5 firms per good in G (120 at the 16 goods it was ruled on, NR-902), under the 200-per-body guard (INDUSTRIALISATION.md sec 1). At 23 goods that is ~172. MEASURE tick cost on the cost table (economy tick, scorer) before shipping; report firms per good, market_viability, and the unspent reasons (density_ceiling should fall). Digests move."
+  },
+  {
+   "status": "designed",
+   "glyph": "◐",
+   "sprint": 49,
+   "written": "2026-10-05",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1205",
+   "short_name": "SCORER_COST_AT_DENSITY",
+   "author": "Claude (Ben's density form, 2026-10-05)",
+   "category": "Performance",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "The corp scorer's tick cost grows no faster than the firm count, so the scaled density ceiling can ship",
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "files": [
+    "src/world/corp_ai.cpp",
+    "src/world/input_reach.cpp"
+   ],
+   "design": "RULED (Ben, 2026-10-05, the density form, option B): ship BL-1204 (density per good served) only after the scorer is cheaper. BL-1204 (b655acf0) raises firms 120 -> 172 (+43%) and the economy tick +67% mean (+34% / +143% / +64% on seeds 10 / 43 / 0); live tick +51-85%; corp_strategic grew 2.4x on seed 43 - cost grows faster than firms. TARGET: on the BL-1204 branch, the economy tick within ~30% of main's at 120 firms (or proportional to firms), with byte-identical decisions (a pure performance change: world_determinism, digests unchanged against the BL-1204 branch). Profile corp_strategic first (scorer_clock, tick_profile): likely suspects are per-candidate input_reach / reachable_supply_cost scans and the Well bucket under more firms. Then merge BL-1204 + this together."
   }
  ]
 }

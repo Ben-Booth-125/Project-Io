@@ -1890,12 +1890,13 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // AFTER every sale this tick has credited it (rows 1-4 above) — so a unit
     // made this tick can feed a household this tick — and after every price the
     // clear bills at was fixed. Production and construction drew earlier in the
-    // tick (the tick's fixed pass order), so households are the shelf's last
-    // claimant within a tick and the first sink after it fills.
+    // tick; the nation's network upkeep and space programme draw LATER in the
+    // tick from what households leave (Ben, 2026-10-05: households come before
+    // the nation — MARKETS.md step 12).
     draw_household_basket(w);
 
-    // BL-1179 (shelf spoilage): after the households' draw — the tick's last
-    // draw on the shelf — and before the next tick's reference prices read the
+    // BL-1179 (shelf spoilage): after the households' draw (the nation's later
+    // claims take what spoilage leaves) and before the next tick's reference prices read the
     // shelf's share of supply (and before next tick's production, construction
     // and dispatch draw on it). Goods leave; no credits move.
     spoil_market_shelves(w, reg);

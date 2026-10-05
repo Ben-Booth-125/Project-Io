@@ -270,8 +270,10 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
 12. **Household draw** — the households clearing at each market take their pooled bid off its
     shelf: `household_fill[r] = min(household_bid[r], inventory[r])`, and that much leaves
     `inventory` for good. It runs after every sale this tick has credited the shelf, so a unit
-    made this tick can feed a household this tick. The household is the shelf's last claimant
-    in a tick: processors and construction drew before the clear. **No money moves** — the
+    made this tick can feed a household this tick. **Households come before the nation (Ben,
+    2026-10-05):** processors and construction drew before the clear, households draw here, and
+    the nation's own claims on the shelf — network upkeep and the space programme — draw later in
+    the tick from what households left. People eat before the roads are mended. **No money moves** — the
     market paid the maker when it bought the stock (step 9 or 11), so the draw moves goods, not
     credits. **The fair-price ceiling does not apply**: it is a processor's reservation price,
     and a household's reservation is already in its elastic bid. Several centres on one market
@@ -280,7 +282,8 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
     (`POPULATION.md` § Growth, decline and razing).
 13. **Shelf spoilage** — every good left on every shelf loses its spoilage rate,
     `inventory[r] −= inventory[r] × rate[r]` (§ Price resolution, *The shelf spoils*). After the
-    households' draw, so the tick's last draw is not taxed by its own spoilage; before the next
+    households' draw, so the households' draw is not taxed by its own spoilage (the nation's later
+    claims take what spoilage left); before the next
     tick's draws and reference prices read the shelf. No money moves. Markets ascending,
     resources ascending.
 14. **Price update** — where explicit trades occurred, the price eases toward their VWAP;
