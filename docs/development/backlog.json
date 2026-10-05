@@ -1317,8 +1317,8 @@
    "design": "GENERATION CHANGE, offered for a later sprint. market_census (16 seeds): 180 of 436 markets (41%) have no building in their catchment at handoff and 83 (19%) clear nothing over the first play year (shells 27.5%, carve 15.4%). Either the carve accounts for where firms stand, or placement seeds every market. Re-read after BL-1185 and BL-1186, which may shrink it on their own."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 49,
    "written": "2026-10-04",
    "requires": [],
@@ -1335,7 +1335,7 @@
    "files": [
     "scripts/economy.lua"
    ],
-   "design": "RULED (Ben, the sprint 49 form, 2026-10-04): retune the upkeep rates as a STOPGAP; BL-1174 (hiring answers a threat) stays the real fix and waits on its AI grant (sprint 50). READING (2026-10-04, 16 seeds, 400 play ticks): standing-force upkeep is ~20 per tick for every firm, survivor or not (insolvent 19.2, alive 21.3 per corp-tick), against income of 75 for firms that go insolvent (a quarter of it) and 229 for survivors; seed 43 field upkeep 4,350 per tick at tick 100 against income 12,573. Constants only (economy.military.unit_upkeep, the credit and goods halves, the hire cap of 3), no scorer change, so no grant is touched. Measure the retune on BL-1184 (market viability gate) in isolation; a world-mover, so it reports its digest movement and leaves the re-bless to the wave."
+   "design": "MERGED to main (d54ccf20, 2026-10-05): standing-force upkeep vector x0.25 (credits_per_head 0.4164 -> 0.1041 etc.; a full cap of 3 Levy Spears under 5% of the leanest seed's median surviving firm's income). Insolvent exits 160 -> 87 (seeds 0/43/10); upkeep share of a survivor's income 12.3% -> 3.6%; market_viability G3 67.6% -> 80.8% (PASS) on 5 seeds, G1/G2 unchanged. upkeep_harness 19/0, unit_upkeep 123/0 on main. BL-1174 (hiring answers a threat) stays the real fix.\n\nRULED (Ben, the sprint 49 form, 2026-10-04): retune the upkeep rates as a STOPGAP; BL-1174 (hiring answers a threat) stays the real fix and waits on its AI grant (sprint 50). READING (2026-10-04, 16 seeds, 400 play ticks): standing-force upkeep is ~20 per tick for every firm, survivor or not (insolvent 19.2, alive 21.3 per corp-tick), against income of 75 for firms that go insolvent (a quarter of it) and 229 for survivors; seed 43 field upkeep 4,350 per tick at tick 100 against income 12,573. Constants only (economy.military.unit_upkeep, the credit and goods halves, the hire cap of 3), no scorer change, so no grant is touched. Measure the retune on BL-1184 (market viability gate) in isolation; a world-mover, so it reports its digest movement and leaves the re-bless to the wave."
   },
   {
    "status": "proposed",
