@@ -1852,14 +1852,18 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // over every want (BL-357's aggregate). One market's shortage shrinks only
     // the centres that clear there. Memoised per market; std::map, so no hash
     // order reaches the result (each entry is a pure function of its market).
-    std::map<entity_id, float> market_met;
+    // Review fix (household stack): the memo also carries whether the market
+    // has a recorded household bid at all (population_met_ratio's `recorded`).
+    std::map<entity_id, std::pair<float, bool>> market_met;
     auto met_at = [&](entity_id mid) {
         const auto it = market_met.find(mid);
         if (it != market_met.end())
             return it->second;
-        const float m = population_met_ratio(w, reg, mid);
-        market_met.emplace(mid, m);
-        return m;
+        bool recorded = true;
+        const float m = population_met_ratio(w, reg, mid, &recorded);
+        const std::pair<float, bool> v{m, recorded};
+        market_met.emplace(mid, v);
+        return v;
     };
 
     // centre_ids (sorted above): per-centre integer arithmetic, but walk in
@@ -1883,7 +1887,16 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         // the share of the population channel's own bid the last clear filled.
         // A centre whose body has no market bids nothing and reads fully met.
         const entity_id centre_market = market_for_tile(w, tile_it->second);
-        const float met_ratio = (centre_market != null_entity) ? met_at(centre_market) : 1.0f;
+        const std::pair<float, bool> met =
+            (centre_market != null_entity) ? met_at(centre_market) : std::pair<float, bool>{1.0f, true};
+        const float met_ratio = met.first;
+        // Review fix (household stack): a market made since the last clear has
+        // recorded no household bid, so its 1.0 is no reading at all. CARRY the
+        // streak -- no growth, decline, promotion or re-settle step this tick --
+        // rather than let one spurious met tick reset a decline streak. A centre
+        // whose body has no market keeps reading met (centre_market null above).
+        if (!met.second)
+            continue;
 
         const bool conditions_met = (hab >= 0.5f)
                                  && (met_ratio >= growth_sp.growth_met_threshold);

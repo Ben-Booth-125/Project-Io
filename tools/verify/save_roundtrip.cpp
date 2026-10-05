@@ -257,7 +257,7 @@ int main()
     check(read_ok && loaded.campaign_band == era_band::industrial,
           "P1 world campaign_band (BL-1101) round-trips at its written value");
 
-    // BL-1196: the household bid and fill survive by VALUE (world_save_version 32).
+    // BL-1196: the household bid and fill survive by VALUE (world_save_version 35; first claimed as 32).
     if (hh_market != null_entity)
     {
         const auto mit = loaded.markets.find(hh_market);

@@ -1047,7 +1047,8 @@ struct market_component
     /// `demand`); `household_fill` is what those households physically DREW
     /// off `inventory` at the end of the clear — `min(bid, shelf)` per good.
     /// The growth gate reads `fill / bid` (`population_met_ratio`) BEFORE the
-    /// next clear rewrites both, so they are SERIALISED (world_save_version 32).
+    /// next clear rewrites both, so they are SERIALISED (world_save_version 35;
+    /// BL-1196 first claimed 32, renumbered at the integration over BL-1201).
     std::array<float, resource_count> household_bid  = {};
     std::array<float, resource_count> household_fill = {};
 };

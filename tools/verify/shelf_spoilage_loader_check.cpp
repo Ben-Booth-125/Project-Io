@@ -15,6 +15,7 @@
 //   S4  a negative, a rate above 1, NaN, an infinity and a string are refused
 //   S5  an unknown good is refused
 //   S6  an absent table loads with no good spoiling (the inert default)
+//   S7  a PRESENT non-table (`= 0.1`, a string) is refused, never read as absent
 //
 // Build (needs a live Lua state):  bash tools/verify/build_lua_harness.sh shelf_spoilage_loader_check
 // Run from the repo root (it reads scripts/recipes.lua and scripts/economy.lua).
@@ -116,6 +117,10 @@ int main()
             "S4 a string is refused");
     refused("economy.shelf_spoilage.steal = 0.02", "Unknown resource 'steal'",
             "S5 an unknown good is refused");
+    refused("economy.shelf_spoilage = 0.1", "present but not a table",
+            "S7 a present non-table (a bare number) is refused, not read as absent");
+    refused("economy.shelf_spoilage = 'fast'", "present but not a table",
+            "S7 a present non-table (a string) is refused, not read as absent");
 
     {
         recipe_registry r;

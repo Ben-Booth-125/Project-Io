@@ -591,6 +591,102 @@ static void test_multi_market_growth_aggregate()
 }
 
 // ---------------------------------------------------------------------------
+// Household stack review fix: a market made since the last clear has recorded
+// NO household bid, so population_met_ratio's 1.0 there is "no reading". The
+// growth gate must CARRY the centre's streak (no step either way), not read it
+// met — one spurious met tick would reset a decline streak.
+//   U1: market prices the basket good, bid 0 everywhere -> recorded = false;
+//       a centre on a -7 decline streak keeps -7 and its population.
+//   U2: once a bid is recorded (bid 10, fill 0) -> recorded = true and the
+//       streak extends to -8 (the ordinary decline arm).
+//   U3: a market pricing NO basket good -> recorded = true, 1.0 (unchanged:
+//       nothing the people could want there).
+// ---------------------------------------------------------------------------
+static void test_unrecorded_bid_carries_streak()
+{
+    std::printf("--- review fix: a market with no recorded household bid carries the streak ---\n");
+
+    world w;
+    const entity_id body = w.create_entity();
+    {
+        body_component bc{};
+        bc.name        = "NewMkt";
+        bc.grid_width  = 4;
+        bc.grid_height = 4;
+        w.bodies[body] = bc;
+    }
+    const entity_id tile = w.create_entity();
+    {
+        tile_component tc{};
+        tc.body = body;
+        w.tiles[tile] = tc;
+    }
+    const std::size_t food  = ri(resource_type::agricultural_produce);
+    const std::size_t steel = ri(resource_type::steel);
+    const entity_id mkt = w.create_entity();
+    {
+        market_component mc{};
+        mc.body        = body;
+        mc.centre_tile = tile;
+        mc.base_price[food] = 1.0f; // priced: the households WOULD bid it
+        w.markets[mkt] = mc;
+    }
+    const entity_id pop = w.create_entity();
+    {
+        population_centre_component pcc{};
+        pcc.scale              = 1;
+        pcc.population         = 20; // between the scale-1 and scale-2 rungs
+        pcc.habitability       = 0.9f;
+        pcc.growth_accumulator = -7; // mid decline streak
+        w.population_centres[pop]     = pcc;
+        w.population_centre_tile[pop] = tile;
+    }
+    recipe_registry reg;
+    {
+        population_demand_params pd;
+        pd.demand_basket[food] = 1.0f;
+        reg.set_population_demand(pd);
+    }
+
+    bool recorded = true;
+    const float m0 = population_met_ratio(w, reg, mkt, &recorded);
+    std::printf("  U1 no bid recorded: met %.2f recorded %d\n", m0, recorded ? 1 : 0);
+    check(!recorded, "U1 a market pricing the basket with no recorded bid reports recorded = false");
+    run_economy_step(w, reg);
+    {
+        const population_centre_component& pcc = w.population_centres.at(pop);
+        std::printf("  U1 after one step: streak %d population %d\n", pcc.growth_accumulator, pcc.population);
+        check(pcc.growth_accumulator == -7 && pcc.population == 20,
+              "U1 the decline streak is CARRIED (no spurious met tick resets it)");
+    }
+
+    {
+        market_component& mc = w.markets.at(mkt);
+        mc.household_bid[food]  = 10.0f;
+        mc.household_fill[food] = 0.0f;
+    }
+    recorded = false;
+    const float m1 = population_met_ratio(w, reg, mkt, &recorded);
+    run_economy_step(w, reg);
+    std::printf("  U2 bid recorded, unfilled: met %.2f recorded %d streak %d\n", m1, recorded ? 1 : 0,
+                w.population_centres.at(pop).growth_accumulator);
+    check(recorded && w.population_centres.at(pop).growth_accumulator == -8,
+          "U2 a recorded unmet bid extends the decline streak as before");
+
+    {
+        market_component& mc = w.markets.at(mkt);
+        mc.base_price.fill(0.0f);
+        mc.base_price[steel] = 1.0f; // prices only a firm's good
+        mc.household_bid.fill(0.0f);
+        mc.household_fill.fill(0.0f);
+    }
+    recorded = false;
+    const float m2 = population_met_ratio(w, reg, mkt, &recorded);
+    std::printf("  U3 no basket good priced: met %.2f recorded %d\n", m2, recorded ? 1 : 0);
+    check(recorded && m2 == 1.0f, "U3 a market pricing no basket good still reads 1.0, recorded");
+}
+
+// ---------------------------------------------------------------------------
 // BL-1196 (households consume): MULTI-TICK. The households a market serves draw
 // their bid off its shelf at the end of every clear, and the next tick's growth
 // gate reads what they received (household_fill / household_bid). A one-tick
@@ -768,6 +864,7 @@ int main()
     test_habitability_scalar();
     test_population_growth();
     test_multi_market_growth_aggregate();
+    test_unrecorded_bid_carries_streak();
     test_household_draw_multi_tick();
 
     if (g_failures == 0)

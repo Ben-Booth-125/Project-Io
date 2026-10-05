@@ -194,3 +194,11 @@ build_gen/verify/steel_chain_probe.exe --seeds 0 --ticks 60 --good water --quiet
 
 Run time: ~5 min per k (three seeds), four k in parallel. The PC's keep-awake hold could not
 be taken from the worktree agent; the run finished without a sleep (per-seed times 48-124 s).
+
+## Cold review of the household stack — finding 1, held for Ben
+
+The households are not the shelf's last claimant in a tick. They draw at the end of
+`clear_markets`; national upkeep and the space programme draw from the same shelf later in
+the tick. So the households are served before those state draws, not after them. Which
+claimant should come last is a priority call for Ben.
+The review fix round left the code order unchanged. Findings 2-5 are fixed on this branch.

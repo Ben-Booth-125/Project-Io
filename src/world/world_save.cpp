@@ -184,8 +184,8 @@ void w_market(std::ostream& o, const market_component& m)
     w_f32_array(o, m.price);
     w_f32_array(o, m.base_price);
     w_f32_array(o, m.inventory);
-    w_f32_array(o, m.household_bid);  // BL-1196: world_save_version 32
-    w_f32_array(o, m.household_fill); // BL-1196: world_save_version 32
+    w_f32_array(o, m.household_bid);  // BL-1196: world_save_version 35 (first claimed as 32)
+    w_f32_array(o, m.household_fill); // BL-1196: world_save_version 35 (first claimed as 32)
 }
 
 bool r_market(std::istream& i, market_component& m)

@@ -51,12 +51,20 @@ void inject_population_demand(world& w, const recipe_registry& reg);
 /// (`draw_household_basket`): `household_fill[r] = min(household_bid[r],
 /// inventory[r])`. The share is `household_fill / household_bid` — what the
 /// people received over what they bid — read from the last clear's two
-/// registers (both serialised, world_save_version 32, because the growth pass
+/// registers (both serialised, world_save_version 35, because the growth pass
 /// reads them before the next clear rewrites them).
 ///
 /// Returns the basket-weighted mean of the per-good share; 1.0 when nothing
 /// was bid (no market, or no clear yet) — nothing unmet. Pure; deterministic.
-float population_met_ratio(const world& w, const recipe_registry& reg, entity_id market);
+///
+/// @p recorded (optional) is set false in exactly one case: the market prices
+/// at least one basket good but holds NO recorded household bid on any of them
+/// -- a market made since the last clear. The 1.0 returned then is "no
+/// reading", and the growth gate carries the centre's streak (no growth or
+/// decline step) rather than reading it met. A market pricing no basket good,
+/// or a missing market, reports recorded = true with 1.0 (nothing to want).
+float population_met_ratio(const world& w, const recipe_registry& reg, entity_id market,
+                           bool* recorded = nullptr);
 
 /// BL-1196 (households consume; POPULATION.md § Population demand): every
 /// market's households TAKE their bid off its shelf — `household_fill[r] =

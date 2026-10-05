@@ -698,8 +698,10 @@ std::vector<resource_type> unspoiled_priced_goods(const world& w, const recipe_r
     return out;
 }
 
-float population_met_ratio(const world& w, const recipe_registry& reg, entity_id market)
+float population_met_ratio(const world& w, const recipe_registry& reg, entity_id market, bool* recorded)
 {
+    if (recorded)
+        *recorded = true;
     const auto mit = w.markets.find(market);
     if (mit == w.markets.end())
         return 1.0f;
@@ -708,11 +710,13 @@ float population_met_ratio(const world& w, const recipe_registry& reg, entity_id
     // pd.demand_basket (the shared tranche alone) and never a second list.
     const std::array<float, resource_count>& basket = reg.population_demand_basket();
     float acc = 0.0f, weight = 0.0f;
+    bool  bids_something = false; // a priced basket good the households would bid on
     for (std::size_t r = 0; r < resource_count; ++r) // resource index ascending: fixed float order
     {
         const float bw = basket[r];
         if (bw <= 0.0f || mc.base_price[r] <= 0.0f)
             continue; // not in the bid (inject_population_demand's two skips)
+        bids_something = true;
         const float bid = mc.household_bid[r];
         if (bid <= 0.0f)
             continue; // no clear has recorded the bid yet
@@ -720,6 +724,12 @@ float population_met_ratio(const world& w, const recipe_registry& reg, entity_id
         acc    += bw * std::min(1.0f, mc.household_fill[r] / bid);
         weight += bw;
     }
+    // Review fix (household stack): a market that prices basket goods but has
+    // recorded no bid on any of them has not been cleared since it was made --
+    // its 1.0 is "no reading", not "fully met". Say so, so the growth gate
+    // carries the centre's streak instead of counting a spurious met tick.
+    if (recorded && bids_something && !(weight > 0.0f))
+        *recorded = false;
     return (weight > 0.0f) ? acc / weight : 1.0f;
 }
 

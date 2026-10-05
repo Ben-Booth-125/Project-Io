@@ -406,6 +406,16 @@ void recipe_registry::load_from_lua(lua_state& lua)
     // the ruling is that every good spoils, durables slowest "but never zero",
     // so an authored 0 is an authoring error. Reject, never clamp. Absent table
     // = no good spoils (the pre-BL-1179 shelf), the price_band tolerance.
+    // Present but NOT a table (e.g. `shelf_spoilage = 0.1`) is refused, not
+    // read as absent: sol::optional<sol::table> would come back empty and
+    // silently disable spoilage. Only a truly absent key means no spoilage.
+    {
+        const sol::object spoil_obj = (*econ)["shelf_spoilage"];
+        if (spoil_obj.valid() && spoil_obj.get_type() != sol::type::lua_nil
+            && spoil_obj.get_type() != sol::type::table)
+            throw std::runtime_error("economy.shelf_spoilage is present but not a table "
+                                     "(expected { <resource> = <rate in (0, 1]>, ... }; omit it for no spoilage)");
+    }
     sol::optional<sol::table> spoil = (*econ)["shelf_spoilage"];
     if (spoil)
     {
