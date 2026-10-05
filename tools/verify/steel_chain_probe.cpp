@@ -71,7 +71,9 @@
 #include "scripting/lua_state.hpp"
 #include "world/building_profit.hpp"
 #include "world/components.hpp"
+#include "world/corporation_generation.hpp" // BL-1185: audit_chain_feasibility
 #include "world/economy_system.hpp"
+#include "world/logistics.hpp"             // invalidate_logistics_caches
 #include "world/market_clearing.hpp"
 #include "world/resource_names.hpp"
 #include "world/supply_system.hpp" // BL-1071: the shelf test (market_shelf_surplus, legs, room)
@@ -713,6 +715,51 @@ void run_seed(lua_state& lua, const options& o, std::uint32_t seed)
     world& w                   = start->w;
     const recipe_registry& reg = start->reg;
     print_shipped_landscape(start->land);
+
+    // BL-1185 / BL-1188: the handed world's roster, and Pass 3's chain-feasible
+    // rule audited against every producer standing (audit_chain_feasibility).
+    // The audit warms the logistics caches, so they are cleared again: the
+    // settle below starts from the cold caches the app's apply leaves.
+    {
+        const chain_feasibility_audit a = audit_chain_feasibility(w, reg);
+        invalidate_logistics_caches(w);
+        int specialists = 0, background = 0;
+        for (const auto& [cid, corp] : w.corporations)
+            (corp.is_background ? background : specialists) += 1;
+        std::printf("[BL-1185] corporations %d (specialists %d, background %d); processors %d "
+                    "(held %d, no recipe %d); chain-infeasible %d (held %d)\n",
+                    specialists + background, specialists, background, a.processors,
+                    a.processors_held, a.no_recipe, a.infeasible, a.infeasible_held);
+        // Every specialist's kit (the seat is one of them; `*` marks the walk's pick).
+        std::vector<entity_id> spec_ids;
+        for (const auto& [cid, corp] : w.corporations)
+            if (!corp.is_background)
+                spec_ids.push_back(cid);
+        std::sort(spec_ids.begin(), spec_ids.end());
+        for (const entity_id sid : spec_ids)
+        {
+            const auto seat = w.corporations.find(sid);
+            std::printf("[BL-1188] specialist %u%s focus %d kit:", static_cast<unsigned>(sid),
+                        sid == w.player_entity ? "*" : "", static_cast<int>(seat->second.focus));
+            for (const entity_id bid : seat->second.assets)
+            {
+                const auto bit = w.buildings.find(bid);
+                if (bit == w.buildings.end())
+                    continue;
+                const building_component& b = bit->second;
+                if (b.type == building_type::processing_facility)
+                {
+                    const recipe* rc = reg.get_recipe(b.recipe);
+                    std::printf(" proc[%s]", rc ? rc->name.c_str() : "none");
+                }
+                else if (b.type == building_type::extraction_site)
+                    std::printf(" ext[%s]", rn(static_cast<std::size_t>(b.target_resource)).c_str());
+                else
+                    std::printf(" other");
+            }
+            std::printf("\n");
+        }
+    }
 
     const entity_id home = w.home_body;
     const std::size_t G  = static_cast<std::size_t>(o.good);

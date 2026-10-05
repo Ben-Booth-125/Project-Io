@@ -430,6 +430,11 @@ enum class charter_unspent_reason : std::uint8_t
                            ///< centre on a nation's tile affords a specialist, so the shipped
                            ///< seam lays the no-budget world instead (`charter_fallback_report`);
                            ///< nothing chartered. Booked by the seam, never by the walk.
+    chain_infeasible = 11, ///< BL-1185 (chain-feasible placement; CORPORATION_GENERATION.md
+                           ///< § Pass 3): the windows HAD ground, but no charter on it was
+                           ///< chain-feasible — no recipe for the good (or, for a specialist,
+                           ///< for its processors) has every input produced within reach of
+                           ///< the ground's market.
 };
 
 inline const char* charter_unspent_reason_name(charter_unspent_reason r)
@@ -447,11 +452,12 @@ inline const char* charter_unspent_reason_name(charter_unspent_reason r)
     case charter_unspent_reason::late_shortfall:   return "late_shortfall";
     case charter_unspent_reason::share_unplaced:   return "share_unplaced";
     case charter_unspent_reason::no_specialist:    return "no_specialist";
+    case charter_unspent_reason::chain_infeasible: return "chain_infeasible";
     }
     return "?";
 }
 
-constexpr int charter_unspent_reason_count = 11;
+constexpr int charter_unspent_reason_count = 12;
 
 /// Which anchor rung a charter landed on. There is no third rung: a charter that
 /// finds no ground in either is UNSPENT, never scattered nation-wide.

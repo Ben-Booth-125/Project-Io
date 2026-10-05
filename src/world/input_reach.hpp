@@ -7,8 +7,9 @@
 // A neutral home for "can a processor at market C get good r?". The play-time
 // scorer (corp_ai.cpp: build, recipe switch, resume) asks it here. It is written
 // to be the one definition generation's placement (corporation_generation.cpp,
-// BL-1185) calls too, so the two cannot disagree once that lane merges onto it;
-// until then BL-1185 carries its own copy of the reach rule.
+// BL-1185) calls too, so the two cannot disagree: placement asks
+// `building_produces` and `market_within_reach` with no report (the generation
+// form), over the buildings standing when each processor is decided.
 //
 // WITHIN REACH (the BL-1186 diagnosis, sprint-49-shipment-diagnosis.md § For
 // BL-1185): a producer in market P is within reach of a consumer in market C when
