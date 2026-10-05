@@ -181,8 +181,32 @@ void build_index(const world& w, const recipe_registry& reg, input_reach& ir)
         const entity_id m = market_for_tile(w, b.tile);
         if (m == null_entity)
             continue;
+        // BL-1205 (scorer cost at density): only the goods this building CAN
+        // make or take are asked — every other r answers 0 from both functions
+        // below, so skipping it changes nothing but the time. A processor makes
+        // its recipe's outputs and takes its inputs; an extraction site makes
+        // its target (a Well) or a deposit on its tile (the BL-437 share) and
+        // takes nothing. Per r the walk is still ascending building id, so every
+        // producer list and every draw sum is built in the order it was.
+        const recipe*         rc      = (b.type == building_type::processing_facility)
+                                            ? reg.get_recipe(b.recipe) : nullptr;
+        const tile_component* site_tc = nullptr;
+        if (b.type == building_type::extraction_site)
+            if (const auto tit = w.tiles.find(b.tile); tit != w.tiles.end())
+                site_tc = &tit->second;
+        if (b.type == building_type::processing_facility && rc == nullptr)
+            continue; // no recipe: neither makes nor takes anything
+        if (b.type == building_type::extraction_site && site_tc == nullptr)
+            continue; // no tile: building_output answers 0 for every r
         for (std::size_t r = 0; r < resource_count; ++r)
         {
+            const bool may_make = (rc != nullptr)
+                ? (rc->outputs[r] > 0.0f)
+                : (r == static_cast<std::size_t>(b.target_resource)
+                   || site_tc->resource_deposit[r] > 0.0f);
+            const bool may_take = rc != nullptr && rc->inputs[r] > 0.0f;
+            if (!may_make && !may_take)
+                continue;
             const float o = building_output(w, reg, bid, b, r, ir.report);
             if (o > 0.0f)
                 ir.producers[r].push_back({m, bid, o});

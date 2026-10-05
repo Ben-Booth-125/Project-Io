@@ -770,7 +770,11 @@ int province_buildings_standing(const world& w, uint32_t province_id);
 /// WHILE ONE IS ALIVE ON THIS THREAD, for the world it was opened on:
 ///   * the population-by-tile map is built ONCE, on first need;
 ///   * `province_building_ceiling` answers each province id once;
-///   * `province_buildings_standing` counts every province in one building walk.
+///   * `province_buildings_standing` counts every province in one building walk;
+///   * the TILE OCCUPANCY counts the placement stack ceiling reads
+///     (`placement_rules::buildings_on_tile`, `non_extraction_buildings_on_tile`)
+///     come from that same kind of one walk, not one walk per question (BL-1205,
+///     scorer cost at density: the corp scorer asks them per site per corp).
 /// Every answer is the SAME value the unscoped call returns (same arithmetic, same
 /// summation order) — the memo moves time, never a result.
 ///
@@ -787,6 +791,18 @@ int province_buildings_standing(const world& w, uint32_t province_id);
 /// Nests (the inner scope shadows the outer, then restores it). Thread-local, so
 /// a UI-thread read never sees a sim-thread scope. Queries against any OTHER
 /// world than the one the scope was opened on bypass it.
+enum class building_type : uint8_t; // components.hpp
+enum class resource_type : uint8_t; // components.hpp
+
+/// BL-1205 (scorer cost at density): the occupancy counts a live
+/// `province_ceiling_scope` on @p w holds — the number of buildings of @p type on
+/// @p tile (extraction sites per @p target, as `buildings_on_tile` counts them),
+/// and the non-extraction buildings on @p tile. -1 when no scope is open on @p w
+/// (the caller walks the building set itself). Same counts either way.
+int scoped_buildings_on_tile(const world& w, entity_id tile, building_type type,
+                             resource_type target);
+int scoped_non_extraction_buildings_on_tile(const world& w, entity_id tile);
+
 class province_ceiling_scope
 {
 public:

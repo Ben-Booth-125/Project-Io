@@ -25,6 +25,7 @@
 #include <limits>
 #include <map>
 #include <memory> // BL-1187: the lazily-built reach context
+#include <optional> // BL-1205: the candidate stretch's placement memo
 #include <set> // BL-1003: the trade candidate's per-(body, resource) seen set
 #include <ostream>
 #include <string>
@@ -1051,6 +1052,19 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
 
         std::vector<candidate> cands;
 
+        // BL-1205 (scorer cost at density): every candidate block below, up to
+        // the greedy selection, is a READ of the building set, the population
+        // centres and the tiles — the writes they make are the logistics caches
+        // (reach fields, A* paths, the haul memo) and nothing the placement
+        // rule reads. So one province_ceiling_scope spans the whole stretch:
+        // each can_place_in_world call reads the province ceilings, the standing
+        // counts and the tile occupancy from one building walk instead of
+        // walking the building set (and every population centre) per candidate.
+        // Same answers (province.hpp § province_ceiling_scope); it closes before
+        // the greedy loop, which is where this corp's commands write the world.
+        std::optional<province_ceiling_scope> candidate_scope;
+        candidate_scope.emplace(w);
+
         // ---- Build candidates: surveyed, deposit-bearing tiles, top-M ------
         // Site ranking is precomputed once per tick above (BL-253); only the
         // per-corp filter (tech gate, logistics reach) and scoring run here.
@@ -1919,7 +1933,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // ceiling reads (body_reach_field writes only its own reach
                     // cache), so the reads are memoised for the scan's length —
                     // the same answers, once per province instead of once per tile.
-                    const province_ceiling_scope ceiling_memo(w);
+                    // BL-1205: the candidate stretch's own scope (`candidate_scope`,
+                    // above) is that memo now — a second scope opened here would
+                    // only shadow it with an empty one and rebuild the same maps.
                     for (const entity_id tid : nation_it->second.tiles)
                     {
                         body_reach_field(w, tile_body(w, tid));
@@ -2378,6 +2394,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             }
         }
 
+        candidate_scope.reset(); // the world is written from here on (BL-1205)
         if (cands.empty())
             continue;
         std::sort(cands.begin(), cands.end(), candidate_before);
