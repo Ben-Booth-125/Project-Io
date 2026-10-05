@@ -1760,7 +1760,7 @@
    "title": "DECISION TAKEN: generation charters a missing raw input so a chain is absent only when the ground lacks it (BL-1197)",
    "raised": "2026-10-05",
    "kind": "decision",
-   "status": "open",
+   "status": "resolved",
    "source": "the sprint 49 main session, on Ben's delegation",
    "what": "BL-1197 round 2 (no fallback for water-gap firms) cost seeds 0 and 43 their alloys/machinery chains and left 401 / 270 centres chain-infeasible: the fallback firms had been the only diggers of those chains' raw inputs, which the per-good turn never charters for. Under your hard rule a chain with no feasible site is absent - but this absence came from chartering order, not geography. Decided: when a wanted processing good is infeasible only because a raw input has no producer in reach, and that raw lies in the centre's windows, generation charters its extractor first (booked as that raw's firm, within caps and budget) and retries; one level deep (raw inputs only).",
    "why_it_matters": "Keeps the hard rule honest: absent chains mean the world lacks the ground, which is the legibility the rule exists for.",
@@ -1775,7 +1775,7 @@
     "src/world/corporation_generation.cpp",
     "docs/generation/CORPORATION_GENERATION.md"
    ],
-   "resolution": null
+   "resolution": "SUPERSEDED by Ben's ruling (the charter walk form, 2026-10-05): option A - the charter walk counts derived demand (a processor's input demand is demand it fills), so steel and every intermediate are chartered in their own right; written into CORPORATION_GENERATION.md sec Pass 6. The raw-input special case is replaced by it."
   }
  ]
 }

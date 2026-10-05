@@ -488,6 +488,18 @@ held ground, and none of it was within reach of a chain. The budget-less Pass 6 
 it has missed as many times as the body has nations (the nation cursor takes them in turn), and
 the mask holds for the rest of the pass unless a firm that produces one of its inputs lands.
 
+**A processor's inputs are wanted too (Ben, 2026-10-05; derived demand).** What the walk fills is
+not only final demand — households and the bodies' own wants — but the **input demand of every
+processor standing or chartered**: a placed steel works' iron ore and coal, a placed machinery
+plant's steel and refined copper, are wants of the body like any other, entered into the same gap
+the walk takes goods from, and filled in the same turn. So a chain is absent only because its
+ground is absent: an intermediate good that downstream plants need (steel above all) is chartered
+in its own right, not by accident of an extractor's attached processor. This replaces the narrower
+"charter a missing raw input" special case: input chartering is simply what derived demand does.
+The input demand is read in the generation form (each processor at its nominal rate, no production
+report), and it is recomputed as firms land, so a newly chartered processor raises its inputs'
+gaps for the turns after it.
+
 **What Pass 6 does not do.** It does not seed any behavioural state, matching the contract the
 rest of this pipeline holds (§ Generation seeds no behaviour) — no sentiment, no diplomatic
 posture, no plans. It also does not touch the player or named-rival corporations Passes 1–5
