@@ -517,7 +517,12 @@ gaps for the turns after it. On a budget world the goods with demand (G), fixed 
 therefore hold the processors' inputs too: the input demand of those standing, and the **input
 closure** of G — every good some recipe draws to make a good already in G, to a fixed point
 (steel for machinery, iron ore and coal for steel). A closure good no processor yet wants is not
-short and the turn passes over it; once one lands, it is served like any other want. Derived
+short and the turn passes over it; once one lands, it is served like any other want. **G holds
+only goods the body can produce** (main session, 2026-10-05): a raw with a deposit somewhere on
+the body's land (water also wherever a Well site stands, agricultural produce also on a coast),
+or a good some recipe makes from inputs that are themselves producible there, to a fixed point.
+A good no firm could ever make on the body — an off-world raw on an earthlike world — takes no
+share of the ceiling it could never fill. Derived
 demand counts what stands or is chartered, never what a refused firm would have wanted: a chain
 none of whose consumers can stand (a cold start) is not begun by it.
 

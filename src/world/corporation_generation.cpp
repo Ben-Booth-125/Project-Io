@@ -1274,6 +1274,58 @@ std::array<float, resource_count> body_processor_input_demand(const world& w,
     return out;
 }
 
+/// BL-1197 round 5 — which goods @p body_id can produce AT ALL: an extractable
+/// with a deposit of it on some land tile of the body; water also wherever a
+/// Well site stands (`placement_rules::is_well_site`); agricultural produce also
+/// on a coastal tile (the Fishing Wharf); and, to a fixed point, any good some
+/// processing recipe makes from inputs that are all themselves producible here.
+/// Existence tests over the body's tiles and the registry: order-free, draws
+/// nothing, deterministic.
+std::array<bool, resource_count> body_producible(const world& w, const recipe_registry& reg,
+                                                 entity_id body_id)
+{
+    std::array<bool, resource_count> can{};
+    const std::size_t water = static_cast<std::size_t>(resource_type::water);
+    const std::size_t food  = static_cast<std::size_t>(resource_type::agricultural_produce);
+    for (const auto& [tid, tc] : w.tiles)
+    {
+        if (tc.body != body_id || placement_rules::is_water_tile(tc.substrate))
+            continue;
+        for (const resource_type e : placement_rules::k_extractable)
+        {
+            const std::size_t r = static_cast<std::size_t>(e);
+            if (!can[r] && tc.resource_deposit[r] > 0.0f)
+                can[r] = true;
+        }
+        if (!can[water] && placement_rules::is_well_site(w, tid, resource_type::water))
+            can[water] = true;
+        if (!can[food] && placement_rules::is_coastal(w, tid))
+            can[food] = true;
+    }
+    const int n = reg.recipe_count(building_type::processing_facility);
+    for (bool grew = true; grew;)
+    {
+        grew = false;
+        for (int i = 0; i < n; ++i)
+        {
+            const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+            bool fed = true;
+            for (std::size_t r = 0; r < resource_count && fed; ++r)
+                if (rc.inputs[r] > 0.0f && !can[r])
+                    fed = false;
+            if (!fed)
+                continue;
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (rc.outputs[r] > 0.0f && !can[r])
+                {
+                    can[r] = true;
+                    grew   = true;
+                }
+        }
+    }
+    return can;
+}
+
 /// BL-708 — the body's INDUSTRIAL demand: what the buildings standing on it draw
 /// as upkeep each tick (`run_building_upkeep`, economy_system.cpp), resolved
 /// through the SAME `building_upkeep_goods` free function the live pass and the
@@ -3907,6 +3959,10 @@ struct charter_body_state
     int64_t                           firm_charters = 0;
     /// G: goods with demand before the walk (resource indices, ascending).
     std::vector<std::uint16_t>        goods;
+    /// BL-1197 round 5: the goods the body can produce at all (`body_producible`);
+    /// G is filtered by it. A short good it rules out still books as a late
+    /// shortfall where it stops a centre — a real want left unserved.
+    std::array<bool, resource_count>  producible{};
     /// B_ref = c x |G| x firm price.
     int64_t                           reference_points = 0;
     /// Firms per good per body; -1 = no per-good cap (`lifted`).
@@ -4098,8 +4154,13 @@ void charter_fix_body_rules(const world& w, const recipe_registry& reg,
                 }
         }
     }
+    // BL-1197 round 5: G holds only goods the BODY CAN PRODUCE
+    // (`body_producible`) — a good no firm could ever make here (an off-world
+    // raw on an earthlike body) would otherwise take a share of the ceiling it
+    // can never fill.
+    bs.producible = body_producible(w, reg, body_id);
     for (std::size_t r = 0; r < resource_count; ++r)
-        if (wanted[r])
+        if (wanted[r] && bs.producible[r])
             bs.goods.push_back(static_cast<std::uint16_t>(r));
 
     const int g = static_cast<int>(bs.goods.size());

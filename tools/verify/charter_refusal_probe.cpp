@@ -274,6 +274,18 @@ std::unique_ptr<world> build(const config& cfg, recipe_registry& reg,
                 break;
             case ground::barren: break;
             }
+            // BL-1197 round 5 (G holds only goods the body can produce): the
+            // ore, and the timber a works_input recipe needs, each stand on ONE
+            // tile at the antipode column of (6, 6), row 0 — outside every
+            // window these cases open, so the goods stay in G (the body CAN make
+            // them) while no centre has ground for them, which is what these
+            // cases measure.
+            if (x == (k_cx + cfg.body_w / 2) % cfg.body_w && y == 0)
+            {
+                tc.resource_deposit[k_raw] = 1.0f;
+                if (cfg.works_input)
+                    tc.resource_deposit[static_cast<std::size_t>(resource_type::timber)] = 1.0f;
+            }
             w->tiles[tid] = tc;
             nc.tiles.push_back(tid);   // raster order: the nation's stored order
             w->tile_to_nation[tid] = nation;
