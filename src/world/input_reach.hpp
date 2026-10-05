@@ -1,53 +1,69 @@
 #pragma once
 
 // ---------------------------------------------------------------------------
-// input_reach — WITHIN REACH and OBTAINABLE, the one definition (BL-1187, build
-// only what runs; the reach is BL-1185's, chain-feasible placement)
+// input_reach — WITHIN REACH and OBTAINABLE (BL-1187, build only what runs; the
+// reach is BL-1185's, chain-feasible placement)
 // ---------------------------------------------------------------------------
-// A neutral home for "can a processor at market M get good r?", so that the
-// play-time scorer (corp_ai.cpp: build, recipe switch, resume) and generation's
-// placement (corporation_generation.cpp, BL-1185) ask ONE question and cannot
-// disagree.
+// A neutral home for "can a processor at market C get good r?". The play-time
+// scorer (corp_ai.cpp: build, recipe switch, resume) asks it here. It is written
+// to be the one definition generation's placement (corporation_generation.cpp,
+// BL-1185) calls too, so the two cannot disagree once that lane merges onto it;
+// until then BL-1185 carries its own copy of the reach rule.
 //
 // WITHIN REACH (the BL-1186 diagnosis, sprint-49-shipment-diagnosis.md § For
 // BL-1185): a producer in market P is within reach of a consumer in market C when
 //   (a) P == C, or
 //   (b) the dispatcher's own market leg `price_market_export_leg(P, C)` is viable
-//       AND its per-unit haul is at most `(reservation_mult - 1 - dispatch_margin)
-//       x base(r)` at C — above that a landed cargo can never be bought at a price
-//       the fair-price ceiling admits.
-// The leg is CALLED, never restated: whatever widens the dispatcher's routing
-// widens this reach with it. A grid good (BL-708) is never cargo, so for one only
-// (a) holds.
+//       AND the dispatcher's own export gate passes: price_C - haul >
+//       (1 + dispatch_margin) x price_P. In play each market's current resolved
+//       price (`dispatch_market_price`, what the dispatcher reads); in generation
+//       and hand-built worlds (no report) each market's own base price.
+// Both halves are the dispatcher's, CALLED or restated term for term, so a lane
+// called in reach is one a convoy would actually run. (The earlier bound —
+// haul <= (reservation_mult - 1 - dispatch_margin) x base — was looser than the
+// gate: it admitted lanes that never ship.) The fair-price ceiling is NOT part of
+// reach; it is the separate landed test below, so reach survives the ceiling
+// being OFF. A grid good (BL-708) is never cargo, so for one only (a) holds.
 //
-// A PRODUCER of r: a live (not decommissioned) processing facility whose recipe
-// outputs r, or a live extraction site that yields r — its target or any other
-// extractable deposit on its tile with reserve left, because a site works the
-// whole tile (BL-437, run_extraction). Under construction counts: it is a producer
-// the moment it completes, and BL-1185 counts what stands. IN PLAY, given this
-// tick's economy_report (`input_reach::report`), a PROCESSOR counts only if it
-// produced this tick: a starved mill supplies nothing.
+// A PRODUCER of r and its OUTPUT of r:
+//   * a processing facility whose recipe outputs r, or an extraction site that
+//     yields r — its primary, or any other extractable deposit on its tile with
+//     reserve left, in the richness share run_extraction gives it (BL-437). A
+//     site whose PRIMARY reserve is spent yields nothing at all, co-extracts
+//     included (run_extraction returns before the basket).
+//   * never one that is decommissioned, under construction, or unlaboured
+//     (no workforce assigned, or a zero workforce target).
+//   * IN PLAY, given this tick's economy_report with rows (`input_reach::report`),
+//     the output is what the building ACTUALLY produced this tick — a starved
+//     mill or an idle mine supplies nothing, and a plant that switched recipe
+//     since its row supplies nothing of its new good yet. Without a report
+//     (generation, a hand-built world) the output is NOMINAL: rate x labour.
 //
-// OBTAINABLE (BL-1187): an input r of a processor at market C is obtainable when
+// SPARE OUTPUT: a producer market P's output of r, less the NOMINAL draw of r of
+// every standing consumer (a live, laboured processor whose recipe takes r) in a
+// market P is within reach of. Counting a consumer against every producer that
+// can feed it is deliberately conservative: one producer in reach does not admit
+// every consumer in reach of it.
+//
+// OBTAINABLE: an input r of a processor at market C, needing `need` units a tick,
+// is obtainable when
 //   (1) STOCK: the corp's own (corp, C) pool plus C's shelf — the shelf only where
 //       the fair-price ceiling admits it (`shelf_admits`, the production tick's own
-//       test) — covers the run at the idle threshold `t_idle`; or
-//   (2) SUPPLY: a producer of r stands within reach of C, and its unit LANDS at
-//       C at a price the fair-price ceiling admits (producer market's posted
-//       price + haul <= reservation_mult x base at C). At base prices that is
-//       the reach bound itself; it bites where the producer's market is priced
-//       over the ceiling — in C itself, exactly when C's shelf is closed.
-// Its OBTAINABLE COST per unit is what the processor would pay: C's posted price
-// when (1) holds; otherwise the cheapest landed cost over the producers within
-// reach — C's price for a producer in C, the producer market's price plus the
-// per-unit haul for one elsewhere.
+//       test) — covers `need` at the idle threshold `t_idle`; or
+//   (2) SUPPLY: the spare output of r over the producer markets within reach of
+//       C, each counted only if its unit LANDS at C at a price the ceiling admits
+//       (producer market's posted price + haul <= reservation_mult x base at C),
+//       covers `need` at `t_idle`. The asking building's own output and its own
+//       standing draw are taken out of the sum first.
+// Its OBTAINABLE COST per unit is C's posted price when (1) holds; otherwise the
+// cheapest landed cost over the producer markets with spare.
 //
-// Deterministic: producers are gathered into per-resource SORTED vectors, every
-// scan is ascending by id with strict comparisons, and the haul memo is an
-// ordered map. The leg calls warm the logistics path caches only.
+// Deterministic: producers and draws are gathered into per-resource SORTED
+// vectors, every scan is ascending by id with strict comparisons, and every memo
+// is an ordered map. The leg calls warm the logistics path caches only.
 
 #include "entity.hpp"
-#include "components.hpp"   // resource_count
+#include "components.hpp"    // resource_count
 #include "supply_system.hpp" // logistics_nodes, price_market_export_leg
 
 #include <array>
@@ -60,36 +76,59 @@ struct recipe;
 struct economy_report;
 class recipe_registry;
 
-/// The reach context one pass shares: the node set the legs price against, a
-/// memo of per-unit hauls, and (built on first use) the producer index. Valid
-/// for as long as the world's buildings and markets are not moved under it; a
-/// caller that builds one per tick or per placement pass is safe.
+/// The reach context one pass shares. The haul memo is valid for as long as the
+/// markets and the logistics nodes stand; the producer/draw index and the spare
+/// memos describe the buildings when they were first asked for, so a caller
+/// whose world changes between questions calls `input_reach_invalidate`.
 struct input_reach
 {
     logistics_nodes                                  nodes;
     /// Per-unit haul of a market pair (src, dst); < 0 = no viable leg.
     std::map<std::pair<entity_id, entity_id>, float> haul;
-    /// `reservation_mult - 1 - dispatch_margin`: the share of base a haul may eat.
-    float                                            headroom = 0.0f;
+    /// The dispatcher's export margin (`logistics.dispatch_margin`).
+    float                                            dispatch_margin = 0.0f;
     /// Fair-price ceiling multiple (`price_band().reservation_mult`).
     float                                            reservation_mult = 0.0f;
 
-    /// Optional, play only: this tick's economy report. When set and non-empty,
-    /// a PROCESSOR counts as a producer only if its row produced this tick (a
-    /// starved mill supplies nothing). Null at generation (BL-1185's reading).
+    /// Optional, play only: this tick's economy report. When it carries rows,
+    /// outputs are this tick's ACTUAL production. Null or empty: nominal.
     const economy_report*                            report = nullptr;
 
-    /// Per resource: (market, building) of every producer, sorted ascending.
-    std::array<std::vector<std::pair<entity_id, entity_id>>, resource_count> producers;
-    bool                                             producers_built = false;
+    struct producer { entity_id market; entity_id building; float out; };
+    struct supply   { entity_id market; float spare; float landed; };
+
+    bool index_built = false;
+    /// Per resource: every producer, sorted by (market, building).
+    std::array<std::vector<producer>, resource_count>                      producers;
+    /// Per resource: (market, summed nominal draw of standing consumers), sorted.
+    std::array<std::vector<std::pair<entity_id, float>>, resource_count>   draws;
+    /// (producer market, r) -> spare output of r there.
+    std::map<std::pair<entity_id, std::size_t>, float>                     spare_memo;
+    /// (consumer market, r) -> the producer markets that can supply it.
+    std::map<std::pair<entity_id, std::size_t>, std::vector<supply>>       supply_memo;
 };
 
-/// Read the node set and the reach headroom. The producer index is built lazily.
+/// Read the node set and the dispatch margin. The producer index is built lazily.
 input_reach make_input_reach(const world& w, const recipe_registry& reg);
 
-/// True when @p b yields resource @p r (see the header note: PRODUCER).
+/// Forget the producer/draw index and the spare memos (the haul memo stays):
+/// call when buildings have changed since the context was first asked.
+void input_reach_invalidate(input_reach& ir);
+
+/// Output of resource @p r by building @p b per tick (see PRODUCER): actual when
+/// @p report carries rows, nominal otherwise; 0 for a non-producer.
+float building_output(const world& w, const recipe_registry& reg, entity_id bid,
+                      const building_component& b, std::size_t r,
+                      const economy_report* report);
+
+/// True when @p b yields resource @p r at its nominal rate (the generation
+/// reading: no report).
 bool building_produces(const world& w, const recipe_registry& reg,
                        const building_component& b, std::size_t r);
+
+/// Nominal per-tick draw of resource @p r by a standing consumer @p b; 0 when it
+/// is decommissioned, under construction, unlaboured, or does not take @p r.
+float building_draw(const recipe_registry& reg, const building_component& b, std::size_t r);
 
 /// Per-unit haul from market @p src to market @p dst (memoised); 0 when they
 /// are the same market; < 0 when no viable leg exists.
@@ -102,11 +141,15 @@ bool market_within_reach(world& w, const recipe_registry& reg, input_reach& ir,
                          entity_id src_market, entity_id dst_market, std::size_t r,
                          float* out_haul = nullptr);
 
-/// The cheapest landed per-unit cost of @p r at @p consumer_market over every
-/// producer within reach, ignoring building @p self (a building never feeds
-/// itself). < 0 when no producer is within reach.
-float reachable_supply_cost(world& w, const recipe_registry& reg, input_reach& ir,
-                            entity_id consumer_market, std::size_t r, entity_id self);
+/// Reachable spare supply of @p r at @p consumer_market (see SUPPLY), with the
+/// asking building @p self's own output and draw taken out (null_entity: none).
+struct reachable_spare
+{
+    float spare  = 0.0f;  ///< summed spare over producer markets within reach
+    float landed = -1.0f; ///< cheapest landed unit over those with spare; < 0 none
+};
+reachable_spare reachable_supply(world& w, const recipe_registry& reg, input_reach& ir,
+                                 entity_id consumer_market, std::size_t r, entity_id self);
 
 /// One input's answer at a consumer market.
 struct input_access
@@ -116,9 +159,8 @@ struct input_access
 };
 
 /// Is input @p r obtainable at @p consumer_market for a run needing @p need units?
-/// @p pool is the corp's (corp, market) pool, may be null.
-/// @p allow_supply false asks the STOCK clause alone (see the corp_ai resume:
-/// a plant that runs next tick needs the input at hand, not a producer in reach).
+/// @p pool is the corp's (corp, market) pool, may be null. @p allow_supply false
+/// asks the STOCK clause alone.
 input_access input_obtainable(world& w, const recipe_registry& reg, input_reach& ir,
                               entity_id consumer_market, const stockpile_component* pool,
                               std::size_t r, float need, entity_id self,
@@ -126,7 +168,7 @@ input_access input_obtainable(world& w, const recipe_registry& reg, input_reach&
 
 /// Every input of recipe @p rc at once: true when each is obtainable; fills
 /// @p unit_cost[r] for each input with its obtainable cost (the posted price for
-/// one that is not). @p batches sizes the run the stock clause must cover.
+/// one that is not). @p batches sizes the run.
 bool recipe_inputs_obtainable(world& w, const recipe_registry& reg, input_reach& ir,
                               entity_id consumer_market, const stockpile_component* pool,
                               const recipe& rc, float batches, entity_id self,

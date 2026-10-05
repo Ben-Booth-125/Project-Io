@@ -164,29 +164,13 @@ float local_price(const world& w, entity_id tile, std::size_t r)
 /// `construction_capex` (construction.hpp), which the affordability gate charges
 /// too, so the scorer's spend and the gate's refusal can no longer disagree.
 
-/// Per-batch margin of `recipe_id` at the prices of the market serving `tile`.
-[[maybe_unused]] float recipe_margin(const world& w, const recipe_registry& reg,
-                    entity_id tile, uint16_t recipe_id)
-{
-    const recipe* rc = reg.get_recipe(recipe_id);
-    if (!rc)
-        return 0.0f;
-    float m = 0.0f;
-    for (std::size_t r = 0; r < resource_count; ++r)
-    {
-        if (rc->outputs[r] > 0.0f) m += rc->outputs[r] * local_price(w, tile, r);
-        if (rc->inputs[r]  > 0.0f) m -= rc->inputs[r]  * local_price(w, tile, r);
-    }
-    return m;
-}
-
 /// BL-1187 (build only what runs) — per-batch margin of `recipe_id` at the
 /// market serving `tile`, its INPUTS priced at what the processor would actually
 /// pay for them (input_reach.hpp § OBTAINABLE: the posted price where the stock
 /// is at hand, the landed cost from a producer within reach otherwise). Outputs
-/// at the posted price, as `recipe_margin`. Returns whether EVERY input is
+/// at the posted price. Returns whether EVERY input is
 /// obtainable; the margin is written either way (an unobtainable input priced
-/// at the posted price, which is `recipe_margin`'s figure for it).
+/// at the posted price).
 ///
 /// `pool` is the corp's (corp, market) pool; `batches` sizes the run the stock
 /// clause must cover; `self` is the building asking (never its own producer).
@@ -937,6 +921,13 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             continue;
         report.corps_evaluated.push_back(corp);
 
+        // BL-1187: the producer index describes the buildings when it was
+        // built; an earlier corp this tick may have switched, idled, resumed
+        // or built since. Forget it (the haul memo stays — markets and nodes
+        // do not move inside the walk), so this corp sees what stands now.
+        if (reach_ctx)
+            input_reach_invalidate(*reach_ctx);
+
         // This corp is evaluating: tick down its buildings' dial cooldowns.
         for (const entity_id bid : cc.assets)
         {
@@ -1138,8 +1129,6 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 const stockpile_component* pool =
                     w.find_pool(corp, pool_key_for_tile(w, tile));
                 const entity_id mid = market_for_tile(w, tile);
-                const auto      mit = (mid != null_entity) ? w.markets.find(mid) : w.markets.end();
-                const market_component* mkt = (mit != w.markets.end()) ? &mit->second : nullptr;
 
                 // RECIPE CHOICE. Walk the BROWSE space (this era's roster) and
                 // cross to the ABSOLUTE id through recipe_id(name) — the two id
@@ -1202,11 +1191,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // with an input it cannot obtain is an immediate loss-maker, so
                     // each input must be OBTAINABLE here (input_reach.hpp): the
                     // production tick's own coverage question — pool + the shelf
-                    // the fair-price ceiling admits, at the idle threshold — OR a
-                    // producer of it standing within reach (the BL-1185 reach:
-                    // same market, or the dispatcher's own market leg with a haul
-                    // the ceiling leaves room for). Opening stock alone used to
-                    // pass this gate for a chain nothing feeds.
+                    // the fair-price ceiling admits, at the idle threshold — OR
+                    // enough SPARE output of it from producers within reach (the
+                    // same market, or a lane the dispatcher's own export gate
+                    // would ship). Opening stock alone does not make a chain run.
                     std::array<float, resource_count> input_cost{};
                     if (!recipe_inputs_obtainable(w, reg, reach(), mid, pool, *abs, batches,
                                                   null_entity, input_cost))
@@ -1494,25 +1482,19 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 // cannot be resumed on REACH grounds is a real gap, but an older
                 // and separate one.
                 // BL-1187 (build only what runs): a processor resumes only when
-                // every input is AT HAND at its market — input_reach.hpp's STOCK
-                // clause (pool + the shelf the fair-price ceiling admits, at the
-                // idle threshold) — and its estimate prices those inputs at what
-                // they cost there. The price-only estimate read a starved plant's
-                // dear OUTPUT and resumed it into the same starvation the reflex
-                // had idled it for (seed 0 ticks 100-200: 73 consumer-goods plants
-                // built or resumed against 85 idled).
-                //
-                // STOCK ONLY, NOT SUPPLY — the one place the scorer asks less
-                // than the full OBTAINABLE test, and measured, not assumed. A
-                // build has its construction ticks for supply to arrive; a resume
-                // runs NEXT tick, and the plant was idled precisely because the
-                // producers in reach were not delivering. With the supply clause
-                // admitted here, 239 of 263 consumer-goods resume candidates on
-                // seed 10 passed on a steel producer in reach whose steel never
-                // landed, and the churn stood (household_supply_probe, seed 10,
-                // ticks 50-200, consumer-goods makers built or resumed against
-                // idled: 237/251 on the price-only scorer, 237/268 with supply
-                // admitted here, 28/58 stock-only).
+                // every input is OBTAINABLE at its market (input_reach.hpp) — at
+                // hand (pool + the shelf the fair-price ceiling admits, at the
+                // idle threshold), or covered by the SPARE output of producers in
+                // reach that actually produced this tick — and its estimate
+                // prices those inputs at what they cost there. The price-only
+                // estimate read a starved plant's dear OUTPUT and resumed it into
+                // the same starvation the reflex had idled it for (seed 0 ticks
+                // 100-200: 73 consumer-goods plants built or resumed against 85
+                // idled). Stock alone is not enough either: an idled processor
+                // posts no demand, so a convoy-fed input may never restock its
+                // shelf, and a stock-only gate would leave it idled for good —
+                // the spare-supply clause is what lets it come back when its
+                // input is genuinely being made within reach.
                 bool                              inputs_ok = true;
                 std::array<float, resource_count> input_cost{};
                 const recipe* res_rc = (b.type == building_type::processing_facility)
@@ -1523,7 +1505,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     inputs_ok = recipe_inputs_obtainable(
                         w, reg, reach(), market_for_tile(w, b.tile),
                         w.find_pool(corp, pool_key_for_tile(w, b.tile)),
-                        *res_rc, res_batches, bid, input_cost, /*allow_supply=*/false);
+                        *res_rc, res_batches, bid, input_cost);
                 }
                 const building_profit pp = inputs_ok
                     ? estimate_prospective_profit(w, reg, b.tile, b.type, b.target_resource, b.recipe, &b,

@@ -1,7 +1,7 @@
 #include "input_reach.hpp"
 
 #include "components.hpp"
-#include "economy_system.hpp"  // extraction_nominal
+#include "economy_system.hpp"  // extraction_nominal, economy_report
 #include "market_clearing.hpp" // market_for_tile
 #include "placement_rules.hpp" // k_extractable
 #include "recipe_registry.hpp"
@@ -15,95 +15,193 @@ input_reach make_input_reach(const world& w, const recipe_registry& reg)
     input_reach ir;
     ir.nodes            = collect_logistics_nodes(w);
     ir.reservation_mult = reg.price_band().reservation_mult;
-    ir.headroom         = ir.reservation_mult - 1.0f - reg.dispatch_margin();
+    ir.dispatch_margin  = reg.dispatch_margin();
     return ir;
+}
+
+void input_reach_invalidate(input_reach& ir)
+{
+    ir.index_built = false;
+    for (auto& v : ir.producers) v.clear();
+    for (auto& v : ir.draws) v.clear();
+    ir.spare_memo.clear();
+    ir.supply_memo.clear();
+}
+
+namespace {
+
+/// Labour the building is actually staffed with: assigned x its target scalar.
+float labour(const building_component& b)
+{
+    return b.workforce_assigned * std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f);
+}
+
+/// A building that can produce or draw at all: standing, complete, staffed.
+bool standing(const building_component& b)
+{
+    return !b.decommissioned && b.ticks_remaining <= 0 && labour(b) > 0.0f;
+}
+
+/// The report row of @p bid, or null.
+const building_report* row_of(const economy_report& rep, entity_id bid)
+{
+    if (const auto it = rep.building_row.find(bid);
+        it != rep.building_row.end() && it->second < rep.buildings.size())
+        return &rep.buildings[it->second];
+    if (rep.building_row.empty())
+        for (const building_report& br : rep.buildings)
+            if (br.building == bid)
+                return &br;
+    return nullptr;
+}
+
+/// The share of an extraction site's basket that is resource @p r (BL-437):
+/// richness over the tile's extractable richness, 0 for a spent deposit.
+float extract_share(const tile_component& tc, std::size_t r)
+{
+    bool extractable = false;
+    float total = 0.0f;
+    for (const resource_type x : placement_rules::k_extractable)
+    {
+        const std::size_t xi = static_cast<std::size_t>(x);
+        total += tc.resource_deposit[xi];
+        if (xi == r) extractable = true;
+    }
+    if (!extractable || !(total > 0.0f) || !(tc.resource_deposit[r] > 0.0f)
+        || !(tc.resource_remaining[r] > 0.0f))
+        return 0.0f;
+    return tc.resource_deposit[r] / total;
+}
+
+} // namespace
+
+float building_output(const world& w, const recipe_registry& reg, entity_id bid,
+                      const building_component& b, std::size_t r,
+                      const economy_report* report)
+{
+    if (r >= resource_count || !standing(b))
+        return 0.0f;
+    const bool actual = report != nullptr && !report->buildings.empty();
+
+    if (b.type == building_type::processing_facility)
+    {
+        const recipe* rc = reg.get_recipe(b.recipe);
+        if (rc == nullptr || !(rc->outputs[r] > 0.0f))
+            return 0.0f;
+        if (!actual)
+            return reg.economics(b.type).base_rate * labour(b) * building_supply_scalar(b)
+                 * rc->outputs[r];
+        const building_report* br = row_of(*report, bid);
+        // Produced this tick, and produced THIS recipe (a plant switched since its
+        // row makes nothing of its new good yet).
+        if (br == nullptr || !br->active || br->recipe != b.recipe)
+            return 0.0f;
+        float total = 0.0f;
+        for (const float o : rc->outputs) total += o;
+        return total > 0.0f ? rc->outputs[r] * (br->output_quantity / total) : 0.0f;
+    }
+    if (b.type == building_type::extraction_site)
+    {
+        const auto tit = w.tiles.find(b.tile);
+        if (tit == w.tiles.end())
+            return 0.0f;
+        const tile_component& tc = tit->second;
+        // A spent PRIMARY yields nothing, co-extracts included.
+        const std::size_t pr = static_cast<std::size_t>(b.target_resource);
+        if (!(tc.resource_remaining[pr] > 0.0f))
+            return 0.0f;
+        const float share = extract_share(tc, r);
+        if (!(share > 0.0f))
+            return 0.0f;
+        if (!actual)
+            return extraction_nominal(w, reg, b, 1.0f) * share;
+        const building_report* br = row_of(*report, bid);
+        if (br == nullptr || !br->active)
+            return 0.0f;
+        return br->output_quantity * share;
+    }
+    return 0.0f;
 }
 
 bool building_produces(const world& w, const recipe_registry& reg,
                        const building_component& b, std::size_t r)
 {
-    if (b.decommissioned || r >= resource_count)
-        return false;
-    if (b.type == building_type::processing_facility)
-    {
-        const recipe* rc = reg.get_recipe(b.recipe);
-        return rc != nullptr && rc->outputs[r] > 0.0f;
-    }
-    if (b.type != building_type::extraction_site)
-        return false;
-    // A site that cannot draw its primary yields nothing at all (run_extraction
-    // returns before the co-extraction basket).
-    if (!(extraction_nominal(w, reg, b, 1.0f) > 0.0f))
-        return false;
-    const auto tit = w.tiles.find(b.tile);
-    if (tit == w.tiles.end())
-        return false;
-    const tile_component& tc = tit->second;
-    // BL-437: the site works every extractable deposit on its tile.
-    for (const resource_type x : placement_rules::k_extractable)
-        if (static_cast<std::size_t>(x) == r)
-            return tc.resource_deposit[r] > 0.0f && tc.resource_remaining[r] > 0.0f;
-    return false;
+    return building_output(w, reg, null_entity, b, r, nullptr) > 0.0f;
+}
+
+float building_draw(const recipe_registry& reg, const building_component& b, std::size_t r)
+{
+    if (r >= resource_count || b.type != building_type::processing_facility || !standing(b))
+        return 0.0f;
+    const recipe* rc = reg.get_recipe(b.recipe);
+    if (rc == nullptr || !(rc->inputs[r] > 0.0f))
+        return 0.0f;
+    return reg.economics(b.type).base_rate * labour(b) * rc->inputs[r];
 }
 
 namespace {
 
-void build_producer_index(const world& w, const recipe_registry& reg, input_reach& ir)
+void build_index(const world& w, const recipe_registry& reg, input_reach& ir)
 {
-    if (ir.producers_built)
+    if (ir.index_built)
         return;
-    ir.producers_built = true;
-    for (auto& v : ir.producers)
-        v.clear();
+    input_reach_invalidate(ir);
+    ir.index_built = true;
     // Ascending building id: the store is unordered, so gather then sort.
     std::vector<entity_id> ids;
     ids.reserve(w.buildings.size());
     for (const auto& [bid, b] : w.buildings)
-    {
-        (void)b;
-        ids.push_back(bid);
-    }
+        if (b.type == building_type::processing_facility
+            || b.type == building_type::extraction_site)
+            ids.push_back(bid);
     std::sort(ids.begin(), ids.end());
-    // RUNNING EVIDENCE (play only): when the caller hands in this tick's
-    // economy_report and it carries rows, a PROCESSOR counts only if it
-    // produced this tick — a starved mill is not a supplier, and counting it
-    // let a consumer-goods plant resume on steel nobody was making. An
-    // extraction site needs no inputs, so it counts while it stands (under
-    // construction included). With no report, or an empty one (generation, a
-    // hand-built harness world), every standing producer counts: BL-1185's
-    // reading, where nothing has run yet.
-    const economy_report* rep =
-        (ir.report != nullptr && !ir.report->buildings.empty()) ? ir.report : nullptr;
-    const auto produced_this_tick = [&](entity_id bid) -> bool {
-        if (const auto it = rep->building_row.find(bid);
-            it != rep->building_row.end() && it->second < rep->buildings.size())
-            return rep->buildings[it->second].active;
-        if (rep->building_row.empty())
-            for (const building_report& br : rep->buildings)
-                if (br.building == bid)
-                    return br.active;
-        return false;
-    };
+
+    std::array<std::map<entity_id, float>, resource_count> draw_by_market;
     for (const entity_id bid : ids)
     {
         const building_component& b = w.buildings.at(bid);
-        if (b.decommissioned)
+        if (!standing(b))
             continue;
-        if (b.type != building_type::processing_facility
-            && b.type != building_type::extraction_site)
-            continue;
-        if (rep != nullptr && b.type == building_type::processing_facility
-            && !produced_this_tick(bid))
-            continue;
-        const entity_id mp = market_for_tile(w, b.tile);
-        if (mp == null_entity)
+        const entity_id m = market_for_tile(w, b.tile);
+        if (m == null_entity)
             continue;
         for (std::size_t r = 0; r < resource_count; ++r)
-            if (building_produces(w, reg, b, r))
-                ir.producers[r].emplace_back(mp, bid);
+        {
+            const float o = building_output(w, reg, bid, b, r, ir.report);
+            if (o > 0.0f)
+                ir.producers[r].push_back({m, bid, o});
+            const float d = building_draw(reg, b, r);
+            if (d > 0.0f)
+                draw_by_market[r][m] += d;
+        }
     }
-    for (auto& v : ir.producers)
-        std::sort(v.begin(), v.end());
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        std::sort(ir.producers[r].begin(), ir.producers[r].end(),
+                  [](const input_reach::producer& a, const input_reach::producer& b) {
+                      return a.market != b.market ? a.market < b.market : a.building < b.building;
+                  });
+        ir.draws[r].assign(draw_by_market[r].begin(), draw_by_market[r].end());
+    }
+}
+
+/// Spare output of @p r in producer market @p p: its producers' output less the
+/// standing draw of every consumer market @p p is within reach of.
+float spare_at(world& w, const recipe_registry& reg, input_reach& ir, entity_id p, std::size_t r)
+{
+    const auto key = std::make_pair(p, r);
+    if (const auto it = ir.spare_memo.find(key); it != ir.spare_memo.end())
+        return it->second;
+    float out = 0.0f;
+    for (const input_reach::producer& pr : ir.producers[r])
+        if (pr.market == p) out += pr.out;
+    float drawn = 0.0f;
+    for (const auto& [q, d] : ir.draws[r])
+        if (market_within_reach(w, reg, ir, p, q, r))
+            drawn += d;
+    const float spare = out - drawn;
+    ir.spare_memo.emplace(key, spare);
+    return spare;
 }
 
 } // namespace
@@ -135,66 +233,99 @@ bool market_within_reach(world& w, const recipe_registry& reg, input_reach& ir,
     }
     if (reg.grid_goods().grid(r)) // BL-708: a grid good is never cargo
         return false;
+    const auto sit = w.markets.find(src_market);
     const auto dit = w.markets.find(dst_market);
-    if (dit == w.markets.end())
-        return false;
-    const float base = dit->second.base_price[r];
-    if (!(base > 0.0f))
-        return false;
-    const float bound = ir.headroom * base;
-    if (!(bound >= 0.0f))
+    if (sit == w.markets.end() || dit == w.markets.end())
         return false;
     const float h = input_reach_haul(w, reg, ir, src_market, dst_market);
-    if (h < 0.0f || h > bound)
+    if (h < 0.0f)
+        return false;
+    // THE DISPATCHER'S OWN GATE (export_market_shelves / dispatch_convoys):
+    // a unit moves from src to dst only when dst's price, net of the haul,
+    // beats src's by the dispatch margin. In play each market's current
+    // resolved price (dispatch_market_price, exactly what the dispatcher
+    // reads); without a report (generation, a hand-built world) each market's
+    // own base price. No reservation_mult term: the ceiling is a separate
+    // check (the landed test in reachable_supply), so reach does not collapse
+    // to same-market when the ceiling is OFF.
+    const bool  play = ir.report != nullptr && !ir.report->buildings.empty();
+    const float ps   = play ? dispatch_market_price(sit->second, r) : sit->second.base_price[r];
+    const float pd   = play ? dispatch_market_price(dit->second, r) : dit->second.base_price[r];
+    if (!(pd > 0.0f) || !(pd - h > (1.0f + ir.dispatch_margin) * ps))
         return false;
     if (out_haul) *out_haul = h;
     return true;
 }
 
-float reachable_supply_cost(world& w, const recipe_registry& reg, input_reach& ir,
-                            entity_id consumer_market, std::size_t r, entity_id self)
+reachable_spare reachable_supply(world& w, const recipe_registry& reg, input_reach& ir,
+                                 entity_id consumer_market, std::size_t r, entity_id self)
 {
+    reachable_spare out;
     if (consumer_market == null_entity || r >= resource_count)
-        return -1.0f;
-    build_producer_index(w, reg, ir);
+        return out;
     const auto cit = w.markets.find(consumer_market);
     if (cit == w.markets.end())
-        return -1.0f;
+        return out;
+    build_index(w, reg, ir);
 
-    float     best      = -1.0f;
-    entity_id last_mkt  = null_entity;
-    bool      last_seen = false;
-    // Sorted (market, building): each market is priced once, at its first
-    // producer that is not `self`.
-    for (const auto& [mp, bid] : ir.producers[r])
+    // The producer markets that can supply C at all — memoised per (C, r).
+    const auto key = std::make_pair(consumer_market, r);
+    auto mit = ir.supply_memo.find(key);
+    if (mit == ir.supply_memo.end())
     {
-        if (bid == self)
-            continue;
-        if (last_seen && mp == last_mkt)
-            continue;
-        last_mkt  = mp;
-        last_seen = true;
-        float haul = 0.0f;
-        if (!market_within_reach(w, reg, ir, mp, consumer_market, r, &haul))
-            continue;
-        const auto pit = w.markets.find(mp);
-        if (pit == w.markets.end())
-            continue;
-        const float landed = posted_price(pit->second, r) + haul;
-        if (!std::isfinite(landed))
-            continue;
-        // The fair-price ceiling binds this draw as it binds the shelf
-        // (BL-1172): a unit that lands dearer than `reservation_mult x base`
-        // at the consumer can never be bought there. At base prices this is
-        // the reach bound itself (base + 0.95 base < 2 base); it bites only
-        // where the producer's own market is priced over the ceiling — in
-        // the consumer's own market, exactly when its shelf is closed.
-        if (ir.reservation_mult > 0.0f && landed > ir.reservation_mult * cit->second.base_price[r])
-            continue;
-        if (best < 0.0f || landed < best)
-            best = landed;
+        std::vector<input_reach::supply> list;
+        entity_id last = null_entity;
+        for (const input_reach::producer& pr : ir.producers[r]) // sorted by market
+        {
+            if (pr.market == last)
+                continue;
+            last = pr.market;
+            float haul = 0.0f;
+            if (!market_within_reach(w, reg, ir, pr.market, consumer_market, r, &haul))
+                continue;
+            const auto pit = w.markets.find(pr.market);
+            if (pit == w.markets.end())
+                continue;
+            const float landed = posted_price(pit->second, r) + haul;
+            if (!std::isfinite(landed))
+                continue;
+            // The fair-price ceiling binds this draw as it binds the shelf
+            // (BL-1172): a unit that lands dearer than `reservation_mult x
+            // base` at C can never be bought there.
+            if (ir.reservation_mult > 0.0f && landed > ir.reservation_mult * cit->second.base_price[r])
+                continue;
+            list.push_back({pr.market, spare_at(w, reg, ir, pr.market, r), landed});
+        }
+        mit = ir.supply_memo.emplace(key, std::move(list)).first;
     }
-    return best;
+
+    // The asking building is never its own supplier, and its own standing draw
+    // is not a competitor for what it asks (a switching plant already counts
+    // against its producers).
+    float     self_out  = 0.0f;
+    float     self_draw = 0.0f;
+    entity_id self_mkt  = null_entity;
+    if (self != null_entity)
+        if (const auto sit = w.buildings.find(self); sit != w.buildings.end())
+        {
+            self_out  = building_output(w, reg, self, sit->second, r, ir.report);
+            self_draw = building_draw(reg, sit->second, r);
+            self_mkt  = market_for_tile(w, sit->second.tile);
+        }
+    for (const input_reach::supply& s : mit->second)
+    {
+        float spare = s.spare;
+        if (s.market == self_mkt)
+            spare -= self_out;
+        if (self_draw > 0.0f && market_within_reach(w, reg, ir, s.market, self_mkt, r))
+            spare += self_draw;
+        if (!(spare > 0.0f))
+            continue;
+        out.spare += spare;
+        if (out.landed < 0.0f || s.landed < out.landed)
+            out.landed = s.landed;
+    }
+    return out;
 }
 
 input_access input_obtainable(world& w, const recipe_registry& reg, input_reach& ir,
@@ -208,28 +339,30 @@ input_access input_obtainable(world& w, const recipe_registry& reg, input_reach&
     const auto mit = (consumer_market != null_entity) ? w.markets.find(consumer_market)
                                                       : w.markets.end();
     const market_component* mkt = (mit != w.markets.end()) ? &mit->second : nullptr;
+    const float floor_need = need * reg.t_idle();
 
     // (1) STOCK — the production tick's own coverage question (run_processing:
     // pool + the shelf the fair-price ceiling admits, at the idle threshold).
     const bool  shelf = mkt && shelf_admits(*mkt, r, ir.reservation_mult, /*off_buys=*/true);
     const float avail = (pool ? std::max(0.0f, pool->quantities[r]) : 0.0f)
                       + (shelf ? std::max(0.0f, mkt->inventory[r]) : 0.0f);
-    if (need <= 0.0f || avail / need >= reg.t_idle())
+    if (need <= 0.0f || avail >= floor_need)
     {
         out.obtainable = true;
         out.unit_cost  = mkt ? posted_price(*mkt, r) : 0.0f;
         return out;
     }
 
-    // (2) SUPPLY — a producer within reach.
-    const float landed = allow_supply
-        ? reachable_supply_cost(w, reg, ir, consumer_market, r, self)
-        : -1.0f;
-    if (landed >= 0.0f)
+    // (2) SUPPLY — enough spare output within reach.
+    if (allow_supply)
     {
-        out.obtainable = true;
-        out.unit_cost  = landed;
-        return out;
+        const reachable_spare s = reachable_supply(w, reg, ir, consumer_market, r, self);
+        if (s.landed >= 0.0f && s.spare >= floor_need)
+        {
+            out.obtainable = true;
+            out.unit_cost  = s.landed;
+            return out;
+        }
     }
     out.unit_cost = mkt ? posted_price(*mkt, r) : 0.0f;
     return out;

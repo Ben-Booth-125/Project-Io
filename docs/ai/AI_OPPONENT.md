@@ -483,24 +483,38 @@ An input *r* is **obtainable** at market *C* when either holds:
 1. **Stock.** The corp's own (corp, *C*) pool plus *C*'s shelf — the shelf only where the fair-price
    ceiling admits it — covers the run at the idle threshold. This is the production tick's own
    coverage question.
-2. **Supply.** A producer of *r* stands **within reach** of *C* — the same reach chain-feasible
-   placement uses (BL-1185): the same market, or the dispatcher's own market leg viable with a
-   per-unit haul of at most `(reservation_mult − 1 − dispatch_margin) × base` — and its unit lands
-   at *C* at a price the ceiling admits. In play, a processor counts as a producer only if it
-   produced on the tick being scored: a starved mill supplies nothing.
+2. **Supply.** The **spare output** of *r* over the producers **within reach** of *C* covers the
+   run at the idle threshold. **Within reach** is the dispatcher's own test, so a lane called in
+   reach is one a convoy would actually run: the same market, or the market export leg is viable
+   **and** the export gate passes — `price_C − haul > (1 + dispatch_margin) × price_P`, with each
+   market's current resolved price in play and its own base price in generation or a hand-built
+   world. This is the one reach rule; chain-feasible placement (BL-1185) calls it too once it
+   merges onto the helper. The fair-price ceiling is not part of reach — it is a separate check, so
+   reach does not collapse to the same market when the ceiling is off: a producer counts only if
+   its unit lands at *C* at a price the ceiling admits. A producer market's spare is its output less the draw of
+   every standing consumer it can reach, so one producer does not admit every consumer near it.
+   In play the output is what the producer **actually made** on the tick being scored — a starved
+   mill or an idle mine supplies nothing; without a report (generation) it is the nominal rate. A
+   building that is idled, under construction or unstaffed never counts, and a mine whose primary
+   deposit is spent yields nothing at all. The asking building's own output and draw are taken
+   out first.
 
 The obtainable cost is the posted price where the stock clause holds, else the cheapest landed
-cost (producer market's price plus haul) over the producers within reach. One definition serves
-the scorer and generation's placement (`src/world/input_reach.hpp`), so they cannot disagree.
+cost (producer market's price plus haul) over the producers with spare. The definition lives in
+`src/world/input_reach.hpp`, written to be the one generation's placement calls too: BL-1185
+carries its own copy of the reach rule until it merges onto this helper.
 
 - **Build** asks both clauses. Construction takes ticks; supply has that long to arrive.
 - **Recipe switch** proposes a sibling only when each of its inputs is obtainable, and prices the
   incumbent and the siblings alike on obtainable cost. The incumbent is priced but not gated: a
   facility whose own inputs are out of reach may still move to a sibling that runs.
-- **Resume** asks the **stock** clause alone. A resumed plant runs on the next tick, and it was
-  idled because the producers in reach were not delivering; a producer in reach is evidence that
-  a chain *could* run, not that this plant *will* run tomorrow. Admitting supply here left the
-  idle/resume churn standing.
+- **Resume** asks both clauses too. Stock alone is not enough: an idled processor posts no
+  demand, so a convoy-fed input may never restock its shelf, and a stock-only gate would leave it
+  idled for good. The spare-supply clause brings it back when its input is genuinely being made
+  within reach — not merely when a producer stands there.
+
+Each corp in the scorer's walk sees the buildings as the corps before it left them: the producer
+index is rebuilt for every evaluating corp.
 
 This prices existing verbs better and adds none; it sits inside the scored-utility grant (§ 11).
 Reach makes a chain *possible*, not *running*: goods still have to cross markets, which is the

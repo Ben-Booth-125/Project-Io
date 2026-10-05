@@ -176,6 +176,12 @@ scene make_scene(float ai_cash)
 recipe_registry make_registry()
 {
     recipe_registry reg;
+    // The shipped fair-price ceiling (economy.lua), not the registry's OFF
+    // default: with 0 the reach bound is negative and the ceiling never binds,
+    // so BL-1187's rows would test a world the game never runs.
+    price_band_params pb = reg.price_band();
+    pb.reservation_mult = 2.0f;
+    reg.set_price_band(pb);
     building_economics ex;
     ex.base_rate            = 10.0f;
     ex.maintenance          = 2.0f;
