@@ -37,6 +37,28 @@ namespace ui {
 
 namespace {
 
+/// The construction-suitability wash's terrain test: tile-level `can_place`,
+/// plus the world-level terrain gate of the two deposit-agnostic extraction
+/// routes, which `can_place` passes through for `can_place_in_world` to
+/// enforce — the Well on fresh water (BL-1198) and the Fishing Wharf on the
+/// coast (BL-168). Without it the wash lit every land tile for a water or
+/// agricultural_produce target. Tech, reach and the province ceiling stay out:
+/// the wash shows ground, as it always has.
+bool suitability_placeable(const world& w, entity_id id, const tile_component& tile,
+                           building_type bt, resource_type target)
+{
+    if (!placement_rules::can_place(tile, bt, target))
+        return false;
+    if (bt != building_type::extraction_site
+        || tile.resource_deposit[static_cast<std::size_t>(target)] > 0.0f)
+        return true;
+    if (target == resource_type::water)
+        return placement_rules::is_fresh_water_adjacent(w, id);
+    if (target == resource_type::agricultural_produce)
+        return placement_rules::is_coastal(w, id);
+    return true;
+}
+
 constexpr float kSqrt3 = 1.7320508f;
 constexpr float kPi    = 3.14159265f;
 
@@ -2919,8 +2941,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // richest extractable) tint green. Skips the selected tile (already outlined).
         if (suitability_active && !selected)
         {
-            const bool placeable = placement_rules::can_place(
-                tile, suitability_btype, suitability_target);
+            const bool placeable = suitability_placeable(
+                w, id, tile, suitability_btype, suitability_target);
             if (!placeable)
                 fill = lerp_colour(fill, IM_COL32(0, 0, 0, 255), 0.35f);
             else if (suitability_affine_kind)
@@ -3335,8 +3357,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 }
                 if (suitability_active && !selected)
                 {
-                    const bool placeable = placement_rules::can_place(
-                        tile, suitability_btype, suitability_target);
+                    const bool placeable = suitability_placeable(
+                        w, id, tile, suitability_btype, suitability_target);
                     if (!placeable)
                         dl->AddConvexPolyFilled(wash_verts, 6, IM_COL32(0, 0, 0, 90)); // 0.35
                     else if (suitability_affine_kind)

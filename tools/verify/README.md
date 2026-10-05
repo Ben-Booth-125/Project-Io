@@ -1195,6 +1195,19 @@ bash tools/verify/build_lua_harness.sh well_census
 ./build_gen/verify/well_census.exe [--seeds 0,43,10] [--ticks 400] [--samples 0,50,200,400] [--income] [--scorer]
 ```
 
+## scorer_clock (BL-1198 cold review)
+
+Milliseconds per PLAY tick of each economy-step phase on the shipped start (settle, seat, then
+play stepped as `market_viability` steps it), read from the BL-1117 phase clock armed per tick:
+the mean and max of `corp_strategic` — where the scorer and `rank_extraction_sites` run — and the
+whole step. Wall-clock is read for the report only. Trajectories differ between builds, so a
+phase total compares workloads as well as code; time a single function by instrumenting it.
+
+```
+bash tools/verify/build_lua_harness.sh scorer_clock
+./build_gen/verify/scorer_clock.exe [--seeds 11,0] [--ticks 50]
+```
+
 ## Which builder?
 
 Do not guess. `build_harness.js` **derives** it and refuses with the reason and the exact command:

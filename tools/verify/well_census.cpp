@@ -94,6 +94,7 @@ void built(const world& w, const economy_report* rep, int tick)
     int n_well = 0, run_well = 0, n_ice = 0, run_ice = 0;
     float out_well = 0.0f, out_ice = 0.0f;
     std::set<entity_id> mk_well, mk_ice;
+    std::map<entity_id, std::set<entity_id>> wells_at; // market -> its Wells (ordered ids)
     for (const auto& [bid, b] : w.buildings)
     {
         if (b.type != building_type::extraction_site || b.target_resource != resource_type::water
@@ -108,6 +109,25 @@ void built(const world& w, const economy_report* rep, int tick)
         const entity_id m = market_for_tile(w, b.tile);
         if (well) { ++n_well; run_well += active; out_well += out; if (m != null_entity) mk_well.insert(m); }
         else      { ++n_ice;  run_ice  += active; out_ice  += out; if (m != null_entity) mk_ice.insert(m); }
+        if (well) wells_at[m].insert(bid);
+    }
+    // Where the Wells stand: per market, its nation (the tile's), the market's
+    // unmet water bid (demand - listed) and the Wells there. Ordered by market id.
+    const std::size_t rwm = static_cast<std::size_t>(resource_type::water);
+    for (const auto& [m, ids] : wells_at)
+    {
+        const auto mit = w.markets.find(m);
+        float unmet = 0.0f;
+        if (mit != w.markets.end())
+            unmet = std::max(0.0f, mit->second.demand[rwm] - mit->second.supply[rwm]);
+        entity_id nation = null_entity;
+        if (!ids.empty())
+            if (const auto nit = w.tile_to_nation.find(w.buildings.at(*ids.begin()).tile);
+                nit != w.tile_to_nation.end())
+                nation = nit->second;
+        std::printf("      wells @ market %llu (nation %llu, unmet water bid %.1f): %zu\n",
+                    static_cast<unsigned long long>(m), static_cast<unsigned long long>(nation), unmet,
+                    ids.size());
     }
     // Water's posted price over its base, the mean over the markets that list it.
     double px = 0.0; int np = 0;

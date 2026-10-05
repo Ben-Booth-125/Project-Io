@@ -733,7 +733,32 @@ std::vector<extraction_site> rank_extraction_sites(const world& w, int top_k_per
 {
     std::vector<extraction_site> sites;
     sites.reserve(w.tiles.size() / 2); // most land tiles carry some deposit
-    std::vector<extraction_site> wells; // BL-1198: its own bucket, see below
+    // BL-1198: the Well bucket's candidates, ranked below on their own keys.
+    struct well_candidate
+    {
+        entity_id tile;
+        float     unmet;        ///< Unmet water bid at the tile's own market, last clear.
+        float     habitability; ///< Secondary key: where people can live.
+    };
+    std::vector<well_candidate> wells;
+    // Tiles already holding a water extraction site. A Well's stack cap is 1
+    // (stack_capacity: no richness), so such a tile can never take another —
+    // one building walk here replaces a full placement check per tile.
+    std::set<entity_id> water_site_tiles;
+    for (const auto& [bid, b] : w.buildings)
+        if (b.type == building_type::extraction_site && b.target_resource == resource_type::water)
+            water_site_tiles.insert(b.tile);
+    // The unmet water bid at a candidate's own market: what the last clear's demand
+    // (household + firm want) left unlisted. Public market aggregates, the same
+    // visibility every rival reads (BL-068).
+    const std::size_t rw = static_cast<std::size_t>(resource_type::water);
+    const auto unmet_water = [&](entity_id tile) -> float {
+        const entity_id mid = market_for_tile(w, tile);
+        const auto mit = w.markets.find(mid);
+        if (mit == w.markets.end())
+            return 0.0f;
+        return std::max(0.0f, mit->second.demand[rw] - mit->second.supply[rw]);
+    };
 
     // BL-253 follow-on (2026-08-12, the 3x map): tile_surveyed re-looked-up the
     // body in w.bodies for EVERY tile — 45,240 hash lookups per tick on the new
@@ -790,22 +815,13 @@ std::vector<extraction_site> rank_extraction_sites(const world& w, int top_k_per
         // above already offers that tile as an Ice Extractor). It has no
         // richness to rank by, and its rank must not be a contest against ice
         // magnitudes (BL-711: selection must be scale-free), so wells go to their
-        // OWN bucket below, ranked by where people can live — the tile's
-        // habitability — times the same demand pull water carries.
-        //
-        // Only wells that can still be PLACED enter the bucket (terrain, slot
-        // and province ceilings; reach and tech stay per-corp, below). A
-        // deposit bucket ranks thousands of tiles by richness; this one ranks
-        // by habitability, which barely varies, so its top K would otherwise
-        // sit on the same two tiles once their slots fill and offer the scorer
-        // nothing for the rest of the campaign (measured: well_census, seed 43).
-        if (tc.resource_deposit[static_cast<std::size_t>(resource_type::water)] <= 0.0f
-            && placement_rules::is_fresh_water_adjacent(w, tid)
-            && placement_rules::can_place_in_world(w, tid, building_type::extraction_site,
-                                                   resource_type::water))
-            wells.push_back({tid,
-                             tc.habitability * demand_weight[static_cast<std::size_t>(resource_type::water)],
-                             resource_type::water});
+        // OWN bucket below. Only the CHEAP tests run here, per tile, per tick;
+        // the full placement check runs below, only while filling the top K.
+        if (tc.resource_deposit[rw] <= 0.0f
+            && tc.cover != terrain_cover::urban // can_place: built over (BL-366)
+            && water_site_tiles.count(tid) == 0
+            && placement_rules::is_fresh_water_adjacent(w, tid))
+            wells.push_back({tid, unmet_water(tid), tc.habitability});
     }
     // PARTIAL SORT within each bucket, not a full one (the 2026-08-12 reason,
     // unchanged): only the first K survive, and `std::partial_sort` orders
@@ -839,14 +855,34 @@ std::vector<extraction_site> rank_extraction_sites(const world& w, int top_k_per
         out.insert(out.end(), bucket.begin(),
                    bucket.begin() + static_cast<std::ptrdiff_t>(keep));
     }
-    // BL-1198: the Well bucket, K of its own, under the same comparator
-    // (habitability, then tile id). Appended last so every deposit bucket keeps
-    // the order it had.
-    if (const std::size_t keep = std::min(wells.size(), k); keep > 0)
+    // BL-1198: the Well bucket, K of its own, appended last so every deposit
+    // bucket keeps the order it had. Ranked by the UNMET water bid at the tile's
+    // own market (where water is wanted and not listed), then habitability
+    // (where people can live), then tile id. Walked in that order, running the
+    // full world placement check (slot, province ceiling — reach and tech stay
+    // per-corp, in the scorer) until K pass: a tile whose slot or province is
+    // full is skipped rather than pinning the bucket for the campaign. The
+    // province-ceiling memo (BL-1079) holds the province reads to one pass;
+    // nothing below writes the world.
+    if (!wells.empty())
     {
-        std::partial_sort(wells.begin(), wells.begin() + static_cast<std::ptrdiff_t>(keep),
-                          wells.end(), cmp);
-        out.insert(out.end(), wells.begin(), wells.begin() + static_cast<std::ptrdiff_t>(keep));
+        std::sort(wells.begin(), wells.end(), [](const well_candidate& a, const well_candidate& b) {
+            if (a.unmet != b.unmet) return a.unmet > b.unmet;
+            if (a.habitability != b.habitability) return a.habitability > b.habitability;
+            return a.tile < b.tile;
+        });
+        const province_ceiling_scope ceiling_memo(w);
+        std::size_t kept = 0;
+        for (const well_candidate& c : wells)
+        {
+            if (kept >= k)
+                break;
+            if (!placement_rules::can_place_in_world(w, c.tile, building_type::extraction_site,
+                                                     resource_type::water))
+                continue;
+            out.push_back({c.tile, c.unmet, resource_type::water});
+            ++kept;
+        }
     }
     return out;
 }

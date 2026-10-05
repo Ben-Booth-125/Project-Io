@@ -604,6 +604,16 @@ province_build_table province_builds(const world& w, entity_id tile_id)
                 continue;
             cap[r] += placement_rules::stack_capacity(tc, building_type::extraction_site, rt);
         }
+        // The deposit-agnostic routes (stack cap 1: no richness): a Well on fresh
+        // water (BL-1198) and a Fishing Wharf on the coast (BL-168). Without them
+        // a standing Well read "water 1/0".
+        if (placement_rules::is_well_site(w, tid, resource_type::water)
+            && placement_rules::can_place(tc, building_type::extraction_site, resource_type::water))
+            cap[static_cast<std::size_t>(resource_type::water)] += 1;
+        if (tc.resource_deposit[static_cast<std::size_t>(resource_type::agricultural_produce)] <= 0.0f
+            && placement_rules::is_coastal(w, tid)
+            && placement_rules::can_place(tc, building_type::extraction_site, resource_type::agricultural_produce))
+            cap[static_cast<std::size_t>(resource_type::agricultural_produce)] += 1;
     }
 
     for (std::size_t r = 0; r < resource_count; ++r)
