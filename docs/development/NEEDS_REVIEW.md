@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*76 entries — 2 open, 74 resolved.*
+*77 entries — 3 open, 74 resolved.*
 
 ---
 
@@ -60,6 +60,22 @@ Settled in MARKETS.md sec The shelf spoils: every good on a market shelf loses a
 > **Recommendation:** A.
 
 *Files: `docs/economy/MARKETS.md`, `scripts/economy.lua`, `src/world/market_clearing.cpp`*
+
+### NR-973 — NOVEL WORK: the scorer's Well candidate bucket (BL-1198)
+*novel-work · raised 2026-10-05 · from the BL-1198 lane (a14a559f)*
+
+To let background firms build Wells, the lane added a Well candidate bucket to corp_ai's build scorer: K = 2 candidates world-wide per tick, ranked by habitability x water demand pull, placeable tiles only, priced at the Well rate. It is a new candidate SOURCE for the existing build verb (no new verb, subject or planner), so it reads as inside the scored-build grant (AI_OPPONENT.md sec 11), but it is a new AI siting rule no doc owned.
+
+**Why it matters.** Novelty should be chosen, not accreted. A per-market bucket would put wells near people across the map but widens the siting rule further; the main session held it at K = 2 and routes the bulk of well placement through generation (BL-1197).
+
+- A: keep the bucket as built (K = 2 world-wide), within the build grant
+- B: per-market bucket (wells near every market) - a wider siting rule
+- C: no scorer bucket; wells come from generation only
+- D: other
+
+> **Recommendation:** A for now; re-read after BL-1197 places wells at generation.
+
+*Files: `src/world/corp_ai.cpp`, `docs/ai/AI_OPPONENT.md`*
 
 ---
 

@@ -1687,6 +1687,28 @@
     "docs/economy/MARKETS.md"
    ],
    "resolution": "RULED (Ben, the water and shelf form, 2026-10-05): option A - k = 0 for now (spoilage and households eating keep stocked shelves off the ceiling); re-sweep k after BL-1198 supplies water."
+  },
+  {
+   "id": "NR-973",
+   "title": "NOVEL WORK: the scorer's Well candidate bucket (BL-1198)",
+   "raised": "2026-10-05",
+   "kind": "novel-work",
+   "status": "open",
+   "source": "the BL-1198 lane (a14a559f)",
+   "what": "To let background firms build Wells, the lane added a Well candidate bucket to corp_ai's build scorer: K = 2 candidates world-wide per tick, ranked by habitability x water demand pull, placeable tiles only, priced at the Well rate. It is a new candidate SOURCE for the existing build verb (no new verb, subject or planner), so it reads as inside the scored-build grant (AI_OPPONENT.md sec 11), but it is a new AI siting rule no doc owned.",
+   "why_it_matters": "Novelty should be chosen, not accreted. A per-market bucket would put wells near people across the map but widens the siting rule further; the main session held it at K = 2 and routes the bulk of well placement through generation (BL-1197).",
+   "options": [
+    "A: keep the bucket as built (K = 2 world-wide), within the build grant",
+    "B: per-market bucket (wells near every market) - a wider siting rule",
+    "C: no scorer bucket; wells come from generation only",
+    "D: other"
+   ],
+   "recommendation": "A for now; re-read after BL-1197 places wells at generation.",
+   "files": [
+    "src/world/corp_ai.cpp",
+    "docs/ai/AI_OPPONENT.md"
+   ],
+   "resolution": null
   }
  ]
 }
