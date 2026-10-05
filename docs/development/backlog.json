@@ -1550,17 +1550,19 @@
    "blocked_on": null,
    "parked": false,
    "id": "BL-1201",
-   "short_name": "AI_SELL_ORDER_RESIZES",
+   "short_name": "ORDERS_ARE_PRICE_FLOORS",
    "author": "Claude (the BL-1198 lane diagnosis, 2026-10-05)",
    "category": "Economy",
    "priority": "A",
    "difficulty": 2,
-   "title": "A rival's standing sell order keeps pace with what it produces, so its surplus reaches the market",
-   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "title": "A standing sell order is a price floor over the whole surplus, with an optional cap, and closes itself when empty",
+   "authority_doc": "docs/economy/MARKETS.md",
    "files": [
-    "src/world/corp_ai.cpp"
+    "src/world/market_clearing.cpp",
+    "src/world/corp_ai.cpp",
+    "src/world/components.hpp"
    ],
-   "design": "FOUND (2026-10-05, well_census --trace, seed 43): the scorer's trade candidate places ONE standing sell order per (corp, body, good), sized at half the excess over 50 units at that moment, no expiry (corp_ai.cpp:2120); it never re-sizes it and never issues remove_sell_order (corp_ai.cpp:2108-2118 refuses a second order). MARKETS.md step 4 exempts a resource under a standing order from auto-surplus (\"the manual order governs\", market_clearing.cpp:1163-1169, :1244-1245), and the order lists min(quantity, pool) per tick (:1305-1314). So production beyond the original quantity piles up for the rest of the campaign: water 18,168 order-held units by play tick 200, food rations 1,859, steel transiently 398; household demand reads unmet and prices sit at 8-9x. DECIDED (main session, 2026-10-05): fix on the AI side, not the market rule (the exemption is right for the player's own manual orders): when the pool under a rival's order outgrows the order (pool > k x quantity over several due ticks), the scorer re-sizes it via remove_sell_order + place_sell_order at the current surplus - existing verbs, inside the scored-trade grant (AI_OPPONENT.md sec 11). The player's orders are never touched. Measure on BL-1184 and well_census --trace (order-held units -> near 0)."
+   "design": "RULED (Ben, 2026-10-05, in chat: options 3 + 1): a market rule for player and rivals alike, not an AI-only re-size - an order by default covers everything auto-surplus would list, at its floor; a quantity cap is optional; an order whose pool stands empty for a short run of ticks closes and the good returns to auto-surplus. Written into MARKETS.md step 4. The lane building the AI re-size was rescoped to this rule.\n\nFOUND (2026-10-05, well_census --trace, seed 43): the scorer's trade candidate places ONE standing sell order per (corp, body, good), sized at half the excess over 50 units at that moment, no expiry (corp_ai.cpp:2120); it never re-sizes it and never issues remove_sell_order (corp_ai.cpp:2108-2118 refuses a second order). MARKETS.md step 4 exempts a resource under a standing order from auto-surplus (\"the manual order governs\", market_clearing.cpp:1163-1169, :1244-1245), and the order lists min(quantity, pool) per tick (:1305-1314). So production beyond the original quantity piles up for the rest of the campaign: water 18,168 order-held units by play tick 200, food rations 1,859, steel transiently 398; household demand reads unmet and prices sit at 8-9x. DECIDED (main session, 2026-10-05): fix on the AI side, not the market rule (the exemption is right for the player's own manual orders): when the pool under a rival's order outgrows the order (pool > k x quantity over several due ticks), the scorer re-sizes it via remove_sell_order + place_sell_order at the current surplus - existing verbs, inside the scored-trade grant (AI_OPPONENT.md sec 11). The player's orders are never touched. Measure on BL-1184 and well_census --trace (order-held units -> near 0)."
   }
  ]
 }
