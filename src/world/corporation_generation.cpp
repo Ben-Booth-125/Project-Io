@@ -1418,8 +1418,10 @@ int best_construction_recipe(const recipe_registry& reg)
 // WITHIN REACH is the reach goods actually travel (the BL-1186 diagnosis): the
 // producer's market IS the consumer's market, or the dispatcher's own market
 // leg `price_market_export_leg(producer market, consumer market)` is viable and
-// the dispatcher's own gate passes at base prices: `base_dest - haul > (1 +
-// dispatch_margin) x base_src`, each market at its own base price. The leg is
+// the dispatcher's own gate passes with the destination short, at its
+// reservation ceiling: `R x base_dest - haul > (1 + dispatch_margin) x
+// base_src`, each market at its own base price, R = reservation_mult (or
+// ceil_mult where the reservation is off). The leg is
 // CALLED, never restated, so whatever widens the dispatcher's routing widens
 // this reach with it. WHEN reach is read: the node set (hubs, cities) is taken
 // at the pass's start, and each market pair is priced once, the first time a
@@ -1447,15 +1449,20 @@ struct chain_reach
     logistics_nodes                                   nodes;
     /// Per-unit haul of a market pair (src, dst); < 0 = no viable leg.
     std::map<std::pair<entity_id, entity_id>, float>  haul;
-    /// `dispatch_margin`: the dispatcher's gate, read at base prices.
+    /// `dispatch_margin`: the dispatcher's gate.
     float                                             margin = 0.0f;
+    /// The destination's shortage price, x its base: `reservation_mult`, or
+    /// `ceil_mult` where the reservation is off (<= 0).
+    float                                             ceiling = 0.0f;
 };
 
 chain_reach make_chain_reach(const world& w, const recipe_registry& reg)
 {
     chain_reach cr;
-    cr.nodes  = collect_logistics_nodes(w);
-    cr.margin = reg.dispatch_margin();
+    cr.nodes   = collect_logistics_nodes(w);
+    cr.margin  = reg.dispatch_margin();
+    const price_band_params& pb = reg.price_band();
+    cr.ceiling = pb.reservation_mult > 0.0f ? pb.reservation_mult : pb.ceil_mult;
     return cr;
 }
 
@@ -1529,13 +1536,15 @@ int chain_input_tier(world& w, const recipe_registry& reg, chain_reach& cr, enti
     const auto mit = w.markets.find(consumer_market);
     if (mit == w.markets.end())
         return chain_tier_none;
-    // THE DISPATCHER'S OWN GATE, AT BASE PRICES (spec refined 2026-10-05): a
-    // pair is in reach iff its export leg is viable and the landed net beats
-    // the source by the dispatch margin, `base_dest - haul > (1 + margin) x
+    // THE DISPATCHER'S OWN GATE, WITH THE DESTINATION SHORT (main session,
+    // 2026-10-05): the dispatcher ships because the destination is short and
+    // bids up, so generation reads the gate with the destination at its
+    // shortage price, its reservation ceiling. A pair is in reach iff its
+    // export leg is viable and `ceiling x base_dest - haul > (1 + margin) x
     // base_src`, each market at its OWN base price (capitals and endemic
-    // distance pricing differ by market). No reservation ceiling is read, so
-    // a world with the ceiling off does not collapse reach to one market.
-    const float base_dest = mit->second.base_price[r];
+    // distance pricing differ by market). `ceiling` is reservation_mult, or
+    // ceil_mult where the reservation is off (<= 0) — never same-market only.
+    const float base_dest = cr.ceiling * mit->second.base_price[r];
     std::sort(far.begin(), far.end());
     far.erase(std::unique(far.begin(), far.end()), far.end());
     for (const entity_id mp : far)

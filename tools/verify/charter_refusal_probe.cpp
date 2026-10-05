@@ -465,8 +465,9 @@ config ten_goods(std::int32_t points, std::int32_t c)
 // at (6, 6) with a window of radius 2, and every tile of market A except (6, 6)
 // is already built on, so the works firm's ANCHOR can only be (6, 6) (market A)
 // and its second processor lands on the nearest free tile, (10, 6) — market B.
-// Equal base prices everywhere: no cross-market pair passes the dispatcher's
-// gate (base - haul > 1.05 x base never holds), so reach is same-market only.
+// Timber is priced so B's timber cannot reach A under the dispatcher's
+// shortage gate (R x base_A - haul > 1.05 x base_B fails), so the anchor's
+// market has no reachable producer.
 namespace chainfx {
 
 struct result
@@ -516,7 +517,9 @@ result run(bool timber_in_a)
         }
     w->nations[nation] = nc;
 
-    // The two markets, equal base prices.
+    // The two markets. Timber is CHEAP in A (base 0.2) and 1.0 in B, so B's
+    // timber never reaches A: the shortage gate R x 0.2 - haul > 1.05 x 1.0
+    // fails at any R <= 5 (the default registry's R is ceil_mult, 4).
     for (const int cx : { 4, 14 })
     {
         const entity_id mid = w->create_entity();
@@ -524,6 +527,8 @@ result run(bool timber_in_a)
         m.body = body;
         m.centre_tile = at.at({ cx, 6 });
         m.base_price.fill(1.0f);
+        if (cx == 4)
+            m.base_price[timber] = 0.2f;
         m.price = m.base_price;
         w->markets[mid] = m;
     }

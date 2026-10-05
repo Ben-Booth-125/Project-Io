@@ -293,14 +293,16 @@ not a broad presence across the nation.
   as idle plant. The reason is legibility: an idle building the player inherits reads as a
   broken economy, where an absent chain reads as a world that lacks it. BL-1185
   (chain-feasible placement) owns the work.
-  - **Within reach, exactly — the dispatcher's own gate, at base prices** (refined 2026-10-05).
-    The producer's market is the processor's market, or both of these hold for the pair:
-    `price_market_export_leg(producer market, processor market)` is viable, and
-    `base_dest − haul > (1 + dispatch_margin) × base_src`, where each base is that market's
-    **own** base price for the input (capitals and endemic distance pricing make them differ) and
-    `haul` is the leg's per-unit cost. No reservation ceiling enters it, so a world with the
-    ceiling off does not shrink reach to one market. Placement **calls** the dispatcher's leg
-    rather than restating it, and whatever widens the dispatcher's routing widens this reach.
+  - **Within reach, exactly — the dispatcher's own gate, with the destination short** (refined
+    2026-10-05). The producer's market is the processor's market, or both of these hold for the
+    pair: `price_market_export_leg(producer market, processor market)` is viable, and
+    `R × base_dest − haul > (1 + dispatch_margin) × base_src`. The dispatcher ships because the
+    destination is short and bids up, so generation reads the gate with the destination at its
+    shortage price, its reservation ceiling: `R` is `reservation_mult`, or `ceil_mult` where the
+    reservation is off (≤ 0) — reach never collapses to one market. Each base is that market's
+    **own** base price for the input (capitals and endemic distance pricing make them differ), and
+    `haul` is the leg's per-unit cost. Placement **calls** the dispatcher's leg rather than
+    restating it, and whatever widens the dispatcher's routing widens this reach.
   - **When reach is read.** A pass reads the logistics nodes once, at its start, and prices each
     market pair the first time a placement asks, memoising it for the rest of the pass. A port
     chartered later in the walk therefore widens a pair only if that pair had not been asked yet:
