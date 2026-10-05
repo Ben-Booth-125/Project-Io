@@ -1474,7 +1474,7 @@
    "files": [
     "src/world/corporation_generation.cpp"
    ],
-   "design": "REWORK SHAPE (main session, 2026-10-05, after BL-1198): a water-gap firm digs water at a WELL site (fresh-water adjacent) where its windows hold one, else falls back to the richest deposit and is not counted against water's cap; the three generation hooks BL-1198 named (author_building explicit target, the slot walk's is_well_site test, tile_score_for for a Well tile) carry it. The chain rule (BL-1185) then sees water near people and can place clean-water and medical makers.\n\nFIRST BUILD DROPPED (2026-10-05, f2b3063d on worktree-agent-a1683c1bd7eda4279, not merged): placing every gap firm on the gap deposit, with no fallback, made every gate worse against BL-1185 alone (5 seeds, 400 ticks: G1 35.4% -> 20.3%, G2 26.5% -> 16.9%, G3 42.5% -> 27.5%; corps 111 -> 72 on seed 0) - a gap firm with no gap deposit in its windows placed nothing - and clean water still did not return on seeds 0/10/11/13/37. REWORK (main session, 2026-10-05): dig the gap good where the windows hold it, else fall back to the richest deposit AND do not count that firm against the gap good's cap (options c+b). OPEN QUESTION FIRST: seeds 10, 11, 13 and 37 have NO water extractor in any state, and seed 0 has 3 water mines yet no clean-water plant in reach. Measure water deposits per seed and per market on an earthlike body before reworking: if water deposits are near-absent, the household water chain is a deposit-generation question (TILES.md / RESOURCES.md), not a charter one.\n\nGENERATION CHANGE (sprint 49 generation lane, after BL-1185). Seeds 0 and 10 have no water extractor at all; seed 43 has 2 in 1 of 18 markets. A firm opened to fill the water gap is placed on whatever its tile holds most of (corporation_generation.cpp:476, :548) yet still counted against water's per-resource cap (:2667), so the cap fills with firms digging something else. Place the gap firm on a tile of the gap resource, or do not count it. Measure water extractors per seed and BL-1184."
+   "design": "BEN (2026-10-05, NR-973): \"we can add wells to generation\" - generation places Wells; the scorer keeps its K = 2 bucket.\n\nREWORK SHAPE (main session, 2026-10-05, after BL-1198): a water-gap firm digs water at a WELL site (fresh-water adjacent) where its windows hold one, else falls back to the richest deposit and is not counted against water's cap; the three generation hooks BL-1198 named (author_building explicit target, the slot walk's is_well_site test, tile_score_for for a Well tile) carry it. The chain rule (BL-1185) then sees water near people and can place clean-water and medical makers.\n\nFIRST BUILD DROPPED (2026-10-05, f2b3063d on worktree-agent-a1683c1bd7eda4279, not merged): placing every gap firm on the gap deposit, with no fallback, made every gate worse against BL-1185 alone (5 seeds, 400 ticks: G1 35.4% -> 20.3%, G2 26.5% -> 16.9%, G3 42.5% -> 27.5%; corps 111 -> 72 on seed 0) - a gap firm with no gap deposit in its windows placed nothing - and clean water still did not return on seeds 0/10/11/13/37. REWORK (main session, 2026-10-05): dig the gap good where the windows hold it, else fall back to the richest deposit AND do not count that firm against the gap good's cap (options c+b). OPEN QUESTION FIRST: seeds 10, 11, 13 and 37 have NO water extractor in any state, and seed 0 has 3 water mines yet no clean-water plant in reach. Measure water deposits per seed and per market on an earthlike body before reworking: if water deposits are near-absent, the household water chain is a deposit-generation question (TILES.md / RESOURCES.md), not a charter one.\n\nGENERATION CHANGE (sprint 49 generation lane, after BL-1185). Seeds 0 and 10 have no water extractor at all; seed 43 has 2 in 1 of 18 markets. A firm opened to fill the water gap is placed on whatever its tile holds most of (corporation_generation.cpp:476, :548) yet still counted against water's per-resource cap (:2667), so the cap fills with firms digging something else. Place the gap firm on a tile of the gap resource, or do not count it. Measure water extractors per seed and BL-1184."
   },
   {
    "status": "designed",
@@ -1519,6 +1519,27 @@
     "src/world/economy_system.cpp"
    ],
    "design": "Found by the BL-1198 lane (2026-10-05): on a tile with no deposit, run_extraction finds a zero reserve and reports the site exhausted, so a Fishing Wharf (coastal adjacency, deposit-agnostic; PRODUCTION.md sec Extraction buildings, BL-168) yields nothing. BL-1198 wrote a no-deposit yield for the Well (base_rate x scalar x labour x supply x (1 - hazard), never tapering); give the Wharf the same path. Wharf numbers will move (a world-mover). Agricultural produce is a household good (food rations' input), so this feeds the market viability gate."
+  },
+  {
+   "status": "designed",
+   "glyph": "◐",
+   "sprint": 49,
+   "written": "2026-10-05",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1200",
+   "short_name": "LAKE_SIZE_CAP",
+   "author": "Claude (Ben's lake and well form, 2026-10-05)",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 2,
+   "title": "A lake is an enclosed water body below a measured size cap; larger enclosed bodies are seas",
+   "authority_doc": "docs/economy/TILES.md",
+   "files": [
+    "src/world/tile_generation.cpp"
+   ],
+   "design": "RULED (Ben, 2026-10-05, NR-974 A; TILES.md sec Water kinds). classify_water_kinds (tile_generation.cpp:283-291) makes every non-largest component a lake. MEASURE FIRST on the 16 curated seeds: every enclosed water component's size, and how many land tiles border each (Well sites they create); pick the cap from the distribution (a clear gap between ponds/lakes and inland seas), record the table and the reason in the commit and in TILES.md. Then components at or above the cap are sea (coast ring + ocean), so they get ports and wharves and no Wells. A world-mover from generation (D_search moves): report, re-bless with the wave. Runs before or with BL-1197 so wells are placed on real lakes."
   }
  ]
 }

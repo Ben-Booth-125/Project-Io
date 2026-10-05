@@ -1817,6 +1817,34 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
         for (const auto& kv : start->w.corporations)
             if (kv.second.is_player)
                 ++players;
+        // BL-1185 review: the roster as the landscape landed (specialists, and
+        // background firms per body) — the firm-count reading the chain rule's
+        // Pass 6 masking is judged by. Report only; no digest reads it.
+        {
+            std::map<entity_id, int> per_body;
+            for (const entity_id f : start->land.firms)
+            {
+                const auto cit = start->w.corporations.find(f);
+                if (cit == start->w.corporations.end())
+                {
+                    ++per_body[null_entity];   // exited during the settle
+                    continue;
+                }
+                entity_id b = null_entity;   // the body of the firm's first holding
+                if (!cit->second.assets.empty())
+                    if (const auto bit = start->w.buildings.find(cit->second.assets.front());
+                        bit != start->w.buildings.end())
+                        if (const auto tit = start->w.tiles.find(bit->second.tile);
+                            tit != start->w.tiles.end())
+                            b = tit->second.body;
+                ++per_body[b];
+            }
+            std::printf("  land: specialists %zu firms %zu (by body:", start->land.specialists.size(),
+                        start->land.firms.size());
+            for (const auto& [b, n] : per_body)
+                std::printf(" %u:%d", static_cast<unsigned>(b), n);
+            std::printf(")");
+        }
         std::printf("  players %d%s", players,
                     report.fell_back ? "  FELL BACK (no specialist affordable: the no-budget world, NR-910)"
                     : report.refused ? "  spend REFUSED" : "");
@@ -3510,7 +3538,7 @@ void print_cost_table_header(const cost_options& opt)
                     "with density | shortlist, trailing net over it, negative share | evalsDue = "
                     "strategic evals due per live tick (count), NOT a cost. ceil = unspent as "
                     "density_ceiling; late = late_shortfall, refsd = refused, share = "
-                    "share_unplaced, nospec = no_specialist (NR-910) — the eleven reason columns sum "
+                    "share_unplaced, nospec = no_specialist (NR-910), chain = chain_infeasible (BL-1185) — the twelve reason columns sum "
                     "to the row's unspent total. Under "
                     "each stockpile row: the rule line, one line per body (B on firms, G, B_ref, "
                     "per-good cap, firms PER GOOD, the turn's spread), the at-land checks, the "
@@ -3519,10 +3547,10 @@ void print_cost_table_header(const cost_options& opt)
                     "opening capital, the chartered good against the extracted one, the "
                     "density-follows-cities reading and the tick ratio with its phase split.\n",
                     prices.c_str(), ms.c_str());
-        std::printf("  %-52s %7s %3s %8s | %4s %5s | %6s %6s %6s %6s %6s %6s %6s %6s %6s %6s %6s | %4s %5s | "
+        std::printf("  %-52s %7s %3s %8s | %4s %5s | %6s %6s %6s %6s %6s %6s %6s %6s %6s %6s %6s %6s | %4s %5s | "
                     "%11s | %9s | %5s %7s %7s | %15s | %15s | %5s %26s %5s | %8s\n",
                     "config", "fP", "sFC", "sPts", "spec", "firms", "no_gap", "prov", "window",
-                    "body", "ceil", "remain", "nonat", "late", "refsd", "share", "nospec", "anyS", "natSh",
+                    "body", "ceil", "remain", "nonat", "late", "refsd", "share", "nospec", "chain", "anyS", "natSh",
                     "hold in/out", "corps/bg", "evals", "seed_ms", "wall/ev", "val med/mean",
                     "live med/mean", "short", "trail8 min/med/max", "neg%", "evalsDue");
         return;
@@ -3552,17 +3580,17 @@ void print_cost_table_header(const cost_options& opt)
                 "open-channel corporation per tick, so only its sort and channel walk follow density. "
                 "BL-1039: ceil = unspent as density_ceiling; BL-1060: late = late_shortfall, refsd = "
                 "refused, share = share_unplaced (NR-905), nospec = no_specialist (NR-910) — the "
-                "eleven reason columns sum to the row's unspent total; under each budget row, the "
+                "twelve reason columns (chain = chain_infeasible, BL-1185) sum to the row's unspent total; under each budget row, the "
                 "rule line "
                 "(per-good cap rule and fill order, ceiling, guard), one line per body (B on firms, "
                 "G, B_ref, per-good cap, firms per good, and under sqrt the turn's spread) and the "
                 "at-land checks, and on every full row the seated corporation's balance and solvent "
                 "flag\n",
                 static_cast<int>(spend.firm_price_points), ladder.c_str());
-    std::printf("  %-52s %3s %3s %4s | %4s %5s | %6s %6s %6s %6s %6s %6s %6s %6s %6s %6s %6s | %4s %5s | "
+    std::printf("  %-52s %3s %3s %4s | %4s %5s | %6s %6s %6s %6s %6s %6s %6s %6s %6s %6s %6s %6s | %4s %5s | "
                 "%11s | %9s | %5s %7s %7s | %15s | %15s | %5s %26s %5s | %8s\n",
                 "config", "fP", "sFC", "sPts", "spec", "firms", "no_gap", "prov", "window", "body",
-                "ceil", "remain", "nonat", "late", "refsd", "share", "nospec", "anyS", "natSh", "hold in/out",
+                "ceil", "remain", "nonat", "late", "refsd", "share", "nospec", "chain", "anyS", "natSh", "hold in/out",
                 "corps/bg", "evals",
                 "seed_ms", "wall/ev", "val med/mean", "live med/mean", "short", "trail8 min/med/max",
                 "neg%", "evalsDue");
@@ -3627,10 +3655,10 @@ void print_cost_row(const cost_row& r, bool wide = false)
     std::snprintf(corps, sizeof corps, "%d/%d", r.at_land.corps, r.at_land.background);
     // EVERY reason has a column, so the row sums to its unspent total; a reason
     // appended to the enum must add its column here.
-    static_assert(charter_unspent_reason_count == 11, "a charter_unspent_reason has no cost-table column");
+    static_assert(charter_unspent_reason_count == 12, "a charter_unspent_reason has no cost-table column");
     std::printf(price_fmt, r.label.c_str(), fp, sfc, spts);
     std::printf(" %4zu %5zu | %6lld %6lld %6lld %6lld %6lld %6lld %6lld %6lld %6lld "
-                "%6lld %6lld | %4s %5.2f | %11s | %9s | %5d %7.0f %7.0f",
+                "%6lld %6lld %6lld | %4s %5.2f | %11s | %9s | %5d %7.0f %7.0f",
                 r.specialists, r.firms,
                 u(charter_unspent_reason::no_gap), u(charter_unspent_reason::province_cap),
                 u(charter_unspent_reason::window_exhausted), u(charter_unspent_reason::body_cap),
@@ -3638,6 +3666,7 @@ void print_cost_row(const cost_row& r, bool wide = false)
                 u(charter_unspent_reason::remainder), u(charter_unspent_reason::no_nation),
                 u(charter_unspent_reason::late_shortfall), u(charter_unspent_reason::refused),
                 u(charter_unspent_reason::share_unplaced), u(charter_unspent_reason::no_specialist),
+                u(charter_unspent_reason::chain_infeasible),
                 r.any_specialist ? "yes" : "NO", r.largest_nation_share, hold, corps,
                 r.evaluations, r.seed_eval_ms, r.proposal_wall_ms_per_eval);
     if (r.build_only)

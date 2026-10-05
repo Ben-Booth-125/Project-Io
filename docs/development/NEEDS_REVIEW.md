@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*77 entries — 3 open, 74 resolved.*
+*78 entries — 2 open, 76 resolved.*
 
 ---
 
@@ -60,22 +60,6 @@ Settled in MARKETS.md sec The shelf spoils: every good on a market shelf loses a
 > **Recommendation:** A.
 
 *Files: `docs/economy/MARKETS.md`, `scripts/economy.lua`, `src/world/market_clearing.cpp`*
-
-### NR-973 — NOVEL WORK: the scorer's Well candidate bucket (BL-1198)
-*novel-work · raised 2026-10-05 · from the BL-1198 lane (a14a559f)*
-
-To let background firms build Wells, the lane added a Well candidate bucket to corp_ai's build scorer: K = 2 candidates world-wide per tick, ranked by habitability x water demand pull, placeable tiles only, priced at the Well rate. It is a new candidate SOURCE for the existing build verb (no new verb, subject or planner), so it reads as inside the scored-build grant (AI_OPPONENT.md sec 11), but it is a new AI siting rule no doc owned.
-
-**Why it matters.** Novelty should be chosen, not accreted. A per-market bucket would put wells near people across the map but widens the siting rule further; the main session held it at K = 2 and routes the bulk of well placement through generation (BL-1197).
-
-- A: keep the bucket as built (K = 2 world-wide), within the build grant
-- B: per-market bucket (wells near every market) - a wider siting rule
-- C: no scorer bucket; wells come from generation only
-- D: other
-
-> **Recommendation:** A for now; re-read after BL-1197 places wells at generation.
-
-*Files: `src/world/corp_ai.cpp`, `docs/ai/AI_OPPONENT.md`*
 
 ---
 
@@ -1328,4 +1312,39 @@ Your NR-968 ruling: the shelf counts as supply (k > 0), set by measurement once 
 > **RESOLVED.** RULED (Ben, the water and shelf form, 2026-10-05): option A - k = 0 for now (spoilage and households eating keep stocked shelves off the ceiling); re-sweep k after BL-1198 supplies water.
 
 *Files: `scripts/economy.lua`, `docs/economy/MARKETS.md`*
+
+### NR-973 — NOVEL WORK: the scorer's Well candidate bucket (BL-1198)
+*novel-work · raised 2026-10-05 · from the BL-1198 lane (a14a559f)*
+
+To let background firms build Wells, the lane added a Well candidate bucket to corp_ai's build scorer: K = 2 candidates world-wide per tick, ranked by habitability x water demand pull, placeable tiles only, priced at the Well rate. It is a new candidate SOURCE for the existing build verb (no new verb, subject or planner), so it reads as inside the scored-build grant (AI_OPPONENT.md sec 11), but it is a new AI siting rule no doc owned.
+
+**Why it matters.** Novelty should be chosen, not accreted. A per-market bucket would put wells near people across the map but widens the siting rule further; the main session held it at K = 2 and routes the bulk of well placement through generation (BL-1197).
+
+- A: keep the bucket as built (K = 2 world-wide), within the build grant
+- B: per-market bucket (wells near every market) - a wider siting rule
+- C: no scorer bucket; wells come from generation only
+- D: other
+
+> **Recommendation:** A for now; re-read after BL-1197 places wells at generation.
+
+> **RESOLVED.** RULED (Ben, the lake and well form, 2026-10-05): option A - keep the scorer's Well bucket at K = 2 world-wide; and "we can add wells to generation" - generation places Wells (BL-1197 rework).
+
+*Files: `src/world/corp_ai.cpp`, `docs/ai/AI_OPPONENT.md`*
+
+### NR-974 — CALL: is every enclosed water body a fresh-water lake? (the Well, BL-1198)
+*question · raised 2026-10-05 · from the BL-1198 cold review*
+
+Tile generation marks every ocean component except the largest as terrain_substrate::lake, with no size cap (tile_generation.cpp:283-291). Before the Well this only removed options (no port, no Fishing Wharf on a lake shore). Now every land tile on such a shore is a Well site: deposit-free water that never tapers. On a seed whose ocean splits into two large basins, or with a big enclosed inland sea, the whole shoreline of the smaller one offers unlimited fresh water while refusing ports and wharves.
+
+**Why it matters.** Fresh water is now a production rule, so what counts as a lake decides where cities drink cheaply - a geography call, not a code one.
+
+- A: a lake is an enclosed water body below a size threshold; larger enclosed bodies are seas (ports and wharves yes, Wells no) - a generation change, world-mover
+- B: accept it - every enclosed body is fresh (an inland sea reads as a great lake)
+- C: other
+
+> **Recommendation:** A, with the threshold measured on the 16 curated seeds (how many enclosed bodies, their sizes) before a number is picked. It keeps the river-city advantage for real lakes and gives inland seas their ports back.
+
+> **RESOLVED.** RULED (Ben, the lake and well form, 2026-10-05): option A - a lake is an enclosed water body below a measured size cap; larger enclosed bodies are seas (coast, ports and wharves; no Wells). Written into TILES.md sec Water kinds (replacing "no size cut-off"); the work is BL-1200 (lake size cap), the cap read off the 16 curated seeds.
+
+*Files: `src/world/tile_generation.cpp`, `docs/economy/TILES.md`, `docs/economy/PRODUCTION.md`*
 

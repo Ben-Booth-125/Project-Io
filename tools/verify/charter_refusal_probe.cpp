@@ -198,6 +198,13 @@ struct config
     float yard_seed = 1.0f;                ///< capacity wanted per standing building
     float yard_output = 1.0f;              ///< the yard recipe's capacity per batch
     bool one_province = false;             ///< every tile in province 1 (its cap: 2 x the centre's rung, BL-1146)
+    /// BL-1185 (chain-feasible placement): the works and the yard need NO input
+    /// by default. The fixture has no market and no producer of anything, so a
+    /// works that needs timber (the fixture's recipe until 2026-10-05) is
+    /// chain-infeasible and is never chartered: every turn/share/cap case below
+    /// would read the chain rule instead of the rule it was written for. Set it
+    /// to read the chain rule on purpose (`chain_infeasible`).
+    bool works_input = false;
 };
 
 struct reading
@@ -310,7 +317,8 @@ std::unique_ptr<world> build(const config& cfg, recipe_registry& reg,
         {
             recipe rc;
             rc.name = std::string("fixture_works_") + std::to_string(b.good);
-            rc.inputs[static_cast<std::size_t>(resource_type::timber)] = 1.0f;
+            if (cfg.works_input)
+                rc.inputs[static_cast<std::size_t>(resource_type::timber)] = 1.0f;
             rc.outputs[b.good] = 1.0f;
             reg.add_recipe(rc);
         }
@@ -329,7 +337,8 @@ std::unique_ptr<world> build(const config& cfg, recipe_registry& reg,
         // yard step wants a yard from the walk's first firm on.
         recipe yard;
         yard.name = "fixture_yard";
-        yard.inputs[static_cast<std::size_t>(resource_type::stone)] = 1.0f;
+        if (cfg.works_input)
+            yard.inputs[static_cast<std::size_t>(resource_type::stone)] = 1.0f;
         yard.outputs[k_yard] = cfg.yard_output;
         reg.add_recipe(yard);
         construction_params cp;
@@ -445,6 +454,310 @@ config ten_goods(std::int32_t points, std::int32_t c)
 } // namespace turn
 
 } // namespace
+
+// ---------------------------------------------------------------------------
+// 6. THE CHAIN RULE (BL-1185, chain-feasible placement; the cold review's rows)
+// ---------------------------------------------------------------------------
+// A hand-built body split into TWO markets: A (centre (4, 6)) holds every tile
+// with x <= 9, B (centre (14, 6)) every tile with x >= 10. A works that makes
+// steel needs timber, and the one timber producer — an extraction site standing
+// on (14, 6) — is in B unless @p timber_in_a puts it at (2, 6). The centre sits
+// at (6, 6) with a window of radius 2, and every tile of market A except (6, 6)
+// is already built on, so the works firm's ANCHOR can only be (6, 6) (market A)
+// and its second processor lands on the nearest free tile, (10, 6) — market B.
+// Timber is priced so B's timber cannot reach A under the dispatcher's
+// shortage gate (R x base_A - haul > 1.05 x base_B fails), so the anchor's
+// market has no reachable producer.
+namespace chainfx {
+
+struct result
+{
+    charter_spend_report rep;
+    std::size_t firms = 0;
+    bool holds_in_b   = false; ///< some chartered firm holds a building with x >= 10
+    bool anchor_at_x  = false; ///< the chartered firm's anchor is (6, 6)
+    long long chain_infeasible = 0;
+    bool balanced = false;
+};
+
+result run(bool timber_in_a)
+{
+    auto w = std::make_unique<world>();
+    recipe_registry reg;
+    const int bw = 24, bh = 12;
+    const entity_id body = w->create_entity();
+    {
+        body_component bc{};
+        bc.name = "ChainBody";
+        bc.grid_width = bw;
+        bc.grid_height = bh;
+        w->bodies[body] = bc;
+    }
+    const entity_id nation = w->create_entity();
+    nation_component nc{};
+    nc.name = "Veyl";
+    std::map<std::pair<int, int>, entity_id> at;
+    const std::size_t timber = static_cast<std::size_t>(resource_type::timber);
+    const int tx = timber_in_a ? 2 : 14;
+    for (int y = 0; y < bh; ++y)
+        for (int x = 0; x < bw; ++x)
+        {
+            const entity_id tid = w->create_entity();
+            tile_component tc{};
+            tc.body = body;
+            tc.grid_x = x;
+            tc.grid_y = y;
+            tc.substrate = terrain_substrate::barren;
+            if (x == tx && y == 6)
+            {
+                tc.resource_deposit[timber]   = 1.0f;
+                tc.resource_remaining[timber] = 1000.0f;   // an unspent reserve: a producer
+            }
+            w->tiles[tid] = tc;
+            nc.tiles.push_back(tid);
+            w->tile_to_nation[tid] = nation;
+            at[{ x, y }] = tid;
+        }
+    w->nations[nation] = nc;
+
+    // The two markets. Timber is CHEAP in A (base 0.2) and 1.0 in B, so B's
+    // timber never reaches A: the shortage gate R x 0.2 - haul > 1.05 x 1.0
+    // fails at any R <= 5 (the default registry's R is ceil_mult, 4).
+    for (const int cx : { 4, 14 })
+    {
+        const entity_id mid = w->create_entity();
+        market_component m{};
+        m.body = body;
+        m.centre_tile = at.at({ cx, 6 });
+        m.base_price.fill(1.0f);
+        if (cx == 4)
+            m.base_price[timber] = 0.2f;
+        m.price = m.base_price;
+        w->markets[mid] = m;
+    }
+
+    // The timber producer, and filler on every market-A tile but (6, 6).
+    {
+        const entity_id bid = w->create_entity();
+        building_component b{};
+        b.tile = at.at({ tx, 6 });
+        b.type = building_type::extraction_site;
+        b.target_resource = resource_type::timber;
+        b.workforce_assigned = 0.5f;
+        w->buildings[bid] = b;
+        w->stockpiles[bid] = stockpile_component{};
+    }
+    for (int y = 0; y < bh; ++y)
+        for (int x = 0; x <= 9; ++x)
+        {
+            if ((x == 6 && y == 6) || (x == tx && y == 6))
+                continue;
+            const entity_id bid = w->create_entity();
+            building_component b{};
+            b.tile = at.at({ x, y });
+            b.type = building_type::military_base;
+            w->buildings[bid] = b;
+        }
+
+    const entity_id centre = w->create_entity();
+    population_centre_component pc{};
+    pc.scale = 5;
+    w->population_centres[centre] = pc;
+    w->population_centre_tile[centre] = at.at({ 6, 6 });
+
+    population_demand_params pd;
+    pd.demand_basket[static_cast<std::size_t>(resource_type::steel)] = 100.0f;
+    reg.set_population_demand(pd);
+    recipe rc;
+    rc.name = "fixture_steel_from_timber";
+    rc.inputs[timber] = 1.0f;
+    rc.outputs[static_cast<std::size_t>(resource_type::steel)] = 1.0f;
+    reg.add_recipe(rc);
+    building_economics ext;
+    ext.base_rate = 1.0f;
+    reg.set_economics(building_type::extraction_site, ext);
+
+    charter_spend_params s;
+    s.firm_price_points        = 1;
+    s.specialist_firm_charters = 1000;
+    s.window_radius            = 2;
+    s.province_cap             = false;
+    s.resource_cap_rule        = charter_cap_rule::sqrt_capital;
+    s.per_resource_firm_cap    = 2;
+    s.max_firms_per_body       = 200;
+    s.density_ceiling          = 120;
+    const charter_budget budget(std::map<entity_id, std::int32_t>{ { centre, 1 } });
+
+    result out;
+    charter_web_from_budget(*w, reg, budget, s, /*seed=*/1185u, /*settle=*/nullptr, &out.rep);
+    out.firms = out.rep.firms.size();
+    for (const entity_id cid : out.rep.firms)
+    {
+        const corporation_component& corp = w->corporations.at(cid);
+        for (const entity_id bid : corp.assets)
+            if (w->tiles.at(w->buildings.at(bid).tile).grid_x >= 10)
+                out.holds_in_b = true;
+        if (!corp.assets.empty() && w->buildings.at(corp.assets.front()).tile == at.at({ 6, 6 }))
+            out.anchor_at_x = true;
+    }
+    long long unspent = 0;
+    for (const charter_unspent& u : out.rep.unspent)
+    {
+        unspent += u.points;
+        if (u.reason == charter_unspent_reason::chain_infeasible)
+            out.chain_infeasible += u.points;
+    }
+    out.balanced = out.rep.points_spent + unspent == budget.total();
+    return out;
+}
+
+/// THE KEPT ROSTER (`enforce_chain_feasible_roster`, the second cold review):
+/// the same two-market body, timber only in B, steel cheap in A so B's steel
+/// cannot reach A either. Specialist S (processing focus, seated) holds
+///   P1 at (6, 6) in A: steel from timber — infeasible (no timber in A);
+///   P3 at (7, 6) in A: tools from steel — feasible ONLY against P1's stale
+///      default recipe, so an order-dependent pass would keep it;
+///   P2 at (12, 6) in B: steel from timber — feasible (timber beside it).
+/// Specialist T (extraction focus) holds the timber mine. With @p s_loses_all,
+/// S holds only P1 and P3, so it is left with no processor and the seat moves.
+struct roster_result
+{
+    chain_roster_enforcement first, second;
+    std::uint64_t digest_first = 0, digest_second = 0;
+    chain_feasibility_audit audit;
+    bool p1_gone = false, p3_gone = false, p2_kept = false;
+    entity_id s = null_entity, t = null_entity;
+};
+
+roster_result run_roster(bool s_loses_all)
+{
+    auto w = std::make_unique<world>();
+    recipe_registry reg;
+    const int bw = 24, bh = 12;
+    const entity_id body = w->create_entity();
+    {
+        body_component bc{};
+        bc.name = "RosterBody";
+        bc.grid_width = bw;
+        bc.grid_height = bh;
+        w->bodies[body] = bc;
+    }
+    const entity_id nation = w->create_entity();
+    nation_component nc{};
+    nc.name = "Veyl";
+    std::map<std::pair<int, int>, entity_id> at;
+    const std::size_t timber = static_cast<std::size_t>(resource_type::timber);
+    const std::size_t steel  = static_cast<std::size_t>(resource_type::steel);
+    const std::size_t tools  = static_cast<std::size_t>(resource_type::tools);
+    for (int y = 0; y < bh; ++y)
+        for (int x = 0; x < bw; ++x)
+        {
+            const entity_id tid = w->create_entity();
+            tile_component tc{};
+            tc.body = body;
+            tc.grid_x = x;
+            tc.grid_y = y;
+            tc.substrate = terrain_substrate::barren;
+            if (x == 14 && y == 6)
+            {
+                tc.resource_deposit[timber]   = 1.0f;
+                tc.resource_remaining[timber] = 1000.0f;
+            }
+            w->tiles[tid] = tc;
+            nc.tiles.push_back(tid);
+            w->tile_to_nation[tid] = nation;
+            at[{ x, y }] = tid;
+        }
+    w->nations[nation] = nc;
+    for (const int cx : { 4, 14 })
+    {
+        const entity_id mid = w->create_entity();
+        market_component m{};
+        m.body = body;
+        m.centre_tile = at.at({ cx, 6 });
+        m.base_price.fill(1.0f);
+        if (cx == 4)
+        {
+            m.base_price[timber] = 0.2f;   // B's timber cannot reach A
+            m.base_price[steel]  = 0.2f;   // nor B's steel
+        }
+        m.price = m.base_price;
+        w->markets[mid] = m;
+    }
+    recipe st;
+    st.name = "fixture_steel_from_timber";
+    st.inputs[timber] = 1.0f;
+    st.outputs[steel] = 1.0f;
+    reg.add_recipe(st);
+    recipe tl;
+    tl.name = "fixture_tools_from_steel";
+    tl.inputs[steel] = 1.0f;
+    tl.outputs[tools] = 1.0f;
+    reg.add_recipe(tl);
+    building_economics e;
+    e.base_rate = 1.0f;
+    reg.set_economics(building_type::extraction_site, e);
+    reg.set_economics(building_type::processing_facility, e);
+
+    const auto add = [&](int x, int y, building_type t, const char* rname) {
+        const entity_id bid = w->create_entity();
+        building_component b{};
+        b.tile = at.at({ x, y });
+        b.type = t;
+        b.workforce_assigned = 0.5f;
+        if (t == building_type::extraction_site)
+            b.target_resource = resource_type::timber;
+        if (rname != nullptr)
+            b.recipe = reg.recipe_id(rname);
+        w->buildings[bid] = b;
+        w->stockpiles[bid] = stockpile_component{};
+        return bid;
+    };
+    const entity_id p1 = add(6, 6, building_type::processing_facility, "fixture_steel_from_timber");
+    const entity_id p3 = add(7, 6, building_type::processing_facility, "fixture_tools_from_steel");
+    const entity_id p2 = s_loses_all ? null_entity
+                       : add(12, 6, building_type::processing_facility, "fixture_steel_from_timber");
+    const entity_id mine = add(14, 6, building_type::extraction_site, nullptr);
+
+    roster_result out;
+    out.s = w->create_entity();
+    {
+        corporation_component s;
+        s.name = "Sereth Works";
+        s.focus = industrial_focus::processing;
+        // P3 BEFORE P1: a walk in asset order would judge P3 while P1 still
+        // carries its stale recipe — the order dependence the review found.
+        s.assets = { p3, p1 };
+        if (p2 != null_entity)
+            s.assets.push_back(p2);
+        s.hq_building = p1;
+        s.is_player = true;
+        w->corporations[out.s] = s;
+        w->player_entity = out.s;
+    }
+    out.t = w->create_entity();
+    {
+        corporation_component t;
+        t.name = "Tolvan Extraction";
+        t.focus = industrial_focus::extraction;
+        t.assets = { mine };
+        t.hq_building = mine;
+        w->corporations[out.t] = t;
+    }
+
+    out.first = enforce_chain_feasible_roster(*w, reg, /*seed=*/1185u);
+    out.digest_first = world_state_digest(*w);
+    out.second = enforce_chain_feasible_roster(*w, reg, /*seed=*/1185u);
+    out.digest_second = world_state_digest(*w);
+    out.audit = audit_chain_feasibility(*w, reg);
+    out.p1_gone = w->buildings.count(p1) == 0;
+    out.p3_gone = w->buildings.count(p3) == 0;
+    out.p2_kept = p2 != null_entity && w->buildings.count(p2) != 0
+               && w->buildings.at(p2).recipe == reg.recipe_id("fixture_steel_from_timber");
+    return out;
+}
+
+} // namespace chainfx
 
 int main()
 {
@@ -1183,6 +1496,69 @@ int main()
         expect_true("pool region with no carve index: nothing resolves a group, so it is the unpooled walk",
                     by_region.pool_transfers.empty() && by_region.firms.size() == plain.firms.size()
                     && by_region.points_spent == plain.points_spent);
+    }
+
+    // --- 6. THE CHAIN RULE (BL-1185) -------------------------------------------
+    std::printf("\ncharter_refusal_probe — the chain rule (BL-1185)\n");
+    {
+        // A works good whose recipe needs an input nothing on the body makes is
+        // never chartered, and its points book as chain_infeasible; the mine
+        // beside it in the turn still charters.
+        turn::config cfg;
+        cfg.works_input = true;
+        const turn::reading r = turn::run(cfg);
+        turn::print("works need timber, none made", r);
+        expect_true("chain: steel and planks (timber, unmade) charter no firm; iron ore still does",
+                    r.firms[turn::k_mill1] == 0 && r.firms[turn::k_mill2] == 0 && r.firms[turn::k_raw] > 0);
+        expect_true("chain: the refused points book as chain_infeasible, and the account closes",
+                    r.u(charter_unspent_reason::chain_infeasible) > 0 && r.balanced);
+    }
+    {
+        // THE ANCHOR STAYS OR THE CHARTER GOES (the cold review's HIGH): the
+        // anchor (6, 6) is in market A, where nothing makes timber; the firm's
+        // second processor lands at (10, 6) in market B, beside the timber.
+        // Promoting it to anchor would charter a firm on ground no gate tested.
+        const chainfx::result bad = chainfx::run(/*timber_in_a=*/false);
+        std::printf("  timber in B: firms %zu, holds in B %d, chain_infeasible %lld%s\n", bad.firms,
+                    bad.holds_in_b ? 1 : 0, bad.chain_infeasible, bad.balanced ? "" : " [UNBALANCED]");
+        expect_true("anchor lost: the firm is NOT chartered, nothing of it stands in market B",
+                    bad.firms == 0 && !bad.holds_in_b);
+        expect_true("anchor lost: its point books chain_infeasible, and the account closes",
+                    bad.chain_infeasible == 1 && bad.balanced);
+        // Control: timber in market A, so the anchor is feasible and stays.
+        const chainfx::result good = chainfx::run(/*timber_in_a=*/true);
+        std::printf("  timber in A: firms %zu, anchor at (6, 6) %d, chain_infeasible %lld\n", good.firms,
+                    good.anchor_at_x ? 1 : 0, good.chain_infeasible);
+        expect_true("control: timber in A — the firm charters, anchored at (6, 6)",
+                    good.firms == 1 && good.anchor_at_x && good.chain_infeasible == 0 && good.balanced);
+    }
+    {
+        // THE KEPT ROSTER: enforce_chain_feasible_roster is order-free,
+        // idempotent, and leaves nothing infeasible.
+        const chainfx::roster_result r = chainfx::run_roster(/*s_loses_all=*/false);
+        std::printf("  kept roster: call 1 re-decided %d unplaced %d holdless %d%s; call 2 re-decided "
+                    "%d unplaced %d; audit infeasible held %d of %d\n",
+                    r.first.processors_redecided, r.first.processors_unplaced, r.first.holdless,
+                    r.first.seat_redrawn ? " (seat redrawn)" : "", r.second.processors_redecided,
+                    r.second.processors_unplaced, r.audit.infeasible_held, r.audit.processors_held);
+        expect_true("roster: P1 (no timber) and P3 (fed only by P1's stale recipe) unplaced; P2 kept",
+                    r.p1_gone && r.p3_gone && r.p2_kept);
+        expect_true("roster: a SECOND call changes nothing (re-decides 0, unplaces 0, same digest)",
+                    r.second.processors_redecided == 0 && r.second.processors_unplaced == 0
+                    && r.digest_first == r.digest_second);
+        expect_true("roster: no held processor is left infeasible (audit)",
+                    r.audit.infeasible_held == 0);
+        expect_true("roster: the seat stays — S still holds a processor",
+                    !r.first.seat_redrawn && r.first.seat == r.s);
+        const chainfx::roster_result lost = chainfx::run_roster(/*s_loses_all=*/true);
+        std::printf("  seat loses all: unplaced %d holdless %d, seat %u (S %u, T %u)%s\n",
+                    lost.first.processors_unplaced, lost.first.holdless,
+                    static_cast<unsigned>(lost.first.seat), static_cast<unsigned>(lost.s),
+                    static_cast<unsigned>(lost.t), lost.first.seat_redrawn ? " redrawn" : "");
+        expect_true("roster: a seated processing specialist left with no processor is re-seated "
+                    "on the one that still qualifies",
+                    lost.first.seat_redrawn && lost.first.seat == lost.t && lost.first.holdless == 1
+                    && lost.audit.infeasible_held == 0);
     }
 
     std::printf("\n%s (%d failing)\n", g_fail == 0 ? "ALL PASS" : "FAILED", g_fail);

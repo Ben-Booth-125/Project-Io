@@ -116,6 +116,12 @@ struct corporation_params
 ///               nowhere on a map to be, so it goes to a ledger column). A pure
 ///               TAP: write-only, consumes no randomness, changes no branch.
 ///               Defined in world/hard_coded_world.hpp.
+/// @param reg    Optional recipe registry (BL-1188, seat kit runs). When given,
+///               Pass 3 is CHAIN-FEASIBLE (CORPORATION_GENERATION.md § Pass 3):
+///               each processor placed is given a recipe whose inputs are
+///               produced within reach of its market, or is unplaced, and a rung
+///               left with nothing widens. Null (world generation's own call,
+///               before any registry exists) leaves processors `no_recipe`.
 /// @return       Corporation entity IDs in generation order (one per corporation
 ///               created). The entry whose corporation_component::is_player is
 ///               true equals w.player_entity.
@@ -124,7 +130,8 @@ std::vector<entity_id> generate_corporations(
     const corporation_params& params,
     uint32_t seed,
     const struct settlement_state* settle = nullptr,
-    struct generation_progress* progress = nullptr);
+    struct generation_progress* progress = nullptr,
+    const recipe_registry* reg = nullptr);
 
 /// BL-977 — strip the SPECIALIST roster so a candidate can lay a fresh one.
 ///
@@ -597,6 +604,58 @@ std::vector<entity_id> generate_background_firms(
 /// Call it after the registry is loaded and after every generation pass that can
 /// author a processor (`generate_corporations`, `generate_background_firms`).
 void assign_default_recipes(world& w, const recipe_registry& reg);
+
+/// BL-1185 (chain-feasible placement) — Pass 3's rule applied to a specialist
+/// roster laid BEFORE a recipe registry existed (world generation's own Pass 3,
+/// which is Lua-free and runs before the registry loads). Called by every path
+/// that keeps that roster once the registry is in hand: the headless run and
+/// run_verify when the charter budget is empty, and the landscape apply when it
+/// does not regenerate the specialists.
+///
+/// ONLY THE INFEASIBLE ARE RE-DECIDED. First the greatest set of the roster's
+/// processors whose CURRENT recipes are feasible against producers that are
+/// themselves kept is found (a fixed point: a processor whose recipe fails is
+/// suspended — it supplies nobody — and the test repeats until nothing more
+/// falls); those keep their recipes. Then each suspended processor, in (corp
+/// id, asset order), takes the feasible recipe nearest its feed (own, market,
+/// reach) as fresh placement would, or is unplaced. IDEMPOTENT: a second call
+/// changes nothing, and no roster processor is left infeasible.
+///
+/// A corporation that lost a processor keeps the rest of its holdings (it
+/// exists; it is not a charter that can be refused); its HQ is designated again
+/// over its non-military holdings and its opening pools re-keyed to that HQ. If
+/// the SEATED specialist is left holdless, or a processing corporation with no
+/// processor, the seat is drawn again over the specialists that still qualify
+/// with world-gen's own pick stream (`seed ^ 0xF0E1D2C3`); none qualifying
+/// leaves the world with no seat (`seat == null_entity`), which callers report.
+struct chain_roster_enforcement
+{
+    int processors_redecided = 0; ///< suspended processors given a feasible recipe
+    int processors_unplaced  = 0; ///< suspended processors no recipe could feed
+    int holdless             = 0; ///< specialists left with no (non-military) holding
+    bool      seat_redrawn   = false;
+    entity_id seat           = null_entity; ///< the seat after the call
+};
+chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_registry& reg,
+                                                       std::uint32_t seed);
+
+/// BL-1185 (chain-feasible placement) — the AUDIT of Pass 3's rule on a built
+/// world: every standing processor (not decommissioned) checked against every
+/// producer standing NOW, with the same reach placement uses
+/// (`price_market_export_leg`). Weaker than the placement-time test, which sees
+/// only what stood before the processor; a processor counted infeasible here
+/// broke the rule outright. A measurement seam for harnesses — read-only on the
+/// simulation, but it WARMS the logistics caches, so a caller that goes on to
+/// tick should `invalidate_logistics_caches` after it.
+struct chain_feasibility_audit
+{
+    int processors        = 0; ///< standing processors
+    int no_recipe         = 0; ///< of which carry no recipe
+    int infeasible        = 0; ///< of which some input has no producer within reach
+    int infeasible_held   = 0; ///< of `infeasible`, held by a corporation
+    int processors_held   = 0; ///< standing processors held by a corporation
+};
+chain_feasibility_audit audit_chain_feasibility(world& w, const recipe_registry& reg);
 
 /// Measurement seam (2026-08-20) — the SHIPPED coverage arithmetic, readable
 /// from outside. `generate_background_firms` stops on its caps (per resource,
