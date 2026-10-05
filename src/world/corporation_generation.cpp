@@ -3960,8 +3960,9 @@ struct charter_body_state
     /// G: goods with demand before the walk (resource indices, ascending).
     std::vector<std::uint16_t>        goods;
     /// BL-1197 round 5: the goods the body can produce at all (`body_producible`);
-    /// G is filtered by it. A short good it rules out still books as a late
-    /// shortfall where it stops a centre — a real want left unserved.
+    /// G is filtered by it. A short good it rules out books `unproducible` where
+    /// it stops a centre — a real want no firm on the body could serve — and a
+    /// short good outside G that the body CAN produce books `late_shortfall`.
     std::array<bool, resource_count>  producible{};
     /// B_ref = c x |G| x firm price.
     int64_t                           reference_points = 0;
@@ -4101,6 +4102,65 @@ int32_t charter_yard_places(const world& w, const recipe_registry& reg, entity_i
     return static_cast<int32_t>(std::max<int64_t>(0, places));
 }
 
+/// BL-1197 review — each good's ANCHOR ROUTE on @p body_id: the browse index of
+/// its cheapest in-band processing recipe by marginal cost per unit of primary
+/// output (inputs at base price + the per-batch wage, PRODUCTION.md § The recipe
+/// margin anchor), among the recipes whose inputs are all @p producible on the
+/// body; -1 for a good with no such recipe, and for every extractable raw
+/// (extraction is a raw's anchor route). Ties go to the earlier recipe. Base
+/// price is the lowest positive base price any market on the body quotes — the
+/// authored table, before a market's premiums. A body with no market prices
+/// inputs at 0 and ranks routes by wage per unit alone. Deterministic: ordered
+/// scans and an order-free min.
+std::array<int, resource_count> body_anchor_routes(const world& w, const recipe_registry& reg,
+                                                   entity_id body_id,
+                                                   const std::array<bool, resource_count>& producible)
+{
+    std::array<float, resource_count> price{};
+    for (const auto& [mid, m] : w.markets)
+    {
+        if (m.body != body_id)
+            continue;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (m.base_price[r] > 0.0f && (price[r] <= 0.0f || m.base_price[r] < price[r]))
+                price[r] = m.base_price[r];
+    }
+    const building_economics& pe = reg.economics(building_type::processing_facility);
+    const double wage_pb = (pe.base_rate > 0.0f)
+        ? static_cast<double>(pe.base_wage) / static_cast<double>(pe.base_rate) : 0.0;
+
+    std::array<int, resource_count>    best;
+    std::array<double, resource_count> best_mc{};
+    best.fill(-1);
+    const int n = reg.recipe_count(building_type::processing_facility);
+    for (int i = 0; i < n; ++i)
+    {
+        const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+        const std::size_t po = static_cast<std::size_t>(primary_output_resource(rc));
+        if (!(rc.outputs[po] > 0.0f) || placement_rules::is_extractable(static_cast<resource_type>(po)))
+            continue;
+        bool runs = true;
+        double inp = 0.0;
+        for (std::size_t r = 0; r < resource_count && runs; ++r)
+        {
+            if (!(rc.inputs[r] > 0.0f))
+                continue;
+            if (!producible[r])
+                runs = false;
+            inp += static_cast<double>(rc.inputs[r]) * static_cast<double>(price[r]);
+        }
+        if (!runs)
+            continue;
+        const double mc = (inp + wage_pb) / static_cast<double>(rc.outputs[po]);
+        if (best[po] < 0 || mc < best_mc[po])
+        {
+            best[po]    = i;
+            best_mc[po] = mc;
+        }
+    }
+    return best;
+}
+
 /// One body's density rule, FIXED BEFORE THE WALK (BL-1039, NR-905, NR-906):
 /// G and the consumer demand, B_ref, the per-good cap, the ceiling, and under
 /// `sqrt_capital` the turn, the yards' places and the even share. @p bs holds
@@ -4121,46 +4181,48 @@ void charter_fix_body_rules(const world& w, const recipe_registry& reg,
         body_construction_demand(w, reg, body_id);
     for (std::size_t r = 0; r < resource_count; ++r)
         demand[r] += construction_need[r];
-    // BL-1197 round 4 — DERIVED DEMAND in G. The fourth half: what the
-    // processors standing now draw of their inputs. And because G is fixed
-    // before the walk while the walk's own processors raise their inputs' gaps
-    // as they land, G also holds every good some recipe CAN draw to make a good
-    // already in G — the input closure, to a fixed point (steel for machinery,
-    // iron ore and coal for steel). A closure good with no processor wanting it
-    // is not short, so the turn passes over it; once one lands, it is served in
-    // the same turn as every other want.
+    // BL-1197 — G, THE GOODS THE WALK SERVES (CORPORATION_GENERATION.md § Pass 6,
+    // "A processor's inputs are wanted too"). Three steps, all fixed here:
+    //  1. DEMAND, final or derived: the three halves above plus what the
+    //     processors standing now draw of their inputs (round 4).
+    //  2. PRODUCIBLE ONLY (round 5): a good the body cannot produce at all
+    //     (`body_producible` — an off-world raw on an earthlike body) is out; it
+    //     would take a share of the ceiling no firm could ever fill.
+    //  3. THE ANCHOR-ROUTE CLOSURE (review, main session 2026-10-05): because G
+    //     is fixed before the walk while the walk's own processors raise their
+    //     inputs' gaps as they land, G also holds the inputs of each member's
+    //     ANCHOR ROUTE — its cheapest in-band recipe by marginal cost per unit of
+    //     primary output (PRODUCTION.md § The recipe margin anchor), chosen among
+    //     the routes the body can run — to a fixed point. Not every alternative
+    //     recipe, and never through a good the body cannot produce. Steel enters
+    //     through machinery's route; iron ore and coal through steel's. A closure
+    //     good no processor wants yet is not short, so the turn passes over it.
     const std::array<float, resource_count> input_need =
         body_processor_input_demand(w, reg, body_id);
-    std::array<bool, resource_count> wanted{};
+    bs.producible = body_producible(w, reg, body_id);
+    std::array<bool, resource_count> in_g{};
     for (std::size_t r = 0; r < resource_count; ++r)
-        wanted[r] = (demand[r] + input_need[r]) > 0.0f;
-    const int n_recipes = reg.recipe_count(building_type::processing_facility);
+        in_g[r] = (demand[r] + input_need[r]) > 0.0f && bs.producible[r];
+    const std::array<int, resource_count> anchor = body_anchor_routes(w, reg, body_id,
+                                                                      bs.producible);
     for (bool grew = true; grew;)
     {
         grew = false;
-        for (int i = 0; i < n_recipes; ++i)
+        for (std::size_t g = 0; g < resource_count; ++g)
         {
-            const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
-            bool serves = false;
-            for (std::size_t r = 0; r < resource_count && !serves; ++r)
-                serves = wanted[r] && rc.outputs[r] > 0.0f;
-            if (!serves)
+            if (!in_g[g] || anchor[g] < 0)
                 continue;
+            const recipe& rc = reg.recipe_at(building_type::processing_facility, anchor[g]);
             for (std::size_t r = 0; r < resource_count; ++r)
-                if (rc.inputs[r] > 0.0f && !wanted[r])
+                if (rc.inputs[r] > 0.0f && !in_g[r])
                 {
-                    wanted[r] = true;
-                    grew      = true;
+                    in_g[r] = true;   // producible: the route was chosen among those
+                    grew    = true;
                 }
         }
     }
-    // BL-1197 round 5: G holds only goods the BODY CAN PRODUCE
-    // (`body_producible`) — a good no firm could ever make here (an off-world
-    // raw on an earthlike body) would otherwise take a share of the ceiling it
-    // can never fill.
-    bs.producible = body_producible(w, reg, body_id);
     for (std::size_t r = 0; r < resource_count; ++r)
-        if (wanted[r] && bs.producible[r])
+        if (in_g[r])
             bs.goods.push_back(static_cast<std::uint16_t>(r));
 
     const int g = static_cast<int>(bs.goods.size());
@@ -4765,6 +4827,11 @@ std::vector<entity_id> charter_web_from_budget(world& w,
     //    so when it is all that is left a centre's rest is booked
     //    `late_shortfall`, never `no_gap` (which says there was none). The
     //    legacy rules pick from every good and have no such case.
+    //    BL-1197 widens G past this: the processors' input demand (derived
+    //    demand), the anchor-route input closure, and only goods the body can
+    //    produce (`charter_fix_body_rules`). A short good the body CANNOT produce
+    //    is out of G by that rule, and books `unproducible`, not
+    //    `late_shortfall`.
     //  * B_ref = c x |G| x firm price and the per-good cap
     //    (`charter_sqrt_per_good_cap`: cap(B_ref) == c exactly, so a body whose
     //    firm spend is the legacy firm spend keeps the legacy cap), the density
@@ -5134,6 +5201,8 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             // rest is `no_gap` — unless a good OUTSIDE G is short, which only the walk's
             // own firms can have caused (their upkeep): the turn serves G alone,
             // so that is `late_shortfall`, a real shortfall left unserved (BL-1060).
+            // A short good the body cannot produce at all is out of G by rule,
+            // not by timing: `unproducible` (BL-1197 review).
             std::size_t            turn_at       = 0;
             bool                   from_turn     = false;
             bool                   go_processing = false;
@@ -5143,6 +5212,10 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             bool                   stop          = false;
             bool                   chain_masked_any = false; // BL-1185, legacy rules only
             bool                   dig_missed_any = false;   // BL-1197, legacy rules only
+            // BL-1197 review: the reason the dig misses named — `province_cap`
+            // if the cap took the water ground of any of them, else
+            // `window_exhausted` — kept, as a chain miss keeps its own.
+            charter_unspent_reason dig_miss_why  = charter_unspent_reason::window_exhausted;
             for (;;)
             {
                 if (gap_r == resource_count && bs.in_turn)
@@ -5216,6 +5289,13 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                             }
                         }
                         else
+                        {
+                            // A short good outside G: `late_shortfall` if the body
+                            // can produce it (the walk's own firms made it short),
+                            // `unproducible` if it cannot (BL-1197 review: out of G
+                            // by rule, no firm here could ever serve it). A late
+                            // shortfall outranks it: it is the one a firm could fill.
+                            bool late = false, unproducible = false;
                             for (std::size_t r = 0; r < resource_count; ++r)
                             {
                                 if (r == cap_i)   // the yard step serves it, in G or not
@@ -5225,12 +5305,18 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                                     continue;
                                 if (bs.firms_by_resource[r] >= bs.per_good_cap)
                                     continue;
-                                if (demand[r] > production[r])
-                                {
-                                    stop_why = charter_unspent_reason::late_shortfall;
-                                    break;
-                                }
+                                if (!(demand[r] > production[r]))
+                                    continue;
+                                if (bs.producible[r])
+                                    late = true;
+                                else
+                                    unproducible = true;
                             }
+                            if (late)
+                                stop_why = charter_unspent_reason::late_shortfall;
+                            else if (unproducible)
+                                stop_why = charter_unspent_reason::unproducible;
+                        }
                         cc.unspent[static_cast<std::size_t>(stop_why)] += left;
                         stop = true;
                         break;
@@ -5252,7 +5338,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                         // BL-1197: or a short good had no ground to dig it.
                         cc.unspent[static_cast<std::size_t>(
                             chain_masked_any ? charter_unspent_reason::chain_infeasible
-                            : dig_missed_any ? charter_unspent_reason::window_exhausted
+                            : dig_missed_any ? dig_miss_why
                                              : charter_unspent_reason::no_gap)] += left;
                         stop = true;
                         break;
@@ -5322,6 +5408,8 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                             // and choose again, as a chain miss does.
                             selectable[gap_r] = std::max(selectable[gap_r], demand[gap_r]);
                             dig_missed_any    = true;
+                            if (why == charter_unspent_reason::province_cap)
+                                dig_miss_why = charter_unspent_reason::province_cap;
                             gap_r    = resource_count;
                             recipe_i = -1;
                             continue;
@@ -5516,7 +5604,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         br.body              = body_id;
         br.firm_points       = bs.firm_points;
         br.firm_charters     = bs.firm_charters;
-        br.goods_with_demand = static_cast<int>(bs.goods.size());
+        br.goods_in_g = static_cast<int>(bs.goods.size());
         br.goods             = bs.goods;
         br.reference_points  = bs.reference_points;
         br.per_good_cap      = bs.per_good_cap;

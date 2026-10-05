@@ -346,11 +346,11 @@ inline std::int64_t charter_isqrt(std::int64_t x)
 /// any mutation (`charter_spend_refusal`, BL-1060): on an accepted spend c x B,
 /// and c x B_ref at the anchor, always fit.
 inline std::int32_t charter_sqrt_per_good_cap(std::int32_t c, std::int64_t firm_points,
-                                              int goods_with_demand, std::int32_t firm_price_points)
+                                              int goods_in_g, std::int32_t firm_price_points)
 {
-    if (c <= 0 || goods_with_demand <= 0 || firm_price_points <= 0 || firm_points <= 0)
+    if (c <= 0 || goods_in_g <= 0 || firm_price_points <= 0 || firm_points <= 0)
         return c;
-    const std::int64_t denom = static_cast<std::int64_t>(goods_with_demand)
+    const std::int64_t denom = static_cast<std::int64_t>(goods_in_g)
                              * static_cast<std::int64_t>(firm_price_points);
     constexpr std::int64_t k_max = std::numeric_limits<std::int64_t>::max();
     if (firm_points > k_max / c)
@@ -412,10 +412,12 @@ enum class charter_unspent_reason : std::uint8_t
     density_ceiling  = 7, ///< the body already carries `density_ceiling` background firms
                           ///< (sqrt_capital only; BL-1039)
     late_shortfall   = 8, ///< sqrt_capital only (BL-1060): no good in the turn could take a
-                          ///< firm, but a good OUTSIDE G is short — one whose demand the
-                          ///< walk's own firms created after G was fixed (their upkeep).
-                          ///< The turn serves G alone, so that shortfall is real and
-                          ///< unserved; `no_gap` would claim there was none.
+                          ///< firm, but a good OUTSIDE G that the body CAN produce is
+                          ///< short — one whose demand the walk's own firms created after
+                          ///< G was fixed (their upkeep). The turn serves G alone, so that
+                          ///< shortfall is real and unserved; `no_gap` would claim there
+                          ///< was none. A short good the body cannot produce at all is
+                          ///< `unproducible`, never this.
     share_unplaced   = 9, ///< sqrt_capital only, where the ceiling binds (NR-905, NR-906): a
                           ///< turn good's share still unfilled at the end of the walk.
                           ///< A centre that stops because every good it could still
@@ -435,6 +437,12 @@ enum class charter_unspent_reason : std::uint8_t
                            ///< chain-feasible — no recipe for the good (or, for a specialist,
                            ///< for its processors) has every input produced within reach of
                            ///< the ground's market.
+    unproducible     = 12, ///< sqrt_capital only (BL-1197 review): no good in the turn could
+                           ///< take a firm, no producible good outside G is short, but a good
+                           ///< the body CANNOT PRODUCE AT ALL is short — no deposit of it on
+                           ///< the body (no Well or ice route, for water) and no recipe for
+                           ///< it from producible inputs — so it is out of G by rule. The
+                           ///< want is real and no firm on this body could ever serve it.
 };
 
 inline const char* charter_unspent_reason_name(charter_unspent_reason r)
@@ -453,11 +461,12 @@ inline const char* charter_unspent_reason_name(charter_unspent_reason r)
     case charter_unspent_reason::share_unplaced:   return "share_unplaced";
     case charter_unspent_reason::no_specialist:    return "no_specialist";
     case charter_unspent_reason::chain_infeasible: return "chain_infeasible";
+    case charter_unspent_reason::unproducible:     return "unproducible";
     }
     return "?";
 }
 
-constexpr int charter_unspent_reason_count = 12;
+constexpr int charter_unspent_reason_count = 13;
 
 /// Which anchor rung a charter landed on. There is no third rung: a charter that
 /// finds no ground in either is UNSPENT, never scattered nation-wide.
@@ -516,9 +525,13 @@ struct charter_body_record
     /// c x B / B_ref exactly where one price holds, and stays meaningful where
     /// a body's centres pay different reach prices.
     std::int64_t firm_charters = 0;
-    /// |G|: goods with demand on the body before the walk (see
-    /// `charter_sqrt_per_good_cap`), and which they are (resource indices, ascending).
-    int                        goods_with_demand = 0;
+    /// |G|: the goods the walk serves on the body, fixed before it (see
+    /// `charter_sqrt_per_good_cap`), and which they are (resource indices,
+    /// ascending). Not "goods with demand": G is the goods with demand (final or
+    /// derived), plus their inputs along each good's anchor route, less every good
+    /// the body cannot produce (BL-1197; CORPORATION_GENERATION.md § Pass 6) — so a
+    /// member may have no demand yet.
+    int                        goods_in_g = 0;
     std::vector<std::uint16_t> goods;
     /// B_ref = c x |G| x firm price (0 when |G| is 0, and under `lifted`, which
     /// carries no c), at the WORLD's price (`firm_price_points`). Reported under

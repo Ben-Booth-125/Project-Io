@@ -1088,7 +1088,8 @@ void part_four_firm_census(const std::vector<std::uint32_t>& seeds)
         const std::int64_t other = r.u_pts[P(charter_unspent_reason::no_nation)]
                                  + r.u_pts[P(charter_unspent_reason::body_cap)]
                                  + r.u_pts[P(charter_unspent_reason::refused)]
-                                 + r.u_pts[P(charter_unspent_reason::chain_infeasible)]; // BL-1185
+                                 + r.u_pts[P(charter_unspent_reason::chain_infeasible)]  // BL-1185
+                                 + r.u_pts[P(charter_unspent_reason::unproducible)];     // BL-1197
         const std::int64_t pc = r.u_pts[P(charter_unspent_reason::province_cap)];
         const std::int64_t pc_firms = r.firm_price > 0 ? pc / r.firm_price : 0;
         const double share = census_pct(pc, r.budgeted);
@@ -1130,7 +1131,8 @@ void part_four_firm_census(const std::vector<std::uint32_t>& seeds)
                 static_cast<long long>(tu[P(charter_unspent_reason::no_nation)]
                                        + tu[P(charter_unspent_reason::body_cap)]
                                        + tu[P(charter_unspent_reason::refused)]
-                                       + tu[P(charter_unspent_reason::chain_infeasible)]));
+                                       + tu[P(charter_unspent_reason::chain_infeasible)]
+                                       + tu[P(charter_unspent_reason::unproducible)]));
     std::printf("  province_cap binds (> 0 points) on %d of %zu worlds; the largest share is %.1f%% of "
                 "a budget (seed %u)\n",
                 worlds_capped, rows.size(), max_share, max_share_seed);
