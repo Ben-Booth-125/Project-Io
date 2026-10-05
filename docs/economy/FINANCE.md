@@ -33,6 +33,10 @@ balance += income − expenditure − maintenance − wages − interest − lev
 - **Upkeep** — standing-force upkeep (below). Its authored rates are all `0.0`, so the
   term is present and carried but contributes nothing at the authored values.
 
+**Household consumption is not a flow.** A household draws its basket off the market's shelf and
+pays nothing for it (`MARKETS.md` § The clearing tick, step 12). The maker was already paid when
+the market bought the stock as buyer of last resort, so consumption moves goods, never credits.
+
 The seven flows are retained per corp in `corp_budget` (BL-072, budget breakdown); its
 `net()` is exactly the delta applied to the balance, so the ledger can never disagree with
 the loop. The breakdown sink is optional — the headless harnesses skip it and take only
@@ -129,7 +133,7 @@ construction site pauses for want of that material (construction capacity over t
 stretches the build instead, as an empty yard does), and a nation buys elsewhere or not at all.
 What a draw is billed is only what the shelf gave.
 
-**The cost of listings-only supply, stated (k = 0 until shelf spoilage, Ben 2026-10-03).** While
+**The cost of listings-only supply, stated (at k = 0, Ben 2026-10-03).** While
 the shelf does not count as supply (MARKETS.md § Price resolution), a draw on a market nobody lists
 into prices itself out of a full shelf: its own want is demand against zero supply, the price
 resolves from 1.5× toward the 10× cap (5.75× in one tick), the draw is then over the ceiling and

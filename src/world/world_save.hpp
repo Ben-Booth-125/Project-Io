@@ -304,6 +304,15 @@ inline constexpr uint32_t world_save_magic =
 /// refused whole on the strict-equality contract, no migration (a pre-bump
 /// battle recorded no ground). Claimed through
 /// `tools/session/next_save_version.js --kind world --claim`.
+/// Bumped to 32 by BL-1196 (households consume): the market record gains two
+/// resource-indexed float arrays at its tail, after `inventory` --
+/// `household_bid` and `household_fill`, the population channel's bid and what
+/// it drew off the shelf at the last clear, which the growth gate reads before
+/// the next clear. A v30 stream is 2 x resource_count floats short per market,
+/// so its next market misreads; refused whole on the strict-equality contract,
+/// no migration. (v31 is claimed by BL-1139, centres abandoned in play, on an
+/// unmerged branch.) Claimed through
+/// `tools/session/next_save_version.js --kind world --claim`.
 /// Bumped to 33 by BL-1201 (orders are price floors): the sell-order record gains
 /// one byte, `sell_order::empty_ticks`, after `resource` -- the run of clearing
 /// ticks the order has had nothing to list, which closes it at
@@ -312,7 +321,14 @@ inline constexpr uint32_t world_save_magic =
 /// (31 and 32 are claimed by in-flight branches -- BL-1139, BL-1196 -- and this
 /// stacks above them.) Claimed through
 /// `tools/session/next_save_version.js --kind world --claim`.
-inline constexpr uint32_t world_save_version = 33;
+/// Bumped to 35 by the household-stack integration (BL-1196 households consume,
+/// BL-1163 per-market growth gate, BL-1179 shelf spoilage) landing on top of
+/// BL-1201: the stream now carries BOTH the market record's household_bid /
+/// household_fill tail (BL-1196's 32) AND sell_order::empty_ticks (BL-1201's 33),
+/// a layout neither 32 nor 33 describes. (34 was taken by an unclaimed throwaway
+/// measurement branch.) Claimed through
+/// `tools/session/next_save_version.js --kind world --claim`.
+inline constexpr uint32_t world_save_version = 35;
 
 /// Write @p w as a complete world snapshot.
 ///

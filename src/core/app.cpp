@@ -1600,6 +1600,20 @@ void app::finish_economy_presentation()
                          e.channel, resource_names::name_of(e.resource).c_str());
         if (!unpriced.empty())
             std::fflush(stderr);
+
+        // BL-1179 (shelf spoilage): the same once-per-start report for a good
+        // some market prices whose shelf never spoils — every good spoils, by
+        // the ruling (MARKETS.md § The shelf spoils), so a missing rate is an
+        // authoring gap in scripts/economy.lua's shelf_spoilage table.
+        const std::vector<resource_type> unspoiled = unspoiled_priced_goods(m_world, m_registry);
+        for (const resource_type r : unspoiled)
+            std::fprintf(stderr,
+                         "ProjectIo: [shelf-spoilage] '%s' is priced but carries no shelf spoilage "
+                         "rate - its shelf stock never drains. Add it to economy.shelf_spoilage "
+                         "in scripts/economy.lua.\n",
+                         resource_names::name_of(r).c_str());
+        if (!unspoiled.empty())
+            std::fflush(stderr);
     }
 
     // Seat the persona counsel mountain bench (BL-207 slice 1). Every non-player

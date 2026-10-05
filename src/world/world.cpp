@@ -128,6 +128,11 @@ uint64_t world::state_hash(int tick) const
             const market_component& m = markets.at(id);
             fnv1a_u32(h, id);
             for (const float p : m.price) fnv1a_f32(h, p);
+            // BL-1196 household channel: the growth gate branches on fill / bid
+            // (population_met_ratio) before the next clear rewrites them, and
+            // both are saved, so a divergence in either is a real divergence.
+            for (const float b : m.household_bid) fnv1a_f32(h, b);
+            for (const float f : m.household_fill) fnv1a_f32(h, f);
         }
     }
 

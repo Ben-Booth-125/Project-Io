@@ -296,20 +296,13 @@ building_upkeep_goods(const building_upkeep_params& p, building_type bt, era_ban
 
 /// BL-365 population-growth-gate tunables, authored in scripts/economy.lua under
 /// `economy.population_growth`. Read only by the population-growth step in
-/// run_economy_step (economy_system.cpp) to test whether a centre's basket is
-/// broadly met before it levels up. This is the surviving remnant of the old
-/// BL-078 elastic nation-substrate model — that model's demand/supply INJECTION
-/// (capacity, clearing_fraction, elasticity) was deleted by BL-365, which
-/// replaced the abstract substrate with real background corporations
-/// (corporation_generation.cpp's generate_background_firms); the growth gate
-/// still needs *some* basket + threshold to test consumption against, so those
-/// two fields alone survive under a new name.
+/// run_economy_step (economy_system.cpp). BL-1163 (play villages decline)
+/// retired the gate's own `demand_basket`: the growth basket IS the household
+/// basket a centre bids (`population_demand_basket()`, read through
+/// `population_met_ratio`), so there is no second list — only the threshold.
 struct growth_params
 {
-    /// Per-capita basket weight per resource, used ONLY to weight the met-supply
-    /// ratio the growth gate reads. Indexed by static_cast<std::size_t>(resource_type).
-    std::array<float, resource_count> demand_basket = {};
-    float growth_met_threshold = 0.50f; ///< basket met-supply ratio a centre needs to grow.
+    float growth_met_threshold = 0.50f; ///< household met ratio a centre needs to grow.
 };
 
 /// BL-617 (population migration) tunables, authored in scripts/economy.lua
@@ -1085,6 +1078,21 @@ public:
     /// (market_clearing.cpp) and wf_target_price (economy_system.cpp).
     const price_band_params& price_band() const { return m_price_band; }
 
+    /// BL-1179 (shelf spoilage; MARKETS.md § The shelf spoils) — the share of
+    /// each good standing on a market's SHELF (`market_component::inventory`)
+    /// that leaves it every economy tick, per resource, authored in
+    /// `economy.shelf_spoilage` (scripts/economy.lua). Applied by
+    /// `spoil_market_shelves` (market_clearing.cpp) and nowhere else: a corp's
+    /// own pool never spoils.
+    ///
+    /// ALL ZERO BY DEFAULT — no good spoils — so a harness that hand-builds a
+    /// registry and never authors the table keeps the shelf it was written
+    /// against. An AUTHORED rate is in (0, 1]: zero is rejected at load
+    /// ("never zero", the ruling), as is anything non-finite or above 1.
+    /// `unspoiled_priced_goods` names a good some market prices that carries
+    /// no rate.
+    const std::array<float, resource_count>& shelf_spoilage() const { return m_shelf_spoilage; }
+
     /// BL-708 grid-good rules (economy.grid_goods in Lua): which goods ride the
     /// road network instead of a convoy, and what their stockpile ceiling is.
     /// Defaults to all-inert, so a hand-built registry authors nothing and
@@ -1343,6 +1351,7 @@ public:
         rebuild_baskets(); // BL-647: same era-resolved fold as the two siblings.
     }
     void set_price_band(const price_band_params& p) { m_price_band = p; }
+    void set_shelf_spoilage(const std::array<float, resource_count>& s) { m_shelf_spoilage = s; }
     void set_grid_goods(const grid_goods_params& g) { m_grid_goods = g; }
     void set_market_emergence(const market_emergence_params& m) { m_market_emergence = m; }
     void set_construction(const construction_params& c) { m_construction = c; }
@@ -1597,6 +1606,7 @@ private:
     std::array<float, resource_count> m_background_basket = {};
     std::array<float, resource_count> m_endemic_basket    = {}; // BL-647
     price_band_params m_price_band = {};
+    std::array<float, resource_count> m_shelf_spoilage = {}; // BL-1179
     grid_goods_params m_grid_goods = {};
     market_emergence_params m_market_emergence = {};
 

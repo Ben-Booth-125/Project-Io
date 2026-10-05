@@ -544,6 +544,16 @@ void inject_population_demand(world& w, const recipe_registry& reg)
     // which a save/load rebuilds (world_save.cpp re-inserts in id order) and
     // another standard library lays out differently again. The order is now a
     // property of the ids alone.
+    // BL-1196 (households consume): the household share of `demand` is kept on
+    // its own register, `household_bid`, so the end-of-clear draw knows how much
+    // the people want and the growth gate can read fill / bid. Zeroed on every
+    // market first: a market no centre clears at bids nothing this tick.
+    for (auto& [mid, mc] : w.markets)
+    {
+        (void)mid;
+        mc.household_bid.fill(0.0f);
+    }
+
     std::vector<entity_id> centre_ids;
     centre_ids.reserve(w.population_centres.size());
     for (const auto& [cid, pcc] : w.population_centres)
@@ -584,9 +594,143 @@ void inject_population_demand(world& w, const recipe_registry& reg)
             const float price   = (mc.price[r] > 0.0f) ? mc.price[r] : base;
             const float elastic = std::clamp(std::pow(base / price, pd.demand_elasticity),
                                              pd.elasticity_min, pd.elasticity_max);
-            mc.demand[r] += weighted * elastic;
+            const float bid = weighted * elastic;
+            mc.demand[r]        += bid;
+            mc.household_bid[r] += bid; // same order, same addends: ascending centre id
         }
     }
+}
+
+void draw_household_basket(world& w)
+{
+    // BL-1196 (households consume; POPULATION.md § Population demand: "a
+    // population centre consumes a basket of goods drawn from the local
+    // market"). The household bid stops being a pricing pull only: the people
+    // TAKE what they bid off the market's shelf, `min(bid, inventory)` per good,
+    // and that leaves the shelf for good — the Household channel's terminal
+    // sink (MARKETS.md § Demand channels, property 4).
+    //
+    // MONEY: none moves. The shelf is the market's, and the market already paid
+    // the maker for every unit on it when it bought the stock as buyer of last
+    // resort (FINANCE.md § The money loop). Consumption moves goods, not credits.
+    //
+    // NO CEILING. A household draws whatever its bid names regardless of
+    // `shelf_admits`: the fair-price ceiling is a PROCESSOR's reservation price
+    // (BL-1172), and a household's reservation is already in its bid — the
+    // price elasticity shrinks the bid as the price climbs.
+    //
+    // SEVERAL CENTRES, ONE MARKET: the bid is pooled (inject_population_demand
+    // sums it in ascending centre id), so a short shelf fills every centre
+    // there in the same share — pro rata, fill / bid. Each market's draw reads
+    // and writes only its own arrays, but walk ascending market id and
+    // ascending resource anyway so no hash order is ever one edit away.
+    std::vector<entity_id> mids;
+    mids.reserve(w.markets.size());
+    for (const auto& [mid, mc] : w.markets)
+    {
+        (void)mc;
+        mids.push_back(mid);
+    }
+    std::sort(mids.begin(), mids.end());
+    for (const entity_id mid : mids)
+    {
+        market_component& mc = w.markets.at(mid);
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            const float bid   = std::max(0.0f, mc.household_bid[r]);
+            const float shelf = std::max(0.0f, mc.inventory[r]);
+            const float take  = std::min(bid, shelf);
+            mc.household_fill[r] = take;
+            if (take > 0.0f)
+                mc.inventory[r] = shelf - take;
+        }
+    }
+}
+
+void spoil_market_shelves(world& w, const recipe_registry& reg)
+{
+    // BL-1179 (MARKETS.md § The shelf spoils). The shelf is the market's,
+    // bought as buyer of last resort, and nobody tends it: each good loses a
+    // fixed share of what stands on it every tick. Goods leave; no credits move
+    // (the market already paid the maker). Ascending market id and resource so
+    // no hash order is ever one edit away, though each market's arithmetic
+    // reads and writes only its own array.
+    const std::array<float, resource_count>& rate = reg.shelf_spoilage();
+    bool any = false;
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (rate[r] > 0.0f) { any = true; break; }
+    if (!any)
+        return; // no rates authored: the pre-BL-1179 shelf, untouched
+    std::vector<entity_id> mids;
+    mids.reserve(w.markets.size());
+    for (const auto& [mid, mc] : w.markets)
+    {
+        (void)mc;
+        mids.push_back(mid);
+    }
+    std::sort(mids.begin(), mids.end());
+    for (const entity_id mid : mids)
+    {
+        market_component& mc = w.markets.at(mid);
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            if (!(rate[r] > 0.0f) || !(mc.inventory[r] > 0.0f))
+                continue;
+            mc.inventory[r] = std::max(0.0f, mc.inventory[r] - mc.inventory[r] * rate[r]);
+        }
+    }
+}
+
+std::vector<resource_type> unspoiled_priced_goods(const world& w, const recipe_registry& reg)
+{
+    std::array<bool, resource_count> priced{};
+    for (const auto& [mid, mc] : w.markets) // a pure OR: the map's layout cannot reach it
+    {
+        (void)mid;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (mc.base_price[r] > 0.0f)
+                priced[r] = true;
+    }
+    std::vector<resource_type> out;
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (priced[r] && !(reg.shelf_spoilage()[r] > 0.0f))
+            out.push_back(static_cast<resource_type>(r));
+    return out;
+}
+
+float population_met_ratio(const world& w, const recipe_registry& reg, entity_id market, bool* recorded)
+{
+    if (recorded)
+        *recorded = true;
+    const auto mit = w.markets.find(market);
+    if (mit == w.markets.end())
+        return 1.0f;
+    const market_component& mc = mit->second;
+    // The SAME vector inject_population_demand multiplies by — never
+    // pd.demand_basket (the shared tranche alone) and never a second list.
+    const std::array<float, resource_count>& basket = reg.population_demand_basket();
+    float acc = 0.0f, weight = 0.0f;
+    bool  bids_something = false; // a priced basket good the households would bid on
+    for (std::size_t r = 0; r < resource_count; ++r) // resource index ascending: fixed float order
+    {
+        const float bw = basket[r];
+        if (bw <= 0.0f || mc.base_price[r] <= 0.0f)
+            continue; // not in the bid (inject_population_demand's two skips)
+        bids_something = true;
+        const float bid = mc.household_bid[r];
+        if (bid <= 0.0f)
+            continue; // no clear has recorded the bid yet
+        // BL-1196: what the households DREW off the shelf over what they bid.
+        acc    += bw * std::min(1.0f, mc.household_fill[r] / bid);
+        weight += bw;
+    }
+    // Review fix (household stack): a market that prices basket goods but has
+    // recorded no bid on any of them has not been cleared since it was made --
+    // its 1.0 is "no reading", not "fully met". Say so, so the growth gate
+    // carries the centre's streak instead of counting a spurious met tick.
+    if (recorded && bids_something && !(weight > 0.0f))
+        *recorded = false;
+    return (weight > 0.0f) ? acc / weight : 1.0f;
 }
 
 void inject_background_demand(world& w, const recipe_registry& reg)
@@ -1741,6 +1885,20 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
             }
         }
     }
+
+    // BL-1196 (households consume): the people take their basket off the shelf,
+    // AFTER every sale this tick has credited it (rows 1-4 above) — so a unit
+    // made this tick can feed a household this tick — and after every price the
+    // clear bills at was fixed. Production and construction drew earlier in the
+    // tick (the tick's fixed pass order), so households are the shelf's last
+    // claimant within a tick and the first sink after it fills.
+    draw_household_basket(w);
+
+    // BL-1179 (shelf spoilage): after the households' draw — the tick's last
+    // draw on the shelf — and before the next tick's reference prices read the
+    // shelf's share of supply (and before next tick's production, construction
+    // and dispatch draw on it). Goods leave; no credits move.
+    spoil_market_shelves(w, reg);
 
     // --- Price update: ref_price (pre-computed from supply/demand) ---
     // Explicit priced trades provide a VWAP signal; when they occurred, ease toward
