@@ -17,3 +17,5 @@
 {"version":29,"kind":"world","owner":"BL-1125 markets can die (world::folded_markets, the fold map)","ts":"2026-10-02T16:09:31.584Z","branch":"worktree-agent-a813ded7b0eb1d30d"}
 {"version":30,"kind":"world","owner":"BL-1145 province front-tile readers (active_battle::ground_tile)","ts":"2026-10-02T20:24:19.307Z","branch":"worktree-agent-a608614e76f63983a"}
 {"version":31,"kind":"world","owner":"BL-1139 centres-abandoned-in-play (world::centre_abandonments)","ts":"2026-10-02T21:09:00.364Z","branch":"worktree-agent-ae9978d9141f0dc73"}
+{"version":32,"kind":"world","owner":"BL-1196 households-consume","ts":"2026-10-04T22:48:23.205Z","branch":"worktree-agent-a4c46e4ea6977dcd0"}
+{"version":33,"kind":"world","owner":"BL-1201 orders-are-price-floors (sell_order::empty_ticks)","ts":"2026-10-05T14:04:03.932Z","branch":"worktree-agent-a67d1a4698aa7d990"}

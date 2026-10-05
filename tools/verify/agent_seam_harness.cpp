@@ -522,6 +522,15 @@ int main()
             + cmd_head + " verb=" + std::to_string(vi(corp_verb::place_sell_order))
                        + " subject=" + std::to_string(s.body) + " target=" + std::to_string(steel)
                        + " quantity=5 floor_price=1e300\n"                                           // finite double, infinite float
+            + cmd_head + " verb=" + std::to_string(vi(corp_verb::place_sell_order))
+                       + " subject=" + std::to_string(s.body) + " target=" + std::to_string(steel)
+                       + " quantity=1e-60 floor_price=2\n"                                           // BL-1201: nonzero -> 0.0f = NO CAP
+            + cmd_head + " verb=" + std::to_string(vi(corp_verb::place_sell_order))
+                       + " subject=" + std::to_string(s.body) + " target=" + std::to_string(steel)
+                       + " quantity=-1e-60 floor_price=2\n"                                          // BL-1201: nonzero -> -0.0f
+            + cmd_head + " verb=" + std::to_string(vi(corp_verb::place_sell_order))
+                       + " subject=" + std::to_string(s.body) + " target=" + std::to_string(steel)
+                       + " quantity=5 floor_price=1e-60\n"                                           // BL-1201: floor narrows to 0 = market
             + "COMMAND corp=" + std::to_string(s.other) + " verb="
                        + std::to_string(vi(corp_verb::set_workforce))
                        + " subject=" + std::to_string(s.bld) + " workforce=50\n"                     // actor gate
@@ -550,7 +559,7 @@ int main()
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
         seam.drain_boundary(s.w, reg, 0);
-        for (int i = 0; i < 200 && count_of(rx, "\n") < 8; ++i)
+        for (int i = 0; i < 200 && count_of(rx, "\n") < 11; ++i)
         {
             seam.pump(s.w, reg, 0);
             client_recv_into(client, rx);
@@ -561,8 +570,9 @@ int main()
         const uint64_t h_after = s.w.state_hash(0);
         check(h_before == h_after,
               "R2.2 state_hash before == after: a rejection mutates NOTHING");
-        check(count_of(rx, "RESULT result=rejected_invalid building=-1") == 6,
-              "R2.3 all six malformed commands rejected WHOLE with the typed reason");
+        check(count_of(rx, "RESULT result=rejected_invalid building=-1") == 9,
+              "R2.3 all nine malformed commands rejected WHOLE with the typed reason "
+              "(incl. BL-1201: a nonzero quantity or floor that narrows to +/-0)");
         check(count_of(rx, "RESULT result=rejected_not_owner building=-1") == 1,
               "R2.4 the actor gate refuses a corp the session is not (typed)");
         check(count_of(rx, "ERR unknown op") == 1,
@@ -570,7 +580,7 @@ int main()
         check(s.w.buildings.at(s.bld).workforce_target == 100,
               "R2.6 workforce=250 neither applied nor CLAMPED to 200 (rejected whole)");
         check(s.w.sell_orders.empty(),
-              "R2.7 no order book entry from the NaN / overflow prices");
+              "R2.7 no order book entry from the NaN / overflow / underflow values");
     }
 
     std::printf("\nagent_seam_harness: %d passed, %d failed\n", g_pass, g_fail);

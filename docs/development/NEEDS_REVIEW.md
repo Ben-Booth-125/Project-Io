@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*79 entries — 3 open, 76 resolved.*
+*80 entries — 3 open, 77 resolved.*
 
 ---
 
@@ -1363,4 +1363,22 @@ Tile generation marks every ocean component except the largest as terrain_substr
 > **RESOLVED.** RULED (Ben, the lake and well form, 2026-10-05): option A - a lake is an enclosed water body below a measured size cap; larger enclosed bodies are seas (coast, ports and wharves; no Wells). Written into TILES.md sec Water kinds (replacing "no size cut-off"); the work is BL-1200 (lake size cap), the cap read off the 16 curated seeds.
 
 *Files: `src/world/tile_generation.cpp`, `docs/economy/TILES.md`, `docs/economy/PRODUCTION.md`*
+
+### NR-976 — DECISION TAKEN: generation charters a missing raw input so a chain is absent only when the ground lacks it (BL-1197)
+*decision · raised 2026-10-05 · from the sprint 49 main session, on Ben's delegation*
+
+BL-1197 round 2 (no fallback for water-gap firms) cost seeds 0 and 43 their alloys/machinery chains and left 401 / 270 centres chain-infeasible: the fallback firms had been the only diggers of those chains' raw inputs, which the per-good turn never charters for. Under your hard rule a chain with no feasible site is absent - but this absence came from chartering order, not geography. Decided: when a wanted processing good is infeasible only because a raw input has no producer in reach, and that raw lies in the centre's windows, generation charters its extractor first (booked as that raw's firm, within caps and budget) and retries; one level deep (raw inputs only).
+
+**Why it matters.** Keeps the hard rule honest: absent chains mean the world lacks the ground, which is the legibility the rule exists for.
+
+- A: keep it (one level of input chartering)
+- B: no input chartering - chains absent whenever their raws were not chartered
+- C: recurse through intermediate goods too
+- D: other
+
+> **Recommendation:** A.
+
+> **RESOLVED.** SUPERSEDED by Ben's ruling (the charter walk form, 2026-10-05): option A - the charter walk counts derived demand (a processor's input demand is demand it fills), so steel and every intermediate are chartered in their own right; written into CORPORATION_GENERATION.md sec Pass 6. The raw-input special case is replaced by it.
+
+*Files: `src/world/corporation_generation.cpp`, `docs/generation/CORPORATION_GENERATION.md`*
 

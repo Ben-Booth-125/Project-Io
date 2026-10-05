@@ -429,6 +429,7 @@ void w_sell(std::ostream& o, const sell_order& s)
     w_id(o, s.corp);
     w_id(o, s.body);
     w_enum(o, s.resource);
+    w_u8(o, s.empty_ticks); // BL-1201: world_save_version 33
     w_f32(o, s.quantity);
     w_f32(o, s.floor_price);
 }
@@ -436,7 +437,10 @@ void w_sell(std::ostream& o, const sell_order& s)
 bool r_sell(std::istream& i, sell_order& s)
 {
     return r_u32(i, s.id) && r_id(i, s.corp) && r_id(i, s.body)
-        && r_enum(i, s.resource, max_resource) && r_f32(i, s.quantity) && r_f32(i, s.floor_price);
+        && r_enum(i, s.resource, max_resource) && r_u8(i, s.empty_ticks)
+        && r_f32(i, s.quantity) && r_f32(i, s.floor_price)
+        // BL-1201: 0 = no cap, otherwise a positive cap; nothing else is writable.
+        && std::isfinite(s.quantity) && s.quantity >= 0.0f;
 }
 
 void w_buy(std::ostream& o, const buy_order& b)

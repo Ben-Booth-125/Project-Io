@@ -225,8 +225,14 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
    player and for rival corps, so a rival's order can never strand the goods it was placed to
    sell.
 5. **Standing sell orders** — read from `world::sell_orders` (the book is world state, placed by
-   the player and by rival corps through the same `place_sell_order` verb), quantity capped by the
-   pool, entered into both market supply and the explicit sell book with their `floor_price`.
+   the player and by rival corps through the same `place_sell_order` verb). Each lists the pool's
+   surplus above the processor reservation — all of it when `quantity` is 0 (no cap), at most
+   `quantity` otherwise — entered into both market supply and the explicit sell book with its
+   `floor_price`. An order whose pool has held **no surplus** above the processor reservation —
+   read before any order's claim, so it is the pool that is empty, not the order — for
+   `sell_order_empty_close_ticks` (4) consecutive ticks is removed at the end of the clearing
+   pass, with a line in the world history log; a second order whose surplus an earlier one
+   claimed is therefore not closed while the pool still holds goods.
    Multiple orders against one `(corp, market, resource)` share a **running remainder**: total
    listed quantity never exceeds the pool, each order's matched/auto-cleared quantity is tracked
    per order, and pool debits clamp at zero.

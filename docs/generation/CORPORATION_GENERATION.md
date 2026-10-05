@@ -488,21 +488,6 @@ held ground, and none of it was within reach of a chain. The budget-less Pass 6 
 it has missed as many times as the body has nations (the nation cursor takes them in turn), and
 the mask holds for the rest of the pass unless a firm that produces one of its inputs lands.
 
-**Input chartering — a chain is absent only where the ground lacks it** (main session, 2026-10-05,
-NR-976; BL-1197). A firm chartered for a processed good whose every recipe is chain-infeasible
-at its centre **only because one or more RAW inputs have no producer within reach** (the reach
-above, in its generation form) does not give the good up while the ground holds that raw. The
-first such raw — the gap selection's recipe first, then the good's others; within a recipe, its
-raws in ascending resource order — that is under its own cap and has a deposit in the centre's
-windows (a Well site, for water) is chartered first: that firm is the raw's extractor, booked as
-the raw's firm, counted against the raw's cap and share, and bound by the province cap and the
-budget like any firm. The processed good is then retried by the next firm (under the turn, its
-place in the turn is kept). A raw is chartered for this reason at most once per centre; without
-a budget, once per raw and market per body, in the refusing nation's tiles of the processor's
-market. **One level deep:** only raw inputs are chartered this way. A recipe missing a processed
-input — steel, refined copper — does not qualify, and the chain stays absent under
-`chain_infeasible`.
-
 **A water-gap firm digs water** (Ben, 2026-10-05, NR-973: "we can add wells to generation";
 BL-1197, gap firm digs the gap). An extraction firm chartered for the water gap stands on water
 ground: a **Well** site (`../economy/PRODUCTION.md` § Extraction buildings — fresh-water adjacent,
@@ -517,6 +502,18 @@ so nothing is lost and nothing is crowded out. Without a budget the miss counts 
 mask, which falls once water has missed as many times as the body has nations (a firm that lands
 for it clears the count). Every other gap good keeps the richest-deposit rule. Chain-feasible placement then sees the water near people, so clean-water
 and medical makers can stand where a Well does.
+
+**A processor's inputs are wanted too (Ben, 2026-10-05; derived demand).** What the walk fills is
+not only final demand — households and the bodies' own wants — but the **input demand of every
+processor standing or chartered**: a placed steel works' iron ore and coal, a placed machinery
+plant's steel and refined copper, are wants of the body like any other, entered into the same gap
+the walk takes goods from, and filled in the same turn. So a chain is absent only because its
+ground is absent: an intermediate good that downstream plants need (steel above all) is chartered
+in its own right, not by accident of an extractor's attached processor. This replaces the narrower
+"charter a missing raw input" special case: input chartering is simply what derived demand does.
+The input demand is read in the generation form (each processor at its nominal rate, no production
+report), and it is recomputed as firms land, so a newly chartered processor raises its inputs'
+gaps for the turns after it.
 
 **What Pass 6 does not do.** It does not seed any behavioural state, matching the contract the
 rest of this pipeline holds (§ Generation seeds no behaviour) — no sentiment, no diplomatic

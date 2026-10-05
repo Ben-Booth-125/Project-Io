@@ -684,8 +684,10 @@ thing that is still trading:
   across its market pools on that body (`PRODUCTION.md` § Stockpile and output flow) above
   `trade_hold_threshold` (50 units) — well clear of any processor's per-tick draw, so listing can
   never compete with feeding the corp's own chain.
-- **Quantity**: `trade_release_fraction` (0.5) of the excess. It meters its release rather than
-  emptying the pool into one quarter's clearing.
+- **Quantity**: none — the order is placed **uncapped**. An order is a price floor over the whole
+  surplus (`MARKETS.md` step 4, Ben 2026-10-05): clearing lists everything above the processor
+  reservation under it, tick by tick, so it keeps pace with what the corp produces, and an order
+  whose pool stands empty closes itself. The scorer has nothing to size and nothing to withdraw.
 - **Floor**: `trade_floor_multiple` × the market's `base_price` — the rarity-derived value floor,
   the closest per-resource cost reference the world exposes. The authored value is **0.25**,
   which is the price band's own floor (the lowest price a glutted market can resolve), so surplus
@@ -699,7 +701,7 @@ thing that is still trading:
   at most `max_trades` (1) order-book command per evaluation. A trade command's subject is a body,
   not a building, so it takes no dial slot and records no building cooldown.
 
-All three numbers are `corp_ai_params` fields, so tuning is a data change. Two limits are part of
+Both numbers are `corp_ai_params` fields, so tuning is a data change. Two limits are part of
 the shape: `base_price` is a rarity floor and not a production cost, so on a resource whose real
 cost sits above its rarity floor the AI will sell at a loss (the blackboard's lack of a reference
 price is BL-385, blackboard exports no reference price); and the book is **one-sided** — a corp

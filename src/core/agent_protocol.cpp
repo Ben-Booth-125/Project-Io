@@ -98,8 +98,11 @@ long long kv_get_checked(const std::unordered_map<std::string, std::string>& kv,
 ///
 /// The first cut of this guard returned the default instead, and that was wrong
 /// for a reason worth keeping: the two keys sharing this getter have defaults
-/// that mean OPPOSITE things downstream. `quantity`'s 0 is rejected by the seam,
-/// so substituting it is a refusal by accident. `floor_price`'s 0 is meaningful
+/// that are both MEANINGFUL downstream. `quantity`'s 0 is NO CAP since BL-1201
+/// (orders are price floors) — the order covers the whole surplus — so
+/// substituting it would widen a capped order to an uncapped one. An ABSENT
+/// `quantity` still defaults to 0 deliberately: an uncapped order is the default
+/// order. Only a MALFORMED value is refused. `floor_price`'s 0 is meaningful
 /// — the seam reads it as "accept the market price" — so substituting it turns
 /// "sell only above this floor" into "sell at market, every tick", answers
 /// `applied`, and issues no diagnostic. That is precisely the silent
@@ -268,10 +271,19 @@ host_op service_line(const std::string& line, world& w, const recipe_registry& r
         // here too: the seam guards them for place_sell_order, but a
         // malformed line should not reach the seam whatever the verb.
         bool floats_ok = true;
-        const float qty_v   = static_cast<float>(kv_getf(kv, "quantity", 0.0, &floats_ok));
-        const float floor_v = static_cast<float>(kv_getf(kv, "floor_price", 0.0, &floats_ok));
+        const double qty_d   = kv_getf(kv, "quantity", 0.0, &floats_ok);
+        const double floor_d = kv_getf(kv, "floor_price", 0.0, &floats_ok);
+        const float  qty_v   = static_cast<float>(qty_d);
+        const float  floor_v = static_cast<float>(floor_d);
         if (!std::isfinite(qty_v) || !std::isfinite(floor_v)
             || qty_v < 0.0f || floor_v < 0.0f)
+            floats_ok = false;
+        // BL-1201 review: a NONZERO double that narrows to (+/-)0 lands as a
+        // different order — quantity 0 is NO CAP and floor 0 is "sell at the
+        // market price" — so `quantity=1e-60` would become an uncapped order and
+        // `floor_price=1e-60` a floorless one. Validated as the value that lands:
+        // refused whole, nothing mutated.
+        if ((qty_d != 0.0 && qty_v == 0.0f) || (floor_d != 0.0 && floor_v == 0.0f))
             floats_ok = false;
 
         if (!ok || !floats_ok)

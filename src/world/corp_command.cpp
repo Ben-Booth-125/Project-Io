@@ -1200,7 +1200,13 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             if (w.markets.at(mid).base_price[r] <= 0.0f)
                 return corp_command_result::rejected_invalid; // unpriced here
 
-            if (!(cmd.quantity > 0.0f) || cmd.floor_price < 0.0f)
+            // BL-1201 (orders are price floors): quantity 0 is NO CAP — the order
+            // covers the whole surplus above the processor reservation, tick by
+            // tick. A positive quantity is a per-tick cap. Negative, NaN and
+            // infinite quantities are refused: `!(q >= 0)` is true for NaN, and
+            // an infinite cap would be "no cap" spelt in a way nothing writes.
+            if (!(cmd.quantity >= 0.0f) || !std::isfinite(cmd.quantity) ||
+                !(cmd.floor_price >= 0.0f) || !std::isfinite(cmd.floor_price))
                 return corp_command_result::rejected_invalid;
 
             if (corp_order_count(w, cmd.corp) >= max_sell_orders_per_corp)

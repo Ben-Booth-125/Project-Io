@@ -144,10 +144,13 @@ struct corp_ai_params
     /// to have genuinely accumulated.
     float trade_hold_threshold = 50.0f;
 
-    /// Fraction of the stock above the threshold that one order lists. Below 1.0
-    /// so the corp meters its release rather than emptying the pool into a single
-    /// quarter's clearing.
-    float trade_release_fraction = 0.5f;
+    /// Scale on the trade candidate's score (expected cash at the floor over the
+    /// excess). It was `trade_release_fraction`, the share of the excess one
+    /// order listed; BL-1201 (orders are price floors) made the order uncapped,
+    /// so nothing is sized any more, and the factor survives only so the score
+    /// keeps the scale it had. Trade candidates compete only inside their own
+    /// family budget, where a common factor cannot reorder them.
+    float trade_score_fraction = 0.5f;
 
     /// Floor price as a multiple of the market's BASE price. The floor is a
     /// reservation price — an order whose floor exceeds the resolved price holds
