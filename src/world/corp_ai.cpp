@@ -225,6 +225,14 @@ struct candidate
     float                 spend  = 0.0f; ///< Committed capex (build cost / survey cost).
     corp_decision_reason  reason = corp_decision_reason::best_build;
     corp_priority_bucket  bucket = corp_priority_bucket::nice_to_have;
+    /// BL-1201 (AI sell order resizes): a RE-SIZE is one trade action spelt as
+    /// two legal verbs — `cmd` is the `remove_sell_order`, and this is the
+    /// `place_sell_order` applied straight after it in the same evaluation,
+    /// only if the removal applied. It takes ONE trade slot (`max_trades`): the
+    /// corp still holds one order on the triple before and after, so the book
+    /// does not grow and the anti-thrash rule it serves is unchanged.
+    bool                  has_then = false;
+    corp_command          then_cmd;
 };
 
 /// The BUDGET CLASS a candidate competes in — and, by construction, the only
@@ -290,7 +298,11 @@ bool candidate_before(const candidate& a, const candidate& b)
     // siblings fall to std::sort's unspecified order among equivalents —
     // stable for one binary, not a property the simulation may rest on.
     if (a.cmd.target != b.cmd.target) return a.cmd.target < b.cmd.target;
-    return a.cmd.recipe < b.cmd.recipe;
+    if (a.cmd.recipe != b.cmd.recipe) return a.cmd.recipe < b.cmd.recipe;
+    // BL-1201: two order-book candidates on one (body, resource) can differ by
+    // nothing but the order they name (an agent-placed second order). The id
+    // is the stable handle, so it is the tie-break; 0 for every other verb.
+    return a.cmd.order < b.cmd.order;
 }
 
 /// Strategy weight for a verb family under the corp's industrial focus —
@@ -376,6 +388,8 @@ const char* corp_decision_reason_label(corp_decision_reason r)
         case corp_decision_reason::survey_expand:  return "discovery within budget";
         case corp_decision_reason::hire_available: return "roster row available";
         case corp_decision_reason::trade_surplus:  return "stock piled up past the hold threshold";
+        case corp_decision_reason::trade_resize:   return "stock outgrew its standing order";
+        case corp_decision_reason::trade_withdraw: return "standing order has nothing under it";
     }
     return "unspecified";
 }
@@ -419,6 +433,8 @@ corp_priority_bucket bucket_for_reason(corp_decision_reason reason)
         case corp_decision_reason::dial_resume:
             return corp_priority_bucket::should_have; // feeds/tunes a running asset
         case corp_decision_reason::trade_surplus:
+        case corp_decision_reason::trade_resize:   // BL-1201: same reasoning — no capex
+        case corp_decision_reason::trade_withdraw: // BL-1201: no capex either
             // Should-Have, not Nice-to-Have: listing accumulated stock carries no
             // capex — it BRINGS cash in — so it can never starve a higher bucket,
             // which is the whole test the buckets apply. It is not Must-Have
@@ -2143,6 +2159,122 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     cands.push_back(c);
                 }
             }
+
+            // ---- BL-1201 (AI sell order resizes): keep a standing order sized
+            // to the pool under it. The placement above sizes an order ONCE; a
+            // standing order lists min(quantity, pool) per tick and exempts its
+            // resource from auto-surplus (MARKETS.md § clearing steps 4-5, an
+            // exemption that is right for a PLAYER'S manual order and stays), so
+            // every unit the corp produces beyond that first quantity was
+            // trapped for the rest of the campaign. Two housekeeping candidates
+            // over the corp's OWN orders, both through existing verbs:
+            //
+            //  - RE-SIZE: the pool exceeds `trade_resize_multiple` x the
+            //    order's quantity -> remove_sell_order, then place_sell_order at
+            //    the placement rule applied to TODAY'S pool (release fraction of
+            //    the excess over the hold threshold, floored by the same
+            //    base_price x floor multiple). One trade slot for the pair.
+            //  - WITHDRAW: the pool holds under `trade_empty_pool` units ->
+            //    remove_sell_order alone, so auto-surplus governs the resource
+            //    again.
+            //
+            // The player's corp never reaches this code in a played session (the
+            // guard at the top of the corp loop), so a player's order is never
+            // touched. The walk is over this corp's orders sorted by order id —
+            // the stable handle — not the book's vector order.
+            std::vector<const sell_order*> own_orders;
+            for (const sell_order& o : w.sell_orders)
+                if (o.corp == corp)
+                    own_orders.push_back(&o);
+            std::sort(own_orders.begin(), own_orders.end(),
+                      [](const sell_order* a, const sell_order* b) { return a->id < b->id; });
+
+            for (const sell_order* op : own_orders)
+            {
+                const sell_order& o = *op;
+                const std::size_t r = static_cast<std::size_t>(o.resource);
+                if (r >= resource_count)
+                    continue;
+
+                // One order per triple is the scorer's own shape. A second
+                // order on the same triple can only be agent-authored (the MCP
+                // seam); the pool is shared between them by a running remainder,
+                // so no one order's quantity reads against it. Left alone.
+                int on_triple = 0;
+                for (const sell_order* q : own_orders)
+                    if (q->body == o.body && q->resource == o.resource)
+                        ++on_triple;
+                if (on_triple != 1)
+                    continue;
+
+                const float pool = body_pool_total(w, corp, o.body).quantities[r];
+
+                if (pool < p.trade_empty_pool)
+                {
+                    candidate c;
+                    c.cmd.tick    = tick;
+                    c.cmd.corp    = corp;
+                    c.cmd.verb    = corp_verb::remove_sell_order;
+                    c.cmd.subject = o.body;     // for the tie-break; the verb reads `order`
+                    c.cmd.target  = o.resource;
+                    c.cmd.order   = o.id;
+                    // A withdrawal brings no cash in, so in the trade family's
+                    // currency it is worth ONE unit at the order's floor: it
+                    // yields to every listing and every re-size (each worth
+                    // many units), and still takes a free trade slot.
+                    c.score  = o.floor_price * jitter;
+                    c.reason = corp_decision_reason::trade_withdraw;
+                    c.bucket = bucket_for_reason(c.reason);
+                    cands.push_back(c);
+                    continue;
+                }
+
+                if (!(pool > p.trade_resize_multiple * o.quantity))
+                    continue; // the order still meters its pool
+
+                const float qty = (pool - p.trade_hold_threshold) * p.trade_release_fraction;
+                if (!(qty > o.quantity))
+                    continue; // re-sizing would not list more; nothing to gain
+
+                // The placement's floor rule, read the same way: the lowest-id
+                // market pool this corp holds on the body that prices the good.
+                float floor = -1.0f;
+                for (auto pit = w.corp_market_pools.lower_bound({corp, entity_id{0}});
+                     pit != w.corp_market_pools.end() && pit->first.first == corp; ++pit)
+                {
+                    const auto mit = w.markets.find(pit->first.second);
+                    if (mit == w.markets.end() || mit->second.body != o.body)
+                        continue;
+                    if (mit->second.base_price[r] <= 0.0f)
+                        continue;
+                    floor = mit->second.base_price[r] * p.trade_floor_multiple;
+                    break;
+                }
+                if (floor < 0.0f)
+                    floor = o.floor_price; // no pool prices it here: keep the order's own
+
+                candidate c;
+                c.cmd.tick    = tick;
+                c.cmd.corp    = corp;
+                c.cmd.verb    = corp_verb::remove_sell_order;
+                c.cmd.subject = o.body;
+                c.cmd.target  = o.resource;
+                c.cmd.order   = o.id;
+                c.has_then             = true;
+                c.then_cmd.tick        = tick;
+                c.then_cmd.corp        = corp;
+                c.then_cmd.verb        = corp_verb::place_sell_order;
+                c.then_cmd.subject     = o.body;
+                c.then_cmd.target      = o.resource;
+                c.then_cmd.quantity    = qty;
+                c.then_cmd.floor_price = floor;
+                // The placement's own score: the re-sized listing valued at the
+                // floor, so it competes with a new listing on one scale.
+                c.score  = qty * floor * jitter;
+                c.reason = corp_decision_reason::trade_resize;
+                c.bucket = bucket_for_reason(c.reason);
+                cands.push_back(c);
+            }
         }
 
         // ---- Directed-dispatch candidate: haul toward a better net price -----
@@ -2677,6 +2809,46 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 log_entry.corp      = corp;
                 log_entry.event     = narrate_agency_event(ev);
                 w.history_log.push_back(std::move(log_entry));
+            }
+
+            // BL-1201: the second half of a RE-SIZE — the re-placement, applied
+            // only because the removal above applied, inside the SAME trade slot
+            // (the counters above already counted the pair once). Logged as its
+            // own decision and agency event, in application order, so the feed
+            // reads "withdrew the order, listed it again at N" rather than a
+            // removal with nothing after it. A refusal here leaves the order
+            // withdrawn, which is the withdraw candidate's outcome: auto-surplus
+            // governs the resource until the placement candidate lists it again.
+            if (c.has_then)
+            {
+                const entity_id then_body = resolve_command_body(w, c.then_cmd);
+                if (apply_corp_command(w, reg, c.then_cmd) == corp_command_result::applied)
+                {
+                    pending_decision pd2;
+                    pd2.d.tick          = tick;
+                    pd2.d.corp          = corp;
+                    pd2.d.command       = c.then_cmd;
+                    pd2.d.winning_score = c.score;
+                    pd2.d.reason        = c.reason;
+                    pd2.log_body        = then_body;
+                    pending.push_back(std::move(pd2));
+
+                    agency_event ev2{};
+                    ev2.corp     = corp;
+                    ev2.building = c.then_cmd.subject;
+                    ev2.what     = agency_event::kind::order_placed;
+                    ev2.tile     = c.then_cmd.subject;
+                    ev2.value    = static_cast<int>(c.then_cmd.target);
+                    report.agency_events.push_back(ev2);
+
+                    world_history_entry log_entry;
+                    log_entry.timestamp = tick;
+                    log_entry.topic     = history_topic::agency;
+                    log_entry.body      = then_body;
+                    log_entry.corp      = corp;
+                    log_entry.event     = narrate_agency_event(ev2);
+                    w.history_log.push_back(std::move(log_entry));
+                }
             }
         }
 

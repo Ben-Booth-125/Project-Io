@@ -420,6 +420,8 @@ enum class corp_decision_reason : uint8_t
     survey_expand,    ///< Discovery spend within the solvency floor.
     hire_available,   ///< Roster row available under the corp's own campaign gate (BL-324).
     trade_surplus,    ///< BL-293: stock piled up past the hold threshold; list it with a floor.
+    trade_resize,     ///< BL-1201: the pool outgrew a standing order; re-size it to today's surplus.
+    trade_withdraw,   ///< BL-1201: the pool under a standing order ran empty; withdraw it.
 };
 
 /// One past the highest reason — the count sentinel `decision_feed.cpp` uses to
@@ -427,7 +429,7 @@ enum class corp_decision_reason : uint8_t
 /// Bound to the same append-only rule: appending a reason means moving this
 /// with it.
 inline constexpr uint8_t corp_decision_reason_count =
-    static_cast<uint8_t>(corp_decision_reason::trade_surplus) + 1;
+    static_cast<uint8_t>(corp_decision_reason::trade_withdraw) + 1;
 
 /// One ring-buffer entry: the command plus its score rationale.
 struct corp_decision

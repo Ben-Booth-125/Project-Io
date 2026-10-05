@@ -161,6 +161,35 @@ struct corp_ai_params
     /// conservative estimate stays honest.
     float trade_floor_multiple = 0.25f;
 
+    /// BL-1201 (AI sell order resizes): a standing order is RE-SIZED when the
+    /// pool under it exceeds this multiple of the order's quantity at a due
+    /// tick. A standing order lists `min(quantity, pool)` per tick and exempts
+    /// its resource from auto-surplus (MARKETS.md § clearing steps 4-5), so an
+    /// order sized once and never again traps every unit produced beyond it.
+    ///
+    /// WHY 4, AND WHY IT MUST EXCEED 1 / `trade_release_fraction`: an order is
+    /// sized at `release x (pool - hold)`, so a freshly sized order already sits
+    /// under a pool of about `2 x quantity + hold`. A multiple of 2 would read
+    /// that fresh order as outgrown at once and re-size it every evaluation.
+    /// 4 reads "the pool has roughly DOUBLED since the order was sized to it":
+    /// a pile grows geometrically before it is re-sized again, so re-sizes on
+    /// a steadily growing pool are logarithmic in its size, not linear in time.
+    ///
+    /// ONE READING, NOT A STREAK (N = 1): the pool is a stock — an integral of
+    /// output less sales — so one reading of it already spans every tick since
+    /// the order was sized; a transient output spike moves it by one tick's
+    /// worth, not by a doubling. Over-sizing on such a spike is harmless (the
+    /// order still lists at most the pool). A consecutive-tick streak would be a
+    /// new persistent per-order counter on the save seam for no measured gain.
+    float trade_resize_multiple = 4.0f;
+
+    /// BL-1201: a standing order is WITHDRAWN when the pool under it holds less
+    /// than this many units at a due tick — the order is metering nothing, and
+    /// withdrawing it hands the resource back to auto-surplus (MARKETS.md step
+    /// 4's exemption lifts with the order). One unit rather than zero so a
+    /// float residue from the clearing debit does not keep an empty order alive.
+    float trade_empty_pool = 1.0f;
+
     /// Solvency reserve floor = max(floor_constant, floor_wage_mult × the corp's
     /// per-tick wage bill). A tick is one quarter, so the default is two
     /// quarters of wages — the accepted design's "≈ 2× quarterly wage bill".
