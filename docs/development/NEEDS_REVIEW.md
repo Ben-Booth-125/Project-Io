@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*79 entries — 3 open, 76 resolved.*
+*80 entries — 4 open, 76 resolved.*
 
 ---
 
@@ -76,6 +76,22 @@ lake_census (dff0abc1) measured 360 enclosed water bodies on the 16 curated seed
 > **Recommendation:** A.
 
 *Files: `src/world/tile_generation.cpp`, `docs/economy/TILES.md`, `tools/verify/lake_census.cpp`*
+
+### NR-976 — DECISION TAKEN: generation charters a missing raw input so a chain is absent only when the ground lacks it (BL-1197)
+*decision · raised 2026-10-05 · from the sprint 49 main session, on Ben's delegation*
+
+BL-1197 round 2 (no fallback for water-gap firms) cost seeds 0 and 43 their alloys/machinery chains and left 401 / 270 centres chain-infeasible: the fallback firms had been the only diggers of those chains' raw inputs, which the per-good turn never charters for. Under your hard rule a chain with no feasible site is absent - but this absence came from chartering order, not geography. Decided: when a wanted processing good is infeasible only because a raw input has no producer in reach, and that raw lies in the centre's windows, generation charters its extractor first (booked as that raw's firm, within caps and budget) and retries; one level deep (raw inputs only).
+
+**Why it matters.** Keeps the hard rule honest: absent chains mean the world lacks the ground, which is the legibility the rule exists for.
+
+- A: keep it (one level of input chartering)
+- B: no input chartering - chains absent whenever their raws were not chartered
+- C: recurse through intermediate goods too
+- D: other
+
+> **Recommendation:** A.
+
+*Files: `src/world/corporation_generation.cpp`, `docs/generation/CORPORATION_GENERATION.md`*
 
 ---
 
