@@ -10,7 +10,7 @@
 #include "world/placement_rules.hpp"
 #include "world/planetology.hpp"    // checkpoint_rng — charter_web_from_budget's keyed streams
 #include "world/settlement.hpp"
-#include "world/supply_system.hpp" // price_market_export_leg — BL-1185's reach
+#include "world/input_reach.hpp"   // the one reach rule (BL-1185 / BL-1187)
 
 #include <algorithm>
 #include <iterator>
@@ -1415,67 +1415,41 @@ int best_construction_recipe(const recipe_registry& reg)
 // REACH of the processor's market: an extractor on a deposit of that good, or a
 // processor whose recipe makes it.
 //
-// WITHIN REACH is the reach goods actually travel (the BL-1186 diagnosis): the
-// producer's market IS the consumer's market, or the dispatcher's own market
-// leg `price_market_export_leg(producer market, consumer market)` is viable and
-// the dispatcher's own gate passes with the destination short, at its
-// reservation ceiling: `R x base_dest - haul > (1 + dispatch_margin) x
-// base_src`, each market at its own base price, R = reservation_mult (or
-// ceil_mult where the reservation is off). The leg is
-// CALLED, never restated, so whatever widens the dispatcher's routing widens
-// this reach with it. WHEN reach is read: the node set (hubs, cities) is taken
-// at the pass's start, and each market pair is priced once, the first time a
-// placement asks, and memoised for the rest of the pass — so a port chartered
-// later in the walk widens a pair only if that pair had not yet been asked.
-// Placement can therefore disagree with live shipping in one direction (it may
-// miss a lane the finished world has), never the other.
+// WITHIN REACH is ONE DEFINITION, `input_reach` (src/world/input_reach.hpp;
+// docs/ai/AI_OPPONENT.md § Build only what runs): placement asks the same
+// `market_within_reach` the play-time scorer does, with no economy report — the
+// generation form: the producer's market IS the consumer's, or the dispatcher's
+// own market leg is viable and its gate passes with the destination short,
+// `R x base_dest - haul > (1 + dispatch_margin) x base_src`, each market at its
+// own base, R = reservation_mult (ceil_mult where the ceiling is off). A
+// producer is `building_produces` (nominal, BL-437 co-extracts included). WHEN
+// reach is read: the node set is taken at the pass's start, and each market pair
+// is priced once, the first time a placement asks, and memoised for the rest of
+// the pass — so a port chartered later in the walk widens a pair only if that
+// pair had not yet been asked (placement may miss a lane the finished world has,
+// never assume one it lacks).
 //
-// WHICH PRODUCERS COUNT: the buildings standing at the moment the processor's
-// recipe is decided — the base installations, every corporation placed before
-// this one, and this corporation's own holdings (a firm's assets are all placed
-// before any of its processors is checked, so its own feed mines count, and a
-// processor checked earlier in its own asset list counts for a later one).
-// Nothing placed later is foreseen.
+// WHICH PRODUCERS COUNT is this file's, not the helper's: the buildings standing
+// at the moment the processor's recipe is decided — the base installations,
+// every corporation placed before this one, and this corporation's own holdings
+// (a firm's assets are all placed before any of its processors is checked, so
+// its own feed mines count, and a processor checked earlier in its own asset
+// list counts for a later one). Nothing placed later is foreseen. So the scan
+// below walks the buildings standing now and asks the helper only the per-
+// building producer test and the per-pair reach; it never uses the helper's
+// lazy producer index, which describes the buildings when it was first built.
 //
 // Deterministic: every answer is an existence test over a set (order-free), and
 // the leg memo is an ordered map. The leg calls warm the logistics caches, so
-// every pass that builds a `chain_reach` clears them again when it ends
+// every pass that builds a reach context clears them again when it ends
 // (`invalidate_logistics_caches`) — its caller may tick next.
 
-/// The reach context one placement pass shares: the node set the legs price
-/// against (read once, at the pass's start) and a memo of per-unit hauls.
-struct chain_reach
-{
-    logistics_nodes                                   nodes;
-    /// Per-unit haul of a market pair (src, dst); < 0 = no viable leg.
-    std::map<std::pair<entity_id, entity_id>, float>  haul;
-    /// `dispatch_margin`: the dispatcher's gate.
-    float                                             margin = 0.0f;
-    /// The destination's shortage price, x its base: `reservation_mult`, or
-    /// `ceil_mult` where the reservation is off (<= 0).
-    float                                             ceiling = 0.0f;
-};
+/// The reach context one placement pass shares: `input_reach`, with no report.
+using chain_reach = input_reach;
 
 chain_reach make_chain_reach(const world& w, const recipe_registry& reg)
 {
-    chain_reach cr;
-    cr.nodes   = collect_logistics_nodes(w);
-    cr.margin  = reg.dispatch_margin();
-    const price_band_params& pb = reg.price_band();
-    cr.ceiling = pb.reservation_mult > 0.0f ? pb.reservation_mult : pb.ceil_mult;
-    return cr;
-}
-
-float chain_haul_per_unit(world& w, const recipe_registry& reg, chain_reach& cr,
-                          entity_id src_market, entity_id dst_market)
-{
-    const auto key = std::make_pair(src_market, dst_market);
-    if (const auto it = cr.haul.find(key); it != cr.haul.end())
-        return it->second;
-    const convoy_leg leg = price_market_export_leg(w, reg, cr.nodes, src_market, dst_market, 1.0f);
-    const float h = leg.viable ? leg.cost : -1.0f;
-    cr.haul.emplace(key, h);
-    return h;
+    return make_input_reach(w, reg);
 }
 
 /// How near an input's nearest producer stands, best first.
@@ -1487,22 +1461,12 @@ enum chain_tier : int
     chain_tier_none   = 3, ///< no producer within reach: infeasible
 };
 
-/// True when @p b produces resource @p r: an extraction site on a deposit of it
-/// (nominal output > 0), or a processor whose recipe outputs it.
+/// True when @p b produces resource @p r — the one producer test
+/// (`building_produces`, input_reach.hpp: nominal, generation reading).
 bool chain_produces(const world& w, const recipe_registry& reg, const building_component& b,
                     std::size_t r)
 {
-    if (b.decommissioned)
-        return false;
-    if (b.type == building_type::extraction_site)
-        return static_cast<std::size_t>(b.target_resource) == r
-            && extraction_nominal(w, reg, b, 1.0f) > 0.0f;
-    if (b.type == building_type::processing_facility)
-    {
-        const recipe* rc = reg.get_recipe(b.recipe);
-        return rc != nullptr && rc->outputs[r] > 0.0f;
-    }
-    return false;
+    return building_produces(w, reg, b, r);
 }
 
 /// The tier of input @p r for a processor @p self in market @p consumer_market.
@@ -1533,30 +1497,11 @@ int chain_input_tier(world& w, const recipe_registry& reg, chain_reach& cr, enti
     if (best != chain_tier_none)
         return best;
 
-    const auto mit = w.markets.find(consumer_market);
-    if (mit == w.markets.end())
-        return chain_tier_none;
-    // THE DISPATCHER'S OWN GATE, WITH THE DESTINATION SHORT (main session,
-    // 2026-10-05): the dispatcher ships because the destination is short and
-    // bids up, so generation reads the gate with the destination at its
-    // shortage price, its reservation ceiling. A pair is in reach iff its
-    // export leg is viable and `ceiling x base_dest - haul > (1 + margin) x
-    // base_src`, each market at its OWN base price (capitals and endemic
-    // distance pricing differ by market). `ceiling` is reservation_mult, or
-    // ceil_mult where the reservation is off (<= 0) — never same-market only.
-    const float base_dest = cr.ceiling * mit->second.base_price[r];
     std::sort(far.begin(), far.end());
     far.erase(std::unique(far.begin(), far.end()), far.end());
     for (const entity_id mp : far)
-    {
-        const auto sit = w.markets.find(mp);
-        if (sit == w.markets.end())
-            continue;
-        const float base_src = sit->second.base_price[r];
-        const float h = chain_haul_per_unit(w, reg, cr, mp, consumer_market);
-        if (h >= 0.0f && base_dest - h > (1.0f + cr.margin) * base_src)
+        if (market_within_reach(w, reg, cr, mp, consumer_market, r))
             return chain_tier_reach;
-    }
     return chain_tier_none;
 }
 

@@ -509,7 +509,10 @@ result run(bool timber_in_a)
             tc.grid_y = y;
             tc.substrate = terrain_substrate::barren;
             if (x == tx && y == 6)
-                tc.resource_deposit[timber] = 1.0f;
+            {
+                tc.resource_deposit[timber]   = 1.0f;
+                tc.resource_remaining[timber] = 1000.0f;   // an unspent reserve: a producer
+            }
             w->tiles[tid] = tc;
             nc.tiles.push_back(tid);
             w->tile_to_nation[tid] = nation;

@@ -301,8 +301,11 @@ not a broad presence across the nation.
     shortage price, its reservation ceiling: `R` is `reservation_mult`, or `ceil_mult` where the
     reservation is off (≤ 0) — reach never collapses to one market. Each base is that market's
     **own** base price for the input (capitals and endemic distance pricing make them differ), and
-    `haul` is the leg's per-unit cost. Placement **calls** the dispatcher's leg rather than
-    restating it, and whatever widens the dispatcher's routing widens this reach.
+    `haul` is the leg's per-unit cost. **This is one definition, not a copy:** reach and the
+    producer test are `../ai/AI_OPPONENT.md` § Build only what runs (the play-time scorer's), asked
+    here in their generation form (no tick's production report: nominal output, base prices). Which
+    buildings count as placed is this pass's own rule, below; the definition is asked only whether a
+    standing building produces a good and whether one market reaches another.
   - **When reach is read.** A pass reads the logistics nodes once, at its start, and prices each
     market pair the first time a placement asks, memoising it for the rest of the pass. A port
     chartered later in the walk therefore widens a pair only if that pair had not been asked yet:
