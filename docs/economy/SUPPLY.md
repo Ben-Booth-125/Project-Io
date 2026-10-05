@@ -75,6 +75,27 @@ Two terms carry it:
   amortises them. The crossover distance at which sea beats land is the design reading, and it is
   reported whenever either term moves.
 
+**The crossover reading (2026-10-05, BL-1194 sea cheaper than highway).** A rate multiplies a
+terrain-weighted path, so the ordering is read per tile. A water tile weighs 2.5 against plains
+1.0; a Highway cuts a land tile to ×0.40, a Road ×0.50, a Track ×0.67. At land 0.02 and sea 0.002
+per unit distance, one unit costs per tile:
+
+| Leg | Per tile |
+|---|---|
+| land, plains, Highway | 0.0080 |
+| land, plains, Road | 0.0100 |
+| land, plains, no road | 0.0200 |
+| sea, open water | 0.0050 |
+| sea, on a sea lane | 0.0025 |
+
+With handling 0.10 a port, a sea route pays 0.20 a unit to start. It beats an equal-length land
+haul once it saves `0.20 / (land tile − 0.0050)` tiles: **67 against a Highway, 40 against a Road,
+24 against a Track, 13 against unroaded plains** (the home body is 261 tiles round). The node
+discount on a land leg (up to 50%) can take a Highway through cities to 0.0040 a tile. That one
+land haul stays cheaper than open sea at any length. Constants: `scripts/economy.lua`
+`logistics.base_cost_per_unit_distance` and `port_handling`; the 2.5 weight is `sea_leg_cost`
+(`src/world/logistics.cpp`).
+
 For **space convoys**, `distance` is the Euclidean distance between the parent bodies' centres (no path routing — straight-line in the prototype). For **intra-body convoys** (land / sea), `distance` is the **terrain-weighted A\* path** over the body's tile grid (BL-077, intra-body pathfinding; `src/world/logistics.{hpp,cpp}`): each tile weighted by its landform cost (TILES.md — plains 1.0 … mountain 2.0) and discounted by `road_level`, respecting the east–west cylinder wrap; the edge cost is the average of the two tiles (so the path is symmetric) and results cache per fixed endpoint pair. Water tiles carry a higher sea-leg cost, so the cheapest path prefers land and a water crossing selects **sea** mode.
 
 **Mode is a property of the leg, not of the whole route.** A route that crosses water is three legs: **land** from the source to a port, **sea** from port to port, **land** from the far port to the destination, each priced at its own mode and each travelling at its own speed. The ports are chosen to minimise the whole route's cost including both handling fees, and a sea leg runs only port to port (§ Infrastructure gates). A single route-wide `crosses_ocean` bit, which billed every land tile at the sea rate once any water appeared, cannot express a cheap sea leg between two land legs and is retired with this ordering.

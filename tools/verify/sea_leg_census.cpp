@@ -21,7 +21,7 @@
 //
 //   S3  WHAT THE BIT COSTS. The supply layer charges
 //           haul_per_unit = logistics_cost(mode) * path.cost
-//       with land = 0.02 and sea = 0.05 (scripts/economy.lua), and times the
+//       with land = 0.02 and sea = 0.002 (scripts/economy.lua; 0.05 until BL-1194), and times the
 //       haul at coastal_km_per_day (130) instead of caravan_km_per_day (25).
 //       So one water tile makes the WHOLE route 2.5x dearer and 5.2x faster.
 //       S3 reports the money delta a per-leg split would produce, against the
@@ -67,7 +67,7 @@ namespace {
 // the Lua-authored values live in scripts/economy.lua and this harness is
 // deliberately Lua-free; if economy.lua moves, these must move with it.
 constexpr float kLandRate = 0.02f; // logistics.base_cost_per_unit_distance.land
-constexpr float kSeaRate  = 0.05f; // logistics.base_cost_per_unit_distance.sea
+constexpr float kSeaRate  = 0.002f; // logistics.base_cost_per_unit_distance.sea (BL-1194; 0.05 before)
 
 struct route_stat
 {

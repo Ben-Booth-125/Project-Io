@@ -1667,7 +1667,7 @@ private:
 
     /// Logistics base cost per unit distance per unit cargo, indexed by convoy_mode
     /// (land=0, sea=1, air=2, space=3). Defaults match economy.lua values.
-    std::array<float, 4> m_logistics_costs = { 0.02f, 0.05f, 0.15f, 1.00f };
+    std::array<float, 4> m_logistics_costs = { 0.02f, 0.002f, 0.15f, 1.00f }; // BL-1194: sea < highway
 
     /// BL-148/149 node-discount tunables (logistics.node_discount). Defaults match economy.lua
     /// so a hand-built harness registry discounts city/hub routes sensibly without Lua.

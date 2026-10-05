@@ -393,7 +393,14 @@ std::string run_sequence(const recipe_registry& reg)
     // 1.75 + 4 x 2.5 + 1.75 = 13.5, then land 3.0. Via (5,0): sea 6.0, then land
     // (5,0) -> (8,3) = 6.0. At land 0.02 / sea 0.05 the second is cheaper
     // (0.16 + 0.30 vs 0.10 + 0.675 per unit before fees), and it is taken.
+    // BL-1194: the SHIPPED sea rate (0.002, below a highway tile) makes the long
+    // channel the cheaper whole route here, and so the port nearest the destination
+    // — which would no longer tell "whole route" from "nearest". The fixture tests
+    // the router's selection, not the rate, so it pins its own: sea 0.05.
     {
+        recipe_registry reg6 = reg;
+        reg6.set_logistics_cost(convoy_mode::sea, 0.05f);
+        const recipe_registry& reg = reg6; // R6's rates, shadowing the shipped ones
         scenario s = make_world({3, 4, 16, 17}, 0, 8, {{2, 0}, {5, 0}, {5, 3}}, 100.0f,
                                 1000.0f, /*dst_row=*/3);
         const corp_command_result r = apply_corp_command(s.w, reg, dispatch_cmd(s, 25.0f));

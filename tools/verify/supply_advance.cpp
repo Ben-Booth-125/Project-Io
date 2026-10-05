@@ -76,11 +76,11 @@ static void test_logistics_constants()
 {
     std::printf("--- R4: logistics constants ---\n");
     recipe_registry reg;
-    // Defaults from economy.lua: land=0.02, sea=0.05, air=0.15, space=1.00
+    // Defaults from economy.lua: land=0.02, sea=0.002 (BL-1194), air=0.15, space=1.00
     check(near(reg.logistics_cost(convoy_mode::land),  0.02f), "land cost == 0.02",
           reg.logistics_cost(convoy_mode::land), 0.02f);
-    check(near(reg.logistics_cost(convoy_mode::sea),   0.05f), "sea cost == 0.05",
-          reg.logistics_cost(convoy_mode::sea), 0.05f);
+    check(near(reg.logistics_cost(convoy_mode::sea),   0.002f), "sea cost == 0.002",
+          reg.logistics_cost(convoy_mode::sea), 0.002f);
     check(near(reg.logistics_cost(convoy_mode::air),   0.15f), "air cost == 0.15",
           reg.logistics_cost(convoy_mode::air), 0.15f);
     check(near(reg.logistics_cost(convoy_mode::space), 1.00f), "space cost == 1.00",
