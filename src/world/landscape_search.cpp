@@ -213,12 +213,31 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
         // chain-feasible (Pass 3); world-gen's own call has none.
         generate_corporations(w, cp, c.placement_seed, w.gen_settlement.get(),
                               /*progress=*/nullptr, &reg);
+        // BL-1185 review: with the chain rule a slot every rung refused is no
+        // corporation, so a roster can come back EMPTY — no specialist, no seat.
+        // Reported, and handled downstream as the no-specialist world is (the
+        // seat path seats nobody rather than a null id).
+        if (w.corporations.count(w.player_entity) == 0)
+        {
+            w.player_entity = null_entity;
+            std::printf("[landscape_apply] no specialist chartered (placement %08X): the roster "
+                        "is empty, nobody is seated\n", c.placement_seed);
+        }
     }
     else
     {
         // BL-1185: the kept world-gen roster was laid before the registry
-        // existed; its processors are made chain-feasible here.
-        enforce_chain_feasible_roster(w, reg);
+        // existed; its processors are made chain-feasible here, and the result
+        // is reported where it changed anything (the search applies many
+        // candidates, so an unchanged roster stays quiet).
+        const chain_roster_enforcement cre =
+            enforce_chain_feasible_roster(w, reg, c.placement_seed ^ 0x4A71012u);
+        if (cre.processors_unplaced > 0 || cre.holdless > 0 || cre.seat_redrawn)
+            std::printf("[landscape_apply] chain roster (placement %08X): %d re-decided, %d "
+                        "unplaced, %d holdless; seat %u%s\n",
+                        c.placement_seed, cre.processors_redecided, cre.processors_unplaced,
+                        cre.holdless, static_cast<unsigned>(cre.seat),
+                        cre.seat_redrawn ? " (redrawn)" : "");
     }
     generate_background_firms(w, reg, c.placement_seed);
 

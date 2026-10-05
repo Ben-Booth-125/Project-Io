@@ -11,6 +11,7 @@
 #include "world/planetology.hpp"    // checkpoint_rng — charter_web_from_budget's keyed streams
 #include "world/settlement.hpp"
 #include "world/input_reach.hpp"   // the one reach rule (BL-1185 / BL-1187)
+#include "world/spawn_seat.hpp"    // repoint_player — enforce_chain_feasible_roster's seat
 
 #include <algorithm>
 #include <iterator>
@@ -2478,6 +2479,12 @@ std::vector<entity_id> generate_corporations(
                 progress->player_slot.store(corp_slot[static_cast<std::size_t>(player_idx)],
                                             std::memory_order_relaxed);
         }
+        else
+        {
+            // Every slot refused (only reachable with a registry): no seat. The
+            // caller reports it (apply_landscape_candidate).
+            w.player_entity = null_entity;
+        }
 
     }
 
@@ -3013,8 +3020,12 @@ std::vector<entity_id> generate_background_firms(
             ++firms_by_resource[gap_r];
             if (anchor_province != 0)
                 ++firms_by_province[anchor_province];
-            // BL-1185: a landing that produces an input of a missed good may bring
-            // it within reach — clear that good's count and mask, and only that.
+            // BL-1185: a firm FOR good g just landed, so g is feasible from some
+            // nation — its misses no longer stand.
+            chain_misses[gap_r] = 0;
+            chain_masked[gap_r] = false;
+            // A landing that produces an input of a missed good may bring it
+            // within reach — clear that good's count and mask, and only that.
             for (std::size_t g = 0; g < resource_count; ++g)
                 if (chain_misses[g] > 0
                     && chain_firm_feeds_good(w, reg, w.corporations.at(corp_id).assets, g))
@@ -3050,7 +3061,8 @@ std::vector<entity_id> generate_background_firms(
     return firm_ids;
 }
 
-chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_registry& reg)
+chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_registry& reg,
+                                                       std::uint32_t seed)
 {
     chain_roster_enforcement out;
     std::vector<entity_id> ids;
@@ -3063,25 +3075,179 @@ chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_re
     for (const auto& kv : w.buildings)
         occupied.insert(kv.second.tile);
     chain_reach cr = make_chain_reach(w, reg);
+    // The roster's processors, in (corp id, asset order) — the order every
+    // step below walks.
+    std::vector<std::pair<entity_id, entity_id>> procs; // (corp, building)
     for (const entity_id cid : ids)
+        for (const entity_id bid : w.corporations.at(cid).assets)
+        {
+            const auto bit = w.buildings.find(bid);
+            if (bit != w.buildings.end() && bit->second.type == building_type::processing_facility
+                && !bit->second.decommissioned)
+                procs.emplace_back(cid, bid);
+        }
+
+    // 1. KEEP WHAT ALREADY RUNS — the greatest set of processors whose CURRENT
+    //    recipes are feasible against producers that are themselves kept (or
+    //    are not the roster's: base installations, background firms). A
+    //    processor whose recipe is infeasible is suspended (no recipe, so it
+    //    supplies nobody) and the test is repeated until nothing more falls:
+    //    a fixed point, independent of the order the roster is walked in,
+    //    because suspending a processor can only take producers away.
+    std::vector<bool> suspended(procs.size(), false);
+    for (bool changed = true; changed;)
+    {
+        changed = false;
+        for (std::size_t i = 0; i < procs.size(); ++i)
+        {
+            if (suspended[i])
+                continue;
+            building_component& b = w.buildings.at(procs[i].second);
+            const recipe* rc = reg.get_recipe(b.recipe);
+            const bool feasible = rc != nullptr
+                && chain_recipe_tier(w, reg, cr, procs[i].second, market_for_tile(w, b.tile), *rc,
+                                     nullptr) != chain_tier_none;
+            if (!feasible)
+            {
+                b.recipe     = no_recipe;
+                suspended[i] = true;
+                changed      = true;
+            }
+        }
+    }
+
+    // 2. DECIDE THE SUSPENDED AS FRESH PLACEMENT DOES, in (corp id, asset
+    //    order): the feasible recipe nearest its feed (own, market, reach)
+    //    against everything standing with a recipe now — the kept processors
+    //    and those decided before it — or unplace it. A processor decided here
+    //    only ADDS a producer, and an unplaced one supplied nothing, so every
+    //    kept or decided processor stays feasible: a second call keeps them all.
+    const int n = reg.recipe_count(building_type::processing_facility);
+    std::map<entity_id, std::vector<entity_id>> unplaced; // corp -> buildings
+    for (std::size_t i = 0; i < procs.size(); ++i)
+    {
+        if (!suspended[i])
+            continue;
+        const entity_id cid = procs[i].first;
+        const entity_id bid = procs[i].second;
+        building_component& b = w.buildings.at(bid);
+        const entity_id market = market_for_tile(w, b.tile);
+        const std::vector<entity_id>& own = w.corporations.at(cid).assets;
+        uint16_t chosen    = no_recipe;
+        int      best_tier = chain_tier_none;
+        for (int k = 0; k < n && best_tier != chain_tier_own; ++k)
+        {
+            const recipe& rc = reg.recipe_at(building_type::processing_facility, k);
+            const int t = chain_recipe_tier(w, reg, cr, bid, market, rc, &own);
+            if (t < best_tier)
+            {
+                best_tier = t;
+                chosen    = reg.recipe_id(rc.name);
+            }
+        }
+        if (chosen != no_recipe)
+        {
+            b.recipe = chosen;
+            ++out.processors_redecided;
+        }
+        else
+            unplaced[cid].push_back(bid);
+    }
+
+    // 3. Unplace the processors no recipe could feed, and re-seat each touched
+    //    corporation: its HQ over its NON-MILITARY holdings (BL-1154's muster
+    //    base is not a seat), and its opening pools re-keyed to that HQ.
+    for (const auto& [cid, gone] : unplaced)
     {
         corporation_component& corp = w.corporations.at(cid);
-        const std::size_t before = corp.assets.size();
-        std::vector<entity_id> assets = corp.assets;
-        make_chain_feasible(w, reg, cr, assets, occupied, nullptr, /*whole=*/false);
-        out.processors_unplaced += static_cast<int>(before - assets.size());
-        if (assets.size() == before)
-            continue;
-        corp.assets = std::move(assets);
-        // The HQ may have been one of the unplaced: designate it again from what
-        // stands (the corp's pools stay where they were seeded).
-        const entity_id home_body = corp_home_body(w, corp.assets);
-        const hq_designation hq   = designate_hq(w, corp.assets, home_body);
+        for (const entity_id bid : gone)
+        {
+            chain_unplace(w, bid, occupied);
+            corp.assets.erase(std::remove(corp.assets.begin(), corp.assets.end(), bid),
+                              corp.assets.end());
+            ++out.processors_unplaced;
+        }
+        std::vector<entity_id> seatable;
+        for (const entity_id bid : corp.assets)
+        {
+            const auto bit = w.buildings.find(bid);
+            if (bit != w.buildings.end() && bit->second.type != building_type::military_base)
+                seatable.push_back(bid);
+        }
+        const entity_id home_body = corp_home_body(w, seatable);
+        const hq_designation hq   = designate_hq(w, seatable, home_body);
         corp.hq_building     = hq.building;
         corp.influence_range = hq.range;
-        if (corp.assets.empty())
+        if (seatable.empty())
             ++out.holdless;
+        // Opening stock follows the HQ (rehome_opening_pools, for this corp only;
+        // world build, before any tick).
+        std::vector<std::pair<entity_id, entity_id>> moves; // (from key, to key)
+        for (const auto& [key, pool] : w.corp_market_pools)
+        {
+            (void)pool;
+            if (key.first != cid)
+                continue;
+            const entity_id body = pool_key_body(w, key.second);
+            if (body == null_entity)
+                continue;
+            const entity_id home = corp_home_pool_key(w, cid, body);
+            if (home != key.second)
+                moves.emplace_back(key.second, home);
+        }
+        std::sort(moves.begin(), moves.end());
+        for (const auto& mv : moves)
+        {
+            const auto src = w.corp_market_pools.find({ cid, mv.first });
+            const stockpile_component moved = src->second;
+            w.corp_market_pools.erase(src);
+            stockpile_component& dst = w.pool_at(cid, mv.second);
+            for (std::size_t r = 0; r < resource_count; ++r)
+                dst.quantities[r] += moved.quantities[r];
+        }
     }
+
+    // 4. THE SEAT (the no-player path): if the seated specialist is now
+    //    holdless, or a processing corporation left with no processor, it is
+    //    drawn again over the specialists that still qualify, with the world-gen
+    //    pick's own stream (seed ^ 0xF0E1D2C3). The app's player picks later.
+    const auto qualifies = [&](entity_id cid) {
+        const corporation_component& corp = w.corporations.at(cid);
+        bool any = false, proc = false;
+        for (const entity_id bid : corp.assets)
+        {
+            const auto bit = w.buildings.find(bid);
+            if (bit == w.buildings.end() || bit->second.type == building_type::military_base)
+                continue;
+            any = true;
+            if (bit->second.type == building_type::processing_facility)
+                proc = true;
+        }
+        return any && (corp.focus != industrial_focus::processing || proc);
+    };
+    const auto seat = w.corporations.find(w.player_entity);
+    if (seat != w.corporations.end() && !seat->second.is_background && !qualifies(w.player_entity))
+    {
+        std::vector<entity_id> pool;
+        for (const entity_id cid : ids)
+            if (qualifies(cid))
+                pool.push_back(cid);
+        out.seat_redrawn = true;
+        if (!pool.empty())
+        {
+            std::mt19937 player_rng(seed ^ 0xF0E1D2C3u);
+            std::uniform_int_distribution<int> pick(0, static_cast<int>(pool.size()) - 1);
+            repoint_player(w, pool[static_cast<std::size_t>(pick(player_rng))]);
+        }
+        else
+        {
+            for (auto& [cid, corp] : w.corporations)
+                corp.is_player = false;
+            w.player_entity = null_entity;
+        }
+    }
+    out.seat = w.player_entity;
+
     invalidate_logistics_caches(w);
     return out;
 }

@@ -610,17 +610,34 @@ void assign_default_recipes(world& w, const recipe_registry& reg);
 /// which is Lua-free and runs before the registry loads). Called by every path
 /// that keeps that roster once the registry is in hand: the headless run and
 /// run_verify when the charter budget is empty, and the landscape apply when it
-/// does not regenerate the specialists. Each specialist (ascending id) has its
-/// processors re-decided against everything standing then — own feed, own
-/// market, reach — and an infeasible one is unplaced; the rest of its holdings
-/// stay (it is an existing corporation, not a charter that can be refused), and
-/// its HQ is designated again from what stands.
+/// does not regenerate the specialists.
+///
+/// ONLY THE INFEASIBLE ARE RE-DECIDED. First the greatest set of the roster's
+/// processors whose CURRENT recipes are feasible against producers that are
+/// themselves kept is found (a fixed point: a processor whose recipe fails is
+/// suspended — it supplies nobody — and the test repeats until nothing more
+/// falls); those keep their recipes. Then each suspended processor, in (corp
+/// id, asset order), takes the feasible recipe nearest its feed (own, market,
+/// reach) as fresh placement would, or is unplaced. IDEMPOTENT: a second call
+/// changes nothing, and no roster processor is left infeasible.
+///
+/// A corporation that lost a processor keeps the rest of its holdings (it
+/// exists; it is not a charter that can be refused); its HQ is designated again
+/// over its non-military holdings and its opening pools re-keyed to that HQ. If
+/// the SEATED specialist is left holdless, or a processing corporation with no
+/// processor, the seat is drawn again over the specialists that still qualify
+/// with world-gen's own pick stream (`seed ^ 0xF0E1D2C3`); none qualifying
+/// leaves the world with no seat (`seat == null_entity`), which callers report.
 struct chain_roster_enforcement
 {
-    int processors_unplaced = 0;
-    int holdless            = 0; ///< specialists left with no holding (reported, kept)
+    int processors_redecided = 0; ///< suspended processors given a feasible recipe
+    int processors_unplaced  = 0; ///< suspended processors no recipe could feed
+    int holdless             = 0; ///< specialists left with no (non-military) holding
+    bool      seat_redrawn   = false;
+    entity_id seat           = null_entity; ///< the seat after the call
 };
-chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_registry& reg);
+chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_registry& reg,
+                                                       std::uint32_t seed);
 
 /// BL-1185 (chain-feasible placement) — the AUDIT of Pass 3's rule on a built
 /// world: every standing processor (not decommissioned) checked against every

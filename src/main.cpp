@@ -272,7 +272,14 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
                                  "(%s); the pre-budget web is laid\n", scs.stockpile.rejection.c_str());
         // BL-1185: world-gen's roster was laid before the registry existed;
         // its processors are made chain-feasible now that it does.
-        enforce_chain_feasible_roster(w, reg);
+        // The seat is redrawn (if it must be) on world-gen's own corp stream:
+        // world seed 0 here, xor generate_corporations' salt.
+        const chain_roster_enforcement cre =
+            enforce_chain_feasible_roster(w, reg, /*seed=*/0u ^ 0x4A71012u);
+        std::fprintf(stderr, "[chain_roster] headless run: %d processor(s) re-decided, %d unplaced, "
+                             "%d specialist(s) holdless; seat %u%s\n",
+                     cre.processors_redecided, cre.processors_unplaced, cre.holdless,
+                     static_cast<unsigned>(cre.seat), cre.seat_redrawn ? " (redrawn)" : "");
         // BL-365: real background corporations, generated now that reg is loaded.
         generate_background_firms(w, reg, /*seed=*/0x8A21F00Du);
     }

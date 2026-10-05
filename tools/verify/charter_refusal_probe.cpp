@@ -611,6 +611,152 @@ result run(bool timber_in_a)
     return out;
 }
 
+/// THE KEPT ROSTER (`enforce_chain_feasible_roster`, the second cold review):
+/// the same two-market body, timber only in B, steel cheap in A so B's steel
+/// cannot reach A either. Specialist S (processing focus, seated) holds
+///   P1 at (6, 6) in A: steel from timber — infeasible (no timber in A);
+///   P3 at (7, 6) in A: tools from steel — feasible ONLY against P1's stale
+///      default recipe, so an order-dependent pass would keep it;
+///   P2 at (12, 6) in B: steel from timber — feasible (timber beside it).
+/// Specialist T (extraction focus) holds the timber mine. With @p s_loses_all,
+/// S holds only P1 and P3, so it is left with no processor and the seat moves.
+struct roster_result
+{
+    chain_roster_enforcement first, second;
+    std::uint64_t digest_first = 0, digest_second = 0;
+    chain_feasibility_audit audit;
+    bool p1_gone = false, p3_gone = false, p2_kept = false;
+    entity_id s = null_entity, t = null_entity;
+};
+
+roster_result run_roster(bool s_loses_all)
+{
+    auto w = std::make_unique<world>();
+    recipe_registry reg;
+    const int bw = 24, bh = 12;
+    const entity_id body = w->create_entity();
+    {
+        body_component bc{};
+        bc.name = "RosterBody";
+        bc.grid_width = bw;
+        bc.grid_height = bh;
+        w->bodies[body] = bc;
+    }
+    const entity_id nation = w->create_entity();
+    nation_component nc{};
+    nc.name = "Veyl";
+    std::map<std::pair<int, int>, entity_id> at;
+    const std::size_t timber = static_cast<std::size_t>(resource_type::timber);
+    const std::size_t steel  = static_cast<std::size_t>(resource_type::steel);
+    const std::size_t tools  = static_cast<std::size_t>(resource_type::tools);
+    for (int y = 0; y < bh; ++y)
+        for (int x = 0; x < bw; ++x)
+        {
+            const entity_id tid = w->create_entity();
+            tile_component tc{};
+            tc.body = body;
+            tc.grid_x = x;
+            tc.grid_y = y;
+            tc.substrate = terrain_substrate::barren;
+            if (x == 14 && y == 6)
+            {
+                tc.resource_deposit[timber]   = 1.0f;
+                tc.resource_remaining[timber] = 1000.0f;
+            }
+            w->tiles[tid] = tc;
+            nc.tiles.push_back(tid);
+            w->tile_to_nation[tid] = nation;
+            at[{ x, y }] = tid;
+        }
+    w->nations[nation] = nc;
+    for (const int cx : { 4, 14 })
+    {
+        const entity_id mid = w->create_entity();
+        market_component m{};
+        m.body = body;
+        m.centre_tile = at.at({ cx, 6 });
+        m.base_price.fill(1.0f);
+        if (cx == 4)
+        {
+            m.base_price[timber] = 0.2f;   // B's timber cannot reach A
+            m.base_price[steel]  = 0.2f;   // nor B's steel
+        }
+        m.price = m.base_price;
+        w->markets[mid] = m;
+    }
+    recipe st;
+    st.name = "fixture_steel_from_timber";
+    st.inputs[timber] = 1.0f;
+    st.outputs[steel] = 1.0f;
+    reg.add_recipe(st);
+    recipe tl;
+    tl.name = "fixture_tools_from_steel";
+    tl.inputs[steel] = 1.0f;
+    tl.outputs[tools] = 1.0f;
+    reg.add_recipe(tl);
+    building_economics e;
+    e.base_rate = 1.0f;
+    reg.set_economics(building_type::extraction_site, e);
+    reg.set_economics(building_type::processing_facility, e);
+
+    const auto add = [&](int x, int y, building_type t, const char* rname) {
+        const entity_id bid = w->create_entity();
+        building_component b{};
+        b.tile = at.at({ x, y });
+        b.type = t;
+        b.workforce_assigned = 0.5f;
+        if (t == building_type::extraction_site)
+            b.target_resource = resource_type::timber;
+        if (rname != nullptr)
+            b.recipe = reg.recipe_id(rname);
+        w->buildings[bid] = b;
+        w->stockpiles[bid] = stockpile_component{};
+        return bid;
+    };
+    const entity_id p1 = add(6, 6, building_type::processing_facility, "fixture_steel_from_timber");
+    const entity_id p3 = add(7, 6, building_type::processing_facility, "fixture_tools_from_steel");
+    const entity_id p2 = s_loses_all ? null_entity
+                       : add(12, 6, building_type::processing_facility, "fixture_steel_from_timber");
+    const entity_id mine = add(14, 6, building_type::extraction_site, nullptr);
+
+    roster_result out;
+    out.s = w->create_entity();
+    {
+        corporation_component s;
+        s.name = "Sereth Works";
+        s.focus = industrial_focus::processing;
+        // P3 BEFORE P1: a walk in asset order would judge P3 while P1 still
+        // carries its stale recipe — the order dependence the review found.
+        s.assets = { p3, p1 };
+        if (p2 != null_entity)
+            s.assets.push_back(p2);
+        s.hq_building = p1;
+        s.is_player = true;
+        w->corporations[out.s] = s;
+        w->player_entity = out.s;
+    }
+    out.t = w->create_entity();
+    {
+        corporation_component t;
+        t.name = "Tolvan Extraction";
+        t.focus = industrial_focus::extraction;
+        t.assets = { mine };
+        t.hq_building = mine;
+        w->corporations[out.t] = t;
+    }
+
+    out.first = enforce_chain_feasible_roster(*w, reg, /*seed=*/1185u);
+    out.digest_first = world_state_digest(*w);
+    out.second = enforce_chain_feasible_roster(*w, reg, /*seed=*/1185u);
+    out.digest_second = world_state_digest(*w);
+    out.audit = audit_chain_feasibility(*w, reg);
+    out.p1_gone = w->buildings.count(p1) == 0;
+    out.p3_gone = w->buildings.count(p3) == 0;
+    out.p2_kept = p2 != null_entity && w->buildings.count(p2) != 0
+               && w->buildings.at(p2).recipe == reg.recipe_id("fixture_steel_from_timber");
+    return out;
+}
+
 } // namespace chainfx
 
 int main()
@@ -1385,6 +1531,34 @@ int main()
                     good.anchor_at_x ? 1 : 0, good.chain_infeasible);
         expect_true("control: timber in A — the firm charters, anchored at (6, 6)",
                     good.firms == 1 && good.anchor_at_x && good.chain_infeasible == 0 && good.balanced);
+    }
+    {
+        // THE KEPT ROSTER: enforce_chain_feasible_roster is order-free,
+        // idempotent, and leaves nothing infeasible.
+        const chainfx::roster_result r = chainfx::run_roster(/*s_loses_all=*/false);
+        std::printf("  kept roster: call 1 re-decided %d unplaced %d holdless %d%s; call 2 re-decided "
+                    "%d unplaced %d; audit infeasible held %d of %d\n",
+                    r.first.processors_redecided, r.first.processors_unplaced, r.first.holdless,
+                    r.first.seat_redrawn ? " (seat redrawn)" : "", r.second.processors_redecided,
+                    r.second.processors_unplaced, r.audit.infeasible_held, r.audit.processors_held);
+        expect_true("roster: P1 (no timber) and P3 (fed only by P1's stale recipe) unplaced; P2 kept",
+                    r.p1_gone && r.p3_gone && r.p2_kept);
+        expect_true("roster: a SECOND call changes nothing (re-decides 0, unplaces 0, same digest)",
+                    r.second.processors_redecided == 0 && r.second.processors_unplaced == 0
+                    && r.digest_first == r.digest_second);
+        expect_true("roster: no held processor is left infeasible (audit)",
+                    r.audit.infeasible_held == 0);
+        expect_true("roster: the seat stays — S still holds a processor",
+                    !r.first.seat_redrawn && r.first.seat == r.s);
+        const chainfx::roster_result lost = chainfx::run_roster(/*s_loses_all=*/true);
+        std::printf("  seat loses all: unplaced %d holdless %d, seat %u (S %u, T %u)%s\n",
+                    lost.first.processors_unplaced, lost.first.holdless,
+                    static_cast<unsigned>(lost.first.seat), static_cast<unsigned>(lost.s),
+                    static_cast<unsigned>(lost.t), lost.first.seat_redrawn ? " redrawn" : "");
+        expect_true("roster: a seated processing specialist left with no processor is re-seated "
+                    "on the one that still qualifies",
+                    lost.first.seat_redrawn && lost.first.seat == lost.t && lost.first.holdless == 1
+                    && lost.audit.infeasible_held == 0);
     }
 
     std::printf("\n%s (%d failing)\n", g_fail == 0 ? "ALL PASS" : "FAILED", g_fail);

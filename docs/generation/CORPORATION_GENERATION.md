@@ -331,11 +331,17 @@ not a broad presence across the nation.
     specialists the landscape search lays apply it as they place. World generation's own Pass 3 is
     Lua-free and runs before a recipe registry exists, so it cannot; every path that keeps that
     roster applies the rule to it as soon as the registry is in hand, before Pass 6 runs
-    (`enforce_chain_feasible_roster`): each specialist's processors are re-decided against
-    everything then standing, and an infeasible one is unplaced. Such a specialist already exists,
-    so it is never refused whole; one left with no holding is reported. With a registry, no
-    specialist slot whose every rung was refused becomes a corporation, and the seat is never
-    drawn from one.
+    (`enforce_chain_feasible_roster`). **Only the infeasible are re-decided:** the processors whose
+    current recipes are feasible against producers that are themselves kept keep them (the
+    greatest such set, found as a fixed point), and each of the rest takes the feasible recipe
+    nearest its feed or is unplaced. The pass is idempotent — a second call changes nothing — and
+    leaves no roster processor infeasible. Such a specialist already exists, so it is never refused
+    whole: its HQ is designated again over its non-military holdings and its opening stock re-keyed
+    to that HQ; one left with no holding is reported. If the seated specialist is left holdless, or
+    a processing corporation with no processor, the seat is drawn again over the specialists that
+    still qualify, on world generation's own pick stream. With a registry, no specialist slot whose
+    every rung was refused becomes a corporation, and the seat is never drawn from one; a roster
+    left empty seats nobody, and says so.
 
 Placement is collision-checked against already-placed assets from other corporations.
 No two corporations begin on the same tile.
