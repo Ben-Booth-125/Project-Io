@@ -12,6 +12,15 @@
 //     running and output, at the requested sample ticks (multi-tick: the scorer
 //     must find, build and staff a Well, which no one-tick row can see).
 //
+//   * TRACE (--trace good,good,...) — where each good goes, per play tick
+//     (printed at the sample ticks, averaged over the ticks since the last
+//     sample): PRODUCED (building_output from the tick's report), SOLD by
+//     corporations to the market (exchange rows with a corp seller; the auto-
+//     surplus path and matched trades), the corp POOLS holding it after the
+//     tick, of which RESERVED by the corp's own processors in that pool
+//     (processor_reservation, the auto-surplus path's own subtraction) and
+//     ORDER-HELD (a standing sell order on that corp/body/good takes the pool
+//     off the auto-surplus path), in CONVOYS, and the exchange-ring rows lost.
 //   * INCOME (--income) — market_viability's G2 window (play ticks 26-50):
 //     mean field income, split by the corporations owning a water site (Well
 //     or ice) and the rest; water sold BY corporations (exchange rows with a
@@ -26,7 +35,7 @@
 // warms the derived logistics-reach cache).
 //
 // Build:  bash tools/verify/build_lua_harness.sh well_census
-// Run:    build_gen/verify/well_census.exe [--seeds 0,43,10] [--ticks 400]
+// Run:    build_gen/verify/well_census.exe [--seeds 0,43,10] [--ticks 400] [--trace water,steel]
 //                                          [--samples 0,50,200,400] [--scorer] [--income]
 
 #include "scripting/lua_state.hpp"
@@ -34,6 +43,7 @@
 #include "world/campaign_settle.hpp"
 #include "world/components.hpp"
 #include "world/economy_system.hpp"
+#include "world/input_reach.hpp"   // building_output: actual per-good output from a report
 #include "world/logistics.hpp"
 #include "world/market_clearing.hpp"
 #include "world/placement_rules.hpp"
@@ -192,6 +202,36 @@ std::map<entity_id, int> water_owners(const world& w)
     return out;
 }
 
+struct trace_acc
+{
+    double produced = 0, sold = 0, ticks = 0;
+};
+
+/// Pool holdings of good @p r after the tick: total, reserved by the corp's own
+/// processors in that pool, held off auto-surplus by a standing sell order.
+void pool_state(const world& w, const recipe_registry& reg, std::size_t r,
+                double& total, double& reserved, double& order_held, int& pools)
+{
+    total = reserved = order_held = 0.0; pools = 0;
+    for (const auto& [key, pool] : w.corp_market_pools)
+    {
+        const double q = pool.quantities[r];
+        if (q <= 0.0) continue;
+        ++pools;
+        total += q;
+        const auto mit = w.markets.find(key.second);
+        if (mit == w.markets.end()) continue;
+        bool held = false;
+        for (const sell_order& o : w.sell_orders)
+            if (o.corp == key.first && o.body == mit->second.body
+                && static_cast<std::size_t>(o.resource) == r && o.quantity > 0.0f)
+                held = true;
+        if (held) { order_held += q; continue; }
+        if (w.corporations.count(key.first))
+            reserved += std::min(q, static_cast<double>(processor_reservation(w, reg, key.first, key.second)[r]));
+    }
+}
+
 struct income_window
 {
     double field = 0, water_owner = 0, rest = 0;                      // field income
@@ -207,11 +247,22 @@ int main(int argc, char** argv)
     int ticks = 400;
     bool scorer = false; // --scorer: the SCORER diagnostic at the handoff (warms the reach cache)
     bool income = false; // --income: the G2-window attribution
+    std::vector<std::size_t> trace; // --trace: goods to follow
     std::set<int> samples{0, 50, 200, 400};
     for (int i = 1; i < argc; ++i)
     {
         if (!std::strcmp(argv[i], "--scorer")) scorer = true;
         else if (!std::strcmp(argv[i], "--income")) income = true;
+        else if (!std::strcmp(argv[i], "--trace") && i + 1 < argc)
+        {
+            std::stringstream ss(argv[++i]); std::string t;
+            while (std::getline(ss, t, ','))
+            {
+                bool ok = false;
+                const resource_type rr = resource_names::resource_from_name(t, ok);
+                if (ok) trace.push_back(static_cast<std::size_t>(rr));
+            }
+        }
         else if (!std::strcmp(argv[i], "--seeds") && i + 1 < argc) seeds = parse_seeds(argv[++i]);
         else if (!std::strcmp(argv[i], "--ticks") && i + 1 < argc) ticks = std::atoi(argv[++i]);
         else if (!std::strcmp(argv[i], "--samples") && i + 1 < argc)
@@ -247,6 +298,8 @@ int main(int argc, char** argv)
         for (const auto& [cid, cc] : w.corporations) { (void)cc; cohort.insert(cid); }
 
         income_window iw;
+        std::vector<trace_acc> tr(trace.size());
+        std::size_t lost_rows = 0;
         for (int k = 1; k <= ticks; ++k)
         {
             const int day = k * k_econ_tick_days;
@@ -256,6 +309,43 @@ int main(int argc, char** argv)
             const std::size_t prev_total = w.exchanges.total;
             const settle_tick_result res =
                 run_settle_tick(w, reg, k_campaign_settle_ticks + (k - 1), day, /*spectating=*/false);
+            if (!trace.empty())
+            {
+                const exchange_record_ring& ring = w.exchanges;
+                const std::size_t added = ring.total - prev_total;
+                const std::size_t n = std::min<std::size_t>(added, ring.size());
+                if (added > n) lost_rows += added - n;
+                for (std::size_t g = 0; g < trace.size(); ++g)
+                {
+                    const std::size_t r = trace[g];
+                    for (const auto& [bid, b] : w.buildings)
+                        tr[g].produced += building_output(w, reg, bid, b, r, &res.report);
+                    for (std::size_t i = ring.size() - n; i < ring.size(); ++i)
+                    {
+                        const exchange_record& e = ring.oldest_first(i);
+                        if (e.seller != null_entity && static_cast<std::size_t>(e.resource) == r)
+                            tr[g].sold += e.quantity;
+                    }
+                    tr[g].ticks += 1;
+                }
+                if (samples.count(k))
+                {
+                    for (std::size_t g = 0; g < trace.size(); ++g)
+                    {
+                        const std::size_t r = trace[g];
+                        double tot, resv, held; int pools;
+                        pool_state(w, reg, r, tot, resv, held, pools);
+                        double conv = 0;
+                        for (const convoy_component& c : w.convoys)
+                            if (static_cast<std::size_t>(c.cargo_resource) == r && !c.arrived) conv += c.cargo_qty;
+                        const double t = tr[g].ticks > 0 ? tr[g].ticks : 1;
+                        std::printf("  TRACE tick %3d %-14s produced %.1f/t sold %.1f/t | pools %.1f in %d (reserved %.1f, order-held %.1f) | convoys %.1f | ring lost %zu\n",
+                                    k, resource_names::name_of(static_cast<resource_type>(r)).c_str(),
+                                    tr[g].produced / t, tr[g].sold / t, tot, pools, resv, held, conv, lost_rows);
+                        tr[g] = trace_acc{};
+                    }
+                }
+            }
             if (samples.count(k)) built(w, &res.report, k);
             if (income && k >= k_win_lo && k <= k_win_hi)
             {

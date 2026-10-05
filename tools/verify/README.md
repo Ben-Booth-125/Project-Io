@@ -1188,11 +1188,14 @@ running, output, markets, water's mean px/base) at sample play ticks. Steps exac
 window (play 26-50): field income split by water-site owners and the rest, water sold by Well
 vs ice owners, corp-sale revenue per good (diff two runs), and the handoff cohort alive at the
 last tick (G3). `--scorer` prints the scorer's top Well candidates with their reach verdict (it
-warms the reach cache, so leave it off for a reading). A report; no gate.
+warms the reach cache, so leave it off for a reading). `--trace good,good` follows each good per
+play tick: produced, sold by corporations, pool holdings after the tick split into reserved (own
+processors) and order-held (a standing sell order takes the pool off auto-surplus), convoy cargo,
+and exchange-ring rows lost. A report; no gate.
 
 ```
 bash tools/verify/build_lua_harness.sh well_census
-./build_gen/verify/well_census.exe [--seeds 0,43,10] [--ticks 400] [--samples 0,50,200,400] [--income] [--scorer]
+./build_gen/verify/well_census.exe [--seeds 0,43,10] [--ticks 400] [--samples 0,50,200,400] [--income] [--scorer] [--trace water,steel]
 ```
 
 ## scorer_clock (BL-1198 cold review)

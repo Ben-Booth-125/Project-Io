@@ -728,7 +728,8 @@ std::array<float, resource_count> input_demand_weights(const world& w,
 /// list's authoring order - registering a new extractable appends, it does not
 /// reshuffle. Within a bucket the comparator is the one the global sort used,
 /// tile-id tie-break included.
-std::vector<extraction_site> rank_extraction_sites(const world& w, int top_k_per_resource,
+std::vector<extraction_site> rank_extraction_sites(const world& w, const recipe_registry& reg,
+                                                   int top_k_per_resource,
                                                    const std::array<float, resource_count>& demand_weight)
 {
     std::vector<extraction_site> sites;
@@ -737,27 +738,61 @@ std::vector<extraction_site> rank_extraction_sites(const world& w, int top_k_per
     struct well_candidate
     {
         entity_id tile;
-        float     unmet;        ///< Unmet water bid at the tile's own market, last clear.
+        float     unmet;        ///< Uncovered water bid at the tile's own market (see below).
         float     habitability; ///< Secondary key: where people can live.
     };
     std::vector<well_candidate> wells;
     // Tiles already holding a water extraction site. A Well's stack cap is 1
     // (stack_capacity: no richness), so such a tile can never take another —
     // one building walk here replaces a full placement check per tile.
-    std::set<entity_id> water_site_tiles;
-    for (const auto& [bid, b] : w.buildings)
-        if (b.type == building_type::extraction_site && b.target_resource == resource_type::water)
-            water_site_tiles.insert(b.tile);
-    // The unmet water bid at a candidate's own market: what the last clear's demand
-    // (household + firm want) left unlisted. Public market aggregates, the same
-    // visibility every rival reads (BL-068).
+    //
+    // The same walk sums the water CAPACITY already standing in each market's
+    // catchment — every water site, Well or ice, built or under construction —
+    // at the rate the scorer itself prices a new site at (construct_building's
+    // 0.5 staffing, the site's own rate scalar, its tile's hazard). Capacity, not
+    // this tick's output: a site still building, or one its dial idles, is water
+    // already committed to that market, and counting only what is listed today
+    // let a market with a hundred Wells keep reading as thirsty (review round 3).
     const std::size_t rw = static_cast<std::size_t>(resource_type::water);
-    const auto unmet_water = [&](entity_id tile) -> float {
+    const building_economics& ex = reg.economics(building_type::extraction_site);
+    std::set<entity_id> water_site_tiles;
+    std::map<entity_id, float> standing_capacity; // market -> water units/tick committed
+    for (const auto& [bid, b] : w.buildings)
+    {
+        if (b.type != building_type::extraction_site || b.target_resource != resource_type::water)
+            continue;
+        water_site_tiles.insert(b.tile);
+        if (b.decommissioned)
+            continue;
+        const auto tit = w.tiles.find(b.tile);
+        if (tit == w.tiles.end())
+            continue;
+        const float rate = placement_rules::is_well_site(w, b.tile, b.target_resource)
+            ? placement_rules::k_well_rate_scalar
+            : richness_rate_scalar(ex, tit->second.resource_deposit[rw]);
+        standing_capacity[market_for_tile(w, b.tile)] +=
+            ex.base_rate * rate * 0.5f * (1.0f - tit->second.hazard_level);
+    }
+    // The UNCOVERED water bid at a candidate's own market: the last clear's
+    // demand (household + firm want) less what is listed, less the capacity
+    // already standing there. Public aggregates plus the visible building set,
+    // what every rival reads (BL-068). A market whose standing capacity covers
+    // its bid offers no Well at all — the bucket saturates by market, so Wells
+    // spread to where water is still wanted instead of piling where it once was.
+    std::map<entity_id, float> uncovered_memo;
+    const auto uncovered_water = [&](entity_id tile) -> float {
         const entity_id mid = market_for_tile(w, tile);
-        const auto mit = w.markets.find(mid);
-        if (mit == w.markets.end())
-            return 0.0f;
-        return std::max(0.0f, mit->second.demand[rw] - mit->second.supply[rw]);
+        if (const auto it = uncovered_memo.find(mid); it != uncovered_memo.end())
+            return it->second;
+        float v = 0.0f;
+        if (const auto mit = w.markets.find(mid); mit != w.markets.end())
+        {
+            const auto cap = standing_capacity.find(mid);
+            v = mit->second.demand[rw] - mit->second.supply[rw]
+              - (cap != standing_capacity.end() ? cap->second : 0.0f);
+        }
+        uncovered_memo[mid] = v;
+        return v;
     };
 
     // BL-253 follow-on (2026-08-12, the 3x map): tile_surveyed re-looked-up the
@@ -821,7 +856,8 @@ std::vector<extraction_site> rank_extraction_sites(const world& w, int top_k_per
             && tc.cover != terrain_cover::urban // can_place: built over (BL-366)
             && water_site_tiles.count(tid) == 0
             && placement_rules::is_fresh_water_adjacent(w, tid))
-            wells.push_back({tid, unmet_water(tid), tc.habitability});
+            if (const float uncovered = uncovered_water(tid); uncovered > 0.0f)
+                wells.push_back({tid, uncovered, tc.habitability});
     }
     // PARTIAL SORT within each bucket, not a full one (the 2026-08-12 reason,
     // unchanged): only the first K survive, and `std::partial_sort` orders
@@ -856,8 +892,8 @@ std::vector<extraction_site> rank_extraction_sites(const world& w, int top_k_per
                    bucket.begin() + static_cast<std::ptrdiff_t>(keep));
     }
     // BL-1198: the Well bucket, K of its own, appended last so every deposit
-    // bucket keeps the order it had. Ranked by the UNMET water bid at the tile's
-    // own market (where water is wanted and not listed), then habitability
+    // bucket keeps the order it had. Ranked by the UNCOVERED water bid at the
+    // tile's own market (wanted, not listed, not already being built for), then habitability
     // (where people can live), then tile id. Walked in that order, running the
     // full world placement check (slot, province ceiling — reach and tech stay
     // per-corp, in the scorer) until K pass: a tile whose slot or province is
@@ -942,7 +978,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
     // site ranking they feed, not once per due corp — the same BL-253 hoist.
     const std::array<float, resource_count> demand_weight = input_demand_weights(w, reg, p);
     const std::vector<extraction_site> ranked_sites =
-        rank_extraction_sites(w, p.top_k_sites_per_resource, demand_weight);
+        rank_extraction_sites(w, reg, p.top_k_sites_per_resource, demand_weight);
 
     // BL-1187 (build only what runs): the reach context every processor
     // decision below asks "is this input obtainable here?" of — build, recipe
