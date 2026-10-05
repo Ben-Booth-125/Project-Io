@@ -222,6 +222,22 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     const recipe_registry& reg,
     const economy_report& report);
 
+/// BL-1201 (orders are price floors, Ben 2026-10-05; MARKETS.md step 4): a
+/// standing sell order that has had NOTHING to list — no surplus above the
+/// processor reservation in any of its corp's pools on its body — for this many
+/// consecutive clearing ticks is removed by `clear_markets`, and the good returns
+/// to auto-surplus. The same rule for the player and for rival corps.
+///
+/// WHY 4 (one year of quarterly ticks): a pool fed by convoys or by a processor
+/// whose input comes and goes can stand empty for a tick or two between
+/// deliveries while the order is still wanted, so 1-2 would close an order the
+/// next delivery needs and make its owner place it again. Much longer leaves a
+/// dead order governing a good for years. Four quarters rides out a delivery gap
+/// and returns an abandoned good to auto-surplus inside a year. It equals the
+/// rival scorer's evaluation cadence (corp_ai_params::cadence_k = 4), so a run
+/// of empty ticks spans one full look by every rival.
+inline constexpr uint8_t sell_order_empty_close_ticks = 4;
+
 /// The UNSMOOTHED price a market aims at for one good this tick: `base x
 /// sqrt(demand / supply)`, `base x ceil` for demand with no supply, `base` with
 /// neither, clamped to [floor_mult, ceil_mult] x base. `resolve_price` eases the

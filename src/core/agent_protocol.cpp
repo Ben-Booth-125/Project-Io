@@ -98,8 +98,11 @@ long long kv_get_checked(const std::unordered_map<std::string, std::string>& kv,
 ///
 /// The first cut of this guard returned the default instead, and that was wrong
 /// for a reason worth keeping: the two keys sharing this getter have defaults
-/// that mean OPPOSITE things downstream. `quantity`'s 0 is rejected by the seam,
-/// so substituting it is a refusal by accident. `floor_price`'s 0 is meaningful
+/// that are both MEANINGFUL downstream. `quantity`'s 0 is NO CAP since BL-1201
+/// (orders are price floors) — the order covers the whole surplus — so
+/// substituting it would widen a capped order to an uncapped one. An ABSENT
+/// `quantity` still defaults to 0 deliberately: an uncapped order is the default
+/// order. Only a MALFORMED value is refused. `floor_price`'s 0 is meaningful
 /// — the seam reads it as "accept the market price" — so substituting it turns
 /// "sell only above this floor" into "sell at market, every tick", answers
 /// `applied`, and issues no diagnostic. That is precisely the silent

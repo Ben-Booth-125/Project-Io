@@ -215,6 +215,7 @@ uint64_t world::state_hash(int tick) const
         fnv1a_u32(h, o.corp);
         fnv1a_u32(h, o.body);
         fnv1a_u32(h, static_cast<uint32_t>(o.resource));
+        fnv1a_u32(h, o.empty_ticks); // BL-1201: it decides when the order closes
         fnv1a_f32(h, o.quantity);
         fnv1a_f32(h, o.floor_price);
     }

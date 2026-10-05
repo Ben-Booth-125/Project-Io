@@ -352,9 +352,16 @@ int main()
                   "R3.3 an unpriced resource is rejected_invalid");
         }
         {
-            corp_command c = place_cmd(s, 0.0f, 1.0f);
+            // BL-1201: 0 is NO CAP now (applied, in its own scenario below so
+            // this one's book stays empty); a NEGATIVE quantity is refused.
+            corp_command c = place_cmd(s, -1.0f, 1.0f);
             check(apply_corp_command(s.w, reg, c) == corp_command_result::rejected_invalid,
-                  "R3.4 a non-positive quantity is rejected_invalid");
+                  "R3.4 a negative quantity is rejected_invalid");
+            scenario z = make_scenario(0.0f);
+            check(apply_corp_command(z.w, reg, place_cmd(z, 0.0f, 1.0f)) ==
+                      corp_command_result::applied &&
+                      z.w.sell_orders.size() == 1 && z.w.sell_orders[0].quantity == 0.0f,
+                  "R3.4b quantity 0 is a legal UNCAPPED order (BL-1201)");
         }
         {
             corp_command c = place_cmd(s, 10.0f, -1.0f);
@@ -517,8 +524,9 @@ int main()
                   "R5.2 the order names the corp's own pool");
             check(o.floor_price >= base * p.trade_floor_multiple - 0.001f,
                   "R5.3 CONSERVATISM: it never lists below the market's rarity floor");
-            check(o.quantity > 0.0f && o.quantity <= 100.0f,
-                  "R5.4 CONSERVATISM: it lists only a fraction of the excess, never the whole pool");
+            check(o.quantity == 0.0f,
+                  "R5.4 the rival's order is UNCAPPED (BL-1201): a price floor over the whole "
+                  "surplus, with nothing to size");
         }
 
         // A second evaluation must not stack another order on the same triple.
@@ -838,6 +846,135 @@ int main()
             check(mc.demand[r_iron] > 7.99f && mc.demand[r_iron] < 8.01f,
                   "R8.4 WANT: demand = 8 even though only 2 arrived — want and fill are separate");
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // R9 — an order is a price floor over the whole surplus (BL-1201, Ben
+    // 2026-10-05; MARKETS.md step 4). Read EVERY tick over a run of ticks — the
+    // trap this replaces was a multi-tick one (an order sized once, output
+    // growing past it), and a one-tick read cannot see a pile form.
+    // -----------------------------------------------------------------------
+    // Two corps on one body, one the PLAYER and one a rival, each holding an
+    // uncapped order and a capped order (on different goods, so each triple
+    // has one order). Output into every pool grows every tick. Clearing alone
+    // is ticked, so no scorer acts: whatever happens is the market rule.
+    {
+        scenario s = make_scenario(0.0f);
+        const std::size_t steel = ri(resource_type::steel);
+        const std::size_t iron  = ri(resource_type::iron_ore);
+        s.w.markets.at(s.market).base_price[iron] = 3.0f;
+        s.w.markets.at(s.market).price[iron]      = 3.0f;
+
+        const entity_id rival  = s.corp;
+        const entity_id player = s.w.create_entity();
+        {
+            corporation_component cc;
+            cc.balance   = 1000.0f;
+            cc.is_player = true;
+            s.w.corporations[player] = cc;
+            s.w.player_entity = player;
+        }
+        const entity_id key = pool_key_for_body(s.w, s.body);
+        auto pool = [&](entity_id corp, std::size_t r) {
+            return s.w.pool_at(corp, key).quantities[r];
+        };
+        auto place = [&](entity_id corp, resource_type r, float qty) {
+            corp_command c = place_cmd(s, qty, 0.0f, r);
+            c.corp = corp;
+            return apply_corp_command(s.w, reg, c) == corp_command_result::applied;
+        };
+        auto orders_of = [&](entity_id corp, resource_type r) {
+            int n = 0;
+            for (const sell_order& o : s.w.sell_orders)
+                if (o.corp == corp && o.resource == r) ++n;
+            return n;
+        };
+        check(place(player, resource_type::steel, 0.0f) && place(rival, resource_type::steel, 0.0f) &&
+              place(player, resource_type::iron_ore, 10.0f) && place(rival, resource_type::iron_ore, 10.0f),
+              "R9.0 fixture: player and rival each hold an uncapped steel and a 10-cap iron order");
+
+        bool uncapped_follows = true;  // the uncapped pool is emptied every tick
+        bool capped_holds     = true;  // the capped pool keeps exactly the excess
+        bool alike            = true;  // player and rival read identically
+        float iron_expected   = 0.0f;
+        for (int t = 1; t <= 8; ++t)
+        {
+            const float out = 25.0f * static_cast<float>(t); // output grows every tick
+            for (const entity_id c : {player, rival})
+            {
+                s.w.pool_at(c, key).quantities[steel] += out;
+                s.w.pool_at(c, key).quantities[iron]  += out;
+            }
+            iron_expected += out - 10.0f;
+            economy_report empty;
+            clear_markets(s.w, reg, empty);
+            for (const entity_id c : {player, rival})
+            {
+                if (pool(c, steel) > 0.01f) uncapped_follows = false;
+                if (std::fabs(pool(c, iron) - iron_expected) > 0.01f) capped_holds = false;
+            }
+            if (pool(player, steel) != pool(rival, steel) || pool(player, iron) != pool(rival, iron))
+                alike = false;
+        }
+        std::printf("       R9 after 8 growing ticks: steel pools %.1f / %.1f, iron pools %.1f / %.1f "
+                    "(player / rival)\n", pool(player, steel), pool(rival, steel),
+                    pool(player, iron), pool(rival, iron));
+        check(uncapped_follows,
+              "R9.1 an UNCAPPED order follows a growing pool: every unit produced lists, every tick");
+        check(capped_holds,
+              "R9.2 a CAPPED order lists its cap and holds the excess (the owner chose to hold it)");
+        check(alike, "R9.3 the player's orders and the rival's are treated alike, tick for tick");
+
+        // Output stops. The steel pools are already empty; each steel order
+        // closes after `sell_order_empty_close_ticks` ticks with nothing to list.
+        // The capped iron orders still have a pile to work down, so they stay.
+        bool open_until_n = true;
+        for (int t = 1; t < static_cast<int>(sell_order_empty_close_ticks); ++t)
+        {
+            economy_report empty;
+            clear_markets(s.w, reg, empty);
+            if (orders_of(player, resource_type::steel) != 1 || orders_of(rival, resource_type::steel) != 1)
+                open_until_n = false;
+        }
+        check(open_until_n, "R9.4 an empty order stays open for fewer than N empty ticks");
+        {
+            economy_report empty;
+            clear_markets(s.w, reg, empty);
+        }
+        check(orders_of(player, resource_type::steel) == 0 && orders_of(rival, resource_type::steel) == 0,
+              "R9.5 at N consecutive empty ticks the order closes itself — player's and rival's alike");
+        check(orders_of(player, resource_type::iron_ore) == 1 && orders_of(rival, resource_type::iron_ore) == 1,
+              "R9.6 an order with a pile still under it is not closed");
+
+        // Auto-surplus resumes: new steel output now sells with no order at all.
+        for (const entity_id c : {player, rival})
+            s.w.pool_at(c, key).quantities[steel] += 40.0f;
+        economy_report empty;
+        const auto flows = clear_markets(s.w, reg, empty);
+        check(pool(player, steel) < 0.01f && pool(rival, steel) < 0.01f &&
+                  flows.count(player) && flows.at(player).income > 0.0f,
+              "R9.7 with the order closed, auto-surplus sells the good again");
+
+        // The run is world state: it rides the save seam and the state hash.
+        s.w.pool_at(rival, key).quantities[iron] = 0.0f;
+        clear_markets(s.w, reg, empty); // rival's iron order: one empty tick
+        const sell_order* ro = nullptr;
+        for (const sell_order& o : s.w.sell_orders)
+            if (o.corp == rival && o.resource == resource_type::iron_ore) ro = &o;
+        check(ro && ro->empty_ticks == 1,
+              "R9.8 the empty run is counted on the order (empty_ticks 1 after one empty tick)");
+        std::stringstream ss;
+        write_order_book(s.w, ss);
+        world dest;
+        const bool ok = read_order_book(dest, ss);
+        bool same = ok && dest.sell_orders.size() == s.w.sell_orders.size();
+        for (std::size_t i = 0; same && i < dest.sell_orders.size(); ++i)
+            same = dest.sell_orders[i].empty_ticks == s.w.sell_orders[i].empty_ticks &&
+                   dest.sell_orders[i].quantity == s.w.sell_orders[i].quantity;
+        check(same, "R9.9 empty_ticks and an uncapped quantity round-trip the order-book stream");
+        const uint64_t h_before = s.w.state_hash(0);
+        s.w.sell_orders.back().empty_ticks ^= 1;
+        check(s.w.state_hash(0) != h_before, "R9.10 the empty run is inside world::state_hash");
     }
 
     std::printf("\n%s  (%d passed, %d failed)\n",

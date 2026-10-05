@@ -1138,6 +1138,17 @@ struct sell_order
     entity_id     corp        = null_entity;
     entity_id     body        = null_entity;
     resource_type resource    = resource_type::iron_ore;
+    /// BL-1201 (orders are price floors): consecutive clearing ticks this order
+    /// has had NOTHING to list — no surplus above the processor reservation in
+    /// any of the corp's pools on its body. Reset by any tick it lists; at
+    /// `sell_order_empty_close_ticks` the clearing pass removes the order and
+    /// the good returns to auto-surplus (MARKETS.md step 4). Sits in the
+    /// padding byte after `resource`, so the record stays 24 bytes; it IS a
+    /// saved field (world_save_version 33, order_book_version 2).
+    uint8_t       empty_ticks = 0;
+    /// Per-tick listing CAP. **0 = no cap** (BL-1201, Ben 2026-10-05): the order
+    /// covers the whole surplus auto-surplus would have listed, tick by tick.
+    /// A positive cap lists at most that much per tick and the rest waits.
     float         quantity    = 0.0f;
     float         floor_price = 0.0f; ///< Minimum acceptable unit price; 0 = sell at the market price.
 };

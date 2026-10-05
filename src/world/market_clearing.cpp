@@ -7,6 +7,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <limits> // BL-1201: an uncapped order's infinite per-tick allowance
 #include <map>
 #include <tuple>
 #include <vector>
@@ -1160,10 +1161,15 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // manual control: the auto-surplus path yields so the floor-priced order
     // governs the sale, not the greedy auto path. True for any corp's order now,
     // not just the player's — a rival that places an order gets the same deal.
+    //
+    // BL-1201 (orders are price floors, Ben 2026-10-05): yielding strands
+    // nothing, because an order by default covers the SAME surplus auto-surplus
+    // would have listed (below), at its floor. Capped or uncapped, any order on
+    // the triple governs it.
     auto order_controls = [&standing_sells](entity_id corp, entity_id body, std::size_t r) {
         for (const sell_order& o : standing_sells)
             if (o.corp == corp && o.body == body &&
-                static_cast<std::size_t>(o.resource) == r && o.quantity > 0.0f)
+                static_cast<std::size_t>(o.resource) == r)
                 return true;
         return false;
     };
@@ -1278,17 +1284,34 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     //
     // BL-1003 CALL: ascending market id decides which catchment's stock an order
     // sells first; a verb that names the market is the fuller answer.
+    //
+    // BL-1201 (orders are price floors, Ben 2026-10-05; MARKETS.md step 4): an
+    // order lists from each pool what AUTO-SURPLUS WOULD HAVE LISTED — the stock
+    // above the corp's processor reservation in that market — recomputed every
+    // tick, so it keeps pace with whatever the corp produces. `quantity` 0 means
+    // NO CAP: the whole surplus, at the floor. A positive `quantity` caps the
+    // listing per tick across the body and the rest of the surplus waits. Before
+    // this rule an order listed min(quantity, pool) and a rival's order, sized
+    // once, trapped every unit produced past it for the rest of the campaign.
+    //
+    // `listed_any[i]` records whether order i listed anything this tick; the
+    // empty-run counter and the auto-close it drives are applied at the end of
+    // this pass, once nothing else reads the book (see the close below).
     std::map<std::tuple<entity_id, entity_id, std::size_t>, float> listed_from_pool;
+    std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> order_reserve;
+    std::vector<char> listed_any(standing_sells.size(), 0);
 
-    for (const sell_order& order : standing_sells)
+    for (std::size_t oi = 0; oi < standing_sells.size(); ++oi)
     {
-        if (order.quantity <= 0.0f)
-            continue;
+        const sell_order& order = standing_sells[oi];
         const auto bmit = by_body.find(order.body);
         if (bmit == by_body.end())
             continue;
         const std::size_t r = static_cast<std::size_t>(order.resource);
-        float order_left = order.quantity;
+        if (r >= resource_count)
+            continue;
+        float order_left = (order.quantity > 0.0f) ? order.quantity
+                                                   : std::numeric_limits<float>::infinity();
         for (const entity_id mid : bmit->second) // ascending market id
         {
             if (order_left <= 0.0f)
@@ -1302,13 +1325,21 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
             if (pkit == w.corp_market_pools.end())
                 continue;
 
+            // The processor reservation is the auto-surplus path's own (one
+            // definition of "the genuine surplus"), memoised per pool.
+            auto rit = order_reserve.find({order.corp, mid});
+            if (rit == order_reserve.end())
+                rit = order_reserve.emplace(std::make_pair(order.corp, mid),
+                                            processor_reservation(w, reg, order.corp, mid)).first;
+
             float& claimed = listed_from_pool[{order.corp, mid, r}];
-            const float unclaimed = pkit->second.quantities[r] - claimed;
+            const float unclaimed = pkit->second.quantities[r] - rit->second[r] - claimed;
             const float available = std::min(order_left, unclaimed);
             if (available <= 0.0f)
-                continue; // an earlier order already spoke for this whole pool
+                continue; // no surplus here, or an earlier order spoke for all of it
             claimed    += available;
             order_left -= available;
+            listed_any[oi] = 1;
 
             w.markets.at(mid).supply[r] += available;
             sell_books[mid][r].push_back({order.corp, available, order.floor_price, available});
@@ -1729,6 +1760,35 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
                 }
             }
         }
+    }
+
+    // --- BL-1201: an order closes itself once its pool has stood empty --------
+    // MARKETS.md step 4 (Ben, 2026-10-05): an order that has had nothing to list
+    // for `sell_order_empty_close_ticks` consecutive ticks is removed and the
+    // good returns to auto-surplus. Applied HERE, after every read of the book
+    // this tick, so no index taken above is invalidated. The same rule for the
+    // player's orders and a rival's: an erase by predicate keeps every
+    // surviving order in its book position (time priority) with its own id.
+    //
+    // `listed_any` was sized from the book at listing time and nothing between
+    // there and here appends to or erases from `w.sell_orders`, so index i still
+    // names the same order.
+    {
+        const std::size_t n = std::min(listed_any.size(), w.sell_orders.size());
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            sell_order& o = w.sell_orders[i];
+            if (listed_any[i])
+                o.empty_ticks = 0;
+            else if (o.empty_ticks < 255)
+                ++o.empty_ticks;
+        }
+        w.sell_orders.erase(
+            std::remove_if(w.sell_orders.begin(), w.sell_orders.end(),
+                           [](const sell_order& o) {
+                               return o.empty_ticks >= sell_order_empty_close_ticks;
+                           }),
+            w.sell_orders.end());
     }
 
     return flows;

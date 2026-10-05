@@ -684,8 +684,10 @@ thing that is still trading:
   across its market pools on that body (`PRODUCTION.md` § Stockpile and output flow) above
   `trade_hold_threshold` (50 units) — well clear of any processor's per-tick draw, so listing can
   never compete with feeding the corp's own chain.
-- **Quantity**: `trade_release_fraction` (0.5) of the excess. It meters its release rather than
-  emptying the pool into one quarter's clearing.
+- **Quantity**: none — the order is placed **uncapped**. An order is a price floor over the whole
+  surplus (`MARKETS.md` step 4, Ben 2026-10-05): clearing lists everything above the processor
+  reservation under it, tick by tick, so it keeps pace with what the corp produces, and an order
+  whose pool stands empty closes itself. The scorer has nothing to size and nothing to withdraw.
 - **Floor**: `trade_floor_multiple` × the market's `base_price` — the rarity-derived value floor,
   the closest per-resource cost reference the world exposes. The authored value is **0.25**,
   which is the price band's own floor (the lowest price a glutted market can resolve), so surplus
@@ -698,22 +700,8 @@ thing that is still trading:
 - **Anti-thrash**: never a second order on a `(corp, body, resource)` that already has one, and
   at most `max_trades` (1) order-book command per evaluation. A trade command's subject is a body,
   not a building, so it takes no dial slot and records no building cooldown.
-- **Upkeep of its own orders** (BL-1201, AI sell order resizes): a standing order lists at most
-  its quantity per tick and exempts its resource from auto-surplus (`MARKETS.md` § clearing steps
-  4–5), so an order sized once would trap every unit produced past it. At each due tick the
-  scorer reads the pool under each of its own orders. **Re-size**: the pool exceeds
-  `trade_resize_multiple` (4) × the order's quantity → `remove_sell_order` then
-  `place_sell_order` at the placement rule applied to today's pool, same floor rule, scored as
-  that listing. The pair is **one** trade action: the corp holds one order on the triple before
-  and after. The multiple must exceed 1 / `trade_release_fraction`, or a freshly sized order
-  reads as outgrown at once; 4 reads "the pool has doubled since sizing". **Withdraw**: the pool
-  holds under `trade_empty_pool` (1 unit) → `remove_sell_order` alone, so auto-surplus governs
-  again; scored as one unit at the floor, so it yields to any listing. Both read the pool once —
-  a stock already integrates every tick since sizing — so no per-order streak is kept. A
-  triple carrying two orders (agent-authored) is left alone. The player's orders are never
-  read: the player's corp is never evaluated in a played session.
 
-All three numbers are `corp_ai_params` fields, so tuning is a data change. Two limits are part of
+Both numbers are `corp_ai_params` fields, so tuning is a data change. Two limits are part of
 the shape: `base_price` is a rarity floor and not a production cost, so on a resource whose real
 cost sits above its rarity floor the AI will sell at a loss (the blackboard's lack of a reference
 price is BL-385, blackboard exports no reference price); and the book is **one-sided** — a corp
