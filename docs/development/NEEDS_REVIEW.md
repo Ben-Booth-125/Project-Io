@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*76 entries — 4 open, 72 resolved.*
+*76 entries — 2 open, 74 resolved.*
 
 ---
 
@@ -60,37 +60,6 @@ Settled in MARKETS.md sec The shelf spoils: every good on a market shelf loses a
 > **Recommendation:** A.
 
 *Files: `docs/economy/MARKETS.md`, `scripts/economy.lua`, `src/world/market_clearing.cpp`*
-
-### NR-971 — CALL: where does a habitable world's water come from? (BL-1198)
-*question · raised 2026-10-05 · from the sprint 49 main session*
-
-Water deposits are seeded on icy substrate only (RESOURCES.md:147). On an earthlike home body that puts all extractable water at the poles, far from the people who bid for it, so household water, clean water and medical supplies go unsupplied on most seeds (no water extractor at all on seeds 10/11/13/37). Every other sprint 49 fix (routing, placement, scorer, households eating, spoilage) leaves this untouched.
-
-**Why it matters.** Water is the heaviest unmet line in the household basket and the input of two more household goods; while it is unsupplied no centre can reach the growth threshold and the held household gate (BL-1163/1196) cannot merge.
-
-- A: a Well / pumping station - an extraction site gated on adjacency to fresh water (river or lake), as the Fishing Wharf is gated on coast; cities on rivers drink
-- B: groundwater - every habitable land tile holds a small water deposit, scaled by habitability or rainfall
-- C: on a habitable body water is free - drop raw water from the household basket and keep clean water (from a plant that draws local water at no input cost)
-- D: other
-
-> **Recommendation:** A. It follows the Fishing Wharf precedent (adjacency-gated extraction, no new deposit field), it is a deterministic consequence of terrain generation already has (rivers, lakes), and it is legible: where the river runs, water is cheap - which makes river cities matter, a Trade-shaped consequence.
-
-*Files: `docs/economy/RESOURCES.md`, `docs/economy/PRODUCTION.md`, `scripts/world_gen.lua`*
-
-### NR-972 — CALL: ratify shelf supply k (the measurement says k barely matters and k = 1 costs firms) (BL-1179)
-*question · raised 2026-10-05 · from the BL-1179 lane (1f589398)*
-
-Your NR-968 ruling: the shelf counts as supply (k > 0), set by measurement once the shelf drains. k sweep (BL-1179 lane, 1f589398, seeds 0/43/10, spoilage on, households eating): consuming prices at the ceiling AGAINST A STOCKED SHELF 0.1% at k=0, 0.0% at k=1-8, 5.2% with spoilage off; at the ceiling on ANY shelf ~76% at every k (empty shelves: goods nobody makes enough of); G3 firms alive 38.2% at k=0 vs 21.3% at k=1 (22-23% at k=2-8); G2 20.9% at k=0 vs 24.0-26.9% at k>0; centres grew 0 with spoilage on at every k (193 with it off). Reading: spoilage, not k, is what clears the ceiling against stocked shelves; the remaining ~76% of ceiling prices sit on EMPTY shelves (supply, not k); and k = 1 halves firm survival relative to k = 0, because a counted shelf lowers prices where stock exists.
-
-**Why it matters.** k > 0 was your ruling's mechanism; the data says it buys almost nothing now and costs firms. The lane chose k = 1 to honour the ruling.
-
-- A: keep k = 0 for now; spoilage + households eating do the job; re-sweep k once water and the household chains are supplied (BL-1198)
-- B: ratify k = 1 as measured
-- C: other
-
-> **Recommendation:** A. The measurement answers the question the ruling asked (a consuming price off the ceiling against a stocked shelf): 0.1% at k = 0 with spoilage. Re-sweep after BL-1198, when shelves are stocked often enough for k to matter.
-
-*Files: `scripts/economy.lua`, `docs/economy/MARKETS.md`*
 
 ---
 
@@ -1308,4 +1277,39 @@ LOGISTICS.md sec Refusal, surface and determinism (Ben, 2026-08-22): "A leg over
 > **RESOLVED.** RULED (Ben, the market calls form, 2026-10-05): option A - the refusal rule covers commanded legs; the automatic dispatch trims to the passive-LP pool. Written into LOGISTICS.md sec Refusal, surface and determinism; SUPPLY.md cites it.
 
 *Files: `docs/economy/LOGISTICS.md`, `docs/economy/SUPPLY.md`, `src/world/supply_system.cpp`*
+
+### NR-971 — CALL: where does a habitable world's water come from? (BL-1198)
+*question · raised 2026-10-05 · from the sprint 49 main session*
+
+Water deposits are seeded on icy substrate only (RESOURCES.md:147). On an earthlike home body that puts all extractable water at the poles, far from the people who bid for it, so household water, clean water and medical supplies go unsupplied on most seeds (no water extractor at all on seeds 10/11/13/37). Every other sprint 49 fix (routing, placement, scorer, households eating, spoilage) leaves this untouched.
+
+**Why it matters.** Water is the heaviest unmet line in the household basket and the input of two more household goods; while it is unsupplied no centre can reach the growth threshold and the held household gate (BL-1163/1196) cannot merge.
+
+- A: a Well / pumping station - an extraction site gated on adjacency to fresh water (river or lake), as the Fishing Wharf is gated on coast; cities on rivers drink
+- B: groundwater - every habitable land tile holds a small water deposit, scaled by habitability or rainfall
+- C: on a habitable body water is free - drop raw water from the household basket and keep clean water (from a plant that draws local water at no input cost)
+- D: other
+
+> **Recommendation:** A. It follows the Fishing Wharf precedent (adjacency-gated extraction, no new deposit field), it is a deterministic consequence of terrain generation already has (rivers, lakes), and it is legible: where the river runs, water is cheap - which makes river cities matter, a Trade-shaped consequence.
+
+> **RESOLVED.** RULED (Ben, the water and shelf form, 2026-10-05): option A - a Well, an extraction site gated on fresh-water adjacency (a land tile on a river or beside a lake), as the Fishing Wharf is gated on coast. Written into PRODUCTION.md sec Extraction buildings and RESOURCES.md; the work is BL-1198 (water where people live).
+
+*Files: `docs/economy/RESOURCES.md`, `docs/economy/PRODUCTION.md`, `scripts/world_gen.lua`*
+
+### NR-972 — CALL: ratify shelf supply k (the measurement says k barely matters and k = 1 costs firms) (BL-1179)
+*question · raised 2026-10-05 · from the BL-1179 lane (1f589398)*
+
+Your NR-968 ruling: the shelf counts as supply (k > 0), set by measurement once the shelf drains. k sweep (BL-1179 lane, 1f589398, seeds 0/43/10, spoilage on, households eating): consuming prices at the ceiling AGAINST A STOCKED SHELF 0.1% at k=0, 0.0% at k=1-8, 5.2% with spoilage off; at the ceiling on ANY shelf ~76% at every k (empty shelves: goods nobody makes enough of); G3 firms alive 38.2% at k=0 vs 21.3% at k=1 (22-23% at k=2-8); G2 20.9% at k=0 vs 24.0-26.9% at k>0; centres grew 0 with spoilage on at every k (193 with it off). Reading: spoilage, not k, is what clears the ceiling against stocked shelves; the remaining ~76% of ceiling prices sit on EMPTY shelves (supply, not k); and k = 1 halves firm survival relative to k = 0, because a counted shelf lowers prices where stock exists.
+
+**Why it matters.** k > 0 was your ruling's mechanism; the data says it buys almost nothing now and costs firms. The lane chose k = 1 to honour the ruling.
+
+- A: keep k = 0 for now; spoilage + households eating do the job; re-sweep k once water and the household chains are supplied (BL-1198)
+- B: ratify k = 1 as measured
+- C: other
+
+> **Recommendation:** A. The measurement answers the question the ruling asked (a consuming price off the ceiling against a stocked shelf): 0.1% at k = 0 with spoilage. Re-sweep after BL-1198, when shelves are stocked often enough for k to matter.
+
+> **RESOLVED.** RULED (Ben, the water and shelf form, 2026-10-05): option A - k = 0 for now (spoilage and households eating keep stocked shelves off the ceiling); re-sweep k after BL-1198 supplies water.
+
+*Files: `scripts/economy.lua`, `docs/economy/MARKETS.md`*
 

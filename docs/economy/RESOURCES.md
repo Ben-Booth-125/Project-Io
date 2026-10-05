@@ -144,7 +144,7 @@ Found predominantly on moons, asteroids, and outer bodies; reachable in Era 1 an
 
 | Resource | Terrain affinity | Notes |
 |----------|-----------------|-------|
-| Water | **Substrate**: icy | Deposits on icy ground, extracted as liquid water; also the baseline life-support input for off-world populations. Trades terrestrially from tick 0 — see note above. |
+| Water | **Substrate**: icy; **or** fresh-water adjacency | Deposits on icy ground, extracted as liquid water by the Ice Extractor; on a habitable world also drawn by the **Well** from any land tile on a river or beside a lake, with no deposit (Ben, 2026-10-05, NR-971; `PRODUCTION.md` § Extraction buildings). Also the baseline life-support input for off-world populations. Trades terrestrially from tick 0 — see note above. |
 | Iron-nickel ore | Rocky (metallic asteroid) | Found in metallic asteroids; feeds the same smelting chain as iron ore and eliminates dependence on Earth-side steel once accessible. |
 | Platinum group metals | Rocky, volcanic (asteroid) | Ultra-rare catalytic and industrial metals. Very low deposit concentration; extremely high base price (40.0). The primary high-value trade good of the asteroid belt — a good to be *sold*. It also has one consumer, `electronics_contact_grade`, a contact-grade/catalytic route to electronics at 0.5 PGM per unit: at base price 40 a premium alternative rather than a cheap bypass, so the belt export remains the obvious use. |
 | Regolith | All terrain (airless bodies) | Loose surface dust and broken rock, present on every tile of every airless body at deposits of 20–50. Its purpose is **in-situ construction** — the route for building where you already are, not a trade good. |
@@ -405,7 +405,7 @@ A representative subset of **seven resources** is the hand-calibrated core the e
 |----------|------|---------------------|-----------------|
 | Iron ore | 1 | Mine | → Steel (Smelter) |
 | Petroleum | 1 | Oil Platform | → Refined fuel (Refinery) |
-| Water | 1 | Ice Extractor | — |
+| Water | 1 | Ice Extractor; Well (fresh-water adjacent) | — |
 | Agricultural produce | 1 | Farm | → Food rations (Food Processor) |
 | Steel | 2 | — | from Iron ore |
 | Refined fuel | 2 | — | from Petroleum |
