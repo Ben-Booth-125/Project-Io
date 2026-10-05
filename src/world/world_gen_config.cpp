@@ -6,6 +6,7 @@
 #include <sol/sol.hpp>
 
 #include <stdexcept>
+#include <string>
 
 void world_gen_config::load_from_lua(lua_state& lua)
 {
@@ -26,6 +27,26 @@ void world_gen_config::load_from_lua(lua_state& lua)
         deposit_scalar[0] = ds->get_or("sparse",   deposit_scalar[0]);
         deposit_scalar[1] = ds->get_or("lean",     deposit_scalar[1]);
         deposit_scalar[2] = ds->get_or("standard", deposit_scalar[2]);
+    }
+
+    // BL-1200: the lake size cap. Rejected, never clamped -- a non-integer or
+    // out-of-domain value is an authoring error, and a silently nudged cap
+    // would move every world's coastline without saying so.
+    {
+        const sol::object cap = (*wg)["lake_size_cap"];
+        if (cap.valid() && cap.get_type() != sol::type::lua_nil)
+        {
+            if (cap.get_type() != sol::type::number)
+                throw std::runtime_error("world_gen.lake_size_cap must be a number");
+            const double v = cap.as<double>();
+            if (!(v >= lake_size_cap_min && v <= lake_size_cap_max)
+                || v != static_cast<double>(static_cast<int>(v)))
+                throw std::runtime_error(
+                    "world_gen.lake_size_cap must be an integer in ["
+                    + std::to_string(lake_size_cap_min) + ", "
+                    + std::to_string(lake_size_cap_max) + "]");
+            lake_size_cap = static_cast<int>(v);
+        }
     }
 
     if (sol::optional<sol::table> km = (*wg)["kepler_market"])
