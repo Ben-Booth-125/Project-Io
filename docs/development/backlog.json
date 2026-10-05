@@ -1141,8 +1141,8 @@
    "design": "Measured on the 16 curated seeds at main b427aed0: 92 of 128 Exploration bindings (72%) and 15 of 30 Industrialisation bindings are freed the same year they are made, mostly seeds 32 and 40. Each cycle moves a purchase price and writes a grudge. Distance cannot cause it (bind needs <= 400, free needs > 500), which leaves cohesion <= 260 or a missing contact. Separate the two, then decide with Ben whether the bind test should read what the free test reads.\n\nMOVED TO SPRINT 50 (2026-10-04): not a market-viability item."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "designed",
+   "glyph": "◐",
    "sprint": 49,
    "written": "2026-10-04",
    "requires": [],
@@ -1159,7 +1159,7 @@
    "files": [
     "src/world/economy_system.cpp"
    ],
-   "design": "Found 2026-10-04 diagnosing acquisition_viability R1: under BL-1172 (fair-price army) a material posted over the 2x ceiling pauses a build, and a site that does not bid cannot lower the price, so background firms' muster bases almost never finish (1,040 of 1,192 such firms on 12 seeds hold only an unbuilt base) and on seeds 0 and 4 the seat's processors started in the settle produced nothing in 24 quarters. Ben (2026-10-04): re-bless first, fix in sprint 49. Diagnose which materials sit over the ceiling and why (listings-only supply at k = 0; BL-1179 shelf spoilage may be the lever), then bring Ben the fix. Also: whether background firms should start muster bases at all is a scorer question (AI grant register)."
+   "design": "DIAGNOSED (2026-10-05, 7c6c6d8a on worktree-agent-a90f2be8107c16fd4; drafts/sprint-49-construction-stall.md there): stalled sites wait almost always on STEEL that never arrives - their markets' shelves are empty while another market on the body holds 680-3,905 units; a draw over the ceiling registers no want, so the dispatcher sees no reason to ship (the BL-1186 cycle from the site's end). Seed 43: 1,323 sites ever stalled, 167 moved again. A paused site is billed full maintenance + 0.5-crew wages though labour skips it (~0.4-1.5M per seed per run). C1 BUILT AND HELD (the scorer starts no site whose materials are unobtainable, BL-1187's test): backlog halves, G3 67.6 -> 80.9 but G1 49.3 -> 45.4 and G2 50.1 -> 48.9 - measured BEFORE BL-1191 (which already passes G3); re-measure C1 after BL-1203. Asked of Ben: site running cost while under construction (C4) and abandonment (C3). C2 (stalled want visible to haulers) is the BL-1203 lane's question.\n\nFound 2026-10-04 diagnosing acquisition_viability R1: under BL-1172 (fair-price army) a material posted over the 2x ceiling pauses a build, and a site that does not bid cannot lower the price, so background firms' muster bases almost never finish (1,040 of 1,192 such firms on 12 seeds hold only an unbuilt base) and on seeds 0 and 4 the seat's processors started in the settle produced nothing in 24 quarters. Ben (2026-10-04): re-bless first, fix in sprint 49. Diagnose which materials sit over the ceiling and why (listings-only supply at k = 0; BL-1179 shelf spoilage may be the lever), then bring Ben the fix. Also: whether background firms should start muster bases at all is a scorer question (AI grant register)."
   },
   {
    "status": "complete",
