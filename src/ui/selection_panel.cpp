@@ -3289,6 +3289,12 @@ void draw_tile_selection(world& w, ui_state& ui)
                 placement_rules::can_place_in_world(w, sel, building_type::extraction_site, er,
                                                    ui.max_logistics_reach).ok())
             { any_placeable = true; break; }
+        // BL-1198: a Well needs no deposit, so the loop above cannot see it.
+        if (!any_placeable && !water
+            && placement_rules::is_well_site(w, sel, resource_type::water)
+            && placement_rules::can_place_in_world(w, sel, building_type::extraction_site,
+                                                   resource_type::water, ui.max_logistics_reach).ok())
+            any_placeable = true;
         if (!any_placeable && !water)
         {
             for (const building_type bt : {building_type::processing_facility,
@@ -3810,6 +3816,10 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
         && placement_rules::is_coastal(w, tile_id))
         cands.push_back({building_type::extraction_site, resource_type::agricultural_produce,
                          "Fishing Wharf"});
+    // Well (BL-1198, NR-971): the same shape for water — no ice deposit here, but
+    // a river runs along the tile or a lake lies beside it.
+    if (placement_rules::is_well_site(w, tile_id, resource_type::water))
+        cands.push_back({building_type::extraction_site, resource_type::water, "Well"});
     // One processing row per recipe (BL-429: its authored display_name, "Bloomery"
     // rather than "Processing: Iron Blooms"), each priced on its own economics.
     for (int ri = 0; ri < reg.recipe_count(building_type::processing_facility); ++ri)

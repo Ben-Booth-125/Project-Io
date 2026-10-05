@@ -31,6 +31,7 @@ const char* placement_reason_text(placement_reason r)
         case placement_reason::province_full: return "This land already sustains as much as it can - improve it, or build elsewhere";
         case placement_reason::needs_centre: return "Must be built in a population centre";
         case placement_reason::centre_too_small: return "This settlement is too small to host it - a larger centre is needed";
+        case placement_reason::not_fresh_water: return "A well must stand on a river or beside a lake";
         case placement_reason::far_from_centre: return "Too far from a population centre to draw a workforce";
     }
     return "Cannot build here";
@@ -126,6 +127,11 @@ placement_result can_place(const tile_component& tc, building_type type, resourc
             // rejecting on no_deposit — can_place_in_world enforces the coastal gate.
             if (target == resource_type::agricultural_produce)
                 return placement_reason::ok;
+            // Well (BL-1198, NR-971): the same pass-through for water — its
+            // fresh-water gate (is_fresh_water_adjacent) needs world access too,
+            // so can_place_in_world enforces it.
+            if (target == resource_type::water)
+                return placement_reason::ok;
             return placement_reason::no_deposit;
 
         case building_type::processing_facility:
@@ -152,12 +158,15 @@ placement_result can_place(const tile_component& tc, building_type type, resourc
     }
 }
 
-bool is_coastal(const world& w, entity_id tile_id)
+namespace {
+
+/// The six-neighbour scan `is_coastal` was written as, lifted out so the Well's
+/// lake test (BL-1198) walks exactly the same neighbours by exactly the same
+/// route. True if any in-grid hex neighbour of @p tc satisfies @p pred on its
+/// substrate. Pure; an existence test, so the answer is order-independent.
+template <typename Pred>
+bool any_neighbour_substrate(const world& w, const tile_component& tc, Pred pred)
 {
-    const auto tc_it = w.tiles.find(tile_id);
-    if (tc_it == w.tiles.end())
-        return false;
-    const tile_component& tc = tc_it->second;
     const entity_id body = tc.body;
 
     const auto body_it = w.bodies.find(body);
@@ -200,12 +209,7 @@ bool is_coastal(const world& w, entity_id tile_id)
             if (nid == null_entity)
                 continue;
             const auto nit = w.tiles.find(nid);
-            // BL-516: SEA, not merely water. `is_coastal` gates ports, the
-            // Fishing Wharf and coastal-only extraction — a lakeshore is not a
-            // coast, and now the data can say so. This is the one place the
-            // narrowing changes an answer the old code gave; every other water
-            // test here is widened to `is_water` and answers exactly as before.
-            if (nit != w.tiles.end() && is_sea(nit->second.substrate))
+            if (nit != w.tiles.end() && pred(nit->second.substrate))
                 return true;
             continue;
         }
@@ -215,13 +219,61 @@ bool is_coastal(const world& w, entity_id tile_id)
         {
             if (ntc.body == body && ntc.grid_x == ncol && ntc.grid_y == nrow)
             {
-                if (is_sea(ntc.substrate)) // BL-516: sea, not lake — see above
+                if (pred(ntc.substrate))
                     return true;
                 break;
             }
         }
     }
     return false;
+}
+
+} // namespace
+
+bool is_coastal(const world& w, entity_id tile_id)
+{
+    const auto tc_it = w.tiles.find(tile_id);
+    if (tc_it == w.tiles.end())
+        return false;
+    // BL-516: SEA, not merely water. `is_coastal` gates ports, the
+    // Fishing Wharf and coastal-only extraction — a lakeshore is not a
+    // coast, and now the data can say so. This is the one place the
+    // narrowing changes an answer the old code gave; every other water
+    // test here is widened to `is_water` and answers exactly as before.
+    return any_neighbour_substrate(w, tc_it->second,
+                                   [](terrain_substrate s) { return is_sea(s); });
+}
+
+bool is_fresh_water_adjacent(const world& w, entity_id tile_id)
+{
+    const auto tc_it = w.tiles.find(tile_id);
+    if (tc_it == w.tiles.end())
+        return false;
+    const tile_component& tc = tc_it->second;
+    // A Well stands on land; water ground is never "adjacent" to itself.
+    if (is_water(tc.substrate))
+        return false;
+    // A river is an EDGE on the tile (BL-170): any side carrying one means the
+    // river runs through or along this tile. generate_rivers sets the bit on
+    // BOTH tiles sharing the side, so each bank qualifies.
+    if (tc.river_edges != 0)
+        return true;
+    // Or a lake beside it — fresh, never the sea (is_coastal's mirror).
+    return any_neighbour_substrate(w, tc,
+                                   [](terrain_substrate s) { return is_lake(s); });
+}
+
+bool is_well_site(const world& w, entity_id tile_id, resource_type target)
+{
+    if (target != resource_type::water)
+        return false;
+    const auto tc_it = w.tiles.find(tile_id);
+    if (tc_it == w.tiles.end())
+        return false;
+    // An ice deposit makes it an Ice Extractor, whatever runs past it.
+    if (tc_it->second.resource_deposit[static_cast<std::size_t>(resource_type::water)] > 0.0f)
+        return false;
+    return is_fresh_water_adjacent(w, tile_id);
 }
 
 namespace {
@@ -308,6 +360,15 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
         // Fishing Wharf (BL-168): no terrestrial deposit here, so it must be coastal.
         if (!is_coastal(w, tile_id))
             return placement_reason::not_coastal;
+    }
+    else if (type == building_type::extraction_site
+             && target == resource_type::water
+             && tc_it->second.resource_deposit[static_cast<std::size_t>(resource_type::water)] <= 0.0f)
+    {
+        // Well (BL-1198, NR-971): no ice deposit here, so it must stand on fresh
+        // water — a river along the tile or a lake beside it.
+        if (!is_fresh_water_adjacent(w, tile_id))
+            return placement_reason::not_fresh_water;
     }
     else if (type == building_type::launchpad)
     {

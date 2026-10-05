@@ -121,8 +121,12 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
     // returns exactly 1.0f for a fully-supplied building — the only state
     // reachable while the authored upkeep rates are zero — so the arithmetic
     // here is bit-for-bit what it was before the field existed.
+    // BL-1198: a Well has no deposit; it runs at a typical deposit's rate.
+    const float rich = placement_rules::is_well_site(w, b.tile, b.target_resource)
+                     ? placement_rules::k_well_rate_scalar
+                     : richness_rate_scalar(e, tc.resource_deposit[ri]);
     const float nominal = e.base_rate
-         * richness_rate_scalar(e, tc.resource_deposit[ri])
+         * rich
          * (b.workforce_assigned * contention)
          * wt_scalar
          * building_supply_scalar(b)
@@ -189,6 +193,23 @@ building_report run_extraction(world& w, const recipe_registry& reg,
     if (nominal <= 0.0f)
     {
         rep.idle = true; // unstaffed, no deposit of the target, or fully hazardous
+        return rep;
+    }
+
+    // --- BL-1198: the Well — water drawn from a river or lake, no deposit ----
+    //
+    // A Well works no reserve: the river keeps running, so there is no taper and
+    // no exhaustion, and it does not co-extract the tile's deposits (BL-437's
+    // basket is the share-out of a DEPOSIT site's capacity; a Well's capacity is
+    // the water it lifts). Output is its nominal, all water, into the pool of
+    // its own tile market — exactly where a deposit site's output lands.
+    if (placement_rules::is_well_site(w, b.tile, b.target_resource))
+    {
+        stockpile_component& pool = w.pool_at(corp, pool_key_for_tile(w, b.tile));
+        pool.quantities[ri] += nominal;
+        mark_produced(w, corp, b.target_resource);
+        rep.active          = true;
+        rep.output_quantity = nominal;
         return rep;
     }
 
@@ -577,9 +598,11 @@ int solve_workforce_target(const world& w, const recipe_registry& reg,
             // BL-436: the same richness->rate conversion the live tick uses.
             // The workforce solver optimises against this curve, so a raw
             // richness here would solve for a rate the building cannot reach.
-            const float rich = richness_rate_scalar(
-                reg.economics(building_type::extraction_site),
-                tit->second.resource_deposit[ri]);
+            // BL-1198: a Well runs at the typical-deposit rate, no richness.
+            const float rich = placement_rules::is_well_site(w, b.tile, b.target_resource)
+                ? placement_rules::k_well_rate_scalar
+                : richness_rate_scalar(reg.economics(building_type::extraction_site),
+                                       tit->second.resource_deposit[ri]);
             // Stack decay (BL-193), applied here for the same reason run_extraction
             // applies it: a rank-3 site never yields the lone-site rate, so a dial
             // solved against the lone-site rate is solved against a curve this

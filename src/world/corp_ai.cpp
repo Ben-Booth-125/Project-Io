@@ -717,6 +717,7 @@ std::vector<extraction_site> rank_extraction_sites(const world& w, int top_k_per
 {
     std::vector<extraction_site> sites;
     sites.reserve(w.tiles.size() / 2); // most land tiles carry some deposit
+    std::vector<extraction_site> wells; // BL-1198: its own bucket, see below
 
     // BL-253 follow-on (2026-08-12, the 3x map): tile_surveyed re-looked-up the
     // body in w.bodies for EVERY tile — 45,240 hash lookups per tick on the new
@@ -767,6 +768,28 @@ std::vector<extraction_site> rank_extraction_sites(const world& w, int top_k_per
                 continue;
             sites.push_back({tid, rich * affinity * demand_weight[ri], rt});
         }
+
+        // BL-1198 (water where people live): a Well is a candidate on any land
+        // tile fresh water touches and no ice deposit sits (the deposit route
+        // above already offers that tile as an Ice Extractor). It has no
+        // richness to rank by, and its rank must not be a contest against ice
+        // magnitudes (BL-711: selection must be scale-free), so wells go to their
+        // OWN bucket below, ranked by where people can live — the tile's
+        // habitability — times the same demand pull water carries.
+        //
+        // Only wells that can still be PLACED enter the bucket (terrain, slot
+        // and province ceilings; reach and tech stay per-corp, below). A
+        // deposit bucket ranks thousands of tiles by richness; this one ranks
+        // by habitability, which barely varies, so its top K would otherwise
+        // sit on the same two tiles once their slots fill and offer the scorer
+        // nothing for the rest of the campaign (measured: well_census, seed 43).
+        if (tc.resource_deposit[static_cast<std::size_t>(resource_type::water)] <= 0.0f
+            && placement_rules::is_fresh_water_adjacent(w, tid)
+            && placement_rules::can_place_in_world(w, tid, building_type::extraction_site,
+                                                   resource_type::water))
+            wells.push_back({tid,
+                             tc.habitability * demand_weight[static_cast<std::size_t>(resource_type::water)],
+                             resource_type::water});
     }
     // PARTIAL SORT within each bucket, not a full one (the 2026-08-12 reason,
     // unchanged): only the first K survive, and `std::partial_sort` orders
@@ -799,6 +822,15 @@ std::vector<extraction_site> rank_extraction_sites(const world& w, int top_k_per
                           bucket.end(), cmp);
         out.insert(out.end(), bucket.begin(),
                    bucket.begin() + static_cast<std::ptrdiff_t>(keep));
+    }
+    // BL-1198: the Well bucket, K of its own, under the same comparator
+    // (habitability, then tile id). Appended last so every deposit bucket keeps
+    // the order it had.
+    if (const std::size_t keep = std::min(wells.size(), k); keep > 0)
+    {
+        std::partial_sort(wells.begin(), wells.begin() + static_cast<std::ptrdiff_t>(keep),
+                          wells.end(), cmp);
+        out.insert(out.end(), wells.begin(), wells.begin() + static_cast<std::ptrdiff_t>(keep));
     }
     return out;
 }
@@ -933,7 +965,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 const float           wf  = 0.5f; // construct_building staffs at 0.5
                 // BL-436: same conversion as the tick. A raw richness made the
                 // scorer expect ~50x the revenue a site actually delivers.
-                const float rich          = richness_rate_scalar(ex, tc.resource_deposit[ri]);
+                // BL-1198: a Well runs at the typical-deposit rate.
+                const float rich          = placement_rules::is_well_site(w, s.tile, s.target)
+                    ? placement_rules::k_well_rate_scalar
+                    : richness_rate_scalar(ex, tc.resource_deposit[ri]);
                 const float price         = local_price(w, s.tile, ri);
                 const float revenue       = ex.base_rate * rich * wf * (1.0f - tc.hazard_level) * price;
                 const float net           = revenue - ex.maintenance - ex.base_wage * wf;
@@ -1306,7 +1341,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     const tile_component& tc  = w.tiles.at(s.tile);
                     const std::size_t     ri  = static_cast<std::size_t>(s.target);
                     const float wf      = 0.5f; // construct_building staffs at 0.5, as the build candidate above
-                    const float rich    = richness_rate_scalar(ex, tc.resource_deposit[ri]);
+                    // BL-1198: a Well runs at the typical-deposit rate.
+                    const float rich    = placement_rules::is_well_site(w, s.tile, s.target)
+                        ? placement_rules::k_well_rate_scalar
+                        : richness_rate_scalar(ex, tc.resource_deposit[ri]);
                     const float price   = local_price(w, s.tile, ri);
                     const float revenue = ex.base_rate * rich * wf * (1.0f - tc.hazard_level) * price;
                     const float net     = revenue - ex.maintenance - ex.base_wage * wf;

@@ -231,8 +231,11 @@ building_profit estimate_prospective_profit(const world& w, const recipe_registr
 
         // BL-436: convert richness to a rate multiplier exactly as the tick
         // does — this figure is shown to the player on the Build door.
+        // BL-1198: a Well prices at the typical-deposit rate and never tapers.
+        const bool  well    = placement_rules::is_well_site(w, tile_id, target);
         const float nominal = econ.base_rate
-                              * richness_rate_scalar(econ, tc.resource_deposit[ri]) * wf
+                              * (well ? placement_rules::k_well_rate_scalar
+                                      : richness_rate_scalar(econ, tc.resource_deposit[ri])) * wf
                               * building_supply_scalar(bc)
                               * (1.0f - tc.hazard_level)
                               * placement_rules::stack_output_scalar(rank);
@@ -270,7 +273,8 @@ building_profit estimate_prospective_profit(const world& w, const recipe_registr
         // place the "a building that does not exist has extracted nothing" reasoning
         // does not hold.
         const float taper_band = deposit_taper_ticks * combined;
-        const float taper      = taper_band > 0.0f
+        const float taper      = well ? 1.0f // BL-1198: the river keeps running
+            : taper_band > 0.0f
             ? std::clamp(tc.resource_remaining[ri] / taper_band, 0.0f, 1.0f)
             : 0.0f;
 
