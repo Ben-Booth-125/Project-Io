@@ -223,6 +223,13 @@ BL-049 (wage/maintenance split).
   actually won, not the labour it requested, and at the rate it offered. `hab` is the body's
   mean population-centre habitability, clamped [0.1, 2.0] (`body_mean_habitability`).
 
+**A site under construction pays the idle floor and nothing else (Ben, 2026-10-05; BL-1183).**
+Until it completes, a building charges no wages and no labour maintenance — only the idle floor,
+as a decommissioned building does. Labour demand already skips a site, so a wage there paid a
+crew nobody supplied; and a site stalled for want of materials should cost what holding the land
+costs, not what running the plant costs. Its materials are paid as they arrive (`PRODUCTION.md`
+§ Construction as a rate).
+
 Maintenance and wage constants per building type load from the recipe registry
 (`scripts/economy.lua`).
 
