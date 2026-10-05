@@ -1387,12 +1387,99 @@ economy = {
         reservation_mult = 2.0,  -- BL-654/BL-1172: a goods draw declines to buy above this (a fair price; see above)
         -- BL-1172 (Ben, 2026-10-03, MARKETS.md § Price resolution): the shelf
         -- counts as supply only as far as it can sell — min(inventory, k x
-        -- demand), k in econ ticks (one tick is a quarter). k = 0 UNTIL SHELF
-        -- SPOILAGE (BL-1179) LANDS (Ben, 2026-10-03): every k above 0 left fewer
-        -- firms than listings-only supply, because a glut the market cannot
-        -- shed floors prices; the k table (seeds 0/10/28) is in MARKETS.md.
-        -- 0 = listings only. The k > 0 path stays built and tested.
-        shelf_supply_ticks = 0,
+        -- demand), k in econ ticks (one tick is a quarter). 0 = listings only.
+        -- k > 0 once the shelf drains (Ben, 2026-10-05, NR-968): households eat
+        -- off it (BL-1196) and it spoils (BL-1179, shelf_spoilage below), and k
+        -- is the SMALLEST value that keeps a consuming market's price off the
+        -- ceiling against a stocked shelf, read on market_viability's G5 row
+        -- (seeds 0,43,10, spoilage on, households eating; pairs a market's
+        -- households bid, play ticks 20-50, priced against a shelf >= 1 unit):
+        --     k            0     1     2     4     8   | 0, no spoilage
+        --     ceil+stocked 0.1%  0.0%  0.0%  0.0%  0.0% | 5.2%
+        --     at ceiling   76.2% 76.6% 75.5% 76.1% 74.5% | 76.6%
+        --     G3 firms     38.2% 21.3% 22.9% 22.9% 22.4% | 26.3%
+        -- k = 1 is the smallest; the remaining ceiling is EMPTY shelves (goods
+        -- nobody makes enough of), which no k can reach. Ratification: Ben.
+        shelf_supply_ticks = 1,
+    },
+
+    -- ===================================================================
+    -- BL-1179 (shelf spoilage) — MARKETS.md § The shelf spoils (settled
+    -- 2026-10-05, NR-970). The share of each good on a market's SHELF that
+    -- leaves it every economy tick (one tick = one quarter). Only the shelf
+    -- spoils (a corp pool never does); nobody is charged (goods leave, no
+    -- credits move). Applied after the households' draw, before the next read
+    -- of the shelf's share of supply.
+    --
+    -- Every priced good carries a rate in (0, 1]; the loader REJECTS a zero,
+    -- a negative, a rate above 1 and an unknown name (never clamps), and the
+    -- app names any priced good missing here at campaign start.
+    --
+    -- FIRST CUTS, BY CLASS (then measured):
+    --   perishable 0.25 / quarter — food, produce, water, medicine: about two
+    --              thirds of a shelf is gone within a year (half-life ~2.4 q).
+    --   consumable 0.10 / quarter — fuels, power-adjacent stocks, consumer and
+    --              organic goods: a third lost a year (half-life ~6.6 q).
+    --   durable    0.02 / quarter — ores, metals, alloys, materials,
+    --              components: ~8% a year (half-life ~34 q), never zero.
+    -- ===================================================================
+    shelf_spoilage = {
+        -- perishable
+        agricultural_produce  = 0.25,
+        water                 = 0.25,
+        food_rations          = 0.25,
+        clean_water           = 0.25,
+        medical_supplies      = 0.25,
+        -- consumable: fuels and power-adjacent stocks
+        coal                  = 0.10,
+        petroleum             = 0.10,
+        peat                  = 0.10,
+        refined_fuel          = 0.10,
+        charcoal              = 0.10,
+        propellant            = 0.10,
+        power                 = 0.10,
+        construction_capacity = 0.10,
+        -- consumable: consumer and organic goods
+        consumer_goods        = 0.10,
+        tobacco               = 0.10,
+        spices                = 0.10,
+        coffee                = 0.10,
+        furs                  = 0.10,
+        hides                 = 0.10,
+        fibre                 = 0.10,
+        trade_goods_misc      = 0.10,
+        cloth                 = 0.10,
+        leather               = 0.10,
+        rigging               = 0.10,
+        -- durable: ores
+        iron_ore              = 0.02,
+        silica                = 0.02,
+        copper_ore            = 0.02,
+        rare_earth_ore        = 0.02,
+        iron_nickel_ore       = 0.02,
+        platinum_group_metals = 0.02,
+        regolith              = 0.02,
+        -- durable: materials
+        stone                 = 0.02,
+        timber                = 0.02,
+        sand                  = 0.02,
+        clay                  = 0.02,
+        ceramics              = 0.02,
+        dressed_stone         = 0.02,
+        planks                = 0.02,
+        -- durable: metals and alloys
+        steel                 = 0.02,
+        iron_blooms           = 0.02,
+        silicon               = 0.02,
+        refined_copper        = 0.02,
+        ree_alloy             = 0.02,
+        alloys                = 0.02,
+        -- durable: components
+        machinery             = 0.02,
+        electronics           = 0.02,
+        spacecraft_components = 0.02,
+        ordnance              = 0.02,
+        tools                 = 0.02,
     },
 
     -- ===================================================================

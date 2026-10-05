@@ -133,7 +133,7 @@ construction site pauses for want of that material (construction capacity over t
 stretches the build instead, as an empty yard does), and a nation buys elsewhere or not at all.
 What a draw is billed is only what the shelf gave.
 
-**The cost of listings-only supply, stated (k = 0 until shelf spoilage, Ben 2026-10-03).** While
+**The cost of listings-only supply, stated (at k = 0, Ben 2026-10-03).** While
 the shelf does not count as supply (MARKETS.md § Price resolution), a draw on a market nobody lists
 into prices itself out of a full shelf: its own want is demand against zero supply, the price
 resolves from 1.5× toward the 10× cap (5.75× in one tick), the draw is then over the ceiling and

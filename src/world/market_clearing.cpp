@@ -645,6 +645,57 @@ void draw_household_basket(world& w)
     }
 }
 
+void spoil_market_shelves(world& w, const recipe_registry& reg)
+{
+    // BL-1179 (MARKETS.md § The shelf spoils). The shelf is the market's,
+    // bought as buyer of last resort, and nobody tends it: each good loses a
+    // fixed share of what stands on it every tick. Goods leave; no credits move
+    // (the market already paid the maker). Ascending market id and resource so
+    // no hash order is ever one edit away, though each market's arithmetic
+    // reads and writes only its own array.
+    const std::array<float, resource_count>& rate = reg.shelf_spoilage();
+    bool any = false;
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (rate[r] > 0.0f) { any = true; break; }
+    if (!any)
+        return; // no rates authored: the pre-BL-1179 shelf, untouched
+    std::vector<entity_id> mids;
+    mids.reserve(w.markets.size());
+    for (const auto& [mid, mc] : w.markets)
+    {
+        (void)mc;
+        mids.push_back(mid);
+    }
+    std::sort(mids.begin(), mids.end());
+    for (const entity_id mid : mids)
+    {
+        market_component& mc = w.markets.at(mid);
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            if (!(rate[r] > 0.0f) || !(mc.inventory[r] > 0.0f))
+                continue;
+            mc.inventory[r] = std::max(0.0f, mc.inventory[r] - mc.inventory[r] * rate[r]);
+        }
+    }
+}
+
+std::vector<resource_type> unspoiled_priced_goods(const world& w, const recipe_registry& reg)
+{
+    std::array<bool, resource_count> priced{};
+    for (const auto& [mid, mc] : w.markets) // a pure OR: the map's layout cannot reach it
+    {
+        (void)mid;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (mc.base_price[r] > 0.0f)
+                priced[r] = true;
+    }
+    std::vector<resource_type> out;
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (priced[r] && !(reg.shelf_spoilage()[r] > 0.0f))
+            out.push_back(static_cast<resource_type>(r));
+    return out;
+}
+
 float population_met_ratio(const world& w, const recipe_registry& reg, entity_id market)
 {
     const auto mit = w.markets.find(market);
@@ -1790,6 +1841,12 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // tick (the tick's fixed pass order), so households are the shelf's last
     // claimant within a tick and the first sink after it fills.
     draw_household_basket(w);
+
+    // BL-1179 (shelf spoilage): after the households' draw — the tick's last
+    // draw on the shelf — and before the next tick's reference prices read the
+    // shelf's share of supply (and before next tick's production, construction
+    // and dispatch draw on it). Goods leave; no credits move.
+    spoil_market_shelves(w, reg);
 
     // --- Price update: ref_price (pre-computed from supply/demand) ---
     // Explicit priced trades provide a VWAP signal; when they occurred, ease toward

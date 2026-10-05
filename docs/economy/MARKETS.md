@@ -231,7 +231,7 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
    explicit buy book (`max_price`, optional `preferred_seller`).
 8. **Reference prices** — computed once from the accumulated demand and the supply the price law
    reads — this tick's listings plus the shelf's share, at most k ticks of demand off the stock
-   standing after the tick's draws (k = 0 until shelf spoilage, BL-1179; § Price resolution,
+   standing after the tick's draws (k is `price_band.shelf_supply_ticks`; § Price resolution,
    below) — so every sale this tick uses the same price.
 9. **Auto clearing** — auto-surplus sells at the reference price (**perfect counterparty**: the
    sell side is unconditional — see § Real market inventory); auto-demand is billed at the
@@ -261,7 +261,12 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
     bid one pooled quantity, so a short shelf fills each of them in the same share. Markets
     ascending, resources ascending. The fill is what the growth gate reads
     (`POPULATION.md` § Growth, decline and razing).
-13. **Price update** — where explicit trades occurred, the price eases toward their VWAP;
+13. **Shelf spoilage** — every good left on every shelf loses its spoilage rate,
+    `inventory[r] −= inventory[r] × rate[r]` (§ Price resolution, *The shelf spoils*). After the
+    households' draw, so the tick's last draw is not taxed by its own spoilage; before the next
+    tick's draws and reference prices read the shelf. No money moves. Markets ascending,
+    resources ascending.
+14. **Price update** — where explicit trades occurred, the price eases toward their VWAP;
     otherwise it takes the reference price.
 
 Cash flows accrue per corp and are applied to balances by `apply_budget`
@@ -680,6 +685,10 @@ goods — the haul is the margin given up, taken off what the cargo realises whe
 bid off the shelf (§ The clearing tick, step 12). It is the Household channel's terminal sink:
 what they draw is consumed and never returns. Like the export, it moves no money.
 
+**The shelf's fifth drain is spoilage.** After the households' draw, every good left on the shelf
+loses its authored rate (§ The clearing tick, step 13; § Price resolution, *The shelf spoils*).
+Only the shelf: a corporation's pool never spoils. It moves no money.
+
 **The sell side has no volume cap.** `market_component.supply` is a derived per-tick flow for
 pricing, and the market absorbs any quantity a seller is willing to release at the resolved price.
 What is conditional is the *price*: an order whose floor exceeds the resolved price holds rather
@@ -931,8 +940,8 @@ price  = prior + 0.5 × (target − prior)       — EMA smoothing
 ```
 
 **The shelf is supply (Ben, 2026-10-03):** `supply` is this tick's listings plus the shelf's share
-of the stock standing on the market's shelf (`inventory`) — at most k ticks of demand, and k = 0
-until shelf spoilage (BL-1179), below. A market fed only by deliveries is not a market with
+of the stock standing on the market's shelf (`inventory`) — at most k ticks of demand, k set by
+measurement (below). A market fed only by deliveries is not a market with
 nothing to sell, so at k > 0 its own buyers cannot drive its price to the ceiling against a full
 shelf.
 **The shelf counts only as far as it can sell (Ben, 2026-10-03):** the shelf's share of `supply` is

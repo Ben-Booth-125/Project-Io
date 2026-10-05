@@ -68,6 +68,23 @@ float population_met_ratio(const world& w, const recipe_registry& reg, entity_id
 /// per-market arithmetic. Deterministic.
 void draw_household_basket(world& w);
 
+/// BL-1179 (shelf spoilage; MARKETS.md § The shelf spoils). Every good on every
+/// market's SHELF loses its authored share of itself:
+/// `inventory[r] -= inventory[r] × reg.shelf_spoilage()[r]`. Only the shelf —
+/// a corp pool never spoils. NO MONEY MOVES: the market paid the maker when it
+/// bought the stock, so a spoiled unit simply leaves, as an eaten one does. A
+/// drain, never a price: called by clear_markets after the households' draw
+/// (the tick's last draw) and before the next read of the shelf's share of
+/// supply (next tick's reference prices, and the dispatch's pricing read). Ascending market id, ascending resource; a zero rate is skipped, so
+/// a registry that authors no rates leaves the shelf bit-identical.
+void spoil_market_shelves(world& w, const recipe_registry& reg);
+
+/// BL-1179: every good some market PRICES (`base_price > 0` anywhere) whose
+/// shelf-spoilage rate is zero — an authoring gap, since the ruling is that
+/// every good on a shelf spoils. The `unpriced_basket_entries` pattern:
+/// reported once at campaign start (app.cpp); ascending resource id.
+std::vector<resource_type> unspoiled_priced_goods(const world& w, const recipe_registry& reg);
+
 /// Inject background-industrial demand into body markets (BL-340/BL-365). A
 /// world-scale pull for the mid-chain processing goods (silicon, refined_copper,
 /// ree_alloy, machinery, alloys, electronics — deliberately NOT
