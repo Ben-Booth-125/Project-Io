@@ -192,6 +192,7 @@ Each building type targets a specific class of resource. Placement is valid only
 | Ice Extractor | Water (from ice deposits) | Icy | 1 |
 | Surface Extractor | Regolith, iron-nickel ore, platinum group metals | Regolith, metallic | 1 |
 | Fishing Wharf | Agricultural produce | Coastal (any composition adjacent to ocean) | 0 |
+| Well | Water | Fresh-water adjacent (a land tile on a river or beside a lake) | 0 |
 
 **Fishing Wharf** (BL-168, fishing wharf). The extraction_site's target resource is again
 `agricultural_produce`, but the placement gate is coastal adjacency rather than a deposit: valid on
@@ -199,6 +200,15 @@ any tile with an ocean neighbour, deposit-agnostic. A tile can satisfy Farm's de
 Fishing Wharf's coastal rule, both, or neither — they are two independent ways the same generic
 extraction_site can reach agricultural_produce, not two building types (`placement_rules.cpp`
 `can_place` / `can_place_in_world`, mirroring the Port coastal check via `is_coastal`).
+
+**Well (Ben, 2026-10-05, NR-971; BL-1198, water where people live).** The extraction_site's target
+resource is `water`, and the placement gate is **fresh-water adjacency** rather than a deposit: valid
+on any land tile a river runs through or that borders a lake, deposit-agnostic — the Fishing Wharf's
+rule with fresh water in place of ocean. It is how a habitable world drinks: ice deposits sit at the
+poles, far from the people who bid for water, while the rivers and lakes generation already lays run
+where people settled. So water is cheap where the river runs, and a river city has an advantage a
+dry one must buy. The Ice Extractor stays the route on icy ground and off-world; a tile can satisfy
+either rule, both, or neither.
 
 The Mine covers all terrestrial hard-mineral deposits and adjusts its output to whatever the tile holds: the same building type on one volcanic tile yields rare earth ore and on another yields copper ore. The distinction between deposit types is in the tile data, not the building type. Off-world metallic deposits (iron-nickel ore, platinum group metals) are harvested by the Surface Extractor, the Era 1 airless-body counterpart to the Mine; both feed the same smelting chain, so the distinction is one of era and deployment environment, not of downstream product.
 

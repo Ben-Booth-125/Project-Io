@@ -116,6 +116,7 @@ namespace {
 constexpr double k_target_g1_running_at_handoff = 0.70; ///< processors running at handoff
 constexpr double k_target_g2_income_ratio       = 0.50; ///< field income tick 50 / settle close
 constexpr double k_target_g3_firms_alive        = 0.70; ///< firms alive at tick 400 / at handoff
+constexpr int    k_g5_idle_window = 100; ///< G5: processors idled up to this play tick are followed
 
 constexpr int k_g1_g2_play_tick     = 50; ///< the "tick 50" reading
 constexpr int k_seat_settle_window  = 8;  ///< the seat's last 8 settle quarters
@@ -324,8 +325,37 @@ struct seed_reading
     int home_markets = 0, idle_markets = 0;
     std::size_t tap_lost = 0;
     int b_live = 0, b_build = 0, b_decom = 0;
+    // G5 (BL-1187 review): do idled processors ever come back?
+    int g5_idled = 0, g5_back = 0, g5_removed = 0;  ///< idled at econ steps <= settle + 100
+    int g5_idle_events = 0, g5_resume_events = 0;   ///< every play-tick transition, ticks 1..end
     double secs = 0.0;
 };
+
+/// G5's per-processor record: the decommission flag last seen, the first econ
+/// step it was seen idled (-1 never), and whether it was later seen running.
+struct g5_rec { bool decom = false; int first_idle = -1; bool back = false; bool gone = false; };
+
+/// Read every processor after one econ step (`step` = 0-based econ step index).
+void g5_track(const world& w, std::map<entity_id, g5_rec>& m, int step, bool play, seed_reading& r)
+{
+    for (auto& [bid, rec] : m)
+        if (!rec.gone && !w.buildings.count(bid)) rec.gone = true;
+    std::vector<entity_id> ids;
+    for (const auto& [bid, b] : w.buildings)
+        if (b.type == building_type::processing_facility) ids.push_back(bid);
+    std::sort(ids.begin(), ids.end());
+    for (const entity_id bid : ids)
+    {
+        const bool d = w.buildings.at(bid).decommissioned;
+        auto [it, fresh] = m.try_emplace(bid);
+        g5_rec& rec = it->second;
+        if (!fresh && d != rec.decom && play)
+            ++(d ? r.g5_idle_events : r.g5_resume_events);
+        if (d && rec.first_idle < 0) rec.first_idle = step;
+        if (!d && rec.first_idle >= 0 && (fresh || rec.decom)) rec.back = true;
+        rec.decom = d;
+    }
+}
 
 void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
 {
@@ -365,10 +395,13 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
     // --- the settle: econ steps 0..11, day 0, spectating (the validation run) ---
     std::map<entity_id, int> ran_window;   // processor -> active ticks in the last 8 settle ticks
     economy_report last_settle;
+    std::map<entity_id, g5_rec> g5;
+    g5_track(w, g5, 0, false, r); // the world as handed to the settle
     for (int step = 0; step < k_campaign_settle_ticks; ++step)
     {
         settle_tick_result res = run_settle_tick(w, reg, step, /*day_tick=*/0, /*spectating=*/true);
         r.inc_settle_mean += field_income(w) / k_campaign_settle_ticks;
+        g5_track(w, g5, step, false, r);
         remember_rows(w, res.report, reg, last_row);
         if (step >= k_campaign_settle_ticks - k_seat_settle_window)
             for (const building_report& br : res.report.buildings)
@@ -443,6 +476,7 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
                 if (mc.body == w.home_body && !tap.active.count(mid)) ++r.idle_markets;
             r.tap_lost = tap.lost;
         }
+        g5_track(w, g5, k_campaign_settle_ticks + (k - 1), true, r);
         if (k <= k_g1_g2_play_tick) remember_rows(w, res.report, reg, last_row);
         if (k > k_g1_g2_play_tick - 25 && k <= k_g1_g2_play_tick)
             r.inc_t26_50_mean += field_income(w) / 25.0;
@@ -459,6 +493,15 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
             }
         }
         r.last_tick = k;
+    }
+    for (const auto& [bid, rec] : g5)
+    {
+        (void)bid;
+        if (rec.first_idle < 0 || rec.first_idle > k_campaign_settle_ticks + k_g5_idle_window - 1)
+            continue;
+        ++r.g5_idled;
+        if (rec.back) ++r.g5_back;
+        else if (rec.gone) ++r.g5_removed;
     }
     for (const entity_id c : cohort)
         if (w.corporations.count(c)) ++r.firms_survived;
@@ -555,6 +598,11 @@ int main(int argc, char** argv)
                     r.tap_lost ? "  (UPPER bound: exchange ring overflowed)" : "");
         std::printf("    buildings at tick 50: live %d  under construction %d  decommissioned %d\n",
                     r.b_live, r.b_build, r.b_decom);
+        std::printf(" G5 processors idled in the settle or play ticks 1-%d: %d; came back by tick %d: %d (%.1f%%);"
+                    " removed while idled: %d | play transitions: idled %d, resumed %d\n",
+                    k_g5_idle_window, r.g5_idled, r.last_tick, r.g5_back,
+                    r.g5_idled ? pct(static_cast<double>(r.g5_back) / r.g5_idled) : 0.0, r.g5_removed,
+                    r.g5_idle_events, r.g5_resume_events);
         std::fflush(stdout);
     }
 
@@ -600,6 +648,12 @@ int main(int argc, char** argv)
                 g3 >= k_target_g3_firms_alive ? "PASS" : "FAIL", ticks, pct(g3), fs, fh, pct(k_target_g3_firms_alive));
     if (honesty_fail)
         std::printf(" HONESTY: %d seed(s) failed an honesty check (see above) — the reading is incomplete\n", honesty_fail);
+    {
+        long long gi = 0, gb = 0, ge = 0, gr = 0;
+        for (const seed_reading& r : rs) { gi += r.g5_idled; gb += r.g5_back; ge += r.g5_idle_events; gr += r.g5_resume_events; }
+        std::printf(" G5 (reported) idled processors that came back: %lld / %lld (%.1f%%) | play transitions idled %lld resumed %lld\n",
+                    gb, gi, gi ? pct(static_cast<double>(gb) / gi) : 0.0, ge, gr);
+    }
     std::printf("market_viability: G1 %.1f/70 G2 %.1f/50 G3 %.1f/70\n", pct(g1), pct(g2), pct(g3));
     return honesty_fail ? 1 : 0;
 }

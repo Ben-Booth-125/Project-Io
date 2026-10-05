@@ -918,8 +918,27 @@ Counted whole, a market that buys every surplus as the buyer of last resort grow
 floors its own prices; measured on seeds 0/10/28 the field fell to 1/1/11 firms. **k is 0 until
 the shelf spoils (Ben, 2026-10-03):** measured at k = 1 to 16, every k above 0 left fewer firms
 than listings-only supply (seeds 0/10/28: 43/48/32 at 0, 16/5/21 at 1, 5/2/19 at 4), because a
-glut the market cannot shed floors prices. So `supply` is listings only for now, and k is set again
-once shelf spoilage (BL-1179) lets a glut drain.
+glut the market cannot shed floors prices. **k is set above 0, by measurement, once the shelf
+drains (Ben, 2026-10-05, NR-968):** a shelf now has two drains — households eat off it
+(`POPULATION.md` § Population demand) and it spoils (below) — so a glut no longer only grows, and k
+is the smallest value that keeps a consuming market's price off the ceiling against a stocked
+shelf, read on the market viability gate.
+
+**The shelf spoils (settled 2026-10-05, on Ben's delegation; BL-1179).** Every good standing on a
+market's shelf loses a fixed share of itself each tick, its **spoilage rate**, authored per good in
+data by class: **perishable** (food rations, agricultural produce, water, clean water, medical
+supplies) fastest, **consumable** (consumer goods, fuels, chemicals, power-adjacent stocks) slower,
+**durable** (ores, metals, alloys, materials, components) slowest but never zero. The rates are
+first cuts, then measured. Three rules hold whatever the numbers:
+
+- **Only the shelf spoils.** A corporation's own pool is stock it holds and answers for; the shelf
+  is the market's, bought as the buyer of last resort, and nobody tends it.
+- **Nobody is charged.** The market already paid the maker when it bought the stock, so a spoiled
+  unit simply leaves — goods leave, no credits move, exactly as when a household eats it.
+- **Spoilage is a drain, not a price.** It takes stock off the shelf after the tick's draws and
+  before the shelf's share of supply is read; it never sets a price by itself.
+
+The k cap stays: spoilage is what makes k > 0 safe, not a replacement for it.
 
 Target and result are clamped to the band **[0.25×, 10×] of base**. Prices are therefore
 *anchored*: no scarcity can push a good past 10× its authored base, and no glut below a quarter

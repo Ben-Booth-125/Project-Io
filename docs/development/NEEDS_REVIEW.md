@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*73 entries — 4 open, 69 resolved.*
+*76 entries — 2 open, 74 resolved.*
 
 ---
 
@@ -45,58 +45,21 @@ tools/verify/rebless_shape_probe.cpp measures the world's shape (centres, scales
 
 *Files: `tools/verify/rebless_shape_probe.cpp`*
 
-### NR-967 — CALL (was a decision taken): the household growth basket is right, and households are unserved - merge, hold, or reweight? (BL-1163)
-*question · raised 2026-10-04 · from the sprint 49 main session (Ben: "I'll also trust your judgement")*
+### NR-970 — DECISION TAKEN: how the shelf spoils (BL-1179)
+*decision · raised 2026-10-05 · from the sprint 49 main session (Ben: "I'll also trust your judgement"; NR-968 brought spoilage forward)*
 
-Your 2026-10-03 ruling left the basket's contents to a short design pass. Taken: the goods and weights a centre grows on are exactly the basket it already bids into its market (shared tranche food rations 0.60 / agricultural produce 0.20 / water 0.30, plus the industrial tranche clean water 0.35 / consumer goods 0.25 / medical supplies 0.15, or the ancient tranche). The met ratio is the share of the centre's own population bid its market filled. economy.lua population_growth.demand_basket (food, agri, steel, water, refined fuel, iron ore, petroleum) retires. Threshold stays 0.50. Written into POPULATION.md.
+Settled in MARKETS.md sec The shelf spoils: every good on a market shelf loses a fixed per-tick share, authored per good by class - perishable (food rations, agricultural produce, water, clean water, medical supplies) fastest, consumable (consumer goods, fuels, chemicals) slower, durable (ores, metals, alloys, materials, components) slowest but never zero; first-cut rates, then measured. Only the SHELF spoils (a corp pool is its owner's stock). Nobody is charged (the market already paid; goods leave, no credits move). Spoilage drains after the tick's draws and before the shelf's share of supply is read. The k cap stays; k > 0 is set by measurement.
 
-BUILT AND HELD UNMERGED (2026-10-04, 26cb6cbe on worktree-agent-a7a4ad16f983163e4; population_mvp ALL PASS 16): the per-market household gate reads the world correctly and the world fails it. centre_decline_trace, 400 play ticks: before, every centre declines from ~t180-260 (seed 0 heads 64.1M -> 76.7M -> 44.7M); after, every centre declines from the settle (seed 0 61.8M -> 32.4M -> 14.9M; seeds 10/41/43 alike), median met 0.10-0.11 at t400, never more than 70 centres at >= 0.50. Cause: water, clean water and medical supplies are supplied 0 on every seed (one exception, gone by t400), consumer goods fall to ~0 by t~100, food rations run 25-45% of demand. Those three zero goods carry 0.80 of the basket's 1.85 weight, so the best reachable ratio is 0.57 even with food and consumer goods met. The lane also defined the household fill as PRO-RATA (households get min(1, supply/demand) like every bidder; no new saved field) - a decision taken, alternatives being households first or last, each needing a saved per-market household record.
+**Why it matters.** Spoilage plus the household draw are the two shelf drains that make k > 0 safe, per your 2026-10-03 ruling.
 
-UPDATE (2026-10-05): BL-1196 (households consume) is built on top of this branch: households really eat now and the gate reads what they received. Centres still shrink everywhere (seed 0 heads 65.2M -> 19.5M by t400), because water, clean water and medical supplies are never produced. Option A (hold) stands; the supply-side items (BL-1197 gap firm digs the gap, BL-1185 chain-feasible placement, BL-1187 build only what runs) are what release it.
-
-**Why it matters.** One basket is legible (what a city eats is what makes it grow) and cannot drift from the bid. The cost: a good that is in the bid but rarely made (medical supplies on some seeds) now weighs on growth; if it pins centres low, the weights are the dial.
-
-- A: HOLD BL-1163 unmerged until households are supplied (BL-1193, household goods unsupplied, diagnoses why first); the old body-wide gate stays live meanwhile
-- B: merge now with weights on food only until BL-1193 lands (honest about what is made; reweight later)
-- C: merge as built - centres shrink from day 1 and the shortage is the signal the market should answer
+- A: keep it
+- B: spoilage also bites corp pools (a holding cost)
+- C: one flat rate for every good
 - D: other
 
-> **Recommendation:** A. The gate is right and the world is wrong; merging it now would shrink every world from the settle and move the start, before the supply side is even diagnosed. Pro-rata fill: keep it (no new saved field, and no doc states a priority).
+> **Recommendation:** A.
 
-*Files: `docs/economy/POPULATION.md`, `scripts/economy.lua`, `src/world/economy_system.cpp`*
-
-### NR-968 — CALL: how to break the price cycle that silences consuming markets three ticks in four (BL-1186)
-*question · raised 2026-10-04 · from the BL-1186 diagnosis (3a353f82)*
-
-With nothing listed (the shelf is not counted as supply: shelf_supply_ticks = 0), a bid aims at 10x base and the price moves halfway; above the 2x reservation ceiling BL-1172 removes the want entirely so the price can ease. Together every market on a landmass cycles 1.6x -> 5.8x -> 3.4x -> 2.2x in step: a consuming market bids one tick in four, so a hauler sees zero demand at the destination and ships nothing, and a site whose own shelf holds steel may not draw it (BL-1183). Routing fixes (ports, partial LP sends) are going ahead regardless; this is the price half.
-
-UPDATE (2026-10-04, the BL-1193 diagnosis): the household bid is a pricing pull that never takes goods off a shelf, so household-good shelves only grow - the premise behind holding k at 0 until spoilage. BL-1196 (households consume) makes households drain the shelf as POPULATION.md already says. The same diagnosis finds the cycle's worst case: households bid water nobody lists, water sits at 10x everywhere, and the makers of clean water and medical supplies may not draw their own input. Option B (keep the over-ceiling want visible) would make that lock worse.
-
-**Why it matters.** Without it, even routable surplus moves one tick in four; with it, shortages price into shipments. Option B partly reverses your 2026-10-03 ruling (BL-1172), so it is yours.
-
-- A: count the shelf as supply (shelf supply k > 0) - your 2026-10-03 path - which brings BL-1179 (shelf spoilage) forward into wave 1, since k was to follow it
-- B: an over-ceiling draw still registers its want (the price sees it) but does not buy - a partial reversal of BL-1172
-- C: haulers read a separate unmet-want register over several clears; the price still eases as BL-1172 wants (a new saved field)
-- D: other
-
-> **Recommendation:** A, built together with BL-1196 (households consume from the shelf): with households draining shelves, a shelf counted as supply no longer only grows, so k > 0 is safe without waiting for spoilage; BL-1179 (shelf spoilage) stays as the drain for goods no household eats. Not B.
-
-*Files: `src/world/market_clearing.cpp`, `scripts/economy.lua`, `src/world/economy_system.cpp`*
-
-### NR-969 — CALL: does "a leg over the LP cap is refused outright" cover the automatic dispatch, or only commanded legs? (BL-1186 E1)
-*question · raised 2026-10-04 · from the BL-1186 routing lane (baede06c)*
-
-LOGISTICS.md sec Refusal, surface and determinism (Ben, 2026-08-22): "A leg over the cap fails - refused outright, and the player is told why ... a refusal nobody sees is silent interdiction again." The routing lane built E1: the AUTOMATIC dispatch passes (a market exporting its own shelf, the auto-surplus) now send what the nearest anchor's passive-LP pool still allows (minimum 1 unit, cost scaled), while the player's verb and the scorer's directed dispatch still send whole or are refused. It wrote that reading into SUPPLY.md sec Dispatch trigger. Before E1, a 20 u-per-anchor pool refused every larger cargo whole, so once routes open the passive cap would block nearly all automatic haulage.
-
-**Why it matters.** Your ruling's wording is general; the lane read it as covering commanded legs only. Narrowing a ruling is yours, not a lane's (the BL-1146 lesson).
-
-- A: confirm the reading - commanded legs are refused whole and told; the automatic dispatch trims to the pool
-- B: the ruling covers every leg - the automatic dispatch is refused whole too (E1 comes out; the passive pool size becomes the lever)
-- C: other
-
-> **Recommendation:** A. The ruling is about legibility of a press: a commanded leg the player chose is refused and told. An automatic dispatch has no one to tell, so a whole refusal there IS the silent interdiction the ruling exists to prevent; a trimmed send is visible as traffic.
-
-*Files: `docs/economy/LOGISTICS.md`, `docs/economy/SUPPLY.md`, `src/world/supply_system.cpp`*
+*Files: `docs/economy/MARKETS.md`, `scripts/economy.lua`, `src/world/market_clearing.cpp`*
 
 ---
 
@@ -1255,4 +1218,98 @@ With the fleet rule on, a crossing whose fleet cannot lift the army, or which th
 > **RESOLVED.** RULED (Ben, 2026-10-01, the open calls form): A: a crossing the fleet rule would refuse is not a candidate -- a legality filter, like every other verb gate, not a scorer term. EXPLORATION.md; BL-1152 builds it.
 
 *Files: `src/world/history_sim.cpp`, `docs/generation/EXPLORATION.md`*
+
+### NR-967 — CALL (was a decision taken): the household growth basket is right, and households are unserved - merge, hold, or reweight? (BL-1163)
+*question · raised 2026-10-04 · from the sprint 49 main session (Ben: "I'll also trust your judgement")*
+
+Your 2026-10-03 ruling left the basket's contents to a short design pass. Taken: the goods and weights a centre grows on are exactly the basket it already bids into its market (shared tranche food rations 0.60 / agricultural produce 0.20 / water 0.30, plus the industrial tranche clean water 0.35 / consumer goods 0.25 / medical supplies 0.15, or the ancient tranche). The met ratio is the share of the centre's own population bid its market filled. economy.lua population_growth.demand_basket (food, agri, steel, water, refined fuel, iron ore, petroleum) retires. Threshold stays 0.50. Written into POPULATION.md.
+
+BUILT AND HELD UNMERGED (2026-10-04, 26cb6cbe on worktree-agent-a7a4ad16f983163e4; population_mvp ALL PASS 16): the per-market household gate reads the world correctly and the world fails it. centre_decline_trace, 400 play ticks: before, every centre declines from ~t180-260 (seed 0 heads 64.1M -> 76.7M -> 44.7M); after, every centre declines from the settle (seed 0 61.8M -> 32.4M -> 14.9M; seeds 10/41/43 alike), median met 0.10-0.11 at t400, never more than 70 centres at >= 0.50. Cause: water, clean water and medical supplies are supplied 0 on every seed (one exception, gone by t400), consumer goods fall to ~0 by t~100, food rations run 25-45% of demand. Those three zero goods carry 0.80 of the basket's 1.85 weight, so the best reachable ratio is 0.57 even with food and consumer goods met. The lane also defined the household fill as PRO-RATA (households get min(1, supply/demand) like every bidder; no new saved field) - a decision taken, alternatives being households first or last, each needing a saved per-market household record.
+
+UPDATE (2026-10-05): BL-1196 (households consume) is built on top of this branch: households really eat now and the gate reads what they received. Centres still shrink everywhere (seed 0 heads 65.2M -> 19.5M by t400), because water, clean water and medical supplies are never produced. Option A (hold) stands; the supply-side items (BL-1197 gap firm digs the gap, BL-1185 chain-feasible placement, BL-1187 build only what runs) are what release it.
+
+**Why it matters.** One basket is legible (what a city eats is what makes it grow) and cannot drift from the bid. The cost: a good that is in the bid but rarely made (medical supplies on some seeds) now weighs on growth; if it pins centres low, the weights are the dial.
+
+- A: HOLD BL-1163 unmerged until households are supplied (BL-1193, household goods unsupplied, diagnoses why first); the old body-wide gate stays live meanwhile
+- B: merge now with weights on food only until BL-1193 lands (honest about what is made; reweight later)
+- C: merge as built - centres shrink from day 1 and the shortage is the signal the market should answer
+- D: other
+
+> **Recommendation:** A. The gate is right and the world is wrong; merging it now would shrink every world from the settle and move the start, before the supply side is even diagnosed. Pro-rata fill: keep it (no new saved field, and no doc states a priority).
+
+> **RESOLVED.** RULED (Ben, the market calls form, 2026-10-05): option A - BL-1163 is HELD (now carried by BL-1196, households consume) until households are supplied; the old body-wide gate stays live meanwhile. Pro-rata fill superseded by the real household draw (BL-1196).
+
+*Files: `docs/economy/POPULATION.md`, `scripts/economy.lua`, `src/world/economy_system.cpp`*
+
+### NR-968 — CALL: how to break the price cycle that silences consuming markets three ticks in four (BL-1186)
+*question · raised 2026-10-04 · from the BL-1186 diagnosis (3a353f82)*
+
+With nothing listed (the shelf is not counted as supply: shelf_supply_ticks = 0), a bid aims at 10x base and the price moves halfway; above the 2x reservation ceiling BL-1172 removes the want entirely so the price can ease. Together every market on a landmass cycles 1.6x -> 5.8x -> 3.4x -> 2.2x in step: a consuming market bids one tick in four, so a hauler sees zero demand at the destination and ships nothing, and a site whose own shelf holds steel may not draw it (BL-1183). Routing fixes (ports, partial LP sends) are going ahead regardless; this is the price half.
+
+UPDATE (2026-10-04, the BL-1193 diagnosis): the household bid is a pricing pull that never takes goods off a shelf, so household-good shelves only grow - the premise behind holding k at 0 until spoilage. BL-1196 (households consume) makes households drain the shelf as POPULATION.md already says. The same diagnosis finds the cycle's worst case: households bid water nobody lists, water sits at 10x everywhere, and the makers of clean water and medical supplies may not draw their own input. Option B (keep the over-ceiling want visible) would make that lock worse.
+
+**Why it matters.** Without it, even routable surplus moves one tick in four; with it, shortages price into shipments. Option B partly reverses your 2026-10-03 ruling (BL-1172), so it is yours.
+
+- A: count the shelf as supply (shelf supply k > 0) - your 2026-10-03 path - which brings BL-1179 (shelf spoilage) forward into wave 1, since k was to follow it
+- B: an over-ceiling draw still registers its want (the price sees it) but does not buy - a partial reversal of BL-1172
+- C: haulers read a separate unmet-want register over several clears; the price still eases as BL-1172 wants (a new saved field)
+- D: other
+
+> **Recommendation:** A, built together with BL-1196 (households consume from the shelf): with households draining shelves, a shelf counted as supply no longer only grows, so k > 0 is safe without waiting for spoilage; BL-1179 (shelf spoilage) stays as the drain for goods no household eats. Not B.
+
+> **RESOLVED.** RULED (Ben, the market calls form, 2026-10-05): option A - the shelf counts as supply (k > 0) and BL-1179 (shelf spoilage) is brought forward into wave 1. Spoilage settled in MARKETS.md (2026-10-05, on Ben's delegation; NR-970); k is set by measurement on the market viability gate once the shelf drains (households eat via BL-1196, and it spoils).
+
+*Files: `src/world/market_clearing.cpp`, `scripts/economy.lua`, `src/world/economy_system.cpp`*
+
+### NR-969 — CALL: does "a leg over the LP cap is refused outright" cover the automatic dispatch, or only commanded legs? (BL-1186 E1)
+*question · raised 2026-10-04 · from the BL-1186 routing lane (baede06c)*
+
+LOGISTICS.md sec Refusal, surface and determinism (Ben, 2026-08-22): "A leg over the cap fails - refused outright, and the player is told why ... a refusal nobody sees is silent interdiction again." The routing lane built E1: the AUTOMATIC dispatch passes (a market exporting its own shelf, the auto-surplus) now send what the nearest anchor's passive-LP pool still allows (minimum 1 unit, cost scaled), while the player's verb and the scorer's directed dispatch still send whole or are refused. It wrote that reading into SUPPLY.md sec Dispatch trigger. Before E1, a 20 u-per-anchor pool refused every larger cargo whole, so once routes open the passive cap would block nearly all automatic haulage.
+
+**Why it matters.** Your ruling's wording is general; the lane read it as covering commanded legs only. Narrowing a ruling is yours, not a lane's (the BL-1146 lesson).
+
+- A: confirm the reading - commanded legs are refused whole and told; the automatic dispatch trims to the pool
+- B: the ruling covers every leg - the automatic dispatch is refused whole too (E1 comes out; the passive pool size becomes the lever)
+- C: other
+
+> **Recommendation:** A. The ruling is about legibility of a press: a commanded leg the player chose is refused and told. An automatic dispatch has no one to tell, so a whole refusal there IS the silent interdiction the ruling exists to prevent; a trimmed send is visible as traffic.
+
+> **RESOLVED.** RULED (Ben, the market calls form, 2026-10-05): option A - the refusal rule covers commanded legs; the automatic dispatch trims to the passive-LP pool. Written into LOGISTICS.md sec Refusal, surface and determinism; SUPPLY.md cites it.
+
+*Files: `docs/economy/LOGISTICS.md`, `docs/economy/SUPPLY.md`, `src/world/supply_system.cpp`*
+
+### NR-971 — CALL: where does a habitable world's water come from? (BL-1198)
+*question · raised 2026-10-05 · from the sprint 49 main session*
+
+Water deposits are seeded on icy substrate only (RESOURCES.md:147). On an earthlike home body that puts all extractable water at the poles, far from the people who bid for it, so household water, clean water and medical supplies go unsupplied on most seeds (no water extractor at all on seeds 10/11/13/37). Every other sprint 49 fix (routing, placement, scorer, households eating, spoilage) leaves this untouched.
+
+**Why it matters.** Water is the heaviest unmet line in the household basket and the input of two more household goods; while it is unsupplied no centre can reach the growth threshold and the held household gate (BL-1163/1196) cannot merge.
+
+- A: a Well / pumping station - an extraction site gated on adjacency to fresh water (river or lake), as the Fishing Wharf is gated on coast; cities on rivers drink
+- B: groundwater - every habitable land tile holds a small water deposit, scaled by habitability or rainfall
+- C: on a habitable body water is free - drop raw water from the household basket and keep clean water (from a plant that draws local water at no input cost)
+- D: other
+
+> **Recommendation:** A. It follows the Fishing Wharf precedent (adjacency-gated extraction, no new deposit field), it is a deterministic consequence of terrain generation already has (rivers, lakes), and it is legible: where the river runs, water is cheap - which makes river cities matter, a Trade-shaped consequence.
+
+> **RESOLVED.** RULED (Ben, the water and shelf form, 2026-10-05): option A - a Well, an extraction site gated on fresh-water adjacency (a land tile on a river or beside a lake), as the Fishing Wharf is gated on coast. Written into PRODUCTION.md sec Extraction buildings and RESOURCES.md; the work is BL-1198 (water where people live).
+
+*Files: `docs/economy/RESOURCES.md`, `docs/economy/PRODUCTION.md`, `scripts/world_gen.lua`*
+
+### NR-972 — CALL: ratify shelf supply k (the measurement says k barely matters and k = 1 costs firms) (BL-1179)
+*question · raised 2026-10-05 · from the BL-1179 lane (1f589398)*
+
+Your NR-968 ruling: the shelf counts as supply (k > 0), set by measurement once the shelf drains. k sweep (BL-1179 lane, 1f589398, seeds 0/43/10, spoilage on, households eating): consuming prices at the ceiling AGAINST A STOCKED SHELF 0.1% at k=0, 0.0% at k=1-8, 5.2% with spoilage off; at the ceiling on ANY shelf ~76% at every k (empty shelves: goods nobody makes enough of); G3 firms alive 38.2% at k=0 vs 21.3% at k=1 (22-23% at k=2-8); G2 20.9% at k=0 vs 24.0-26.9% at k>0; centres grew 0 with spoilage on at every k (193 with it off). Reading: spoilage, not k, is what clears the ceiling against stocked shelves; the remaining ~76% of ceiling prices sit on EMPTY shelves (supply, not k); and k = 1 halves firm survival relative to k = 0, because a counted shelf lowers prices where stock exists.
+
+**Why it matters.** k > 0 was your ruling's mechanism; the data says it buys almost nothing now and costs firms. The lane chose k = 1 to honour the ruling.
+
+- A: keep k = 0 for now; spoilage + households eating do the job; re-sweep k once water and the household chains are supplied (BL-1198)
+- B: ratify k = 1 as measured
+- C: other
+
+> **Recommendation:** A. The measurement answers the question the ruling asked (a consuming price off the ceiling against a stocked shelf): 0.1% at k = 0 with spoilage. Re-sweep after BL-1198, when shelves are stocked often enough for k to matter.
+
+> **RESOLVED.** RULED (Ben, the water and shelf form, 2026-10-05): option A - k = 0 for now (spoilage and households eating keep stocked shelves off the ceiling); re-sweep k after BL-1198 supplies water.
+
+*Files: `scripts/economy.lua`, `docs/economy/MARKETS.md`*
 
