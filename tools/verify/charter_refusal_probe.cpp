@@ -205,6 +205,10 @@ struct config
     /// would read the chain rule instead of the rule it was written for. Set it
     /// to read the chain rule on purpose (`chain_infeasible`).
     bool works_input = false;
+    /// BL-1197 review: households also want TOOLS, whose one recipe draws
+    /// platinum group metals — a raw with no deposit on this body, so tools
+    /// cannot be produced here and leave G (`unproducible`).
+    bool offworld_good = false;
 };
 
 struct reading
@@ -273,6 +277,18 @@ std::unique_ptr<world> build(const config& cfg, recipe_registry& reg,
                 tc.resource_deposit[static_cast<std::size_t>(resource_type::agricultural_produce)] = 1.0f;
                 break;
             case ground::barren: break;
+            }
+            // BL-1197 round 5 (G holds only goods the body can produce): the
+            // ore, and the timber a works_input recipe needs, each stand on ONE
+            // tile at the antipode column of (6, 6), row 0 — outside every
+            // window these cases open, so the goods stay in G (the body CAN make
+            // them) while no centre has ground for them, which is what these
+            // cases measure.
+            if (x == (k_cx + cfg.body_w / 2) % cfg.body_w && y == 0)
+            {
+                tc.resource_deposit[k_raw] = 1.0f;
+                if (cfg.works_input)
+                    tc.resource_deposit[static_cast<std::size_t>(resource_type::timber)] = 1.0f;
             }
             w->tiles[tid] = tc;
             nc.tiles.push_back(tid);   // raster order: the nation's stored order
@@ -345,8 +361,26 @@ std::unique_ptr<world> build(const config& cfg, recipe_registry& reg,
         cp.seed_capacity_per_building = cfg.yard_seed;
         reg.set_construction(cp);
     }
+    if (cfg.offworld_good)
+    {
+        pd.demand_basket[static_cast<std::size_t>(resource_type::tools)] = 100.0f;
+        reg.set_population_demand(pd);
+        recipe rc;
+        rc.name = "fixture_tools_from_pgm";
+        rc.inputs[static_cast<std::size_t>(resource_type::platinum_group_metals)] = 1.0f;
+        rc.outputs[static_cast<std::size_t>(resource_type::tools)] = 1.0f;
+        reg.add_recipe(rc);
+    }
     if (cfg.upkeep)
     {
+        // BL-1197 review: power must be PRODUCIBLE here for its shortfall to be
+        // the walk's own (`late_shortfall`) rather than `unproducible` — a
+        // recipe with no inputs makes it. Nothing wants power before the walk,
+        // so it is still not in G.
+        recipe pw;
+        pw.name = "fixture_power";
+        pw.outputs[k_late] = 1.0f;
+        reg.add_recipe(pw);
         building_upkeep_params up;
         up.goods[static_cast<std::size_t>(building_type::processing_facility)]
                 [static_cast<std::size_t>(era_band::any)][k_late] = 1.0f;
@@ -478,9 +512,17 @@ struct result
     bool anchor_at_x  = false; ///< the chartered firm's anchor is (6, 6)
     long long chain_infeasible = 0;
     bool balanced = false;
+    bool input_mine   = false; ///< BL-1197: a firm's anchor is a timber site at (5, 6)
+    std::size_t steel_firms = 0; ///< firms whose holdings include a steel-making processor
 };
 
-result run(bool timber_in_a)
+/// BL-1197 round 4 (derived demand): @p spare_deposit puts an UNBUILT timber
+/// deposit at (5, 6), inside the centre's window in market A; @p points firm
+/// charters to spend; @p standing_works stands a steel-from-timber works at
+/// (7, 6) in market A before the walk (no corporation holds it); @p no_producer
+/// removes the timber producer, so nothing on the body makes timber.
+result run(bool timber_in_a, bool spare_deposit = false, std::int32_t points = 1,
+           bool standing_works = false, bool no_producer = false)
 {
     auto w = std::make_unique<world>();
     recipe_registry reg;
@@ -508,7 +550,7 @@ result run(bool timber_in_a)
             tc.grid_x = x;
             tc.grid_y = y;
             tc.substrate = terrain_substrate::barren;
-            if (x == tx && y == 6)
+            if ((x == tx && y == 6) || (spare_deposit && x == 5 && y == 6))
             {
                 tc.resource_deposit[timber]   = 1.0f;
                 tc.resource_remaining[timber] = 1000.0f;   // an unspent reserve: a producer
@@ -537,6 +579,7 @@ result run(bool timber_in_a)
     }
 
     // The timber producer, and filler on every market-A tile but (6, 6).
+    if (!no_producer)
     {
         const entity_id bid = w->create_entity();
         building_component b{};
@@ -550,7 +593,8 @@ result run(bool timber_in_a)
     for (int y = 0; y < bh; ++y)
         for (int x = 0; x <= 9; ++x)
         {
-            if ((x == 6 && y == 6) || (x == tx && y == 6))
+            if ((x == 6 && y == 6) || (x == tx && y == 6) || (spare_deposit && x == 5 && y == 6)
+                || (standing_works && x == 7 && y == 6))
                 continue;
             const entity_id bid = w->create_entity();
             building_component b{};
@@ -573,6 +617,21 @@ result run(bool timber_in_a)
     rc.inputs[timber] = 1.0f;
     rc.outputs[static_cast<std::size_t>(resource_type::steel)] = 1.0f;
     reg.add_recipe(rc);
+    if (standing_works)
+    {
+        // A works runs at a nominal rate, so it has an input draw to want.
+        building_economics proc;
+        proc.base_rate = 1.0f;
+        reg.set_economics(building_type::processing_facility, proc);
+        const entity_id bid = w->create_entity();
+        building_component b{};
+        b.tile = at.at({ 7, 6 });
+        b.type = building_type::processing_facility;
+        b.recipe = reg.recipe_id(rc.name);
+        b.workforce_assigned = 0.5f;
+        w->buildings[bid] = b;
+        w->stockpiles[bid] = stockpile_component{};
+    }
     building_economics ext;
     ext.base_rate = 1.0f;
     reg.set_economics(building_type::extraction_site, ext);
@@ -586,7 +645,7 @@ result run(bool timber_in_a)
     s.per_resource_firm_cap    = 2;
     s.max_firms_per_body       = 200;
     s.density_ceiling          = 120;
-    const charter_budget budget(std::map<entity_id, std::int32_t>{ { centre, 1 } });
+    const charter_budget budget(std::map<entity_id, std::int32_t>{ { centre, points } });
 
     result out;
     charter_web_from_budget(*w, reg, budget, s, /*seed=*/1185u, /*settle=*/nullptr, &out.rep);
@@ -599,6 +658,24 @@ result run(bool timber_in_a)
                 out.holds_in_b = true;
         if (!corp.assets.empty() && w->buildings.at(corp.assets.front()).tile == at.at({ 6, 6 }))
             out.anchor_at_x = true;
+        if (!corp.assets.empty())
+        {
+            const building_component& a = w->buildings.at(corp.assets.front());
+            if (a.tile == at.at({ 5, 6 }) && a.type == building_type::extraction_site
+                && a.target_resource == resource_type::timber)
+                out.input_mine = true;
+        }
+        for (const entity_id bid : corp.assets)
+        {
+            const building_component& b = w->buildings.at(bid);
+            if (b.type == building_type::processing_facility && b.recipe != no_recipe
+                && reg.get_recipe(b.recipe) != nullptr
+                && reg.get_recipe(b.recipe)->outputs[static_cast<std::size_t>(resource_type::steel)] > 0.0f)
+            {
+                ++out.steel_firms;
+                break;
+            }
+        }
     }
     long long unspent = 0;
     for (const charter_unspent& u : out.rep.unspent)
@@ -758,6 +835,181 @@ roster_result run_roster(bool s_loses_all)
 }
 
 } // namespace chainfx
+
+// ---------------------------------------------------------------------------
+// 7. THE WATER DIG LADDER (BL-1197, gap firm digs the gap; the review's rows)
+// ---------------------------------------------------------------------------
+// One nation on a 24 x 12 barren body, a centre at (6, 6) with a window of
+// radius 4, and households that want WATER and STONE (the turn takes water,
+// index 7, before stone, 11). Stone stands at (9, 6) and (9, 7). Water ground,
+// by mode:
+//   well_and_ice  a Well site (a river along (7, 6)) AND an ice deposit at (5, 6)
+//   ice_only      the ice deposit at (5, 6) alone
+//   far_ice_only  an ice deposit at (18, 0) only — outside the window, so water
+//                 is producible on the body (in G) but this centre has no ground
+//   no_water      no Well site and no ice anywhere (Pass 6's mask case)
+namespace waterfx {
+
+enum class mode { well_and_ice, ice_only, far_ice_only, no_water };
+
+struct result
+{
+    std::size_t firms        = 0;
+    int  water_firms         = 0;  ///< charters booked to water
+    int  stone_firms         = 0;  ///< charters booked to stone
+    bool anchor_at_well      = false;
+    bool anchor_at_ice       = false;
+    bool any_water_site      = false; ///< some placed building targets water
+    bool balanced            = false;
+    long long unspent        = 0;
+};
+
+std::unique_ptr<world> build(mode m, recipe_registry& reg, entity_id& centre,
+                             std::map<std::pair<int, int>, entity_id>& at)
+{
+    auto w = std::make_unique<world>();
+    const int bw = 24, bh = 12;
+    const entity_id body = w->create_entity();
+    {
+        body_component bc{};
+        bc.name = "WaterBody";
+        bc.grid_width = bw;
+        bc.grid_height = bh;
+        w->bodies[body] = bc;
+    }
+    const entity_id nation = w->create_entity();
+    nation_component nc{};
+    nc.name = "Veyl";
+    const std::size_t water = static_cast<std::size_t>(resource_type::water);
+    const std::size_t stone = static_cast<std::size_t>(resource_type::stone);
+    for (int y = 0; y < bh; ++y)
+        for (int x = 0; x < bw; ++x)
+        {
+            const entity_id tid = w->create_entity();
+            tile_component tc{};
+            tc.body = body;
+            tc.grid_x = x;
+            tc.grid_y = y;
+            tc.substrate = terrain_substrate::barren;
+            tc.habitability = 0.5f;
+            if (x == 9 && (y == 6 || y == 7))
+            {
+                tc.resource_deposit[stone]   = 1.0f;
+                tc.resource_remaining[stone] = 1000.0f;
+            }
+            const bool ice_here =
+                ((m == mode::well_and_ice || m == mode::ice_only) && x == 5 && y == 6)
+                || (m == mode::far_ice_only && x == 18 && y == 0);
+            if (ice_here)
+            {
+                tc.resource_deposit[water]   = 1.0f;
+                tc.resource_remaining[water] = 1000.0f;
+            }
+            if (m == mode::well_and_ice && x == 7 && y == 6)
+                tc.river_edges = 1;   // a river along the tile: a Well site
+            w->tiles[tid] = tc;
+            nc.tiles.push_back(tid);
+            w->tile_to_nation[tid] = nation;
+            at[{ x, y }] = tid;
+        }
+    w->nations[nation] = nc;
+
+    centre = w->create_entity();
+    population_centre_component pc{};
+    pc.scale = 5;
+    w->population_centres[centre] = pc;
+    w->population_centre_tile[centre] = at.at({ 6, 6 });
+
+    population_demand_params pd;
+    pd.demand_basket[water] = 100.0f;
+    pd.demand_basket[stone] = 100.0f;
+    reg.set_population_demand(pd);
+    building_economics ext;
+    ext.base_rate = 1.0f;
+    reg.set_economics(building_type::extraction_site, ext);
+    return w;
+}
+
+/// The charter walk (sqrt_capital, the turn) with @p points firm charters.
+result run_walk(mode m, std::int32_t points)
+{
+    recipe_registry reg;
+    entity_id centre = null_entity;
+    std::map<std::pair<int, int>, entity_id> at;
+    auto w = build(m, reg, centre, at);
+
+    charter_spend_params s;
+    s.firm_price_points        = 1;
+    s.specialist_firm_charters = 1000;
+    s.window_radius            = 4;
+    s.province_cap             = false;
+    s.resource_cap_rule        = charter_cap_rule::sqrt_capital;
+    s.per_resource_firm_cap    = 2;
+    s.max_firms_per_body       = 200;
+    s.density_ceiling          = 120;
+    const charter_budget budget(std::map<entity_id, std::int32_t>{ { centre, points } });
+
+    charter_spend_report rep;
+    charter_web_from_budget(*w, reg, budget, s, /*seed=*/1197u, /*settle=*/nullptr, &rep);
+    result out;
+    out.firms = rep.firms.size();
+    for (const charter_record& r : rep.charters)
+    {
+        if (r.specialist)
+            continue;
+        if (r.good == static_cast<std::uint16_t>(resource_type::water)) ++out.water_firms;
+        if (r.good == static_cast<std::uint16_t>(resource_type::stone)) ++out.stone_firms;
+        const corporation_component& corp = w->corporations.at(r.corp);
+        if (corp.assets.empty())
+            continue;
+        const building_component& a = w->buildings.at(corp.assets.front());
+        if (a.target_resource == resource_type::water && a.tile == at.at({ 7, 6 }))
+            out.anchor_at_well = true;
+        if (a.target_resource == resource_type::water && a.tile == at.at({ 5, 6 }))
+            out.anchor_at_ice = true;
+    }
+    for (const auto& [bid, b] : w->buildings)
+        if (b.type == building_type::extraction_site && b.target_resource == resource_type::water)
+            out.any_water_site = true;
+    for (const charter_unspent& u : rep.unspent)
+        out.unspent += u.points;
+    out.balanced = rep.points_spent + out.unspent == budget.total();
+    return out;
+}
+
+/// Budget-less Pass 6 (`generate_background_firms`) on the same ground.
+result run_pass6(mode m)
+{
+    recipe_registry reg;
+    entity_id centre = null_entity;
+    std::map<std::pair<int, int>, entity_id> at;
+    auto w = build(m, reg, centre, at);
+    const std::vector<entity_id> firms = generate_background_firms(*w, reg, /*seed=*/1197u);
+    result out;
+    out.firms = firms.size();
+    for (const entity_id cid : firms)
+    {
+        const corporation_component& corp = w->corporations.at(cid);
+        if (corp.assets.empty())
+            continue;
+        const building_component& a = w->buildings.at(corp.assets.front());
+        if (a.type == building_type::extraction_site && a.target_resource == resource_type::stone)
+            ++out.stone_firms;
+        if (a.type == building_type::extraction_site && a.target_resource == resource_type::water)
+        {
+            ++out.water_firms;
+            if (a.tile == at.at({ 7, 6 }))
+                out.anchor_at_well = true;
+        }
+    }
+    for (const auto& [bid, b] : w->buildings)
+        if (b.type == building_type::extraction_site && b.target_resource == resource_type::water)
+            out.any_water_site = true;
+    out.balanced = true;
+    return out;
+}
+
+} // namespace waterfx
 
 int main()
 {
@@ -1346,6 +1598,40 @@ int main()
         expect_true("late: the 2 points left are late_shortfall, not no_gap",
                     r.u(why_t::late_shortfall) == 2 && r.u(why_t::no_gap) == 0 && r.balanced);
     }
+    {
+        // BL-1197 review — UNPRODUCIBLE: households want tools, made only from
+        // platinum group metals, which this body holds nowhere. Tools leave G,
+        // and so do the metals; G's count and the per-good cap are read AFTER
+        // that filter; once G fills, the rest books `unproducible`.
+        turn::config cfg;
+        cfg.offworld_good = true;
+        const turn::reading r = turn::run(cfg);
+        turn::print("tools need platinum (none on the body)", r);
+        const charter_body_record* b = r.rep.bodies.empty() ? nullptr : &r.rep.bodies.front();
+        const auto in_g = [&](resource_type g) {
+            return b != nullptr
+                && std::find(b->goods.begin(), b->goods.end(), static_cast<std::uint16_t>(g))
+                       != b->goods.end();
+        };
+        std::printf("  unproducible: G %d [", b ? b->goods_in_g : -1);
+        if (b)
+            for (const std::uint16_t g : b->goods)
+                std::printf(" %s", resource_names::name_of(static_cast<resource_type>(g)).c_str());
+        std::printf(" ], per-good cap %d, tools firms %d\n", b ? static_cast<int>(b->per_good_cap) : -1,
+                    r.firms[static_cast<std::size_t>(resource_type::tools)]);
+        expect_true("unproducible: tools and platinum are out of G; ore, steel and planks are in",
+                    b != nullptr && !in_g(resource_type::tools)
+                    && !in_g(resource_type::platinum_group_metals) && in_g(resource_type::iron_ore)
+                    && in_g(resource_type::steel) && in_g(resource_type::planks));
+        expect_true("unproducible: |G| and the per-good cap are read after the filter (3 goods)",
+                    b != nullptr && b->goods_in_g == 3
+                    && b->goods_in_g == static_cast<int>(b->goods.size())
+                    && b->per_good_cap == charter_sqrt_per_good_cap(2, b->firm_charters, 3, 1));
+        expect_true("unproducible: no firm for tools; the rest books unproducible, not late_shortfall",
+                    r.firms[static_cast<std::size_t>(resource_type::tools)] == 0
+                    && r.u(why_t::unproducible) > 0 && r.u(why_t::late_shortfall) == 0
+                    && r.u(why_t::no_gap) == 0 && r.balanced);
+    }
 
     // --- 4. THE NO-SPECIALIST WORLD (BL-1044, NR-910) --------------------------
     std::printf("\ncharter_refusal_probe — the no-specialist world falls back (NR-910)\n");
@@ -1531,6 +1817,33 @@ int main()
                     good.anchor_at_x ? 1 : 0, good.chain_infeasible);
         expect_true("control: timber in A — the firm charters, anchored at (6, 6)",
                     good.firms == 1 && good.anchor_at_x && good.chain_infeasible == 0 && good.balanced);
+        // DERIVED DEMAND (BL-1197 round 4; Ben, 2026-10-05): a steel works
+        // standing in market A wants timber, nothing on the body makes it, and
+        // an unbuilt timber deposit lies at (5, 6) in the window. No household
+        // wants timber, yet the works' input demand puts it in the gap: the walk
+        // charters timber's extractor there, and the steel firm then places.
+        // (The extractor's own processor slot may take the steel recipe too, fed
+        // by its own timber, so at least one firm makes steel.)
+        const chainfx::result dd = chainfx::run(/*timber_in_a=*/false, /*spare_deposit=*/true,
+                                                /*points=*/2, /*standing_works=*/true,
+                                                /*no_producer=*/true);
+        std::printf("  derived demand: firms %zu, timber site at (5, 6) %d, steel firms %zu, "
+                    "works anchored at (6, 6) %d, chain_infeasible %lld%s\n", dd.firms,
+                    dd.input_mine ? 1 : 0, dd.steel_firms, dd.anchor_at_x ? 1 : 0,
+                    dd.chain_infeasible, dd.balanced ? "" : " [UNBALANCED]");
+        expect_true("derived demand: a standing works' raw is chartered, then the steel firm places",
+                    dd.firms == 2 && dd.input_mine && dd.steel_firms >= 1 && dd.anchor_at_x
+                    && dd.chain_infeasible == 0 && dd.balanced);
+        // Control — the cold start: the same ground with NO works standing.
+        // Nothing wants timber, so none is chartered, and steel (whose works
+        // would need it) books chain_infeasible: derived demand counts what
+        // stands or is chartered, never what a refused firm would have wanted.
+        const chainfx::result cold = chainfx::run(false, true, 2, /*standing_works=*/false,
+                                                  /*no_producer=*/true);
+        std::printf("  cold start: firms %zu, timber site %d, chain_infeasible %lld\n", cold.firms,
+                    cold.input_mine ? 1 : 0, cold.chain_infeasible);
+        expect_true("cold start: no works stands, so timber is not wanted and steel is chain_infeasible",
+                    cold.firms == 0 && !cold.input_mine && cold.chain_infeasible > 0 && cold.balanced);
     }
     {
         // THE KEPT ROSTER: enforce_chain_feasible_roster is order-free,
@@ -1559,6 +1872,41 @@ int main()
                     "on the one that still qualifies",
                     lost.first.seat_redrawn && lost.first.seat == lost.t && lost.first.holdless == 1
                     && lost.audit.infeasible_held == 0);
+    }
+
+
+    // --- 7. THE WATER DIG LADDER (BL-1197) --------------------------------------
+    std::printf("\ncharter_refusal_probe — the water dig ladder (BL-1197)\n");
+    {
+        const waterfx::result wi = waterfx::run_walk(waterfx::mode::well_and_ice, 1);
+        std::printf("  well and ice in the window: water firms %d, anchor at Well %d, at ice %d\n",
+                    wi.water_firms, wi.anchor_at_well ? 1 : 0, wi.anchor_at_ice ? 1 : 0);
+        expect_true("dig ladder: with a Well site and an ice deposit, the water firm stands on the Well",
+                    wi.water_firms == 1 && wi.anchor_at_well && !wi.anchor_at_ice && wi.balanced);
+        const waterfx::result io = waterfx::run_walk(waterfx::mode::ice_only, 1);
+        std::printf("  ice only: water firms %d, anchor at ice %d\n", io.water_firms,
+                    io.anchor_at_ice ? 1 : 0);
+        expect_true("dig ladder: with no Well site, the water firm stands on the ice deposit",
+                    io.water_firms == 1 && io.anchor_at_ice && io.balanced);
+        const waterfx::result fi = waterfx::run_walk(waterfx::mode::far_ice_only, 1);
+        std::printf("  no water ground in the window: firms %zu, water %d, stone %d, water site %d\n",
+                    fi.firms, fi.water_firms, fi.stone_firms, fi.any_water_site ? 1 : 0);
+        expect_true("dig ladder: no water ground in the window places nothing for water (no fallback)",
+                    fi.water_firms == 0 && !fi.any_water_site && fi.balanced);
+        expect_true("dig ladder: the same firm takes the next good (stone)",
+                    fi.firms == 1 && fi.stone_firms == 1);
+    }
+    {
+        const waterfx::result nw = waterfx::run_pass6(waterfx::mode::no_water);
+        std::printf("  Pass 6, no water ground on the body: firms %zu, water %d, stone %d, water site %d\n",
+                    nw.firms, nw.water_firms, nw.stone_firms, nw.any_water_site ? 1 : 0);
+        expect_true("Pass 6: water misses once per nation, is masked, and stone still charters",
+                    nw.water_firms == 0 && !nw.any_water_site && nw.stone_firms >= 1);
+        const waterfx::result pw = waterfx::run_pass6(waterfx::mode::well_and_ice);
+        std::printf("  Pass 6, a Well site and ice on the body: water firms %d, anchor at Well %d\n",
+                    pw.water_firms, pw.anchor_at_well ? 1 : 0);
+        expect_true("Pass 6: a water-gap firm digs water, the Well tier first",
+                    pw.water_firms >= 1 && pw.anchor_at_well);
     }
 
     std::printf("\n%s (%d failing)\n", g_fail == 0 ? "ALL PASS" : "FAILED", g_fail);

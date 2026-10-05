@@ -488,6 +488,22 @@ held ground, and none of it was within reach of a chain. The budget-less Pass 6 
 it has missed as many times as the body has nations (the nation cursor takes them in turn), and
 the mask holds for the rest of the pass unless a firm that produces one of its inputs lands.
 
+**A water-gap firm digs water** (Ben, 2026-10-05, NR-973: "we can add wells to generation";
+BL-1197, gap firm digs the gap). An extraction firm chartered for the water gap stands on water
+ground: a **Well** site (`../economy/PRODUCTION.md` § Extraction buildings — fresh-water adjacent,
+no ice deposit), drawn at random with each site weighted by its habitability plus 0.05, so the
+water tends to land where people live; else an **ice
+deposit**; each tier is tried across every window the firm may anchor in before the next. Its
+later extraction slots dig water where their tile can, and otherwise take the tile's richest
+deposit. Where its windows hold no water ground at all it places **nothing** — there is no
+fallback to another deposit, which would spend a water firm's slot on a good nobody chartered and
+crowd the goods that were. The miss is the good's, not the extraction focus's: water is passed
+over for the rest of that centre (the windows only fill) and the same firm takes the next good,
+so nothing is lost and nothing is crowded out. Without a budget the miss counts toward water's
+mask, which falls once water has missed as many times as the body has nations (a firm that lands
+for it clears the count). Every other gap good keeps the richest-deposit rule. Chain-feasible placement then sees the water near people, so clean-water
+and medical makers can stand where a Well does.
+
 **A processor's inputs are wanted too (Ben, 2026-10-05; derived demand).** What the walk fills is
 not only final demand — households and the bodies' own wants — but the **input demand of every
 processor standing or chartered**: a placed steel works' iron ore and coal, a placed machinery
@@ -498,7 +514,31 @@ in its own right, not by accident of an extractor's attached processor. This rep
 "charter a missing raw input" special case: input chartering is simply what derived demand does.
 The input demand is read in the generation form (each processor at its nominal rate, no production
 report), and it is recomputed as firms land, so a newly chartered processor raises its inputs'
-gaps for the turns after it.
+gaps for the turns after it. On a budget world the goods with demand (G), fixed before the walk,
+therefore hold the processors' inputs too: the input demand of those standing, and the
+**anchor-route closure** of G (main session, 2026-10-05). Each member's anchor route is its
+cheapest in-band recipe by marginal cost per unit of primary output (`../economy/PRODUCTION.md`
+§ The recipe margin anchor), chosen among the recipes the body can run. Its inputs join G, and
+so on to a fixed point: steel through machinery's route, iron ore and coal through steel's. A
+raw's anchor route is extraction, so the closure stops there. It follows the anchor route only,
+not every alternative recipe, and never passes through a good the body cannot produce. Base price
+is the lowest base price any market on the body quotes. A closure good no processor yet wants is
+not short, so the turn passes over it; once one lands, it is served like any other want.
+
+**G holds only goods the body can produce** (main session, 2026-10-05). That means a raw with a
+deposit somewhere on the body's land (water also wherever a Well site stands, agricultural produce
+also on a coast), or a good some recipe makes from inputs that are themselves producible there, to
+a fixed point. A good no firm could ever make on the body, such as an off-world raw on an earthlike
+world, takes no share of the ceiling it could never fill. If such a good is wanted and short when
+a centre can charter nothing else, the rest of that centre's points book as `unproducible`: the
+want is real and no firm on this body could serve it. That is distinct from `late_shortfall`,
+which is a producible good outside G that the walk's own firms made short. |G| is the count of
+these goods (`goods_in_g`); it is not a count of goods with demand, since a closure member may
+have none yet.
+
+Derived
+demand counts what stands or is chartered, never what a refused firm would have wanted: a chain
+none of whose consumers can stand (a cold start) is not begun by it.
 
 **What Pass 6 does not do.** It does not seed any behavioural state, matching the contract the
 rest of this pipeline holds (§ Generation seeds no behaviour) — no sentiment, no diplomatic
