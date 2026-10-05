@@ -1196,6 +1196,12 @@ struct ceiling_memo
     std::unordered_map<uint32_t, int>      ceiling;     // province id -> ceiling
     bool                                   standing_built = false;
     std::unordered_map<uint32_t, int>      standing;    // province id -> buildings
+    // BL-1205: tile occupancy, one building walk per scope (counts by key, so the
+    // walk order cannot matter). Keys pack (tile << 8 | type-or-target).
+    bool                                   occupancy_built = false;
+    std::unordered_map<uint64_t, int>      extraction_by_target; // (tile, target)
+    std::unordered_map<uint64_t, int>      by_type;              // (tile, type)
+    std::unordered_map<entity_id, int>     non_extraction;       // tile
 };
 
 thread_local ceiling_memo* t_ceiling_memo = nullptr;
@@ -1207,6 +1213,55 @@ ceiling_memo* memo_for(const world& w)
 }
 
 } // namespace
+
+namespace {
+
+uint64_t occupancy_key(entity_id tile, uint8_t sub)
+{
+    return (static_cast<uint64_t>(tile) << 8) | sub;
+}
+
+/// The scope's occupancy counts, built on first need; null when no scope.
+ceiling_memo* occupancy_for(const world& w)
+{
+    ceiling_memo* m = memo_for(w);
+    if (m == nullptr || m->occupancy_built)
+        return m;
+    for (const auto& [bid, bc] : w.buildings)
+    {
+        ++m->by_type[occupancy_key(bc.tile, static_cast<uint8_t>(bc.type))];
+        if (bc.type == building_type::extraction_site)
+            ++m->extraction_by_target[occupancy_key(bc.tile, static_cast<uint8_t>(bc.target_resource))];
+        else
+            ++m->non_extraction[bc.tile];
+    }
+    m->occupancy_built = true;
+    return m;
+}
+
+} // namespace
+
+int scoped_buildings_on_tile(const world& w, entity_id tile, building_type type,
+                             resource_type target)
+{
+    const ceiling_memo* m = occupancy_for(w);
+    if (m == nullptr)
+        return -1;
+    const bool ext     = type == building_type::extraction_site;
+    const auto& counts = ext ? m->extraction_by_target : m->by_type;
+    const uint8_t sub  = ext ? static_cast<uint8_t>(target) : static_cast<uint8_t>(type);
+    const auto it = counts.find(occupancy_key(tile, sub));
+    return it != counts.end() ? it->second : 0;
+}
+
+int scoped_non_extraction_buildings_on_tile(const world& w, entity_id tile)
+{
+    const ceiling_memo* m = occupancy_for(w);
+    if (m == nullptr)
+        return -1;
+    const auto it = m->non_extraction.find(tile);
+    return it != m->non_extraction.end() ? it->second : 0;
+}
 
 province_ceiling_scope::province_ceiling_scope(const world& w)
     : m_prev(t_ceiling_memo), m_self(new ceiling_memo)

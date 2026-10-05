@@ -579,6 +579,9 @@ int non_extraction_stack_cap(terrain_substrate sub, terrain_cover cov)
 
 int non_extraction_buildings_on_tile(const world& w, entity_id tile_id)
 {
+    // BL-1205: inside a province_ceiling_scope, the scope's one building walk.
+    if (const int scoped = scoped_non_extraction_buildings_on_tile(w, tile_id); scoped >= 0)
+        return scoped;
     int n = 0;
     for (const auto& [bid, bc] : w.buildings)
     {
@@ -620,6 +623,9 @@ bool maybe_transform_to_urban(world& w, entity_id tile_id)
 int buildings_on_tile(const world& w, entity_id tile_id,
                       building_type type, resource_type target)
 {
+    // BL-1205: inside a province_ceiling_scope, the scope's one building walk.
+    if (const int scoped = scoped_buildings_on_tile(w, tile_id, type, target); scoped >= 0)
+        return scoped;
     int n = 0;
     for (const auto& [bid, bc] : w.buildings)
     {

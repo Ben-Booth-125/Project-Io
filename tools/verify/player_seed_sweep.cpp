@@ -1236,8 +1236,8 @@ charter_rule_check check_charter_rules(const world& w, const charter_budget& bud
                               bref, c);
                 failed(buf);
             }
-            if (b.density_ceiling != spend.density_ceiling)
-                failed("sqrt rule: the body's ceiling is not the spend's");
+            if (b.density_ceiling != charter_density_ceiling(spend, b.goods_in_g))
+                failed("sqrt rule: the body's ceiling is not the spend's (fixed, or per good served)");
             break;
         }
         }
@@ -2158,6 +2158,10 @@ std::string cost_cap_label(const cost_config& c)
     case charter_cap_rule::fixed:  return "on";
     case charter_cap_rule::lifted: return "off";
     case charter_cap_rule::sqrt_capital:
+        // BL-1204: ceiling 0 on a stockpile row is the SHIPPED rate per good served.
+        if (c.density_ceiling == 0)
+            return "sqrt c" + std::to_string(k_stockpile_density_per_good_tenths / 10) + "."
+                 + std::to_string(k_stockpile_density_per_good_tenths % 10) + "/g";
         return "sqrt c" + std::to_string(static_cast<int>(c.density_ceiling));
     }
     return "?";
@@ -2674,8 +2678,12 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
         stock_spend.resource_cap_rule        = cfg.resource_cap_rule;
         if (cfg.resource_cap_rule == charter_cap_rule::lifted)
             stock_spend.per_resource_firm_cap = 0;   // unread there, and refused if set
+        // BL-1204: a fixed ceiling replaces the shipped rate per good served; a
+        // ceiling of 0 keeps the shipped rate. A legacy rule carries neither.
         stock_spend.density_ceiling =
             cfg.resource_cap_rule == charter_cap_rule::sqrt_capital ? cfg.density_ceiling : 0;
+        if (cfg.resource_cap_rule != charter_cap_rule::sqrt_capital || cfg.density_ceiling > 0)
+            stock_spend.density_per_good_tenths = 0;
         stock_spend.province_cap  = cfg.province_cap;
         stock_spend.window_radius = cfg.window_radius;
         charter.stockpile_spend      = &stock_spend;
@@ -2710,6 +2718,10 @@ void run_cost_config(lua_state& lua, uint32_t seed, const cost_config& cfg,
             charter.spend.per_resource_firm_cap = 0;
         charter.spend.density_ceiling   =
             cfg.resource_cap_rule == charter_cap_rule::sqrt_capital ? cfg.density_ceiling : 0;
+        // BL-1204: ceiling 0 under sqrt is the shipped rate per good served.
+        charter.spend.density_per_good_tenths =
+            (cfg.resource_cap_rule == charter_cap_rule::sqrt_capital && cfg.density_ceiling == 0)
+                ? k_stockpile_density_per_good_tenths : 0;
         charter.spend.province_cap  = cfg.province_cap;
         charter.spend.window_radius = cfg.window_radius;
         charter.spend.specialist_firm_charters = cfg.specialist_firm_charters;
@@ -5500,7 +5512,7 @@ int main(int argc, char** argv)
             if (!opt.ceilings_set
                 && std::find(opt.resource_caps.begin(), opt.resource_caps.end(),
                              charter_cap_rule::sqrt_capital) != opt.resource_caps.end())
-                opt.density_ceilings = { k_stockpile_density_ceiling };   // RULED, NR-902
+                opt.density_ceilings = { 0 };   // RULED: 0 = the shipped rate per good (BL-1204)
         }
         else if (!opt.firm_prices.empty() || !opt.price_divisors.empty() || !opt.price_pairs.empty())
         {

@@ -379,7 +379,8 @@ charter_spend_params stockpile_charter_spend(const stockpile_budget& sb)
     s.resource_cap_rule        = charter_cap_rule::sqrt_capital;
     s.per_resource_firm_cap    = k_stockpile_per_resource_firm_cap;
     s.max_firms_per_body       = k_stockpile_max_firms_per_body;
-    s.density_ceiling          = k_stockpile_density_ceiling;
+    s.density_ceiling          = 0;   // BL-1204: no fixed ceiling; the rate per good served
+    s.density_per_good_tenths  = k_stockpile_density_per_good_tenths;
     return s;
 }
 

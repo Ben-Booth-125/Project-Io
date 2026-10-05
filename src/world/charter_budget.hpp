@@ -263,7 +263,18 @@ struct charter_spend_params
     /// guard, so the guard goes back to catching runaways only. Under
     /// `sqrt_capital` it must satisfy 0 < ceiling < `max_firms_per_body`; under
     /// a legacy rule it must be 0 (they carry no ceiling).
+    ///
+    /// A FIXED ceiling, the same on every body: an instrument's row (a swept
+    /// ceiling, a refusal probe). The shipped spend carries none — it sets
+    /// `density_per_good_tenths` instead, and under `sqrt_capital` exactly one of
+    /// the two is set (refused otherwise).
     std::int32_t density_ceiling = 0;
+    /// BL-1204 — THE CEILING PER GOOD SERVED (Ben, 2026-10-05; INDUSTRIALISATION.md
+    /// § 1), in TENTHS of a firm: each body's ceiling is this rate times its |G|,
+    /// fixed once G is (`charter_density_ceiling`). Read only under
+    /// `sqrt_capital`, and only when `density_ceiling` is 0; must be 0 under a
+    /// legacy rule.
+    std::int32_t density_per_good_tenths = 0;
 
     /// Points one specialist costs: the firm price times the firm charters it is
     /// worth. Widened, so no pair of int32 inputs overflows it; a price above any
@@ -657,17 +668,24 @@ inline const char* charter_spend_refusal(const charter_budget& b, const charter_
         if (s.resource_cap_rule == charter_cap_rule::lifted && s.per_resource_firm_cap != 0)
             return "per_resource_firm_cap is not read under the lifted cap rule; a lifted spend with "
                    "a cap set would silently ignore it";
-        if (s.density_ceiling != 0)
-            return "density_ceiling is read only by the sqrt_capital cap rule; a legacy rule with a "
-                   "ceiling set would silently ignore it";
+        if (s.density_ceiling != 0 || s.density_per_good_tenths != 0)
+            return "density_ceiling / density_per_good_tenths are read only by the sqrt_capital cap "
+                   "rule; a legacy rule with a ceiling set would silently ignore it";
         break;
     case charter_cap_rule::sqrt_capital:
         if (s.per_resource_firm_cap <= 0)
             return "per_resource_firm_cap must be > 0 under the sqrt_capital cap rule (no shipped default)";
-        if (s.density_ceiling <= 0)
-            return "density_ceiling must be > 0 under the sqrt_capital cap rule (no shipped default)";
+        if (s.density_ceiling < 0 || s.density_per_good_tenths < 0)
+            return "density_ceiling and density_per_good_tenths must not be negative";
+        if ((s.density_ceiling > 0) == (s.density_per_good_tenths > 0))
+            return "exactly one of density_ceiling (fixed) and density_per_good_tenths (per good "
+                   "served, BL-1204) must be > 0 under the sqrt_capital cap rule (no shipped default)";
         if (s.density_ceiling >= s.max_firms_per_body)
             return "density_ceiling must sit below max_firms_per_body (the runaway guard)";
+        // The per-good ceiling is clamped to guard - 1 (`charter_density_ceiling`);
+        // a guard of 1 would clamp it to 0, which every reader takes as "no ceiling".
+        if (s.density_per_good_tenths > 0 && s.max_firms_per_body < 2)
+            return "a per-good density ceiling needs max_firms_per_body >= 2 (it sits below the guard)";
         break;
     default:
         return "resource_cap_rule is not a known rule";
@@ -708,6 +726,34 @@ inline const char* charter_spend_refusal(const charter_budget& b, const charter_
         }
     }
     return nullptr;
+}
+
+/// BL-1204 — THE DENSITY CEILING IN FORCE on a body serving @p goods_in_g goods
+/// (|G|, fixed before the walk), under params @p s that `charter_spend_refusal`
+/// accepts. 0 under a legacy rule (no ceiling). Under `sqrt_capital`: a fixed
+/// `density_ceiling` where one is set (an instrument's row); otherwise the rate
+/// per good served (Ben, 2026-10-05; INDUSTRIALISATION.md § 1),
+///
+///     ceiling = min( floor(density_per_good_tenths x |G| / 10), max_firms_per_body - 1 )
+///
+/// ROUNDED DOWN: a body never carries more than the rate per good it serves
+/// (7.5 x 23 = 172.5 -> 172; at the 16 goods NR-902 was ruled on, exactly 120).
+/// CLAMPED BELOW THE GUARD: the ceiling stays what binds and `body_cap` keeps
+/// naming runaways only. A body serving no good gets 0, which every reader takes
+/// as "no ceiling": such a body has no turn and no share, and the guard still
+/// holds it (G is every good with final or derived demand the body can produce,
+/// so an empty G leaves the walk nothing it wants there).
+/// Pure integer arithmetic in int64: no rate x |G| can overflow it.
+inline std::int32_t charter_density_ceiling(const charter_spend_params& s, int goods_in_g)
+{
+    if (s.resource_cap_rule != charter_cap_rule::sqrt_capital)
+        return 0;
+    if (s.density_ceiling > 0)
+        return s.density_ceiling;
+    const std::int64_t per_good = static_cast<std::int64_t>(s.density_per_good_tenths)
+                                * static_cast<std::int64_t>(std::max(0, goods_in_g)) / 10;
+    const std::int64_t below_guard = static_cast<std::int64_t>(s.max_firms_per_body) - 1;
+    return static_cast<std::int32_t>(std::max<std::int64_t>(0, std::min(per_good, below_guard)));
 }
 
 /// The report a REFUSED spend leaves: nothing chartered, nobody picked, every

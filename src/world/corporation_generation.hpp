@@ -375,20 +375,26 @@ int province_firm_cap_of(const std::map<std::uint32_t, int>& rungs, std::uint32_
 /// the world exists (app::load_economy, `finish_campaign_world`) — and the world
 /// refusal needs one: it reads the yards' places off the registry's construction
 /// recipe and the body's demand off its baskets. So bump 11 skips step 3.
-/// Under the SHIPPED constants step 3 cannot fire. It refuses a body only when
-/// the ceiling binds AND (ceiling - yard_places) < n_turn, with yard_places <=
-/// the per-good cap (`charter_yard_places` takes the minimum with it). The cap is
+/// Under the SHIPPED constants step 3 cannot fire on a body serving 7 or more
+/// goods. It refuses a body only when the ceiling binds AND (ceiling -
+/// yard_places) < n_turn, with yard_places <= the per-good cap
+/// (`charter_yard_places` takes the minimum with it). The cap is
 /// max(c, isqrt(c x F / |G|)) for F the body's whole firm charters; F < 2 x
 /// `k_stockpile_price_divisor` (the firm price is the stock / the divisor,
 /// rounded down, so the stock buys fewer than twice the divisor), so with
-/// c = 8 the cap is at most isqrt(8 x 1299 / |G|), and n_turn <= |G|. Over every
-/// |G| from 1 to `resource_count`, n_turn + cap stays at or under ~103 (at
-/// |G| = 1: 1 + 101) against `k_stockpile_density_ceiling` = 120, so no body's
-/// shares are ever uncuttable. A tune that lifted c, the divisor or |G| past that
-/// bound would reach a world bump 11 calls a budget world and the search does
+/// c = 8 the cap is at most isqrt(8 x 1299 / |G|), and n_turn <= |G|. The
+/// ceiling is per good served (BL-1204): floor(7.5 x |G|) under the guard. At
+/// |G| = 7, n_turn + cap <= 7 + 38 = 45 against a ceiling of 52, and past it the
+/// cap only falls while the ceiling rises, so no body serving 7+ goods is ever
+/// uncuttable. BELOW 7 THE BOUND DOES NOT HOLD (|G| = 6: 6 + 41 = 47 against
+/// 45): a body serving 1-6 goods whose budget outruns its small ceiling and
+/// whose yards' places eat it could refuse the whole spend. A budgeted body —
+/// one carrying a population centre — serves far more (its baskets alone, plus
+/// their inputs), so this is a bound on the argument, not a seen case; the
+/// harness row that would name it is landscape_search_harness's L1. A world
+/// that hit it would be one bump 11 calls a budget world and the search does
 /// not — the carve would then have read planned firms and the search's no-budget
-/// branch would lay the roster itself (so the world still gets one); the harness
-/// row that names the gap is landscape_search_harness's L1.
+/// branch would lay the roster itself (so the world still gets one).
 enum class budget_world_kind : std::uint8_t
 {
     no_budget     = 0,
@@ -429,15 +435,19 @@ bool is_budget_world(const world& w, const charter_budget* budget,
 ///     any it receives (NR-913, `plan_charter_pool`, the walk's own plan; zero
 ///     under the shipped `charter_pool::none`), in whole firm charters — each
 ///     firm counted only while its BODY is under the walk's stop: the runaway
-///     guard `max_firms_per_body`, and under `sqrt_capital` the lower
-///     `density_ceiling`. A richer centre's firms therefore take a body's room
-///     before a poorer centre's, exactly as the walk spends them.
+///     guard `max_firms_per_body`, and under `sqrt_capital` the lower density
+///     ceiling. A richer centre's firms therefore take a body's room before a
+///     poorer centre's, exactly as the walk spends them. BL-1204: the shipped
+///     ceiling is per good served, and |G| needs the recipe registry this plan
+///     (and the carve that asks it) does not have, so the plan reads the ceiling
+///     at |G| = `resource_count` — the guard less one under the shipped rate. A
+///     fixed `density_ceiling` (an instrument's row) is read as it stands.
 ///
 /// WHAT IT STILL CANNOT SEE: whether ground is found. The walk places each
 /// charter, and a placement can fail (the windows, the province cap, the
 /// per-good cap and the turn's shares); a failed firm is not chartered and does
 /// not count toward the ceiling. So per BODY the walk charters AT MOST what this
-/// plans (an exact upper bound), while per NATION a poorer nation can charter a
+/// plans (an upper bound), while per NATION a poorer nation can charter a
 /// few more than planned where a richer centre's placements failed and left the
 /// ceiling room it would have taken. landscape_search_harness's L1 reads both.
 /// Placement is a function of the candidate's seed, which the carve cannot

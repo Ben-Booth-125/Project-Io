@@ -16,6 +16,7 @@
 
 #include "scripting/lua_state.hpp"
 #include "harness_params.hpp"
+#include "world_digest.hpp"     // world_state_digest (BL-1205: decisions unchanged)
 #include "world/campaign_settle.hpp"
 #include "world/economy_system.hpp"
 #include "world/spawn_seat.hpp"
@@ -88,6 +89,11 @@ int main(int argc, char** argv)
         for (int ph = 0; ph < k_economy_step_phase_count; ++ph)
             std::printf(" %s %.1f", k_economy_step_phase_names[ph], sum[ph] / ticks);
         std::printf("\n");
+        // BL-1205 (scorer cost at density): the world after the play ticks, as the
+        // save snapshot + state_hash. A pure performance change to the scorer must
+        // leave this digest byte-identical; compare it across the two trees.
+        std::printf("   digest after %d play ticks: %016llx\n", ticks,
+                    static_cast<unsigned long long>(world_state_digest(w)));
     }
     return 0;
 }

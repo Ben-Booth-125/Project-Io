@@ -297,7 +297,8 @@ std::vector<std::int64_t> stockpile_region_reach(const world& w, const std::vect
 // THE SHIPPED SPEND'S NAMED CONSTANTS, SET HERE AND NOT IN charter_budget.hpp
 // (whose prices have no shipped default by design). Every one is RULED
 // (INDUSTRIALISATION.md § 1): the specialist's price anchored to the seat menu and the
-// square root's base (Ben, 2026-09-21, NR-910), the density ceiling (NR-902).
+// square root's base (Ben, 2026-09-21, NR-910), the density ceiling per good served (NR-902,
+// BL-1204).
 // The FIRM price is not a constant at all: it is derived from the stockpile
 // within each centre's trade reach by `k_stockpile_price_divisor` (above, NR-907;
 // the reach is BL-1168's, Ben 2026-10-03). They are read only
@@ -337,13 +338,20 @@ inline constexpr std::int32_t k_stockpile_specialist_firm_charters = 44;
 inline constexpr std::int32_t k_stockpile_per_resource_firm_cap = 8;
 /// The anti-runaway guard per body (Pass 6's 200).
 inline constexpr std::int32_t k_stockpile_max_firms_per_body = 200;
-/// The density ceiling under the ruled square-root rule: 120 background firms
-/// per body. RULED (Ben, 2026-09-19, NR-902; INDUSTRIALISATION.md § 1): on the cost
-/// table's square-root rows the ceiling is what binds — at four times the
-/// reference budget it trims every good evenly to 12 firms — while 160 never
+/// THE DENSITY CEILING PER GOOD SERVED, in tenths of a firm: 7.5 background
+/// firms for each good in the body's G, so a body's ceiling is floor(7.5 x |G|),
+/// under the guard (`charter_density_ceiling`). RULED (Ben, 2026-10-05, BL-1204;
+/// INDUSTRIALISATION.md § 1): once the walk counted derived demand (BL-1197) it
+/// served ~23 goods, and a fixed 120 trimmed each household good to 4-5 firms.
+///
+/// THE ANCHOR IS NR-902's (Ben, 2026-09-19): a ceiling of 120 per body, ruled on
+/// the cost table's square-root rows when bodies served 16 goods — 120 / 16 =
+/// 7.5 is this rate. There the ceiling was what bound (at four times the
+/// reference budget it trimmed every good evenly to 12 firms), while 160 never
 /// bound (each good's own cap of 15 filled first) and cost a 12-31% dearer
-/// economy tick for it. A ceiling that never binds is not a brake.
-inline constexpr std::int32_t k_stockpile_density_ceiling = 120;
+/// economy tick for it. A ceiling that never binds is not a brake. What the
+/// 2026-09-19 measurement anchors is the RATE, not the 120.
+inline constexpr std::int32_t k_stockpile_density_per_good_tenths = 75;
 
 /// The spend @p sb is charged at: its own DERIVED firm price (BL-1064), the
 /// ruled `sqrt_capital` cap rule under the constants above, window 4, the
