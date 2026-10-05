@@ -456,6 +456,10 @@ struct seed_curve
     long long nation_gap_abs = 0;        ///< sum over nations of |chartered - planned|
     // The world refusal's margin, per body max (read_budget_world's header).
     int       turn_plus_cap = 0, turn_plus_yards = 0, ceiling = 0;
+    // BL-1204: the ceiling is per body (per good served), so the margin that
+    // matters is per body: min over bodies of ceiling - (n_turn + yard places),
+    // and the smallest |G| a budgeted body serves (the bound holds at |G| >= 7).
+    int       min_body_margin = 1 << 30, min_goods_in_g = 1 << 30;
 };
 
 const char* short_axis(int a)
@@ -637,6 +641,9 @@ seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
                 sc.turn_plus_cap   = std::max(sc.turn_plus_cap, n_turn + b.per_good_cap);
                 sc.turn_plus_yards = std::max(sc.turn_plus_yards, n_turn + b.yard_places);
                 sc.ceiling         = std::max(sc.ceiling, b.density_ceiling);
+                sc.min_body_margin = std::min(sc.min_body_margin,
+                                              b.density_ceiling - n_turn - b.yard_places);
+                sc.min_goods_in_g  = std::min(sc.min_goods_in_g, b.goods_in_g);
             }
         }
         else
@@ -811,10 +818,11 @@ seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
                     "%d nations chartered more firms than planned (+%lld); sum |gap| over nations %lld  "
                     "|  L1b %s\n"
                     "  the world refusal's margin: max per body n_turn + cap %d, n_turn + yard places %d, "
-                    "against a ceiling of %d\n",
+                    "against a ceiling of %d (max); per body, min ceiling - (n_turn + yards) %d, min |G| %d\n",
                     sc.ledger_specialists, sc.chartered_specialists, sc.ledger_firms, sc.chartered_firms,
                     sc.nations_over_plan, sc.firms_over_plan, sc.nation_gap_abs,
-                    sc.l1b ? "PASS" : "FAIL", sc.turn_plus_cap, sc.turn_plus_yards, sc.ceiling);
+                    sc.l1b ? "PASS" : "FAIL", sc.turn_plus_cap, sc.turn_plus_yards, sc.ceiling,
+                    sc.min_body_margin, sc.min_goods_in_g);
     std::printf("  memory, MB (working set / private): base held %.0f / %.0f; serial walk peak %.0f / %.0f; "
                 "P1 walk on %d thread(s) peak %.0f / %.0f; one world copy %.0f private (%s); "
                 "process lifetime peak working set %.0f\n",
