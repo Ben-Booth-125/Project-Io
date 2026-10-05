@@ -304,7 +304,15 @@ inline constexpr uint32_t world_save_magic =
 /// refused whole on the strict-equality contract, no migration (a pre-bump
 /// battle recorded no ground). Claimed through
 /// `tools/session/next_save_version.js --kind world --claim`.
-inline constexpr uint32_t world_save_version = 30;
+/// Bumped to 33 by BL-1201 (orders are price floors): the sell-order record gains
+/// one byte, `sell_order::empty_ticks`, after `resource` -- the run of clearing
+/// ticks the order has had nothing to list, which closes it at
+/// `sell_order_empty_close_ticks`. A v30 stream with a standing order is one byte
+/// short per order; refused whole on the strict-equality contract, no migration.
+/// (31 and 32 are claimed by in-flight branches -- BL-1139, BL-1196 -- and this
+/// stacks above them.) Claimed through
+/// `tools/session/next_save_version.js --kind world --claim`.
+inline constexpr uint32_t world_save_version = 33;
 
 /// Write @p w as a complete world snapshot.
 ///

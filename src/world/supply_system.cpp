@@ -1394,9 +1394,10 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
     // to sell it at home at a floor; shipping it away would empty the order.
     // A std::set over a totally ordered tuple, read only by lookup.
     std::set<std::tuple<entity_id, entity_id, std::size_t>> order_controlled;
+    // BL-1201: quantity 0 is an UNCAPPED order now, not an inert one — every
+    // order controls its triple, exactly as `order_controls` reads it.
     for (const sell_order& o : w.sell_orders)
-        if (o.quantity > 0.0f)
-            order_controlled.insert({o.corp, o.body, static_cast<std::size_t>(o.resource)});
+        order_controlled.insert({o.corp, o.body, static_cast<std::size_t>(o.resource)});
 
     struct candidate
     {

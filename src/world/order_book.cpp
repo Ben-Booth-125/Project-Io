@@ -1,5 +1,6 @@
 #include "order_book.hpp"
 
+#include <cmath> // std::isfinite -- BL-1201's quantity check
 #include <istream>
 #include <ostream>
 #include <utility>
@@ -72,6 +73,7 @@ void write_order_book(const world& w, std::ostream& out)
         write_u32(out, o.corp);
         write_u32(out, o.body);
         write_u8(out, static_cast<uint8_t>(o.resource));
+        write_u8(out, o.empty_ticks); // BL-1201, order_book_version 2
         write_f32(out, o.quantity);
         write_f32(out, o.floor_price);
     }
@@ -120,7 +122,14 @@ bool read_order_book(world& w, std::istream& in)
         if (!read_u8(in, res) || !valid_resource_id(res))
             return false;
         o.resource = static_cast<resource_type>(res);
+        // BL-1201 (version 2): the empty-tick run. A quantity that is not a
+        // finite non-negative number cannot have been written by the seam
+        // (0 = no cap, otherwise a positive cap), so it refuses the stream.
+        if (!read_u8(in, o.empty_ticks))
+            return false;
         if (!read_f32(in, o.quantity) || !read_f32(in, o.floor_price))
+            return false;
+        if (!std::isfinite(o.quantity) || o.quantity < 0.0f)
             return false;
         sells.push_back(o);
     }

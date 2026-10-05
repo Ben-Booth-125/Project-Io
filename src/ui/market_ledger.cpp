@@ -394,7 +394,9 @@ void draw_place_order_form(ui_state& state, entity_id corp, entity_id body,
                            const market_component& market)
 {
     static int   add_resource = -1;
-    static float add_quantity = 10.0f;
+    // BL-1201 (orders are price floors): 0 = no cap, the default order — it
+    // covers the whole surplus at the floor. A positive value caps it per tick.
+    static float add_quantity = 0.0f;
     static float add_floor    = 0.0f;
 
     // Reset the form when the selected market's body changes — the statics
@@ -404,7 +406,7 @@ void draw_place_order_form(ui_state& state, entity_id corp, entity_id body,
     {
         form_body    = body;
         add_resource = -1;
-        add_quantity = 10.0f;
+        add_quantity = 0.0f;
         add_floor    = 0.0f;
     }
 
@@ -430,13 +432,15 @@ void draw_place_order_form(ui_state& state, entity_id corp, entity_id body,
         ImGui::EndCombo();
     }
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.55f);
-    ImGui::InputFloat("Qty / qtr", &add_quantity, 1.0f, 10.0f, "%.0f");
+    ImGui::InputFloat("Cap / qtr", &add_quantity, 1.0f, 10.0f, "%.0f");
+    ImGui::SetItemTooltip("0 = no cap: the order sells all your surplus above the floor.\n"
+                          "A cap sells at most this much per quarter; the rest waits.");
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.55f);
     ImGui::InputFloat("Floor",     &add_floor,    0.1f, 1.0f,  "%.1f");
     if (add_quantity < 0.0f) add_quantity = 0.0f;
     if (add_floor    < 0.0f) add_floor    = 0.0f;
 
-    ImGui::BeginDisabled(add_resource < 0 || add_quantity <= 0.0f);
+    ImGui::BeginDisabled(add_resource < 0); // quantity 0 is a legal, uncapped order
     if (ImGui::Button("Place sell trade"))
     {
         corp_command cmd;
@@ -490,7 +494,7 @@ void draw_trade_table(const char* table_id, const std::vector<trade_row_record>&
     ImGui::TableSetupColumn("Good", ImGuiTableColumnFlags_WidthStretch, 1.2f);
     if (show_owner)
         ImGui::TableSetupColumn("Holder", ImGuiTableColumnFlags_WidthStretch, 1.0f);
-    ImGui::TableSetupColumn("Qty",   ImGuiTableColumnFlags_WidthFixed, w_qty);
+    ImGui::TableSetupColumn("Cap",   ImGuiTableColumnFlags_WidthFixed, w_qty); // BL-1201: a per-qtr cap; "all" = none
     ImGui::TableSetupColumn("Limit", ImGuiTableColumnFlags_WidthFixed, w_lim);
     if (removable)
         ImGui::TableSetupColumn("##x", ImGuiTableColumnFlags_WidthFixed, w_rm);
@@ -533,7 +537,12 @@ void draw_trade_table(const char* table_id, const std::vector<trade_row_record>&
         }
 
         ImGui::TableSetColumnIndex(col++);
-        ImGui::Text("%.0f", static_cast<double>(r.quantity));
+        // BL-1201: a sell order's quantity 0 is NO CAP — it covers the whole
+        // surplus each tick — so it reads "all", never "0".
+        if (!r.is_buy && r.quantity <= 0.0f)
+            ImGui::TextUnformatted("all");
+        else
+            ImGui::Text("%.0f", static_cast<double>(r.quantity));
 
         // DIRECTION IS THE LIMIT'S OPERATOR. ">=" is a sell's floor, "<=" a buy's
         // ceiling — the same shorthand the pre-rename row used, and it buys the

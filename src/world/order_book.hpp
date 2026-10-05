@@ -38,7 +38,9 @@ inline constexpr uint32_t order_book_magic =
 /// the stream shape — the `static_assert`s on both record sizes (components.hpp)
 /// are the tripwire that says when. read_order_book rejects a mismatched version
 /// rather than reinterpreting a differently-shaped record.
-inline constexpr uint32_t order_book_version = 1;
+/// Version 2 (BL-1201, orders are price floors): each sell record gains one byte,
+/// `empty_ticks`, after `resource`; and a sell `quantity` of 0 now means NO CAP.
+inline constexpr uint32_t order_book_version = 2;
 
 /// Sanity ceiling on each side's declared order count. Guards read_order_book
 /// against an eager large allocation from a corrupt or maliciously-crafted count
@@ -49,7 +51,7 @@ inline constexpr uint32_t order_book_max_orders = 1u << 20; // ~1M orders per si
 
 /// Write @p w's order book as: a 4-byte magic + a uint32_t version header, then
 /// the uint32_t `next_order_id`, then each side as a uint32_t count followed by
-/// its records (sell: id, corp, body, resource, quantity, floor_price; buy: id,
+/// its records (sell: id, corp, body, resource, empty_ticks (v2), quantity, floor_price; buy: id,
 /// corp, body, resource, quantity, max_price, preferred_seller). Binary, native
 /// byte order — the project's settled flat-binary convention (no other world/*
 /// stream is byte-order-normalised either).

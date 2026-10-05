@@ -964,8 +964,11 @@ int main()
         f.body_last_glimpse_tick[b1] = 555;
         f.body_last_glimpse_tick[b2] = -3; // negative on purpose: signedness bugs hide in ticks
 
-        f.sell_orders.push_back({ 5, c1, b1, resource_type::steel, 30.0f, 2.5f });
-        f.sell_orders.push_back({ 6, c2, b2, resource_type::propellant, 4.0f, 0.0f });
+        // BL-1201 (v33): `empty_ticks` follows `resource`, nonzero on one record so
+        // a reader that dropped it breaks byte-equality; and the second order is
+        // UNCAPPED (quantity 0), the default order since the same item.
+        f.sell_orders.push_back({ 5, c1, b1, resource_type::steel, 3, 30.0f, 2.5f });
+        f.sell_orders.push_back({ 6, c2, b2, resource_type::propellant, 0, 0.0f, 0.0f });
         f.buy_orders.push_back({ 7, c2, b1, resource_type::machinery, 8.0f, 99.5f, c1 });
 
         f.procurement_quotes.push_back({ 3, c1, c2, b1, b2, resource_type::alloys,
