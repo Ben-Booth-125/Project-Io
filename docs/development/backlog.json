@@ -1607,8 +1607,8 @@
    "design": "Found by the k re-sweep (2026-10-05, drafts/sprint-49-k-resweep.md, integration branch): 2.5-6k units of water sit on surplus shelves while 15-18 consuming markets are dry, and water shipped between markets stays 8-22 units/tick at every k. k > 0 drops stocked markets' price to 1.4-1.5x and cuts seed 0's price-gate refusals from 75 to 13 per tick, but two other brakes remain: (1) NO ROUTE - most refusals are \"no port reached overland\" (seed 0's 2,066-unit shelf at 0.59x reaches no market); (2) NO ROOM - a dry market's household demand has collapsed at the price ceiling (0.1-1.4 units), so a shipment has little to fill. Read beside BL-1194 (sea cheaper than highway) and port placement; measure which share of dry markets is land-locked from every surplus."
   },
   {
-   "status": "designed",
-   "glyph": "◐",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 49,
    "written": "2026-10-05",
    "requires": [],
@@ -1626,11 +1626,11 @@
     "src/world/stockpile_budget.hpp",
     "src/world/corporation_generation.cpp"
    ],
-   "design": "BUILT AND HELD (2026-10-05, b655acf0): economy tick +67%; G2 54.0% (passes) but G1 54.6 -> 49.5, G3 63.0 -> 61.0 on 5 seeds. Ben (2026-10-05): ship after BL-1205 makes the scorer cheaper. Open from the lane: the market carve plans at |G| = 49 (199 firms) vs 172 chartered; the bump-11 safety argument holds only for |G| >= 7; cap at 199 (one below the 200 guard).\n\nRULED (Ben, 2026-10-05, the shelf and density form, option B): with derived demand (BL-1197) the walk serves ~23 goods and the fixed 120-firm ceiling trimmed each household good to 4-5 firms. The ceiling becomes 7.5 firms per good in G (120 at the 16 goods it was ruled on, NR-902), under the 200-per-body guard (INDUSTRIALISATION.md sec 1). At 23 goods that is ~172. MEASURE tick cost on the cost table (economy tick, scorer) before shipping; report firms per good, market_viability, and the unspent reasons (density_ceiling should fall). Digests move."
+   "design": "MERGED to main (7aae16de, 2026-10-05) together: the density ceiling is 7.5 firms per good in G (172 at 23 goods, cap 199); the scorer's candidate stretch memoises occupancy and province ceilings per corp - economy tick ~0.3x main's at 120 firms, decisions byte-identical (digests matched); cold-reviewed (no correctness findings); a debug assert now guards the stretch's read-only contract. Not re-measured on main after merge: gates (BL-1204 alone read G1 49.5 / G2 54.0 / G3 61.0 on 5 seeds). Open: the market carve plans at |G| = 49; the bump-11 argument holds for |G| >= 7; dispatch now 37% of the live tick on seed 10 (convoy volume).\n\nBUILT AND HELD (2026-10-05, b655acf0): economy tick +67%; G2 54.0% (passes) but G1 54.6 -> 49.5, G3 63.0 -> 61.0 on 5 seeds. Ben (2026-10-05): ship after BL-1205 makes the scorer cheaper. Open from the lane: the market carve plans at |G| = 49 (199 firms) vs 172 chartered; the bump-11 safety argument holds only for |G| >= 7; cap at 199 (one below the 200 guard).\n\nRULED (Ben, 2026-10-05, the shelf and density form, option B): with derived demand (BL-1197) the walk serves ~23 goods and the fixed 120-firm ceiling trimmed each household good to 4-5 firms. The ceiling becomes 7.5 firms per good in G (120 at the 16 goods it was ruled on, NR-902), under the 200-per-body guard (INDUSTRIALISATION.md sec 1). At 23 goods that is ~172. MEASURE tick cost on the cost table (economy tick, scorer) before shipping; report firms per good, market_viability, and the unspent reasons (density_ceiling should fall). Digests move."
   },
   {
-   "status": "designed",
-   "glyph": "◐",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 49,
    "written": "2026-10-05",
    "requires": [],
@@ -1648,7 +1648,7 @@
     "src/world/corp_ai.cpp",
     "src/world/input_reach.cpp"
    ],
-   "design": "RULED (Ben, 2026-10-05, the density form, option B): ship BL-1204 (density per good served) only after the scorer is cheaper. BL-1204 (b655acf0) raises firms 120 -> 172 (+43%) and the economy tick +67% mean (+34% / +143% / +64% on seeds 10 / 43 / 0); live tick +51-85%; corp_strategic grew 2.4x on seed 43 - cost grows faster than firms. TARGET: on the BL-1204 branch, the economy tick within ~30% of main's at 120 firms (or proportional to firms), with byte-identical decisions (a pure performance change: world_determinism, digests unchanged against the BL-1204 branch). Profile corp_strategic first (scorer_clock, tick_profile): likely suspects are per-candidate input_reach / reachable_supply_cost scans and the Well bucket under more firms. Then merge BL-1204 + this together."
+   "design": "MERGED to main (7aae16de, 2026-10-05) together: the density ceiling is 7.5 firms per good in G (172 at 23 goods, cap 199); the scorer's candidate stretch memoises occupancy and province ceilings per corp - economy tick ~0.3x main's at 120 firms, decisions byte-identical (digests matched); cold-reviewed (no correctness findings); a debug assert now guards the stretch's read-only contract. Not re-measured on main after merge: gates (BL-1204 alone read G1 49.5 / G2 54.0 / G3 61.0 on 5 seeds). Open: the market carve plans at |G| = 49; the bump-11 argument holds for |G| >= 7; dispatch now 37% of the live tick on seed 10 (convoy volume).\n\nRULED (Ben, 2026-10-05, the density form, option B): ship BL-1204 (density per good served) only after the scorer is cheaper. BL-1204 (b655acf0) raises firms 120 -> 172 (+43%) and the economy tick +67% mean (+34% / +143% / +64% on seeds 10 / 43 / 0); live tick +51-85%; corp_strategic grew 2.4x on seed 43 - cost grows faster than firms. TARGET: on the BL-1204 branch, the economy tick within ~30% of main's at 120 firms (or proportional to firms), with byte-identical decisions (a pure performance change: world_determinism, digests unchanged against the BL-1204 branch). Profile corp_strategic first (scorer_clock, tick_profile): likely suspects are per-candidate input_reach / reachable_supply_cost scans and the Well bucket under more firms. Then merge BL-1204 + this together."
   }
  ]
 }

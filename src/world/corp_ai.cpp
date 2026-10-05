@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <cmath>
 #include <cstdio>
 #include <limits>
@@ -1064,6 +1065,12 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // the greedy loop, which is where this corp's commands write the world.
         std::optional<province_ceiling_scope> candidate_scope;
         candidate_scope.emplace(w);
+#ifndef NDEBUG
+        // Guard the scope's read-only contract: a candidate block that adds or
+        // removes a building inside the stretch would leave the memo stale with
+        // no error. Checked (debug builds) when the scope closes.
+        const std::size_t scope_buildings_at_open = w.buildings.size();
+#endif
 
         // ---- Build candidates: surveyed, deposit-bearing tiles, top-M ------
         // Site ranking is precomputed once per tick above (BL-253); only the
@@ -2394,6 +2401,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             }
         }
 
+#ifndef NDEBUG
+        assert(w.buildings.size() == scope_buildings_at_open
+               && "BL-1205: the candidate stretch must not add or remove buildings while its scope is open");
+#endif
         candidate_scope.reset(); // the world is written from here on (BL-1205)
         if (cands.empty())
             continue;

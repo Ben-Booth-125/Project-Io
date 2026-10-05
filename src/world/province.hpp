@@ -785,8 +785,11 @@ int province_buildings_standing(const world& w, uint32_t province_id);
 /// dozen places across the tick, and a cache that misses one writer returns a
 /// stale ceiling SILENTLY. A scope has no writers to find: the caller promises the
 /// world is not mutated in those fields while it is open, and the memo dies with
-/// it. Open one only around a read-only stretch (the muster-base scan calls only
-/// const placement reads plus the reach-field warm, which writes none of them).
+/// it. Open one only around a read-only stretch. The main user is each corp's
+/// candidate stretch in corp_ai.cpp (BL-1205: extraction build through dispatch
+/// candidates, closed before the greedy loop that writes the world; a debug
+/// assert checks the building count is unchanged at close); rank_extraction_sites'
+/// Well loop opens one too. Their only writes are logistics caches.
 ///
 /// Nests (the inner scope shadows the outer, then restores it). Thread-local, so
 /// a UI-thread read never sees a sim-thread scope. Queries against any OTHER
