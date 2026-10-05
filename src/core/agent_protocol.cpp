@@ -271,10 +271,19 @@ host_op service_line(const std::string& line, world& w, const recipe_registry& r
         // here too: the seam guards them for place_sell_order, but a
         // malformed line should not reach the seam whatever the verb.
         bool floats_ok = true;
-        const float qty_v   = static_cast<float>(kv_getf(kv, "quantity", 0.0, &floats_ok));
-        const float floor_v = static_cast<float>(kv_getf(kv, "floor_price", 0.0, &floats_ok));
+        const double qty_d   = kv_getf(kv, "quantity", 0.0, &floats_ok);
+        const double floor_d = kv_getf(kv, "floor_price", 0.0, &floats_ok);
+        const float  qty_v   = static_cast<float>(qty_d);
+        const float  floor_v = static_cast<float>(floor_d);
         if (!std::isfinite(qty_v) || !std::isfinite(floor_v)
             || qty_v < 0.0f || floor_v < 0.0f)
+            floats_ok = false;
+        // BL-1201 review: a NONZERO double that narrows to (+/-)0 lands as a
+        // different order — quantity 0 is NO CAP and floor 0 is "sell at the
+        // market price" — so `quantity=1e-60` would become an uncapped order and
+        // `floor_price=1e-60` a floorless one. Validated as the value that lands:
+        // refused whole, nothing mutated.
+        if ((qty_d != 0.0 && qty_v == 0.0f) || (floor_d != 0.0 && floor_v == 0.0f))
             floats_ok = false;
 
         if (!ok || !floats_ok)

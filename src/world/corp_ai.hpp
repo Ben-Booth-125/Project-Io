@@ -144,9 +144,13 @@ struct corp_ai_params
     /// to have genuinely accumulated.
     float trade_hold_threshold = 50.0f;
 
-    // (`trade_release_fraction` retired with BL-1201, orders are price floors:
-    // the scorer's order is uncapped and clearing lists the whole surplus under
-    // it each tick, so there is no quantity left to size.)
+    /// Scale on the trade candidate's score (expected cash at the floor over the
+    /// excess). It was `trade_release_fraction`, the share of the excess one
+    /// order listed; BL-1201 (orders are price floors) made the order uncapped,
+    /// so nothing is sized any more, and the factor survives only so the score
+    /// keeps the scale it had. Trade candidates compete only inside their own
+    /// family budget, where a common factor cannot reorder them.
+    float trade_score_fraction = 0.5f;
 
     /// Floor price as a multiple of the market's BASE price. The floor is a
     /// reservation price — an order whose floor exceeds the resolved price holds

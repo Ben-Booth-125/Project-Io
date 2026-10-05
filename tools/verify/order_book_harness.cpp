@@ -975,6 +975,122 @@ int main()
         const uint64_t h_before = s.w.state_hash(0);
         s.w.sell_orders.back().empty_ticks ^= 1;
         check(s.w.state_hash(0) != h_before, "R9.10 the empty run is inside world::state_hash");
+
+        // R9.11: the close is not silent — every auto-close above wrote a line
+        // to the world history log, tagged with the order's corp.
+        int close_lines = 0, player_lines = 0;
+        for (const world_history_entry& e : s.w.history_log)
+            if (e.topic == history_topic::agency &&
+                e.event.find("Standing sell order #") == 0)
+            {
+                ++close_lines;
+                if (e.corp == player) ++player_lines;
+            }
+        check(close_lines == 2 && player_lines == 1,
+              "R9.11 each auto-close writes one history-log line tagged with its corp "
+              "(the player's included)");
+    }
+
+    // -----------------------------------------------------------------------
+    // R10 — the close keys on the POOL, not on what one order listed (BL-1201
+    // review). Two uncapped orders on ONE triple: A, first in the book, claims
+    // the whole surplus every tick, so B lists nothing — but B's pool is not
+    // empty, and B must not close. Read every tick over 10 ticks of output.
+    // -----------------------------------------------------------------------
+    {
+        scenario s = make_scenario(0.0f);
+        const std::size_t steel = ri(resource_type::steel);
+        const entity_id key = pool_key_for_body(s.w, s.body);
+        apply_corp_command(s.w, reg, place_cmd(s, 0.0f, 0.0f)); // A
+        apply_corp_command(s.w, reg, place_cmd(s, 0.0f, 0.0f)); // B
+        const uint32_t id_b = s.w.sell_orders.size() == 2 ? s.w.sell_orders[1].id : 0u;
+
+        bool b_survives = id_b != 0;
+        for (int t = 1; t <= 10; ++t)
+        {
+            s.w.pool_at(s.corp, key).quantities[steel] += 30.0f;
+            economy_report empty;
+            clear_markets(s.w, reg, empty);
+            if (s.w.sell_orders.size() != 2 || s.w.sell_orders[1].id != id_b ||
+                s.w.sell_orders[1].empty_ticks != 0)
+                b_survives = false;
+        }
+        check(b_survives,
+              "R10.1 an order whose surplus an earlier order claims whole stays open (and its "
+              "empty run stays 0) for 10 ticks while the pool keeps producing");
+
+        bool both_open_before_n = true;
+        for (int t = 1; t < static_cast<int>(sell_order_empty_close_ticks); ++t)
+        {
+            economy_report empty;
+            clear_markets(s.w, reg, empty);
+            if (s.w.sell_orders.size() != 2) both_open_before_n = false;
+        }
+        economy_report empty;
+        clear_markets(s.w, reg, empty);
+        check(both_open_before_n && s.w.sell_orders.empty(),
+              "R10.2 once the pool stands empty, BOTH orders close together at N ticks");
+    }
+
+    // -----------------------------------------------------------------------
+    // R11 — a rival never lists goods its own processors have reserved
+    // (BL-1201 review). Stock past the hold threshold that a running processor
+    // reserves for its next batch is not surplus: clearing would list none of
+    // it, so an order on it would list nothing, close at N, and be placed again
+    // at the next evaluation, forever. Read every tick over 12 evaluations.
+    // -----------------------------------------------------------------------
+    {
+        corp_ai_params p;
+        p.cadence_k  = 1;  // evaluate every tick
+        p.max_dials  = 0;  // the processor is the fixture; the scorer may not idle it
+        p.max_builds = 0;
+
+        auto run = [&](bool with_processor, int& placements) {
+            scenario s = make_scenario(0.0f);
+            s.w.player_entity = null_entity;
+            const std::size_t iron = ri(resource_type::iron_ore);
+            s.w.markets.at(s.market).base_price[iron] = 3.0f;
+            s.w.markets.at(s.market).price[iron]      = 3.0f;
+            const entity_id key = pool_key_for_body(s.w, s.body);
+            s.w.pool_at(s.corp, key).quantities[iron] = p.trade_hold_threshold + 100.0f;
+            if (with_processor)
+            {
+                const entity_id tile = s.w.create_entity();
+                tile_component tc{};
+                tc.body = s.body;
+                s.w.tiles[tile] = tc;
+                const entity_id bld = s.w.create_entity();
+                building_component b{};
+                b.tile               = tile;
+                b.type               = building_type::processing_facility;
+                b.recipe             = 0;      // the registry's only recipe: steel from iron
+                b.workforce_assigned = 10.0f; // reserves 2 x 8 x 10 = 160 iron > the 150 held
+                s.w.buildings[bld] = b;
+                s.w.corporations.at(s.corp).assets.push_back(bld);
+            }
+            placements = 0;
+            std::size_t book_was = 0;
+            for (int t = 0; t < 12; ++t)
+            {
+                economy_report rep;
+                run_corp_strategic_step(s.w, reg, rep, t, p);
+                if (s.w.sell_orders.size() > book_was) ++placements;
+                economy_report empty;
+                clear_markets(s.w, reg, empty);
+                book_was = s.w.sell_orders.size();
+            }
+        };
+        int with = -1, without = -1;
+        run(true, with);
+        run(false, without);
+        std::printf("       R11 placements over 12 evaluations: reserved %d, unreserved %d\n",
+                    with, without);
+        check(with == 0,
+              "R11.1 stock a running processor reserves is never listed: no order placed in 12 "
+              "evaluations, so no place/close churn");
+        check(without == 1,
+              "R11.2 the same stock with no processor IS surplus: one order, placed once and "
+              "kept (the refusal above is not vacuous)");
     }
 
     std::printf("\n%s  (%d passed, %d failed)\n",

@@ -1138,9 +1138,12 @@ struct sell_order
     entity_id     corp        = null_entity;
     entity_id     body        = null_entity;
     resource_type resource    = resource_type::iron_ore;
-    /// BL-1201 (orders are price floors): consecutive clearing ticks this order
-    /// has had NOTHING to list — no surplus above the processor reservation in
-    /// any of the corp's pools on its body. Reset by any tick it lists; at
+    /// BL-1201 (orders are price floors): consecutive clearing ticks the POOL
+    /// under this order has held no surplus — no stock above the processor
+    /// reservation in any of the corp's market pools on its body, read BEFORE any
+    /// order's claim. It keys on the pool, not on what this order listed: a
+    /// second order on a triple whose surplus an earlier order claimed whole is
+    /// not empty. Reset by any tick the pool has surplus; at
     /// `sell_order_empty_close_ticks` the clearing pass removes the order and
     /// the good returns to auto-surplus (MARKETS.md step 4). Sits in the
     /// padding byte after `resource`, so the record stays 24 bytes; it IS a

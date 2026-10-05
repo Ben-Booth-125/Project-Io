@@ -223,10 +223,11 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     const economy_report& report);
 
 /// BL-1201 (orders are price floors, Ben 2026-10-05; MARKETS.md step 4): a
-/// standing sell order that has had NOTHING to list — no surplus above the
-/// processor reservation in any of its corp's pools on its body — for this many
-/// consecutive clearing ticks is removed by `clear_markets`, and the good returns
-/// to auto-surplus. The same rule for the player and for rival corps.
+/// standing sell order whose POOL has held no surplus — no stock above the
+/// processor reservation in any of its corp's market pools on its body, read
+/// before any order's claim — for this many consecutive clearing ticks is removed
+/// by `clear_markets`, and the good returns to auto-surplus. The same rule for
+/// the player and for rival corps.
 ///
 /// WHY 4 (one year of quarterly ticks): a pool fed by convoys or by a processor
 /// whose input comes and goes can stand empty for a tick or two between

@@ -2081,10 +2081,58 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             // BL-1003 CALL: `place_sell_order` names a BODY, and clearing lists
             // it across the corp's market pools on that body (market_clearing.cpp).
             // So the candidate is per (body, resource): its excess is the corp's
-            // stock summed over the body (`body_pool_total`), and its floor is
+            // listable surplus summed over the body (`listable_surplus`), and its floor is
             // read off the lowest-id market pool on the body that prices the
             // good — the first one this sorted walk reaches. Seen once per eval.
             std::set<std::pair<entity_id, std::size_t>> seen_triple;
+
+            // BL-1201 review: the excess is the quantity CLEARING WILL LIST under
+            // an uncapped order — each of the corp's market pools on the body
+            // above its processor reservation, the grid gate applied exactly as
+            // clearing applies it (market_clearing.cpp, standing sell orders) —
+            // not the raw stock. Reading raw stock placed an order on goods the
+            // corp's own processors had reserved: it listed nothing, closed
+            // itself after `sell_order_empty_close_ticks`, and was placed again
+            // at the next evaluation, forever, spending the trade slot each time.
+            const grid_goods_params& grid_rules = reg.grid_goods();
+            std::map<entity_id, std::array<float, resource_count>> reserve_memo; // by market
+            std::map<entity_id, bool> on_grid_memo;                              // by market
+            auto listable_surplus = [&](entity_id body, std::size_t r) {
+                float sum = 0.0f;
+                for (auto q = w.corp_market_pools.lower_bound({corp, entity_id{0}});
+                     q != w.corp_market_pools.end() && q->first.first == corp; ++q)
+                {
+                    const entity_id mid = q->first.second;
+                    const auto qm = w.markets.find(mid);
+                    if (qm == w.markets.end() || qm->second.body != body)
+                        continue;
+                    if (grid_rules.any() && grid_rules.grid(r))
+                    {
+                        auto g = on_grid_memo.find(mid);
+                        if (g == on_grid_memo.end())
+                        {
+                            bool ok = false;
+                            if (qm->second.centre_tile != null_entity)
+                            {
+                                body_reach_field(w, body);
+                                const float rc = tile_reach_cost(w, qm->second.centre_tile);
+                                ok = (rc >= 0.0f) && std::isfinite(rc);
+                            }
+                            g = on_grid_memo.emplace(mid, ok).first;
+                        }
+                        if (!g->second)
+                            continue; // off the network: clearing will not list it
+                    }
+                    auto rm = reserve_memo.find(mid);
+                    if (rm == reserve_memo.end())
+                        rm = reserve_memo.emplace(mid, processor_reservation(w, reg, corp, mid)).first;
+                    const float s = q->second.quantities[r] - rm->second[r];
+                    if (s > 0.0f)
+                        sum += s;
+                }
+                return sum;
+            };
+
             for (auto pit = w.corp_market_pools.lower_bound({corp, entity_id{0}});
                  pit != w.corp_market_pools.end() && pit->first.first == corp; ++pit)
             {
@@ -2093,7 +2141,6 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     continue; // body-level pool: nowhere to list it
                 const market_component& mc = mit->second;
                 const entity_id body = mc.body;
-                const stockpile_component total = body_pool_total(w, corp, body);
 
                 for (std::size_t r = 0; r < resource_count; ++r)
                 {
@@ -2102,7 +2149,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     if (!seen_triple.emplace(body, r).second)
                         continue; // an earlier market pool on this body spoke for it
 
-                    const float excess = total.quantities[r] - p.trade_hold_threshold;
+                    const float excess = listable_surplus(body, r) - p.trade_hold_threshold;
                     if (excess <= 0.0f)
                         continue;
 
@@ -2142,9 +2189,12 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     c.cmd.target      = static_cast<resource_type>(r);
                     c.cmd.quantity    = 0.0f; // no cap (BL-1201)
                     c.cmd.floor_price = floor;
-                    // Valued over the excess it would list now — the whole of it,
-                    // as the uncapped order will.
-                    c.score  = excess * floor * jitter;
+                    // The score keeps the scale it had when the order listed a
+                    // fraction of the excess (`trade_score_fraction`, 0.5), so
+                    // this item is no AI tuning change; trade candidates compete
+                    // only inside their own family budget, where a common factor
+                    // cannot reorder them.
+                    c.score  = p.trade_score_fraction * excess * floor * jitter;
                     c.reason = corp_decision_reason::trade_surplus;
                     c.bucket = bucket_for_reason(c.reason);
                     cands.push_back(c);

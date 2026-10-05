@@ -494,7 +494,7 @@ void draw_trade_table(const char* table_id, const std::vector<trade_row_record>&
     ImGui::TableSetupColumn("Good", ImGuiTableColumnFlags_WidthStretch, 1.2f);
     if (show_owner)
         ImGui::TableSetupColumn("Holder", ImGuiTableColumnFlags_WidthStretch, 1.0f);
-    ImGui::TableSetupColumn("Qty",   ImGuiTableColumnFlags_WidthFixed, w_qty);
+    ImGui::TableSetupColumn("Cap",   ImGuiTableColumnFlags_WidthFixed, w_qty); // BL-1201: a per-qtr cap; "all" = none
     ImGui::TableSetupColumn("Limit", ImGuiTableColumnFlags_WidthFixed, w_lim);
     if (removable)
         ImGui::TableSetupColumn("##x", ImGuiTableColumnFlags_WidthFixed, w_rm);
