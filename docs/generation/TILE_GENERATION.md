@@ -241,7 +241,8 @@ terrain).
   on a wet rocky upland, snow on cold high ground, dunes on dry barren) and never
   rewrites a substrate. Also no stream.
 - **4e — water kinds** (BL-516, water provinces). Classifies water structurally into
-  lake / coast / open ocean by flood fill. Also no stream, and it writes a separate
+  lake / coast / open ocean by flood fill; an enclosed body at or above the lake size
+  cap is sea, not lake (`TILES.md` § Water kinds). Also no stream, and it writes a separate
   reported substrate so Passes 5 and 6 still see the coarse `ocean` they are written
   against.
 

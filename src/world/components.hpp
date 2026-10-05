@@ -486,9 +486,11 @@ enum class terrain_substrate : uint8_t
     // the ground. APPENDED, NEVER RENUMBERED — `ocean` keeps id 7, so no wire
     // value, golden or fixture shifts meaning.
     //
-    // The three kinds are EXCLUSIVE and STRUCTURAL — no threshold picks between
-    // them (tile_generation.cpp § classify_water_kinds):
-    //   * `lake`  — a water component that does not reach the body's sea.
+    // The three kinds are EXCLUSIVE and STRUCTURAL — one authored threshold, the
+    // measured lake size cap (BL-1200), and nothing else picks between them
+    // (tile_generation.cpp § classify_water_kinds):
+    //   * `lake`  — an enclosed water component (not the body's largest) BELOW
+    //               the lake size cap; a larger enclosed one is sea.
     //   * `coast` — a sea tile with at least one land neighbour: the shoreline ring.
     //   * `ocean` — a sea tile with none: open water.
     //
@@ -499,7 +501,7 @@ enum class terrain_substrate : uint8_t
     //
     // A WATER TILE STILL CARRIES `terrain_cover::none`, whichever kind it is. The
     // cover axis describes what grew on ground; water has no ground.
-    lake        = 8, ///< Inland water with no path to the sea. Buildings refuse it as ocean does.
+    lake        = 8, ///< Small enclosed water (below the lake size cap). Buildings refuse it as ocean does.
     coast       = 9, ///< Shallow sea adjacent to land — the shoreline ring. Not buildable.
 };
 

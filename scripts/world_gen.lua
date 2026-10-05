@@ -15,6 +15,15 @@ world_gen = {
         standard = 1.00,
     },
 
+    -- BL-1200: an enclosed water body (any but a body's largest) of at least
+    -- this many tiles is a SEA (coast + ocean: ports, wharves, no Wells);
+    -- smaller ones are lakes (TILES.md § Water kinds). Measured on the 16
+    -- curated seeds (tools/verify/lake_census.cpp): the thinnest band of the
+    -- enclosed-body sizes is 89-143 tiles, under a dense cluster from 154; 150
+    -- keeps 301 lakes and makes 59 seas. Integer in [1, 1000000], rejected
+    -- (never clamped) otherwise.
+    lake_size_cap = 150,
+
     kepler_market = {
         -- Starting per-resource base price on Kepler's seeded markets.
         base_price = {

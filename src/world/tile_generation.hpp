@@ -1,6 +1,7 @@
 #pragma once
 
 #include "world.hpp"
+#include "world_gen_config.hpp" // lake_size_cap_default (BL-1200)
 
 #include <array>
 #include <cstdint>
@@ -220,7 +221,8 @@ std::vector<entity_id> generate_body_surface(
     generation_record& record,
     const std::vector<float>* continent_bias = nullptr,
     const std::vector<uint8_t>* convergent = nullptr,
-    const continent_state* continents = nullptr);
+    const continent_state* continents = nullptr,
+    int lake_size_cap = lake_size_cap_default);
 
 /// The LIFE half of `generate_body_tiles` (BL-965): the palaeo pre-pass, the
 /// ore-field pre-pass and the Life phase of Pass 6, run over a tile set the Body
@@ -294,6 +296,12 @@ void generate_life_deposits_over(
 ///                answer collapses to the present and the fossil rules read today's
 ///                climate. That is a correct fallback, not a degraded one: a world with
 ///                no drift history has no palaeo-geography to read.
+/// @param lake_size_cap The lake size cap (BL-1200, `world_gen_config::lake_size_cap`):
+///                an enclosed water component of at least this many tiles reports as
+///                sea (coast/ocean), a smaller one as lake. Must satisfy
+///                `lake_size_cap_valid`. Touches no RNG and only the REPORTED water
+///                kind (Pass 4e): no other field this pipeline writes moves, though
+///                every later pass reading lake/coast/ocean does.
 /// @return        Tile entity IDs in raster order (index = row * gw + col).
 std::vector<entity_id> generate_body_tiles(
     world& w,
@@ -306,7 +314,8 @@ std::vector<entity_id> generate_body_tiles(
     generation_record* record = nullptr,
     const std::vector<float>* continent_bias = nullptr,
     const std::vector<uint8_t>* convergent = nullptr,
-    const continent_state* continents = nullptr);
+    const continent_state* continents = nullptr,
+    int lake_size_cap = lake_size_cap_default);
 
 /// Scan raster order and return the first @p n land (non-ocean) tile IDs. Used to
 /// pick building attachment points after a body's tiles are generated.

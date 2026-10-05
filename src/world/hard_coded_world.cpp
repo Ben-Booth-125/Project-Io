@@ -587,7 +587,8 @@ std::vector<entity_id> generate_home_surface_preview(world& w, entity_id body,
     std::vector<entity_id> tiles =
         generate_body_tiles(w, body, home_grid_width, home_grid_height,
                             st.profile, tile_seed, deposit_scalar, &st,
-                            &record, &cs.height_bias, &cs.convergent, &cs);
+                            &record, &cs.height_bias, &cs.convergent, &cs,
+                            gen_cfg.lake_size_cap);
 
     // RIVERS TOO (BL-915). The wizard's Culture and Empires maps draw the river
     // strokes under the political fill, and the only surface those rounds hold
@@ -944,7 +945,8 @@ void run_life_gate(generation_cursor& c)
     const planetology_state cinder_pl = plan_body(c, 0, cinder, 180, 84, cinder_bias, nullptr, &cinder_cs);
     const uint32_t cinder_tile_seed = params.seed ^ 0xC1D0001u;
     generate_body_tiles(w, cinder, 180, 84, cinder_pl.profile,
-        cinder_tile_seed, deposit_scalar, &cinder_pl, nullptr, &cinder_bias, nullptr, &cinder_cs);
+        cinder_tile_seed, deposit_scalar, &cinder_pl, nullptr, &cinder_bias, nullptr, &cinder_cs,
+        gen_cfg.lake_size_cap);
     record_tile_inputs(c, cinder, cinder_tile_seed, 180, 84, /*used_convergent=*/false);
 
     // -----------------------------------------------------------------------
@@ -1016,7 +1018,7 @@ void run_life_gate(generation_cursor& c)
     c.kepler_tiles = generate_body_tiles(w, kepler, home_grid_width, home_grid_height,
         kepler_pl.profile,
         kepler_tile_seed, deposit_scalar, &kepler_pl, &kepler_record, &kepler_bias, &kepler_convergent,
-        &kepler_cs);
+        &kepler_cs, gen_cfg.lake_size_cap);
     const std::vector<entity_id>& kepler_tiles = c.kepler_tiles;
     record_tile_inputs(c, kepler, kepler_tile_seed, 180, 84, /*used_convergent=*/true);
 
@@ -3327,7 +3329,8 @@ void run_tail(generation_cursor& c)
     const planetology_state selene_pl = plan_body(c, 2, selene, 90, 42, selene_bias, nullptr, &selene_cs);
     const uint32_t selene_tile_seed = params.seed ^ 0x5E1E001u;
     generate_body_tiles(w, selene, 90, 42, selene_pl.profile,
-        selene_tile_seed, deposit_scalar, &selene_pl, nullptr, &selene_bias, nullptr, &selene_cs);
+        selene_tile_seed, deposit_scalar, &selene_pl, nullptr, &selene_bias, nullptr, &selene_cs,
+        gen_cfg.lake_size_cap);
     record_tile_inputs(c, selene, selene_tile_seed, 90, 42, /*used_convergent=*/false);
 
     // -----------------------------------------------------------------------
@@ -3371,7 +3374,8 @@ void run_tail(generation_cursor& c)
         const planetology_state ast_pl = plan_body(c, a.proto_index, id, 30, 14, ast_bias, nullptr, &ast_cs);
         const uint32_t ast_tile_seed = params.seed ^ a.seed;
         generate_body_tiles(w, id, 30, 14, ast_pl.profile,
-            ast_tile_seed, deposit_scalar, &ast_pl, nullptr, &ast_bias, nullptr, &ast_cs);
+            ast_tile_seed, deposit_scalar, &ast_pl, nullptr, &ast_bias, nullptr, &ast_cs,
+            gen_cfg.lake_size_cap);
         record_tile_inputs(c, id, ast_tile_seed, 30, 14, /*used_convergent=*/false);
     }
 

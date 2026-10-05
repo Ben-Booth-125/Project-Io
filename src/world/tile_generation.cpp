@@ -8,6 +8,8 @@
 #include <cmath>
 #include <cstdint>
 #include <random>
+#include <stdexcept>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -210,10 +212,13 @@ void hex_neighbours(int col, int row, int gw, int gh,
 //      adjacency (columns wrap) every other body-grid pass walks.
 //   2. THE SEA is the LARGEST component; ties break on the lowest tile index,
 //      so no container or scan order reaches the decision. Every other
-//      component is a LAKE — "does not reach the sea" is the whole definition,
-//      and it needs no size cut-off.
-//   3. Within the sea: a tile with at least one LAND neighbour is COAST (the
-//      shoreline ring); a tile with none is OPEN OCEAN.
+//      component of at least `lake_size_cap` tiles is ALSO sea (BL-1200; Ben
+//      2026-10-05, NR-974): a lake is an enclosed body BELOW the cap, because
+//      a lakeshore now gives a Well fresh water and a second salt basin must
+//      not. Only the smaller enclosed components are LAKES. The cap's value
+//      and its measured reason: `lake_size_cap_default`, world_gen_config.hpp.
+//   3. Within any sea component: a tile with at least one LAND neighbour is
+//      COAST (the shoreline ring); a tile with none is OPEN OCEAN.
 //
 // A body with no water leaves the output untouched. A body that is ALL water
 // has one component, no land neighbours anywhere, and is therefore all ocean —
@@ -226,9 +231,15 @@ void hex_neighbours(int col, int row, int gw, int gh,
 // still handed the coarse `ocean` they were written against. Only what the tile
 // REPORTS about its water changed, which is what makes the generated surface
 // bit-identical to the pre-BL-516 build rather than merely intended to be.
-void classify_water_kinds(const std::vector<bool>& is_ocean, int gw, int gh,
+void classify_water_kinds(const std::vector<bool>& is_ocean, int gw, int gh, int lake_size_cap,
                           std::vector<terrain_substrate>& reported_sub)
 {
+    // Rejected, never clamped: an out-of-domain cap is a caller's error, and a
+    // nudged one would move every coastline without saying so.
+    if (!lake_size_cap_valid(lake_size_cap))
+        throw std::invalid_argument("classify_water_kinds: lake_size_cap "
+                                    + std::to_string(lake_size_cap) + " out of domain");
+
     const int total = gw * gh;
     if (total <= 0)
         return;
@@ -285,7 +296,8 @@ void classify_water_kinds(const std::vector<bool>& is_ocean, int gw, int gh,
     {
         if (!is_ocean[static_cast<std::size_t>(idx)])
             continue;
-        if (component[static_cast<std::size_t>(idx)] != sea)
+        const int comp = component[static_cast<std::size_t>(idx)];
+        if (comp != sea && sizes[static_cast<std::size_t>(comp)] < lake_size_cap)
         {
             reported_sub[static_cast<std::size_t>(idx)] = terrain_substrate::lake;
             continue;
@@ -1761,7 +1773,8 @@ std::vector<entity_id> generate_body_surface(
     generation_record& record,
     const std::vector<float>* continent_bias,
     const std::vector<uint8_t>* convergent,
-    const continent_state* continents)
+    const continent_state* continents,
+    int lake_size_cap)
 {
     const int total = gw * gh;
 
@@ -2063,7 +2076,7 @@ std::vector<entity_id> generate_body_surface(
     // the coarse `ocean`, so no cluster, deposit or environment draw moves.
     // `reported_sub` is what the tile carries. See classify_water_kinds.
     std::vector<terrain_substrate> reported_sub = sub;
-    classify_water_kinds(is_ocean, gw, gh, reported_sub);
+    classify_water_kinds(is_ocean, gw, gh, lake_size_cap, reported_sub);
 
     // --- Pass 5: landform clusters ---
     std::mt19937 cluster_rng(seed_cluster);
@@ -2620,7 +2633,8 @@ std::vector<entity_id> generate_body_tiles(
     generation_record* record,
     const std::vector<float>* continent_bias,
     const std::vector<uint8_t>* convergent,
-    const continent_state* continents)
+    const continent_state* continents,
+    int lake_size_cap)
 {
     // BL-965: the two halves in order, over one record. A caller that asked for
     // no record still needs the seam between them, so a local one is built and
@@ -2629,7 +2643,8 @@ std::vector<entity_id> generate_body_tiles(
     generation_record& seam = record ? *record : local;
 
     std::vector<entity_id> tile_ids =
-        generate_body_surface(w, body_id, gw, gh, profile, seed, pl, seam, continent_bias, convergent, continents);
+        generate_body_surface(w, body_id, gw, gh, profile, seed, pl, seam, continent_bias, convergent,
+                              continents, lake_size_cap);
     generate_life_deposits_over(w, tile_ids, seam, profile, seed, deposit_scalar, pl, convergent, continents);
     return tile_ids;
 }
