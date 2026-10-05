@@ -1039,6 +1039,17 @@ struct market_component
     /// the market genuinely has on hand; it is no longer an unconditional,
     /// infinite auto-buy. See docs/economy/MARKETS.md § Real market inventory.
     std::array<float, resource_count> inventory = {};
+
+    /// BL-1196 (households consume): the HOUSEHOLD channel's want and fill at
+    /// the last clear (MARKETS.md § Want and fill; POPULATION.md § Population
+    /// demand). `household_bid` is the population channel's price-elastic bid,
+    /// summed over every centre clearing here (the household share of
+    /// `demand`); `household_fill` is what those households physically DREW
+    /// off `inventory` at the end of the clear — `min(bid, shelf)` per good.
+    /// The growth gate reads `fill / bid` (`population_met_ratio`) BEFORE the
+    /// next clear rewrites both, so they are SERIALISED (world_save_version 32).
+    std::array<float, resource_count> household_bid  = {};
+    std::array<float, resource_count> household_fill = {};
 };
 
 /// BL-1172 — THE POSTED PRICE of good `r` on market `m`: the price that stands

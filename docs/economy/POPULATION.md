@@ -255,7 +255,10 @@ agricultural produce, water) plus its era band's tranche — clean water, consum
 medical supplies in the industrial band; cloth, ceramics, leather, dressed stone, the fuels and
 the woods in the ancient. A centre's **met ratio** is the weight-averaged share of its own
 population bid that its market filled (`MARKETS.md` § Want and fill records the bid), each good
-capped at 1, read from the market's last clear. Steel, ore, fuel and every other industrial want
+capped at 1, read from the market's last clear. **Filled means received:** the households draw
+their bid off the market's shelf at the end of each clear, and the fill is what they took
+(`MARKETS.md` § The clearing tick, step 12). A shelf that stands full feeds them whether or not
+anything was listed that tick. Steel, ore, fuel and every other industrial want
 are out: they are firms' wants, and a city does not shrink because a mill is short. The grow
 threshold is unchanged at one half. A good the band does not make is never in the basket, because
 the basket is era-masked as the bid is.

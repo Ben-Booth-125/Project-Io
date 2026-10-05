@@ -16,6 +16,7 @@
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
 
+#include <array>
 #include <cmath>
 #include <cstdio>
 
@@ -215,6 +216,82 @@ int main()
               "R6 construction draws real inventory (5 of 5 available, rate capped at 0.5)");
         check(near(w.buildings.at(bld).construction_progress, 0.5f),
               "R6 construction rate is capped by real inventory, not an unconditional draw");
+    }
+
+    // --- R7 (BL-1179, shelf spoilage; MARKETS.md § The shelf spoils): a shelf
+    // with NO buyer drains geometrically by its authored rate over N clears; a
+    // perishable drains faster than a durable; nobody's balance moves. Multi-
+    // tick on purpose: a one-tick row cannot tell a geometric drain from a
+    // one-off cut. N = 8 full ticks (run_economy_step + clear_markets), the
+    // rates the shipped first cut authors (perishable 0.25, durable 0.02). ---
+    {
+        recipe_registry reg3;
+        std::array<float, resource_count> rates = {};
+        rates[ri(resource_type::food_rations)] = 0.25f;
+        rates[ri(resource_type::steel)]        = 0.02f;
+        reg3.set_shelf_spoilage(rates);
+
+        world w;
+        const entity_id body = w.create_entity(); w.bodies[body] = body_component{};
+        const entity_id market = w.create_entity();
+        { market_component mc; mc.body = body;
+          mc.base_price[ri(resource_type::food_rations)] = 13.6f;
+          mc.base_price[ri(resource_type::steel)]        = 16.1f;
+          mc.price = mc.base_price;
+          mc.inventory[ri(resource_type::food_rations)] = 1000.0f;
+          mc.inventory[ri(resource_type::steel)]        = 1000.0f;
+          w.markets[market] = mc; }
+        const entity_id corp = w.create_entity();
+        { corporation_component cc; cc.balance = 5000.0f; w.corporations[corp] = cc; }
+
+        constexpr int n = 8;
+        double income = 0.0, spend = 0.0;
+        for (int t = 0; t < n; ++t)
+        {
+            const economy_report rep = run_economy_step(w, reg3);
+            const auto flows = clear_markets(w, reg3, rep);
+            for (const auto& [cid, f] : flows) { (void)cid; income += f.income; spend += f.expenditure; }
+        }
+        const float food  = w.markets.at(market).inventory[ri(resource_type::food_rations)];
+        const float steel = w.markets.at(market).inventory[ri(resource_type::steel)];
+        const float want_food  = 1000.0f * static_cast<float>(std::pow(0.75, n));
+        const float want_steel = 1000.0f * static_cast<float>(std::pow(0.98, n));
+        std::printf("    R7 after %d clears: food %.3f (want %.3f)  steel %.3f (want %.3f)\n",
+                    n, food, want_food, steel, want_steel);
+        check(std::fabs(food - want_food) < 1e-3f * want_food,
+              "R7 a perishable shelf with no buyer drains geometrically: 1000 x 0.75^8");
+        check(std::fabs(steel - want_steel) < 1e-3f * want_steel,
+              "R7 a durable shelf with no buyer drains geometrically: 1000 x 0.98^8");
+        check(food < steel, "R7 the perishable drains faster than the durable");
+        check(income == 0.0 && spend == 0.0 && w.corporations.at(corp).balance == 5000.0f,
+              "R7 nobody is charged: no flow, and the corp's balance is untouched");
+    }
+
+    // --- R8 (BL-1179): only the SHELF spoils — a corp's pool on the same body
+    // keeps every unit; and a registry that authors no rates leaves the shelf
+    // bit-identical (the inert default every hand-built harness relies on). ---
+    {
+        recipe_registry reg4;
+        std::array<float, resource_count> rates = {};
+        rates[ri(resource_type::food_rations)] = 0.25f;
+        reg4.set_shelf_spoilage(rates);
+        world w;
+        const entity_id body = w.create_entity(); w.bodies[body] = body_component{};
+        const entity_id market = w.create_entity();
+        { market_component mc; mc.body = body;
+          mc.base_price[ri(resource_type::food_rations)] = 13.6f; mc.price = mc.base_price;
+          mc.inventory[ri(resource_type::food_rations)] = 100.0f; w.markets[market] = mc; }
+        const entity_id corp = w.create_entity();
+        { corporation_component cc; cc.balance = 100.0f; w.corporations[corp] = cc; }
+        w.pool_at(corp, pool_key_for_body(w, body)).quantities[ri(resource_type::food_rations)] = 40.0f;
+        spoil_market_shelves(w, reg4);
+        check(near(w.markets.at(market).inventory[ri(resource_type::food_rations)], 75.0f),
+              "R8 the shelf loses its rate (100 -> 75)");
+        check(near(w.pool_at(corp, pool_key_for_body(w, body)).quantities[ri(resource_type::food_rations)], 40.0f),
+              "R8 the corp pool on the same body does not spoil (40 stays 40)");
+        spoil_market_shelves(w, reg); // the R1-R6 registry: no rates authored
+        check(w.markets.at(market).inventory[ri(resource_type::food_rations)] == 75.0f,
+              "R8 a registry with no rates leaves the shelf bit-identical");
     }
 
     if (g_failures == 0) std::printf("\nALL PASS\n");

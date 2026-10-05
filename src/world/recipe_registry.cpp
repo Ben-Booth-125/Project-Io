@@ -282,9 +282,12 @@ void recipe_registry::load_from_lua(lua_state& lua)
     if (growth)
     {
         growth_params gp;
-        sol::optional<sol::table> basket = (*growth)["demand_basket"];
-        if (basket)
-            read_resource_map(*basket, gp.demand_basket, "economy.population_growth.demand_basket");
+        // BL-1163: `demand_basket` here is RETIRED — the growth basket is the
+        // household basket (population_demand). A leftover table is refused
+        // rather than silently ignored, so nobody tunes a list nothing reads.
+        if (sol::optional<sol::table> retired = (*growth)["demand_basket"]; retired)
+            throw std::runtime_error("recipe_registry: economy.population_growth.demand_basket is retired "
+                                     "(BL-1163) - the growth basket is economy.population_demand's");
         gp.growth_met_threshold = growth->get_or("growth_met_threshold", gp.growth_met_threshold);
         m_growth = gp;
     }
@@ -393,6 +396,37 @@ void recipe_registry::load_from_lua(lua_state& lua)
         // 0 -> listings only, the price law before the ruling.
         pb.shelf_supply_ticks = price_band->get_or("shelf_supply_ticks", pb.shelf_supply_ticks);
         m_price_band = pb;
+    }
+
+    // BL-1179 shelf spoilage (economy.shelf_spoilage) — MARKETS.md § The shelf
+    // spoils. Keyed by RESOURCE NAME; an unknown name throws (read_resource_map's
+    // contract, by hand here because the range differs). Each rate is validated
+    // AS THE VALUE THAT LANDS: a finite number in (0, 1], checked as a double
+    // before the narrowing cast. ZERO IS REJECTED, not read as "no spoilage":
+    // the ruling is that every good spoils, durables slowest "but never zero",
+    // so an authored 0 is an authoring error. Reject, never clamp. Absent table
+    // = no good spoils (the pre-BL-1179 shelf), the price_band tolerance.
+    sol::optional<sol::table> spoil = (*econ)["shelf_spoilage"];
+    if (spoil)
+    {
+        std::array<float, resource_count> rates = {};
+        for (const auto& kv : *spoil)
+        {
+            const std::string rkey = kv.first.as<std::string>();
+            bool ok = false;
+            const resource_type rt = resource_names::resource_from_name(rkey, ok);
+            if (!ok)
+                throw std::runtime_error("Unknown resource '" + rkey + "' in economy.shelf_spoilage");
+            if (kv.second.get_type() != sol::type::number)
+                throw std::runtime_error("economy.shelf_spoilage." + rkey
+                                         + " is not a number (expected a rate in (0, 1])");
+            const double v = kv.second.as<double>();
+            if (!std::isfinite(v) || v <= 0.0 || v > 1.0)
+                throw std::runtime_error("economy.shelf_spoilage." + rkey + " = " + std::to_string(v)
+                                         + " is not a finite rate in (0, 1] (a good never spoils at zero)");
+            rates[static_cast<std::size_t>(rt)] = static_cast<float>(v);
+        }
+        m_shelf_spoilage = rates;
     }
 
     // BL-708 grid goods (economy.grid_goods) — docs/economy/PRODUCTION.md § Power,

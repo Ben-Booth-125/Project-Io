@@ -1807,8 +1807,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // BL-048B / BL-078 / BL-616: Population growth, promotion and decline
     // (docs/economy/POPULATION.md § Growth, decline and razing). Each tick a
     // centre's conditions either hold — body habitability >= 0.5 AND the
-    // consumption basket met at >= growth_met_threshold (BL-078 keys growth off
-    // met-supply, not food alone) — or fail. `growth_accumulator` counts the
+    // household basket it bids met at >= growth_met_threshold at its own
+    // market (BL-1163; population_met_ratio) — or fail. `growth_accumulator` counts the
     // CONSECUTIVE streak, positive while conditions hold, negative while they
     // fail; flipping direction resets it, and it rides the existing serialised
     // field (negative values round-trip — save_roundtrip R10), so BL-616 adds
@@ -1846,30 +1846,21 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     constexpr int k_resettle_window_ticks  = k_promotion_window_ticks / 2;
     const growth_params& growth_sp = reg.growth();
 
-    // Per-body market basket, summed over ALL the body's markets (BL-357). A body
-    // hosts several resource-carved markets (BL-096), and reading whichever one an
-    // unordered walk found first let hash layout pick which market gated a centre's
-    // growth — and ignored the rest of the body's supply. Market ids ascending so
-    // the float accumulation order is fixed.
-    std::map<entity_id, std::array<float, resource_count>> basket_supply, basket_demand;
-    {
-        std::vector<entity_id> market_ids;
-        market_ids.reserve(w.markets.size());
-        for (const auto& kv : w.markets)
-            market_ids.push_back(kv.first);
-        std::sort(market_ids.begin(), market_ids.end());
-        for (const entity_id mid : market_ids)
-        {
-            const market_component& mc = w.markets.at(mid);
-            auto& sup = basket_supply[mc.body];
-            auto& dem = basket_demand[mc.body];
-            for (std::size_t r = 0; r < resource_count; ++r)
-            {
-                sup[r] += mc.supply[r];
-                dem[r] += mc.demand[r];
-            }
-        }
-    }
+    // BL-1163 (play villages decline): the met ratio is judged PER CENTRE, at
+    // the centre's own market, over the household basket it bids there
+    // (population_met_ratio, market_clearing.cpp) — no longer a body-wide sum
+    // over every want (BL-357's aggregate). One market's shortage shrinks only
+    // the centres that clear there. Memoised per market; std::map, so no hash
+    // order reaches the result (each entry is a pure function of its market).
+    std::map<entity_id, float> market_met;
+    auto met_at = [&](entity_id mid) {
+        const auto it = market_met.find(mid);
+        if (it != market_met.end())
+            return it->second;
+        const float m = population_met_ratio(w, reg, mid);
+        market_met.emplace(mid, m);
+        return m;
+    };
 
     // centre_ids (sorted above): per-centre integer arithmetic, but walk in
     // ascending id anyway so any future cross-centre coupling stays ordered.
@@ -1888,26 +1879,11 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         const auto hit = report.body_habitability.find(body);
         const float hab = (hit != report.body_habitability.end()) ? hit->second : 1.0f;
 
-        // Met-supply ratio across the whole demand basket (BL-078): a basket-weighted
-        // mean of supply/demand over the body's aggregated markets (BL-357), so a
-        // centre grows only when its population's consumption is broadly met and
-        // declines when it is not.
-        float met_ratio = 1.0f;
-        if (const auto dit = basket_demand.find(body); dit != basket_demand.end())
-        {
-            const auto& sup = basket_supply.at(body);
-            float met_acc = 0.0f, met_weight = 0.0f;
-            for (std::size_t r = 0; r < resource_count; ++r)
-            {
-                const float bw = growth_sp.demand_basket[r];
-                if (bw <= 0.0f || dit->second[r] <= 0.0f)
-                    continue;
-                met_acc    += bw * std::min(1.0f, sup[r] / dit->second[r]);
-                met_weight += bw;
-            }
-            if (met_weight > 0.0f)
-                met_ratio = met_acc / met_weight;
-        }
+        // The household met ratio at this centre's catchment market (BL-1163):
+        // the share of the population channel's own bid the last clear filled.
+        // A centre whose body has no market bids nothing and reads fully met.
+        const entity_id centre_market = market_for_tile(w, tile_it->second);
+        const float met_ratio = (centre_market != null_entity) ? met_at(centre_market) : 1.0f;
 
         const bool conditions_met = (hab >= 0.5f)
                                  && (met_ratio >= growth_sp.growth_met_threshold);
