@@ -245,7 +245,13 @@ holds rows between 81 and 150 firms and a tally of firms per good. **The ceiling
 body (Ben, 2026-09-19, NR-902):** on the cost table's square-root rows it is the ceiling that binds —
 at four times the reference budget it trims every good evenly to 12 firms — while 160 never bound,
 each good's own cap of 15 filling first, and cost a 12-31% dearer economy tick for it. A ceiling that
-never binds is not a brake.
+never binds is not a brake. **The ceiling scales with the goods the walk serves (Ben, 2026-10-05):**
+once the walk counts derived demand (`CORPORATION_GENERATION.md` § Pass 6), it serves more goods —
+the inputs of the goods households and bodies want — and a fixed 120 trimmed each household good
+from 8-14 firms to 4-5. So the ceiling is a density **per good served**: 7.5 firms for each good in
+G (120 at the 16 goods it was ruled on), still under the 200-per-body runaway guard, which keeps
+catching runaways only. Its tick cost is measured on the cost table before it ships; the rate, not
+the 120, is what the 2026-09-19 measurement anchors.
 
 **SETTLED (Ben, 2026-09-18, wave 1 form): the budget and its reference are in the same units, and
 the ceiling fills goods in turn.** A body's charter capital B counts only the points spent on firms,
