@@ -90,6 +90,22 @@
 //                 every market and the window.
 //        centres  heads (k) and live centres at the handoff and the last tick;
 //                 centres whose heads rose / fell / held over the play run.
+//   W  (the k re-sweep, sprint 49; reported, no target) WATER, in two windows
+//      -- early (play ticks 20-50) and late (the last 50 play ticks) -- per tick
+//      means over every market whose households bid water, against the shelf
+//      as the price law read it (the G5 snapshot):
+//        surplus  markets whose shelf held the households' whole bid; the
+//                 water units on those shelves; their mean price / base
+//        dry      markets whose shelf held < 1 unit; their unfilled bid
+//                 (bid - fill); their mean price / base
+//        shipped  convoys dispatched this tick carrying water (ids above the
+//                 last tick's highest), units, the share a market exported
+//                 off its own shelf (corp null), and units bound for a market
+//                 that was dry this tick
+//      Plus the late window's household fill/bid per good. The hypothesis it
+//      tests: at k = 0 a stocked shelf does not lower its price, so the
+//      dispatcher's price gate (price_d > price_src x (1 + margin)) sees no
+//      gradient between a stocked market and a dry one.
 //      OVERRIDES for a sweep (default: the shipped registry, untouched):
 //        --k X        price_band.shelf_supply_ticks = X
 //        --no-spoil   every shelf spoilage rate zero (the pre-BL-1179 shelf)
@@ -145,6 +161,7 @@ constexpr int k_g1_g2_play_tick     = 50; ///< the "tick 50" reading
 constexpr int k_seat_settle_window  = 8;  ///< the seat's last 8 settle quarters
 constexpr int k_idle_market_ticks   = 4;  ///< market_census's first play year
 constexpr int k_g5_from = 20, k_g5_to = 50; ///< BL-1179: the shelf window (play ticks)
+constexpr int k_w_late = 50;                ///< W: the late window, the last N play ticks
 
 // --- sweep overrides (BL-1179): applied to the registry after the build ---
 float g_k_override = -1.0f;   ///< < 0: shipped k
@@ -332,6 +349,8 @@ void tap_after_lap(const world& w, int lap, void* ctx)
 
 // --- one seed ----------------------------------------------------------------------
 
+using shelf_snap_fwd = std::map<entity_id, std::array<float, resource_count>>;
+
 struct seed_reading
 {
     std::uint32_t seed = 0;
@@ -361,8 +380,83 @@ struct seed_reading
     std::array<double, resource_count> g5_bid{}, g5_fill{};
     long long heads_handoff = 0, heads_end = 0;
     int centres_handoff = 0, centres_end = 0, centres_grew = 0, centres_fell = 0, centres_held = 0;
+    // W (the k re-sweep): water, early and late windows
+    struct water_win
+    {
+        int    ticks = 0;
+        double cons = 0, surplus_mkts = 0, surplus_units = 0, dry_mkts = 0, dry_unmet = 0;
+        double shelf_all = 0;                       ///< water on every market's shelf
+        double p_surplus = 0, n_surplus = 0, p_dry = 0, n_dry = 0;
+        double ship_n = 0, ship_qty = 0, ship_shelf_qty = 0, ship_to_dry_qty = 0;
+        void add(const water_win& o)
+        {
+            ticks += o.ticks; cons += o.cons; surplus_mkts += o.surplus_mkts; surplus_units += o.surplus_units;
+            dry_mkts += o.dry_mkts; dry_unmet += o.dry_unmet; shelf_all += o.shelf_all;
+            p_surplus += o.p_surplus; n_surplus += o.n_surplus; p_dry += o.p_dry; n_dry += o.n_dry;
+            ship_n += o.ship_n; ship_qty += o.ship_qty; ship_shelf_qty += o.ship_shelf_qty;
+            ship_to_dry_qty += o.ship_to_dry_qty;
+        }
+    };
+    water_win w_early, w_late;
+    std::array<double, resource_count> late_bid{}, late_fill{};
     double secs = 0.0;
 };
+
+/// W: one tick's water read. `max_convoy_id` is the highest convoy id seen
+/// before this tick; every convoy above it was dispatched this tick (ids are
+/// allocated monotonically and never reused, world::allocate_convoy_id).
+void read_water(const world& w, const shelf_snap_fwd& snap, seed_reading::water_win& ww, std::uint32_t& max_convoy_id)
+{
+    const std::size_t g = static_cast<std::size_t>(resource_type::water);
+    ++ww.ticks;
+    std::set<entity_id> dry;
+    std::vector<entity_id> mids;
+    for (const auto& kv : w.markets) mids.push_back(kv.first);
+    std::sort(mids.begin(), mids.end());
+    for (const entity_id m : mids)
+    {
+        const market_component& mc = w.markets.at(m);
+        const auto si = snap.find(m);
+        const float shelf = si == snap.end() ? 0.0f : si->second[g];
+        ww.shelf_all += shelf;
+        if (!(mc.household_bid[g] > 0.0f) || !(mc.base_price[g] > 0.0f)) continue;
+        ww.cons += 1;
+        const double pr = static_cast<double>(mc.price[g] > 0.0f ? mc.price[g] : mc.base_price[g]) / mc.base_price[g];
+        if (shelf >= mc.household_bid[g])
+        {
+            ww.surplus_mkts += 1; ww.surplus_units += shelf; ww.p_surplus += pr; ww.n_surplus += 1;
+        }
+        else if (shelf < 1.0f)
+        {
+            ww.dry_mkts += 1; ww.dry_unmet += std::max(0.0f, mc.household_bid[g] - mc.household_fill[g]);
+            ww.p_dry += pr; ww.n_dry += 1;
+            dry.insert(m);
+        }
+    }
+    std::uint32_t top = max_convoy_id;
+    for (const convoy_component& c : w.convoys)
+    {
+        if (c.id <= max_convoy_id) continue;
+        top = std::max(top, c.id);
+        if (c.cargo_resource != resource_type::water) continue;
+        ww.ship_n += 1; ww.ship_qty += c.cargo_qty;
+        if (c.corp == null_entity) ww.ship_shelf_qty += c.cargo_qty;
+        if (dry.count(c.dest_market)) ww.ship_to_dry_qty += c.cargo_qty;
+    }
+    max_convoy_id = top;
+}
+
+void print_water(const char* label, const seed_reading::water_win& ww)
+{
+    const double t = ww.ticks > 0 ? ww.ticks : 1.0;
+    std::printf("    W %-5s (%d ticks, per tick): consuming mkts %.1f | surplus mkts %.1f holding %.0f u (p/base %.2f)"
+                " | dry mkts %.1f unmet %.0f u (p/base %.2f) | all shelves %.0f u | shipped %.1f convoys %.0f u"
+                " (shelf export %.0f u, to a dry mkt %.0f u)\n",
+                label, ww.ticks, ww.cons / t, ww.surplus_mkts / t, ww.surplus_units / t,
+                ww.n_surplus > 0 ? ww.p_surplus / ww.n_surplus : 0.0, ww.dry_mkts / t, ww.dry_unmet / t,
+                ww.n_dry > 0 ? ww.p_dry / ww.n_dry : 0.0, ww.shelf_all / t, ww.ship_n / t, ww.ship_qty / t,
+                ww.ship_shelf_qty / t, ww.ship_to_dry_qty / t);
+}
 
 /// G5's per-processor record: the decommission flag last seen, the first econ
 /// step it was seen idled (-1 never), and whether it was later seen running.
@@ -565,6 +659,8 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
     tap.clear_lap  = clear_lap_index();
     tap.last_total = w.exchanges.total;
     constexpr int k_econ_tick_days = 90; // sim_loop::econ_tick_days (harness_params.hpp)
+    std::uint32_t max_convoy_id = 0;
+    for (const convoy_component& c : w.convoys) max_convoy_id = std::max(max_convoy_id, c.id);
     for (int k = 1; k <= ticks; ++k)
     {
         const int day = k * k_econ_tick_days;
@@ -573,7 +669,8 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
         w.current_day_tick = day;
         settle_tick_hooks hooks;
         if (k <= k_idle_market_ticks) { hooks.after_lap = tap_after_lap; hooks.ctx = &tap; }
-        else if (k >= k_g5_from && k <= k_g5_to) { hooks.after_lap = snap_after_lap; hooks.ctx = &snap; }
+        else if ((k >= k_g5_from && k <= k_g5_to) || k > ticks - k_w_late)
+        { hooks.after_lap = snap_after_lap; hooks.ctx = &snap; }
         static_assert(k_idle_market_ticks < k_g5_from, "the G5 shelf hook and the exchange tap share one slot");
         settle_tick_result res = run_settle_tick(w, reg, k_campaign_settle_ticks + (k - 1), day,
                                                  /*spectating=*/false, &hooks);
@@ -586,6 +683,13 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
         g5_track(w, g5, k_campaign_settle_ticks + (k - 1), true, r);
         if (k <= k_g1_g2_play_tick) remember_rows(w, res.report, reg, last_row);
         if (k >= k_g5_from && k <= k_g5_to) read_shelf(w, reg, snap, r);
+        if (k >= k_g5_from && k <= k_g5_to) read_water(w, snap.inv, r.w_early, max_convoy_id);
+        else if (k > ticks - k_w_late && k > k_g5_to) read_water(w, snap.inv, r.w_late, max_convoy_id);
+        else for (const convoy_component& c : w.convoys) max_convoy_id = std::max(max_convoy_id, c.id);
+        if (k > ticks - k_w_late)
+            for (const auto& [mid, mc] : w.markets)
+                for (std::size_t g = 0; g < resource_count; ++g)
+                    if (mc.household_bid[g] > 0.0f) { r.late_bid[g] += mc.household_bid[g]; r.late_fill[g] += mc.household_fill[g]; }
         if (k > k_g1_g2_play_tick - 25 && k <= k_g1_g2_play_tick)
             r.inc_t26_50_mean += field_income(w) / 25.0;
         if (k == k_g1_g2_play_tick)
@@ -743,6 +847,14 @@ int main(int argc, char** argv)
         std::printf("\n    centres: handoff %d (%lldk heads) -> tick %d %d (%lldk heads); grew %d fell %d held %d\n",
                     r.centres_handoff, r.heads_handoff, r.last_tick, r.centres_end, r.heads_end,
                     r.centres_grew, r.centres_fell, r.centres_held);
+        print_water("early", r.w_early);
+        print_water("late", r.w_late);
+        std::printf("    late household fill/bid (last %d ticks):", k_w_late);
+        for (std::size_t g = 0; g < resource_count; ++g)
+            if (r.late_bid[g] > 0.0)
+                std::printf(" %s %.0f%%", resource_names::name_of(static_cast<resource_type>(g)).c_str(),
+                            pct(r.late_fill[g] / r.late_bid[g]));
+        std::printf("\n");
         std::fflush(stdout);
     }
 
@@ -812,6 +924,21 @@ int main(int argc, char** argv)
         for (std::size_t g = 0; g < resource_count; ++g)
             if (bid[g] > 0.0)
                 std::printf(" %s %.0f%%", resource_names::name_of(static_cast<resource_type>(g)).c_str(), pct(fill[g] / bid[g]));
+        std::printf("\n");
+        seed_reading::water_win we, wl;
+        std::array<double, resource_count> lb{}, lf{};
+        for (const seed_reading& r : rs)
+        {
+            we.add(r.w_early); wl.add(r.w_late);
+            for (std::size_t g = 0; g < resource_count; ++g) { lb[g] += r.late_bid[g]; lf[g] += r.late_fill[g]; }
+        }
+        std::printf(" W pooled (per seed-tick):\n");
+        print_water("early", we);
+        print_water("late", wl);
+        std::printf("    pooled late household fill/bid:");
+        for (std::size_t g = 0; g < resource_count; ++g)
+            if (lb[g] > 0.0)
+                std::printf(" %s %.0f%%", resource_names::name_of(static_cast<resource_type>(g)).c_str(), pct(lf[g] / lb[g]));
         std::printf("\n");
     }
     std::printf("market_viability: G1 %.1f/70 G2 %.1f/50 G3 %.1f/70\n", pct(g1), pct(g2), pct(g3));

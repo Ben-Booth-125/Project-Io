@@ -30,6 +30,7 @@
 //   --quiet  suppress the per-maker rows; print the per-tick aggregates only
 //   --no-breakdown  skip BL-1186's refusal breakdown (on by default)
 //   --detail-ticks -1,0,10,12,20  ticks printing sample pairs + the market table (-1 = pre-settle, 12 = handoff)
+//   --k X    price_band.shelf_supply_ticks = X from the first tick (the sprint 49 k re-sweep)
 //   --lp-scale X  COUNTERFACTUAL (not the shipped world): scale the passive-LP cap
 //            per anchor by X from the first probed tick — BL-1071's reading of how
 //            much shelf stock the cap, rather than the price rule, holds home
@@ -105,6 +106,7 @@ struct options
     long long epoch = -1;   ///< -1: world_params' own default (the shipped epoch)
     resource_type good = resource_type::steel;
     float lp_scale = 1.0f;  ///< --lp-scale: a counterfactual passive-LP cap (BL-1071 reading)
+    float k = -1.0f;        ///< --k: price_band.shelf_supply_ticks override (< 0: shipped)
     bool breakdown = true;  ///< BL-1186: the per-refusal breakdown (--no-breakdown)
     std::set<int> detail_ticks{-1, 0, 10, 12, 20}; ///< ticks printing samples + market table (-1 = pre-settle; 12 = seat handoff)
 };
@@ -712,6 +714,15 @@ void run_seed(lua_state& lua, const options& o, std::uint32_t seed)
         std::printf("COUNTERFACTUAL: passive LP per anchor x%.2f (NOT the shipped world)\n",
                     o.lp_scale);
     }
+    if (o.k >= 0.0f)
+    {
+        // The sprint 49 k re-sweep: shelf supply k, set before the first tick
+        // exactly as market_viability's --k does.
+        price_band_params pb = start->reg.price_band();
+        pb.shelf_supply_ticks = o.k;
+        start->reg.set_price_band(pb);
+        std::printf("OVERRIDE: price_band.shelf_supply_ticks = %.2f\n", o.k);
+    }
     world& w                   = start->w;
     const recipe_registry& reg = start->reg;
     print_shipped_landscape(start->land);
@@ -1302,6 +1313,7 @@ int main(int argc, char** argv)
         }
         else if (a == "--epoch" && i + 1 < argc) o.epoch = std::atoll(argv[++i]);
         else if (a == "--lp-scale" && i + 1 < argc) o.lp_scale = static_cast<float>(std::atof(argv[++i]));
+        else if (a == "--k" && i + 1 < argc) o.k = static_cast<float>(std::atof(argv[++i]));
         else if (a == "--good" && i + 1 < argc)
         {
             bool ok = false;
