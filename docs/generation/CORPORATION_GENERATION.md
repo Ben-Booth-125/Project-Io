@@ -488,6 +488,21 @@ held ground, and none of it was within reach of a chain. The budget-less Pass 6 
 it has missed as many times as the body has nations (the nation cursor takes them in turn), and
 the mask holds for the rest of the pass unless a firm that produces one of its inputs lands.
 
+**Input chartering — a chain is absent only where the ground lacks it** (main session, 2026-10-05,
+NR-976; BL-1197). A firm chartered for a processed good whose every recipe is chain-infeasible
+at its centre **only because one or more RAW inputs have no producer within reach** (the reach
+above, in its generation form) does not give the good up while the ground holds that raw. The
+first such raw — the gap selection's recipe first, then the good's others; within a recipe, its
+raws in ascending resource order — that is under its own cap and has a deposit in the centre's
+windows (a Well site, for water) is chartered first: that firm is the raw's extractor, booked as
+the raw's firm, counted against the raw's cap and share, and bound by the province cap and the
+budget like any firm. The processed good is then retried by the next firm (under the turn, its
+place in the turn is kept). A raw is chartered for this reason at most once per centre; without
+a budget, once per raw and market per body, in the refusing nation's tiles of the processor's
+market. **One level deep:** only raw inputs are chartered this way. A recipe missing a processed
+input — steel, refined copper — does not qualify, and the chain stays absent under
+`chain_infeasible`.
+
 **A water-gap firm digs water** (Ben, 2026-10-05, NR-973: "we can add wells to generation";
 BL-1197, gap firm digs the gap). An extraction firm chartered for the water gap stands on water
 ground: a **Well** site (`../economy/PRODUCTION.md` § Extraction buildings — fresh-water adjacent,

@@ -23,6 +23,7 @@
 #include <cstdlib>
 #include <limits>
 #include <random>
+#include <set>
 #include <string>
 #include <unordered_set>
 #include <utility>
@@ -1794,6 +1795,43 @@ bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
     return true;
 }
 
+/// INPUT CHARTERING (BL-1197 round 3; NR-976, 2026-10-05: a chain may be absent
+/// only because the GROUND lacks it, never because chartering skipped its input).
+/// The raw inputs a processing good's chain lacks at @p market: the first recipe
+/// of @p serve (the gap selection's preference) whose inputs are all within reach
+/// there except some RAW ones (`placement_rules::is_extractable`) — those raws, in
+/// ascending resource id (the recipe's own input order). ONE LEVEL DEEP: a recipe
+/// missing a processed input (steel, refined copper, ...) does not qualify, and
+/// the chain stays absent. Empty when no recipe qualifies. Read-only, draws
+/// nothing; reach is the generation form (`chain_input_tier`, no report).
+std::vector<std::size_t> chain_missing_raws(world& w, const recipe_registry& reg,
+                                            chain_reach& cr, entity_id market,
+                                            const std::vector<int>& serve)
+{
+    if (market == null_entity)
+        return {};
+    for (const int i : serve)
+    {
+        const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+        std::vector<std::size_t> miss;
+        bool raws_only = true;
+        for (std::size_t r = 0; r < resource_count && raws_only; ++r)
+        {
+            if (!(rc.inputs[r] > 0.0f))
+                continue;
+            if (chain_input_tier(w, reg, cr, null_entity, market, r, nullptr) != chain_tier_none)
+                continue;
+            if (!placement_rules::is_extractable(static_cast<resource_type>(r)))
+                raws_only = false;
+            else
+                miss.push_back(r);
+        }
+        if (raws_only && !miss.empty())
+            return miss;
+    }
+    return {};
+}
+
 /// BL-476 — seed one `military_base` + one starting `unit_component` for
 /// `corp_id`, exactly the logic BL-330 originally scoped to the player only.
 /// Placed on the nearest valid land tile to the corp's HQ (falling back to the
@@ -2860,6 +2898,14 @@ std::vector<entity_id> generate_background_firms(
         // since a firm for it last landed, and whether that masks it.
         std::array<int, resource_count>  dig_misses = {};
         std::array<bool, resource_count> dig_masked = {};
+        // BL-1197 round 3 (input chartering): the raw the next iteration
+        // charters, the nation and the window (that nation's tiles of the
+        // refused processor's market) it charters in, and every (raw, market)
+        // already chartered for this reason on this body.
+        std::size_t                                  pending_input  = resource_count;
+        entity_id                                    pending_nation = null_entity;
+        std::vector<entity_id>                       pending_window;
+        std::set<std::pair<std::size_t, entity_id>>  input_chartered;
         for (int iter = 0; iter < max_iterations_per_body && firms_this_body < max_firms_per_body; ++iter)
         {
             std::array<float, resource_count> production = {};
@@ -2937,6 +2983,13 @@ std::vector<entity_id> generate_background_firms(
             // the ordinary rule unchanged.
             std::size_t gap_r    = resource_count;
             int         recipe_i = -1;
+            // BL-1197 round 3 (input chartering): a raw a chain-refused good
+            // lacked is chartered first, by the nation whose placement found the
+            // lack (below); then the selection runs as ever and retries the good.
+            const bool input_firm = (pending_input != resource_count);
+            if (input_firm)
+                gap_r = pending_input;
+            if (!input_firm)
             {
                 const std::size_t cap_i =
                     static_cast<std::size_t>(resource_type::construction_capacity);
@@ -3006,9 +3059,19 @@ std::vector<entity_id> generate_background_firms(
             const industrial_focus focus = go_processing ? industrial_focus::processing
                                                           : industrial_focus::extraction;
 
-            const entity_id home_nid = nation_ids[static_cast<std::size_t>(
-                nation_cursor % static_cast<int>(nation_ids.size()))];
-            ++nation_cursor;
+            // The input firm stands in the nation whose placement found the lack,
+            // and takes no turn of the nation cursor.
+            entity_id home_nid = pending_nation;
+            if (!input_firm)
+            {
+                home_nid = nation_ids[static_cast<std::size_t>(
+                    nation_cursor % static_cast<int>(nation_ids.size()))];
+                ++nation_cursor;
+            }
+            const std::vector<entity_id> input_window = std::move(pending_window);
+            pending_input  = resource_count;
+            pending_nation = null_entity;
+            pending_window.clear();
             const auto nit = w.nations.find(home_nid);
             if (nit == w.nations.end())
                 continue;
@@ -3019,14 +3082,28 @@ std::vector<entity_id> generate_background_firms(
             // GOOD's, so it counts toward water's mask — once water has missed
             // as many times as the body has nations (the cursor takes them in
             // turn) it is masked for the pass, and the next gap is taken.
+            // Round 3: an input firm digs its raw inside the failed processor's
+            // market (its window), or places nothing.
             resource_type dig_r = resource_type::water;
-            const bool    digs  = gap_firm_digs(gap_r, go_processing, dig_r);
-            std::vector<entity_id> assets = digs
-                ? place_digging_assets(w, nit->second, focus, occupied_tiles, asset_rng,
-                                       nullptr, dig_r)
-                : place_starting_assets(w, nit->second, focus, occupied_tiles, asset_rng);
+            const bool    digs  = input_firm ? true : gap_firm_digs(gap_r, go_processing, dig_r);
+            if (input_firm)
+                dig_r = static_cast<resource_type>(gap_r);
+            std::vector<entity_id> assets;
+            if (input_firm)
+            {
+                if (!input_window.empty())
+                    assets = place_digging_assets(w, nit->second, focus, occupied_tiles, asset_rng,
+                                                  &input_window, dig_r);
+            }
+            else
+                assets = digs
+                    ? place_digging_assets(w, nit->second, focus, occupied_tiles, asset_rng,
+                                           nullptr, dig_r)
+                    : place_starting_assets(w, nit->second, focus, occupied_tiles, asset_rng);
             if (assets.empty())
             {
+                if (input_firm)
+                    continue; // no ground for the raw: the good's chain stays absent
                 if (digs && ++dig_misses[gap_r] >= static_cast<int>(nation_ids.size()))
                     dig_masked[gap_r] = true;
                 continue; // this nation had nothing left to anchor on this round; try the next
@@ -3089,9 +3166,42 @@ std::vector<entity_id> generate_background_firms(
                         if (i != recipe_i)
                             serve.push_back(i);
                 }
+                // Round 3: the market the firm's first processor stands in — where
+                // the chain was asked — read before a refusal unplaces it.
+                entity_id proc_market = null_entity;
+                for (const entity_id bid : assets)
+                    if (const auto bit = w.buildings.find(bid);
+                        bit != w.buildings.end()
+                        && bit->second.type == building_type::processing_facility)
+                    {
+                        proc_market = market_for_tile(w, bit->second.tile);
+                        break;
+                    }
                 if (!make_chain_feasible(w, reg, chain, assets, occupied_tiles,
                                          go_processing ? &serve : nullptr))
                 {
+                    // BL-1197 round 3 — INPUT CHARTERING (NR-976): when the chain
+                    // lacks only RAW inputs within reach of that market, the next
+                    // iteration charters the first such raw (ascending id) that is
+                    // under its cap and not yet chartered for that market, inside
+                    // this nation's tiles of that market; the good is retried as
+                    // the selection comes round. Each (raw, market) is chartered
+                    // for this reason once per body, which bounds it.
+                    if (go_processing)
+                        for (const std::size_t r :
+                             chain_missing_raws(w, reg, chain, proc_market, serve))
+                        {
+                            if (firms_by_resource[r] >= per_resource_firm_cap
+                                || input_chartered.count({ r, proc_market }))
+                                continue;
+                            input_chartered.insert({ r, proc_market });
+                            pending_input  = r;
+                            pending_nation = home_nid;
+                            for (entity_id tid : nit->second.tiles)
+                                if (market_for_tile(w, tid) == proc_market)
+                                    pending_window.push_back(tid);
+                            break;
+                        }
                     // Given back whole. Another nation's turn may anchor in reach,
                     // so the good is masked once it has missed as many times as
                     // the body has nations (the cursor takes them in turn). The
@@ -4844,6 +4954,13 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         // every rule (the turn also marks it skipped); a miss is the GOOD's, never
         // the focus's, so `focus_failed` is not set by it.
         std::array<bool, resource_count> dig_missed{};
+        // BL-1197 round 3 (input chartering, NR-976): the raws this centre has
+        // chartered an extractor for because a processing good lacked them. A raw
+        // is chartered for that reason at most once per centre, which bounds the
+        // retry: each one either brings the chain within reach or it stays absent.
+        std::array<bool, resource_count> input_chartered{};
+        const entity_id centre_market =
+            (cc.tile != null_entity) ? market_for_tile(w, cc.tile) : null_entity;
 
         for (int32_t k = 0; k < n_firms; ++k)
         {
@@ -5182,6 +5299,51 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                     }
                     else if (chain_rejected)
                     {
+                        // BL-1197 round 3 — INPUT CHARTERING (NR-976). Before the
+                        // good is passed over, ask whether its chain is absent only
+                        // because a RAW input has no producer within reach of this
+                        // centre's market. If so, and the windows hold a deposit of
+                        // that raw (a Well site, for water) and its own cap has
+                        // room, THIS firm is that raw's extractor — booked as the
+                        // raw's firm, against its cap and share, under the same
+                        // province cap and budget as any firm. The good is not
+                        // skipped and the turn's cursor does not move past it, so
+                        // the next firm retries it with the raw now produced.
+                        std::vector<entity_id> in_assets;
+                        std::size_t            in_r = resource_count;
+                        const std::vector<std::size_t> missing = go_processing
+                            ? chain_missing_raws(w, reg, chain, centre_market, serve)
+                            : std::vector<std::size_t>{};
+                        for (const std::size_t r : missing)
+                        {
+                            if (input_chartered[r])
+                                continue;
+                            if (bs.per_good_cap >= 0 && bs.firms_by_resource[r] >= bs.per_good_cap)
+                                continue;
+                            const resource_type dig_in = static_cast<resource_type>(r);
+                            charter_unspent_reason in_why = charter_unspent_reason::window_exhausted;
+                            bool in_rejected = false;
+                            in_assets = charter_place(w, nc, industrial_focus::extraction, occupied,
+                                                      asset_rng, cc, settle, spend, by_province,
+                                                      &province_rungs, rung, in_why, reg, &chain,
+                                                      nullptr, in_rejected, &dig_in);
+                            if (!in_assets.empty())
+                            {
+                                in_r = r;
+                                break;
+                            }
+                        }
+                        if (in_r != resource_count)
+                        {
+                            input_chartered[in_r] = true;
+                            assets        = std::move(in_assets);
+                            gap_r         = in_r;
+                            recipe_i      = -1;
+                            go_processing = false;
+                            focus         = industrial_focus::extraction;
+                            from_turn     = false;   // the cursor stays on the good
+                            break;
+                        }
                         // A failure of the GOOD, not of the focus: the windows
                         // held ground, none of it within reach of the good's
                         // chain. The focus is not marked failed — another good
