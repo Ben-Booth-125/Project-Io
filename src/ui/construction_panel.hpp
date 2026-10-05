@@ -14,14 +14,15 @@ namespace ui {
 
 /// The NAME the Buildings view files @p b under — the same words the Build door
 /// offers, so a player recognises the row as the thing they built:
-/// `extraction_building_name(target_resource)` for an extraction site ("Quarry"),
+/// `extraction_building_name(target_resource)` for an extraction site ("Quarry";
+/// "Well" where `placement_rules::is_well_site` holds, BL-1198 — so it needs @p w),
 /// the active recipe's own `group` for a processing facility ("Metal Foundry", the
 /// BL-434 grouping vocabulary), and `building_type_name` for everything else.
 ///
 /// The grouping key is the display name itself, deliberately: two buildings the
 /// player would call the same thing belong on the same row, and nothing finer is
 /// visible to them.
-std::string building_group_name(const recipe_registry& reg, const building_component& b);
+std::string building_group_name(const world& w, const recipe_registry& reg, const building_component& b);
 
 /// One row of the Buildings view: a building TYPE the player owns at least one of.
 struct building_group

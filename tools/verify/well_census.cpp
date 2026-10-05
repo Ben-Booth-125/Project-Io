@@ -12,12 +12,22 @@
 //     running and output, at the requested sample ticks (multi-tick: the scorer
 //     must find, build and staff a Well, which no one-tick row can see).
 //
-// A PURE READER. Steps the world with run_settle_tick exactly as
-// household_supply_probe does (settle ticks spectated, then play ticks).
+//   * INCOME (--income) — market_viability's G2 window (play ticks 26-50):
+//     mean field income, split by the corporations owning a water site (Well
+//     or ice) and the rest; water sold BY corporations (exchange rows with a
+//     corp seller), split by whether the seller owns a Well or an ice site; and
+//     the window's corp-sale revenue per good, to diff two runs. Plus the
+//     handoff cohort alive at the last tick (market_viability's G3).
+//
+// STEPPING mirrors market_viability (the app's order): the 12-tick settle
+// spectated at day 0, the seat, then play ticks with advance_orbits /
+// advance_surveys over 90 days each. Sample tick N = play tick N; 0 = handoff.
+// A READER otherwise: it writes nothing the sim reads (except --scorer, which
+// warms the derived logistics-reach cache).
 //
 // Build:  bash tools/verify/build_lua_harness.sh well_census
-// Run:    build_gen/verify/well_census.exe [--seeds 0,43,10] [--ticks 200]
-//                                          [--samples 0,12,50,200] [--scorer]
+// Run:    build_gen/verify/well_census.exe [--seeds 0,43,10] [--ticks 400]
+//                                          [--samples 0,50,200,400] [--scorer] [--income]
 
 #include "scripting/lua_state.hpp"
 #include "harness_params.hpp"
@@ -28,9 +38,12 @@
 #include "world/market_clearing.hpp"
 #include "world/placement_rules.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/resource_names.hpp"
+#include "world/spawn_seat.hpp"
 #include "world/world.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -96,8 +109,14 @@ void built(const world& w, const economy_report* rep, int tick)
         if (well) { ++n_well; run_well += active; out_well += out; if (m != null_entity) mk_well.insert(m); }
         else      { ++n_ice;  run_ice  += active; out_ice  += out; if (m != null_entity) mk_ice.insert(m); }
     }
-    std::printf("  tick %3d  WELLS placed %d running %d output %.1f in %zu markets | ICE placed %d running %d output %.1f in %zu markets\n",
-                tick, n_well, run_well, out_well, mk_well.size(), n_ice, run_ice, out_ice, mk_ice.size());
+    // Water's posted price over its base, the mean over the markets that list it.
+    double px = 0.0; int np = 0;
+    const std::size_t rw = static_cast<std::size_t>(resource_type::water);
+    for (const auto& [mid, mc] : w.markets)
+        if (mc.base_price[rw] > 0.0f) { px += mc.price[rw] / mc.base_price[rw]; ++np; }
+    std::printf("  tick %3d  WELLS placed %d running %d output %.1f in %zu markets | ICE placed %d running %d output %.1f in %zu markets | water px/base %.2f\n",
+                tick, n_well, run_well, out_well, mk_well.size(), n_ice, run_ice, out_ice, mk_ice.size(),
+                np ? px / np : 0.0);
 }
 
 /// The scorer's Well bucket as rank_extraction_sites keeps it (corp_ai.cpp,
@@ -137,17 +156,42 @@ void top_wells(world& w, const recipe_registry& reg, int n)
     }
 }
 
+/// Which water site, if any, each corporation owns: bit 1 a Well, bit 2 ice.
+std::map<entity_id, int> water_owners(const world& w)
+{
+    std::map<entity_id, int> out;
+    for (const auto& [cid, cc] : w.corporations)
+        for (const entity_id a : cc.assets)
+        {
+            const auto bi = w.buildings.find(a);
+            if (bi == w.buildings.end() || bi->second.decommissioned) continue;
+            const building_component& b = bi->second;
+            if (b.type != building_type::extraction_site || b.target_resource != resource_type::water) continue;
+            out[cid] |= placement_rules::is_well_site(w, b.tile, b.target_resource) ? 1 : 2;
+        }
+    return out;
+}
+
+struct income_window
+{
+    double field = 0, water_owner = 0, rest = 0;                      // field income
+    double sold_well = 0, sold_ice = 0, sold_other = 0, sold_qty = 0; // water sold by corps
+    std::array<double, resource_count> by_good{};                     // corp-sale revenue per good
+};
+
 } // namespace
 
 int main(int argc, char** argv)
 {
     std::vector<std::uint32_t> seeds{0, 43, 10};
-    int ticks = 200;
+    int ticks = 400;
     bool scorer = false; // --scorer: the SCORER diagnostic at the handoff (warms the reach cache)
-    std::set<int> samples{0, 12, 50, 200};
+    bool income = false; // --income: the G2-window attribution
+    std::set<int> samples{0, 50, 200, 400};
     for (int i = 1; i < argc; ++i)
     {
         if (!std::strcmp(argv[i], "--scorer")) scorer = true;
+        else if (!std::strcmp(argv[i], "--income")) income = true;
         else if (!std::strcmp(argv[i], "--seeds") && i + 1 < argc) seeds = parse_seeds(argv[++i]);
         else if (!std::strcmp(argv[i], "--ticks") && i + 1 < argc) ticks = std::atoi(argv[++i]);
         else if (!std::strcmp(argv[i], "--samples") && i + 1 < argc)
@@ -156,7 +200,9 @@ int main(int argc, char** argv)
             for (const std::uint32_t s : parse_seeds(argv[++i])) samples.insert(static_cast<int>(s));
         }
     }
-    std::printf("well_census — BL-1198; settle %d ticks then play\n", k_campaign_settle_ticks);
+    std::printf("well_census — BL-1198; settle %d ticks, seat, then %d play ticks\n", k_campaign_settle_ticks, ticks);
+    constexpr int k_econ_tick_days = 90;        // sim_loop::econ_tick_days
+    constexpr int k_win_lo = 26, k_win_hi = 50; // market_viability's G2 window
     for (const std::uint32_t seed : seeds)
     {
         lua_state lua;
@@ -168,14 +214,73 @@ int main(int argc, char** argv)
         const recipe_registry& reg = start->reg;
         std::printf("=== seed %u ===\n", seed);
         ground(w);
-        if (samples.count(0)) built(w, nullptr, 0);
-        for (int step = 0; step < ticks; ++step)
+        economy_report last;
+        for (int step = 0; step < k_campaign_settle_ticks; ++step)
         {
-            const bool settle = step < k_campaign_settle_ticks;
-            const settle_tick_result res = run_settle_tick(w, reg, step, settle ? 0 : step, settle);
-            if (samples.count(step + 1)) built(w, &res.report, step + 1);
-            if (scorer && step + 1 == k_campaign_settle_ticks) top_wells(w, reg, 4);
+            settle_tick_result res = run_settle_tick(w, reg, step, /*day_tick=*/0, /*spectating=*/true);
+            if (step == k_campaign_settle_ticks - 1) last = std::move(res.report);
         }
+        seat_player_corporation(w, seed, start->land.search.winner_score);
+        if (samples.count(0)) built(w, &last, 0);
+        if (scorer) top_wells(w, reg, 4);
+        std::set<entity_id> cohort;
+        for (const auto& [cid, cc] : w.corporations) { (void)cc; cohort.insert(cid); }
+
+        income_window iw;
+        for (int k = 1; k <= ticks; ++k)
+        {
+            const int day = k * k_econ_tick_days;
+            advance_orbits(w, static_cast<double>(k_econ_tick_days));
+            advance_surveys(w, k_econ_tick_days);
+            w.current_day_tick = day;
+            const std::size_t prev_total = w.exchanges.total;
+            const settle_tick_result res =
+                run_settle_tick(w, reg, k_campaign_settle_ticks + (k - 1), day, /*spectating=*/false);
+            if (samples.count(k)) built(w, &res.report, k);
+            if (income && k >= k_win_lo && k <= k_win_hi)
+            {
+                const std::map<entity_id, int> own = water_owners(w);
+                for (const auto& [cid, cc] : w.corporations)
+                {
+                    if (cc.returns.empty()) continue;
+                    const double inc = cc.returns.back().income;
+                    iw.field += inc;
+                    (own.count(cid) ? iw.water_owner : iw.rest) += inc;
+                }
+                const exchange_record_ring& ring = w.exchanges;
+                const std::size_t n = std::min<std::size_t>(ring.total - prev_total, ring.size());
+                for (std::size_t i = ring.size() - n; i < ring.size(); ++i)
+                {
+                    const exchange_record& e = ring.oldest_first(i);
+                    if (e.seller == null_entity) continue;
+                    const double v = static_cast<double>(e.quantity) * e.unit_price;
+                    iw.by_good[static_cast<std::size_t>(e.resource)] += v;
+                    if (e.resource != resource_type::water) continue;
+                    iw.sold_qty += e.quantity;
+                    const auto o = own.find(e.seller);
+                    const int bits = (o == own.end()) ? 0 : o->second;
+                    ((bits & 1) ? iw.sold_well : (bits & 2) ? iw.sold_ice : iw.sold_other) += v;
+                }
+            }
+        }
+        if (income)
+        {
+            const double nw = k_win_hi - k_win_lo + 1;
+            std::printf("  INCOME play %d-%d mean/tick: field %.0f = water-site owners %.0f + rest %.0f\n",
+                        k_win_lo, k_win_hi, iw.field / nw, iw.water_owner / nw, iw.rest / nw);
+            std::printf("  WATER sold by corps, mean/tick: %.1f u for %.0f cr (Well owners %.0f, ice owners %.0f, other %.0f)\n",
+                        iw.sold_qty / nw, (iw.sold_well + iw.sold_ice + iw.sold_other) / nw,
+                        iw.sold_well / nw, iw.sold_ice / nw, iw.sold_other / nw);
+            std::printf("  SALES by good, mean/tick:");
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (iw.by_good[r] > 0.5 * nw)
+                    std::printf(" %s %.0f", resource_names::name_of(static_cast<resource_type>(r)).c_str(),
+                                iw.by_good[r] / nw);
+            std::printf("\n");
+        }
+        int alive = 0;
+        for (const entity_id c : cohort) alive += w.corporations.count(c) ? 1 : 0;
+        std::printf("  FIRMS handoff %zu, alive at play tick %d: %d\n", cohort.size(), ticks, alive);
         if (samples.count(ticks)) ground(w);
     }
     return 0;

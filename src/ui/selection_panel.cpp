@@ -2254,7 +2254,7 @@ void draw_building_selection_body(world& w, const recipe_registry& reg,
                 close_all_panels(ui);
                 ui.show_construction_panel = true;
                 ui.construction.panel_view = 1; // Buildings
-                ui.construction.buildings_expanded = building_group_name(reg, building);
+                ui.construction.buildings_expanded = building_group_name(w, reg, building);
                 ui.selected_entity = sel; // already true; stated because the aim depends on it
             }
         }

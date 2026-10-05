@@ -4210,7 +4210,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                         estimate_building_profit(m_world, m_registry, m_last_econ_report, bld_id);
                     rec["profit"]       = bp.has_data ? bp.net() : 0.0f;
                     rec["profit_known"] = bp.has_data;
-                    rec["group"]        = ui::building_group_name(m_registry, bld_it->second);
+                    rec["group"]        = ui::building_group_name(m_world, m_registry, bld_it->second);
                 }
                 out[++idx]    = rec;
             }
