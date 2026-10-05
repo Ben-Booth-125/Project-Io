@@ -155,10 +155,11 @@ scene make_scene()
     return s;
 }
 
-/// Price coal so the dispatcher's export gate (price_A - haul > (1 + margin) x
-/// price_src) passes from N and fails from F: N and F price coal at 1, A at
-/// (1 + margin) + the mean of the two hauls. Base and posted price alike, so the
-/// gate reads the same in play and in generation. Returns false if the fixture
+/// Price coal so the export gate passes from N and fails from F in BOTH forms:
+/// N and F price coal at 1 (base and posted). A's base is set for the
+/// generation form (2 x base_A - haul > (1 + margin) x 1, the gate the scorer
+/// rows below read: their reports are empty), and A's posted price for the play
+/// form (price_A - haul > (1 + margin) x 1). Returns false if the fixture
 /// cannot separate the two lanes.
 bool place_bound(scene& s, const recipe_registry& reg)
 {
@@ -169,12 +170,13 @@ bool place_bound(scene& s, const recipe_registry& reg)
                 ir.dispatch_margin);
     if (!(hn > 0.0f) || !(hf > hn))
         return false;
-    const float pa = (1.0f + ir.dispatch_margin) + 0.5f * (hn + hf);
+    const float mid_haul = 0.5f * (hn + hf);
+    const float pa_play  = (1.0f + ir.dispatch_margin) + mid_haul;
+    const float ba_gen   = pa_play / ir.gen_price_mult;
     for (auto& [mid, m] : s.w.markets)
     {
-        const float p = (mid == s.a) ? pa : 1.0f;
-        m.base_price[r_coal] = p;
-        m.price[r_coal]      = p;
+        m.base_price[r_coal] = (mid == s.a) ? ba_gen : 1.0f;
+        m.price[r_coal]      = (mid == s.a) ? pa_play : 1.0f;
     }
     return true;
 }
@@ -269,19 +271,44 @@ int main()
                   "R1 a mine in N whose market posts coal so dear it lands over A's ceiling: refused");
         }
         {
-            // The OLD reach bound (haul <= (reservation_mult - 1 - margin) x base
-            // at A) admits this lane; the dispatcher's gate does not, because N
-            // prices coal as A does and a haul can never beat that by the margin.
+            // PLAY: the OLD reach bound (haul <= (reservation_mult - 1 - margin)
+            // x base at A) admits this lane; the dispatcher's literal gate does
+            // not, because N posts coal at A's price and a haul can never beat
+            // that by the margin. (The mine has a producing row this tick.)
             scene t = make_scene(); place_bound(t, reg);
-            add_mine(t, 6, 2);
-            market_component& mn = t.w.markets.at(t.n);
-            const float pa = t.w.markets.at(t.a).base_price[r_coal];
-            mn.base_price[r_coal] = pa; mn.price[r_coal] = pa;
+            const entity_id mine = add_mine(t, 6, 2);
+            const float pa = t.w.markets.at(t.a).price[r_coal];
+            for (auto& [mid, m] : t.w.markets) { (void)mid; m.base_price[r_coal] = pa; m.price[r_coal] = pa; }
             input_reach ir = make_input_reach(t.w, reg);
             const float hn = input_reach_haul(t.w, reg, ir, t.n, t.a);
             const bool old_bound = hn <= (2.0f - 1.0f - ir.dispatch_margin) * pa;
-            check(old_bound && !coal_ok(t, reg, need),
-                  "R1 a lane the old haul bound admitted but the dispatcher's gate refuses is REFUSED");
+            economy_report rep;
+            building_report br;
+            br.building = mine; br.type = building_type::extraction_site;
+            br.target_resource = resource_type::coal; br.active = true; br.output_quantity = 5.0f;
+            rep.buildings.push_back(br);
+            rep.building_row[mine] = 0;
+            check(old_bound && !coal_ok(t, reg, need, null_entity, &rep),
+                  "R1 play: a lane the old haul bound admitted but the dispatcher's gate refuses is REFUSED");
+        }
+        {
+            // GENERATION-SIDE reach (no report): equal bases everywhere and the
+            // short N->A haul. The play-side test on base prices would refuse it
+            // (a haul can never beat an equal price); generation takes A at
+            // reservation_mult x base, so the lane is in reach. F's long haul is
+            // priced out even so if it eats more than that headroom.
+            scene t = make_scene();
+            for (auto& [mid, m] : t.w.markets) { (void)mid; m.base_price[r_coal] = 1.0f; m.price[r_coal] = 1.0f; }
+            add_mine(t, 6, 2);
+            input_reach ir = make_input_reach(t.w, reg);
+            const float hn = input_reach_haul(t.w, reg, ir, t.n, t.a);
+            const bool cheap = 2.0f * 1.0f - hn > (1.0f + ir.dispatch_margin) * 1.0f;
+            check(cheap && coal_ok(t, reg, need),
+                  "R1 generation: equal bases and a cheap haul (N->A) are IN reach");
+            economy_report rep;
+            building_report br; br.building = null_entity; rep.buildings.push_back(br);
+            check(!coal_ok(t, reg, need, null_entity, &rep),
+                  "R1 play: the same equal-priced lane fails the dispatcher's literal test");
         }
         {
             // The ceiling OFF must not collapse reach to the same market.

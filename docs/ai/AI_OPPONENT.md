@@ -486,9 +486,13 @@ An input *r* is **obtainable** at market *C* when either holds:
 2. **Supply.** The **spare output** of *r* over the producers **within reach** of *C* covers the
    run at the idle threshold. **Within reach** is the dispatcher's own test, so a lane called in
    reach is one a convoy would actually run: the same market, or the market export leg is viable
-   **and** the export gate passes — `price_C − haul > (1 + dispatch_margin) × price_P`, with each
-   market's current resolved price in play and its own base price in generation or a hand-built
-   world. This is the one reach rule; chain-feasible placement (BL-1185) calls it too once it
+   **and** the export gate passes. In play that is literally the dispatcher's test,
+   `price_C − haul > (1 + dispatch_margin) × price_P`, on each market's current resolved price. In
+   generation or a hand-built world, where no price has resolved, it is
+   `reservation_mult × base_C − haul > (1 + dispatch_margin) × base_P` on each market's own base
+   (the price band's `ceil_mult` when the ceiling is off): the dispatcher ships because the
+   destination is short, and a short market prices up to the ceiling. Equal bases and a cheap haul
+   are in reach. This is the one reach rule; chain-feasible placement (BL-1185) calls it too once it
    merges onto the helper. The fair-price ceiling is not part of reach — it is a separate check, so
    reach does not collapse to the same market when the ceiling is off: a producer counts only if
    its unit lands at *C* at a price the ceiling admits. A producer market's spare is its output less the draw of

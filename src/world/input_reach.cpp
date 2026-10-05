@@ -16,6 +16,10 @@ input_reach make_input_reach(const world& w, const recipe_registry& reg)
     ir.nodes            = collect_logistics_nodes(w);
     ir.reservation_mult = reg.price_band().reservation_mult;
     ir.dispatch_margin  = reg.dispatch_margin();
+    // Generation-side reach uses the dearest price a short destination can
+    // post: the fair-price ceiling, or the price band's cap when it is OFF.
+    ir.gen_price_mult   = ir.reservation_mult > 0.0f ? ir.reservation_mult
+                                                     : reg.price_band().ceil_mult;
     return ir;
 }
 
@@ -242,15 +246,29 @@ bool market_within_reach(world& w, const recipe_registry& reg, input_reach& ir,
         return false;
     // THE DISPATCHER'S OWN GATE (export_market_shelves / dispatch_convoys):
     // a unit moves from src to dst only when dst's price, net of the haul,
-    // beats src's by the dispatch margin. In play each market's current
-    // resolved price (dispatch_market_price, exactly what the dispatcher
-    // reads); without a report (generation, a hand-built world) each market's
-    // own base price. No reservation_mult term: the ceiling is a separate
-    // check (the landed test in reachable_supply), so reach does not collapse
-    // to same-market when the ceiling is OFF.
-    const bool  play = ir.report != nullptr && !ir.report->buildings.empty();
-    const float ps   = play ? dispatch_market_price(sit->second, r) : sit->second.base_price[r];
-    const float pd   = play ? dispatch_market_price(dit->second, r) : dit->second.base_price[r];
+    // beats src's by the dispatch margin.
+    //  * PLAY (a report with rows): literally that test, on each market's
+    //    current resolved price (dispatch_market_price, what the dispatcher
+    //    reads).
+    //  * GENERATION / a hand-built world (no report): no price has resolved,
+    //    and the dispatcher ships because the destination is SHORT, which
+    //    lifts its price. So the destination is taken at the dearest price a
+    //    draw there will pay — reservation_mult x base_dst (the price band's
+    //    ceil_mult when the ceiling is OFF) — against the source's base:
+    //    reservation_mult x base_dst - haul > (1 + margin) x base_src.
+    // The ceiling's landed test is separate (reachable_supply).
+    const bool play = ir.report != nullptr && !ir.report->buildings.empty();
+    float ps = 0.0f, pd = 0.0f;
+    if (play)
+    {
+        ps = dispatch_market_price(sit->second, r);
+        pd = dispatch_market_price(dit->second, r);
+    }
+    else
+    {
+        ps = sit->second.base_price[r];
+        pd = ir.gen_price_mult * dit->second.base_price[r];
+    }
     if (!(pd > 0.0f) || !(pd - h > (1.0f + ir.dispatch_margin) * ps))
         return false;
     if (out_haul) *out_haul = h;

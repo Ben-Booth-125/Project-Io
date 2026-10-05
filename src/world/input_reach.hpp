@@ -14,10 +14,15 @@
 // BL-1185): a producer in market P is within reach of a consumer in market C when
 //   (a) P == C, or
 //   (b) the dispatcher's own market leg `price_market_export_leg(P, C)` is viable
-//       AND the dispatcher's own export gate passes: price_C - haul >
-//       (1 + dispatch_margin) x price_P. In play each market's current resolved
-//       price (`dispatch_market_price`, what the dispatcher reads); in generation
-//       and hand-built worlds (no report) each market's own base price.
+//       AND the dispatcher's own export gate passes, in one of two forms:
+//         * PLAY (a report with rows): price_C - haul > (1 + dispatch_margin) x
+//           price_P on each market's current resolved price
+//           (`dispatch_market_price`, literally what the dispatcher tests);
+//         * GENERATION / hand-built (no report): reservation_mult x base_C -
+//           haul > (1 + dispatch_margin) x base_P, each market's own base — the
+//           dispatcher ships because the destination is short, and a short
+//           market prices up to the ceiling (ceil_mult when the ceiling is OFF).
+//           Equal bases and a cheap haul are therefore in reach.
 // Both halves are the dispatcher's, CALLED or restated term for term, so a lane
 // called in reach is one a convoy would actually run. (The earlier bound —
 // haul <= (reservation_mult - 1 - dispatch_margin) x base — was looser than the
@@ -89,6 +94,9 @@ struct input_reach
     float                                            dispatch_margin = 0.0f;
     /// Fair-price ceiling multiple (`price_band().reservation_mult`).
     float                                            reservation_mult = 0.0f;
+    /// Generation-side destination multiple: reservation_mult, or the price
+    /// band's ceil_mult when the ceiling is OFF.
+    float                                            gen_price_mult = 0.0f;
 
     /// Optional, play only: this tick's economy report. When it carries rows,
     /// outputs are this tick's ACTUAL production. Null or empty: nominal.
