@@ -881,11 +881,11 @@ economy = {
         -- than guessed — same "credits per unit-distance" shape the convoy
         -- layer already prices with. Doubled to 0.04: moving armed units
         -- costs more than routine cargo the way the convoy table itself
-        -- already prices mode by burden (land 0.02 < sea 0.05 < air 0.15 <
-        -- space 1.00) — a marching column's escort/coordination overhead
-        -- sits above a cargo haul's, so a flat 2x on the cheapest (land)
-        -- rate is the conservative first step up that ladder rather than a
-        -- reach for the next rung. Charged per (active-LP-unit drawn x head
+        -- already prices mode by burden (land 0.02 < air 0.15 < space 1.00;
+        -- sea, 0.002 since BL-1194, is not a marching mode) — a marching
+        -- column's escort/coordination overhead sits above a cargo haul's, so
+        -- a flat 2x on the land rate is the conservative first step up that
+        -- ladder rather than a reach for the next rung. Charged per (active-LP-unit drawn x head
         -- in the unit), so a company of 200 drawing 1.0 LP this tick pays
         -- 200 x 1.0 x 0.04 = 8.0 credits — well under hire_base_cost (40,
         -- above), so marching an already-raised unit stays far cheaper than
@@ -1635,13 +1635,36 @@ economy = {
 
 -- Logistics cost constants (BL-045 / BL-039 supply layer).
 -- base_cost_per_unit_distance is multiplied by convoy distance × cargo_qty to
--- give the per-dispatch budget debit. Ordered land < sea < air < space so that
--- space transport is the most expensive, reflecting the energy and infrastructure
--- cost of leaving a gravity well.
+-- give the per-dispatch budget debit. Space is the most expensive, reflecting the
+-- energy and infrastructure cost of leaving a gravity well.
+--
+-- BL-1194 (sea cheaper than highway; SUPPLY.md § Logistical cost, Ben 2026-09-15):
+-- PER DISTANCE, A SEA LEG COSTS LESS THAN LAND ON A HIGHWAY. The rate is not the
+-- per-tile cost on its own: the path a rate multiplies is terrain-weighted
+-- (logistics.cpp tile_traversal_cost), and a water tile weighs 2.5 (sea_leg_cost)
+-- against plains 1.0, while a Highway (road tier 3) cuts a land tile to x0.40.
+-- Per tile, per unit:
+--     land, plains, Highway   0.02  x 1.0 x 0.40 = 0.0080   (the ruling's yardstick)
+--     land, plains, Road      0.02  x 1.0 x 0.50 = 0.0100
+--     land, plains, no road   0.02  x 1.0        = 0.0200
+--     sea, open water         0.002 x 2.5        = 0.0050   (< 0.0080: the ordering)
+--     sea, on a sea lane      0.002 x 2.5 x 0.50 = 0.0025
+-- The old 0.05 priced a sea tile at 0.125 - 15x a highway tile, 6x unroaded
+-- plains - so a sea leg never won at any distance and BL-1186's port routes ran
+-- only where no land path existed at all.
+-- THE CROSSOVER (the design reading; re-state it whenever this rate, the 2.5
+-- weight, the road multipliers or logistics.port_handling move). A sea route pays
+-- handling twice (2 x 0.10 = 0.20 per unit), so it beats an equal-length land
+-- haul once  0.20 / (land_tile - 0.0050)  tiles of sea are saved:
+--     vs Highway  67 tiles | vs Road  40 tiles | vs Track (x0.67) 24 tiles |
+--     vs unroaded plains  13 tiles  (against the 261-tile home circumference).
+-- A short coastal hop still loses to a road; a long crossing wins. The BL-148
+-- city discount on a land leg (up to 50%) can take a highway below the sea rate
+-- again (0.0040): a road through cities is the one land haul sea never beats.
 logistics = {
     base_cost_per_unit_distance = {
         land  = 0.02,
-        sea   = 0.05,
+        sea   = 0.002,
         air   = 0.15,
         space = 1.00,
     },
