@@ -114,7 +114,8 @@ building_profit estimate_prospective_profit(const world& w, const recipe_registr
                                             entity_id tile_id, building_type type,
                                             resource_type target,
                                             std::uint16_t recipe_id,
-                                            const building_component* existing)
+                                            const building_component* existing,
+                                            const std::array<float, resource_count>* input_unit_cost)
 {
     building_profit out;
 
@@ -294,8 +295,11 @@ building_profit estimate_prospective_profit(const world& w, const recipe_registr
             for (std::size_t ri = 0; ri < resource_count; ++ri)
             {
                 const float p = price(static_cast<resource_type>(ri));
+                // BL-1187: an input is priced at what the processor would pay for
+                // it (the caller's obtainable cost) when one is handed in.
+                const float pin = input_unit_cost ? (*input_unit_cost)[ri] : p;
                 out.revenue    += rcp->outputs[ri] * batches * p;
-                out.input_cost += rcp->inputs[ri]  * batches * p;
+                out.input_cost += rcp->inputs[ri]  * batches * pin;
             }
         }
     }

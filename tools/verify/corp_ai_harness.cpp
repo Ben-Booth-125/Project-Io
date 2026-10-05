@@ -23,6 +23,9 @@
 //        at the solvency gate becomes ONE earmarked `public_exploration` claim
 //        on the corp's home nation for the FULL survey cost of the top-scoring
 //        gated body; no home nation or no gating means no claim.
+//   R9 — build only what runs (BL-1187): the recipe chase refuses a sibling
+//        whose input is unobtainable and takes it once a producer or stock is
+//        in reach, read every tick over 12 evaluations.
 // Hand-builds a minimal world (no Lua / SDL / ImGui); kept outside src/ so the
 // CMake glob ignores it. Follows the corp_agency_harness.cpp pattern.
 
@@ -173,6 +176,12 @@ scene make_scene(float ai_cash)
 recipe_registry make_registry()
 {
     recipe_registry reg;
+    // The shipped fair-price ceiling (economy.lua), not the registry's OFF
+    // default: with 0 the reach bound is negative and the ceiling never binds,
+    // so BL-1187's rows would test a world the game never runs.
+    price_band_params pb = reg.price_band();
+    pb.reservation_mult = 2.0f;
+    reg.set_price_band(pb);
     building_economics ex;
     ex.base_rate            = 10.0f;
     ex.maintenance          = 2.0f;
@@ -1042,6 +1051,134 @@ int main()
             check(held == reg.recipe_id("alpha_high"),
                   "BL-712 R8: and the chase still WORKS - the better sibling inside "
                   "its own group is taken, so the row above is not vacuous");
+        }
+    }
+
+    // =====================================================================
+    // R9 — build only what runs: a switch needs OBTAINABLE inputs (BL-1187)
+    // =====================================================================
+    // The margin chase priced every recipe at base and never asked whether its
+    // inputs could be had, so a working plant moved onto a fatter sibling whose
+    // inputs nothing supplied (seed 0: 16 clean-water plants to consumer goods
+    // by tick 3, then starved). Now a sibling is proposed only when each input
+    // is obtainable at the plant's market (input_reach.hpp): stock at hand (pool
+    // + an admitted shelf, at t_idle) or a producer within reach.
+    //
+    // One group, "Alpha": the incumbent `alpha_iron` (iron -> 1 steel, iron in
+    // the pool) and `alpha_coal` (coal -> 3 steel), ~4x the margin. Three worlds,
+    // each walked for 12 evaluations and read EVERY tick:
+    //   (a) no coal anywhere            -> the switch is refused on every tick;
+    //   (b) a coal mine in the market   -> the switch is taken;
+    //   (c) coal stock in the corp pool -> the switch is taken.
+    {
+        auto staged_registry = [&]() {
+            recipe_registry reg = make_registry();
+            building_economics pe;
+            pe.base_rate            = 1.0f;
+            pe.maintenance          = 0.0f;
+            pe.base_wage            = 0.0f;
+            pe.build_cost           = 100.0f;
+            pe.build_duration_ticks = 2.0f;
+            reg.set_economics(building_type::processing_facility, pe);
+
+            recipe a_iron;
+            a_iron.name  = "alpha_iron";
+            a_iron.group = "Alpha";
+            a_iron.inputs [ri(resource_type::iron_ore)] = 1.0f;
+            a_iron.outputs[ri(resource_type::steel)]    = 1.0f;
+            recipe a_coal;
+            a_coal.name  = "alpha_coal";
+            a_coal.group = "Alpha";
+            a_coal.inputs [ri(resource_type::coal)]  = 1.0f;
+            a_coal.outputs[ri(resource_type::steel)] = 3.0f;
+            reg.add_recipe(a_iron);
+            reg.add_recipe(a_coal);
+            return reg;
+        };
+
+        enum class coal_source { none, producer, pool };
+        struct walked
+        {
+            std::vector<uint16_t> held; ///< the plant's recipe after each eval, ticks 1..12
+            uint16_t iron = 0;
+            uint16_t coal = 0;
+        };
+        auto walk = [&](coal_source src) {
+            const recipe_registry reg = staged_registry();
+            scene s = make_scene(5000.0f);
+            market_component& mc = s.w.markets.at(s.market);
+            mc.base_price[ri(resource_type::steel)] = 10.0f;
+            mc.base_price[ri(resource_type::coal)]  = 2.0f;
+            mc.price = mc.base_price;
+
+            const entity_id t = make_tile(s.w, s.body, 1, 1, terrain_substrate::rocky, 0.0f);
+            const entity_id f = s.w.create_entity();
+            building_component b{};
+            b.tile               = t;
+            b.type               = building_type::processing_facility;
+            b.workforce_assigned = 1.0f;
+            b.workforce_auto     = false;
+            b.target_resource    = resource_type::steel;
+            b.recipe             = reg.recipe_id("alpha_iron");
+            s.w.buildings[f] = b;
+            s.w.corporations.at(s.ai_corp).assets.push_back(f);
+
+            stockpile_component pool;
+            pool.quantities[ri(resource_type::iron_ore)] = 10000.0f;
+            if (src == coal_source::pool)
+                pool.quantities[ri(resource_type::coal)] = 10000.0f;
+            s.w.corp_market_pools[{s.ai_corp, pool_key_for_body(s.w, s.body)}] = pool;
+
+            if (src == coal_source::producer)
+            {
+                // A coal mine in the SAME market, held by the player corp (so the
+                // scorer never dials it): a producer within reach, no stock yet.
+                const entity_id tc = make_tile(s.w, s.body, 2, 1, terrain_substrate::rocky, 0.0f);
+                s.w.tiles.at(tc).resource_deposit[ri(resource_type::coal)]   = 1.0f;
+                s.w.tiles.at(tc).resource_remaining[ri(resource_type::coal)] = 1.0e6f;
+                const entity_id mine = s.w.create_entity();
+                building_component m{};
+                m.tile               = tc;
+                m.type               = building_type::extraction_site;
+                m.workforce_assigned = 0.5f;
+                m.workforce_auto     = false;
+                m.target_resource    = resource_type::coal;
+                s.w.buildings[mine] = m;
+                s.w.corporations.at(s.pl_corp).assets.push_back(mine);
+            }
+
+            walked out;
+            out.iron = reg.recipe_id("alpha_iron");
+            out.coal = reg.recipe_id("alpha_coal");
+            for (int tk = 1; tk <= 12; ++tk)
+            {
+                economy_report rep;
+                run_corp_strategic_step(s.w, reg, rep, tk);
+                out.held.push_back(s.w.buildings.at(f).recipe);
+            }
+            return out;
+        };
+
+        {
+            const walked r = walk(coal_source::none);
+            bool never = !r.held.empty();
+            for (const uint16_t h : r.held)
+                if (h != r.iron) never = false;
+            check(never,
+                  "BL-1187 R9: a switch onto a recipe whose input is UNOBTAINABLE (no stock, "
+                  "no producer within reach) is refused on every one of 12 evaluations");
+        }
+        {
+            const walked r = walk(coal_source::producer);
+            check(!r.held.empty() && r.held.back() == r.coal,
+                  "BL-1187 R9: the same switch is TAKEN once a producer of the input stands "
+                  "in the plant's market (obtainable by supply)");
+        }
+        {
+            const walked r = walk(coal_source::pool);
+            check(!r.held.empty() && r.held.back() == r.coal,
+                  "BL-1187 R9: and TAKEN when the input is stock in the corp's own pool "
+                  "(obtainable by stock), so the refusal above is not vacuous");
         }
     }
 
