@@ -806,8 +806,37 @@ economy = {
             -- headroom. hire_base_cost / hire_cost_per_power move by the same
             -- x2.776 so "a year's keep < a fresh hire" (4 x 50 x 0.4164 = 83.3
             -- < 120) still holds in consistent units.
-            credits_per_head           = 0.4164,  -- flat wage per head per tick (was 0.15; 6.0 before BL-635)
-            credits_per_head_per_power = 0.00028, -- wage scaled by the roster row's power_mod (was 0.0001; bounded <= 0.000331, seederivation above)
+            --
+            -- BL-1191 (UPKEEP_RETUNE_STOPGAP, Ben's sprint 49 form, 2026-10-04):
+            -- THE WHOLE VECTOR x 0.25 — a STOPGAP. The real fix is BL-1174
+            -- (hiring answers a threat), which waits on its AI grant; until a
+            -- firm's guard follows the hostility it faces, every firm fills the
+            -- flat hire cap and pays for a guard nobody is threatening.
+            --
+            -- MEASURED (firm_attrition_trace, seeds 0/43/10, 400 play ticks, at
+            -- the old rates): 505 of 539 firms ever armed; the credit half was
+            -- a median 12.3% of a surviving firm's income (47.6 of 370.6 cr/
+            -- tick) and 38% of an exiting firm's (30.0 of 68.7). Of 160
+            -- insolvent exits, 92 had lifetime flows that netted non-negative
+            -- WITHOUT upkeep — the guard was what tipped them. The goods half
+            -- cost almost no money (it is mostly unfilled at the fair-price
+            -- ceiling; corp units sat at ~100-250 permille supply).
+            --
+            -- THE TARGET: a full hire cap (3 Levy Spears, 150 heads) costs
+            -- under 5% of a median surviving firm's income on the LEANEST
+            -- measured seed (seed 10, 313.6 cr/tick): 313.6 x 0.05 / 150 =
+            -- 0.1045 cr/head/tick. 0.4164 x 0.25 = 0.1041 sits just under it.
+            --
+            -- WHY UNIFORMLY, not the credit half alone: value_anchor R1 and
+            -- upkeep_harness U1 hold the goods half at ~2x the wage at base
+            -- price (NATIONS.md § 3), and FINANCE.md's retuning rule scales both
+            -- halves by one factor. The per-power term and the goods draws take
+            -- the same 0.25, so every roster row stays where it was in the
+            -- band. A cheaper goods draw is also a draw the fair-price ceiling
+            -- fills more often, so a guard is better fed, not only cheaper.
+            -- "A year's keep < a fresh hire": 4 x 50 x 0.1041 = 20.8 < 120.
+            credits_per_head           = 0.1041,  -- flat wage per head per tick (BL-1191 x0.25; was 0.4164; 0.15 before BL-744; 6.0 before BL-635)
+            credits_per_head_per_power = 0.00007, -- wage scaled by the roster row's power_mod (BL-1191 x0.25; was 0.00028; bound now <= 0.0000828)
 
             -- The goods half of the vector, per head per tick. ORDNANCE is the
             -- good (BL-457 added it as the roster's first terminal MILITARY
@@ -815,8 +844,8 @@ economy = {
             -- the sanctioned second line. Both rescaled by the same 0.025, so
             -- value_anchor's equipment:wage ratio is untouched.
             goods_per_head = {
-                ordnance     = 0.0035, -- was 0.14
-                food_rations = 0.025,  -- was 1.0
+                ordnance     = 0.000875, -- BL-1191 x0.25 (was 0.0035; 0.14 before BL-635)
+                food_rations = 0.00625,  -- BL-1191 x0.25 (was 0.025; 1.0 before BL-635)
             },
 
             supply_decay_permille    = 50,   -- the ONE decay subtraction, per tick

@@ -30,8 +30,7 @@ balance += income − expenditure − maintenance − wages − interest − lev
 - **Levies** — what enacted law took (below). The prototype extraction levy is
   generation-seeded *enacted*, authored by the player's home nation, so it reaches the
   player from turn one (NR-369).
-- **Upkeep** — standing-force upkeep (below). Its authored rates are all `0.0`, so the
-  term is present and carried but contributes nothing at the authored values.
+- **Upkeep** — standing-force upkeep (below): the credit half of a unit's upkeep vector.
 
 **Household consumption is not a flow.** A household draws its basket off the market's shelf and
 pays nothing for it (`MARKETS.md` § The clearing tick, step 12). The maker was already paid when
@@ -98,6 +97,12 @@ standing-force upkeep was what wound most of the field up.
 **SETTLED (Ben, 2026-10-03), for the next sprint: hiring answers a threat.** A firm's standing force
 follows the hostility it faces — hostile stance or contested ground — rather than filling a flat
 cap. It widens the AI-behaviour grant and is recorded in `../ai/AI_OPPONENT.md` § 11 when built.
+
+**Until then the rates carry the load (Ben, 2026-10-04, a stopgap — BL-1191, upkeep retune).**
+While every firm fills a flat cap whether or not anyone threatens it, the rates are sized so a
+guard under no threat does not bleed its owner: a full cap of the cheapest row costs **under ~5 %
+of a median surviving firm's income**, on the leanest measured seed. Both halves of the vector
+move by the one factor, per the retuning rule above, so the equipment-to-wage anchor holds.
 
 **A short pool BUYS before it goes short (Ben, 2026-08-26, BL-654).** Before the shortfall rule
 below fires, the draw bids the missing quantity onto the market and pays for what it gets — so
