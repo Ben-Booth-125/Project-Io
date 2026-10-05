@@ -488,6 +488,22 @@ held ground, and none of it was within reach of a chain. The budget-less Pass 6 
 it has missed as many times as the body has nations (the nation cursor takes them in turn), and
 the mask holds for the rest of the pass unless a firm that produces one of its inputs lands.
 
+**A water-gap firm digs water** (Ben, 2026-10-05, NR-973: "we can add wells to generation";
+BL-1197, gap firm digs the gap). An extraction firm chartered for the water gap stands on water
+ground: a **Well** site (`../economy/PRODUCTION.md` § Extraction buildings — fresh-water adjacent,
+no ice deposit), ranked by habitability so the water lands where people live; else an **ice
+deposit**; each tier is tried across every window the firm may anchor in before the next. Its
+later extraction slots dig water where their tile can, and otherwise take the tile's richest
+deposit. Where its windows hold no water ground at all it **falls back** to its richest deposit,
+as any extraction firm does — and that firm is **not counted against water's per-resource cap**
+(nor its share), since it digs something else: it is booked as a firm of the good its anchor
+digs. Water is then passed over for the rest of that
+centre (the windows only fill); without a budget it is masked once it has fallen back as many
+times as the body has nations, and a firm that digs it clears the count. A fallback always places
+a firm: the gap good never leaves a firm with nothing. Every other gap good keeps the
+richest-deposit rule. Chain-feasible placement then sees the water near people, so clean-water
+and medical makers can stand where a Well does.
+
 **What Pass 6 does not do.** It does not seed any behavioural state, matching the contract the
 rest of this pipeline holds (§ Generation seeds no behaviour) — no sentiment, no diplomatic
 posture, no plans. It also does not touch the player or named-rival corporations Passes 1–5

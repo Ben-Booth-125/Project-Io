@@ -394,10 +394,20 @@ float dryness_lean(terrain_substrate sub, terrain_cover cov)
 /// `focus_asset_pattern` never proposes these types — so the lean is dormant until
 /// something places them, and is tuning data rather than a settled design.
 ///
-/// @param tc    The candidate tile.
-/// @param btype The building type proposed for it.
-/// @return      A positive placement score; larger is more preferred.
-float tile_score_for(const tile_component& tc, building_type btype)
+/// A WELL TILE (BL-1197 / BL-1198) carries no deposit — its water comes from the
+/// river or lake beside it — so scoring it by deposit would rank every Well site
+/// at the floor. A Well is scored by the tile's habitability instead: the water
+/// is wanted where people live, and habitable ground is where they settled.
+///
+/// @param tc        The candidate tile.
+/// @param btype     The building type proposed for it.
+/// @param target    The extraction target, when the caller names one (a gap
+///                  firm digging its good); null means the tile's richest.
+/// @param well_site True when the tile is a Well site for @p target
+///                  (`placement_rules::is_well_site`) — the caller has the world.
+/// @return          A positive placement score; larger is more preferred.
+float tile_score_for(const tile_component& tc, building_type btype,
+                     const resource_type* target = nullptr, bool well_site = false)
 {
     float score = 1.0f;
     switch (btype)
@@ -405,8 +415,13 @@ float tile_score_for(const tile_component& tc, building_type btype)
         case building_type::extraction_site:
             // Rank by extractable deposit so the site lands where it can work;
             // tiny floor keeps a deposit-poor tile still placeable (it will fail
-            // can_place separately and be skipped there).
-            score = placement_rules::extractable_deposit(tc) + 0.001f;
+            // can_place separately and be skipped there). A Well by habitability.
+            if (well_site)
+                score = 0.05f + tc.habitability;
+            else if (target != nullptr)
+                score = tc.resource_deposit[static_cast<std::size_t>(*target)] + 0.001f;
+            else
+                score = placement_rules::extractable_deposit(tc) + 0.001f;
             break;
         case building_type::processing_facility:
             // Mild lean toward tiles with some deposit (own feedstock nearby).
@@ -450,11 +465,15 @@ float tile_score_for(const tile_component& tc, building_type btype)
 /// @param tid   Tile to place on (must be a valid, unoccupied land tile).
 /// @param btype Building type to author.
 /// @param occupied_tiles Occupancy set; `tid` is inserted.
+/// @param target An explicit extraction target (BL-1197: a water-gap firm's Well
+///               or ice site authors `water`; a Well tile has no deposit for the
+///               richest-deposit rule to find); null means the richest.
 /// @return      Entity id of the created building.
 entity_id author_building(world& w,
                           entity_id tid,
                           building_type btype,
-                          std::unordered_set<entity_id>& occupied_tiles)
+                          std::unordered_set<entity_id>& occupied_tiles,
+                          const resource_type* target = nullptr)
 {
     const entity_id bld_id = w.create_entity();
 
@@ -472,8 +491,9 @@ entity_id author_building(world& w,
 
     if (btype == building_type::extraction_site)
     {
-        const auto tit = w.tiles.find(tid);
-        if (tit != w.tiles.end())
+        if (target != nullptr)
+            bc.target_resource = *target;
+        else if (const auto tit = w.tiles.find(tid); tit != w.tiles.end())
         {
             bool any = false;
             bc.target_resource = placement_rules::richest_extractable(tit->second, any);
@@ -487,6 +507,23 @@ entity_id author_building(world& w,
     w.stockpiles[bld_id] = stockpile_component{};
     occupied_tiles.insert(tid);
     return bld_id;
+}
+
+/// How a tile can host an extraction site digging @p dig (BL-1197, gap firm digs
+/// the gap): `none`, a `well` (water only — a fresh-water-adjacent tile with no
+/// ice deposit, `placement_rules::is_well_site`), or a `deposit` of @p dig. Both
+/// pass `can_place` (never water ground, never urban). Read-only, draws nothing.
+enum class dig_site { none, well, deposit };
+dig_site dig_site_of(const world& w, entity_id tid, const tile_component& tc,
+                     resource_type dig)
+{
+    if (!placement_rules::can_place(tc, building_type::extraction_site, dig))
+        return dig_site::none;
+    if (tc.resource_deposit[static_cast<std::size_t>(dig)] > 0.0f)
+        return dig_site::deposit;
+    if (placement_rules::is_well_site(w, tid, dig))
+        return dig_site::well;
+    return dig_site::none;
 }
 
 /// Place a clustered set of starting buildings for one corporation inside its home
@@ -509,7 +546,23 @@ entity_id author_building(world& w,
 /// @param focus          Corporate industrial focus (determines the asset mix and tile preference).
 /// @param occupied_tiles Tiles already taken by another building; never reused.
 /// @param rng            Seeded RNG for the anchor weighted draw and holdings count.
+/// DIGGING A NAMED GOOD (BL-1197, gap firm digs the gap). With @p dig and a
+/// @p dig_tier other than `none`, an extraction anchor stands ONLY on a tile of
+/// that tier for @p dig (`dig_site_of`) — a Well site, scored by habitability, or
+/// a deposit of the good, scored by that deposit — and extracts @p dig; a window
+/// with no such tile places nothing and draws nothing, so the caller can try the
+/// next tier as it would the next rung. Each later extraction slot digs @p dig
+/// where its tile can, and otherwise takes the tile's richest deposit as ever.
+/// Without @p dig the placement is exactly the richest-deposit rule above.
+///
+/// @param w              World to write the new entities into.
+/// @param home_nation    The nation_component of the home nation.
+/// @param focus          Corporate industrial focus (determines the asset mix and tile preference).
+/// @param occupied_tiles Tiles already taken by another building; never reused.
+/// @param rng            Seeded RNG for the anchor weighted draw and holdings count.
 /// @param anchor_window  Tiles the anchor may sit on; null/empty means the whole nation.
+/// @param dig            The good an extraction firm digs (BL-1197); null for none.
+/// @param dig_tier       Which ground the anchor must stand on to dig it.
 /// @return               Entity ids of every building placed (may be empty when the
 ///                       window holds no tile that can host the anchor type — the
 ///                       caller's cue to widen a rung).
@@ -518,7 +571,9 @@ std::vector<entity_id> place_starting_assets(world& w,
                                              industrial_focus focus,
                                              std::unordered_set<entity_id>& occupied_tiles,
                                              std::mt19937& rng,
-                                             const std::vector<entity_id>* anchor_window = nullptr)
+                                             const std::vector<entity_id>* anchor_window = nullptr,
+                                             const resource_type* dig = nullptr,
+                                             dig_site dig_tier = dig_site::none)
 {
     std::vector<entity_id> placed;
     if (home_nation.tiles.empty())
@@ -529,6 +584,9 @@ std::vector<entity_id> place_starting_assets(world& w,
 
     const std::vector<building_type>& pattern = focus_asset_pattern(focus);
     const building_type anchor_type = pattern.front();
+    // BL-1197: digging only applies to an extraction anchor on a named tier.
+    const bool digging = dig != nullptr && dig_tier != dig_site::none
+                      && anchor_type == building_type::extraction_site;
 
     // --- choose the anchor tile (weighted by anchor-type score) ---------------
     // Candidates are the window's non-ocean, unoccupied tiles that can validly host
@@ -545,6 +603,15 @@ std::vector<entity_id> place_starting_assets(world& w,
         if (it == w.tiles.end())
             continue;
         const tile_component& tc = it->second;
+        if (digging)
+        {
+            // BL-1197: only the named tier's ground for the dug good.
+            if (dig_site_of(w, tid, tc, *dig) != dig_tier)
+                continue;
+            anchors.push_back({ tid, tile_score_for(tc, anchor_type, dig,
+                                                    dig_tier == dig_site::well) });
+            continue;
+        }
         // An extraction anchor must sit on a workable deposit; for processing/port
         // anchors can_place reduces to "non-ocean land".
         bool any = false;
@@ -576,7 +643,8 @@ std::vector<entity_id> place_starting_assets(world& w,
     const int anchor_x = anchor_tc.grid_x;
     const int anchor_y = anchor_tc.grid_y;
 
-    placed.push_back(author_building(w, anchor_tid, anchor_type, occupied_tiles));
+    placed.push_back(author_building(w, anchor_tid, anchor_type, occupied_tiles,
+                                     digging ? dig : nullptr));
 
     // --- order the rest of the nation's tiles by distance to the anchor -------
     // Squared grid distance keeps holdings contiguous; ties break on tile id so
@@ -625,6 +693,17 @@ std::vector<entity_id> place_starting_assets(world& w,
             if (occupied_tiles.count(tid))
                 continue;
             const tile_component& tc = w.tiles.at(tid);
+            // BL-1197: a digging firm's extraction slot digs its good where the
+            // tile can (a Well site or a deposit of it — the slot walk has the
+            // world, so the fresh-water gate is tested here), else the richest.
+            if (digging && btype == building_type::extraction_site
+                && dig_site_of(w, tid, tc, *dig) != dig_site::none)
+            {
+                placed.push_back(author_building(w, tid, btype, occupied_tiles, dig));
+                ++cursor_tile;
+                placed_this_slot = true;
+                break;
+            }
             bool any = false;
             const resource_type tgt = placement_rules::richest_extractable(tc, any);
             if (!placement_rules::can_place(tc, btype, tgt))
@@ -640,6 +719,46 @@ std::vector<entity_id> place_starting_assets(world& w,
     }
 
     return placed;
+}
+
+/// The good a background extraction firm chartered for @p gap digs at its own
+/// ground (BL-1197, gap firm digs the gap): water, today, and only water — the
+/// household chain's heaviest unmet good, which a habitable world draws from a
+/// Well where people live (BL-1198). Every other gap keeps the richest-deposit
+/// rule. Returns false when the firm digs no named good.
+bool gap_firm_digs(std::size_t gap, bool go_processing, resource_type& dig_out)
+{
+    if (go_processing || gap != static_cast<std::size_t>(resource_type::water))
+        return false;
+    dig_out = resource_type::water;
+    return true;
+}
+
+/// THE DIG LADDER (BL-1197): a Well site, else a deposit of the good, else the
+/// firm's richest deposit — each tier tried over the whole of @p anchor_window
+/// before the next, a tier with no ground drawing nothing. @p dug_out says
+/// whether the firm stands on its good (anchor digs @p dig) or fell back.
+std::vector<entity_id> place_digging_assets(world& w,
+                                            const nation_component& home_nation,
+                                            industrial_focus focus,
+                                            std::unordered_set<entity_id>& occupied_tiles,
+                                            std::mt19937& rng,
+                                            const std::vector<entity_id>* anchor_window,
+                                            resource_type dig,
+                                            bool& dug_out)
+{
+    dug_out = false;
+    for (const dig_site tier : { dig_site::well, dig_site::deposit })
+    {
+        std::vector<entity_id> assets = place_starting_assets(
+            w, home_nation, focus, occupied_tiles, rng, anchor_window, &dig, tier);
+        if (!assets.empty())
+        {
+            dug_out = true;
+            return assets;
+        }
+    }
+    return place_starting_assets(w, home_nation, focus, occupied_tiles, rng, anchor_window);
 }
 
 /// The grid width of the body a nation's territory sits on, or 0 when it has no
@@ -2742,6 +2861,10 @@ std::vector<entity_id> generate_background_firms(
         // landed, and whether the good is masked out of the selection for it.
         std::array<int, resource_count>  chain_misses = {};
         std::array<bool, resource_count> chain_masked = {};
+        // BL-1197: per good, the firms chartered for it that fell back to their
+        // richest deposit since one last dug it, and whether that masks it.
+        std::array<int, resource_count>  dig_misses = {};
+        std::array<bool, resource_count> dig_masked = {};
         for (int iter = 0; iter < max_iterations_per_body && firms_this_body < max_firms_per_body; ++iter)
         {
             std::array<float, resource_count> production = {};
@@ -2783,7 +2906,8 @@ std::vector<entity_id> generate_background_firms(
             // selection rule to drift out of step with the first.
             std::array<float, resource_count> selectable = production;
             for (std::size_t r = 0; r < resource_count; ++r)
-                if (firms_by_resource[r] >= per_resource_firm_cap || chain_masked[r])
+                if (firms_by_resource[r] >= per_resource_firm_cap || chain_masked[r]
+                    || dig_masked[r])
                     selectable[r] = std::max(selectable[r], demand[r]);
 
             // BL-709 — THE CONSTRUCTION SECTOR IS PROVISIONED FIRST, and this
@@ -2894,8 +3018,16 @@ std::vector<entity_id> generate_background_firms(
             if (nit == w.nations.end())
                 continue;
 
-            std::vector<entity_id> assets = place_starting_assets(
-                w, nit->second, focus, occupied_tiles, asset_rng);
+            // BL-1197 (gap firm digs the gap): a water-gap firm digs water at a
+            // Well site, else an ice deposit, else falls back to its richest
+            // deposit — and a fallback is not counted against water (below).
+            resource_type dig_r = resource_type::water;
+            const bool    digs  = gap_firm_digs(gap_r, go_processing, dig_r);
+            bool          dug   = false;
+            std::vector<entity_id> assets = digs
+                ? place_digging_assets(w, nit->second, focus, occupied_tiles, asset_rng,
+                                       nullptr, dig_r, dug)
+                : place_starting_assets(w, nit->second, focus, occupied_tiles, asset_rng);
             if (assets.empty())
                 continue; // this nation had nothing left to anchor on this round; try the next
 
@@ -3017,7 +3149,25 @@ std::vector<entity_id> generate_background_firms(
             w.corporations[corp_id] = std::move(cc);
             firm_ids.push_back(corp_id);
             ++firms_this_body;
-            ++firms_by_resource[gap_r];
+            // BL-1197: a water-gap firm that fell back to its richest deposit
+            // digs no water, so it is not counted against water's cap — the
+            // cap would otherwise fill with firms digging something else. It is
+            // booked as a firm of what its anchor digs. Water is masked once it
+            // has fallen back as many times as the body has nations (the cursor
+            // takes them in turn), so the fallback cannot run away; a firm that
+            // does dig it clears the count.
+            if (digs && !dug)
+            {
+                ++firms_by_resource[static_cast<std::size_t>(
+                    w.buildings.at(w.corporations.at(corp_id).assets.front()).target_resource)];
+                if (++dig_misses[gap_r] >= static_cast<int>(nation_ids.size()))
+                    dig_masked[gap_r] = true;
+            }
+            else
+            {
+                ++firms_by_resource[gap_r];
+                dig_misses[gap_r] = 0;
+            }
             if (anchor_province != 0)
                 ++firms_by_province[anchor_province];
             // BL-1185: a firm FOR good g just landed, so g is feasible from some
@@ -3552,7 +3702,8 @@ std::vector<entity_id> charter_under_province_cap(const world& w,
 /// Only asked after a placement failed, to name WHY it failed.
 bool charter_window_anchorable(const world& w, const std::vector<entity_id>& window,
                                industrial_focus focus,
-                               const std::unordered_set<entity_id>& occupied)
+                               const std::unordered_set<entity_id>& occupied,
+                               const resource_type* dig = nullptr)
 {
     const building_type anchor_type = focus_asset_pattern(focus).front();
     for (entity_id tid : window)
@@ -3565,6 +3716,10 @@ bool charter_window_anchorable(const world& w, const std::vector<entity_id>& win
         bool any = false;
         const resource_type tgt = placement_rules::richest_extractable(it->second, any);
         if (placement_rules::can_place(it->second, anchor_type, tgt))
+            return true;
+        // BL-1197: a digging firm can also anchor on a Well site.
+        if (dig != nullptr && anchor_type == building_type::extraction_site
+            && dig_site_of(w, tid, it->second, *dig) != dig_site::none)
             return true;
     }
     return false;
@@ -3597,12 +3752,13 @@ charter_unspent_reason charter_place_failure_reason(const world& w, const nation
                                                     charter_centre& cc,
                                                     const settlement_state* settle,
                                                     const charter_spend_params& spend,
-                                                    const std::map<uint32_t, int>* by_province)
+                                                    const std::map<uint32_t, int>* by_province,
+                                                    const resource_type* dig = nullptr)
 {
     if (by_province != nullptr)
         for (const charter_rung rung : k_charter_rungs)
             if (charter_window_anchorable(w, charter_rung_window(w, nc, cc, settle, spend, rung),
-                                          focus, occupied))
+                                          focus, occupied, dig))
                 return charter_unspent_reason::province_cap;
     return charter_unspent_reason::window_exhausted;
 }
@@ -3615,12 +3771,15 @@ charter_unspent_reason charter_place_failure_reason(const world& w, const nation
 /// finds no anchorable tile consumes no randomness (place_starting_assets
 /// returns before its first draw), so rung 2 draws as if it had been first.
 ///
-/// THE PLACEMENT NEVER SEES THE GOOD, only @p focus: an extraction anchor takes
-/// the richest extractable deposit on its tile, whatever good the firm was
-/// chartered for, and a processing anchor any workable land. So whether a
-/// charter can land is a property of (centre, focus) and the ground as it
-/// stands, and a centre whose windows hold no free deposit tile OF ANY KIND
-/// can place no extraction firm at all.
+/// THE PLACEMENT SEES THE GOOD ONLY FOR A DIGGING FIRM (@p dig, BL-1197: a
+/// water-gap firm, `gap_firm_digs`); otherwise only @p focus: an extraction
+/// anchor takes the richest extractable deposit on its tile, whatever good the
+/// firm was chartered for, and a processing anchor any workable land. So whether
+/// a charter can land is a property of (centre, focus) and the ground as it
+/// stands — widened, for a digging firm, by the Well sites in its windows — and a
+/// centre whose windows hold no free deposit tile OF ANY KIND (and, digging, no
+/// Well site) can place no extraction firm at all. @p dug_out says whether the
+/// firm stands on its good or fell back to its richest deposit.
 ///
 /// On failure @p fail_out names why (`charter_place_failure_reason`).
 ///
@@ -3648,27 +3807,47 @@ std::vector<entity_id> charter_place(world& w, const nation_component& nc,
                                      const recipe_registry& reg,
                                      chain_reach* cr,
                                      const std::vector<int>* serve,
-                                     bool& chain_rejected)
+                                     bool& chain_rejected,
+                                     const resource_type* dig = nullptr,
+                                     bool* dug_out = nullptr)
 {
     chain_rejected = false;
-    for (const charter_rung rung : k_charter_rungs)
+    if (dug_out != nullptr)
+        *dug_out = false;
+    // BL-1197 (gap firm digs the gap): with @p dig THE DIG LADDER runs
+    // outermost — a Well site in either window, else a deposit of the good in
+    // either, else the richest deposit as ever — so "where its windows hold one"
+    // reads both windows before falling back. Each tier with no ground draws
+    // nothing. Without @p dig only the last tier runs: the rule above, verbatim.
+    const bool digging = dig != nullptr
+                      && focus_asset_pattern(focus).front() == building_type::extraction_site;
+    for (const dig_site tier : { dig_site::well, dig_site::deposit, dig_site::none })
     {
-        const std::vector<entity_id>& base = charter_rung_window(w, nc, cc, settle, spend, rung);
-        std::vector<entity_id> window = (by_province != nullptr && province_rungs != nullptr)
-            ? charter_under_province_cap(w, base, *by_province, *province_rungs)
-            : base;
-        if (window.empty())
+        if (!digging && tier != dig_site::none)
             continue;
-        std::vector<entity_id> assets = place_starting_assets(w, nc, focus, occupied, rng, &window);
-        if (!assets.empty())
+        for (const charter_rung rung : k_charter_rungs)
         {
-            if (cr != nullptr && !make_chain_feasible(w, reg, *cr, assets, occupied, serve))
-            {
-                chain_rejected = true;
+            const std::vector<entity_id>& base = charter_rung_window(w, nc, cc, settle, spend, rung);
+            std::vector<entity_id> window = (by_province != nullptr && province_rungs != nullptr)
+                ? charter_under_province_cap(w, base, *by_province, *province_rungs)
+                : base;
+            if (window.empty())
                 continue;
+            std::vector<entity_id> assets = place_starting_assets(
+                w, nc, focus, occupied, rng, &window,
+                tier != dig_site::none ? dig : nullptr, tier);
+            if (!assets.empty())
+            {
+                if (cr != nullptr && !make_chain_feasible(w, reg, *cr, assets, occupied, serve))
+                {
+                    chain_rejected = true;
+                    continue;
+                }
+                rung_out = rung;
+                if (dug_out != nullptr)
+                    *dug_out = (tier != dig_site::none);
+                return assets;
             }
-            rung_out = rung;
-            return assets;
         }
     }
 
@@ -3677,7 +3856,8 @@ std::vector<entity_id> charter_place(world& w, const nation_component& nc,
     // just did — unless a rung had ground and the chain refused it.
     fail_out = chain_rejected
         ? charter_unspent_reason::chain_infeasible
-        : charter_place_failure_reason(w, nc, focus, occupied, cc, settle, spend, by_province);
+        : charter_place_failure_reason(w, nc, focus, occupied, cc, settle, spend, by_province,
+                                       digging ? dig : nullptr);
     return {};
 }
 
@@ -4675,6 +4855,12 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         // for want of ground — cleared, and retried, at this centre's next charter.
         std::array<bool, resource_count> chain_skipped{};
         std::array<charter_unspent_reason, 2> focus_reason{};
+        // BL-1197 (gap firm digs the gap): the goods whose firm fell back to its
+        // richest deposit here — this centre's windows hold no ground for the
+        // good (no Well site, no deposit of it), and they only fill as firms
+        // land, so a later firm for it would fall back again. Passed over for the
+        // rest of this centre under every rule (the turn also marks it skipped).
+        std::array<bool, resource_count> dig_fell_back{};
 
         for (int32_t k = 0; k < n_firms; ++k)
         {
@@ -4728,6 +4914,9 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                 for (std::size_t r = 0; r < resource_count; ++r)
                     if (bs.firms_by_resource[r] >= bs.per_good_cap)
                         selectable[r] = std::max(selectable[r], demand[r]);
+            for (std::size_t r = 0; r < resource_count; ++r)   // BL-1197
+                if (dig_fell_back[r])
+                    selectable[r] = std::max(selectable[r], demand[r]);
 
             // THE YARD, under every rule: construction capacity provisioned first,
             // bounded by `want_yards` and the per-good cap (Pass 6's step).
@@ -4823,6 +5012,8 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             std::vector<entity_id> assets;
             bool                   stop          = false;
             bool                   chain_masked_any = false; // BL-1185, legacy rules only
+            bool                   dug           = false;    // BL-1197: stands on its good
+            bool                   fell_back     = false;    // BL-1197: dug its richest instead
             for (;;)
             {
                 if (gap_r == resource_count && bs.in_turn)
@@ -4947,7 +5138,14 @@ std::vector<entity_id> charter_web_from_budget(world& w,
 
                 // --- placement: the centre's two windows and nothing wider --------
                 charter_unspent_reason why = charter_unspent_reason::window_exhausted;
-                if (bs.in_turn && focus_failed[fi])
+                // BL-1197 (gap firm digs the gap): a water-gap firm digs water at
+                // a Well site, else an ice deposit, else its richest deposit. Its
+                // ground is wider than the focus's (a Well needs no deposit), so
+                // an extraction focus that failed here does not stand for it.
+                resource_type dig_r = resource_type::water;
+                const bool    digs  = gap_firm_digs(gap_r, go_processing, dig_r);
+                dug = false;
+                if (bs.in_turn && focus_failed[fi] && !digs)
                 {
                     // This focus already failed here and would fail again: no
                     // placement, only the reason, read now (see `focus_failed`).
@@ -4977,9 +5175,12 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                     assets = charter_place(w, nc, focus, occupied, asset_rng, cc, settle, spend,
                                            by_province, &province_rungs, rung, why,
                                            reg, &chain, go_processing ? &serve : nullptr,
-                                           chain_rejected);
+                                           chain_rejected, digs ? &dig_r : nullptr, &dug);
                     if (!assets.empty())
+                    {
+                        fell_back = digs && !dug;
                         break;
+                    }
                     if (chain_rejected)
                     {
                         // A failure of the GOOD, not of the focus: the windows
@@ -5061,13 +5262,32 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             corp.hq_building     = hq.building;
             corp.influence_range = hq.range;
 
+            // BL-1197: a water-gap firm that fell back to its richest deposit digs
+            // no water, so it is not counted against water's cap (or its share) —
+            // the cap would otherwise fill with firms digging something else. It
+            // is booked, in the tally and its charter record alike, as a firm of
+            // what its anchor digs, so the body's firms still sum by good. Water
+            // is passed over for the rest of this centre, whose windows hold no
+            // ground for it; the next centre on the body retries it.
+            const std::size_t booked = fell_back
+                ? static_cast<std::size_t>(w.buildings.at(assets.front()).target_resource)
+                : gap_r;
             const entity_id corp_id = w.create_entity();
             record(corp_id, cc, /*specialist=*/false, rung, assets, fp);
-            rep.charters.back().good = static_cast<std::uint16_t>(gap_r);
+            rep.charters.back().good = static_cast<std::uint16_t>(booked);
             corp.assets = std::move(assets);
             w.corporations[corp_id] = std::move(corp);
             ++bs.firms;
-            ++bs.firms_by_resource[gap_r];
+            ++bs.firms_by_resource[booked];
+            if (fell_back)
+            {
+                dig_fell_back[gap_r] = true;
+                if (bs.in_turn)
+                {
+                    skipped[gap_r]     = true;
+                    skip_reason[gap_r] = charter_unspent_reason::window_exhausted;
+                }
+            }
             if (anchor_province != 0)
                 ++bs.firms_by_province[anchor_province];
             if (from_turn)   // the pass moves on past the good that was just served
