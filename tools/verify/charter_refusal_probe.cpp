@@ -1063,10 +1063,35 @@ int main()
     { auto s = base(); s.density_ceiling = 120;
       expect("fixed rule with a ceiling set", small, s, true, "read only by the sqrt_capital"); }
     { auto s = base(); s.resource_cap_rule = charter_cap_rule::sqrt_capital;
-      expect("sqrt rule, no ceiling", small, s, true, "density_ceiling must be > 0"); }
+      expect("sqrt rule, no ceiling", small, s, true, "exactly one of density_ceiling"); }
     expect("sqrt rule, ceiling 120", small, sqrt_spend(), false);
     { auto s = sqrt_spend(); s.density_ceiling = 200;
       expect("sqrt rule, ceiling at the guard", small, s, true, "below max_firms_per_body"); }
+
+    // --- BL-1204: the ceiling per good served — sqrt only, exclusive of a fixed one ---
+    { auto s = sqrt_spend(); s.density_ceiling = 0; s.density_per_good_tenths = 75;
+      expect("sqrt rule, 7.5 per good", small, s, false); }
+    { auto s = sqrt_spend(); s.density_per_good_tenths = 75;
+      expect("sqrt rule, a fixed ceiling AND a rate", small, s, true, "exactly one of density_ceiling"); }
+    { auto s = base(); s.density_per_good_tenths = 75;
+      expect("fixed rule with a rate set", small, s, true, "read only by the sqrt_capital"); }
+    { auto s = sqrt_spend(); s.density_ceiling = 0; s.density_per_good_tenths = -75;
+      expect("sqrt rule, a negative rate", small, s, true, "must not be negative"); }
+    { auto s = sqrt_spend(); s.density_ceiling = 0; s.density_per_good_tenths = 75;
+      s.max_firms_per_body = 1;
+      expect("sqrt rule, a rate under a guard of 1", small, s, true, "max_firms_per_body >= 2"); }
+    {
+        // floor(7.5 x |G|) under the guard less one; a fixed ceiling is read as set.
+        auto s = sqrt_spend(); s.density_ceiling = 0; s.density_per_good_tenths = 75;
+        const auto f = sqrt_spend();
+        expect_true("per good: |G| 0/1/16/23/26/27/49 -> 0/7/120/172/195/199/199; fixed 120 at any |G|",
+                    charter_density_ceiling(s, 0) == 0 && charter_density_ceiling(s, 1) == 7
+                 && charter_density_ceiling(s, 16) == 120 && charter_density_ceiling(s, 23) == 172
+                 && charter_density_ceiling(s, 26) == 195 && charter_density_ceiling(s, 27) == 199
+                 && charter_density_ceiling(s, static_cast<int>(resource_count)) == 199
+                 && charter_density_ceiling(f, 0) == 120 && charter_density_ceiling(f, 49) == 120
+                 && charter_density_ceiling(base(), 23) == 0);
+    }
     { auto s = sqrt_spend(); s.per_resource_firm_cap = 0;
       expect("sqrt rule, c 0", small, s, true, "per_resource_firm_cap must be > 0"); }
 

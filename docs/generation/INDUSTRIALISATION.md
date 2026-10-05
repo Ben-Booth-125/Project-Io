@@ -251,7 +251,9 @@ the inputs of the goods households and bodies want — and a fixed 120 trimmed e
 from 8-14 firms to 4-5. So the ceiling is a density **per good served**: 7.5 firms for each good in
 G (120 at the 16 goods it was ruled on), still under the 200-per-body runaway guard, which keeps
 catching runaways only. Its tick cost is measured on the cost table before it ships; the rate, not
-the 120, is what the 2026-09-19 measurement anchors.
+the 120, is what the 2026-09-19 measurement anchors. A body's ceiling is fixed once its G is: 7.5 ×
+|G| **rounded down** to a whole firm (172 at 23 goods), so no body carries more than the rate per
+good it serves, and one below the guard where the rate would reach it (27 goods and up).
 
 **SETTLED (Ben, 2026-09-18, wave 1 form): the budget and its reference are in the same units, and
 the ceiling fills goods in turn.** A body's charter capital B counts only the points spent on firms,

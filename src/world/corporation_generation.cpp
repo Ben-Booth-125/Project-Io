@@ -4246,7 +4246,8 @@ void charter_fix_body_rules(const world& w, const recipe_registry& reg,
         // c x B / (|G| x fp) exactly, since B is whole charters times fp.
         bs.per_good_cap = charter_sqrt_per_good_cap(spend.per_resource_firm_cap,
                                                     bs.firm_charters, g, 1);
-        bs.density_ceiling = spend.density_ceiling;
+        // BL-1204: the ceiling per good served, read once G is fixed (above).
+        bs.density_ceiling = charter_density_ceiling(spend, g);
         // The turn: G ascending, construction capacity out (it keeps its own
         // provisioning step, which runs before the turn — see the walk).
         const std::uint16_t cap_good =
@@ -4565,9 +4566,20 @@ std::map<entity_id, charter_nation_plan> plan_charters_by_nation(
     // The walk's stop per body: the runaway guard, and under `sqrt_capital` the
     // density ceiling below it (`charter_fix_body_rules` sets the ceiling only
     // there). A body at its stop charters no further firm.
+    //
+    // BL-1204: the shipped ceiling is per good SERVED, and |G| needs a recipe
+    // registry this plan does not have (generation is registry-free; the carve
+    // asks it at bump 11). So the plan reads the ceiling at the most goods a
+    // body could serve, `resource_count` — under the guard that is the guard
+    // less one. The plan stays an UPPER BOUND per body (the walk's ceiling, at
+    // its real |G|, is never above it); what it gives up is closeness on a body
+    // whose budget outruns its real ceiling. A fixed ceiling (an instrument's
+    // row) is read as before.
     int64_t body_stop = spend.max_firms_per_body;
-    if (spend.resource_cap_rule == charter_cap_rule::sqrt_capital && spend.density_ceiling > 0)
-        body_stop = std::min<int64_t>(body_stop, spend.density_ceiling);
+    const int32_t plan_ceiling =
+        charter_density_ceiling(spend, static_cast<int>(resource_count));
+    if (plan_ceiling > 0)
+        body_stop = std::min<int64_t>(body_stop, plan_ceiling);
     body_stop = std::max<int64_t>(0, body_stop);
 
     // NR-913: the walk's own pooled-remainder plan (empty under `none`).
