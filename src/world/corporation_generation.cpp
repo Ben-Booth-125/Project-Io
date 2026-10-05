@@ -1418,10 +1418,15 @@ int best_construction_recipe(const recipe_registry& reg)
 // WITHIN REACH is the reach goods actually travel (the BL-1186 diagnosis): the
 // producer's market IS the consumer's market, or the dispatcher's own market
 // leg `price_market_export_leg(producer market, consumer market)` is viable and
-// its per-unit haul is at most `(reservation_mult - 1 - dispatch_margin) x base`
-// of the input at the consumer's market. The leg is CALLED, never restated, so
-// placement and shipping cannot disagree; whatever widens the dispatcher's
-// routing widens this reach with it.
+// the dispatcher's own gate passes at base prices: `base_dest - haul > (1 +
+// dispatch_margin) x base_src`, each market at its own base price. The leg is
+// CALLED, never restated, so whatever widens the dispatcher's routing widens
+// this reach with it. WHEN reach is read: the node set (hubs, cities) is taken
+// at the pass's start, and each market pair is priced once, the first time a
+// placement asks, and memoised for the rest of the pass — so a port chartered
+// later in the walk widens a pair only if that pair had not yet been asked.
+// Placement can therefore disagree with live shipping in one direction (it may
+// miss a lane the finished world has), never the other.
 //
 // WHICH PRODUCERS COUNT: the buildings standing at the moment the processor's
 // recipe is decided — the base installations, every corporation placed before
@@ -1431,8 +1436,9 @@ int best_construction_recipe(const recipe_registry& reg)
 // Nothing placed later is foreseen.
 //
 // Deterministic: every answer is an existence test over a set (order-free), and
-// the leg memo is an ordered map. The leg calls warm the logistics caches; both
-// callers of the walks invalidate them after the apply.
+// the leg memo is an ordered map. The leg calls warm the logistics caches, so
+// every pass that builds a `chain_reach` clears them again when it ends
+// (`invalidate_logistics_caches`) — its caller may tick next.
 
 /// The reach context one placement pass shares: the node set the legs price
 /// against (read once, at the pass's start) and a memo of per-unit hauls.
@@ -1441,15 +1447,15 @@ struct chain_reach
     logistics_nodes                                   nodes;
     /// Per-unit haul of a market pair (src, dst); < 0 = no viable leg.
     std::map<std::pair<entity_id, entity_id>, float>  haul;
-    /// `reservation_mult - 1 - dispatch_margin`: the share of base a haul may eat.
-    float                                             headroom = 0.0f;
+    /// `dispatch_margin`: the dispatcher's gate, read at base prices.
+    float                                             margin = 0.0f;
 };
 
 chain_reach make_chain_reach(const world& w, const recipe_registry& reg)
 {
     chain_reach cr;
-    cr.nodes    = collect_logistics_nodes(w);
-    cr.headroom = reg.price_band().reservation_mult - 1.0f - reg.dispatch_margin();
+    cr.nodes  = collect_logistics_nodes(w);
+    cr.margin = reg.dispatch_margin();
     return cr;
 }
 
@@ -1523,15 +1529,23 @@ int chain_input_tier(world& w, const recipe_registry& reg, chain_reach& cr, enti
     const auto mit = w.markets.find(consumer_market);
     if (mit == w.markets.end())
         return chain_tier_none;
-    const float bound = cr.headroom * mit->second.base_price[r];
-    if (!(bound >= 0.0f) || !(mit->second.base_price[r] > 0.0f))
-        return chain_tier_none;
+    // THE DISPATCHER'S OWN GATE, AT BASE PRICES (spec refined 2026-10-05): a
+    // pair is in reach iff its export leg is viable and the landed net beats
+    // the source by the dispatch margin, `base_dest - haul > (1 + margin) x
+    // base_src`, each market at its OWN base price (capitals and endemic
+    // distance pricing differ by market). No reservation ceiling is read, so
+    // a world with the ceiling off does not collapse reach to one market.
+    const float base_dest = mit->second.base_price[r];
     std::sort(far.begin(), far.end());
     far.erase(std::unique(far.begin(), far.end()), far.end());
     for (const entity_id mp : far)
     {
+        const auto sit = w.markets.find(mp);
+        if (sit == w.markets.end())
+            continue;
+        const float base_src = sit->second.base_price[r];
         const float h = chain_haul_per_unit(w, reg, cr, mp, consumer_market);
-        if (h >= 0.0f && h <= bound)
+        if (h >= 0.0f && base_dest - h > (1.0f + cr.margin) * base_src)
             return chain_tier_reach;
     }
     return chain_tier_none;
@@ -1571,6 +1585,29 @@ std::vector<int> chain_recipes_for_good(const recipe_registry& reg, std::size_t 
     return out;
 }
 
+/// True when one of @p assets produces an input of some recipe that makes
+/// @p good — a landing that can bring a chain-refused good within reach.
+bool chain_firm_feeds_good(const world& w, const recipe_registry& reg,
+                           const std::vector<entity_id>& assets, std::size_t good)
+{
+    for (const int i : chain_recipes_for_good(reg, good))
+    {
+        const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            if (!(rc.inputs[r] > 0.0f))
+                continue;
+            for (const entity_id bid : assets)
+            {
+                const auto bit = w.buildings.find(bid);
+                if (bit != w.buildings.end() && chain_produces(w, reg, bit->second, r))
+                    return true;
+            }
+        }
+    }
+    return false;
+}
+
 /// Undo one authored building: `author_building` writes the building, its
 /// stockpile and the occupancy, and all three go.
 void chain_unplace(world& w, entity_id bid, std::unordered_set<entity_id>& occupied)
@@ -1600,13 +1637,18 @@ void chain_unplace(world& w, entity_id bid, std::unordered_set<entity_id>& occup
 /// A corporation whose ANCHOR — its defining asset, the first placed — is a
 /// processor (the processing mix) is a processing corporation: left with no
 /// processor it is not that corporation, so it too is unplaced whole rather
-/// than handed on as a mine wearing a processing focus.
+/// than handed on as a mine wearing a processing focus. And a charter whose
+/// ANCHOR is unplaced is rejected whole: every gate upstream (the province cap,
+/// the rung, the region) tested the anchor, not the holding behind it.
+///
+/// @p whole false (a roster that already exists, `enforce_chain_feasible_roster`)
+/// only unplaces the infeasible processors and never rejects the rest.
 ///
 /// @return false when nothing is left placed (the caller treats the charter as
 ///         a placement that found no feasible ground).
 bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
                          std::vector<entity_id>& assets, std::unordered_set<entity_id>& occupied,
-                         const std::vector<int>* serve)
+                         const std::vector<int>* serve, bool whole = true)
 {
     const int n = reg.recipe_count(building_type::processing_facility);
     bool processing_anchor = false;
@@ -1663,9 +1705,17 @@ bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
         kept.push_back(bid);
         ++serving;
     }
+    // THE ANCHOR STAYS OR THE CHARTER GOES (BL-1185 review): the anchor is what
+    // every gate before this one tested — its province against the province
+    // cap, its rung, its region. Promoting the next holding in its place would
+    // land a firm the caps never saw, so an unplaced anchor rejects the charter.
+    const bool anchor_lost = !assets.empty()
+        && (kept.empty() || kept.front() != assets.front());
     assets = std::move(kept);
+    if (!whole)
+        return !assets.empty();
 
-    if (((serve != nullptr || processing_anchor) && serving == 0) || assets.empty())
+    if (anchor_lost || ((serve != nullptr || processing_anchor) && serving == 0) || assets.empty())
     {
         for (const entity_id bid : assets)
             chain_unplace(w, bid, occupied);
@@ -2376,9 +2426,23 @@ std::vector<entity_id> generate_corporations(
 
     std::vector<entity_id> corp_ids;
     corp_ids.reserve(static_cast<std::size_t>(corp_count));
+    std::vector<int> corp_slot; // the slot c each created corporation came from
+    corp_slot.reserve(static_cast<std::size_t>(corp_count));
 
     for (int c = 0; c < corp_count; ++c)
     {
+        // BL-1185 review: with a registry (the chain-feasible path) a slot whose
+        // every rung was refused is NOT a corporation — no holdless specialist is
+        // created, so none can be seated. Its stockpile draw is still taken, so
+        // every later slot draws exactly what it would have.
+        if (reg != nullptr && corp_assets[static_cast<std::size_t>(c)].empty())
+        {
+            (void)generate_starting_stockpile(corp_focuses[static_cast<std::size_t>(c)],
+                                              corp_capitals[static_cast<std::size_t>(c)],
+                                              params.base_capital, stock_rng);
+            continue;
+        }
+        corp_slot.push_back(c);
         corporation_component cc;
         cc.name             = std::move(corp_names[static_cast<std::size_t>(c)]);
         cc.home_nation      = nation_ids[static_cast<std::size_t>(
@@ -2441,18 +2505,25 @@ std::vector<entity_id> generate_corporations(
     // player corporation varies with the seed rather than always being corp 0.
     {
         std::mt19937 player_rng(seed ^ 0xF0E1D2C3u);
-        std::uniform_int_distribution<int> pick_player(0, corp_count - 1);
-        const int player_idx = pick_player(player_rng);
+        // BL-1185 review: the pick is over the corporations that EXIST (every
+        // slot without a registry, so that path draws exactly as before).
+        const int created = static_cast<int>(corp_ids.size());
+        if (created > 0)
+        {
+            std::uniform_int_distribution<int> pick_player(0, created - 1);
+            const int player_idx = pick_player(player_rng);
 
-        const entity_id player_corp_id = corp_ids[static_cast<std::size_t>(player_idx)];
-        w.corporations[player_corp_id].is_player = true;
-        w.player_entity = player_corp_id;
+            const entity_id player_corp_id = corp_ids[static_cast<std::size_t>(player_idx)];
+            w.corporations[player_corp_id].is_player = true;
+            w.player_entity = player_corp_id;
 
-        // BL-305: which ledger row the player ends up as is only decided here,
-        // after every row is already published — so it is a separate field
-        // rather than a column on the row.
-        if (progress)
-            progress->player_slot.store(player_idx, std::memory_order_relaxed);
+            // BL-305: which ledger row the player ends up as is only decided here,
+            // after every row is already published — so it is a separate field
+            // rather than a column on the row.
+            if (progress)
+                progress->player_slot.store(corp_slot[static_cast<std::size_t>(player_idx)],
+                                            std::memory_order_relaxed);
+        }
 
     }
 
@@ -2506,7 +2577,7 @@ std::vector<entity_id> generate_corporations(
         for (const auto& [bld_id, bc] : w.buildings)
             military_occupied_tiles.insert(bc.tile);
 
-        if (params.seed_starting_force)
+        if (params.seed_starting_force && w.corporations.count(w.player_entity) != 0)
             seed_starting_military(w, w.player_entity, military_occupied_tiles);
 
         for (entity_id corp_id : corp_ids)
@@ -2514,6 +2585,8 @@ std::vector<entity_id> generate_corporations(
                 seed_starting_military(w, corp_id, military_occupied_tiles);
     }
 
+    if (chain != nullptr)
+        invalidate_logistics_caches(w); // the reach legs warmed them (chain_reach)
     return corp_ids;
 }
 
@@ -2926,17 +2999,19 @@ std::vector<entity_id> generate_background_firms(
                                          go_processing ? &serve : nullptr))
                 {
                     // Given back whole. Another nation's turn may anchor in reach,
-                    // so the good is masked only once every nation on the body has
-                    // missed it since the last firm landed (a landing can bring it
-                    // within reach, so it clears every count).
+                    // so the good is masked once it has missed as many times as
+                    // the body has nations (the cursor takes them in turn). The
+                    // mask is STICKY for the pass: only a firm that produces one
+                    // of the good's inputs can bring it within reach, so only
+                    // such a landing clears it (below) — an unrelated landing
+                    // does not, and an input-less good never burns the pass's
+                    // iterations again.
                     if (++chain_misses[gap_r] >= static_cast<int>(nation_ids.size()))
                         chain_masked[gap_r] = true;
                     continue;
                 }
-                // An unplaced anchor moves the firm's home to its next holding.
-                const auto abit = w.buildings.find(assets.front());
-                if (abit != w.buildings.end())
-                    anchor_province = w.provinces.province_of(abit->second.tile);
+                // The anchor survived (an unplaced anchor rejects the firm), so
+                // `anchor_province`, the one the cap test above read, stands.
             }
 
             // Financial profile: opened at zero here and handed its working
@@ -2984,8 +3059,15 @@ std::vector<entity_id> generate_background_firms(
             ++firms_by_resource[gap_r];
             if (anchor_province != 0)
                 ++firms_by_province[anchor_province];
-            chain_misses.fill(0);   // BL-1185: a new producer may bring a masked good in reach
-            chain_masked.fill(false);
+            // BL-1185: a landing that produces an input of a missed good may bring
+            // it within reach — clear that good's count and mask, and only that.
+            for (std::size_t g = 0; g < resource_count; ++g)
+                if (chain_misses[g] > 0
+                    && chain_firm_feeds_good(w, reg, w.corporations.at(corp_id).assets, g))
+                {
+                    chain_misses[g] = 0;
+                    chain_masked[g] = false;
+                }
 
             // Starting stockpile — the same BL-116 generator every generated
             // corp uses, so a background firm opens with materials from turn
@@ -3010,7 +3092,44 @@ std::vector<entity_id> generate_background_firms(
         }
     }
 
+    invalidate_logistics_caches(w); // the reach legs warmed them (chain_reach)
     return firm_ids;
+}
+
+chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_registry& reg)
+{
+    chain_roster_enforcement out;
+    std::vector<entity_id> ids;
+    for (const auto& [cid, corp] : w.corporations)
+        if (!corp.is_background)
+            ids.push_back(cid);
+    std::sort(ids.begin(), ids.end());
+    std::unordered_set<entity_id> occupied;
+    occupied.reserve(w.buildings.size() * 2);
+    for (const auto& kv : w.buildings)
+        occupied.insert(kv.second.tile);
+    chain_reach cr = make_chain_reach(w, reg);
+    for (const entity_id cid : ids)
+    {
+        corporation_component& corp = w.corporations.at(cid);
+        const std::size_t before = corp.assets.size();
+        std::vector<entity_id> assets = corp.assets;
+        make_chain_feasible(w, reg, cr, assets, occupied, nullptr, /*whole=*/false);
+        out.processors_unplaced += static_cast<int>(before - assets.size());
+        if (assets.size() == before)
+            continue;
+        corp.assets = std::move(assets);
+        // The HQ may have been one of the unplaced: designate it again from what
+        // stands (the corp's pools stay where they were seeded).
+        const entity_id home_body = corp_home_body(w, corp.assets);
+        const hq_designation hq   = designate_hq(w, corp.assets, home_body);
+        corp.hq_building     = hq.building;
+        corp.influence_range = hq.range;
+        if (corp.assets.empty())
+            ++out.holdless;
+    }
+    invalidate_logistics_caches(w);
+    return out;
 }
 
 chain_feasibility_audit audit_chain_feasibility(world& w, const recipe_registry& reg)
@@ -4834,9 +4953,11 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             if (from_turn)   // the pass moves on past the good that was just served
                 bs.turn_cursor = (turn_at + 1) % bs.turn.size();
             // BL-1185: a good passed over for want of a reachable input is retried
-            // now — this charter's holdings may be the producer it lacked.
+            // now only if this charter's holdings produce one of its inputs — the
+            // producer it may have lacked. An unrelated charter changes nothing.
             for (std::size_t r = 0; r < resource_count; ++r)
-                if (chain_skipped[r])
+                if (chain_skipped[r]
+                    && chain_firm_feeds_good(w, reg, w.corporations.at(corp_id).assets, r))
                 {
                     chain_skipped[r] = false;
                     skipped[r]       = false;
@@ -4984,6 +5105,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
 
     if (report != nullptr)
         *report = std::move(rep);
+    invalidate_logistics_caches(w); // the reach legs warmed them (chain_reach)
     return chartered;
 }
 

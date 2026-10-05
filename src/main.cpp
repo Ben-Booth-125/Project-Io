@@ -270,6 +270,9 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
         if (scs.stockpile.rejected)
             std::fprintf(stderr, "[stockpile_budget] headless run: the stockpile budget was REJECTED "
                                  "(%s); the pre-budget web is laid\n", scs.stockpile.rejection.c_str());
+        // BL-1185: world-gen's roster was laid before the registry existed;
+        // its processors are made chain-feasible now that it does.
+        enforce_chain_feasible_roster(w, reg);
         // BL-365: real background corporations, generated now that reg is loaded.
         generate_background_firms(w, reg, /*seed=*/0x8A21F00Du);
     }

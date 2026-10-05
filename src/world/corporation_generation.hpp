@@ -605,6 +605,23 @@ std::vector<entity_id> generate_background_firms(
 /// author a processor (`generate_corporations`, `generate_background_firms`).
 void assign_default_recipes(world& w, const recipe_registry& reg);
 
+/// BL-1185 (chain-feasible placement) — Pass 3's rule applied to a specialist
+/// roster laid BEFORE a recipe registry existed (world generation's own Pass 3,
+/// which is Lua-free and runs before the registry loads). Called by every path
+/// that keeps that roster once the registry is in hand: the headless run and
+/// run_verify when the charter budget is empty, and the landscape apply when it
+/// does not regenerate the specialists. Each specialist (ascending id) has its
+/// processors re-decided against everything standing then — own feed, own
+/// market, reach — and an infeasible one is unplaced; the rest of its holdings
+/// stay (it is an existing corporation, not a charter that can be refused), and
+/// its HQ is designated again from what stands.
+struct chain_roster_enforcement
+{
+    int processors_unplaced = 0;
+    int holdless            = 0; ///< specialists left with no holding (reported, kept)
+};
+chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_registry& reg);
+
 /// BL-1185 (chain-feasible placement) — the AUDIT of Pass 3's rule on a built
 /// world: every standing processor (not decommissioned) checked against every
 /// producer standing NOW, with the same reach placement uses

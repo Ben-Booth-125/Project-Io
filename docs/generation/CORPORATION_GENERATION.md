@@ -293,12 +293,19 @@ not a broad presence across the nation.
   as idle plant. The reason is legibility: an idle building the player inherits reads as a
   broken economy, where an absent chain reads as a world that lacks it. BL-1185
   (chain-feasible placement) owns the work.
-  - **Within reach, exactly.** The producer's market is the processor's market, or the
-    dispatcher's own market leg (`price_market_export_leg`) from the producer's market to the
-    processor's is viable and its per-unit haul is at most
-    `(reservation_mult − 1 − dispatch_margin) × base` of the input at the processor's market.
-    Placement **calls** that function rather than restating it, so placement and shipping cannot
-    disagree, and whatever widens the dispatcher's routing widens this reach with it.
+  - **Within reach, exactly — the dispatcher's own gate, at base prices** (refined 2026-10-05).
+    The producer's market is the processor's market, or both of these hold for the pair:
+    `price_market_export_leg(producer market, processor market)` is viable, and
+    `base_dest − haul > (1 + dispatch_margin) × base_src`, where each base is that market's
+    **own** base price for the input (capitals and endemic distance pricing make them differ) and
+    `haul` is the leg's per-unit cost. No reservation ceiling enters it, so a world with the
+    ceiling off does not shrink reach to one market. Placement **calls** the dispatcher's leg
+    rather than restating it, and whatever widens the dispatcher's routing widens this reach.
+  - **When reach is read.** A pass reads the logistics nodes once, at its start, and prices each
+    market pair the first time a placement asks, memoising it for the rest of the pass. A port
+    chartered later in the walk therefore widens a pair only if that pair had not been asked yet:
+    placement may miss a lane the finished world has (conservative), and never assumes one it
+    lacks.
   - **Which producers count.** The buildings standing when the processor's recipe is decided:
     the base installations, every corporation placed before this one in its pass's own order, and
     the corporation's own holdings. A corporation's whole holding set is placed before any of its
@@ -308,16 +315,22 @@ not a broad presence across the nation.
   - **The recipe bends before the building goes.** A specialist's processor (and the one processor
     in an extraction or trade mix) takes the feasible recipe nearest its feed: its **own** holdings
     first, then its own market, then reach, ties to the band's recipe order. A processor with no
-    feasible recipe is unplaced; a corporation left with nothing — or a processing corporation
-    left with no processor, which would be a mine wearing a processing focus — tries its next
+    feasible recipe is unplaced. A corporation whose **anchor** is unplaced is refused whole — the
+    province cap, the rung and the region all tested the anchor, so the holding behind it is never
+    promoted in its place. A corporation left with nothing — or a processing corporation left with
+    no processor, which would be a mine wearing a processing focus — tries its next
     anchor rung, and with none left it is not chartered — on a budget world its price books under
     its own unspent reason, `chain_infeasible` (the windows held ground, none of it within reach of
     a chain), distinct from `window_exhausted` (no ground at all).
-  - **Which world it binds.** Every placement made with the recipe registry in hand: the charter
-    walk (specialists and firms) and Pass 6 on every path that lays them, searched or not, and the
-    specialists the landscape search lays. World generation's own Pass 3 runs before a registry
-    exists; where that roster survives (a world with no charter budget, laid without the search),
-    its processors take the band's default recipe.
+  - **Which world it binds — every one.** The charter walk (specialists and firms), Pass 6 and the
+    specialists the landscape search lays apply it as they place. World generation's own Pass 3 is
+    Lua-free and runs before a recipe registry exists, so it cannot; every path that keeps that
+    roster applies the rule to it as soon as the registry is in hand, before Pass 6 runs
+    (`enforce_chain_feasible_roster`): each specialist's processors are re-decided against
+    everything then standing, and an infeasible one is unplaced. Such a specialist already exists,
+    so it is never refused whole; one left with no holding is reported. With a registry, no
+    specialist slot whose every rung was refused becomes a corporation, and the seat is never
+    drawn from one.
 
 Placement is collision-checked against already-placed assets from other corporations.
 No two corporations begin on the same tile.
@@ -457,11 +470,12 @@ a processor with no feasible recipe is unplaced, and a firm none of whose proces
 good is not chartered for it. An extraction firm's one processor follows the specialist rule. The
 walk is **ordered**, so a chain can be absent because its upstream had not landed yet. A good
 refused this way is therefore a failure of the good, not of the firm's focus: it is passed over
-at that centre only until the centre charters again, because the new firm may be the producer it
-lacked. Under the legacy cap rules the good is masked out of that firm's selection and the next
+at that centre until the centre charters a firm that produces one of the good's inputs — the only
+landing that can bring it within reach; an unrelated charter changes nothing. Under the legacy cap rules the good is masked out of that firm's selection and the next
 gap is taken. Where nothing feasible is left, the points book as `chain_infeasible`: the windows
 held ground, and none of it was within reach of a chain. The budget-less Pass 6 masks a good once
-every nation on the body has missed it since the last firm landed.
+it has missed as many times as the body has nations (the nation cursor takes them in turn), and
+the mask holds for the rest of the pass unless a firm that produces one of its inputs lands.
 
 **What Pass 6 does not do.** It does not seed any behavioural state, matching the contract the
 rest of this pipeline holds (§ Generation seeds no behaviour) — no sentiment, no diplomatic

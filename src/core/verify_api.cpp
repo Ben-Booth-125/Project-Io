@@ -816,6 +816,9 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         if (scs.stockpile.rejected)
             std::printf("[stockpile_budget] run_verify: the stockpile budget was REJECTED (%s); "
                         "the pre-budget web is laid\n", scs.stockpile.rejection.c_str());
+        // BL-1185: world-gen's roster was laid before the registry existed;
+        // its processors are made chain-feasible now that it does.
+        enforce_chain_feasible_roster(m_world, m_registry);
         generate_background_firms(m_world, m_registry, /*seed=*/0x8A21F00Du);
     }
     else

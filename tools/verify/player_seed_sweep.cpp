@@ -1817,6 +1817,34 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
         for (const auto& kv : start->w.corporations)
             if (kv.second.is_player)
                 ++players;
+        // BL-1185 review: the roster as the landscape landed (specialists, and
+        // background firms per body) — the firm-count reading the chain rule's
+        // Pass 6 masking is judged by. Report only; no digest reads it.
+        {
+            std::map<entity_id, int> per_body;
+            for (const entity_id f : start->land.firms)
+            {
+                const auto cit = start->w.corporations.find(f);
+                if (cit == start->w.corporations.end())
+                {
+                    ++per_body[null_entity];   // exited during the settle
+                    continue;
+                }
+                entity_id b = null_entity;   // the body of the firm's first holding
+                if (!cit->second.assets.empty())
+                    if (const auto bit = start->w.buildings.find(cit->second.assets.front());
+                        bit != start->w.buildings.end())
+                        if (const auto tit = start->w.tiles.find(bit->second.tile);
+                            tit != start->w.tiles.end())
+                            b = tit->second.body;
+                ++per_body[b];
+            }
+            std::printf("  land: specialists %zu firms %zu (by body:", start->land.specialists.size(),
+                        start->land.firms.size());
+            for (const auto& [b, n] : per_body)
+                std::printf(" %u:%d", static_cast<unsigned>(b), n);
+            std::printf(")");
+        }
         std::printf("  players %d%s", players,
                     report.fell_back ? "  FELL BACK (no specialist affordable: the no-budget world, NR-910)"
                     : report.refused ? "  spend REFUSED" : "");

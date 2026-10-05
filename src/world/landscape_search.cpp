@@ -214,6 +214,12 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
         generate_corporations(w, cp, c.placement_seed, w.gen_settlement.get(),
                               /*progress=*/nullptr, &reg);
     }
+    else
+    {
+        // BL-1185: the kept world-gen roster was laid before the registry
+        // existed; its processors are made chain-feasible here.
+        enforce_chain_feasible_roster(w, reg);
+    }
     generate_background_firms(w, reg, c.placement_seed);
 
     // Either pass can author a port or an inland hub, and each is a supply
