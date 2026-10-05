@@ -1066,7 +1066,33 @@ float dispatch_absorbable(const world& w, const recipe_registry& reg, entity_id 
     // market_clearing.hpp; here the last clear's demand, as D below is). The
     // shipped k is 0 — listings only — until shelf spoilage, BL-1179.
     const float S = pricing_supply(dm, r, reg.price_band().shelf_supply_ticks);
-    const float D = dm.demand[r];
+    // BL-1203 (SUPPLY.md § Dispatch trigger, "What a hauler sees as unmet
+    // demand", Ben 2026-10-05): D is the demand A HAULER LANDING AT
+    // `landed_cost` meets, not the posted demand alone:
+    //   (1) the households' bid RE-READ at the landed price — their elastic
+    //       factor clamp((base / L)^e) in place of the one their posted bid
+    //       carries (inject_population_demand's formula, the landed price in
+    //       place of the posted), from the clear's pre-elastic weight;
+    //   (2) the want the fair-price ceiling silenced (`hauler_want`: processor
+    //       inputs and construction materials over reservation_mult x base),
+    //       counted only when the landed cost is under that buyer's ceiling —
+    //       the shelf_admits test, read at the landed price.
+    // Dispatch only: `demand` itself, and so the price law, is untouched.
+    float D = dm.demand[r];
+    if (reg.hauler_room() && landed_cost > 0.0f && std::isfinite(landed_cost))
+    {
+        const population_demand_params& pd = reg.population_demand();
+        if (dm.household_weight[r] > 0.0f)
+        {
+            const float at_l = dm.household_weight[r]
+                             * std::clamp(std::pow(base / landed_cost, pd.demand_elasticity),
+                                          pd.elasticity_min, pd.elasticity_max);
+            D += at_l - dm.household_bid[r];
+        }
+        const float res_mult = reg.price_band().reservation_mult;
+        if (dm.hauler_want[r] > 0.0f && res_mult > 0.0f && landed_cost <= base * res_mult)
+            D += dm.hauler_want[r];
+    }
     if (S <= 0.0f)
         return std::max(0.0f, D - S);
     if (!(landed_cost > 0.0f))

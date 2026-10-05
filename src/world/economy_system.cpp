@@ -371,6 +371,7 @@ building_report run_processing(world& w, const recipe_registry& reg,
     // Accumulated into a local first and merged below, so a building with no
     // inputs never creates an empty row.
     std::array<float, resource_count> wanted{};
+    std::array<float, resource_count> suppressed{}; // BL-1203: hauler-only (below)
     float coverage = std::numeric_limits<float>::infinity();
     bool  has_input = false;
     for (std::size_t r = 0; r < resource_count; ++r)
@@ -395,6 +396,11 @@ building_report run_processing(world& w, const recipe_registry& reg,
         // Ben 2026-10-03) — its want leaves the price so the price can ease.
         if (mc == nullptr || shelf)
             wanted[r] += std::max(0.0f, need - pool.quantities[r]);
+        else
+            // BL-1203: the want the ceiling silenced is not dropped — it goes to
+            // the HAULER-ONLY register (never `wanted`, never the price), so a
+            // dispatcher landing under the ceiling can see it as room.
+            suppressed[r] += std::max(0.0f, need - pool.quantities[r]);
 
         if (cov < coverage)
         {
@@ -413,6 +419,14 @@ building_report run_processing(world& w, const recipe_registry& reg,
         auto& want_row = out.wants[std::make_pair(corp, pool_key)];
         for (std::size_t r = 0; r < resource_count; ++r)
             want_row[r] += wanted[r];
+        // BL-1203: a row only where something was suppressed (a std::map, so
+        // the merge in clear_markets walks it sorted).
+        if (std::any_of(suppressed.begin(), suppressed.end(), [](float v) { return v > 0.0f; }))
+        {
+            auto& hw = out.hauler_wants[std::make_pair(corp, pool_key)];
+            for (std::size_t r = 0; r < resource_count; ++r)
+                hw[r] += suppressed[r];
+        }
     }
 
     if (!has_input)
@@ -814,6 +828,22 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
                 // BL-1172: a material over the ceiling does not bid either.
                 if (need > 0.0f && (m == nullptr || admitted(r)))
                     want[r] += need;
+            }
+            // BL-1203: the material the ceiling silenced goes to the hauler-only
+            // register instead (never `wants`, never the price).
+            if (m != nullptr)
+            {
+                std::map<std::pair<entity_id, entity_id>,
+                         std::array<float, resource_count>>::iterator hw = report.hauler_wants.end();
+                for (std::size_t r = 0; r < resource_count; ++r)
+                {
+                    const float need = need_row[r];
+                    if (!(need > 0.0f) || admitted(r))
+                        continue;
+                    if (hw == report.hauler_wants.end())
+                        hw = report.hauler_wants.try_emplace(std::make_pair(corp, pool_key)).first;
+                    hw->second[r] += need;
+                }
             }
         }
 

@@ -552,6 +552,7 @@ void inject_population_demand(world& w, const recipe_registry& reg)
     {
         (void)mid;
         mc.household_bid.fill(0.0f);
+        mc.household_weight.fill(0.0f); // BL-1203: dispatch-only, same zeroing
     }
 
     std::vector<entity_id> centre_ids;
@@ -597,6 +598,9 @@ void inject_population_demand(world& w, const recipe_registry& reg)
             const float bid = weighted * elastic;
             mc.demand[r]        += bid;
             mc.household_bid[r] += bid; // same order, same addends: ascending centre id
+            // BL-1203: the bid before its elastic factor, for the dispatcher to
+            // re-read at a cargo's landed price. The price law never reads it.
+            mc.household_weight[r] += weighted;
         }
     }
 }
@@ -1541,6 +1545,27 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         for (std::size_t r = 0; r < resource_count; ++r)
             if (wanted[r] > 0.0f)
                 mkit->second.demand[r] += wanted[r];
+    }
+
+    // BL-1203 (SUPPLY.md § Dispatch trigger, "What a hauler sees as unmet
+    // demand"): the HAULER-ONLY register — the want the fair-price ceiling
+    // silenced. Copied to the market for the next tick's dispatch, and NOT into
+    // `demand`: nothing in clearing or price resolution reads `hauler_want`
+    // (BL-1172 unchanged). Rewritten whole every clear, as `demand` is. std::map:
+    // a sorted accumulation.
+    for (auto& [mid, mc] : w.markets)
+    {
+        (void)mid;
+        mc.hauler_want.fill(0.0f);
+    }
+    for (const auto& [key, suppressed] : report.hauler_wants)
+    {
+        const auto mkit = w.markets.find(key.second);
+        if (mkit == w.markets.end())
+            continue;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (suppressed[r] > 0.0f)
+                mkit->second.hauler_want[r] += suppressed[r];
     }
 
     // The FILL, kept strictly separate: goods actually delivered to a consumer

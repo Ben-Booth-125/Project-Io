@@ -231,6 +231,16 @@ struct economy_report
     /// sorted-accumulation reason.
     std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> upkeep_wants;
 
+    /// BL-1203 (water reaches dry markets; SUPPLY.md § Dispatch trigger, "What a
+    /// hauler sees as unmet demand", Ben 2026-10-05): the HAULER-ONLY want — a
+    /// processor's input and a construction site's material that went unbid
+    /// because the posted price stood over the fair-price ceiling (BL-1172: a
+    /// draw over the ceiling does not bid). Keyed (corp, market) like `wants`.
+    /// NEVER summed into `mc.demand` and never paid against: clearing copies it
+    /// to `market_component::hauler_want`, which only the dispatcher's room
+    /// (`dispatch_absorbable`) reads. Same std::map, same sorted accumulation.
+    std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> hauler_wants;
+
 
     /// Per (corporation, body): the pool-level workforce scarcity figure this
     /// tick — `min(1, supply/demand)`, rescaled by habitability efficiency after
