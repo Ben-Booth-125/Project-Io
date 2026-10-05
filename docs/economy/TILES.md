@@ -74,14 +74,20 @@ Water lives on the **substrate** axis, because every consumer asks "is this wate
 describes what grew on ground, and water has no ground. The water-kind design is BL-516 (lakes,
 coasts and oceans).
 
-The three kinds are **structural** — no threshold picks between them
-(`tile_generation.cpp` § Pass 4e, `classify_water_kinds`):
+The three kinds are read from the water's shape (`tile_generation.cpp` § Pass 4e,
+`classify_water_kinds`):
 
 1. Flood-fill the water into connected components on the body's hex grid (columns wrap).
-2. **The sea** is the largest component; every other component is a **lake**. "Does not reach
-   the sea" is the whole definition of a lake, so no size cut-off is needed or wanted.
-3. Within the sea, a tile with at least one land neighbour is **coast** — the shoreline ring —
-   and a tile with none is **ocean**.
+2. **A lake is an enclosed body below a size cap; anything larger is sea (Ben, 2026-10-05,
+   NR-974).** The largest component is sea, and so is every other component at or above the
+   **lake size cap**; only the smaller enclosed bodies are lakes. The cap is measured, not chosen:
+   it is read off the enclosed water bodies on the curated seeds. The reason is that a lake is now a
+   production rule — a lakeshore gives a Well fresh water (`PRODUCTION.md` § Extraction buildings)
+   — so a second salt basin or an inland sea must not read as fresh water along its whole shore,
+   and it should keep the ports and wharves a sea shore earns. (This replaces the earlier "no size
+   cut-off is needed or wanted", which held while a lake only removed options.)
+3. Within any sea component, a tile with at least one land neighbour is **coast** — the shoreline
+   ring — and a tile with none is **ocean**.
 
 **Almost every consumer asks "is this water?" and must keep asking exactly that.** That question
 is `is_water()` in `components.hpp`, and it is the choke point: placement, the urban transform,

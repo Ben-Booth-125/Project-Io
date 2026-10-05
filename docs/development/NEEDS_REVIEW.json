@@ -1693,7 +1693,7 @@
    "title": "NOVEL WORK: the scorer's Well candidate bucket (BL-1198)",
    "raised": "2026-10-05",
    "kind": "novel-work",
-   "status": "open",
+   "status": "resolved",
    "source": "the BL-1198 lane (a14a559f)",
    "what": "To let background firms build Wells, the lane added a Well candidate bucket to corp_ai's build scorer: K = 2 candidates world-wide per tick, ranked by habitability x water demand pull, placeable tiles only, priced at the Well rate. It is a new candidate SOURCE for the existing build verb (no new verb, subject or planner), so it reads as inside the scored-build grant (AI_OPPONENT.md sec 11), but it is a new AI siting rule no doc owned.",
    "why_it_matters": "Novelty should be chosen, not accreted. A per-market bucket would put wells near people across the map but widens the siting rule further; the main session held it at K = 2 and routes the bulk of well placement through generation (BL-1197).",
@@ -1708,14 +1708,14 @@
     "src/world/corp_ai.cpp",
     "docs/ai/AI_OPPONENT.md"
    ],
-   "resolution": null
+   "resolution": "RULED (Ben, the lake and well form, 2026-10-05): option A - keep the scorer's Well bucket at K = 2 world-wide; and \"we can add wells to generation\" - generation places Wells (BL-1197 rework)."
   },
   {
    "id": "NR-974",
    "title": "CALL: is every enclosed water body a fresh-water lake? (the Well, BL-1198)",
    "raised": "2026-10-05",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "the BL-1198 cold review",
    "what": "Tile generation marks every ocean component except the largest as terrain_substrate::lake, with no size cap (tile_generation.cpp:283-291). Before the Well this only removed options (no port, no Fishing Wharf on a lake shore). Now every land tile on such a shore is a Well site: deposit-free water that never tapers. On a seed whose ocean splits into two large basins, or with a big enclosed inland sea, the whole shoreline of the smaller one offers unlimited fresh water while refusing ports and wharves.",
    "why_it_matters": "Fresh water is now a production rule, so what counts as a lake decides where cities drink cheaply - a geography call, not a code one.",
@@ -1730,7 +1730,7 @@
     "docs/economy/TILES.md",
     "docs/economy/PRODUCTION.md"
    ],
-   "resolution": null
+   "resolution": "RULED (Ben, the lake and well form, 2026-10-05): option A - a lake is an enclosed water body below a measured size cap; larger enclosed bodies are seas (coast, ports and wharves; no Wells). Written into TILES.md sec Water kinds (replacing \"no size cut-off\"); the work is BL-1200 (lake size cap), the cap read off the 16 curated seeds."
   }
  ]
 }
