@@ -1584,6 +1584,27 @@
     "src/ui/market_ledger.cpp"
    ],
    "design": "BL-1201 closes an order whose pool has stood empty for 4 quarters and writes an agency-topic world::history_log line (\"Standing sell order #N closed: nothing to sell for 4 quarters; the good returns to auto-surplus\") tagged with the corp and body. Nothing displays it: the decision feed reads only the decision topic, and the chat feed reads economy_report::agency_events. Show the player's own closes - in the Market Ledger Trades tab (a closed-orders line) or the decision feed. Needs a question_log entry and an ACTIONS check per src/ui rules. Small UI lane."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 49,
+   "written": "2026-10-05",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1203",
+   "short_name": "WATER_REACHES_DRY_MARKETS",
+   "author": "Claude (the k re-sweep, 2026-10-05)",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 3,
+   "title": "Surplus water reaches the markets that are dry",
+   "authority_doc": "docs/economy/SUPPLY.md",
+   "files": [
+    "src/world/supply_system.cpp"
+   ],
+   "design": "Found by the k re-sweep (2026-10-05, drafts/sprint-49-k-resweep.md, integration branch): 2.5-6k units of water sit on surplus shelves while 15-18 consuming markets are dry, and water shipped between markets stays 8-22 units/tick at every k. k > 0 drops stocked markets' price to 1.4-1.5x and cuts seed 0's price-gate refusals from 75 to 13 per tick, but two other brakes remain: (1) NO ROUTE - most refusals are \"no port reached overland\" (seed 0's 2,066-unit shelf at 0.59x reaches no market); (2) NO ROOM - a dry market's household demand has collapsed at the price ceiling (0.1-1.4 units), so a shipment has little to fill. Read beside BL-1194 (sea cheaper than highway) and port placement; measure which share of dry markets is land-locked from every surplus."
   }
  ]
 }
