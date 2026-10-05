@@ -513,7 +513,13 @@ in its own right, not by accident of an extractor's attached processor. This rep
 "charter a missing raw input" special case: input chartering is simply what derived demand does.
 The input demand is read in the generation form (each processor at its nominal rate, no production
 report), and it is recomputed as firms land, so a newly chartered processor raises its inputs'
-gaps for the turns after it.
+gaps for the turns after it. On a budget world the goods with demand (G), fixed before the walk,
+therefore hold the processors' inputs too: the input demand of those standing, and the **input
+closure** of G — every good some recipe draws to make a good already in G, to a fixed point
+(steel for machinery, iron ore and coal for steel). A closure good no processor yet wants is not
+short and the turn passes over it; once one lands, it is served like any other want. Derived
+demand counts what stands or is chartered, never what a refused firm would have wanted: a chain
+none of whose consumers can stand (a cold start) is not begun by it.
 
 **What Pass 6 does not do.** It does not seed any behavioural state, matching the contract the
 rest of this pipeline holds (§ Generation seeds no behaviour) — no sentiment, no diplomatic

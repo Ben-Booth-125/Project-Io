@@ -478,14 +478,17 @@ struct result
     bool anchor_at_x  = false; ///< the chartered firm's anchor is (6, 6)
     long long chain_infeasible = 0;
     bool balanced = false;
-    bool input_mine   = false; ///< BL-1197 r3: a firm's anchor is a timber site at (5, 6)
+    bool input_mine   = false; ///< BL-1197: a firm's anchor is a timber site at (5, 6)
     std::size_t steel_firms = 0; ///< firms whose holdings include a steel-making processor
 };
 
-/// @p spare_deposit (BL-1197 round 3, input chartering): an UNBUILT timber
-/// deposit at (5, 6), inside the centre's window in market A, and @p points
-/// firm charters to spend.
-result run(bool timber_in_a, bool spare_deposit = false, std::int32_t points = 1)
+/// BL-1197 round 4 (derived demand): @p spare_deposit puts an UNBUILT timber
+/// deposit at (5, 6), inside the centre's window in market A; @p points firm
+/// charters to spend; @p standing_works stands a steel-from-timber works at
+/// (7, 6) in market A before the walk (no corporation holds it); @p no_producer
+/// removes the timber producer, so nothing on the body makes timber.
+result run(bool timber_in_a, bool spare_deposit = false, std::int32_t points = 1,
+           bool standing_works = false, bool no_producer = false)
 {
     auto w = std::make_unique<world>();
     recipe_registry reg;
@@ -542,6 +545,7 @@ result run(bool timber_in_a, bool spare_deposit = false, std::int32_t points = 1
     }
 
     // The timber producer, and filler on every market-A tile but (6, 6).
+    if (!no_producer)
     {
         const entity_id bid = w->create_entity();
         building_component b{};
@@ -555,7 +559,8 @@ result run(bool timber_in_a, bool spare_deposit = false, std::int32_t points = 1
     for (int y = 0; y < bh; ++y)
         for (int x = 0; x <= 9; ++x)
         {
-            if ((x == 6 && y == 6) || (x == tx && y == 6) || (spare_deposit && x == 5 && y == 6))
+            if ((x == 6 && y == 6) || (x == tx && y == 6) || (spare_deposit && x == 5 && y == 6)
+                || (standing_works && x == 7 && y == 6))
                 continue;
             const entity_id bid = w->create_entity();
             building_component b{};
@@ -578,6 +583,21 @@ result run(bool timber_in_a, bool spare_deposit = false, std::int32_t points = 1
     rc.inputs[timber] = 1.0f;
     rc.outputs[static_cast<std::size_t>(resource_type::steel)] = 1.0f;
     reg.add_recipe(rc);
+    if (standing_works)
+    {
+        // A works runs at a nominal rate, so it has an input draw to want.
+        building_economics proc;
+        proc.base_rate = 1.0f;
+        reg.set_economics(building_type::processing_facility, proc);
+        const entity_id bid = w->create_entity();
+        building_component b{};
+        b.tile = at.at({ 7, 6 });
+        b.type = building_type::processing_facility;
+        b.recipe = reg.recipe_id(rc.name);
+        b.workforce_assigned = 0.5f;
+        w->buildings[bid] = b;
+        w->stockpiles[bid] = stockpile_component{};
+    }
     building_economics ext;
     ext.base_rate = 1.0f;
     reg.set_economics(building_type::extraction_site, ext);
@@ -1554,25 +1574,33 @@ int main()
                     good.anchor_at_x ? 1 : 0, good.chain_infeasible);
         expect_true("control: timber in A — the firm charters, anchored at (6, 6)",
                     good.firms == 1 && good.anchor_at_x && good.chain_infeasible == 0 && good.balanced);
-        // INPUT CHARTERING (BL-1197 round 3, NR-976): timber is made only in B,
-        // but an UNBUILT timber deposit lies at (5, 6) in the window, in market A.
-        // The steel works is chain-infeasible only for want of a raw that the
-        // ground holds, so its extractor is chartered first (booked as timber's
-        // firm) and the works then charters, anchored at (6, 6).
-        const chainfx::result in = chainfx::run(/*timber_in_a=*/false, /*spare_deposit=*/true,
-                                                /*points=*/2);
-        std::printf("  input chartering: firms %zu, timber site at (5, 6) %d, steel firms %zu, "
-                    "works anchored at (6, 6) %d, chain_infeasible %lld%s\n", in.firms,
-                    in.input_mine ? 1 : 0, in.steel_firms, in.anchor_at_x ? 1 : 0,
-                    in.chain_infeasible, in.balanced ? "" : " [UNBALANCED]");
-        expect_true("input chartering: the raw's extractor is chartered, then the works places",
-                    in.firms == 2 && in.input_mine && in.steel_firms == 1 && in.anchor_at_x
-                    && in.chain_infeasible == 0 && in.balanced);
-        // Control: the same with one firm's budget — the extractor takes it and
-        // the works waits (never placed infeasible).
-        const chainfx::result one = chainfx::run(false, true, 1);
-        expect_true("input chartering: one charter's budget buys the extractor, no infeasible works",
-                    one.firms == 1 && one.input_mine && one.steel_firms == 0 && one.balanced);
+        // DERIVED DEMAND (BL-1197 round 4; Ben, 2026-10-05): a steel works
+        // standing in market A wants timber, nothing on the body makes it, and
+        // an unbuilt timber deposit lies at (5, 6) in the window. No household
+        // wants timber, yet the works' input demand puts it in the gap: the walk
+        // charters timber's extractor there, and the steel firm then places.
+        // (The extractor's own processor slot may take the steel recipe too, fed
+        // by its own timber, so at least one firm makes steel.)
+        const chainfx::result dd = chainfx::run(/*timber_in_a=*/false, /*spare_deposit=*/true,
+                                                /*points=*/2, /*standing_works=*/true,
+                                                /*no_producer=*/true);
+        std::printf("  derived demand: firms %zu, timber site at (5, 6) %d, steel firms %zu, "
+                    "works anchored at (6, 6) %d, chain_infeasible %lld%s\n", dd.firms,
+                    dd.input_mine ? 1 : 0, dd.steel_firms, dd.anchor_at_x ? 1 : 0,
+                    dd.chain_infeasible, dd.balanced ? "" : " [UNBALANCED]");
+        expect_true("derived demand: a standing works' raw is chartered, then the steel firm places",
+                    dd.firms == 2 && dd.input_mine && dd.steel_firms >= 1 && dd.anchor_at_x
+                    && dd.chain_infeasible == 0 && dd.balanced);
+        // Control — the cold start: the same ground with NO works standing.
+        // Nothing wants timber, so none is chartered, and steel (whose works
+        // would need it) books chain_infeasible: derived demand counts what
+        // stands or is chartered, never what a refused firm would have wanted.
+        const chainfx::result cold = chainfx::run(false, true, 2, /*standing_works=*/false,
+                                                  /*no_producer=*/true);
+        std::printf("  cold start: firms %zu, timber site %d, chain_infeasible %lld\n", cold.firms,
+                    cold.input_mine ? 1 : 0, cold.chain_infeasible);
+        expect_true("cold start: no works stands, so timber is not wanted and steel is chain_infeasible",
+                    cold.firms == 0 && !cold.input_mine && cold.chain_infeasible > 0 && cold.balanced);
     }
     {
         // THE KEPT ROSTER: enforce_chain_feasible_roster is order-free,
