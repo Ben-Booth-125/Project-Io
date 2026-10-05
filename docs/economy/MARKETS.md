@@ -212,7 +212,18 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
      is deterministic. Tunables in `scripts/economy.lua` § `background_demand`.
 4. **Auto-surplus** — each `(corp, market)` pool lists everything above its **processor
    reservation** (the inputs its own processors need for a full run next tick) for sale. A
-   resource under a standing sell order is exempted — the manual order governs.
+   resource under a standing sell order is exempted — the order governs, and by default the order
+   covers the same surplus (step 5), so nothing is stranded.
+
+   **A standing sell order is a price floor over the whole surplus (Ben, 2026-10-05).** Most goods
+   need no order: auto-surplus sells them. An order is the decision *not to sell below a price*, so
+   by default it covers **everything** auto-surplus would have listed — the surplus above the
+   processor reservation, tick by tick as it grows — at the order's floor. A **quantity cap is
+   optional**: given one, the order lists at most that much per tick and the rest of the surplus
+   waits (the player chose to hold it). **An order closes itself once its pool has stood empty**
+   for a short run of ticks, and the good returns to auto-surplus. The rule is the same for the
+   player and for rival corps, so a rival's order can never strand the goods it was placed to
+   sell.
 5. **Standing sell orders** — read from `world::sell_orders` (the book is world state, placed by
    the player and by rival corps through the same `place_sell_order` verb), quantity capped by the
    pool, entered into both market supply and the explicit sell book with their `floor_price`.

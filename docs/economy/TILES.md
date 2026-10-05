@@ -81,7 +81,11 @@ The three kinds are read from the water's shape (`tile_generation.cpp` § Pass 4
 2. **A lake is an enclosed body below a size cap; anything larger is sea (Ben, 2026-10-05,
    NR-974).** The largest component is sea, and so is every other component at or above the
    **lake size cap**; only the smaller enclosed bodies are lakes. The cap is measured, not chosen:
-   it is read off the enclosed water bodies on the curated seeds. The reason is that a lake is now a
+   it is read off the enclosed water bodies on the curated seeds. **The cap is 150 tiles** (NR-975),
+   authored as `world_gen.lake_size_cap` and rejected outside [1, 1000000]. Measured by
+   `tools/verify/lake_census.cpp` on the 16 curated home bodies: the 360 enclosed bodies run from 1 to
+   5802 tiles with no empty gap. Their thinnest band is 89–143 tiles (3 bodies), just under a dense
+   cluster from 154, so 150 keeps 301 lakes and makes 59 seas. The reason is that a lake is now a
    production rule — a lakeshore gives a Well fresh water (`PRODUCTION.md` § Extraction buildings)
    — so a second salt basin or an inland sea must not read as fresh water along its whole shore,
    and it should keep the ports and wharves a sea shore earns. (This replaces the earlier "no size

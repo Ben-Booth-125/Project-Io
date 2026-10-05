@@ -11,6 +11,28 @@
 // recipe_registry.hpp split (see its header comment).
 class lua_state;
 
+/// THE LAKE SIZE CAP's default and domain (BL-1200, TILES.md § Water kinds).
+///
+/// MEASURED, NOT CHOSEN (tools/verify/lake_census.cpp, the 16 curated seeds,
+/// home body, 2026-10-05). The 360 enclosed water bodies (every component but
+/// the largest) run from 1 tile to 5802 with no empty gap; the thinnest band is
+/// 89-143 tiles, which holds 3 bodies (96, 119, 138) against 15 in 144-232, a
+/// dense cluster opening at 154. 150 sits just under that cluster: pooled, 301
+/// bodies stay lakes (3079 tiles) and 59 become seas (61668 tiles) -- among
+/// them the 21 enclosed bodies of 1000+ tiles that rival a world's main ocean.
+/// The value was taken by the main session on Ben's delegation (NR-975).
+///
+/// The domain: at least 1 (1 = every enclosed body is a sea, no lakes) and at
+/// most 1,000,000 (above any grid, i.e. no cap -- every enclosed body a lake).
+inline constexpr int lake_size_cap_default = 150;
+inline constexpr int lake_size_cap_min     = 1;
+inline constexpr int lake_size_cap_max     = 1000000;
+
+constexpr bool lake_size_cap_valid(int cap)
+{
+    return cap >= lake_size_cap_min && cap <= lake_size_cap_max;
+}
+
 /// Kepler market-carving tunables, authored in scripts/world_gen.lua under
 /// `world_gen.kepler_market.carving`. Classifies a nation's tradeable-resource
 /// concentration against the cross-nation mean to fracture or fold its market
@@ -152,6 +174,16 @@ struct world_gen_config
     /// Deposit-density multiplier per abundance_level (sparse/lean/standard),
     /// authored under `world_gen.deposit_scalar`. Indexed by abundance_level.
     std::array<float, 3> deposit_scalar = { 0.40f, 0.65f, 1.00f };
+
+    /// THE LAKE SIZE CAP (BL-1200; Ben 2026-10-05, NR-974; value NR-975),
+    /// authored under `world_gen.lake_size_cap`. An enclosed water component
+    /// (any but a body's largest) of at least this many tiles is SEA -- coast
+    /// ring plus open ocean, so ports and wharves and no Wells; only smaller
+    /// ones are lakes (TILES.md § Water kinds). Validated on load: an integer
+    /// in [lake_size_cap_min, lake_size_cap_max], rejected (never clamped)
+    /// otherwise. The default and its measured reason live with the constant,
+    /// `lake_size_cap_default`, below.
+    int lake_size_cap = lake_size_cap_default;
 
     /// Kepler's starting market base prices, authored under
     /// `world_gen.kepler_market.base_price`, indexed by resource_type.
