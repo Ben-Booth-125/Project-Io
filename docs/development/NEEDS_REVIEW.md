@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*77 entries — 3 open, 74 resolved.*
+*78 entries — 4 open, 74 resolved.*
 
 ---
 
@@ -76,6 +76,21 @@ To let background firms build Wells, the lane added a Well candidate bucket to c
 > **Recommendation:** A for now; re-read after BL-1197 places wells at generation.
 
 *Files: `src/world/corp_ai.cpp`, `docs/ai/AI_OPPONENT.md`*
+
+### NR-974 — CALL: is every enclosed water body a fresh-water lake? (the Well, BL-1198)
+*question · raised 2026-10-05 · from the BL-1198 cold review*
+
+Tile generation marks every ocean component except the largest as terrain_substrate::lake, with no size cap (tile_generation.cpp:283-291). Before the Well this only removed options (no port, no Fishing Wharf on a lake shore). Now every land tile on such a shore is a Well site: deposit-free water that never tapers. On a seed whose ocean splits into two large basins, or with a big enclosed inland sea, the whole shoreline of the smaller one offers unlimited fresh water while refusing ports and wharves.
+
+**Why it matters.** Fresh water is now a production rule, so what counts as a lake decides where cities drink cheaply - a geography call, not a code one.
+
+- A: a lake is an enclosed water body below a size threshold; larger enclosed bodies are seas (ports and wharves yes, Wells no) - a generation change, world-mover
+- B: accept it - every enclosed body is fresh (an inland sea reads as a great lake)
+- C: other
+
+> **Recommendation:** A, with the threshold measured on the 16 curated seeds (how many enclosed bodies, their sizes) before a number is picked. It keeps the river-city advantage for real lakes and gives inland seas their ports back.
+
+*Files: `src/world/tile_generation.cpp`, `docs/economy/TILES.md`, `docs/economy/PRODUCTION.md`*
 
 ---
 
