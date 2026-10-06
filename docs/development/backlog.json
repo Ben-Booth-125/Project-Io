@@ -1649,6 +1649,48 @@
     "src/world/input_reach.cpp"
    ],
    "design": "MERGED to main (7aae16de, 2026-10-05) together: the density ceiling is 7.5 firms per good in G (172 at 23 goods, cap 199); the scorer's candidate stretch memoises occupancy and province ceilings per corp - economy tick ~0.3x main's at 120 firms, decisions byte-identical (digests matched); cold-reviewed (no correctness findings); a debug assert now guards the stretch's read-only contract. Not re-measured on main after merge: gates (BL-1204 alone read G1 49.5 / G2 54.0 / G3 61.0 on 5 seeds). Open: the market carve plans at |G| = 49; the bump-11 argument holds for |G| >= 7; dispatch now 37% of the live tick on seed 10 (convoy volume).\n\nRULED (Ben, 2026-10-05, the density form, option B): ship BL-1204 (density per good served) only after the scorer is cheaper. BL-1204 (b655acf0) raises firms 120 -> 172 (+43%) and the economy tick +67% mean (+34% / +143% / +64% on seeds 10 / 43 / 0); live tick +51-85%; corp_strategic grew 2.4x on seed 43 - cost grows faster than firms. TARGET: on the BL-1204 branch, the economy tick within ~30% of main's at 120 firms (or proportional to firms), with byte-identical decisions (a pure performance change: world_determinism, digests unchanged against the BL-1204 branch). Profile corp_strategic first (scorer_clock, tick_profile): likely suspects are per-candidate input_reach / reachable_supply_cost scans and the Well bucket under more firms. Then merge BL-1204 + this together."
+  },
+  {
+   "glyph": "○",
+   "status": "proposed",
+   "sprint": 49,
+   "written": "2026-10-06",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Claude (sprint 49 close-out, 2026-10-06)",
+   "category": "Economy",
+   "id": "BL-1206",
+   "short_name": "SEAT_DAY1_PROFIT",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "The seated corporation operates at a profit from day 1 on every curated seed",
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "files": [
+    "src/world/corporation_generation.cpp"
+   ],
+   "design": "Sprint 49's headline promise is the PLAYER's profit from day 1, and the seat still runs a loss on some seeds (BL-1185 tip: seat operating net -44 / -2 / +48 / -13 / +14 on seeds 0/43/10/28/38). Measure on current main, all 16 curated seeds: the seat's operating net per quarter over its last 8 settle quarters and first 8 play quarters, by flow (income, inputs, maintenance, wages, upkeep, levies) and per holding (which processor runs, which idles and why). Name the cause before choosing a fix; candidate levers are the seat kit's recipe/site choice (BL-1188), its inputs' reach, its opening stock, and running costs."
+  },
+  {
+   "glyph": "○",
+   "status": "proposed",
+   "sprint": 49,
+   "written": "2026-10-06",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Claude (sprint 49 close-out, 2026-10-06)",
+   "category": "Economy",
+   "id": "BL-1207",
+   "short_name": "HANDOFF_STARVATION",
+   "priority": "A",
+   "difficulty": 2,
+   "title": "Find what is starved at handoff now, by input and by market",
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "tools/verify/"
+   ],
+   "design": "G1 (processors running at handoff) is sprint 49's furthest gate (~49% vs 70%). Diagnose on current main before choosing a lever: every processor at handoff by state (running / input-starved / unsupplied / under construction / idled), and for the starved, which input, whether it is produced on the body, in reach, over the ceiling, or never chartered; per market and pooled, 16 seeds. Candidate levers already filed: BL-1189 (opening stock sized), BL-1203 (hauler room)."
   }
  ]
 }
