@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**60 surfaces** — 7 settled, 53 awaiting Ben's wording.
+**61 surfaces** — 7 settled, 54 awaiting Ben's wording.
 
 ---
 
@@ -253,6 +253,16 @@ RANKING IS PERMITTED HERE and this is the one surface where that has been ruled 
 EACH LONG SECTION IS BOUNDED AND SCROLLS INSIDE ITSELF -- measured, not preferred: the book runs to 24 rows on the shipped fixture and the exchange read to 120, so laid out end to end the first fills the column and the other three reads are below the fold on open. A tab whose headline question is 'what could I be doing?' cannot open on a list of rival orders with the answer three screens down.
 
 *Demanded by BL-687 · `src/ui/market_ledger.cpp`, `src/ui/market_ledger.hpp` · id `market_ledger_trades`*
+
+### Market Ledger - Trades tab - 'Closed' table under My trades
+
+**Answers:** Which of my standing sell orders closed themselves, and why?
+
+**Because:** AN ORDER THAT CLOSES ITSELF IS A ROW THAT SILENTLY VANISHES. MARKETS.md step 4: an order whose pool stands empty for 4 quarters is removed by the clearing pass and the good returns to auto-surplus. The rule is right — a dead order should not hold a book slot forever — but a player who set a floor ON PURPOSE then finds the good selling at the market price when stock returns, and nothing on screen says the order is gone or why. The clearing pass already logs the close (an agency-topic history line, tagged with corp and body); nothing read it.
+
+IT LIVES UNDER MY TRADES, NOT IN A FEED. The question it answers is about the player's positions on this body, which is exactly what My trades lists; a closed order is the row that used to be there. The decision feed is the rivals' reasoning and the chat feed is economy_report events — routing an order-book fact into either would make the player look for it somewhere other than where the order stood. It is a notice, not a history: the newest 3 closes within the last 4 quarters, Closed (month) · Good · Floor, the log line itself on hover. DRAWN ONLY WHEN THERE IS ONE, so the section's measured height budget is untouched in the ordinary case.
+
+*Demanded by BL-1202 · `src/ui/market_ledger.cpp`, `src/ui/market_ledger.hpp`, `src/world/market_clearing.cpp` · id `market_ledger_trades_closed`*
 
 ### National border band (Planetary canvas, plain-canvas chrome)
 

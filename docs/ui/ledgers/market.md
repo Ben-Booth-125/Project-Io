@@ -73,7 +73,7 @@ clearing tick retains a per-exchange record — one that has already happened.
 
 | Section | Read | Columns |
 |---|---|---|
-| **My trades** | The acting corp's standing orders on the selected market's **body** (`sell_orders` *and* `buy_orders`) | Good · Qty · Limit · `x` |
+| **My trades** | The acting corp's standing orders on the selected market's **body** (`sell_orders` *and* `buy_orders`) — and beneath them, **only when one exists**, a **Closed** table: the player's orders on that body that closed themselves after 4 empty quarters (BL-1202, order close notice) | Good · Qty · Limit · `x`; Closed: month · Good · Floor, the log line on hover |
 | **All trades here** | Every standing order on that body, whoever holds it | Good · Holder · Qty · Limit |
 | **Potential trades** | A derivation: buy here, sell there, less haulage. Per unit, ranked by margin | Good · To · Margin |
 | **Recent trades** | The exchange record filtered to this market, newest first | qtr · Good · With · **Revenue** |
