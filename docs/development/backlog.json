@@ -1672,8 +1672,8 @@
    "design": "Sprint 49's headline promise is the PLAYER's profit from day 1, and the seat still runs a loss on some seeds (BL-1185 tip: seat operating net -44 / -2 / +48 / -13 / +14 on seeds 0/43/10/28/38). Measure on current main, all 16 curated seeds: the seat's operating net per quarter over its last 8 settle quarters and first 8 play quarters, by flow (income, inputs, maintenance, wages, upkeep, levies) and per holding (which processor runs, which idles and why). Name the cause before choosing a fix; candidate levers are the seat kit's recipe/site choice (BL-1188), its inputs' reach, its opening stock, and running costs."
   },
   {
-   "glyph": "○",
-   "status": "proposed",
+   "glyph": "●",
+   "status": "complete",
    "sprint": 49,
    "written": "2026-10-06",
    "requires": [],
@@ -1690,7 +1690,7 @@
    "files": [
     "tools/verify/"
    ],
-   "design": "G1 (processors running at handoff) is sprint 49's furthest gate (~49% vs 70%). Diagnose on current main before choosing a lever: every processor at handoff by state (running / input-starved / unsupplied / under construction / idled), and for the starved, which input, whether it is produced on the body, in reach, over the ceiling, or never chartered; per market and pooled, 16 seeds. Candidate levers already filed: BL-1189 (opening stock sized), BL-1203 (hauler room)."
+   "design": "MERGED (e5937d28, 2026-10-07): handoff_starvation probe + drafts/sprint-49-handoff-starvation.md. G1 41.8% on 16 seeds; ceiling cycle ~65%; levers ranked; ruled into BL-1209. Open: 424 idled plants with every input on hand not resumed - check the resume path.\n\nG1 (processors running at handoff) is sprint 49's furthest gate (~49% vs 70%). Diagnose on current main before choosing a lever: every processor at handoff by state (running / input-starved / unsupplied / under construction / idled), and for the starved, which input, whether it is produced on the body, in reach, over the ceiling, or never chartered; per market and pooled, 16 seeds. Candidate levers already filed: BL-1189 (opening stock sized), BL-1203 (hauler room)."
   },
   {
    "status": "complete",
@@ -1712,6 +1712,31 @@
     "src/world/corporation_generation.cpp"
    ],
    "design": "MERGED (2026-10-07): dig_ladder(produce) = deposit -> Wharf, no fallback; body_producible names exactly the ladder's ground; charter_refusal_probe section 8. NO CHANGE on seeds 0/43/10/28/38 (byte-identical worlds): a produce gap always takes a processing focus (the Hydroponics Bay recipe), so the ladder never runs there. Whether produce gaps should prefer extraction is a sprint 50+ design question.\n\nFound by BL-1199: body_producible counts any coastal tile as able to make agricultural produce, but dig_site_of offers no Wharf tier, so a produce gap firm on a coastal body with no produce deposit is told the good is producible and finds nowhere to build. The sibling of the Well tier Ben approved (NR-973, \"we can add wells to generation\"): give dig_site_of a Wharf tier for agricultural produce (deposit first, then a coastal no-deposit Wharf site), through the same three hooks the Well uses. Applied directly as the approved pattern (main session, 2026-10-06)."
+  },
+  {
+   "status": "designed",
+   "glyph": "◐",
+   "sprint": 49,
+   "written": "2026-10-07",
+   "requires": [
+    "BL-1203"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1209",
+   "short_name": "SHELF_SEES_SILENCED_WANT",
+   "author": "Claude (Ben's ceiling cycle form, 2026-10-07)",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "A stocked shelf counts as supply against the want the ceiling silenced, and a short shelf is shared pro-rata",
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "src/world/market_clearing.cpp",
+    "src/world/economy_system.cpp",
+    "scripts/economy.lua"
+   ],
+   "design": "RULED (Ben, 2026-10-07): (A) the shelf's supply share = min(inventory, k x (demand + suppressed want)), the suppressed want being BL-1203's hauler register; the want never bids; (B) a short shelf is shared pro-rata among admitted draws (MARKETS.md sec Price resolution). BL-1207 (handoff starvation): G1 41.8% on 16 seeds; ~65% of starved processors (1,588) have their input on a shelf priced ~4x base over the ceiling with demand 0 - the k x demand cap reads 0, so no k breaks it (the k re-sweep showed G1 flat). Estimated upper bound with resumes: G1 to ~67%. Build on BL-1203's register; then re-sweep k (currently 0) for Ben to ratify."
   }
  ]
 }

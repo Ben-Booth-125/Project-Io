@@ -979,6 +979,19 @@ swept at k = 0/1/2/4/8 on seeds 0/43/10 with spoilage on and households eating, 
 took the share of consuming prices at the ceiling against a stocked shelf from 5.2% to 0.1%, every
 k above 0 left fewer firms alive (38% at 0, 21–23% above), and the ceiling that remains is empty
 shelves no k can reach. It is re-swept once water is supplied (BL-1198, the Well).
+**The shelf's share reads the want the ceiling silenced (Ben, 2026-10-07; BL-1209).** With the
+share at `min(inventory, k × demand)`, a buyer silenced by the fair-price ceiling contributes no
+demand, so a full shelf priced over the ceiling counts as no supply and stays priced over it — a
+cycle that starved about 65% of the processors starved at handoff (BL-1207, handoff starvation).
+So the share is `min(inventory, k × (demand + suppressed want))`, the suppressed want being the
+processor inputs and construction materials that went unbought over the ceiling (the same register
+the hauler reads, `SUPPLY.md` § Dispatch trigger). The want **still never bids** — it only lets a
+stocked shelf count as what it is, so the price can fall to where the silenced buyers return. The
+ceiling ruling stands unchanged. k is re-swept under this rule.
+**A short shelf is shared pro-rata (Ben, 2026-10-07; BL-1209).** When a shelf cannot meet every
+draw admitted against it in a tick, each draw receives the same share of its need, not first-come
+by building id: a dip under the ceiling no longer lets the lowest-numbered plants empty the shelf
+while the rest starve.
 
 **The shelf spoils (settled 2026-10-05, on Ben's delegation; BL-1179).** Every good standing on a
 market's shelf loses a fixed share of itself each tick, its **spoilage rate**, authored per good in
