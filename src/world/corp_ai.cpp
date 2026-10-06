@@ -1100,9 +1100,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 const float           wf  = 0.5f; // construct_building staffs at 0.5
                 // BL-436: same conversion as the tick. A raw richness made the
                 // scorer expect ~50x the revenue a site actually delivers.
-                // BL-1198: a Well runs at the typical-deposit rate.
-                const float rich          = placement_rules::is_well_site(w, s.tile, s.target)
-                    ? placement_rules::k_well_rate_scalar
+                // BL-1198/BL-1199: a Well or Wharf runs at the typical-deposit rate.
+                const float rich          = placement_rules::is_depositless_site(w, s.tile, s.target)
+                    ? placement_rules::depositless_rate_scalar(s.target)
                     : richness_rate_scalar(ex, tc.resource_deposit[ri]);
                 const float price         = local_price(w, s.tile, ri);
                 const float revenue       = ex.base_rate * rich * wf * (1.0f - tc.hazard_level) * price;
@@ -1465,9 +1465,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     const tile_component& tc  = w.tiles.at(s.tile);
                     const std::size_t     ri  = static_cast<std::size_t>(s.target);
                     const float wf      = 0.5f; // construct_building staffs at 0.5, as the build candidate above
-                    // BL-1198: a Well runs at the typical-deposit rate.
-                    const float rich    = placement_rules::is_well_site(w, s.tile, s.target)
-                        ? placement_rules::k_well_rate_scalar
+                    // BL-1198/BL-1199: a Well or Wharf runs at the typical-deposit rate.
+                    const float rich    = placement_rules::is_depositless_site(w, s.tile, s.target)
+                        ? placement_rules::depositless_rate_scalar(s.target)
                         : richness_rate_scalar(ex, tc.resource_deposit[ri]);
                     const float price   = local_price(w, s.tile, ri);
                     const float revenue = ex.base_rate * rich * wf * (1.0f - tc.hazard_level) * price;

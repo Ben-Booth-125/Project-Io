@@ -15,7 +15,8 @@ namespace ui {
 /// The NAME the Buildings view files @p b under — the same words the Build door
 /// offers, so a player recognises the row as the thing they built:
 /// `extraction_building_name(target_resource)` for an extraction site ("Quarry";
-/// "Well" where `placement_rules::is_well_site` holds, BL-1198 — so it needs @p w),
+/// "Well" where `placement_rules::is_well_site` holds, BL-1198, and "Fishing
+/// Wharf" where `placement_rules::is_wharf_site` does, BL-1199 — so it needs @p w),
 /// the active recipe's own `group` for a processing facility ("Metal Foundry", the
 /// BL-434 grouping vocabulary), and `building_type_name` for everything else.
 ///

@@ -111,10 +111,11 @@ float building_output(const world& w, const recipe_registry& reg, entity_id bid,
             return 0.0f;
         const tile_component& tc = tit->second;
         const std::size_t pr = static_cast<std::size_t>(b.target_resource);
-        // BL-1198: a Well draws no reserve and yields its target alone
-        // (economy_system.cpp § run_extraction), so the reserve/share reading
-        // below would call it a non-producer and hide its water from the reach.
-        if (placement_rules::is_well_site(w, b.tile, b.target_resource))
+        // BL-1198/BL-1199: a Well or Wharf draws no reserve and yields its
+        // target alone (economy_system.cpp § run_extraction), so the
+        // reserve/share reading below would call it a non-producer and hide
+        // its output from the reach.
+        if (placement_rules::is_depositless_site(w, b.tile, b.target_resource))
         {
             if (r != pr)
                 return 0.0f;

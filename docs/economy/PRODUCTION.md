@@ -211,6 +211,15 @@ dry one must buy. The Ice Extractor stays the route on icy ground and off-world;
 either rule, both, or neither. Where it satisfies both, the deposit wins: a tile carrying any ice
 deposit takes the Ice Extractor route — even once that deposit is spent — and never offers a Well.
 
+**The deposit-agnostic yield (BL-1198, BL-1199).** A Well and a Fishing Wharf have no deposit, so
+neither has a richness to set its rate nor a reserve to draw. Each runs at the rate a **typical**
+deposit earns — a richness→rate scalar of 1.0, the median deposit's (§ Extraction) — so output is
+`base_rate × 1.0 × labour × supply × (1 − hazard)`. The river keeps running and the sea keeps
+fishing: there is no taper and no exhaustion, and the site yields its target alone (no co-extracted
+basket). A tile carrying any deposit of the target is the deposit route instead — a Farm, an Ice
+Extractor — even once that reserve is spent. The tick, the workforce solver, the Build door's profit
+estimate and the input-reach reading all price the site by this one formula.
+
 The Mine covers all terrestrial hard-mineral deposits and adjusts its output to whatever the tile holds: the same building type on one volcanic tile yields rare earth ore and on another yields copper ore. The distinction between deposit types is in the tile data, not the building type. Off-world metallic deposits (iron-nickel ore, platinum group metals) are harvested by the Surface Extractor, the Era 1 airless-body counterpart to the Mine; both feed the same smelting chain, so the distinction is one of era and deployment environment, not of downstream product.
 
 The Quarry and Lumber Camp exist specifically to harvest ambient resources (stone, timber, sand, clay) that are present at low levels on most tiles. They ensure every tile can be productive in some capacity, even if only as a local construction material source. They share the same workforce and hazard scalar model as other extraction buildings.

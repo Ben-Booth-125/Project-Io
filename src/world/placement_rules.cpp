@@ -276,6 +276,25 @@ bool is_well_site(const world& w, entity_id tile_id, resource_type target)
     return is_fresh_water_adjacent(w, tile_id);
 }
 
+bool is_wharf_site(const world& w, entity_id tile_id, resource_type target)
+{
+    if (target != resource_type::agricultural_produce)
+        return false;
+    const auto tc_it = w.tiles.find(tile_id);
+    if (tc_it == w.tiles.end())
+        return false;
+    // A produce deposit makes it a Farm, whatever sea lies beside it — the
+    // same `<= 0` test can_place_in_world's Wharf gate reads.
+    if (tc_it->second.resource_deposit[static_cast<std::size_t>(resource_type::agricultural_produce)] > 0.0f)
+        return false;
+    return is_coastal(w, tile_id);
+}
+
+bool is_depositless_site(const world& w, entity_id tile_id, resource_type target)
+{
+    return is_well_site(w, tile_id, target) || is_wharf_site(w, tile_id, target);
+}
+
 namespace {
 
 /// BL-615: the highest stratum among population centres anchored on
