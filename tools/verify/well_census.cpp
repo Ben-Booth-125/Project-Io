@@ -147,6 +147,40 @@ void built(const world& w, const economy_report* rep, int tick)
     std::printf("  tick %3d  WELLS placed %d running %d output %.1f in %zu markets | ICE placed %d running %d output %.1f in %zu markets | water px/base %.2f\n",
                 tick, n_well, run_well, out_well, mk_well.size(), n_ice, run_ice, out_ice, mk_ice.size(),
                 np ? px / np : 0.0);
+
+    // BL-1208 (generation sites wharves): the produce mirror — agricultural
+    // produce extraction sites by kind (Fishing Wharf vs Farm deposit), and the
+    // corporations whose FIRST asset digs produce (a background produce firm's
+    // anchor), split by the anchor's kind.
+    int n_wharf = 0, run_wharf = 0, n_farm = 0, run_farm = 0;
+    float out_wharf = 0.0f, out_farm = 0.0f;
+    for (const auto& [bid, b] : w.buildings)
+    {
+        if (b.type != building_type::extraction_site
+            || b.target_resource != resource_type::agricultural_produce || b.decommissioned)
+            continue;
+        const bool wharf = placement_rules::is_wharf_site(w, b.tile, b.target_resource);
+        const auto it = by_id.find(bid);
+        const bool active = it != by_id.end() && it->second->active;
+        const float out = (it != by_id.end()) ? it->second->output_quantity : 0.0f;
+        if (wharf) { ++n_wharf; run_wharf += active; out_wharf += out; }
+        else       { ++n_farm;  run_farm  += active; out_farm  += out; }
+    }
+    int firm_wharf = 0, firm_farm = 0;
+    for (const auto& [cid, cc] : w.corporations)
+    {
+        if (cc.assets.empty()) continue;
+        const auto bi = w.buildings.find(cc.assets.front());
+        if (bi == w.buildings.end()) continue;
+        const building_component& b = bi->second;
+        if (b.type != building_type::extraction_site
+            || b.target_resource != resource_type::agricultural_produce)
+            continue;
+        if (placement_rules::is_wharf_site(w, b.tile, b.target_resource)) ++firm_wharf;
+        else ++firm_farm;
+    }
+    std::printf("  tick %3d  WHARVES placed %d running %d output %.1f | FARMS placed %d running %d output %.1f | produce-anchored firms: Wharf %d, Farm %d\n",
+                tick, n_wharf, run_wharf, out_wharf, n_farm, run_farm, out_farm, firm_wharf, firm_farm);
 }
 
 /// The scorer's Well bucket as rank_extraction_sites keeps it (corp_ai.cpp,
