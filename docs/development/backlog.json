@@ -1693,8 +1693,8 @@
    "design": "G1 (processors running at handoff) is sprint 49's furthest gate (~49% vs 70%). Diagnose on current main before choosing a lever: every processor at handoff by state (running / input-starved / unsupplied / under construction / idled), and for the starved, which input, whether it is produced on the body, in reach, over the ceiling, or never chartered; per market and pooled, 16 seeds. Candidate levers already filed: BL-1189 (opening stock sized), BL-1203 (hauler room)."
   },
   {
-   "status": "designed",
-   "glyph": "◐",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 49,
    "written": "2026-10-06",
    "requires": [],
@@ -1711,7 +1711,7 @@
    "files": [
     "src/world/corporation_generation.cpp"
    ],
-   "design": "Found by BL-1199: body_producible counts any coastal tile as able to make agricultural produce, but dig_site_of offers no Wharf tier, so a produce gap firm on a coastal body with no produce deposit is told the good is producible and finds nowhere to build. The sibling of the Well tier Ben approved (NR-973, \"we can add wells to generation\"): give dig_site_of a Wharf tier for agricultural produce (deposit first, then a coastal no-deposit Wharf site), through the same three hooks the Well uses. Applied directly as the approved pattern (main session, 2026-10-06)."
+   "design": "MERGED (2026-10-07): dig_ladder(produce) = deposit -> Wharf, no fallback; body_producible names exactly the ladder's ground; charter_refusal_probe section 8. NO CHANGE on seeds 0/43/10/28/38 (byte-identical worlds): a produce gap always takes a processing focus (the Hydroponics Bay recipe), so the ladder never runs there. Whether produce gaps should prefer extraction is a sprint 50+ design question.\n\nFound by BL-1199: body_producible counts any coastal tile as able to make agricultural produce, but dig_site_of offers no Wharf tier, so a produce gap firm on a coastal body with no produce deposit is told the good is producible and finds nowhere to build. The sibling of the Well tier Ben approved (NR-973, \"we can add wells to generation\"): give dig_site_of a Wharf tier for agricultural produce (deposit first, then a coastal no-deposit Wharf site), through the same three hooks the Well uses. Applied directly as the approved pattern (main session, 2026-10-06)."
   }
  ]
 }
