@@ -294,6 +294,12 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
 /// of empty ticks spans one full look by every rival.
 inline constexpr uint8_t sell_order_empty_close_ticks = 4;
 
+/// The EMA factor `resolve_price` eases a market price toward its target by, each
+/// clear: next = prior + k_price_smoothing x (target - prior). Exported for
+/// BL-1203's first-clear guard in `dispatch_absorbable` (supply_system.cpp), which
+/// projects the price a cargo will SELL at on its arrival tick.
+inline constexpr float k_price_smoothing = 0.5f;
+
 /// The UNSMOOTHED price a market aims at for one good this tick: `base x
 /// sqrt(demand / supply)`, `base x ceil` for demand with no supply, `base` with
 /// neither, clamped to [floor_mult, ceil_mult] x base. `resolve_price` eases the

@@ -115,6 +115,12 @@ struct tally
            hh_bid_at_l = 0.0, landed_over_base = 0.0, demand = 0.0;
     // sea vs land where both exist, over surplus->dry same-body pairs that route
     long both_modes = 0, sea_cheaper = 0;
+    // BL-1203: the one-destination-per-pass rule (export_market_shelves sends
+    // each (market, good) to ONE destination a pass). Read after dispatch, a
+    // surplus source that still has a `room` destination was held by that rule
+    // or by the passive-LP cap.
+    long src_with_room = 0, src_with_room2 = 0;
+    double room_units_left = 0.0;
 };
 
 struct probe_ctx
@@ -191,6 +197,8 @@ void probe_hook(const world& cw, int lap, void* vctx)
     t.surplus_mkts += static_cast<long>(sur.size());
     t.dry_mkts += static_cast<long>(dry.size());
 
+    std::map<entity_id, int> room_dests;          // surplus source -> dry dests with room
+    std::map<entity_id, double> room_left;        // source -> sum of room
     for (const entity_id d : dry)
     {
         const market_component& dm = w.markets.at(d);
@@ -260,6 +268,8 @@ void probe_hook(const world& cw, int lap, void* vctx)
                         {
                             c = c_room;
                             (mode == convoy_mode::sea ? t.room_sea : t.room_land)++;
+                            ++room_dests[s];
+                            room_left[s] += absorb - pend;
                         }
                     }
                 }
@@ -268,7 +278,7 @@ void probe_hook(const world& cw, int lap, void* vctx)
             if (c >= c_costly && (best < c_costly || landed < best_l)) best_l = landed;
             if (best < 0 || k_rank[c] > k_rank[best]) best = c;
         }
-        if (best < 0) continue; // no surplus market at all this tick
+        if (best < 0) continue; // no surplus market at all this tick (dry loop)
         ++t.best[best];
         if (best >= c_costly)
         {
@@ -296,6 +306,12 @@ void probe_hook(const world& cw, int lap, void* vctx)
             if (admit) ++t.cf_admit;
             ctx->cf.push_back({d, L, a, S <= 0.0f ? 1.0f : r2, admit});
         }
+    }
+    for (const auto& [src, n] : room_dests)
+    {
+        ++t.src_with_room;
+        if (n >= 2) ++t.src_with_room2;
+        t.room_units_left += std::min<double>(room_left[src], market_shelf_surplus(w, src, G));
     }
 }
 
@@ -358,6 +374,8 @@ void print(const char* who, const tally& t)
     std::printf("\n   land-locked from every surplus (best = body/noroute): %.0f%% of dry markets\n",
                 dry ? 100.0 * (t.best[c_body] + t.best[c_noroute]) / dry : 0.0);
     const double m = t.cf_n ? static_cast<double>(t.cf_n) : 1.0;
+    std::printf("   one-destination-per-pass: surplus sources still holding a dry destination with room after dispatch %.1f (of them >= 2 such destinations %.1f), room left %.1f u per probe\n",
+                t.src_with_room / n, t.src_with_room2 / n, t.room_units_left / n);
     std::printf("   room counterfactuals over %ld routed dry markets (mean L/base %.2f; L <= reservation in %ld): mean demand %.2f, hh bid %.2f -> at L %.2f, latent processor want %.2f; ROOM now %.2f | A (bid re-read at L) %.2f | B (A + suppressed processor want) %.2f units per market\n",
                 t.cf_n, t.landed_over_base / m, t.cf_admit, t.demand / m, t.hh_bid / m,
                 t.hh_bid_at_l / m, t.latent / m, t.room_now / m, t.room_a / m, t.room_b / m);
@@ -458,6 +476,8 @@ int main(int argc, char** argv)
         pooled.room_a += t.room_a; pooled.room_b += t.room_b; pooled.latent += t.latent;
         pooled.hh_bid += t.hh_bid; pooled.hh_bid_at_l += t.hh_bid_at_l;
         pooled.landed_over_base += t.landed_over_base; pooled.demand += t.demand;
+        pooled.src_with_room += t.src_with_room; pooled.src_with_room2 += t.src_with_room2;
+        pooled.room_units_left += t.room_units_left;
         std::fflush(stdout);
     }
     print("POOLED", pooled);
