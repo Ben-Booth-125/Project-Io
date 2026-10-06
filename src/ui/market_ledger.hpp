@@ -165,6 +165,31 @@ struct exchange_row_record
     bool          buyer_is_market  = false;
 };
 
+/// One of the player's standing sell orders that CLOSED ITSELF (BL-1202, order
+/// close notice) — its pool stood empty for `sell_order_empty_close_ticks`
+/// quarters, so the clearing pass removed it and the good went back to
+/// auto-surplus (`MARKETS.md` step 4).
+///
+/// A READ OF `world::history_log`, not new state: the order is gone from the
+/// book by the time the player looks, and the agency-topic line the clearing
+/// pass wrote is the only record of it. The line's `consequence` carries the good
+/// and floor in a fixed tag the clearing pass writes and this side parses.
+struct closed_trade_record
+{
+    std::int64_t  day      = 0;                ///< Sim day tick the close was logged at.
+    std::uint32_t order_id = 0;                ///< The closed order's `sell_order::id`.
+    bool          good_known = false;          ///< False if the tag did not parse (an older save).
+    resource_type resource = resource_type::iron_ore;
+    const char*   name     = "";               ///< Display name; "" when !good_known.
+    float         floor_price = 0.0f;
+    std::string   why;                         ///< The log line itself, for the hover.
+};
+
+/// The player's own self-closed orders on the selected market's body, NEWEST
+/// FIRST, bounded (see `market_ledger.cpp` § closed orders). Empty when the
+/// Trades tab is not on screen.
+const std::vector<closed_trade_record>& closed_trades();
+
 /// Read 1 — the player's standing trades at the selected market's body, as drawn.
 const std::vector<trade_row_record>& my_trades();
 

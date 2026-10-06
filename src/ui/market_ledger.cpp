@@ -1,7 +1,7 @@
 #include "market_ledger.hpp"
 
 #include "foldout_column.hpp" // shell fold-out column host (BL-122)
-#include "format.hpp"         // fmt::abbreviate — the Revenue column's width budget
+#include "format.hpp"         // fmt::abbreviate — the Revenue column's width budget; fmt::date_from_day — closed orders
 #include "icons.hpp"
 #include "plot_history.hpp"
 #include "presentation.hpp"
@@ -105,6 +105,7 @@ std::vector<trade_row_record>       g_my_trades;
 std::vector<trade_row_record>       g_market_trades;
 std::vector<potential_trade_record> g_potential;
 std::vector<exchange_row_record>    g_exchanges;
+std::vector<closed_trade_record>    g_closed;
 bool                                g_market_trades_open = false;
 entity_id                           g_trades_market      = null_entity;
 
@@ -117,6 +118,13 @@ int         g_cache_tick    = -1;
 std::size_t g_cache_markets = 0;
 std::size_t g_cache_assets  = 0;
 
+// The closed-orders cache key (BL-1202). The read walks `world::history_log`
+// backwards, and that log also holds the whole genesis chapter, so it is keyed on
+// the log's LENGTH (append-only: nothing changes without it growing) and the body.
+entity_id   g_closed_body     = null_entity;
+std::size_t g_closed_log_size = 0;
+int         g_closed_tick     = -1; // the window ages with the quarter, not only the log
+
 /// Drop every Trades record and the cache key with them. Called when the tab is
 /// not the one on screen.
 void clear_trade_records()
@@ -125,6 +133,10 @@ void clear_trade_records()
     g_market_trades.clear();
     g_potential.clear();
     g_exchanges.clear();
+    g_closed.clear();
+    g_closed_body     = null_entity;
+    g_closed_log_size = 0;
+    g_closed_tick     = -1;
     g_market_trades_open = false;
     g_trades_market      = null_entity;
     g_cache_market       = null_entity;
@@ -253,6 +265,141 @@ std::vector<trade_row_record> collect_trades(const world& w, entity_id body, boo
         out.push_back(r);
     }
     return out;
+}
+
+// --- Closed orders (BL-1202, order close notice) ------------------------------
+// "Which of my orders closed themselves, and why?" An order whose pool stands
+// empty for `sell_order_empty_close_ticks` quarters is removed by the clearing
+// pass and its good returns to auto-surplus (`MARKETS.md` step 4). The book no
+// longer holds it, so My trades simply loses a row — and a player who set a floor
+// on purpose would find the good selling at the market price with nothing to say
+// why. The clearing pass logs each close as an agency-topic `history_log` line;
+// this is the player's reader of it, under the section the order used to stand in.
+
+/// How many closes the notice keeps. It is a notice, not a history: the newest
+/// few are what the player needs to re-place an order, and the section beside it
+/// is already capped at five rows.
+constexpr std::size_t k_closed_rows = 3;
+
+/// How far back a close still counts as recent: four quarters, in day ticks
+/// (`sim_loop::econ_tick_days`, mirrored world-side as `econ_tick_days_world`).
+constexpr std::int64_t k_closed_window_days = 4 * 90;
+
+/// The player's own self-closed sell orders on @p body, newest first.
+///
+/// Parses the two fixed formats the clearing pass writes (market_clearing.cpp,
+/// the BL-1201 close loop): the event's "Standing sell order #<id>" prefix and the
+/// consequence's "good #<index> floor <price>" tag. A line whose tag does not parse
+/// (a save written before the tag existed) still lists, with the good unnamed —
+/// the close happened, and hiding it would be the silence this exists to end.
+std::vector<closed_trade_record> collect_closed_trades(const world& w, entity_id body)
+{
+    static constexpr char k_prefix[] = "Standing sell order #";
+    std::vector<closed_trade_record> out;
+    const entity_id    player = w.player_entity;
+    const std::int64_t now    = w.current_day_tick;
+
+    for (auto it = w.history_log.rbegin(); it != w.history_log.rend(); ++it)
+    {
+        const world_history_entry& e = *it;
+        if (e.topic != history_topic::agency || e.corp != player || e.body != body)
+            continue;
+        if (e.event.rfind(k_prefix, 0) != 0)
+            continue;
+        // Newest first and the log is append-ordered, so the first close past
+        // the window ends the walk.
+        if (now - e.timestamp > k_closed_window_days)
+            break;
+
+        closed_trade_record r;
+        r.day = e.timestamp;
+        r.why = e.event;
+        unsigned id = 0;
+        if (std::sscanf(e.event.c_str() + (sizeof k_prefix - 1), "%u", &id) == 1)
+            r.order_id = static_cast<std::uint32_t>(id);
+        int   good  = -1;
+        float fl    = 0.0f;
+        if (std::sscanf(e.consequence.c_str(), "good #%d floor %f", &good, &fl) == 2
+            && good >= 0 && static_cast<std::size_t>(good) < resource_count)
+        {
+            r.good_known  = true;
+            r.resource    = static_cast<resource_type>(good);
+            r.name        = presentation_of(r.resource).name;
+            r.floor_price = fl;
+        }
+        out.push_back(std::move(r));
+        if (out.size() >= k_closed_rows)
+            break;
+    }
+    return out;
+}
+
+/// "Jan 1962" — month and year, which is the grain a quarterly close is worth.
+std::string closed_when_label(std::int64_t day)
+{
+    const fmt::calendar_date d =
+        fmt::date_from_day(day > 0 ? static_cast<std::uint64_t>(day) : 0u);
+    char buf[32];
+    std::snprintf(buf, sizeof buf, "%s %d", fmt::month_abbrev(d.month), d.year);
+    return buf;
+}
+
+/// The closed-orders table: Closed · Good · Floor, the log line on hover.
+void draw_closed_table(const std::vector<closed_trade_record>& rows)
+{
+    constexpr ImGuiTableFlags flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit;
+    if (!ImGui::BeginTable("##closed", 3, flags))
+        return;
+
+    const float pad    = ImGui::GetStyle().CellPadding.x * 2.0f;
+    const float w_when = ImGui::CalcTextSize("May 0000").x + pad;
+    const float w_lim  = ImGui::CalcTextSize(">=00.0").x + pad;
+    ImGui::TableSetupColumn("Closed", ImGuiTableColumnFlags_WidthFixed, w_when);
+    ImGui::TableSetupColumn("Good",   ImGuiTableColumnFlags_WidthStretch, 1.0f);
+    ImGui::TableSetupColumn("Floor",  ImGuiTableColumnFlags_WidthFixed, w_lim);
+    ImGui::TableHeadersRow();
+
+    int id = 0;
+    for (const closed_trade_record& r : rows)
+    {
+        ImGui::PushID(id++);
+        ImGui::TableNextRow();
+
+        ImGui::TableSetColumnIndex(0);
+        ImGui::TextDisabled("%s", closed_when_label(r.day).c_str());
+
+        ImGui::TableSetColumnIndex(1);
+        if (r.good_known)
+        {
+            const resource_presentation& rp = presentation_of(r.resource);
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(rp.colour));
+            ui::fit_text(ui::text_box::table_cell, "market.trades.closed_good", r.name,
+                         ImGui::GetContentRegionAvail().x);
+            ImGui::PopStyleColor();
+        }
+        else
+        {
+            ImGui::TextDisabled("Order #%u", static_cast<unsigned>(r.order_id));
+        }
+
+        ImGui::TableSetColumnIndex(2);
+        if (r.good_known)
+            ImGui::TextDisabled(">=%.1f", static_cast<double>(r.floor_price));
+        else
+            ImGui::TextDisabled("-");
+
+        // The why, in the clearing pass's own words — the row is the notice, the
+        // hover is the record.
+        if (ImGui::BeginItemTooltip())
+        {
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 24.0f);
+            ImGui::TextUnformatted(r.why.c_str());
+            ImGui::PopTextWrapPos();
+            ImGui::EndTooltip();
+        }
+        ImGui::PopID();
+    }
+    ImGui::EndTable();
 }
 
 /// READ 3 — the potential-trade derivation. Buy price here against sell price
@@ -786,6 +933,17 @@ void draw_trades_tab(world& w, const recipe_registry& reg, ui_state& state,
         g_exchanges     = derive_exchange_rows(w, mid);
     }
 
+    // Closed orders (BL-1202): keyed on the log's length and the body, never a
+    // per-frame walk of the whole log (it carries the genesis chapter too).
+    if (g_closed_body != body || g_closed_log_size != w.history_log.size()
+        || g_closed_tick != w.current_econ_tick)
+    {
+        g_closed_body     = body;
+        g_closed_log_size = w.history_log.size();
+        g_closed_tick     = w.current_econ_tick;
+        g_closed          = collect_closed_trades(w, body);
+    }
+
     // Named child so `verify.scroll_panel("market_trades", ...)` reaches the REAL
     // scroller rather than the window, which has no scrollable extent (NR-719).
     // A NAME OF ITS OWN, not the Goods child's: a tab strip's two views are two
@@ -830,6 +988,16 @@ void draw_trades_tab(world& w, const recipe_registry& reg, ui_state& state,
             ImGui::BeginChild("##mine_box", {0.0f, table_height(k_mine_cap)}, false);
             draw_trade_table("##mine", g_my_trades, false, true, state, corp);
             ImGui::EndChild();
+        }
+
+        // BL-1202: the player's orders that closed themselves. Drawn only when
+        // there is one, so it costs the section nothing in the ordinary case;
+        // the head states the rule, so no row needs a column to say why.
+        if (!g_closed.empty())
+        {
+            ImGui::TextDisabled("Closed: nothing to sell for %d qtrs.",
+                                static_cast<int>(sell_order_empty_close_ticks));
+            draw_closed_table(g_closed);
         }
 
         if (ImGui::TreeNode("Place a trade"))
@@ -1415,6 +1583,7 @@ const std::vector<trade_row_record>&       market_trades()      { return g_marke
 bool                                       market_trades_open() { return g_market_trades_open; }
 const std::vector<potential_trade_record>& potential_trades()   { return g_potential; }
 const std::vector<exchange_row_record>&    exchange_rows()      { return g_exchanges; }
+const std::vector<closed_trade_record>&    closed_trades()      { return g_closed; }
 entity_id                                  trades_market()      { return g_trades_market; }
 
 void draw_market_ledger(world& w, const recipe_registry& reg, ui_state& s,
