@@ -107,9 +107,18 @@ building_opex compute_building_opex(const building_component& b,
     // Material cost: the authored idle floor (BL-739 â€” was a hard-coded 30%),
     // charged even when decommissioned.
     // Labour cost: scales with workforce_target; zero when decommissioned.
+    //
+    // BL-1183 C4 (Ben, 2026-10-05; FINANCE.md § Building operating cost): a site
+    // UNDER CONSTRUCTION (`ticks_remaining > 0`, the one flag every pass reads as
+    // "not yet built") is charged exactly what a decommissioned building is — the
+    // idle floor, no labour maintenance, no wages — until the tick it completes.
+    // Labour demand already skips a site (economy_system.cpp, the labour claims),
+    // so a wage here paid a crew nobody supplied. One test, here, so the budget
+    // loop and every estimate that asks this function agree.
+    const bool  idle          = b.decommissioned || b.ticks_remaining > 0;
     const float wt_scalar     = std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f);
     const float material_cost = e.maintenance * idle_floor;
-    const float labour_cost   = b.decommissioned ? 0.0f
+    const float labour_cost   = idle ? 0.0f
                                 : e.maintenance * wt_scalar - material_cost;
     const float hab           = std::clamp(mean_hab, 0.1f, 2.0f);
 
@@ -120,7 +129,7 @@ building_opex compute_building_opex(const building_component& b,
     // BL-614: wages are paid AT THE OFFERED RATE â€” base_wage Ã— (1 + wage_bid) â€”
     // on the labour actually allocated. A zero bid multiplies by exactly 1.0f,
     // so every pre-BL-614 wage is bit-identical.
-    o.wages       = b.decommissioned
+    o.wages       = idle
                     ? 0.0f
                     : b.workforce_assigned * contention_scalar * e.base_wage
                           * (1.0f + b.wage_bid) * wt_scalar * hab;

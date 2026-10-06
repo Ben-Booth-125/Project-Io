@@ -37,7 +37,8 @@ struct building_opex
 /// OFFERED RATE (BL-614): `base_wage × (1 + b.wage_bid)` — a building that outbid
 /// its siblings for scarce labour pays the premium it offered, on the labour it
 /// actually got. Decommissioned buildings pay only fixed material maintenance,
-/// no wages.
+/// no wages � and so does a building under construction (`ticks_remaining > 0`;
+/// BL-1183 C4, Ben 2026-10-05), until the tick it completes.
 /// @p idle_floor is the BL-739 idle-maintenance floor — the fraction of
 /// `e.maintenance` charged even at workforce 0 or decommissioned. Every caller
 /// passes `reg.idle_maintenance_floor()`; the parameter is deliberately
