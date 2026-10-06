@@ -20,12 +20,19 @@
 //      inventory, and every corporation's balance, agree BIT FOR BIT on every
 //      tick. With the switch off nothing reads the fields, so this is the
 //      register's content not reaching any price.
-//   H2 THE CEILING GATE, read at the function. For every (market, good) whose
-//      `hauler_want` is positive on a sampled tick: dispatch_absorbable with a
-//      landed cost just ABOVE reservation_mult x base equals the same call with
-//      the register zeroed; at a landed cost AT the ceiling it is never less, and
-//      larger on at least one (where listings already exceed the sized target
-//      both read 0). Vacuity guard: at least one such pair is seen.
+//   H2 THE SUPPRESSED WANT IS GATED (cold review fix 2). For every (market,
+//      good) whose `hauler_want` is positive on a sampled tick:
+//      dispatch_absorbable at a landed cost AT and just ABOVE the buyer's
+//      ceiling equals the call with the register zeroed (the aim, landed x
+//      (1 + margin), is over the ceiling, so its buyers will not bid); at a
+//      landed cost of 1.0x base it is never less, and larger on at least one.
+//   H5 THE CARGO'S OWN SALE (cold review measurement). Every corporate convoy
+//      that arrives in the run: its owner's realised sale price of the good at
+//      the destination on the arrival tick against its landed cost, quantity
+//      weighted, ON and OFF. H5.1: destinations carrying suppressed want
+//      (hauler_want > 0 at dispatch) receive cargo under ON, and none of it —
+//      nor of the W-dominated subset (hauler_want over posted demand) — clears
+//      below its landed cost.
 //   H3 A SHORT MARKET RECEIVES A SHIPMENT. Over the play ticks, with the hauler
 //      view ON (the shipped game) against OFF, from the same world: the units of
 //      a good dispatched INTO a market whose `hauler_want` for that good was
@@ -58,7 +65,9 @@
 #include <cstring>
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace {
@@ -118,36 +127,122 @@ struct ship_tally
 {
     double units = 0.0;
     long   convoys = 0;
+    // H5 (the cold review's measurement): every CORPORATE convoy's realised
+    // sale price at its destination against its landed cost (source posted
+    // price + haul per unit), quantity-weighted. "W-dominated" = a destination
+    // whose hauler_want for the good exceeded its posted demand at dispatch.
+    double r_qty = 0.0, r_sum = 0.0, r_below = 0.0, r_below_margin = 0.0, r_unsold = 0.0;
+    double w_qty = 0.0, w_sum = 0.0, w_below = 0.0, w_unsold = 0.0; // W > 0 at dispatch
+    double d_qty = 0.0, d_below = 0.0;                              // W > posted demand
+    double haul = 0.0;
+    long   corp_convoys = 0;
 };
+
+/// The corporation's sale of a good at a market this tick (exchange ring).
+struct sale_tap
+{
+    int clear_lap = -1;
+    std::size_t last_total = 0;
+    std::map<std::tuple<entity_id, entity_id, std::size_t>, std::pair<double, double>> rows; // u, v
+};
+
+void sale_after_lap(const world& w, int lap, void* ctx)
+{
+    auto* t = static_cast<sale_tap*>(ctx);
+    if (lap != t->clear_lap) return;
+    const std::size_t fresh = w.exchanges.total - t->last_total;
+    t->last_total = w.exchanges.total;
+    const std::size_t held = std::min(fresh, w.exchanges.size());
+    const std::size_t n = w.exchanges.size();
+    for (std::size_t i = n - held; i < n; ++i)
+    {
+        const exchange_record& e = w.exchanges.oldest_first(i);
+        if (e.seller == null_entity) continue;
+        auto& row = t->rows[{e.seller, e.market, static_cast<std::size_t>(e.resource)}];
+        row.first += e.quantity;
+        row.second += static_cast<double>(e.quantity) * e.unit_price;
+    }
+}
 
 /// H3: run `ticks` play ticks from `w`, counting units dispatched into a
 /// (market, good) whose hauler_want was positive at the decision (the register
 /// the dispatch read: written by the previous clear), landing at or under that
-/// market's ceiling.
+/// market's ceiling. H5: the realised-vs-landed reading for every corporate
+/// convoy that arrives inside the run (its owner's sale of that good at that
+/// market on the arrival tick's clear).
 ship_tally run_and_count(world& w, const recipe_registry& reg, int ticks)
 {
     ship_tally t;
     const float res = reg.price_band().reservation_mult;
+    const float margin = reg.dispatch_margin();
+    struct pend { entity_id corp, dest; std::size_t r; float landed, qty; bool wany, wdom; };
+    std::map<std::uint32_t, pend> pending;
+    sale_tap tap;
+    for (int i = 0; i < k_campaign_settle_lap_count; ++i)
+        if (std::strcmp(k_campaign_settle_lap_names[i], "clear_markets") == 0) tap.clear_lap = i;
+    tap.last_total = w.exchanges.total;
+    settle_tick_hooks hooks;
+    hooks.after_lap = sale_after_lap;
+    hooks.ctx = &tap;
     std::uint32_t max_id = 0;
     for (const convoy_component& c : w.convoys) max_id = std::max(max_id, c.id);
     for (int k = 1; k <= ticks; ++k)
     {
-        // The register and the prices dispatch reads this tick: last clear's.
-        std::map<entity_id, std::array<float, resource_count>> want, price;
-        for (const auto& [mid, mc] : w.markets) { want[mid] = mc.hauler_want; price[mid] = mc.price; }
-        play_tick(w, reg, k);
+        // The register, demand and prices dispatch reads this tick: last clear's.
+        std::map<entity_id, std::array<float, resource_count>> want, price, demand;
+        for (const auto& [mid, mc] : w.markets) { want[mid] = mc.hauler_want; price[mid] = mc.price; demand[mid] = mc.demand; }
+        tap.rows.clear();
+        const int day = k * k_econ_tick_days;
+        advance_orbits(w, static_cast<double>(k_econ_tick_days));
+        advance_surveys(w, k_econ_tick_days);
+        w.current_day_tick = day;
+        run_settle_tick(w, reg, k_campaign_settle_ticks + (k - 1), day, false, &hooks);
+        // Arrivals this tick: pending convoys no longer on the books.
+        std::set<std::uint32_t> live;
+        for (const convoy_component& c : w.convoys) live.insert(c.id);
+        for (auto it = pending.begin(); it != pending.end();)
+        {
+            if (live.count(it->first)) { ++it; continue; }
+            const pend& pc = it->second;
+            const auto row = tap.rows.find({pc.corp, pc.dest, pc.r});
+            if (row == tap.rows.end() || !(row->second.first > 0.0))
+            {
+                t.r_unsold += pc.qty;
+                if (pc.wany) t.w_unsold += pc.qty;
+            }
+            else
+            {
+                const double realised = row->second.second / row->second.first;
+                const double ratio = realised / pc.landed;
+                t.r_qty += pc.qty; t.r_sum += ratio * pc.qty;
+                if (realised < pc.landed) t.r_below += pc.qty;
+                if (realised < pc.landed * (1.0 + margin)) t.r_below_margin += pc.qty;
+                if (pc.wany) { t.w_qty += pc.qty; t.w_sum += ratio * pc.qty; if (realised < pc.landed) t.w_below += pc.qty; }
+                if (pc.wdom) { t.d_qty += pc.qty; if (realised < pc.landed) t.d_below += pc.qty; }
+            }
+            it = pending.erase(it);
+        }
         for (const convoy_component& c : w.convoys)
         {
             if (c.id <= max_id) continue;
             const std::size_t r = static_cast<std::size_t>(c.cargo_resource);
-            const auto wi = want.find(c.dest_market);
-            if (wi == want.end() || !(wi->second[r] > 0.0f) || !(c.cargo_qty > 0.0f)) continue;
+            if (!(c.cargo_qty > 0.0f) || !w.markets.count(c.dest_market)) continue;
             const market_component& dm = w.markets.at(c.dest_market);
             const auto si = price.find(c.source_market);
             const float p_src = (si != price.end() && si->second[r] > 0.0f)
                                     ? si->second[r]
                                     : (w.markets.count(c.source_market) ? w.markets.at(c.source_market).base_price[r] : 0.0f);
             const float landed = p_src + c.cost_paid / c.cargo_qty;
+            const auto wi = want.find(c.dest_market);
+            const float wv = wi == want.end() ? 0.0f : wi->second[r];
+            if (c.corp != null_entity)
+            {
+                ++t.corp_convoys;
+                t.haul += c.cost_paid;
+                if (landed > 0.0f)
+                    pending[c.id] = {c.corp, c.dest_market, r, landed, c.cargo_qty, wv > 0.0f, wv > demand[c.dest_market][r]};
+            }
+            if (!(wv > 0.0f)) continue;
             if (landed <= res * dm.base_price[r])
             {
                 t.units += c.cargo_qty;
@@ -157,6 +252,16 @@ ship_tally run_and_count(world& w, const recipe_registry& reg, int ticks)
         for (const convoy_component& c : w.convoys) max_id = std::max(max_id, c.id);
     }
     return t;
+}
+
+void print_realised(const char* who, const ship_tally& t, int ticks)
+{
+    std::printf("   H5 %s: corp convoys %.1f/tick, haul %.1f/tick | arrived and sold %.0f u: realised/landed %.3f, below landed %.1f%%, below landed x (1+margin) %.1f%% (unsold on arrival %.0f u) | dest carrying suppressed want: %.0f u, realised/landed %.3f, below landed %.1f%% (unsold %.0f u); of it W-dominated %.0f u, below landed %.0f u\n",
+                who, t.corp_convoys / static_cast<double>(ticks), t.haul / ticks, t.r_qty,
+                t.r_qty ? t.r_sum / t.r_qty : 0.0, t.r_qty ? 100.0 * t.r_below / t.r_qty : 0.0,
+                t.r_qty ? 100.0 * t.r_below_margin / t.r_qty : 0.0, t.r_unsold, t.w_qty,
+                t.w_qty ? t.w_sum / t.w_qty : 0.0, t.w_qty ? 100.0 * t.w_below / t.w_qty : 0.0, t.w_unsold,
+                t.d_qty, t.d_below);
 }
 
 } // namespace
@@ -211,10 +316,10 @@ int main(int argc, char** argv)
         check(same, "H1 register zeroed every tick vs kept: price, demand, supply, inventory, balances bit-identical on every tick (the price law never reads it)");
     }
 
-    // ---- H2: the ceiling gate at the function -----------------------------
+    // ---- H2: the suppressed want is gated --------------------------------
     {
         world a = w0;
-        long pairs = 0, above_equal = 0, at_larger = 0, at_not_less = 0;
+        long pairs = 0, ceil_equal = 0, base_not_less = 0, base_larger = 0;
         const float res = reg_on.price_band().reservation_mult;
         for (int k = 1; k <= ticks; ++k)
         {
@@ -229,28 +334,27 @@ int main(int argc, char** argv)
                 {
                     if (!(mc.hauler_want[r] > 0.0f) || !(mc.base_price[r] > 0.0f)) continue;
                     ++pairs;
-                    const float ceil_l = res * mc.base_price[r];
-                    const float above = std::nextafter(ceil_l, 1e30f);
+                    const float base = mc.base_price[r];
+                    const float ls[3] = {base, res * base, std::nextafter(res * base, 1e30f)};
+                    float on[3], off[3];
+                    for (int i = 0; i < 3; ++i) on[i] = dispatch_absorbable(a, reg_on, m, r, ls[i]);
                     const float keep = mc.hauler_want[r];
-                    const float on_above = dispatch_absorbable(a, reg_on, m, r, above);
-                    const float on_at    = dispatch_absorbable(a, reg_on, m, r, ceil_l);
                     mc.hauler_want[r] = 0.0f;
-                    const float off_above = dispatch_absorbable(a, reg_on, m, r, above);
-                    const float off_at    = dispatch_absorbable(a, reg_on, m, r, ceil_l);
+                    for (int i = 0; i < 3; ++i) off[i] = dispatch_absorbable(a, reg_on, m, r, ls[i]);
                     mc.hauler_want[r] = keep;
-                    if (on_above == off_above) ++above_equal;
-                    if (on_at > off_at) ++at_larger;
-                    if (on_at >= off_at) ++at_not_less;
+                    if (on[1] == off[1] && on[2] == off[2]) ++ceil_equal;
+                    if (on[0] >= off[0]) ++base_not_less;
+                    if (on[0] > off[0]) ++base_larger;
                 }
             }
         }
-        std::printf("   H2: %ld (market, good) pairs carried hauler want over %d ticks\n", pairs, ticks);
+        std::printf("   H2: %ld (market, good) pairs carried hauler want over %d ticks; at 1.0x base the want added room on %ld\n",
+                    pairs, ticks, base_larger);
         check(pairs > 0, "H2.0 some market carries ceiling-suppressed want (vacuity)");
-        check(pairs > 0 && above_equal == pairs,
-              "H2.1 landed just above the buyer's ceiling: the register adds no room");
-        std::printf("   H2: at the ceiling the register added room on %ld of them (the rest: the market's listed supply already exceeds the sized target either way)\n", at_larger);
-        check(pairs > 0 && at_not_less == pairs && at_larger > 0,
-              "H2.2 landed at the buyer's ceiling: the register adds room (never less)");
+        check(pairs > 0 && ceil_equal == pairs,
+              "H2.1 landed at or above the buyer's ceiling (aim over it): the want adds no room");
+        check(pairs > 0 && base_not_less == pairs && base_larger > 0,
+              "H2.2 landed at base: the want adds room where the projected sale allows (never less)");
     }
 
     // ---- H3 / H4: a short market receives a shipment ----------------------
@@ -263,6 +367,10 @@ int main(int argc, char** argv)
                     t_on.convoys, t_on.units, t_off.convoys, t_off.units);
         check(t_on.units > 0.0, "H3.1 with the hauler view ON a short market's suppressed want receives a shipment");
         check(t_on.units > t_off.units, "H3.2 ON ships more into suppressed want than OFF");
+        print_realised("OFF", t_off, ticks);
+        print_realised("ON ", t_on, ticks);
+        check(t_on.w_qty > 0.0 && t_on.w_below == 0.0 && t_on.d_below == 0.0,
+              "H5.1 a destination carrying ceiling-suppressed want receives cargo, and none of it clears below its landed cost");
         check(t_on.units == t_on2.units && on.state_hash(0) == on2.state_hash(0),
               "H4 the ON run repeats bit for bit (shipped units and state hash)");
     }

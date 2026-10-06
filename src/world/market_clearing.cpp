@@ -24,7 +24,7 @@ namespace {
 /// once in scripts/economy.lua under `economy.price_band` and reach both this
 /// function and economy_system.cpp's `wf_target_price` through
 /// `recipe_registry::price_band()`. They arrive as parameters below.
-constexpr float price_smoothing  = 0.5f;  ///< EMA factor toward the tick's target price.
+constexpr float price_smoothing  = k_price_smoothing; ///< EMA factor toward the tick's target price (market_clearing.hpp).
 
 } // namespace
 

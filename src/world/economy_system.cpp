@@ -838,7 +838,9 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
                 for (std::size_t r = 0; r < resource_count; ++r)
                 {
                     const float need = need_row[r];
-                    if (!(need > 0.0f) || admitted(r))
+                    // Cold review fix 3: construction CAPACITY is a grid good,
+                    // never cargo — the ruling names materials only.
+                    if (r == cap_index || !(need > 0.0f) || admitted(r))
                         continue;
                     if (hw == report.hauler_wants.end())
                         hw = report.hauler_wants.try_emplace(std::make_pair(corp, pool_key)).first;

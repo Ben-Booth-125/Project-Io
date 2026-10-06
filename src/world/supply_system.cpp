@@ -1045,8 +1045,9 @@ float dispatch_absorbable(const world& w, const recipe_registry& reg, entity_id 
     //     (the caller's surplus caps the send);
     //   * landed at or above ceil x base, or no demand at all (the target sits
     //     on the floor): no supply level prices above landed — nothing.
-    // The ZERO-SUPPLY case is the doc's own rule: nothing to scale, so the
-    // market absorbs its unmet demand.
+    // The ZERO-SUPPLY case sizes by the same S* (BL-1203 cold review, fix 1,
+    // below); its old rule — absorb the whole unmet demand — aimed the target
+    // at base, under the landed cost of any haul that costs anything.
     //
     // It is sized off the TARGET, never the eased market price: the eased
     // price lags its target, so a size read off it asks for more every tick
@@ -1066,46 +1067,75 @@ float dispatch_absorbable(const world& w, const recipe_registry& reg, entity_id 
     // market_clearing.hpp; here the last clear's demand, as D below is). The
     // shipped k is 0 — listings only — until shelf spoilage, BL-1179.
     const float S = pricing_supply(dm, r, reg.price_band().shelf_supply_ticks);
+    if (!(landed_cost > 0.0f))
+        return (S <= 0.0f) ? std::max(0.0f, dm.demand[r]) : std::numeric_limits<float>::infinity();
+    // BL-1203 COLD REVIEW, FIX 1 — THE SHIPPER'S MARGIN. The send is sized to
+    // leave the destination's target at the landed cost PLUS the margin the
+    // destination was chosen on (dispatch_margin, SUPPLY.md § Dispatch
+    // trigger), not at the landed cost itself: sized at L the send aimed every
+    // destination at zero margin and pushed its local sellers down to the
+    // importer's landed cost. L' = L x (1 + margin) is the price aimed at.
+    const float aim = landed_cost * (1.0f + reg.dispatch_margin());
     // BL-1203 (SUPPLY.md § Dispatch trigger, "What a hauler sees as unmet
-    // demand", Ben 2026-10-05): D is the demand A HAULER LANDING AT
-    // `landed_cost` meets, not the posted demand alone:
-    //   (1) the households' bid RE-READ at the landed price — their elastic
-    //       factor clamp((base / L)^e) in place of the one their posted bid
-    //       carries (inject_population_demand's formula, the landed price in
-    //       place of the posted), from the clear's pre-elastic weight;
-    //   (2) the want the fair-price ceiling silenced (`hauler_want`: processor
-    //       inputs and construction materials over reservation_mult x base),
-    //       counted only when the landed cost is under that buyer's ceiling —
-    //       the shelf_admits test, read at the landed price.
-    // Dispatch only: `demand` itself, and so the price law, is untouched.
+    // demand", Ben 2026-10-05): D is the demand a hauler landing at L' meets —
+    // the households' bid RE-READ at that price (their elastic factor
+    // clamp((base / L')^e) in place of the one their posted bid carries;
+    // inject_population_demand's formula, from the clear's pre-elastic weight).
+    //
+    // COLD REVIEW, FIX 2 — THE SUPPRESSED WANT IS GATED ON THE PROJECTED SALE.
+    // See below, after the W-silent size.
     float D = dm.demand[r];
-    if (reg.hauler_room() && landed_cost > 0.0f && std::isfinite(landed_cost))
+    if (reg.hauler_room() && std::isfinite(aim) && dm.household_weight[r] > 0.0f)
     {
         const population_demand_params& pd = reg.population_demand();
-        if (dm.household_weight[r] > 0.0f)
-        {
-            const float at_l = dm.household_weight[r]
-                             * std::clamp(std::pow(base / landed_cost, pd.demand_elasticity),
-                                          pd.elasticity_min, pd.elasticity_max);
-            D += at_l - dm.household_bid[r];
-        }
-        const float res_mult = reg.price_band().reservation_mult;
-        if (dm.hauler_want[r] > 0.0f && res_mult > 0.0f && landed_cost <= base * res_mult)
-            D += dm.hauler_want[r];
+        const float at_aim = dm.household_weight[r]
+                           * std::clamp(std::pow(base / aim, pd.demand_elasticity),
+                                        pd.elasticity_min, pd.elasticity_max);
+        D += at_aim - dm.household_bid[r];
     }
-    if (S <= 0.0f)
-        return std::max(0.0f, D - S);
-    if (!(landed_cost > 0.0f))
-        return std::numeric_limits<float>::infinity();
     const float lo = base * reg.price_band().floor_mult;
     const float hi = base * reg.price_band().ceil_mult;
-    if (landed_cost < lo)
+    if (aim < lo)
         return std::numeric_limits<float>::infinity();
-    if (landed_cost >= hi || D <= 0.0f)
+    if (aim >= hi || D <= 0.0f)
         return 0.0f;
-    const float ratio  = base / landed_cost;
-    const float s_star = D * ratio * ratio;
-    return std::max(0.0f, s_star - S);
+    // FIX 1 applies to the ZERO-SUPPLY case too: sending the whole unmet
+    // demand into an empty market resolves its target to base x sqrt(D / D) =
+    // base, below the aim whenever the landed cost is above base. S* is the
+    // honest size there as well — S is simply 0.
+    const float ratio  = base / aim;
+    float       s_star = D * ratio * ratio; // the W-silent size: target lands at the aim
+    // FIX 2 (cold review) — THE SUPPRESSED WANT (`hauler_want`, W) IS GATED ON
+    // THE PROJECTED POST-LANDING PRICE, NOT ON THE LANDED COST ALONE. Its buyers
+    // bid only once the POSTED price is under their ceiling, and a cargo sells
+    // at the clear of its arrival tick — while the posted price still stands
+    // where it stood and W is still silent. So W counts only (a) when the aim
+    // is under the buyers' ceiling (they will bid once a delivery has brought
+    // the price there) and (b) only up to the size whose FIRST clear, with W
+    // silent and the households bidding at the posted price (`demand` as it
+    // stands), still sells at or above the aim. That clear eases the posted
+    // price P toward its target by k_price_smoothing (resolve_price), so it
+    // sells at or above the aim while
+    //     target >= T* = P - (P - aim) / k_price_smoothing,
+    // i.e. supply <= demand x (base / T*)^2; a T* at or under the floor bounds
+    // nothing. This guards the cargo's own sale only: the main size above stays
+    // the TARGET-based one (the 2026-09-23 rule: never size off the eased price).
+    const float W        = dm.hauler_want[r];
+    const float res_mult = reg.price_band().reservation_mult;
+    if (reg.hauler_room() && W > 0.0f && res_mult > 0.0f && aim <= base * res_mult)
+    {
+        const float s_with = (D + W) * ratio * ratio;
+        const float P      = (dm.price[r] > 0.0f) ? dm.price[r] : base;
+        const float t_star = P - (P - aim) / k_price_smoothing;
+        float       cap    = std::numeric_limits<float>::infinity();
+        if (t_star > lo)
+        {
+            const float d_post = std::max(0.0f, dm.demand[r]);
+            cap = d_post * (base / t_star) * (base / t_star);
+        }
+        s_star = std::max(s_star, std::min(s_with, cap));
+    }
+    return std::max(0.0f, s_star - std::max(0.0f, S));
 }
 
 float dispatch_pending(const world& w, const recipe_registry& reg, entity_id dest,
