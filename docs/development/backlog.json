@@ -907,8 +907,8 @@
    "design": "ADDED (2026-10-04, the BL-1186 routing lane): haulage_measure.cpp (~line 1029) carries its own copy of the old per-leg pricing, so its haul table and the MARKETS.md price-ceiling derivation it feeds no longer match the router after BL-1186. Re-point it at price_market_export_leg rather than a copy.\n\nBen authorised the sprint 48 re-bless (2026-10-03, merged 179615b8) with three untraced movements filed here: (1) world population 12.19B -> 6.27B (likeliest BL-1130/1132, the doubled war); (2) shipped haulage (--far-trade) 16,327 / 14,729 -> 14,434 / 11,917 per year (-11.6% / -19.1%), rising on 8 seeds and falling on 8, though every item that read it alone reported a rise or no change (likeliest BL-1125's folds); (3) nation units 414,404 -> 167,110. WORK: bisect each across the sprint's merge commits with rebless_shape_probe (v0.1.26 e50ab81c -> a899bb2a), name the cause, and report for Ben whether each is wanted. ADDED 2026-10-04 (sprint 48 second re-bless, blessed by Ben without a trace): seed 0's Exploration fingerprint moved treasury_median 8664 -> 162 (-98%), expl_battles 993 -> 899, flows 77 -> 72, living polities 75 -> 70; seed 9 moved the other way (battles 836 -> 1094, treasury_median 153 -> 233). The re-bless attributes every fingerprint move to BL-1171 (far trade), the only step that moves Exploration fields, but the mechanism is not traced. Also untraced there: road tiers flipping whole national networks Road/Highway on seeds 28, 31, 37 (Highway gate percentile tie, inferred); BL-1168's -35.6% haulage (a third fewer corporations, inferred). See docs/development/drafts/sprint-48-rebless-2.md."
   },
   {
-   "status": "designed",
-   "glyph": "✓",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 49,
    "written": "2026-10-03",
    "requires": [],
@@ -925,7 +925,7 @@
    "files": [
     "tools/verify/industrialisation_sim_harness.cpp"
    ],
-   "design": "FOUND 2026-10-03 (the re-bless lane): the harness halts at its BL-1056 self-check (2), \"NOT REFUSED\", since NR-964 (the treasury share by employed heads), so the fingerprint check after it never runs. WORK: re-state the self-check for the employed-heads spread (never weakened to pass), then confirm the fingerprint check runs and passes."
+   "design": "MERGED (b8802e91, 2026-10-07): the BL-1056 self-check restated for employed heads (two refusal paths + boundary, static_assert); the fingerprint check now runs: 16/16 mismatched against the 2026-10-04 library bless (db4653c2), report-only, expected after sprint 49's world changes - the wave re-bless covers it.\n\nFOUND 2026-10-03 (the re-bless lane): the harness halts at its BL-1056 self-check (2), \"NOT REFUSED\", since NR-964 (the treasury share by employed heads), so the fingerprint check after it never runs. WORK: re-state the self-check for the employed-heads spread (never weakened to pass), then confirm the fingerprint check runs and passes."
   },
   {
    "status": "designed",
@@ -1011,8 +1011,8 @@
    "design": "BEN (2026-10-03, sprint 49): a design session first. Today firms only exit; ~17 of 211 survive 450 ticks on seed 0. Design who founds an entrant (a nation, a parent, the market), what it costs, where it stands, and how the player sees it."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 49,
    "written": "2026-10-03",
    "requires": [],
@@ -1030,11 +1030,11 @@
     "src/world/history_sim.cpp",
     "tools/verify/industry_concentration.cpp"
    ],
-   "design": "NR-907 requires the span and the close to price by one divisor and one reach. industry_concentration's REACH gate only checks the two landmass rasters agree; it never runs history_sim's per-region note step (landmass_of_region, ~5129-5215). Add a row that compares each region's note price in the span to sb.centre_firm_price for the same stock, so a change to how the sim labels a region fails."
+   "design": "MERGED (b8802e91): works_note_region_prices lifted unchanged; industry_concentration NOTEPRICE gate 16/16 PASS, differ=0; no behaviour change (digests identical).\n\nNR-907 requires the span and the close to price by one divisor and one reach. industry_concentration's REACH gate only checks the two landmass rasters agree; it never runs history_sim's per-region note step (landmass_of_region, ~5129-5215). Add a row that compares each region's note price in the span to sb.centre_firm_price for the same stock, so a change to how the sim labels a region fails."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 49,
    "written": "2026-10-03",
    "requires": [],
@@ -1053,11 +1053,11 @@
     "src/world/era_timelapse.hpp",
     "src/world/history_sim.cpp"
    ],
-   "design": "STARTUP.md (Company creation flashes) says each note is a real charter whose points are debited (NR-925); INDUSTRIALISATION.md says the record-only clause is overturned; era_timelapse.hpp's works_chartered comment and the sim's NOTHING MOVES block say record-only, no point debited. One of them is wrong; read the code, fix the docs or the code."
+   "design": "RECONCILED (2026-10-07): the code is record-only (NOTHING MOVES block); the ruled design is real in-span chartering (NR-925 overturned 2026-09-25 to option B; INDUSTRIALISATION.md, STARTUP.md), owned by BL-1122 (in-span chartering, unbuilt). Docs state the ruling, comments state the code; the overturned clause in INDUSTRIALISATION.md's Works chartered paragraph removed.\n\nSTARTUP.md (Company creation flashes) says each note is a real charter whose points are debited (NR-925); INDUSTRIALISATION.md says the record-only clause is overturned; era_timelapse.hpp's works_chartered comment and the sim's NOTHING MOVES block say record-only, no point debited. One of them is wrong; read the code, fix the docs or the code."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 49,
    "written": "2026-10-03",
    "requires": [],
@@ -1074,7 +1074,7 @@
    "files": [
     "src/world/history_sim.hpp"
    ],
-   "design": "works_event_fraction_q = 2000 was pinned on readings taken under the world price (3233 notes, 894 of 1297 charters dated). Under the reach price far landmasses note more and start cheaper, so the NR-940 early clustering may worsen there. Re-measure with industry_concentration DATING on the 16 library seeds and record the readings beside the pin; report, do not retune silently."
+   "design": "MERGED (b8802e91): readings recorded beside the pin, no retune: 12,124 notes vs 2,967 charters (4.1 per charter vs 2.5 at the pin), 66% note-dated, 0 furnace-dated; 94.9% of notes before 1760 - NR-940 (early clustering) aggravated under the reach price. For a later sprint.\n\nworks_event_fraction_q = 2000 was pinned on readings taken under the world price (3233 notes, 894 of 1297 charters dated). Under the reach price far landmasses note more and start cheaper, so the NR-940 early clustering may worsen there. Re-measure with industry_concentration DATING on the 16 library seeds and record the readings beside the pin; report, do not retune silently."
   },
   {
    "status": "complete",
