@@ -694,6 +694,16 @@ struct history_sim_params
     /// consequence of the running-price rule, raised as NR-940. Those readings
     /// were taken on the WORLD's running price; the reach price (BL-1168) is
     /// cheaper on every landmass but the richest, so a far landmass notes more.
+    ///
+    /// RE-READ UNDER THE REACH PRICE (BL-1178, 2026-10-07; industry_concentration
+    /// DATING and NOTECENT, the 16 library seeds, the shipped world after the
+    /// sprint 48 re-blesses; a reading, NOT a retune -- f stays 2): 12124 notes
+    /// (heartland 6582, far landmasses 5542) against 2967 charters; 1970 charters
+    /// dated by a note (66%: heartland 1530 of 2263, 68%; far 440 of 704, 62%),
+    /// 997 by the epoch, 0 by a furnace year. 4.1 notes a charter, against 2.5
+    /// under the world price. The NR-940 clustering is WORSE, not better: 94.9%
+    /// of the notes fall before 1760, the span's first century (heartland 95.4%,
+    /// far 94.4%), 3.1% in 1760-1859, 2.0% from 1860. Whether f moves is Ben's.
     int     works_event_fraction_q = 2000;
 
     /// DEFAULT A (RULED, Ben 2026-09-18, wave 1 form). A region the span FOUNDS

@@ -357,6 +357,23 @@ int main(int argc, char** argv)
             }
             int span_notes = 0;
             for (const auto& [rg, v] : notes_of) span_notes += static_cast<int>(v.size());
+            // BL-1178 (WORKS_FRACTION_UNDER_REACH): WHEN the notes fire, by
+            // century of the span (it opens at `industry_open_year`, 1660),
+            // heartland vs far landmass -- the NR-940 early clustering read
+            // under the reach price. A reading, not a gate.
+            int cent[2][4] = {};   // [far][1660s-1750s, 1760s-1850s, 1860s on, no landmass]
+            for (const auto& [rg, v] : notes_of)
+            {
+                const bool known = rg >= 0 && static_cast<std::size_t>(rg) < R.size()
+                                && reg_lm[static_cast<std::size_t>(rg)] >= 0;
+                const int far = (known && reg_lm[static_cast<std::size_t>(rg)] != heart) ? 1 : 0;
+                for (const int32_t y : v)
+                    ++cent[far][!known ? 3 : (y < 1760 ? 0 : (y < 1860 ? 1 : 2))];
+            }
+            std::printf("NOTECENT seed=%u heartland %d/%d/%d far %d/%d/%d no_landmass %d"
+                        " (notes by century: <1760 / 1760-1859 / >=1860)\n",
+                        seed, cent[0][0], cent[0][1], cent[0][2], cent[1][0], cent[1][1], cent[1][2],
+                        cent[0][3] + cent[1][3]);
             std::printf("DATING seed=%u notes=%d heartland_lm=%d heartland note=%d furnace=%d epoch=%d | "
                         "far note=%d furnace=%d epoch=%d | no_origin=%d disagree=%d\n",
                         seed, span_notes, heart, src[0][0], src[0][1], src[0][2], src[1][0], src[1][1], src[1][2],
