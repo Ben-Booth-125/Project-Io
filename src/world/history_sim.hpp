@@ -3648,6 +3648,25 @@ bool industry_points_params_valid(const history_sim_params& p);
 /// crossed four prices in a span has told its story.
 inline constexpr int works_event_region_cap = 4;
 
+/// BL-1176 (NOTE_PRICE_MATCHES_CLOSE_ROW): the RUNNING charter price each
+/// region's works notes are read against, ONE function the span's note step
+/// calls every year and a harness can run against the close's price
+/// (`stockpile_budget::centre_firm_price`, industry_concentration's NOTE PRICE
+/// row) -- so the span and the close are held to one divisor and one reach
+/// (NR-907, BL-1168) by a check, not by two copies agreeing.
+///
+/// The world's stock is every region's `industry_points`; a region's price is
+/// `charter_running_price` of its landmass's stock (every region whose anchor
+/// `landmass_at` @p landmass labels the same, the ones no centre takes
+/// included), never above the world's price; a region with no landmass (an
+/// anchor off the raster, or sea), or an EMPTY @p landmass (no substrate),
+/// pays the world's price. @p price_out gets one price per region, indexed as
+/// @p regions. False -- @p price_out empty -- when a region's points are
+/// negative or the world's sum would pass 2^62 (the close's own refusal
+/// bound): the step prices nothing that year.
+bool works_note_region_prices(const std::vector<region>& regions, const std::vector<int32_t>& landmass,
+                              int gw, int gh, std::vector<int64_t>& price_out);
+
 /// Is `works_event_fraction_q` inside its stated domain (0-1000000)? False
 /// REJECTS every works note of the run
 /// (`history_sim_state::works_event_params_rejected`), never clamps; the

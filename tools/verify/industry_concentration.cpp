@@ -23,6 +23,9 @@
 // whose own tile stands on a different landmass from their region's anchor, and
 // a DATING line splits the charters' founding years by source (note, furnace,
 // epoch), heartland vs far landmass.
+// A SECOND GATE (BL-1176): a NOTEPRICE line runs the span's works-note price
+// step (`works_note_region_prices`) on the close's stock and holds each
+// budgeted centre's region to the close's `centre_firm_price`, exactly.
 //
 // Build: bash tools/verify/build_lua_harness.sh industry_concentration
 // Run from the repo root: build_gen/verify/industry_concentration.exe [--seeds a,b]
@@ -117,6 +120,7 @@ int main(int argc, char** argv)
 
     lua_state lua;
     int failures = 0;
+    long long note_price_compared = 0; // BL-1176: the NOTE PRICE row must compare something
     for (uint32_t seed : seeds)
     {
         world_params p = arc_params(world_arc::shipped);
@@ -213,6 +217,56 @@ int main(int argc, char** argv)
                 std::printf("FAIL  REACH seed=%u: the close's landmass reach and the sim's disagree "
                             "(%d regions differ, %zu reach keys for %zu regions)\n",
                             seed, differ, reach.size(), R.size());
+                ++failures;
+            }
+        }
+        {
+            // NOTE PRICE (BL-1176, NOTE_PRICE_MATCHES_CLOSE_ROW): the span's
+            // works-note price step -- `works_note_region_prices`, the one
+            // function the sim's note loop calls every year -- run on the
+            // close's stock over the sim's own landmass raster, against the
+            // price the close charges each budgeted centre
+            // (`stockpile_budget::centre_firm_price`, the shipped reach). NR-907
+            // and BL-1168 hold the span and the close to one divisor and one
+            // reach; the REACH gate above only checks the two label rasters
+            // agree, so a change to how the sim's step labels or sums a region
+            // fails HERE. A GATE: every budgeted centre is compared, by its
+            // carve slot's region, and one differing price is a defect.
+            const stockpile_budget sb = build_stockpile_budget(w);
+            std::vector<std::int64_t> note_price;
+            const bool priced = works_note_region_prices(R, labels, gw, gh, note_price);
+            int compared = 0, differ = 0, unslotted = 0, shown = 0;
+            for (const auto& [centre, close_price] : sb.centre_firm_price)
+            {
+                const auto slot = w.gen_carve_centres.find(centre);
+                if (slot == w.gen_carve_centres.end() || slot->second.region < 0
+                    || slot->second.region >= static_cast<int>(R.size()))
+                {
+                    ++unslotted;
+                    continue;
+                }
+                if (!priced) continue;
+                ++compared;
+                const std::int64_t span_price = note_price[static_cast<std::size_t>(slot->second.region)];
+                if (span_price != static_cast<std::int64_t>(close_price))
+                {
+                    if (shown++ < 5)
+                        std::printf("NOTEPRICE seed=%u centre=%llu region=%d span=%lld close=%d\n", seed,
+                                    static_cast<unsigned long long>(centre), slot->second.region,
+                                    static_cast<long long>(span_price), close_price);
+                    ++differ;
+                }
+            }
+            note_price_compared += compared;
+            std::printf("NOTEPRICE seed=%u reach=%s centres=%zu compared=%d differ=%d unslotted=%d world_price=%d%s\n",
+                        seed, sb.reach == charter_price_reach::landmass ? "landmass" : "other",
+                        sb.centre_firm_price.size(), compared, differ, unslotted, sb.firm_price_points,
+                        priced ? "" : " (span step refused the stock)");
+            if (!priced || differ != 0 || unslotted != 0 || sb.reach != k_stockpile_charter_reach)
+            {
+                std::printf("FAIL  NOTEPRICE seed=%u: the span's note price and the close's charter price "
+                            "disagree (%d of %d centres differ, %d unslotted, span step %s)\n",
+                            seed, differ, compared, unslotted, priced ? "priced" : "REFUSED");
                 ++failures;
             }
         }
@@ -648,6 +702,12 @@ int main(int argc, char** argv)
             std::printf("%s\n", row.c_str());
         }
         std::fflush(stdout);
+    }
+    // BL-1176: a row that compared no centre on any seed proved nothing.
+    if (note_price_compared == 0)
+    {
+        std::printf("FAIL  NOTEPRICE: no budgeted centre was compared on any seed\n");
+        ++failures;
     }
     std::printf("%s (%d failure%s)\n", failures ? "FAIL" : "PASS", failures, failures == 1 ? "" : "s");
     return failures ? 1 : 0;
