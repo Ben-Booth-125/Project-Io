@@ -680,6 +680,11 @@ struct seed_row
     bool    has_fingerprint = false;
     bool    prefix_matches  = false;
     int64_t control_battles = 0;
+    // BL-1166: the control's other two counters and the library's three, so
+    // a MISMATCH says which counter moved and by how much.
+    int64_t control_flows   = 0;
+    int64_t control_alive   = 0;
+    int64_t fp_battles = -1, fp_flows = -1, fp_alive = -1;
 
     // --- Evidence counts behind the n/a lines -------------------------------
     std::size_t battles_standing   = 0; ///< world::battles after generation.
@@ -2457,18 +2462,55 @@ bool bl1056_self_check()
                      && tie[2].second == 1 && tie[3].second == 0;
     std::vector<std::pair<int, int64_t>> none;
     const bool n_ok = industry_points_apportion_by_scale(pr, 9, 500, none, &apw) && none.empty();
-    std::vector<region> big(3);
-    for (region& r : big) { r.nation = 1; r.centres = 1; r.urban_population = 1LL << 31; }
+    // The domain, re-stated for NR-964 (BL-1166): the weight is now the heads a
+    // region's works EMPLOY, at most 32 x `work_employs_max` = 3.2e8 a region,
+    // so the old fixture (three regions of 2^31 urban heads, no works) weighed
+    // nobody and was never refused. Two refusal paths remain, both exercised:
+    //  (a) the polity's employed total past `industry_points_apportion_heads_max`
+    //      (2^32): fourteen full-mask regions weigh 4.48e9 -> REFUSED, and the
+    //      boundary's other side, thirteen (4.16e9), apportions exactly;
+    //  (b) one region's urban heads past `industry_points_urban_heads_max`
+    //      (2^31) -> REFUSED, however few it employs.
+    works_registry full;
+    for (std::size_t i = 0; i < works_mask_bits; ++i)
+    {
+        work_row w; w.name = "Works"; w.effect.industrial_mod = 1;
+        w.employs = work_employs_max; w.weight = 1;
+        full.add_row(w);
+    }
+    const auto full_mask_regions = [](int n) {
+        std::vector<region> v(static_cast<std::size_t>(n));
+        for (region& r : v) { r.nation = 1; r.centres = 1; r.urban_population = 1LL << 31; r.works_built = 0xFFFFFFFFu; }
+        return v;
+    };
+    static_assert(14 * static_cast<int64_t>(works_mask_bits) * work_employs_max > industry_points_apportion_heads_max
+               && 13 * static_cast<int64_t>(works_mask_bits) * work_employs_max <= industry_points_apportion_heads_max,
+                  "BL-1166: the fixture straddles the employed-heads domain");
     std::vector<std::pair<int, int64_t>> refused;
-    const bool refuse_ok = !industry_points_apportion_by_scale(big, 1, 1000, refused, &apw) && refused.empty();
+    const bool refuse_total = !industry_points_apportion_by_scale(full_mask_regions(14), 1, 1000, refused, &full)
+                              && refused.empty();
+    std::vector<std::pair<int, int64_t>> inside;
+    int64_t inside_sum = 0;
+    const bool inside_ok = industry_points_apportion_by_scale(full_mask_regions(13), 1, 1000, inside, &full)
+                           && inside.size() == 13;
+    for (const auto& p : inside) inside_sum += p.second;
+    std::vector<region> crowd(1);
+    crowd[0].nation = 1; crowd[0].centres = 1; crowd[0].urban_population = (1LL << 31) + 1; crowd[0].works_built = 1u;
+    std::vector<std::pair<int, int64_t>> refused_heads;
+    const bool refuse_heads = !industry_points_apportion_by_scale(crowd, 1, 1000, refused_heads, &apw)
+                              && refused_heads.empty();
+    const bool refuse_ok = refuse_total && inside_ok && inside_sum == 1000 && refuse_heads;
     std::printf("BL-1056 self-check (2): 1001 points over centres {30k,10k,20k,20k} -> %lld/%lld/%lld/%lld (sum %lld);"
-                " 2 points -> %lld/%lld/%lld/%lld; no centre -> %s; past the heads domain -> %s\n",
+                " 2 points -> %lld/%lld/%lld/%lld; no centre -> %s; past the heads domain -> %s"
+                " (employed 14 x 3.2e8 %s, 13 x 3.2e8 %s sum %lld; a region past 2^31 urban heads %s)\n",
                 out.size() > 0 ? (long long)out[0].second : -1LL, out.size() > 1 ? (long long)out[1].second : -1LL,
                 out.size() > 2 ? (long long)out[2].second : -1LL, out.size() > 3 ? (long long)out[3].second : -1LL,
                 (long long)sum,
                 tie.size() > 0 ? (long long)tie[0].second : -1LL, tie.size() > 1 ? (long long)tie[1].second : -1LL,
                 tie.size() > 2 ? (long long)tie[2].second : -1LL, tie.size() > 3 ? (long long)tie[3].second : -1LL,
-                n_ok ? "empty (no town: nothing converts)" : "WRONG", refuse_ok ? "refused" : "NOT REFUSED");
+                n_ok ? "empty (no town: nothing converts)" : "WRONG", refuse_ok ? "refused" : "NOT REFUSED",
+                refuse_total ? "refused" : "NOT REFUSED", inside_ok ? "apportioned" : "WRONG", (long long)inside_sum,
+                refuse_heads ? "refused" : "NOT REFUSED");
     if (!a_ok || sum != 1001 || !shape || !t_ok || !tie_ok || !n_ok || !refuse_ok)
     {
         std::printf("FAIL  BL-1056 (2): the treasury points did not apportion exactly by urban scale\n");
@@ -3771,6 +3813,14 @@ int main(int argc, char** argv)
             // Flows against the RAW sim state, as the fingerprint counts them:
             // the fold prunes flows whose clause lapsed or whose party died by
             // the close, so the folded count can sit one or two below it.
+            row.control_flows = static_cast<int64_t>(control.trade_flows.size());
+            row.control_alive = control_alive;
+            if (row.has_fingerprint)
+            {
+                row.fp_battles = fp->second.expl_battles;
+                row.fp_flows   = fp->second.flows;
+                row.fp_alive   = fp->second.living_polities;
+            }
             if (row.has_fingerprint)
                 row.prefix_matches = fp->second.expl_battles    == control.battles
                                   && fp->second.flows           == static_cast<int64_t>(control.trade_flows.size())
@@ -4136,6 +4186,13 @@ int main(int argc, char** argv)
     };
     const std::size_t N = rows.size();
 
+    // BL-1166: each mismatched control, counter by counter (control / library).
+    for (const seed_row& r : rows)
+        if (r.expl_ran && r.has_fingerprint && !r.prefix_matches)
+            std::printf("PREFIX MISMATCH seed=%u expl_battles %lld/%lld flows %lld/%lld living_polities %lld/%lld"
+                        " (control / library fingerprint)\n", r.seed,
+                        (long long)r.control_battles, (long long)r.fp_battles, (long long)r.control_flows,
+                        (long long)r.fp_flows, (long long)r.control_alive, (long long)r.fp_alive);
     std::printf("\n=== THE THIRTEEN READINGS - a spread over %zu seeds, never a per-world verdict ===\n", N);
     std::printf("(%zu of %zu worlds ran the Empires round; %zu carry a usable handoff. 1660 control vs the\n"
                 " library fingerprint: %zu checked, %zu mismatched. Handoff violations: %zu.)\n",
