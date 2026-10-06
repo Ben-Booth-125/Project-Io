@@ -1500,8 +1500,8 @@
    "design": "MERGED to main (c39d2989, 2026-10-05).\n\nBUILT, ROUND 2 OPEN (2026-10-05, a14a559f on worktree-agent-a26d22c169e545e60): placement_rules is_fresh_water_adjacent / is_well_site, a no-deposit Well yield (rate x 1.0, never exhausts), a scorer Well bucket (K=2 world-wide, ranked by habitability x water pull, placeable tiles only), construction ledger row, ACTIONS.json; well_gate P1-P8/E1-E2 PASS. Qualifying ground 2.0-5.7% of habitable land, a Well site in 17-29 markets per seed. In play the scorer builds wells only on seed 43 (5 running by t200, water listed 25% -> 67% of the bid, price 6.32x -> 2.88x); seed 0 one never finishes, seed 10 none. Seed 43 G2/G3 fall (being attributed in round 2). GENERATION CANNOT PLACE A WELL: author_building (~454-487) takes its target from richest_extractable, the cluster slot walk (~620-630) tests can_place on the tile alone, tile_score_for (~402) scores a Well tile 0.001 - the BL-1197 rework places water-gap firms on Wells through these three hooks.\n\nRULED (Ben, 2026-10-05, NR-971 A): the Well - an extraction_site targeting water, placement gated on fresh-water adjacency (a land tile a river runs through or bordering a lake), deposit-agnostic, mirroring the Fishing Wharf (placement_rules.cpp can_place / can_place_in_world, is_coastal). Spec in PRODUCTION.md sec Extraction buildings. Generation then has a water source near people: BL-1185's chain rule and BL-1197's gap firm can place wells; the scorer can build them. THEN re-sweep k (NR-972) and re-read the held household stack (BL-1163/1196/1179).\n\nRESOURCES.md:147 seeds water deposits on ICY substrate only. On an earthlike home body that is the poles, so water - the household basket's heaviest unmet good, and the input of clean water and medical supplies - is almost never extracted near people: seeds 10/11/13/37 have no water extractor in any sprint 49 state, seed 0's three sit out of reach of any clean-water site, and household water fill is 5-24% (BL-1179 lane). No charter (BL-1197) or scorer (BL-1187) change can supply a good the ground does not hold where it is wanted. DESIGN CALL NR-971."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 49,
    "written": "2026-10-05",
    "requires": [],
@@ -1518,7 +1518,7 @@
    "files": [
     "src/world/economy_system.cpp"
    ],
-   "design": "Found by the BL-1198 lane (2026-10-05): on a tile with no deposit, run_extraction finds a zero reserve and reports the site exhausted, so a Fishing Wharf (coastal adjacency, deposit-agnostic; PRODUCTION.md sec Extraction buildings, BL-168) yields nothing. BL-1198 wrote a no-deposit yield for the Well (base_rate x scalar x labour x supply x (1 - hazard), never tapering); give the Wharf the same path. Wharf numbers will move (a world-mover). Agricultural produce is a household good (food rations' input), so this feeds the market viability gate."
+   "design": "MERGED (ea697134, 2026-10-06): one depositless yield path (is_depositless_site / depositless_rate_scalar) for the Well and the Fishing Wharf (k_wharf_rate_scalar 1.0); wharf hover, Buildings name, province table and Build door fixed. well_gate W1-W8 pass on main; app builds. No movement in shipped worlds: nothing sites a Wharf yet (BL-1208). Live click owed: a coastal no-deposit tile offers a Fishing Wharf.\n\nFound by the BL-1198 lane (2026-10-05): on a tile with no deposit, run_extraction finds a zero reserve and reports the site exhausted, so a Fishing Wharf (coastal adjacency, deposit-agnostic; PRODUCTION.md sec Extraction buildings, BL-168) yields nothing. BL-1198 wrote a no-deposit yield for the Well (base_rate x scalar x labour x supply x (1 - hazard), never tapering); give the Wharf the same path. Wharf numbers will move (a world-mover). Agricultural produce is a household good (food rations' input), so this feeds the market viability gate."
   },
   {
    "status": "complete",
@@ -1691,6 +1691,27 @@
     "tools/verify/"
    ],
    "design": "G1 (processors running at handoff) is sprint 49's furthest gate (~49% vs 70%). Diagnose on current main before choosing a lever: every processor at handoff by state (running / input-starved / unsupplied / under construction / idled), and for the starved, which input, whether it is produced on the body, in reach, over the ceiling, or never chartered; per market and pooled, 16 seeds. Candidate levers already filed: BL-1189 (opening stock sized), BL-1203 (hauler room)."
+  },
+  {
+   "status": "designed",
+   "glyph": "◐",
+   "sprint": 49,
+   "written": "2026-10-06",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1208",
+   "short_name": "GENERATION_SITES_WHARVES",
+   "author": "Claude (the BL-1199 lane, 2026-10-06)",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "Generation sites a Fishing Wharf where a produce firm has coast but no produce deposit",
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "files": [
+    "src/world/corporation_generation.cpp"
+   ],
+   "design": "Found by BL-1199: body_producible counts any coastal tile as able to make agricultural produce, but dig_site_of offers no Wharf tier, so a produce gap firm on a coastal body with no produce deposit is told the good is producible and finds nowhere to build. The sibling of the Well tier Ben approved (NR-973, \"we can add wells to generation\"): give dig_site_of a Wharf tier for agricultural produce (deposit first, then a coastal no-deposit Wharf site), through the same three hooks the Well uses. Applied directly as the approved pattern (main session, 2026-10-06)."
   }
  ]
 }
