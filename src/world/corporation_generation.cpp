@@ -397,17 +397,19 @@ float dryness_lean(terrain_substrate sub, terrain_cover cov)
 /// A WELL TILE (BL-1197 / BL-1198) carries no deposit — its water comes from the
 /// river or lake beside it — so scoring it by deposit would rank every Well site
 /// at the floor. A Well is scored by the tile's habitability instead: the water
-/// is wanted where people live, and habitable ground is where they settled.
+/// is wanted where people live, and habitable ground is where they settled. A
+/// Fishing Wharf tile (BL-1208) carries no produce deposit either — the sea is
+/// its ground — and is scored the same way, for the same reason.
 ///
 /// @param tc        The candidate tile.
 /// @param btype     The building type proposed for it.
 /// @param target    The extraction target, when the caller names one (a gap
 ///                  firm digging its good); null means the tile's richest.
-/// @param well_site True when the tile is a Well site for @p target
-///                  (`placement_rules::is_well_site`) — the caller has the world.
+/// @param depositless True when the tile is a Well or Wharf site for @p target
+///                  (`placement_rules::is_depositless_site`) — the caller has the world.
 /// @return          A positive placement score; larger is more preferred.
 float tile_score_for(const tile_component& tc, building_type btype,
-                     const resource_type* target = nullptr, bool well_site = false)
+                     const resource_type* target = nullptr, bool depositless = false)
 {
     float score = 1.0f;
     switch (btype)
@@ -415,8 +417,9 @@ float tile_score_for(const tile_component& tc, building_type btype,
         case building_type::extraction_site:
             // Rank by extractable deposit so the site lands where it can work;
             // tiny floor keeps a deposit-poor tile still placeable (it will fail
-            // can_place separately and be skipped there). A Well by habitability.
-            if (well_site)
+            // can_place separately and be skipped there). A Well or a Wharf by
+            // habitability.
+            if (depositless)
                 score = 0.05f + tc.habitability;
             else if (target != nullptr)
                 score = tc.resource_deposit[static_cast<std::size_t>(*target)] + 0.001f;
@@ -511,9 +514,11 @@ entity_id author_building(world& w,
 
 /// How a tile can host an extraction site digging @p dig (BL-1197, gap firm digs
 /// the gap): `none`, a `well` (water only — a fresh-water-adjacent tile with no
-/// ice deposit, `placement_rules::is_well_site`), or a `deposit` of @p dig. Both
+/// ice deposit, `placement_rules::is_well_site`), a `wharf` (agricultural
+/// produce only — a coastal tile with no produce deposit,
+/// `placement_rules::is_wharf_site`; BL-1208), or a `deposit` of @p dig. All
 /// pass `can_place` (never water ground, never urban). Read-only, draws nothing.
-enum class dig_site { none, well, deposit };
+enum class dig_site { none, well, wharf, deposit };
 dig_site dig_site_of(const world& w, entity_id tid, const tile_component& tc,
                      resource_type dig)
 {
@@ -523,7 +528,21 @@ dig_site dig_site_of(const world& w, entity_id tid, const tile_component& tc,
         return dig_site::deposit;
     if (placement_rules::is_well_site(w, tid, dig))
         return dig_site::well;
+    if (placement_rules::is_wharf_site(w, tid, dig))
+        return dig_site::wharf;
     return dig_site::none;
+}
+
+/// THE DIG LADDER for @p dig, in the order its tiers are tried (BL-1197 /
+/// BL-1208): water a Well site before an ice deposit (the water is wanted where
+/// people live); agricultural produce a produce deposit before a coastal Wharf
+/// site (the Farm is the good's own ground, the sea its fallback). Only the
+/// goods `gap_firm_digs` names have a ladder.
+std::array<dig_site, 2> dig_ladder(resource_type dig)
+{
+    if (dig == resource_type::agricultural_produce)
+        return { dig_site::deposit, dig_site::wharf };
+    return { dig_site::well, dig_site::deposit };
 }
 
 /// Place a clustered set of starting buildings for one corporation inside its home
@@ -548,7 +567,7 @@ dig_site dig_site_of(const world& w, entity_id tid, const tile_component& tc,
 /// @param rng            Seeded RNG for the anchor weighted draw and holdings count.
 /// DIGGING A NAMED GOOD (BL-1197, gap firm digs the gap). With @p dig and a
 /// @p dig_tier other than `none`, an extraction anchor stands ONLY on a tile of
-/// that tier for @p dig (`dig_site_of`) — a Well site, scored by habitability, or
+/// that tier for @p dig (`dig_site_of`) — a Well or Wharf site, scored by habitability, or
 /// a deposit of the good, scored by that deposit — and extracts @p dig; a window
 /// with no such tile places nothing and draws nothing, so the caller can try the
 /// next tier as it would the next rung. Each later extraction slot digs @p dig
@@ -609,7 +628,8 @@ std::vector<entity_id> place_starting_assets(world& w,
             if (dig_site_of(w, tid, tc, *dig) != dig_tier)
                 continue;
             anchors.push_back({ tid, tile_score_for(tc, anchor_type, dig,
-                                                    dig_tier == dig_site::well) });
+                                                    dig_tier == dig_site::well
+                                                    || dig_tier == dig_site::wharf) });
             continue;
         }
         // An extraction anchor must sit on a workable deposit; for processing/port
@@ -694,8 +714,9 @@ std::vector<entity_id> place_starting_assets(world& w,
                 continue;
             const tile_component& tc = w.tiles.at(tid);
             // BL-1197: a digging firm's extraction slot digs its good where the
-            // tile can (a Well site or a deposit of it — the slot walk has the
-            // world, so the fresh-water gate is tested here), else the richest.
+            // tile can (a Well or Wharf site or a deposit of it — the slot walk
+            // has the world, so the fresh-water and coastal gates are tested
+            // here), else the richest.
             if (digging && btype == building_type::extraction_site
                 && dig_site_of(w, tid, tc, *dig) != dig_site::none)
             {
@@ -722,22 +743,28 @@ std::vector<entity_id> place_starting_assets(world& w,
 }
 
 /// The good a background extraction firm chartered for @p gap digs at its own
-/// ground (BL-1197, gap firm digs the gap): water, today, and only water — the
-/// household chain's heaviest unmet good, which a habitable world draws from a
-/// Well where people live (BL-1198). Every other gap keeps the richest-deposit
-/// rule. Returns false when the firm digs no named good.
+/// ground (BL-1197, gap firm digs the gap): water and agricultural produce, the
+/// two goods with a depositless tier — water from a Well where people live
+/// (BL-1198), produce from a Farm deposit or else a coastal Fishing Wharf
+/// (BL-1199 / BL-1208). Every other gap keeps the richest-deposit rule. Returns
+/// false when the firm digs no named good.
 bool gap_firm_digs(std::size_t gap, bool go_processing, resource_type& dig_out)
 {
-    if (go_processing || gap != static_cast<std::size_t>(resource_type::water))
+    if (go_processing)
         return false;
-    dig_out = resource_type::water;
+    if (gap == static_cast<std::size_t>(resource_type::water))
+        dig_out = resource_type::water;
+    else if (gap == static_cast<std::size_t>(resource_type::agricultural_produce))
+        dig_out = resource_type::agricultural_produce;
+    else
+        return false;
     return true;
 }
 
-/// THE DIG LADDER (BL-1197): a Well site, else a deposit of the good — each tier
-/// tried over the whole of @p anchor_window before the next, a tier with no
-/// ground drawing nothing. There is NO fallback to another deposit: a window
-/// with no ground for the good places nothing, and the miss is the good's.
+/// THE DIG LADDER (BL-1197 / BL-1208, `dig_ladder`): each tier tried over the
+/// whole of @p anchor_window before the next, a tier with no ground drawing
+/// nothing. There is NO fallback to another deposit: a window with no ground
+/// for the good places nothing, and the miss is the good's.
 std::vector<entity_id> place_digging_assets(world& w,
                                             const nation_component& home_nation,
                                             industrial_focus focus,
@@ -746,7 +773,7 @@ std::vector<entity_id> place_digging_assets(world& w,
                                             const std::vector<entity_id>* anchor_window,
                                             resource_type dig)
 {
-    for (const dig_site tier : { dig_site::well, dig_site::deposit })
+    for (const dig_site tier : dig_ladder(dig))
     {
         std::vector<entity_id> assets = place_starting_assets(
             w, home_nation, focus, occupied_tiles, rng, anchor_window, &dig, tier);
@@ -1277,7 +1304,10 @@ std::array<float, resource_count> body_processor_input_demand(const world& w,
 /// BL-1197 round 5 — which goods @p body_id can produce AT ALL: an extractable
 /// with a deposit of it on some land tile of the body; water also wherever a
 /// Well site stands (`placement_rules::is_well_site`); agricultural produce also
-/// on a coastal tile (the Fishing Wharf); and, to a fixed point, any good some
+/// wherever a Fishing Wharf site stands (`placement_rules::is_wharf_site` — any
+/// coast; a coastal produce deposit is a Farm, counted above). Exactly the
+/// ground `dig_ladder` reaches, so a good this calls producible is one a
+/// digging firm can find ground for (BL-1208); and, to a fixed point, any good some
 /// processing recipe makes from inputs that are all themselves producible here.
 /// Existence tests over the body's tiles and the registry: order-free, draws
 /// nothing, deterministic.
@@ -1299,7 +1329,7 @@ std::array<bool, resource_count> body_producible(const world& w, const recipe_re
         }
         if (!can[water] && placement_rules::is_well_site(w, tid, resource_type::water))
             can[water] = true;
-        if (!can[food] && placement_rules::is_coastal(w, tid))
+        if (!can[food] && placement_rules::is_wharf_site(w, tid, resource_type::agricultural_produce))
             can[food] = true;
     }
     const int n = reg.recipe_count(building_type::processing_facility);
@@ -3114,11 +3144,12 @@ std::vector<entity_id> generate_background_firms(
                 continue;
 
             // BL-1197 (gap firm digs the gap): a water-gap firm digs water at a
-            // Well site, else an ice deposit, and never anything else. A nation
-            // with no such ground left places nothing for it: the miss is the
-            // GOOD's, so it counts toward water's mask — once water has missed
-            // as many times as the body has nations (the cursor takes them in
-            // turn) it is masked for the pass, and the next gap is taken.
+            // Well site, else an ice deposit; a produce-gap firm (BL-1208) a
+            // produce deposit, else a Wharf site — and never anything else. A
+            // nation with no such ground left places nothing for it: the miss is
+            // the GOOD's, so it counts toward that good's mask — once it has
+            // missed as many times as the body has nations (the cursor takes
+            // them in turn) it is masked for the pass, and the next gap is taken.
             resource_type dig_r = resource_type::water;
             const bool    digs  = gap_firm_digs(gap_r, go_processing, dig_r);
             std::vector<entity_id> assets = digs
@@ -3859,13 +3890,14 @@ charter_unspent_reason charter_place_failure_reason(const world& w, const nation
 /// returns before its first draw), so rung 2 draws as if it had been first.
 ///
 /// THE PLACEMENT SEES THE GOOD ONLY FOR A DIGGING FIRM (@p dig, BL-1197: a
-/// water-gap firm, `gap_firm_digs`); otherwise only @p focus: an extraction
+/// water- or produce-gap firm, `gap_firm_digs`); otherwise only @p focus: an extraction
 /// anchor takes the richest extractable deposit on its tile, whatever good the
 /// firm was chartered for, and a processing anchor any workable land. So whether
 /// a charter can land is a property of (centre, focus) and the ground as it
 /// stands, and a centre whose windows hold no free deposit tile OF ANY KIND can
 /// place no extraction firm at all. A digging firm's landing is a property of
-/// (centre, good) instead: it stands only on a Well site or a deposit of its good.
+/// (centre, good) instead: it stands only on its dig ladder's ground (a Well or
+/// Wharf site, or a deposit of its good — `dig_ladder`).
 ///
 /// On failure @p fail_out names why (`charter_place_failure_reason`).
 ///
@@ -3898,17 +3930,21 @@ std::vector<entity_id> charter_place(world& w, const nation_component& nc,
 {
     chain_rejected = false;
     // BL-1197 (gap firm digs the gap): with @p dig THE DIG LADDER runs
-    // outermost — a Well site in either window, else a deposit of the good in
-    // either — so "where its windows hold one" reads both windows before the
-    // deposit tier. There is no fallback to another deposit: a centre with no
-    // ground for the good places nothing for it. Each tier with no ground draws
-    // nothing. Without @p dig only the last tier runs: the rule above, verbatim.
+    // outermost (`dig_ladder`: water a Well site then an ice deposit, produce a
+    // produce deposit then a Wharf site) — its first tier in either window, else
+    // its second in either — so "where its windows hold one" reads both windows
+    // before the next tier. There is no fallback to another deposit: a centre
+    // with no ground for the good places nothing for it. Each tier with no
+    // ground draws nothing. Without @p dig only the `none` tier runs: the rule
+    // above, verbatim.
     const bool digging = dig != nullptr
                       && focus_asset_pattern(focus).front() == building_type::extraction_site;
-    for (const dig_site tier : { dig_site::well, dig_site::deposit, dig_site::none })
+    const std::array<dig_site, 2> ladder =
+        digging ? dig_ladder(*dig) : std::array<dig_site, 2>{ dig_site::none, dig_site::none };
+    const std::size_t n_tiers = digging ? ladder.size() : 1u;
+    for (std::size_t ti = 0; ti < n_tiers; ++ti)
     {
-        if (digging != (tier != dig_site::none))
-            continue;
+        const dig_site tier = ladder[ti];
         for (const charter_rung rung : k_charter_rungs)
         {
             const std::vector<entity_id>& base = charter_rung_window(w, nc, cc, settle, spend, rung);
@@ -5059,8 +5095,8 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         std::array<bool, resource_count> chain_skipped{};
         std::array<charter_unspent_reason, 2> focus_reason{};
         // BL-1197 (gap firm digs the gap): the goods a digging firm found no
-        // ground for here — this centre's windows hold no Well site and no
-        // deposit of the good, and they only fill as firms land, so a later firm
+        // ground for here — this centre's windows hold none of its dig ladder's
+        // ground (a Well or Wharf site, or a deposit of the good), and they only fill as firms land, so a later firm
         // for it would miss again. Passed over for the rest of this centre under
         // every rule (the turn also marks it skipped); a miss is the GOOD's, never
         // the focus's, so `focus_failed` is not set by it.
@@ -5368,8 +5404,10 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                 // --- placement: the centre's two windows and nothing wider --------
                 charter_unspent_reason why = charter_unspent_reason::window_exhausted;
                 // BL-1197 (gap firm digs the gap): a water-gap firm digs water at
-                // a Well site, else an ice deposit, and nothing else. Its ground
-                // is not the focus's (a Well needs no deposit), so an extraction
+                // a Well site, else an ice deposit; a produce-gap firm (BL-1208)
+                // a produce deposit, else a Wharf site; and nothing else. Its
+                // ground is not the focus's (a Well or Wharf needs no deposit, and
+                // a Farm only a produce one), so an extraction
                 // focus that failed here does not stand for it, and its own miss
                 // does not mark the focus failed.
                 resource_type dig_r = resource_type::water;
@@ -5409,7 +5447,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                         break;
                     if (digs && !chain_rejected)
                     {
-                        // BL-1197: no Well site and no deposit of the good in
+                        // BL-1197: none of the good's dig-ladder ground in
                         // either window — a miss of the GOOD, not the focus. It is
                         // passed over for the rest of this centre and the same
                         // firm takes the next good: nothing is placed in its stead.

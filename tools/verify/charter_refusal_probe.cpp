@@ -61,6 +61,7 @@
 #include "world/components.hpp"
 #include "world/corporation_generation.hpp"
 #include "world/landscape_search.hpp"  // apply_landscape_candidate's budget overload (NR-910)
+#include "world/placement_rules.hpp"   // is_wharf_site, the produce ladder's rows (BL-1208)
 #include "world/province.hpp"          // province_anchors, the fixture's province (BL-1146)
 #include "world/recipe_registry.hpp"
 #include "world/resource_names.hpp"
@@ -1011,6 +1012,190 @@ result run_pass6(mode m)
 
 } // namespace waterfx
 
+// ---------------------------------------------------------------------------
+// 8. THE PRODUCE DIG LADDER (BL-1208, generation sites wharves)
+// ---------------------------------------------------------------------------
+// The water fixture's shape for AGRICULTURAL PRODUCE: one nation on a 24 x 12
+// barren body, a centre at (6, 6) with a window of radius 4, households that
+// want PRODUCE and STONE (the turn takes produce, index 6, before stone, 11).
+// Stone stands at (9, 6) and (9, 7). Produce ground, by mode:
+//   deposit_and_coast  a produce deposit at (5, 6) AND a sea tile at (7, 8),
+//                      whose land neighbours are Wharf sites
+//   coast_only         the sea tile at (7, 8) alone — a coastal body with no
+//                      produce deposit anywhere (the BL-1208 gap)
+//   far_coast_only     a sea tile at (18, 0) only — outside the window, so
+//                      produce is producible on the body but not at this centre
+//   no_produce         no sea and no produce deposit anywhere (Pass 6's mask)
+namespace producefx {
+
+enum class mode { deposit_and_coast, coast_only, far_coast_only, no_produce };
+
+struct result
+{
+    std::size_t firms        = 0;
+    int  produce_firms       = 0;  ///< charters / firms whose anchor digs produce
+    int  stone_firms         = 0;
+    bool anchor_at_deposit   = false;
+    bool anchor_at_wharf     = false; ///< a produce anchor on a Wharf site
+    bool any_produce_site    = false; ///< some placed building targets produce
+    bool balanced            = false;
+};
+
+std::unique_ptr<world> build(mode m, recipe_registry& reg, entity_id& centre,
+                             std::map<std::pair<int, int>, entity_id>& at)
+{
+    auto w = std::make_unique<world>();
+    const int bw = 24, bh = 12;
+    const entity_id body = w->create_entity();
+    {
+        body_component bc{};
+        bc.name = "FoodBody";
+        bc.grid_width = bw;
+        bc.grid_height = bh;
+        w->bodies[body] = bc;
+    }
+    const entity_id nation = w->create_entity();
+    nation_component nc{};
+    nc.name = "Oskar";
+    const std::size_t food  = static_cast<std::size_t>(resource_type::agricultural_produce);
+    const std::size_t stone = static_cast<std::size_t>(resource_type::stone);
+    for (int y = 0; y < bh; ++y)
+        for (int x = 0; x < bw; ++x)
+        {
+            const entity_id tid = w->create_entity();
+            tile_component tc{};
+            tc.body = body;
+            tc.grid_x = x;
+            tc.grid_y = y;
+            tc.substrate = terrain_substrate::barren;
+            tc.habitability = 0.5f;
+            if (x == 9 && (y == 6 || y == 7))
+            {
+                tc.resource_deposit[stone]   = 1.0f;
+                tc.resource_remaining[stone] = 1000.0f;
+            }
+            if (m == mode::deposit_and_coast && x == 5 && y == 6)
+            {
+                tc.resource_deposit[food]   = 1.0f;
+                tc.resource_remaining[food] = 1000.0f;
+            }
+            const bool sea_here =
+                ((m == mode::deposit_and_coast || m == mode::coast_only) && x == 7 && y == 8)
+                || (m == mode::far_coast_only && x == 18 && y == 0);
+            if (sea_here)
+            {
+                tc.substrate    = terrain_substrate::ocean;
+                tc.habitability = 0.0f;
+            }
+            w->tiles[tid] = tc;
+            nc.tiles.push_back(tid);
+            w->tile_to_nation[tid] = nation;
+            at[{ x, y }] = tid;
+        }
+    w->nations[nation] = nc;
+
+    centre = w->create_entity();
+    population_centre_component pc{};
+    pc.scale = 5;
+    w->population_centres[centre] = pc;
+    w->population_centre_tile[centre] = at.at({ 6, 6 });
+
+    population_demand_params pd;
+    pd.demand_basket[food]  = 100.0f;
+    pd.demand_basket[stone] = 100.0f;
+    reg.set_population_demand(pd);
+    building_economics ext;
+    ext.base_rate = 1.0f;
+    reg.set_economics(building_type::extraction_site, ext);
+    return w;
+}
+
+void read_anchor(const world& w, const building_component& a,
+                 const std::map<std::pair<int, int>, entity_id>& at, result& out)
+{
+    if (a.type != building_type::extraction_site)
+        return;
+    if (a.target_resource == resource_type::stone)
+        ++out.stone_firms;
+    if (a.target_resource != resource_type::agricultural_produce)
+        return;
+    ++out.produce_firms;
+    if (a.tile == at.at({ 5, 6 }))
+        out.anchor_at_deposit = true;
+    if (placement_rules::is_wharf_site(w, a.tile, resource_type::agricultural_produce))
+        out.anchor_at_wharf = true;
+}
+
+/// The charter walk (sqrt_capital, the turn) with @p points firm charters.
+result run_walk(mode m, std::int32_t points)
+{
+    recipe_registry reg;
+    entity_id centre = null_entity;
+    std::map<std::pair<int, int>, entity_id> at;
+    auto w = build(m, reg, centre, at);
+
+    charter_spend_params s;
+    s.firm_price_points        = 1;
+    s.specialist_firm_charters = 1000;
+    s.window_radius            = 4;
+    s.province_cap             = false;
+    s.resource_cap_rule        = charter_cap_rule::sqrt_capital;
+    s.per_resource_firm_cap    = 2;
+    s.max_firms_per_body       = 200;
+    s.density_ceiling          = 120;
+    const charter_budget budget(std::map<entity_id, std::int32_t>{ { centre, points } });
+
+    charter_spend_report rep;
+    charter_web_from_budget(*w, reg, budget, s, /*seed=*/1208u, /*settle=*/nullptr, &rep);
+    result out;
+    out.firms = rep.firms.size();
+    for (const charter_record& r : rep.charters)
+    {
+        if (r.specialist)
+            continue;
+        const corporation_component& corp = w->corporations.at(r.corp);
+        if (corp.assets.empty())
+            continue;
+        read_anchor(*w, w->buildings.at(corp.assets.front()), at, out);
+    }
+    for (const auto& [bid, b] : w->buildings)
+        if (b.type == building_type::extraction_site
+            && b.target_resource == resource_type::agricultural_produce)
+            out.any_produce_site = true;
+    long long unspent = 0;
+    for (const charter_unspent& u : rep.unspent)
+        unspent += u.points;
+    out.balanced = rep.points_spent + unspent == budget.total();
+    return out;
+}
+
+/// Budget-less Pass 6 (`generate_background_firms`) on the same ground.
+result run_pass6(mode m)
+{
+    recipe_registry reg;
+    entity_id centre = null_entity;
+    std::map<std::pair<int, int>, entity_id> at;
+    auto w = build(m, reg, centre, at);
+    const std::vector<entity_id> firms = generate_background_firms(*w, reg, /*seed=*/1208u);
+    result out;
+    out.firms = firms.size();
+    for (const entity_id cid : firms)
+    {
+        const corporation_component& corp = w->corporations.at(cid);
+        if (corp.assets.empty())
+            continue;
+        read_anchor(*w, w->buildings.at(corp.assets.front()), at, out);
+    }
+    for (const auto& [bid, b] : w->buildings)
+        if (b.type == building_type::extraction_site
+            && b.target_resource == resource_type::agricultural_produce)
+            out.any_produce_site = true;
+    out.balanced = true;
+    return out;
+}
+
+} // namespace producefx
+
 int main()
 {
     const charter_budget empty;
@@ -1932,6 +2117,40 @@ int main()
                     pw.water_firms, pw.anchor_at_well ? 1 : 0);
         expect_true("Pass 6: a water-gap firm digs water, the Well tier first",
                     pw.water_firms >= 1 && pw.anchor_at_well);
+    }
+
+    // --- 8. THE PRODUCE DIG LADDER (BL-1208) ------------------------------------
+    std::printf("\ncharter_refusal_probe — the produce dig ladder (BL-1208)\n");
+    {
+        const producefx::result dc = producefx::run_walk(producefx::mode::deposit_and_coast, 1);
+        std::printf("  deposit and coast in the window: produce firms %d, at deposit %d, at Wharf %d\n",
+                    dc.produce_firms, dc.anchor_at_deposit ? 1 : 0, dc.anchor_at_wharf ? 1 : 0);
+        expect_true("produce ladder: with a produce deposit and a coast, the firm stands on the deposit",
+                    dc.produce_firms == 1 && dc.anchor_at_deposit && !dc.anchor_at_wharf && dc.balanced);
+        const producefx::result co = producefx::run_walk(producefx::mode::coast_only, 1);
+        std::printf("  coast, no produce deposit: produce firms %d, at Wharf %d\n",
+                    co.produce_firms, co.anchor_at_wharf ? 1 : 0);
+        expect_true("produce ladder: a coastal body with no produce deposit gets a Wharf for the gap",
+                    co.produce_firms == 1 && co.anchor_at_wharf && co.balanced);
+        const producefx::result fc = producefx::run_walk(producefx::mode::far_coast_only, 1);
+        std::printf("  no produce ground in the window: firms %zu, produce %d, stone %d, produce site %d\n",
+                    fc.firms, fc.produce_firms, fc.stone_firms, fc.any_produce_site ? 1 : 0);
+        expect_true("produce ladder: no produce ground in the window places nothing for produce (no fallback)",
+                    fc.produce_firms == 0 && !fc.any_produce_site && fc.balanced);
+        expect_true("produce ladder: the same firm takes the next good (stone)",
+                    fc.firms == 1 && fc.stone_firms == 1);
+    }
+    {
+        const producefx::result np = producefx::run_pass6(producefx::mode::no_produce);
+        std::printf("  Pass 6, no produce ground on the body: firms %zu, produce %d, stone %d, produce site %d\n",
+                    np.firms, np.produce_firms, np.stone_firms, np.any_produce_site ? 1 : 0);
+        expect_true("Pass 6: produce misses once per nation, is masked, and stone still charters",
+                    np.produce_firms == 0 && !np.any_produce_site && np.stone_firms >= 1);
+        const producefx::result pc = producefx::run_pass6(producefx::mode::coast_only);
+        std::printf("  Pass 6, a coast and no produce deposit: produce firms %d, at Wharf %d\n",
+                    pc.produce_firms, pc.anchor_at_wharf ? 1 : 0);
+        expect_true("Pass 6: a produce-gap firm on a depositless coast stands on a Wharf",
+                    pc.produce_firms >= 1 && pc.anchor_at_wharf);
     }
 
     std::printf("\n%s (%d failing)\n", g_fail == 0 ? "ALL PASS" : "FAILED", g_fail);
