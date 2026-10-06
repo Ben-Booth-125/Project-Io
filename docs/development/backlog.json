@@ -1565,8 +1565,8 @@
    "design": "MERGED to main (7ab91754, 2026-10-05). Clean A/B on seeds 0/43/10, 400 ticks, vs main f37a12ea: G1 35.3% -> 41.0%, G2 30.6% -> 45.1%, G3 50.5% -> 55.2%; order-held units 0.0 in all 36 readings. agent_seam_harness 22/22 on main. OWED: a live click on the Market Ledger order form (Cap / qtr, 0 = no cap, rows read \"all\"); a visible auto-close notice (BL-1202).\n\nRULED (Ben, 2026-10-05, in chat: options 3 + 1): a market rule for player and rivals alike, not an AI-only re-size - an order by default covers everything auto-surplus would list, at its floor; a quantity cap is optional; an order whose pool stands empty for a short run of ticks closes and the good returns to auto-surplus. Written into MARKETS.md step 4. The lane building the AI re-size was rescoped to this rule.\n\nFOUND (2026-10-05, well_census --trace, seed 43): the scorer's trade candidate places ONE standing sell order per (corp, body, good), sized at half the excess over 50 units at that moment, no expiry (corp_ai.cpp:2120); it never re-sizes it and never issues remove_sell_order (corp_ai.cpp:2108-2118 refuses a second order). MARKETS.md step 4 exempts a resource under a standing order from auto-surplus (\"the manual order governs\", market_clearing.cpp:1163-1169, :1244-1245), and the order lists min(quantity, pool) per tick (:1305-1314). So production beyond the original quantity piles up for the rest of the campaign: water 18,168 order-held units by play tick 200, food rations 1,859, steel transiently 398; household demand reads unmet and prices sit at 8-9x. DECIDED (main session, 2026-10-05): fix on the AI side, not the market rule (the exemption is right for the player's own manual orders): when the pool under a rival's order outgrows the order (pool > k x quantity over several due ticks), the scorer re-sizes it via remove_sell_order + place_sell_order at the current surplus - existing verbs, inside the scored-trade grant (AI_OPPONENT.md sec 11). The player's orders are never touched. Measure on BL-1184 and well_census --trace (order-held units -> near 0)."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 49,
    "written": "2026-10-05",
    "requires": [],
@@ -1583,7 +1583,7 @@
    "files": [
     "src/ui/market_ledger.cpp"
    ],
-   "design": "BL-1201 closes an order whose pool has stood empty for 4 quarters and writes an agency-topic world::history_log line (\"Standing sell order #N closed: nothing to sell for 4 quarters; the good returns to auto-surplus\") tagged with the corp and body. Nothing displays it: the decision feed reads only the decision topic, and the chat feed reads economy_report::agency_events. Show the player's own closes - in the Market Ledger Trades tab (a closed-orders line) or the decision feed. Needs a question_log entry and an ACTIONS check per src/ui rules. Small UI lane."
+   "design": "MERGED (648e2c41, 2026-10-06): the player's auto-closed orders are listed under My trades (Closed: month, good, floor; hover = the reason), newest 3 from the last 4 quarters; close lines carry a parseable tag (market_clearing.cpp, pinned by order_book_harness R9.12, 87/0). order_close_notice.lua all PASS on main; capture checked. Live click owed (Ben).\n\nBL-1201 closes an order whose pool has stood empty for 4 quarters and writes an agency-topic world::history_log line (\"Standing sell order #N closed: nothing to sell for 4 quarters; the good returns to auto-surplus\") tagged with the corp and body. Nothing displays it: the decision feed reads only the decision topic, and the chat feed reads economy_report::agency_events. Show the player's own closes - in the Market Ledger Trades tab (a closed-orders line) or the decision feed. Needs a question_log entry and an ACTIONS check per src/ui rules. Small UI lane."
   },
   {
    "status": "designed",
