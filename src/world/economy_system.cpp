@@ -1,5 +1,7 @@
 #include "economy_system.hpp"
 
+#include "input_reach.hpp"     // recipe_inputs_obtainable (BL-1206 recipe rescue gate)
+
 #include "battle_system.hpp"   // run_battles (BL-467 engagement trigger)
 #include "budget_system.hpp"   // compute_building_opex, body_mean_habitability (BL-181 solver)
 #include "building_profit.hpp" // estimate_building_profit (BL-079 corp agency)
@@ -14,7 +16,9 @@
 #include "workforce.hpp"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
+#include <memory>
 #include <cmath>
 #include <limits>
 #include <string>
@@ -1986,6 +1990,20 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     {
         constexpr int   loss_streak_to_idle = 8;     // consecutive loss ticks before idling.
         constexpr float floored_frac        = 0.30f; // output within ~30% of the price floor reads as "floored".
+        // BL-1206: the reach context the recipe rescue asks "is this input
+        // obtainable here?" of — built on first use, shared by every corp this
+        // tick, and reading this tick's production (corp_ai.cpp's `reach`, the
+        // same construction): a snapshot taken at a fixed point of the sorted
+        // corp walk, so it is replayable.
+        std::unique_ptr<input_reach> rescue_reach_ctx;
+        const auto rescue_reach = [&]() -> input_reach& {
+            if (!rescue_reach_ctx)
+            {
+                rescue_reach_ctx = std::make_unique<input_reach>(make_input_reach(w, reg));
+                rescue_reach_ctx->report = &report;
+            }
+            return *rescue_reach_ctx;
+        };
         for (const entity_id corp : corp_ids)
         {
             const corporation_component& acc = w.corporations.at(corp);
@@ -2028,11 +2046,41 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                         const int n      = reg.recipe_count(building_type::processing_facility);
                         int   best_i     = -1;
                         float best_ratio = output_ratio(b.recipe);
+                        // BL-1206 (seat day-1 profit): the rescue proposes only a
+                        // recipe whose every input is OBTAINABLE here — AI_OPPONENT.md
+                        // § Build only what runs: "a processor decision — build,
+                        // recipe switch, resume — is taken only on inputs the
+                        // building can obtain". The same test the scorer's switch
+                        // asks (`recipe_inputs_obtainable`, input_reach.hpp), with
+                        // the scorer's batches and pool. Ungated, the rescue chased
+                        // the dearest output and moved own-fed refined-fuel plants
+                        // onto steel with no coal in reach (seeds 40, 43) or onto
+                        // food rations with no produce (seed 37) at settle tick 4,
+                        // and the seat was handed a plant that never ran again.
+                        // The incumbent is not gated (a floored plant whose own
+                        // inputs are gone may still leave for one that runs).
+                        const float sw_batches =
+                            reg.economics(b.type).base_rate * b.workforce_assigned;
+                        const stockpile_component* sw_pool =
+                            w.find_pool(corp, pool_key_for_tile(w, b.tile));
                         for (int i = 0; i < n; ++i)
                         {
                             const recipe& cand = reg.recipe_at(building_type::processing_facility, i);
                             const float ratio  = output_ratio(reg.recipe_id(cand.name));
-                            if (ratio > best_ratio)
+                            std::array<float, resource_count> cand_cost{};
+                            // A candidate that consumes what the incumbent makes is
+                            // fed, on the tick it is asked, by the plant's own
+                            // last output in its pool — supply that ends the tick
+                            // it switches (seed 40: refined fuel -> propellant,
+                            // starved from the next tick). Not obtainable.
+                            bool eats_own = false;
+                            if (const recipe* inc = reg.get_recipe(b.recipe))
+                                for (std::size_t r = 0; r < resource_count; ++r)
+                                    eats_own = eats_own
+                                            || (cand.inputs[r] > 0.0f && inc->outputs[r] > 0.0f);
+                            if (!eats_own && ratio > best_ratio
+                                && recipe_inputs_obtainable(w, reg, rescue_reach(), mid, sw_pool, cand,
+                                                            sw_batches, bid, cand_cost))
                             {
                                 best_ratio = ratio;
                                 best_i     = i;
