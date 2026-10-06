@@ -591,6 +591,13 @@ of the viable ones.** Design: BL-630 (spawn shortlist). The sequence:
    no player to ask draws one from the shortlist against the world seed), and `is_player` /
    `world::player_entity` are re-pointed onto it. The same world and the same pick seat the same
    firm in the same state.
+5. **The seat opens with a clean slate of construction (Ben, 2026-10-07; BL-1206).** During the
+   settle the seated firm was an ordinary corporation under spectate, and its scorer started
+   builds the player never chose. At the seat, every building of the seated firm still under
+   construction is cancelled and the materials already paid into it are refunded to the firm's
+   balance. Finished buildings stay. So the player chooses every build, and the first quarters'
+   operating result is the firm's own, not a spike of material purchases for projects nobody
+   picked.
 
 **A firm carries its founding year and its origin region** (`corporation_component::founded_year`,
 `corporation_component::origin_region`; Ben, 2026-09-24). The search charters each firm from a
