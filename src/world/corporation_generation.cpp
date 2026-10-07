@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <iterator>
 #include <map>
+#include <set>
 #include <memory>
 #include <array>
 #include <cmath>
@@ -1429,6 +1430,92 @@ std::array<float, resource_count> body_upkeep_demand(const world& w, const recip
             demand[r] += basket[ti][r];
     }
     return demand;
+}
+
+/// BL-1232 (power plants per grid; PRODUCTION.md, "Generation is sized per
+/// grid, not per body", Ben 2026-10-07): @p body_id's POWER GAP, read per wired
+/// grid (`tile_power_grid`, LOGISTICS.md § 3a) rather than across the body.
+/// Power moves only within a grid, so a surplus on one grid cannot cancel a
+/// deficit on another: the gap is the sum over the body's grids of
+/// max(0, need - output), where need is the operating buildings' power upkeep
+/// on the grid (`body_upkeep_demand`'s own eligibility and basket) and output
+/// is the grid's generators at `accumulate_body_production`'s nominal rate.
+/// A building in a dark province (grid 0) draws no power (economy_system.cpp,
+/// "no wire, no draw") and a generator there feeds nothing, so neither counts.
+///
+/// A grid whose need is under HALF of one plant's output (@p plant_output: the
+/// most power any in-band recipe makes, at the nominal rate) is left to a road
+/// that joins it to a bigger grid, not given a plant of its own: its gap is
+/// not counted and it is not short. @p short_grids receives every grid whose
+/// gap is counted — the grids a power firm may stand on.
+///
+/// Sums walk ascending building id (BL-1050: float addition does not
+/// associate); grids are keyed in a std::map. Deterministic.
+float body_power_grid_gap(world& w, const recipe_registry& reg, entity_id body_id,
+                          float plant_output, std::set<std::uint32_t>& short_grids)
+{
+    short_grids.clear();
+    const std::size_t pw = static_cast<std::size_t>(resource_type::power);
+    const building_upkeep_params& up = reg.building_upkeep();
+    std::array<float, building_type_count> need_of{};
+    for (std::size_t t = 0; t < building_type_count; ++t)
+        need_of[t] = building_upkeep_goods(up, static_cast<building_type>(t), reg.era())[pw];
+    const float batches = nominal_processing_batches(reg);
+
+    std::vector<entity_id> bids;
+    bids.reserve(w.buildings.size());
+    for (const auto& [bid, b] : w.buildings)
+    {
+        if (b.decommissioned)
+            continue;
+        const auto tit = w.tiles.find(b.tile);
+        if (tit == w.tiles.end() || tit->second.body != body_id)
+            continue;
+        bids.push_back(bid);
+    }
+    std::sort(bids.begin(), bids.end());
+
+    std::map<std::uint32_t, std::pair<float, float>> grids;   // grid -> (need, output)
+    for (const entity_id bid : bids)
+    {
+        const building_component& b = w.buildings.at(bid);
+        const std::uint32_t g = tile_power_grid(w, b.tile);
+        if (g == 0)
+            continue;
+        if (b.ticks_remaining <= 0 && static_cast<std::size_t>(b.type) < building_type_count)
+        {
+            const float n = need_of[static_cast<std::size_t>(b.type)];
+            if (n > 0.0f)
+                grids[g].first += n;
+        }
+        if (b.type == building_type::processing_facility)
+            if (const recipe* rcp = reg.get_recipe(b.recipe); rcp && rcp->outputs[pw] > 0.0f)
+                grids[g].second += batches * rcp->outputs[pw];
+    }
+
+    float gap = 0.0f;
+    for (const auto& [g, no] : grids)
+    {
+        if (!(no.first > no.second) || no.first < 0.5f * plant_output)
+            continue;
+        gap += no.first - no.second;
+        short_grids.insert(g);
+    }
+    return gap;
+}
+
+/// The most power one plant makes: the largest power output of any in-band
+/// processing recipe, at `nominal_processing_batches` — the plant the walk's
+/// power firm is chartered with (`best_recipe_for_gaps` takes the most output
+/// of the good). 0 where no recipe makes power.
+float one_power_plant_output(const recipe_registry& reg)
+{
+    const std::size_t pw = static_cast<std::size_t>(resource_type::power);
+    float best = 0.0f;
+    const int n = reg.recipe_count(building_type::processing_facility);
+    for (int i = 0; i < n; ++i)
+        best = std::max(best, reg.recipe_at(building_type::processing_facility, i).outputs[pw]);
+    return nominal_processing_batches(reg) * best;
 }
 
 /// BL-709 — the body's CONSTRUCTION demand: how much construction capacity a
@@ -3957,7 +4044,8 @@ std::vector<entity_id> charter_place(world& w, const nation_component& nc,
                                      chain_reach* cr,
                                      const std::vector<int>* serve,
                                      bool& chain_rejected,
-                                     const resource_type* dig = nullptr)
+                                     const resource_type* dig = nullptr,
+                                     const std::set<std::uint32_t>* grids = nullptr)
 {
     chain_rejected = false;
     // BL-1197 (gap firm digs the gap): with @p dig THE DIG LADDER runs
@@ -3982,6 +4070,15 @@ std::vector<entity_id> charter_place(world& w, const nation_component& nc,
             std::vector<entity_id> window = (by_province != nullptr && province_rungs != nullptr)
                 ? charter_under_province_cap(w, base, *by_province, *province_rungs)
                 : base;
+            // BL-1232: a power firm stands only on a short grid's provinces
+            // (@p grids, `body_power_grid_gap`) — the window filtered to them,
+            // order kept, before any draw.
+            if (grids != nullptr)
+                window.erase(std::remove_if(window.begin(), window.end(),
+                                            [&](entity_id t) {
+                                                return grids->count(tile_power_grid(w, t)) == 0;
+                                            }),
+                             window.end());
             if (window.empty())
                 continue;
             std::vector<entity_id> assets = place_starting_assets(
@@ -4877,6 +4974,36 @@ std::vector<entity_id> charter_web_from_budget(world& w,
     // against (Pass 3 "Chain-feasible"), its node set read once, here.
     chain_reach chain = make_chain_reach(w, reg);
 
+    // BL-1232 (power plants per grid; PRODUCTION.md, "Generation is sized per
+    // grid, not per body", Ben 2026-10-07): power's gap is read per wired grid
+    // (`body_power_grid_gap`) and a power firm stands on a short grid. Only
+    // where the band authors a power upkeep draw and some recipe makes power —
+    // elsewhere the walk is the body-wide measure it was, byte for byte.
+    const std::size_t power_i     = static_cast<std::size_t>(resource_type::power);
+    const float       plant_output = one_power_plant_output(reg);
+    bool              power_per_grid = false;
+    if (plant_output > 0.0f)
+        for (std::size_t t = 0; t < building_type_count && !power_per_grid; ++t)
+            power_per_grid = building_upkeep_goods(reg.building_upkeep(),
+                                                   static_cast<building_type>(t),
+                                                   reg.era())[power_i] > 0.0f;
+    // The walk's power measure, re-read per firm: the body-wide demand terms
+    // other than upkeep (consumer, construction, processor inputs — all zero for
+    // power in the shipped data), plus the per-grid gap over today's output, so
+    // `demand - production` is exactly the grids' summed shortfall.
+    const auto size_power_per_grid =
+        [&](entity_id body, const std::array<float, resource_count>& production,
+            const std::array<float, resource_count>& consumer,
+            const std::array<float, resource_count>& construction_need,
+            const std::array<float, resource_count>& input_need,
+            std::array<float, resource_count>& demand, std::set<std::uint32_t>& short_grids) {
+            if (!power_per_grid)
+                return;
+            const float gap = body_power_grid_gap(w, reg, body, plant_output, short_grids);
+            demand[power_i] = production[power_i] + gap
+                + (consumer[power_i] + construction_need[power_i] + input_need[power_i]);
+        };
+
     // --- EACH BODY'S DENSITY RULE, FIXED BEFORE THE WALK (BL-1039) -----------
     // Every body holding a nation-resolved budgeted centre gets its state here,
     // before any charter lands, and three things are read ONCE:
@@ -5184,6 +5311,11 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                 body_processor_input_demand(w, reg, cc.body);
             for (std::size_t r = 0; r < resource_count; ++r)
                 demand[r] += input_need[r];
+            // BL-1232: power's gap is the short grids' summed shortfall, and
+            // `short_grids` is where its firm may stand.
+            std::set<std::uint32_t> short_grids;
+            size_power_per_grid(cc.body, production, bs.consumer_demand, construction_need,
+                                input_need, demand, short_grids);
 
             std::array<float, resource_count> selectable = production;
             if (bs.per_good_cap >= 0)
@@ -5470,18 +5602,24 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                                 serve.push_back(i);
                     }
                     bool chain_rejected = false;
+                    // BL-1232: a power firm's windows are cut to the short grids.
+                    const bool grid_sited = power_per_grid && gap_r == power_i;
                     assets = charter_place(w, nc, focus, occupied, asset_rng, cc, settle, spend,
                                            by_province, &province_rungs, rung, why,
                                            reg, &chain, go_processing ? &serve : nullptr,
-                                           chain_rejected, digs ? &dig_r : nullptr);
+                                           chain_rejected, digs ? &dig_r : nullptr,
+                                           grid_sited ? &short_grids : nullptr);
                     if (!assets.empty())
                         break;
-                    if (digs && !chain_rejected)
+                    if ((digs || grid_sited) && !chain_rejected)
                     {
                         // BL-1197: none of the good's dig-ladder ground in
                         // either window — a miss of the GOOD, not the focus. It is
                         // passed over for the rest of this centre and the same
                         // firm takes the next good: nothing is placed in its stead.
+                        // BL-1232: so is a power firm whose windows hold no ground
+                        // on a short grid — the GOOD's miss (a later good of the
+                        // processing focus may still place), never the focus's.
                         dig_missed[gap_r] = true;
                         if (!bs.in_turn)
                         {
@@ -5653,6 +5791,9 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             demand[r] += construction_need[r];
         for (std::size_t r = 0; r < resource_count; ++r)
             demand[r] += input_need[r];
+        std::set<std::uint32_t> short_grids;   // BL-1232: the walk's own power measure
+        size_power_per_grid(body_id, production, bs.consumer_demand, construction_need,
+                            input_need, demand, short_grids);
         int64_t open = 0;
         for (const std::uint16_t r : bs.turn)
             if (demand[r] > production[r] && bs.firms_by_resource[r] < bs.share[r])
