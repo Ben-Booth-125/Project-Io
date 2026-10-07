@@ -116,8 +116,8 @@ dispatcher's order. They are not refusals by a rule:
 | `noshelfsurplus/ordered` | As `poolheld`, but every such pool surplus is under a standing sell order. The corp dispatcher never hauls an order-controlled (corp, body, good); the order sells it at home. |
 | `noshelfsurplus/none` | No shelf surplus and no shippable pool surplus on the body, pre-step. Nothing to ship. |
 | `grid` | A grid good. It is never cargo, so it is not classified. |
-| `stocked/ceiling` | Processor block only. Before the economy step, the processor's market shelf held >= 1 unit, but its price was over the BL-1172 fair-price ceiling (`!shelf_admits`, `reservation_mult x base`). The draw does not buy and does not bid. |
-| `stocked/thin` | Stocked and admitted, but pool plus the WHOLE shelf covers less than `t_idle` of a full run. This is `run_processing`'s early idle return, even with no contention. |
+| `stocked/thin` | Processor block only. Before the economy step, the processor's market shelf held >= 1 unit, but pool plus the WHOLE shelf covers less than `t_idle` of a full run: `run_processing`'s early idle return, at ANY price. Tested first, so a thin shelf is never counted as a ceiling lock; its "over ceiling" count says how many were also priced over. |
+| `stocked/ceiling` | Stocked enough to run, but priced over the BL-1172 fair-price ceiling (`!shelf_admits`, `reservation_mult x base`). The draw does not buy and does not bid. Only this class would run if the price fell. |
 | `stocked/contended` | Stocked, admitted and enough. Earlier draws in the step, or the BL-1209 pro-rata share of a short shelf, left this processor too little. |
 | `unpriced` | The processor's market has no base price for the input. Unpriced is unbuyable. |
 | `nomarket` | The processor has no tile market and draws a body pool. No market-export rule applies. |

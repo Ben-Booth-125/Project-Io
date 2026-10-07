@@ -857,18 +857,20 @@ void lg_after_tick(const world& w, const economy_report& rep, const recipe_regis
             else if (s.shelf[g] >= 1.0f)
             {
                 r.stocked_shelf += s.shelf[g];
-                if (!s.admits[g]) c = x_ceiling;
-                else
-                {
-                    // run_processing's early idle return: coverage of a full run
-                    // with the WHOLE shelf (no pro-rata) still under t_idle
-                    const recipe* rc = reg.get_recipe(b.recipe);
-                    const float wt = std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f);
-                    const float need = (rc ? rc->inputs[g] : 0.0f) * base_rate * row->effective_workforce
-                                     * wt * building_supply_scalar(b);
-                    const bool thin = need > 0.0f && (s.pool[g] + s.shelf[g]) / need < reg.t_idle();
-                    c = thin ? x_thin : x_contended;
-                }
+                // run_processing's early idle return: coverage of a full run
+                // with the WHOLE shelf (no pro-rata) still under t_idle. Tested
+                // BEFORE the ceiling (cold check, 2026-10-07): a thin shelf idles
+                // the processor at any price, so counting it as a ceiling lock
+                // overstated what lowering the price would recover. `over` still
+                // reports the price beside it.
+                const recipe* rc = reg.get_recipe(b.recipe);
+                const float wt = std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f);
+                const float need = (rc ? rc->inputs[g] : 0.0f) * base_rate * row->effective_workforce
+                                 * wt * building_supply_scalar(b);
+                const bool thin = need > 0.0f && (s.pool[g] + s.shelf[g]) / need < reg.t_idle();
+                if (thin) c = x_thin;
+                else if (!s.admits[g]) c = x_ceiling;
+                else c = x_contended;
             }
             else
             {
