@@ -383,6 +383,43 @@ reachable_spare reachable_supply(world& w, const recipe_registry& reg, input_rea
     return out;
 }
 
+bool building_makes(const world& w, const recipe_registry& reg, entity_id bid, std::size_t r)
+{
+    if (r >= resource_count)
+        return false;
+    const auto bit = w.buildings.find(bid);
+    if (bit == w.buildings.end())
+        return false;
+    const building_component& b = bit->second;
+    if (b.type == building_type::processing_facility)
+    {
+        const recipe* rc = reg.get_recipe(b.recipe);
+        return rc != nullptr && rc->outputs[r] > 0.0f;
+    }
+    if (b.type == building_type::extraction_site)
+    {
+        if (static_cast<std::size_t>(b.target_resource) == r)
+            return true;
+        const auto tit = w.tiles.find(b.tile);
+        return tit != w.tiles.end() && extract_share(tit->second, r) > 0.0f;
+    }
+    return false;
+}
+
+float judged_batches(const recipe_registry& reg, const building_component& b)
+{
+    const float rate = reg.economics(b.type).base_rate;
+    const float l    = labour(b);
+    if (l > 0.0f)
+        return rate * l;
+    // Unstaffed (no workforce assigned, or a target dialled to zero): judge it
+    // at the staffing a placed building is authored with — half its workforce
+    // assigned (author_building / construct_building) at the nominal 100 %
+    // target — so its need is real rather than zero.
+    constexpr float k_authored_assignment = 0.5f;
+    return rate * k_authored_assignment;
+}
+
 input_access input_obtainable(world& w, const recipe_registry& reg, input_reach& ir,
                               entity_id consumer_market, const stockpile_component* pool,
                               std::size_t r, float need, entity_id self,
@@ -398,10 +435,21 @@ input_access input_obtainable(world& w, const recipe_registry& reg, input_reach&
 
     // (1) STOCK — the production tick's own coverage question (run_processing:
     // pool + the shelf the fair-price ceiling admits, at the idle threshold).
+    //
+    // BL-1206 (cold review of the rescue gate): THE ASKER'S OWN OUTPUT IS NOT
+    // ITS OWN STOCK COVER. A building that makes r and asks whether it could run
+    // a recipe eating r sees, in its pool and on its shelf, the r it just made —
+    // stock that stops arriving the tick it switches (seed 40: a refined-fuel
+    // plant moved onto propellant, fed one tick by its own leftovers, starved
+    // from the next). The stock clause cannot tell its units from a third
+    // party's, so for such an input it is not asked: the SUPPLY clause decides,
+    // and it already takes the asker's own output out.
+    const bool  own_good = self != null_entity && building_makes(w, reg, self, r);
     const bool  shelf = mkt && shelf_admits(*mkt, r, ir.reservation_mult, /*off_buys=*/true);
-    const float avail = (pool ? std::max(0.0f, pool->quantities[r]) : 0.0f)
+    const float avail = own_good ? 0.0f
+                      : (pool ? std::max(0.0f, pool->quantities[r]) : 0.0f)
                       + (shelf ? std::max(0.0f, mkt->inventory[r]) : 0.0f);
-    if (need <= 0.0f || avail >= floor_need)
+    if (need <= 0.0f || (!own_good && avail >= floor_need))
     {
         out.obtainable = true;
         out.unit_cost  = mkt ? posted_price(*mkt, r) : 0.0f;

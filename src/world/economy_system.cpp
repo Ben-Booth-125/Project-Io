@@ -2061,9 +2061,12 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                         // food rations with no produce (seed 37) at settle tick 4,
                         // and the seat was handed a plant that never ran again.
                         // The incumbent is not gated (a floored plant whose own
-                        // inputs are gone may still leave for one that runs).
-                        const float sw_batches =
-                            reg.economics(b.type).base_rate * b.workforce_assigned;
+                        // inputs are gone may still leave for one that runs). The
+                        // run is judged at `judged_batches` (an unstaffed plant at
+                        // its authored staffing, never a zero need), and its own
+                        // output is never its own stock cover (input_reach.cpp
+                        // § STOCK) — one rule for the reflex and the scorer.
+                        const float sw_batches = judged_batches(reg, b);
                         const stockpile_component* sw_pool =
                             w.find_pool(corp, pool_key_for_tile(w, b.tile));
                         for (int i = 0; i < n; ++i)
@@ -2071,17 +2074,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                             const recipe& cand = reg.recipe_at(building_type::processing_facility, i);
                             const float ratio  = output_ratio(reg.recipe_id(cand.name));
                             std::array<float, resource_count> cand_cost{};
-                            // A candidate that consumes what the incumbent makes is
-                            // fed, on the tick it is asked, by the plant's own
-                            // last output in its pool — supply that ends the tick
-                            // it switches (seed 40: refined fuel -> propellant,
-                            // starved from the next tick). Not obtainable.
-                            bool eats_own = false;
-                            if (const recipe* inc = reg.get_recipe(b.recipe))
-                                for (std::size_t r = 0; r < resource_count; ++r)
-                                    eats_own = eats_own
-                                            || (cand.inputs[r] > 0.0f && inc->outputs[r] > 0.0f);
-                            if (!eats_own && ratio > best_ratio
+                            if (ratio > best_ratio
                                 && recipe_inputs_obtainable(w, reg, rescue_reach(), mid, sw_pool, cand,
                                                             sw_batches, bid, cand_cost))
                             {
@@ -2098,6 +2091,10 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                             report.agency_events.push_back(
                                 {corp, bid, agency_event::kind::recipe_switch, b.recipe});
                             log_reflex_agency(w, corp, building_body(w, b), "switched recipe (floored output)");
+                            // The producer index no longer describes this plant:
+                            // forget it so the next question sees the switch.
+                            if (rescue_reach_ctx)
+                                input_reach_invalidate(*rescue_reach_ctx);
                             continue;
                         }
                     }
@@ -2111,6 +2108,10 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                     if (++b.loss_streak >= loss_streak_to_idle)
                     {
                         b.decommissioned = true;
+                        // An idled building supplies nothing: forget the index
+                        // the rescue reads (BL-1206 cold review).
+                        if (rescue_reach_ctx)
+                            input_reach_invalidate(*rescue_reach_ctx);
                         // Hold the strategic tier off this building for the same
                         // span its own state changes hold for (AI_OPPONENT.md
                         // § "Hysteresis & action budget": a building that changed

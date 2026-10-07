@@ -25,6 +25,12 @@
 //   R5 RESUME (scorer, 12 evals): an idled coal plant stays idled while no coal
 //      can reach it; once a mine in N stands, it resumes.
 //
+//   R6 OWN OUTPUT IS NOT OWN STOCK COVER (BL-1206 cold review): a steel plant
+//      whose pool holds the steel it made may not count it toward a steel-eating
+//      recipe; a third party's spare may. Shared test, the reflex rescue (one
+//      run_economy_step) and the scorer's within-group switch (12 evals); and an
+//      unstaffed plant is judged at a non-zero need (judged_batches).
+//
 // Exits non-zero on any FAIL.
 
 #include "world/components.hpp"
@@ -40,6 +46,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <tuple>
 
 namespace {
 
@@ -52,6 +59,7 @@ void check(bool ok, const char* what)
 
 constexpr std::size_t r_coal  = static_cast<std::size_t>(resource_type::coal);
 constexpr std::size_t r_steel = static_cast<std::size_t>(resource_type::steel);
+constexpr std::size_t r_mach  = static_cast<std::size_t>(resource_type::machinery);
 
 struct scene
 {
@@ -91,6 +99,22 @@ recipe_registry make_registry()
     coal_steel.inputs [r_coal]  = 1.0f;
     coal_steel.outputs[r_steel] = 3.0f;
     reg.add_recipe(coal_steel);
+
+    // BL-1206 (R6): two recipes that EAT steel — one in another group (only the
+    // reflex rescue, which may cross groups, can reach it) and one in coal_steel's
+    // own group (the scorer's within-group switch).
+    recipe forge;
+    forge.name  = "steel_forge";
+    forge.group = "Forge";
+    forge.inputs [r_steel] = 1.0f;
+    forge.outputs[r_mach]  = 1.0f;
+    reg.add_recipe(forge);
+    recipe temper;
+    temper.name  = "steel_temper";
+    temper.group = "Foundry";
+    temper.inputs [r_steel] = 1.0f;
+    temper.outputs[r_mach]  = 1.0f;
+    reg.add_recipe(temper);
     return reg;
 }
 
@@ -102,6 +126,7 @@ entity_id add_market(scene& s, int col)
     m.centre_tile = tile_at(s.w, s.body, col, 0);
     m.base_price[r_coal]  = 2.0f; // reset from the hauls below
     m.base_price[r_steel] = 20.0f;
+    m.base_price[r_mach]  = 400.0f; // BL-1206 R6: the steel-eaters' output, dear
     m.price = m.base_price;
     s.w.markets[id] = m;
     return id;
@@ -413,6 +438,113 @@ int main()
         check(never < 0, "R5 no coal can reach it: the idled plant stays idled for 12 evaluations");
         check(far < 0, "R5 a mine beyond reach (F) does not bring it back");
         check(later >= 6, "R5 once a mine in N stands, the idled plant resumes (and not before)");
+    }
+
+    // R6 (BL-1206 cold review): a steel plant asking whether it could run a
+    // recipe that EATS steel. Its pool holds the steel it made; that is not
+    // cover, because it stops arriving the tick the plant switches. Only a
+    // third party's spare admits the switch — in the shared test, in the
+    // reflex rescue, and in the scorer's switch.
+    std::printf("R6 own output is not own stock cover (shared test, reflex, scorer)\n");
+    {
+        const uint16_t coal_steel = reg.recipe_id("coal_steel");
+        const recipe*  forge      = reg.get_recipe(reg.recipe_id("steel_forge"));
+        // AI steel plant P at A (col 1, row 2), its own steel leftovers in its pool.
+        auto make = [&](bool third_party, float price_steel_mult) {
+            scene s = make_scene(); place_bound(s, reg);
+            const entity_id p = add_plant(s, reg, s.ai, 1, 2, 1.0f, /*idled=*/false);
+            s.w.pool_at(s.ai, s.a).quantities[r_steel] = 100.0f;
+            entity_id third = null_entity;
+            if (third_party)
+            {
+                third = add_plant(s, reg, s.pl, 0, 3, 1.0f, /*idled=*/false);
+                s.w.pool_at(s.pl, s.a).quantities[r_coal] = 1000.0f;
+            }
+            for (auto& [mid, m] : s.w.markets)
+            {
+                (void)mid;
+                m.price[r_steel] = price_steel_mult * m.base_price[r_steel];
+                m.price[r_mach]  = m.base_price[r_mach];
+            }
+            return std::make_tuple(std::move(s), p, third);
+        };
+        {
+            auto [s, p, third] = make(false, 1.0f);
+            (void)third;
+            input_reach ir = make_input_reach(s.w, reg);
+            const stockpile_component* pool = s.w.find_pool(s.ai, s.a);
+            const float need = judged_batches(reg, s.w.buildings.at(p)) * forge->inputs[r_steel];
+            check(!input_obtainable(s.w, reg, ir, s.a, pool, r_steel, need, p).obtainable,
+                  "R6 shared: the steel plant's own leftover steel does NOT admit a steel-eating run");
+            input_reach ir2 = make_input_reach(s.w, reg);
+            check(input_obtainable(s.w, reg, ir2, s.a, pool, r_steel, need, null_entity).obtainable,
+                  "R6 shared: the same stock DOES cover a candidate that is not its maker (a build)");
+        }
+        {
+            auto [s, p, third] = make(true, 1.0f);
+            (void)third;
+            input_reach ir = make_input_reach(s.w, reg);
+            const stockpile_component* pool = s.w.find_pool(s.ai, s.a);
+            const float need = judged_batches(reg, s.w.buildings.at(p)) * forge->inputs[r_steel];
+            check(input_obtainable(s.w, reg, ir, s.a, pool, r_steel, need, p).obtainable,
+                  "R6 shared: a third party's steel plant in A (spare) admits it");
+        }
+        {
+            // judged_batches: an unstaffed plant is judged at its authored
+            // staffing, never at zero need.
+            building_component b{};
+            b.type = building_type::processing_facility;
+            b.workforce_assigned = 0.0f;
+            check(judged_batches(reg, b) > 0.0f,
+                  "R6 an unstaffed plant is judged at a non-zero need (labour basis, not zero)");
+        }
+        // The REFLEX rescue: P's steel floored (0.1 x base), machinery dear. One
+        // economy step; the scorer is held off P (ai_cooldown) so any switch is
+        // the reflex's.
+        auto reflex = [&](bool third_party) {
+            auto [s, p, third] = make(third_party, 0.1f);
+            (void)third;
+            s.w.buildings.at(p).ai_cooldown = 1000;
+            s.w.current_econ_tick = 1;
+            const economy_report rep = run_economy_step(s.w, reg);
+            bool third_ran = false;
+            for (const building_report& br : rep.buildings)
+                if (br.building == third && br.active) third_ran = true;
+            return std::make_pair(s.w.buildings.at(p).recipe, third_ran);
+        };
+        {
+            const auto [rc, ran] = reflex(false);
+            (void)ran;
+            check(rc == coal_steel,
+                  "R6 reflex: a floored steel plant with only its OWN steel stays on coal_steel");
+        }
+        {
+            const auto [rc, ran] = reflex(true);
+            std::printf("  reflex with a third-party steel plant: it ran this tick %s; recipe now %s\n",
+                        ran ? "yes" : "NO", reg.get_recipe(rc) ? reg.get_recipe(rc)->name.c_str() : "?");
+            check(ran && rc != coal_steel,
+                  "R6 reflex: with a third party's steel produced this tick, it may switch to a steel-eater");
+        }
+        // The SCORER's within-group switch (steel_temper), 12 evaluations.
+        auto scorer = [&](bool third_party) {
+            auto [s, p, third] = make(third_party, 1.0f);
+            (void)third;
+            const uint16_t temper = reg.recipe_id("steel_temper");
+            int at = -1;
+            for (int t = 1; t <= 12; ++t)
+            {
+                economy_report rep;
+                run_corp_strategic_step(s.w, reg, rep, t);
+                if (at < 0 && s.w.buildings.at(p).recipe == temper) at = t;
+            }
+            return at;
+        };
+        const int own_only = scorer(false);
+        const int with_3p  = scorer(true);
+        std::printf("  scorer switched to steel_temper at: own stock only -> %d, third party -> %d (-1 never)\n",
+                    own_only, with_3p);
+        check(own_only < 0, "R6 scorer: never switches onto its own leftover steel");
+        check(with_3p > 0, "R6 scorer: switches when a third party's spare steel covers it");
     }
 
     std::printf("\n%s (%d failure%s)\n", g_fail == 0 ? "ALL PASS" : "FAILURES", g_fail,

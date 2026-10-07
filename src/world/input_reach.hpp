@@ -167,6 +167,22 @@ struct input_access
     float unit_cost  = 0.0f; ///< what a unit would cost the processor (see OBTAINABLE)
 };
 
+/// True when building @p bid MAKES resource @p r by what it is — a processor
+/// whose recipe outputs r, or an extraction site targeting r or co-extracting it
+/// from its tile — whether or not it is running. The STOCK clause of
+/// `input_obtainable` does not count the asker's own good as its own cover
+/// (BL-1206): its pool and shelf hold what it made, which stops arriving when it
+/// switches. The SUPPLY clause then decides, with the asker's output taken out.
+bool building_makes(const world& w, const recipe_registry& reg, entity_id bid, std::size_t r);
+
+/// The batches a processor decision judges a building's inputs at (BL-1206):
+/// `base_rate x labour` — labour as this file's producer test reads it,
+/// assigned x the workforce target scalar, which is what run_processing draws
+/// at. An UNSTAFFED building (labour 0) is judged at the staffing a placed
+/// building is authored with (half assigned, target 100 %), never at zero — a
+/// zero need passes every input and would admit any recipe.
+float judged_batches(const recipe_registry& reg, const building_component& b);
+
 /// Is input @p r obtainable at @p consumer_market for a run needing @p need units?
 /// @p pool is the corp's (corp, market) pool, may be null. @p allow_supply false
 /// asks the STOCK clause alone.
