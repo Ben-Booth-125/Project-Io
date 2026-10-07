@@ -69,8 +69,46 @@
   "**Sprint-number ceiling advanced to 35 (Ben, 2026-09-08: “We will open sprint 35 looking at the startup budget”).** The 2026-08-24 ceiling stands in spirit — author no sprint past the one Ben opens — with 35 now the horizon. One sprint is open, well inside the three-sprint cap. This is the first sprint authored after the same day's board clear, and it is deliberately four items: the board was emptied because too many items hung off sprint plans that should have been better planned, so the corrective is fewer items with their preconditions stated, not the same list under a new number.",
   "**The startup-budget chain is dropped outright (Ben, 2026-09-08): “drop it — a watched wait needs no budget”.** Sprint 35 was authored that morning around the 72–73 s warm start and re-authored the same day around generation visibility. BL-813/814/815 are deleted under the 2026-08-24 unstarted-plans policy. The ruling is not that startup time stopped mattering — it is that a wait the player is WATCHING is content rather than cost, so the obligation moves from a stopwatch to whether the thing on screen is worth looking at."
  ],
- "sprints": [],
- "next_up": "SPRINT 49 OPEN (2026-10-04), market viability: wave 0 - BL-1184 (market viability gate) as a skill reads the baseline; BL-1186 (goods cross markets) diagnoses the zero shipments; then three lanes: generation (BL-1188, BL-1185, BL-1189), economy (BL-1186, BL-1191, BL-1163, BL-1183), AI (BL-1187).",
+ "sprints": [
+  {
+   "id": "50",
+   "theme": "logistics and trade flow",
+   "state": "open",
+   "status_line": "OPEN 2026-10-07 (worktree-sprint-50). Wave 0: the instrument (BL-1223 gate logistics row, BL-1222 trade-flow lens).",
+   "opened_date": "2026-10-07",
+   "author": "Ben (2026-10-07, the sprint 50 cut form: all nine items, measure-led, G1 stays 70%, diagnostic lens, extend rather than cut); Claude (the proposal in NEXT_SESSION.md)",
+   "goal": "Goods that exist reach the markets and processors that want them: a built processor gets its inputs (BL-1217, G1 >= 70% at handoff, pooled 16 seeds), surplus reaches shortage, and the flows and refusals are visible on one diagnostic lens.",
+   "planned": [
+    "WAVE 0 - THE INSTRUMENT. BL-1223 (gate logistics row): the market-viability skill gains a logistics row - units moved surplus -> shortage, dry markets, refusals by class for every good with processor inputs singled out. BL-1222 (trade-flow lens): diagnostic only (player polish is sprint 51). Read the baseline on main.",
+    "WAVE 1 - THE DIAGNOSIS. BL-1217 (inputs reach processors): which inputs fail to arrive, at which markets, by refusal class; the ranking orders wave 2. Re-measure construction stalls.",
+    "WAVE 2 - THE FIXES, IN RANKED ORDER. The BL-1203 (water reaches dry markets) follow-ups, each minted as its own item when the diagnosis ranks it: the one-destination-per-pass rule (supply_system.cpp export_market_shelves), the price gate at k = 0, no route (ports per body, port placement). BL-1192 (catchment ignores water) and BL-1190 (markets meet firms) where the diagnosis points at them.",
+    "WAVE 3 - THE NETWORK SHAPE, LAST. BL-1195 (convoy lane follows legs); BL-1119 (roads tree and detour) R4/R6/R7.",
+    "CLOSE. BL-1165 (untraced re-bless movements) with the sprint's one re-bless, including haulage_measure re-pointed at price_market_export_leg."
+   ],
+   "risk": "Five world-movers on the dispatch seam. Each measures its own before/after on the market-viability skill in isolation, briefed with MULTI-TICK rows, and takes a cold review with a fix round budgeted. Baselines are read on main by the main session, never taken from a lane. Overflow (Ben): extend the sprint, cut nothing.",
+   "done_when": "market-viability, pooled over the 16 curated seeds after the one re-bless: G1 >= 70% of built processors running at handoff, G2 and G3 still pass; the logistics row reported with every refusal class named.",
+   "notes": "Ben, 2026-10-07: sprint 51 takes the player trading loop and the visibility suite; BL-1170, BL-1148, BL-1174, BL-1181, BL-1175, BL-1189, BL-1139 sit in sprint 52."
+  },
+  {
+   "id": "51",
+   "theme": "visibility: the player's trading loop",
+   "state": "proposed",
+   "status_line": "PROPOSED 2026-10-07. Opens after sprint 50 closes - serial by Ben's call (2026-10-07): its surfaces read the dispatch and pricing rules sprint 50 is still moving.",
+   "opened_date": null,
+   "author": "Ben (2026-10-07: sprint 51 is another visibility run; run it after sprint 50, not beside it); Claude (the proposal in NEXT_SESSION.md)",
+   "goal": "The player can see the trade the simulation runs and act on it: what is short, where, at what price, and why goods did not arrive - and can answer with the trade verbs (standing orders, directed hauls, contracts) from the surfaces that show the problem.",
+   "planned": [
+    "THE TRADING LOOP, END TO END. The player's verbs - standing orders (price floors, MARKETS.md step 4), the directed haul (SUPPLY.md), contracts (CONTRACTS.md) - each reachable from the surface that shows the reason to use it. Items to mint at the cut.",
+    "THE LENS SUITE. The lenses held 'for before sprint 50' over sprint 48's surfaces; the trade-flow lens (BL-1222) taken from diagnostic to player polish; ledger legibility for prices, shortages and routes.",
+    "THE CONSTRUCTION PANELS. BL-1180 (construction rate panel drift): the panels predict the rate the tick takes. BL-1219 (site cost and materials visible): a site's running cost while building, and which material is short and why.",
+    "SMALL SURFACES. BL-1218 (wharf placed on shore): the placement offer and the placement rule agree. BL-1215 (refunds flow shown): the quarterly refunds flow on the dashboard and selection panel."
+   ],
+   "risk": "Live-click heavy: every interactive surface needs Ben's walk, so plan the sprint around his walks, not lane throughput. Every surface reads sprint 50's refusal classes and price gate, so cut only after sprint 50's wave 2 has merged, and re-run the visual checks after its re-bless.",
+   "done_when": "Set at the cut. Proposed: each trade verb is pressed live from the surface that shows its cause, and each new surface carries its question_log.json entry.",
+   "notes": "Serial, not parallel (Ben, 2026-10-07, after a collision check): the lens and strip files (body_surface_canvas.cpp, overlay.cpp, icons.*) are sprint 50's BL-1222 (trade-flow lens) and BL-1225 (every lens on strip), and the panels' predictions read the tick that BL-1217 (inputs reach processors) may change."
+  }
+ ],
+ "next_up": "SPRINT 50 OPEN (2026-10-07), logistics and trade flow, on worktree-sprint-50: wave 0 instruments (BL-1223 gate logistics row, BL-1222 trade-flow lens), wave 1 diagnoses BL-1217 (inputs reach processors), wave 2 fixes in ranked order, wave 3 network shape (BL-1195, BL-1119), close with BL-1165 and one re-bless. SPRINT 51 PROPOSED, a visibility run over the player's trading loop; it opens after sprint 50 closes.",
  "footer_notes": [
   "**The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first."
  ]
