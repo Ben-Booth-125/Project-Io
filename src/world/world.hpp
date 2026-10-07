@@ -38,6 +38,40 @@ struct asteroid_belt
     bool present() const { return outer_radius_au > inner_radius_au && outer_radius_au > 0.0f; }
 };
 
+/// BL-1222 (trade-flow lens) — why the player's surplus of a good did not go to a
+/// market short of it: the corporation dispatcher's own rules, worst first, so a
+/// larger value is CLOSER to sending (LENSES.md § Trade-flow lens). `sent` is not a
+/// refusal: some player source shipped the good there this pass.
+enum class trade_refusal : std::uint8_t
+{
+    no_lane = 0, ///< Another body, and no leg off this one is viable.
+    gate,        ///< The destination's price does not clear the margin over the source's.
+    no_route,    ///< Same body, and no viable leg reaches it.
+    costly,      ///< Routed, but the haul eats the margin.
+    no_room,     ///< Clears the margin, but cannot absorb more at the landed cost.
+    room,        ///< The rule would send; held by one-destination-per-pass or the LP cap.
+    sent,        ///< Shipped this pass.
+};
+
+/// One player shipment, recorded by `dispatch_convoys` for the Trade-flow lens.
+struct trade_flow_shipment
+{
+    entity_id     source = null_entity; ///< The pool key the cargo left (a market, or a body-level pool).
+    entity_id     dest   = null_entity; ///< The destination market.
+    std::uint16_t good   = 0;           ///< resource_type index.
+    float         units  = 0.0f;        ///< What was actually sent (after any LP trim).
+    float         price_d = 0.0f;       ///< The destination price the dispatcher netted against its haul.
+};
+
+/// One dispatcher pass's player record: shipments, and the best class per
+/// (destination market, good) over the player's surplus sources, for markets short
+/// of the good (last clear's demand above its supply).
+struct trade_flow_pass
+{
+    std::vector<trade_flow_shipment> shipments;
+    std::map<std::pair<entity_id, std::uint16_t>, trade_refusal> best;
+};
+
 /// Result of an intra-body pathfind (BL-077): the terrain-weighted path cost, whether the
 /// cheapest path crosses ocean (=> sea mode, else land), and whether the endpoints connect.
 /// DIRECTED (BL-1126): a river discounts an edge in one direction, so the cost is the
@@ -449,6 +483,16 @@ struct world
     /// which clears it first — so a loaded world with an empty map behaves
     /// exactly as the saved one would have on its next tick.
     std::map<std::pair<entity_id, entity_id>, stockpile_component> arrived_this_tick;
+
+    /// BL-1222 (trade-flow lens) — what the PLAYER corporation's dispatcher did
+    /// over its last few passes, for the Trade-flow lens (LENSES.md § Trade-flow
+    /// lens). WRITE-ONLY for the simulation: `dispatch_convoys` appends one pass
+    /// and nothing in `world/*` reads it. TRANSIENT: never saved, never folded
+    /// into a state hash, so a loaded game shows the lens from its first pass on.
+    /// Newest pass at the back; at most `trade_flow_window` passes are kept, the
+    /// trailing window the lens sizes its arrows over.
+    std::vector<trade_flow_pass> player_trade_flow;
+    static constexpr std::size_t trade_flow_window = 4;
 
     /// Next stable convoy handle. Monotonic and never reused, exactly like
     /// `next_order_id`: an arrived convoy's id does not come back, so a command

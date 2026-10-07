@@ -64,6 +64,7 @@ enum class overlay_mode
     // `corporation` because the value is serialised in the save's view bindings —
     // inserting mid-enum would silently re-point a saved lens.
     company,       ///< Background-firm holdings, drawn exactly as the Corporation lens draws corporations. See LENSES.md § Company lens.
+    trade_flow,    ///< The player's dispatcher: market-to-market shipment arrows + a marker per short market coloured by why the surplus did not go. BL-1222. See LENSES.md § Trade-flow lens.
     count,         ///< Sentinel — keep last. The lens-cycle wrap (canvas_command.cpp) derives its modulus from this, so a new lens above is reachable without touching a hand-kept count.
 };
 

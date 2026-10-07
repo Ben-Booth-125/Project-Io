@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*157 entries — 28 gameplay · 25 canvas · 16 lens · 53 ledger · 35 chrome.*
+*158 entries — 28 gameplay · 25 canvas · 17 lens · 53 ledger · 35 chrome.*
 
 ---
 
@@ -674,7 +674,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Valid when:**
 - The app is in-game and no ImGui text field has keyboard focus.
 
-**Expected output.** The overlay lens advances to the next mode in cycle order. The keyboard cycle covers the FULL lens roster, including the off-bar lenses (Scarcity, Industry, Reach, Supply-routes) the minimap bar has no room for — cycling is the only way to reach those. The active lens re-skins the canvas per that lens's semantics (owned elsewhere) and highlights its glyph on the minimap bar when it is an on-bar lens. Selection, view framing, and sim speed are untouched.
+**Expected output.** The overlay lens advances to the next mode in cycle order. The keyboard cycle covers the FULL lens roster, including the off-bar lenses (Scarcity, Industry, Reach, Supply-routes, Company, Trade-flow) the minimap bar has no room for — cycling is the only way to reach those. The active lens re-skins the canvas per that lens's semantics (owned elsewhere) and highlights its glyph on the minimap bar when it is an on-bar lens. Selection, view framing, and sim speed are untouched.
 
 **Reason to select.** Walk the lens family in order — including the keyboard-only lenses — to change which question the map is answering.
 
@@ -1124,7 +1124,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 ### `lens.throughput` — Lens strip slot 6, on the minimap (draw_overlay_controls, src/ui/overlay.cpp). Its glyph is a TRUCK in profile (icons::throughput) — its own mark since BL-605, no longer the borrowed convoy chevron, because an on-screen lens carries one distinct glyph.
 
-**Press.** Click the truck glyph on the lens strip, or cycle with L / Shift+L (Throughput is the LAST lens in the family, so one Shift+L from no lens lands on it). Re-clicking the active glyph clears to overlay_mode::none, per the strip toggle rule. Planetary rung only.
+**Press.** Click the truck glyph on the lens strip, or cycle with L / Shift+L (Trade-flow is the LAST lens in the family, so one Shift+L from no lens lands on Trade-flow, not Throughput). Re-clicking the active glyph clears to overlay_mode::none, per the strip toggle rule. Planetary rung only.
 
 **Valid when:**
 - Only reachable by keyboard cycle.
@@ -1136,6 +1136,20 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Expected output.** Two layers over the Planetary surface. FIELD: every tile is composited 0.72 toward a deep-navy-to-cyan ramp over its weighted reach cost to the nearest supply anchor — cyan at an anchor, navy on the ground furthest from one, the cold end for anything unreachable. The cost ratio is square-root compressed before the ramp because the distribution is heavily left-skewed (measured on the home body: median 20.8 against a maximum 101.8 over 57 anchors), so a linear ramp would read as one flat wash. ANCHORS: every supply anchor tile carries a RING (not a filled mark — the tile already carries a settlement or building marker drawn over it), its thickness carrying that anchor's active Logistic Points as a share of the body's largest pool, in a hotter near-white cyan over a dark backing. KEY: a fixed-height gradient key flush-left of the minimap, drawn on ImGui's FOREGROUND list with an opaque fill so it is readable over the Selection band — the field ramp labelled far / at anchor, the anchor ring beside its per-anchor LP rate, and the body's anchor count and total LP per tick. Pure rendering: it computes no game state, mutates nothing, and cannot trigger the reach-field Dijkstra (it reads the const tile_reach_cost, whose -1 'not computed' case draws nothing). The LP pools are rebuilt every frame and never persisted — LP is a per-tick rate, never a stock. Pointer clicks fall through to the tile/province; there is no dedicated ledger route. Terrain texture (BL-520) survives this lens at 0.45 strength. National borders are NOT drawn while any lens is active (2026-08-28) — neither the inward band nor the coloured frontier rule, and the border's click corridor goes with them. The plain canvas is the only place the national read appears.
 
 **Reason to select.** Select to answer 'how much can move through here, and how far is this ground from the capacity that would move it?' — before ordering a march that active LP could refuse, before siting a building whose supply has to come from somewhere, or when deciding where a new port or inland hub would actually widen the network. It is the surface half of the Logistic Points cap (LOGISTICS.md): a refused march is legible only if the player can see where throughput is thin, and a cap nobody can see is silent interdiction. It extends the Reach lens rather than replacing it — Reach spends the same field as a yes/no placement predicate, this spends the quantity that predicate throws away. It does NOT mean LP is priced by distance (it is not): the shading says how far this ground is from a generator, never that the points thin out on the way.
+
+### `lens.trade_flow` — Keyboard lens cycle only -- no lens-bar slot and no dedicated glyph (it borrows the supply mark in the cycle readout). LENSES.md § Trade-flow lens.
+
+**Press.** Cycle lenses with L (forward) / Shift+L (backward) until Trade flow is active -- it is the LAST mode in the cycle, so one Shift+L from no lens lands on it. Planetary rung.
+
+**Valid when:**
+- In-game on the Planetary canvas (the lens-cycle keys are live).
+- Reads the player corporation's own dispatcher record, filled by each dispatch pass and never saved: on a freshly loaded game or before the first play tick the lens draws nothing and its key reads 'no shipments'.
+- Player's flows only (DISCOVERY.md § Competitor visibility): no rival shipment, no market's own shelf export and no rival refusal appears.
+- Cleared by cycling off it or the clear hotkey (lens.clear).
+
+**Expected output.** No tile re-skin. FLOWS: one arrow per (source market, destination market, good) the player shipped within the last four dispatch passes with both ends on the active body, market centre to market centre, in a neutral pale-steel logistics hue; stroke width from the window's mean units per tick against the body's heaviest flow (1.5 px trickle to 7 px). REFUSALS: a filled dot up-right of each market centre on the active body that is short of a good (last clear's demand above its supply) the player held in surplus and did not send there this pass, coloured by the best refusal class over that market's goods, worst to best: grey no lane (another body, no viable leg), violet price gate (the destination's price does not clear the dispatch margin over the source's), red no route (same body, no viable leg), orange costly (routed, but the haul eats the margin), yellow no room (cannot absorb more at the landed cost), green room (the rule would send; held by the one-destination-per-pass rule or the passive-LP cap). HOVER: an immediate card at the cursor -- over an arrow: good, units per tick, landed price (the destination price the dispatcher netted against its haul), source -> destination; over a marker: the market and each short good with its class (or 'sent'). KEY: a fixed-height key in the minimap header -- the six classes with their colours, and three flow-width samples labelled in units per tick. Pointer clicks fall through to the ground; nothing is selectable on the lens.
+
+**Reason to select.** Where is my surplus going, and why is it not going where it is short? Select it when a market is short of a good you produce and nothing is arriving: the marker names the dispatcher's own reason -- a missing lane or road, a price that does not clear the margin, a haul too costly, or a market already full -- so the fix (build a port, a road, move the surplus, wait) is the one that reason points at.
 
 ---
 

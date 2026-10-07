@@ -104,6 +104,7 @@ overlay_mode overlay_from_name(const std::string& s)
     if (s == "continent")   return overlay_mode::continent;
     if (s == "supply_routes") return overlay_mode::supply_routes;
     if (s == "throughput")  return overlay_mode::throughput;
+    if (s == "trade_flow")  return overlay_mode::trade_flow;
     return overlay_mode::none;
 }
 
@@ -127,6 +128,7 @@ const char* overlay_script_name(overlay_mode m)
         case overlay_mode::continent:     return "continent";
         case overlay_mode::supply_routes: return "supply_routes";
         case overlay_mode::throughput:    return "throughput";
+        case overlay_mode::trade_flow:    return "trade_flow";
         default:                          return "none";
     }
 }
