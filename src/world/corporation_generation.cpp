@@ -4,6 +4,7 @@
 
 #include "world/hard_coded_world.hpp" // generation_progress — the BL-305 tap
 
+#include "world/construction.hpp"    // demolish_building — seat_clean_slate (BL-1206)
 #include "world/economy_system.hpp"
 #include "world/logistics.hpp"      // invalidate_logistics_caches — remove_specialist_roster
 #include "world/market_clearing.hpp" // market_for_tile — NR-913's market pool
@@ -2063,6 +2064,34 @@ void arm_corporation(world& w, entity_id corp)
     for (const auto& [bid, bc] : w.buildings)
         occupied.insert(bc.tile);
     seed_starting_military(w, corp, occupied);
+}
+
+float seat_clean_slate(world& w, entity_id corp)
+{
+    const auto cit = w.corporations.find(corp);
+    if (cit == w.corporations.end())
+        return 0.0f;
+    std::vector<entity_id> sites;
+    for (const entity_id bid : cit->second.assets)
+        if (const auto b = w.buildings.find(bid); b != w.buildings.end() && b->second.ticks_remaining > 0)
+            sites.push_back(bid);
+    std::sort(sites.begin(), sites.end());
+    float refund = 0.0f;
+    for (const entity_id bid : sites)
+    {
+        // What run_construction charged this site and nothing else: never an
+        // estimate, so the refund cannot exceed what the firm paid in.
+        const float paid = std::max(0.0f, w.buildings.at(bid).construction_paid);
+        if (demolish_building(w, corp, bid))
+            refund += paid;
+    }
+    if (refund > 0.0f)
+    {
+        corporation_component& cc = w.corporations.at(corp);
+        cc.balance         += refund;
+        cc.refund_unbooked += refund;
+    }
+    return refund;
 }
 
 void move_seat_force(world& w, entity_id previous, entity_id corp)

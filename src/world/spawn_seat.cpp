@@ -283,6 +283,10 @@ bool repoint_player(world& w, entity_id corp)
         cc.is_player = false;
     w.corporations[corp].is_player = true;
     w.player_entity                = corp;
+    // BL-1206 (Ben, 2026-10-07): the seat opens with a clean slate of
+    // construction — its unfinished settle builds cancelled and refunded. Before
+    // the force moves, so an unfinished muster base is refunded, not disarmed.
+    seat_clean_slate(w, corp);
     // BL-1154 (Ben, 2026-10-01, NR-963 A): THE SEAT OPENS UNARMED, WHICHEVER
     // CORPORATION IT IS. Rivals were armed at chartering and the generation-time
     // pick was not; when the seat moves, the new seat's opening force goes and

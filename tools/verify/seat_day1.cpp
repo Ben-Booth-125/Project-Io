@@ -283,9 +283,10 @@ void run_seed(std::uint32_t seed, int play)
     if (cit == w.corporations.end()) { std::printf(" NO SEAT\n"); return; }
     {
         const corporation_component& cc = cit->second;
-        std::printf(" \"%s\" focus %d; cash gen %.0f -> handoff %.0f; pool units gen %.0f -> handoff %.0f\n",
-                    cc.name.c_str(), static_cast<int>(cc.focus), bal_gen[s], cc.balance, stock_gen[s],
-                    pool_units(w, s));
+        std::printf(" \"%s\" focus %d; cash gen %.0f -> handoff %.0f (of which clean-slate refund %.1f); "
+                    "pool units gen %.0f -> handoff %.0f\n",
+                    cc.name.c_str(), static_cast<int>(cc.focus), bal_gen[s], cc.balance,
+                    static_cast<double>(cc.refund_unbooked), stock_gen[s], pool_units(w, s));
         std::array<double, resource_count> by{};
         for (const auto& [k, sp] : w.corp_market_pools)
             if (k.first == s) for (std::size_t r = 0; r < resource_count; ++r) by[r] += sp.quantities[r];

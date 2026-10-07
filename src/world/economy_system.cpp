@@ -851,11 +851,23 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
                                       : need * rate;
                 bought[r] += drawn;
                 if (m)
+                {
                     m->inventory[r] -= drawn;
+                    // BL-1206: the site's record of what it cost. A drawn unit is
+                    // billed at the posted price (clear_markets' auto-buy loop),
+                    // and `price` is not written until the end of that clear, so
+                    // this is the price the bill will use. A market-less draw is
+                    // never billed (clearing skips the body key), so it costs 0.
+                    b.construction_paid += drawn * posted_price(*m, r);
+                }
             }
             const auto cit = w.corporations.find(corp);
             if (cit != w.corporations.end())
-                cit->second.balance -= (econ.build_cost / duration) * rate;
+            {
+                const float flat = (econ.build_cost / duration) * rate;
+                cit->second.balance -= flat;
+                b.construction_paid += flat; // BL-1206: the flat half, as debited
+            }
         }
 
         // Advance sub-tick progress; a full-rate tick consumes exactly one whole

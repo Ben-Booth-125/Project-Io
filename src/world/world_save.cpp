@@ -144,6 +144,7 @@ void w_building(std::ostream& o, const building_component& b)
     w_f32(o, b.wage_bid); // BL-614: world_save_version 14 (v12 pre-renumber)
     w_int(o, b.supply_factor_permille); // BL-641: world_save_version 18
     w_int(o, b.recipe_switch_cooldown);
+    w_f32(o, b.construction_paid); // BL-1206: world_save_version 37
 }
 
 bool r_building(std::istream& i, building_component& b)
@@ -156,7 +157,11 @@ bool r_building(std::istream& i, building_component& b)
         && r_f32(i, b.construction_progress) && r_int(i, b.loss_streak)
         && r_int(i, b.ai_cooldown) && r_f32(i, b.wage_bid)
         && r_int(i, b.supply_factor_permille)
-        && r_int(i, b.recipe_switch_cooldown)))
+        && r_int(i, b.recipe_switch_cooldown)
+        && r_f32(i, b.construction_paid)))
+        return false;
+    // BL-1206: what a site has been charged is a non-negative running sum.
+    if (!(std::isfinite(b.construction_paid) && b.construction_paid >= 0.0f))
         return false;
     // BL-614: `wage_bid` is non-negative by contract (a bid raises, never
     // undercuts, in this cut). The writer cannot have produced a NaN or a
@@ -324,6 +329,7 @@ void w_return(std::ostream& o, const quarterly_return& q)
     w_f32(o, q.balance);
     w_u32(o, q.holdings);
     w_f32(o, q.book_value);
+    w_f32(o, q.refunds); // BL-1206: world_save_version 37
 }
 
 bool r_return(std::istream& i, quarterly_return& q)
@@ -331,7 +337,11 @@ bool r_return(std::istream& i, quarterly_return& q)
     if (!(r_f32(i, q.income) && r_f32(i, q.expenditure) && r_f32(i, q.maintenance)
           && r_f32(i, q.wages) && r_f32(i, q.interest) && r_f32(i, q.levies)
           && r_f32(i, q.upkeep) && r_f32(i, q.net) && r_f32(i, q.balance)
-          && r_u32(i, q.holdings) && r_f32(i, q.book_value)))
+          && r_u32(i, q.holdings) && r_f32(i, q.book_value) && r_f32(i, q.refunds)))
+        return false;
+    // BL-1206: a refund is a credit, never negative; the writer cannot produce
+    // one, so a negative or non-finite figure is a corrupt stream.
+    if (!(std::isfinite(q.refunds) && q.refunds >= 0.0f))
         return false;
     // The writer cannot have produced a non-finite figure — the money loop that
     // fills the record is finite by construction — so one here means the stream
@@ -362,6 +372,7 @@ void w_corp(std::ostream& o, const corporation_component& c)
     w_vec(o, c.returns, w_return); // BL-626: world_save_version 16
     w_i32(o, c.founded_year);      // BL-1099: world_save_version 27
     w_i32(o, c.origin_region);     // BL-1099: world_save_version 27
+    w_f32(o, c.refund_unbooked);   // BL-1206: world_save_version 37
 }
 
 bool r_corp(std::istream& i, corporation_component& c)
@@ -377,7 +388,12 @@ bool r_corp(std::istream& i, corporation_component& c)
           && r_bool(i, c.is_background) && r_ids(i, c.assets) && r_id(i, c.hq_building)
           && r_f32(i, c.influence_range) && r_f32(i, c.science)
           && r_bool_array(i, c.produced_ever) && r_vec(i, c.returns, r_return)
-          && r_i32(i, c.founded_year) && r_i32(i, c.origin_region)))
+          && r_i32(i, c.founded_year) && r_i32(i, c.origin_region)
+          && r_f32(i, c.refund_unbooked)))
+        return false;
+    // BL-1206: an unbooked refund is a credit awaiting its return — finite and
+    // never negative. Refused, never clamped.
+    if (!(std::isfinite(c.refund_unbooked) && c.refund_unbooked >= 0.0f))
         return false;
     // BL-626: retention is bounded by the writer, so a longer run is a corrupt
     // stream, not a longer history. Refused rather than trimmed — trimming would

@@ -1966,6 +1966,9 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 cc.is_player = false;
             w.corporations.at(cmd.corp).is_player = true;
             w.player_entity                        = cmd.corp;
+            // BL-1206: the clean slate of construction, the same rule as the
+            // draw (`seat_clean_slate`), before the force moves.
+            seat_clean_slate(w, cmd.corp);
             // BL-1154: the seat opens unarmed, whichever way it is taken — the
             // same rule as the draw (`move_seat_force`).
             move_seat_force(w, previous, cmd.corp);
