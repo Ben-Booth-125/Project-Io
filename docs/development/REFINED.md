@@ -42,6 +42,16 @@ Both behind a registry switch, default OFF; no doc changes before the ruling.
 - [x] D Lane PHANTOM (a9019c35): G1 57.0 -> 60.9, G2 52.8 -> 64.4, G3 90.0 -> 91.9 on 5 seeds. Ben ADOPTED it switch on, after cold review (running). A dropped (Ben). BL-1226 (background pull per doc) filed.
 - [ ] M Main session: readings side by side; Ben's ruling form; write the ruling into MARKETS.md.
 
+### Wave 2 — raw supply (widened, Ben, the supply lever form, 2026-10-07)
+
+`inflow_probe` (merged 69c4d56b): processors want 2-4x the raw silica / copper ore / rare earth ore
+produced; not staffing, not over-building. Each item diagnosed first (read-only), then fixed and
+measured alone on the market-viability skill. G1 70% stays.
+- [ ] S1 BL-1227 (idle mines): why mines sit under construction or decommissioned.
+- [ ] S2 BL-1228 (mine upkeep supply): which upkeep goods hold the supply scalar at ~0.72.
+- [ ] S3 BL-1229 (steel stays home): who sets the sell orders and why the gate refuses.
+- [ ] B BL-1226 (background pull per doc), then lever D's true re-measure and switch-on.
+
 ## Sprint 48 — the world moves forward (opened 2026-09-25, CLOSED 2026-10-04)
 
 **Goal.** The world is built once at the Life gate and moves forward through the rounds; Next waits

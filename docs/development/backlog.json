@@ -1453,6 +1453,73 @@
     "scripts/economy.lua"
    ],
    "design": "CODE DISAGREES WITH A SETTLED DOC (MARKETS.md step 3, inject_background_demand): (1) \"A body's pull is SPLIT across its markets in proportion to their catchment population, never granted whole to each\" - but market_clearing.cpp ~785-797 adds the WHOLE body scale to every market on the body, so a body with N markets bids N times its pull; (2) \"electronics left it when the metropolis rung of the household ladder took it (Ben, 2026-09-15)\" - but scripts/economy.lua background_demand.baskets industrial still lists electronics = 0.15. With lever D adopted (the pull consumes, Ben 2026-10-07) the N-times bid drains shelves 5-30x their stock and starves refined copper's real users (3.4 -> 4.2 per reading). WORK: split by catchment population as the doc says; drop electronics from the basket; a world-mover - measure on the market-viability skill, 5 seeds, before/after, with consumes on."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 50,
+   "written": "2026-10-07",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Ben (2026-10-07, the supply lever form: levers 1-3, sprint 50 widens, G1 70% stays); filed by Claude",
+   "category": "Economy",
+   "priority": "A",
+   "id": "BL-1227",
+   "short_name": "IDLE_MINES",
+   "difficulty": 3,
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "title": "Mines that sit under construction or decommissioned are found out and fixed at the cause",
+   "files": [
+    "src/world/construction.cpp",
+    "src/world/economy_system.cpp",
+    "src/world/corp_ai.cpp"
+   ],
+   "design": "From the BL-1217 inflow diagnosis (inflow_probe round 2, d04faa9c/f9b3e9e7, 5 seeds, consumes on, cold-checked): processors want ~2-4x the raw silica / copper ore / rare earth ore their bodies produce (49% / 63% / 28% system-wide); not staffing (contention 1.0, targets ~180%), not over-building processors (0.6-0.8 per mine). Site-reads per probe: silica 393 under construction and 77 decommissioned against 630 live; copper ore 280 / 320 against 536; rare earth 302 / 255 against 315. Restarting them (with the other levers) would close 23-69% of the deficit. DIAGNOSE FIRST: why each sits - construction stalled on a material (BL-1183, the ceiling stall; abandonment C3 still unruled), never funded, or decommissioned by the loss reflex (and why the mine lost money). Then fix the cause, not by clamping the reflex (Ben rejects forced outcomes)."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 50,
+   "written": "2026-10-07",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Ben (2026-10-07, the supply lever form: levers 1-3, sprint 50 widens, G1 70% stays); filed by Claude",
+   "category": "Economy",
+   "priority": "A",
+   "id": "BL-1228",
+   "short_name": "MINE_UPKEEP_SUPPLY",
+   "difficulty": 3,
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "title": "Mines get the upkeep goods they need, so the supply scalar stops costing a quarter of their output",
+   "files": [
+    "src/world/economy_system.cpp",
+    "src/world/supply_system.cpp"
+   ],
+   "design": "From the BL-1217 inflow diagnosis (inflow_probe round 2, d04faa9c/f9b3e9e7, 5 seeds, consumes on, cold-checked): processors want ~2-4x the raw silica / copper ore / rare earth ore their bodies produce (49% / 63% / 28% system-wide); not staffing (contention 1.0, targets ~180%), not over-building processors (0.6-0.8 per mine). The extractors of these goods run at a mean supply scalar ~0.72 (building upkeep short); restoring it alone closes 24% / 54% / 11% of the deficit. DIAGNOSE FIRST: which upkeep goods are short, at which markets, and the refusal class (the BL-1223 reader vocabulary) - then fix in dispatch or network."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 50,
+   "written": "2026-10-07",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Ben (2026-10-07, the supply lever form: levers 1-3, sprint 50 widens, G1 70% stays); filed by Claude",
+   "category": "Economy",
+   "priority": "A",
+   "id": "BL-1229",
+   "short_name": "STEEL_STAYS_HOME",
+   "difficulty": 2,
+   "authority_doc": "docs/economy/SUPPLY.md",
+   "title": "Steel that exists reaches the processors that need it instead of staying home under sell orders and the price gate",
+   "files": [
+    "src/world/supply_system.cpp",
+    "src/world/corp_ai.cpp"
+   ],
+   "design": "From the BL-1217 inflow diagnosis (inflow_probe round 2, d04faa9c/f9b3e9e7, 5 seeds, consumes on, cold-checked): processors want ~2-4x the raw silica / copper ore / rare earth ore their bodies produce (49% / 63% / 28% system-wide); not staffing (contention 1.0, targets ~180%), not over-building processors (0.6-0.8 per mine). Steel is NOT short (production / want 101% once want is corrected for other binding inputs) but its starved users are refused: ordered 31% (dispatch_convoys skips a (corp, body, good) under a standing sell order), gate 25%, noroom 28% (upper bound). DIAGNOSE FIRST: who places the standing sell orders on steel (the AI scorer? the seat?), at what floor, and why the gate refuses - then fix the cause."
   }
  ]
 }
