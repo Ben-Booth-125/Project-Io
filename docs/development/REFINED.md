@@ -20,7 +20,7 @@ live click for any UI item. One re-bless, last.
 - [x] G2 market_viability's logistics row over every good, multi-tick, with the
   processor-input block (R2), pure reader (R3).
 - [x] G3 SKILL.md section (R4).
-- [ ] G4 Main session: read the 16-seed baseline on this branch; it is BL-1217's R1 input.
+- [x] G4 Main session: read the 16-seed baseline on this branch; it is BL-1217's R1 input.
 
 **Lens — BL-1222 (trade-flow lens).** Settled (Ben, the lens form, 2026-10-07): player lens,
 own flows only; LENSES.md § Trade-flow lens. Lane: `supply_system.*` (a transient record only),
