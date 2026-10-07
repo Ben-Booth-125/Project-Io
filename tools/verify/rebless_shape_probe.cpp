@@ -22,7 +22,12 @@
 // Build: bash tools/verify/build_lua_harness.sh rebless_shape_probe
 // Run from the repo root: build_gen/verify/rebless_shape_probe.exe [--seeds a,b,c]
 //   (default: the 16 curated seeds of docs/generation/seed_library.json)
-// Output: one `ROW seed=<n> key=value ...` line per seed, for a script to pool.
+// Output: one `ROW seed=<n> key=value ...` line per seed, for a script to pool,
+//   then one `MIX seed=<n> ext:<good>=n proc:<recipe>=n ...` line: live buildings
+//   on the home body by extraction target (resource index) and processor recipe.
+//   Sprint 49's re-bless (2026-10-07) added the MIX line and the treasury fields
+//   (player / rival / background balances, nation treasuries); both read only
+//   fields that exist on 1a44b6df and after.
 // ---------------------------------------------------------------------------
 
 #include "harness_params.hpp"
@@ -41,6 +46,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <map>
 #include <memory>
 #include <set>
 #include <string>
@@ -300,6 +306,78 @@ int main(int argc, char** argv)
         kv("seat_shortlist", seat.shortlist_size);
         kv("seat_floor_unmet", seat.floor_unmet ? 1 : 0);
 
+        // Treasuries (sprint 49 addition; every field read here exists on both
+        // sides of sprint 49's re-bless). Corporation balances split player /
+        // background / other rival; nation treasuries on the nation component.
+        {
+            long long player_bal = 0, bg_sum = 0, rival_sum = 0, rivals_neg = 0;
+            std::vector<long long> rbal;
+            for (const auto& [id, c] : w.corporations)
+            {
+                const long long b = static_cast<long long>(c.balance);
+                if (c.is_player) { player_bal += b; continue; }
+                rival_sum += b;
+                rbal.push_back(b);
+                if (b < 0) ++rivals_neg;
+                if (c.is_background) bg_sum += b;
+            }
+            kv("player_balance", player_bal);
+            kv("rival_balance_sum", rival_sum);
+            kv("rival_balance_p50", pct(rbal, 50));
+            kv("background_balance_sum", bg_sum);
+            kv("rivals_negative", rivals_neg);
+            long long nat_sum = 0, nations = 0;
+            std::vector<long long> nt;
+            for (const auto& [id, n] : w.nations)
+            {
+                ++nations;
+                nat_sum += static_cast<long long>(n.treasury);
+                nt.push_back(static_cast<long long>(n.treasury));
+            }
+            kv("nations", nations);
+            kv("nation_treasury_sum", nat_sum);
+            kv("nation_treasury_p50", pct(nt, 50));
+        }
+
+        // Buildings on the home body by type, and the mix by recipe / target
+        // (sprint 49 addition). Printed as a second MIX line per seed.
+        std::string mix = "MIX seed=" + std::to_string(seed);
+        {
+            std::map<std::string, long long> by;
+            long long bt[16] = {}, under_construction = 0, decommissioned = 0;
+            for (const auto& [id, b] : w.buildings)
+            {
+                const auto tt = w.tiles.find(b.tile);
+                if (tt == w.tiles.end() || tt->second.body != home) continue;
+                if (b.decommissioned) { ++decommissioned; continue; }
+                ++bt[std::min<int>(static_cast<int>(b.type), 15)];
+                if (b.ticks_remaining > 0) ++under_construction;
+                std::string key;
+                if (b.type == building_type::extraction_site)
+                {
+                    const recipe* r = b.recipe != no_recipe ? out->reg.get_recipe(b.recipe) : nullptr;
+                    key = r ? "ext:" + r->name : "ext:r" + std::to_string(static_cast<int>(b.target_resource));
+                }
+                else if (b.type == building_type::processing_facility)
+                {
+                    const recipe* r = b.recipe != no_recipe ? out->reg.get_recipe(b.recipe) : nullptr;
+                    key = r ? "proc:" + r->name : "proc:none";
+                }
+                else continue;
+                for (char& ch : key) if (ch == ' ' || ch == '=') ch = '_';
+                ++by[key];
+            }
+            kv("bld_extraction", bt[1]);
+            kv("bld_processing", bt[2]);
+            kv("bld_port", bt[3]);
+            kv("bld_logistics_hub", bt[5]);
+            kv("bld_military", bt[6]);
+            kv("bld_other", bt[4] + bt[7] + bt[8] + bt[9]);
+            kv("bld_under_construction", under_construction);
+            kv("bld_decommissioned", decommissioned);
+            for (const auto& [k, n] : by) mix += " " + k + "=" + std::to_string(n);
+        }
+
         // The spans.
         kv("emp_battles", fx.battles);
         kv("emp_conquests", fx.conquests);
@@ -314,7 +392,7 @@ int main(int argc, char** argv)
             span("ind", fx.industrialisation_state);
             prefs("ind", fx.industrialisation_handoff);
         }
-        std::printf("%s\n", row.c_str());
+        std::printf("%s\n%s\n", row.c_str(), mix.c_str());
         std::fflush(stdout);
     }
     return 0;
