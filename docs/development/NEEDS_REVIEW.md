@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*86 entries — 9 open, 77 resolved.*
+*86 entries — 8 open, 78 resolved.*
 
 ---
 
@@ -125,11 +125,6 @@ After the sprint 49 re-bless (the lake cap moved every seed's history), the libr
 *question · raised 2026-10-07 · from the BL-1222 (trade-flow lens) cold review, 2026-10-07*
 
 The lens marks a short market "no room" when the destination cannot absorb more at the landed price. That room subtracts EVERY corporation's convoys in flight to it and stock pooled there, so "no room" tells the player, in aggregate, that someone is already filling that market. It names no rival and no quantity. DISCOVERY.md § Competitor visibility makes market supply/demand aggregates public but does not say whether goods in flight count. Options: (A) accept it as a public market signal (cargo on the road is observable) and say so in DISCOVERY.md; (B) compute the player's room without rivals' in-flight cargo for the lens only (a second room figure the dispatcher does not use, so the lens and the decision could disagree).
-
-### NR-981 — Decision taken on your behalf: electronics STAYS in the background stopgap (the household rung that was to take it was cancelled)
-*decision · raised 2026-10-07 · from the BL-1226 (background pull per doc) cold review, 2026-10-07*
-
-MARKETS.md said electronics "left" the background basket when the metropolis rung of the household ladder took it (Ben, 2026-09-15). That rung was BL-996 (stratum demand ladder), cancelled unmerged on 2026-09-16, so no household bids electronics; the BL-1226 lane removed it from the basket to match the doc, which would have left electronics with almost no final buyer (only the Assembly Plant feeding militia-only spacecraft components) and shifted generation's body_demand. TAKEN: kept electronics in the stopgap (what the code always did) and reworded MARKETS.md to "leaves it when the metropolis rung takes it, and not before". Reversible. Your call if instead you want BL-996 revived, or electronics retired some other way.
 
 ### NR-982 — Decisions taken on your behalf building "an order is a floor, not a hold" (BL-1229)
 *decision · raised 2026-10-07 · from the BL-1229 (steel stays home) build lane, 2026-10-07*
@@ -1440,4 +1435,11 @@ BL-1197 round 2 (no fallback for water-gap firms) cost seeds 0 and 43 their allo
 > **RESOLVED.** SUPERSEDED by Ben's ruling (the charter walk form, 2026-10-05): option A - the charter walk counts derived demand (a processor's input demand is demand it fills), so steel and every intermediate are chartered in their own right; written into CORPORATION_GENERATION.md sec Pass 6. The raw-input special case is replaced by it.
 
 *Files: `src/world/corporation_generation.cpp`, `docs/generation/CORPORATION_GENERATION.md`*
+
+### NR-981 — Decision taken on your behalf: electronics STAYS in the background stopgap (the household rung that was to take it was cancelled)
+*decision · raised 2026-10-07 · from the BL-1226 (background pull per doc) cold review, 2026-10-07*
+
+MARKETS.md said electronics "left" the background basket when the metropolis rung of the household ladder took it (Ben, 2026-09-15). That rung was BL-996 (stratum demand ladder), cancelled unmerged on 2026-09-16, so no household bids electronics; the BL-1226 lane removed it from the basket to match the doc, which would have left electronics with almost no final buyer (only the Assembly Plant feeding militia-only spacecraft components) and shifted generation's body_demand. TAKEN: kept electronics in the stopgap (what the code always did) and reworded MARKETS.md to "leaves it when the metropolis rung takes it, and not before". Reversible. Your call if instead you want BL-996 revived, or electronics retired some other way.
+
+> **RESOLVED.** Ben, 2026-10-07 (the path form): keep electronics in the stopgap, as now.
 

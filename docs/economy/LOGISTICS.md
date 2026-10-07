@@ -157,7 +157,12 @@ roads join form **one grid**: a building in any of them draws from any generator
 across market boundaries, on the one-tick latency above. A building pays **its own market's power
 price**, cleared against the generation on its grid, so power keeps a market price while its
 supply is the grid's. A province with no road is dark, and a cut that splits the roads splits the
-grid (§ 7). Found by the BL-1228 (mine upkeep supply) diagnosis: power held on one market's shelf
+grid (§ 7). **A market's shelf is on its centre's grid (Ben, 2026-10-07):** power listed into a
+market feeds the grid that market's centre stands on, and a building bids at its own market — so
+"on the grid" is read through the market centre, which keeps power on the ordinary per-market shelf
+(measured: buildings on a grid other than their market centre's hold 1.3–2.1% of power need). A
+wired grid with no generation on it runs short and decays like any short draw; the answer is
+generation on that grid, not a softer rule. Found by the BL-1228 (mine upkeep supply) diagnosis: power held on one market's shelf
 never reached a mine in the next market's catchment, and that alone held most mines at the
 shortfall floor.
 
