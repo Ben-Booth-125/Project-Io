@@ -1828,7 +1828,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 }
                 if (best_id != b.recipe)
                 {
-                    const float batches = reg.economics(b.type).base_rate * b.workforce_assigned;
+                    // BL-1206 review: the gain is judged at the same staffing the
+                    // gate judged the inputs at (judged_batches).
+                    const float batches = sw_batches;
                     const float gain    = (best_m - cur_margin) * batches;
                     if (gain > margin_gate)
                     {

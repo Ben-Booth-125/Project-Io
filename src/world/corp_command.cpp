@@ -489,6 +489,7 @@ void merge_returns(std::vector<quarterly_return>& dst,
             row.interest    += b->interest;
             row.levies      += b->levies;
             row.upkeep      += b->upkeep;
+            row.refunds     += b->refunds; // BL-1206: the merged flows still rebuild net
             row.net         += b->net;
             row.balance     += b->balance;
             row.holdings    += b->holdings;
@@ -748,8 +749,11 @@ float corp_trailing_net(const corporation_component& c)
     // is a pure function of the record rather than of how the window happened to
     // be walked. n is at most 8, so this cannot overflow anything.
     double sum = 0.0;
+    // BL-1206 review: `refunds` is excluded — a refund is cash the balance
+    // already holds, not earnings, so pricing it into the trailing net would
+    // charge a buyer for it twice.
     for (std::size_t i = c.returns.size() - n; i < c.returns.size(); ++i)
-        sum += static_cast<double>(c.returns[i].net);
+        sum += static_cast<double>(c.returns[i].net) - static_cast<double>(c.returns[i].refunds);
     return static_cast<float>(sum / static_cast<double>(n));
 }
 

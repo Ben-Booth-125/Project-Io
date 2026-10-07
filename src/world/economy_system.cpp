@@ -2153,8 +2153,13 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                     {
                         b.decommissioned = true;
                         // An idled building supplies nothing: forget the index
-                        // the rescue reads (BL-1206 cold review).
-                        if (rescue_reach_ctx)
+                        // the rescue reads (BL-1206 cold review). An idled port
+                        // or hub also stops anchoring supply, so the node set and
+                        // the haul memo are stale too: drop the whole context and
+                        // let the next question rebuild it.
+                        if (building_affects_logistics(b.type))
+                            rescue_reach_ctx.reset();
+                        else if (rescue_reach_ctx)
                             input_reach_invalidate(*rescue_reach_ctx);
                         // Hold the strategic tier off this building for the same
                         // span its own state changes hold for (AI_OPPONENT.md

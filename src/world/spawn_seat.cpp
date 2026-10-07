@@ -155,7 +155,7 @@ spawn_seat_result rank_spawn_candidates(const world& w, const landscape_score& l
         const std::size_t filed = cc.returns.size();
         const std::size_t take  = std::min(filed, k_spawn_trailing_quarters);
         for (std::size_t i = filed - take; i < filed; ++i)
-            c.trailing_net += cc.returns[i].net;
+            c.trailing_net += cc.returns[i].net - cc.returns[i].refunds; // BL-1206: a refund is not earnings
         c.quarters_read = static_cast<int>(take);
 
         for (const entity_id bid : cc.assets)

@@ -2088,6 +2088,8 @@ float seat_clean_slate(world& w, entity_id corp)
     if (refund > 0.0f)
     {
         corporation_component& cc = w.corporations.at(corp);
+        if (cc.refund_unbooked == 0.0f)
+            cc.refund_opening = cc.balance; // the exact pre-refund balance
         cc.balance         += refund;
         cc.refund_unbooked += refund;
     }

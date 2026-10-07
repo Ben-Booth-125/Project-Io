@@ -23,6 +23,8 @@
 //   R4 the books: the next filed return carries refunds == the refund, and its
 //      flows reconstruct its net (income - expenditure - maintenance - wages -
 //      interest - levies - upkeep + refunds); refund_unbooked is zero after.
+//      And bit-exact telescoping across the seat: net == balance - the previous
+//      return's balance, to the float.
 //   R5 idempotent: seating again refunds nothing.
 //
 // Exits non-zero on any FAIL.
@@ -198,6 +200,7 @@ int main()
           "R3 pick (take_seat): the same cancellation and the same balance, to the float");
 
     // R4 — the books.
+    const float prev_close = x.w.corporations.at(x.s).returns.back().balance; // tick 1's return
     const quarterly_return* q = tick(x.w, reg, x.s, 2);
     const double rebuilt = q ? static_cast<double>(q->income) - q->expenditure - q->maintenance
                                    - q->wages - q->interest - q->levies - q->upkeep + q->refunds
@@ -207,7 +210,40 @@ int main()
     check(q != nullptr && near(q->refunds, pa + pb),
           "R4 the next return books the refund as `refunds`");
     check(q != nullptr && near(rebuilt, q->net), "R4 its flows reconstruct its net");
+    // Bit-exact across the seat: the booking return opens from the previous
+    // return's close itself (the stored pre-refund balance), not from
+    // fl(fl(C0 + R) - R), so net is exactly the difference of the two closes.
+    check(q != nullptr && q->net == q->balance - prev_close,
+          "R4 bit-exact telescoping across the seat: net == balance - previous return's balance");
     check(x.w.corporations.at(x.s).refund_unbooked == 0.0f, "R4 nothing is left unbooked");
+
+    // R4b — the rounding case the stored opening exists for: a balance and a
+    // refund whose float sum does not subtract back exactly.
+    {
+        // Find (C0, R) where the subtraction form gives a DIFFERENT net from the
+        // stored opening: fl(c - C0) != fl(c - fl(c - R)), c = fl(C0 + R). A
+        // fixed deterministic walk; the row is vacuous if none is found.
+        volatile float c0 = 0.0f, r = 3.0f;
+        bool rounds = false;
+        for (int k = 1; k < 100000 && !rounds; ++k)
+        {
+            c0 = 0.1f * static_cast<float>(k);
+            const float c = c0 + r;
+            const float back = c - r;
+            rounds = back != c0 && (c - c0) != (c - back);
+        }
+        fixture y = make_fixture();
+        corporation_component& yc = y.w.corporations.at(y.s);
+        yc.balance = c0;
+        y.w.buildings.at(y.a).construction_paid = r;
+        y.w.buildings.at(y.b).construction_paid = 0.0f;
+        repoint_player(y.w, y.s);
+        const quarterly_return* yq = tick(y.w, reg, y.s, 0);
+        std::printf("  rounding case: fl(fl(C0+R)-R) %s C0; net %.9g, balance - C0 %.9g\n",
+                    rounds ? "!=" : "==", yq ? yq->net : 0.0f, yq ? yq->balance - c0 : 0.0f);
+        check(rounds && yq != nullptr && yq->net == yq->balance - c0,
+              "R4b where fl(fl(C0+R)-R) != C0, net is still exactly balance - C0 (the stored opening)");
+    }
 
     // R5 — idempotent.
     const double b4 = x.w.corporations.at(x.s).balance;

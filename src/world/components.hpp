@@ -1777,6 +1777,14 @@ struct corporation_component
     /// world_save_version 37.
     float refund_unbooked = 0.0f;
 
+    /// BL-1206 review: the balance the refund was credited ONTO, kept exactly so
+    /// the booking return can open from it rather than from `balance - refund`
+    /// (fl(fl(C0 + R) - R) is not always C0). `apply_budget` uses it when the
+    /// balance it finds is still exactly `fl(refund_opening + refund_unbooked)`
+    /// — nothing else moved it since — and subtracts otherwise. Meaningful only
+    /// while `refund_unbooked > 0`. world_save_version 37.
+    float refund_opening = 0.0f;
+
     /// BL-1099 -- THE FIRM'S ORIGIN (CORPORATION_GENERATION.md sec The spawn
     /// shortlist; Ben, 2026-09-24, R15/R22). The search charters a firm from
     /// a population centre's budget, so `origin_region` is the settlement

@@ -339,9 +339,10 @@ inline constexpr uint32_t world_save_magic =
 /// floats at three record tails -- `building_component::construction_paid` after
 /// `recipe_switch_cooldown` (what run_construction has charged the site, the
 /// seat's refund), `quarterly_return::refunds` after `book_value`, and
-/// `corporation_component::refund_unbooked` after `origin_region` (a refund
-/// credited at the seat, awaiting its return). A v36 stream is short by a float
-/// per building, per return and per corporation; refused whole on the
+/// `corporation_component::refund_unbooked` and `refund_opening` after
+/// `origin_region` (a refund credited at the seat, awaiting its return, and the
+/// exact balance it was credited onto). A v36 stream is short by a float per
+/// building and per return and two per corporation; refused whole on the
 /// strict-equality contract, no migration. Claimed through
 /// `tools/session/next_save_version.js --kind world --claim`.
 inline constexpr uint32_t world_save_version = 37;

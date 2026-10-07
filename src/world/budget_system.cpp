@@ -212,9 +212,15 @@ void apply_budget(world& w,
         // construction) is booked HERE, on the next return: the opening is taken
         // from before it, so this return's `net` includes it, its `refunds`
         // names it, and the flows still reconstruct `net`.
+        // Opened from the exact pre-refund balance when nothing has moved the
+        // balance since the refund (review: fl(fl(C0 + R) - R) is not always
+        // C0); otherwise the subtraction is the best available reading.
         const float refunds         = cc.refund_unbooked;
+        const bool  exact           = refunds != 0.0f
+                                   && cc.balance == cc.refund_opening + refunds;
+        const float opening_balance = exact ? cc.refund_opening : cc.balance - refunds;
         cc.refund_unbooked          = 0.0f;
-        const float opening_balance = cc.balance - refunds;
+        cc.refund_opening           = 0.0f;
         float       book_value      = 0.0f;
 
         // Capture the flows into `bud` for the BL-072 breakdown, but keep the
