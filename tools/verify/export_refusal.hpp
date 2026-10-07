@@ -24,7 +24,9 @@
 // (the enum's numeric order; higher is closer to sending).
 //
 // THE SETS (water_pair_probe's definitions, now for any good):
-//   surplus source  base_price > 0, market_shelf_surplus >= 1 unit, and an
+//   surplus source  base_price > 0, market_shelf_surplus >= 1 unit (or, under
+//                   surplus_rule::dispatcher, any surplus > 0 -- the
+//                   dispatcher's own test, which probes min(surplus, 1)), and an
 //                   anchored centre tile (an unanchored market cannot export)
 //   consuming       base_price > 0 and the households bid the good
 //   dry             consuming and the shelf holds < 1 unit
@@ -147,7 +149,13 @@ struct good_markets
     double surplus_units = 0.0;
 };
 
-inline good_markets scan_good(const context& x, std::size_t G)
+/// Which shelf counts as a surplus source. `one_unit` is water_pair_probe's
+/// (>= 1 unit, kept so its output never moves); `dispatcher` is
+/// export_market_shelves' own (> 0).
+enum class surplus_rule { one_unit, dispatcher };
+
+inline good_markets scan_good(const context& x, std::size_t G,
+                              surplus_rule rule = surplus_rule::one_unit)
 {
     good_markets out;
     for (const entity_id m : x.mids)
@@ -160,7 +168,8 @@ inline good_markets scan_good(const context& x, std::size_t G)
             if (mc.inventory[G] < 1.0f) out.dry.push_back(m);
         }
         const float s = market_shelf_surplus(x.w, m, G);
-        if (s >= 1.0f && mc.centre_tile != null_entity)
+        const bool is_src = rule == surplus_rule::one_unit ? (s >= 1.0f) : (s > 0.0f);
+        if (is_src && mc.centre_tile != null_entity)
         {
             out.sur.push_back(m);
             out.surplus_units += s;

@@ -107,21 +107,26 @@ market, good) triple, in the dispatcher's own order. The class is the FIRST rule
 | `room` | The rule would send. It was held by the one-destination-per-pass rule or the passive-LP cap, or sent elsewhere this tick. |
 
 A destination's **BEST** class is the closest any surplus source came:
-`room > noroom > costly > gate > noroute > body`. The row adds three labels outside the
-dispatcher's order; they are not refusals by a rule:
+`room > noroom > costly > gate > noroute > body`. The row adds labels outside the
+dispatcher's order. They are not refusals by a rule:
 
 | Label | Meaning |
 |---|---|
-| `nosurplus` | No market anywhere holds a surplus of the good (shelf surplus >= 1 unit, anchored centre). Nothing to ship. |
+| `noshelfsurplus/poolheld` | No market shelf anywhere holds a surplus of the good. Some corporation's pool on the destination's body does hold >= 1 unit beyond its `processor_reservation`. That is the surplus clearing's auto-surplus and the corporations' dispatcher treat as sellable. Usually it is this tick's output, which sits in pools until the clear lists it. |
+| `noshelfsurplus/none` | No shelf surplus and no pool surplus on the body. Nothing to ship. |
 | `grid` | A grid good. It is never cargo, so it is not classified. |
-| `stocked` | Processor block only: the processor's own market shelf holds >= 1 unit of the input. The good is there; the processor did not buy it. That is a price or reservation failure, not a haul. |
+| `stocked/ceiling` | Processor block only. Before the economy step, the processor's market shelf held >= 1 unit, but its price was over the BL-1172 fair-price ceiling (`!shelf_admits`, `reservation_mult x base`). The draw does not buy and does not bid. |
+| `stocked/thin` | Stocked and admitted, but pool plus the WHOLE shelf covers less than `t_idle` of a full run. This is `run_processing`'s early idle return, even with no contention. |
+| `stocked/contended` | Stocked, admitted and enough. Earlier draws in the step, or the BL-1209 pro-rata share of a short shelf, left this processor too little. |
+| `unpriced` | The processor's market has no base price for the input. Unpriced is unbuyable. |
+| `nomarket` | The processor has no tile market and draws a body pool. No market-export rule applies. |
 
-**The sets** (`water_pair_probe`'s definitions, applied to every good):
-a **surplus source** has `market_shelf_surplus >= 1` and an anchored centre.
-A market is **consuming** a good when its households bid it.
-It is **dry** when consuming and its shelf holds < 1 unit.
-Industrial inputs are never household-bid, so they never count as dry — the processor block
-covers them instead.
+**The sets.** A market is **consuming** a good when its households bid it. It is **dry** when
+consuming and its shelf holds < 1 unit (`water_pair_probe`'s definition, applied to every
+good). Industrial inputs are never household-bid, so they never count as dry; the processor
+block covers them instead. A **surplus source** in this row uses the DISPATCHER's own test:
+`market_shelf_surplus > 0` and an anchored centre (`export_market_shelves` probes
+`min(surplus, 1)`). `water_pair_probe` keeps its >= 1 unit test, so its output does not move.
 
 ### The lines, field by field
 
@@ -136,32 +141,60 @@ covers them instead.
 - **`dry (mkt, good) D of C consuming: good n ...`** — dry pairs, with the top goods by count.
 - **`dry by BEST class`** — each dry pair by its best class over every surplus source of that
   good, with its share of dry pairs. A pile on `noroute` / `body` means land-locked from
-  every surplus. A pile on `nosurplus` means nothing to send. A pile on `noroom` / `room`
-  means a route and a price exist, and room or pass rules held the goods.
+  every surplus. `noshelfsurplus/poolheld` means the goods exist but are still in pools.
+  `noshelfsurplus/none` means nothing to send. A pile on `noroom` / `room` means a route and
+  a price exist, and room or pass rules held the goods.
 - **`INPUT-STARVED processors P; scarcest input's class at its market`** — every processor
   in G1's `input` state on that tick's report. Each is filed under its scarcest input (the
-  report's `limiting_input`) and that input's class at the processor's market: `stocked`,
-  `grid`, `nosurplus`, or the best dispatcher class, in that order. `stocked: mean shelf X u`
-  is the mean shelf behind the `stocked` cases. `stocked` needs only 1 unit, so a small X
-  means "barely stocked", not "the good is there". `UNREAD` counts any
-  processor the hook did not see live; it should never print.
+  report's `limiting_input`) and that input's class at the processor's market. Only nonzero
+  classes print. The order of the cuts:
+  1. `nomarket`, `grid`, `unpriced`.
+  2. `stocked/*`, if the shelf held >= 1 unit in the snapshot.
+  3. Otherwise the best dispatcher class, read at dispatch.
+  4. Otherwise `noshelfsurplus/*`.
+
+  Each class prints **`N over ceiling`**: how many of those processors' inputs are priced
+  above the fair-price ceiling. A delivery would not unblock them until the price falls.
+- **`stocked/* S (pre-step shelf mean X u) | input priced over the ceiling C | input
+  shelf-exported from its market this tick E`** — the stocked total and its mean shelf. `C`
+  is all starved processors whose input is over the ceiling, whatever their class. `E` counts
+  processors whose input `export_market_shelves` shipped off their own market this tick.
+  `UNREAD` prints only if a starved processor had a market but no pre-step snapshot (it was
+  not live before the step). It should not print.
 - **`starved by input: good n [class n, ...]`** — the same processors listed by input good,
   top goods first, each with its class split.
 
+**When the processor block reads.** The stocked cut uses a SNAPSHOT taken after the
+`convoys` lap, before `run_economy_step`. It holds the shelf, the owner's pool and
+`shelf_admits`. Later draws in the step and this tick's shelf export therefore cannot hide
+stock. Price is written only at the end of `clear_markets`, so the pre-step price is the
+price the draw saw. Two biases remain:
+- The `thin` need is estimated, as `water_pair_probe`'s latent want is. The formula is
+  `input x base_rate x effective workforce x workforce target x supply scalar`.
+- The pool is read before this step's extraction credits it.
+
 ### How to read the processor-input block (BL-1217)
 
-Read the class split first, then the goods.
-- **`stocked`**: the input sits on the shelf where the processor is. The fix is in buying —
-  price above the reservation, the fair-price ceiling (BL-1172), or the pool. It is not
-  logistics.
-- **`nosurplus`**: no market holds a surplus. The fix is upstream supply: extraction or
-  another processor's output.
-- **`noroute` / `body`**: surplus exists but cannot reach. The fix is the network: ports,
-  roads, reach.
+Read the class split first, then the over-ceiling counts, then the goods.
+- **`stocked/ceiling`**: the input sits on the processor's shelf, priced over the fair-price
+  ceiling. The fix is the price: why it is so high, and whether the ceiling is right. It is
+  not logistics.
+- **`stocked/thin`**: a shelf too thin to clear `t_idle`. The fix is more supply into that
+  market.
+- **`stocked/contended`**: enough stock for this processor alone, but other draws took it.
+  The fix is total supply into that market, or the BL-1209 sharing rule.
+- **`noshelfsurplus/none`**: no surplus on any shelf or pool. The fix is upstream supply:
+  extraction or another processor's output.
+- **`noshelfsurplus/poolheld`**: the goods exist in pools and have not reached a shelf. Look
+  at listing and auto-surplus, and at corporations' dispatch.
+- **`noroute` / `body`**: shelf surplus exists but cannot reach. The fix is the network:
+  ports, roads, reach.
 - **`gate` / `costly`**: reachable, but the price gradient does not pay for the haul. The
   fix is prices, haul cost, or the margin.
 - **`noroom` / `room`**: the dispatcher would send, or nearly would. Look at absorbable room,
   pending cargo, the one-destination-per-pass rule, and the passive-LP cap.
+- **Over ceiling in a non-stocked class**: a delivery alone will not help. The price must
+  fall too.
 
 The goods list ranks which inputs to fix first. Read it per seed as well as pooled: one
 seed's land-locked steel can dominate the pool.

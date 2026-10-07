@@ -121,16 +121,30 @@
 //        dry      dry (market, good) pairs, every non-grid good (export_refusal's
 //                 dry: the households bid it, the shelf holds < 1 unit), listed
 //                 by good; then each dry pair by its BEST class over every
-//                 surplus source of that good, plus `nosurplus` (no surplus shelf
-//                 of the good anywhere) and `grid` (a grid good is never cargo;
-//                 not classified)
+//                 surplus source of that good -- sources under the DISPATCHER's
+//                 own test (surplus > 0; water_pair_probe keeps >= 1 unit) --
+//                 plus noshelfsurplus (no surplus shelf of the good anywhere),
+//                 split `poolheld` (a corporation's pool on the body holds >= 1
+//                 unit beyond its processor_reservation: this tick's output not
+//                 yet listed) / `none`, and `grid` (never cargo; unclassified)
 //        input    every input-starved processor (G1's `input` state, this tick's
-//                 report): its scarcest input (the report's limiting_input) and
-//                 that input's class AT THE PROCESSOR'S MARKET -- `stocked` (the
-//                 shelf there holds >= 1 unit: a buying failure, not a haul),
-//                 `grid`, `nosurplus`, or the best dispatcher class over every
-//                 surplus source -- pooled by class and listed by good. This is
-//                 BL-1217 (inputs reach processors)'s diagnosis.
+//                 report), filed under its scarcest input (limiting_input) at
+//                 ITS market: `nomarket` (no tile market: a body pool), `grid`,
+//                 `unpriced` (base price 0 there), then -- on the shelf and pool
+//                 SNAPSHOTTED after the convoys lap, before the economy step, so
+//                 later draws and this tick's shelf export cannot hide stock --
+//                 stocked/ceiling (shelf >= 1 unit, price over the BL-1172
+//                 fair-price ceiling: shelf_admits false), stocked/thin (pool +
+//                 the WHOLE shelf < t_idle of a full run: run_processing's early
+//                 idle return even with no contention), stocked/contended (enough
+//                 stock, taken by earlier draws or the BL-1209 pro-rata share);
+//                 else the best dispatcher class read at dispatch, or
+//                 noshelfsurplus/poolheld|none. Per class, how many have the
+//                 input priced over the ceiling (a delivery would not unblock
+//                 them until the price falls); and how many had the input
+//                 shelf-exported off their own market this tick. Pooled by
+//                 class and listed by good: BL-1217 (inputs reach processors)'s
+//                 diagnosis.
 //      Pure: export_refusal.hpp's rule (router caches warmed through a
 //      const_cast; nothing the simulation reads is written). --no-logistics
 //      drops the row (the R3 check: G1-G4 read identically either way).
@@ -380,17 +394,25 @@ void tap_after_lap(const world& w, int lap, void* ctx)
 }
 
 // --- L: the logistics row (BL-1223) -------------------------------------------
-// export_refusal's six dispatcher classes, then three this row adds OUTSIDE the
-// dispatcher's order (they are not refusals by a rule; see the header).
-constexpr int x_nosurplus = export_refusal::c_count; ///< no surplus shelf of the good anywhere
-constexpr int x_grid      = x_nosurplus + 1;         ///< a grid good: never cargo
-constexpr int x_stocked   = x_grid + 1;              ///< the market's own shelf holds >= 1 unit
-constexpr int x_count     = x_stocked + 1;
-const char* const k_x_name[x_count] = {"body", "noroute", "gate", "costly", "noroom", "room",
-                                       "nosurplus", "grid", "stocked"};
+// export_refusal's six dispatcher classes (0..5), then labels this row adds
+// OUTSIDE the dispatcher's order (they are not refusals by a rule):
+constexpr int x_poolheld  = export_refusal::c_count; ///< no shelf surplus; a corp pool on the body holds one
+constexpr int x_none      = x_poolheld + 1;          ///< no shelf surplus and no pool surplus on the body
+constexpr int x_grid      = x_none + 1;              ///< a grid good: never cargo
+constexpr int x_ceiling   = x_grid + 1;              ///< stocked, but priced over the fair-price ceiling
+constexpr int x_thin      = x_ceiling + 1;           ///< stocked, but pool + whole shelf < t_idle of a full run
+constexpr int x_contended = x_thin + 1;              ///< stocked and enough; other draws / pro-rata took it
+constexpr int x_unpriced  = x_contended + 1;         ///< the processor's market has no base price for it
+constexpr int x_nomarket  = x_unpriced + 1;          ///< the processor has no tile market (body pool)
+constexpr int x_count     = x_nomarket + 1;
+const char* const k_x_name[x_count] = {
+    "body", "noroute", "gate", "costly", "noroom", "room",
+    "noshelfsurplus/poolheld", "noshelfsurplus/none", "grid",
+    "stocked/ceiling", "stocked/thin", "stocked/contended", "unpriced", "nomarket"};
 /// Print orders: furthest from sending first.
-const int k_dry_order[]  = {x_nosurplus, 0, 1, 2, 3, 4, 5, x_grid};
-const int k_proc_order[] = {x_stocked, x_grid, x_nosurplus, 0, 1, 2, 3, 4, 5};
+const int k_dry_order[]  = {x_none, x_poolheld, 0, 1, 2, 3, 4, 5, x_grid};
+const int k_proc_order[] = {x_nomarket, x_grid, x_unpriced, x_ceiling, x_thin, x_contended,
+                            x_none, x_poolheld, 0, 1, 2, 3, 4, 5};
 
 struct lg_reading
 {
@@ -400,20 +422,28 @@ struct lg_reading
     std::array<long, resource_count> dry_good{};
     long   dry_best[x_count] = {};
     long   starved = 0, unread = 0;
-    double stocked_shelf = 0; ///< shelf units summed over the `stocked` starved processors
+    long   export_away = 0;      ///< starved whose input the market shelf-exported this tick
+    double stocked_shelf = 0;    ///< pre-step shelf units summed over the stocked/* processors
     long   starved_cls[x_count] = {};
+    long   starved_over_ceil[x_count] = {}; ///< of each class: the input priced over the ceiling
     std::array<std::array<long, x_count>, resource_count> starved_good{};
     void add(const lg_reading& o)
     {
         reads += o.reads; ship_n += o.ship_n; ship_u += o.ship_u; ship_shelf_u += o.ship_shelf_u;
         ship_short_u += o.ship_short_u; ship_dry_u += o.ship_dry_u;
-        consuming += o.consuming; dry += o.dry; starved += o.starved; unread += o.unread; stocked_shelf += o.stocked_shelf;
+        consuming += o.consuming; dry += o.dry; starved += o.starved; unread += o.unread;
+        export_away += o.export_away; stocked_shelf += o.stocked_shelf;
         for (std::size_t g = 0; g < resource_count; ++g)
         {
             dry_good[g] += o.dry_good[g];
             for (int c = 0; c < x_count; ++c) starved_good[g][c] += o.starved_good[g][c];
         }
-        for (int c = 0; c < x_count; ++c) { dry_best[c] += o.dry_best[c]; starved_cls[c] += o.starved_cls[c]; }
+        for (int c = 0; c < x_count; ++c)
+        {
+            dry_best[c] += o.dry_best[c];
+            starved_cls[c] += o.starved_cls[c];
+            starved_over_ceil[c] += o.starved_over_ceil[c];
+        }
     }
 };
 
@@ -605,16 +635,30 @@ void read_shelf(const world& w, const recipe_registry& reg, const shelf_snap& sn
     }
 }
 
+/// One live processor as it stood BEFORE the economy step (after the convoys
+/// lap): its market, its owner's pool there and the market's shelf, and
+/// whether the fair-price ceiling admitted each good. Price is written only at
+/// the end of clear_markets, so the pre-step price is the price the draw saw.
+struct proc_snap
+{
+    entity_id m = null_entity;
+    std::array<float, resource_count> shelf{}, pool{};
+    std::array<bool, resource_count>  admits{};
+};
+
 struct lg_probe
 {
-    int                    lap = -1;
+    int                    lap_pre = -1; ///< the convoys lap: the pre-step snapshot
+    int                    lap = -1;     ///< the run_economy_step lap: the dispatch read
     bool                   armed = false;
     const recipe_registry* reg = nullptr;
-    std::uint32_t          max_id = 0;  ///< highest convoy id before this tick
+    std::uint32_t          max_id = 0;   ///< highest convoy id before this tick
     lg_reading*            cur = nullptr;
-    /// (processor's market, input good) -> class, filled at the hook for every
-    /// live processor's every input; read after the tick for the starved ones.
-    std::map<std::pair<entity_id, std::size_t>, std::pair<int, float>> proc_cls; ///< class, shelf units
+    std::map<entity_id, proc_snap> snap; ///< processor -> pre-step state
+    /// (processor's market, input good) -> best dispatcher class at the
+    /// dispatch read (x_poolheld / x_none where no shelf surplus exists).
+    std::map<std::pair<entity_id, std::size_t>, int> proc_best;
+    std::set<std::pair<entity_id, std::size_t>> exported; ///< (src market, good) shelf-exported this tick
 };
 
 std::vector<entity_id> sorted_processors(const world& w)
@@ -626,11 +670,71 @@ std::vector<entity_id> sorted_processors(const world& w)
     return ids;
 }
 
+bool live_processor(const building_component& b)
+{
+    return !b.decommissioned && b.ticks_remaining <= 0;
+}
+
+/// The pre-step snapshot (after the convoys lap).
+void lg_snapshot(const world& w, lg_probe& p)
+{
+    const recipe_registry& reg = *p.reg;
+    const float res_mult = reg.price_band().reservation_mult;
+    std::map<entity_id, entity_id> owner;
+    for (const auto& [cid, cc] : w.corporations)
+        for (const entity_id a : cc.assets) owner.emplace(a, cid);
+    p.snap.clear();
+    for (const entity_id bid : sorted_processors(w))
+    {
+        const building_component& b = w.buildings.at(bid);
+        if (!live_processor(b)) continue;
+        const recipe* rc = reg.get_recipe(b.recipe);
+        if (rc == nullptr) continue;
+        const entity_id m = market_for_tile(w, b.tile);
+        const auto mi = w.markets.find(m);
+        if (mi == w.markets.end()) continue; // nomarket: labelled after the tick
+        proc_snap s;
+        s.m = m;
+        const auto oi = owner.find(bid);
+        const stockpile_component* pool = oi != owner.end() ? w.find_pool(oi->second, m) : nullptr;
+        for (std::size_t g = 0; g < resource_count; ++g)
+        {
+            if (!(rc->inputs[g] > 0.0f)) continue;
+            s.shelf[g]  = mi->second.inventory[g];
+            s.pool[g]   = pool ? pool->quantities[g] : 0.0f;
+            s.admits[g] = shelf_admits(mi->second, g, res_mult, /*off_buys=*/true);
+        }
+        p.snap.emplace(bid, s);
+    }
+}
+
+/// noshelfsurplus split: does some corporation's pool on `body` hold >= 1 unit
+/// of `g` beyond its processor_reservation (the surplus the corporations'
+/// dispatcher and clearing's auto-surplus treat as sellable)?
+bool pool_surplus_on_body(const world& w, const recipe_registry& reg, entity_id body, std::size_t g,
+                          std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>>& res_cache)
+{
+    for (const auto& [key, pool] : w.corp_market_pools) // std::map: sorted
+    {
+        if (!(pool.quantities[g] >= 1.0f)) continue;
+        const auto mi = w.markets.find(key.second);
+        const entity_id kb = mi != w.markets.end() ? mi->second.body : key.second;
+        if (kb != body || !w.corporations.count(key.first)) continue;
+        auto ri = res_cache.find(key);
+        if (ri == res_cache.end())
+            ri = res_cache.emplace(key, processor_reservation(w, reg, key.first, key.second)).first;
+        if (pool.quantities[g] - ri->second[g] >= 1.0f) return true;
+    }
+    return false;
+}
+
 void lg_after_lap(const world& cw, int lap, void* vctx)
 {
     using namespace export_refusal;
     auto* p = static_cast<lg_probe*>(vctx);
-    if (!p->armed || lap != p->lap) return;
+    if (!p->armed) return;
+    if (lap == p->lap_pre) { lg_snapshot(cw, *p); return; }
+    if (lap != p->lap) return;
     world& w = const_cast<world&>(cw); // router path caches only (export_refusal.hpp)
     const recipe_registry& reg = *p->reg;
     lg_reading& r = *p->cur;
@@ -639,13 +743,18 @@ void lg_after_lap(const world& cw, int lap, void* vctx)
 
     // shipped this tick
     std::uint32_t top = p->max_id;
+    p->exported.clear();
     for (const convoy_component& c : w.convoys)
     {
         if (c.id <= p->max_id) continue;
         top = std::max(top, c.id);
         const std::size_t g = static_cast<std::size_t>(c.cargo_resource);
         r.ship_n += 1; r.ship_u += c.cargo_qty;
-        if (c.corp == null_entity) r.ship_shelf_u += c.cargo_qty;
+        if (c.corp == null_entity)
+        {
+            r.ship_shelf_u += c.cargo_qty;
+            p->exported.insert(std::make_pair(c.source_market, g));
+        }
         const auto di = w.markets.find(c.dest_market);
         if (di == w.markets.end() || g >= resource_count) continue;
         const market_component& dm = di->second;
@@ -654,11 +763,23 @@ void lg_after_lap(const world& cw, int lap, void* vctx)
     }
     p->max_id = top;
 
-    // dry (market, good) pairs by best class
+    // the dispatcher's own surplus test (> 0), not water_pair_probe's 1 unit
     std::vector<good_markets> scans(resource_count);
+    std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> res_cache;
+    std::map<std::pair<entity_id, std::size_t>, bool> pool_held; // (body, good)
+    const auto no_shelf_class = [&](entity_id d, std::size_t g) {
+        const entity_id body = w.markets.at(d).body;
+        const auto key = std::make_pair(body, g);
+        auto it = pool_held.find(key);
+        if (it == pool_held.end())
+            it = pool_held.emplace(key, pool_surplus_on_body(w, reg, body, g, res_cache)).first;
+        return it->second ? x_poolheld : x_none;
+    };
+
+    // dry (market, good) pairs by best class
     for (std::size_t g = 0; g < resource_count; ++g)
     {
-        scans[g] = scan_good(x, g);
+        scans[g] = scan_good(x, g, surplus_rule::dispatcher);
         const good_markets& gm = scans[g];
         r.consuming += gm.consuming;
         r.dry += static_cast<long>(gm.dry.size());
@@ -668,44 +789,34 @@ void lg_after_lap(const world& cw, int lap, void* vctx)
         {
             if (grid) { ++r.dry_best[x_grid]; continue; }
             const int b = classify_destination(x, d, g, gm.sur).best;
-            ++r.dry_best[b < 0 ? x_nosurplus : b];
+            ++r.dry_best[b < 0 ? no_shelf_class(d, g) : b];
         }
     }
 
-    // every live processor's every input, at its market
-    p->proc_cls.clear();
-    for (const entity_id bid : sorted_processors(w))
+    // every snapped processor's every input: the best dispatcher class at its
+    // market (the stocked / grid / unpriced cuts are made after the tick)
+    p->proc_best.clear();
+    for (const auto& [bid, s] : p->snap)
     {
-        const building_component& b = w.buildings.at(bid);
-        if (b.decommissioned || b.ticks_remaining > 0) continue;
-        const recipe* rc = reg.get_recipe(b.recipe);
+        const recipe* rc = reg.get_recipe(w.buildings.at(bid).recipe);
         if (rc == nullptr) continue;
-        const entity_id m = market_for_tile(w, b.tile);
-        const auto mi = w.markets.find(m);
-        if (mi == w.markets.end()) continue;
         for (std::size_t g = 0; g < resource_count; ++g)
         {
-            if (!(rc->inputs[g] > 0.0f)) continue;
-            const auto key = std::make_pair(m, g);
-            if (p->proc_cls.count(key)) continue;
-            int c;
-            if (reg.grid_goods().grid(g)) c = x_grid;
-            else if (mi->second.inventory[g] >= 1.0f) c = x_stocked;
-            else
-            {
-                const int b2 = classify_destination(x, m, g, scans[g].sur).best;
-                c = b2 < 0 ? x_nosurplus : b2;
-            }
-            p->proc_cls.emplace(key, std::make_pair(c, mi->second.inventory[g]));
+            if (!(rc->inputs[g] > 0.0f) || reg.grid_goods().grid(g)) continue;
+            const auto key = std::make_pair(s.m, g);
+            if (p->proc_best.count(key)) continue;
+            const int b = classify_destination(x, s.m, g, scans[g].sur).best;
+            p->proc_best.emplace(key, b < 0 ? no_shelf_class(s.m, g) : b);
         }
     }
 }
 
-/// After the tick: each input-starved processor (G1's `input`) by its scarcest
-/// input's class at its market, as the hook read it.
+/// After the tick: each input-starved processor (G1's `input`) filed under its
+/// scarcest input's class at its market.
 void lg_after_tick(const world& w, const economy_report& rep, const recipe_registry& reg, lg_probe& p)
 {
     lg_reading& r = *p.cur;
+    const float base_rate = reg.economics(building_type::processing_facility).base_rate;
     for (const entity_id bid : sorted_processors(w))
     {
         const building_component& b = w.buildings.at(bid);
@@ -713,14 +824,51 @@ void lg_after_tick(const world& w, const economy_report& rep, const recipe_regis
         if (classify(b, row, reg) != ps_input) continue;
         ++r.starved;
         const std::size_t g = static_cast<std::size_t>(row->limiting_input);
-        const auto it = p.proc_cls.find(std::make_pair(market_for_tile(w, b.tile), g));
-        if (it == p.proc_cls.end() || g >= resource_count) { ++r.unread; continue; }
-        const int c = it->second.first;
+        if (g >= resource_count) { ++r.unread; continue; }
+        const entity_id m = market_for_tile(w, b.tile);
+        int c = -1;
+        bool over = false;
+        if (w.markets.find(m) == w.markets.end()) c = x_nomarket;
+        else
+        {
+            const auto si = p.snap.find(bid);
+            if (si == p.snap.end()) { ++r.unread; continue; }
+            const proc_snap& s = si->second;
+            const market_component& mc = w.markets.at(m);
+            over = mc.base_price[g] > 0.0f && !s.admits[g];
+            if (reg.grid_goods().grid(g)) c = x_grid;
+            else if (!(mc.base_price[g] > 0.0f)) c = x_unpriced;
+            else if (s.shelf[g] >= 1.0f)
+            {
+                r.stocked_shelf += s.shelf[g];
+                if (!s.admits[g]) c = x_ceiling;
+                else
+                {
+                    // run_processing's early idle return: coverage of a full run
+                    // with the WHOLE shelf (no pro-rata) still under t_idle
+                    const recipe* rc = reg.get_recipe(b.recipe);
+                    const float wt = std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f);
+                    const float need = (rc ? rc->inputs[g] : 0.0f) * base_rate * row->effective_workforce
+                                     * wt * building_supply_scalar(b);
+                    const bool thin = need > 0.0f && (s.pool[g] + s.shelf[g]) / need < reg.t_idle();
+                    c = thin ? x_thin : x_contended;
+                }
+            }
+            else
+            {
+                const auto it = p.proc_best.find(std::make_pair(m, g));
+                if (it == p.proc_best.end()) { ++r.unread; continue; }
+                c = it->second;
+            }
+            if (p.exported.count(std::make_pair(m, g))) ++r.export_away;
+        }
         ++r.starved_cls[c];
-        if (c == x_stocked) r.stocked_shelf += it->second.second;
+        if (over) ++r.starved_over_ceil[c];
         ++r.starved_good[g][c];
     }
-    p.proc_cls.clear();
+    p.snap.clear();
+    p.proc_best.clear();
+    p.exported.clear();
 }
 
 /// Two after_lap readers on the one hook slot: the existing one first, untouched.
@@ -762,10 +910,19 @@ void print_lg(const char* label, const lg_reading& r, int top_goods)
         std::printf("  %s %.1f (%.0f%%)", k_x_name[c], r.dry_best[c] / n, 100.0 * r.dry_best[c] / dd);
     const double sd = r.starved > 0 ? r.starved : 1.0;
     std::printf("\n      INPUT-STARVED processors %.1f; scarcest input's class at its market:", r.starved / n);
+    long stocked = 0, over = 0;
     for (const int c : k_proc_order)
-        std::printf("  %s %.1f (%.0f%%)", k_x_name[c], r.starved_cls[c] / n, 100.0 * r.starved_cls[c] / sd);
-    if (r.starved_cls[x_stocked] > 0)
-        std::printf("  | stocked: mean shelf %.1f u", r.stocked_shelf / r.starved_cls[x_stocked]);
+    {
+        over += r.starved_over_ceil[c];
+        if (r.starved_cls[c] == 0) continue; // nonzero classes only
+        std::printf("  %s %.1f (%.0f%%", k_x_name[c], r.starved_cls[c] / n, 100.0 * r.starved_cls[c] / sd);
+        if (r.starved_over_ceil[c] > 0) std::printf("; %.1f over ceiling", r.starved_over_ceil[c] / n);
+        std::printf(")");
+    }
+    stocked = r.starved_cls[x_ceiling] + r.starved_cls[x_thin] + r.starved_cls[x_contended];
+    std::printf("\n        stocked/* %.1f (pre-step shelf mean %.1f u) | input priced over the ceiling %.1f"
+                " | input shelf-exported from its market this tick %.1f",
+                stocked / n, stocked ? r.stocked_shelf / stocked : 0.0, over / n, r.export_away / n);
     if (r.unread) std::printf("  UNREAD %ld", r.unread);
     std::printf("\n      starved by input:");
     std::vector<std::pair<long, std::size_t>> sg;
@@ -925,6 +1082,8 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
     lg_probe lg;
     lg.reg = &reg;
     lg.lap = snap.lap; // the run_economy_step lap
+    for (int i = 0; i < k_campaign_settle_lap_count; ++i)
+        if (std::strcmp(k_campaign_settle_lap_names[i], "convoys") == 0) lg.lap_pre = i;
     lg.max_id = max_convoy_id;
     if (g_logistics) r.lg.assign(g_lg_ticks.size(), lg_reading{});
     for (int k = 1; k <= ticks; ++k)
@@ -1258,7 +1417,7 @@ int main(int argc, char** argv)
         // appended (BL-1223), never reordered: the L row's headline numbers
         const double u = lg_all.ship_u > 0 ? lg_all.ship_u : 1.0;
         const double sd = lg_all.starved > 0 ? static_cast<double>(lg_all.starved) : 1.0;
-        int top = x_stocked;
+        int top = k_proc_order[0];
         for (const int c : k_proc_order)
             if (lg_all.starved_cls[c] > lg_all.starved_cls[top]) top = c;
         std::printf(" | L to-short %.1f%% dry/read %.1f starved/read %.1f top-class %s %.0f%%",
