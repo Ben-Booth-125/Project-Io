@@ -25,10 +25,10 @@ live click for any UI item. One re-bless, last.
 **Lens — BL-1222 (trade-flow lens).** Settled (Ben, the lens form, 2026-10-07): player lens,
 own flows only; LENSES.md § Trade-flow lens. Lane: `supply_system.*` (a transient record only),
 `body_surface_canvas.cpp`, the overlay enum, `question_log.json`.
-- [ ] L1 The dispatcher's transient player record: shipments + best class per (good, market),
+- [x] L1 The dispatcher's transient player record: shipments + best class per (good, market),
   never read by the sim, never saved; world bit-identical (R1).
-- [ ] L2 `trade_flow` overlay: arrows, markers, hover, class and width keys (R2, R3).
-- [ ] L3 question_log entry; ACTIONS entry if the cycle changed (R4).
+- [x] L2 `trade_flow` overlay: arrows, markers, hover, class and width keys (R2, R3).
+- [x] L3 question_log entry; ACTIONS entry if the cycle changed (R4).
 - [ ] L4 Main session: capture, then Ben's live click.
 
 ## Sprint 48 — the world moves forward (opened 2026-09-25, CLOSED 2026-10-04)

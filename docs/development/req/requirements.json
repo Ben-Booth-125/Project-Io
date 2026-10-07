@@ -6726,23 +6726,23 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism twice; save_roundtrip; market_viability G1-G4 identical on --seeds 0,43 --ticks 50"
      ],
      "requirement": "The dispatcher records the player corporation's shipments and best refusal class per (good, destination market) as a transient output; the simulation never reads it, the save never holds it, and the world is bit-identical.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "Merged 3306c300. market_viability --seeds 0,43 --ticks 50 before (cc40b100) and after (3306c300): every non-timing line identical, G1 52.5 / G2 58.5 / G3 100.0 both (main session). world_determinism twice ALL PASS, same digests; save_roundtrip OK (lane, 81e13872). Cold review: no dispatch decision changes; the extra dispatch_room read is pure."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: a verifier-visual capture of the lens on a seated seed"
      ],
      "requirement": "The trade_flow lens draws the player's market-to-market arrows (width by units) and a marker on each short market coloured by its best class, with a class key and a width key; no rival flow appears.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "scripts/verify/trade_flow_lens.lua, 8 captures, 6 expects PASS (lane, 81e13872): arrows, 19-25 markers in class colours, both hovers; seat change draws nothing until the new corp's first pass (the review's leak, fixed)."
     },
     {
      "id": "R3",
@@ -6751,18 +6751,18 @@
       "live click: Ben cycles to the lens in the built app and hovers an arrow and a marker"
      ],
      "requirement": "The lens is reachable by the keyboard lens-cycle; hovering an arrow shows good, units and landed price; hovering a marker lists the classes by good.",
-     "notes": "",
+     "notes": "Owed: Ben's live click.",
      "result_metric": ""
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: question_log.json entry rendered; ACTIONS entry if the cycle changed"
      ],
      "requirement": "The surface carries its question_log entry (\"Where is my surplus going, and why is it not going where it is short?\").",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "question_log entry and lens.trade_flow ACTIONS entry (eight classes, empty until the held corp's first pass); canvas.lens_next and lens.throughput corrected; both re-rendered."
     }
    ]
   }
