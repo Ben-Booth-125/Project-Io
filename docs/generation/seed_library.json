@@ -11,7 +11,9 @@
   "",
   "To check or bless, regenerate the library's own table first: `build_gen/verify/exploration_sweep.exe --seeds $(node tools/session/seed_library.js --seed-list) --out seed_library_sweep.json` (BL-1026). The checked-in exploration_sweep.json carries seeds 0..15 only and is not the library's table.",
   "",
-  "A `review` field marks a seed whose rationale is under Ben's review in NEEDS_REVIEW, naming the entry and the candidates; it is removed when he rules. A `replaces` field records which seed an entry took the place of, and why."
+  "A `review` field marks a seed whose rationale is under Ben's review in NEEDS_REVIEW, naming the entry and the candidates; it is removed when he rules. A `replaces` field records which seed an entry took the place of, and why.",
+  "",
+  "READINGS AND RATIONALE REWRITTEN 2026-10-07 (Ben's ruling, after the sprint 49 re-bless) from seed_library_sweep.json at main c77f2d5a, with haulage from docs/development/drafts/sprint-49-rebless.md. The lake cap (BL-1200) redrew every world. Rankings in the `why` lines are against the other fifteen library seeds, not the 48-seed curation pool, which has not been re-swept."
  ],
  "pool": {
   "swept": 48,
@@ -29,30 +31,30 @@
     "roads",
     "colonial"
    ],
-   "why": "The richest world in the pool by a wide margin: a median polity chest of 15.7M against a pool median of about 43k, a top chest of 1.73 billion, 47 post roads (the most) and 7 subjects. If firms cannot form here they cannot form anywhere, so it is the ceiling case for chartering.",
+   "why": "The richest world in the library by a wide margin: a median polity chest of 3.67M against a next-best of 9,519 (seed 41), the largest top chest at 594M, 36 post roads (the most; the next is seed 40's 10) and 5 subjects, tied for the most. If firms cannot form here they cannot form anywhere, so it is the ceiling case for chartering.",
    "readings": {
-    "empire_battles": 14541,
-    "expl_battles": 1223,
-    "displacement": 1.5426,
+    "empire_battles": 17962,
+    "expl_battles": 1057,
+    "displacement": 7.5242,
     "displacement_verdict": "displaced",
-    "living_polities": 74,
-    "subjects_alive": 7,
-    "treasury_median": 15748517,
-    "treasury_max": 1726277055,
-    "flows": 45,
-    "flow_volume": 4556,
-    "corridors": 5285,
-    "post_roads_built": 47,
-    "treaties_standing_1660": 154
+    "living_polities": 85,
+    "subjects_alive": 5,
+    "treasury_median": 3668183,
+    "treasury_max": 594263761,
+    "flows": 56,
+    "flow_volume": 11572,
+    "corridors": 2271,
+    "post_roads_built": 36,
+    "treaties_standing_1660": 209
    },
    "fingerprint": {
-    "empire_battles": 19841,
-    "expl_battles": 1790,
-    "flows": 44,
-    "treasury_median": 8351615,
-    "living_polities": 78
+    "empire_battles": 17962,
+    "expl_battles": 1057,
+    "flows": 56,
+    "treasury_median": 3668183,
+    "living_polities": 85
    },
-   "fingerprint_blessed": "2026-10-03"
+   "fingerprint_blessed": "2026-10-07"
   },
   {
    "seed": 28,
@@ -62,30 +64,30 @@
     "sparse",
     "stress"
    ],
-   "why": "The floor case: 22 polities, eleven trade flows and 320 volume — the fewest flows and the lowest volume in the pool — no post roads and a modest 66k median chest. Industrialisation has to produce something legible from almost nothing here.",
+   "why": "The floor of the political map: 41 polities and 666 corridors, both the fewest in the library, 33 flows (second fewest), two post roads, no subjects and a 156 median chest. Its trade is no longer the floor: volume 7,374 sits mid-library and seed 12 now carries the fewest flows and the lowest volume. First-year haulage, 1,423.5 units sold at destination, is the second lowest of the sixteen. Industrialisation has to produce something legible from few polities and a thin network here.",
    "readings": {
-    "empire_battles": 3418,
-    "expl_battles": 181,
-    "displacement": null,
-    "displacement_verdict": "displaced(no-nb)",
-    "living_polities": 22,
-    "subjects_alive": 1,
-    "treasury_median": 66493,
-    "treasury_max": 764662902,
-    "flows": 11,
-    "flow_volume": 320,
-    "corridors": 1257,
-    "post_roads_built": 0,
-    "treaties_standing_1660": 22
+    "empire_battles": 6455,
+    "expl_battles": 291,
+    "displacement": 1.7196,
+    "displacement_verdict": "displaced",
+    "living_polities": 41,
+    "subjects_alive": 0,
+    "treasury_median": 156,
+    "treasury_max": 98922935,
+    "flows": 33,
+    "flow_volume": 7374,
+    "corridors": 666,
+    "post_roads_built": 2,
+    "treaties_standing_1660": 88
    },
    "fingerprint": {
-    "empire_battles": 5114,
-    "expl_battles": 350,
-    "flows": 29,
-    "treasury_median": 241,
-    "living_polities": 32
+    "empire_battles": 6455,
+    "expl_battles": 291,
+    "flows": 33,
+    "treasury_median": 156,
+    "living_polities": 41
    },
-   "fingerprint_blessed": "2026-10-04",
+   "fingerprint_blessed": "2026-10-07",
    "replaces": "seed 17 (Ben, 2026-09-17, NR-887: the old seed no longer answered this question)"
   },
   {
@@ -96,30 +98,30 @@
     "trade",
     "poor"
    ],
-   "why": "The most crowded: 95 living polities, 19,204 Empire battles, 82 flows and 166 standing treaties, and a median chest of 281. Many poor traders rather than a few rich ones — the hardest case for a firm that needs a treasury behind it.",
+   "why": "The most crowded: 115 living polities and 28,371 Empire battles, both the most in the library, with 97 flows, the highest flow volume (14,584) and 249 standing treaties. Its median chest is 197 and its top chest, 38.7M, is the smallest of the sixteen. Many poor traders rather than a few rich ones: the hardest case for a firm that needs a treasury behind it.",
    "readings": {
-    "empire_battles": 19204,
-    "expl_battles": 1934,
-    "displacement": 1.4859,
+    "empire_battles": 28371,
+    "expl_battles": 2302,
+    "displacement": 6.6733,
     "displacement_verdict": "displaced",
-    "living_polities": 95,
-    "subjects_alive": 1,
-    "treasury_median": 281,
-    "treasury_max": 100166510,
-    "flows": 82,
-    "flow_volume": 9763,
-    "corridors": 4073,
-    "post_roads_built": 0,
-    "treaties_standing_1660": 166
+    "living_polities": 115,
+    "subjects_alive": 2,
+    "treasury_median": 197,
+    "treasury_max": 38695127,
+    "flows": 97,
+    "flow_volume": 14584,
+    "corridors": 3179,
+    "post_roads_built": 2,
+    "treaties_standing_1660": 249
    },
    "fingerprint": {
-    "empire_battles": 26050,
-    "expl_battles": 2126,
-    "flows": 98,
-    "treasury_median": 274,
-    "living_polities": 110
+    "empire_battles": 28371,
+    "expl_battles": 2302,
+    "flows": 97,
+    "treasury_median": 197,
+    "living_polities": 115
    },
-   "fingerprint_blessed": "2026-10-03"
+   "fingerprint_blessed": "2026-10-07"
   },
   {
    "seed": 31,
@@ -128,128 +130,129 @@
     "trade",
     "fragmented"
    ],
-   "why": "The busiest network in the pool: 94 flows across 77 polities, 5,881 corridors and 166 treaties, with displacement at 8.9. The best world to watch prices form on, because there is already something moving.",
+   "why": "The busiest network in the library: 99 flows (tied with seed 25 for the most) across 105 polities, 3,303 corridors and 290 standing treaties (both the most), with displacement at 40.7. The best world to watch prices form on, because there is already something moving.",
    "readings": {
-    "empire_battles": 17842,
-    "expl_battles": 1875,
-    "displacement": 8.9206,
+    "empire_battles": 26985,
+    "expl_battles": 2791,
+    "displacement": 40.6567,
     "displacement_verdict": "displaced",
-    "living_polities": 77,
-    "subjects_alive": 3,
-    "treasury_median": 50397,
-    "treasury_max": 474439601,
-    "flows": 94,
-    "flow_volume": 8214,
-    "corridors": 5881,
-    "post_roads_built": 11,
-    "treaties_standing_1660": 166
+    "living_polities": 105,
+    "subjects_alive": 0,
+    "treasury_median": 197,
+    "treasury_max": 114724073,
+    "flows": 99,
+    "flow_volume": 13898,
+    "corridors": 3303,
+    "post_roads_built": 3,
+    "treaties_standing_1660": 290
    },
    "fingerprint": {
-    "empire_battles": 34221,
-    "expl_battles": 3504,
-    "flows": 109,
-    "treasury_median": 226,
-    "living_polities": 116
+    "empire_battles": 26985,
+    "expl_battles": 2791,
+    "flows": 99,
+    "treasury_median": 197,
+    "living_polities": 105
    },
-   "fingerprint_blessed": "2026-10-04"
+   "fingerprint_blessed": "2026-10-07"
   },
   {
    "seed": 40,
-   "name": "The inward world",
+   "name": "The second road world",
    "tags": [
-    "held",
-    "treasury",
-    "roads"
+    "roads",
+    "displaced"
    ],
-   "why": "Wealthy and uninterested: displacement 0.88 (135 neighbour wars against 119 frontier battles), a 1.64M median chest, 26 post roads — the second most in the pool — and 36 flows. Money and infrastructure without an outward turn — the case where Industrialisation must not assume exploration set the table.",
+   "why": "Ten post roads, the second most in the library after seed 46, with a 479 median chest and 43 flows. It no longer stays home: 1,108 frontier battles against 15 neighbour wars, displacement 73.9, the second highest of the sixteen. The case it was chosen for, money and infrastructure without an outward turn, it no longer answers; seed 12 is now the library's only held world.",
    "readings": {
-    "empire_battles": 5820,
-    "expl_battles": 254,
-    "displacement": 0.8815,
-    "displacement_verdict": "held",
-    "living_polities": 33,
+    "empire_battles": 10805,
+    "expl_battles": 1123,
+    "displacement": 73.8667,
+    "displacement_verdict": "displaced",
+    "living_polities": 52,
     "subjects_alive": 3,
-    "treasury_median": 1643825,
-    "treasury_max": 660204008,
-    "flows": 36,
-    "flow_volume": 4581,
-    "corridors": 1715,
-    "post_roads_built": 26,
-    "treaties_standing_1660": 34
+    "treasury_median": 479,
+    "treasury_max": 95453616,
+    "flows": 43,
+    "flow_volume": 5320,
+    "corridors": 1633,
+    "post_roads_built": 10,
+    "treaties_standing_1660": 101
    },
    "fingerprint": {
-    "empire_battles": 10184,
-    "expl_battles": 933,
-    "flows": 59,
-    "treasury_median": 221,
-    "living_polities": 53
+    "empire_battles": 10805,
+    "expl_battles": 1123,
+    "flows": 43,
+    "treasury_median": 479,
+    "living_polities": 52
    },
-   "fingerprint_blessed": "2026-10-04",
+   "fingerprint_blessed": "2026-10-07",
    "replaces": "seed 6 (Ben, 2026-09-17, NR-887: the old seed no longer answered this question)"
   },
   {
    "seed": 12,
    "name": "The most inward world",
    "tags": [
-    "silent",
-    "sparse"
+    "held",
+    "sparse",
+    "low-trade"
    ],
-   "why": "The inward extreme, and the only SILENT seed in the pool: twelve Exploration battles, twenty flows, a 274 median chest and no subjects. Whatever the phase does here, it does without colonial ties, capital or an outward turn.",
+   "why": "The inward extreme, and the only HELD seed in the library: 116 neighbour wars against 24 frontier battles (displacement 0.21). It has the fewest flows (22), the lowest volume (3,418), the fewest standing treaties (48) and the fewest Empire battles (4,982), with one subject and a 120 median chest. Whatever the phase does here, it does with almost no outward turn, colonial ties or capital. The lake cap barely touched it (Empires battles 4,983 -> 4,982), so it is also the control for that change.",
    "readings": {
-    "empire_battles": 4905,
-    "expl_battles": 12,
-    "displacement": null,
-    "displacement_verdict": "SILENT",
-    "living_polities": 50,
-    "subjects_alive": 0,
-    "treasury_median": 274,
-    "treasury_max": 190501037,
-    "flows": 20,
-    "flow_volume": 2636,
-    "corridors": 2649,
+    "empire_battles": 4982,
+    "expl_battles": 140,
+    "displacement": 0.2069,
+    "displacement_verdict": "held",
+    "living_polities": 43,
+    "subjects_alive": 1,
+    "treasury_median": 120,
+    "treasury_max": 129139070,
+    "flows": 22,
+    "flow_volume": 3418,
+    "corridors": 1076,
     "post_roads_built": 1,
-    "treaties_standing_1660": 47
+    "treaties_standing_1660": 48
    },
    "fingerprint": {
-    "empire_battles": 4983,
+    "empire_battles": 4982,
     "expl_battles": 140,
     "flows": 22,
-    "treasury_median": 136,
-    "living_polities": 42
+    "treasury_median": 120,
+    "living_polities": 43
    },
-   "fingerprint_blessed": "2026-10-04"
+   "fingerprint_blessed": "2026-10-07"
   },
   {
    "seed": 37,
    "name": "The frontier world",
    "tags": [
     "displaced",
-    "no-colonial"
+    "no-colonial",
+    "no-roads"
    ],
-   "why": "Displacement 459 with zero subjects alive: the conflict moved entirely outward and nobody was subjected by it. A test that trade relationships can form without an overlord graph to inherit.",
+   "why": "Displacement 57.9 (1,216 frontier battles against 21 neighbour wars) with one subject alive of five subjections formed: the conflict moved outward and almost nobody stayed subjected. A near test that trade relationships can form without an overlord graph to inherit; seeds 28, 31, 43 and 25 now carry zero subjects. It also has no post road against 77 flows, the cleanest roadless trade in the library.",
    "readings": {
-    "empire_battles": 12181,
-    "expl_battles": 920,
-    "displacement": 459,
+    "empire_battles": 20144,
+    "expl_battles": 1237,
+    "displacement": 57.9048,
     "displacement_verdict": "displaced",
-    "living_polities": 65,
-    "subjects_alive": 0,
-    "treasury_median": 164,
-    "treasury_max": 85431299,
-    "flows": 65,
-    "flow_volume": 8003,
-    "corridors": 3537,
-    "post_roads_built": 9,
-    "treaties_standing_1660": 152
+    "living_polities": 77,
+    "subjects_alive": 1,
+    "treasury_median": 137,
+    "treasury_max": 103849863,
+    "flows": 77,
+    "flow_volume": 12322,
+    "corridors": 2506,
+    "post_roads_built": 0,
+    "treaties_standing_1660": 199
    },
    "fingerprint": {
-    "empire_battles": 20112,
-    "expl_battles": 1507,
-    "flows": 72,
-    "treasury_median": 102,
-    "living_polities": 75
+    "empire_battles": 20144,
+    "expl_battles": 1237,
+    "flows": 77,
+    "treasury_median": 137,
+    "living_polities": 77
    },
-   "fingerprint_blessed": "2026-10-04"
+   "fingerprint_blessed": "2026-10-07"
   },
   {
    "seed": 13,
@@ -258,160 +261,158 @@
     "colonial",
     "displaced"
    ],
-   "why": "Seven subjects alive at 1660, tied for the most in the pool, at a middling size — 50 polities and 53 flows. The seed for preferred-seller ties, which EXPLORATION hands forward and nothing yet reads. It barely displaced (1.16), so this overlord graph formed close to home.",
+   "why": "Fifty-six subjections formed through Exploration, the second most after seed 0's 78, and 53 of them freed: only two subjects are alive at 1660. A colonial age that mostly came undone, in a world of 81 polities and 87 flows at displacement 7.27. The preferred-seller ties EXPLORATION hands forward survive here in two subjects only; seeds 46 and 38, with five each, now carry the most living ties.",
    "readings": {
-    "empire_battles": 10250,
-    "expl_battles": 266,
-    "displacement": 1.1626,
+    "empire_battles": 19428,
+    "expl_battles": 1307,
+    "displacement": 7.2722,
     "displacement_verdict": "displaced",
-    "living_polities": 50,
-    "subjects_alive": 7,
-    "treasury_median": 38820,
-    "treasury_max": 661279001,
-    "flows": 53,
-    "flow_volume": 4625,
-    "corridors": 3224,
-    "post_roads_built": 1,
-    "treaties_standing_1660": 79
+    "living_polities": 81,
+    "subjects_alive": 2,
+    "treasury_median": 213,
+    "treasury_max": 303446415,
+    "flows": 87,
+    "flow_volume": 12848,
+    "corridors": 2492,
+    "post_roads_built": 5,
+    "treaties_standing_1660": 170
    },
    "fingerprint": {
-    "empire_battles": 18772,
-    "expl_battles": 985,
-    "flows": 73,
-    "treasury_median": 336,
-    "living_polities": 73
+    "empire_battles": 19428,
+    "expl_battles": 1307,
+    "flows": 87,
+    "treasury_median": 213,
+    "living_polities": 81
    },
-   "fingerprint_blessed": "2026-10-04"
+   "fingerprint_blessed": "2026-10-07"
   },
   {
    "seed": 41,
-   "name": "The second colonial world",
+   "name": "The quiet Exploration world",
    "tags": [
-    "colonial",
-    "displaced"
+    "displaced",
+    "treasury"
    ],
-   "why": "Six subjects and a 281 median chest: colonial ties without the capital behind them, against seed 13 whose chest runs a hundred times deeper.",
+   "why": "Forty-seven Exploration battles, the fewest in the library by a wide margin (the next is seed 12's 140), against 8,657 in Empires. Almost all of them are frontier (46 against one neighbour war). The median chest is 9,519, the second highest of the sixteen, and one subject is alive. It no longer answers the question it was chosen for, colonial ties without capital: both halves have reversed.",
    "readings": {
-    "empire_battles": 7329,
-    "expl_battles": 264,
-    "displacement": 1.3571,
+    "empire_battles": 8657,
+    "expl_battles": 47,
+    "displacement": 46,
     "displacement_verdict": "displaced",
-    "living_polities": 45,
-    "subjects_alive": 6,
-    "treasury_median": 281,
-    "treasury_max": 549153158,
-    "flows": 51,
-    "flow_volume": 4403,
-    "corridors": 2602,
-    "post_roads_built": 1,
-    "treaties_standing_1660": 68
+    "living_polities": 48,
+    "subjects_alive": 1,
+    "treasury_median": 9519,
+    "treasury_max": 162871398,
+    "flows": 57,
+    "flow_volume": 6520,
+    "corridors": 1481,
+    "post_roads_built": 5,
+    "treaties_standing_1660": 84
    },
    "fingerprint": {
-    "empire_battles": 10367,
-    "expl_battles": 207,
-    "flows": 53,
-    "treasury_median": 159,
+    "empire_battles": 8657,
+    "expl_battles": 47,
+    "flows": 57,
+    "treasury_median": 9519,
     "living_polities": 48
    },
-   "fingerprint_blessed": "2026-10-04"
+   "fingerprint_blessed": "2026-10-07"
   },
   {
    "seed": 43,
-   "name": "The small rich world",
+   "name": "The small poor world",
    "tags": [
-    "treasury",
     "sparse",
-    "colonial"
+    "poor",
+    "no-colonial"
    ],
-   "why": "Twenty-eight polities, a 5.69M median chest and 7 subjects: concentrated wealth in a thin political map. The counterweight to seed 11, and a good world for asking what a company is when there are few of everything.",
+   "why": "Forty-six polities, a 105 median chest (the lowest in the library) and no subjects, none ever formed. Its first-year haulage, 1,412.9 units sold at destination on 284 convoys, is the lowest of the sixteen. It no longer answers the question it was chosen for, concentrated wealth in a thin political map: the wealth is gone.",
    "readings": {
-    "empire_battles": 4168,
-    "expl_battles": 401,
-    "displacement": null,
-    "displacement_verdict": "displaced(no-nb)",
-    "living_polities": 28,
-    "subjects_alive": 7,
-    "treasury_median": 5686113,
-    "treasury_max": 830220694,
-    "flows": 43,
-    "flow_volume": 5456,
-    "corridors": 2027,
-    "post_roads_built": 1,
-    "treaties_standing_1660": 35
+    "empire_battles": 8951,
+    "expl_battles": 328,
+    "displacement": 35.4444,
+    "displacement_verdict": "displaced",
+    "living_polities": 46,
+    "subjects_alive": 0,
+    "treasury_median": 105,
+    "treasury_max": 211552744,
+    "flows": 57,
+    "flow_volume": 9457,
+    "corridors": 1366,
+    "post_roads_built": 6,
+    "treaties_standing_1660": 122
    },
    "fingerprint": {
-    "empire_battles": 7361,
-    "expl_battles": 581,
-    "flows": 49,
-    "treasury_median": 21849427,
-    "living_polities": 31
+    "empire_battles": 8951,
+    "expl_battles": 328,
+    "flows": 57,
+    "treasury_median": 105,
+    "living_polities": 46
    },
-   "fingerprint_blessed": "2026-10-03"
+   "fingerprint_blessed": "2026-10-07"
   },
   {
    "seed": 32,
-   "name": "The paved world",
+   "name": "The neighbour-war world",
    "tags": [
-    "roads",
-    "infrastructure",
-    "low-trade"
+    "displaced",
+    "ordinary"
    ],
-   "why": "Seventeen post roads, the third most in the pool, yet 35 flows, the fifth-lowest volume and the poorest median chest of all (163). Infrastructure without traffic or capital — the network exists and neither the trade nor the treasury to justify it does.",
+   "why": "510 neighbour wars, the most in the library (seed 11 is next at 300), against 617 frontier battles: displacement 1.21, the lowest of the fifteen displaced seeds. On most other axes it is middling: 77 polities, 55 flows, 9,574 volume, 5 post roads and a 182 median chest. It no longer answers the question it was chosen for, roads without traffic or capital: its post roads fell to the library middle and its first-year haulage rose from 138.9 to 2,247.1 units.",
    "readings": {
-    "empire_battles": 8389,
-    "expl_battles": 1502,
-    "displacement": 1.861,
+    "empire_battles": 16469,
+    "expl_battles": 1127,
+    "displacement": 1.2098,
     "displacement_verdict": "displaced",
-    "living_polities": 68,
+    "living_polities": 77,
     "subjects_alive": 3,
-    "treasury_median": 163,
-    "treasury_max": 258695366,
-    "flows": 35,
-    "flow_volume": 2329,
-    "corridors": 3295,
-    "post_roads_built": 17,
-    "treaties_standing_1660": 108
+    "treasury_median": 182,
+    "treasury_max": 112061489,
+    "flows": 55,
+    "flow_volume": 9574,
+    "corridors": 1716,
+    "post_roads_built": 5,
+    "treaties_standing_1660": 194
    },
    "fingerprint": {
-    "empire_battles": 14867,
-    "expl_battles": 1918,
-    "flows": 35,
-    "treasury_median": 411,
-    "living_polities": 62
+    "empire_battles": 16469,
+    "expl_battles": 1127,
+    "flows": 55,
+    "treasury_median": 182,
+    "living_polities": 77
    },
-   "fingerprint_blessed": "2026-10-04"
+   "fingerprint_blessed": "2026-10-07"
   },
   {
    "seed": 10,
-   "name": "The roadless traders",
+   "name": "The one-road traders",
    "tags": [
-    "trade",
-    "no-roads"
+    "trade"
    ],
-   "why": "The mirror of seed 32: zero post roads, 58 flows and a 144k median chest. Trade that never bought a road, which is the reading BL-949 made recoverable and nobody has explained.",
+   "why": "One post road, 65 flows and the highest first-year haulage in the library: 2,943.6 units sold at destination, on 819 convoys. Trade that barely bought a road. Seed 37, with 77 flows and no post road, is now the cleaner roadless case, and seed 32 is no longer the paved mirror it was chosen against.",
    "readings": {
-    "empire_battles": 11148,
-    "expl_battles": 461,
-    "displacement": 6.2031,
+    "empire_battles": 17314,
+    "expl_battles": 1281,
+    "displacement": 14.8148,
     "displacement_verdict": "displaced",
-    "living_polities": 58,
-    "subjects_alive": 1,
-    "treasury_median": 144250,
-    "treasury_max": 122664625,
-    "flows": 58,
-    "flow_volume": 4419,
-    "corridors": 3779,
-    "post_roads_built": 0,
-    "treaties_standing_1660": 93
+    "living_polities": 72,
+    "subjects_alive": 2,
+    "treasury_median": 276,
+    "treasury_max": 123444528,
+    "flows": 65,
+    "flow_volume": 9817,
+    "corridors": 2175,
+    "post_roads_built": 1,
+    "treaties_standing_1660": 183
    },
    "fingerprint": {
-    "empire_battles": 20944,
-    "expl_battles": 1799,
-    "flows": 60,
-    "treasury_median": 106,
+    "empire_battles": 17314,
+    "expl_battles": 1281,
+    "flows": 65,
+    "treasury_median": 276,
     "living_polities": 72
    },
-   "fingerprint_blessed": "2026-10-03"
+   "fingerprint_blessed": "2026-10-07"
   },
   {
    "seed": 25,
@@ -421,97 +422,97 @@
     "trade",
     "violent"
    ],
-   "why": "18,776 Empire battles, 75 polities, 75 flows and 9,030 volume: large, violent and commercial at once. The stress case for whatever Industrialisation runs per polity per round.",
+   "why": "24,258 Empire battles, 84 polities, 99 flows (tied for the most) and 13,808 volume: large, violent and commercial at once. It also dispatches the most convoys in the library in its first play year (869). The stress case for whatever Industrialisation runs per polity per round.",
    "readings": {
-    "empire_battles": 18776,
-    "expl_battles": 629,
-    "displacement": 21.4643,
+    "empire_battles": 24258,
+    "expl_battles": 1087,
+    "displacement": 53.35,
     "displacement_verdict": "displaced",
-    "living_polities": 75,
-    "subjects_alive": 3,
-    "treasury_median": 380,
-    "treasury_max": 361484523,
-    "flows": 75,
-    "flow_volume": 9030,
-    "corridors": 3792,
-    "post_roads_built": 16,
-    "treaties_standing_1660": 160
+    "living_polities": 84,
+    "subjects_alive": 0,
+    "treasury_median": 4607,
+    "treasury_max": 360559989,
+    "flows": 99,
+    "flow_volume": 13808,
+    "corridors": 2721,
+    "post_roads_built": 3,
+    "treaties_standing_1660": 281
    },
    "fingerprint": {
-    "empire_battles": 25795,
-    "expl_battles": 2371,
-    "flows": 84,
-    "treasury_median": 303,
-    "living_polities": 82
+    "empire_battles": 24258,
+    "expl_battles": 1087,
+    "flows": 99,
+    "treasury_median": 4607,
+    "living_polities": 84
    },
-   "fingerprint_blessed": "2026-10-03"
+   "fingerprint_blessed": "2026-10-07"
   },
   {
    "seed": 38,
-   "name": "The insular rich",
+   "name": "The small colonial world",
    "tags": [
-    "treasury",
-    "held",
-    "sparse"
+    "colonial",
+    "displaced",
+    "sparse",
+    "no-roads"
    ],
-   "why": "Thirty polities, an 8.6M median chest, displacement 0.50 and 27 flows. Wealth that stayed home, against seed 40 which is wealth that built roads.",
+   "why": "Forty-seven polities holding five subjects, tied with seed 46 for the most, with no post road, 34 flows and a 303 median chest. Displacement is 56.1 (505 frontier battles against 9 neighbour wars). It no longer answers the question it was chosen for, wealth that stayed home: the median chest is 303, not the 8.6M it read when curated, and the conflict turned outward.",
    "readings": {
-    "empire_battles": 4453,
-    "expl_battles": 176,
-    "displacement": 0.5043,
-    "displacement_verdict": "held",
-    "living_polities": 30,
-    "subjects_alive": 1,
-    "treasury_median": 8602106,
-    "treasury_max": 198671803,
-    "flows": 27,
-    "flow_volume": 1909,
-    "corridors": 1910,
-    "post_roads_built": 4,
-    "treaties_standing_1660": 36
+    "empire_battles": 7443,
+    "expl_battles": 514,
+    "displacement": 56.1111,
+    "displacement_verdict": "displaced",
+    "living_polities": 47,
+    "subjects_alive": 5,
+    "treasury_median": 303,
+    "treasury_max": 147687690,
+    "flows": 34,
+    "flow_volume": 5619,
+    "corridors": 1469,
+    "post_roads_built": 0,
+    "treaties_standing_1660": 93
    },
    "fingerprint": {
-    "empire_battles": 4822,
-    "expl_battles": 153,
-    "flows": 29,
-    "treasury_median": 196,
-    "living_polities": 29
+    "empire_battles": 7443,
+    "expl_battles": 514,
+    "flows": 34,
+    "treasury_median": 303,
+    "living_polities": 47
    },
-   "fingerprint_blessed": "2026-10-04",
+   "fingerprint_blessed": "2026-10-07",
    "replaces": "seed 19 (Ben, 2026-09-17, NR-887: the old seed no longer answered this question)"
   },
   {
    "seed": 9,
-   "name": "The frontier with no neighbours",
+   "name": "The few-neighbour frontier",
    "tags": [
     "displaced",
-    "no-colonial",
     "ordinary"
    ],
-   "why": "A no-neighbour-war world: 229 frontier battles, zero neighbour wars, one subject, 50 polities and a 380 median chest. It tests the displacement reading itself as much as the phase — a world satisfied by silence on one axis and busy on the other.",
+   "why": "A frontier world with almost no neighbour wars: 297 frontier battles against 6, displacement 49.5, with 3 subjects, 50 polities, 40 flows and a 157 median chest. It no longer tests the displacement reading itself: with six neighbour wars the ratio is defined, and no library seed now reads displaced(no-nb).",
    "readings": {
-    "empire_battles": 5834,
-    "expl_battles": 229,
-    "displacement": null,
-    "displacement_verdict": "displaced(no-nb)",
+    "empire_battles": 5944,
+    "expl_battles": 303,
+    "displacement": 49.5,
+    "displacement_verdict": "displaced",
     "living_polities": 50,
-    "subjects_alive": 1,
-    "treasury_median": 380,
-    "treasury_max": 162260598,
-    "flows": 41,
-    "flow_volume": 3029,
-    "corridors": 2891,
-    "post_roads_built": 3,
-    "treaties_standing_1660": 69
+    "subjects_alive": 3,
+    "treasury_median": 157,
+    "treasury_max": 58323826,
+    "flows": 40,
+    "flow_volume": 4595,
+    "corridors": 1162,
+    "post_roads_built": 1,
+    "treaties_standing_1660": 71
    },
    "fingerprint": {
-    "empire_battles": 9467,
-    "expl_battles": 1094,
-    "flows": 46,
-    "treasury_median": 233,
-    "living_polities": 52
+    "empire_battles": 5944,
+    "expl_battles": 303,
+    "flows": 40,
+    "treasury_median": 157,
+    "living_polities": 50
    },
-   "fingerprint_blessed": "2026-10-04",
+   "fingerprint_blessed": "2026-10-07",
    "replaces": "seed 4 (Ben, 2026-09-17, NR-887: the old seed no longer answered this question)"
   },
   {
@@ -521,30 +522,30 @@
     "reference",
     "ordinary"
    ],
-   "why": "Seed 0 is the descriptor default and the world every harness, capture and golden is written about; the wizard board capture of 2026-09-16 is this world. It belongs here because a library needs the world everything else is compared against, not because it is unusual.",
+   "why": "Seed 0 is the descriptor default and the world every harness, capture and golden is written about; the wizard board capture of 2026-09-16 was taken on this seed. It belongs here because a library needs the world everything else is compared against, not because it is unusual. On this binary it is not ordinary on every axis: its displacement, 147.1, is the highest in the library, and its 78 subjections formed are the most.",
    "readings": {
-    "empire_battles": 10103,
-    "expl_battles": 406,
-    "displacement": 2.5,
+    "empire_battles": 15235,
+    "expl_battles": 1333,
+    "displacement": 147.1111,
     "displacement_verdict": "displaced",
-    "living_polities": 54,
-    "subjects_alive": 6,
-    "treasury_median": 310871,
-    "treasury_max": 734515623,
-    "flows": 59,
-    "flow_volume": 5271,
-    "corridors": 2914,
-    "post_roads_built": 15,
-    "treaties_standing_1660": 87
+    "living_polities": 68,
+    "subjects_alive": 4,
+    "treasury_median": 432,
+    "treasury_max": 165737114,
+    "flows": 65,
+    "flow_volume": 10341,
+    "corridors": 2185,
+    "post_roads_built": 7,
+    "treaties_standing_1660": 222
    },
    "fingerprint": {
-    "empire_battles": 16712,
-    "expl_battles": 899,
-    "flows": 72,
-    "treasury_median": 162,
-    "living_polities": 70
+    "empire_battles": 15235,
+    "expl_battles": 1333,
+    "flows": 65,
+    "treasury_median": 432,
+    "living_polities": 68
    },
-   "fingerprint_blessed": "2026-10-04"
+   "fingerprint_blessed": "2026-10-07"
   }
  ]
 }

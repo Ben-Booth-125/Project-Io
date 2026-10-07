@@ -1293,6 +1293,50 @@
     "src/ui/selection_panel.cpp"
    ],
    "design": "LIVE CLICK (Ben, 2026-10-07): (a) no visible surface shows a site's running cost under construction, so the idle-floor rule (FINANCE.md, a site pays the idle floor) could not be checked; (b) the player still hits \"market can't supply materials\" on many buildings. Show the site's cost while building, and say which material is short and why (none on the shelf, over the fair-price ceiling, no producer in reach) so the player can act. Pair with BL-1180 (construction panel drift, same panels). The supply half may share a cause with BL-1217 (inputs reach processors)."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 50,
+   "written": "2026-10-07",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Claude (the sprint 49 re-bless; Ben, the re-bless form, 2026-10-07)",
+   "id": "BL-1220",
+   "short_name": "GATE_LAKE_CAP_AND_DENSITY",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "A committed check asserts the lake size cap and the density ceiling per good served",
+   "authority_doc": "docs/economy/TILES.md",
+   "files": [
+    "tools/verify/lake_census.cpp",
+    "tools/verify/density_census.cpp"
+   ],
+   "design": "Ben (the re-bless form, 2026-10-07): authorised the sprint 49 re-bless without these, filed for sprint 50. DELIVERY.md asks that a claim being re-blessed has a committed check first; two of sprint 49's did not. (a) No enclosed water body above the lake size cap (150 tiles, TILES.md) is classed a lake, and none at or below is classed a sea. (b) On the shipped spend, firms per good in G sit at the density ceiling of 7.5 per good served, capped at 199 (INDUSTRIALISATION.md). lake_census and density_census only read today; turn each into a gate with a row that fails on the pre-rule code."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 50,
+   "written": "2026-10-07",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Claude (the sprint 49 re-bless; Ben, the re-bless form, 2026-10-07)",
+   "id": "BL-1221",
+   "short_name": "REBLESS_49_UNTRACED",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 3,
+   "title": "Trace the movements the sprint 49 re-bless could not attribute",
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "tools/verify/rebless_shape_probe.cpp",
+    "tools/verify/haulage_measure.cpp"
+   ],
+   "design": "Ben (the re-bless form, 2026-10-07): sprint 50, beside BL-1217 (inputs reach processors). The per-merge series is in docs/development/drafts/sprint-49-rebless.md. Trace: (1) BL-1209 (shelf k = 1) cuts rival cash by 1.96 M pooled and leaves 13 rivals with negative cash (was 1) - which flow; (2) BL-1203 (water reaches dry markets) runs 25% more convoys yet sells 12.8% less at destination; (3) BL-1198 (the Well) adds 33 water sites and moves haulage not at all, to the decimal; (4) at BL-1200 (lake cap) people in centres rise 11.9% while the settlement record falls 2.4%; (5) whole road networks flip between Highway and Road tiers on single seeds at four merges with no new length (sprint 48 saw the same). Each: name the mechanism, then decide whether it is intended."
   }
  ]
 }

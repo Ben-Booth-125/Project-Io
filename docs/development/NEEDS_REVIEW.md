@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*82 entries — 5 open, 77 resolved.*
+*83 entries — 6 open, 77 resolved.*
 
 ---
 
@@ -105,6 +105,21 @@ Your ruling read "materials paid so far refunded". The build refunds the recorde
 > **Recommendation:** A.
 
 *Files: `src/world/economy_system.cpp`, `src/world/corporation_generation.cpp`, `docs/generation/CORPORATION_GENERATION.md`*
+
+### NR-979 — Six curated seeds no longer serve the purpose they were chosen for: re-curate them?
+*question · raised 2026-10-07 · from the sprint 49 seed-library rewrite (Ben, the re-bless form: rewrite descriptions from the new readings)*
+
+After the sprint 49 re-bless (the lake cap moved every seed's history), the library was rewritten to be true; six seeds now say plainly that they no longer answer their question: 41 (colonial ties without capital - now capital, almost no colonial ties), 43 (concentrated wealth in a thin map - now the poorest), 38 (wealth that stayed home - neither), 32 (roads without traffic - mid-library on both), 9 (the displaced(no-nb) reading - no seed reads it now), 40 (money and roads without an outward turn - only roads survive). Two more are weaker than a sibling at their own job: 10 (37 is the cleaner roadless case) and 13 (46 and 38 now hold more living subjects).
+
+**Why it matters.** A check aimed at "the rich small world" or "the roadless traders" now runs on a seed that is neither; tags still route --for queries to them.
+
+- A: re-curate - sweep a seed pool for replacements that serve the lost purposes (a sprint 50/51 item)
+- B: keep the rewritten seeds; drop the lost purposes from the library
+- C: re-curate only the purposes a harness or skill depends on
+
+> **Recommendation:** C - check which tags a harness or skill queries (--for), replace those seeds, and let the rest go.
+
+*Files: `docs/generation/seed_library.json`*
 
 ---
 
