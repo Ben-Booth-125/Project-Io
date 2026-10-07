@@ -124,9 +124,12 @@
 //                 surplus source of that good -- sources under the DISPATCHER's
 //                 own test (surplus > 0; water_pair_probe keeps >= 1 unit) --
 //                 plus noshelfsurplus (no surplus shelf of the good anywhere),
-//                 split `poolheld` (a corporation's pool on the body holds >= 1
-//                 unit beyond its processor_reservation: this tick's output not
-//                 yet listed) / `none`, and `grid` (never cargo; unclassified)
+//                 split on the PRE-STEP pools (last tick's leftover, not this
+//                 tick's output): `poolheld` (a corporation's pool on the body
+//                 holds >= 1 unit beyond processor_reservation and this tick's
+//                 deliveries, outside any standing sell order -- dispatch_convoys'
+//                 own surplus) / `ordered` (only under a sell order, which the
+//                 corp dispatcher never hauls) / `none`; and `grid` (never cargo)
 //        input    every input-starved processor (G1's `input` state, this tick's
 //                 report), filed under its scarcest input (limiting_input) at
 //                 ITS market: `nomarket` (no tile market: a body pool), `grid`,
@@ -188,6 +191,7 @@
 #include <map>
 #include <memory>
 #include <set>
+#include <tuple>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -396,9 +400,10 @@ void tap_after_lap(const world& w, int lap, void* ctx)
 // --- L: the logistics row (BL-1223) -------------------------------------------
 // export_refusal's six dispatcher classes (0..5), then labels this row adds
 // OUTSIDE the dispatcher's order (they are not refusals by a rule):
-constexpr int x_poolheld  = export_refusal::c_count; ///< no shelf surplus; a corp pool on the body holds one
+constexpr int x_poolheld  = export_refusal::c_count; ///< no shelf surplus; a corp pool on the body holds one (pre-step)
 constexpr int x_none      = x_poolheld + 1;          ///< no shelf surplus and no pool surplus on the body
-constexpr int x_grid      = x_none + 1;              ///< a grid good: never cargo
+constexpr int x_ordered   = x_none + 1;              ///< pool surplus exists only under standing sell orders
+constexpr int x_grid      = x_ordered + 1;           ///< a grid good: never cargo
 constexpr int x_ceiling   = x_grid + 1;              ///< stocked, but priced over the fair-price ceiling
 constexpr int x_thin      = x_ceiling + 1;           ///< stocked, but pool + whole shelf < t_idle of a full run
 constexpr int x_contended = x_thin + 1;              ///< stocked and enough; other draws / pro-rata took it
@@ -407,12 +412,12 @@ constexpr int x_nomarket  = x_unpriced + 1;          ///< the processor has no t
 constexpr int x_count     = x_nomarket + 1;
 const char* const k_x_name[x_count] = {
     "body", "noroute", "gate", "costly", "noroom", "room",
-    "noshelfsurplus/poolheld", "noshelfsurplus/none", "grid",
+    "noshelfsurplus/poolheld", "noshelfsurplus/none", "noshelfsurplus/ordered", "grid",
     "stocked/ceiling", "stocked/thin", "stocked/contended", "unpriced", "nomarket"};
 /// Print orders: furthest from sending first.
-const int k_dry_order[]  = {x_none, x_poolheld, 0, 1, 2, 3, 4, 5, x_grid};
+const int k_dry_order[]  = {x_none, x_ordered, x_poolheld, 0, 1, 2, 3, 4, 5, x_grid};
 const int k_proc_order[] = {x_nomarket, x_grid, x_unpriced, x_ceiling, x_thin, x_contended,
-                            x_none, x_poolheld, 0, 1, 2, 3, 4, 5};
+                            x_none, x_ordered, x_poolheld, 0, 1, 2, 3, 4, 5};
 
 struct lg_reading
 {
@@ -659,6 +664,9 @@ struct lg_probe
     /// dispatch read (x_poolheld / x_none where no shelf surplus exists).
     std::map<std::pair<entity_id, std::size_t>, int> proc_best;
     std::set<std::pair<entity_id, std::size_t>> exported; ///< (src market, good) shelf-exported this tick
+    /// (body, good) -> x_poolheld / x_ordered / absent (x_none), from the PRE-STEP
+    /// pools: last tick's post-clear leftover, not this tick's fresh output.
+    std::map<std::pair<entity_id, std::size_t>, int> pool_status;
 };
 
 std::vector<entity_id> sorted_processors(const world& w)
@@ -708,24 +716,38 @@ void lg_snapshot(const world& w, lg_probe& p)
     }
 }
 
-/// noshelfsurplus split: does some corporation's pool on `body` hold >= 1 unit
-/// of `g` beyond its processor_reservation (the surplus the corporations'
-/// dispatcher and clearing's auto-surplus treat as sellable)?
-bool pool_surplus_on_body(const world& w, const recipe_registry& reg, entity_id body, std::size_t g,
-                          std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>>& res_cache)
+/// noshelfsurplus split, read PRE-STEP (after the convoys lap): per (body, good),
+/// does some corporation's pool on the body hold >= 1 unit the corporations'
+/// dispatcher would treat as shippable -- pool less processor_reservation less
+/// this tick's deliveries (dispatch_arrived), dispatch_convoys' own surplus
+/// (supply_system.cpp) -- outside a standing sell order (`poolheld`), or only
+/// under one (`ordered`: dispatch_convoys never hauls an order-controlled
+/// (corp, body, good))? Absent = `none`.
+void snapshot_pool_status(const world& w, const recipe_registry& reg, lg_probe& p)
 {
+    p.pool_status.clear();
+    std::set<std::tuple<entity_id, entity_id, std::size_t>> ordered;
+    for (const sell_order& o : w.sell_orders)
+        ordered.insert({o.corp, o.body, static_cast<std::size_t>(o.resource)});
+    const grid_goods_params& grid = reg.grid_goods();
     for (const auto& [key, pool] : w.corp_market_pools) // std::map: sorted
     {
-        if (!(pool.quantities[g] >= 1.0f)) continue;
-        const auto mi = w.markets.find(key.second);
-        const entity_id kb = mi != w.markets.end() ? mi->second.body : key.second;
-        if (kb != body || !w.corporations.count(key.first)) continue;
-        auto ri = res_cache.find(key);
-        if (ri == res_cache.end())
-            ri = res_cache.emplace(key, processor_reservation(w, reg, key.first, key.second)).first;
-        if (pool.quantities[g] - ri->second[g] >= 1.0f) return true;
+        if (!w.corporations.count(key.first)) continue;
+        const entity_id body = pool_key_body(w, key.second);
+        if (body == null_entity) continue;
+        bool any = false;
+        for (std::size_t g = 0; g < resource_count && !any; ++g) any = pool.quantities[g] >= 1.0f;
+        if (!any) continue;
+        const std::array<float, resource_count> res = processor_reservation(w, reg, key.first, key.second);
+        for (std::size_t g = 0; g < resource_count; ++g)
+        {
+            if (grid.grid(g) || !(pool.quantities[g] >= 1.0f)) continue;
+            const float surplus = pool.quantities[g] - res[g] - dispatch_arrived(w, key.first, key.second, g);
+            if (!(surplus >= 1.0f)) continue;
+            int& st = p.pool_status.try_emplace(std::make_pair(body, g), x_ordered).first->second;
+            if (!ordered.count({key.first, body, g})) st = x_poolheld;
+        }
     }
-    return false;
 }
 
 void lg_after_lap(const world& cw, int lap, void* vctx)
@@ -733,7 +755,7 @@ void lg_after_lap(const world& cw, int lap, void* vctx)
     using namespace export_refusal;
     auto* p = static_cast<lg_probe*>(vctx);
     if (!p->armed) return;
-    if (lap == p->lap_pre) { lg_snapshot(cw, *p); return; }
+    if (lap == p->lap_pre) { lg_snapshot(cw, *p); snapshot_pool_status(cw, *p->reg, *p); return; }
     if (lap != p->lap) return;
     world& w = const_cast<world&>(cw); // router path caches only (export_refusal.hpp)
     const recipe_registry& reg = *p->reg;
@@ -765,15 +787,9 @@ void lg_after_lap(const world& cw, int lap, void* vctx)
 
     // the dispatcher's own surplus test (> 0), not water_pair_probe's 1 unit
     std::vector<good_markets> scans(resource_count);
-    std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> res_cache;
-    std::map<std::pair<entity_id, std::size_t>, bool> pool_held; // (body, good)
     const auto no_shelf_class = [&](entity_id d, std::size_t g) {
-        const entity_id body = w.markets.at(d).body;
-        const auto key = std::make_pair(body, g);
-        auto it = pool_held.find(key);
-        if (it == pool_held.end())
-            it = pool_held.emplace(key, pool_surplus_on_body(w, reg, body, g, res_cache)).first;
-        return it->second ? x_poolheld : x_none;
+        const auto it = p->pool_status.find(std::make_pair(w.markets.at(d).body, g));
+        return it == p->pool_status.end() ? x_none : it->second;
     };
 
     // dry (market, good) pairs by best class
@@ -869,6 +885,7 @@ void lg_after_tick(const world& w, const economy_report& rep, const recipe_regis
     p.snap.clear();
     p.proc_best.clear();
     p.exported.clear();
+    p.pool_status.clear();
 }
 
 /// Two after_lap readers on the one hook slot: the existing one first, untouched.

@@ -112,8 +112,9 @@ dispatcher's order. They are not refusals by a rule:
 
 | Label | Meaning |
 |---|---|
-| `noshelfsurplus/poolheld` | No market shelf anywhere holds a surplus of the good. Some corporation's pool on the destination's body does hold >= 1 unit beyond its `processor_reservation`. That is the surplus clearing's auto-surplus and the corporations' dispatcher treat as sellable. Usually it is this tick's output, which sits in pools until the clear lists it. |
-| `noshelfsurplus/none` | No shelf surplus and no pool surplus on the body. Nothing to ship. |
+| `noshelfsurplus/poolheld` | No market shelf anywhere holds a surplus of the good. Some corporation's pool on the destination's body holds >= 1 unit the corporations' dispatcher would ship. That is `dispatch_convoys`' own surplus: pool less `processor_reservation` less this tick's deliveries (`dispatch_arrived`), outside any standing sell order. It is read on the PRE-STEP pools (after the `convoys` lap): last tick's post-clear leftover. This tick's fresh output is excluded, since any producer on the body would make the test true. |
+| `noshelfsurplus/ordered` | As `poolheld`, but every such pool surplus is under a standing sell order. The corp dispatcher never hauls an order-controlled (corp, body, good); the order sells it at home. |
+| `noshelfsurplus/none` | No shelf surplus and no shippable pool surplus on the body, pre-step. Nothing to ship. |
 | `grid` | A grid good. It is never cargo, so it is not classified. |
 | `stocked/ceiling` | Processor block only. Before the economy step, the processor's market shelf held >= 1 unit, but its price was over the BL-1172 fair-price ceiling (`!shelf_admits`, `reservation_mult x base`). The draw does not buy and does not bid. |
 | `stocked/thin` | Stocked and admitted, but pool plus the WHOLE shelf covers less than `t_idle` of a full run. This is `run_processing`'s early idle return, even with no contention. |
@@ -151,7 +152,7 @@ block covers them instead. A **surplus source** in this row uses the DISPATCHER'
   1. `nomarket`, `grid`, `unpriced`.
   2. `stocked/*`, if the shelf held >= 1 unit in the snapshot.
   3. Otherwise the best dispatcher class, read at dispatch.
-  4. Otherwise `noshelfsurplus/*`.
+  4. Otherwise `noshelfsurplus/*` (`poolheld`, `ordered`, `none`).
 
   Each class prints **`N over ceiling`**: how many of those processors' inputs are priced
   above the fair-price ceiling. A delivery would not unblock them until the price falls.
@@ -159,8 +160,8 @@ block covers them instead. A **surplus source** in this row uses the DISPATCHER'
   shelf-exported from its market this tick E`** — the stocked total and its mean shelf. `C`
   is all starved processors whose input is over the ceiling, whatever their class. `E` counts
   processors whose input `export_market_shelves` shipped off their own market this tick.
-  `UNREAD` prints only if a starved processor had a market but no pre-step snapshot (it was
-  not live before the step). It should not print.
+  `UNREAD` counts starved processors that had a market but no pre-step snapshot. It prints
+  for a plant completed this tick, which was not live before the step.
 - **`starved by input: good n [class n, ...]`** — the same processors listed by input good,
   top goods first, each with its class split.
 
@@ -168,10 +169,15 @@ block covers them instead. A **surplus source** in this row uses the DISPATCHER'
 `convoys` lap, before `run_economy_step`. It holds the shelf, the owner's pool and
 `shelf_admits`. Later draws in the step and this tick's shelf export therefore cannot hide
 stock. Price is written only at the end of `clear_markets`, so the pre-step price is the
-price the draw saw. Two biases remain:
+price the draw saw. Biases remain:
 - The `thin` need is estimated, as `water_pair_probe`'s latent want is. The formula is
   `input x base_rate x effective workforce x workforce target x supply scalar`.
 - The pool is read before this step's extraction credits it.
+- Between the snapshot and the processor's draw, other things move the shelf and pool.
+  Construction sites draw shelves (phase 1). Contract deliveries and drains run (phase 2).
+  Sibling buildings of the same corporation draw the same pool. Any of these can swap a
+  processor between `stocked/thin` and `stocked/contended`. Read the two together when
+  the margin matters.
 
 ### How to read the processor-input block (BL-1217)
 
@@ -185,8 +191,10 @@ Read the class split first, then the over-ceiling counts, then the goods.
   The fix is total supply into that market, or the BL-1209 sharing rule.
 - **`noshelfsurplus/none`**: no surplus on any shelf or pool. The fix is upstream supply:
   extraction or another processor's output.
-- **`noshelfsurplus/poolheld`**: the goods exist in pools and have not reached a shelf. Look
-  at listing and auto-surplus, and at corporations' dispatch.
+- **`noshelfsurplus/poolheld`**: shippable goods sat in pools from last tick and have not
+  reached a shelf. Look at listing and auto-surplus, and at corporations' dispatch.
+- **`noshelfsurplus/ordered`**: the only pool surplus is under standing sell orders, which
+  keep it home by design.
 - **`noroute` / `body`**: shelf surplus exists but cannot reach. The fix is the network:
   ports, roads, reach.
 - **`gate` / `costly`**: reachable, but the price gradient does not pay for the haul. The
