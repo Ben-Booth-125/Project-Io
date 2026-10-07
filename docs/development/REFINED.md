@@ -39,7 +39,7 @@ a draw-and-silence PULSE (ores, steel) and PHANTOM background demand (ree alloy,
 Ben (2026-10-07, the ceiling-lock form): try A and D, each ALONE on 5 seeds, then rule.
 Both behind a registry switch, default OFF; no doc changes before the ruling.
 - [x] A Lane PRICE (b9480859, unmerged): no G1 lift - 57.0 / A1 56.5 / A2 56.2 on 5 seeds; the ceiling share moves to contended. Inflow is the constraint.
-- [ ] D Lane PHANTOM: the background basket draws from the shelf (after households, no money).
+- [x] D Lane PHANTOM (a9019c35): G1 57.0 -> 60.9, G2 52.8 -> 64.4, G3 90.0 -> 91.9 on 5 seeds. Ben ADOPTED it switch on, after cold review (running). A dropped (Ben). BL-1226 (background pull per doc) filed.
 - [ ] M Main session: readings side by side; Ben's ruling form; write the ruling into MARKETS.md.
 
 ## Sprint 48 — the world moves forward (opened 2026-09-25, CLOSED 2026-10-04)

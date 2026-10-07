@@ -210,7 +210,16 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
      building upkeep buys them. **A body's pull is SPLIT across its markets in proportion to their
      catchment population**, never granted whole to each — a body carved into nine markets does not
      want nine times as much. Per-body population is gathered in a `std::map` so accumulation order
-     is deterministic. Tunables in `scripts/economy.lua` § `background_demand`.
+     is deterministic. **The pull consumes what it buys (Ben, 2026-10-07; BL-1217, inputs reach
+     processors):** after the households' draw in step 12, the background basket draws from the
+     market's shelf what it bid, or the whole shelf if it holds less, markets and resources
+     ascending. No money moves, on the households' rule: the market paid the maker when it bought
+     the stock. A bid that never took goods held a stocked shelf over the fair-price ceiling while
+     the processors beside it were silenced; measured on five seeds, consuming lifted processors
+     running at handoff 57.0% → 60.9%, run-rate income 52.8% → 64.4% and firm survival 90.0% →
+     91.9%. **The cost, accepted:** a shelf the pull drains is a shelf a real processor cannot
+     draw next tick (refined copper's users starved 3.4 → 4.2 per reading). Tunables in
+     `scripts/economy.lua` § `background_demand` (`consumes`).
 4. **Auto-surplus** — each `(corp, market)` pool lists everything above its **processor
    reservation** (the inputs its own processors need for a full run next tick) for sale. A
    resource under a standing sell order is exempted — the order governs, and by default the order
@@ -279,7 +288,9 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
     and a household's reservation is already in its elastic bid. Several centres on one market
     bid one pooled quantity, so a short shelf fills each of them in the same share. Markets
     ascending, resources ascending. The fill is what the growth gate reads
-    (`POPULATION.md` § Growth, decline and razing).
+    (`POPULATION.md` § Growth, decline and razing). **The background pull draws next**, on the
+    same terms, from what households left: `min(background bid, inventory)` (step 3,
+    `inject_background_demand`).
 13. **Shelf spoilage** — every good left on every shelf loses its spoilage rate,
     `inventory[r] −= inventory[r] × rate[r]` (§ Price resolution, *The shelf spoils*). After the
     households' draw, so the households' draw is not taxed by its own spoilage (the nation's later

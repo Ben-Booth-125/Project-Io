@@ -1431,6 +1431,28 @@
     "docs/ai/ACTIONS.json"
    ],
    "design": "SETTLED (Ben, 2026-10-07): every built lens sits in at least one rung row of the strip and carries its OWN glyph - none borrows another lens's mark, none is keyboard-only (LENSES.md § The strip rotates with the rung). The check (2026-10-07, overlay.cpp): Trade flow is on no strip and borrows supply; Company is on the Planetary strip borrowing the corporation mark beside Corporation; Supply-routes is on the Solar strip borrowing supply beside Supply; Reach is on the Solar strip borrowing the convoy chevron. WORK: four new glyphs in src/ui/icons.* under the (dl, centre, r, colour) contract, catalogued in ICONS.md; Trade flow added to planetary_modes; ACTIONS entries for the strip presses; captures of all three rung strips. NOTE: the LENSES.md roster lists a `culture` lens with no overlay_mode in code - a doc/code mismatch to raise, not this item's work."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 50,
+   "written": "2026-10-07",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1226",
+   "short_name": "BACKGROUND_PULL_PER_DOC",
+   "author": "Claude (found writing the lever D ruling into MARKETS.md, 2026-10-07)",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 2,
+   "title": "Background demand is split across a body's markets and leaves electronics, as MARKETS.md already says",
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "src/world/market_clearing.cpp",
+    "scripts/economy.lua"
+   ],
+   "design": "CODE DISAGREES WITH A SETTLED DOC (MARKETS.md step 3, inject_background_demand): (1) \"A body's pull is SPLIT across its markets in proportion to their catchment population, never granted whole to each\" - but market_clearing.cpp ~785-797 adds the WHOLE body scale to every market on the body, so a body with N markets bids N times its pull; (2) \"electronics left it when the metropolis rung of the household ladder took it (Ben, 2026-09-15)\" - but scripts/economy.lua background_demand.baskets industrial still lists electronics = 0.15. With lever D adopted (the pull consumes, Ben 2026-10-07) the N-times bid drains shelves 5-30x their stock and starves refined copper's real users (3.4 -> 4.2 per reading). WORK: split by catchment population as the doc says; drop electronics from the basket; a world-mover - measure on the market-viability skill, 5 seeds, before/after, with consumes on."
   }
  ]
 }
