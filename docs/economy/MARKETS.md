@@ -236,7 +236,12 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
    waits (the player chose to hold it). **An order closes itself once its pool has stood empty**
    for a short run of ticks, and the good returns to auto-surplus. The rule is the same for the
    player and for rival corps, so a rival's order can never strand the goods it was placed to
-   sell.
+   sell. **An order is a floor, not a hold (Ben, 2026-10-07; BL-1229, steel stays home):** the
+   good under an order still travels. The dispatcher may haul from an ordered pool whenever the
+   haul nets the seller more than the order's floor, exactly as it would haul unordered surplus
+   (`SUPPLY.md` § Dispatch trigger); the order only refuses a sale below its price. Holding goods
+   back from every convoy is not what a price floor means, and measured it stranded 30% of all
+   steel surplus while the processors that wanted it starved.
 5. **Standing sell orders** — read from `world::sell_orders` (the book is world state, placed by
    the player and by rival corps through the same `place_sell_order` verb). Each lists the pool's
    surplus above the processor reservation — all of it when `quantity` is 0 (no cap), at most

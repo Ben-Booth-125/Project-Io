@@ -150,6 +150,17 @@ about its *connectedness* rather than about its ground. That is a supply asymmet
 player can read and change, which is what `docs/generation/GENERATION_STRATEGY.md` § Asymmetry is the
 deliverable asks generation to produce.
 
+**The province is the grid's cell (Ben, 2026-10-07; BL-1230, power crosses markets).** A province
+with a road in it is **wired**, and every building in a wired province is on the power grid there —
+the province, not the building's own tile, is what the road has to reach. Wired provinces whose
+roads join form **one grid**: a building in any of them draws from any generator on that grid,
+across market boundaries, on the one-tick latency above. A building pays **its own market's power
+price**, cleared against the generation on its grid, so power keeps a market price while its
+supply is the grid's. A province with no road is dark, and a cut that splits the roads splits the
+grid (§ 7). Found by the BL-1228 (mine upkeep supply) diagnosis: power held on one market's shelf
+never reached a mine in the next market's catchment, and that alone held most mines at the
+shortfall floor.
+
 `docs/economy/PRODUCTION.md` § Power owns the generation buildings, the upkeep draw and the
 shortfall rule; this section owns only the transmission.
 

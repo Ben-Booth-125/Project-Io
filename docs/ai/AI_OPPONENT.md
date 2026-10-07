@@ -446,6 +446,14 @@ tile's extractable deposits by what the economy's recipes want and cannot get �
 sites already targeting that resource, so the pull decays as the shortage is answered); recipes
 and dials enumerate per owned building. Bounded enumeration is what keeps the per-tick cost flat.
 
+**An extraction candidate is priced at the rank it would take (Ben, 2026-10-07; BL-1227, idle
+mines).** A new site on a tile that already carries a stack yields `0.8^(k−1)` of the first
+(`PRODUCTION.md` § Building stacks), so its build estimate reads its own stack rank, as BL-162's
+`estimate_prospective_profit` already models it — never the first site's output. Priced at rank 1,
+the scorer stacked up to 85 sites on one tile, the deep ones earning about a tenth of their running
+cost, and the loss reflex then idled them. This corrects a wrong estimate inside the existing
+scorer grant (§ 11); it adds no behaviour.
+
 **The processing-facility candidate** (BL-439, AI builds processors) runs on the same score curve
 and the same solvency, glut and reserve-floor gates as the extraction candidate, and differs only
 where a processor genuinely differs from a mine:
