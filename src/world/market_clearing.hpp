@@ -340,13 +340,26 @@ float price_target(float base, float supply, float demand,
 ///     already sizes a haul against, paired here as it always was with the
 ///     last clear's listings.
 /// Negative figures read as zero. Pure; deterministic.
+/// BL-1209: the cap is k x (demand + suppressed want), `hauler_want` (above).
 inline float pricing_supply(const market_component& m, std::size_t r, float shelf_supply_ticks)
 {
     const float listed = std::max(0.0f, m.supply[r]);
     if (!(shelf_supply_ticks > 0.0f))
         return listed;
     const float shelf = std::max(0.0f, m.inventory[r]);
-    const float sells = shelf_supply_ticks * std::max(0.0f, m.demand[r]);
+    // BL-1209 (MARKETS.md § Price resolution, "The shelf's share reads the want
+    // the ceiling silenced", Ben 2026-10-07): the cap counts the SUPPRESSED want
+    // (`hauler_want`, BL-1203's register — processor inputs and construction
+    // materials unbid over the fair-price ceiling) beside `demand`. It is read
+    // HERE ONLY: it never enters `demand`, never bids, never pays; it only lets
+    // a stocked shelf count as the supply it is, so a shelf priced over the
+    // ceiling against silenced buyers can fall back to where they return. With
+    // an empty shelf the min is 0 and the price law is exactly the base's; with
+    // k = 0 the early return above means it is never read at all. Both callers
+    // read the register at the same point they read `demand`: clearing after it
+    // rewrites both this tick, dispatch the last clear's.
+    const float wants = std::max(0.0f, m.demand[r]) + std::max(0.0f, m.hauler_want[r]);
+    const float sells = shelf_supply_ticks * wants;
     return listed + std::min(shelf, sells);
 }
 

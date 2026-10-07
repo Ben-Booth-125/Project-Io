@@ -1551,9 +1551,12 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // BL-1203 (SUPPLY.md § Dispatch trigger, "What a hauler sees as unmet
     // demand"): the HAULER-ONLY register — the want the fair-price ceiling
     // silenced. Copied to the market for the next tick's dispatch, and NOT into
-    // `demand`: nothing in clearing or price resolution reads `hauler_want`
-    // (BL-1172 unchanged). Rewritten whole every clear, as `demand` is. std::map:
-    // a sorted accumulation.
+    // `demand`: it never bids and is never paid against (BL-1172 unchanged).
+    // BL-1209: the price law reads it in ONE place only — the cap on the
+    // shelf's share, `pricing_supply` (k x (demand + this)), below; written
+    // HERE, before the reference prices, so this tick's clear reads this tick's
+    // silenced want. At k = 0 that read never happens. Rewritten whole every
+    // clear, as `demand` is. std::map: a sorted accumulation.
     for (auto& [mid, mc] : w.markets)
     {
         (void)mid;

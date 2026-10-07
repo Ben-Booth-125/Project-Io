@@ -147,6 +147,57 @@ struct agency_event
     int       value      = 0;           ///< workforce_set: new target; road_placed: tier; order_*: resource id.
 };
 
+/// BL-1209 (MARKETS.md § Price resolution, "A short shelf is shared pro-rata",
+/// Ben 2026-10-07) — ONE DRAW ADMITTED AGAINST A SHELF, as a phase's pre-pass
+/// sees it before anything is drawn. A phase (the construction pass, the
+/// processor pass) lists every draw it is about to make, in its own visit
+/// order, and `ration_short_shelves` says how much of each SHORT shelf each draw
+/// may take: the same share of its want, not first-come by id.
+struct shelf_claimant
+{
+    entity_id building  = null_entity; ///< the drawing building (report attribution)
+    entity_id market    = null_entity; ///< the shelf drawn
+    /// The draw runs only at coverage >= threshold (a processor's t_idle, a
+    /// site's pause_below); coverage 0 never runs.
+    float     threshold = 0.0f;
+    std::array<float, resource_count> need{};  ///< full-run need per good
+    std::array<float, resource_count> own{};   ///< met without the shelf (the pool's take)
+    std::array<float, resource_count> claim{}; ///< the want ADMITTED against the shelf (under the ceiling)
+    std::array<bool,  resource_count> gates{}; ///< goods whose coverage decides whether it runs
+};
+
+/// BL-1209 — the shelf caps of one phase, one row per claimant (same order):
+/// `cap[r]` is the most claimant i may take of good r off its shelf this phase.
+/// +infinity where the shelf is not short (every admitted want fits — the draw
+/// is exactly the pre-BL-1209 draw, so an unshort world is byte-identical).
+/// Where it IS short (total admitted want over the shelf as the phase opens):
+/// every RUNNING claimant gets `claim x shelf / total` — the same share of its
+/// want — and the share is solved over the claimants that can run on it: one
+/// that cannot run even at its full want (another good short) is dropped first,
+/// and if the equal share still leaves some under their run threshold, the LAST
+/// such in visit order is dropped, one at a time, until the share runs the rest
+/// (an equal share that runs nobody is not a sharing rule). A dropped claimant
+/// gets 0 off any shelf that was short as the phase opened. Two passes per
+/// solve: the total, then the share; caps sum to at most the shelf, and the
+/// draw is still capped by the shelf as it stands, so the shelf can never be
+/// overdrawn or grow. Pure, deterministic: visit order only.
+std::vector<std::array<float, resource_count>> ration_short_shelves(
+    const world& w, const std::vector<shelf_claimant>& claimants);
+
+/// BL-1209 — one rationed draw, for the verify surface (report-only; nothing
+/// in the sim reads it): a claimant's want, its cap and what it actually drew
+/// of one good off a short shelf. `phase` 'c' construction, 'p' processing.
+struct shelf_ration_row
+{
+    entity_id     market   = null_entity;
+    entity_id     building = null_entity;
+    std::uint16_t r        = 0;
+    char          phase    = 'p';
+    float         claim    = 0.0f;
+    float         cap      = 0.0f;
+    float         drawn    = 0.0f;
+};
+
 /// Result of one economy step: the per-building reports plus the auto-bought
 /// input shortfalls per (corp, body), which become market demand and corporate
 /// expenditure downstream (market_clearing.hpp / budget_system.hpp).
@@ -240,6 +291,10 @@ struct economy_report
     /// to `market_component::hauler_want`, which only the dispatcher's room
     /// (`dispatch_absorbable`) reads. Same std::map, same sorted accumulation.
     std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> hauler_wants;
+
+    /// BL-1209: every draw off a SHORT shelf this tick, rationed pro-rata
+    /// (`ration_short_shelves`). Report-only — the verify surface.
+    std::vector<shelf_ration_row> shelf_rations;
 
 
     /// Per (corporation, body): the pool-level workforce scarcity figure this

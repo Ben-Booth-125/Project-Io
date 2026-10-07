@@ -1429,6 +1429,9 @@ economy = {
         -- Spoilage alone takes the stocked-shelf ceiling to ~0, and every k
         -- above 0 cost firms; the remaining ceiling is EMPTY shelves, which no
         -- k reaches. Re-sweep once water is supplied (BL-1198, the Well).
+        -- BL-1209 (Ben, 2026-10-07): the cap is now k x (demand + the want
+        -- the ceiling silenced) — re-swept for Ben to ratify; k stays 0 here
+        -- until he does.
         shelf_supply_ticks = 0,
     },
 
