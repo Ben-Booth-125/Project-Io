@@ -44,6 +44,9 @@ void draw_lens_icon(ImDrawList* dl, overlay_mode m, ImVec2 rect_min, ImVec2 rect
         // it joins the strip — two strip neighbours sharing a glyph is exactly
         // what LENSES.md forbids, and Corp would be its neighbour.
         case overlay_mode::company:       icons::corporation(dl, centre, r, colour); break;
+        // Trade-flow (BL-1222) is keyboard-only with no dedicated glyph (LENSES.md);
+        // it borrows the supply mark on the same precedent as Supply-routes.
+        case overlay_mode::trade_flow:    icons::supply(dl, centre, r, colour); break;
         default: break;
     }
 }
@@ -66,6 +69,7 @@ const char* overlay_mode_name(overlay_mode m)
         case overlay_mode::supply_routes: return "Supply-routes graph";
         case overlay_mode::throughput:    return "Throughput (active Logistic Points)";
         case overlay_mode::company:       return "Company holdings (background firms)";
+        case overlay_mode::trade_flow:    return "Trade flow (your shipments and refusals)";
         default:                        return "None";
     }
 }
@@ -86,6 +90,7 @@ const char* overlay_mode_short_name(overlay_mode m)
         case overlay_mode::supply_routes: return "Supply routes";
         case overlay_mode::throughput:    return "Throughput";
         case overlay_mode::company:       return "Company";
+        case overlay_mode::trade_flow:    return "Trade flow";
         default:                        return "None";
     }
 }

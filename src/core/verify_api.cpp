@@ -104,6 +104,7 @@ overlay_mode overlay_from_name(const std::string& s)
     if (s == "continent")   return overlay_mode::continent;
     if (s == "supply_routes") return overlay_mode::supply_routes;
     if (s == "throughput")  return overlay_mode::throughput;
+    if (s == "trade_flow")  return overlay_mode::trade_flow;
     return overlay_mode::none;
 }
 
@@ -127,6 +128,7 @@ const char* overlay_script_name(overlay_mode m)
         case overlay_mode::continent:     return "continent";
         case overlay_mode::supply_routes: return "supply_routes";
         case overlay_mode::throughput:    return "throughput";
+        case overlay_mode::trade_flow:    return "trade_flow";
         default:                          return "none";
     }
 }
@@ -2923,6 +2925,14 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // pressed (convoys.md § 3).
     v.set_function("overlay_name", [this]() {
         return std::string{overlay_script_name(m_ui.overlay)};
+    });
+
+    // BL-1222: what the Trade-flow lens drew on the last Planetary frame — arrows,
+    // refusal markers, and the held corporation's passes it read — so a script
+    // can assert the lens shows nothing of a corporation the player left.
+    v.set_function("trade_flow_counts", [this]() {
+        return std::make_tuple(m_ui.trade_flow_arrows, m_ui.trade_flow_markers,
+                               m_ui.trade_flow_passes);
     });
 
     // Drill one row into the expanded Corporation-dashboard roll-up (BL-248), or

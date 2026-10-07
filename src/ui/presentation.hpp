@@ -137,6 +137,23 @@ inline constexpr ImU32 activity_stale   = IM_COL32(140, 142, 150, 210); ///< Rou
 inline constexpr ImU32 activity_visible = IM_COL32(150, 230, 190, 255); ///< Live lane / player presence.
 inline constexpr ImU32 activity_corridor= IM_COL32(120, 205, 160, 130); ///< Lit trade corridor between bodies.
 
+// --- Trade-flow lens (BL-1222; LENSES.md § Trade-flow lens) ---
+// The flow arrows take a neutral logistics hue — a shipment is not an identity.
+// The refusal classes run worst -> best, indexed by `trade_refusal` up to `room`
+// (grey, violet, red, orange, brown, yellow, blue, green): the later the class,
+// the closer the player's surplus came to going there.
+inline constexpr ImU32 trade_flow_arrow = IM_COL32(205, 214, 228, 225);
+inline constexpr ImU32 trade_refusal_colour[8] = {
+    IM_COL32(130, 132, 142, 255), // no lane
+    IM_COL32(170, 125, 225, 255), // price gate
+    IM_COL32(216,  90,  80, 255), // no route
+    IM_COL32(236, 150,  60, 255), // costly
+    IM_COL32(165, 110,  70, 255), // no propellant
+    IM_COL32(232, 212,  80, 255), // no room
+    IM_COL32( 90, 170, 235, 255), // no funds
+    IM_COL32(110, 200, 120, 255), // room
+};
+
 // --- activity fog as a dim shadow (BL-150) ---
 // The activity fog (BL-089) is absence-by-default: an un-networked body is a plain
 // astronomy dot, so with little player commerce the whole map reads as "no fog".
