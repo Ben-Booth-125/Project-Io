@@ -3236,6 +3236,14 @@ struct draw_outcome
 /// caller's shortfall rule takes it unchanged: the building SCALES ITS OUTPUT
 /// DOWN (`building_supply_scalar`), it is not idled — the lights go dim, not out.
 ///
+/// BL-1230 (power crosses markets) — `grid_residual`, when non-null, is the
+/// BUILDING path (LOGISTICS.md § 3a, "The province is the grid's cell"): the
+/// caller has already decided the building is wired by its PROVINCE, so the
+/// tile-reach gate above is not read, and a grid good's admitted shortfall is
+/// bid on the tile's market as usual but NOT filled from that shelf — it is
+/// added to `*grid_residual` for the caller's grid clear, and does not count
+/// as unmet here. The unit path passes nullptr and is unchanged.
+///
 /// BL-1172 — THE OUTCOME. `rec`, when non-null, receives what the draw asked
 /// for (`need`) and what it got per good (`met`: pool take plus market fill,
 /// stored as `need - shortfall` so a fully met good is exactly `need`). The unit
@@ -3249,7 +3257,8 @@ struct draw_outcome
 bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& report,
                        entity_id corp, entity_id body, entity_id tile,
                        const std::array<float, resource_count>& need,
-                       draw_outcome* rec = nullptr)
+                       draw_outcome* rec = nullptr,
+                       std::array<float, resource_count>* grid_residual = nullptr)
 {
     // BL-1003: the draw is from the pool of the TILE's market — the shelf the
     // buyer stands at — or the body-level pool on a market-less body, and the
@@ -3275,7 +3284,7 @@ bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& rep
     // the same conservative direction run_unit_upkeep's own reach trigger takes.
     const grid_goods_params& grid = reg.grid_goods();
     bool connected = true;
-    if (grid.any())
+    if (grid.any() && grid_residual == nullptr)
     {
         const float rc = tile_reach_cost(w, tile);
         connected = (rc >= 0.0f) && std::isfinite(rc);
@@ -3329,6 +3338,20 @@ bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& rep
             }
             (*want)[r] += shortfall; // the BID: the whole shortfall
             (*upk)[r]  += shortfall; // attribution mirror; nothing pays it
+
+            // BL-1230 (power crosses markets): a grid good's bid is placed HERE,
+            // on the buyer's own market at its own price, but its FILL is not
+            // this shelf's to give — it is the grid's. The caller pools every
+            // such residual on a grid and fills them together, pro rata, from
+            // every shelf on the grid (run_building_upkeep). Not unmet yet: the
+            // caller decides that once the grid has been cleared.
+            if (grid_residual != nullptr && grid.grid(r))
+            {
+                (*grid_residual)[r] += shortfall;
+                if (rec != nullptr)
+                    rec->met[r] = required - shortfall;
+                continue;
+            }
 
             const float avail = std::max(0.0f, m->inventory[r]);
             const float drawn = std::min(shortfall, avail);
@@ -3575,6 +3598,36 @@ building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg,
     // corp on one body draw the same stock), so the visit order decides which one
     // goes short — load-bearing, not cosmetic, exactly as run_unit_upkeep's is.
     // io-standing-rules § Determinism.
+    // BL-1230: a wired building whose grid-good bid is still open after its
+    // own pool waits here for the grid clear below; its supply step waits with
+    // it. Pushed in ascending building id.
+    struct grid_wait
+    {
+        entity_id                         building;
+        entity_id                         corp;
+        entity_id                         market;   // the buyer's own market: billed here
+        std::uint32_t                     grid;
+        std::array<float, resource_count> residual; // the grid goods' open bid
+        bool                              other_unmet; // a non-grid good already short
+    };
+    std::vector<grid_wait> grid_waiting;
+
+    // THE SHORTFALL RULE IS THE SAME RULE. An unmet draw takes the same
+    // subtraction an out-of-supply unit takes; it never destroys, idles or
+    // decommissions the building. A met draw recovers, ceilinged at 1000.
+    // BL-746 (NR-782 (a)): the decay stops at the authored floor — the
+    // lights go dim, not out — so an unmet draw scales output down and
+    // never to zero. A factor already below the floor (a save from before
+    // the rule) is lifted to it on its next unmet tick.
+    auto step_building = [&](building_component& b, bool unmet) {
+        const int before = b.supply_factor_permille;
+        if (unmet)
+            ++out.unmet;
+        b.supply_factor_permille = step_building_supply(b.supply_factor_permille, unmet, up);
+        if (b.supply_factor_permille < before)      ++out.weakened;
+        else if (b.supply_factor_permille > before) ++out.recovered;
+    };
+
     for (const auto& [bid, corp] : owner_of)
     {
         building_component& b = w.buildings.at(bid);
@@ -3602,16 +3655,6 @@ building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg,
         if (body == null_entity)
             continue; // detached tile; nothing to draw against
 
-        // BL-708: warm the body's reach field before the draw reads it, exactly
-        // as run_unit_upkeep's own reach trigger does — `tile_reach_cost` is the
-        // CONST half of the pair and returns -1 ("not computed") rather than
-        // building the Dijkstra itself. Gated on a grid good actually being
-        // authored, so a world with none never pays for the field here; the
-        // field is cached on `world.body_reach_cost`, so this costs one Dijkstra
-        // per body per cache invalidation, not one per building.
-        if (grid_rules)
-            body_reach_field(w, body);
-
         // BL-654: THE SAME PATH the unit pass takes, not a second one. The pool
         // is drawn first; whatever it cannot cover is BID onto the building's
         // local market — which is what finally makes the Industry channel a
@@ -3619,19 +3662,24 @@ building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg,
         // prices above the buyer's reservation ceiling, in which case the
         // building goes without and the shortfall rule below applies unchanged.
         // BL-746 (Ben, 2026-09-02, ruling NR-782 (b)): NO WIRE, NO DRAW. A grid
-        // good on a tile the network does not reach cannot arrive, so the draw
-        // is a fiction and the building must not decay for want of it. The
-        // grid goods are struck from THIS building's basket before the draw;
-        // the ordinary goods still draw and still bind. Measured before this
-        // rule: every unreached industrial building — most of them — went dark
-        // 1000/decay ticks in, in one tick, whatever its owner did.
+        // good that cannot arrive is a fiction to draw, so the building must not
+        // decay for want of it: the grid goods are struck from THIS building's
+        // basket before the draw; the ordinary goods still draw and still bind.
+        //
+        // BL-1230 (power crosses markets; LOGISTICS.md § 3a, "The province is
+        // the grid's cell", Ben 2026-10-07): the wire is the PROVINCE's, not
+        // the tile's. A building in a province with a road is on that
+        // province's grid (`tile_power_grid`); a building in a dark province is
+        // the "no wire" case above. A wired building's grid goods are bid on
+        // its own market and filled from the GRID below, once every building
+        // has bid.
         std::array<float, resource_count> need = basket[ti];
         bool any_need = true;
+        std::uint32_t grid_id = 0;
         if (grid_rules)
         {
-            const float rc        = tile_reach_cost(w, b.tile);
-            const bool  connected = (rc >= 0.0f) && std::isfinite(rc);
-            if (!connected)
+            grid_id = tile_power_grid(w, b.tile);
+            if (grid_id == 0)
             {
                 any_need = false;
                 for (std::size_t r = 0; r < resource_count; ++r)
@@ -3645,23 +3693,117 @@ building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg,
         }
         // A basket the strip emptied draws nothing and creates no pool; the
         // building counts as supplied for the tick (recovery below).
+        std::array<float, resource_count> residual{};
         const bool unmet = any_need
-            ? draw_goods_or_bid(w, reg, report, corp, body, b.tile, need)
+            ? draw_goods_or_bid(w, reg, report, corp, body, b.tile, need, nullptr,
+                                (grid_id != 0) ? &residual : nullptr)
             : false;
 
-        // THE SHORTFALL RULE IS THE SAME RULE. An unmet draw takes the same
-        // subtraction an out-of-supply unit takes; it never destroys, idles or
-        // decommissions the building. A met draw recovers, ceilinged at 1000.
-        // BL-746 (NR-782 (a)): the decay stops at the authored floor — the
-        // lights go dim, not out — so an unmet draw scales output down and
-        // never to zero. A factor already below the floor (a save from before
-        // the rule) is lifted to it on its next unmet tick.
-        const int before = b.supply_factor_permille;
-        if (unmet)
-            ++out.unmet;
-        b.supply_factor_permille = step_building_supply(b.supply_factor_permille, unmet, up);
-        if (b.supply_factor_permille < before)      ++out.weakened;
-        else if (b.supply_factor_permille > before) ++out.recovered;
+        bool on_grid = false;
+        if (grid_id != 0)
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (residual[r] > 0.0f)
+                {
+                    on_grid = true;
+                    break;
+                }
+        if (on_grid)
+        {
+            // The supply step waits for the grid's clear below.
+            grid_waiting.push_back({ bid, corp, market_for_tile(w, b.tile), grid_id, residual, unmet });
+            continue;
+        }
+
+        step_building(b, unmet);
+    }
+
+    // BL-1230 — THE GRID CLEAR. Every shelf on a grid is one pool: the power its
+    // generators listed last tick, wherever on the grid they listed it (the
+    // one-tick latency of LOGISTICS.md § 3a). A market's shelf is on the grid of
+    // its centre tile's province. Per (grid, good), the residual bids of every
+    // wired building on the grid are filled together: in full when the pool
+    // covers them, PRO RATA when it is short — so no building's id decides who
+    // goes dark — and the pool is debited from each shelf in proportion to what
+    // it held. Each fill is billed to the buyer's OWN market at its posted
+    // price (the bid was placed there, `report.purchases` keyed (corp, own
+    // market)); the shelf a unit came off was paid for when its seller listed.
+    // std::map / ascending ids throughout: no hash order reaches a float sum.
+    if (!grid_waiting.empty())
+    {
+        std::map<std::uint32_t, std::vector<entity_id>> shelves_on; // grid -> markets, ascending
+        {
+            std::vector<entity_id> mids;
+            mids.reserve(w.markets.size());
+            for (const auto& [mid, mc] : w.markets)
+            {
+                (void)mc;
+                mids.push_back(mid);
+            }
+            std::sort(mids.begin(), mids.end());
+            for (const entity_id mid : mids)
+            {
+                const entity_id centre = w.markets.at(mid).centre_tile;
+                if (centre == null_entity)
+                    continue;
+                const std::uint32_t g = tile_power_grid(w, centre);
+                if (g != 0)
+                    shelves_on[g].push_back(mid);
+            }
+        }
+
+        std::map<std::uint32_t, std::vector<std::size_t>> waiting_on; // grid -> grid_waiting idx
+        for (std::size_t i = 0; i < grid_waiting.size(); ++i)
+            waiting_on[grid_waiting[i].grid].push_back(i);
+
+        for (const auto& [g, idxs] : waiting_on)
+        {
+            const auto sit = shelves_on.find(g);
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                float asked = 0.0f;
+                for (const std::size_t i : idxs)
+                    asked += grid_waiting[i].residual[r];
+                if (!(asked > 0.0f) || sit == shelves_on.end())
+                    continue;
+                float held = 0.0f;
+                for (const entity_id mid : sit->second)
+                    held += std::max(0.0f, w.markets.at(mid).inventory[r]);
+                if (!(held > 0.0f))
+                    continue;
+
+                const bool  covered = held >= asked;
+                const float fill    = covered ? 1.0f : held / asked;  // share of each bid met
+                const float take    = covered ? asked / held : 1.0f;  // share of each shelf drawn
+                for (const entity_id mid : sit->second)
+                {
+                    float& inv = w.markets.at(mid).inventory[r];
+                    if (!(inv > 0.0f))
+                        continue;
+                    inv = covered ? std::max(0.0f, inv - inv * take) : 0.0f;
+                }
+                for (const std::size_t i : idxs)
+                {
+                    grid_wait& gw = grid_waiting[i];
+                    const float want_r = gw.residual[r];
+                    if (!(want_r > 0.0f))
+                        continue;
+                    const float got = covered ? want_r : want_r * fill;
+                    if (got > 0.0f && gw.market != null_entity)
+                        report.purchases[std::make_pair(gw.corp, gw.market)][r] += got;
+                    gw.residual[r] = covered ? 0.0f : want_r - got;
+                }
+            }
+        }
+
+        // The deferred supply steps, ascending building id (the push order).
+        for (const grid_wait& gw : grid_waiting)
+        {
+            bool unmet = gw.other_unmet;
+            for (std::size_t r = 0; r < resource_count && !unmet; ++r)
+                if (gw.residual[r] > 0.0f)
+                    unmet = true;
+            step_building(w.buildings.at(gw.building), unmet);
+        }
     }
 
     return out;

@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <unordered_map>
 #include <vector>
 
@@ -166,6 +167,25 @@ const std::vector<float>& body_reach_field(world& w, entity_id body);
 /// UI surfaces hold a `const world&` and must not trigger the Dijkstra.
 float tile_reach_cost(const world& w, entity_id tile);
 
+/// BL-1230 (power crosses markets) — LOGISTICS.md § 3a, "The province is the
+/// grid's cell". A province with a road tile in it is WIRED; wired provinces
+/// whose roads join form ONE grid. Roads join where two roaded land tiles are
+/// 4-cardinal neighbours (east-west wrapped — the road raster's own adjacency),
+/// or across a strait: a run of at most kMaxCrossingTiles non-ocean water tiles
+/// between them, the same crossing the road-only walk admits. The province is
+/// the cell, so two road pieces in one province are one grid even where their
+/// tiles do not touch.
+///
+/// Returns wired province id -> grid id, the grid id being the LOWEST wired
+/// province id in it, so the answer is independent of every visit order.
+/// Built lazily and cached on `world.power_grid_of_province`; cleared by
+/// invalidate_logistics_caches. Deterministic.
+const std::map<std::uint32_t, std::uint32_t>& province_power_grid(world& w);
+
+/// The grid @p tile's province is on, or 0 when the province is dark (no road)
+/// or the tile is unpartitioned. Builds the cache on first use.
+std::uint32_t tile_power_grid(world& w, entity_id tile);
+
 /// Clear the path-cost and reach-field caches together. Call after any event
 /// that can change traversal cost or the anchor set. The caches rebuild lazily
 /// on next read, so an over-clear costs one Dijkstra, never a wrong answer; a
@@ -192,6 +212,8 @@ inline void invalidate_logistics_caches(world& w)
     w.body_reach_cost.clear();
     w.lp_anchor_fields.clear();       // BL-1117: road-weighted and anchor-keyed, so it stales
                                       // on exactly the events the three above do
+    w.power_grid_of_province.clear(); // BL-1230: the power grid is a function of road_level
+    w.power_grid_built = false;
 }
 
 /// True when a state change on this building TYPE can alter a cached logistics
