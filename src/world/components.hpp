@@ -1051,6 +1051,22 @@ struct market_component
     /// BL-1196 first claimed 32, renumbered at the integration over BL-1201).
     std::array<float, resource_count> household_bid  = {};
     std::array<float, resource_count> household_fill = {};
+
+    /// BL-1203 (water reaches dry markets; SUPPLY.md § Dispatch trigger, "What a
+    /// hauler sees as unmet demand", Ben 2026-10-05). Two DISPATCH-ONLY reads of
+    /// the last clear — the price law never reads either (BL-1172 unchanged):
+    ///   * `household_weight` — the households' bid BEFORE the price-elastic
+    ///     factor (sum over the centres clearing here of scale x demand_scale x
+    ///     basket), so the dispatcher can re-read the bid at a cargo's LANDED
+    ///     price: bid(L) = weight x clamp((base / L)^e).
+    ///   * `hauler_want` — processor input and construction material want that
+    ///     went UNBID because the posted price stood over the buyer's fair-price
+    ///     ceiling (reservation_mult x base); room only when the landed cost is
+    ///     under that ceiling.
+    /// Dispatch reads them on the tick AFTER the clear that wrote them (as it
+    /// reads `demand`), so they are SERIALISED (world_save_version 36).
+    std::array<float, resource_count> household_weight = {};
+    std::array<float, resource_count> hauler_want      = {};
 };
 
 /// BL-1172 — THE POSTED PRICE of good `r` on market `m`: the price that stands

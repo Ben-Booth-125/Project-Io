@@ -133,6 +133,10 @@ uint64_t world::state_hash(int tick) const
             // both are saved, so a divergence in either is a real divergence.
             for (const float b : m.household_bid) fnv1a_f32(h, b);
             for (const float f : m.household_fill) fnv1a_f32(h, f);
+            // BL-1203: dispatch branches on both (the hauler's room), and both
+            // are saved.
+            for (const float x : m.household_weight) fnv1a_f32(h, x);
+            for (const float x : m.hauler_want) fnv1a_f32(h, x);
         }
     }
 

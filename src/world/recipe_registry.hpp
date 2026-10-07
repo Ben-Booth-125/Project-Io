@@ -1166,6 +1166,11 @@ public:
     /// only when `net(d) - price_src > dispatch_margin() * price_src`
     /// (SUPPLY.md § Dispatch trigger). Never zero: see m_dispatch_margin.
     float dispatch_margin() const { return m_dispatch_margin; }
+    /// BL-1203: whether the dispatcher's room reads the hauler's view (households
+    /// at the landed price + the ceiling-suppressed want). Always on in the game
+    /// (Ben, 2026-10-05); the setter exists so a harness can prove the price law
+    /// never reads the register (tools/verify/hauler_room.cpp). Not authored in Lua.
+    bool hauler_room() const { return m_hauler_room; }
 
     /// BL-1186: the per-unit HANDLING fee at each port a cargo passes through
     /// (logistics.port_handling in Lua; SUPPLY.md § Logistical cost). A route with a
@@ -1401,6 +1406,7 @@ public:
     }
     void set_logistics_nodes(const logistics_node_params& p) { m_logistics_nodes = p; }
     void set_dispatch_margin(float v) { m_dispatch_margin = v; }
+    void set_hauler_room(bool on) { m_hauler_room = on; } // BL-1203: harness switch
     void set_port_handling(float v) { m_port_handling = v; }
     void set_road_econ(std::uint8_t tier, const road_economics& r)
     {
@@ -1679,6 +1685,7 @@ private:
     /// is "never zero". A non-finite or non-positive authored value is refused
     /// at load and this default stands.
     float m_dispatch_margin = 0.05f;
+    bool  m_hauler_room     = true; ///< BL-1203: see hauler_room()
 
     /// BL-1186 port handling (logistics.port_handling): credits per unit of cargo at EACH
     /// port a cargo passes through (SUPPLY.md § Logistical cost) -- loading and again at

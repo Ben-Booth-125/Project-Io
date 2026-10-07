@@ -125,6 +125,9 @@ int main()
     {
         w.markets.at(hh_market).household_bid[hh_food]  = 12.5f;
         w.markets.at(hh_market).household_fill[hh_food] = 7.25f;
+        // BL-1203: the hauler's room fields (world_save_version 36).
+        w.markets.at(hh_market).household_weight[hh_food] = 3.375f;
+        w.markets.at(hh_market).hauler_want[hh_food]      = 9.625f;
     }
 
     // BL-614: same treatment for the building record's newest field — the
@@ -265,6 +268,14 @@ int main()
                   && mit->second.household_bid[hh_food] == 12.5f
                   && mit->second.household_fill[hh_food] == 7.25f,
               "P1 market household_bid / household_fill (BL-1196) round-trip at their written values");
+    }
+    if (hh_market != null_entity)
+    {
+        const auto mit = loaded.markets.find(hh_market);
+        check(read_ok && mit != loaded.markets.end()
+                  && mit->second.household_weight[hh_food] == 3.375f
+                  && mit->second.hauler_want[hh_food] == 9.625f,
+              "P1 market household_weight / hauler_want (BL-1203) round-trip at their written values");
     }
 
     // BL-614: likewise for the wage bid.

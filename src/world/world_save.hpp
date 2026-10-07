@@ -328,7 +328,14 @@ inline constexpr uint32_t world_save_magic =
 /// a layout neither 32 nor 33 describes. (34 was taken by an unclaimed throwaway
 /// measurement branch.) Claimed through
 /// `tools/session/next_save_version.js --kind world --claim`.
-inline constexpr uint32_t world_save_version = 35;
+/// Bumped to 36 by BL-1203 (water reaches dry markets, the hauler's room): the
+/// market record gains two resource-indexed float arrays at its tail, after
+/// `household_fill` -- `household_weight` (the households' pre-elastic bid) and
+/// `hauler_want` (the want the fair-price ceiling silenced), both written at the
+/// clear and read by the NEXT tick's dispatch. A v35 stream is 2 x resource_count
+/// floats short per market; refused whole on the strict-equality contract, no
+/// migration. Claimed through `tools/session/next_save_version.js --kind world --claim`.
+inline constexpr uint32_t world_save_version = 36;
 
 /// Write @p w as a complete world snapshot.
 ///
