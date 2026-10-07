@@ -398,6 +398,94 @@ void s1()
     }
 }
 
+// ---- S5: the REAL processor pass on a small built world ------------------
+// One market, an iron shelf of 8 under the ceiling. Corp A: a steel plant P_a
+// (8 iron for a full run). Corp B: an ore works M_b (no input, 8 iron into B's
+// pool) visited BEFORE its own steel plant P_b. The pre-pass sees both plants
+// wanting 8 off a shelf of 8: contended, floors 4 each. P_a (first) is offered
+// 8 - 4 = 4 and runs half. M_b then fills B's pool, so P_b runs whole from its
+// pool and takes none of its floor — 4 iron is left on the shelf with P_a
+// short. Only the top-up can give it to P_a: run_economy_step's real
+// run_processing / top_up_processing must leave P_a at a full run, the shelf
+// empty, the top-up counted and the independent audit at 0.
+void s5()
+{
+    const std::size_t IRON = static_cast<std::size_t>(resource_type::iron_ore);
+    const std::size_t STEEL = static_cast<std::size_t>(resource_type::steel);
+    recipe_registry reg;
+    reg.set_thresholds(1.0f, 0.2f);
+    building_economics pr;
+    pr.base_rate = 8.0f; pr.maintenance = 10.0f; pr.base_wage = 12.0f;
+    pr.build_cost = 300.0f; pr.build_duration_ticks = 3.0f;
+    reg.set_economics(building_type::processing_facility, pr);
+    recipe steel; steel.name = "steel"; steel.inputs[IRON] = 2.0f; steel.outputs[STEEL] = 1.0f;
+    const uint16_t steel_id = reg.add_recipe(steel);
+    recipe ore; ore.name = "ore"; ore.outputs[IRON] = 1.0f;
+    const uint16_t ore_id = reg.add_recipe(ore);
+    price_band_params pb;
+    pb.floor_mult = 0.25f; pb.ceil_mult = 10.0f; pb.reservation_mult = 2.0f; pb.shelf_supply_ticks = 1.0f;
+    reg.set_price_band(pb);
+
+    world w;
+    const entity_id body = w.create_entity();
+    w.bodies[body] = body_component{};
+    auto tile = [&]() {
+        const entity_id t = w.create_entity();
+        tile_component tc{};
+        tc.body = body; tc.substrate = terrain_substrate::sedimentary;
+        tc.cover = terrain_cover::grass; tc.cover_density = 150;
+        w.tiles[t] = tc;
+        return t;
+    };
+    const entity_id t0 = tile();
+    const entity_id M = w.create_entity();
+    {
+        market_component mc;
+        mc.body = body; mc.centre_tile = t0;
+        mc.base_price[IRON] = 2.5f; mc.price[IRON] = 2.5f * 1.5f; mc.inventory[IRON] = 8.0f;
+        mc.base_price[STEEL] = 8.0f; mc.price[STEEL] = 8.0f;
+        w.markets[M] = mc;
+    }
+    auto building = [&](uint16_t recipe_id, float wf) {
+        const entity_id b = w.create_entity();
+        building_component bc{};
+        bc.tile = tile(); bc.type = building_type::processing_facility;
+        bc.workforce_assigned = wf; bc.recipe = recipe_id;
+        w.buildings[b] = bc;
+        return b;
+    };
+    auto corp = [&](std::vector<entity_id> assets) {
+        const entity_id c = w.create_entity();
+        corporation_component cc;
+        cc.name = "Test Co"; cc.is_player = true;
+        cc.starting_capital = 10000.0f; cc.balance = 10000.0f;
+        cc.assets = assets;
+        w.corporations[c] = cc;
+        return c;
+    };
+    const entity_id Pa = building(steel_id, 0.5f);
+    const entity_id Mb = building(ore_id, 1.0f);
+    const entity_id Pb = building(steel_id, 0.5f);
+    corp({Pa});
+    corp({Mb, Pb});
+
+    const economy_report rep = run_economy_step(w, reg);
+    float run_a = -1.0f, run_b = -1.0f, out_a = -1.0f;
+    for (const building_report& br : rep.buildings)
+    {
+        if (br.building == Pa) { run_a = br.run; out_a = br.output_quantity; }
+        if (br.building == Pb) run_b = br.run;
+    }
+    const shelf_phase_audit& au = rep.shelf_audit[1];
+    std::printf("   S5: built world: P_a run %.3f (output %.2f steel), P_b run %.3f, iron left %.3f; contended draws %d, top-ups %d, stranded %d / open %d\n",
+                run_a, out_a, run_b, w.markets.at(M).inventory[IRON], au.claimants, au.topups, au.stranded, au.stranded_open);
+    check(au.claimants == 2 && au.topups >= 1, "S5.1 the real processor pass: the shelf is contended and the top-up fires");
+    check(std::fabs(run_a - 1.0f) < 1e-5f && std::fabs(out_a - 4.0f) < 1e-4f && std::fabs(run_b - 1.0f) < 1e-5f
+              && w.markets.at(M).inventory[IRON] < 1e-4f,
+          "S5.2 the floor P_b did not need reaches P_a: both run whole, the shelf is emptied");
+    check(au.stranded == 0 && au.stranded_open == 0, "S5.3 the independent audit reads 0 stranded on the real pass");
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -412,6 +500,7 @@ int main(int argc, char** argv)
     std::printf("shelf_share — BL-1209 (shelf sees silenced want), seed %d\n", seed);
     s0();
     s1();
+    s5();
 
     lua_state lua;
     world_params p;
@@ -513,7 +602,8 @@ int main(int argc, char** argv)
     {
         world a = w0;
         long rows[2] = {0, 0}, groups3 = 0, groups3_equal = 0;
-        long claimants[2] = {0, 0}, topups[2] = {0, 0}, stranded[2] = {0, 0}, hopeless = 0;
+        long claimants[2] = {0, 0}, topups[2] = {0, 0}, stranded[2] = {0, 0}, open_str[2] = {0, 0}, hopeless = 0;
+        double open_units = 0.0;
         double worst = 0.0;
         for (int t = 1; t <= 12; ++t)
         {
@@ -523,6 +613,8 @@ int main(int argc, char** argv)
                 claimants[ph] += res.report.shelf_audit[ph].claimants;
                 topups[ph]    += res.report.shelf_audit[ph].topups;
                 stranded[ph]  += res.report.shelf_audit[ph].stranded;
+                open_str[ph]  += res.report.shelf_audit[ph].stranded_open;
+                open_units    += res.report.shelf_audit[ph].stranded_units;
             }
             std::map<std::tuple<char, entity_id, std::uint16_t>, std::vector<const shelf_ration_row*>> g;
             for (const shelf_ration_row& row : res.report.shelf_rations)
@@ -547,12 +639,14 @@ int main(int argc, char** argv)
         }
         std::printf("   S4: 12 ticks at the shipped k: contended draws construction %ld / processing %ld (rows %ld / %ld, hopeless rows %ld); top-ups %ld / %ld; stranded after the phase %ld / %ld\n",
                     claimants[0], claimants[1], rows[0], rows[1], hopeless, topups[0], topups[1], stranded[0], stranded[1]);
+        std::printf("   S4: independent audit (real pools and shelves, every processor): stranded on a contended shelf %ld, on an uncontended shelf %ld (%.1f units, both phases)\n",
+                    stranded[1], open_str[1], open_units);
         std::printf("   S4: %ld contended shelves with 3+ hopeful draws, %ld reserve the same share (worst relative spread %.2e)\n",
                     groups3, groups3_equal, worst);
         check(groups3 > 0 && groups3_equal == groups3,
               "S4.1 every contended shelf with three or more draws reserves each the same share of its want");
         check(claimants[0] + claimants[1] > 0 && stranded[0] == 0 && stranded[1] == 0,
-              "S4.2 THE INVARIANT, both phases, 12 ticks: no shelf ends a phase holding stock while an admitted draw left short could have used it");
+              "S4.2 THE INVARIANT, both phases, 12 ticks (processing audited independently of the top-up): no CONTENDED shelf ends a phase holding stock while an admitted draw left short could have used it");
         check(topups[0] + topups[1] > 0, "S4.3 the top-up turn did work on the real world (S4.2 is not vacuous)");
     }
 

@@ -20,6 +20,8 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <set>
+#include <functional>
 #include <utility>
 #include <vector>
 
@@ -497,6 +499,29 @@ float credit_processing_outputs(world& w, const recipe_registry& reg, entity_id 
     return produced;
 }
 
+/// BL-1209: the most extra run a processor's outputs can still be credited for
+/// under the BL-708 store ceiling. Infinite while any output is uncapped (a run
+/// still makes that output); else the largest run any capped output has room for.
+float store_run_limit(const recipe_registry& reg, const recipe& rcp,
+                      const std::array<float, resource_count>& pool, float batches_full)
+{
+    const grid_goods_params& grid = reg.grid_goods();
+    float limit = 0.0f;
+    bool any_output = false;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        const float outq = rcp.outputs[r] * batches_full;
+        if (!(outq > 0.0f))
+            continue;
+        any_output = true;
+        const float cap = grid.ceiling(r);
+        if (!(cap > 0.0f))
+            return std::numeric_limits<float>::infinity();
+        limit = std::max(limit, std::max(0.0f, cap - pool[r]) / outq);
+    }
+    return any_output ? limit : std::numeric_limits<float>::infinity();
+}
+
 /// `turn` (BL-1209): set when this processor draws a CONTENDED shelf. It may
 /// take its full need from what the shelf holds beyond the floors reserved for
 /// the draws after it (`reserved_after`); null = the shelf as it stands (an
@@ -693,11 +718,13 @@ building_report run_processing(world& w, const recipe_registry& reg,
 /// (pool + admitted shelf) / full need)`, taken only if it reaches t_idle. The
 /// increment draws pool-first then shelf and credits its outputs, exactly as the
 /// first turn does (the run is linear). Nothing is reserved any more: every draw
-/// has had its turn. `dry` = report whether it COULD run more, change nothing
-/// (the phase's invariant audit). Returns true iff it ran (or could run) more.
+/// has had its turn. The increment is also capped at what the BL-708 store
+/// ceiling lets its outputs take (`store_run_limit`): a plant whose every output
+/// is clamped full draws nothing for a run that would make nothing. Returns true
+/// iff it ran more.
 bool top_up_processing(world& w, const recipe_registry& reg, entity_id corp,
                        const building_component& b, entity_id market_id, float contention,
-                       economy_report& out, building_report& rep, proc_shelf_turn* turn, bool dry)
+                       economy_report& out, building_report& rep, proc_shelf_turn* turn)
 {
     if (rep.run >= 1.0f || market_id == null_entity)
         return false;
@@ -724,12 +751,11 @@ bool top_up_processing(world& w, const recipe_registry& reg, entity_id corp,
     }
     if (!has_input)
         return false;
+    extra = std::min(extra, store_run_limit(reg, *rcp, pool.quantities, batches_full));
     const float new_run = std::min(1.0f, rep.run + extra);
     // A meaningful increment only: float dust left by the first turn is not a run.
     if (!(new_run >= reg.t_idle()) || !(new_run - rep.run > 1e-5f))
         return false;
-    if (dry)
-        return true;
 
     const float delta = new_run - rep.run;
     const float batches = batches_full * delta;
@@ -755,7 +781,99 @@ bool top_up_processing(world& w, const recipe_registry& reg, entity_id corp,
     rep.run    = new_run;
     rep.active = true;
     rep.idle   = false;
+    // The binding input is now whichever is scarcest of what is left.
+    float scarcest = std::numeric_limits<float>::infinity();
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        const float in = rcp->inputs[r];
+        if (in <= 0.0f)
+            continue;
+        const bool  shelf = shelf_admits(mc, r, res_mult, /*off_buys=*/true);
+        const float cov = (std::max(0.0f, pool.quantities[r]) + (shelf ? std::max(0.0f, mc.inventory[r]) : 0.0f))
+                        / (in * batches_full);
+        if (cov < scarcest)
+        {
+            scarcest           = cov;
+            rep.limiting_input = static_cast<resource_type>(r);
+            rep.has_limiting   = true;
+        }
+    }
     return true;
+}
+
+/// BL-1209 — THE PROCESSING PHASE'S INVARIANT, AUDITED INDEPENDENTLY of the
+/// top-up (report-only; writes nothing, inserts no pool). After the phase,
+/// every processor that ran under its labour-granted run (run < 1) is checked
+/// against the REAL pools and shelves: could it run more, by at least 1e-4 and
+/// to at least t_idle, within its store ceiling, with some input of that
+/// increment taken off a shelf holding stock? Each such draw is stranded stock,
+/// counted on a shelf that was contended as the phase opened (`contended`) or
+/// not.
+void audit_processing_shelves(const world& w, const recipe_registry& reg, const economy_report& report,
+                              const std::set<std::pair<entity_id, std::size_t>>& contended,
+                              const std::function<float(entity_id, entity_id, entity_id)>& labour_for,
+                              shelf_phase_audit& audit)
+{
+    const float res_mult = reg.price_band().reservation_mult;
+    static const std::array<float, resource_count> empty{};
+    for (const building_report& rep : report.buildings)
+    {
+        if (rep.type != building_type::processing_facility || !(rep.run < 1.0f))
+            continue;
+        const auto bit = w.buildings.find(rep.building);
+        if (bit == w.buildings.end())
+            continue;
+        const building_component& b = bit->second;
+        const entity_id mid = market_for_tile(w, b.tile);
+        const recipe* rcp = reg.get_recipe(b.recipe);
+        if (mid == null_entity || rcp == nullptr)
+            continue;
+        const float bf = processing_batches_full(reg, b, labour_for(rep.building, rep.corp, building_body(w, b)));
+        if (!(bf > 0.0f))
+            continue;
+        const auto pit = w.corp_market_pools.find(std::make_pair(rep.corp, mid));
+        const std::array<float, resource_count>& pool = (pit != w.corp_market_pools.end()) ? pit->second.quantities : empty;
+        const market_component& mc = w.markets.at(mid);
+        float more = std::numeric_limits<float>::infinity();
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            const float in = rcp->inputs[r];
+            if (in <= 0.0f)
+                continue;
+            const float on_shelf = shelf_admits(mc, r, res_mult, true) ? std::max(0.0f, mc.inventory[r]) : 0.0f;
+            more = std::min(more, (std::max(0.0f, pool[r]) + on_shelf) / (in * bf));
+        }
+        if (!std::isfinite(more))
+            continue; // no inputs
+        more = std::min(more, store_run_limit(reg, *rcp, pool, bf));
+        const float could = std::min(1.0f, rep.run + more);
+        if (!(could >= reg.t_idle()) || !(could - rep.run > 1e-4f))
+            continue;
+        // The increment must reach a shelf: some input its pool cannot cover.
+        bool on_contended = false, on_shelf = false;
+        float units = 0.0f;
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            const float in = rcp->inputs[r];
+            if (in <= 0.0f)
+                continue;
+            const float from_shelf = in * bf * (could - rep.run) - std::max(0.0f, pool[r]);
+            if (from_shelf > 1e-6f && mc.inventory[r] > 1e-6f)
+            {
+                on_shelf = true;
+                units += from_shelf;
+                if (contended.count({mid, r}))
+                    on_contended = true;
+            }
+        }
+        if (!on_shelf)
+            continue;
+        if (on_contended)
+            ++audit.stranded;
+        else
+            ++audit.stranded_open;
+        audit.stranded_units += units;
+    }
 }
 
 // --- Player workforce auto-solver (BL-181) --------------------------------------
@@ -986,7 +1104,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
     // draws only the shelf, so the whole allocation is EXACT before anything
     // moves: it is solved here on a copy of the shelves and the pass below draws
     // it. With no shelf contended nothing is solved and the pass is unchanged.
-    struct site_alloc { std::size_t claimant; float rate; std::array<float, resource_count> drawn; std::array<float, resource_count> real; };
+    struct site_alloc { std::size_t claimant; float rate; std::array<float, resource_count> drawn; std::array<float, resource_count> real; std::array<float, resource_count> first; };
     std::unordered_map<entity_id, site_alloc> site_plan;
     std::vector<shelf_claimant> claimants;
     shelf_ration_plan plan;
@@ -1052,7 +1170,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
                 for (std::size_t r = 0; r < resource_count; ++r)
                     if (c.claim[r] > 0.0f)
                         offer[r] = std::max(0.0f, inv[r] - plan.reserved_after[i][r]);
-                site_alloc a{i, site_rate(c.need, [&](std::size_t r) { return offer[r]; }), {}, {}};
+                site_alloc a{i, site_rate(c.need, [&](std::size_t r) { return offer[r]; }), {}, {}, offer};
                 if (a.rate > 0.0f)
                     for (std::size_t r = 0; r < resource_count; ++r)
                         if (c.claim[r] > 0.0f)
@@ -1321,7 +1439,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
                 if (plan.on_contended[i][r])
                     report.shelf_rations.push_back({c.market, c.building, static_cast<std::uint16_t>(r), 'c',
                                                     plan.hopeless[i] != 0, c.claim[r], plan.floor[i][r],
-                                                    std::max(0.0f, a.drawn[r]), a.real[r], a.rate});
+                                                    a.first[r], a.real[r], a.rate});
         }
     }
 }
@@ -2300,7 +2418,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     if (proc_plan.any)
     {
         shelf_phase_audit& audit = report.shelf_audit[1];
-        auto top_up_all = [&](bool dry) {
+        auto top_up_all = [&]() {
             int n = 0;
             for (std::size_t i = 0; i < claimants.size(); ++i)
             {
@@ -2311,19 +2429,18 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                 const entity_id body = building_body(w, b);
                 if (top_up_processing(w, reg, rep.corp, b, claimants[i].market,
                                       labour_for(claimants[i].building, rep.corp, body),
-                                      report, rep, &proc_turns[i], dry))
+                                      report, rep, &proc_turns[i]))
                     ++n;
             }
             return n;
         };
         for (int sweep = 0; sweep < 8; ++sweep)
         {
-            const int n = top_up_all(false);
+            const int n = top_up_all();
             audit.topups += n;
             if (n == 0)
                 break;
         }
-        audit.stranded = top_up_all(true);
         for (std::size_t i = 0; i < claimants.size(); ++i)
         {
             if (proc_report_row[i] == static_cast<std::size_t>(-1))
@@ -2338,6 +2455,18 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                                                     proc_plan.floor[i][r], proc_turns[i].access[r],
                                                     proc_turns[i].drawn[r], run});
         }
+    }
+
+    // BL-1209: the invariant, audited on the real pools and shelves over EVERY
+    // processor (contended shelves and not), independent of the top-up.
+    {
+        std::set<std::pair<entity_id, std::size_t>> contended;
+        if (proc_plan.any)
+            for (std::size_t i = 0; i < claimants.size(); ++i)
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    if (proc_plan.on_contended[i][r])
+                        contended.insert({claimants[i].market, r});
+        audit_processing_shelves(w, reg, report, contended, labour_for, report.shelf_audit[1]);
     }
 
     // Index the report rows once (BL-360): estimate_building_profit resolves its

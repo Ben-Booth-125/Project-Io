@@ -1008,8 +1008,10 @@ uncontended shelf is drawn as it always was. On a contended shelf:
 - the phase then **tops up**: a draw left short takes, in visit order, what the shelves still hold,
   sweeping again while a sweep moves.
 
-The invariant this keeps: **no shelf ends a phase holding stock while an admitted draw left short
-could have used it.** **It is shared within each phase, not across the tick (NR-977):** the
+The invariant this keeps: **no contended shelf ends a phase holding stock while an admitted draw
+left short could have used it.** An uncontended shelf is drawn first-come as it always was, with no
+top-up; there every draw found enough at its turn, and the one way a draw there can end short
+beside stock is its own pool growing later in the phase. **It is shared within each phase, not across the tick (NR-977):** the
 construction phase rations its sites first, then the production phase rations its processors
 from what construction left; upkeep draws, later in the tick, stay first-come after both.
 Pooling every draw of the tick would need the tick reordered — construction runs before labour is

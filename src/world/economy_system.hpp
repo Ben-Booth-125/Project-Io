@@ -230,9 +230,16 @@ struct shelf_ration_row
 /// what the shelves hold (must be 0), and how many top-ups the phase took.
 struct shelf_phase_audit
 {
-    int claimants = 0; ///< draws on a contended shelf
-    int topups    = 0; ///< second turns that drew more
-    int stranded  = 0; ///< draws that could still have run more after the phase
+    int   claimants      = 0;    ///< draws on a contended shelf
+    int   topups         = 0;    ///< second turns that drew more
+    /// Draws that could still have run more off a shelf holding stock after the
+    /// phase. Processing: audited INDEPENDENTLY of the top-up over every
+    /// processor (audit_processing_shelves); `stranded` on a contended shelf
+    /// (the invariant: must be 0), `stranded_open` on an uncontended one (first-
+    /// come; reported, not bound). Construction: re-read on the real shelves.
+    int   stranded       = 0;
+    int   stranded_open  = 0;
+    float stranded_units = 0.0f; ///< processing: shelf stock those draws could have used
 };
 /// Result of one economy step: the per-building reports plus the auto-bought
 /// input shortfalls per (corp, body), which become market demand and corporate
