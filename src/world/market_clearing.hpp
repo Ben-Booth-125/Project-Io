@@ -76,6 +76,14 @@ float population_met_ratio(const world& w, const recipe_registry& reg, entity_id
 /// per-market arithmetic. Deterministic.
 void draw_household_basket(world& w);
 
+/// BL-1217 lever D (measurement switch `economy.background_demand.consumes`,
+/// default false). When on, every market's background basket TAKES its bid
+/// (`background_bid`, written by inject_background_demand) off the shelf after
+/// the households' draw: `background_fill[r] = min(bid, inventory[r])`. No
+/// money moves; no ceiling. When off, the shelf is untouched and
+/// `background_fill` reads zero. Ascending market id and resource.
+void draw_background_basket(world& w, const recipe_registry& reg);
+
 /// BL-1179 (shelf spoilage; MARKETS.md § The shelf spoils). Every good on every
 /// market's SHELF loses its authored share of itself:
 /// `inventory[r] -= inventory[r] × reg.shelf_spoilage()[r]`. Only the shelf —

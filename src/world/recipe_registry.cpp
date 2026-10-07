@@ -347,6 +347,17 @@ void recipe_registry::load_from_lua(lua_state& lua)
         bd.elasticity_min    = bg_demand->get_or("elasticity_min",    bd.elasticity_min);
         bd.elasticity_max    = bg_demand->get_or("elasticity_max",    bd.elasticity_max);
         bd.demand_scale      = bg_demand->get_or("demand_scale",      bd.demand_scale);
+        // BL-1217 lever D: absent -> false -> the basket bids only (today).
+        {
+            const sol::object c = (*bg_demand)["consumes"];
+            if (c.valid() && c.get_type() != sol::type::lua_nil)
+            {
+                if (c.get_type() != sol::type::boolean)
+                    throw std::runtime_error("economy.background_demand.consumes: "
+                                             "must be a boolean");
+                bd.consumes = c.as<bool>();
+            }
+        }
         read_era_baskets(*bg_demand, bd.baskets, "economy.background_demand"); // BL-640
         set_background_demand(bd);
     }
