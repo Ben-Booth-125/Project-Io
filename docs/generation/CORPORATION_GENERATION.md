@@ -488,21 +488,30 @@ held ground, and none of it was within reach of a chain. The budget-less Pass 6 
 it has missed as many times as the body has nations (the nation cursor takes them in turn), and
 the mask holds for the rest of the pass unless a firm that produces one of its inputs lands.
 
-**A water-gap firm digs water** (Ben, 2026-10-05, NR-973: "we can add wells to generation";
-BL-1197, gap firm digs the gap). An extraction firm chartered for the water gap stands on water
-ground: a **Well** site (`../economy/PRODUCTION.md` § Extraction buildings — fresh-water adjacent,
-no ice deposit), drawn at random with each site weighted by its habitability plus 0.05, so the
-water tends to land where people live; else an **ice
-deposit**; each tier is tried across every window the firm may anchor in before the next. Its
-later extraction slots dig water where their tile can, and otherwise take the tile's richest
-deposit. Where its windows hold no water ground at all it places **nothing** — there is no
-fallback to another deposit, which would spend a water firm's slot on a good nobody chartered and
-crowd the goods that were. The miss is the good's, not the extraction focus's: water is passed
-over for the rest of that centre (the windows only fill) and the same firm takes the next good,
-so nothing is lost and nothing is crowded out. Without a budget the miss counts toward water's
-mask, which falls once water has missed as many times as the body has nations (a firm that lands
-for it clears the count). Every other gap good keeps the richest-deposit rule. Chain-feasible placement then sees the water near people, so clean-water
-and medical makers can stand where a Well does.
+**A water-gap or produce-gap firm digs its good** (Ben, 2026-10-05, NR-973: "we can add wells
+to generation"; BL-1197, gap firm digs the gap; BL-1208, generation sites wharves). The two goods
+with a **depositless tier** (`../economy/PRODUCTION.md` § Extraction buildings) each have a dig
+ladder, and an extraction firm chartered for either gap stands only on that ladder's ground:
+
+- **Water** — a **Well** site (fresh-water adjacent, no ice deposit) first, so the water tends to
+  land where people live; else an **ice deposit**.
+- **Agricultural produce** — a **produce deposit** (a Farm) first, the good's own ground; else a
+  **Fishing Wharf** site (coastal, no produce deposit).
+
+A depositless site — Well or Wharf — is drawn at random with each site weighted by its
+habitability plus 0.05; a deposit by the deposit. Each tier is tried across every window the
+firm may anchor in before the next. The firm's later extraction slots dig its good where their
+tile can, and otherwise take the tile's richest deposit. Where its windows hold no ground for the
+good at all it places **nothing** — there is no fallback to another deposit, which would spend
+the slot on a good nobody chartered and crowd the goods that were. The miss is the good's, not
+the extraction focus's: the good is passed over for the rest of that centre (the windows only
+fill) and the same firm takes the next good, so nothing is lost and nothing is crowded out.
+Without a budget the miss counts toward the good's mask, which falls once it has missed as many
+times as the body has nations (a firm that lands for it clears the count). Every other gap good
+keeps the richest-deposit rule. The ladder reaches exactly the ground `body_producible` counts
+(§ below), so a good the walk calls producible is one a digging firm can find ground for on the
+body. Chain-feasible placement then sees the water near people, so clean-water and medical
+makers can stand where a Well does.
 
 **A processor's inputs are wanted too (Ben, 2026-10-05; derived demand).** What the walk fills is
 not only final demand — households and the bodies' own wants — but the **input demand of every
@@ -582,6 +591,13 @@ of the viable ones.** Design: BL-630 (spawn shortlist). The sequence:
    no player to ask draws one from the shortlist against the world seed), and `is_player` /
    `world::player_entity` are re-pointed onto it. The same world and the same pick seat the same
    firm in the same state.
+5. **The seat opens with a clean slate of construction (Ben, 2026-10-07; BL-1206).** During the
+   settle the seated firm was an ordinary corporation under spectate, and its scorer started
+   builds the player never chose. At the seat, every building of the seated firm still under
+   construction is cancelled and the materials already paid into it are refunded to the firm's
+   balance. Finished buildings stay. So the player chooses every build, and the first quarters'
+   operating result is the firm's own, not a spike of material purchases for projects nobody
+   picked.
 
 **A firm carries its founding year and its origin region** (`corporation_component::founded_year`,
 `corporation_component::origin_region`; Ben, 2026-09-24). The search charters each firm from a

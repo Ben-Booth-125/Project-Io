@@ -1422,12 +1422,13 @@
     "docs/ui/ledgers/market.md § 2b",
     "docs/economy/MARKETS.md § Trades"
    ],
-   "summary": "Four headed sections, each bounded and scrolling inside itself. My trades (the player's standing orders on the body, sell and buy, with an x per row and the place-order form folded under it); All trades here (the whole book on that body, GATED on the player owning a building there); Potential trades (a derivation — buy here, sell there, less the haulage price_convoy_leg charges for that route — ranked by margin); Recent trades (the exchange record filtered to this market, newest first, column headed REVENUE). An absent counterparty renders as the market, not as unknown.",
+   "summary": "Four headed sections, each bounded and scrolling inside itself. My trades (the player's standing orders on the body, sell and buy, with an x per row and the place-order form folded under it; beneath them, only when one exists, a Closed table of the player's orders on the body that closed themselves after 4 empty quarters — month, good, floor, the history-log line on hover); All trades here (the whole book on that body, GATED on the player owning a building there); Potential trades (a derivation — buy here, sell there, less the haulage price_convoy_leg charges for that route — ranked by margin); Recent trades (the exchange record filtered to this market, newest first, column headed REVENUE). An absent counterparty renders as the market, not as unknown.",
    "interesting_question": "The three reads are not equally cheap to know — one is a filter on the player's own orders, one is the same book past a gate, one has no store behind it at all. What stops them collapsing into one table at 380 px, where four sections end-to-end put three of them below the fold on open?",
    "resolution": "Bounded sections. Measured on the shipped fixture the book runs to 24 rows and the exchange read to 120, so laid out end to end the first fills the column; caps of 5 / 5 / 7 / 6 rows against a ~595 px content height keep all four HEADS on screen and put the depth one scroll inside the section that has it. The gate on the second read is enforced rather than assumed and is asserted against the world, including its SHUT state.",
    "checks": [
     "market_ledger",
-    "trades_tab"
+    "trades_tab",
+    "order_close_notice"
    ]
   },
   {

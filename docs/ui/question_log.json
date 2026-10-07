@@ -417,6 +417,20 @@
    ],
    "status": "drafted"
   },
+  "market_ledger_trades_closed": {
+   "surface": "Market Ledger - Trades tab - 'Closed' table under My trades",
+   "answers": "Which of my standing sell orders closed themselves, and why?",
+   "because": "AN ORDER THAT CLOSES ITSELF IS A ROW THAT SILENTLY VANISHES. MARKETS.md step 4: an order whose pool stands empty for 4 quarters is removed by the clearing pass and the good returns to auto-surplus. The rule is right — a dead order should not hold a book slot forever — but a player who set a floor ON PURPOSE then finds the good selling at the market price when stock returns, and nothing on screen says the order is gone or why. The clearing pass already logs the close (an agency-topic history line, tagged with corp and body); nothing read it.\n\nIT LIVES UNDER MY TRADES, NOT IN A FEED. The question it answers is about the player's positions on this body, which is exactly what My trades lists; a closed order is the row that used to be there. The decision feed is the rivals' reasoning and the chat feed is economy_report events — routing an order-book fact into either would make the player look for it somewhere other than where the order stood. It is a notice, not a history: the newest 3 closes within the last 4 quarters, Closed (month) · Good · Floor, the log line itself on hover. DRAWN ONLY WHEN THERE IS ONE, so the section's measured height budget is untouched in the ordinary case.",
+   "backlog_item": [
+    "BL-1202"
+   ],
+   "files": [
+    "src/ui/market_ledger.cpp",
+    "src/ui/market_ledger.hpp",
+    "src/world/market_clearing.cpp"
+   ],
+   "status": "drafted"
+  },
   "market_ledger_nation_row": {
    "surface": "Market Ledger - nation presence row",
    "answers": "Which nations operate in this market?",

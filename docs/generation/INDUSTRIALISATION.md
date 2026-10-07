@@ -661,16 +661,15 @@ into, never against a constant and never against the 1960 price applied backward
 *works chartered* note fires for that region, capped per region per round. It fires on the same
 switches that let the span record industry points at all — the industry-point switch, from the
 span's open year, and a record being written — with no other gate than the price multiple. It
-records nothing but the moment: region, polity, focus and year. **Points are not
-debited** — the Works sink above is Beat 1's own force, and a note is not a sink. The fraction *f*
+records the moment: region, polity, focus and year; whether it also debits the points is the
+ruling above (in-span chartering, BL-1122). The fraction *f*
 is read on the seed spread, notes against 1960 firm count per seed, before it is pinned, starting
 at 1. At the close the firms that flash are the REAL charters — the ones each budget bought,
 richest centre first, at their anchor tiles — and each is dated by pairing a region's k-th firm
 with its k-th in-span crossing; a roster no budget chartered is never shown, because the player
 never meets it. **A firm carries its founding year and its origin region into play**, so a seat's
-origin is read from the firm, not from the record. The note's shape — a record-only crossing of a
-running price rather than a debit or a heat reading — is a delegated reading (2026-09-24,
-NEEDS_REVIEW).
+origin is read from the firm, not from the record. The note reads a crossing of a running price,
+not a heat reading.
 
 ### Beat 2 — Mass migration, and innovation where people gather
 

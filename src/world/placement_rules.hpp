@@ -233,6 +233,38 @@ bool is_well_site(const world& w, entity_id tile_id, resource_type target);
 /// calibration's promise). A river or lake is neither rich nor poor ground.
 inline constexpr float k_well_rate_scalar = 1.0f;
 
+/// BL-1199 (fishing wharf yields): is an extraction site targeting `target` on
+/// `tile_id` a **Fishing Wharf** — an `agricultural_produce` site on a tile with
+/// no produce deposit, standing on the coast (`is_coastal`)? The same predicate
+/// `can_place_in_world` gates the Wharf by, so whatever it lets stand, yields. A
+/// tile carrying ANY produce deposit is a Farm — even once that reserve is
+/// spent (`resource_deposit` is never drawn; `resource_remaining` is) — the
+/// Well/Ice Extractor rule. Derived from tile state alone: no persistent field.
+bool is_wharf_site(const world& w, entity_id tile_id, resource_type target);
+
+/// BL-1199: the Wharf's richness->rate scalar. The Well's 1.0 and for the
+/// Well's reason: the sea is neither rich nor poor ground, so it fishes at the
+/// rate `richness_rate_scalar` hands a TYPICAL (median) deposit — the BL-436
+/// calibration's promise. A separate constant so the two can part later.
+inline constexpr float k_wharf_rate_scalar = 1.0f;
+
+/// BL-1199: a deposit-agnostic extraction site — a Well or a Fishing Wharf. It
+/// draws no finite reserve (no taper, never exhausts), yields its target alone
+/// (no BL-437 co-extraction basket), and runs at `depositless_rate_scalar` in
+/// place of the deposit's richness. Every yield reader (run_extraction, the
+/// workforce solver, building_profit, input_reach, the AI scorer) asks THIS, so
+/// the one formula cannot drift between them.
+bool is_depositless_site(const world& w, entity_id tile_id, resource_type target);
+
+/// BL-1199: the richness->rate scalar for a deposit-agnostic site of `target`:
+/// `k_wharf_rate_scalar` for produce, `k_well_rate_scalar` otherwise (water).
+/// Only meaningful where `is_depositless_site` holds.
+inline constexpr float depositless_rate_scalar(resource_type target)
+{
+    return target == resource_type::agricultural_produce ? k_wharf_rate_scalar
+                                                         : k_well_rate_scalar;
+}
+
 /// Full placement check including world-level constraints (BL-043):
 ///  1. Tile-level can_place (ocean / deposit / terrain).
 ///  2. Port: tile must be coastal (is_coastal).

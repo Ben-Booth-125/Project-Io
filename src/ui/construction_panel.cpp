@@ -409,6 +409,10 @@ std::string building_group_name(const world& w, const recipe_registry& reg, cons
     {
         // The Build door names this candidate "Farm" rather than by its resource, so
         // the roster does too — one vocabulary (presentation.hpp).
+        // BL-1199: a coastal no-deposit produce site is a Fishing Wharf, by
+        // the name the Build door offers it under.
+        if (placement_rules::is_wharf_site(w, b.tile, b.target_resource))
+            return "Fishing Wharf";
         if (b.target_resource == resource_type::agricultural_produce)
             return "Farm";
         // BL-1198: the Build door offers a Well by that name; the roster agrees.

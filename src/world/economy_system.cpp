@@ -125,9 +125,10 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
     // returns exactly 1.0f for a fully-supplied building — the only state
     // reachable while the authored upkeep rates are zero — so the arithmetic
     // here is bit-for-bit what it was before the field existed.
-    // BL-1198: a Well has no deposit; it runs at a typical deposit's rate.
-    const float rich = placement_rules::is_well_site(w, b.tile, b.target_resource)
-                     ? placement_rules::k_well_rate_scalar
+    // BL-1198/BL-1199: a Well or a Fishing Wharf has no deposit; it runs at a
+    // typical deposit's rate.
+    const float rich = placement_rules::is_depositless_site(w, b.tile, b.target_resource)
+                     ? placement_rules::depositless_rate_scalar(b.target_resource)
                      : richness_rate_scalar(e, tc.resource_deposit[ri]);
     const float nominal = e.base_rate
          * rich
@@ -200,14 +201,16 @@ building_report run_extraction(world& w, const recipe_registry& reg,
         return rep;
     }
 
-    // --- BL-1198: the Well — water drawn from a river or lake, no deposit ----
+    // --- BL-1198/BL-1199: the Well and the Fishing Wharf — no deposit -------
     //
-    // A Well works no reserve: the river keeps running, so there is no taper and
-    // no exhaustion, and it does not co-extract the tile's deposits (BL-437's
-    // basket is the share-out of a DEPOSIT site's capacity; a Well's capacity is
-    // the water it lifts). Output is its nominal, all water, into the pool of
-    // its own tile market — exactly where a deposit site's output lands.
-    if (placement_rules::is_well_site(w, b.tile, b.target_resource))
+    // A Well (water from a river or lake) or a Wharf (produce from the sea)
+    // works no reserve: the river keeps running and the sea keeps fishing, so
+    // there is no taper and no exhaustion, and it does not co-extract the
+    // tile's deposits (BL-437's basket is the share-out of a DEPOSIT site's
+    // capacity; this site's capacity is the one good it lifts). Output is its
+    // nominal, all target, into the pool of its own tile market — exactly where
+    // a deposit site's output lands.
+    if (placement_rules::is_depositless_site(w, b.tile, b.target_resource))
     {
         stockpile_component& pool = w.pool_at(corp, pool_key_for_tile(w, b.tile));
         pool.quantities[ri] += nominal;
@@ -602,9 +605,9 @@ int solve_workforce_target(const world& w, const recipe_registry& reg,
             // BL-436: the same richness->rate conversion the live tick uses.
             // The workforce solver optimises against this curve, so a raw
             // richness here would solve for a rate the building cannot reach.
-            // BL-1198: a Well runs at the typical-deposit rate, no richness.
-            const float rich = placement_rules::is_well_site(w, b.tile, b.target_resource)
-                ? placement_rules::k_well_rate_scalar
+            // BL-1198/BL-1199: a Well or Wharf runs at the typical-deposit rate.
+            const float rich = placement_rules::is_depositless_site(w, b.tile, b.target_resource)
+                ? placement_rules::depositless_rate_scalar(b.target_resource)
                 : richness_rate_scalar(reg.economics(building_type::extraction_site),
                                        tit->second.resource_deposit[ri]);
             // Stack decay (BL-193), applied here for the same reason run_extraction

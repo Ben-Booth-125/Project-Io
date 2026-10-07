@@ -694,6 +694,16 @@ struct history_sim_params
     /// consequence of the running-price rule, raised as NR-940. Those readings
     /// were taken on the WORLD's running price; the reach price (BL-1168) is
     /// cheaper on every landmass but the richest, so a far landmass notes more.
+    ///
+    /// RE-READ UNDER THE REACH PRICE (BL-1178, 2026-10-07; industry_concentration
+    /// DATING and NOTECENT, the 16 library seeds, the shipped world after the
+    /// sprint 48 re-blesses; a reading, NOT a retune -- f stays 2): 12124 notes
+    /// (heartland 6582, far landmasses 5542) against 2967 charters; 1970 charters
+    /// dated by a note (66%: heartland 1530 of 2263, 68%; far 440 of 704, 62%),
+    /// 997 by the epoch, 0 by a furnace year. 4.1 notes a charter, against 2.5
+    /// under the world price. The NR-940 clustering is WORSE, not better: 94.9%
+    /// of the notes fall before 1760, the span's first century (heartland 95.4%,
+    /// far 94.4%), 3.1% in 1760-1859, 2.0% from 1860. Whether f moves is Ben's.
     int     works_event_fraction_q = 2000;
 
     /// DEFAULT A (RULED, Ben 2026-09-18, wave 1 form). A region the span FOUNDS
@@ -3647,6 +3657,25 @@ bool industry_points_params_valid(const history_sim_params& p);
 /// (NR-910), so a region's real firms rarely reach it, and a region that has
 /// crossed four prices in a span has told its story.
 inline constexpr int works_event_region_cap = 4;
+
+/// BL-1176 (NOTE_PRICE_MATCHES_CLOSE_ROW): the RUNNING charter price each
+/// region's works notes are read against, ONE function the span's note step
+/// calls every year and a harness can run against the close's price
+/// (`stockpile_budget::centre_firm_price`, industry_concentration's NOTE PRICE
+/// row) -- so the span and the close are held to one divisor and one reach
+/// (NR-907, BL-1168) by a check, not by two copies agreeing.
+///
+/// The world's stock is every region's `industry_points`; a region's price is
+/// `charter_running_price` of its landmass's stock (every region whose anchor
+/// `landmass_at` @p landmass labels the same, the ones no centre takes
+/// included), never above the world's price; a region with no landmass (an
+/// anchor off the raster, or sea), or an EMPTY @p landmass (no substrate),
+/// pays the world's price. @p price_out gets one price per region, indexed as
+/// @p regions. False -- @p price_out empty -- when a region's points are
+/// negative or the world's sum would pass 2^62 (the close's own refusal
+/// bound): the step prices nothing that year.
+bool works_note_region_prices(const std::vector<region>& regions, const std::vector<int32_t>& landmass,
+                              int gw, int gh, std::vector<int64_t>& price_out);
 
 /// Is `works_event_fraction_q` inside its stated domain (0-1000000)? False
 /// REJECTS every works note of the run

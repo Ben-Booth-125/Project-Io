@@ -610,8 +610,7 @@ province_build_table province_builds(const world& w, entity_id tile_id)
         if (placement_rules::is_well_site(w, tid, resource_type::water)
             && placement_rules::can_place(tc, building_type::extraction_site, resource_type::water))
             cap[static_cast<std::size_t>(resource_type::water)] += 1;
-        if (tc.resource_deposit[static_cast<std::size_t>(resource_type::agricultural_produce)] <= 0.0f
-            && placement_rules::is_coastal(w, tid)
+        if (placement_rules::is_wharf_site(w, tid, resource_type::agricultural_produce)
             && placement_rules::can_place(tc, building_type::extraction_site, resource_type::agricultural_produce))
             cap[static_cast<std::size_t>(resource_type::agricultural_produce)] += 1;
     }
@@ -3305,6 +3304,13 @@ void draw_tile_selection(world& w, ui_state& ui)
             && placement_rules::can_place_in_world(w, sel, building_type::extraction_site,
                                                    resource_type::water, ui.max_logistics_reach).ok())
             any_placeable = true;
+        // BL-1199: nor a Fishing Wharf (coastal, no produce deposit).
+        if (!any_placeable && !water
+            && placement_rules::is_wharf_site(w, sel, resource_type::agricultural_produce)
+            && placement_rules::can_place_in_world(w, sel, building_type::extraction_site,
+                                                   resource_type::agricultural_produce,
+                                                   ui.max_logistics_reach).ok())
+            any_placeable = true;
         if (!any_placeable && !water)
         {
             for (const building_type bt : {building_type::processing_facility,
@@ -3822,8 +3828,7 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
     // Fishing Wharf (BL-168): agricultural_produce has no terrestrial deposit here,
     // so the loop above skips it — but a coastal tile can still work it. Without this,
     // the ledger never offers the one candidate whose whole point is a zero-deposit tile.
-    if (tile.resource_deposit[static_cast<std::size_t>(resource_type::agricultural_produce)] <= 0.0f
-        && placement_rules::is_coastal(w, tile_id))
+    if (placement_rules::is_wharf_site(w, tile_id, resource_type::agricultural_produce))
         cands.push_back({building_type::extraction_site, resource_type::agricultural_produce,
                          "Fishing Wharf"});
     // Well (BL-1198, NR-971): the same shape for water — no ice deposit here, but

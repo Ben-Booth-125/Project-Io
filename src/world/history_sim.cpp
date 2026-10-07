@@ -5205,59 +5205,27 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     }
                     else
                     {
-                        // The world's stock so far: every region's points, the
-                        // ones no centre will take included -- the dearest
-                        // price, and the one a region with no reach pays. Each is inside
-                        // [0, industry_points_ceiling] (the accrual refuses a
-                        // credit past it), and a sum past 2^62 -- the close's
-                        // own refusal bound -- prices nothing this year.
-                        constexpr int64_t total_max = 1LL << 62;
-                        int64_t total = 0;
-                        bool    priced = true;
-                        for (const region& r : ss.regions)
+                        // BL-1168 (Ben, 2026-10-03): A CHARTER IS PRICED BY
+                        // THE CAPITAL IN ITS OWN TRADE REACH -- its landmass.
+                        // The close prices a centre at its region's landmass
+                        // stock over the divisor (`build_stockpile_budget`,
+                        // the `landmass` reach), so the note reads the price
+                        // THAT price grows into: each region's landmass's
+                        // running stock, every region's points on it counted
+                        // (the ones no centre will take included, as the close
+                        // counts them), off the same `landmass` labels the
+                        // span's cross-water reads use, read at the region's
+                        // anchor (`landmass_of_region`'s rule). A region with
+                        // no landmass, or a run with no substrate, reads the
+                        // world's stock -- the dearest price -- as the close
+                        // prices a region with no reach. One function
+                        // (`works_note_region_prices`, BL-1176) so
+                        // industry_concentration's NOTE PRICE row runs THIS
+                        // step against the close's price; a stock past the
+                        // close's own refusal bound prices nothing this year.
+                        std::vector<int64_t> note_price;
+                        if (works_note_region_prices(ss.regions, landmass, gw, gh, note_price))
                         {
-                            if (r.industry_points < 0 || r.industry_points > total_max - total)
-                            {
-                                priced = false;
-                                break;
-                            }
-                            total += r.industry_points;
-                        }
-                        if (priced)
-                        {
-                            // BL-1168 (Ben, 2026-10-03): A CHARTER IS PRICED BY
-                            // THE CAPITAL IN ITS OWN TRADE REACH -- its landmass.
-                            // The close prices a centre at its region's
-                            // landmass stock over the divisor
-                            // (`build_stockpile_budget`, the `landmass`
-                            // reach), so the note reads the price THAT price
-                            // grows into: each region's landmass's running
-                            // stock, every region's points on it counted (the
-                            // ones no centre will take included, as the close
-                            // counts them). The landmass is `landmass_of_region`
-                            // -- the labels the span's own cross-water reads
-                            // use, read off the region's anchor exactly as the
-                            // close reads it (industry_concentration checks the
-                            // two rasters agree; no row yet runs this step
-                            // against the close's price). A region with no landmass, or a
-                            // run with no substrate, reads the world's stock,
-                            // as the close prices a region with no reach. A
-                            // landmass's stock is at most the world's, so its
-                            // sum cannot overflow where the world's did not.
-                            const int64_t world_price = charter_running_price(total);
-                            const std::size_t nreg = ss.regions.size();
-                            std::vector<int32_t> region_mass(nreg, -1);
-                            std::vector<int64_t> mass_stock;
-                            if (!landmass.empty())
-                                for (std::size_t ri = 0; ri < nreg; ++ri)
-                                {
-                                    const int32_t m = landmass_of_region(static_cast<int>(ri));
-                                    region_mass[ri] = m;
-                                    if (m < 0) continue;
-                                    if (mass_stock.size() <= static_cast<std::size_t>(m))
-                                        mass_stock.resize(static_cast<std::size_t>(m) + 1, 0);
-                                    mass_stock[static_cast<std::size_t>(m)] += ss.regions[ri].industry_points;
-                                }
                             // f per mille of the price, split so the product
                             // stays inside int64 at the domain's ceiling
                             // (price <= 2^62 / 650, f <= 10^6), and never
@@ -5274,12 +5242,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                             {
                                 const region& r = ss.regions[ri];
                                 if (r.centres <= 0) continue; // only ground that stands centres charters works
-                                const int32_t m = region_mass[ri];
-                                const int64_t price = (m >= 0)
-                                    ? std::min(world_price,
-                                               charter_running_price(mass_stock[static_cast<std::size_t>(m)]))
-                                    : world_price;
-                                const int64_t step = step_of(price);
+                                const int64_t step = step_of(note_price[ri]);
                                 uint8_t& k = works_noted[ri];
                                 // pts >= (k + 1) * step, written as a division
                                 // so the product can never overflow.
@@ -11208,6 +11171,54 @@ int64_t industry_points_scale_credit(const region& r, int industrial_q,
     pts = (pts * industry_points_fuel_factor_q(industry_fuel_reading_q(r), p)) / 1000;
     pts = (pts * tree_mult_q) / 1000;
     return pts;
+}
+
+bool works_note_region_prices(const std::vector<region>& regions, const std::vector<int32_t>& landmass,
+                              int gw, int gh, std::vector<int64_t>& price_out)
+{
+    // BL-1176: the span's works-note price step, lifted out of the round
+    // unchanged so a harness runs the same arithmetic the sim does.
+    price_out.clear();
+    // The world's stock so far: every region's points, the ones no centre will
+    // take included -- the dearest price, and the one a region with no reach
+    // pays. Each is inside [0, industry_points_ceiling] (the accrual refuses a
+    // credit past it), and a sum past 2^62 -- the close's own refusal bound --
+    // prices nothing.
+    constexpr int64_t total_max = 1LL << 62;
+    int64_t total = 0;
+    for (const region& r : regions)
+    {
+        if (r.industry_points < 0 || r.industry_points > total_max - total) return false;
+        total += r.industry_points;
+    }
+    const int64_t world_price = charter_running_price(total);
+    const std::size_t nreg = regions.size();
+    // Each region's landmass, read off its anchor as the round's
+    // `landmass_of_region` reads it (off the raster: none). A landmass's stock
+    // is at most the world's, so its sum cannot overflow where the world's
+    // did not.
+    std::vector<int32_t> region_mass(nreg, -1);
+    std::vector<int64_t> mass_stock;
+    if (!landmass.empty())
+        for (std::size_t ri = 0; ri < nreg; ++ri)
+        {
+            const region& r = regions[ri];
+            if (r.col < 0 || r.row < 0 || r.col >= gw || r.row >= gh) continue;
+            const int32_t m = landmass_at(landmass, gw, gh, r.col, r.row);
+            region_mass[ri] = m;
+            if (m < 0) continue;
+            if (mass_stock.size() <= static_cast<std::size_t>(m))
+                mass_stock.resize(static_cast<std::size_t>(m) + 1, 0);
+            mass_stock[static_cast<std::size_t>(m)] += r.industry_points;
+        }
+    price_out.assign(nreg, world_price);
+    for (std::size_t ri = 0; ri < nreg; ++ri)
+    {
+        const int32_t m = region_mass[ri];
+        if (m >= 0)
+            price_out[ri] = std::min(world_price, charter_running_price(mass_stock[static_cast<std::size_t>(m)]));
+    }
+    return true;
 }
 
 bool industry_points_apportion_by_scale(const std::vector<region>& regions, int holder, int64_t credit,

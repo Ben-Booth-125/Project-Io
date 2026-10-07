@@ -4,7 +4,7 @@
 #include "presentation.hpp"
 #include "world/components.hpp"
 #include "world/logistics.hpp" // landform_logistics_cost — the landform's real cost (BL-232)
-#include "world/placement_rules.hpp" // is_well_site — an idle Well is labour-short (BL-1198)
+#include "world/placement_rules.hpp" // is_depositless_site — an idle Well/Wharf is labour-short (BL-1198/1199)
 #include "world/workforce.hpp"
 
 #include <imgui.h>
@@ -224,8 +224,9 @@ void hover_building_detail(const world& w, const building_component& b)
             {
                 const float dep = tile_it->second
                     .resource_deposit[static_cast<std::size_t>(b.target_resource)];
-                // BL-1198: a Well draws no deposit, so idle means labour.
-                if (dep <= 0.0f && !placement_rules::is_well_site(w, b.tile, b.target_resource))
+                // BL-1198/BL-1199: a Well or Fishing Wharf draws no deposit,
+                // so idle means labour.
+                if (dep <= 0.0f && !placement_rules::is_depositless_site(w, b.tile, b.target_resource))
                     ImGui::TextDisabled("Idle \xe2\x80\x94 no deposit on this tile");
                 else
                     ImGui::TextDisabled("Idle \xe2\x80\x94 labour short");

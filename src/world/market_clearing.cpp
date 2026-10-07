@@ -7,6 +7,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>  // BL-1202: std::snprintf — the auto-close line's good/floor tag
 #include <limits> // BL-1201: an uncapped order's infinite per-tick allowance
 #include <string> // BL-1201: the auto-close history line
 #include <map>
@@ -1971,6 +1972,17 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
                           " closed: nothing to sell for " +
                           std::to_string(static_cast<int>(sell_order_empty_close_ticks)) +
                           " quarters; the good returns to auto-surplus";
+            // BL-1202 (order close notice): the closed order is gone from the
+            // book by the time anyone reads this, so the line carries what the
+            // Market Ledger's Trades tab needs to name it — the good (as its
+            // resource_type index; resource_names.cpp is not linked by every
+            // harness that links this file) and the floor. FIXED FORMAT, parsed
+            // by `ui::market_ledger.cpp` (collect_closed_trades): change both or
+            // neither. Not in state_hash; the log is append-only text.
+            char tag[64];
+            std::snprintf(tag, sizeof tag, "good #%d floor %.2f",
+                          static_cast<int>(o.resource), static_cast<double>(o.floor_price));
+            e.consequence = tag;
             w.history_log.push_back(std::move(e));
         }
         w.sell_orders.erase(

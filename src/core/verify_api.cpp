@@ -2775,6 +2775,28 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return out;
     });
 
+    // BL-1202 (order close notice): the player's self-closed sell orders the
+    // Trades tab DREW last frame, newest first — the reader of the clearing
+    // pass's agency-topic close line. `good_known` is false when the line's
+    // good/floor tag did not parse (a save from before the tag), and then
+    // `good` is "" and only `order_id` names the order.
+    v.set_function("closed_trades", [this]() {
+        sol::table out = m_lua.state().create_table();
+        int i = 1;
+        for (const ui::closed_trade_record& r : ui::closed_trades())
+        {
+            sol::table row = m_lua.state().create_table();
+            row["order_id"]   = r.order_id;
+            row["day"]        = r.day;
+            row["good_known"] = r.good_known;
+            row["good"]       = r.name;
+            row["floor"]      = r.floor_price;
+            row["why"]        = r.why;
+            out[i++] = row;
+        }
+        return out;
+    });
+
     // The market the Trades tab last drew for, and the body it sits on — so a
     // check can name a second body, re-point the selector and assert the gate
     // actually moved rather than assuming it did.

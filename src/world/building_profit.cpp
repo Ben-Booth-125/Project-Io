@@ -232,10 +232,11 @@ building_profit estimate_prospective_profit(const world& w, const recipe_registr
 
         // BL-436: convert richness to a rate multiplier exactly as the tick
         // does — this figure is shown to the player on the Build door.
-        // BL-1198: a Well prices at the typical-deposit rate and never tapers.
-        const bool  well    = placement_rules::is_well_site(w, tile_id, target);
+        // BL-1198/BL-1199: a Well or Wharf prices at the typical-deposit rate
+        // and never tapers.
+        const bool  well    = placement_rules::is_depositless_site(w, tile_id, target);
         const float nominal = econ.base_rate
-                              * (well ? placement_rules::k_well_rate_scalar
+                              * (well ? placement_rules::depositless_rate_scalar(target)
                                       : richness_rate_scalar(econ, tc.resource_deposit[ri])) * wf
                               * building_supply_scalar(bc)
                               * (1.0f - tc.hazard_level)

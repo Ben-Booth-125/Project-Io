@@ -907,8 +907,8 @@
    "design": "ADDED (2026-10-04, the BL-1186 routing lane): haulage_measure.cpp (~line 1029) carries its own copy of the old per-leg pricing, so its haul table and the MARKETS.md price-ceiling derivation it feeds no longer match the router after BL-1186. Re-point it at price_market_export_leg rather than a copy.\n\nBen authorised the sprint 48 re-bless (2026-10-03, merged 179615b8) with three untraced movements filed here: (1) world population 12.19B -> 6.27B (likeliest BL-1130/1132, the doubled war); (2) shipped haulage (--far-trade) 16,327 / 14,729 -> 14,434 / 11,917 per year (-11.6% / -19.1%), rising on 8 seeds and falling on 8, though every item that read it alone reported a rise or no change (likeliest BL-1125's folds); (3) nation units 414,404 -> 167,110. WORK: bisect each across the sprint's merge commits with rebless_shape_probe (v0.1.26 e50ab81c -> a899bb2a), name the cause, and report for Ben whether each is wanted. ADDED 2026-10-04 (sprint 48 second re-bless, blessed by Ben without a trace): seed 0's Exploration fingerprint moved treasury_median 8664 -> 162 (-98%), expl_battles 993 -> 899, flows 77 -> 72, living polities 75 -> 70; seed 9 moved the other way (battles 836 -> 1094, treasury_median 153 -> 233). The re-bless attributes every fingerprint move to BL-1171 (far trade), the only step that moves Exploration fields, but the mechanism is not traced. Also untraced there: road tiers flipping whole national networks Road/Highway on seeds 28, 31, 37 (Highway gate percentile tie, inferred); BL-1168's -35.6% haulage (a third fewer corporations, inferred). See docs/development/drafts/sprint-48-rebless-2.md."
   },
   {
-   "status": "designed",
-   "glyph": "✓",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 49,
    "written": "2026-10-03",
    "requires": [],
@@ -925,7 +925,7 @@
    "files": [
     "tools/verify/industrialisation_sim_harness.cpp"
    ],
-   "design": "FOUND 2026-10-03 (the re-bless lane): the harness halts at its BL-1056 self-check (2), \"NOT REFUSED\", since NR-964 (the treasury share by employed heads), so the fingerprint check after it never runs. WORK: re-state the self-check for the employed-heads spread (never weakened to pass), then confirm the fingerprint check runs and passes."
+   "design": "MERGED (b8802e91, 2026-10-07): the BL-1056 self-check restated for employed heads (two refusal paths + boundary, static_assert); the fingerprint check now runs: 16/16 mismatched against the 2026-10-04 library bless (db4653c2), report-only, expected after sprint 49's world changes - the wave re-bless covers it.\n\nFOUND 2026-10-03 (the re-bless lane): the harness halts at its BL-1056 self-check (2), \"NOT REFUSED\", since NR-964 (the treasury share by employed heads), so the fingerprint check after it never runs. WORK: re-state the self-check for the employed-heads spread (never weakened to pass), then confirm the fingerprint check runs and passes."
   },
   {
    "status": "designed",
@@ -1011,8 +1011,8 @@
    "design": "BEN (2026-10-03, sprint 49): a design session first. Today firms only exit; ~17 of 211 survive 450 ticks on seed 0. Design who founds an entrant (a nation, a parent, the market), what it costs, where it stands, and how the player sees it."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 49,
    "written": "2026-10-03",
    "requires": [],
@@ -1030,11 +1030,11 @@
     "src/world/history_sim.cpp",
     "tools/verify/industry_concentration.cpp"
    ],
-   "design": "NR-907 requires the span and the close to price by one divisor and one reach. industry_concentration's REACH gate only checks the two landmass rasters agree; it never runs history_sim's per-region note step (landmass_of_region, ~5129-5215). Add a row that compares each region's note price in the span to sb.centre_firm_price for the same stock, so a change to how the sim labels a region fails."
+   "design": "MERGED (b8802e91): works_note_region_prices lifted unchanged; industry_concentration NOTEPRICE gate 16/16 PASS, differ=0; no behaviour change (digests identical).\n\nNR-907 requires the span and the close to price by one divisor and one reach. industry_concentration's REACH gate only checks the two landmass rasters agree; it never runs history_sim's per-region note step (landmass_of_region, ~5129-5215). Add a row that compares each region's note price in the span to sb.centre_firm_price for the same stock, so a change to how the sim labels a region fails."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 49,
    "written": "2026-10-03",
    "requires": [],
@@ -1053,11 +1053,11 @@
     "src/world/era_timelapse.hpp",
     "src/world/history_sim.cpp"
    ],
-   "design": "STARTUP.md (Company creation flashes) says each note is a real charter whose points are debited (NR-925); INDUSTRIALISATION.md says the record-only clause is overturned; era_timelapse.hpp's works_chartered comment and the sim's NOTHING MOVES block say record-only, no point debited. One of them is wrong; read the code, fix the docs or the code."
+   "design": "RECONCILED (2026-10-07): the code is record-only (NOTHING MOVES block); the ruled design is real in-span chartering (NR-925 overturned 2026-09-25 to option B; INDUSTRIALISATION.md, STARTUP.md), owned by BL-1122 (in-span chartering, unbuilt). Docs state the ruling, comments state the code; the overturned clause in INDUSTRIALISATION.md's Works chartered paragraph removed.\n\nSTARTUP.md (Company creation flashes) says each note is a real charter whose points are debited (NR-925); INDUSTRIALISATION.md says the record-only clause is overturned; era_timelapse.hpp's works_chartered comment and the sim's NOTHING MOVES block say record-only, no point debited. One of them is wrong; read the code, fix the docs or the code."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 49,
    "written": "2026-10-03",
    "requires": [],
@@ -1074,7 +1074,7 @@
    "files": [
     "src/world/history_sim.hpp"
    ],
-   "design": "works_event_fraction_q = 2000 was pinned on readings taken under the world price (3233 notes, 894 of 1297 charters dated). Under the reach price far landmasses note more and start cheaper, so the NR-940 early clustering may worsen there. Re-measure with industry_concentration DATING on the 16 library seeds and record the readings beside the pin; report, do not retune silently."
+   "design": "MERGED (b8802e91): readings recorded beside the pin, no retune: 12,124 notes vs 2,967 charters (4.1 per charter vs 2.5 at the pin), 66% note-dated, 0 furnace-dated; 94.9% of notes before 1760 - NR-940 (early clustering) aggravated under the reach price. For a later sprint.\n\nworks_event_fraction_q = 2000 was pinned on readings taken under the world price (3233 notes, 894 of 1297 charters dated). Under the reach price far landmasses note more and start cheaper, so the NR-940 early clustering may worsen there. Re-measure with industry_concentration DATING on the 16 library seeds and record the readings beside the pin; report, do not retune silently."
   },
   {
    "status": "complete",
@@ -1500,8 +1500,8 @@
    "design": "MERGED to main (c39d2989, 2026-10-05).\n\nBUILT, ROUND 2 OPEN (2026-10-05, a14a559f on worktree-agent-a26d22c169e545e60): placement_rules is_fresh_water_adjacent / is_well_site, a no-deposit Well yield (rate x 1.0, never exhausts), a scorer Well bucket (K=2 world-wide, ranked by habitability x water pull, placeable tiles only), construction ledger row, ACTIONS.json; well_gate P1-P8/E1-E2 PASS. Qualifying ground 2.0-5.7% of habitable land, a Well site in 17-29 markets per seed. In play the scorer builds wells only on seed 43 (5 running by t200, water listed 25% -> 67% of the bid, price 6.32x -> 2.88x); seed 0 one never finishes, seed 10 none. Seed 43 G2/G3 fall (being attributed in round 2). GENERATION CANNOT PLACE A WELL: author_building (~454-487) takes its target from richest_extractable, the cluster slot walk (~620-630) tests can_place on the tile alone, tile_score_for (~402) scores a Well tile 0.001 - the BL-1197 rework places water-gap firms on Wells through these three hooks.\n\nRULED (Ben, 2026-10-05, NR-971 A): the Well - an extraction_site targeting water, placement gated on fresh-water adjacency (a land tile a river runs through or bordering a lake), deposit-agnostic, mirroring the Fishing Wharf (placement_rules.cpp can_place / can_place_in_world, is_coastal). Spec in PRODUCTION.md sec Extraction buildings. Generation then has a water source near people: BL-1185's chain rule and BL-1197's gap firm can place wells; the scorer can build them. THEN re-sweep k (NR-972) and re-read the held household stack (BL-1163/1196/1179).\n\nRESOURCES.md:147 seeds water deposits on ICY substrate only. On an earthlike home body that is the poles, so water - the household basket's heaviest unmet good, and the input of clean water and medical supplies - is almost never extracted near people: seeds 10/11/13/37 have no water extractor in any sprint 49 state, seed 0's three sit out of reach of any clean-water site, and household water fill is 5-24% (BL-1179 lane). No charter (BL-1197) or scorer (BL-1187) change can supply a good the ground does not hold where it is wanted. DESIGN CALL NR-971."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 49,
    "written": "2026-10-05",
    "requires": [],
@@ -1518,7 +1518,7 @@
    "files": [
     "src/world/economy_system.cpp"
    ],
-   "design": "Found by the BL-1198 lane (2026-10-05): on a tile with no deposit, run_extraction finds a zero reserve and reports the site exhausted, so a Fishing Wharf (coastal adjacency, deposit-agnostic; PRODUCTION.md sec Extraction buildings, BL-168) yields nothing. BL-1198 wrote a no-deposit yield for the Well (base_rate x scalar x labour x supply x (1 - hazard), never tapering); give the Wharf the same path. Wharf numbers will move (a world-mover). Agricultural produce is a household good (food rations' input), so this feeds the market viability gate."
+   "design": "MERGED (ea697134, 2026-10-06): one depositless yield path (is_depositless_site / depositless_rate_scalar) for the Well and the Fishing Wharf (k_wharf_rate_scalar 1.0); wharf hover, Buildings name, province table and Build door fixed. well_gate W1-W8 pass on main; app builds. No movement in shipped worlds: nothing sites a Wharf yet (BL-1208). Live click owed: a coastal no-deposit tile offers a Fishing Wharf.\n\nFound by the BL-1198 lane (2026-10-05): on a tile with no deposit, run_extraction finds a zero reserve and reports the site exhausted, so a Fishing Wharf (coastal adjacency, deposit-agnostic; PRODUCTION.md sec Extraction buildings, BL-168) yields nothing. BL-1198 wrote a no-deposit yield for the Well (base_rate x scalar x labour x supply x (1 - hazard), never tapering); give the Wharf the same path. Wharf numbers will move (a world-mover). Agricultural produce is a household good (food rations' input), so this feeds the market viability gate."
   },
   {
    "status": "complete",
@@ -1565,8 +1565,8 @@
    "design": "MERGED to main (7ab91754, 2026-10-05). Clean A/B on seeds 0/43/10, 400 ticks, vs main f37a12ea: G1 35.3% -> 41.0%, G2 30.6% -> 45.1%, G3 50.5% -> 55.2%; order-held units 0.0 in all 36 readings. agent_seam_harness 22/22 on main. OWED: a live click on the Market Ledger order form (Cap / qtr, 0 = no cap, rows read \"all\"); a visible auto-close notice (BL-1202).\n\nRULED (Ben, 2026-10-05, in chat: options 3 + 1): a market rule for player and rivals alike, not an AI-only re-size - an order by default covers everything auto-surplus would list, at its floor; a quantity cap is optional; an order whose pool stands empty for a short run of ticks closes and the good returns to auto-surplus. Written into MARKETS.md step 4. The lane building the AI re-size was rescoped to this rule.\n\nFOUND (2026-10-05, well_census --trace, seed 43): the scorer's trade candidate places ONE standing sell order per (corp, body, good), sized at half the excess over 50 units at that moment, no expiry (corp_ai.cpp:2120); it never re-sizes it and never issues remove_sell_order (corp_ai.cpp:2108-2118 refuses a second order). MARKETS.md step 4 exempts a resource under a standing order from auto-surplus (\"the manual order governs\", market_clearing.cpp:1163-1169, :1244-1245), and the order lists min(quantity, pool) per tick (:1305-1314). So production beyond the original quantity piles up for the rest of the campaign: water 18,168 order-held units by play tick 200, food rations 1,859, steel transiently 398; household demand reads unmet and prices sit at 8-9x. DECIDED (main session, 2026-10-05): fix on the AI side, not the market rule (the exemption is right for the player's own manual orders): when the pool under a rival's order outgrows the order (pool > k x quantity over several due ticks), the scorer re-sizes it via remove_sell_order + place_sell_order at the current surplus - existing verbs, inside the scored-trade grant (AI_OPPONENT.md sec 11). The player's orders are never touched. Measure on BL-1184 and well_census --trace (order-held units -> near 0)."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 49,
    "written": "2026-10-05",
    "requires": [],
@@ -1583,7 +1583,7 @@
    "files": [
     "src/ui/market_ledger.cpp"
    ],
-   "design": "BL-1201 closes an order whose pool has stood empty for 4 quarters and writes an agency-topic world::history_log line (\"Standing sell order #N closed: nothing to sell for 4 quarters; the good returns to auto-surplus\") tagged with the corp and body. Nothing displays it: the decision feed reads only the decision topic, and the chat feed reads economy_report::agency_events. Show the player's own closes - in the Market Ledger Trades tab (a closed-orders line) or the decision feed. Needs a question_log entry and an ACTIONS check per src/ui rules. Small UI lane."
+   "design": "MERGED (648e2c41, 2026-10-06): the player's auto-closed orders are listed under My trades (Closed: month, good, floor; hover = the reason), newest 3 from the last 4 quarters; close lines carry a parseable tag (market_clearing.cpp, pinned by order_book_harness R9.12, 87/0). order_close_notice.lua all PASS on main; capture checked. Live click owed (Ben).\n\nBL-1201 closes an order whose pool has stood empty for 4 quarters and writes an agency-topic world::history_log line (\"Standing sell order #N closed: nothing to sell for 4 quarters; the good returns to auto-surplus\") tagged with the corp and body. Nothing displays it: the decision feed reads only the decision topic, and the chat feed reads economy_report::agency_events. Show the player's own closes - in the Market Ledger Trades tab (a closed-orders line) or the decision feed. Needs a question_log entry and an ACTIONS check per src/ui rules. Small UI lane."
   },
   {
    "status": "designed",
@@ -1651,8 +1651,8 @@
    "design": "MERGED to main (7aae16de, 2026-10-05) together: the density ceiling is 7.5 firms per good in G (172 at 23 goods, cap 199); the scorer's candidate stretch memoises occupancy and province ceilings per corp - economy tick ~0.3x main's at 120 firms, decisions byte-identical (digests matched); cold-reviewed (no correctness findings); a debug assert now guards the stretch's read-only contract. Not re-measured on main after merge: gates (BL-1204 alone read G1 49.5 / G2 54.0 / G3 61.0 on 5 seeds). Open: the market carve plans at |G| = 49; the bump-11 argument holds for |G| >= 7; dispatch now 37% of the live tick on seed 10 (convoy volume).\n\nRULED (Ben, 2026-10-05, the density form, option B): ship BL-1204 (density per good served) only after the scorer is cheaper. BL-1204 (b655acf0) raises firms 120 -> 172 (+43%) and the economy tick +67% mean (+34% / +143% / +64% on seeds 10 / 43 / 0); live tick +51-85%; corp_strategic grew 2.4x on seed 43 - cost grows faster than firms. TARGET: on the BL-1204 branch, the economy tick within ~30% of main's at 120 firms (or proportional to firms), with byte-identical decisions (a pure performance change: world_determinism, digests unchanged against the BL-1204 branch). Profile corp_strategic first (scorer_clock, tick_profile): likely suspects are per-candidate input_reach / reachable_supply_cost scans and the Well bucket under more firms. Then merge BL-1204 + this together."
   },
   {
-   "glyph": "○",
-   "status": "proposed",
+   "glyph": "◐",
+   "status": "designed",
    "sprint": 49,
    "written": "2026-10-06",
    "requires": [],
@@ -1669,11 +1669,11 @@
    "files": [
     "src/world/corporation_generation.cpp"
    ],
-   "design": "Sprint 49's headline promise is the PLAYER's profit from day 1, and the seat still runs a loss on some seeds (BL-1185 tip: seat operating net -44 / -2 / +48 / -13 / +14 on seeds 0/43/10/28/38). Measure on current main, all 16 curated seeds: the seat's operating net per quarter over its last 8 settle quarters and first 8 play quarters, by flow (income, inputs, maintenance, wages, upkeep, levies) and per holding (which processor runs, which idles and why). Name the cause before choosing a fix; candidate levers are the seat kit's recipe/site choice (BL-1188), its inputs' reach, its opening stock, and running costs."
+   "design": "RULED (Ben, 2026-10-07, the seat inheritance form, option A): the seat opens with no unfinished builds - cancelled at seating, materials paid so far refunded (CORPORATION_GENERATION.md sec The spawn shortlist, and the seat, step 5).\n\nDIAGNOSED (2026-10-07, a70ef236 on worktree-agent-a530461bc2bad5656; probe tools/verify/seat_day1): seats with play op.net >= 0 over 8 quarters 12/16 on main, 13/16 with the reflex gate. Cause on every remaining loser: construction the seat INHERITS from its spectate-era scorer (2-3 builds started in the settle, materials landing as 30-330 credit spikes); with those dropped, 16/16 >= 0 (min +0.2 main / +9.1 fix); seed 9's builds ARE its profit. Ben asked (the seat inheritance form). REFLEX GATE (built, in cold review): the BL-079 recipe rescue proposes only obtainable recipes (recipe_inputs_obtainable) and refuses one eating the current recipe's own output; G1 41.8 -> 43.4 on 16 seeds (50 ticks).\n\nSprint 49's headline promise is the PLAYER's profit from day 1, and the seat still runs a loss on some seeds (BL-1185 tip: seat operating net -44 / -2 / +48 / -13 / +14 on seeds 0/43/10/28/38). Measure on current main, all 16 curated seeds: the seat's operating net per quarter over its last 8 settle quarters and first 8 play quarters, by flow (income, inputs, maintenance, wages, upkeep, levies) and per holding (which processor runs, which idles and why). Name the cause before choosing a fix; candidate levers are the seat kit's recipe/site choice (BL-1188), its inputs' reach, its opening stock, and running costs."
   },
   {
-   "glyph": "○",
-   "status": "proposed",
+   "glyph": "●",
+   "status": "complete",
    "sprint": 49,
    "written": "2026-10-06",
    "requires": [],
@@ -1690,7 +1690,110 @@
    "files": [
     "tools/verify/"
    ],
-   "design": "G1 (processors running at handoff) is sprint 49's furthest gate (~49% vs 70%). Diagnose on current main before choosing a lever: every processor at handoff by state (running / input-starved / unsupplied / under construction / idled), and for the starved, which input, whether it is produced on the body, in reach, over the ceiling, or never chartered; per market and pooled, 16 seeds. Candidate levers already filed: BL-1189 (opening stock sized), BL-1203 (hauler room)."
+   "design": "MERGED (e5937d28, 2026-10-07): handoff_starvation probe + drafts/sprint-49-handoff-starvation.md. G1 41.8% on 16 seeds; ceiling cycle ~65%; levers ranked; ruled into BL-1209. Open: 424 idled plants with every input on hand not resumed - check the resume path.\n\nG1 (processors running at handoff) is sprint 49's furthest gate (~49% vs 70%). Diagnose on current main before choosing a lever: every processor at handoff by state (running / input-starved / unsupplied / under construction / idled), and for the starved, which input, whether it is produced on the body, in reach, over the ceiling, or never chartered; per market and pooled, 16 seeds. Candidate levers already filed: BL-1189 (opening stock sized), BL-1203 (hauler room)."
+  },
+  {
+   "status": "complete",
+   "glyph": "●",
+   "sprint": 49,
+   "written": "2026-10-06",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1208",
+   "short_name": "GENERATION_SITES_WHARVES",
+   "author": "Claude (the BL-1199 lane, 2026-10-06)",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "Generation sites a Fishing Wharf where a produce firm has coast but no produce deposit",
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "files": [
+    "src/world/corporation_generation.cpp"
+   ],
+   "design": "MERGED (2026-10-07): dig_ladder(produce) = deposit -> Wharf, no fallback; body_producible names exactly the ladder's ground; charter_refusal_probe section 8. NO CHANGE on seeds 0/43/10/28/38 (byte-identical worlds): a produce gap always takes a processing focus (the Hydroponics Bay recipe), so the ladder never runs there. Whether produce gaps should prefer extraction is a sprint 50+ design question.\n\nFound by BL-1199: body_producible counts any coastal tile as able to make agricultural produce, but dig_site_of offers no Wharf tier, so a produce gap firm on a coastal body with no produce deposit is told the good is producible and finds nowhere to build. The sibling of the Well tier Ben approved (NR-973, \"we can add wells to generation\"): give dig_site_of a Wharf tier for agricultural produce (deposit first, then a coastal no-deposit Wharf site), through the same three hooks the Well uses. Applied directly as the approved pattern (main session, 2026-10-06)."
+  },
+  {
+   "status": "designed",
+   "glyph": "◐",
+   "sprint": 49,
+   "written": "2026-10-07",
+   "requires": [
+    "BL-1203"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1209",
+   "short_name": "SHELF_SEES_SILENCED_WANT",
+   "author": "Claude (Ben's ceiling cycle form, 2026-10-07)",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "A stocked shelf counts as supply against the want the ceiling silenced, and a short shelf is shared pro-rata",
+   "authority_doc": "docs/economy/MARKETS.md",
+   "files": [
+    "src/world/market_clearing.cpp",
+    "src/world/economy_system.cpp",
+    "scripts/economy.lua"
+   ],
+   "design": "RULED (Ben, 2026-10-07): (A) the shelf's supply share = min(inventory, k x (demand + suppressed want)), the suppressed want being BL-1203's hauler register; the want never bids; (B) a short shelf is shared pro-rata among admitted draws (MARKETS.md sec Price resolution). BL-1207 (handoff starvation): G1 41.8% on 16 seeds; ~65% of starved processors (1,588) have their input on a shelf priced ~4x base over the ceiling with demand 0 - the k x demand cap reads 0, so no k breaks it (the k re-sweep showed G1 flat). Estimated upper bound with resumes: G1 to ~67%. Build on BL-1203's register; then re-sweep k (currently 0) for Ben to ratify."
+  },
+  {
+   "glyph": "○",
+   "status": "proposed",
+   "sprint": 50,
+   "written": "2026-10-07",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Claude (the BL-1206 lane, 2026-10-07)",
+   "id": "BL-1210",
+   "short_name": "KIT_RECIPE_TIEBREAK",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "A specialist's own-fed recipe is not always refined fuel",
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "files": [],
+   "design": "Found by BL-1206 (seat day-1 profit, 2026-10-07). 13 of 16 seat kits open on refined_fuel: generation picks the FIRST own-fed recipe in browse order and petroleum is co-extracted widely, so most specialists make refined fuel, it gluts by tick 4, and the loss reflex fires. Break the tie by what the kit's market is short of (derived demand), not browse order."
+  },
+  {
+   "glyph": "○",
+   "status": "proposed",
+   "sprint": 50,
+   "written": "2026-10-07",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Claude (the BL-1206 lane, 2026-10-07)",
+   "id": "BL-1211",
+   "short_name": "KIT_EXTRACTION_FEEDS_PROCESSOR",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "A seat kit's processor stands in the market its own extraction feeds",
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "files": [],
+   "design": "Found by BL-1206 (seat day-1 profit, 2026-10-07). Seed 0: a trade-focus kit places its processor in a different market from its only extraction site, so no recipe it could take is own-fed, and its steel starves on a thin coal shelf. A seat kit's processor should stand where its own extraction delivers."
+  },
+  {
+   "glyph": "○",
+   "status": "proposed",
+   "sprint": 50,
+   "written": "2026-10-07",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Claude (the BL-1206 lane, 2026-10-07)",
+   "id": "BL-1212",
+   "short_name": "STARVED_PLANT_STAFFED",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "The workforce auto-dial does not staff a plant starved of its input",
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [],
+   "design": "Found by BL-1206 (seat day-1 profit, 2026-10-07). The auto-dial holds an input-starved processor at workforce 200 (seed 40), so its owner pays wages for no output. Staff to what the inputs allow."
   }
  ]
 }

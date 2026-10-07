@@ -978,14 +978,23 @@ int main()
 
         // R9.11: the close is not silent — every auto-close above wrote a line
         // to the world history log, tagged with the order's corp.
-        int close_lines = 0, player_lines = 0;
+        int close_lines = 0, player_lines = 0, tagged_lines = 0;
         for (const world_history_entry& e : s.w.history_log)
             if (e.topic == history_topic::agency &&
                 e.event.find("Standing sell order #") == 0)
             {
                 ++close_lines;
                 if (e.corp == player) ++player_lines;
+                // BL-1202 (order close notice): the consequence carries the
+                // fixed "good #<index> floor <price>" tag the Market Ledger parses.
+                int   good = -1;
+                float fl   = 0.0f;
+                if (std::sscanf(e.consequence.c_str(), "good #%d floor %f", &good, &fl) == 2 &&
+                    good >= 0 && static_cast<std::size_t>(good) < resource_count)
+                    ++tagged_lines;
             }
+        check(tagged_lines == close_lines,
+              "R9.12 every auto-close line carries the good/floor tag the Trades tab reads");
         check(close_lines == 2 && player_lines == 1,
               "R9.11 each auto-close writes one history-log line tagged with its corp "
               "(the player's included)");
