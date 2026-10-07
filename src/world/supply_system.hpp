@@ -8,6 +8,7 @@
 #include <array>
 #include <cstdint>
 #include <map>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -194,6 +195,21 @@ float dispatch_market_price(const market_component& mc, std::size_t r);
 /// The HOME price of a pool: its market's last resolved price, or 0 for a
 /// body-level pool (no market to sell into) or a good its market does not price.
 float dispatch_home_price(const world& w, entity_id src_key, std::size_t r);
+
+/// BL-1229 (an order is a floor, not a hold; MARKETS.md step 4): the highest
+/// `floor_price` among the standing sell orders on each (corp, body, good).
+/// Built once per pass from `w.sell_orders`; a std::map, read only by lookup.
+using order_floor_map = std::map<std::tuple<entity_id, entity_id, std::size_t>, float>;
+order_floor_map collect_order_floors(const world& w);
+
+/// The SOURCE price a haul out of pool `src_key` must beat — the one rule the
+/// auto-dispatcher and the rival scorer's directed dispatch share. The pool's
+/// home price, or, where the corp holds a standing sell order on the good on
+/// the pool's body, max(home price, the highest floor): the order accepts no
+/// sale below its floor, at home or by haul, so a haul must beat it as it beats
+/// home, and is sized so the destination lands no lower than floor + haul.
+float dispatch_source_price(const world& w, const order_floor_map& floors, entity_id corp,
+                            entity_id src_key, std::size_t r);
 
 /// Supply `dest` can absorb before its UNSMOOTHED target price (`price_target`)
 /// falls to `landed_cost`: S* - S with S* = D x (base / landed)^2, clamped by the

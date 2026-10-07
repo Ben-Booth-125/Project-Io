@@ -128,8 +128,11 @@
 //                 tick's output): `poolheld` (a corporation's pool on the body
 //                 holds >= 1 unit beyond processor_reservation and this tick's
 //                 deliveries, outside any standing sell order -- dispatch_convoys'
-//                 own surplus) / `ordered` (only under a sell order, which the
-//                 corp dispatcher never hauls) / `none`; and `grid` (never cargo)
+//                 own surplus) / `ordered` (only under a sell order, and the
+//                 order's FLOOR is what refuses the haul to this market: an
+//                 order is a floor, not a hold, BL-1229; an ordered pool the
+//                 floor does not refuse reads `poolheld`) / `none`; and `grid`
+//                 (never cargo)
 //        input    every input-starved processor (G1's `input` state, this tick's
 //                 report), filed under its scarcest input (limiting_input) at
 //                 ITS market: `nomarket` (no tile market: a body pool), `grid`,
@@ -679,7 +682,13 @@ struct lg_probe
     std::set<std::pair<entity_id, std::size_t>> exported; ///< (src market, good) shelf-exported this tick
     /// (body, good) -> x_poolheld / x_ordered / absent (x_none), from the PRE-STEP
     /// pools: last tick's post-clear leftover, not this tick's fresh output.
-    std::map<std::pair<entity_id, std::size_t>, int> pool_status;
+    /// BL-1229 (an order is a floor, not a hold): an ordered-only entry carries
+    /// the lowest source price among its ordered pools (max(home, floor),
+    /// dispatch_source_price) and that pool's home price, so the read can tell a
+    /// destination only the FLOOR refuses (x_ordered) from one the dispatcher
+    /// would gate anyway, or haul (x_poolheld).
+    struct pool_stat { int st = x_ordered; float src = 0.0f, home = 0.0f; };
+    std::map<std::pair<entity_id, std::size_t>, pool_stat> pool_status;
 };
 
 std::vector<entity_id> sorted_processors(const world& w)
@@ -734,14 +743,13 @@ void lg_snapshot(const world& w, lg_probe& p)
 /// dispatcher would treat as shippable -- pool less processor_reservation less
 /// this tick's deliveries (dispatch_arrived), dispatch_convoys' own surplus
 /// (supply_system.cpp) -- outside a standing sell order (`poolheld`), or only
-/// under one (`ordered`: dispatch_convoys never hauls an order-controlled
-/// (corp, body, good))? Absent = `none`.
+/// under one (`ordered`)? Absent = `none`. Since BL-1229 (an order is a floor,
+/// not a hold) dispatch hauls an ordered pool at max(home, floor), so an
+/// ordered-only entry is resolved per destination at read time (no_shelf_class).
 void snapshot_pool_status(const world& w, const recipe_registry& reg, lg_probe& p)
 {
     p.pool_status.clear();
-    std::set<std::tuple<entity_id, entity_id, std::size_t>> ordered;
-    for (const sell_order& o : w.sell_orders)
-        ordered.insert({o.corp, o.body, static_cast<std::size_t>(o.resource)});
+    const order_floor_map ordered = collect_order_floors(w);
     const grid_goods_params& grid = reg.grid_goods();
     for (const auto& [key, pool] : w.corp_market_pools) // std::map: sorted
     {
@@ -757,8 +765,12 @@ void snapshot_pool_status(const world& w, const recipe_registry& reg, lg_probe& 
             if (grid.grid(g) || !(pool.quantities[g] >= 1.0f)) continue;
             const float surplus = pool.quantities[g] - res[g] - dispatch_arrived(w, key.first, key.second, g);
             if (!(surplus >= 1.0f)) continue;
-            int& st = p.pool_status.try_emplace(std::make_pair(body, g), x_ordered).first->second;
-            if (!ordered.count({key.first, body, g})) st = x_poolheld;
+            const auto [it, fresh] = p.pool_status.try_emplace(std::make_pair(body, g));
+            lg_probe::pool_stat& ps = it->second;
+            if (!ordered.count({key.first, body, g})) { ps.st = x_poolheld; continue; }
+            if (ps.st != x_ordered) continue;
+            const float src = dispatch_source_price(w, ordered, key.first, key.second, g);
+            if (fresh || src < ps.src) { ps.src = src; ps.home = dispatch_home_price(w, key.second, g); }
         }
     }
 }
@@ -800,9 +812,18 @@ void lg_after_lap(const world& cw, int lap, void* vctx)
 
     // the dispatcher's own surplus test (> 0), not water_pair_probe's 1 unit
     std::vector<good_markets> scans(resource_count);
+    // BL-1229: an ordered-only pool is `ordered` only where the FLOOR refuses —
+    // the gate at max(home, floor) fails at d but the home price alone passes.
+    const float lg_margin = reg.dispatch_margin();
     const auto no_shelf_class = [&](entity_id d, std::size_t g) {
         const auto it = p->pool_status.find(std::make_pair(w.markets.at(d).body, g));
-        return it == p->pool_status.end() ? x_none : it->second;
+        if (it == p->pool_status.end()) return static_cast<int>(x_none);
+        const lg_probe::pool_stat& ps = it->second;
+        if (ps.st != x_ordered) return ps.st;
+        const float pd = dispatch_market_price(w.markets.at(d), g);
+        const bool floor_refuses = !(pd > ps.src * (1.0f + lg_margin)) &&
+                                   pd > ps.home * (1.0f + lg_margin);
+        return floor_refuses ? static_cast<int>(x_ordered) : static_cast<int>(x_poolheld);
     };
 
     // dry (market, good) pairs by best class

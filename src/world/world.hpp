@@ -490,6 +490,17 @@ struct world
     /// exactly as the saved one would have on its next tick.
     std::map<std::pair<entity_id, entity_id>, stockpile_component> arrived_this_tick;
 
+    /// BL-1229 (an order is a floor, not a hold) — the (corp, body, good) triples
+    /// under a standing sell order that THIS tick's `dispatch_convoys` hauled
+    /// from. TRANSIENT: written by dispatch (cleared at its top), read by the
+    /// SAME tick's `clear_markets` — which counts a hauled pool as NOT empty for
+    /// the order's auto-close, so an order stays alive (and keeps its floor on
+    /// the haul) while its goods are travelling — and cleared again at the end
+    /// of that clear, so a clear run without a dispatch never reads a stale set.
+    /// Never saved, never in a state hash: saves are taken BETWEEN ticks, when
+    /// it is always empty (the same argument as `arrived_this_tick`).
+    std::set<std::tuple<entity_id, entity_id, std::size_t>> hauled_ordered_this_tick;
+
     /// BL-1222 (trade-flow lens) — what the PLAYER corporation's dispatcher did
     /// over its last few passes, for the Trade-flow lens (LENSES.md § Trade-flow
     /// lens). WRITE-ONLY for the simulation: `dispatch_convoys` appends one pass
