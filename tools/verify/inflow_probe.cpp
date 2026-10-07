@@ -114,6 +114,7 @@ const char* k_scls[k_scount] = {"body", "noroute", "gate", "costly", "noroom", "
 
 // --- the pool categories ----------------------------------------------------
 enum cat : int { c_atM = 0, c_deficit, c_local, c_else, c_refused, c_toM, c_count };
+constexpr double k_deficit_primary = 0.20; ///< round 2: 'deficit' is the primary cause only above this d
 const char* k_cat[c_count] = {"(0) at M", "(1) body deficit", "(2) consumed/held upstream",
                               "(3) shipped elsewhere", "(4) refused (sold at home)", "(5) to M"};
 
@@ -126,6 +127,7 @@ struct tick_read
 {
     pool_map p0, p1, p2;
     std::map<entity_id, arr> tile0, tile1;            ///< extraction tiles' reserves
+    std::map<entity_id, arr> inv0;                   ///< round 2: pre-step shelf, admitted under the ceiling only (0 if refused)
     std::vector<ship_rec> ships;                     ///< convoys dispatched this tick
     /// (corp, X, M, g) -> corp-side class (only pools holding g at dispatch)
     std::map<std::tuple<entity_id, entity_id, entity_id, std::size_t>, int> corp_cls;
@@ -307,7 +309,20 @@ void after_lap(const world& cw, int lap, void* ctx)
     auto* p = static_cast<probe*>(ctx);
     if (!p->armed) return;
     tick_read& t = *p->cur;
-    if (lap == p->lap_conv) { t.p0 = copy_pools(cw); t.tile0 = copy_tiles(cw); return; }
+    if (lap == p->lap_conv)
+    {
+        t.p0 = copy_pools(cw);
+        t.tile0 = copy_tiles(cw);
+        const float res_mult = p->reg->price_band().reservation_mult;
+        for (const auto& [mid, mc] : cw.markets)
+        {
+            arr a{};
+            for (std::size_t g = 0; g < resource_count; ++g)
+                a[g] = shelf_admits(mc, g, res_mult, /*off_buys=*/true) ? std::max(0.0f, mc.inventory[g]) : 0.0f;
+            t.inv0.emplace(mid, a);
+        }
+        return;
+    }
     if (lap == p->lap_econ)
     {
         t.p1 = copy_pools(cw);
@@ -344,9 +359,47 @@ struct tally
 
 struct good_tally
 {
-    tally t;
-    double body_prod = 0, body_want = 0, mkt_demand = 0; ///< summed over distinct (body, tick)
-    int bodies_deficit = 0, bodies = 0;
+    tally t, tc; ///< tc: pooled on the CORRECTED want (round 2, item 1)
+    double body_prod = 0, body_want = 0, body_want_corr = 0, mkt_demand = 0; ///< summed over distinct (body, tick)
+    int bodies_deficit = 0, bodies_deficit_corr = 0, bodies = 0;
+};
+
+// --- round 2: the four goods the cold check named ---------------------------
+constexpr std::size_t k_focus[] = {static_cast<std::size_t>(resource_type::silica),
+                                   static_cast<std::size_t>(resource_type::copper_ore),
+                                   static_cast<std::size_t>(resource_type::rare_earth_ore),
+                                   static_cast<std::size_t>(resource_type::steel)};
+constexpr int k_nfocus = 4, k_nraw = 3; ///< the first three are extracted
+
+/// Item 3: system-wide, every body, no selection (summed over reads).
+struct sys_tally
+{
+    double prod = 0, want = 0, want_corr = 0, shelf = 0, pool = 0;
+    double reads = 0;
+    long procs = 0, producers = 0; ///< processors with g as input; live producers of g (sites working a g deposit / plants making g)
+    double deficit = 0, deficit_corr = 0; ///< sum over bodies of max(0, want - prod)
+};
+
+/// Item 2: extraction realised vs capacity (per good, summed over reads).
+/// Steps, applied cumulatively to every LIVE site working a g deposit:
+///   X0 realised  X1 workforce target -> 100  X2 contention -> 1 (labour short)
+///   X3 supply scalar -> 1  X4 workforce_assigned -> 1.0  X5 depletion taper -> 1
+/// plus the decommissioned and under-construction sites at X5 (they make 0 now).
+enum xstep : int { x_real = 0, x_target, x_labour, x_supply, x_assigned, x_taper, x_sup_cur, x_asg_cur, x_nsteps };
+const char* k_xstep[x_nsteps] = {"realised", "+target->100", "+labour(contention->1)", "+supply->1",
+                                 "+assigned->1.0", "+taper->1",
+                                 "ALT(not cumulative) supply->1 at the CURRENT target",
+                                 "ALT supply->1 + assigned->1.0 at the current target"};
+struct ext_tally
+{
+    std::array<double, x_nsteps> x{};
+    double decom_cap = 0, build_cap = 0;
+    long sites = 0, active = 0, idle_nolab = 0, exhausted = 0, decom = 0, building = 0, other_idle = 0;
+    double assigned_sum = 0, contention_sum = 0, wt_sum = 0, sup_sum = 0; long live_n = 0;
+    /// over DEFICIT bodies (corrected want): the deficit and what each capacity step closes
+    double deficit = 0;
+    std::array<double, x_nsteps> closes{};
+    double closes_restart = 0; ///< X5 plus decom + building sites restarted
 };
 
 struct near_tally
@@ -383,13 +436,21 @@ const char* mode_name(convoy_mode m)
 
 struct run_out
 {
-    tally all;
+    tally all, all_corr;
     std::map<std::size_t, good_tally> goods;
     near_tally nt;
+    std::array<sys_tally, k_nfocus> sys{};
+    std::array<ext_tally, k_nraw> ext{};
 };
 
+int focus_index(std::size_t g)
+{
+    for (int i = 0; i < k_nfocus; ++i) if (k_focus[i] == g) return i;
+    return -1;
+}
+
 void analyse_tick(world& w, const recipe_registry& reg, const economy_report& rep, const tick_read& t,
-                  int tick, std::uint32_t seed, int samples, run_out& R, tally& seed_t)
+                  int tick, std::uint32_t seed, int samples, run_out& R, tally& seed_t, tally& seed_tc)
 {
     const float base_rate = reg.economics(building_type::processing_facility).base_rate;
     std::map<entity_id, const building_report*> row;
@@ -397,6 +458,7 @@ void analyse_tick(world& w, const recipe_registry& reg, const economy_report& re
 
     // ---- production per (corp pool, good) ----
     pool_map prod;
+    std::map<entity_id, arr> site_real; // extraction site -> realised output by good
     std::map<entity_id, std::vector<std::pair<entity_id, float>>> tile_sites; // tile -> (bid, output)
     for (const auto& [bid, br] : row)
     {
@@ -434,10 +496,11 @@ void analyse_tick(world& w, const recipe_registry& reg, const economy_report& re
             const building_component& bb = w.buildings.at(s.first);
             const entity_id key = pool_key_for_tile(w, bb.tile);
             arr& out = prod[{row.at(s.first)->corp, key}];
+            arr& sr = site_real[s.first];
             for (std::size_t g = 0; g < resource_count; ++g)
             {
                 const float d = a->second[g] - b->second[g];
-                if (d > 0.0f) out[g] += d * s.second / sum;
+                if (d > 0.0f) { out[g] += d * s.second / sum; sr[g] += d * s.second / sum; }
             }
         }
     }
@@ -445,7 +508,8 @@ void analyse_tick(world& w, const recipe_registry& reg, const economy_report& re
     // ---- per processor need; body want ----
     struct pinfo { entity_id bid, m, body; std::size_t g; float need; bool starved; };
     std::vector<pinfo> starved;
-    std::map<std::pair<entity_id, std::size_t>, float> body_want, body_prod, body_mdem;
+    std::map<std::pair<entity_id, std::size_t>, float> body_want, body_want_corr, body_prod, body_mdem;
+    std::array<long, resource_count> proc_count{};
     std::vector<entity_id> procs;
     for (const auto& [bid, b] : w.buildings)
         if (b.type == building_type::processing_facility && live_processor(b)) procs.push_back(bid);
@@ -463,8 +527,38 @@ void analyse_tick(world& w, const recipe_registry& reg, const economy_report& re
         const entity_id m = market_for_tile(w, b.tile);
         entity_id body = br ? br->body : null_entity;
         if (body == null_entity) { const auto mi = w.markets.find(m); if (mi != w.markets.end()) body = mi->second.body; }
+        // Round 2, item 1: coverage of every input from the PRE-STEP pool
+        // (owner corp, the processor's pool key) plus the admitted pre-step shelf.
+        arr cov{};
+        {
+            const entity_id pk = pool_key_for_tile(w, b.tile);
+            const auto pi = br ? t.p0.find({br->corp, pk}) : t.p0.end();
+            const auto si = t.inv0.find(m);
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                const float need_r = rc->inputs[r] * bf;
+                if (!(need_r > 0.0f)) { cov[r] = 1e30f; continue; }
+                const float have = (pi != t.p0.end() ? std::max(0.0f, pi->second[r]) : 0.0f)
+                                 + (si != t.inv0.end() ? si->second[r] : 0.0f);
+                cov[r] = have / need_r;
+            }
+        }
         for (std::size_t g = 0; g < resource_count; ++g)
-            if (rc->inputs[g] > 0.0f) body_want[{body, g}] += rc->inputs[g] * bf;
+        {
+            if (!(rc->inputs[g] > 0.0f)) continue;
+            ++proc_count[g];
+            const float need_g = rc->inputs[g] * bf;
+            body_want[{body, g}] += need_g;
+            float corr = need_g;
+            if (!(br && br->has_limiting && static_cast<std::size_t>(br->limiting_input) == g))
+            {
+                float other = 1e30f;
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    if (r != g && rc->inputs[r] > 0.0f) other = std::min(other, cov[r]);
+                corr = need_g * std::min(1.0f, other);
+            }
+            body_want_corr[{body, g}] += corr;
+        }
         // G1's `input` state (market_viability classify_row)
         if (!br || br->active || !(eff > 0.0f) || building_supply_scalar(b) <= 0.0f || b.workforce_target <= 0.0f
             || !br->has_limiting)
@@ -480,6 +574,153 @@ void analyse_tick(world& w, const recipe_registry& reg, const economy_report& re
     }
     for (const auto& [mid, mc] : w.markets)
         for (std::size_t g = 0; g < resource_count; ++g) if (mc.demand[g] > 0.0f) body_mdem[{mc.body, g}] += mc.demand[g];
+
+    // ---- round 2, item 3: system-wide balance, every body ----
+    for (int fi = 0; fi < k_nfocus; ++fi)
+    {
+        const std::size_t g = k_focus[fi];
+        sys_tally& S = R.sys[fi];
+        S.reads += 1;
+        std::set<entity_id> bodies;
+        for (const auto& [k, v] : body_prod) if (k.second == g) bodies.insert(k.first);
+        for (const auto& [k, v] : body_want) if (k.second == g) bodies.insert(k.first);
+        for (const entity_id bd : bodies)
+        {
+            const float p = body_prod.count({bd, g}) ? body_prod[{bd, g}] : 0.0f;
+            const float q = body_want.count({bd, g}) ? body_want[{bd, g}] : 0.0f;
+            const float qc = body_want_corr.count({bd, g}) ? body_want_corr[{bd, g}] : 0.0f;
+            S.prod += p; S.want += q; S.want_corr += qc;
+            S.deficit += std::max(0.0f, q - p); S.deficit_corr += std::max(0.0f, qc - p);
+        }
+        for (const auto& [mid, mc] : w.markets) S.shelf += std::max(0.0f, mc.inventory[g]);
+        for (const auto& [k, pool] : w.corp_market_pools) S.pool += std::max(0.0f, pool.quantities[g]);
+        S.procs += proc_count[g];
+        for (const auto& [bid, b] : w.buildings)
+        {
+            if (b.decommissioned || b.ticks_remaining > 0) continue;
+            if (fi < k_nraw)
+            {
+                if (b.type != building_type::extraction_site) continue;
+                const auto ti = w.tiles.find(b.tile);
+                if (ti != w.tiles.end() && ti->second.resource_deposit[g] > 0.0f) ++S.producers;
+            }
+            else if (b.type == building_type::processing_facility)
+            {
+                const recipe* rc = reg.get_recipe(b.recipe);
+                if (rc && rc->outputs[g] > 0.0f) ++S.producers;
+            }
+        }
+    }
+
+    // ---- round 2, item 2: extraction realised vs capacity ----
+    {
+        std::map<std::pair<entity_id, std::size_t>, std::vector<entity_id>> stacks; // (tile, target) -> ids ascending
+        std::vector<entity_id> sites;
+        for (const auto& [bid, b] : w.buildings)
+            if (b.type == building_type::extraction_site) sites.push_back(bid);
+        std::sort(sites.begin(), sites.end());
+        for (const entity_id bid : sites)
+        {
+            const building_component& b = w.buildings.at(bid);
+            stacks[{b.tile, static_cast<std::size_t>(b.target_resource)}].push_back(bid);
+        }
+        std::map<entity_id, entity_id> owner;
+        for (const auto& [cid, cc] : w.corporations) for (const entity_id a : cc.assets) owner.emplace(a, cid);
+        const auto nominal = [&](const building_component& b, entity_id corp, float a, float c, int wt, bool sup) {
+            building_component x = b;
+            x.workforce_assigned = a;
+            x.workforce_target = wt;
+            if (sup) x.supply_factor_permille = 1000;
+            return extraction_nominal(w, reg, x, c, corp);
+        };
+        for (int fi = 0; fi < k_nraw; ++fi)
+        {
+            const std::size_t g = k_focus[fi];
+            ext_tally& E = R.ext[fi];
+            std::map<entity_id, std::array<double, x_nsteps>> body_x;
+            std::map<entity_id, double> body_restart;
+            for (const entity_id bid : sites)
+            {
+                const building_component& b = w.buildings.at(bid);
+                const auto ti = w.tiles.find(b.tile);
+                if (ti == w.tiles.end()) continue;
+                const tile_component& tc = ti->second;
+                if (!(tc.resource_deposit[g] > 0.0f)) continue;
+                if (placement_rules::is_depositless_site(w, b.tile, b.target_resource)) continue;
+                float rich_tot = 0.0f;
+                for (const resource_type r : placement_rules::k_extractable) rich_tot += tc.resource_deposit[static_cast<std::size_t>(r)];
+                if (!(rich_tot > 0.0f)) continue;
+                const double share = tc.resource_deposit[g] / rich_tot;
+                const auto& st = stacks[{b.tile, static_cast<std::size_t>(b.target_resource)}];
+                const int rank = static_cast<int>(std::find(st.begin(), st.end(), bid) - st.begin()) + 1;
+                const float ss = placement_rules::stack_output_scalar(rank);
+                const auto oi = owner.find(bid);
+                const entity_id corp = oi == owner.end() ? null_entity : oi->second;
+                const std::size_t pr = static_cast<std::size_t>(b.target_resource);
+                const auto t0 = t.tile0.find(b.tile);
+                const float rem = t0 != t.tile0.end() ? t0->second[pr] : tc.resource_remaining[pr];
+                const auto self_taper = [&](float nom) {
+                    if (!(nom > 0.0f)) return 1.0f;
+                    const float tp = std::clamp(rem / (deposit_taper_ticks * nom), 0.0f, 1.0f);
+                    return tp < deposit_min_taper ? 0.0f : tp;
+                };
+                ++E.sites;
+                const entity_id body = tc.body;
+                if (b.ticks_remaining > 0 || b.decommissioned)
+                {
+                    const float nf = nominal(b, corp, 1.0f, 1.0f, 100, true) * ss;
+                    const double cap = nf * self_taper(nf) * share;
+                    if (b.ticks_remaining > 0) { ++E.building; E.build_cap += cap; }
+                    else { ++E.decom; E.decom_cap += cap; }
+                    body_restart[body] += cap;
+                    continue;
+                }
+                const auto ri = row.find(bid);
+                const building_report* br = ri == row.end() ? nullptr : ri->second;
+                const float a = b.workforce_assigned;
+                const float eff = br ? br->effective_workforce : 0.0f;
+                const float c = a > 0.0f ? eff / a : 1.0f;
+                ++E.live_n; E.assigned_sum += a; E.contention_sum += c; E.wt_sum += b.workforce_target;
+                E.sup_sum += building_supply_scalar(b);
+                if (br && br->active) ++E.active;
+                else if (br && br->exhausted) ++E.exhausted;
+                else if (!(eff > 0.0f)) ++E.idle_nolab;
+                else ++E.other_idle;
+                const float n_cur = nominal(b, corp, a, c, b.workforce_target, false) * ss;
+                const float real_tot = (br && br->active) ? br->output_quantity : 0.0f;
+                float tp;
+                if (br && br->exhausted) tp = 0.0f;
+                else if (real_tot > 0.0f && n_cur > 0.0f) tp = std::min(1.0f, real_tot / n_cur);
+                else tp = self_taper(nominal(b, corp, a, 1.0f, 100, false) * ss);
+                std::array<double, x_nsteps> X{};
+                const auto sr = site_real.find(bid);
+                X[x_real]     = sr == site_real.end() ? 0.0 : sr->second[g];
+                X[x_target]   = nominal(b, corp, a, c, 100, false) * ss * tp * share;
+                X[x_labour]   = nominal(b, corp, a, 1.0f, 100, false) * ss * tp * share;
+                X[x_supply]   = nominal(b, corp, a, 1.0f, 100, true) * ss * tp * share;
+                X[x_assigned] = nominal(b, corp, 1.0f, 1.0f, 100, true) * ss * tp * share;
+                X[x_taper]    = tp > 0.0f ? X[x_assigned] / tp : X[x_assigned]; // an exhausted reserve stays exhausted
+                X[x_sup_cur]  = nominal(b, corp, a, c, b.workforce_target, true) * ss * tp * share;
+                X[x_asg_cur]  = nominal(b, corp, 1.0f, c, b.workforce_target, true) * ss * tp * share;
+                for (int k = 0; k < x_nsteps; ++k) { E.x[k] += X[k]; body_x[body][k] += X[k]; }
+            }
+            // what each step closes of the CORRECTED deficit, per body
+            for (const auto& [k, qc] : body_want_corr)
+            {
+                if (k.second != g) continue;
+                const float p = body_prod.count(k) ? body_prod[k] : 0.0f;
+                const double D = std::max(0.0, double(qc) - p);
+                if (!(D > 0.0)) continue;
+                E.deficit += D;
+                const auto bx = body_x.find(k.first);
+                for (int s = 1; s < x_nsteps; ++s)
+                    if (bx != body_x.end()) E.closes[s] += std::min(D, std::max(0.0, bx->second[s] - bx->second[x_real]));
+                const double rs = (bx != body_x.end() ? bx->second[x_taper] - bx->second[x_real] : 0.0)
+                                + (body_restart.count(k.first) ? body_restart[k.first] : 0.0);
+                E.closes_restart += std::min(D, std::max(0.0, rs));
+            }
+        }
+    }
 
     // ---- shipments indexed ----
     std::map<std::tuple<entity_id, entity_id, std::size_t>, std::map<entity_id, float>> cship; // (corp, src, g)
@@ -582,7 +823,7 @@ void analyse_tick(world& w, const recipe_registry& reg, const economy_report& re
 
     // ---- per (body, g) good rows (once per tick) ----
     std::set<std::pair<entity_id, std::size_t>> seen_bg;
-    tally tick_t;
+    tally tick_t, tick_tc;
     int printed = 0;
     std::set<std::pair<entity_id, std::size_t>> sampled;
     logistics_nodes nodes = collect_logistics_nodes(w);
@@ -591,41 +832,49 @@ void analyse_tick(world& w, const recipe_registry& reg, const economy_report& re
         const auto bg = std::make_pair(s.body, s.g);
         const float bp = body_prod.count(bg) ? body_prod[bg] : 0.0f;
         const float bw = body_want.count(bg) ? body_want[bg] : 0.0f;
+        const float bwc = body_want_corr.count(bg) ? body_want_corr[bg] : 0.0f;
         good_tally& gt = R.goods[s.g];
         if (seen_bg.insert(bg).second)
         {
-            gt.body_prod += bp; gt.body_want += bw; gt.mkt_demand += body_mdem.count(bg) ? body_mdem[bg] : 0.0f;
-            ++gt.bodies; if (bp < bw) ++gt.bodies_deficit;
+            gt.body_prod += bp; gt.body_want += bw; gt.body_want_corr += bwc;
+            gt.mkt_demand += body_mdem.count(bg) ? body_mdem[bg] : 0.0f;
+            ++gt.bodies; if (bp < bw) ++gt.bodies_deficit; if (bp < bwc) ++gt.bodies_deficit_corr;
         }
-        const double U = s.need;
-        const double d = (bw > 0.0f && bp < bw) ? 1.0 - double(bp) / bw : 0.0;
         const ledger& l = L.at({s.m, s.g});
         double ltot = 0;
         for (int i = 0; i < c_count; ++i) if (i != c_deficit) ltot += std::max(0.0, l.u[i]);
-        tally one;
-        one.starved = 1; one.unmet = U;
-        if (!(ltot > 0.0)) one.units[c_deficit] += U;
-        else
-        {
-            one.units[c_deficit] += U * d;
-            const double rest = U * (1.0 - d);
-            for (int i = 0; i < c_count; ++i) if (i != c_deficit) one.units[i] += rest * std::max(0.0, l.u[i]) / ltot;
-            one.atM_sold += rest * std::max(0.0, l.atM_sold) / ltot;
-            double bysum = 0, sbysum = 0;
-            for (int c = 0; c < k_ccount; ++c) bysum += l.by[c];
-            for (int c = 0; c < k_scount; ++c) sbysum += l.sby[c];
-            for (int c = 0; c < k_ccount; ++c) if (bysum > 0) one.refused_by[c] += one.units[c_refused] * l.by[c] / bysum;
-            for (int c = 0; c < k_scount; ++c) if (sbysum > 0) one.refused_shelf[c] += one.units[c_refused] * l.sby[c] / sbysum;
-        }
-        int prim = c_deficit;
-        if (!(bp < bw) && ltot > 0.0)
-        {
-            double best = -1;
-            for (int i = 0; i < c_count; ++i) if (i != c_deficit && l.u[i] > best) { best = l.u[i]; prim = i; }
-        }
-        one.primary[prim] = 1;
-        tick_t.add(one);
-        gt.t.add(one);
+        // the pool for one processor at body want `want`; primary 'deficit'
+        // needs d above k_deficit_primary (round 2)
+        const auto pool_one = [&](float want) {
+            const double U = s.need;
+            const double d = (want > 0.0f && bp < want) ? 1.0 - double(bp) / want : 0.0;
+            tally one;
+            one.starved = 1; one.unmet = U;
+            if (!(ltot > 0.0)) one.units[c_deficit] += U;
+            else
+            {
+                one.units[c_deficit] += U * d;
+                const double rest = U * (1.0 - d);
+                for (int i = 0; i < c_count; ++i) if (i != c_deficit) one.units[i] += rest * std::max(0.0, l.u[i]) / ltot;
+                one.atM_sold += rest * std::max(0.0, l.atM_sold) / ltot;
+                double bysum = 0, sbysum = 0;
+                for (int c = 0; c < k_ccount; ++c) bysum += l.by[c];
+                for (int c = 0; c < k_scount; ++c) sbysum += l.sby[c];
+                for (int c = 0; c < k_ccount; ++c) if (bysum > 0) one.refused_by[c] += one.units[c_refused] * l.by[c] / bysum;
+                for (int c = 0; c < k_scount; ++c) if (sbysum > 0) one.refused_shelf[c] += one.units[c_refused] * l.sby[c] / sbysum;
+            }
+            int prim = c_deficit;
+            if (!(d > k_deficit_primary || !(ltot > 0.0)))
+            {
+                double best = -1;
+                for (int i = 0; i < c_count; ++i) if (i != c_deficit && l.u[i] > best) { best = l.u[i]; prim = i; }
+            }
+            one.primary[prim] = 1;
+            return one;
+        };
+        const tally one = pool_one(bw), onec = pool_one(bwc);
+        tick_t.add(one); tick_tc.add(onec);
+        gt.t.add(one); gt.tc.add(onec);
 
         // nearest producers by route cost (legs are price-independent)
         struct nr { double cost; const ledger::prodr* p; convoy_leg leg; };
@@ -681,8 +930,10 @@ void analyse_tick(world& w, const recipe_registry& reg, const economy_report& re
     char lbl[64];
     std::snprintf(lbl, sizeof lbl, "seed %u t%d", seed, tick);
     print_tally(lbl, tick_t);
-    seed_t.add(tick_t);
-    R.all.add(tick_t);
+    std::snprintf(lbl, sizeof lbl, "seed %u t%d CORRECTED want", seed, tick);
+    print_tally(lbl, tick_tc);
+    seed_t.add(tick_t); seed_tc.add(tick_tc);
+    R.all.add(tick_t); R.all_corr.add(tick_tc);
 }
 
 void run_seed(std::uint32_t seed, int ticks, int samples, run_out& R)
@@ -711,7 +962,7 @@ void run_seed(std::uint32_t seed, int ticks, int samples, run_out& R)
         if (!std::strcmp(k_campaign_settle_lap_names[i], "clear_markets")) p.lap_clear = i;
     }
     for (const convoy_component& c : w.convoys) p.max_id = std::max(p.max_id, c.id);
-    tally seed_t;
+    tally seed_t, seed_tc;
     constexpr int k_days = 90;
     for (int k = 1; k <= ticks; ++k)
     {
@@ -726,13 +977,15 @@ void run_seed(std::uint32_t seed, int ticks, int samples, run_out& R)
         hooks.after_lap = after_lap;
         hooks.ctx = &p;
         settle_tick_result res = run_settle_tick(w, reg, k_campaign_settle_ticks + (k - 1), k * k_days, false, &hooks);
-        if (sel) analyse_tick(w, reg, res.report, t, k, seed, samples, R, seed_t);
+        if (sel) analyse_tick(w, reg, res.report, t, k, seed, samples, R, seed_t, seed_tc);
         for (const convoy_component& c : w.convoys) p.max_id = std::max(p.max_id, c.id);
         std::fflush(stdout);
     }
     char lbl[64];
     std::snprintf(lbl, sizeof lbl, "SEED %u (t10+t25+t50)", seed);
     print_tally(lbl, seed_t);
+    std::snprintf(lbl, sizeof lbl, "SEED %u CORRECTED want", seed);
+    print_tally(lbl, seed_tc);
 }
 
 } // namespace
@@ -767,6 +1020,7 @@ int main(int argc, char** argv)
 
     std::printf("\n================ POOLED over %zu seeds ================\n", seeds.size());
     print_tally("ALL", R.all);
+    print_tally("ALL, CORRECTED want (need of g bound by another input counted at need x min(1, that input's coverage))", R.all_corr);
     std::vector<std::pair<double, std::size_t>> order;
     for (const auto& [g, gt] : R.goods) order.push_back({gt.t.unmet, g});
     std::sort(order.begin(), order.end(), [](const auto& a, const auto& b) { return a.first != b.first ? a.first > b.first : a.second < b.second; });
@@ -783,11 +1037,48 @@ int main(int argc, char** argv)
         std::printf("  %-18s starved %3d unmet %7.1f | body prod %8.1f vs proc want %8.1f (%.0f%%) mkt demand %8.1f | deficit bodies %d/%d\n",
                     gname(order[i].second).c_str(), gt.t.starved, gt.t.unmet, gt.body_prod, gt.body_want,
                     gt.body_want > 0 ? 100.0 * gt.body_prod / gt.body_want : 0.0, gt.mkt_demand, gt.bodies_deficit, gt.bodies);
+        std::printf("  %-18s corrected want %8.1f: prod/want %.0f%%, deficit bodies %d/%d\n", "", gt.body_want_corr,
+                    gt.body_want_corr > 0 ? 100.0 * gt.body_prod / gt.body_want_corr : 0.0, gt.bodies_deficit_corr, gt.bodies);
         print_tally(gname(order[i].second).c_str(), gt.t);
+        print_tally((gname(order[i].second) + " CORRECTED").c_str(), gt.tc);
     }
     const near_tally& n = R.nt;
     std::printf("\n  PRODUCERS of the starved input (per starved processor, %d): one AT M %d | nearest OFF-M producer: land %d sea %d space/air %d noroute %d, none on body %d | mean haul %.2f/u = %.1f%% of the price at M (over %d routed)\n",
                 R.all.starved, n.has_local, n.nearest_cls[0], n.nearest_cls[1], n.nearest_cls[2], n.nearest_cls[3], n.no_remote,
                 n.haul_n ? n.haul / n.haul_n : 0.0, n.haul_n ? 100.0 * n.haul_over_price / n.haul_n : 0.0, n.haul_n);
+    std::printf("  NOTE: the noroom class is read AFTER the dispatch pass (this tick's commits are pending): an upper bound.\n");
+
+    // ---- round 2, item 3 ----
+    std::printf("\n  SYSTEM-WIDE (every body, no selection; per-read means over %zu seeds x reads):\n", seeds.size());
+    std::printf("  %-16s %9s %9s %6s %9s %6s %9s %9s %9s %7s %7s %8s %9s\n", "good", "prod/t", "want/t", "p/w", "wantcorr", "p/wc",
+                "deficit", "defcorr", "shelf", "pool", "procs", "producers", "procs/prd");
+    for (int fi = 0; fi < k_nfocus; ++fi)
+    {
+        const sys_tally& S = R.sys[fi];
+        const double r = S.reads > 0 ? S.reads : 1.0;
+        std::printf("  %-16s %9.1f %9.1f %5.0f%% %9.1f %5.0f%% %9.1f %9.1f %9.1f %7.1f %7.1f %8.1f %9.2f\n",
+                    gname(k_focus[fi]).c_str(), S.prod / r, S.want / r, S.want > 0 ? 100.0 * S.prod / S.want : 0.0,
+                    S.want_corr / r, S.want_corr > 0 ? 100.0 * S.prod / S.want_corr : 0.0, S.deficit / r, S.deficit_corr / r,
+                    S.shelf / r, S.pool / r, S.procs / r, S.producers / r, S.producers ? double(S.procs) / S.producers : 0.0);
+    }
+    std::printf("  (producers: live extraction sites on a tile carrying the deposit, co-extraction included; steel: live plants whose recipe outputs it)\n");
+
+    // ---- round 2, item 2 ----
+    std::printf("\n  EXTRACTION realised vs capacity (sum over reads; steps cumulative; capacity uses the site's own taper):\n");
+    for (int fi = 0; fi < k_nraw; ++fi)
+    {
+        const ext_tally& E = R.ext[fi];
+        const double ln = E.live_n ? double(E.live_n) : 1.0;
+        std::printf("  %s: %ld site-reads (live %ld: active %ld, no labour %ld, exhausted %ld, other idle %ld; decom %ld, building %ld)\n",
+                    gname(k_focus[fi]).c_str(), E.sites, E.live_n, E.active, E.idle_nolab, E.exhausted, E.other_idle, E.decom, E.building);
+        std::printf("    live means: workforce_assigned %.2f, contention %.2f, workforce_target %.0f, supply scalar %.2f\n",
+                    E.assigned_sum / ln, E.contention_sum / ln, E.wt_sum / ln, E.sup_sum / ln);
+        std::printf("    output:");
+        for (int k = 0; k < x_nsteps; ++k) std::printf("  %s %.1f", k_xstep[k], E.x[k]);
+        std::printf("  | decom sites at full %.1f, building at full %.1f\n", E.decom_cap, E.build_cap);
+        std::printf("    deficit bodies (corrected want): deficit %.1f; closed by:", E.deficit);
+        for (int k = 1; k < x_nsteps; ++k) std::printf("  %s %.0f%%", k_xstep[k], E.deficit > 0 ? 100.0 * E.closes[k] / E.deficit : 0.0);
+        std::printf("  | +restart decom/building %.0f%%\n", E.deficit > 0 ? 100.0 * E.closes_restart / E.deficit : 0.0);
+    }
     return 0;
 }
