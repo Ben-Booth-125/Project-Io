@@ -38,7 +38,7 @@ input on their own shelf to run, priced over the 2x ceiling. Trace (`ceiling_tra
 a draw-and-silence PULSE (ores, steel) and PHANTOM background demand (ree alloy, refined copper).
 Ben (2026-10-07, the ceiling-lock form): try A and D, each ALONE on 5 seeds, then rule.
 Both behind a registry switch, default OFF; no doc changes before the ruling.
-- [ ] A Lane PRICE: A1 price from the pre-draw shelf; A2 count this tick's fill as supply.
+- [x] A Lane PRICE (b9480859, unmerged): no G1 lift - 57.0 / A1 56.5 / A2 56.2 on 5 seeds; the ceiling share moves to contended. Inflow is the constraint.
 - [ ] D Lane PHANTOM: the background basket draws from the shelf (after households, no money).
 - [ ] M Main session: readings side by side; Ben's ruling form; write the ruling into MARKETS.md.
 
