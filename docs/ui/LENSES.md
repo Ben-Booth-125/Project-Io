@@ -852,18 +852,29 @@ no corporation's and do not appear either.
   player holds in surplus, coloured by the **best** class over the player's sources of
   that good. Hover lists the classes by good.
 
-**The classes** are the dispatcher's own rules, in the order it applies them, best last:
-no lane (another body, no route off it), price gate (the destination does not pay
-the margin over the source), no route, costly (routed, but the haul eats the margin), no
-room (the destination cannot absorb more at the landed price), room (the rule would send,
-but held back by the one-destination-per-pass rule or the LP cap). The names match the
-market-viability skill's logistics row, so a lens read and a headless read use one
-vocabulary.
+**The classes** name the corporation dispatcher's rule that refused, ranked by how far a
+destination got through those rules, best last:
+- **no lane** — another body, and no lane off this one.
+- **price gate** — the destination does not pay the margin over the source. The dispatcher
+  tests this before it prices a route.
+- **no route** — no road or sea leg reaches it.
+- **costly** — routed, but the haul eats the margin.
+- **no propellant** — a space lane, but the pool cannot fuel the launch.
+- **no room** — the destination cannot absorb more at the landed price.
+- **no funds** — the rule would send, but the player cannot pay for the convoy.
+- **room** — the rule would send, but the one-destination-per-pass rule or the LP cap held
+  it back.
+
+The market-viability skill's logistics row classifies **market shelf** exports, a
+different dispatcher with its own order; its labels are the tool's
+(`body / noroute / gate / costly / noroom / room`), not these.
 
 **Data.** The dispatcher records, for the player's corporation only, each pass's
-shipments and its best class per (good, destination market) as a transient output. The
-simulation never reads it and it is not saved, so a loaded game shows the lens from its
-first pass on.
+shipments and its best class per (good, destination market) as a transient output,
+tagged with the corporation it was taken for. The lens draws only passes taken for the
+corporation the player holds now, so a seat change shows nothing of the corporation
+left behind. The simulation never reads the record and it is not saved, so a loaded
+game shows the lens from its first pass on.
 
 **Legend.** A class key (colour → class) and a flow-width key (units per tick), in the
 shared legend home.
