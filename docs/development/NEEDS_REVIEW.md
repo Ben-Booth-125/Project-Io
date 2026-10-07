@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*80 entries — 3 open, 77 resolved.*
+*81 entries — 4 open, 77 resolved.*
 
 ---
 
@@ -76,6 +76,21 @@ lake_census (dff0abc1) measured 360 enclosed water bodies on the 16 curated seed
 > **Recommendation:** A.
 
 *Files: `src/world/tile_generation.cpp`, `docs/economy/TILES.md`, `tools/verify/lake_census.cpp`*
+
+### NR-977 — DECISION TAKEN: a short shelf is shared within each phase of the tick, construction first (BL-1209)
+*decision · raised 2026-10-07 · from the BL-1209 cold review*
+
+Your pro-rata ruling says every draw admitted against a short shelf in a tick shares it. The tick draws in phases: construction sites draw before labour is solved, processors after. Pooling both phases into one ration would mean reordering the tick, so the share is computed within each phase: sites share among themselves, then processors share what is left; upkeep draws stay first-come after both. A short steel shelf can therefore go to sites before plants. MARKETS.md will say so exactly.
+
+**Why it matters.** Construction-first can starve production of a shared input in a tight market; the alternative is a tick reorder.
+
+- A: keep per-phase, construction first
+- B: pool the phases (reorder the tick so sites and plants share one ration)
+- C: per-phase, production first
+
+> **Recommendation:** A for sprint 49; revisit in sprint 50 (logistics) if the trade-flow lens shows sites starving plants.
+
+*Files: `src/world/economy_system.cpp`, `docs/economy/MARKETS.md`*
 
 ---
 
