@@ -1159,6 +1159,10 @@ economy = {
         elasticity_min     = 0.30,
         elasticity_max     = 2.50,
         demand_scale       = 1.00,
+        -- BL-1217 lever D (MEASUREMENT switch, no ruling yet): when true the
+        -- basket DRAWS its bid off the market's shelf after the households'
+        -- draw (no money moves, no ceiling). false = bids only (today).
+        consumes           = false,
     },
 
     -- BL-368 (2026-08-11): the real per-centre population demand basket,

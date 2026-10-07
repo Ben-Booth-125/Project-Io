@@ -1077,6 +1077,17 @@ struct market_component
     /// reads `demand`), so they are SERIALISED (world_save_version 36).
     std::array<float, resource_count> household_weight = {};
     std::array<float, resource_count> hauler_want      = {};
+
+    /// BL-1217 lever D (measurement, behind `economy.background_demand.consumes`,
+    /// default off): the BACKGROUND channel's bid at the last clear
+    /// (`inject_background_demand`) and what it DREW off `inventory`
+    /// (`draw_background_basket`, zero while the switch is off). TRANSIENT and
+    /// deliberately NOT serialised: both are rewritten inside the same clear
+    /// before anything reads them, and no simulation code reads them at all --
+    /// they exist for the verify harnesses. A load leaves them zero until the
+    /// next clear, which changes nothing the simulation computes.
+    std::array<float, resource_count> background_bid  = {};
+    std::array<float, resource_count> background_fill = {};
 };
 
 /// BL-1172 — THE POSTED PRICE of good `r` on market `m`: the price that stands
