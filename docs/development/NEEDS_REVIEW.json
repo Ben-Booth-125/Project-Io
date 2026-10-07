@@ -1838,6 +1838,15 @@
     "docs/generation/seed_library.json"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-980",
+   "title": "Trade-flow lens: may \"no room\" reflect rivals' cargo in flight to a market?",
+   "raised": "2026-10-07",
+   "kind": "question",
+   "status": "open",
+   "source": "the BL-1222 (trade-flow lens) cold review, 2026-10-07",
+   "what": "The lens marks a short market \"no room\" when the destination cannot absorb more at the landed price. That room subtracts EVERY corporation's convoys in flight to it and stock pooled there, so \"no room\" tells the player, in aggregate, that someone is already filling that market. It names no rival and no quantity. DISCOVERY.md § Competitor visibility makes market supply/demand aggregates public but does not say whether goods in flight count. Options: (A) accept it as a public market signal (cargo on the road is observable) and say so in DISCOVERY.md; (B) compute the player's room without rivals' in-flight cargo for the lens only (a second room figure the dispatcher does not use, so the lens and the decision could disagree)."
   }
  ]
 }

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*83 entries — 6 open, 77 resolved.*
+*84 entries — 7 open, 77 resolved.*
 
 ---
 
@@ -120,6 +120,11 @@ After the sprint 49 re-bless (the lake cap moved every seed's history), the libr
 > **Recommendation:** C - check which tags a harness or skill queries (--for), replace those seeds, and let the rest go.
 
 *Files: `docs/generation/seed_library.json`*
+
+### NR-980 — Trade-flow lens: may "no room" reflect rivals' cargo in flight to a market?
+*question · raised 2026-10-07 · from the BL-1222 (trade-flow lens) cold review, 2026-10-07*
+
+The lens marks a short market "no room" when the destination cannot absorb more at the landed price. That room subtracts EVERY corporation's convoys in flight to it and stock pooled there, so "no room" tells the player, in aggregate, that someone is already filling that market. It names no rival and no quantity. DISCOVERY.md § Competitor visibility makes market supply/demand aggregates public but does not say whether goods in flight count. Options: (A) accept it as a public market signal (cargo on the road is observable) and say so in DISCOVERY.md; (B) compute the player's room without rivals' in-flight cargo for the lens only (a second room figure the dispatcher does not use, so the lens and the decision could disagree).
 
 ---
 
