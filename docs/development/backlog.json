@@ -1250,6 +1250,49 @@
     "src/world/corp_ai.cpp"
    ],
    "design": "CARRIED from sprint 49 (Ben, the close-out form, 2026-10-07: close with G1 unmet, carry it to sprint 50 as a logistics item). The 16-seed market_viability reading on main after BL-1183 C1: G1 54.7% of built processors running at handoff against Ben's 70% (G2 54.4 and G3 88.9 pass). About a quarter of built processors are already decommissioned by the handoff, and by their last reported state almost all were input-starved (half A: 578 of 674). Diagnose which inputs fail to arrive, at which markets, and why - no producer within reach, a producer whose surplus is not dispatched, or a dispatch the margin refuses - then fix the cause in the network or dispatch, not by clamping the loss reflex. Re-measure construction stalls here too: whether a stalled site is ever abandoned (BL-1183 C3) is still unruled. Judge it on the market-viability skill, 16 seeds."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 51,
+   "written": "2026-10-07",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1218",
+   "short_name": "WHARF_PLACED_ON_SHORE",
+   "author": "Ben (the sprint 49 live clicks, 2026-10-07)",
+   "title": "The Fishing Wharf is offered and placed on a land tile beside the coast",
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "src/ui/"
+   ],
+   "design": "LIVE CLICK (Ben, 2026-10-07, play build 02:37): the Fishing Wharf appears in the build options only when hovering a water (coast) tile, not a land tile adjacent to the coast, and placing it there fails with \"Cannot build on water\". The placement offer and the placement rule disagree: the wharf should be offered on, and placeable on, a land tile with coast adjacency (PRODUCTION.md, the wharf/well depositless path). Check the Well (river/lake adjacency) for the same mismatch."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 51,
+   "written": "2026-10-07",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 3,
+   "id": "BL-1219",
+   "short_name": "SITE_COST_AND_MATERIALS_VISIBLE",
+   "author": "Ben (the sprint 49 live clicks, 2026-10-07)",
+   "title": "A construction site shows what it costs while building, and why its materials cannot be supplied",
+   "authority_doc": "docs/economy/FINANCE.md",
+   "files": [
+    "src/ui/construction_panel.cpp",
+    "src/ui/selection_panel.cpp"
+   ],
+   "design": "LIVE CLICK (Ben, 2026-10-07): (a) no visible surface shows a site's running cost under construction, so the idle-floor rule (FINANCE.md, a site pays the idle floor) could not be checked; (b) the player still hits \"market can't supply materials\" on many buildings. Show the site's cost while building, and say which material is short and why (none on the shelf, over the fair-price ceiling, no producer in reach) so the player can act. Pair with BL-1180 (construction panel drift, same panels). The supply half may share a cause with BL-1217 (inputs reach processors)."
   }
  ]
 }
