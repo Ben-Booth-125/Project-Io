@@ -1080,8 +1080,9 @@ void r11_the_province_is_the_grid_cell()
     }
 
     // --- R11c2: an ISOLATED road wires a province onto a grid with no shelf ----
-    // Recorded, not endorsed (review round 1, item 4): wired, it bids and decays;
-    // dark, it would not.
+    // RULED (Ben, 2026-10-07): a wired grid with no generation keeps decaying as
+    // written — wired, it bids and goes short; dark, it would not. This row pins
+    // the ruled behaviour.
     {
         grid_fixture f;
         f.build(6, 3, "rr..r.", "......", { 4 });
@@ -1141,6 +1142,96 @@ void r11_the_province_is_the_grid_cell()
         std::printf("      capacity: M1 %.3f  M2 %.3f\n", p1, p2);
         check(p1 < 0.5f && p2 > 5.0f,
               "R11e CAPACITY (a grid good the ruling does not name) still prices on its own market");
+    }
+
+    // --- R11g: the shelf cap is taken ONCE, at the grid (review round 2) -------
+    // All the grid's power stands on M1's shelf; nothing is listed this tick;
+    // the only demand is M2's building. Summed market by market, M1's capped
+    // share (min(shelf, k x LOCAL demand) = 0) and M2's (empty shelf) would price
+    // the grid as empty and drive M2 over the ceiling; capped at the grid, the
+    // shelf answers the grid's demand and M2 stays under it.
+    {
+        grid_fixture f;
+        f.build(6, 3, "rrrrrr", "......", { 4 }, 1.0f, 1.0f, 1.9f);
+        f.shelf(f.m1) = 100.0f;
+        recipe_registry reg = power_registry(need); // the SHIPPED k = 1
+        bool under = true, met = true;
+        float worst = 0.0f;
+        for (int i = 0; i < 20; ++i)
+        {
+            economy_report rep;
+            const building_upkeep_tick t = run_building_upkeep(f.w, reg, rep);
+            if (t.unmet != 0) met = false;
+            clear_markets(f.w, reg, rep);
+            const float p2 = f.w.markets.at(f.m2).price[ri(resource_type::power)];
+            worst = std::max(worst, p2);
+            if (p2 > 1.0f * k_shipped_reservation) under = false;
+        }
+        std::printf("      M2 highest resolved price over 20 ticks %.3f (ceiling %.3f)\n", worst, k_shipped_reservation);
+        check(under, "R11g shelf on M1, demand only at M2: the grid price stays under the ceiling");
+        check(met && f.w.buildings.at(f.buildings[0]).supply_factor_permille == 1000,
+              "R11g ... and M2's building is filled every tick from M1's shelf");
+        check_near(f.shelf(f.m1), 100.0f - 20.0f * need, "R11g M1's shelf gave up exactly 20 draws", 1e-2f);
+    }
+
+    // --- R11h: construction capacity's wire and draw stay LOCAL ----------------
+    // The ruling names power; capacity keeps the tile-reach wire (BL-708) and its
+    // own market's shelf.
+    {
+        auto cap_registry = [&]() {
+            recipe_registry reg = registry_with_reservation(resource_type::construction_capacity, need,
+                                                            k_shipped_reservation);
+            grid_goods_params g;
+            g.is_grid[ri(resource_type::power)] = true;
+            g.is_grid[ri(resource_type::construction_capacity)] = true;
+            reg.set_grid_goods(g);
+            return reg;
+        };
+        auto anchor = [](grid_fixture& f) {
+            f.w.population_centre_tile[f.w.create_entity()] = f.tiles.front();
+            f.w.population_centre_tile[f.w.create_entity()] = f.tiles.back();
+        };
+        // Reached by the tile wire, in a road-wired province, capacity only on M1:
+        // the grid does NOT carry it — the building goes short at its own M2.
+        {
+            grid_fixture f;
+            f.build(6, 3, "rrrrrr", "......", { 4 });
+            anchor(f);
+            f.shelf(f.m1, resource_type::construction_capacity) = 10.0f;
+            recipe_registry reg = cap_registry();
+            economy_report rep;
+            const building_upkeep_tick t = run_building_upkeep(f.w, reg, rep);
+            check(t.unmet == 1, "R11h capacity on M1's shelf does NOT reach a building at M2 (no grid draw)");
+            check_near(f.shelf(f.m1, resource_type::construction_capacity), 10.0f,
+                       "R11h ... M1's capacity shelf is untouched");
+        }
+        // A DARK province but a reached tile: capacity still draws at its own market.
+        {
+            grid_fixture f;
+            f.build(6, 3, "rrr...", "......", { 4 });
+            anchor(f);
+            f.shelf(f.m2, resource_type::construction_capacity) = 10.0f;
+            recipe_registry reg = cap_registry();
+            economy_report rep;
+            const building_upkeep_tick t = run_building_upkeep(f.w, reg, rep);
+            check(f.grid_at(4) == 0 && t.unmet == 0,
+                  "R11h a dark province does not strike capacity: its wire is the tile's reach");
+            check_near(f.shelf(f.m2, resource_type::construction_capacity), 10.0f - need,
+                       "R11h ... drawn from its OWN market's shelf");
+        }
+        // An unreached tile (no anchor) strikes capacity, as BL-708 always did.
+        {
+            grid_fixture f;
+            f.build(6, 3, "rrrrrr", "......", { 4 });
+            f.shelf(f.m2, resource_type::construction_capacity) = 10.0f;
+            recipe_registry reg = cap_registry();
+            economy_report rep;
+            for (int i = 0; i < 3; ++i)
+                run_building_upkeep(f.w, reg, rep);
+            check(f.w.buildings.at(f.buildings[0]).supply_factor_permille == 1000
+                      && f.shelf(f.m2, resource_type::construction_capacity) == 10.0f,
+                  "R11h an unreached tile strikes capacity (no draw, no decay) even in a wired province");
+        }
     }
 
     // --- R11f: a road write invalidates the grid ------------------------------

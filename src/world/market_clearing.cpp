@@ -1678,8 +1678,20 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // Power only (grid_good_crosses_markets): construction capacity, the other
     // grid good, still draws locally, so it still prices locally.
     std::map<entity_id, std::uint32_t> market_grid;
-    std::map<std::uint32_t, std::pair<std::array<float, resource_count>,
-                                      std::array<float, resource_count>>> grid_sd; // (supply, demand)
+    //
+    // THE SHELF CAP IS APPLIED ONCE, AT THE GRID (review round 2). pricing_supply's
+    // shelf share is min(shelf, k x (demand + silenced want)); summed market by
+    // market it would count a shelf with no LOCAL demand as no supply, though a
+    // building anywhere on the grid draws from it — so the grid would price as
+    // empty while one market held plenty. The three registers are pooled
+    // separately and the cap taken over the pooled figures: listed + min(sum
+    // shelf, k x sum(demand + silenced want)). At one market on a grid this is
+    // exactly pricing_supply.
+    struct grid_figures
+    {
+        std::array<float, resource_count> listed{}, shelf{}, wants{}, demand{};
+    };
+    std::map<std::uint32_t, grid_figures> grid_sd;
     if (any_grid)
     {
         std::vector<entity_id> mids;
@@ -1704,8 +1716,10 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
             {
                 if (!grid_rules.grid(r) || !grid_good_crosses_markets(r))
                     continue;
-                sd.first[r]  += pricing_supply(mc, r, reg.price_band().shelf_supply_ticks);
-                sd.second[r] += mc.demand[r];
+                sd.listed[r] += std::max(0.0f, mc.supply[r]);
+                sd.shelf[r]  += std::max(0.0f, mc.inventory[r]);
+                sd.wants[r]  += std::max(0.0f, mc.demand[r]) + std::max(0.0f, mc.hauler_want[r]);
+                sd.demand[r] += mc.demand[r];
             }
         }
     }
@@ -1718,9 +1732,10 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         for (std::size_t r = 0; r < resource_count; ++r)
         {
             const bool  pooled = (sd != nullptr) && grid_rules.grid(r) && grid_good_crosses_markets(r);
-            const float supply = pooled ? sd->first[r]
-                                        : pricing_supply(mc, r, reg.price_band().shelf_supply_ticks);
-            const float demand = pooled ? sd->second[r] : mc.demand[r];
+            const float k      = reg.price_band().shelf_supply_ticks;
+            const float supply = pooled ? sd->listed[r] + ((k > 0.0f) ? std::min(sd->shelf[r], k * sd->wants[r]) : 0.0f)
+                                        : pricing_supply(mc, r, k);
+            const float demand = pooled ? sd->demand[r] : mc.demand[r];
             ref_price[mid][r] = resolve_price(mc.price[r], mc.base_price[r], supply, demand,
                                               reg.price_band().floor_mult,
                                               reg.price_band().ceil_mult);
