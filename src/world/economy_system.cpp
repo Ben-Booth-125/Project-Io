@@ -3238,11 +3238,14 @@ struct draw_outcome
 ///
 /// BL-1230 (power crosses markets) — `grid_residual`, when non-null, is the
 /// BUILDING path (LOGISTICS.md § 3a, "The province is the grid's cell"): the
-/// caller has already decided the building is wired by its PROVINCE, so the
-/// tile-reach gate above is not read, and a grid good's admitted shortfall is
-/// bid on the tile's market as usual but NOT filled from that shelf — it is
-/// added to `*grid_residual` for the caller's grid clear, and does not count
-/// as unmet here. The unit path passes nullptr and is unchanged.
+/// caller has already decided the building is wired by its PROVINCE, so for a
+/// good that crosses markets (`grid_good_crosses_markets` — power only; the
+/// ruling names power) the tile-reach gate above is not read, and its admitted
+/// shortfall is bid on the tile's market as usual but NOT filled from that
+/// shelf — it is added to `*grid_residual` for the caller's grid clear, and
+/// does not count as unmet here. Every other grid good (construction
+/// capacity) keeps the tile-reach gate and the local shelf exactly as before.
+/// The unit path passes nullptr and is unchanged.
 ///
 /// BL-1172 — THE OUTCOME. `rec`, when non-null, receives what the draw asked
 /// for (`need`) and what it got per good (`met`: pool take plus market fill,
@@ -3284,7 +3287,7 @@ bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& rep
     // the same conservative direction run_unit_upkeep's own reach trigger takes.
     const grid_goods_params& grid = reg.grid_goods();
     bool connected = true;
-    if (grid.any() && grid_residual == nullptr)
+    if (grid.any())
     {
         const float rc = tile_reach_cost(w, tile);
         connected = (rc >= 0.0f) && std::isfinite(rc);
@@ -3307,7 +3310,8 @@ bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& rep
         // BL-708: a grid good on an unreached tile draws NOTHING — not from the
         // pool, not from the shelf. The whole requirement falls through as
         // shortfall to the caller's rule below.
-        if (grid.grid(r) && !connected)
+        const bool via_grid = grid_residual != nullptr && grid_good_crosses_markets(r);
+        if (grid.grid(r) && !connected && !via_grid)
         {
             unmet = true;
             continue; // met stays 0: contributes 0 to the share
@@ -3345,7 +3349,7 @@ bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& rep
             // such residual on a grid and fills them together, pro rata, from
             // every shelf on the grid (run_building_upkeep). Not unmet yet: the
             // caller decides that once the grid has been cleared.
-            if (grid_residual != nullptr && grid.grid(r))
+            if (via_grid && grid.grid(r))
             {
                 (*grid_residual)[r] += shortfall;
                 if (rec != nullptr)
@@ -3678,17 +3682,32 @@ building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg,
         std::uint32_t grid_id = 0;
         if (grid_rules)
         {
+            // Power (`grid_good_crosses_markets`) is wired by the PROVINCE;
+            // every other grid good keeps the tile-reach wire it had (BL-708),
+            // read off the body's reach field, warmed here as run_unit_upkeep
+            // warms it (cached on `world.body_reach_cost`).
             grid_id = tile_power_grid(w, b.tile);
-            if (grid_id == 0)
+            body_reach_field(w, body);
+            const float rc        = tile_reach_cost(w, b.tile);
+            const bool  reached   = (rc >= 0.0f) && std::isfinite(rc);
+            bool        stripped  = false;
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                if (!reg.grid_goods().grid(r) || !(need[r] > 0.0f))
+                    continue;
+                const bool wired = grid_good_crosses_markets(r) ? (grid_id != 0) : reached;
+                if (!wired)
+                {
+                    need[r]  = 0.0f;
+                    stripped = true;
+                }
+            }
+            if (stripped)
             {
                 any_need = false;
                 for (std::size_t r = 0; r < resource_count; ++r)
-                {
-                    if (reg.grid_goods().grid(r))
-                        need[r] = 0.0f;
                     if (need[r] > 0.0f)
                         any_need = true;
-                }
             }
         }
         // A basket the strip emptied draws nothing and creates no pool; the

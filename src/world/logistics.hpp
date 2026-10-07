@@ -186,6 +186,17 @@ const std::map<std::uint32_t, std::uint32_t>& province_power_grid(world& w);
 /// or the tile is unpartitioned. Builds the cache on first use.
 std::uint32_t tile_power_grid(world& w, entity_id tile);
 
+/// BL-1230: the grid goods whose supply is the GRID's rather than the market's —
+/// wired by the province, filled from any shelf on the grid, priced against the
+/// grid. POWER ONLY: the ruling (LOGISTICS.md § 3a, Ben 2026-10-07) names power,
+/// and construction capacity, the other grid good, keeps its tile-reach wire,
+/// local shelf and local price (BL-708/BL-709) until a ruling says otherwise.
+/// The one place the roster is named; every reader asks this.
+inline bool grid_good_crosses_markets(std::size_t r)
+{
+    return r == static_cast<std::size_t>(resource_type::power);
+}
+
 /// Clear the path-cost and reach-field caches together. Call after any event
 /// that can change traversal cost or the anchor set. The caches rebuild lazily
 /// on next read, so an over-clear costs one Dijkstra, never a wrong answer; a

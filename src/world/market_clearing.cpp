@@ -1666,7 +1666,7 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // listings only — until shelf spoilage, BL-1179.)
     //
     // BL-1230 (power crosses markets; LOGISTICS.md § 3a, "The province is the
-    // grid's cell"): a GRID GOOD's price clears against its GRID. A building
+    // grid's cell"): POWER's price clears against its GRID. A building
     // draws a grid good from every shelf on its grid (run_building_upkeep), so
     // the supply its own market's price answers is the grid's, not the shelf
     // at its own centre. Each market on a grid (its centre tile's province's
@@ -1675,6 +1675,8 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // market price that converges on the grid's rather than being replaced by
     // one. A market off every grid resolves on its own figures, as before.
     // Sums run over ascending market id, so no hash order reaches a float.
+    // Power only (grid_good_crosses_markets): construction capacity, the other
+    // grid good, still draws locally, so it still prices locally.
     std::map<entity_id, std::uint32_t> market_grid;
     std::map<std::uint32_t, std::pair<std::array<float, resource_count>,
                                       std::array<float, resource_count>>> grid_sd; // (supply, demand)
@@ -1700,7 +1702,7 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
             auto& sd = grid_sd[g];
             for (std::size_t r = 0; r < resource_count; ++r)
             {
-                if (!grid_rules.grid(r))
+                if (!grid_rules.grid(r) || !grid_good_crosses_markets(r))
                     continue;
                 sd.first[r]  += pricing_supply(mc, r, reg.price_band().shelf_supply_ticks);
                 sd.second[r] += mc.demand[r];
@@ -1715,7 +1717,7 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         const auto* sd = (mg != market_grid.end()) ? &grid_sd.at(mg->second) : nullptr;
         for (std::size_t r = 0; r < resource_count; ++r)
         {
-            const bool  pooled = (sd != nullptr) && grid_rules.grid(r);
+            const bool  pooled = (sd != nullptr) && grid_rules.grid(r) && grid_good_crosses_markets(r);
             const float supply = pooled ? sd->first[r]
                                         : pricing_supply(mc, r, reg.price_band().shelf_supply_ticks);
             const float demand = pooled ? sd->second[r] : mc.demand[r];
