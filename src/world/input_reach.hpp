@@ -183,6 +183,22 @@ bool building_makes(const world& w, const recipe_registry& reg, entity_id bid, s
 /// zero need passes every input and would admit any recipe.
 float judged_batches(const recipe_registry& reg, const building_component& b);
 
+/// The SUPPLY clause of `input_obtainable`, alone: the reachable spare of @p r
+/// at @p consumer_market (`reachable_supply`, @p self taken out) covers @p need
+/// at `t_idle`, with some producer landing a unit there. Writes the cheapest
+/// landed unit cost when given. A non-positive @p need is covered.
+bool input_supply_covers(world& w, const recipe_registry& reg, input_reach& ir,
+                         entity_id consumer_market, std::size_t r, float need, entity_id self,
+                         float* out_landed = nullptr);
+
+/// Every input of recipe @p rc by the SUPPLY clause alone (no stock): the test
+/// generation's placement asks (BL-1233, a processor needs SPARE reachable
+/// supply) — a new plant's draw is judged against the standing producers and
+/// consumers, never against an opening shelf it would eat through.
+bool recipe_inputs_supplied(world& w, const recipe_registry& reg, input_reach& ir,
+                            entity_id consumer_market, const recipe& rc, float batches,
+                            entity_id self);
+
 /// Is input @p r obtainable at @p consumer_market for a run needing @p need units?
 /// @p pool is the corp's (corp, market) pool, may be null. @p allow_supply false
 /// asks the STOCK clause alone.

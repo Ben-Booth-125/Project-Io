@@ -420,6 +420,30 @@ float judged_batches(const recipe_registry& reg, const building_component& b)
     return rate * k_authored_assignment;
 }
 
+bool input_supply_covers(world& w, const recipe_registry& reg, input_reach& ir,
+                         entity_id consumer_market, std::size_t r, float need, entity_id self,
+                         float* out_landed)
+{
+    if (r >= resource_count)
+        return false;
+    if (!(need > 0.0f))
+        return true;
+    const reachable_spare s = reachable_supply(w, reg, ir, consumer_market, r, self);
+    if (out_landed) *out_landed = s.landed;
+    return s.landed >= 0.0f && s.spare >= need * reg.t_idle();
+}
+
+bool recipe_inputs_supplied(world& w, const recipe_registry& reg, input_reach& ir,
+                            entity_id consumer_market, const recipe& rc, float batches,
+                            entity_id self)
+{
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (rc.inputs[r] > 0.0f
+            && !input_supply_covers(w, reg, ir, consumer_market, r, rc.inputs[r] * batches, self))
+            return false;
+    return true;
+}
+
 input_access input_obtainable(world& w, const recipe_registry& reg, input_reach& ir,
                               entity_id consumer_market, const stockpile_component* pool,
                               std::size_t r, float need, entity_id self,
@@ -459,11 +483,11 @@ input_access input_obtainable(world& w, const recipe_registry& reg, input_reach&
     // (2) SUPPLY — enough spare output within reach.
     if (allow_supply)
     {
-        const reachable_spare s = reachable_supply(w, reg, ir, consumer_market, r, self);
-        if (s.landed >= 0.0f && s.spare >= floor_need)
+        float landed = -1.0f;
+        if (input_supply_covers(w, reg, ir, consumer_market, r, need, self, &landed))
         {
             out.obtainable = true;
-            out.unit_cost  = s.landed;
+            out.unit_cost  = landed;
             return out;
         }
     }

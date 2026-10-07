@@ -1760,6 +1760,50 @@ int chain_recipe_tier(world& w, const recipe_registry& reg, chain_reach& cr, ent
     return worst;
 }
 
+// BL-1233 (processors to inputs; Pass 3 "Sized to its inputs", Ben, 2026-10-07):
+// a producer within reach is necessary, not sufficient. A processor is placed
+// only where the SPARE reachable output of each input covers its draw at t_idle,
+// spare being the producers' output in reach less the draw of every processor
+// already standing there — the play-time scorer's own supply clause
+// (`recipe_inputs_supplied` -> `input_supply_covers`, input_reach.hpp), judged at
+// the labour a new plant is judged at (`judged_batches`). The stock clause is not
+// asked: an opening shelf is eaten through, a producer is not.
+//
+// WHICH BUILDINGS COUNT is still this file's rule (the ones standing when the
+// recipe is decided), so the helper's lazy producer/draw index is rebuilt before
+// every processor's decision (`chain_begin_decision`); the haul memo is kept for
+// the pass, as reach is read.
+
+/// Forget the producer/draw index so the next sized test reads the buildings
+/// standing now. Call once before deciding each processor.
+void chain_begin_decision(chain_reach& cr)
+{
+    input_reach_invalidate(cr);
+}
+
+/// The sized test for recipe @p rc at processor @p self (see above).
+bool chain_recipe_sized(world& w, const recipe_registry& reg, chain_reach& cr, entity_id self,
+                        entity_id consumer_market, const recipe& rc)
+{
+    const auto bit = w.buildings.find(self);
+    if (bit == w.buildings.end())
+        return false;
+    return recipe_inputs_supplied(w, reg, cr, consumer_market, rc,
+                                  judged_batches(reg, bit->second), self);
+}
+
+/// A recipe's PLACEMENT tier: its chain tier, or `none` where an input's spare
+/// reachable supply does not cover the plant's draw (BL-1233).
+int chain_recipe_placeable(world& w, const recipe_registry& reg, chain_reach& cr, entity_id self,
+                           entity_id consumer_market, const recipe& rc,
+                           const std::vector<entity_id>* own)
+{
+    const int t = chain_recipe_tier(w, reg, cr, self, consumer_market, rc, own);
+    if (t == chain_tier_none || !chain_recipe_sized(w, reg, cr, self, consumer_market, rc))
+        return chain_tier_none;
+    return t;
+}
+
 /// Browse indices of the in-band processing recipes that output @p good, in the
 /// gap selection's own preference: most output of the good first, ties to
 /// registry order (`best_recipe_for_gaps` on that good alone ranks the same way).
@@ -1862,12 +1906,13 @@ bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
         }
         const entity_id market = market_for_tile(w, bit->second.tile);
         uint16_t chosen = no_recipe;
+        chain_begin_decision(cr); // BL-1233: spare is read over what stands now
         if (serve != nullptr)
         {
             for (const int i : *serve)
             {
                 const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
-                if (chain_recipe_tier(w, reg, cr, bid, market, rc, &assets) != chain_tier_none)
+                if (chain_recipe_placeable(w, reg, cr, bid, market, rc, &assets) != chain_tier_none)
                 {
                     chosen = reg.recipe_id(rc.name);
                     break;
@@ -1880,7 +1925,7 @@ bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
             for (int i = 0; i < n && best_tier != chain_tier_own; ++i)
             {
                 const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
-                const int t = chain_recipe_tier(w, reg, cr, bid, market, rc, &assets);
+                const int t = chain_recipe_placeable(w, reg, cr, bid, market, rc, &assets);
                 if (t < best_tier)
                 {
                     best_tier = t;
@@ -3390,10 +3435,21 @@ chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_re
     //    supplies nobody) and the test is repeated until nothing more falls:
     //    a fixed point, independent of the order the roster is walked in,
     //    because suspending a processor can only take producers away.
+    //
+    //    BL-1233 (sized to its inputs): a kept recipe must also find its inputs'
+    //    SPARE reachable supply covering its draw. Suspending a consumer frees
+    //    supply as well as taking a producer away, so a sweep is no longer
+    //    monotone in walk order: each sweep tests every unsuspended processor
+    //    against the SAME standing set and suspends the failures together — the
+    //    walk order still decides nothing. One sweep may suspend two plants
+    //    contending for supply that would feed one; step 2 re-decides both in
+    //    order, so the first is re-admitted.
     std::vector<bool> suspended(procs.size(), false);
     for (bool changed = true; changed;)
     {
         changed = false;
+        chain_begin_decision(cr);
+        std::vector<std::size_t> failing;
         for (std::size_t i = 0; i < procs.size(); ++i)
         {
             if (suspended[i])
@@ -3401,14 +3457,16 @@ chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_re
             building_component& b = w.buildings.at(procs[i].second);
             const recipe* rc = reg.get_recipe(b.recipe);
             const bool feasible = rc != nullptr
-                && chain_recipe_tier(w, reg, cr, procs[i].second, market_for_tile(w, b.tile), *rc,
-                                     nullptr) != chain_tier_none;
+                && chain_recipe_placeable(w, reg, cr, procs[i].second, market_for_tile(w, b.tile),
+                                          *rc, nullptr) != chain_tier_none;
             if (!feasible)
-            {
-                b.recipe     = no_recipe;
-                suspended[i] = true;
-                changed      = true;
-            }
+                failing.push_back(i);
+        }
+        for (const std::size_t i : failing)
+        {
+            w.buildings.at(procs[i].second).recipe = no_recipe;
+            suspended[i] = true;
+            changed      = true;
         }
     }
 
@@ -3417,7 +3475,10 @@ chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_re
     //    against everything standing with a recipe now — the kept processors
     //    and those decided before it — or unplace it. A processor decided here
     //    only ADDS a producer, and an unplaced one supplied nothing, so every
-    //    kept or decided processor stays feasible: a second call keeps them all.
+    //    kept or decided processor stays chain-feasible. BL-1233: it also ADDS a
+    //    draw, judged against the spare left after every standing draw — a
+    //    decision is sized when taken; a later admission is not re-tested
+    //    against an earlier one's margin.
     const int n = reg.recipe_count(building_type::processing_facility);
     std::map<entity_id, std::vector<entity_id>> unplaced; // corp -> buildings
     for (std::size_t i = 0; i < procs.size(); ++i)
@@ -3431,10 +3492,11 @@ chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_re
         const std::vector<entity_id>& own = w.corporations.at(cid).assets;
         uint16_t chosen    = no_recipe;
         int      best_tier = chain_tier_none;
+        chain_begin_decision(cr); // BL-1233: spare over what stands now
         for (int k = 0; k < n && best_tier != chain_tier_own; ++k)
         {
             const recipe& rc = reg.recipe_at(building_type::processing_facility, k);
-            const int t = chain_recipe_tier(w, reg, cr, bid, market, rc, &own);
+            const int t = chain_recipe_placeable(w, reg, cr, bid, market, rc, &own);
             if (t < best_tier)
             {
                 best_tier = t;
