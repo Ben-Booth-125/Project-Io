@@ -307,6 +307,7 @@ profitability, updated each quarter with company balance sheets."*
 | `income` / `expenditure` | `corp_budget` — the market cash flows from `clear_markets` |
 | `maintenance` / `wages` | `corp_budget` — summed `compute_building_opex` |
 | `interest` / `levies` / `upkeep` | `corp_budget` — the debt charge, enacted law, standing force |
+| `refunds` | Credits refunded to the firm since its last return, booked on the next one — the seat's cancelled construction (`CORPORATION_GENERATION.md` § The spawn shortlist, and the seat, step 5) is the one source. A credit: `net` = the seven flows **+ refunds**, and the return's opening is taken from before the refund so it still telescopes |
 | `net` | The difference of two consecutive balances across the money loop — see below |
 | `balance` | closing `corporation_component.balance` |
 | `holdings` | `assets.size()` — the building count |

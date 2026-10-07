@@ -1632,7 +1632,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                                            ? reg.get_recipe(b.recipe) : nullptr;
                 if (res_rc != nullptr)
                 {
-                    const float res_batches = reg.economics(b.type).base_rate * b.workforce_assigned;
+                    // BL-1206: judged at the staffing it would run at, never a
+                    // zero need (input_reach.hpp § judged_batches).
+                    const float res_batches = judged_batches(reg, b);
                     inputs_ok = recipe_inputs_obtainable(
                         w, reg, reach(), market_for_tile(w, b.tile),
                         w.find_pool(corp, pool_key_for_tile(w, b.tile)),
@@ -1765,7 +1767,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 // that cannot run; BL-1193 H5 is that fix, not this one).
                 const stockpile_component* sw_pool =
                     w.find_pool(corp, pool_key_for_tile(w, b.tile));
-                const float sw_batches = reg.economics(b.type).base_rate * b.workforce_assigned;
+                // BL-1206: judged at the staffing it would run at, never a zero
+                // need (input_reach.hpp § judged_batches).
+                const float sw_batches = judged_batches(reg, b);
                 float cur_margin = 0.0f;
                 (void)recipe_margin_obtainable(w, reg, reach(), b.tile, b.recipe, sw_pool,
                                                sw_batches, bid, cur_margin);
@@ -1824,7 +1828,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 }
                 if (best_id != b.recipe)
                 {
-                    const float batches = reg.economics(b.type).base_rate * b.workforce_assigned;
+                    // BL-1206 review: the gain is judged at the same staffing the
+                    // gate judged the inputs at (judged_batches).
+                    const float batches = sw_batches;
                     const float gain    = (best_m - cur_margin) * batches;
                     if (gain > margin_gate)
                     {

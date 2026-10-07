@@ -914,6 +914,14 @@ struct building_component
     /// build to stretch over many ticks. Not meaningful once ticks_remaining == 0.
     float construction_progress = 0.0f;
 
+    /// BL-1206 (seat clean slate): every credit run_construction has charged the
+    /// owner for this site so far — the flat `build_cost / duration x rate` it
+    /// debits and the materials it draws at the posted price clearing bills them
+    /// at (MARKETS.md: a draw pays the posted price). The site's own record, so a
+    /// cancelled build is refunded exactly what it consumed, never an estimate.
+    /// Stays at its final figure once the build completes. world_save_version 37.
+    float construction_paid = 0.0f;
+
     /// BL-079: consecutive economy ticks this building has been estimated
     /// loss-making. Read only by the scoped background-corp agency (a non-player corp
     /// idles a building whose streak passes a threshold); reset to 0 on any
@@ -1567,6 +1575,13 @@ struct quarterly_return
     float levies      = 0.0f;
     float upkeep      = 0.0f;
 
+    /// BL-1206 (seat clean slate): credits REFUNDED to the firm since its last
+    /// return — today only the seat's cancelled construction, credited at the
+    /// seat and booked on the next return (FINANCE.md § The quarterly return).
+    /// A credit, so `net` = income − expenditure − maintenance − wages − interest
+    /// − levies − upkeep + refunds. Zero on every other row. world_save_version 37.
+    float refunds     = 0.0f;
+
     /// The exact balance delta this tick — closing balance less opening balance.
     float net = 0.0f;
 
@@ -1754,6 +1769,21 @@ struct corporation_component
     /// its history intact. The player's own profit chart keeps reading the UI
     /// cache; that surface is unchanged.
     std::vector<quarterly_return> returns;
+
+    /// BL-1206 (seat clean slate): a refund already credited to `balance` that no
+    /// return has booked yet. `apply_budget` books it as the next return's
+    /// `refunds` (that return's `net` runs from the previous close, so it
+    /// includes the refund and still telescopes) and zeroes it.
+    /// world_save_version 37.
+    float refund_unbooked = 0.0f;
+
+    /// BL-1206 review: the balance the refund was credited ONTO, kept exactly so
+    /// the booking return can open from it rather than from `balance - refund`
+    /// (fl(fl(C0 + R) - R) is not always C0). `apply_budget` uses it when the
+    /// balance it finds is still exactly `fl(refund_opening + refund_unbooked)`
+    /// — nothing else moved it since — and subtracts otherwise. Meaningful only
+    /// while `refund_unbooked > 0`. world_save_version 37.
+    float refund_opening = 0.0f;
 
     /// BL-1099 -- THE FIRM'S ORIGIN (CORPORATION_GENERATION.md sec The spawn
     /// shortlist; Ben, 2026-09-24, R15/R22). The search charters a firm from

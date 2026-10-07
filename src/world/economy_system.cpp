@@ -1,5 +1,7 @@
 #include "economy_system.hpp"
 
+#include "input_reach.hpp"     // recipe_inputs_obtainable (BL-1206 recipe rescue gate)
+
 #include "battle_system.hpp"   // run_battles (BL-467 engagement trigger)
 #include "budget_system.hpp"   // compute_building_opex, body_mean_habitability (BL-181 solver)
 #include "building_profit.hpp" // estimate_building_profit (BL-079 corp agency)
@@ -14,7 +16,9 @@
 #include "workforce.hpp"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
+#include <memory>
 #include <cmath>
 #include <limits>
 #include <string>
@@ -879,11 +883,23 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
                                       : need * rate;
                 bought[r] += drawn;
                 if (m)
+                {
                     m->inventory[r] -= drawn;
+                    // BL-1206: the site's record of what it cost. A drawn unit is
+                    // billed at the posted price (clear_markets' auto-buy loop),
+                    // and `price` is not written until the end of that clear, so
+                    // this is the price the bill will use. A market-less draw is
+                    // never billed (clearing skips the body key), so it costs 0.
+                    b.construction_paid += drawn * posted_price(*m, r);
+                }
             }
             const auto cit = w.corporations.find(corp);
             if (cit != w.corporations.end())
-                cit->second.balance -= (econ.build_cost / duration) * rate;
+            {
+                const float flat = (econ.build_cost / duration) * rate;
+                cit->second.balance -= flat;
+                b.construction_paid += flat; // BL-1206: the flat half, as debited
+            }
         }
 
         // Advance sub-tick progress; a full-rate tick consumes exactly one whole
@@ -2021,6 +2037,20 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     {
         constexpr int   loss_streak_to_idle = 8;     // consecutive loss ticks before idling.
         constexpr float floored_frac        = 0.30f; // output within ~30% of the price floor reads as "floored".
+        // BL-1206: the reach context the recipe rescue asks "is this input
+        // obtainable here?" of — built on first use, shared by every corp this
+        // tick, and reading this tick's production (corp_ai.cpp's `reach`, the
+        // same construction): a snapshot taken at a fixed point of the sorted
+        // corp walk, so it is replayable.
+        std::unique_ptr<input_reach> rescue_reach_ctx;
+        const auto rescue_reach = [&]() -> input_reach& {
+            if (!rescue_reach_ctx)
+            {
+                rescue_reach_ctx = std::make_unique<input_reach>(make_input_reach(w, reg));
+                rescue_reach_ctx->report = &report;
+            }
+            return *rescue_reach_ctx;
+        };
         for (const entity_id corp : corp_ids)
         {
             const corporation_component& acc = w.corporations.at(corp);
@@ -2063,11 +2093,34 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                         const int n      = reg.recipe_count(building_type::processing_facility);
                         int   best_i     = -1;
                         float best_ratio = output_ratio(b.recipe);
+                        // BL-1206 (seat day-1 profit): the rescue proposes only a
+                        // recipe whose every input is OBTAINABLE here — AI_OPPONENT.md
+                        // § Build only what runs: "a processor decision — build,
+                        // recipe switch, resume — is taken only on inputs the
+                        // building can obtain". The same test the scorer's switch
+                        // asks (`recipe_inputs_obtainable`, input_reach.hpp), with
+                        // the scorer's batches and pool. Ungated, the rescue chased
+                        // the dearest output and moved own-fed refined-fuel plants
+                        // onto steel with no coal in reach (seeds 40, 43) or onto
+                        // food rations with no produce (seed 37) at settle tick 4,
+                        // and the seat was handed a plant that never ran again.
+                        // The incumbent is not gated (a floored plant whose own
+                        // inputs are gone may still leave for one that runs). The
+                        // run is judged at `judged_batches` (an unstaffed plant at
+                        // its authored staffing, never a zero need), and its own
+                        // output is never its own stock cover (input_reach.cpp
+                        // § STOCK) — one rule for the reflex and the scorer.
+                        const float sw_batches = judged_batches(reg, b);
+                        const stockpile_component* sw_pool =
+                            w.find_pool(corp, pool_key_for_tile(w, b.tile));
                         for (int i = 0; i < n; ++i)
                         {
                             const recipe& cand = reg.recipe_at(building_type::processing_facility, i);
                             const float ratio  = output_ratio(reg.recipe_id(cand.name));
-                            if (ratio > best_ratio)
+                            std::array<float, resource_count> cand_cost{};
+                            if (ratio > best_ratio
+                                && recipe_inputs_obtainable(w, reg, rescue_reach(), mid, sw_pool, cand,
+                                                            sw_batches, bid, cand_cost))
                             {
                                 best_ratio = ratio;
                                 best_i     = i;
@@ -2082,6 +2135,10 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                             report.agency_events.push_back(
                                 {corp, bid, agency_event::kind::recipe_switch, b.recipe});
                             log_reflex_agency(w, corp, building_body(w, b), "switched recipe (floored output)");
+                            // The producer index no longer describes this plant:
+                            // forget it so the next question sees the switch.
+                            if (rescue_reach_ctx)
+                                input_reach_invalidate(*rescue_reach_ctx);
                             continue;
                         }
                     }
@@ -2095,6 +2152,15 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                     if (++b.loss_streak >= loss_streak_to_idle)
                     {
                         b.decommissioned = true;
+                        // An idled building supplies nothing: forget the index
+                        // the rescue reads (BL-1206 cold review). An idled port
+                        // or hub also stops anchoring supply, so the node set and
+                        // the haul memo are stale too: drop the whole context and
+                        // let the next question rebuild it.
+                        if (building_affects_logistics(b.type))
+                            rescue_reach_ctx.reset();
+                        else if (rescue_reach_ctx)
+                            input_reach_invalidate(*rescue_reach_ctx);
                         // Hold the strategic tier off this building for the same
                         // span its own state changes hold for (AI_OPPONENT.md
                         // § "Hysteresis & action budget": a building that changed

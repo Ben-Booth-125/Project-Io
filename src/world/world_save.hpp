@@ -335,7 +335,17 @@ inline constexpr uint32_t world_save_magic =
 /// clear and read by the NEXT tick's dispatch. A v35 stream is 2 x resource_count
 /// floats short per market; refused whole on the strict-equality contract, no
 /// migration. Claimed through `tools/session/next_save_version.js --kind world --claim`.
-inline constexpr uint32_t world_save_version = 36;
+/// Bumped to 37 by BL-1206 (seat clean slate), stacked on BL-1203's 36: three
+/// floats at three record tails -- `building_component::construction_paid` after
+/// `recipe_switch_cooldown` (what run_construction has charged the site, the
+/// seat's refund), `quarterly_return::refunds` after `book_value`, and
+/// `corporation_component::refund_unbooked` and `refund_opening` after
+/// `origin_region` (a refund credited at the seat, awaiting its return, and the
+/// exact balance it was credited onto). A v36 stream is short by a float per
+/// building and per return and two per corporation; refused whole on the
+/// strict-equality contract, no migration. Claimed through
+/// `tools/session/next_save_version.js --kind world --claim`.
+inline constexpr uint32_t world_save_version = 37;
 
 /// Write @p w as a complete world snapshot.
 ///

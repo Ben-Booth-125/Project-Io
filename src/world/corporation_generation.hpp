@@ -187,6 +187,23 @@ int remove_specialist_roster(world& w);
 /// with their ids. Accepted (BL-1154 review, 2026-10-02).
 bool corporation_has_opening_force(const world& w, entity_id corp);
 void move_seat_force(world& w, entity_id previous, entity_id corp);
+
+/// BL-1206 — THE SEAT OPENS WITH A CLEAN SLATE OF CONSTRUCTION (Ben, 2026-10-07;
+/// CORPORATION_GENERATION.md § The spawn shortlist, and the seat, step 5). Every
+/// building of @p corp still under construction (`ticks_remaining > 0`) is
+/// cancelled — removed through `demolish_building`, so no building, stockpile or
+/// asset entry survives — in ASCENDING building id, and what each had been
+/// charged so far (`building_component::construction_paid`, the site's own
+/// record of every credit run_construction took for it) is refunded to the
+/// corporation's balance. Finished buildings stay. The refund is booked on the
+/// corporation's next quarterly return as `refunds` (FINANCE.md § The quarterly
+/// return) through `corporation_component::refund_unbooked`.
+///
+/// Called by both ways a seat is taken — the draw (`repoint_player`) and the
+/// pick (`corp_verb::take_seat`) — BEFORE `move_seat_force`, so a muster base
+/// still under construction is refunded rather than disarmed unpaid.
+/// Deterministic and draw-free. Returns the credits refunded.
+float seat_clean_slate(world& w, entity_id corp);
 void arm_rivals(world& w);
 void arm_corporation(world& w, entity_id corp);
 void disarm_corporation(world& w, entity_id corp);

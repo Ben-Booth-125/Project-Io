@@ -108,10 +108,10 @@ building_opex compute_building_opex(const building_component& b,
     // charged even when decommissioned.
     // Labour cost: scales with workforce_target; zero when decommissioned.
     //
-    // BL-1183 C4 (Ben, 2026-10-05; FINANCE.md § Building operating cost): a site
+    // BL-1183 C4 (Ben, 2026-10-05; FINANCE.md ï¿½ Building operating cost): a site
     // UNDER CONSTRUCTION (`ticks_remaining > 0`, the one flag every pass reads as
-    // "not yet built") is charged exactly what a decommissioned building is — the
-    // idle floor, no labour maintenance, no wages — until the tick it completes.
+    // "not yet built") is charged exactly what a decommissioned building is ï¿½ the
+    // idle floor, no labour maintenance, no wages ï¿½ until the tick it completes.
     // Labour demand already skips a site (economy_system.cpp, the labour claims),
     // so a wage here paid a crew nobody supplied. One test, here, so the budget
     // loop and every estimate that asks this function agree.
@@ -207,7 +207,20 @@ void apply_budget(world& w,
         // filed `net` is the DIFFERENCE of this and the closing balance â€” the
         // movement the loop actually applied â€” not a re-grouped sum of the
         // flows, which could differ by a float ULP and would not telescope.
-        const float opening_balance = cc.balance;
+        //
+        // BL-1206: a refund credited between ticks (the seat's cancelled
+        // construction) is booked HERE, on the next return: the opening is taken
+        // from before it, so this return's `net` includes it, its `refunds`
+        // names it, and the flows still reconstruct `net`.
+        // Opened from the exact pre-refund balance when nothing has moved the
+        // balance since the refund (review: fl(fl(C0 + R) - R) is not always
+        // C0); otherwise the subtraction is the best available reading.
+        const float refunds         = cc.refund_unbooked;
+        const bool  exact           = refunds != 0.0f
+                                   && cc.balance == cc.refund_opening + refunds;
+        const float opening_balance = exact ? cc.refund_opening : cc.balance - refunds;
+        cc.refund_unbooked          = 0.0f;
+        cc.refund_opening           = 0.0f;
         float       book_value      = 0.0f;
 
         // Capture the flows into `bud` for the BL-072 breakdown, but keep the
@@ -405,7 +418,8 @@ void apply_budget(world& w,
         qr.interest    = bud.interest;
         qr.levies      = bud.levies;
         qr.upkeep      = bud.upkeep;
-        qr.net         = cc.balance - opening_balance; // the exact delta applied
+        qr.refunds     = refunds;
+        qr.net        = cc.balance - opening_balance; // the exact delta applied
         qr.balance     = cc.balance;
         qr.holdings    = static_cast<uint32_t>(cc.assets.size());
         qr.book_value  = book_value;

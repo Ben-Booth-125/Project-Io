@@ -66,6 +66,14 @@ uint64_t world::state_hash(int tick) const
             fnv1a_u32(h, id);
             fnv1a_f32(h, cc.balance);
             fnv1a_i32(h, cc.is_player ? 1 : 0);
+            // BL-1206: a refund credited at the seat and not yet booked —
+            // sparse, so a corporation with none hashes as before.
+            if (cc.refund_unbooked != 0.0f)
+            {
+                fnv1a_u32(h, id);
+                fnv1a_f32(h, cc.refund_unbooked);
+                fnv1a_f32(h, cc.refund_opening);
+            }
         }
         fnv1a_u32(h, player_entity);
     }
@@ -113,6 +121,14 @@ uint64_t world::state_hash(int tick) const
             {
                 fnv1a_u32(h, id);
                 fnv1a_i32(h, b.supply_factor_permille);
+            }
+            // BL-1206: what the site has been charged — the seat's refund. Folded
+            // sparsely on the supply factor's argument: a building never built
+            // under construction holds 0 and contributes nothing.
+            if (b.construction_paid != 0.0f)
+            {
+                fnv1a_u32(h, id);
+                fnv1a_f32(h, b.construction_paid);
             }
         }
     }

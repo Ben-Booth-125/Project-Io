@@ -22,3 +22,4 @@
 {"version":35,"kind":"world","owner":"BL-1196/BL-1163/BL-1179 household stack integration (households consume + per-market growth gate + shelf spoilage)","ts":"2026-10-05T17:16:49.461Z","branch":"worktree-agent-a836856240126a55f"}
 {"version":34,"kind":"world","owner":"SKIPPED / UNCLAIMED: used without a claim by the throwaway measurement branch meas49-c (never merged); no record layout ships as 34. The household stack integration took 35.","ts":"2026-10-05T19:00:00.000Z","branch":"meas49-c"}
 {"version":36,"kind":"world","owner":"BL-1203 water-reaches-dry-markets room (market household_weight + hauler_want)","ts":"2026-10-05T21:36:38.148Z","branch":"bl-1203-room"}
+{"version":37,"kind":"world","owner":"BL-1206 seat clean slate (building_component::construction_paid)","ts":"2026-10-07T00:07:50.611Z","branch":"worktree-agent-a530461bc2bad5656"}
