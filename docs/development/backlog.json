@@ -1478,8 +1478,8 @@
    "design": "PATH (Ben, 2026-10-07): f5cbcde7 merged; the ranking round ee4c10ca is merged only after the fibre/hides boom it sets off is diagnosed and fixed (G1 path B: more mines on fresh ground). From the BL-1217 inflow diagnosis (inflow_probe round 2, d04faa9c/f9b3e9e7, 5 seeds, consumes on, cold-checked): processors want ~2-4x the raw silica / copper ore / rare earth ore their bodies produce (49% / 63% / 28% system-wide); not staffing (contention 1.0, targets ~180%), not over-building processors (0.6-0.8 per mine). Site-reads per probe: silica 393 under construction and 77 decommissioned against 630 live; copper ore 280 / 320 against 536; rare earth 302 / 255 against 315. Restarting them (with the other levers) would close 23-69% of the deficit. DIAGNOSE FIRST: why each sits - construction stalled on a material (BL-1183, the ceiling stall; abandonment C3 still unruled), never funded, or decommissioned by the loss reflex (and why the mine lost money). Then fix the cause, not by clamping the reflex (Ben rejects forced outcomes)."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 50,
    "written": "2026-10-07",
    "requires": [],
@@ -1497,7 +1497,7 @@
     "src/world/economy_system.cpp",
     "src/world/supply_system.cpp"
    ],
-   "design": "DIAGNOSED (2026-10-07, mine_upkeep_probe 88984ec4): the cause is power not crossing markets - fix owned by BL-1230 (power crosses markets). Timber 4.9% of the loss (shelf export noroute), stone 0.1%. From the BL-1217 inflow diagnosis (inflow_probe round 2, d04faa9c/f9b3e9e7, 5 seeds, consumes on, cold-checked): processors want ~2-4x the raw silica / copper ore / rare earth ore their bodies produce (49% / 63% / 28% system-wide); not staffing (contention 1.0, targets ~180%), not over-building processors (0.6-0.8 per mine). The extractors of these goods run at a mean supply scalar ~0.72 (building upkeep short); restoring it alone closes 24% / 54% / 11% of the deficit. DIAGNOSE FIRST: which upkeep goods are short, at which markets, and the refusal class (the BL-1223 reader vocabulary) - then fix in dispatch or network."
+   "design": "COMPLETE via BL-1230 (power crosses markets), merged 88391b7f. DIAGNOSED (2026-10-07, mine_upkeep_probe 88984ec4): the cause is power not crossing markets - fix owned by BL-1230 (power crosses markets). Timber 4.9% of the loss (shelf export noroute), stone 0.1%. From the BL-1217 inflow diagnosis (inflow_probe round 2, d04faa9c/f9b3e9e7, 5 seeds, consumes on, cold-checked): processors want ~2-4x the raw silica / copper ore / rare earth ore their bodies produce (49% / 63% / 28% system-wide); not staffing (contention 1.0, targets ~180%), not over-building processors (0.6-0.8 per mine). The extractors of these goods run at a mean supply scalar ~0.72 (building upkeep short); restoring it alone closes 24% / 54% / 11% of the deficit. DIAGNOSE FIRST: which upkeep goods are short, at which markets, and the refusal class (the BL-1223 reader vocabulary) - then fix in dispatch or network."
   },
   {
    "status": "complete",
@@ -1522,8 +1522,8 @@
    "design": "MERGED (f785d832, 2026-10-07; two cold-review rounds): an order is a floor, not a hold; a hauled pool keeps its order; one ordered-pool source price (dispatch_source_price) for dispatch and the scorer. 5 seeds: steel-starved users 249 -> 163, G2 55.6 -> 56.4, G3 91.8 -> 92.4, G1 58.9 -> 58.4. Follow-ups in BL-1231. From the BL-1217 inflow diagnosis (inflow_probe round 2, d04faa9c/f9b3e9e7, 5 seeds, consumes on, cold-checked): processors want ~2-4x the raw silica / copper ore / rare earth ore their bodies produce (49% / 63% / 28% system-wide); not staffing (contention 1.0, targets ~180%), not over-building processors (0.6-0.8 per mine). Steel is NOT short (production / want 101% once want is corrected for other binding inputs) but its starved users are refused: ordered 31% (dispatch_convoys skips a (corp, body, good) under a standing sell order), gate 25%, noroom 28% (upper bound). DIAGNOSE FIRST: who places the standing sell orders on steel (the AI scorer? the seat?), at what floor, and why the gate refuses - then fix the cause."
   },
   {
-   "status": "designed",
-   "glyph": "✓",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 50,
    "written": "2026-10-07",
    "requires": [],
@@ -1541,7 +1541,7 @@
     "src/world/market_clearing.cpp",
     "src/world/economy_system.cpp"
    ],
-   "design": "SETTLED DESIGN, PARTLY BUILT: LOGISTICS.md § 3a (Ben, 2026-08-31) - power rides the road network; connectivity not distance (tile_reach_cost as a boolean); one tick flat latency; a buyer clears against any generator its roads reach, so power has a regional price. BL-708 (power as a grid, closed complete) built the listing gate (a market sells power only when on the grid, market_clearing.cpp ~1404-1455) but NOTHING moves power between markets: the building upkeep draw reads only its own market's shelf and pool. FOUND by mine_upkeep_probe (88984ec4, 5 seeds, replay agrees with the real step on 32,538 of 32,538 building-ticks): 95% of extraction sites' supply-scalar loss is power, 94.6% of it \"none at its market while another market or pool on the body holds power\"; 72% of silica / copper / REE mines are unmet every tick and pinned at the 500 floor; mean scalar ~0.72. Restoring the scalar closes ~24% / 54% / 11% of the BL-1217 deficit. WORK: let a connected market's power clear against generation on any market its roads reach (one tick), as § 3a says; measure on the market-viability skill, 5 seeds, before/after."
+   "design": "MERGED (88391b7f, 2026-10-07; three cold-review rounds): wired provinces join a grid by roads and straits; power drawn across markets at the buyer market price; grid-level shelf cap; power-only (capacity unchanged). 5 seeds: mines at the floor 40.7% -> 21%, scalar 0.77 -> 0.87; G1 flat. Generation-less grids: BL-1232. SETTLED DESIGN, PARTLY BUILT: LOGISTICS.md § 3a (Ben, 2026-08-31) - power rides the road network; connectivity not distance (tile_reach_cost as a boolean); one tick flat latency; a buyer clears against any generator its roads reach, so power has a regional price. BL-708 (power as a grid, closed complete) built the listing gate (a market sells power only when on the grid, market_clearing.cpp ~1404-1455) but NOTHING moves power between markets: the building upkeep draw reads only its own market's shelf and pool. FOUND by mine_upkeep_probe (88984ec4, 5 seeds, replay agrees with the real step on 32,538 of 32,538 building-ticks): 95% of extraction sites' supply-scalar loss is power, 94.6% of it \"none at its market while another market or pool on the body holds power\"; 72% of silica / copper / REE mines are unmet every tick and pinned at the 500 floor; mean scalar ~0.72. Restoring the scalar closes ~24% / 54% / 11% of the BL-1217 deficit. WORK: let a connected market's power clear against generation on any market its roads reach (one tick), as § 3a says; measure on the market-viability skill, 5 seeds, before/after."
   },
   {
    "status": "proposed",
