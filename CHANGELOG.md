@@ -12,6 +12,67 @@ release.
 
 ## [Unreleased]
 
+## [0.1.28] — 2026-10-07
+
+*Profit from day 1. Sprint 49 set out to make the market economy viable from the first tick, at its
+run-rate rather than on its opening stock, judged on one 16-seed reading against Ben's targets. Two
+of three targets were met: field income held after the handoff went from 27.5% to 54.4% (target 50),
+and firms alive at tick 400 from 31.3% to 88.9% (target 70). Processors running at the handoff rose
+from 17.6% to 54.7% against a target of 70: a quarter of built plant still stands idle for want of an
+input that never arrives, and that is carried into the logistics sprint rather than clamped.*
+
+### Added
+
+- **The market viability gate** (BL-1184): one 16-seed reading of the shipped 1960 start, wrapped as
+  the `market-viability` skill. Income is judged on window means; a single-tick ratio passed a broken
+  baseline.
+- **Households consume** (BL-1196): a population centre draws its basket off its market's shelf and
+  grows on it; households draw before the nation's claims.
+- **The Well** (BL-1198): clean water drawn beside a river or lake, sharing the Fishing Wharf's
+  depositless yield path. The Fishing Wharf yields produce (BL-1199), and generation sites one where
+  a produce firm has coast but no deposit (BL-1208). A lake is an enclosed water body below 150
+  tiles; larger ones are seas (BL-1200).
+- **Orders are price floors** (BL-1201): a standing sell order sells the whole surplus above its
+  floor, with an optional cap per quarter, and closes itself after four empty quarters (BL-1202,
+  with a notice and a Closed orders list).
+- **A clean slate at the seat** (BL-1206): the seated corporation opens with no unfinished AI builds;
+  everything those sites were charged is refunded. The seat operates at a profit over its first
+  eight quarters on 15 of 16 curated seeds.
+
+### Changed
+
+- **Chain-feasible placement** (BL-1185, a hard rule): generation places a processor only where its
+  inputs are produced within reach, by the same reach rule the dispatcher uses. Gap firms dig the gap
+  they were chartered for (BL-1197); the seat's starting processor can run on day 1 (BL-1188).
+- **Goods cross markets** (BL-1186, BL-1194, BL-1203): port routing fixed; a sea leg costs less per
+  distance than a highway; a hauler sees the want the fair-price ceiling silences and sends what
+  keeps its margin, so surplus water reaches dry markets.
+- **The shelf** (BL-1179, BL-1209): a market's shelf spoils, counts as supply against the want the
+  ceiling silenced (k = 1), and a short shelf is shared pro-rata within each phase, construction
+  first, with no stock stranded while a buyer waits.
+- **Firms build only what runs** (BL-1187, BL-1183): no plant whose inputs it cannot obtain, and no
+  site whose materials it cannot get. A site under construction pays only the idle maintenance floor.
+- **Density scales with the goods served** (BL-1204): 7.5 firms per good, 172 firms a world; the
+  scorer's cost at that density was cut to about a third (BL-1205). Standing-force upkeep retuned as
+  a stopgap (BL-1191).
+- **Sea lanes carried** from Exploration into Industrialisation.
+- **One re-bless**, authorised against its shape: the lake cap redraws history; processors 3,352 ->
+  7,443; goods hauled and sold in year one x4.1. `player_seed_sweep` 16/16 on both arcs; 16 library
+  fingerprints blessed and the library rewritten to fit.
+
+### Known — recorded, not fixed
+
+- **Processors running at the handoff: 54.7% against 70%** — inputs not arriving (BL-1217, sprint 50).
+- **Thirteen rivals open in debt** under the shelf change, and four other re-bless movements are
+  untraced (BL-1221). The lake cap and the density ceiling have no committed gate yet (BL-1220).
+- **Six curated seeds no longer serve their purpose** after the re-bless (NR-979).
+- **The Fishing Wharf is offered only on water**, where it cannot be placed (BL-1218); a site's cost
+  and its short materials are not shown (BL-1219, BL-1180).
+- **The CTest tier is still not a working gate** (BL-1065). This release was gated on the Release
+  build, `world_determinism` twice (6244EC4CAD3871C2 / 6C49522501D8F8B2 / AC7AF48B9FD2EA83,
+  bit-identical), `player_seed_sweep --digest-check` on both arcs, both save round trips, and the
+  harnesses named in each merge.
+
 ## [0.1.27] — 2026-10-04
 
 *The world moves forward. The world is built once and carried through the six rounds rather
