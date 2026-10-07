@@ -6623,6 +6623,94 @@
    "batch": "sprint-48",
    "resolved": "2026-10-03",
    "archived": "docs/development/archive/requirements-2026-Q4.json"
+  },
+  {
+   "brief": "gate-logistics-row",
+   "title": "BL-1223 - The market-viability gate reports a logistics row",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1223 - sprint 50 (cut 2026-10-07, Ben's cut form)",
+   "batch": "sprint-50",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: water_pair_probe --seeds 0,43,10 before and after; the water rows read identically"
+     ],
+     "requirement": "The dispatcher-order refusal classifier lives in one shared reader that water_pair_probe and market_viability both call; water_pair_probe's output is unchanged by the move.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: market_viability --seeds 0,43 --ticks 100"
+     ],
+     "requirement": "market_viability prints a logistics row at several play ticks: units shipped between markets and the share landing at a market short of the good; dry markets per good; dry markets by best refusal class; and per input-starved processor its scarcest input with that input's best class at its market, pooled by class and by good.",
+     "notes": "Reported, no target.",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism twice; market_viability G1/G2/G3 unchanged on the same seeds"
+     ],
+     "requirement": "A pure reader: G1-G4 read identically with the row added, and the world is unchanged.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "review: the SKILL.md section read against the printed row"
+     ],
+     "requirement": "The market-viability skill documents the row, each class, and how to read the processor-input block.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "inputs-reach-processors",
+   "title": "BL-1217 - A built processor gets its inputs, so 70% are running at handoff",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1217 - sprint 50 (cut 2026-10-07, Ben's cut form)",
+   "batch": "sprint-50",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: market_viability (BL-1223's row), 16 curated seeds, read on main"
+     ],
+     "requirement": "The diagnosis: which inputs fail to reach processors, at which markets, ranked by refusal class; construction stalls re-measured. The ranking orders the wave 2 fixes.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: market-viability skill, 16 curated seeds, after the re-bless"
+     ],
+     "requirement": "G1 >= 70% of built processors running at handoff, pooled; G2 and G3 still pass. The cause is fixed in the network or dispatch, never by clamping the loss reflex.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
   }
  ]
 }
