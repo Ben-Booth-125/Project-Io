@@ -987,7 +987,11 @@ So the share is `min(inventory, k × (demand + suppressed want))`, the suppresse
 processor inputs and construction materials that went unbought over the ceiling (the same register
 the hauler reads, `SUPPLY.md` § Dispatch trigger). The want **still never bids** — it only lets a
 stocked shelf count as what it is, so the price can fall to where the silenced buyers return. The
-ceiling ruling stands unchanged. k is re-swept under this rule.
+ceiling ruling stands unchanged. **Under this rule k = 1 (Ben, 2026-10-07):** re-swept at
+k = 0/1/2/4 on seeds 0/43/10/28/38, k = 1 is the smallest k that takes a consuming market's price
+at the ceiling against a stocked shelf to 0% (2.5% at k = 0); it passes run-rate income (50.8%
+against 47.2% at k = 0) and firm survival (83.5%, against 88.9% at k = 0), and lifts medical
+supply at ticks 20-50 from 31% to 51% of the household bid.
 **A short shelf is shared pro-rata (Ben, 2026-10-07; BL-1209).** When a shelf cannot meet every
 draw admitted against it in a tick, each draw receives the same share of its need, not first-come
 by building id: a dip under the ceiling no longer lets the lowest-numbered plants empty the shelf
