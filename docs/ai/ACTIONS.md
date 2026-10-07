@@ -910,18 +910,18 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 ### `lens.clear` — Minimap lens bar — the glyph of whichever lens is currently active (shown highlighted)
 
-**Press.** Single left-click on the currently-active (highlighted) lens glyph. This is the family's one toggle behaviour, stated here once: the bar is single-select with a null state, so re-selecting the active lens clears to no-lens (overlay_mode::none). Each bar-lens entry references this. Off-bar lenses have no glyph to re-click; they are cleared via the keyboard cycle or the clear hotkey (controls family).
+**Press.** Single left-click on the currently-active (highlighted) lens glyph. This is the family's one toggle behaviour, stated here once: the strip is single-select with a null state, so re-selecting the active lens clears to no-lens (overlay_mode::none). Each lens entry references this. A lens armed by the keyboard cycle while its glyph is not on the current rung's strip is cleared via the cycle or the clear hotkey (controls family).
 
 **Valid when:**
 - A bar lens must currently be active — with no lens active there is no highlighted glyph and this press does not exist.
 - Selecting a different lens is an ordinary switch, not a clear; only re-clicking the active one clears.
-- The bar carries six glyphs — Corporation, Country, Resource, Market, Population, Continent. Opportunity and Production were bar lenses until BL-604 retired both; a press on either no longer exists, and neither is reachable by the keyboard cycle.
+- Every built lens has a glyph on at least one rung's strip (Ben, 2026-10-07). The minimap lens strip is keyed on the canvas rung (LENSES.md § The strip rotates with the rung): Planetary carries Corporation, Company, Resource, Market, Scarcity, Industry, Population, Continent, Throughput, Trade flow; Circumplanetary Market, Scarcity, Supply; Solar Supply, Reach, Supply-routes. Opportunity, Production and Country were strip lenses until retired; a press on any of them no longer exists.
 
 **Expected output.** The canvas returns to plain terrain (overlay_mode::none) — the state the campaign opens in. All lens tints, marks, and keys disappear. Always-on chrome survives, now at FULL strength rather than the 0.45 a lens attenuates it to (BL-520): the substrate grain and cover pattern that texture the ground, the player-identity tile wash and outline, the player's home ring and HQ star, selection outlines, and building/unit markers are not lens-dependent. Pointer clicks revert to resolving the lowest drawn entity (marker, else tile), routing to the Tile Ledger.
 
 **Reason to select.** Return to the unskinned terrain read — when the current lens's tint is obscuring terrain, markers, or colours you need, or when a plain click should select the thing under the pointer rather than the lens's unit of meaning.
 
-### `lens.continent` — Minimap lens bar, slot 6 (the two-interlocking-plates-split-by-a-diagonal-seam glyph)
+### `lens.continent` — Minimap lens bar, Planetary rung, slot 8 (the two-interlocking-plates-split-by-a-diagonal-seam glyph)
 
 **Press.** Single left-click on the Continent glyph in the lens bar.
 
@@ -934,13 +934,13 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Why is the land shaped like that? Shows the plates that drifted the terrain into place, and above all where they meet — the seams the mountain ranges, rifts, and boundary-formed deposits came from. Honestly informational/orientational: it explains the map rather than driving an economic decision.
 
-### `lens.company` — Keyboard lens cycle only — no lens-bar slot yet (it has no distinct glyph; see BL-663).
+### `lens.company` — Minimap lens strip, Planetary rung, slot 2 — the briefcase glyph (icons::company), beside Corporation's seal-square.
 
-**Press.** Cycle the lens with the lens-cycle key until Company is active.
+**Press.** Single left-click on the Company (briefcase) glyph in the lens strip, or cycle with L / Shift+L until Company is active.
 
 **Valid when:**
-- The app is in-game on a body surface; like every lens it only re-skins the Planetary canvas.
-- If Company is already the active lens, cycling past it clears it (see lens.clear).
+- The app is in-game on a body surface; like every lens it only re-skins the Planetary canvas, and its glyph is on the Planetary strip only.
+- Re-clicking while active clears the lens (see lens.clear); the keyboard cycle (L / Shift+L) also reaches it from any rung.
 
 **Expected output.** On the Planetary canvas, every tile holding a BACKGROUND FIRM's building tints to that firm's identity colour, and each background firm's seat draws an HQ marker. The mirror of lens.corporation, drawn identically and admitting the opposite population: a corporation is the player and its rivals, a company is a background firm (GLOSSARY.md, Ben 2026-08-28). The two lenses are disjoint — no firm appears under both. Measured on the home body at generation: 373 background-firm buildings across 80 companies, against 33 rival buildings across 7 corporations, so this lens is much the busier of the pair. National borders are NOT drawn while any lens is active (2026-08-28) — neither the inward band nor the coloured frontier rule, and the border's click corridor goes with them. The plain canvas is the only place the national read appears.
 
@@ -975,14 +975,13 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Change the question's subject without changing the question: which good is this market pricing high, what is each market short of — by flipping the good while the lens holds.
 
-### `lens.industry` — Off the lens bar (trimmed in BL-093 the day it shipped); the factory-silhouette glyph exists but is not on the strip
+### `lens.industry` — Minimap lens strip, Planetary rung, slot 6 — the factory-silhouette glyph (icons::industry).
 
-**Press.** No bar press — reachable only via the keyboard lens-cycle (controls family owns the hotkeys).
+**Press.** Single left-click on the Industry glyph in the lens strip, or cycle with L / Shift+L.
 
 **Valid when:**
-- Only reachable by keyboard cycle.
 - Planetary-only. The field is read from the economy report, so at least one economy tick must have run before the tint has anything to show.
-- Cleared by cycling off it or the clear hotkey, not by a bar re-click.
+- Re-clicking while active clears the lens (see lens.clear); the keyboard cycle (L / Shift+L) also reaches it from any rung.
 
 **Expected output.** A sequential dark-to-amber tint over the tiles carrying buildings owned by BACKGROUND corporations (corporation_component.is_background). Per tile the value is the sum over those buildings of (0.5 + 0.5 x output share), where output share is that building's output this tick normalised to the largest background output on the body — so an idle or under-construction background plant still reads, a high-output one reads brightest, and two buildings on one tile stack. Normalised to the body maximum. Tiles with no background building keep plain terrain. Low-to-high amber gradient key titled 'Background industry'. Pure rendering — it changes nothing in the market arithmetic. Pointer clicks fall through to the tile (Tile Ledger); there is no dedicated ledger route. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour. National borders are NOT drawn while any lens is active (2026-08-28) — neither the inward band nor the coloured frontier rule, and the border's click corridor goes with them. The plain canvas is the only place the national read appears.
 
@@ -1001,7 +1000,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Read the lens's colour code by name — which nation is which tint, which market is which catchment, which bodies your lanes reach. The collapsed header already reports how many rows are hiding, so open it when the count itself is not the answer you wanted.
 
-### `lens.market` — Minimap lens bar, slot 4 (the three-ascending-vertical-bars glyph)
+### `lens.market` — Minimap lens bar, Planetary rung slot 4, Circumplanetary rung slot 1 (the three-ascending-vertical-bars glyph)
 
 **Press.** Single left-click on the Market glyph in the lens bar.
 
@@ -1018,7 +1017,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Which market does a tile clear against, and where do market boundaries fall? Decide which catchment to build in (your output sells to the nearest centre) and read per-body prices on the Circumplanetary rung to pick where a good is dear enough to sell.
 
-### `lens.population` — Minimap lens bar, slot 5 (the small figure glyph: round head over tapered torso)
+### `lens.population` — Minimap lens bar, Planetary rung, slot 7 (the small figure glyph: round head over tapered torso)
 
 **Press.** Single left-click on the Population glyph in the lens bar.
 
@@ -1030,15 +1029,14 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Where does labour run at full efficiency? Site buildings where the marks read green (habitability >= 0.6 = full workforce), because the same wages buy less output on the red end. The siting complement to Resource's material read.
 
-### `lens.reach` — Off the lens bar; currently reuses the convoy glyph (a dedicated glyph is an open TODO)
+### `lens.reach` — Minimap lens strip, Solar rung, slot 2 — the broadcast glyph (icons::reach): a source dot with two arcs widening up and right.
 
-**Press.** No bar press — reachable only via the keyboard lens-cycle (controls family owns the hotkeys).
+**Press.** Single left-click on the Reach glyph in the lens strip, or cycle with L / Shift+L.
 
 **Valid when:**
-- Only reachable by keyboard cycle.
-- Planetary key today; the specified Solar connected-body glow is owed.
+- Planetary key today; the specified Solar connected-body glow is owed. Its glyph is on the Solar strip.
 - Shows the player's own trade routes only (competitor-visibility rule — rival lanes stay private).
-- Cleared by cycling off it or the clear hotkey.
+- Re-clicking while active clears the lens (see lens.clear); the keyboard cycle (L / Shift+L) also reaches it from any rung.
 
 **Expected output.** No tile re-skin. A connection-list key headed 'Reach (your trade network)' opens upward out of the minimap's header at top right (the lens chrome region), collapsed by default: one row per body the active body is routed to, name plus a recency dot — fresh routes green, gone-cold routes grey (the activity-fog colour convention). An unrouted body honestly reads 'no routes from this body'. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour. National borders are NOT drawn while any lens is active (2026-08-28) — neither the inward band nor the coloured frontier rule, and the border's click corridor goes with them. The plain canvas is the only place the national read appears.
 
@@ -1078,74 +1076,71 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Compare or overlay deposits: see where two inputs to one recipe sit together, or narrow the map back to one good, without leaving the lens.
 
-### `lens.scarcity` — Off the lens bar; the hollow downward-triangle glyph exists but is not on the strip. Reached by the keyboard lens-cycle only — an off-strip status that is a width call, never a data gate.
+### `lens.scarcity` — Minimap lens strip — Planetary rung slot 5 and Circumplanetary rung slot 2 — the hollow downward-triangle glyph (icons::scarcity).
 
-**Press.** No bar press — reachable only via the keyboard lens-cycle (L / Shift+L; those hotkeys are catalogued in the controls family, not here).
+**Press.** Single left-click on the Scarcity glyph in the lens strip, or cycle with L / Shift+L (those hotkeys are catalogued in the controls family).
 
 | Arg | Type | Meaning |
 |---|---|---|
 | `resource` | `resource name (optional)` | The good whose shortfall is shown — scarcity of what? Set via the shared good selector (lens.good_selector), which appears in the on-canvas legend once the lens is active. |
 
 **Valid when:**
-- Only reachable by keyboard cycle — there is no glyph to click.
-- Planetary-only. The economy must have ticked so market supply/demand arrays are populated.
-- Cleared by cycling off it or pressing the clear hotkey (controls family), not by a bar re-click.
+- Planetary per-market shortfall blocks; Circumplanetary per-body shortfall badge. The economy must have ticked so market supply/demand arrays are populated.
+- Re-clicking while active clears the lens (see lens.clear); the keyboard cycle (L / Shift+L) also reaches it from any rung.
 
 **Expected output.** A market-level field, not per-tile: every tile in a market's catchment reads as one solid block, composited toward a hot red hue at opacity proportional to that market's supply shortfall of the selected good (max(0, demand - supply), normalised to the body's worst market). A met market keeps plain terrain; a short one reads hot. With one market per body the whole body is a single block — honest to the market structure. Abundant-to-scarce key plus the selected resource's swatch and the shared selector. Pointer clicks are NOT lens-dependent: selection resolves the same way under every lens — marker hit-test (building outranks market centre), else the tile under the pointer, with a built tile resolving to its building. The lens changes what is drawn, never what a click selects. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour. BEING RE-MADE (BL-662, Ben 2026-08-28): the lens keeps the name Scarcity, is re-cut to tint MARKETS, takes the retired Opportunity lens's glyph, and will route to a new Market-ledger sub-view. Not yet built — today it still draws per-market shortfall blocks. National borders are NOT drawn while any lens is active (2026-08-28) — neither the inward band nor the coloured frontier rule, and the border's click corridor goes with them. The plain canvas is the only place the national read appears.
 
 **Reason to select.** Where did demand outrun supply for a chosen good last tick? The inverse of the Resource lens — gaps, not concentrations. Pick a good you can produce and find the hot markets: that is where to sell into or build supply for.
 
-### `lens.supply` — Off the lens bar; the two-parallel-horizontal-lines convoy glyph exists but is not on the strip
+### `lens.supply` — Minimap lens strip — Solar rung slot 1 and Circumplanetary rung slot 3 — the two-parallel-lines glyph (icons::supply).
 
-**Press.** No bar press — reachable only via the keyboard lens-cycle (controls family owns the hotkeys).
+**Press.** Single left-click on the Supply glyph in the lens strip, or cycle with L / Shift+L.
 
 **Valid when:**
-- Only reachable by keyboard cycle.
-- The one genuinely multi-rung lens: surfaces on all three canvases.
+- The one genuinely multi-rung lens: surfaces on all three canvases (its glyph sits on the Solar and Circumplanetary strips).
 - Shows player convoys only; nothing renders if no player convoy is in transit.
-- Cleared by cycling off it or the clear hotkey.
+- Re-clicking while active clears the lens (see lens.clear); the keyboard cycle (L / Shift+L) also reaches it from any rung.
 
 **Expected output.** Solar: a route line per player convoy currently in transit between bodies. Circumplanetary: a convoy-count badge beside each body's label. Planetary: a convoy glyph on the active body's tiles while a player convoy touches them. Lines and badges use a single neutral logistics hue — flow, not ownership. Tiles are not re-tinted; supply annotates, it does not re-skin terrain. The throughput scale-key is still owed. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour. National borders are NOT drawn while any lens is active (2026-08-28) — neither the inward band nor the coloured frontier rule, and the border's click corridor goes with them. The plain canvas is the only place the national read appears.
 
 **Reason to select.** Where are my goods moving right now? Verify dispatched convoys are actually in flight and see the live shape of your logistics — the in-motion read; the standing lanes they carve belong to the Supply-routes lens.
 
-### `lens.supply_routes` — Off the lens bar; reuses the supply glyph
+### `lens.supply_routes` — Minimap lens strip, Solar rung, slot 3 — the lane-graph glyph (icons::supply_routes): three nodes joined by edges of unequal weight.
 
-**Press.** Cycle lenses with L (forward) / Shift+L (backward) until Supply-routes is active — it is the last mode in the cycle. No lens-bar slot.
+**Press.** Single left-click on the Supply-routes glyph in the lens strip, or cycle with L / Shift+L.
 
 **Valid when:**
-- In-game on a canvas (the lens-cycle keys are live).
-- Off the bar: reachable only via the keyboard lens cycle. (A 2026-07-31 doc note claimed the cycle could not reach this lens; that was stale — canvas_command.cpp anchors overlay_mode_count to supply_routes+1 with a static_assert, so the cycle covers all 14 modes.)
-- Planetary key only (the specified Solar aggregated-graph render is owed); player routes only.
+- In-game on a canvas.
+- Planetary key only (the specified Solar aggregated-graph render is owed); player routes only. Its glyph is on the Solar strip.
+- Re-clicking while active clears the lens (see lens.clear); the keyboard cycle (L / Shift+L) also reaches it from any rung.
 
 **Expected output.** No tile re-skin. A lane-list key: one row per standing trade lane touching the active body (one entry per body pair), with a log-scaled thickness bar from that lane's cumulative convoy count (a single completion reads as a thin sliver; heavy repeat traffic saturates rather than growing linearly) and the same recency-tier colouring as Reach. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour. National borders are NOT drawn while any lens is active (2026-08-28) — neither the inward band nor the coloured frontier rule, and the border's click corridor goes with them. The plain canvas is the only place the national read appears.
 
 **Reason to select.** Which standing lanes carry my economy, and how heavily? The aggregate counterpart to Supply's in-flight convoys: the carved trade lanes and their traffic weight, for judging which routes are load-bearing and which are vestigial.
 
-### `lens.throughput` — Lens strip slot 6, on the minimap (draw_overlay_controls, src/ui/overlay.cpp). Its glyph is a TRUCK in profile (icons::throughput) — its own mark since BL-605, no longer the borrowed convoy chevron, because an on-screen lens carries one distinct glyph.
+### `lens.throughput` — Minimap lens strip, Planetary rung, slot 9 (draw_overlay_controls, src/ui/overlay.cpp). Its glyph is a TRUCK in profile (icons::throughput).
 
 **Press.** Click the truck glyph on the lens strip, or cycle with L / Shift+L (Trade-flow is the LAST lens in the family, so one Shift+L from no lens lands on Trade-flow, not Throughput). Re-clicking the active glyph clears to overlay_mode::none, per the strip toggle rule. Planetary rung only.
 
 **Valid when:**
-- Only reachable by keyboard cycle.
 - Planetary only. Needs the body's logistics reach field, which the app warms for the active body every frame before the draw.
 - Needs at least one supply anchor on the body (a city, or a BUILT and ACTIVE port or inland logistics hub) for the anchor rings and the LP totals; with none, the key says so rather than drawing a scale over nothing.
 - Reads the authored economy.military.active_lp_per_anchor_tick; an authored rate of zero yields no anchor rings.
-- Cleared by cycling off it or the clear hotkey, not by a bar re-click.
+- Re-clicking while active clears the lens (see lens.clear); the keyboard cycle (L / Shift+L) also reaches it from any rung.
 
 **Expected output.** Two layers over the Planetary surface. FIELD: every tile is composited 0.72 toward a deep-navy-to-cyan ramp over its weighted reach cost to the nearest supply anchor — cyan at an anchor, navy on the ground furthest from one, the cold end for anything unreachable. The cost ratio is square-root compressed before the ramp because the distribution is heavily left-skewed (measured on the home body: median 20.8 against a maximum 101.8 over 57 anchors), so a linear ramp would read as one flat wash. ANCHORS: every supply anchor tile carries a RING (not a filled mark — the tile already carries a settlement or building marker drawn over it), its thickness carrying that anchor's active Logistic Points as a share of the body's largest pool, in a hotter near-white cyan over a dark backing. KEY: a fixed-height gradient key flush-left of the minimap, drawn on ImGui's FOREGROUND list with an opaque fill so it is readable over the Selection band — the field ramp labelled far / at anchor, the anchor ring beside its per-anchor LP rate, and the body's anchor count and total LP per tick. Pure rendering: it computes no game state, mutates nothing, and cannot trigger the reach-field Dijkstra (it reads the const tile_reach_cost, whose -1 'not computed' case draws nothing). The LP pools are rebuilt every frame and never persisted — LP is a per-tick rate, never a stock. Pointer clicks fall through to the tile/province; there is no dedicated ledger route. Terrain texture (BL-520) survives this lens at 0.45 strength. National borders are NOT drawn while any lens is active (2026-08-28) — neither the inward band nor the coloured frontier rule, and the border's click corridor goes with them. The plain canvas is the only place the national read appears.
 
 **Reason to select.** Select to answer 'how much can move through here, and how far is this ground from the capacity that would move it?' — before ordering a march that active LP could refuse, before siting a building whose supply has to come from somewhere, or when deciding where a new port or inland hub would actually widen the network. It is the surface half of the Logistic Points cap (LOGISTICS.md): a refused march is legible only if the player can see where throughput is thin, and a cap nobody can see is silent interdiction. It extends the Reach lens rather than replacing it — Reach spends the same field as a yes/no placement predicate, this spends the quantity that predicate throws away. It does NOT mean LP is priced by distance (it is not): the shading says how far this ground is from a generator, never that the points thin out on the way.
 
-### `lens.trade_flow` — Keyboard lens cycle only -- no lens-bar slot and no dedicated glyph (it borrows the supply mark in the cycle readout). LENSES.md § Trade-flow lens.
+### `lens.trade_flow` — Minimap lens strip, Planetary rung, slot 10 — the exchange glyph (icons::trade_flow, ⇄). LENSES.md § Trade-flow lens.
 
-**Press.** Cycle lenses with L (forward) / Shift+L (backward) until Trade flow is active -- it is the LAST mode in the cycle, so one Shift+L from no lens lands on it. Planetary rung.
+**Press.** Single left-click on the Trade flow glyph in the lens strip, or cycle with L / Shift+L -- it is the LAST mode in the cycle, so one Shift+L from no lens lands on it. Planetary rung.
 
 **Valid when:**
-- In-game on the Planetary canvas (the lens-cycle keys are live).
+- In-game on the Planetary canvas (the glyph is on the Planetary strip; the lens-cycle keys reach it from any rung).
 - Reads the dispatcher record of the corporation the player holds NOW: each pass is tagged with the corporation it was taken for, and the record is never saved. So the lens draws nothing until that corporation's first dispatch pass -- after a load, and after a seat change (the corporation left behind is never shown) -- and its key then reads 'no shipments'.
 - Player's flows only (DISCOVERY.md § Competitor visibility): no rival shipment, no market's own shelf export and no rival refusal appears.
-- Cleared by cycling off it or the clear hotkey (lens.clear).
+- Re-clicking while active clears the lens (see lens.clear); the keyboard cycle (L / Shift+L) also reaches it from any rung.
 
 **Expected output.** No tile re-skin. FLOWS: one arrow per (source market, destination market, good) the player shipped within the last four dispatch passes with both ends on the active body, market centre to market centre, in a neutral pale-steel logistics hue; stroke width from the window's mean units per tick against the body's heaviest flow (1.5 px trickle to 7 px). REFUSALS: a filled dot up-right of each market centre on the active body that is short of a good (last clear's demand above its supply) the player held in surplus and did not send there this pass, coloured by the best refusal class over that market's goods -- the corporation dispatcher's own rules, worst to best: grey no lane (another body, no viable leg), violet price gate (the destination's price does not clear the dispatch margin over the source's), red no route (same body, no viable leg), orange costly (routed, but the haul eats the margin), brown no propellant (a space lane, but the pool cannot fuel the launch), yellow no room (cannot absorb more at the landed cost), blue no funds (the rule would send, but the corporation cannot pay for the convoy), green room (the rule would send; held by the one-destination-per-pass rule or the passive-LP cap). HOVER: an immediate card at the cursor -- over an arrow: good, units per tick, landed price (the destination price the dispatcher netted against its haul), source -> destination; over a marker: the market and each short good with its class (or 'sent'). KEY: a fixed-height key in the minimap header -- the eight classes with their colours, and three flow-width samples labelled in units per tick. Pointer clicks fall through to the ground; nothing is selectable on the lens.
 
