@@ -18,14 +18,18 @@ stalled construction sites wait on steel another market holds. The water diagnos
 (`tools/verify/water_pair_probe`) classified each dry market's best route: no room 62% (fixed in
 sprint 49 by the hauler-room rule, SUPPLY.md § Dispatch trigger), price gate 22%, no route 13%,
 room 4%. After the room fix, the one-destination-per-pass rule binds (~113 units unfilled per
-probe tick). The `market-viability` skill (BL-1184) is the gate; sprint 49 left G1 (processors
-running at handoff) the furthest from target.
+probe tick). The `market-viability` skill (BL-1184) is the gate. Sprint 49 closed (2026-10-07) on
+16 seeds at G1 54.7% (target 70, unmet) / G2 54.4% / G3 88.9%: a quarter of built processors are
+idled for want of inputs before the handoff.
 
 ## Sprint 50 — logistics and trade flow
 
 - **The trade-flow lens, first:** who ships what, where, at what landed price, and what was
   refused and why (the refusal classes the water probe already computes). The instrument for
   the rest of the sprint.
+- **BL-1217 (inputs reach processors):** G1 carried from sprint 49 (Ben, the close-out form) —
+  which inputs fail to arrive, where, and why; fix the cause in network or dispatch. Also
+  re-measures construction stalls (abandonment is still unruled).
 - **BL-1203 follow-ups:** the one-destination-per-pass rule (`supply_system.cpp` market export);
   the price gate at k = 0; no route — ports per body and port placement.
 - **BL-1195 (convoy lane follows legs):** position, vision and interdiction read the direct
@@ -33,7 +37,7 @@ running at handoff) the furthest from target.
 - **BL-1165 (untraced re-bless movements),** including `haulage_measure`'s stale copy of the
   old pricing (re-point it at `price_market_export_leg`).
 - **BL-1192 (catchment ignores water)** and **BL-1190 (markets meet firms).**
-- **BL-1175 (firm entry):** competition returns after a glut — design first.
+- **BL-1119 (roads tree and detour):** the road network's shape, settled 2026-09-25.
 - **The gate:** extend BL-1184 with a logistics row (units moved surplus -> shortage; dry
   markets; refusals by class).
 
@@ -43,11 +47,15 @@ running at handoff) the furthest from target.
   directed hauls, contracts (`CONTRACTS.md`) — and what the player reads to choose them.
 - The lenses Ben held "for before sprint 50" over sprint 48's surfaces; ledger legibility for
   prices, shortages and routes. Live-click heavy: plan for Ben's walks.
+- **BL-1180 (construction rate panel drift):** the panels predict the rate the tick takes,
+  including the pro-rata share of a short shelf.
 
 ## Displaced to sprint 52 (currently tagged 50)
 
 BL-1170 (heartlands reach overseas) + BL-1148 (migration carries culture), BL-1174 (hiring
-answers a threat — needs its AI grant), BL-1181 (bind-and-free churn).
+answers a threat — needs its AI grant), BL-1181 (bind-and-free churn). From sprint 49's close:
+BL-1175 (firm entry, design first), BL-1189 (opening stock sized), BL-1139 (centres abandoned in
+play).
 
 ## Hazards to carry
 

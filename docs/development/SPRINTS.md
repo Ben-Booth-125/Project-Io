@@ -59,23 +59,7 @@ and/or a version goal (v0.1.1 etc.).
 
 ## Open now
 
-### Sprint 49 — market viability
-*Open · opened 2026-10-04 · Ben (2026-10-04, the focus and 'file them'); Claude (the 16-seed reading and the cut)*
-
-**Goal.** The market economy is profitable from day 1 at its run-rate, not on its opening stock: processors get their inputs, surplus reaches shortage, firms stop building plant that cannot run, and the field and the seat stay solvent through 400 play ticks, judged on one 16-seed reading (BL-1184) against targets Ben sets.
-
-**Planned.**
-- WAVE 0 - THE BASELINE AND THE DIAGNOSES. The second re-bless is merged (1a44b6df, by the sprint 48 session); the v0.1.27 cut follows it. BL-1184 (market viability gate): one 16-seed instrument, wrapped as a skill, read on main as the baseline. BL-1186 (goods cross markets): the diagnosis half - why shipments are zero - because BL-1185 and BL-1187 both need its answer to what "reachable" means. Short design passes: BL-1163 (play villages decline) basket contents; BL-1175 (firm entry); BL-1179 (shelf spoilage).
-- WAVE 1 - THE LEVERS, three lanes on disjoint files. GENERATION: BL-1188 (seat kit runs) first, then BL-1185 (chain-feasible placement, a hard rule), then BL-1189 (opening stock sized). ECONOMY: BL-1186 (goods cross markets) fix, BL-1191 (upkeep retune stopgap), BL-1163 (play villages decline) household basket, BL-1183 (ceiling stalls construction). AI: BL-1187 (build only what runs), after BL-1186. Each measures its own before/after on BL-1184.
-- WAVE 2 - REFILL AND DRAIN. BL-1175 (firm entry), BL-1179 (shelf spoilage) then shelf supply k re-read, BL-1180 (construction rate panel drift). One re-bless after every world-mover in waves 1-2, against shape.
-- CARRIED / SMALL. BL-1119 (roads tree and detour) R4/R6/R7; BL-1165 (untraced re-bless movements), its haulage half read with BL-1186; BL-1166 (industrialisation harness self-check); BL-1176-1178 (works-note leftovers).
-- OUT. BL-1170 (heartlands reach overseas) and BL-1148 (migration carries culture) to sprint 50; BL-1174 (hiring answers a threat) waits on its AI grant; BL-1181 (bind-and-free churn) to sprint 50; BL-1190 (markets meet firms) re-read after BL-1185/1186.
-
-**Done when.** BL-1184 reads, pooled over the 16 curated seeds: at least 70% of processors running at handoff; field income at tick 50 at least 50% of the settle close; at least 70% of firms alive at tick 400 - after one re-bless.
-
-**Risk.** Wave 1 runs three world-movers on the economy seam at once (generation placement, shipping, the scorer); rule 2 of the re-bless (each item measures its own before/after on BL-1184) is what keeps the causes attributable. Brief every rule with a MULTI-TICK row (BL-1172's lesson). BL-1185 is a hard rule: a world where a chain has no feasible site loses that chain rather than placing an orphan, which may thin some seeds - the gate reads it.
-
-THE READING (2026-10-04, main a56e4ce3, 16 seeds, shipped 1960 start): recipe_margin green in both bands; day 1 solvent but the settle is opening stock auctioned (field income 54-74k/tick at the settle close, 10-19k by tick 50); 119-141 of ~225 processors input-starved at handoff (seeds 0/43/37); 0 shipments between markets; processors 225 -> 390 while those running fall; 70% of firms insolvent by tick 400; the seat's steel mill idles on every seed. Full numbers in BL-1184. RULINGS (the sprint 49 form, 2026-10-04): the second re-bless authorised; targets 70% processors running at handoff, 50% run-rate income at tick 50, 70% firms alive at tick 400; upkeep retuned as a stopgap (BL-1191); the sweep becomes a skill; BL-1188, BL-1185 and BL-1189 pulled in; BL-1185 is a hard rule. CHECKPOINT (2026-10-05, main 1dae6ca7, market_viability seeds 0/43/10/28/38, 400 ticks): G1 49.3% (target 70), G2 50.1% PASS, G3 67.6% (target 70); heads 257M -> 492M; household fill pooled late: produce 92%, water 88%, food rations 74%, clean water 38%, consumer goods 64%, medical 60%. Merged: BL-1184/1185/1186/1187/1188/1193/1198/1200/1201/1197/1163/1196/1179/1204/1205. Wave in flight: BL-1203+1194 (goods reach dry markets), BL-1183 (construction stalls), BL-1191 (upkeep stopgap).
+*Nothing open.*
 
 ## Where things stand
 
@@ -148,10 +132,10 @@ THE READING (2026-10-04, main a56e4ce3, 16 seeds, shipped 1960 start): recipe_ma
 | 46 | the generation reaches the game | CLOSED EARLY 2026-09-24 (Ben: cut v0.1.25, move to sprint 47). The core landed — the wizard plays the whole arc, Begin keeps the world it built, the player chooses the corporation — and the economy thread it exposed was rebuilt; the carry rows and the draft's unfiled rows go to the sprint 47 cut. |
 | 47 | one history, told through the rounds | CLOSED 2026-09-25 (Ben: "I'll accept this as sprint 47 complete"; cut v0.1.26). The identity wave and each round's flair landed and passed two live-click walks; the one re-bless was taken once; BL-1084 (the world built once and moved) and the wave-3 stretch carried to sprint 48. |
 | 48 | the world moves forward | CLOSED 2026-10-04 (Ben: "close out this sprint"). The world is built once and moves forward; roads are a tree, markets can die, centres consolidate and deepen, sea lanes ride currents and trade, fleets project power, and three late branches (charter by reach, far trade, the fair-price army) were ruled, cold-reviewed and merged. Ben walked every owed live click. BL-1119 (roads tree and detour) carries three rows to sprint 49. The second re-bless is PREPARED, awaiting Ben's authorisation against its shape; the version cut follows it. |
-| 49 | market viability | OPEN, checkpoint 2026-10-05 on main 1dae6ca7: G1 49.3 / G2 50.1 (PASS) / G3 67.6 against 70/50/70; 17 items merged; wave in flight: water routing + sea cost, construction stalls, upkeep stopgap. |
+| 49 | market viability | CLOSED 2026-10-07 on main: 16-seed market_viability G1 54.7 (FAIL, target 70) / G2 54.4 (PASS) / G3 88.9 (PASS); baseline was G1 17.6 / G2 27.5 / G3 31.3. G1 carried to sprint 50 as BL-1217 (inputs reach processors); seat profit 15/16. |
 
 **Next up.** SPRINT 49 OPEN (2026-10-04), market viability: wave 0 - BL-1184 (market viability gate) as a skill reads the baseline; BL-1186 (goods cross markets) diagnoses the zero shipments; then three lanes: generation (BL-1188, BL-1185, BL-1189), economy (BL-1186, BL-1191, BL-1163, BL-1183), AI (BL-1187).
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*67 sprints archived cold; 1 open/gated in the hot store.*
+*68 sprints archived cold; 0 open/gated in the hot store.*
