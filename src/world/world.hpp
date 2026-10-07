@@ -676,6 +676,20 @@ struct world
     /// for the whole visible grid at once, so a per-query search would be the wrong shape.
     faithful_unordered_map<entity_id, std::vector<float>> body_reach_cost;
 
+    /// BL-1230 (power crosses markets) — THE POWER GRID, province grain
+    /// (LOGISTICS.md § 3a, "The province is the grid's cell"). Wired province id
+    /// -> its grid id (the LOWEST wired province id in the grid). A province with
+    /// no road tile is dark and absent. A derived cache on the same footing as the
+    /// reach field: built lazily by `province_power_grid()`, cleared by
+    /// invalidate_logistics_caches (every road write calls it) and by
+    /// clear_derived_state, never serialised. `power_grid_built` distinguishes
+    /// "not built" from "built, every province dark"; `power_grid_stamp` is the
+    /// partition's province count at build, so a partition redrawn under the
+    /// cache rebuilds it rather than being read stale.
+    std::map<std::uint32_t, std::uint32_t> power_grid_of_province;
+    bool        power_grid_built = false;
+    std::size_t power_grid_stamp = 0;
+
     /// Per-body NEAREST LOGISTIC POINT ANCHOR (BL-1117) — see lp_anchor_field. A
     /// derived cache on the same footing as the three above: built lazily by
     /// `nearest_lp_anchor`, cleared by invalidate_logistics_caches and by

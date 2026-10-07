@@ -1,12 +1,14 @@
 #include "logistics.hpp"
 #include "river_generation.hpp"
 #include "hex_neighbors.hpp" // BL-1186: a port reaches its sea across any hex side
+#include "road_generation.hpp" // BL-1230: kMaxCrossingTiles, the strait a road crosses
 
 #include <algorithm>
 #include <cmath>
 #include <functional>
 #include <limits>
 #include <queue>
+#include <set>
 #include <tuple>
 #include <unordered_map>
 #include <unordered_set>
@@ -843,6 +845,208 @@ float tile_reach_cost(const world& w, entity_id tile)
     if (idx >= fit->second.size())
         return -1.0f;
     return fit->second[idx];
+}
+
+// ---------------------------------------------------------------------------
+// BL-1230 (power crosses markets) — the power grid at province grain
+// ---------------------------------------------------------------------------
+// LOGISTICS.md § 3a, "The province is the grid's cell (Ben, 2026-10-07)". A
+// union-find over the partition's provinces: every province holding a roaded
+// land tile is wired, and two wired provinces join wherever roads join — two
+// roaded tiles 4-cardinal adjacent (east-west wrapped), or two roaded tiles
+// either side of a strait (at most kMaxCrossingTiles of non-ocean water, the
+// crossing the road-only walk of road_generation.cpp admits). The grid id is
+// the lowest province id in the component, read only after every union, so no
+// visit order can reach the answer.
+namespace {
+
+struct province_dsu
+{
+    std::vector<std::size_t> parent;
+    explicit province_dsu(std::size_t n) : parent(n)
+    {
+        for (std::size_t i = 0; i < n; ++i)
+            parent[i] = i;
+    }
+    std::size_t find(std::size_t a)
+    {
+        while (parent[a] != a)
+        {
+            parent[a] = parent[parent[a]];
+            a = parent[a];
+        }
+        return a;
+    }
+    void unite(std::size_t a, std::size_t b)
+    {
+        a = find(a);
+        b = find(b);
+        if (a == b)
+            return;
+        if (b < a)
+            std::swap(a, b);
+        parent[b] = a; // cosmetic: the grid id is re-derived as a minimum below
+    }
+};
+
+} // namespace
+
+const std::map<std::uint32_t, std::uint32_t>& province_power_grid(world& w)
+{
+    const std::vector<province>& provs = w.provinces.provinces;
+    if (w.power_grid_built && w.power_grid_stamp == provs.size())
+        return w.power_grid_of_province;
+
+    w.power_grid_of_province.clear();
+    w.power_grid_built = true;
+    w.power_grid_stamp = provs.size();
+    if (provs.empty())
+        return w.power_grid_of_province;
+
+    const std::size_t np = provs.size();
+    auto index_of = [&](std::uint32_t pid) -> std::size_t {
+        const auto it = std::lower_bound(provs.begin(), provs.end(), pid,
+                                         [](const province& p, std::uint32_t id) { return p.id < id; });
+        return (it != provs.end() && it->id == pid) ? static_cast<std::size_t>(it - provs.begin()) : np;
+    };
+
+    // Wired provinces, and the bodies they sit on (ascending: std::set).
+    std::vector<char> wired(np, 0);
+    std::set<entity_id> bodies;
+    for (std::size_t i = 0; i < np; ++i)
+    {
+        for (const entity_id t : provs[i].tiles)
+        {
+            const auto tit = w.tiles.find(t);
+            if (tit == w.tiles.end() || is_water(tit->second.substrate))
+                continue;
+            if (tit->second.road_level > 0)
+            {
+                wired[i] = 1;
+                bodies.insert(provs[i].body);
+                break;
+            }
+        }
+    }
+
+    province_dsu dsu(np);
+    for (const entity_id body : bodies)
+    {
+        const auto bit = w.bodies.find(body);
+        if (bit == w.bodies.end())
+            continue;
+        const int gw = bit->second.grid_width;
+        const int gh = bit->second.grid_height;
+        if (gw <= 0 || gh <= 0)
+            continue;
+        const std::vector<entity_id> raster = body_tile_grid(w, body); // a copy: owned here
+        const std::size_t n = static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh);
+        if (raster.size() < n)
+            continue;
+
+        // Per cell: the province index of a ROADED land cell (np otherwise), and
+        // whether the cell is crossable water (non-ocean water).
+        std::vector<std::size_t> road_prov(n, np);
+        std::vector<char>        strait(n, 0);
+        for (std::size_t c = 0; c < n; ++c)
+        {
+            const auto tit = w.tiles.find(raster[c]);
+            if (tit == w.tiles.end())
+                continue;
+            const tile_component& tc = tit->second;
+            if (is_water(tc.substrate))
+            {
+                strait[c] = is_open_ocean(tc.substrate) ? 0 : 1;
+                continue;
+            }
+            if (tc.road_level > 0)
+                road_prov[c] = index_of(w.provinces.province_of(raster[c]));
+        }
+
+        auto cell_at = [&](int x, int y) -> int {
+            if (y < 0 || y >= gh)
+                return -1;
+            const int wx = ((x % gw) + gw) % gw; // the east-west wrap
+            return y * gw + wx;
+        };
+
+        std::vector<int> frontier, next;
+        std::vector<int> seen_stamp(n, -1);
+        for (int c = 0; c < static_cast<int>(n); ++c)
+        {
+            const std::size_t pc = road_prov[static_cast<std::size_t>(c)];
+            if (pc >= np)
+                continue;
+            const int cx = c % gw, cy = c / gw;
+
+            // Land: right and down suffice for an undirected adjacency.
+            const int right = cell_at(cx + 1, cy);
+            const int down  = cell_at(cx, cy + 1);
+            if (right >= 0 && road_prov[static_cast<std::size_t>(right)] < np)
+                dsu.unite(pc, road_prov[static_cast<std::size_t>(right)]);
+            if (down >= 0 && road_prov[static_cast<std::size_t>(down)] < np)
+                dsu.unite(pc, road_prov[static_cast<std::size_t>(down)]);
+
+            // A strait: a breadth-first run of at most kMaxCrossingTiles water
+            // cells from this road, joining any road on the far shore.
+            frontier.clear();
+            seen_stamp[static_cast<std::size_t>(c)] = c;
+            frontier.push_back(c);
+            for (int depth = 0; depth < kMaxCrossingTiles && !frontier.empty(); ++depth)
+            {
+                next.clear();
+                for (const int f : frontier)
+                {
+                    const int fx = f % gw, fy = f / gw;
+                    const int nb[4] = { cell_at(fx - 1, fy), cell_at(fx + 1, fy),
+                                        cell_at(fx, fy - 1), cell_at(fx, fy + 1) };
+                    for (const int v : nb)
+                    {
+                        if (v < 0 || seen_stamp[static_cast<std::size_t>(v)] == c)
+                            continue;
+                        seen_stamp[static_cast<std::size_t>(v)] = c;
+                        if (strait[static_cast<std::size_t>(v)])
+                            next.push_back(v);
+                    }
+                }
+                // The far shore: roads adjacent to this depth's water cells.
+                for (const int f : next)
+                {
+                    const int fx = f % gw, fy = f / gw;
+                    const int nb[4] = { cell_at(fx - 1, fy), cell_at(fx + 1, fy),
+                                        cell_at(fx, fy - 1), cell_at(fx, fy + 1) };
+                    for (const int v : nb)
+                        if (v >= 0 && road_prov[static_cast<std::size_t>(v)] < np)
+                            dsu.unite(pc, road_prov[static_cast<std::size_t>(v)]);
+                }
+                frontier.swap(next);
+            }
+        }
+    }
+
+    // Grid id = the lowest wired province id in the component. Ascending walk:
+    // the first member met of each root is its lowest id.
+    std::vector<std::uint32_t> grid_of_root(np, 0);
+    for (std::size_t i = 0; i < np; ++i)
+    {
+        if (!wired[i])
+            continue;
+        const std::size_t root = dsu.find(i);
+        if (grid_of_root[root] == 0)
+            grid_of_root[root] = provs[i].id;
+        w.power_grid_of_province.emplace(provs[i].id, grid_of_root[root]);
+    }
+    return w.power_grid_of_province;
+}
+
+std::uint32_t tile_power_grid(world& w, entity_id tile)
+{
+    const auto& grid = province_power_grid(w);
+    const std::uint32_t pid = w.provinces.province_of(tile);
+    if (pid == 0)
+        return 0;
+    const auto it = grid.find(pid);
+    return (it != grid.end()) ? it->second : 0;
 }
 
 // ---------------------------------------------------------------------------

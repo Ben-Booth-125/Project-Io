@@ -1664,15 +1664,82 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // tick's draws and this tick's demand phase, before the auto-surplus loop
     // below credits this clear's listings to the shelf. (The shipped k is 0 —
     // listings only — until shelf spoilage, BL-1179.)
+    //
+    // BL-1230 (power crosses markets; LOGISTICS.md § 3a, "The province is the
+    // grid's cell"): POWER's price clears against its GRID. A building
+    // draws a grid good from every shelf on its grid (run_building_upkeep), so
+    // the supply its own market's price answers is the grid's, not the shelf
+    // at its own centre. Each market on a grid (its centre tile's province's
+    // grid) therefore resolves the grid good against the grid's summed supply
+    // and demand — from its OWN prior price and its OWN base, so it keeps a
+    // market price that converges on the grid's rather than being replaced by
+    // one. A market off every grid resolves on its own figures, as before.
+    // Sums run over ascending market id, so no hash order reaches a float.
+    // Power only (grid_good_crosses_markets): construction capacity, the other
+    // grid good, still draws locally, so it still prices locally.
+    std::map<entity_id, std::uint32_t> market_grid;
+    //
+    // THE SHELF CAP IS APPLIED ONCE, AT THE GRID (review round 2). pricing_supply's
+    // shelf share is min(shelf, k x (demand + silenced want)); summed market by
+    // market it would count a shelf with no LOCAL demand as no supply, though a
+    // building anywhere on the grid draws from it — so the grid would price as
+    // empty while one market held plenty. The three registers are pooled
+    // separately and the cap taken over the pooled figures: listed + min(sum
+    // shelf, k x sum(demand + silenced want)). At one market on a grid this is
+    // exactly pricing_supply.
+    struct grid_figures
+    {
+        std::array<float, resource_count> listed{}, shelf{}, wants{}, demand{};
+    };
+    std::map<std::uint32_t, grid_figures> grid_sd;
+    if (any_grid)
+    {
+        std::vector<entity_id> mids;
+        mids.reserve(w.markets.size());
+        for (const auto& [mid, mc] : w.markets)
+        {
+            (void)mc;
+            mids.push_back(mid);
+        }
+        std::sort(mids.begin(), mids.end());
+        for (const entity_id mid : mids)
+        {
+            const market_component& mc = w.markets.at(mid);
+            if (mc.centre_tile == null_entity)
+                continue;
+            const std::uint32_t g = tile_power_grid(w, mc.centre_tile);
+            if (g == 0)
+                continue;
+            market_grid.emplace(mid, g);
+            auto& sd = grid_sd[g];
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                if (!grid_rules.grid(r) || !grid_good_crosses_markets(r))
+                    continue;
+                sd.listed[r] += std::max(0.0f, mc.supply[r]);
+                sd.shelf[r]  += std::max(0.0f, mc.inventory[r]);
+                sd.wants[r]  += std::max(0.0f, mc.demand[r]) + std::max(0.0f, mc.hauler_want[r]);
+                sd.demand[r] += mc.demand[r];
+            }
+        }
+    }
     std::unordered_map<entity_id, std::array<float, resource_count>> ref_price;
     for (const auto& [mid, mc] : w.markets)
     {
         ref_price[mid] = {};
+        const auto mg = market_grid.find(mid);
+        const auto* sd = (mg != market_grid.end()) ? &grid_sd.at(mg->second) : nullptr;
         for (std::size_t r = 0; r < resource_count; ++r)
-            ref_price[mid][r] = resolve_price(mc.price[r], mc.base_price[r],
-                                              pricing_supply(mc, r, reg.price_band().shelf_supply_ticks), mc.demand[r],
+        {
+            const bool  pooled = (sd != nullptr) && grid_rules.grid(r) && grid_good_crosses_markets(r);
+            const float k      = reg.price_band().shelf_supply_ticks;
+            const float supply = pooled ? sd->listed[r] + ((k > 0.0f) ? std::min(sd->shelf[r], k * sd->wants[r]) : 0.0f)
+                                        : pricing_supply(mc, r, k);
+            const float demand = pooled ? sd->demand[r] : mc.demand[r];
+            ref_price[mid][r] = resolve_price(mc.price[r], mc.base_price[r], supply, demand,
                                               reg.price_band().floor_mult,
                                               reg.price_band().ceil_mult);
+        }
     }
 
     // --- Auto-surplus clearing: income at ref_price, pool debited immediately ---
