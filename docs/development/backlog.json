@@ -1385,6 +1385,27 @@
     ".claude/skills/market-viability/SKILL.md"
    ],
    "design": "SPRINT 50 WAVE 0 (Ben, 2026-10-07, the cut form; the NEXT_SESSION.md proposal \"extend BL-1184 with a logistics row\"). Reported, no target (G1 stays the target, 70%). Generalise water_pair_probe's per-pair classifier (the dispatcher's rules in its own order) from water to every good, factored into one shared reader both tools use rather than a copy (BL-1165's haulage_measure lesson). Rows: units shipped between markets per tick, and the share landing at a market short of that good; dry markets per good; per dry market its best refusal class; and a PROCESSOR-INPUT block - for each input-starved processor, its scarcest input and that input's best class at its market - which is BL-1217 (inputs reach processors)'s diagnosis. Multi-tick: read at several play ticks, never one. A pure reader."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 50,
+   "written": "2026-10-07",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1224",
+   "short_name": "DUST_CONVOYS",
+   "author": "Claude (the BL-1222 lens lane, review round 1, 2026-10-07)",
+   "category": "Economy",
+   "priority": "C",
+   "difficulty": 2,
+   "title": "The corporation dispatcher never commits a convoy carrying a negligible cargo",
+   "authority_doc": "docs/economy/SUPPLY.md",
+   "files": [
+    "src/world/supply_system.cpp"
+   ],
+   "design": "Found by the BL-1222 (trade-flow lens) verify script (2026-10-07): a re-seated corporation's first dispatch pass committed a shipment of ~5e-08 units per tick - a convoy that pays its haul and LP for nothing. MEASURE first: how many committed convoys per tick carry under a small threshold (e.g. 0.01 u, or under one batch of the destination's need) on the 16 seeds, and what they cost. Then a minimum cargo rule in dispatch_convoys, if the count is non-trivial. Read the sizing in the BL-995 net-price rule (supply_system.hpp) before choosing the threshold."
   }
  ]
 }
