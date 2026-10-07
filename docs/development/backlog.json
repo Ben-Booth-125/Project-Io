@@ -1339,8 +1339,8 @@
    "design": "Ben (the re-bless form, 2026-10-07): sprint 50, beside BL-1217 (inputs reach processors). The per-merge series is in docs/development/drafts/sprint-49-rebless.md. Trace: (1) BL-1209 (shelf k = 1) cuts rival cash by 1.96 M pooled and leaves 13 rivals with negative cash (was 1) - which flow; (2) BL-1203 (water reaches dry markets) runs 25% more convoys yet sells 12.8% less at destination; (3) BL-1198 (the Well) adds 33 water sites and moves haulage not at all, to the decimal; (4) at BL-1200 (lake cap) people in centres rise 11.9% while the settlement record falls 2.4%; (5) whole road networks flip between Highway and Road tiers on single seeds at four merges with no new length (sprint 48 saw the same). Each: name the mechanism, then decide whether it is intended."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "designed",
+   "glyph": "✓",
    "sprint": 50,
    "written": "2026-10-07",
    "requires": [],
@@ -1352,13 +1352,16 @@
    "category": "UI",
    "priority": "A",
    "difficulty": 3,
-   "title": "A diagnostic lens shows who ships what where, at what landed price, and what was refused and why",
+   "title": "A player lens shows where my surplus ships, at what landed price, and why it did not go where a market is short",
    "authority_doc": "docs/ui/LENSES.md",
    "files": [
+    "src/world/supply_system.cpp",
+    "src/world/supply_system.hpp",
     "src/ui/body_surface_canvas.cpp",
-    "src/world/supply_system.cpp"
+    "docs/ui/question_log.json",
+    "docs/ai/ACTIONS.json"
    ],
-   "design": "SPRINT 50 WAVE 0 (Ben, 2026-10-07, the cut form): the instrument for the sprint, DIAGNOSTIC scope - flows, landed price, refusals by class; player polish is sprint 51. The refusal classes are the market-export dispatcher's own, in its order (tools/verify/water_pair_probe.cpp: body, gate, noroute, costly, noroom, room). OPEN (asked 2026-10-07): whose flows it shows - the Supply-routes lens is player-only under competitor visibility (DISCOVERY.md) - and how a refusal is drawn. The dispatcher must record its refusals as a pure output the simulation never reads (determinism unchanged)."
+   "design": "SETTLED (Ben, 2026-10-07, the lens form): a PLAYER lens over the player's own flows only; the whole-world diagnosis stays headless (BL-1223, gate logistics row). Refusals: a marker per short market coloured by the best class over the player's sources, hover lists classes by good. Design in docs/ui/LENSES.md § Trade-flow lens. WORK: the dispatcher records the player corporation's shipments and best class per (good, destination market) each pass as a transient output the simulation never reads and the save never holds; the `trade_flow` overlay_mode at the enum's end; the Planetary arrows, markers, hover and class key; the question_log entry; the ACTIONS entry for the lens cycle if it changes. Before mint: Ben's cut form 2026-10-07 set DIAGNOSTIC scope (player polish in sprint 51)."
   },
   {
    "status": "proposed",

@@ -6711,6 +6711,60 @@
      "result_metric": ""
     }
    ]
+  },
+  {
+   "brief": "trade-flow-lens",
+   "title": "BL-1222 - A player lens shows my shipments and why my surplus did not go where a market is short",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1222 - sprint 50 (Ben's cut form and lens form, 2026-10-07)",
+   "batch": "sprint-50",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism twice; save_roundtrip; market_viability G1-G4 identical on --seeds 0,43 --ticks 50"
+     ],
+     "requirement": "The dispatcher records the player corporation's shipments and best refusal class per (good, destination market) as a transient output; the simulation never reads it, the save never holds it, and the world is bit-identical.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "visual: a verifier-visual capture of the lens on a seated seed"
+     ],
+     "requirement": "The trade_flow lens draws the player's market-to-market arrows (width by units) and a marker on each short market coloured by its best class, with a class key and a width key; no rival flow appears.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "live click: Ben cycles to the lens in the built app and hovers an arrow and a marker"
+     ],
+     "requirement": "The lens is reachable by the keyboard lens-cycle; hovering an arrow shows good, units and landed price; hovering a marker lists the classes by good.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "review: question_log.json entry rendered; ACTIONS entry if the cycle changed"
+     ],
+     "requirement": "The surface carries its question_log entry (\"Where is my surplus going, and why is it not going where it is short?\").",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
   }
  ]
 }

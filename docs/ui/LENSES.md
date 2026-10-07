@@ -50,6 +50,7 @@ by the cycle without a literal being kept in step by hand.
 | `supply_routes` | Planetary key of aggregated lanes, log-scaled thickness |
 | `throughput` | Planetary reach-cost field (far → at an anchor) + an active-LP ring on every supply anchor + gradient key |
 | `culture` | Planetary province fill in the primary culture's lineage hue; a checker of the second culture where it is close + culture key |
+| `trade_flow` | Planetary market-to-market arrows of the player's shipments + a marker on each short market coloured by why the player's surplus did not go there + class key |
 
 Identity colours live in `presentation.hpp`; the corporation-identity helper is
 `palette::corp_colour`.
@@ -828,6 +829,47 @@ Reach. The Solar-canvas graph is the lens's inter-body representation (rung tabl
 
 **Glyph / access.** Reuses `icons::supply`; off the strip, reached by the
 keyboard lens-cycle.
+
+## Trade-flow lens
+
+**Intent.** Where is my surplus going, and why is it not going where it is short? Supply
+shows convoys in flight and Supply-routes the lanes they carved; Trade-flow shows the
+**decision** behind them — what the player's dispatcher sent this pass, to where, at what
+landed price, and what it refused. Owned by BL-1222 (trade-flow lens). Ruled by Ben
+(2026-10-07, the lens form): a player lens over the player's own flows; the whole-world
+diagnosis stays headless (the market-viability skill's logistics row).
+
+**Visibility.** The player's own flows only (DISCOVERY.md § Competitor visibility). A market
+being short of a good is a public market signal; the refusal is a fact about the player's own
+surplus. No rival's shipments, shelves or refusals appear. A market's own shelf exports are
+no corporation's and do not appear either.
+
+**Surface (Planetary).**
+- **Flows** — one arrow per (source market, destination market, good) the player shipped,
+  width from units over a short trailing window, in the neutral logistics hue. Hover: good,
+  units, landed price (the destination price the dispatcher netted against its haul).
+- **Refusals** — a marker on each market of the active body that is short of a good the
+  player holds in surplus, coloured by the **best** class over the player's sources of
+  that good. Hover lists the classes by good.
+
+**The classes** are the dispatcher's own rules, in the order it applies them, best last:
+no lane (another body, no route off it), price gate (the destination does not pay
+the margin over the source), no route, costly (routed, but the haul eats the margin), no
+room (the destination cannot absorb more at the landed price), room (the rule would send,
+but held back by the one-destination-per-pass rule or the LP cap). The names match the
+market-viability skill's logistics row, so a lens read and a headless read use one
+vocabulary.
+
+**Data.** The dispatcher records, for the player's corporation only, each pass's
+shipments and its best class per (good, destination market) as a transient output. The
+simulation never reads it and it is not saved, so a loaded game shows the lens from its
+first pass on.
+
+**Legend.** A class key (colour → class) and a flow-width key (units per tick), in the
+shared legend home.
+
+**Glyph / access.** Off the strip, reached by the keyboard lens-cycle. A strip slot and a
+dedicated glyph are not part of this design.
 
 ## Throughput lens
 
