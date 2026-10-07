@@ -782,6 +782,14 @@ void inject_background_demand(world& w, const recipe_registry& reg)
     }
     std::sort(scale_centre_ids.begin(), scale_centre_ids.end());
 
+    // BL-1217 lever D: the per-market bid record restarts every clear, on
+    // every market (a market whose body has no scale bids nothing).
+    for (auto& [mid, mc] : w.markets)
+    {
+        (void)mid;
+        mc.background_bid.fill(0.0f);
+    }
+
     std::map<entity_id, float> body_scale;
     for (const entity_id cid : scale_centre_ids)
     {
@@ -812,6 +820,44 @@ void inject_background_demand(world& w, const recipe_registry& reg)
             const float elastic = std::clamp(std::pow(base / price, bd.demand_elasticity),
                                              bd.elasticity_min, bd.elasticity_max);
             mc.demand[r] += weighted * elastic;
+            mc.background_bid[r] = weighted * elastic; // one write per (market, good)
+        }
+    }
+}
+
+void draw_background_basket(world& w, const recipe_registry& reg)
+{
+    // BL-1217 lever D (measurement, behind economy.background_demand.consumes,
+    // default OFF). The background basket stops being a pricing pull only: it
+    // TAKES what it bid off the market's shelf, `min(bid, inventory)` per good,
+    // exactly as draw_household_basket does and on the same terms -- NO MONEY
+    // MOVES (the market paid the maker when it bought the stock as buyer of
+    // last resort), and NO CEILING (the bid's elasticity is its reservation).
+    // One bid per (market, good), so a short shelf fills it pro rata trivially.
+    // Ascending market id, ascending resource.
+    const bool consumes = reg.background_demand().consumes;
+    std::vector<entity_id> mids;
+    mids.reserve(w.markets.size());
+    for (const auto& [mid, mc] : w.markets)
+    {
+        (void)mc;
+        mids.push_back(mid);
+    }
+    std::sort(mids.begin(), mids.end());
+    for (const entity_id mid : mids)
+    {
+        market_component& mc = w.markets.at(mid);
+        mc.background_fill.fill(0.0f);
+        if (!consumes)
+            continue; // switch off: the shelf is untouched (pre-lever behaviour)
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            const float bid   = std::max(0.0f, mc.background_bid[r]);
+            const float shelf = std::max(0.0f, mc.inventory[r]);
+            const float take  = std::min(bid, shelf);
+            mc.background_fill[r] = take;
+            if (take > 0.0f)
+                mc.inventory[r] = shelf - take;
         }
     }
 }
@@ -1923,6 +1969,11 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // tick from what households leave (Ben, 2026-10-05: households come before
     // the nation — MARKETS.md step 12).
     draw_household_basket(w);
+
+    // BL-1217 lever D: the background basket draws what the households left,
+    // before spoilage and before the nation's later claims. A no-op on the
+    // shelf while economy.background_demand.consumes is false (the default).
+    draw_background_basket(w, reg);
 
     // BL-1179 (shelf spoilage): after the households' draw (the nation's later
     // claims take what spoilage leaves) and before the next tick's reference prices read the

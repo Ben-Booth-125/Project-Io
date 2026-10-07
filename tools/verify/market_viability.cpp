@@ -504,6 +504,12 @@ struct seed_reading
     };
     water_win w_early, w_late;
     std::array<double, resource_count> late_bid{}, late_fill{};
+    // BG (BL-1217 lever D): the background basket's bid and shelf draw summed
+    // over every play tick and market; `bg_short` counts market-ticks where the
+    // shelf could not cover the bid. The draw is zero while the switch is off.
+    std::array<double, resource_count> bg_bid{}, bg_fill{};
+    std::array<long long, resource_count> bg_short{};
+    int bg_ticks = 0;
     double secs = 0.0;
     std::vector<lg_reading> lg; ///< L (BL-1223): one per g_lg_ticks entry
 };
@@ -1142,6 +1148,15 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
         if (k >= k_g5_from && k <= k_g5_to) read_water(w, snap.inv, r.w_early, max_convoy_id);
         else if (k > ticks - k_w_late && k > k_g5_to) read_water(w, snap.inv, r.w_late, max_convoy_id);
         else for (const convoy_component& c : w.convoys) max_convoy_id = std::max(max_convoy_id, c.id);
+        ++r.bg_ticks;
+        for (const auto& [mid, mc] : w.markets)
+            for (std::size_t g = 0; g < resource_count; ++g)
+                if (mc.background_bid[g] > 0.0f)
+                {
+                    r.bg_bid[g]  += mc.background_bid[g];
+                    r.bg_fill[g] += mc.background_fill[g];
+                    if (mc.background_fill[g] < mc.background_bid[g] * 0.999f) ++r.bg_short[g];
+                }
         if (k > ticks - k_w_late)
             for (const auto& [mid, mc] : w.markets)
                 for (std::size_t g = 0; g < resource_count; ++g)
@@ -1415,6 +1430,27 @@ int main(int argc, char** argv)
                 std::printf(" %s %.0f%%", resource_names::name_of(static_cast<resource_type>(g)).c_str(), pct(lf[g] / lb[g]));
         std::printf("\n");
     }
+    {
+        std::array<double, resource_count> bb{}, bf{};
+        std::array<long long, resource_count> bs{};
+        long long bt = 0;
+        for (const seed_reading& r : rs)
+        {
+            bt += r.bg_ticks;
+            for (std::size_t g = 0; g < resource_count; ++g) { bb[g] += r.bg_bid[g]; bf[g] += r.bg_fill[g]; bs[g] += r.bg_short[g]; }
+        }
+        const double d = bt > 0 ? static_cast<double>(bt) : 1.0;
+        std::printf(" BG pooled background basket per seed-tick (bid / DRAWN off the shelf, short market-ticks):");
+        double tb = 0, tf = 0;
+        for (std::size_t g = 0; g < resource_count; ++g)
+            if (bb[g] > 0.0)
+            {
+                std::printf(" %s %.1f/%.1f (%lld)", resource_names::name_of(static_cast<resource_type>(g)).c_str(),
+                            bb[g] / d, bf[g] / d, bs[g]);
+                tb += bb[g]; tf += bf[g];
+            }
+        std::printf("  | all %.1f/%.1f\n", tb / d, tf / d);
+    }
     lg_reading lg_all;
     if (g_logistics)
     {
@@ -1429,6 +1465,30 @@ int main(int argc, char** argv)
             lg_all.add(t);
         }
         print_lg("all", lg_all, 10);
+        // BL-1217 lever D: the background basket's goods, every one, so a good
+        // outside the top 10 still reads (per read, by class).
+        {
+            const double n = lg_all.reads > 0 ? lg_all.reads : 1.0;
+            std::printf("    L all background-basket goods starved by input (per read):");
+            for (std::size_t g = 0; g < resource_count; ++g)
+            {
+                bool in_basket = false;
+                for (const seed_reading& r : rs) if (r.bg_bid[g] > 0.0) in_basket = true;
+                if (!in_basket) continue;
+                long s = 0;
+                for (int c = 0; c < x_count; ++c) s += lg_all.starved_good[g][c];
+                std::printf(" %s %.1f [", good_name(g).c_str(), s / n);
+                bool first = true;
+                for (const int c : k_proc_order)
+                    if (lg_all.starved_good[g][c] > 0)
+                    {
+                        std::printf("%s%s %.1f", first ? "" : ", ", k_x_name[c], lg_all.starved_good[g][c] / n);
+                        first = false;
+                    }
+                std::printf("]");
+            }
+            std::printf("\n");
+        }
     }
     std::printf("market_viability: G1 %.1f/70 G2 %.1f/50 G3 %.1f/70", pct(g1), pct(g2), pct(g3));
     if (g_logistics)
