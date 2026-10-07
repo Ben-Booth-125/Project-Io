@@ -32,12 +32,14 @@
 //                <cls> = export_refusal's BEST class over those sources
 //                (body/noroute/gate/costly/noroom/room) — the shelf exporter's
 //                verdict for hauling g to d
-//   grid:drained g is a grid good (power) and d's shelf held it at the start
-//                of the upkeep pass, but earlier draws (lower building ids)
-//                took it before this building's turn
-//   grid:none    g is a grid good, d's shelf held none at the pass start, and
-//                another market/pool on the body holds it: a grid good is never
-//                cargo and is drawn only at the tile's own market
+//   grid:short   power (BL-1230): the building's grid held some, but less than
+//                every open bid on it, so each got its pro-rata share
+//   grid:none    power (BL-1230): no shelf on the building's grid held any
+//                (a grid with no generation, or none listed last tick)
+//   (BL-1230: power is drawn as run_building_upkeep draws it — wired by the
+//   PROVINCE, bid on the tile's market, filled from every shelf on the grid
+//   pro rata after every building has bid. Other grid goods keep the tile-
+//   reach wire and the local shelf.)
 //   pool:<cls>   no shelf surplus elsewhere, but a pool on the body (key != d)
 //                holds g; <cls> = the owner corp's dispatcher rule for its own
 //                pools (reserved/gate/noroute/costly/room), or 'othercorp' when
@@ -110,20 +112,20 @@ enum cause : int
 const char* k_cause[k_ncause] = {
     "ceiling", "nomarket",
     "shelf:body", "shelf:noroute", "shelf:gate", "shelf:costly", "shelf:noroom", "shelf:room",
-    "grid:none at d (never cargo)", "grid:d drained by earlier draws",
+    "grid:none (its grid held none)", "grid:short (shared pro rata)",
     "pool:reserved", "pool:gate", "pool:noroute", "pool:costly", "pool:room", "pool:othercorp",
     "nospare(made, none held)", "notmade(on body)"};
 // the brief's three families
 int family(int c)
 {
     if (c == k_ceiling) return 0;                       // ceiling
-    if (c == k_nospare || c == k_notmade || c == k_nomarket) return 2; // not available on the body
+    if (c == k_nospare || c == k_notmade || c == k_nomarket || c == k_grid) return 2; // not available on the body / grid
     if (c == k_grid_drained) return 3;                  // d's own shelf too small
     return 1;                                           // made/held elsewhere, refused
 }
 const char* k_family[4] = {"ceiling (shelf held it, priced over)", "held elsewhere on body, not moved (by class)",
-                           "not on the body (none made spare / not made / no market)",
-                           "d's own shelf held some, drained by earlier draws"};
+                           "not on the body (none made spare / not made / no market) or, power, none on its grid",
+                           "power: its grid held some, short, shared pro rata"};
 
 /// A building is the probe's subject if it is a live extraction site on a tile
 /// carrying a focus deposit (co-extraction included, inflow_probe's set).
@@ -207,6 +209,9 @@ struct short_rec
     entity_id bid; int fi; std::size_t g; float need, pool, shelf, shortu; int c; float ratio;
 };
 
+/// What a grid-cleared bid still lacks: exactly 0 when the clear covered it.
+float covered_left(float open, float filled) { return filled >= open ? 0.0f : open - filled; }
+
 /// Replay run_building_upkeep's draw on the pre-upkeep copy. Returns, per focus
 /// building, (replica unmet, short goods). Mutates only the copy.
 void replay(world& W, const recipe_registry& reg, std::map<entity_id, bool>& unmet_out,
@@ -239,6 +244,10 @@ void replay(world& W, const recipe_registry& reg, std::map<entity_id, bool>& unm
     std::sort(corp_ids.begin(), corp_ids.end());
     reservation_memo memo;
 
+    // BL-1230: open power bids awaiting the grid clear (every building, focus or not).
+    struct pending { entity_id bid; int fi; std::size_t r; float need, pool, open; entity_id corp, mid; std::uint32_t grid; };
+    std::vector<pending> pend;
+
     for (const auto& [bid, corp] : owner_of)
     {
         const building_component& b = W.buildings.at(bid);
@@ -251,18 +260,24 @@ void replay(world& W, const recipe_registry& reg, std::map<entity_id, bool>& unm
         if (grid_rules) body_reach_field(W, body);
         arr need = basket[ti];
         bool any_need = true, connected = true;
+        std::uint32_t grid_id = 0;
         if (grid_rules)
         {
+            // BL-1230: power is wired by the province; other grid goods by the tile.
+            grid_id = tile_power_grid(W, b.tile);
             const float rc = tile_reach_cost(W, b.tile);
             connected = (rc >= 0.0f) && std::isfinite(rc);
-            if (!connected)
+            bool stripped = false;
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                if (!reg.grid_goods().grid(r) || !(need[r] > 0.0f)) continue;
+                const bool wired = grid_good_crosses_markets(r) ? grid_id != 0 : connected;
+                if (!wired) { need[r] = 0.0f; stripped = true; }
+            }
+            if (stripped)
             {
                 any_need = false;
-                for (std::size_t r = 0; r < resource_count; ++r)
-                {
-                    if (reg.grid_goods().grid(r)) need[r] = 0.0f;
-                    if (need[r] > 0.0f) any_need = true;
-                }
+                for (std::size_t r = 0; r < resource_count; ++r) if (need[r] > 0.0f) any_need = true;
             }
         }
         const int fi = focus_of(W, b);
@@ -290,6 +305,13 @@ void replay(world& W, const recipe_registry& reg, std::map<entity_id, bool>& unm
             float drawn = 0.0f;
             const float inv_before = m ? std::max(0.0f, m->inventory[r]) : 0.0f;
             const bool admits = m && shelf_admits(*m, r, res_mult, false);
+            const bool via_grid = grid_rules && grid_id != 0 && grid_good_crosses_markets(r);
+            if (via_grid && shortfall > 0.0f && admits)
+            {
+                // BL-1230: bid here, filled by the grid clear below.
+                pend.push_back({bid, fi, r, required, take, shortfall, corp, mid, grid_id});
+                continue;
+            }
             if (shortfall > 0.0f && admits)
             {
                 drawn = std::min(shortfall, inv_before);
@@ -304,7 +326,7 @@ void replay(world& W, const recipe_registry& reg, std::map<entity_id, bool>& unm
                 // ---- the cause --------------------------------------------
                 int c;
                 if (m == nullptr) c = k_nomarket;
-                else if (!admits && inv_before > 0.0f)
+                else if (!admits && (inv_before > 0.0f || via_grid))
                 {
                     c = k_ceiling;
                     const float ceil = m->base_price[r] * res_mult;
@@ -330,6 +352,8 @@ void replay(world& W, const recipe_registry& reg, std::map<entity_id, bool>& unm
                     }
                     if (grid)
                     {
+                        // a grid good the ruling does not name (capacity):
+                        // the tile-local draw, as before BL-1230
                         if (inv_start.at(mid)[r] > 0.0f) c = k_grid_drained;
                         else if (other_shelf || owner_pool || other_pool) c = k_grid;
                     }
@@ -390,6 +414,66 @@ void replay(world& W, const recipe_registry& reg, std::map<entity_id, bool>& unm
         }
         if (fi >= 0) unmet_out[bid] = unmet;
         (void)connected;
+    }
+
+    // ---- BL-1230: the grid clear, exactly as run_building_upkeep does it ----
+    if (!pend.empty())
+    {
+        std::map<std::uint32_t, std::vector<entity_id>> shelves_on;
+        {
+            std::vector<entity_id> mids;
+            for (const auto& kv : W.markets) mids.push_back(kv.first);
+            std::sort(mids.begin(), mids.end());
+            for (const entity_id m0 : mids)
+            {
+                const entity_id centre = W.markets.at(m0).centre_tile;
+                if (centre == null_entity) continue;
+                const std::uint32_t g = tile_power_grid(W, centre);
+                if (g != 0) shelves_on[g].push_back(m0);
+            }
+        }
+        std::map<std::uint32_t, std::vector<std::size_t>> waiting_on;
+        for (std::size_t i = 0; i < pend.size(); ++i) waiting_on[pend[i].grid].push_back(i);
+        std::vector<float> filled(pend.size(), 0.0f);
+        std::vector<char> grid_held(pend.size(), 0);
+        for (const auto& [g, idxs] : waiting_on)
+        {
+            const auto sit = shelves_on.find(g);
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                float asked = 0.0f;
+                for (const std::size_t i : idxs) if (pend[i].r == r) asked += pend[i].open;
+                if (!(asked > 0.0f) || sit == shelves_on.end()) continue;
+                float held = 0.0f;
+                for (const entity_id m0 : sit->second) held += std::max(0.0f, W.markets.at(m0).inventory[r]);
+                if (!(held > 0.0f)) continue;
+                const bool covered = held >= asked;
+                const float fill = covered ? 1.0f : held / asked;
+                const float take = covered ? asked / held : 1.0f;
+                for (const entity_id m0 : sit->second)
+                {
+                    float& inv = W.markets.at(m0).inventory[r];
+                    if (!(inv > 0.0f)) continue;
+                    inv = covered ? std::max(0.0f, inv - inv * take) : 0.0f;
+                }
+                for (const std::size_t i : idxs)
+                {
+                    if (pend[i].r != r) continue;
+                    grid_held[i] = 1;
+                    filled[i] = covered ? pend[i].open : pend[i].open * fill;
+                }
+            }
+        }
+        for (std::size_t i = 0; i < pend.size(); ++i)
+        {
+            const pending& q = pend[i];
+            const float left = covered_left(q.open, filled[i]);
+            if (q.fi < 0) continue;
+            if (left > 0.0f) unmet_out[q.bid] = true;
+            short_rec s{q.bid, q.fi, q.r, q.need, q.pool, filled[i], left, -1, 0.0f};
+            if (left > 0.0f) s.c = grid_held[i] ? k_grid_drained : k_grid;
+            shorts.push_back(s);
+        }
     }
 }
 

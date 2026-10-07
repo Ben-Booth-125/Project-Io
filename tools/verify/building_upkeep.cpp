@@ -14,6 +14,11 @@
 //   R3  rates are per type and ERA-BANDED, and every rate is authorable at 0.0 —
 //       a zero entry skipped exactly as an absent one, so the shape lands inert
 //       (the BL-454 precedent).
+//   R11 BL-1230 (power crosses markets): the province is the grid's cell — a
+//       wired province draws across markets, billed at its own market; a strait
+//       joins; a dark province strikes power; a short grid is shared pro rata;
+//       power's price pools per grid, capacity's does not; a road write
+//       invalidates the grid.
 //   R6  determinism with rates ON: two identical runs produce identical pools and
 //       identical supply factors, and no unordered container decides an outcome.
 //
@@ -28,7 +33,9 @@
 //   .\build_gen\verify\building_upkeep.exe
 
 #include "world/components.hpp"
+#include "world/construction.hpp"
 #include "world/economy_system.hpp"
+#include "world/logistics.hpp"
 #include "world/market_clearing.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
@@ -919,6 +926,236 @@ void r10_a_shelf_draw_pays_the_posted_price()
     }
 }
 
+// ---------------------------------------------------------------------------
+// R11 — BL-1230 (power crosses markets): THE PROVINCE IS THE GRID'S CELL
+// ---------------------------------------------------------------------------
+// LOGISTICS.md § 3a (Ben, 2026-10-07). A one-row body of `n` tiles, two
+// provinces (tiles [0, split) and [split, n)), two markets with centres at the
+// two ends — so tiles left of the middle route to M1 and right of it to M2. A
+// road mask wires provinces; a water mask makes a strait. Buildings stand on
+// the tiles named, owned by one corp.
+struct grid_fixture
+{
+    world     w;
+    entity_id body = null_entity;
+    entity_id corp = null_entity;
+    entity_id m1 = null_entity, m2 = null_entity;
+    std::vector<entity_id> tiles;
+    std::vector<entity_id> buildings;
+
+    void build(int n, int split, const std::string& road, const std::string& water,
+               const std::vector<int>& at, float base = 1.0f, float p1 = 1.0f, float p2 = 1.5f)
+    {
+        body = w.create_entity();
+        w.bodies[body] = body_component{};
+        w.bodies[body].name        = "Wire";
+        w.bodies[body].grid_width  = n;
+        w.bodies[body].grid_height = 1;
+        for (int x = 0; x < n; ++x)
+        {
+            const entity_id t = w.create_entity();
+            tile_component tc{};
+            tc.body       = body;
+            tc.grid_x     = x;
+            tc.grid_y     = 0;
+            tc.substrate  = (water[static_cast<std::size_t>(x)] == 'w') ? terrain_substrate::coast
+                                                                        : terrain_substrate::sedimentary;
+            tc.road_level = (road[static_cast<std::size_t>(x)] == 'r') ? 1 : 0;
+            w.tiles[t] = tc;
+            tiles.push_back(t);
+        }
+        // The partition: ascending ids, each id its lowest tile (province.hpp).
+        province a, b;
+        a.body = b.body = body;
+        for (int x = 0; x < n; ++x)
+            (x < split ? a : b).tiles.push_back(tiles[static_cast<std::size_t>(x)]);
+        a.id = static_cast<std::uint32_t>(a.tiles.front());
+        b.id = static_cast<std::uint32_t>(b.tiles.front());
+        w.provinces.provinces = { a, b };
+        for (const province& p : w.provinces.provinces)
+            for (const entity_id t : p.tiles)
+                w.provinces.tile_province[t] = p.id;
+
+        corp = w.create_entity();
+        corporation_component cc;
+        cc.name = "Wire Holdings";
+        cc.starting_capital = 1000.0f;
+        cc.balance = 1000.0f;
+        cc.is_player = true;
+        for (const int x : at)
+        {
+            const entity_id bid = w.create_entity();
+            building_component bc{};
+            bc.tile = tiles[static_cast<std::size_t>(x)];
+            bc.type = building_type::extraction_site;
+            bc.workforce_assigned = 0.5f;
+            w.buildings[bid] = bc;
+            buildings.push_back(bid);
+            cc.assets.push_back(bid);
+        }
+        w.corporations[corp] = cc;
+
+        auto market = [&](entity_id centre, float price) {
+            const entity_id mid = w.create_entity();
+            market_component mc{};
+            mc.body = body;
+            mc.centre_tile = centre;
+            mc.base_price[ri(resource_type::power)] = base;
+            mc.price[ri(resource_type::power)]      = price;
+            mc.base_price[ri(resource_type::construction_capacity)] = base;
+            mc.price[ri(resource_type::construction_capacity)]      = price;
+            w.markets[mid] = mc;
+            return mid;
+        };
+        m1 = market(tiles.front(), p1);
+        m2 = market(tiles.back(), p2);
+    }
+
+    std::uint32_t grid_at(int x) { return tile_power_grid(w, tiles[static_cast<std::size_t>(x)]); }
+    float& shelf(entity_id mid, resource_type r = resource_type::power) { return w.markets.at(mid).inventory[ri(r)]; }
+};
+
+recipe_registry power_registry(float need)
+{
+    recipe_registry reg = registry_with_reservation(resource_type::power, need, k_shipped_reservation);
+    grid_goods_params g;
+    g.is_grid[ri(resource_type::power)] = true;
+    g.is_grid[ri(resource_type::construction_capacity)] = true;
+    reg.set_grid_goods(g);
+    return reg;
+}
+
+void r11_the_province_is_the_grid_cell()
+{
+    std::printf("\n--- R11  BL-1230: a wired province draws power from any shelf on its grid ---\n");
+    constexpr float need = 0.4f;
+
+    // --- R11a: across markets, billed at the BUYER's market ------------------
+    {
+        grid_fixture f;
+        f.build(6, 3, "rrrrrr", "......", { 4 });
+        check(market_for_tile(f.w, f.tiles[4]) == f.m2, "R11a fixture: the building's tile routes to M2");
+        check(f.grid_at(0) != 0 && f.grid_at(0) == f.grid_at(5), "R11a two road-joined provinces are one grid");
+        f.shelf(f.m1) = 10.0f; // all the power is on M1's shelf; M2's is empty
+        recipe_registry reg = power_registry(need);
+        economy_report rep;
+        const building_upkeep_tick t = run_building_upkeep(f.w, reg, rep);
+        check(t.unmet == 0, "R11a a building in M2's catchment is met from M1's shelf");
+        check(f.w.buildings.at(f.buildings[0]).supply_factor_permille == 1000, "R11a ... and does not weaken");
+        check_near(f.shelf(f.m1), 10.0f - need, "R11a M1's shelf gave up exactly the draw");
+        const auto pit = rep.purchases.find({ f.corp, f.m2 });
+        check_near(pit == rep.purchases.end() ? 0.0f : pit->second[ri(resource_type::power)], need,
+                   "R11a the fill is booked to the buyer's OWN market (corp, M2)");
+        const auto flows = clear_markets(f.w, reg, rep);
+        const auto fit = flows.find(f.corp);
+        check_near(fit == flows.end() ? 0.0f : fit->second.expenditure, need * 1.5f,
+                   "R11a billed at M2's posted price (1.5), not M1's (1.0)");
+    }
+
+    // --- R11b: a strait joins; a wider water run does not ---------------------
+    {
+        grid_fixture f;
+        f.build(8, 3, "rr..rr..", "..ww....", {});
+        check(f.grid_at(1) != 0 && f.grid_at(1) == f.grid_at(4),
+              "R11b roads either side of a 2-tile strait (kMaxCrossingTiles) are one grid");
+        grid_fixture g;
+        g.build(9, 3, "rr...rr..", "..www....", {});
+        check(g.grid_at(1) != 0 && g.grid_at(5) != 0 && g.grid_at(1) != g.grid_at(5),
+              "R11b ... a 3-tile water run is open water: two grids");
+    }
+
+    // --- R11c: a dark province strikes power ---------------------------------
+    {
+        grid_fixture f;
+        f.build(6, 3, "rrr...", "......", { 4 });
+        check(f.grid_at(4) == 0, "R11c a province with no road is dark");
+        f.shelf(f.m1) = 10.0f;
+        recipe_registry reg = power_registry(need);
+        economy_report rep;
+        for (int i = 0; i < 5; ++i)
+            run_building_upkeep(f.w, reg, rep);
+        check(f.w.buildings.at(f.buildings[0]).supply_factor_permille == 1000,
+              "R11c a building in a dark province does not weaken for power it cannot receive (NR-782 b)");
+        check_near(f.shelf(f.m1), 10.0f, "R11c ... and draws nothing off the grid's shelf");
+    }
+
+    // --- R11c2: an ISOLATED road wires a province onto a grid with no shelf ----
+    // Recorded, not endorsed (review round 1, item 4): wired, it bids and decays;
+    // dark, it would not.
+    {
+        grid_fixture f;
+        f.build(6, 3, "rr..r.", "......", { 4 });
+        check(f.grid_at(4) != 0 && f.grid_at(4) != f.grid_at(0), "R11c2 an isolated road is a grid of its own");
+        f.shelf(f.m1) = 10.0f;
+        recipe_registry reg = power_registry(need);
+        economy_report rep;
+        run_building_upkeep(f.w, reg, rep);
+        check(f.w.buildings.at(f.buildings[0]).supply_factor_permille == 950,
+              "R11c2 ... with nothing on it, the wired building goes short (worse off than dark)");
+    }
+
+    // --- R11d: a short grid is shared PRO RATA --------------------------------
+    {
+        grid_fixture f;
+        f.build(6, 3, "rrrrrr", "......", { 4, 5 });
+        f.shelf(f.m1) = need; // enough for one of the two
+        recipe_registry reg = power_registry(need);
+        economy_report rep;
+        const building_upkeep_tick t = run_building_upkeep(f.w, reg, rep);
+        check(t.unmet == 2, "R11d both buildings on a half-covered grid are short (no id decides)");
+        check_near(rep.purchases[{ f.corp, f.m2 }][ri(resource_type::power)], need,
+                   "R11d the whole shelf is drawn (half each)");
+        check_near(f.shelf(f.m1), 0.0f, "R11d ... leaving the grid's shelf empty");
+    }
+
+    // --- R11e: the pooled price converges per market; capacity stays local ----
+    {
+        auto run = [&](resource_type good, float& p1, float& p2) {
+            grid_fixture f;
+            f.build(6, 3, "rrrrrr", "......", {}, 1.0f, 1.0f, 5.0f);
+            // A city at each centre anchors the reach field, so M1 may LIST
+            // power at all (the BL-708 listing gate, unchanged).
+            f.w.population_centre_tile[f.w.create_entity()] = f.tiles.front();
+            f.w.population_centre_tile[f.w.create_entity()] = f.tiles.back();
+            const entity_id seller = f.w.create_entity();
+            corporation_component sc;
+            sc.name = "Generator Co";
+            f.w.corporations[seller] = sc;
+            recipe_registry reg = power_registry(need);
+            for (int i = 0; i < 60; ++i)
+            {
+                f.w.pool_at(seller, f.m1).quantities[ri(good)] = 10.0f; // M1 lists 10
+                economy_report rep;
+                rep.wants[{ f.corp, f.m2 }][ri(good)] = 10.0f;         // M2 wants 10
+                clear_markets(f.w, reg, rep);
+            }
+            p1 = f.w.markets.at(f.m1).price[ri(good)];
+            p2 = f.w.markets.at(f.m2).price[ri(good)];
+        };
+        float p1 = 0, p2 = 0;
+        run(resource_type::power, p1, p2);
+        std::printf("      power: M1 %.3f  M2 %.3f\n", p1, p2);
+        check(std::fabs(p1 - p2) < 0.02f && p2 < 2.0f,
+              "R11e POWER: each market's price converges on the grid's (supply 10 / demand 10 across two markets)");
+        run(resource_type::construction_capacity, p1, p2);
+        std::printf("      capacity: M1 %.3f  M2 %.3f\n", p1, p2);
+        check(p1 < 0.5f && p2 > 5.0f,
+              "R11e CAPACITY (a grid good the ruling does not name) still prices on its own market");
+    }
+
+    // --- R11f: a road write invalidates the grid ------------------------------
+    {
+        grid_fixture f;
+        f.build(6, 3, "rrr...", "......", {});
+        check(f.grid_at(4) == 0, "R11f before: the second province is dark");
+        recipe_registry reg;
+        const construction_result res = place_road(f.w, reg, f.corp, f.tiles[3], 1);
+        check(res == construction_result::placed, "R11f place_road placed a Track on the second province's edge");
+        check(f.grid_at(4) != 0 && f.grid_at(4) == f.grid_at(0),
+              "R11f after: the cached grid was invalidated and the province joined the first's grid");
+    }
+}
+
 int main()
 {
     std::printf("building_upkeep — BL-641, requirement group `building-upkeep-goods` R1-R3, R6;\n");
@@ -935,6 +1172,7 @@ int main()
     r8_the_floor();
     r9_no_wire_no_draw();
     r10_a_shelf_draw_pays_the_posted_price();
+    r11_the_province_is_the_grid_cell();
 
     std::printf("\n%s — %d failure(s)\n", g_failures == 0 ? "PASS" : "FAIL", g_failures);
     return g_failures == 0 ? 0 : 1;
