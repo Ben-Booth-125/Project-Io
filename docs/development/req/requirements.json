@@ -6720,7 +6720,7 @@
    "evaluated_difficulty": null,
    "status": "in-flight",
    "promoted_from": "backlog.json BL-1222 - sprint 50 (Ben's cut form and lens form, 2026-10-07)",
-   "batch": "sprint-50",
+   "batch": "sprint-51",
    "resolved": null,
    "resolution": null,
    "rows": [
@@ -6746,12 +6746,12 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "deferred",
      "verification": [
       "live click: Ben cycles to the lens in the built app and hovers an arrow and a marker"
      ],
      "requirement": "The lens is reachable by the keyboard lens-cycle; hovering an arrow shows good, units and landed price; hovering a marker lists the classes by good.",
-     "notes": "Owed: Ben's live click.",
+     "notes": "Ben, 2026-10-07 live walk: could not find what he was looking for; moved to sprint 51 with BL-1222.",
      "result_metric": ""
     },
     {

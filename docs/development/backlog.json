@@ -1341,7 +1341,7 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": 50,
+   "sprint": 51,
    "written": "2026-10-07",
    "requires": [],
    "blocked_on": null,
@@ -1361,7 +1361,7 @@
     "docs/ui/question_log.json",
     "docs/ai/ACTIONS.json"
    ],
-   "design": "SETTLED (Ben, 2026-10-07, the lens form): a PLAYER lens over the player's own flows only; the whole-world diagnosis stays headless (BL-1223, gate logistics row). Refusals: a marker per short market coloured by the best class over the player's sources, hover lists classes by good. Design in docs/ui/LENSES.md § Trade-flow lens. WORK: the dispatcher records the player corporation's shipments and best class per (good, destination market) each pass as a transient output the simulation never reads and the save never holds; the `trade_flow` overlay_mode at the enum's end; the Planetary arrows, markers, hover and class key; the question_log entry; the ACTIONS entry for the lens cycle if it changes. Before mint: Ben's cut form 2026-10-07 set DIAGNOSTIC scope (player polish in sprint 51)."
+   "design": "MOVED (Ben, 2026-10-07, the live walk): sprint 50 -> 51. Built and merged on worktree-sprint-50 (3306c300; R1, R2, R4 complete), but at the live click Ben \"couldn't find what I am looking for in the trade-flow lens\" - saved for sprint 51's visibility pass, which asks first what the player is looking for. SETTLED (Ben, 2026-10-07, the lens form): a PLAYER lens over the player's own flows only; the whole-world diagnosis stays headless (BL-1223, gate logistics row). Refusals: a marker per short market coloured by the best class over the player's sources, hover lists classes by good. Design in docs/ui/LENSES.md § Trade-flow lens. WORK: the dispatcher records the player corporation's shipments and best class per (good, destination market) each pass as a transient output the simulation never reads and the save never holds; the `trade_flow` overlay_mode at the enum's end; the Planetary arrows, markers, hover and class key; the question_log entry; the ACTIONS entry for the lens cycle if it changes. Before mint: Ben's cut form 2026-10-07 set DIAGNOSTIC scope (player polish in sprint 51)."
   },
   {
    "status": "proposed",
@@ -1408,8 +1408,8 @@
    "design": "Found by the BL-1222 (trade-flow lens) verify script (2026-10-07): a re-seated corporation's first dispatch pass committed a shipment of ~5e-08 units per tick - a convoy that pays its haul and LP for nothing. MEASURE first: how many committed convoys per tick carry under a small threshold (e.g. 0.01 u, or under one batch of the destination's need) on the 16 seeds, and what they cost. Then a minimum cargo rule in dispatch_convoys, if the count is non-trivial. Read the sizing in the BL-995 net-price rule (supply_system.hpp) before choosing the threshold."
   },
   {
-   "status": "designed",
-   "glyph": "✓",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 50,
    "written": "2026-10-07",
    "requires": [],
@@ -1430,7 +1430,7 @@
     "docs/ui/ICONS.md",
     "docs/ai/ACTIONS.json"
    ],
-   "design": "SETTLED (Ben, 2026-10-07): every built lens sits in at least one rung row of the strip and carries its OWN glyph - none borrows another lens's mark, none is keyboard-only (LENSES.md § The strip rotates with the rung). The check (2026-10-07, overlay.cpp): Trade flow is on no strip and borrows supply; Company is on the Planetary strip borrowing the corporation mark beside Corporation; Supply-routes is on the Solar strip borrowing supply beside Supply; Reach is on the Solar strip borrowing the convoy chevron. WORK: four new glyphs in src/ui/icons.* under the (dl, centre, r, colour) contract, catalogued in ICONS.md; Trade flow added to planetary_modes; ACTIONS entries for the strip presses; captures of all three rung strips. NOTE: the LENSES.md roster lists a `culture` lens with no overlay_mode in code - a doc/code mismatch to raise, not this item's work."
+   "design": "COMPLETE (Ben, 2026-10-07, the live walk: \"I like these glyphs\"). Merged 75367957. SETTLED (Ben, 2026-10-07): every built lens sits in at least one rung row of the strip and carries its OWN glyph - none borrows another lens's mark, none is keyboard-only (LENSES.md § The strip rotates with the rung). The check (2026-10-07, overlay.cpp): Trade flow is on no strip and borrows supply; Company is on the Planetary strip borrowing the corporation mark beside Corporation; Supply-routes is on the Solar strip borrowing supply beside Supply; Reach is on the Solar strip borrowing the convoy chevron. WORK: four new glyphs in src/ui/icons.* under the (dl, centre, r, colour) contract, catalogued in ICONS.md; Trade flow added to planetary_modes; ACTIONS entries for the strip presses; captures of all three rung strips. NOTE: the LENSES.md roster lists a `culture` lens with no overlay_mode in code - a doc/code mismatch to raise, not this item's work."
   },
   {
    "status": "designed",

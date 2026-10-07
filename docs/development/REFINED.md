@@ -29,7 +29,7 @@ own flows only; LENSES.md § Trade-flow lens. Lane: `supply_system.*` (a transie
   never read by the sim, never saved; world bit-identical (R1).
 - [x] L2 `trade_flow` overlay: arrows, markers, hover, class and width keys (R2, R3).
 - [x] L3 question_log entry; ACTIONS entry if the cycle changed (R4).
-- [ ] L4 Main session: capture, then Ben's live click.
+- [x] L4 Ben's live walk 2026-10-07: glyphs liked (BL-1225 complete); lens did not show him what he looks for - BL-1222 moved to sprint 51. Roads: keep the current schema (Ben).
 
 ### Wave 1 — BL-1217 (inputs reach processors), the ceiling lock
 
