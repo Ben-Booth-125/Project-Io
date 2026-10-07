@@ -1406,6 +1406,31 @@
     "src/world/supply_system.cpp"
    ],
    "design": "Found by the BL-1222 (trade-flow lens) verify script (2026-10-07): a re-seated corporation's first dispatch pass committed a shipment of ~5e-08 units per tick - a convoy that pays its haul and LP for nothing. MEASURE first: how many committed convoys per tick carry under a small threshold (e.g. 0.01 u, or under one batch of the destination's need) on the 16 seeds, and what they cost. Then a minimum cargo rule in dispatch_convoys, if the count is non-trivial. Read the sizing in the BL-995 net-price rule (supply_system.hpp) before choosing the threshold."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 50,
+   "written": "2026-10-07",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1225",
+   "short_name": "EVERY_LENS_ON_STRIP",
+   "author": "Ben (2026-10-07: \"we need a glyph below the minimap for every lens\"); filed by Claude",
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 2,
+   "title": "Every lens has its own glyph on the minimap strip",
+   "authority_doc": "docs/ui/LENSES.md",
+   "files": [
+    "src/ui/icons.hpp",
+    "src/ui/icons.cpp",
+    "src/ui/overlay.cpp",
+    "docs/ui/ICONS.md",
+    "docs/ai/ACTIONS.json"
+   ],
+   "design": "SETTLED (Ben, 2026-10-07): every built lens sits in at least one rung row of the strip and carries its OWN glyph - none borrows another lens's mark, none is keyboard-only (LENSES.md § The strip rotates with the rung). The check (2026-10-07, overlay.cpp): Trade flow is on no strip and borrows supply; Company is on the Planetary strip borrowing the corporation mark beside Corporation; Supply-routes is on the Solar strip borrowing supply beside Supply; Reach is on the Solar strip borrowing the convoy chevron. WORK: four new glyphs in src/ui/icons.* under the (dl, centre, r, colour) contract, catalogued in ICONS.md; Trade flow added to planetary_modes; ACTIONS entries for the strip presses; captures of all three rung strips. NOTE: the LENSES.md roster lists a `culture` lens with no overlay_mode in code - a doc/code mismatch to raise, not this item's work."
   }
  ]
 }
