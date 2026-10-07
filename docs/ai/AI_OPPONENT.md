@@ -454,6 +454,14 @@ the scorer stacked up to 85 sites on one tile, the deep ones earning about a ten
 cost, and the loss reflex then idled them. This corrects a wrong estimate inside the existing
 scorer grant (§ 11); it adds no behaviour.
 
+**A power-plant candidate is priced against its grid's shortfall (Ben, 2026-10-07; BL-1232, power
+plants per grid).** Power moves only within its grid (`../economy/LOGISTICS.md` § 3a), so the
+estimate reads the grid's need less its live output **and less the output of plants already under
+construction on it**, and places nothing where that is not short. Blind to its own siblings under
+construction, the settle scorer started 11–13 plants on a grid needing one, most of which stalled
+and were decommissioned. Like the stack rank above, this is a corrected estimate inside the
+existing scorer grant (§ 11), not a new behaviour.
+
 **The processing-facility candidate** (BL-439, AI builds processors) runs on the same score curve
 and the same solvency, glut and reserve-floor gates as the extraction candidate, and differs only
 where a processor genuinely differs from a mine:

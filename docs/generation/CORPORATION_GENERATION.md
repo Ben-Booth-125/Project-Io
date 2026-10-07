@@ -293,6 +293,17 @@ not a broad presence across the nation.
   as idle plant. The reason is legibility: an idle building the player inherits reads as a
   broken economy, where an absent chain reads as a world that lacks it. BL-1185
   (chain-feasible placement) owns the work.
+- **Sized to its inputs — a processor needs SPARE reachable supply (Ben, 2026-10-07; BL-1233,
+  processors to inputs).** A producer within reach is necessary, not sufficient: every pass (the
+  charter web, Pass 6, the specialists, the seat's kit) places a processor only where the **spare**
+  reachable output of each of its inputs covers its draw at `t_idle` — a fifth of a full run.
+  Spare is the producers' output in reach less the draw of every processor already standing
+  there, judged at the labour a new plant is judged at, the same test the play-time scorer uses
+  (`recipe_inputs_obtainable` with its supply clause). A good that fails is passed over at that
+  centre and retried once a firm producing its input is chartered, by the same retry the
+  chain-feasible rule uses. Measured before the rule: one rare-earth site yields about 6 units a
+  tick against a REE alloy plant's 32, and the charter web placed about one site per plant, so
+  bodies made 19–62% of the raw ore their processors wanted.
   - **Within reach, exactly — the dispatcher's own gate, with the destination short** (refined
     2026-10-05). The producer's market is the processor's market, or both of these hold for the
     pair: `price_market_export_leg(producer market, processor market)` is viable, and

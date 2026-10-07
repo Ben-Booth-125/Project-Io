@@ -645,6 +645,16 @@ So power is:
   into a full store is producing nothing anyone will ever buy — a real decision rather than an
   accounting detail.
 
+**Generation is sized per grid, not per body (Ben, 2026-10-07; BL-1232, power plants per grid).**
+Power moves only within a grid (`LOGISTICS.md` § 3a), so the world's generation is measured where
+it can be used: a body's power gap is the sum over its wired grids of `max(0, need − live output)`,
+and a power firm is placed in a short grid's provinces. A surplus on the core grid never cancels a
+deficit on another. A grid needing less than half of one plant's output is left to a road that
+joins it to a bigger one rather than given a plant of its own. The scorer's power-plant estimate
+reads the same per-grid gap, and counts plants already under construction on that grid as supply
+(`../ai/AI_OPPONENT.md`). Measured before: generation put every plant on the body's core grid on
+four of five seeds, and the settle then started 11–13 plants on a grid needing one.
+
 **Generation is a business, not a cost centre.** Background firms build power plants and run them at
 a profit, which is the point: it gives the world a firm type with a reason to exist, and it means
 power supply is induced by price the way every other good's is.
