@@ -60,3 +60,38 @@ verify.command("zoom_in")
 verify.command("zoom_in")
 verify.frames(2)
 verify.capture("trade_flow_lens_zoom")
+
+-- The lens drew something for the seated corporation before the seat moves —
+-- otherwise the "nothing after a seat change" row below would prove nothing.
+do
+    local a, m, p = verify.trade_flow_counts()
+    print(string.format("[trade_flow_lens] seat %d: arrows %d markers %d passes %d", firm, a, m, p))
+    verify.expect(p > 0 and (a + m) > 0, "the held corporation's passes draw (" .. p .. " passes)")
+end
+
+-- SEAT CHANGE (review round 1). The window still holds the corporation left
+-- behind, now a rival; the lens must draw none of it until the newly held
+-- corporation's first dispatcher pass.
+local other = verify.seat_candidate(1)
+if other == firm then other = verify.seat_candidate(2) end
+local r2 = verify.take_seat(other)
+print("[trade_flow_lens] reseat " .. tostring(other) .. " -> " .. tostring(r2))
+verify.expect(r2 == "applied", "the second seat applies")
+verify.goto_surface("home")
+verify.set_overlay("trade_flow")
+verify.frames(2)
+do
+    local a, m, p = verify.trade_flow_counts()
+    verify.expect(a == 0 and m == 0 and p == 0,
+                  string.format("after a seat change the lens draws nothing (arrows %d markers %d passes %d)", a, m, p))
+end
+verify.capture("trade_flow_lens_reseat_empty")
+
+verify.econ_step(1)
+verify.frames(2)
+do
+    local a, m, p = verify.trade_flow_counts()
+    print(string.format("[trade_flow_lens] after one pass for %d: arrows %d markers %d passes %d", other, a, m, p))
+    verify.expect(p == 1, "the new corporation's first pass is the only one the lens reads (" .. p .. ")")
+end
+verify.capture("trade_flow_lens_reseat_first_pass")

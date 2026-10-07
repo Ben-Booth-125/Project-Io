@@ -401,6 +401,14 @@ struct ui_state
     /// player opens it. One flag serves every legend: they are mutually
     /// exclusive by construction (a lens draws at most one).
     bool lens_key_open = false;
+    /// BL-1222: what the Trade-flow lens drew last frame — its arrows, its refusal
+    /// markers, and how many dispatcher passes of the HELD corporation it read.
+    /// Written by the Planetary canvas every frame (zero under any other lens);
+    /// read only by the verify API, so a script can assert a seat change shows
+    /// nothing of the corporation left behind.
+    int trade_flow_arrows  = 0;
+    int trade_flow_markers = 0;
+    int trade_flow_passes  = 0;
     /// Which section of the tile Selection accordion stands OPEN: 0 Buildings,
     /// 1 Deposits, 2 Resources, 3 Population, 4 Terrain — or -1 for none open
     /// (BL-598, Ben 2026-08-24). One section at a time: the band is a fixed

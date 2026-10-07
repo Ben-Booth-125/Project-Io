@@ -1472,6 +1472,7 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
     // query); no branch the dispatcher takes reads it. Rolled into the world's
     // trailing window at the end of the pass.
     trade_flow_pass tf;
+    tf.corp = w.player_entity;
     const auto tf_note = [&tf](entity_id dest, std::size_t ri, trade_refusal cls) {
         const auto key = std::make_pair(dest, static_cast<std::uint16_t>(ri));
         const auto it  = tf.best.find(key);
@@ -1630,8 +1631,15 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                         qty = std::min(qty, pool_qty - launch_draw[ri]);
                     if (!(qty > 0.0f) || !std::isfinite(qty))
                     {
+                        // BL-1222: the propellant clamp is the source's own limit
+                        // and ranks below the destination's room, so it is named
+                        // whenever it zeroes the send, room or none.
                         if (tf_rec)
-                            tf_note(c.dest, ri, trade_refusal::no_room);
+                            tf_note(c.dest, ri,
+                                    (c.space && launch_draw[ri] > 0.0f
+                                     && !(pool_qty - launch_draw[ri] > 0.0f))
+                                        ? trade_refusal::no_propellant
+                                        : trade_refusal::no_room);
                         continue;
                     }
 
@@ -1678,10 +1686,12 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                     {
                         if (refused_no_lp)
                             ++out.refused_no_lp;
-                        // Refused at commit (the LP cap, or solvency): the rule
-                        // would have sent.
+                        // Refused at commit: the LP cap (`room`, held back), or
+                        // otherwise solvency — with a viable leg and a known
+                        // corp, commit_convoy's only other refusal.
                         if (tf_rec)
-                            tf_note(c.dest, ri, trade_refusal::room);
+                            tf_note(c.dest, ri, refused_no_lp ? trade_refusal::room
+                                                              : trade_refusal::no_funds);
                     }
                     break; // one destination per (pool, good) per pass
                 }
@@ -1690,13 +1700,21 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                 // They cleared the margin; whether they had room is one extra
                 // `dispatch_room` read each — a pure query (its memo is a cache
                 // of values this pass never changes), paid for the player only,
-                // and only for a short destination.
+                // and only for a short destination. The propellant clamp is read
+                // as the loop above reads it; solvency is not knowable without
+                // committing, so an unreached candidate is never `no funds`.
                 if (tf_player)
                     for (std::size_t k = tf_tried; k < cands.size(); ++k)
                     {
                         const candidate& c = cands[k];
                         if (!tf_short(c.dest, ri))
                             continue;
+                        if (c.space && launch_draw[ri] > 0.0f
+                            && !(pool_qty - launch_draw[ri] > 0.0f))
+                        {
+                            tf_note(c.dest, ri, trade_refusal::no_propellant);
+                            continue;
+                        }
                         const float room = dispatch_room(w, reg, c.dest, ri, price_src + c.haul,
                                                          corp_ids, memo);
                         tf_note(c.dest, ri,

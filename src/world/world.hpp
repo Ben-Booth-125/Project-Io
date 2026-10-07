@@ -48,7 +48,9 @@ enum class trade_refusal : std::uint8_t
     gate,        ///< The destination's price does not clear the margin over the source's.
     no_route,    ///< Same body, and no viable leg reaches it.
     costly,      ///< Routed, but the haul eats the margin.
+    no_propellant, ///< A space lane, but the pool cannot fuel the launch.
     no_room,     ///< Clears the margin, but cannot absorb more at the landed cost.
+    no_funds,    ///< The rule would send, but the corporation cannot pay for the convoy.
     room,        ///< The rule would send; held by one-destination-per-pass or the LP cap.
     sent,        ///< Shipped this pass.
 };
@@ -68,6 +70,10 @@ struct trade_flow_shipment
 /// of the good (last clear's demand above its supply).
 struct trade_flow_pass
 {
+    /// The corporation this pass was taken for (the player at the time). The lens
+    /// draws only passes whose corp is the one the player holds NOW, so a seat
+    /// change never shows the corporation left behind (LENSES.md § Trade-flow lens).
+    entity_id corp = null_entity;
     std::vector<trade_flow_shipment> shipments;
     std::map<std::pair<entity_id, std::uint16_t>, trade_refusal> best;
 };
@@ -490,7 +496,9 @@ struct world
     /// and nothing in `world/*` reads it. TRANSIENT: never saved, never folded
     /// into a state hash, so a loaded game shows the lens from its first pass on.
     /// Newest pass at the back; at most `trade_flow_window` passes are kept, the
-    /// trailing window the lens sizes its arrows over.
+    /// trailing window the lens sizes its arrows over. Each pass carries the corp
+    /// it was taken for; nothing clears the window on a seat change, so the lens
+    /// filters on `trade_flow_pass::corp == player_entity`.
     std::vector<trade_flow_pass> player_trade_flow;
     static constexpr std::size_t trade_flow_window = 4;
 

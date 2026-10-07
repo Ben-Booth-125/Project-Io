@@ -2927,6 +2927,14 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return std::string{overlay_script_name(m_ui.overlay)};
     });
 
+    // BL-1222: what the Trade-flow lens drew on the last Planetary frame — arrows,
+    // refusal markers, and the held corporation's passes it read — so a script
+    // can assert the lens shows nothing of a corporation the player left.
+    v.set_function("trade_flow_counts", [this]() {
+        return std::make_tuple(m_ui.trade_flow_arrows, m_ui.trade_flow_markers,
+                               m_ui.trade_flow_passes);
+    });
+
     // Drill one row into the expanded Corporation-dashboard roll-up (BL-248), or
     // -1 to return to the roll-up itself.
     v.set_function("rollup_drill", [this](int row) { m_ui.corp_rollup_drill = row; });

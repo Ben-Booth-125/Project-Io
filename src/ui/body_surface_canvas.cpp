@@ -1348,12 +1348,19 @@ void draw_supply_routes_key(const world& w, const std::vector<supply_edge>& edge
 }
 
 /// --- Trade-flow lens (BL-1222; LENSES.md § Trade-flow lens) -------------------
-/// The refusal classes' on-screen names, indexed by `trade_refusal` up to `room`.
-/// They match the market-viability skill's logistics row, so a lens read and a
-/// headless read use one vocabulary.
-constexpr const char* k_trade_refusal_name[6] = {
-    "no lane", "price gate", "no route", "costly", "no room", "room",
+/// The refusal classes' on-screen names, indexed by `trade_refusal` up to `room`:
+/// the CORPORATION dispatcher's rules, worst first (LENSES.md § Trade-flow lens).
+/// The market-viability skill's logistics row classifies MARKET SHELF exports, a
+/// different dispatcher with its own order and its own labels; these are not those.
+constexpr int k_trade_refusal_count = 8;
+constexpr const char* k_trade_refusal_name[k_trade_refusal_count] = {
+    "no lane", "price gate", "no route", "costly",
+    "no propellant", "no room", "no funds", "room",
 };
+static_assert(static_cast<int>(trade_refusal::room) + 1 == k_trade_refusal_count,
+              "one name per refusal class");
+static_assert(std::size(palette::trade_refusal_colour) == k_trade_refusal_count,
+              "one colour per refusal class");
 
 /// Arrow stroke width for a flow of @p rate units/tick against the body's
 /// heaviest flow @p max_rate: 1.5 px for a trickle, 7 px at the heaviest.
@@ -1374,7 +1381,8 @@ void draw_trade_flow_key(ImDrawList* dl, const ui_state& state, float max_rate, 
     const float row_h  = line_h + 2.0f;
     const float sw     = 10.0f;
 
-    const float body_h = pad + line_h + 4.0f + line_h + 2.0f + 6.0f * row_h + 6.0f
+    const float body_h = pad + line_h + 4.0f + line_h + 2.0f
+                       + static_cast<float>(k_trade_refusal_count) * row_h + 6.0f
                        + line_h + 2.0f + 3.0f * row_h + pad;
     float x, y, inner_w;
     begin_lens_key(dl, state, body_h, pad, x, y, inner_w);
@@ -1387,7 +1395,7 @@ void draw_trade_flow_key(ImDrawList* dl, const ui_state& state, float max_rate, 
     std::snprintf(buf, sizeof buf, "Not sent, best reason (%d)", markers);
     dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), buf); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 2.0f;
-    for (int i = 0; i < 6; ++i)
+    for (int i = 0; i < k_trade_refusal_count; ++i)
     {
         const ImVec2 c{ x + sw * 0.5f + 1.0f, y + line_h * 0.5f };
         dl->AddCircleFilled(c, sw * 0.5f + 1.5f, IM_COL32(10, 12, 18, 230), 12);
@@ -1407,7 +1415,7 @@ void draw_trade_flow_key(ImDrawList* dl, const ui_state& state, float max_rate, 
         const float ly  = y + line_h * 0.5f;
         dl->AddLine({x, ly}, {x + 36.0f, ly}, palette::trade_flow_arrow, wpx);
         if (max_rate > 0.0f)
-            std::snprintf(buf, sizeof buf, "%.1f", f * max_rate);
+            std::snprintf(buf, sizeof buf, "%.3g", f * max_rate); // 3 significant: a trickle reads, not 0.0
         else
             std::snprintf(buf, sizeof buf, "%s", "no shipments");
         dl->AddText({x + 44.0f, y}, IM_COL32(220, 220, 228, 255), buf); // fit-exempt: legend box sized to its measured entries (container 2)
@@ -4783,7 +4791,16 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     float                  tf_max_rate = 0.0f;
     int                    tf_hover_arrow  = -1;
     int                    tf_hover_marker = -1;
-    if (state.overlay == overlay_mode::trade_flow && !w.player_trade_flow.empty())
+    // THE HELD CORPORATION'S PASSES ONLY. Each pass is tagged with the corp it was
+    // taken for; after a seat change the window still holds the corporation left
+    // behind (now a rival), and drawing it would show that rival's flows as the
+    // player's. So the lens reads nothing until the held corp's first pass.
+    std::vector<const trade_flow_pass*> tf_passes;
+    if (state.overlay == overlay_mode::trade_flow)
+        for (const trade_flow_pass& p : w.player_trade_flow)
+            if (p.corp == w.player_entity && p.corp != null_entity)
+                tf_passes.push_back(&p);
+    if (state.overlay == overlay_mode::trade_flow && !tf_passes.empty())
     {
         const auto on_body = [&](entity_id m) {
             const auto it = w.markets.find(m);
@@ -4797,10 +4814,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         };
 
         // Aggregate the window, in a std::map so the draw order is fixed.
-        const float passes = static_cast<float>(w.player_trade_flow.size());
+        const float passes = static_cast<float>(tf_passes.size());
         std::map<std::tuple<entity_id, entity_id, std::uint16_t>, std::pair<float, float>> agg;
-        for (const trade_flow_pass& p : w.player_trade_flow)
-            for (const trade_flow_shipment& s : p.shipments)
+        for (const trade_flow_pass* p : tf_passes)
+            for (const trade_flow_shipment& s : p->shipments)
             {
                 if (!on_body(s.source) || !on_body(s.dest))
                     continue;
@@ -4816,10 +4833,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             tf_max_rate = std::max(tf_max_rate, rate);
         }
 
-        // Refusals from the NEWEST pass: "why not this pass", not a blend.
+        // Refusals from the NEWEST matching pass: "why not this pass", not a blend.
         {
             std::map<entity_id, tf_marker> by_market;
-            for (const auto& [key, cls] : w.player_trade_flow.back().best)
+            for (const auto& [key, cls] : tf_passes.back()->best)
             {
                 if (!on_body(key.first))
                     continue;
@@ -4917,7 +4934,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             for (const auto& g : m.goods)
                 if (g.second != trade_refusal::sent)
                     best = std::max(best, static_cast<int>(g.second));
-            if (best < 0 || best > 5)
+            if (best < 0 || best >= k_trade_refusal_count)
                 continue;
             const ImVec2 c0 = centre_of(m.market);
             const ImVec2 at0{ c0.x + mkt_r * 1.7f, c0.y - mkt_r * 1.7f };
@@ -4939,6 +4956,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         if (tf_hover_marker >= 0)
             tf_hover_arrow = -1;
     }
+    state.trade_flow_arrows  = static_cast<int>(tf_arrows.size());
+    state.trade_flow_markers = static_cast<int>(tf_markers.size());
+    state.trade_flow_passes  = static_cast<int>(tf_passes.size());
 
     // Building-placement ghost preview. When construction mode is active and a tile
     // is hovered, draw a translucent-intent marker of the chosen building type at the
@@ -5045,7 +5065,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         {
             const tf_arrow& f = tf_arrows[static_cast<std::size_t>(tf_hover_arrow)];
             const char* good = presentation_of(static_cast<resource_type>(f.good)).name;
-            std::snprintf(line, sizeof line, "%s  %.1f units/tick\nlanded price %.2f\n%s -> %s",
+            std::snprintf(line, sizeof line, "%s  %.3g units/tick\nlanded price %.2f\n%s -> %s",
                           good, f.rate, f.price, market_city_name(w, f.src).c_str(),
                           market_city_name(w, f.dest).c_str());
             text = line;
