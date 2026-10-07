@@ -1429,7 +1429,17 @@ economy = {
         -- Spoilage alone takes the stocked-shelf ceiling to ~0, and every k
         -- above 0 cost firms; the remaining ceiling is EMPTY shelves, which no
         -- k reaches. Re-sweep once water is supplied (BL-1198, the Well).
-        shelf_supply_ticks = 0,
+        -- BL-1209 (Ben, 2026-10-07): the cap is now k x (demand + the want
+        -- the ceiling silenced), and UNDER THAT RULE k = 1 (Ben, 2026-10-07,
+        -- MARKETS.md § Price resolution). Swept at k = 0/1/2/4 on seeds
+        -- 0/43/10/28/38 (market_viability, 400 ticks, pro-rata shelf on):
+        --     k            0      1      2      4
+        --     ceil+stocked 2.5%   0.0%   0.0%   0.0%
+        --     G2 income    47.2%  50.8%  48.1%  51.6%
+        --     G3 firms     88.9%  83.5%  83.5%  83.0%
+        -- k = 1 is the smallest k that takes a consuming price at the ceiling
+        -- against a stocked shelf to 0 and passes run-rate income.
+        shelf_supply_ticks = 1,
     },
 
     -- ===================================================================

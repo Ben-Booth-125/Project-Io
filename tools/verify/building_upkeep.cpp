@@ -78,14 +78,19 @@ std::size_t ri(resource_type r) { return static_cast<std::size_t>(r); }
 constexpr float k_shipped_reservation = 2.0f;
 
 /// The SHIPPED shelf share of supply, in ticks of demand (scripts/economy.lua
-/// `price_band.shelf_supply_ticks`): 0 — listings only — until shelf spoilage
-/// (BL-1179) lands (Ben, 2026-10-03, MARKETS.md § Price resolution). Restated,
-/// not loaded. Every row that claims shipped behaviour runs at this.
-constexpr float k_shipped_shelf_ticks = 0.0f;
+/// `price_band.shelf_supply_ticks`): 1 (Ben, 2026-10-07, MARKETS.md § Price
+/// resolution, under BL-1209's k x (demand + silenced want) law). Restated, not
+/// loaded. Every row that claims shipped behaviour runs at this.
+constexpr float k_shipped_shelf_ticks = 1.0f;
 
-/// A DORMANT k > 0: the k = 4 the sweep measured, NOT shipped. Rows that are
-/// deliberately about the k > 0 path (the law Ben will revisit after BL-1179)
-/// run at this, and say so in their names.
+/// HISTORICAL k = 0 (listings only), shipped 2026-10-03 to 2026-10-07. Rows whose
+/// point is k = 0's over-ceiling cost run at this and say HISTORICAL — they are
+/// counterfactuals now.
+constexpr float k_historical_shelf_ticks = 0.0f;
+
+/// A k > 0 that is NOT shipped (the k = 4 the sweep measured). No processor or
+/// site draws in these fixtures, so the silenced-want register is 0 and BL-1209's
+/// k x (demand + silenced want) law reads exactly as k x demand here.
 constexpr float k_dormant_shelf_ticks = 4.0f;
 
 /// The fixture: ONE body, ONE corp, and however many buildings the caller asks
@@ -798,13 +803,13 @@ void r9_no_wire_no_draw()
 // governs every goods draw, building upkeep's included, and "a draw from a
 // market's shelf is decided and billed at the price that stood when it was
 // made — the price it checked against the ceiling — with one exchange row at
-// that price". The shelf posts 1.5x base. (a) Shelf only, at the SHIPPED k = 0:
-// the building is billed 1.5x — though its own want, against zero listed
+// that price". The shelf posts 1.5x base. (a) Shelf only, at the HISTORICAL
+// k = 0: the building is billed 1.5x — though its own want, against zero listed
 // supply, resolves this tick's price over the ceiling (k = 0's known cost;
 // fair_price_ceiling M5 / unit_upkeep U13). (b) A seller listing plenty,
 // shipped k: the price resolves elsewhere — and the building still pays 1.5x.
-// (c) DORMANT k = 4: the shelf's share is supply, so the same want leaves the
-// price at or under the ceiling.
+// (c) k = 4 (not shipped) and (d) the SHIPPED k = 1: the shelf's share is
+// supply, so the same want leaves the price at or under the ceiling.
 void r10_a_shelf_draw_pays_the_posted_price()
 {
     std::printf("\n--- R10  BL-1172: a shelf draw pays the posted price ---\n");
@@ -822,12 +827,13 @@ void r10_a_shelf_draw_pays_the_posted_price()
         return n;
     };
 
-    // --- R10a: shelf only, shipped k = 0 — billed at posted -----------------
+    // --- R10a: shelf only, HISTORICAL k = 0 — billed at posted --------------
     {
         fixture f;
         f.build(1, building_type::extraction_site);
         const entity_id mid = add_market(f, good, base, posted, shelf);
-        recipe_registry reg = registry_with_reservation(good, need, k_shipped_reservation);
+        recipe_registry reg = registry_with_reservation(good, need, k_shipped_reservation,
+                                                        k_historical_shelf_ticks);
 
         economy_report rep;
         const building_upkeep_tick t = run_building_upkeep(f.w, reg, rep);
@@ -836,7 +842,7 @@ void r10_a_shelf_draw_pays_the_posted_price()
         const auto flows = clear_markets(f.w, reg, rep);
         const float resolved = f.w.markets.at(mid).price[ri(good)];
         check(resolved > base * k_shipped_reservation,
-              "R10a at shipped k = 0 the draw's own want resolves the price OVER the ceiling (the known cost)");
+              "R10a HISTORICAL k = 0: the draw's own want resolves the price OVER the ceiling (the known cost)");
         const auto fit = flows.find(f.corp);
         check_near(fit == flows.end() ? 0.0f : fit->second.expenditure, need * posted,
                    "R10a billed need x POSTED, not the resolved price");
@@ -851,7 +857,25 @@ void r10_a_shelf_draw_pays_the_posted_price()
               "R10a the building, supplied, does not weaken");
     }
 
-    // --- R10c: DORMANT k = 4 — the shelf's share holds the price down ---------
+    // --- R10d: the SHIPPED k = 1 — the shelf's share holds the price down ------
+    {
+        fixture f;
+        f.build(1, building_type::extraction_site);
+        const entity_id mid = add_market(f, good, base, posted, shelf);
+        recipe_registry reg = registry_with_reservation(good, need, k_shipped_reservation,
+                                                        k_shipped_shelf_ticks);
+        economy_report rep;
+        run_building_upkeep(f.w, reg, rep);
+        const auto flows = clear_markets(f.w, reg, rep);
+        const float resolved = f.w.markets.at(mid).price[ri(good)];
+        check(resolved <= base * k_shipped_reservation && std::fabs(resolved - posted) > 1e-3f,
+              "R10d SHIPPED k = 1: the shelf's share is supply, so the draw's own want leaves the price at or under the ceiling");
+        const auto fit = flows.find(f.corp);
+        check_near(fit == flows.end() ? 0.0f : fit->second.expenditure, need * posted,
+                   "R10d SHIPPED k = 1: ... billed at the posted price");
+    }
+
+    // --- R10c: k = 4 (not shipped) — the shelf's share holds the price down ---
     {
         fixture f;
         f.build(1, building_type::extraction_site);
@@ -863,10 +887,10 @@ void r10_a_shelf_draw_pays_the_posted_price()
         const auto flows = clear_markets(f.w, reg, rep);
         const float resolved = f.w.markets.at(mid).price[ri(good)];
         check(resolved <= base * k_shipped_reservation && std::fabs(resolved - posted) > 1e-3f,
-              "R10c DORMANT k = 4: the shelf's share is supply, so the draw's own want leaves the price at or under the ceiling");
+              "R10c k = 4 (not shipped): the shelf's share is supply, so the draw's own want leaves the price at or under the ceiling");
         const auto fit = flows.find(f.corp);
         check_near(fit == flows.end() ? 0.0f : fit->second.expenditure, need * posted,
-                   "R10c DORMANT k = 4: ... billed at the posted price all the same");
+                   "R10c k = 4 (not shipped): ... billed at the posted price all the same");
     }
 
     // --- R10b: a seller listing plenty — resolved low, billed at posted ------

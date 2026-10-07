@@ -48,12 +48,13 @@ int main()
     recipe_registry reg;
     reg.set_thresholds(/*t_full=*/1.0f, /*t_idle=*/0.2f);
     {
-        // BL-1172: the shelf's share of supply at the SHIPPED k = 0 (Ben,
-        // 2026-10-03: listings only until shelf spoilage, BL-1179; restated —
+        // BL-1172/BL-1209: the shelf's share of supply at the SHIPPED k = 1 (Ben,
+        // 2026-10-07, under the k x (demand + silenced want) law; restated —
         // this harness reads no Lua). Band multipliers keep their defaults;
-        // reservation_mult stays 0, the ceiling OFF, so processors buy as ever.
+        // reservation_mult stays 0, the ceiling OFF, so processors buy as ever
+        // and nothing is silenced (the register is 0).
         price_band_params pb;
-        pb.shelf_supply_ticks = 0.0f;
+        pb.shelf_supply_ticks = 1.0f;
         reg.set_price_band(pb);
     }
     {
@@ -192,26 +193,27 @@ int main()
     check(near(m.demand[ri(resource_type::iron_ore)], 4.0f), "R4.2 market demand = auto-bought (iron 4)", m.demand[ri(resource_type::iron_ore)], 4.0f);
 
     // Price resolution (Brief A, R1/R2): target = base*sqrt(D/S), clamped, EMA from base.
-    // BL-1172 (MARKETS.md § Price resolution, Ben 2026-10-03): S is the listings
-    // plus the shelf's share min(inventory, k x demand) — and k is 0 (listings
-    // only) until shelf spoilage (BL-1179), so S is the listings alone:
-    //   iron: S=20 D=4  -> base2.5 * sqrt(0.2)=1.118; EMA 2.5 + 0.5*(1.118-2.5) = 1.809
-    //         (at k = 4 it was 1.6667, with the whole shelf 1.5625)
+    // BL-1172/BL-1209 (MARKETS.md § Price resolution): S is the listings plus
+    // the shelf's share min(inventory, k x (demand + silenced want)); shipped
+    // k = 1 (Ben, 2026-10-07), silenced want 0 here (the ceiling is OFF):
+    //   iron: S = 20 + min(996, 1 x 4) = 24, D = 4 -> base2.5 * sqrt(4/24) = 1.0206;
+    //         EMA 2.5 + 0.5*(1.0206-2.5) = 1.760310
+    //         (HISTORICAL k = 0, listings only: 1.809017; k = 4: 1.6667)
     //   steel: S=4 D=0  -> target 0 -> floor 0.25*8=2.0; EMA 8 + 0.5*(2-8) = 5.0
-    check(near(m.price[ri(resource_type::iron_ore)], 1.809017f),
-          "A.R1/R2 iron price eased toward base*sqrt(D/S), S = listings (shipped k = 0)", m.price[ri(resource_type::iron_ore)], 1.809017f);
+    check(near(m.price[ri(resource_type::iron_ore)], 1.760310f),
+          "A.R1/R2 iron price eased toward base*sqrt(D/S), S = listings + the shelf's share (shipped k = 1)", m.price[ri(resource_type::iron_ore)], 1.760310f);
     check(near(m.price[ri(resource_type::steel)], 5.0f),
           "A.R2 steel price floored (no demand) and eased from base", m.price[ri(resource_type::steel)], 5.0f);
 
     // Budget (Brief A, R3 + L3 R5): sales valued at the resolved price; a shelf
     // draw billed at the POSTED price it was decided against (BL-1172, FINANCE.md
     // § Standing-force upkeep, Ben 2026-10-03: "A draw pays the posted price").
-    //   E: income 20*1.809017=36.180, maint 5, wage 0.5*8=4 -> +27.180 -> 1027.180
-    //      (1024.333 at k = 4, 1022.250 with the whole shelf as supply)
+    //   E: income 20*1.760310=35.206, maint 5, wage 0.5*8=4 -> +26.206 -> 1026.206
+    //      (HISTORICAL k = 0: 1027.180; 1024.333 at k = 4)
     //   P: income 4*5=20, expend 4*2.5 (iron posted at base) = 10, maint 10,
     //      wage 0.5*12=6 -> -6 -> 994.000   (was 4*1.809 = 7.236 -> 996.764 under
     //      the resolved-price billing the ruling retired)
-    check(near(w.corporations[corp_e].balance, 1027.180f), "A.R3 extraction corp balance at resolved price", w.corporations[corp_e].balance, 1027.180f);
+    check(near(w.corporations[corp_e].balance, 1026.206f), "A.R3 extraction corp balance at resolved price (shipped k = 1)", w.corporations[corp_e].balance, 1026.206f);
     check(near(w.corporations[corp_p].balance, 994.0f),    "A.R3 processing corp balance: sales at resolved, the shelf draw at posted", w.corporations[corp_p].balance, 994.0f);
 
     // R3.3 idle below t_idle: zero P's workforce-pool scenario -> empty pool, run again.

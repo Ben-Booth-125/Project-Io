@@ -81,7 +81,7 @@
 // the logistics path caches only, after the handoff, and no tick follows.
 //
 // Usage (repo root):
-//   build_gen/verify/handoff_starvation.exe [--seeds a,b] [--top N] [--list]
+//   build_gen/verify/handoff_starvation.exe [--seeds a,b] [--top N] [--list] [--k X]
 //   --list   one line per starved / idled-starving processor
 // Default seeds: docs/generation/seed_library.json, in library order.
 // Build:  bash tools/verify/build_lua_harness.sh handoff_starvation
@@ -297,6 +297,9 @@ entity_id body_of(const world& w, const building_component& b)
     return it == w.tiles.end() ? null_entity : it->second.body;
 }
 
+/// BL-1209: price_band.shelf_supply_ticks override (market_viability's --k); < 0 = shipped.
+float g_k_override = -1.0f;
+
 void run_seed(std::uint32_t seed, seed_out& out)
 {
     out.seed = seed;
@@ -307,6 +310,13 @@ void run_seed(std::uint32_t seed, seed_out& out)
     try { build_app_start_world(lua, p, *start); }
     catch (const std::exception& e) { out.fail = std::string("world build threw: ") + e.what(); return; }
     world& w = start->w;
+    if (g_k_override >= 0.0f)
+    {
+        // BL-1209: market_viability's --k, applied the same way (before the settle).
+        price_band_params pb = start->reg.price_band();
+        pb.shelf_supply_ticks = g_k_override;
+        start->reg.set_price_band(pb);
+    }
     const recipe_registry& reg = start->reg;
     if (w.corporations.empty()) { out.fail = "no corporations"; return; }
 
@@ -554,7 +564,8 @@ int main(int argc, char** argv)
         if (!std::strcmp(argv[i], "--seeds") && i + 1 < argc) { seeds = parse_seed_list(argv[++i]); from_args = true; }
         else if (!std::strcmp(argv[i], "--top") && i + 1 < argc) top = std::max(1, std::atoi(argv[++i]));
         else if (!std::strcmp(argv[i], "--list")) list = true;
-        else { std::fprintf(stderr, "usage: handoff_starvation [--seeds a,b] [--top N] [--list]\n"); return 2; }
+        else if (!std::strcmp(argv[i], "--k") && i + 1 < argc) g_k_override = static_cast<float>(std::atof(argv[++i]));
+        else { std::fprintf(stderr, "usage: handoff_starvation [--seeds a,b] [--top N] [--list] [--k X]\n"); return 2; }
     }
     if (!from_args)
     {

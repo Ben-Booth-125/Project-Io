@@ -22,10 +22,10 @@
 //   Z   reservation_mult 0 (the hand-built default): a processor buys as it
 //       did before the ceiling existed — the OFF switch
 //   M   MULTI-TICK (ten ticks of run_economy_step -> clear_markets each):
-//       M1/M2 (DORMANT k > 0) a processor and a construction site keep buying,
-//       every tick, on a shelf-only market under the ceiling (the shelf's share
-//       is supply, MARKETS.md § Price resolution; shipped k is 0, and M5 bounds
-//       the pulse that costs); M3/M4 over the ceiling on an empty shelf they do
+//       M1/M2 (k > 0, the SHIPPED k = 1 first) a processor and a construction
+//       site keep buying, every tick, on a shelf-only market under the ceiling
+//       (the shelf's share is supply, MARKETS.md § Price resolution; M5 keeps
+//       the HISTORICAL k = 0 pulse measured); M3/M4 over the ceiling on an empty shelf they do
 //       not bid, and the price eases after every such tick (Ben, 2026-10-03:
 //       "a draw over it does not bid either, so its want leaves the price")
 //
@@ -69,14 +69,19 @@ std::size_t ri(resource_type r) { return static_cast<std::size_t>(r); }
 constexpr float k_shipped_reservation = 2.0f;
 
 /// The SHIPPED shelf share of supply, in ticks of demand (scripts/economy.lua
-/// `price_band.shelf_supply_ticks`): 0 — listings only — until shelf spoilage
-/// (BL-1179) lands (Ben, 2026-10-03, MARKETS.md § Price resolution). Restated,
-/// not loaded. Every row that claims shipped behaviour runs at this.
-constexpr float k_shipped_shelf_ticks = 0.0f;
+/// `price_band.shelf_supply_ticks`): 1 (Ben, 2026-10-07, MARKETS.md § Price
+/// resolution, under BL-1209's k x (demand + silenced want) law). Restated, not
+/// loaded. Every row that claims shipped behaviour runs at this.
+constexpr float k_shipped_shelf_ticks = 1.0f;
 
-/// A DORMANT k > 0: the k = 4 the sweep measured, NOT shipped. Rows that are
-/// deliberately about the k > 0 path (the law Ben will revisit after BL-1179)
-/// run at this, and say so in their names.
+/// HISTORICAL k = 0 (listings only), shipped 2026-10-03 to 2026-10-07: M5 keeps
+/// its cost measured as a counterfactual.
+constexpr float k_historical_shelf_ticks = 0.0f;
+
+/// A k > 0 that is NOT shipped (the k = 4 the sweep measured). Under BL-1209's
+/// law the cap is k x (demand + silenced want); the M rows' draws sit under the
+/// ceiling (silenced want 0) or over it on an EMPTY shelf (min(0, ...) = 0), so
+/// the law reads as before in every one of them.
 constexpr float k_dormant_shelf_ticks = 4.0f;
 constexpr float k_shelf_tick_sweep[] = {1.0f, 2.0f, 4.0f, 8.0f, 16.0f};
 
@@ -480,8 +485,8 @@ void m_at(float k)
                 ++full;
             clear_markets(s.w, reg, rep);
         }
-        check(full == ticks, "M1 (dormant k) the processor buys a full run's iron off the shelf EVERY tick", full, ticks);
-        check(over == 0, "M1 (dormant k) its own want never prices the full shelf over the ceiling", over, 0);
+        check(full == ticks, "M1 (k > 0) the processor buys a full run's iron off the shelf EVERY tick", full, ticks);
+        check(over == 0, "M1 (k > 0) its own want never prices the full shelf over the ceiling", over, 0);
         check(near(s.w.markets.at(s.market).inventory[ri(IRON)], 1000.0f - 8.0f * ticks),
               "M1 the shelf gave up exactly ten runs of iron");
     }
@@ -504,8 +509,8 @@ void m_at(float k)
                 ++drew;
             clear_markets(s.w, reg, rep);
         }
-        check(drew == ticks, "M2 (dormant k) the site draws a tick of steel off the shelf EVERY tick", drew, ticks);
-        check(over == 0, "M2 (dormant k) its own want never prices the full shelf over the ceiling", over, 0);
+        check(drew == ticks, "M2 (k > 0) the site draws a tick of steel off the shelf EVERY tick", drew, ticks);
+        check(over == 0, "M2 (k > 0) its own want never prices the full shelf over the ceiling", over, 0);
         check(s.w.buildings.at(b).ticks_remaining == 30 - ticks, "M2 ... and advances a whole tick each time",
               s.w.buildings.at(b).ticks_remaining, 30 - ticks);
     }
@@ -573,19 +578,20 @@ void m_at(float k)
 
 void m_multi_tick()
 {
-    std::printf("\n--- M  ten ticks at every DORMANT k > 0: shelf-only markets keep buying; over the ceiling nothing bids ---\n");
+    std::printf("\n--- M  ten ticks at every k > 0 (the SHIPPED k = 1 first): shelf-only markets keep buying; over the ceiling nothing bids ---\n");
     for (const float k : k_shelf_tick_sweep)
         m_at(k);
 }
 
 // ---------------------------------------------------------------------------
-// M5 — BL-1172 KNOWN COST OF k = 0: A PROCESSOR BESIDE A FULL SHELF PULSES
+// M5 — HISTORICAL (counterfactual since k = 1, 2026-10-07): THE KNOWN COST OF
+// k = 0: A PROCESSOR BESIDE A FULL SHELF PULSES
 // ---------------------------------------------------------------------------
 // NOT A STATEMENT THAT THE PATTERN IS RIGHT. Ben's ruling (2026-10-03,
 // MARKETS.md § Price resolution): supply is listings only — k = 0 — until shelf
 // spoilage (BL-1179) lets a glut drain. The price of that ruling, measured and
 // bounded so it can only get better unnoticed: M1's scenario (a processor, no
-// pool, a 1000-unit iron shelf nobody lists into) at the SHIPPED k = 0.
+// pool, a 1000-unit iron shelf nobody lists into) at the HISTORICAL k = 0.
 //
 // MEASURED TRACE (posted iron price as x base, iron bought, steel made):
 //   t1 1.50x 8 bought, 4 steel | t2 5.75x idle | t3 3.38x idle | t4 2.19x idle
@@ -601,9 +607,9 @@ void m_multi_tick()
 
 void m5_known_cost_at_k0()
 {
-    std::printf("\n--- M5  KNOWN COST at k = 0: a processor beside a full shelf, no listing ---\n");
+    std::printf("\n--- M5  HISTORICAL k = 0 (counterfactual): a processor beside a full shelf, no listing ---\n");
     uint16_t sid = 0;
-    recipe_registry reg = make_registry(k_shipped_reservation, sid, /*shelf_ticks: shipped*/ 0.0f);
+    recipe_registry reg = make_registry(k_shipped_reservation, sid, k_historical_shelf_ticks);
     scene s = make_scene(k_iron_base * 1.5f, k_steel_base, 1000.0f);
     const entity_id b = add_processor(s, sid, s.tile);
     const entity_id c = add_corp(s, b, 0.0f);
@@ -620,9 +626,9 @@ void m5_known_cost_at_k0()
         clear_markets(s.w, reg, rep);
     }
     std::printf("     ran %d of 12, longest run idle %d\n", ran, longest_gap);
-    check(ran >= 3, "M5 KNOWN COST (k = 0): the processor runs at least 3 of 12 ticks beside a full shelf",
+    check(ran >= 3, "M5 HISTORICAL k = 0: the processor runs at least 3 of 12 ticks beside a full shelf",
           ran, 3);
-    check(longest_gap <= 3, "M5 KNOWN COST (k = 0): never idle more than 3 ticks running",
+    check(longest_gap <= 3, "M5 HISTORICAL k = 0: never idle more than 3 ticks running",
           longest_gap, 3);
 }
 

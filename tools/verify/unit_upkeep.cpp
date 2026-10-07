@@ -163,14 +163,20 @@ bool near(float a, float b, float eps = 1e-3f) { return std::fabs(a - b) <= eps;
 constexpr float k_shipped_reservation = 2.0f;
 
 /// The SHIPPED shelf share of supply, in ticks of demand (scripts/economy.lua
-/// `price_band.shelf_supply_ticks`): 0 — listings only — until shelf spoilage
-/// (BL-1179) lands (Ben, 2026-10-03, MARKETS.md § Price resolution). Restated,
-/// not loaded. Every row that claims shipped behaviour runs at this.
-constexpr float k_shipped_shelf_ticks = 0.0f;
+/// `price_band.shelf_supply_ticks`): 1 (Ben, 2026-10-07, MARKETS.md § Price
+/// resolution, under BL-1209's k x (demand + silenced want) law). Restated, not
+/// loaded. Every row that claims shipped behaviour runs at this.
+constexpr float k_shipped_shelf_ticks = 1.0f;
 
-/// A DORMANT k > 0: the k = 4 the sweep measured, NOT shipped. Rows that are
-/// deliberately about the k > 0 path (the law Ben will revisit after BL-1179)
-/// run at this, and say so in their names.
+/// HISTORICAL k = 0 (listings only) — shipped 2026-10-03 to 2026-10-07. Rows
+/// whose point is k = 0's over-ceiling cost run at this and say HISTORICAL:
+/// they are counterfactuals now, kept so the cost the ruling removed stays
+/// measured.
+constexpr float k_historical_shelf_ticks = 0.0f;
+
+/// A k > 0 that is NOT shipped (the k = 4 the sweep measured). No processor or
+/// site draws in these fixtures, so the silenced-want register is 0 and the
+/// k x (demand + silenced want) law reads exactly as k x demand here.
 constexpr float k_dormant_shelf_ticks = 4.0f;
 constexpr float k_shelf_tick_sweep[] = {1.0f, 2.0f, 4.0f, 8.0f, 16.0f};
 
@@ -693,13 +699,13 @@ void u9_half_fed_settles_at_half()
 // up."
 //
 // The shelf posts 1.5x base (under the 2x ceiling). (a) SHELF ONLY, no listing,
-// at the SHIPPED k = 0: the unit buys at 1.5x and is billed 1.5x — even though
-// its own want, against zero listed supply, resolves this tick's price to
-// 5.75x, over the ceiling (that is k = 0's known cost, U13: the NEXT tick is
-// refused). (b) A seller listing plenty, shipped k: the price resolves
-// elsewhere, and the unit still pays the 1.5x it agreed to. (c) DORMANT k = 4:
-// the shelf's share is supply, so the same shelf-only want leaves the price at
-// or under the ceiling — the k > 0 path U12 runs for twelve ticks.
+// at the HISTORICAL k = 0: the unit buys at 1.5x and is billed 1.5x — even
+// though its own want, against zero listed supply, resolves this tick's price
+// to 5.75x, over the ceiling (that was k = 0's known cost, U13). (b) A seller
+// listing plenty, shipped k: the price resolves elsewhere, and the unit still
+// pays the 1.5x it agreed to. (c) k = 4 (not shipped) and (d) the SHIPPED
+// k = 1: the shelf's share is supply, so the same shelf-only want leaves the
+// price at or under the ceiling — the path U12 runs for twelve ticks.
 
 void u10_a_shelf_draw_pays_the_posted_price()
 {
@@ -741,14 +747,14 @@ void u10_a_shelf_draw_pays_the_posted_price()
         return n;
     };
 
-    // --- (a) shelf only, shipped k = 0: bought and billed at posted; the
+    // --- (a) shelf only, HISTORICAL k = 0: bought and billed at posted; the
     //     price its want resolves goes OVER the ceiling (k = 0's cost, U13)
     {
         fixture f = make_fixture();
         const entity_id u   = add_unit(f, ROW_LEVY, heads, f.base, 600);
         const entity_id mid = setup(f);
         f.w.pool_at(f.corp, mid).quantities[ORD] = need * 0.5f; // half from the pool
-        recipe_registry reg = reg_for(k_shipped_shelf_ticks);
+        recipe_registry reg = reg_for(k_historical_shelf_ticks);
 
         economy_report rep;
         const unit_upkeep_tick t = run_unit_upkeep(f.w, reg, rep);
@@ -756,7 +762,7 @@ void u10_a_shelf_draw_pays_the_posted_price()
         const auto flows = clear_markets(f.w, reg, rep);
         const float resolved = f.w.markets.at(mid).price[ORD];
         check(resolved > base * k_shipped_reservation,
-              "U10a at shipped k = 0 its own want resolves the price OVER the ceiling (5.75x; U13 is the cost)");
+              "U10a HISTORICAL k = 0: its own want resolves the price OVER the ceiling (5.75x; U13 is the cost)");
         const auto fit = flows.find(f.corp);
         const float spent = (fit == flows.end()) ? 0.0f : fit->second.expenditure;
         check(near(spent, need * 0.5f * posted),
@@ -770,7 +776,26 @@ void u10_a_shelf_draw_pays_the_posted_price()
               "U10a fully fed this tick, the unit steps toward 1000 (600 -> 700)");
     }
 
-    // --- (c) DORMANT k = 4: the shelf's share is supply and holds the price down
+    // --- (d) the SHIPPED k = 1: the same shelf-only want stays at or under the ceiling
+    {
+        fixture f = make_fixture();
+        add_unit(f, ROW_LEVY, heads, f.base, 600);
+        const entity_id mid = setup(f);
+        f.w.pool_at(f.corp, mid).quantities[ORD] = need * 0.5f;
+        recipe_registry reg = reg_for(k_shipped_shelf_ticks);
+
+        economy_report rep;
+        run_unit_upkeep(f.w, reg, rep);
+        const auto flows = clear_markets(f.w, reg, rep);
+        const float resolved = f.w.markets.at(mid).price[ORD];
+        check(resolved <= base * k_shipped_reservation && !near(resolved, posted),
+              "U10d SHIPPED k = 1: the shelf's share is supply, so its own want leaves the price at or under the ceiling");
+        const auto fit = flows.find(f.corp);
+        check(near(fit == flows.end() ? 0.0f : fit->second.expenditure, need * 0.5f * posted),
+              "U10d SHIPPED k = 1: ... billed at the posted 1.5x");
+    }
+
+    // --- (c) k = 4 (not shipped): the shelf's share is supply and holds the price down
     {
         fixture f = make_fixture();
         add_unit(f, ROW_LEVY, heads, f.base, 600);
@@ -783,10 +808,10 @@ void u10_a_shelf_draw_pays_the_posted_price()
         const auto flows = clear_markets(f.w, reg, rep);
         const float resolved = f.w.markets.at(mid).price[ORD];
         check(resolved <= base * k_shipped_reservation && !near(resolved, posted),
-              "U10c DORMANT k = 4: the shelf's share is supply, so its own want leaves the price at or under the ceiling");
+              "U10c k = 4 (not shipped): the shelf's share is supply, so its own want leaves the price at or under the ceiling");
         const auto fit = flows.find(f.corp);
         check(near(fit == flows.end() ? 0.0f : fit->second.expenditure, need * 0.5f * posted),
-              "U10c DORMANT k = 4: ... billed at the posted 1.5x all the same");
+              "U10c k = 4 (not shipped): ... billed at the posted 1.5x all the same");
     }
 
     // --- (b) a seller listing plenty: the price resolves low; the unit pays posted
@@ -854,7 +879,7 @@ void u11_one_good_over_one_under()
         reg.set_military(mp);
         price_band_params pb;
         pb.floor_mult = 0.25f; pb.ceil_mult = 10.0f; pb.reservation_mult = k_shipped_reservation;
-        pb.shelf_supply_ticks = k_shipped_shelf_ticks; // shipped k = 0
+        pb.shelf_supply_ticks = k_shipped_shelf_ticks; // shipped k = 1
         reg.set_price_band(pb);
     }
 
@@ -888,7 +913,7 @@ void u11_one_good_over_one_under()
 }
 
 // ---------------------------------------------------------------------------
-// U12 — BL-1172 (DORMANT k > 0): A UNIT BESIDE A FULL SHELF STAYS FED
+// U12 — BL-1172 (k > 0, the SHIPPED k = 1 first): A UNIT BESIDE A FULL SHELF STAYS FED
 // ---------------------------------------------------------------------------
 // The multi-tick defect the cold review found: with the shelf left out of the
 // price law, a unit's own tick-1 want resolved a shelf-only market to 5.75x
@@ -898,9 +923,10 @@ void u11_one_good_over_one_under()
 // draw -> clear on a market nobody lists into, every draw met, every posted
 // price at or under the ceiling, the supply factor only climbing.
 //
-// THIS IS THE DORMANT PATH. The shipped k is 0 until shelf spoilage (BL-1179),
-// and at k = 0 the pulse is real — U13 measures and bounds it as a known cost.
-// These rows hold the k > 0 law for when Ben revisits k.
+// THIS IS THE SHIPPED PATH: k = 1 (Ben, 2026-10-07) is the first k of the
+// sweep. At the historical k = 0 the pulse was real — U13 keeps it measured as
+// a counterfactual. No processor or site draws here, so the silenced-want
+// register is 0 and BL-1209's law reads as k x demand.
 
 void u12_at(float k)
 {
@@ -962,20 +988,21 @@ void u12_at(float k)
 
 void u12_fed_every_tick_beside_a_full_shelf()
 {
-    std::printf("\n-- U12: BL-1172 DORMANT k > 0, twelve ticks beside a full shelf with no listing --\n");
+    std::printf("\n-- U12: BL-1172 k > 0 (shipped k = 1 first), twelve ticks beside a full shelf with no listing --\n");
     for (const float k : k_shelf_tick_sweep)
         u12_at(k);
 }
 
 // ---------------------------------------------------------------------------
-// U13 — BL-1172 KNOWN COST OF k = 0: A UNIT BESIDE A FULL SHELF PULSES
+// U13 — HISTORICAL (counterfactual since k = 1, 2026-10-07): THE KNOWN COST OF
+// k = 0: A UNIT BESIDE A FULL SHELF PULSES
 // ---------------------------------------------------------------------------
 // NOT A STATEMENT THAT THE PATTERN IS RIGHT. Ben's ruling (2026-10-03,
 // MARKETS.md § Price resolution): supply is listings only — k = 0 — until shelf
 // spoilage (BL-1179) lets a glut drain, because every k above 0 left fewer
 // firms. The price of that ruling is this pattern, measured and bounded here so
 // it can only get BETTER unnoticed, never worse: U12's scenario (twelve ticks,
-// a unit beside a 100-unit shelf, nobody listing) at the SHIPPED k = 0.
+// a unit beside a 100-unit shelf, nobody listing) at the HISTORICAL k = 0.
 //
 // MEASURED TRACE (posted price as x base, outcome, supply factor after):
 //   t1 1.50x met 700 | t2 5.75x refused 650 | t3 3.38x refused 600 | t4 2.19x refused 550
@@ -994,7 +1021,7 @@ void u12_fed_every_tick_beside_a_full_shelf()
 
 void u13_known_cost_at_k0()
 {
-    std::printf("\n-- U13: BL-1172 KNOWN COST at k = 0 — a unit beside a full shelf, no listing --\n");
+    std::printf("\n-- U13: HISTORICAL k = 0 (counterfactual) — a unit beside a full shelf, no listing --\n");
 
     constexpr float base     = 43.0f;
     constexpr float per_head = 0.1f;
@@ -1016,7 +1043,7 @@ void u13_known_cost_at_k0()
     {
         price_band_params pb;
         pb.floor_mult = 0.25f; pb.ceil_mult = 10.0f; pb.reservation_mult = k_shipped_reservation;
-        pb.shelf_supply_ticks = 0.0f; // the shipped k (Ben, 2026-10-03)
+        pb.shelf_supply_ticks = k_historical_shelf_ticks; // HISTORICAL k (Ben, 2026-10-03; k = 1 since 2026-10-07)
         reg.set_price_band(pb);
     }
 
@@ -1035,9 +1062,9 @@ void u13_known_cost_at_k0()
         min_sf = std::min(min_sf, sf);
     }
     std::printf("     fed %d of 12, longest run refused %d, lowest supply %d\n", fed, longest_gap, min_sf);
-    check(fed >= 3, "U13 KNOWN COST (k = 0): fed at least 3 of 12 ticks beside a full shelf");
-    check(longest_gap <= 3, "U13 KNOWN COST (k = 0): never refused more than 3 ticks running");
-    check(min_sf >= 450, "U13 KNOWN COST (k = 0): supply never falls below 450");
+    check(fed >= 3, "U13 HISTORICAL k = 0: fed at least 3 of 12 ticks beside a full shelf");
+    check(longest_gap <= 3, "U13 HISTORICAL k = 0: never refused more than 3 ticks running");
+    check(min_sf >= 450, "U13 HISTORICAL k = 0: supply never falls below 450");
 
     // The same run carried on to tick 48: the cycle repeats (one met tick in
     // four), and each cycle nets -50 permille, so the factor walks down to the
@@ -1058,7 +1085,7 @@ void u13_known_cost_at_k0()
     std::printf("     to tick 48: fed %d of 48; supply over ticks 37-48 cycles %d..%d\n",
                 fed_long, end_min, end_max);
     check(fed_long >= 12 && end_max >= 250,
-          "U13 KNOWN COST (k = 0): over 48 ticks fed at least 12, and the late cycle peaks at 250 or more");
+          "U13 HISTORICAL k = 0: over 48 ticks fed at least 12, and the late cycle peaks at 250 or more");
 }
 
 } // namespace
