@@ -1183,8 +1183,24 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 const float rich          = placement_rules::is_depositless_site(w, s.tile, s.target)
                     ? placement_rules::depositless_rate_scalar(s.target)
                     : richness_rate_scalar(ex, tc.resource_deposit[ri]);
+                // BL-1227 (idle mines; AI_OPPONENT.md, "An extraction candidate
+                // is priced at the rank it would take"): the new site joins the
+                // stack already working this deposit, at its BOTTOM, and yields
+                // 0.8^(rank-1) of a lone site (PRODUCTION.md § Building stacks).
+                // Priced at rank 1, the scorer stacked up to 85 sites on one
+                // tile whose deep members earned about a tenth of their running
+                // cost, and the loss reflex then idled them. The rank is BL-162's
+                // own model (placement_rules::prospective_stack_rank, what
+                // estimate_prospective_profit prices a hypothetical at), not a
+                // second copy. It scales the OUTPUT only — revenue and the glut
+                // forecast's added supply; a deep site's upkeep and wages are
+                // a first site's.
+                const float stack_scalar  = placement_rules::stack_output_scalar(
+                    placement_rules::prospective_stack_rank(w, s.tile, building_type::extraction_site,
+                                                            s.target));
                 const float price         = local_price(w, s.tile, ri);
-                const float revenue       = ex.base_rate * rich * wf * (1.0f - tc.hazard_level) * price;
+                const float revenue       = ex.base_rate * rich * wf * (1.0f - tc.hazard_level)
+                                          * stack_scalar * price;
                 const float net           = revenue - ex.maintenance - ex.base_wage * wf;
                 if (net <= 0.0f)
                     continue; // never build into an expected loss
@@ -1217,7 +1233,8 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 // not build into its own glut. Visibility-honest: reads only
                 // market_component.supply/demand, the same public aggregates
                 // export_corp_blackboard shows a rival (BL-068).
-                const float added_rate = ex.base_rate * rich * wf * (1.0f - tc.hazard_level);
+                const float added_rate = ex.base_rate * rich * wf * (1.0f - tc.hazard_level)
+                                       * stack_scalar;
                 const int   horizon    = static_cast<int>(ex.build_duration_ticks) + p.forecast_clearing_ticks;
                 const float glut       = forecast_glut_multiplier(w, s.tile, s.target, added_rate, horizon, p);
                 if (glut <= 0.0f)
@@ -1560,8 +1577,13 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     const float rich    = placement_rules::is_depositless_site(w, s.tile, s.target)
                         ? placement_rules::depositless_rate_scalar(s.target)
                         : richness_rate_scalar(ex, tc.resource_deposit[ri]);
+                    // BL-1227: the site the road would open is priced at the
+                    // stack rank it would take, as the build candidate above.
+                    const float stack   = placement_rules::stack_output_scalar(
+                        placement_rules::prospective_stack_rank(w, s.tile, building_type::extraction_site,
+                                                                s.target));
                     const float price   = local_price(w, s.tile, ri);
-                    const float revenue = ex.base_rate * rich * wf * (1.0f - tc.hazard_level) * price;
+                    const float revenue = ex.base_rate * rich * wf * (1.0f - tc.hazard_level) * stack * price;
                     const float net     = revenue - ex.maintenance - ex.base_wage * wf;
                     if (net <= best_net)
                         continue; // never extend toward a loss, and keep only the single best
