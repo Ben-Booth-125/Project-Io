@@ -196,6 +196,75 @@ bool recipe_margin_obtainable(world& w, const recipe_registry& reg, input_reach&
     return ok;
 }
 
+/// BL-1183 (ceiling stalls construction) — the per-tick MATERIAL draw of every
+/// site already under construction, summed per market (the site's catchment
+/// market, the shelf run_construction draws). Construction capacity is left out:
+/// it stretches a build, never pauses one (BL-709). Ascending building id, so the
+/// float sums are a function of the world, not of the map's layout.
+using construction_draw_map = std::map<entity_id, std::array<float, resource_count>>;
+
+construction_draw_map standing_construction_draws(const world& w, const recipe_registry& reg)
+{
+    const std::size_t cap = static_cast<std::size_t>(resource_type::construction_capacity);
+    std::vector<entity_id> ids;
+    for (const auto& [bid, b] : w.buildings)
+        if (b.ticks_remaining > 0)
+            ids.push_back(bid);
+    std::sort(ids.begin(), ids.end());
+    construction_draw_map out;
+    for (const entity_id bid : ids)
+    {
+        const building_component& b = w.buildings.at(bid);
+        const float duration = reg.economics(b.type).build_duration_ticks;
+        if (duration <= 0.0f)
+            continue;
+        const entity_id mid = market_for_tile(w, b.tile);
+        if (mid == null_entity)
+            continue;
+        const auto& row = reg.resource_build_cost_for(b.type, b.target_resource, b.recipe);
+        auto& acc = out[mid];
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (r != cap && row[r] > 0.0f)
+                acc[r] += row[r] / duration;
+    }
+    return out;
+}
+
+/// BL-1183 — BL-1187's OBTAINABLE rule (input_reach.hpp), asked of a build's own
+/// MATERIALS. A site draws the shelf of its catchment market only, and a
+/// material over the fair-price ceiling or absent from that shelf pauses it
+/// (run_construction; MARKETS.md § a short pool BUYS, up to a reservation
+/// ceiling). So a site is worth starting only where each material is
+/// obtainable for the draw it would JOIN: this site's per-tick need plus every
+/// standing site's in the same market — the shelf the ceiling admits, or spare
+/// output within reach, at the same idle threshold a processor input is held to.
+/// No pool term: a site never draws its owner's pool. A tile with no market
+/// draws nothing off a shelf (run_construction's market-less branch), so it is
+/// never refused here; nor is an instant (undurationed) build.
+bool construction_materials_obtainable(world& w, const recipe_registry& reg, input_reach& ir,
+                                       const construction_draw_map& standing, entity_id tile,
+                                       building_type type, resource_type target, uint16_t recipe)
+{
+    const float duration = reg.economics(type).build_duration_ticks;
+    if (duration <= 0.0f)
+        return true;
+    const entity_id mid = market_for_tile(w, tile);
+    if (mid == null_entity)
+        return true;
+    const std::size_t cap = static_cast<std::size_t>(resource_type::construction_capacity);
+    const auto& row = reg.resource_build_cost_for(type, target, recipe);
+    const auto  sit = standing.find(mid);
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        if (r == cap || !(row[r] > 0.0f))
+            continue;
+        const float need = row[r] / duration + (sit != standing.end() ? sit->second[r] : 0.0f);
+        if (!input_obtainable(w, reg, ir, mid, nullptr, r, need, null_entity).obtainable)
+            return false;
+    }
+    return true;
+}
+
 /// The resource a recipe mostly makes — its largest output. Names what a
 /// processor is FOR, which is the argument the glut forecast and the placement
 /// rules both want (BL-439). Ties resolve to the lowest resource index, so the
@@ -1000,6 +1069,15 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         }
         return *reach_ctx;
     };
+    // BL-1183: the standing construction draw per market, built on first use
+    // and forgotten with the reach index below (an earlier corp's builds
+    // this tick join it).
+    std::optional<construction_draw_map> standing_ctx;
+    const auto standing = [&]() -> const construction_draw_map& {
+        if (!standing_ctx)
+            standing_ctx = standing_construction_draws(w, reg);
+        return *standing_ctx;
+    };
 
     for (std::size_t index = 0; index < corp_ids.size(); ++index)
     {
@@ -1033,6 +1111,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // do not move inside the walk), so this corp sees what stands now.
         if (reach_ctx)
             input_reach_invalidate(*reach_ctx);
+        standing_ctx.reset(); // BL-1183: likewise the standing construction draw
 
         // This corp is evaluating: tick down its buildings' dial cooldowns.
         for (const entity_id bid : cc.assets)
@@ -1109,6 +1188,13 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 const float net           = revenue - ex.maintenance - ex.base_wage * wf;
                 if (net <= 0.0f)
                     continue; // never build into an expected loss
+                // BL-1183 (ceiling stalls construction): never start a site
+                // whose materials it cannot get — it would sit paused, paying
+                // its upkeep, while the shelf it waits on serves no one.
+                if (!construction_materials_obtainable(w, reg, reach(), standing(), s.tile,
+                                                       building_type::extraction_site, s.target,
+                                                       no_recipe))
+                    continue;
                 // BL-709 / NR-592: capex is now CASH PLUS MATERIALS PLUS the
                 // capacity the project will draw. It feeds both `c.score` (via
                 // the net^2/capex curve) and `c.spend` (the solvency gate), so
@@ -1376,6 +1462,11 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     const float net = best_net;
                     if (net <= 0.0f)
                         continue; // never build into an expected loss, same as above
+                    // BL-1183: its materials obtainable, as the extraction half.
+                    if (!construction_materials_obtainable(w, reg, reach(), standing(), tile,
+                                                           building_type::processing_facility,
+                                                           target, best_recipe))
+                        continue;
 
                     // BL-709 / NR-592, the processing half — same reasoning as the
                     // extraction candidate above. The recipe travels into the
@@ -1981,6 +2072,14 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         }
                     }
                 }
+                // BL-1183: a muster base whose materials it cannot get would
+                // stand unbuilt (the 2026-10-04 finding: most background firms
+                // held only an unbuilt base). Same rule as the economic builds.
+                if (best_tile != null_entity
+                    && !construction_materials_obtainable(w, reg, reach(), standing(), best_tile,
+                                                          building_type::military_base,
+                                                          resource_type::iron_ore, no_recipe))
+                    best_tile = null_entity;
                 if (best_tile != null_entity)
                 {
                     const building_economics& mex = reg.economics(building_type::military_base);
