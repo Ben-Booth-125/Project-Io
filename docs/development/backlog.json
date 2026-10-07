@@ -1542,6 +1542,31 @@
     "src/world/economy_system.cpp"
    ],
    "design": "SETTLED DESIGN, PARTLY BUILT: LOGISTICS.md § 3a (Ben, 2026-08-31) - power rides the road network; connectivity not distance (tile_reach_cost as a boolean); one tick flat latency; a buyer clears against any generator its roads reach, so power has a regional price. BL-708 (power as a grid, closed complete) built the listing gate (a market sells power only when on the grid, market_clearing.cpp ~1404-1455) but NOTHING moves power between markets: the building upkeep draw reads only its own market's shelf and pool. FOUND by mine_upkeep_probe (88984ec4, 5 seeds, replay agrees with the real step on 32,538 of 32,538 building-ticks): 95% of extraction sites' supply-scalar loss is power, 94.6% of it \"none at its market while another market or pool on the body holds power\"; 72% of silica / copper / REE mines are unmet every tick and pinned at the 500 floor; mean scalar ~0.72. Restoring the scalar closes ~24% / 54% / 11% of the BL-1217 deficit. WORK: let a connected market's power clear against generation on any market its roads reach (one tick), as § 3a says; measure on the market-viability skill, 5 seeds, before/after."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 50,
+   "written": "2026-10-07",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1231",
+   "short_name": "BROKEN_HARNESSES",
+   "author": "Claude (found by the BL-1227 and BL-1229 lanes, 2026-10-07)",
+   "category": "Tooling",
+   "priority": "B",
+   "difficulty": 2,
+   "title": "Two harnesses that silently stopped checking are repaired, and three probes stop copying the retired order hold",
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "files": [
+    "tools/verify/prospective_profit_harness.cpp",
+    "tools/verify/convoy_command.cpp",
+    "tools/verify/live_tick_cost_probe.cpp",
+    "tools/verify/steel_chain_probe.cpp",
+    "tools/verify/inflow_probe.cpp"
+   ],
+   "design": "PRE-EXISTING, found in passing (2026-10-07): (1) prospective_profit_harness does not compile - line ~165 calls compute_building_opex with 4 arguments, a signature that has moved; (2) convoy_command R4.2 / R4.4 / R4.5 (player vs auto convoy cost and cargo) fail identically on the sprint branch before BL-1229 - find when and why, fix the cause or split it, never weaken the rows; (3) after BL-1229 (an order is a floor, not a hold) the probes live_tick_cost_probe, steel_chain_probe and inflow_probe still copy the old order_controlled hold, so their \"ordered\" class misreports - re-point them at the dispatcher's rule."
   }
  ]
 }

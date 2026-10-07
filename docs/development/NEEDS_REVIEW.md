@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*85 entries — 8 open, 77 resolved.*
+*86 entries — 9 open, 77 resolved.*
 
 ---
 
@@ -130,6 +130,11 @@ The lens marks a short market "no room" when the destination cannot absorb more 
 *decision · raised 2026-10-07 · from the BL-1226 (background pull per doc) cold review, 2026-10-07*
 
 MARKETS.md said electronics "left" the background basket when the metropolis rung of the household ladder took it (Ben, 2026-09-15). That rung was BL-996 (stratum demand ladder), cancelled unmerged on 2026-09-16, so no household bids electronics; the BL-1226 lane removed it from the basket to match the doc, which would have left electronics with almost no final buyer (only the Assembly Plant feeding militia-only spacecraft components) and shifted generation's body_demand. TAKEN: kept electronics in the stopgap (what the code always did) and reworded MARKETS.md to "leaves it when the metropolis rung takes it, and not before". Reversible. Your call if instead you want BL-996 revived, or electronics retired some other way.
+
+### NR-982 — Decisions taken on your behalf building "an order is a floor, not a hold" (BL-1229)
+*decision · raised 2026-10-07 · from the BL-1229 (steel stays home) build lane, 2026-10-07*
+
+Four readings of the ruling, taken as the lane built them (reversible): (1) the dispatch margin applies ON TOP of the floor - a haul from an ordered pool must beat the floor by the same margin it must beat home by (the floor acts as that pool's home price when it is higher); (2) several orders on one (corp, body, good): the HIGHEST floor binds; (3) a quantity cap limits only what is listed at home per tick, not what may be hauled; (4) an order whose pool is hauled empty every tick reads as empty and closes after its usual run, returning the good to auto-surplus. Floors almost never bind today (0.25-0.31x base, 3 of 782 surplus-ticks), so (1) and (2) rarely matter in play.
 
 ---
 
