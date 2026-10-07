@@ -31,6 +31,17 @@ own flows only; LENSES.md § Trade-flow lens. Lane: `supply_system.*` (a transie
 - [x] L3 question_log entry; ACTIONS entry if the cycle changed (R4).
 - [ ] L4 Main session: capture, then Ben's live click.
 
+### Wave 1 — BL-1217 (inputs reach processors), the ceiling lock
+
+Baseline (16 seeds, thin tested first): 47% of input-starved processors have enough of their
+input on their own shelf to run, priced over the 2x ceiling. Trace (`ceiling_trace`, cold-checked):
+a draw-and-silence PULSE (ores, steel) and PHANTOM background demand (ree alloy, refined copper).
+Ben (2026-10-07, the ceiling-lock form): try A and D, each ALONE on 5 seeds, then rule.
+Both behind a registry switch, default OFF; no doc changes before the ruling.
+- [ ] A Lane PRICE: A1 price from the pre-draw shelf; A2 count this tick's fill as supply.
+- [ ] D Lane PHANTOM: the background basket draws from the shelf (after households, no money).
+- [ ] M Main session: readings side by side; Ben's ruling form; write the ruling into MARKETS.md.
+
 ## Sprint 48 — the world moves forward (opened 2026-09-25, CLOSED 2026-10-04)
 
 **Goal.** The world is built once at the Life gate and moves forward through the rounds; Next waits
