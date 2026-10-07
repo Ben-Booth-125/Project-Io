@@ -1714,8 +1714,8 @@
    "design": "MERGED (2026-10-07): dig_ladder(produce) = deposit -> Wharf, no fallback; body_producible names exactly the ladder's ground; charter_refusal_probe section 8. NO CHANGE on seeds 0/43/10/28/38 (byte-identical worlds): a produce gap always takes a processing focus (the Hydroponics Bay recipe), so the ladder never runs there. Whether produce gaps should prefer extraction is a sprint 50+ design question.\n\nFound by BL-1199: body_producible counts any coastal tile as able to make agricultural produce, but dig_site_of offers no Wharf tier, so a produce gap firm on a coastal body with no produce deposit is told the good is producible and finds nowhere to build. The sibling of the Well tier Ben approved (NR-973, \"we can add wells to generation\"): give dig_site_of a Wharf tier for agricultural produce (deposit first, then a coastal no-deposit Wharf site), through the same three hooks the Well uses. Applied directly as the approved pattern (main session, 2026-10-06)."
   },
   {
-   "status": "designed",
-   "glyph": "◐",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 49,
    "written": "2026-10-07",
    "requires": [
@@ -1736,7 +1736,7 @@
     "src/world/economy_system.cpp",
     "scripts/economy.lua"
    ],
-   "design": "k RULED 1 (Ben, 2026-10-07, after the re-sweep under this rule) - ship shelf_supply_ticks = 1 with BL-1209. BUILT (6c77d89b on worktree-agent-af6291e06a660da59): pro-rata alone at k = 0 lifts G1 47.0 -> 57.3, G3 86.0 -> 88.9 (5 seeds); in cold review.\n\nRULED (Ben, 2026-10-07): (A) the shelf's supply share = min(inventory, k x (demand + suppressed want)), the suppressed want being BL-1203's hauler register; the want never bids; (B) a short shelf is shared pro-rata among admitted draws (MARKETS.md sec Price resolution). BL-1207 (handoff starvation): G1 41.8% on 16 seeds; ~65% of starved processors (1,588) have their input on a shelf priced ~4x base over the ceiling with demand 0 - the k x demand cap reads 0, so no k breaks it (the k re-sweep showed G1 flat). Estimated upper bound with resumes: G1 to ~67%. Build on BL-1203's register; then re-sweep k (currently 0) for Ben to ratify."
+   "design": "MERGED (2026-10-07): k = 1 shipped (Ben); short shelves shared pro-rata per phase (floor, remainder, top-up), independent stranded audit scoped to contended shelves (MARKETS.md), top-up capped at the store ceiling; harnesses relabelled to shipped k = 1. 5-seed gates at k = 1: G1 57.0 / G2 49.6 / G3 82.6. Owed: hauler_room H1 label is k = 0 only; the audit has no failing case of its own. k RULED 1 (Ben, 2026-10-07, after the re-sweep under this rule) - ship shelf_supply_ticks = 1 with BL-1209. BUILT (6c77d89b on worktree-agent-af6291e06a660da59): pro-rata alone at k = 0 lifts G1 47.0 -> 57.3, G3 86.0 -> 88.9 (5 seeds); in cold review.\n\nRULED (Ben, 2026-10-07): (A) the shelf's supply share = min(inventory, k x (demand + suppressed want)), the suppressed want being BL-1203's hauler register; the want never bids; (B) a short shelf is shared pro-rata among admitted draws (MARKETS.md sec Price resolution). BL-1207 (handoff starvation): G1 41.8% on 16 seeds; ~65% of starved processors (1,588) have their input on a shelf priced ~4x base over the ceiling with demand 0 - the k x demand cap reads 0, so no k breaks it (the k re-sweep showed G1 flat). Estimated upper bound with resumes: G1 to ~67%. Build on BL-1203's register; then re-sweep k (currently 0) for Ben to ratify."
   },
   {
    "glyph": "○",
