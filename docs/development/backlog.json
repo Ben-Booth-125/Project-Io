@@ -1500,8 +1500,8 @@
    "design": "DIAGNOSED (2026-10-07, mine_upkeep_probe 88984ec4): the cause is power not crossing markets - fix owned by BL-1230 (power crosses markets). Timber 4.9% of the loss (shelf export noroute), stone 0.1%. From the BL-1217 inflow diagnosis (inflow_probe round 2, d04faa9c/f9b3e9e7, 5 seeds, consumes on, cold-checked): processors want ~2-4x the raw silica / copper ore / rare earth ore their bodies produce (49% / 63% / 28% system-wide); not staffing (contention 1.0, targets ~180%), not over-building processors (0.6-0.8 per mine). The extractors of these goods run at a mean supply scalar ~0.72 (building upkeep short); restoring it alone closes 24% / 54% / 11% of the deficit. DIAGNOSE FIRST: which upkeep goods are short, at which markets, and the refusal class (the BL-1223 reader vocabulary) - then fix in dispatch or network."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 50,
    "written": "2026-10-07",
    "requires": [],
@@ -1519,7 +1519,7 @@
     "src/world/supply_system.cpp",
     "src/world/corp_ai.cpp"
    ],
-   "design": "From the BL-1217 inflow diagnosis (inflow_probe round 2, d04faa9c/f9b3e9e7, 5 seeds, consumes on, cold-checked): processors want ~2-4x the raw silica / copper ore / rare earth ore their bodies produce (49% / 63% / 28% system-wide); not staffing (contention 1.0, targets ~180%), not over-building processors (0.6-0.8 per mine). Steel is NOT short (production / want 101% once want is corrected for other binding inputs) but its starved users are refused: ordered 31% (dispatch_convoys skips a (corp, body, good) under a standing sell order), gate 25%, noroom 28% (upper bound). DIAGNOSE FIRST: who places the standing sell orders on steel (the AI scorer? the seat?), at what floor, and why the gate refuses - then fix the cause."
+   "design": "MERGED (f785d832, 2026-10-07; two cold-review rounds): an order is a floor, not a hold; a hauled pool keeps its order; one ordered-pool source price (dispatch_source_price) for dispatch and the scorer. 5 seeds: steel-starved users 249 -> 163, G2 55.6 -> 56.4, G3 91.8 -> 92.4, G1 58.9 -> 58.4. Follow-ups in BL-1231. From the BL-1217 inflow diagnosis (inflow_probe round 2, d04faa9c/f9b3e9e7, 5 seeds, consumes on, cold-checked): processors want ~2-4x the raw silica / copper ore / rare earth ore their bodies produce (49% / 63% / 28% system-wide); not staffing (contention 1.0, targets ~180%), not over-building processors (0.6-0.8 per mine). Steel is NOT short (production / want 101% once want is corrected for other binding inputs) but its starved users are refused: ordered 31% (dispatch_convoys skips a (corp, body, good) under a standing sell order), gate 25%, noroom 28% (upper bound). DIAGNOSE FIRST: who places the standing sell orders on steel (the AI scorer? the seat?), at what floor, and why the gate refuses - then fix the cause."
   },
   {
    "status": "designed",
@@ -1566,7 +1566,7 @@
     "tools/verify/steel_chain_probe.cpp",
     "tools/verify/inflow_probe.cpp"
    ],
-   "design": "PRE-EXISTING, found in passing (2026-10-07): (1) prospective_profit_harness does not compile - line ~165 calls compute_building_opex with 4 arguments, a signature that has moved; (2) convoy_command R4.2 / R4.4 / R4.5 (player vs auto convoy cost and cargo) fail identically on the sprint branch before BL-1229 - find when and why, fix the cause or split it, never weaken the rows; (3) after BL-1229 (an order is a floor, not a hold) the probes live_tick_cost_probe, steel_chain_probe and inflow_probe still copy the old order_controlled hold, so their \"ordered\" class misreports - re-point them at the dispatcher's rule."
+   "design": "PRE-EXISTING, found in passing (2026-10-07): (1) prospective_profit_harness does not compile - line ~165 calls compute_building_opex with 4 arguments, a signature that has moved; (2) convoy_command R4.2 / R4.4 / R4.5 (player vs auto convoy cost and cargo) fail identically on the sprint branch before BL-1229 - find when and why, fix the cause or split it, never weaken the rows; (3) after BL-1229 (an order is a floor, not a hold) the probes live_tick_cost_probe, steel_chain_probe and inflow_probe still copy the old order_controlled hold, so their \"ordered\" class misreports - re-point them at the dispatcher's rule. ADDED (BL-1229 re-review, 2026-10-07): (4) a dispatch_convoy command (scorer directed haul or the player's manual convoy) that drains an ordered pool still counts as empty and can close it with the nothing-to-sell text - mark the hauled set in commit_convoy; (5) order_book_harness R12 inserts into hauled_ordered_this_tick by hand - add a row proving dispatch_convoys inserts on a haul; (6) the rival scorer's steel order placements rose 16 -> 26 -> 44 across the BL-1229 rounds - read placements per (corp, body, good) to tell new triples (harmless) from churn."
   }
  ]
 }

@@ -49,7 +49,7 @@ produced; not staffing, not over-building. Each item diagnosed first (read-only)
 measured alone on the market-viability skill. G1 70% stays.
 - [x] S1 BL-1227 (idle mines): f5cbcde7 merged (4670c7b4) - idle 1588 -> 371, G3 91.8 -> 95.7, G1 flat. Ranking round ee4c10ca HELD: fresh tiles set off a fibre/hides building boom (2949 new sites in play).
 - [ ] S2 BL-1228 (mine upkeep supply): which upkeep goods hold the supply scalar at ~0.72.
-- [ ] S3 BL-1229 (steel stays home): who sets the sell orders and why the gate refuses.
+- [x] S3 BL-1229 (steel stays home): merged f785d832 - order is a floor, not a hold. Steel-starved 249 -> 163; G1 flat.
 - [x] B BL-1226 merged (split, razed; electronics kept - NR-981); D ON; 16 seeds G1 54.7 -> 55.4, G2 54.4 -> 52.3, G3 88.9 -> 88.7, starved 47.0 -> 35.0. The 5-seed 65.2 was electronics removal moving generation.
 
 ## Sprint 48 — the world moves forward (opened 2026-09-25, CLOSED 2026-10-04)
