@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*84 entries — 7 open, 77 resolved.*
+*85 entries — 8 open, 77 resolved.*
 
 ---
 
@@ -125,6 +125,11 @@ After the sprint 49 re-bless (the lake cap moved every seed's history), the libr
 *question · raised 2026-10-07 · from the BL-1222 (trade-flow lens) cold review, 2026-10-07*
 
 The lens marks a short market "no room" when the destination cannot absorb more at the landed price. That room subtracts EVERY corporation's convoys in flight to it and stock pooled there, so "no room" tells the player, in aggregate, that someone is already filling that market. It names no rival and no quantity. DISCOVERY.md § Competitor visibility makes market supply/demand aggregates public but does not say whether goods in flight count. Options: (A) accept it as a public market signal (cargo on the road is observable) and say so in DISCOVERY.md; (B) compute the player's room without rivals' in-flight cargo for the lens only (a second room figure the dispatcher does not use, so the lens and the decision could disagree).
+
+### NR-981 — Decision taken on your behalf: electronics STAYS in the background stopgap (the household rung that was to take it was cancelled)
+*decision · raised 2026-10-07 · from the BL-1226 (background pull per doc) cold review, 2026-10-07*
+
+MARKETS.md said electronics "left" the background basket when the metropolis rung of the household ladder took it (Ben, 2026-09-15). That rung was BL-996 (stratum demand ladder), cancelled unmerged on 2026-09-16, so no household bids electronics; the BL-1226 lane removed it from the basket to match the doc, which would have left electronics with almost no final buyer (only the Assembly Plant feeding militia-only spacecraft components) and shifted generation's body_demand. TAKEN: kept electronics in the stopgap (what the code always did) and reworded MARKETS.md to "leaves it when the metropolis rung takes it, and not before". Reversible. Your call if instead you want BL-996 revived, or electronics retired some other way.
 
 ---
 

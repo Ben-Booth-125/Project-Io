@@ -201,16 +201,18 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
      The bid is also kept on the market's own household register (`household_bid`), because
      the households draw it in step 12. Tunables in `scripts/economy.lua` § `population_demand`.
    - `inject_background_demand` — **a labelled STOPGAP**: the offstage economy's own pull on the
-     mid-chain processing goods (silicon, refined copper, REE alloy, machinery, alloys — **not**
-     `spacecraft_components`, which stays procurement-only so the militia's contracts remain its
-     only buyer), because real background firms alone would under-consume these before enough of
-     them exist. **It retires good by good as a real channel claims each one (Ben, 2026-09-15):**
-     electronics left it when the metropolis rung of the household ladder took it
-     (`POPULATION.md` § The stratum ladder); the intermediates stay until the Industry channel's
-     building upkeep buys them. **A body's pull is SPLIT across its markets in proportion to their
-     catchment population**, never granted whole to each — a body carved into nine markets does not
-     want nine times as much. Per-body population is gathered in a `std::map` so accumulation order
-     is deterministic. **The pull consumes what it buys (Ben, 2026-10-07; BL-1217, inputs reach
+     mid-chain processing goods (silicon, refined copper, REE alloy, machinery, alloys, electronics
+     — **not** `spacecraft_components`, which stays procurement-only so the militia's contracts
+     remain its only buyer), because real background firms alone would under-consume these before
+     enough of them exist. **It retires good by good as a real channel claims each one (Ben,
+     2026-09-15):** electronics leaves it when the metropolis rung of the household ladder takes it
+     (`POPULATION.md` § The stratum ladder), and not before — until then this pull is its only
+     final buyer; the intermediates stay until the Industry channel's building upkeep buys them.
+     **A body's pull is SPLIT across its markets in proportion to their catchment population**
+     (each centre's scale, credited to the market `market_for_tile` gives it, the household
+     channel's own attribution), never granted whole to each — a body carved into nine markets does
+     not want nine times as much. Per-market scale is gathered in a `std::map` in ascending centre
+     id, so accumulation order is deterministic. **The pull consumes what it buys (Ben, 2026-10-07; BL-1217, inputs reach
      processors):** after the households' draw in step 12, the background basket draws from the
      market's shelf what it bid, or the whole shelf if it holds less, markets and resources
      ascending. No money moves, on the households' rule: the market paid the maker when it bought
