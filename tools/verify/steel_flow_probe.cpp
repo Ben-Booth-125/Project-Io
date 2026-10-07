@@ -33,7 +33,10 @@
 // PART B — STARVED STEEL USERS at reads 10/25/50/100: every processor whose
 // limiting input is steel (G1's `input` state), and every (corp pool X on the
 // same body, X != M) holding steel surplus, classed by dispatch_convoys' rules
-// for X -> M: ordered | gate | noroute | costly | noroom | room. For 'gate':
+// for X -> M: ordered | gate | noroute | costly | noroom | room. Since BL-1229's
+// fix (an order is a floor, not a hold) an ordered pool is classed by the normal
+// rule at max(home, floor), and 'ordered' is a pair only the floor refuses.
+// For 'gate':
 // source price vs destination price, the destination's base, ceiling
 // (reservation_mult x base), demand, listed supply, shelf and the suppressed
 // want (hauler_want). For noroom/room: room read PRE-PASS — pending less every
@@ -141,6 +144,10 @@ struct run_out
     gate_tally gate;
     room_tally room;
     double steel_pool_total = 0, steel_pool_ordered = 0; int steel_pool_reads = 0;
+    /// BL-1229 (an order is a floor, not a hold): steel convoys committed by the
+    /// tick's dispatch pass, and of them those hauled out of an ORDERED
+    /// (corp, body, steel) pool - zero by construction under the old hold.
+    double steel_shipped = 0, steel_shipped_ordered = 0;
 };
 
 using units_map = std::map<std::tuple<entity_id, std::size_t, entity_id>, std::array<double, p_count>>;
@@ -284,13 +291,28 @@ void lap_econ(world& w, probe& p)
             if (ordered.count({k.first, pool_key_body(w, k.second)})) ord += s;
         }
         p.R->steel_pool_total += tot; p.R->steel_pool_ordered += ord; ++p.R->steel_pool_reads;
+        // BL-1229: this tick's steel convoys, and those out of an ordered pool
+        for (const convoy_component& c : w.convoys)
+        {
+            if (c.id <= p.max_convoy || static_cast<std::size_t>(c.cargo_resource) != k_steel) continue;
+            p.R->steel_shipped += c.cargo_qty;
+            const entity_id sb = c.source_market != null_entity ? pool_key_body(w, c.source_market) : null_entity;
+            if (ordered.count({c.corp, sb})) p.R->steel_shipped_ordered += c.cargo_qty;
+        }
     }
 
     if (!p.sel) return;
 
     // ---- PART B / C: starved users, every (pool X -> M) pair ----
-    std::set<std::tuple<entity_id, entity_id, std::size_t>> ordered;
-    for (const sell_order& o : w.sell_orders) ordered.insert({o.corp, o.body, static_cast<std::size_t>(o.resource)});
+    // BL-1229 (an order is a floor, not a hold): an ordered pool is hauled by the
+    // normal rule with max(home, highest floor) as its home price. 'ordered' now
+    // names a pair the FLOOR refuses - one the home price alone would pass.
+    std::map<std::tuple<entity_id, entity_id, std::size_t>, float> ordered;
+    for (const sell_order& o : w.sell_orders)
+    {
+        float& f = ordered[{o.corp, o.body, static_cast<std::size_t>(o.resource)}];
+        f = std::max(f, o.floor_price);
+    }
     std::map<std::pair<entity_id, std::size_t>, float> new_to;
     for (const convoy_component& c : w.convoys)
         if (c.id > p.max_convoy && !c.arrived) new_to[{c.dest_market, static_cast<std::size_t>(c.cargo_resource)}] += c.cargo_qty;
@@ -328,12 +350,14 @@ void lap_econ(world& w, probe& p)
             const float s = pool.quantities[g] - reserve(corp, X)[g] - dispatch_arrived(w, corp, X, g);
             if (!(s > 0.0f)) continue;
             int c;
-            const float price_src = dispatch_home_price(w, X, g);
-            if (ordered.count({corp, body, g})) c = p_ordered;
-            else if (!(price_d > price_src + margin * price_src))
+            const float home = dispatch_home_price(w, X, g);
+            const auto  ofl  = ordered.find({corp, body, g});
+            const float price_src = ofl != ordered.end() ? std::max(home, ofl->second) : home;
+            const bool  floor_up  = price_src > home; // the floor, not home, is the bar
+            if (!(price_d > price_src + margin * price_src))
             {
-                c = p_gate;
-                if (g == k_steel && p.R)
+                c = (floor_up && price_d > home + margin * home) ? p_ordered : p_gate;
+                if (c == p_gate && g == k_steel && p.R)
                 {
                     gate_tally& G = p.R->gate;
                     ++G.n; G.w += s;
@@ -356,7 +380,8 @@ void lap_econ(world& w, probe& p)
                 const convoy_leg leg = price_convoy_leg(w, reg, nodes, corp, X, M, g, 1.0f,
                                                         reg.logistics_cost(convoy_mode::space));
                 if (!leg.viable) c = p_noroute;
-                else if (!(price_d - leg.cost - price_src > margin * price_src)) c = p_costly;
+                else if (!(price_d - leg.cost - price_src > margin * price_src))
+                    c = (floor_up && price_d - leg.cost - home > margin * home) ? p_ordered : p_costly;
                 else
                 {
                     const float absorb = dispatch_absorbable(w, reg, M, g, price_src + leg.cost);
@@ -630,6 +655,10 @@ int main(int argc, char** argv)
                 R.steel_pool_reads ? R.steel_pool_total / R.steel_pool_reads : 0.0,
                 R.steel_pool_reads ? R.steel_pool_ordered / R.steel_pool_reads : 0.0,
                 R.steel_pool_total > 0 ? 100.0 * R.steel_pool_ordered / R.steel_pool_total : 0.0);
+    std::printf("    steel convoyed per tick: %.1f u, of it out of an ORDERED pool %.1f u (%.0f%%)\n",
+                R.steel_pool_reads ? R.steel_shipped / R.steel_pool_reads : 0.0,
+                R.steel_pool_reads ? R.steel_shipped_ordered / R.steel_pool_reads : 0.0,
+                R.steel_shipped > 0 ? 100.0 * R.steel_shipped_ordered / R.steel_shipped : 0.0);
 
     const auto print_pairs = [](const char* lbl, const pair_tally& T) {
         double tu = 0;
