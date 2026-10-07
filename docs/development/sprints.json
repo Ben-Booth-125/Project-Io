@@ -74,7 +74,7 @@
    "id": "50",
    "theme": "logistics and trade flow",
    "state": "open",
-   "status_line": "OPEN, widened 2026-10-07 to raw supply (BL-1227/1228/1229). Wave 0 done; lever D merged off pending BL-1226; BL-1222 to sprint 51; BL-1225 complete.",
+   "status_line": "OPEN. Integrated 16-seed reading 2026-10-08 (88391b7f+, D on, stack rank, order floor, power grid): G1 54.7 -> 55.4 (FAIL), G2 54.4 -> 59.8, G3 88.9 -> 96.3, starved/read 47.0 -> 35.0; determinism pass. In flight: BL-1233 (processors to inputs), BL-1232 (power plants per grid), the sell diagnosis.",
    "opened_date": "2026-10-07",
    "author": "Ben (2026-10-07, the sprint 50 cut form: all nine items, measure-led, G1 stays 70%, diagnostic lens, extend rather than cut); Claude (the proposal in NEXT_SESSION.md)",
    "goal": "Goods that exist reach the markets and processors that want them: a built processor gets its inputs (BL-1217, G1 >= 70% at handoff, pooled 16 seeds), surplus reaches shortage, and the flows and refusals are visible on one diagnostic lens.",
