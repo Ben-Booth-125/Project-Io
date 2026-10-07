@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*81 entries — 4 open, 77 resolved.*
+*82 entries — 5 open, 77 resolved.*
 
 ---
 
@@ -91,6 +91,20 @@ Your pro-rata ruling says every draw admitted against a short shelf in a tick sh
 > **Recommendation:** A for sprint 49; revisit in sprint 50 (logistics) if the trade-flow lens shows sites starving plants.
 
 *Files: `src/world/economy_system.cpp`, `docs/economy/MARKETS.md`*
+
+### NR-978 — DECISION TAKEN: the seat clean slate refunds everything a site was charged, not only materials (BL-1206)
+*decision · raised 2026-10-07 · from the BL-1206 cold review*
+
+Your ruling read "materials paid so far refunded". The build refunds the recorded sum of every charge the site took: materials at the posted price, the flat build-cost slice, and the construction capacity it drew. A site paused for want of materials but still drawing capacity is refunded those charges too. CORPORATION_GENERATION.md step 5 now says so.
+
+**Why it matters.** A clean slate means the player pays for nothing they did not choose; refunding materials only would leave the flat cost of builds the AI started on the player's books.
+
+- A: keep - refund everything the site was charged
+- B: materials only (needs a field separating the flat slice and capacity)
+
+> **Recommendation:** A.
+
+*Files: `src/world/economy_system.cpp`, `src/world/corporation_generation.cpp`, `docs/generation/CORPORATION_GENERATION.md`*
 
 ---
 

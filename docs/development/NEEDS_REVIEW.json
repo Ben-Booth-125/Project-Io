@@ -1797,6 +1797,27 @@
     "docs/economy/MARKETS.md"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-978",
+   "title": "DECISION TAKEN: the seat clean slate refunds everything a site was charged, not only materials (BL-1206)",
+   "raised": "2026-10-07",
+   "kind": "decision",
+   "status": "open",
+   "source": "the BL-1206 cold review",
+   "what": "Your ruling read \"materials paid so far refunded\". The build refunds the recorded sum of every charge the site took: materials at the posted price, the flat build-cost slice, and the construction capacity it drew. A site paused for want of materials but still drawing capacity is refunded those charges too. CORPORATION_GENERATION.md step 5 now says so.",
+   "why_it_matters": "A clean slate means the player pays for nothing they did not choose; refunding materials only would leave the flat cost of builds the AI started on the player's books.",
+   "options": [
+    "A: keep - refund everything the site was charged",
+    "B: materials only (needs a field separating the flat slice and capacity)"
+   ],
+   "recommendation": "A.",
+   "files": [
+    "src/world/economy_system.cpp",
+    "src/world/corporation_generation.cpp",
+    "docs/generation/CORPORATION_GENERATION.md"
+   ],
+   "resolution": null
   }
  ]
 }

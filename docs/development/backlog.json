@@ -1851,6 +1851,27 @@
    "authority_doc": "docs/ui/ledgers/README.md",
    "files": [],
    "design": "Found by BL-1206 (2026-10-07). BL-1206 adds a `refunds` flow to the quarterly return (the seat clean slate); the corporation dashboard and selection panel do not show it yet."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 50,
+   "written": "2026-10-07",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1216",
+   "short_name": "CANCELLED_SITE_STAYS_URBAN",
+   "author": "Claude (the BL-1206 cold review, 2026-10-07)",
+   "category": "Economy",
+   "priority": "C",
+   "difficulty": 2,
+   "title": "A cancelled construction site gives its tile back as it was",
+   "authority_doc": "docs/economy/TILES.md",
+   "files": [
+    "src/world/construction.cpp"
+   ],
+   "design": "demolish_building does not undo maybe_transform_to_urban, so a site cancelled at the seat (BL-1206) or demolished leaves its tile permanently urban. Decide whether a tile reverts when the building that urbanised it is gone before completion, and build it if so."
   }
  ]
 }

@@ -594,8 +594,10 @@ of the viable ones.** Design: BL-630 (spawn shortlist). The sequence:
 5. **The seat opens with a clean slate of construction (Ben, 2026-10-07; BL-1206).** During the
    settle the seated firm was an ordinary corporation under spectate, and its scorer started
    builds the player never chose. At the seat, every building of the seated firm still under
-   construction is cancelled and the materials already paid into it are refunded to the firm's
-   balance. Finished buildings stay. So the player chooses every build, and the first quarters'
+   construction is cancelled and everything already paid into it — its materials, its flat build
+   cost and the construction capacity it drew — is refunded to the firm's balance (a clean slate
+   means the player pays for nothing they did not choose; the refund is the recorded sum of those
+   charges, never an estimate). Finished buildings stay. So the player chooses every build, and the first quarters'
    operating result is the firm's own, not a spike of material purchases for projects nobody
    picked.
 
