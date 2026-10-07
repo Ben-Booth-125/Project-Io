@@ -1151,7 +1151,8 @@ economy = {
                 ree_alloy       = 0.15,
                 machinery       = 0.15,
                 alloys          = 0.15,
-                electronics     = 0.15,
+                -- electronics left (BL-1226): the metropolis household rung
+                -- took it (MARKETS.md step 3, Ben 2026-09-15).
                 -- spacecraft_components intentionally absent — militia-only demand.
             } },
         },

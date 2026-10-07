@@ -741,38 +741,39 @@ float population_met_ratio(const world& w, const recipe_registry& reg, entity_id
 void inject_background_demand(world& w, const recipe_registry& reg)
 {
     // BL-340/BL-365: the offstage economy's own pull on the mid-chain
-    // processing goods, world-scale rather than per-centre (unlike
-    // inject_population_demand above) — real background firms alone would
-    // under-consume these during the early game before enough of them exist.
+    // processing goods, pooled per market catchment rather than bid per centre
+    // (unlike inject_population_demand above) — real background firms alone
+    // would under-consume these during the early game before enough of them
+    // exist.
     //
-    // BL-640: banded, NOT deleted. All six goods are industrial, so this pass
+    // BL-640: banded, NOT deleted. All five goods are industrial, so this pass
     // injects nothing in an ancient campaign — but it remains the stopgap
     // standing in for the Industry channel (BL-641) until that lands.
     const background_demand_params& bd = reg.background_demand();
     const std::array<float, resource_count>& basket = reg.background_demand_basket();
 
-    // Per-body population scale: sum of every centre's scale on that body,
-    // gathered once so every market on a multi-market body (BL-096) sees the
-    // same pull.
+    // Per-MARKET population scale (BL-1226, background pull per doc): each
+    // centre's scale goes to the ONE market whose catchment holds its tile —
+    // `market_for_tile`, the attribution inject_population_demand uses, so the
+    // household and background channels agree on which market a centre feeds.
+    // MARKETS.md step 3: "A body's pull is SPLIT across its markets in
+    // proportion to their catchment population, never granted whole to each".
+    // The old per-body sum was applied whole to EVERY market on the body, so a
+    // body carved into N markets bid N times its pull; the body total is now
+    // conserved across its markets.
     //
-    // ASCENDING CENTRE ID (BL-1050), and the reason that stood here was WRONG:
-    // it argued that a std::map keyed by entity_id makes the accumulation
-    // deterministic "regardless of population_centres' layout". An ordered KEY
-    // orders which bucket each addend lands in; it does not order the addends
-    // WITHIN a bucket, and `body_scale[body] +=` is a float accumulation whose
-    // order is `population_centres`' — which a save/load rebuilds (world_save.cpp
-    // re-inserts in id order) and another standard library lays out differently
-    // again. Today every scale is a small integer, so every partial sum is exact
-    // and no shipped world's number moves; the order is fixed anyway, because a
-    // sum that happens to be exact today is not a sum that is order-free.
-    //
-    // The membership test is order-free, so the filter runs unordered and only
-    // the accumulation is sorted.
+    // ASCENDING CENTRE ID (BL-1050): `market_scale[mid] +=` is a float
+    // accumulation. An ordered KEY orders the buckets, not the addends within
+    // one, so the addends are walked in id order — a save/load rebuilds
+    // `population_centres` in another layout. The membership filter is
+    // order-free and runs unordered; only the accumulation is sorted.
     std::vector<entity_id> scale_centre_ids;
     scale_centre_ids.reserve(w.population_centres.size());
     for (const auto& [cid, pcc] : w.population_centres)
     {
-        (void)pcc;
+        if (pcc.razed)
+            continue; // BL-624: a razed centre has no heads — no pull, exactly
+                      // as inject_population_demand skips it.
         const auto tile_it = w.population_centre_tile.find(cid);
         if (tile_it == w.population_centre_tile.end())
             continue;
@@ -783,24 +784,26 @@ void inject_background_demand(world& w, const recipe_registry& reg)
     std::sort(scale_centre_ids.begin(), scale_centre_ids.end());
 
     // BL-1217 lever D: the per-market bid record restarts every clear, on
-    // every market (a market whose body has no scale bids nothing).
+    // every market (a market whose catchment holds no live centre bids nothing).
     for (auto& [mid, mc] : w.markets)
     {
         (void)mid;
         mc.background_bid.fill(0.0f);
     }
 
-    std::map<entity_id, float> body_scale;
+    std::map<entity_id, float> market_scale;
     for (const entity_id cid : scale_centre_ids)
     {
-        const entity_id body = w.tiles.at(w.population_centre_tile.at(cid)).body;
-        body_scale[body] += static_cast<float>(w.population_centres.at(cid).scale);
+        const entity_id mid = market_for_tile(w, w.population_centre_tile.at(cid));
+        if (mid == null_entity)
+            continue;
+        market_scale[mid] += static_cast<float>(w.population_centres.at(cid).scale);
     }
 
     for (auto& [mid, mc] : w.markets)
     {
-        const auto sit = body_scale.find(mc.body);
-        if (sit == body_scale.end() || sit->second <= 0.0f)
+        const auto sit = market_scale.find(mid);
+        if (sit == market_scale.end() || sit->second <= 0.0f)
             continue;
         const float scale = sit->second * bd.demand_scale;
 

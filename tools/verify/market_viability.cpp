@@ -508,8 +508,15 @@ struct seed_reading
     // over every play tick and market; `bg_short` counts market-ticks where the
     // shelf could not cover the bid. The draw is zero while the switch is off.
     std::array<double, resource_count> bg_bid{}, bg_fill{};
-    std::array<long long, resource_count> bg_short{};
+    std::array<long long, resource_count> bg_short{}, bg_mt{}; ///< bg_mt: market-ticks with a bid
     int bg_ticks = 0;
+    // BG ship (BL-1226, the lever D cold review's finding 3): units of each
+    // background-basket good on convoys DISPATCHED this tick, and the share
+    // bound for a market whose background pull bid / DREW that good the same
+    // tick — goods hauled to a shelf the pull then destroys. Dispatch-tick
+    // proxy: the cargo lands later; a convoy that arrives inside its own
+    // dispatch tick is gone before the read and is not counted.
+    std::array<double, resource_count> bg_ship{}, bg_ship_bid{}, bg_ship_drawn{};
     double secs = 0.0;
     std::vector<lg_reading> lg; ///< L (BL-1223): one per g_lg_ticks entry
 };
@@ -1110,6 +1117,8 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
     for (int i = 0; i < k_campaign_settle_lap_count; ++i)
         if (std::strcmp(k_campaign_settle_lap_names[i], "convoys") == 0) lg.lap_pre = i;
     lg.max_id = max_convoy_id;
+    std::uint32_t bg_max_id = max_convoy_id; // BG ship: its own watermark
+    const std::array<float, resource_count>& bg_basket = reg.background_demand_basket();
     if (g_logistics) r.lg.assign(g_lg_ticks.size(), lg_reading{});
     for (int k = 1; k <= ticks; ++k)
     {
@@ -1156,7 +1165,24 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
                     r.bg_bid[g]  += mc.background_bid[g];
                     r.bg_fill[g] += mc.background_fill[g];
                     if (mc.background_fill[g] < mc.background_bid[g] * 0.999f) ++r.bg_short[g];
+                    ++r.bg_mt[g];
                 }
+        {
+            std::uint32_t top = bg_max_id;
+            for (const convoy_component& c : w.convoys)
+            {
+                if (c.id <= bg_max_id) continue;
+                top = std::max(top, c.id);
+                const std::size_t g = static_cast<std::size_t>(c.cargo_resource);
+                if (!(bg_basket[g] > 0.0f)) continue;
+                r.bg_ship[g] += c.cargo_qty;
+                const auto dit = w.markets.find(c.dest_market);
+                if (dit == w.markets.end()) continue;
+                if (dit->second.background_bid[g] > 0.0f)  r.bg_ship_bid[g]   += c.cargo_qty;
+                if (dit->second.background_fill[g] > 0.0f) r.bg_ship_drawn[g] += c.cargo_qty;
+            }
+            bg_max_id = top;
+        }
         if (k > ticks - k_w_late)
             for (const auto& [mid, mc] : w.markets)
                 for (std::size_t g = 0; g < resource_count; ++g)
@@ -1432,24 +1458,43 @@ int main(int argc, char** argv)
     }
     {
         std::array<double, resource_count> bb{}, bf{};
-        std::array<long long, resource_count> bs{};
+        std::array<long long, resource_count> bs{}, bm{};
+        std::array<double, resource_count> sh{}, shb{}, shd{};
         long long bt = 0;
         for (const seed_reading& r : rs)
         {
             bt += r.bg_ticks;
-            for (std::size_t g = 0; g < resource_count; ++g) { bb[g] += r.bg_bid[g]; bf[g] += r.bg_fill[g]; bs[g] += r.bg_short[g]; }
+            for (std::size_t g = 0; g < resource_count; ++g)
+            {
+                bb[g] += r.bg_bid[g]; bf[g] += r.bg_fill[g]; bs[g] += r.bg_short[g]; bm[g] += r.bg_mt[g];
+                sh[g] += r.bg_ship[g]; shb[g] += r.bg_ship_bid[g]; shd[g] += r.bg_ship_drawn[g];
+            }
         }
         const double d = bt > 0 ? static_cast<double>(bt) : 1.0;
-        std::printf(" BG pooled background basket per seed-tick (bid / DRAWN off the shelf, short market-ticks):");
+        std::printf(" BG pooled background basket per seed-tick (bid / DRAWN off the shelf, short of bid market-ticks):");
         double tb = 0, tf = 0;
+        long long ts = 0, tm = 0;
         for (std::size_t g = 0; g < resource_count; ++g)
             if (bb[g] > 0.0)
             {
-                std::printf(" %s %.1f/%.1f (%lld)", resource_names::name_of(static_cast<resource_type>(g)).c_str(),
-                            bb[g] / d, bf[g] / d, bs[g]);
-                tb += bb[g]; tf += bf[g];
+                std::printf(" %s %.1f/%.1f (%lld of %lld)", resource_names::name_of(static_cast<resource_type>(g)).c_str(),
+                            bb[g] / d, bf[g] / d, bs[g], bm[g]);
+                tb += bb[g]; tf += bf[g]; ts += bs[g]; tm += bm[g];
             }
-        std::printf("  | all %.1f/%.1f\n", tb / d, tf / d);
+        std::printf("  | all %.1f/%.1f (%lld of %lld)\n", tb / d, tf / d, ts, tm);
+        // BL-1226 finding 3: basket goods hauled to a market whose pull bid /
+        // drew that good in the dispatch tick (units per seed-tick).
+        std::printf(" BG ship basket goods dispatched per seed-tick (units -> to a market whose pull BID it / DREW it):");
+        double ta = 0, tbb = 0, tdd = 0;
+        for (std::size_t g = 0; g < resource_count; ++g)
+            if (bb[g] > 0.0 || sh[g] > 0.0)
+            {
+                std::printf(" %s %.1f -> %.1f / %.1f", resource_names::name_of(static_cast<resource_type>(g)).c_str(),
+                            sh[g] / d, shb[g] / d, shd[g] / d);
+                ta += sh[g]; tbb += shb[g]; tdd += shd[g];
+            }
+        std::printf("  | all %.1f -> %.1f (%.0f%%) / %.1f (%.0f%%)\n", ta / d, tbb / d,
+                    ta > 0 ? 100.0 * tbb / ta : 0.0, tdd / d, ta > 0 ? 100.0 * tdd / ta : 0.0);
     }
     lg_reading lg_all;
     if (g_logistics)
