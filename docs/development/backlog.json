@@ -1831,7 +1831,7 @@
    "title": "FINANCE.md describes the quarterly return as the code files it",
    "authority_doc": "docs/economy/FINANCE.md",
    "files": [],
-   "design": "Found by BL-1206 (2026-10-07). FINANCE.md sec The eighth field still describes an  flow though BL-653 (the eighth field) was cancelled; flat construction charges, hires and other debits outside the money loop appear in no return. Make the doc state what the return carries, or file the work that makes it carry them."
+   "design": "Found by BL-1206 (2026-10-07). FINANCE.md sec The eighth field still describes an `other` flow though BL-653 (the eighth field) was cancelled; flat construction charges, hires and other debits outside the money loop appear in no return. Make the doc state what the return carries, or file the work that makes it carry them."
   },
   {
    "glyph": "○",
@@ -1850,7 +1850,7 @@
    "title": "The player sees the seat refund in their finances",
    "authority_doc": "docs/ui/ledgers/README.md",
    "files": [],
-   "design": "Found by BL-1206 (2026-10-07). BL-1206 adds a  flow to the quarterly return (the seat clean slate); the corporation dashboard and selection panel do not show it yet."
+   "design": "Found by BL-1206 (2026-10-07). BL-1206 adds a `refunds` flow to the quarterly return (the seat clean slate); the corporation dashboard and selection panel do not show it yet."
   }
  ]
 }
