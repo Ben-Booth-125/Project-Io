@@ -756,10 +756,22 @@ int main()
         // Not attributed per cause on this fixture: the items measured their
         // own moves on the 16 seeds, and this pin only catches an
         // unexplained move from here.
-        check(ex1.battles == 239 && ex1.conquests == 150 && ex1.foundings == 134
-           && ex1.subjections_formed == 0 && ex1.subjections_freed == 0
-           && ex1.tribute_remitted == 0 && ex1.treaties_formed == 496
-           && ex1.treaties_broken == 4 && ex1.owner_changes.size() == 864,
+        // RE-PINNED 2026-10-07 (sprint 49's one re-bless, PREPARED for Ben's
+        // authorisation; docs/development/drafts/sprint-49-rebless.md):
+        // 239/150/134, subjections 0, freed 0, tribute 0, treaties 496, broken
+        // 4, owner changes 864 -> 86/83/112, subjections 2, freed 0, tribute
+        // 2481129, treaties 359, broken 1, owner changes 778. Read on main
+        // c77f2d5a. ONE CAUSE, measured: the lake size cap (BL-1200, enclosed
+        // water of 150+ tiles is sea). The harness built on c39d2989 (the
+        // merge before it) passes on the old pins; built on 8277706d (its
+        // merge) it reads exactly the new values, which hold unchanged to the
+        // tip. The fixture's 1200 close is re-drawn by the re-classified water,
+        // so the span resumes on a different map: it fights a third as much
+        // and a realm holds subjects again, so purchases and tribute return.
+        check(ex1.battles == 86 && ex1.conquests == 83 && ex1.foundings == 112
+           && ex1.subjections_formed == 2 && ex1.subjections_freed == 0
+           && ex1.tribute_remitted == 2481129 && ex1.treaties_formed == 359
+           && ex1.treaties_broken == 1 && ex1.owner_changes.size() == 778,
               "R3b  REGRESSION PIN: the w_want_q = 0 Exploration span matches its pinned counters "
               "exactly (battles, conquests, foundings, subjections, tribute, treaties, owner record)");
 
@@ -828,10 +840,19 @@ int main()
             // is no longer reproducible; on the re-blessed fixture no realm
             // holds a subject, so the fork-off span equals R3b's fork-on span
             // counter for counter -- the control now pins that equality.
-            check(off.battles == 239 && off.conquests == 150 && off.foundings == 134
-               && off.subjections_formed == 0 && off.subjections_freed == 0
-               && off.tribute_remitted == 0 && off.treaties_formed == 496
-               && off.treaties_broken == 4 && off.owner_changes.size() == 864,
+            // RE-PINNED 2026-10-07 (sprint 49's one re-bless, PREPARED for
+            // Ben's authorisation; see R3b's note for the cause, BL-1200):
+            // 239/150/134, 0, 0, 0, 496, 4, 864 -> 86/83/112, 2, 0, 747063,
+            // 359, 1, 778, read on main c77f2d5a. Subjects exist again on this
+            // fixture, so the fork-off span and R3b's fork-on span no longer
+            // agree counter for counter: they share every war, treaty and
+            // ownership counter and differ only in tribute (747063 here
+            // against R3b's 2481129; the purchase fork is the only switch
+            // between them, its payment mechanism not traced further here).
+            check(off.battles == 86 && off.conquests == 83 && off.foundings == 112
+               && off.subjections_formed == 2 && off.subjections_freed == 0
+               && off.tribute_remitted == 747063 && off.treaties_formed == 359
+               && off.treaties_broken == 1 && off.owner_changes.size() == 778,
                   "R3d.1 CONTROL: the fork-off span matches its pinned counters exactly (battles, "
                   "conquests, foundings, subjections, tribute, treaties, owner record)");
             std::printf("      control (purchase off): battles=%lld conquests=%lld foundings=%lld "
