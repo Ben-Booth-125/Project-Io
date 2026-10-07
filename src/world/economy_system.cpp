@@ -143,17 +143,18 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
 // Ben 2026-10-07). Contract in economy_system.hpp. The rule this replaces is
 // first-come by id: a dip under the ceiling let the lowest-numbered plants
 // empty the shelf while the rest starved (BL-1207, handoff starvation).
-std::vector<std::array<float, resource_count>> ration_short_shelves(
-    const world& w, const std::vector<shelf_claimant>& cl)
+shelf_ration_plan plan_short_shelves(const world& w, const std::vector<shelf_claimant>& cl)
 {
     using row = std::array<float, resource_count>;
-    constexpr float inf = std::numeric_limits<float>::infinity();
     const std::size_t n = cl.size();
-    std::vector<row> caps(n);
-    for (row& c : caps)
-        c.fill(inf);
+    shelf_ration_plan plan;
+    plan.contends.assign(n, 0);
+    plan.hopeless.assign(n, 0);
+    plan.floor.assign(n, row{});
+    plan.reserved_after.assign(n, row{});
+    plan.on_contended.assign(n, std::array<bool, resource_count>{});
     if (n == 0)
-        return caps;
+        return plan;
 
     // The shelf as the phase opens. Lookups only; nothing iterates a hash map.
     auto shelf_of = [&](entity_id m, std::size_t r) -> float {
@@ -161,14 +162,13 @@ std::vector<std::array<float, resource_count>> ration_short_shelves(
         return it == w.markets.end() ? 0.0f : std::max(0.0f, it->second.inventory[r]);
     };
 
-    // PASS ONE: the total admitted want per (shelf, good), summed in visit
-    // order (a fixed order, so the float sum is replayable).
-    std::vector<char> active(n, 1);
-    auto totals = [&]() {
+    // Total admitted want per (shelf, good), summed in visit order (a fixed
+    // order, so the float sum replays). `skip` leaves the hopeless out.
+    auto totals = [&](const std::vector<char>* skip) {
         std::unordered_map<entity_id, row> t;
         for (std::size_t i = 0; i < n; ++i)
         {
-            if (!active[i])
+            if (skip != nullptr && (*skip)[i])
                 continue;
             row* tr = nullptr;
             for (std::size_t r = 0; r < resource_count; ++r)
@@ -182,89 +182,73 @@ std::vector<std::array<float, resource_count>> ration_short_shelves(
         }
         return t;
     };
-    auto short_in = [&](const std::unordered_map<entity_id, row>& t, entity_id m, std::size_t r) {
-        const auto it = t.find(m);
-        return it != t.end() && it->second[r] > shelf_of(m, r);
-    };
 
-    const std::unordered_map<entity_id, row> t0 = totals();
-    // Which claimants contend a shelf short as the phase opens. With none, the
-    // phase draws exactly as before — every cap infinite, nothing else read.
-    std::vector<char> contends(n, 0);
-    bool any = false;
+    const std::unordered_map<entity_id, row> t_all = totals(nullptr);
+    auto contended = [&](entity_id m, std::size_t r) {
+        const auto it = t_all.find(m);
+        return it != t_all.end() && it->second[r] > shelf_of(m, r);
+    };
     for (std::size_t i = 0; i < n; ++i)
         for (std::size_t r = 0; r < resource_count; ++r)
-            if (cl[i].claim[r] > 0.0f && short_in(t0, cl[i].market, r))
+            if (cl[i].claim[r] > 0.0f && contended(cl[i].market, r))
             {
-                contends[i] = 1;
-                any = true;
-                break;
+                plan.contends[i] = 1;
+                plan.on_contended[i][r] = true;
+                plan.any = true;
             }
-    if (!any)
-        return caps;
+    if (!plan.any)
+        return plan;
 
-    // Coverage of a claimant's run: the scarcest gating good's (own + shelf
-    // share) over its need. `t == nullptr` reads its FULL claim (the most the
-    // shelf could ever give it).
-    auto coverage = [&](std::size_t i, const std::unordered_map<entity_id, row>* t) {
+    // HOPELESS at the best case: each gating good met by the pool's take plus
+    // as much of the claim as the whole shelf holds. An empty co-input shelf
+    // is a share of 0, so the draw is marked here, once — no drop loop.
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        if (!plan.contends[i])
+            continue;
         const shelf_claimant& c = cl[i];
-        float cov = inf;
+        float cov = std::numeric_limits<float>::infinity();
         bool gated = false;
         for (std::size_t r = 0; r < resource_count; ++r)
         {
             if (!c.gates[r] || !(c.need[r] > 0.0f))
                 continue;
             gated = true;
-            float got = c.own[r];
-            if (c.claim[r] > 0.0f)
-            {
-                float share = 1.0f;
-                if (t != nullptr && short_in(*t, c.market, r))
-                    share = shelf_of(c.market, r) / t->at(c.market)[r];
-                got += c.claim[r] * share;
-            }
+            const float got = c.own[r] + std::min(c.claim[r], shelf_of(c.market, r));
             cov = std::min(cov, got / c.need[r]);
         }
-        return gated ? cov : 1.0f;
-    };
-    auto runs = [&](std::size_t i, float cov) { return cov > 0.0f && cov >= cl[i].threshold; };
-
-    // A contender that cannot run even on its full want is not a draw: drop it.
-    for (std::size_t i = 0; i < n; ++i)
-        if (contends[i] && !runs(i, coverage(i, nullptr)))
-            active[i] = 0;
-    // PASS TWO, solved over who can run on it: while the equal share leaves a
-    // contender under its threshold, drop the LAST such in visit order. Each
-    // drop only raises every other share, so this ends within n rounds.
-    std::unordered_map<entity_id, row> t = totals();
-    for (;;)
-    {
-        std::size_t last = n;
-        for (std::size_t i = 0; i < n; ++i)
-            if (active[i] && contends[i] && !runs(i, coverage(i, &t)))
-                last = i;
-        if (last == n)
-            break;
-        active[last] = 0;
-        t = totals();
+        if (gated && !(cov > 0.0f && cov >= c.threshold))
+            plan.hopeless[i] = 1;
     }
 
+    // The FLOOR: the same share of every hopeful claimant's want.
+    const std::unordered_map<entity_id, row> t = totals(&plan.hopeless);
     for (std::size_t i = 0; i < n; ++i)
     {
-        if (!contends[i])
+        if (!plan.contends[i] || plan.hopeless[i])
             continue;
+        const auto it = t.find(cl[i].market);
         for (std::size_t r = 0; r < resource_count; ++r)
         {
-            if (!(cl[i].claim[r] > 0.0f) || !short_in(t0, cl[i].market, r))
+            if (!(cl[i].claim[r] > 0.0f) || !contended(cl[i].market, r) || it == t.end())
                 continue;
-            if (!active[i])
-                caps[i][r] = 0.0f; // dropped: none of a contended shelf
-            else if (short_in(t, cl[i].market, r))
-                caps[i][r] = cl[i].claim[r] * (shelf_of(cl[i].market, r) / t.at(cl[i].market)[r]);
-            // else: the running draws fit the shelf whole — uncapped
+            const float total = it->second[r];
+            const float shelf = shelf_of(cl[i].market, r);
+            plan.floor[i][r] = (total > shelf) ? cl[i].claim[r] * (shelf / total) : cl[i].claim[r];
         }
     }
-    return caps;
+
+    // RESERVED AFTER: the floors of the claimants still to come, per shelf — a
+    // suffix sum, accumulated in reverse visit order.
+    std::unordered_map<entity_id, row> suffix;
+    for (std::size_t k = n; k-- > 0;)
+    {
+        auto& sfx = suffix[cl[k].market];
+        plan.reserved_after[k] = sfx;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            sfx[r] += plan.floor[k][r];
+    }
+    return plan;
 }
 
 namespace {
@@ -461,20 +445,77 @@ float processing_batches_full(const recipe_registry& reg, const building_compone
            * building_supply_scalar(b);
 }
 
-/// `shelf_cap` (BL-1209): the most this processor may take of each good off its
-/// shelf this tick, from `ration_short_shelves`; null = uncapped (the shelf is
-/// not short). `shelf_claim` is its admitted want, for the report row.
+/// BL-1209 — one processor's turn at a contended shelf (`plan_short_shelves`):
+/// what the later draws' floors hold back, and (out) what the shelf offered it
+/// and what it took, for the report row.
+struct proc_shelf_turn
+{
+    const std::array<float, resource_count>* reserved_after = nullptr;
+    std::array<float, resource_count> access{};
+    std::array<float, resource_count> drawn{};
+};
+
+/// Credit one run's outputs to the pool under the BL-708 stockpile ceiling.
+/// Returns what was produced. Shared by the draw and BL-1209's top-up.
+float credit_processing_outputs(world& w, const recipe_registry& reg, entity_id corp,
+                                const recipe& rcp, stockpile_component& pool, float batches)
+{
+    // BL-708 — THE STOCKPILE CEILING, and it is power's one genuinely novel
+    // property against the rest of the roster (PRODUCTION.md § Power: "a
+    // generator running into a full store is producing nothing anyone will ever
+    // buy — a real decision rather than an accounting detail").
+    //
+    // Applied HERE, where output ACCRUES, so the overflow is never produced
+    // rather than produced and then deleted. That distinction is the whole
+    // point: `rep.output_quantity` is what the profitability model and the corp
+    // AI's idle reflex both read, so a plant backed up against a full store must
+    // report the truth — it made nothing this tick — or the AI would keep paying
+    // wages for output that evaporated after the fact.
+    //
+    // ZERO CEILING = UNCAPPED, which is every other good in the roster, so this
+    // block is arithmetically inert in a world that authors no ceiling.
+    const grid_goods_params& grid = reg.grid_goods();
+
+    float produced = 0.0f;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        float outq = rcp.outputs[r] * batches;
+        if (outq <= 0.0f)
+            continue;
+        const float cap = grid.ceiling(r);
+        if (cap > 0.0f)
+        {
+            const float room = cap - pool.quantities[r];
+            outq = std::max(0.0f, std::min(outq, room)); // a store already over cap makes nothing
+            if (outq <= 0.0f)
+                continue;
+        }
+        pool.quantities[r] += outq;
+        produced           += outq;
+        mark_produced(w, corp, static_cast<resource_type>(r)); // BL-428 growth spine
+    }
+    return produced;
+}
+
+/// `turn` (BL-1209): set when this processor draws a CONTENDED shelf. It may
+/// take its full need from what the shelf holds beyond the floors reserved for
+/// the draws after it (`reserved_after`); null = the shelf as it stands (an
+/// uncontended shelf, exactly the pre-BL-1209 draw).
 building_report run_processing(world& w, const recipe_registry& reg,
                                entity_id corp, entity_id building_id,
                                const building_component& b,
                                entity_id market_id,
                                float contention,
                                economy_report& out,
-                               const std::array<float, resource_count>* shelf_cap = nullptr,
-                               const std::array<float, resource_count>* shelf_claim = nullptr)
+                               proc_shelf_turn* turn = nullptr)
 {
-    constexpr float uncapped = std::numeric_limits<float>::infinity();
-    auto cap_of = [&](std::size_t r) { return shelf_cap ? (*shelf_cap)[r] : uncapped; };
+    // What the shelf offers this draw of good r. With nothing reserved it is
+    // max(0, inventory) exactly (x - 0.0f == x), so an uncontended draw is the
+    // old draw bit for bit.
+    auto access_of = [&](const market_component& m, std::size_t r) {
+        const float held = (turn != nullptr) ? (*turn->reserved_after)[r] : 0.0f;
+        return std::max(0.0f, m.inventory[r] - held);
+    };
     building_report rep;
     rep.building = building_id;
     rep.corp     = corp;
@@ -531,8 +572,10 @@ building_report run_processing(world& w, const recipe_registry& reg,
         // BL-1172: the shelf counts only where the ceiling admits the posted price.
         const bool  shelf  = mc && shelf_admits(*mc, r, res_mult, /*off_buys=*/true);
         // BL-1209: a short shelf offers this draw its pro-rata share only.
-        const float avail  = pool.quantities[r]
-                           + (shelf ? std::min(std::max(0.0f, mc->inventory[r]), cap_of(r)) : 0.0f);
+        const float offer  = shelf ? access_of(*mc, r) : 0.0f;
+        if (turn != nullptr)
+            turn->access[r] = offer;
+        const float avail  = pool.quantities[r] + offer;
         const float cov    = (need > 0.0f) ? avail / need : std::numeric_limits<float>::infinity();
 
         // The want registered is the want OF THE MARKET: the full-run need less
@@ -600,6 +643,7 @@ building_report run_processing(world& w, const recipe_registry& reg,
         rep.idle = true; // too little between pool and market to bootstrap
         return rep;
     }
+    rep.run = run;
 
     const float batches = batches_full * run;
 
@@ -626,54 +670,92 @@ building_report run_processing(world& w, const recipe_registry& reg,
         // excluded it, so the remainder there is zero up to rounding).
         const bool  shelf       = mc && shelf_admits(*mc, r, res_mult, /*off_buys=*/true);
         const float from_market = shelf ? std::min(std::min(std::max(0.0f, mc->inventory[r]), remainder),
-                                                   cap_of(r))
+                                                   access_of(*mc, r))
                                         : 0.0f;
         if (shelf)
             mc->inventory[r] = std::max(0.0f, mc->inventory[r] - from_market);
         bought[r] += from_market;
-        if (shelf && cap_of(r) < uncapped) // BL-1209: a rationed draw, for the verify surface
-            out.shelf_rations.push_back({market_id, building_id, static_cast<std::uint16_t>(r), 'p',
-                                         shelf_claim ? (*shelf_claim)[r] : 0.0f, cap_of(r), from_market});
+        if (turn != nullptr)
+            turn->drawn[r] += from_market;
     }
 
-    // BL-708 — THE STOCKPILE CEILING, and it is power's one genuinely novel
-    // property against the rest of the roster (PRODUCTION.md § Power: "a
-    // generator running into a full store is producing nothing anyone will ever
-    // buy — a real decision rather than an accounting detail").
-    //
-    // Applied HERE, where output ACCRUES, so the overflow is never produced
-    // rather than produced and then deleted. That distinction is the whole
-    // point: `rep.output_quantity` is what the profitability model and the corp
-    // AI's idle reflex both read, so a plant backed up against a full store must
-    // report the truth — it made nothing this tick — or the AI would keep paying
-    // wages for output that evaporated after the fact.
-    //
-    // ZERO CEILING = UNCAPPED, which is every other good in the roster, so this
-    // block is arithmetically inert in a world that authors no ceiling.
-    const grid_goods_params& grid = reg.grid_goods();
-
-    float produced = 0.0f;
-    for (std::size_t r = 0; r < resource_count; ++r)
-    {
-        float outq = rcp->outputs[r] * batches;
-        if (outq <= 0.0f)
-            continue;
-        const float cap = grid.ceiling(r);
-        if (cap > 0.0f)
-        {
-            const float room = cap - pool.quantities[r];
-            outq = std::max(0.0f, std::min(outq, room)); // a store already over cap makes nothing
-            if (outq <= 0.0f)
-                continue;
-        }
-        pool.quantities[r] += outq;
-        produced           += outq;
-        mark_produced(w, corp, static_cast<resource_type>(r)); // BL-428 growth spine
-    }
+    const float produced = credit_processing_outputs(w, reg, corp, *rcp, pool, batches);
 
     rep.active          = true;
     rep.output_quantity = produced;
     return rep;
+}
+
+/// BL-1209 — A PROCESSOR'S SECOND TURN at the shelves (MARKETS.md § Price
+/// resolution, "A short shelf is shared pro-rata"). After every processor has
+/// drawn, one left short (run < 1, idle included) runs the increment its pool
+/// and the shelves now hold: `new_run = min(1, run + min over inputs of
+/// (pool + admitted shelf) / full need)`, taken only if it reaches t_idle. The
+/// increment draws pool-first then shelf and credits its outputs, exactly as the
+/// first turn does (the run is linear). Nothing is reserved any more: every draw
+/// has had its turn. `dry` = report whether it COULD run more, change nothing
+/// (the phase's invariant audit). Returns true iff it ran (or could run) more.
+bool top_up_processing(world& w, const recipe_registry& reg, entity_id corp,
+                       const building_component& b, entity_id market_id, float contention,
+                       economy_report& out, building_report& rep, proc_shelf_turn* turn, bool dry)
+{
+    if (rep.run >= 1.0f || market_id == null_entity)
+        return false;
+    const recipe* rcp = reg.get_recipe(b.recipe);
+    const float batches_full = processing_batches_full(reg, b, contention);
+    if (rcp == nullptr || !(batches_full > 0.0f))
+        return false;
+    stockpile_component& pool = w.pool_at(corp, market_id);
+    market_component& mc = w.markets.at(market_id);
+    const float res_mult = reg.price_band().reservation_mult;
+
+    float extra = std::numeric_limits<float>::infinity();
+    bool has_input = false;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        const float in = rcp->inputs[r];
+        if (in <= 0.0f)
+            continue;
+        has_input = true;
+        const float need  = in * batches_full;
+        const bool  shelf = shelf_admits(mc, r, res_mult, /*off_buys=*/true);
+        const float avail = std::max(0.0f, pool.quantities[r]) + (shelf ? std::max(0.0f, mc.inventory[r]) : 0.0f);
+        extra = std::min(extra, avail / need);
+    }
+    if (!has_input)
+        return false;
+    const float new_run = std::min(1.0f, rep.run + extra);
+    // A meaningful increment only: float dust left by the first turn is not a run.
+    if (!(new_run >= reg.t_idle()) || !(new_run - rep.run > 1e-5f))
+        return false;
+    if (dry)
+        return true;
+
+    const float delta = new_run - rep.run;
+    const float batches = batches_full * delta;
+    auto& bought = out.purchases[std::make_pair(corp, market_id)];
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        const float in = rcp->inputs[r];
+        if (in <= 0.0f)
+            continue;
+        const float need      = in * batches;
+        const float from_pool = std::min(std::max(0.0f, pool.quantities[r]), need);
+        pool.quantities[r] -= from_pool;
+        const float remainder = need - from_pool;
+        if (remainder <= 0.0f || !shelf_admits(mc, r, res_mult, /*off_buys=*/true))
+            continue;
+        const float from_market = std::min(std::max(0.0f, mc.inventory[r]), remainder);
+        mc.inventory[r] = std::max(0.0f, mc.inventory[r] - from_market);
+        bought[r] += from_market;
+        if (turn != nullptr)
+            turn->drawn[r] += from_market;
+    }
+    rep.output_quantity += credit_processing_outputs(w, reg, corp, *rcp, pool, batches);
+    rep.run    = new_run;
+    rep.active = true;
+    rep.idle   = false;
+    return true;
 }
 
 // --- Player workforce auto-solver (BL-181) --------------------------------------
@@ -867,19 +949,49 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
         return row;
     };
 
+    // A site's rate from what each good offers it (`avail_of`) — ONE rule, read
+    // by the draw below and by BL-1209's allocation alike. Comments at the draw.
+    auto site_rate = [&](const std::array<float, resource_count>& need_row, auto&& avail_of) {
+        float rate = 1.0f;
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            if (r == cap_index)
+                continue; // BL-709 — capacity STRETCHES rather than pauses
+            const float need = need_row[r];
+            if (need <= 0.0f)
+                continue;
+            rate = std::min(rate, avail_of(r) / need);
+        }
+        if (capacity_rate > 0.0f)
+        {
+            const float need  = need_row[cap_index];
+            const float avail = avail_of(cap_index);
+            const float cov   = (need > 0.0f) ? (avail / need) : 1.0f;
+            rate = std::min(rate, std::max(cov, pause_below));
+        }
+        rate = std::clamp(rate, 0.0f, 1.0f);
+        if (rate < pause_below)
+            rate = 0.0f; // paused: market can't supply even the max-stretched rate
+        return rate;
+    };
+
     // BL-1209 (MARKETS.md § Price resolution, "A short shelf is shared
     // pro-rata", Ben 2026-10-07): every site's draw, listed in this pass's visit
-    // order before any is made, so a short shelf gives each site the same share
-    // of its need instead of emptying into the lowest ids. A site draws the
-    // shelf only, so its claim is its whole need of each admitted good;
-    // materials gate the run (pause_below), capacity is shared but never
-    // gates (it stretches). With no shelf short every cap is infinite and the
-    // pass below is unchanged.
-    std::unordered_map<entity_id, std::pair<std::array<float, resource_count>,
-                                            std::array<float, resource_count>>> site_cap; // cap, claim
+    // order before any is made. A site draws the shelf only, so its claim is its
+    // whole need of each admitted good; materials gate the run (pause_below),
+    // capacity is shared but never gates (it stretches). On a CONTENDED shelf
+    // (`plan_short_shelves`) each site has a floor reserved; in visit order a
+    // site takes its rate from what the shelf holds beyond the floors of the
+    // sites after it, then sites left short top up from what is left. A site
+    // draws only the shelf, so the whole allocation is EXACT before anything
+    // moves: it is solved here on a copy of the shelves and the pass below draws
+    // it. With no shelf contended nothing is solved and the pass is unchanged.
+    struct site_alloc { std::size_t claimant; float rate; std::array<float, resource_count> drawn; std::array<float, resource_count> real; };
+    std::unordered_map<entity_id, site_alloc> site_plan;
+    std::vector<shelf_claimant> claimants;
+    shelf_ration_plan plan;
     {
         const float res_mult = reg.price_band().reservation_mult;
-        std::vector<shelf_claimant> claimants;
         for (const entity_id bid : ids)
         {
             const building_component& b = w.buildings.at(bid);
@@ -912,14 +1024,80 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
             if (claims)
                 claimants.push_back(c);
         }
-        const std::vector<std::array<float, resource_count>> caps = ration_short_shelves(w, claimants);
-        for (std::size_t i = 0; i < claimants.size(); ++i)
-            for (const float v : caps[i])
-                if (v < std::numeric_limits<float>::infinity())
+        plan = plan_short_shelves(w, claimants);
+        if (plan.any)
+        {
+            // The shelves as the pass opens, copied for the contending sites.
+            std::unordered_map<entity_id, std::array<float, resource_count>> sim;
+            auto sim_of = [&](entity_id mid) -> std::array<float, resource_count>& {
+                auto it = sim.find(mid);
+                if (it == sim.end())
                 {
-                    site_cap[claimants[i].building] = {caps[i], claimants[i].claim};
-                    break;
+                    std::array<float, resource_count> q{};
+                    const market_component& m = w.markets.at(mid);
+                    for (std::size_t r = 0; r < resource_count; ++r)
+                        q[r] = std::max(0.0f, m.inventory[r]);
+                    it = sim.emplace(mid, q).first;
                 }
+                return it->second;
+            };
+            // First turn: the shelf beyond the later sites' floors.
+            for (std::size_t i = 0; i < claimants.size(); ++i)
+            {
+                if (!plan.contends[i])
+                    continue;
+                const shelf_claimant& c = claimants[i];
+                auto& inv = sim_of(c.market);
+                std::array<float, resource_count> offer{};
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    if (c.claim[r] > 0.0f)
+                        offer[r] = std::max(0.0f, inv[r] - plan.reserved_after[i][r]);
+                site_alloc a{i, site_rate(c.need, [&](std::size_t r) { return offer[r]; }), {}, {}};
+                if (a.rate > 0.0f)
+                    for (std::size_t r = 0; r < resource_count; ++r)
+                        if (c.claim[r] > 0.0f)
+                        {
+                            a.drawn[r] = std::min(c.need[r] * a.rate, offer[r]);
+                            inv[r]    -= a.drawn[r];
+                        }
+                site_plan.emplace(c.building, a);
+            }
+            // Top-up: a site left short takes more of what is left, in visit
+            // order, sweeping while any sweep moves.
+            for (int sweep = 0; sweep < 8; ++sweep)
+            {
+                int moved = 0;
+                for (std::size_t i = 0; i < claimants.size(); ++i)
+                {
+                    if (!plan.contends[i])
+                        continue;
+                    const shelf_claimant& c = claimants[i];
+                    site_alloc& a = site_plan.at(c.building);
+                    if (a.rate >= 1.0f)
+                        continue;
+                    auto& inv = sim_of(c.market);
+                    std::array<float, resource_count> offer{};
+                    for (std::size_t r = 0; r < resource_count; ++r)
+                        if (c.claim[r] > 0.0f)
+                            offer[r] = a.drawn[r] + std::max(0.0f, inv[r]);
+                    const float rate2 = site_rate(c.need, [&](std::size_t r) { return offer[r]; });
+                    if (!(rate2 - a.rate > 1e-5f))
+                        continue;
+                    for (std::size_t r = 0; r < resource_count; ++r)
+                        if (c.claim[r] > 0.0f)
+                        {
+                            const float d2 = std::min(c.need[r] * rate2, offer[r]);
+                            inv[r]    -= (d2 - a.drawn[r]);
+                            a.drawn[r] = d2;
+                        }
+                    a.rate = rate2;
+                    ++moved;
+                }
+                report.shelf_audit[0].topups += moved;
+                if (moved == 0)
+                    break;
+            }
+        }
     }
 
     for (const entity_id bid : ids)
@@ -928,12 +1106,9 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
         const building_economics& econ = reg.economics(b.type);
         const float duration           = econ.build_duration_ticks;
         if (duration <= 0.0f) { b.ticks_remaining = 0; continue; } // instant safety
-        // BL-1209: this site's pro-rata caps where its shelf is short.
-        const auto sc = site_cap.find(bid);
-        const std::array<float, resource_count>* cap   = (sc != site_cap.end()) ? &sc->second.first : nullptr;
-        auto cap_of = [&](std::size_t r) {
-            return cap ? (*cap)[r] : std::numeric_limits<float>::infinity();
-        };
+        // BL-1209: this site's allocation where it draws a contended shelf.
+        const auto sp = site_plan.find(bid);
+        site_alloc* alloc = (sp != site_plan.end()) ? &sp->second : nullptr;
 
         // BL-709 — THE PER-TICK NEED ROW, materialised ONCE rather than
         // recomputed by each of the three loops below (rate, want, draw). That
@@ -983,20 +1158,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
 
         // Rate = the fraction of this tick's material need the market can
         // supply, set by the scarcest required material; below 1/max_stretch it
-        // pauses.
-        float rate = 1.0f;
-        for (std::size_t r = 0; r < resource_count; ++r)
-        {
-            if (r == cap_index)
-                continue; // BL-709 — capacity STRETCHES rather than pauses; see below
-            const float need = need_row[r];
-            if (need <= 0.0f)
-                continue;
-            // BL-1209: a short shelf offers this site its pro-rata share only.
-            const float avail = admitted(r) ? std::min(std::max(0.0f, m->inventory[r]), cap_of(r)) : 0.0f;
-            rate = std::min(rate, avail / need);
-        }
-
+        // pauses (`site_rate`, above).
         // BL-709 — CAPACITY STRETCHES A BUILD; IT NEVER STOPS ONE, and that
         // asymmetry against the materials above is the whole of what this item
         // learned the hard way.
@@ -1022,19 +1184,12 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
         // REGISTERING its want every tick (the want loop below is unfloored, so
         // the price signal is the full need), and so induces the yard that
         // answers it. That loop is MARKETS.md property 3, and pausing severed it.
-        if (capacity_rate > 0.0f)
-        {
-            const float need  = need_row[cap_index];
-            const float avail = admitted(cap_index)
-                                    ? std::min(std::max(0.0f, m->inventory[cap_index]), cap_of(cap_index))
-                                    : 0.0f;
-            const float cov   = (need > 0.0f) ? (avail / need) : 1.0f;
-            rate = std::min(rate, std::max(cov, pause_below));
-        }
-
-        rate = std::clamp(rate, 0.0f, 1.0f);
-        if (rate < pause_below)
-            rate = 0.0f; // paused: market can't supply even the max-stretched rate
+        // BL-1209: a site drawing a contended shelf takes the rate its
+        // allocation solved; every other site reads the shelf as it stands.
+        const float rate = alloc ? alloc->rate
+                                 : site_rate(need_row, [&](std::size_t r) {
+                                       return admitted(r) ? std::max(0.0f, m->inventory[r]) : 0.0f;
+                                   });
 
         // BL-441: register the WANT before the pause check, not after. The want
         // is this tick's full-rate material need — unreduced by `rate`, which is
@@ -1097,15 +1252,16 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
                 // not — it stretches at a floored rate past an empty yard — so
                 // its draw is capped by the shelf rather than billing goods
                 // that were never there.
-                const float drawn = m ? std::min(std::min(need * rate, std::max(0.0f, m->inventory[r])),
-                                                 cap_of(r))
-                                      : need * rate;
+                float drawn = m ? std::min(need * rate, std::max(0.0f, m->inventory[r]))
+                                : need * rate;
+                if (alloc != nullptr) // BL-1209: no more than its allocation
+                {
+                    drawn = std::min(drawn, alloc->drawn[r]);
+                    alloc->real[r] = drawn;
+                }
                 bought[r] += drawn;
                 if (m)
                     m->inventory[r] -= drawn;
-                if (m && cap_of(r) < std::numeric_limits<float>::infinity()) // BL-1209: verify surface
-                    report.shelf_rations.push_back({mid, bid, static_cast<std::uint16_t>(r), 'c',
-                                                    sc->second.second[r], cap_of(r), drawn});
             }
             const auto cit = w.corporations.find(corp);
             if (cit != w.corporations.end())
@@ -1136,6 +1292,36 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
             // instant build that already spawned one at placement, construction.cpp).
             if (body != null_entity)
                 maybe_spawn_market(w, reg, body, b.tile);
+        }
+    }
+
+    // BL-1209 — the invariant audit (report-only): after the pass, could any
+    // site on a contended shelf still have built faster off what the shelves
+    // now hold? Read off the REAL shelves, not the allocation's copy.
+    if (plan.any)
+    {
+        shelf_phase_audit& audit = report.shelf_audit[0];
+        for (std::size_t i = 0; i < claimants.size(); ++i)
+        {
+            if (!plan.contends[i])
+                continue;
+            const shelf_claimant& c = claimants[i];
+            const site_alloc& a = site_plan.at(c.building);
+            ++audit.claimants;
+            const market_component& m = w.markets.at(c.market);
+            if (a.rate < 1.0f)
+            {
+                const float rate2 = site_rate(c.need, [&](std::size_t r) {
+                    return c.claim[r] > 0.0f ? a.real[r] + std::max(0.0f, m.inventory[r]) : 0.0f;
+                });
+                if (rate2 - a.rate > 1e-5f)
+                    ++audit.stranded;
+            }
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (plan.on_contended[i][r])
+                    report.shelf_rations.push_back({c.market, c.building, static_cast<std::uint16_t>(r), 'c',
+                                                    plan.hopeless[i] != 0, c.claim[r], plan.floor[i][r],
+                                                    std::max(0.0f, a.drawn[r]), a.real[r], a.rate});
         }
     }
 }
@@ -1958,12 +2144,18 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // each processor taking its full need off a scratch copy of the pool — so a
     // corp's own stock is still its own, and a claim is never smaller than the
     // draw it stands for), on goods the ceiling admits. Nothing here writes the
-    // world; with no shelf short, every cap is infinite and pass 5 is unchanged.
-    std::unordered_map<entity_id, std::array<float, resource_count>> proc_cap, proc_claim;
+    // world; with no shelf contended, nothing is reserved and pass 5 is unchanged.
+    // `plan_short_shelves` (economy_system.hpp) gives each draw on a contended
+    // shelf a FLOOR; the draw takes its need from what the shelf holds beyond the
+    // floors of the draws after it; pass 5b below tops up the draws left short.
+    std::vector<shelf_claimant> claimants;
+    shelf_ration_plan proc_plan;
+    std::unordered_map<entity_id, std::size_t> proc_claimant; // building -> claimant row
+    std::vector<proc_shelf_turn> proc_turns;
+    std::vector<std::size_t> proc_report_row;
     {
         const float res_mult = reg.price_band().reservation_mult;
         std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> scratch_pool;
-        std::vector<shelf_claimant> claimants;
         for (const entity_id corp : corp_ids)
         {
             const corporation_component& cc = w.corporations.at(corp);
@@ -2021,16 +2213,18 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                     claimants.push_back(c);
             }
         }
-        const std::vector<std::array<float, resource_count>> caps = ration_short_shelves(w, claimants);
-        for (std::size_t i = 0; i < claimants.size(); ++i)
+        proc_plan = plan_short_shelves(w, claimants);
+        if (proc_plan.any)
         {
-            bool capped = false;
-            for (const float v : caps[i])
-                if (v < std::numeric_limits<float>::infinity()) { capped = true; break; }
-            if (!capped)
-                continue;
-            proc_cap[claimants[i].building]   = caps[i];
-            proc_claim[claimants[i].building] = claimants[i].claim;
+            proc_turns.resize(claimants.size());
+            proc_report_row.assign(claimants.size(), static_cast<std::size_t>(-1));
+            for (std::size_t i = 0; i < claimants.size(); ++i)
+            {
+                if (!proc_plan.contends[i])
+                    continue;
+                proc_claimant.emplace(claimants[i].building, i);
+                proc_turns[i].reserved_after = &proc_plan.reserved_after[i];
+            }
         }
     }
 
@@ -2077,20 +2271,72 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                     const entity_id market_id = market_for_tile(w, b.tile);
                     // BL-613/BL-614: the building's own grant — ordinary pool
                     // cleared by wage, qualified constraint folded in.
-                    // BL-1209: its pro-rata cap where its shelf is short.
-                    const auto pc = proc_cap.find(building_id);
-                    const bool  rationed = pc != proc_cap.end();
+                    // BL-1209: its turn at a contended shelf (floors reserved for
+                    // the draws after it).
+                    const auto pc = proc_claimant.find(building_id);
+                    proc_shelf_turn* turn = nullptr;
+                    if (pc != proc_claimant.end())
+                    {
+                        turn = &proc_turns[pc->second];
+                        proc_report_row[pc->second] = report.buildings.size();
+                    }
                     report.buildings.push_back(
                         run_processing(w, reg, corp, building_id, b, market_id,
                                        labour_for(building_id, corp, body),
-                                       report,
-                                       rationed ? &pc->second : nullptr,
-                                       rationed ? &proc_claim.at(building_id) : nullptr));
+                                       report, turn));
                     break;
                 }
                 default:
                     break; // ports and none take no production action in L3
             }
+        }
+    }
+
+    // ── Pass 5b, BL-1209: THE TOP-UP. Every draw on a contended shelf has had
+    // its turn; one left short now runs what its pool and the shelves still
+    // hold, in visit order, sweeping again while any sweep draws more (a top-up
+    // can feed a later plant's pool; stock only leaves the shelves, so this
+    // ends). Then the audit: no draw may still be able to run more.
+    if (proc_plan.any)
+    {
+        shelf_phase_audit& audit = report.shelf_audit[1];
+        auto top_up_all = [&](bool dry) {
+            int n = 0;
+            for (std::size_t i = 0; i < claimants.size(); ++i)
+            {
+                if (proc_report_row[i] == static_cast<std::size_t>(-1))
+                    continue;
+                building_report& rep = report.buildings[proc_report_row[i]];
+                const building_component& b = w.buildings.at(claimants[i].building);
+                const entity_id body = building_body(w, b);
+                if (top_up_processing(w, reg, rep.corp, b, claimants[i].market,
+                                      labour_for(claimants[i].building, rep.corp, body),
+                                      report, rep, &proc_turns[i], dry))
+                    ++n;
+            }
+            return n;
+        };
+        for (int sweep = 0; sweep < 8; ++sweep)
+        {
+            const int n = top_up_all(false);
+            audit.topups += n;
+            if (n == 0)
+                break;
+        }
+        audit.stranded = top_up_all(true);
+        for (std::size_t i = 0; i < claimants.size(); ++i)
+        {
+            if (proc_report_row[i] == static_cast<std::size_t>(-1))
+                continue;
+            ++audit.claimants;
+            const float run = report.buildings[proc_report_row[i]].run;
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (proc_plan.on_contended[i][r])
+                    report.shelf_rations.push_back({claimants[i].market, claimants[i].building,
+                                                    static_cast<std::uint16_t>(r), 'p',
+                                                    proc_plan.hopeless[i] != 0, claimants[i].claim[r],
+                                                    proc_plan.floor[i][r], proc_turns[i].access[r],
+                                                    proc_turns[i].drawn[r], run});
         }
     }
 

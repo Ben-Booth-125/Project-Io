@@ -56,6 +56,9 @@ struct building_report
 
     bool          has_limiting   = false;               ///< Processing: a binding input exists.
     resource_type limiting_input = resource_type::iron_ore; ///< Processing: the scarcest input (pool-relative).
+    /// Processing: the run fraction drawn and produced this tick (0 idle, 1 full).
+    /// BL-1209: the top-up raises it; report-only.
+    float run = 0.0f;
 };
 
 /// Per-corporation budget breakdown retained from the budget step (BL-072): the
@@ -166,38 +169,71 @@ struct shelf_claimant
     std::array<bool,  resource_count> gates{}; ///< goods whose coverage decides whether it runs
 };
 
-/// BL-1209 — the shelf caps of one phase, one row per claimant (same order):
-/// `cap[r]` is the most claimant i may take of good r off its shelf this phase.
-/// +infinity where the shelf is not short (every admitted want fits — the draw
-/// is exactly the pre-BL-1209 draw, so an unshort world is byte-identical).
-/// Where it IS short (total admitted want over the shelf as the phase opens):
-/// every RUNNING claimant gets `claim x shelf / total` — the same share of its
-/// want — and the share is solved over the claimants that can run on it: one
-/// that cannot run even at its full want (another good short) is dropped first,
-/// and if the equal share still leaves some under their run threshold, the LAST
-/// such in visit order is dropped, one at a time, until the share runs the rest
-/// (an equal share that runs nobody is not a sharing rule). A dropped claimant
-/// gets 0 off any shelf that was short as the phase opened. Two passes per
-/// solve: the total, then the share; caps sum to at most the shelf, and the
-/// draw is still capped by the shelf as it stands, so the shelf can never be
-/// overdrawn or grow. Pure, deterministic: visit order only.
-std::vector<std::array<float, resource_count>> ration_short_shelves(
-    const world& w, const std::vector<shelf_claimant>& claimants);
+/// BL-1209 — ONE PHASE'S SHARE OF ITS SHORT SHELVES: a FLOOR reserved for each
+/// draw, then the remainder in visit order (MARKETS.md § Price resolution, "A
+/// short shelf is shared pro-rata"). Rows parallel the claimant list.
+///
+///   * A shelf is CONTENDED when the admitted want against it (every claimant)
+///     exceeds what it holds as the phase opens. An uncontended shelf is drawn
+///     exactly as before BL-1209 (reserved 0 — so an uncontended world is
+///     byte-identical).
+///   * A claimant is HOPELESS when it cannot run even at its best case — every
+///     good's claim met as far as the shelf holds it — so an empty co-input
+///     shelf (share 0) marks it up front. A hopeless claimant reserves nothing,
+///     but may still draw what nobody reserved.
+///   * Every other claimant on a contended shelf gets the same share of its
+///     want reserved: `floor = claim x min(1, shelf / total)`, the total over
+///     the claimants that are not hopeless.
+///   * Each draw, in visit order, may take its full need from what the shelf
+///     holds BEYOND the floors still reserved for the draws not yet visited
+///     (`reserved_after`, a suffix sum in visit order). A draw that takes less
+///     than its floor — short on another good, covered by its own pool, a
+///     partial run — releases the rest to the draws after it; an equal share too
+///     small to run anybody accumulates down the order until it runs someone.
+///   * The phase then TOPS UP: a draw left short gets a second turn, in visit
+///     order, at whatever the shelves still hold (see run_economy_step / the
+///     construction pass). So no shelf ends a phase holding stock that an
+///     admitted draw left short could have used.
+/// Pure, deterministic: visit order only; nothing iterates a hash map.
+struct shelf_ration_plan
+{
+    std::vector<char> contends; ///< claims against a shelf contended as the phase opens
+    std::vector<char> hopeless; ///< cannot run even at its best case
+    std::vector<std::array<float, resource_count>> floor;          ///< reserved share (0 off contended goods)
+    std::vector<std::array<float, resource_count>> reserved_after; ///< floors of LATER claimants, same shelf
+    std::vector<std::array<bool, resource_count>>  on_contended;   ///< claims good r on a contended shelf
+    bool any = false; ///< some shelf is contended (else every row is zero: the old draw)
+};
+shelf_ration_plan plan_short_shelves(const world& w, const std::vector<shelf_claimant>& claimants);
 
-/// BL-1209 — one rationed draw, for the verify surface (report-only; nothing
-/// in the sim reads it): a claimant's want, its cap and what it actually drew
-/// of one good off a short shelf. `phase` 'c' construction, 'p' processing.
+/// BL-1209 — one draw off a CONTENDED shelf, for the verify surface (report
+/// only; nothing in the sim reads it). `phase` 'c' construction, 'p'
+/// processing. `drawn` is the whole phase's take, top-up included; `access`
+/// what the shelf offered the draw on its first turn (shelf less the later
+/// floors); `run` the draw's final run fraction (a site's rate).
 struct shelf_ration_row
 {
     entity_id     market   = null_entity;
     entity_id     building = null_entity;
     std::uint16_t r        = 0;
     char          phase    = 'p';
+    bool          hopeless = false;
     float         claim    = 0.0f;
-    float         cap      = 0.0f;
+    float         floor    = 0.0f;
+    float         access   = 0.0f;
     float         drawn    = 0.0f;
+    float         run      = 0.0f;
 };
 
+/// BL-1209 — the phase's own check of the invariant, report-only: after the
+/// top-up, how many admitted draws on a contended shelf could STILL run more off
+/// what the shelves hold (must be 0), and how many top-ups the phase took.
+struct shelf_phase_audit
+{
+    int claimants = 0; ///< draws on a contended shelf
+    int topups    = 0; ///< second turns that drew more
+    int stranded  = 0; ///< draws that could still have run more after the phase
+};
 /// Result of one economy step: the per-building reports plus the auto-bought
 /// input shortfalls per (corp, body), which become market demand and corporate
 /// expenditure downstream (market_clearing.hpp / budget_system.hpp).
@@ -292,9 +328,11 @@ struct economy_report
     /// (`dispatch_absorbable`) reads. Same std::map, same sorted accumulation.
     std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> hauler_wants;
 
-    /// BL-1209: every draw off a SHORT shelf this tick, rationed pro-rata
-    /// (`ration_short_shelves`). Report-only — the verify surface.
+    /// BL-1209: every draw off a CONTENDED shelf this tick, rationed pro-rata
+    /// (`plan_short_shelves`), and each phase's own invariant audit
+    /// ([0] construction, [1] processing). Report-only — the verify surface.
     std::vector<shelf_ration_row> shelf_rations;
+    std::array<shelf_phase_audit, 2> shelf_audit{};
 
 
     /// Per (corporation, body): the pool-level workforce scarcity figure this

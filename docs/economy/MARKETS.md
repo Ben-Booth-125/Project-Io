@@ -995,7 +995,25 @@ supply at ticks 20-50 from 31% to 51% of the household bid.
 **A short shelf is shared pro-rata (Ben, 2026-10-07; BL-1209).** When a shelf cannot meet every
 draw admitted against it in a tick, each draw receives the same share of its need, not first-come
 by building id: a dip under the ceiling no longer lets the lowest-numbered plants empty the shelf
-while the rest starve.
+while the rest starve. **The sharing is a floor, then the remainder.** A shelf is *contended* when
+the want admitted against it (under the ceiling) exceeds what it holds as the phase opens; an
+uncontended shelf is drawn as it always was. On a contended shelf:
+- a draw that cannot run even at its best case — every good it needs met as far as its shelf
+  holds it, so an empty co-input shelf is a share of 0 — is *hopeless* and reserves nothing;
+- every other draw has the same share of its want reserved, `floor = want × shelf / total want`;
+- in visit order, each draw may take its **full** need from what the shelf holds beyond the floors
+  still reserved for the draws after it. A draw that takes less than its floor — short on another
+  good, covered by its own pool, running part of a batch — releases the rest down the order, so an
+  equal share too small to run anybody passes on until it runs someone;
+- the phase then **tops up**: a draw left short takes, in visit order, what the shelves still hold,
+  sweeping again while a sweep moves.
+
+The invariant this keeps: **no shelf ends a phase holding stock while an admitted draw left short
+could have used it.** **It is shared within each phase, not across the tick (NR-977):** the
+construction phase rations its sites first, then the production phase rations its processors
+from what construction left; upkeep draws, later in the tick, stay first-come after both.
+Pooling every draw of the tick would need the tick reordered — construction runs before labour is
+solved, and a processor's need depends on its labour.
 
 **The shelf spoils (settled 2026-10-05, on Ben's delegation; BL-1179).** Every good standing on a
 market's shelf loses a fixed share of itself each tick, its **spoilage rate**, authored per good in
