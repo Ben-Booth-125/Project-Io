@@ -8,8 +8,8 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <map>
 #include <numbers>
-#include <set>
 #include <string>
 #include <tuple>
 #include <unordered_map>
@@ -1026,6 +1026,29 @@ float dispatch_home_price(const world& w, entity_id src_key, std::size_t r)
     return (it != w.markets.end()) ? dispatch_market_price(it->second, r) : 0.0f;
 }
 
+order_floor_map collect_order_floors(const world& w)
+{
+    // Several orders on one triple: the HIGHEST floor binds — a haul never
+    // sells below a price any of the corp's orders on the good named.
+    order_floor_map floors;
+    for (const sell_order& o : w.sell_orders)
+    {
+        float& f = floors[{o.corp, o.body, static_cast<std::size_t>(o.resource)}];
+        f = std::max(f, o.floor_price);
+    }
+    return floors;
+}
+
+float dispatch_source_price(const world& w, const order_floor_map& floors, entity_id corp,
+                            entity_id src_key, std::size_t r)
+{
+    const float home = dispatch_home_price(w, src_key, r);
+    if (floors.empty())
+        return home;
+    const auto it = floors.find({corp, pool_key_body(w, src_key), r});
+    return (it != floors.end()) ? std::max(home, it->second) : home;
+}
+
 float dispatch_absorbable(const world& w, const recipe_registry& reg, entity_id dest,
                           std::size_t r, float landed_cost)
 {
@@ -1444,16 +1467,33 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
     // touches a building), so each (corp, market) is computed once.
     reservation_memo memo;
 
-    // BL-995 CALL: a good under a standing SELL ORDER (corp, body, resource) is
-    // under manual control and is not auto-hauled — the same yield clearing's
-    // auto-surplus makes (market_clearing.cpp, `order_controls`). The corp chose
-    // to sell it at home at a floor; shipping it away would empty the order.
-    // A std::set over a totally ordered tuple, read only by lookup.
-    std::set<std::tuple<entity_id, entity_id, std::size_t>> order_controlled;
-    // BL-1201: quantity 0 is an UNCAPPED order now, not an inert one — every
-    // order controls its triple, exactly as `order_controls` reads it.
-    for (const sell_order& o : w.sell_orders)
-        order_controlled.insert({o.corp, o.body, static_cast<std::size_t>(o.resource)});
+    // BL-1229 (steel stays home) — AN ORDER IS A FLOOR, NOT A HOLD (Ben,
+    // 2026-10-07; MARKETS.md step 4). A good under a standing SELL ORDER still
+    // travels: the dispatcher hauls an ordered (corp, body, good) pool by the
+    // same net-price rule and the same room as unordered surplus, with the
+    // order's floor standing in for the home price wherever the floor is the
+    // higher — the seller's alternative to the haul is a sale the order would
+    // accept, and the order refuses any below its floor. So a haul must net the
+    // seller more than the floor (by the margin, as it must beat home), and is
+    // sized so the destination's price lands no lower than floor + haul. Before
+    // this rule an order held its pool out of every convoy (the BL-995 CALL) and
+    // stranded ~30% of all steel surplus while processors elsewhere starved.
+    //
+    // Several orders on one triple: the HIGHEST floor binds (collect_order_floors;
+    // dispatch_source_price is the one rule this pass and the rival scorer's
+    // directed dispatch share). A capped order's `quantity` caps what is LISTED
+    // at home per tick, not what may be hauled: the haul draws on the same
+    // surplus above the processor reservation as an unordered pool. One rule for
+    // the player's orders and a rival's.
+    //
+    // A HAULED POOL KEEPS ITS ORDER (BL-1229 review). Dispatch runs before the
+    // clear, so a pool hauled empty would read as "nothing to sell" to the
+    // order's auto-close, and once closed the haul would price at the home price
+    // and could ship below the floor. Every ordered triple this pass hauls from
+    // is recorded in `w.hauled_ordered_this_tick`, which the clear reads as
+    // "not empty" and then clears (world.hpp).
+    const order_floor_map order_floor = collect_order_floors(w);
+    w.hauled_ordered_this_tick.clear();
 
     struct candidate
     {
@@ -1536,8 +1576,6 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                 // it too; skipped here before any leg is priced).
                 if (grid_rules.grid(ri))
                     continue;
-                if (order_controlled.count({corp_id, src_body, ri}) != 0)
-                    continue;
 
                 // Live pool read: an earlier commit in this pass (a launch's
                 // propellant burn) may have drawn this pool down. THIS TICK'S
@@ -1554,7 +1592,12 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                 // sold at home at all — a market-less body's body-level pool,
                 // or a home market that does not price the good (auto-surplus
                 // lists neither). Any positive net price then beats home.
-                const float price_src = dispatch_home_price(w, src_key, ri);
+                //
+                // BL-1229: under a standing sell order the home price the rule
+                // weighs is max(home, floor) — the order accepts no sale below
+                // its floor, so a haul must beat the floor as it beats home, and
+                // `landed` below (the room's aim) is floor + haul.
+                const float price_src = dispatch_source_price(w, order_floor, corp_id, src_key, ri);
                 const float gate      = price_src + margin * price_src;
 
                 // Every destination that clears the margin, with its net price.
@@ -1673,6 +1716,9 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                         ++out.dispatched;
                         if (sent < qty)
                             ++out.trimmed_by_lp;
+                        // BL-1229 review: a hauled pool keeps its order.
+                        if (order_floor.count({corp_id, src_body, ri}) != 0)
+                            w.hauled_ordered_this_tick.insert({corp_id, src_body, ri});
                         if (tf_player)
                         {
                             tf.shipments.push_back({src_key, c.dest,

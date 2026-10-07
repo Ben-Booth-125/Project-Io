@@ -2027,11 +2027,18 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // there and here appends to or erases from `w.sell_orders`, so index i still
     // names the same order.
     {
+        // BL-1229 review (an order is a floor, not a hold): a pool this tick's
+        // dispatch HAULED from is not empty — its goods left by convoy, above the
+        // order's floor, before this clear could list them. Counting it empty
+        // would close the order and drop the floor from the next haul, and the
+        // close notice below ("nothing to sell") would be false.
         const std::size_t n = std::min(pool_has_surplus.size(), w.sell_orders.size());
         for (std::size_t i = 0; i < n; ++i)
         {
             sell_order& o = w.sell_orders[i];
-            if (pool_has_surplus[i])
+            const bool hauled = w.hauled_ordered_this_tick.count(
+                                    {o.corp, o.body, static_cast<std::size_t>(o.resource)}) != 0;
+            if (pool_has_surplus[i] || hauled)
                 o.empty_ticks = 0;
             else if (o.empty_ticks < 255)
                 ++o.empty_ticks;
@@ -2073,6 +2080,8 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
                                return o.empty_ticks >= sell_order_empty_close_ticks;
                            }),
             w.sell_orders.end());
+        // Consumed: a clear run without a dispatch must not read last tick's set.
+        w.hauled_ordered_this_tick.clear();
     }
 
     return flows;

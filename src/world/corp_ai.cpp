@@ -2407,6 +2407,11 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             std::sort(all_corp_ids.begin(), all_corp_ids.end());
             reservation_memo memo;
             const float margin = reg.dispatch_margin();
+            // BL-1229 (an order is a floor, not a hold): an ordered pool's source
+            // price is max(home, floor) — the auto-dispatcher's own rule, shared
+            // through dispatch_source_price, so the scorer never values a haul
+            // the corp's own order would refuse.
+            const order_floor_map order_floors = collect_order_floors(w);
 
             entity_id   best_market   = null_entity;
             entity_id   best_src_key  = null_entity;
@@ -2439,8 +2444,11 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
 
                     // The goods are already the corp's and would sell at home
                     // at the next clear, so a haul earns only the GAP over the
-                    // home price (SUPPLY.md § Dispatch trigger).
-                    const float home_price = dispatch_home_price(w, src_key, r);
+                    // home price (SUPPLY.md § Dispatch trigger) — or over the
+                    // floor of the corp's own standing order on the good, where
+                    // that is the higher (BL-1229).
+                    const float home_price =
+                        dispatch_source_price(w, order_floors, corp, src_key, r);
                     const float gate       = home_price + margin * home_price;
                     const float probe_qty  = std::min(surplus, 1.0f);
 

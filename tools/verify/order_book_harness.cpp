@@ -1042,6 +1042,51 @@ int main()
     }
 
     // -----------------------------------------------------------------------
+    // R12 — a HAULED pool keeps its order (BL-1229 review: an order is a
+    // floor, not a hold). Dispatch runs before the clear and may haul the
+    // ordered surplus away whole; the clear then lists nothing, but the pool
+    // is not "empty" — its goods left above the floor. The clearing side of the
+    // seam: dispatch records the triple in world::hauled_ordered_this_tick, the
+    // clear reads it as not-empty and consumes it.
+    // -----------------------------------------------------------------------
+    {
+        scenario s = make_scenario(0.0f);
+        const std::size_t steel = ri(resource_type::steel);
+        apply_corp_command(s.w, reg, place_cmd(s, 0.0f, 0.0f));
+        const uint32_t id = s.w.sell_orders.size() == 1 ? s.w.sell_orders[0].id : 0u;
+
+        bool open = id != 0, consumed = true;
+        for (int t = 1; t <= 10; ++t)
+        {
+            s.w.hauled_ordered_this_tick.insert({s.corp, s.body, steel}); // dispatch hauled it
+            economy_report empty;
+            clear_markets(s.w, reg, empty);
+            if (s.w.sell_orders.size() != 1 || s.w.sell_orders[0].id != id ||
+                s.w.sell_orders[0].empty_ticks != 0)
+                open = false;
+            if (!s.w.hauled_ordered_this_tick.empty())
+                consumed = false;
+        }
+        check(open,
+              "R12.1 an order whose pool dispatch hauls empty every tick stays open (empty run 0) "
+              "for 10 ticks: hauled is not 'nothing to sell'");
+        check(consumed, "R12.2 the clear consumes the hauled set (a clear without a dispatch "
+                        "never reads a stale tick)");
+
+        bool open_before_n = true;
+        for (int t = 1; t < static_cast<int>(sell_order_empty_close_ticks); ++t)
+        {
+            economy_report empty;
+            clear_markets(s.w, reg, empty);
+            if (s.w.sell_orders.size() != 1) open_before_n = false;
+        }
+        economy_report empty;
+        clear_markets(s.w, reg, empty);
+        check(open_before_n && s.w.sell_orders.empty(),
+              "R12.3 once nothing is hauled and the pool stands empty, it closes at N ticks");
+    }
+
+    // -----------------------------------------------------------------------
     // R11 — a rival never lists goods its own processors have reserved
     // (BL-1201 review). Stock past the hold threshold that a running processor
     // reserves for its next batch is not surplus: clearing would list none of
