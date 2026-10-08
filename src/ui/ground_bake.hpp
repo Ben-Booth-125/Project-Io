@@ -52,7 +52,17 @@ struct geometry
     double y_min = 0.0;      ///< Canonical y of pixel row 0 (top margin above row 0's hexes).
     double tilt_sy = 1.0;    ///< cos(tilt) the camera will apply; 1 = flat.
     double lift    = 0.0;    ///< Upward displacement per unit height, canonical units.
+    /// Supersample factor this geometry is being baked at (BL-1244): s is the
+    /// ACTUAL pixels per hex, s / ss the NOMINAL tier resolution the result
+    /// will be downsampled to. Every resolution-keyed character choice (the
+    /// close-tier octave, tree stamps, the post passes) keys on the nominal
+    /// figure, so supersampling anti-aliases a tier without changing what it
+    /// draws. Callers always pass ss = 1; bake_region derives the 2x geometry.
+    double ss      = 1.0;
 };
+
+/// The NOMINAL bake resolution, px per hex circumradius (s / ss).
+inline double nominal_s(const geometry& g) { return g.s / g.ss; }
 
 /// Derive the bake geometry for a body grid at roughly @p target_px_per_r
 /// baked pixels per hex circumradius. W is rounded to a whole pixel count and
@@ -96,7 +106,15 @@ struct bake_params
     // edge, and none touches the lock fill or the transparent margin.
     float edge_ink        = 0.30f;  ///< Darkening where two cover classes meet (>= 20 px/r).
     float shore_ink       = 0.42f;  ///< Darkening on the land|water boundary (stronger).
-    float unsharp_amount  = 0.50f;  ///< Unsharp-mask strength at >= 40 px/r.
+    float unsharp_amount  = 0.50f;  ///< Unsharp-mask strength at >= 40 px/r, single-sample bake.
+    float unsharp_amount_ss = 0.35f; ///< The same pass on a SUPERSAMPLED bake: run once, at nominal
+                                    ///< resolution AFTER the downsample, re-tuned against the
+                                    ///< anti-aliased result (BL-1244) rather than stacked on it.
+    // Supersampling (BL-1244, RENDERING.md § Level of detail): every tier
+    // bakes at this multiple of its nominal px per hex and is box-downsampled
+    // before upload, so stamp edges, creases and banks are anti-aliased in the
+    // bake. 1 = the pre-BL-1244 single-sample bake, byte for byte.
+    int   supersample     = 2;
     // Water.
     float water_noise     = 0.03f;
     // Near-future grade (the separable pass).
@@ -137,6 +155,22 @@ bake_source prepare_source(const world& w, entity_id body, bool reveal_all = fal
 /// same source + params + window -> byte-identical output.
 void bake_region(const bake_source& src, const geometry& g, const bake_params& p,
                  int px0, int py0, int pw, int ph, std::uint32_t* out);
+
+/// The never-magnify tier chooser (BL-1244, RENDERING.md § Level of detail):
+/// the index of the SMALLEST tier whose px per hex is at or above @p draw_r,
+/// so the tier is drawn minified (never past 2:1 on a x2 ladder) and never
+/// magnified. -1 = the far page, which carries the frame only where it too is
+/// drawn at or below 1:1 (@p draw_r <= @p far_ppr). Past the top tier the top
+/// tier is returned and magnifies — the ladder's one bound.
+/// @p tier_ppr must be ascending.
+int choose_tier(double draw_r, double far_ppr, const double* tier_ppr, int n_tiers);
+
+/// The shipped tier ladder (RENDERING.md § Level of detail): the far page and
+/// the chunked tiers, px per hex circumradius. One source for ground_layer and
+/// the headless chooser rows.
+inline constexpr double k_far_ppr = 6.0;
+inline constexpr int    k_tier_count = 5;
+inline constexpr double k_tier_ladder[k_tier_count] = { 12.0, 24.0, 48.0, 96.0, 192.0 };
 
 /// Content hash of everything bake_region reads for the given pixel window
 /// (tile fields + mask state of the tiles overlapping it, plus a margin ring).

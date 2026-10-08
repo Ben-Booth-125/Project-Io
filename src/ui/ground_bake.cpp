@@ -326,7 +326,7 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
     // 1.4 tiles soft is 70 px soft up close. As the bake resolution grows past
     // the play tier, tighten the field and lift the detail: res_t is 0 at
     // 24 px/r and 1 at 96.
-    const float  res_t = static_cast<float>(std::clamp((g.s - 24.0) / 48.0, 0.0, 1.0));
+    const float  res_t = static_cast<float>(std::clamp((nominal_s(g) - 24.0) / 48.0, 0.0, 1.0));
     const double R     = p.blend_radius * (1.0 - 0.22 * res_t); // stays > 1 (corner coverage)
     const double R2    = R * R;
     const float  detail_mul = 1.0f + 1.1f * res_t;
@@ -360,7 +360,7 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
     // close — one finer octave keys in on resolution alone.
     int fine_cells = 1;
     const double fine_cell = periodic_cell(0.155, fine_cells);
-    const bool   fine_on   = g.s >= 40.0;
+    const bool   fine_on   = nominal_s(g) >= 40.0;
 
     for (int py = 0; py < ph; ++py)
     {
@@ -734,21 +734,20 @@ void unsharp(std::uint32_t* buf, const std::uint8_t* tag, int pw, int ph, float 
         }
 }
 
-} // namespace
-
-void bake_region(const bake_source& src, const geometry& g, const bake_params& p,
-                 int px0, int py0, int pw, int ph, std::uint32_t* out)
+/// One bake of a window at geometry @p g — which, under supersampling, is the
+/// 2x geometry bake_region derives (g.ss > 1): every pass runs here at the
+/// actual resolution, keyed on the NOMINAL one for its character. @p tag_out
+/// (optional, pw*ph) receives the terrain tag of each output pixel.
+void bake_region_at(const bake_source& src, const geometry& g, const bake_params& p,
+                    int px0, int py0, int pw, int ph, std::uint32_t* out,
+                    std::uint8_t* tag_out)
 {
-    if (src.gw <= 0 || src.gh <= 0)
-    {
-        std::memset(out, 0, static_cast<std::size_t>(pw) * ph * 4u);
-        return;
-    }
+    const double ns = nominal_s(g);
     // APRON (BL-736): the post passes below read neighbours (ink 1 px,
     // unsharp ±2 px), so the window bakes with a margin and crops — a chunk
     // edge can then never seam or halo, because every chunk computed the same
     // overlap. Below 20 px/r no post pass runs and the apron is skipped.
-    const int  A   = g.s >= 20.0 ? 6 : 0;
+    const int  A   = ns >= 20.0 ? 6 : 0;
     const int  apw = pw + 2 * A, aph = ph + 2 * A;
     const std::size_t an = static_cast<std::size_t>(apw) * aph;
     std::vector<std::uint32_t> abuf(an);
@@ -758,10 +757,14 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
 
     // Cover-boundary ink BEFORE the stamps: a tree may straddle an inked
     // boundary and should occlude the line, never carry it.
+    // Under supersampling the 1 px ink line is 1/ss of a nominal pixel after
+    // the downsample, so its strength scales by ss to keep the same weight.
     if (A > 0)
-        edge_ink(abuf.data(), acov.data(), apw, aph, p.edge_ink, p.shore_ink);
+        edge_ink(abuf.data(), acov.data(), apw, aph,
+                 std::min(0.9f, p.edge_ink  * static_cast<float>(g.ss)),
+                 std::min(0.9f, p.shore_ink * static_cast<float>(g.ss)));
 
-    if (g.s >= 40.0 && p.tree_density > 0.0f)
+    if (ns >= 40.0 && p.tree_density > 0.0f)
         stamp_trees(src, g, p, px0 - A, py0 - A, apw, aph, abuf.data(), atag.data());
 
     // The separable near-future grade. Its haze lift falls and its contrast
@@ -769,7 +772,7 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
     // tiers need their local contrast more than their atmosphere.
     if (p.grade_enabled)
     {
-        const float res_t = static_cast<float>(std::clamp((g.s - 24.0) / 48.0, 0.0, 1.0));
+        const float res_t = static_cast<float>(std::clamp((ns - 24.0) / 48.0, 0.0, 1.0));
         const float lift     = p.grade_lift * (1.0f - 0.5f * res_t);
         const float contrast = p.grade_contrast + 0.045f * res_t;
         const float haze_r = 15.0f, haze_g = 15.0f, haze_b = 20.0f;
@@ -800,13 +803,112 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
 
     // Unsharp last: it sees the graded, inked, stamped image — the thing the
     // player sees — and restores the edge contrast the interpolation lacks.
-    if (g.s >= 40.0 && p.unsharp_amount > 0.0f)
+    // A supersampled bake defers it: bake_region runs it ONCE, at nominal
+    // resolution, after the downsample (never stacked on both).
+    if (g.ss <= 1.0 && ns >= 40.0 && p.unsharp_amount > 0.0f)
         unsharp(abuf.data(), atag.data(), apw, aph, p.unsharp_amount);
 
     for (int y = 0; y < ph; ++y)
+    {
         std::memcpy(out + static_cast<std::size_t>(y) * pw,
                     abuf.data() + static_cast<std::size_t>(y + A) * apw + A,
                     static_cast<std::size_t>(pw) * 4u);
+        if (tag_out)
+            std::memcpy(tag_out + static_cast<std::size_t>(y) * pw,
+                        atag.data() + static_cast<std::size_t>(y + A) * apw + A,
+                        static_cast<std::size_t>(pw));
+    }
+}
+
+} // namespace
+
+void bake_region(const bake_source& src, const geometry& g, const bake_params& p,
+                 int px0, int py0, int pw, int ph, std::uint32_t* out)
+{
+    if (src.gw <= 0 || src.gh <= 0)
+    {
+        std::memset(out, 0, static_cast<std::size_t>(pw) * ph * 4u);
+        return;
+    }
+    const int ss = std::max(1, p.supersample);
+    if (ss == 1)
+    {
+        bake_region_at(src, g, p, px0, py0, pw, ph, out, nullptr);
+        return;
+    }
+
+    // SUPERSAMPLED (BL-1244): bake the same window at ss x the pixels per hex
+    // — the ss geometry is the nominal one scaled exactly (W, H and s all x ss,
+    // y_min and lift unchanged), so pixel (ss*x .. ss*x+ss-1) of it covers
+    // nominal pixel x precisely and chunks stay seamless and wrap-exact —
+    // then box-downsample to nominal. The unsharp pass runs once, on the
+    // nominal result, inside a margin M it can read across without seaming.
+    geometry gs = g;
+    gs.s  = g.s * ss;
+    gs.W  = g.W * ss;
+    gs.H  = g.H * ss;
+    gs.ss = g.ss * ss;
+    const bool sharpen = nominal_s(g) >= 40.0 && p.unsharp_amount_ss > 0.0f;
+    const int  M  = sharpen ? 3 : 0;
+    const int  mw = pw + 2 * M, mh = ph + 2 * M;
+    const int  hw = mw * ss,    hh = mh * ss;
+    std::vector<std::uint32_t> hi(static_cast<std::size_t>(hw) * hh);
+    std::vector<std::uint8_t>  htag(static_cast<std::size_t>(hw) * hh, 0u);
+    bake_region_at(src, gs, p, (px0 - M) * ss, (py0 - M) * ss, hw, hh,
+                   hi.data(), htag.data());
+
+    // Box downsample, alpha-weighted so the transparent margin never darkens
+    // a grid edge. A nominal pixel is TAGGED only when every sub-sample is
+    // terrain: the unsharp pass must leave a lock-fill or mask-edge pixel
+    // exactly as averaged (a pixel wholly inside the lock fill averages to
+    // the lock colour byte-exact).
+    std::vector<std::uint32_t> lo(static_cast<std::size_t>(mw) * mh);
+    std::vector<std::uint8_t>  ltag(static_cast<std::size_t>(mw) * mh);
+    const int n = ss * ss;
+    for (int y = 0; y < mh; ++y)
+        for (int x = 0; x < mw; ++x)
+        {
+            int sr = 0, sg = 0, sb = 0, sa = 0;
+            std::uint8_t all = 1;
+            for (int dy = 0; dy < ss; ++dy)
+            {
+                const std::size_t row = static_cast<std::size_t>(y * ss + dy) * hw;
+                for (int dx = 0; dx < ss; ++dx)
+                {
+                    const std::size_t i = row + static_cast<std::size_t>(x * ss + dx);
+                    const std::uint32_t c = hi[i];
+                    const int a = palette::col_a(c);
+                    sr += palette::col_r(c) * a;
+                    sg += palette::col_g(c) * a;
+                    sb += palette::col_b(c) * a;
+                    sa += a;
+                    all &= htag[i];
+                }
+            }
+            const std::size_t o = static_cast<std::size_t>(y) * mw + x;
+            ltag[o] = all;
+            lo[o] = sa == 0 ? 0u
+                  : palette::col32((sr + sa / 2) / sa, (sg + sa / 2) / sa,
+                                   (sb + sa / 2) / sa, (sa + n / 2) / n);
+        }
+
+    if (sharpen)
+        unsharp(lo.data(), ltag.data(), mw, mh, p.unsharp_amount_ss);
+
+    for (int y = 0; y < ph; ++y)
+        std::memcpy(out + static_cast<std::size_t>(y) * pw,
+                    lo.data() + static_cast<std::size_t>(y + M) * mw + M,
+                    static_cast<std::size_t>(pw) * 4u);
+}
+
+int choose_tier(double draw_r, double far_ppr, const double* tier_ppr, int n_tiers)
+{
+    if (draw_r <= far_ppr || n_tiers <= 0)
+        return -1;
+    for (int t = 0; t < n_tiers; ++t)
+        if (tier_ppr[t] >= draw_r)
+            return t;
+    return n_tiers - 1; // past the top tier: magnified, the ladder's bound
 }
 
 std::uint64_t region_hash(const bake_source& src, const geometry& g,
