@@ -74,6 +74,17 @@ world_gen = {
             -- value_anchor) reads this number, so a move here moves the head wage.
             ordnance               = 155.8,
 
+            -- Propellant has a base price (Ben, 2026-10-08; BL-1217;
+            -- RESOURCES.md § What trades). Unpriced, every propellant plant
+            -- forecast zero revenue and was idled the moment it stood. DERIVED
+            -- like every Tier 3 price: the cheapest in-band route is
+            -- propellant_electrolysis (water x3 + refined_fuel x1 = 20.10 at
+            -- base, + 0.75 wage per batch = 20.85 marginal), k = 1 needs 41.70,
+            -- and the table carries the same 0.1 over the exact need every
+            -- anchored price does. propellant_atmospheric (refined_fuel x2,
+            -- 31.95 marginal) is the alternate and clears k_alt = 0 at it.
+            propellant             = 41.8,
+
             -- BL-429: the ANCIENT tier. BL-340 closed the minable-but-unsellable
             -- asymmetry for the space chain and left it wide open here — every one
             -- of these had authored deposits and extraction rules (tile_generation

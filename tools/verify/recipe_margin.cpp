@@ -67,8 +67,10 @@
 // bands are checked below against the same table.
 //
 // WHAT IS EXEMPT, AND SAYS SO. A recipe whose every output carries base_price 0
-// (propellant: "consumed by the Launchpad, never sold", RESOURCES.md) has no
-// market margin to anchor and is listed as UNPRICED rather than failed. A recipe
+// has no market margin to anchor and is listed as UNPRICED rather than failed.
+// No recipe in the roster qualifies: propellant, the one good that once did,
+// carries a base price (RESOURCES.md, Ben 2026-10-08), so both Chemical Plant
+// routes are anchored like every other row. A recipe
 // with an UNPRICED INPUT is a defect, not an exemption — the input cannot be
 // bought at any price — and R5 fails on it.
 //

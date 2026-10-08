@@ -329,7 +329,7 @@ Products are the highest-value goods and the primary driver of market price dive
 |----------|---------------|---------------------|-----------|
 | Machinery | Steel + refined copper | Fabricator | 61.0 |
 | Electronics | Silicon + refined copper + REE alloy | Electronics Lab | 41.6 |
-| Propellant | Refined fuel + liquid oxygen | Chemical Plant | Launchpad, space programme (priced, Ben 2026-10-08) |
+| Propellant | Refined fuel + liquid oxygen | Chemical Plant | 41.8 |
 | Alloys | Steel + REE alloy | Fabricator | 85.0 |
 | Spacecraft components | Alloys + electronics | Assembly Plant | 310.0 |
 | **Ordnance** | **Steel + machinery** | **Fabricator**; also the **Smithy** on the ancient roster | 155.8 |
@@ -446,6 +446,7 @@ tradeable, and `resolve_price` / the clearing pass ignore everything else
   61.0, alloys 85.0, electronics 41.6, spacecraft components 310.0.
 - **The habitability tranche**: clean water 7.7, consumer goods 61.0, medical supplies 14.0.
 - **Ordnance** 140.8 (ancient 113.0).
+- **Propellant** 41.8 — derived below.
 - **Power** 2.6 and **construction capacity** 6.6 — the grid good and the
   construction sector's product (`docs/economy/PRODUCTION.md`).
 
@@ -453,7 +454,11 @@ tradeable, and `resolve_price` / the clearing pass ignore everything else
 burned by a Launchpad and by the nation's space programme, and both buy it — so it trades, and a
 plant that makes it can be judged by what it earns. Unpriced, every propellant plant forecast zero
 revenue and was idled the moment it stood (102 of them across the 16 curated seeds). Its base
-price is derived from its inputs (refined fuel and liquid oxygen) as every Tier 3 product's is.
+price is derived from its inputs (refined fuel and liquid oxygen) as every Tier 3 product's is. The
+cheapest route is the airless one (`propellant_electrolysis`: water ×3 + refined fuel ×1, 20.10 at
+base, plus 0.75 wage per batch), so under `docs/economy/PRODUCTION.md` § The recipe margin anchor
+(k = 1) it needs 41.70; the table carries 41.8, the same 0.1 over the exact need every anchored
+Tier 3 price carries. Re-derive if refined fuel, water or the recipe quantities move.
 
 Water is in this tradeable set from tick 0: it carries an authored base price on the home-body
 markets and sits in the substrate demand basket (`scripts/economy.lua`, weight 0.40).
