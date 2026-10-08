@@ -1569,8 +1569,8 @@
    "design": "PRE-EXISTING, found in passing (2026-10-07): (1) prospective_profit_harness does not compile - line ~165 calls compute_building_opex with 4 arguments, a signature that has moved; (2) convoy_command R4.2 / R4.4 / R4.5 (player vs auto convoy cost and cargo) fail identically on the sprint branch before BL-1229 - find when and why, fix the cause or split it, never weaken the rows; (3) after BL-1229 (an order is a floor, not a hold) the probes live_tick_cost_probe, steel_chain_probe and inflow_probe still copy the old order_controlled hold, so their \"ordered\" class misreports - re-point them at the dispatcher's rule. ADDED (BL-1229 re-review, 2026-10-07): (4) a dispatch_convoy command (scorer directed haul or the player's manual convoy) that drains an ordered pool still counts as empty and can close it with the nothing-to-sell text - mark the hauled set in commit_convoy; (5) order_book_harness R12 inserts into hauled_ordered_this_tick by hand - add a row proving dispatch_convoys inserts on a haul; (6) the rival scorer's steel order placements rose 16 -> 26 -> 44 across the BL-1229 rounds - read placements per (corp, body, good) to tell new triples (harmless) from churn. ADDED (sell_probe, 2026-10-08): (7) dispatch_absorbable (supply_system.cpp) returns infinite room when the aimed price is below floor x base, BEFORE the D <= 0 test, so a market with no demand can read unbounded room for a cheap landing - latent, unseen sending; pin with a harness row and order the tests; (8) seed 28: the passive-LP cap appears to block hauls to a reachable, short, roomy market (10 of 17 reflex-misjudged closures) - measure LP refusals there; (9) the loss reflex values a mine's whole co-extraction basket at its PRIMARY good's home price, and at home rather than the dispatcher's room-limited net (17 of 257 closures flip)."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 50,
    "written": "2026-10-07",
    "requires": [],
@@ -1588,7 +1588,7 @@
     "src/world/corporation_generation.cpp",
     "src/world/corp_ai.cpp"
    ],
-   "design": "Ben (2026-10-07, the path form): a wired grid with no generation keeps decaying as written; the answer is more generation, diagnosed first. power_grid_probe (BL-1230, 40e6cec4, 5 seeds): 156 grids for 106 markets, only 6-9 carry a live generator; wired buildings on generator-less grids hold 16.6% of power need at handoff and 10.5% at t50 (seed 28: 52% / 45%); there the pooled price passes the 2x ceiling and buildings stop bidding - the largest single remaining power loss. DIAGNOSE: why generation places so few plants (body-level upkeep demand in body_upkeep_demand vs per-grid draw; the scorer's power-plant scoring grain; fuel and site rules), then fix placement so each grid with power demand gets generation."
+   "design": "MERGED (e643c5b3, 2026-10-08; four review rounds; conflicts with BL-1233 resolved by hand): generation sized per grid, output keyed by the market centre's grid, unpowered first, an unreachable grid never holds up the others; the solver reads power on its grid and prices inputs at the posted price; the AI gate HELD on bl1232-gate-remeasure. Follow-ups BL-1237, BL-1238. Ben (2026-10-07, the path form): a wired grid with no generation keeps decaying as written; the answer is more generation, diagnosed first. power_grid_probe (BL-1230, 40e6cec4, 5 seeds): 156 grids for 106 markets, only 6-9 carry a live generator; wired buildings on generator-less grids hold 16.6% of power need at handoff and 10.5% at t50 (seed 28: 52% / 45%); there the pooled price passes the 2x ceiling and buildings stop bidding - the largest single remaining power loss. DIAGNOSE: why generation places so few plants (body-level upkeep demand in body_upkeep_demand vs per-grid draw; the scorer's power-plant scoring grain; fuel and site rules), then fix placement so each grid with power demand gets generation."
   },
   {
    "status": "complete",
@@ -1612,8 +1612,8 @@
    "design": "MERGED (6cf81da2, 2026-10-08; three cold-review rounds): spare-supply test at t_idle in every pass; spare counted once and bounded per consumer; a refused processor's in-reach want enters derived demand as a shortage of its own; roster to a fixed point. 5 seeds: G1 59.3 -> 73.9, G1b 29.8 -> 20.0, G2 58.8 -> 64.2; generation-built starved 364 -> ~70; the remaining gap is the settle scorer on seed 0 (BL-1234). Ben (2026-10-07, the path form, G1 path C; extends BL-1185, chain-feasible placement). inflow_probe (cold-checked): bodies produce 28-63% of the raw silica / copper ore / rare earth ore their processors want, system-wide; processors per producer 0.6-0.8, but each mine yields a co-extraction basket so its share of any one good is small. BL-1185 made a chain feasible (a site exists); this item makes it SIZED: a processor is placed only where the input supply it can reach (by the market-viability reach rules) covers a run. DIAGNOSE FIRST: per body and good, processors placed vs the extraction that can feed them at handoff, and which generation pass places the surplus processors; then propose the rule (no clamp, a placement consequence)."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 50,
    "written": "2026-10-08",
    "requires": [],
@@ -1630,7 +1630,7 @@
    "files": [
     "src/world/corp_ai.cpp"
    ],
-   "design": "FOUND by processor_placement_probe (BL-1233): the 12-tick settle scorer adds 221-271 processors by handoff and 96-156 of them are input-starved, nearly all on PROCESSED inputs (consumer goods, ordnance, machinery, propellant); seed 0 alone has 110 of 117 starved after BL-1233. Generation's new sized rule does not reach the scorer. DIAGNOSE: which candidate gate admits them (recipe_inputs_obtainable reading opening stock as cover? the BL-1187 build-only-what-runs test at settle prices?), then fix the estimate inside the scorer grant. Read with BL-1233."
+   "design": "MERGED (a6910272 + 88304efb, 2026-10-08; two review rounds): a new processor judged on supply; plants under construction count against spare; landed-cost pricing. 5 seeds: settle builds starved at handoff 110 -> 0; G1 76.7 -> 80.5, G1b 16.2 -> 11.2. NOTE (review): a site stalled indefinitely reserves its draw indefinitely - watch with BL-1236 (plant builds stall). FOUND by processor_placement_probe (BL-1233): the 12-tick settle scorer adds 221-271 processors by handoff and 96-156 of them are input-starved, nearly all on PROCESSED inputs (consumer goods, ordnance, machinery, propellant); seed 0 alone has 110 of 117 starved after BL-1233. Generation's new sized rule does not reach the scorer. DIAGNOSE: which candidate gate admits them (recipe_inputs_obtainable reading opening stock as cover? the BL-1187 build-only-what-runs test at settle prices?), then fix the estimate inside the scorer grant. Read with BL-1233."
   },
   {
    "status": "proposed",

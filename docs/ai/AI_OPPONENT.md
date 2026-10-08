@@ -490,7 +490,13 @@ where a processor genuinely differs from a mine:
   seed 0 one steel shelf of 6,313 units with negative spare admitted 63 builds in eight ticks and
   was empty by the tenth, and 97% of the settle's starved processors were admitted that way. Stock
   still counts where a plant already stands — a resume, a recipe switch — because there the
-  question is whether to run what exists, not whether to add a draw.
+  question is whether to run what exists, not whether to add a draw. **A plant under construction
+  has already claimed its draw:** spare is net of every processor standing **or under
+  construction** in reach, charged at the draw it will take when it stands, so firms deciding in
+  the same ticks do not all count on the same spare; and a new plant is priced at the landed cost
+  of the supply that admitted it, not at a local shelf it will eat through. The shared reading
+  reaches every use of spare — a resume, a recipe switch, the reflex rescue — so a rival's plant
+  mid-build can hold back another's resume on the same producers, as the draw it has committed.
 - **Pricing.** Priced by `estimate_prospective_profit` rather than the extraction candidate's
   inline revenue-minus-wages sum. The inline model survives on the extraction side because
   switching it would move every blessed golden for no player-visible gain; a new candidate had no
