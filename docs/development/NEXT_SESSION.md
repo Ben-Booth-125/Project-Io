@@ -65,7 +65,13 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   dial reading silenced want first (IDLE16 agent round 3); BL-1235 designed — a dial-idled plant is
   not losing, the hold ends when its forecast recovers (lane DIALHOLD, agent `a1b28029261a2f580`);
   propellant gets a base price derived from its inputs (lane PROPELLANT, agent `a14f239f7a0f14bad`);
-  **G1 >= 85% at tick 50 too** (gate prints it). Then merge the probe and
+  **G1 >= 85% at tick 50 too** (gate prints it). **ROUND 3 DONE, merged (a5734335):** silenced
+  want (`hauler_want`) is 0 at EVERY zeroing market — steel 42 events (3 with demand, 0 want),
+  refined_fuel 123 (0/0), food_rations 159 (all demand, 0 want). Dial reading it: G1 71.5, moves 2
+  plants — the silenced-want lever is moot. Body-pooled 73.1; BL-1235 variant 79.5 handoff but
+  **t50 62.2**, G1b t50 ~25%; pooled+BL-1235 80.0. **No variant holds t50 past 62.6.** Open
+  question is upstream: why does no market bid steel / refined_fuel / silicon / clean_water at
+  settle start (how industrial demand is registered). Form to Ben pending. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
 
