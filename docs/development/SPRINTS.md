@@ -75,7 +75,7 @@ and/or a version goal (v0.1.1 etc.).
 
 **Risk.** Five world-movers on the dispatch seam. Each measures its own before/after on the market-viability skill in isolation, briefed with MULTI-TICK rows, and takes a cold review with a fix round budgeted. Baselines are read on main by the main session, never taken from a lane. Overflow (Ben): extend the sprint, cut nothing.
 
-Ben, 2026-10-07: sprint 51 takes the player trading loop and the visibility suite; BL-1170, BL-1148, BL-1174, BL-1181, BL-1175, BL-1189, BL-1139 sit in sprint 52.
+Ben, 2026-10-07: sprint 51 takes the player trading loop and the visibility suite; BL-1170, BL-1148, BL-1174, BL-1181, BL-1175, BL-1189, BL-1139 sit in sprint 52. 2026-10-08 (Ben): the sprint 52 parking above is void - sprint 52 became the player-as-nation pivot, and its items, those seven plus every untagged item, were cancelled. Wave 2's references to BL-1190 (markets meet firms) and BL-1192 (catchment ignores water) now point at cancelled items; re-mint one only if the diagnosis ranks it.
 
 ### Sprint 51 — visibility: the player's trading loop
 *Proposed · Ben (2026-10-07: sprint 51 is another visibility run; run it after sprint 50, not beside it); Claude (the proposal in NEXT_SESSION.md)*
@@ -93,6 +93,22 @@ Ben, 2026-10-07: sprint 51 takes the player trading loop and the visibility suit
 **Risk.** Live-click heavy: every interactive surface needs Ben's walk, so plan the sprint around his walks, not lane throughput. Every surface reads sprint 50's refusal classes and price gate, so cut only after sprint 50's wave 2 has merged, and re-run the visual checks after its re-bless.
 
 Serial, not parallel (Ben, 2026-10-07, after a collision check): the lens and strip files (body_surface_canvas.cpp, overlay.cpp, icons.*) are sprint 50's BL-1222 (trade-flow lens) and BL-1225 (every lens on strip), and the panels' predictions read the tick that BL-1217 (inputs reach processors) may change.
+
+### Sprint 52 — the player is a nation
+*Proposed · Ben (2026-10-08: move the player to nations with space programmes, put it in sprint 52, cancel sprint 52's items and every untagged item)*
+
+**Goal.** The player plays a nation that runs a space programme, with a space corporation tied to it that can still acquire and raise funds internationally; generation decides how many nations run a programme.
+
+**Planned.**
+- WAVE 0 - THE RULING. BL-1245 (player is a nation): Ben answers NR-980's six calls on one form; the settled design is written into CONCEPT.md § Player identity the moment it is settled.
+- WAVE 1 - THE SWEEP. Every doc that names the player a corporation holding a seat, the NR-885 sweep in reverse; grant register narrowed for the player's nation.
+- WAVE 2 - THE BUILD CUT. Items minted from the swept docs: the seat on a nation, the generation parameter, the nation step skipping the player, the player's verbs on the nation surfaces.
+
+**Done when.** Set at the cut. Proposed: no authority doc describes the player as a corporation holding a seat, and the player can be seated on a nation in a live build.
+
+**Risk.** The identity change was ruled once already three weeks ago (NR-885); a half-swept corpus is worse than either identity. Sweep before build, and grep the old wording (same-day rulings orphan siblings).
+
+Ben, 2026-10-08: cancelled 43 items to clear the sprint - 'if they're important we will reinvent them.' They restore with archive_landed.js --restore <ids>.
 
 ## Where things stand
 
@@ -168,9 +184,10 @@ Serial, not parallel (Ben, 2026-10-07, after a collision check): the lens and st
 | 49 | market viability | CLOSED 2026-10-07 on main: 16-seed market_viability G1 54.7 (FAIL, target 70) / G2 54.4 (PASS) / G3 88.9 (PASS); baseline was G1 17.6 / G2 27.5 / G3 31.3. G1 carried to sprint 50 as BL-1217 (inputs reach processors); seat profit 15/16. |
 | 50 | logistics and trade flow | OPEN 2026-10-07 (worktree-sprint-50). Wave 0: the instrument (BL-1223 gate logistics row, BL-1222 trade-flow lens). |
 | 51 | visibility: the player's trading loop | PROPOSED 2026-10-07. Opens after sprint 50 closes - serial by Ben's call (2026-10-07): its surfaces read the dispatch and pricing rules sprint 50 is still moving. |
+| 52 | the player is a nation | PROPOSED 2026-10-08. A design-first sprint: rule the identity, sweep the docs, then cut the build. Sequencing against sprint 51 not yet ruled. |
 
-**Next up.** SPRINT 50 OPEN (2026-10-07), logistics and trade flow, on worktree-sprint-50: wave 0 instruments (BL-1223 gate logistics row, BL-1222 trade-flow lens), wave 1 diagnoses BL-1217 (inputs reach processors), wave 2 fixes in ranked order, wave 3 network shape (BL-1195, BL-1119), close with BL-1165 and one re-bless. SPRINT 51 PROPOSED, a visibility run over the player's trading loop; it opens after sprint 50 closes.
+**Next up.** SPRINT 50 OPEN (2026-10-07), logistics and trade flow, on worktree-sprint-50: wave 0 instruments (BL-1223 gate logistics row, BL-1222 trade-flow lens), wave 1 diagnoses BL-1217 (inputs reach processors), wave 2 fixes in ranked order, wave 3 network shape (BL-1195, BL-1119), close with BL-1165 and one re-bless. SPRINT 51 PROPOSED, a visibility run over the player's trading loop; it opens after sprint 50 closes. SPRINT 52 PROPOSED (2026-10-08): the player is a nation (BL-1245); design first, NR-980.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*68 sprints archived cold; 2 open/gated in the hot store.*
+*68 sprints archived cold; 3 open/gated in the hot store.*

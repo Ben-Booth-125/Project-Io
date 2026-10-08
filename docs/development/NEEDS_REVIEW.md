@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*83 entries — 6 open, 77 resolved.*
+*84 entries — 7 open, 77 resolved.*
 
 ---
 
@@ -120,6 +120,15 @@ After the sprint 49 re-bless (the lake cap moved every seed's history), the libr
 > **Recommendation:** C - check which tags a harness or skill queries (--for), replace those seeds, and let the rest go.
 
 *Files: `docs/generation/seed_library.json`*
+
+### NR-980 — The player is a nation: six calls before the doc sweep
+*question · raised 2026-10-08 · from Ben's 2026-10-08 direction (option A) - BL-1245 (player is a nation)*
+
+Direction is ruled: the player is a nation with a space programme, reversing NR-885. Six calls remain, listed in BL-1245's design: the player's nation verbs; the nation step and grant register skipping the player's nation; what replaces 'answer to' in the design test; whether the space corporation is a separate actor or the space_programme line; the how-many-programmes generation parameter and its default; the elimination rule.
+
+**Why it matters.** Every doc sweep and build item in sprint 52 reads these answers; NR-885's sweep touched 14 docs, and reversing it half-way leaves the corpus asserting two identities.
+
+- Answer on one design form, then sweep in a single pass
 
 ---
 

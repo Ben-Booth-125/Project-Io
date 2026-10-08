@@ -1838,6 +1838,19 @@
     "docs/generation/seed_library.json"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-980",
+   "title": "The player is a nation: six calls before the doc sweep",
+   "raised": "2026-10-08",
+   "kind": "question",
+   "status": "open",
+   "source": "Ben's 2026-10-08 direction (option A) - BL-1245 (player is a nation)",
+   "what": "Direction is ruled: the player is a nation with a space programme, reversing NR-885. Six calls remain, listed in BL-1245's design: the player's nation verbs; the nation step and grant register skipping the player's nation; what replaces 'answer to' in the design test; whether the space corporation is a separate actor or the space_programme line; the how-many-programmes generation parameter and its default; the elimination rule.",
+   "why_it_matters": "Every doc sweep and build item in sprint 52 reads these answers; NR-885's sweep touched 14 docs, and reversing it half-way leaves the corpus asserting two identities.",
+   "options": [
+    "Answer on one design form, then sweep in a single pass"
+   ]
   }
  ]
 }
