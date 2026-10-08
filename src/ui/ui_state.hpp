@@ -332,6 +332,9 @@ struct ground_view
     entity_id body = null_entity;    ///< Body the bake describes; canvas ignores a mismatch.
     double    tier_ppr = 0.0;        ///< Active tier's baked px per hex circumradius (0 = far only).
     std::vector<ground_chunk_view> chunks; ///< The active tier's ready chunks.
+    /// The next tier DOWN's resident chunks — the stand-in while the active
+    /// tier fills (BL-1244); drawn over the far page, under `chunks`.
+    std::vector<ground_chunk_view> standin;
     ground_chunk_view far;           ///< Low-res whole-body page (tex null until baked).
     bool far_ready = false;
 };

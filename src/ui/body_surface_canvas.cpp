@@ -2726,6 +2726,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             }
         };
         draw_ground_rect(gview.far);
+        for (const ground_chunk_view& cv : gview.standin) // BL-1244: next tier down while filling
+            draw_ground_rect(cv);
         for (const ground_chunk_view& cv : gview.chunks)
             draw_ground_rect(cv);
 
@@ -2738,9 +2740,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             char gbuf[96];
             if (gview.tier_ppr > 0.0)
                 std::snprintf(gbuf, sizeof gbuf,
-                              "ground: tier %.0f px/r  ·  %.2f texel/px  ·  %d chunks",
+                              "ground: tier %.0f px/r  ·  %.2f texel/px  ·  %d chunks  ·  %d stand-in",
                               gview.tier_ppr, gview.tier_ppr / draw_r,
-                              static_cast<int>(gview.chunks.size()));
+                              static_cast<int>(gview.chunks.size()),
+                              static_cast<int>(gview.standin.size()));
             else
                 std::snprintf(gbuf, sizeof gbuf,
                               "ground: far page 6 px/r  ·  %.2f texel/px",

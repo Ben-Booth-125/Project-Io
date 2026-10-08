@@ -16,6 +16,16 @@
 //   P6  Mask: a source built WITHOUT reveal_all on an unsurveyed body bakes
 //       the lock colour, and leaks no terrain hue.
 //   P7  region_hash moves when a tile field the bake reads moves.
+//   P8/P9 close-tier and oblique bakes stay pure and wrap-exact.
+//
+// Requirement group `ground-never-magnified` (BL-1244):
+//
+//   P10 The tier chooser: smallest tier with ppr >= draw_r, far page at or
+//       below 1:1, no radius magnified up to the 192 px top tier, no chunked
+//       tier minified past 2:1.
+//   P11 The 2x supersampled bake is pure, wrap-exact, seamless across a chunk
+//       edge, and not a no-op.
+//   P12 (a reading) bake ms per 512 px chunk per tier, 1x vs 2x.
 //
 // Exits 0 on PASS, non-zero naming the failed phase.
 
@@ -27,6 +37,8 @@
 #include "world/world.hpp"
 #include "harness_params.hpp"
 
+#include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -268,6 +280,113 @@ int main()
         check(t1 == t3, "P9", "45-degree oblique bake wraps byte-identical one period east");
         check(g45.lift > 0.8 && g45.lift < 1.0, "P9", "45-degree lift derives to ~0.9 canonical");
         check(t1 != a48, "P9", "the oblique projection differs from the flat bake");
+    }
+
+    // P10 — the never-magnify chooser (BL-1244, RENDERING.md § Level of
+    // detail): the smallest tier at or above the drawn radius; the far page
+    // only at or below 1:1; minification never past 2:1 on the ladder; the
+    // 192 px tier exists. Rows include the measured rung radii at 1720x1080
+    // (5.93 / 12.87 / 26.73 / 54.47 / 109.66) and 3840x2160 (13.0 ... 222.41).
+    {
+        const double* L = k_tier_ladder;
+        const int     N = k_tier_count;
+        check(N >= 5 && L[N - 1] == 192.0, "P10", "a 192 px chunked tier tops the ladder");
+        const struct { double r; int want; } rows[] = {
+            { 5.93, -1 }, { 6.0, -1 }, { 6.01, 0 }, { 12.0, 0 }, { 12.87, 1 }, { 13.0, 1 },
+            { 26.73, 2 }, { 27.0, 2 }, { 54.47, 3 }, { 54.99, 3 }, { 96.0, 3 },
+            { 109.66, 4 }, { 110.98, 4 }, { 192.0, 4 }, { 222.41, 4 },
+        };
+        bool all = true;
+        for (const auto& row : rows)
+        {
+            const int got = choose_tier(row.r, k_far_ppr, L, N);
+            if (got != row.want)
+            {
+                std::printf("      draw_r %.2f -> tier %d, want %d\n", row.r, got, row.want);
+                all = false;
+            }
+        }
+        check(all, "P10", "chooser picks the smallest tier with ppr >= draw_r (far page at <= 6)");
+        // Sweep: every radius the ladder covers draws at texel/px in [1, 2].
+        bool never_mag = true, within_2 = true;
+        for (double r = 0.5; r <= L[N - 1]; r += 0.0625)
+        {
+            const int t = choose_tier(r, k_far_ppr, L, N);
+            const double ppr = t < 0 ? k_far_ppr : L[t];
+            if (ppr / r < 1.0) never_mag = false;
+            if (r > k_far_ppr && ppr / r > 2.0) within_2 = false;
+        }
+        check(never_mag, "P10", "no radius up to the top tier is magnified (texel/px >= 1)");
+        check(within_2, "P10", "no chunked tier is minified past 2:1");
+    }
+
+    // P11 — supersampling (BL-1244): the 2x bake is pure (byte-identical
+    // twice), wrap-exact (one period east), seamless (two half windows equal
+    // the whole — the downsample and the nominal unsharp cannot seam a chunk
+    // edge), and actually different from the single-sample bake.
+    {
+        const geometry g48 = make_geometry(hb.grid_width, hb.grid_height, 48.0);
+        const int lr = land_i / src.gw, lc = land_i % src.gw;
+        const double lx = 1.7320508075688772 * (lc + ((lr & 1) ? 0.5 : 0.0));
+        const int side = 96;
+        const int px0 = static_cast<int>(lx * g48.s) - side / 2;
+        const int py0 = std::clamp(static_cast<int>((1.5 * lr - g48.y_min) * g48.s) - side / 2,
+                                   0, std::max(0, g48.H - side));
+        bake_params p2 = p;   p2.supersample = 2;
+        bake_params p1 = p;   p1.supersample = 1;
+        const std::size_t n = static_cast<std::size_t>(side) * side;
+        std::vector<std::uint32_t> a(n), b(n), e(n), s1(n), whole(n * 2), l(n), r(n);
+        bake_region(src, g48, p2, px0, py0, side, side, a.data());
+        bake_region(src, g48, p2, px0, py0, side, side, b.data());
+        bake_region(src, g48, p2, px0 + g48.W, py0, side, side, e.data());
+        bake_region(src, g48, p1, px0, py0, side, side, s1.data());
+        check(a == b, "P11", "2x supersampled bake is byte-identical twice");
+        check(a == e, "P11", "2x supersampled bake wraps byte-identical one period east");
+        check(a != s1, "P11", "supersampling changes the bake (it is not a no-op)");
+        // Seam: a 2*side-wide window vs its two halves baked separately.
+        bake_region(src, g48, p2, px0, py0, side * 2, side, whole.data());
+        bake_region(src, g48, p2, px0, py0, side, side, l.data());
+        bake_region(src, g48, p2, px0 + side, py0, side, side, r.data());
+        bool seam_ok = true;
+        for (int y = 0; y < side && seam_ok; ++y)
+            for (int x = 0; x < side; ++x)
+                if (whole[static_cast<std::size_t>(y) * side * 2 + x] != l[static_cast<std::size_t>(y) * side + x]
+                    || whole[static_cast<std::size_t>(y) * side * 2 + side + x] != r[static_cast<std::size_t>(y) * side + x])
+                {
+                    seam_ok = false;
+                    break;
+                }
+        check(seam_ok, "P11", "two adjacent 2x windows equal one window spanning both (no chunk seam)");
+    }
+
+    // P12 — bake cost per tier (a reading, not a check): one 512 px chunk per
+    // tier at 1x and 2x, wall-clock ms, so R3's before/after has a number
+    // independent of the app's viewport. The window is centred on land.
+    {
+        const int lr = land_i / src.gw, lc = land_i % src.gw;
+        const double lx = 1.7320508075688772 * (lc + ((lr & 1) ? 0.5 : 0.0));
+        const double ladder[] = { k_far_ppr, 12.0, 24.0, 48.0, 96.0, 192.0 };
+        std::vector<std::uint32_t> buf(512u * 512u);
+        for (const double ppr : ladder)
+        {
+            const geometry g = make_geometry(hb.grid_width, hb.grid_height, ppr);
+            const int cw = std::min(512, g.W), ch = std::min(512, g.H);
+            const int px0 = static_cast<int>(lx * g.s) - cw / 2;
+            const int py0 = std::clamp(static_cast<int>((1.5 * lr - g.y_min) * g.s) - ch / 2,
+                                       0, std::max(0, g.H - ch));
+            double ms[2] = {};
+            for (int k = 0; k < 2; ++k)
+            {
+                bake_params pk = p;
+                pk.supersample = k == 0 ? 1 : 2;
+                const auto t0 = std::chrono::steady_clock::now();
+                bake_region(src, g, pk, px0, py0, cw, ch, buf.data());
+                ms[k] = std::chrono::duration<double, std::milli>(
+                    std::chrono::steady_clock::now() - t0).count();
+            }
+            std::printf("TIMING  tier %3.0f px/r  chunk %dx%d  1x %8.1f ms  2x %8.1f ms  (x%.2f)\n",
+                        ppr, cw, ch, ms[0], ms[1], ms[0] > 0.0 ? ms[1] / ms[0] : 0.0);
+        }
     }
 
     // ------------------------------------------------------------------

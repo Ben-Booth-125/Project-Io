@@ -991,6 +991,43 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // as a no-op so existing verify scripts that call it keep loading.
     v.set_function("set_resource_mode", [](bool) {});
     v.set_function("set_zoom", [this](float z) { m_ui.planetary_zoom = z; });
+    // BL-1244 (ground never magnified): the frame HUD's ground line as data —
+    // the drawn hex radius, the active tier, texel/px (tier px per hex over
+    // drawn px per hex: >= 1 is minified, < 1 magnified), per-slot cumulative
+    // bake ms / count since ground_stats_reset(), and resident texture bytes.
+    // Slot 0 = the far page, slot 1 + t = chunked tier t.
+    v.set_function("ground_stats", [this]() {
+        sol::state& lua = m_lua.state();
+        const ground_layer::stats s = m_ground.stats_snapshot();
+        sol::table t = lua.create_table();
+        const float draw_r = m_ui.ground_req.draw_r;
+        const double ppr = m_ui.ground.tier_ppr > 0.0 ? m_ui.ground.tier_ppr : 6.0;
+        t["draw_r"]      = draw_r;
+        t["tier_ppr"]    = ppr;
+        t["texel_per_px"] = draw_r > 0.0f ? ppr / draw_r : 0.0;
+        t["chunks"]      = static_cast<int>(m_ui.ground.chunks.size());
+        t["active_slot"] = s.active_slot;
+        int ww = 0, wh = 0;
+        SDL_GetWindowSize(m_window, &ww, &wh);
+        t["window_w"] = ww;
+        t["window_h"] = wh;
+        sol::table slots = lua.create_table();
+        for (int i = 0; i < ground_layer::k_stat_slots; ++i)
+        {
+            sol::table r = lua.create_table();
+            r["ppr"]            = s.tier_ppr[i];
+            r["bake_ms"]        = s.bake_ms[i];
+            r["bakes"]          = s.bakes[i];
+            r["resident_bytes"] = static_cast<double>(s.resident_bytes[i]);
+            slots[i] = r;
+        }
+        t["slots"] = slots;
+        return t;
+    });
+    v.set_function("ground_stats_reset", [this]() { m_ground.reset_stats(); });
+    // The mid-fill frame: at most n chunk bakes per tick (-1 = unlimited, the
+    // --verify default). Pair with a rung change to capture the stand-in.
+    v.set_function("ground_fill_limit", [this](int n) { m_ground.verify_fill_limit = n; });
     v.set_function("set_pan",  [this](float x, float y) {
         m_ui.planetary_pan_x = x;
         m_ui.planetary_pan_y = y;

@@ -3,6 +3,7 @@
 #include "world/world.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 
 namespace {
@@ -11,6 +12,7 @@ constexpr double kSqrt3 = 1.7320508075688772;
 
 constexpr double      ground_layer::k_tier_ppr[];
 constexpr std::size_t ground_layer::k_tier_cap[];
+constexpr int         ground_layer::k_tier_supersample[];
 
 ground_layer::~ground_layer()
 {
@@ -38,9 +40,13 @@ void ground_layer::worker_main()
         d.tier = j.tier; d.ci = j.ci; d.cj = j.cj; d.pw = j.pw; d.ph = j.ph;
         d.hash = j.hash; d.gen = j.gen;
         d.px.assign(static_cast<std::size_t>(j.pw) * j.ph, 0u);
+        const auto t0 = std::chrono::steady_clock::now();
         ui::ground::bake_region(*j.src, j.geom, j.prm, j.px0, j.py0, j.pw, j.ph, d.px.data());
+        const double ms = std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - t0).count();
         {
             std::lock_guard lk(m_mx);
+            note_bake(j.tier, ms);
             m_results.push_back(std::move(d));
             --m_inflight; // counted from enqueue until the result LANDS — a popped job is still in flight
         }
@@ -167,6 +173,7 @@ ground_layer::job ground_layer::make_chunk_job(int tier, int ci, int cj) const
     j.src = m_src;
     j.geom = t.geom;
     j.prm  = params;
+    j.prm.supersample = std::min(params.supersample, k_tier_supersample[tier]);
     j.hash = ui::ground::region_hash(*m_src, t.geom, j.px0, j.py0, j.pw, j.ph);
     return j;
 }
@@ -240,13 +247,65 @@ void ground_layer::drain_results(SDL_Renderer* r)
 void ground_layer::bake_now(SDL_Renderer* r, const job& j)
 {
     m_scratch.assign(static_cast<std::size_t>(j.pw) * j.ph, 0u);
+    const auto t0 = std::chrono::steady_clock::now();
     ui::ground::bake_region(*j.src, j.geom, j.prm, j.px0, j.py0, j.pw, j.ph,
                             m_scratch.data());
+    {
+        const double ms = std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - t0).count();
+        std::lock_guard lk(m_mx);
+        note_bake(j.tier, ms);
+    }
     result d;
     d.tier = j.tier; d.ci = j.ci; d.cj = j.cj; d.pw = j.pw; d.ph = j.ph;
     d.hash = j.hash; d.gen = j.gen;
     d.px = m_scratch;
     upload(r, d);
+}
+
+void ground_layer::note_bake(int tier, double ms)
+{
+    const int slot = tier + 1;
+    if (slot < 0 || slot >= k_stat_slots)
+        return;
+    m_stats.bake_ms[slot] += ms;
+    ++m_stats.bakes[slot];
+}
+
+void ground_layer::reset_stats()
+{
+    std::lock_guard lk(m_mx);
+    m_stats = stats{};
+}
+
+ground_layer::stats ground_layer::stats_snapshot() const
+{
+    stats s;
+    {
+        std::lock_guard lk(m_mx);
+        s = m_stats;
+    }
+    s.tier_ppr[0] = k_far_px_per_r;
+    if (m_far_ready && m_far)
+        s.resident_bytes[0] = static_cast<long long>(m_far_geom.W) * m_far_geom.H * 4;
+    for (int t = 0; t < k_tiers && t + 1 < k_stat_slots; ++t)
+    {
+        s.tier_ppr[t + 1] = k_tier_ppr[t];
+        const tier_state& ts = m_tiers[t];
+        long long bytes = 0;
+        for (const auto& [key, c] : ts.chunks)
+        {
+            if (!c.ready || !c.tex || ts.cw <= 0)
+                continue;
+            const int ci = static_cast<int>(key % static_cast<std::uint32_t>(ts.cw));
+            const int cj = static_cast<int>(key / static_cast<std::uint32_t>(ts.cw));
+            bytes += static_cast<long long>(std::min(k_chunk_px, ts.geom.W - ci * k_chunk_px))
+                   * std::min(k_chunk_px, ts.geom.H - cj * k_chunk_px) * 4;
+        }
+        s.resident_bytes[t + 1] = bytes;
+    }
+    s.active_slot = m_active_tier + 1;
+    return s;
 }
 
 void ground_layer::evict(tier_state& t, std::size_t cap)
@@ -333,25 +392,36 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
     const ground_request& req = ui.ground_req;
     if (req.valid && req.body == m_body && req.draw_r > 0.0f)
     {
-        // Smallest tier within the magnification headroom of the drawn hex
-        // radius; below the first tier the far page alone carries the frame
-        // (the bottom zoom rung). The headroom exists because hex_size is
-        // FIT-DERIVED (window height / grid rows), so the ladder's rungs land
-        // NEAR the tier sizes, not on them — at the reference 1080p window the
-        // rungs run ~4-14% magnified. Too tight a factor here jumps every rung
-        // one tier high (2x the memory and bake for a minified image); the
-        // review fleet caught exactly that at 0.93. Beyond the top tier the
-        // 96 px bake magnifies unboundedly on very large windows — a known
-        // bound, recorded in RENDERING.md.
-        constexpr float k_tier_headroom = 1.2f;
-        int tier = k_tiers - 1;
-        for (int t = 0; t < k_tiers; ++t)
-            if (k_tier_ppr[t] * k_tier_headroom >= req.draw_r)
+        // THE GROUND IS NEVER MAGNIFIED (BL-1244, Ben 2026-10-08): the
+        // smallest tier at or above the drawn hex radius, drawn minified —
+        // never past 2:1 on the x2 ladder — and the far page only where it too
+        // is at or below 1:1. The old 1.2x magnification headroom read as blur
+        // (rungs 4-14% magnified at the reference window). hex_size is
+        // fit-derived, so where a rung lands against its tier still moves with
+        // the window; past the 192 px top tier the ground magnifies — the
+        // ladder's one bound.
+        m_active_tier = ui::ground::choose_tier(req.draw_r, k_far_px_per_r,
+                                                k_tier_ppr, k_tiers);
+
+        // The top tier is resident only while its rung is active
+        // (RENDERING.md § Level of detail): its memory is the viewport's
+        // chunks, never a body's worth left behind by a zoom-out. The tiers
+        // below keep their LRU sets — they are the stand-ins.
+        if (m_active_tier != k_tiers - 1 && !m_tiers[k_tiers - 1].chunks.empty())
+        {
+            tier_state& top = m_tiers[k_tiers - 1];
+            for (auto it = top.chunks.begin(); it != top.chunks.end();)
             {
-                tier = t;
-                break;
+                if (it->second.queued)
+                {
+                    ++it; // a result is in flight; upload heals it, next sweep drops it
+                    continue;
+                }
+                if (it->second.tex)
+                    SDL_DestroyTexture(it->second.tex);
+                it = top.chunks.erase(it);
             }
-        m_active_tier = (req.draw_r <= k_far_px_per_r * 1.15f) ? -1 : tier;
+        }
 
         if (m_active_tier >= 0)
         {
@@ -384,6 +454,7 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
                 std::ceil((req.y1 - t.geom.y_min) * s / k_chunk_px)));
 
             int queued_now = 0;
+            int fills = 0;
             {
                 std::lock_guard lk(m_mx);
                 queued_now = static_cast<int>(m_jobs.size());
@@ -411,7 +482,15 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
                     if (c.ready && j.hash == c.hash)
                         continue;
                     if (bake_everything)
-                        bake_now(r, j);
+                    {
+                        // verify_fill_limit: a capture of the MID-FILL frame
+                        // bakes at most N chunks this tick, deterministically.
+                        if (verify_fill_limit < 0 || fills < verify_fill_limit)
+                        {
+                            bake_now(r, j);
+                            ++fills;
+                        }
+                    }
                     else if (queued_now < k_max_queued)
                     {
                         c.queued = true;
@@ -440,14 +519,13 @@ void ground_layer::publish(ui_state& ui) const
     v.far.y0    = static_cast<float>(m_far_geom.y_min);
     v.far.y1    = static_cast<float>(m_far_geom.H / m_far_geom.s + m_far_geom.y_min);
     v.chunks.clear();
+    v.standin.clear();
     v.tier_ppr = 0.0;
-    if (m_active_tier >= 0)
+    const auto emit = [](const tier_state& t, std::vector<ground_chunk_view>& out)
     {
-        const tier_state& t = m_tiers[m_active_tier];
-        v.tier_ppr = t.geom_ppr;
         for (const auto& [key, c] : t.chunks)
         {
-            if (!c.ready || !c.tex)
+            if (!c.ready || !c.tex || t.cw <= 0)
                 continue;
             const int ci  = static_cast<int>(key % static_cast<std::uint32_t>(t.cw));
             const int cj  = static_cast<int>(key / static_cast<std::uint32_t>(t.cw));
@@ -461,7 +539,20 @@ void ground_layer::publish(ui_state& ui) const
             cv.y0  = static_cast<float>(py0 / t.geom.s + t.geom.y_min);
             cv.y1  = static_cast<float>((py0 + ph) / t.geom.s + t.geom.y_min);
             cv.tex = c.tex;
-            v.chunks.push_back(cv);
+            out.push_back(cv);
         }
+    };
+    if (m_active_tier >= 0)
+    {
+        v.tier_ppr = m_tiers[m_active_tier].geom_ppr;
+        // THE STAND-IN (BL-1244): while the active tier's chunks fill, the
+        // next tier down carries the frame wherever it is resident — drawn
+        // over the far page, under the active chunks — so the far page shows
+        // only where nothing closer is. (A stand-in baked at another rung's
+        // tilt is off by that tilt's lift for the frames it stands in; the
+        // far page, always flat, already was.)
+        if (m_active_tier > 0)
+            emit(m_tiers[m_active_tier - 1], v.standin);
+        emit(m_tiers[m_active_tier], v.chunks);
     }
 }

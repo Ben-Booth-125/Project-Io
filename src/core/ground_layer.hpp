@@ -20,10 +20,12 @@
 // Owns the textures the Planetary canvas draws its ground from, in TIERS that
 // pair with the stepped x2 zoom ladder (Ben, 2026-09-01 — stepped zoom so
 // every level is crisp): one whole-body FAR page at ~6 px per hex circumradius
-// for the bottom rung, and chunked tiers at 12/24/48/96 px matching the four
-// zoom rungs above it. The canvas's ground_request carries the drawn hex
-// radius; the smallest tier that covers it becomes the ACTIVE tier and its
-// chunks are baked around the viewport, LRU-capped.
+// for the bottom rung, and chunked tiers at 12/24/48/96/192 px for the rungs
+// above it. The canvas's ground_request carries the drawn hex radius; the
+// smallest tier at or above it becomes the ACTIVE tier — drawn minified, never
+// magnified (BL-1244) — and its chunks are baked around the viewport,
+// LRU-capped, with the next tier down standing in while they fill. Every bake
+// is supersampled 2x and downsampled before upload (ui/ground_bake).
 //
 // ALL BAKING RUNS ON A WORKER THREAD (wave 2's perf half): the pure bake
 // (ui/ground_bake) executes against an immutable source snapshot; the render
@@ -50,6 +52,27 @@ public:
 
     /// The C-F dials; shipped values are ground_bake.hpp's defaults.
     ui::ground::bake_params params;
+
+    /// Bake-cost and residency instrumentation (BL-1244): cumulative bake
+    /// milliseconds and bake count per slot since the last reset_stats(),
+    /// slot 0 = the far page, slot 1 + t = chunked tier t; plus the resident
+    /// texture bytes per slot NOW. Read by verify.ground_stats().
+    static constexpr int k_stat_slots = 8;
+    struct stats
+    {
+        double    bake_ms[k_stat_slots]        = {};
+        int       bakes[k_stat_slots]          = {};
+        long long resident_bytes[k_stat_slots] = {};
+        double    tier_ppr[k_stat_slots]       = {};
+        int       active_slot = -1;
+    };
+    stats stats_snapshot() const;
+    void  reset_stats();
+
+    /// Verify-only: under bake_everything, bake at most this many chunks per
+    /// tick (-1 = no limit) — so a script can capture the deterministic
+    /// MID-FILL frame a rung change shows while its tier fills (BL-1244).
+    int verify_fill_limit = -1;
 
 private:
     struct chunk
@@ -111,9 +134,17 @@ private:
     int           m_active_tier = -1;
     std::shared_ptr<const ui::ground::bake_source> m_src;
 
-    static constexpr int k_tiers = 4;
-    static constexpr double k_tier_ppr[k_tiers] = { 12.0, 24.0, 48.0, 96.0 };
-    static constexpr std::size_t k_tier_cap[k_tiers] = { 60, 90, 48, 48 };
+    static constexpr int k_tiers = ui::ground::k_tier_count;
+    static constexpr double k_tier_ppr[k_tiers] = {
+        ui::ground::k_tier_ladder[0], ui::ground::k_tier_ladder[1], ui::ground::k_tier_ladder[2],
+        ui::ground::k_tier_ladder[3], ui::ground::k_tier_ladder[4] };
+    static constexpr std::size_t k_tier_cap[k_tiers] = { 60, 90, 48, 48, 48 };
+    /// Per-tier supersample ceiling (BL-1244), min'd with params.supersample.
+    /// The 192 px tier bakes single-sample: at 2x its fill time at the
+    /// reference window measured ~30 s on the one worker (99 chunks x ~305 ms),
+    /// past what the brief allowed — the 2x-at-192 call is Ben's. Raise this
+    /// entry to 2 to take it.
+    static constexpr int k_tier_supersample[k_tiers] = { 2, 2, 2, 2, 1 };
     tier_state    m_tiers[k_tiers];
 
     ui::ground::geometry m_far_geom;
@@ -125,7 +156,7 @@ private:
 
     // Worker plumbing. The worker starts lazily on the first enqueue.
     std::thread             m_worker;
-    std::mutex              m_mx;
+    mutable std::mutex      m_mx;
     std::condition_variable m_cv;
     std::deque<job>         m_jobs;
     std::vector<result>     m_results;
@@ -134,7 +165,10 @@ private:
 
     std::vector<std::uint32_t> m_scratch; ///< Synchronous-path bake buffer.
 
+    void  note_bake(int tier, double ms); ///< Accumulates m_stats; caller holds m_mx.
+    stats m_stats;
+
     static constexpr int    k_chunk_px      = 512;
-    static constexpr double k_far_px_per_r  = 6.0;
+    static constexpr double k_far_px_per_r  = ui::ground::k_far_ppr;
     static constexpr int    k_max_queued    = 6; ///< Outstanding jobs cap — keeps the queue near the viewport.
 };
