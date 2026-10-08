@@ -61,7 +61,11 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   body-pooled demand 72.8. Sell-order leak: not a factor. Hypothesis: processors silenced by the
   fair-price ceiling never show as demand, so the dial sees no buyer — the dial reading silenced want
   is a NEW AI input (grant). **Lever form sent to Ben** (dial reads silenced want: measure first /
-  grant / no; hold & reflex; propellant pricing; G1 at t50). Then merge the probe and
+  grant / no; hold & reflex; propellant pricing; G1 at t50). **BEN RULED (bd1cd032):** measure the
+  dial reading silenced want first (IDLE16 agent round 3); BL-1235 designed — a dial-idled plant is
+  not losing, the hold ends when its forecast recovers (lane DIALHOLD, agent `a1b28029261a2f580`);
+  propellant gets a base price derived from its inputs (lane PROPELLANT, agent `a14f239f7a0f14bad`);
+  **G1 >= 85% at tick 50 too** (gate prints it). Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
 
