@@ -670,9 +670,14 @@ the floor; stage B layers priority buckets and predictive spending over it (§ 2
   (`base_rate × richness × workforce × (1 − hazard)`) over a horizon of
   `build_duration_ticks + forecast_clearing_ticks` (1 — "one clearing pass") against the **local
   market's PUBLIC `supply`/`demand` aggregates only** — the same facts `export_corp_blackboard`
-  would show a rival (BL-068, competitor visibility; DISCOVERY.md), never a private read. No
-  public demand signal (`demand <= 0`) yields no penalty (the AI cannot forecast against a fact
-  it cannot see); the projected supply/demand ratio is unpenalised at or below
+  would show a rival (BL-068, competitor visibility; DISCOVERY.md), never a private read. **A
+  market with no bid is read by what it lists (Ben, 2026-10-07; BL-1227, idle mines).** No bid
+  against listed supply is a glut, not a missing signal: the projected ratio is unbounded, so the
+  build is vetoed (the scorer had built 1,745 fibre and 461 hide sites into markets with no buyer
+  and hundreds of thousands of units listed). In play — once a market has cleared — no bid and
+  nothing listed is a **dead market**, and the build is vetoed too. Only before a market has ever
+  cleared is "no bid, nothing listed" no signal, and that yields no penalty (the AI cannot
+  forecast against a fact it cannot see). Otherwise the projected supply/demand ratio is unpenalised at or below
   `glut_taper_ratio` (1.0), tapers the build's score linearly to zero at `glut_veto_ratio` (2.0),
   and vetoes (removes the candidate entirely) at or above it. Applied only to build candidates;
   dials and survey are unaffected (a body's total surveyed area doesn't glut a market).

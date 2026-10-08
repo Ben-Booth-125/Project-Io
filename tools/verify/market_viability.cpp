@@ -47,7 +47,7 @@
 //      G4's row. The share over ALL processors, build included, is printed
 //      beside it. (This denominator is the instrument's call, not the ruling's
 //      wording; it matches the 2026-10-04 reading's "~225 processors".)
-//      TARGET: pooled share running at the handoff >= 70%.
+//      TARGET: pooled share running at the handoff >= 85% (Ben, 2026-10-08); G1b: input-starved (now or decommissioned after starving) <= 5% of built.
 //   G2 field income per tick: the sum of `quarterly_return::income` over every
 //      corporation's return filed that tick, as WINDOW MEANS: play ticks 26-50
 //      over the 12 settle ticks. Pooled = sum / sum. TARGET: pooled >= 50%.
@@ -202,8 +202,11 @@
 namespace {
 
 // --- THE TARGETS: Ben's ruling, the sprint 49 form, 2026-10-04 (BL-1184) ----
-// Pooled over the seeds read (the 16 curated seeds by default).
-constexpr double k_target_g1_running_at_handoff = 0.70; ///< processors running at handoff
+// Pooled over the seeds read (the 16 curated seeds by default). G1 raised 70% -> 85%
+// and G1b added by Ben, 2026-10-08 (sprint 50): running is not the whole question --
+// a plant idled for want of a buyer is the economy working; a STARVED plant is not.
+constexpr double k_target_g1_running_at_handoff = 0.85; ///< processors running at handoff
+constexpr double k_target_g1b_starved_max       = 0.05; ///< input-starved (now, or decommissioned after starving) / built, at handoff
 constexpr double k_target_g2_income_ratio       = 0.50; ///< field income tick 50 / settle close
 constexpr double k_target_g3_firms_alive        = 0.70; ///< firms alive at tick 400 / at handoff
 constexpr int    k_g5_idle_window = 100; ///< G5: processors idled up to this play tick are followed
@@ -317,6 +320,10 @@ struct proc_tally
     int built() const { return total() - n[ps_build]; }
     double share_run() const { const int t = built(); return t ? static_cast<double>(n[ps_run]) / t : 0.0; }
     double share_run_incl_build() const { const int t = total(); return t ? static_cast<double>(n[ps_run]) / t : 0.0; }
+    /// G1b: input-starved now, plus decommissioned after starving (decom_after[1]) --
+    /// a plant mothballed because its inputs never came was starved, not idle by choice.
+    int starved() const { return n[ps_input] + decom_after[1]; }
+    double share_starved() const { const int t = built(); return t ? static_cast<double>(starved()) / t : 0.0; }
     void add(const proc_tally& o)
     {
         for (int i = 0; i < ps_count; ++i) n[i] += o.n[i];
@@ -1302,9 +1309,9 @@ int main(int argc, char** argv)
     }
 
     std::printf("market_viability — BL-1184 (market viability gate)\n");
-    std::printf("targets (Ben, the sprint 49 form, 2026-10-04), pooled: G1 running at handoff >= %.0f%%,"
-                " G2 income t%d/settle-close >= %.0f%%, G3 firms alive t%d/handoff >= %.0f%%\n",
-                pct(k_target_g1_running_at_handoff), k_g1_g2_play_tick, pct(k_target_g2_income_ratio),
+    std::printf("targets (Ben, 2026-10-04; G1/G1b 2026-10-08), pooled: G1 running at handoff >= %.0f%%,"
+                " G1b starved <= %.0f%%, G2 income t%d/settle-close >= %.0f%%, G3 firms alive t%d/handoff >= %.0f%%\n",
+                pct(k_target_g1_running_at_handoff), pct(k_target_g1b_starved_max), k_g1_g2_play_tick, pct(k_target_g2_income_ratio),
                 ticks, pct(k_target_g3_firms_alive));
     std::printf("seeds (%s, %zu):", from_args ? "--seeds" : "docs/generation/seed_library.json", seeds.size());
     for (const std::uint32_t s : seeds) std::printf(" %u", s);
@@ -1422,6 +1429,7 @@ int main(int argc, char** argv)
                     r.idle_markets, r.home_markets, r.b_live, r.b_build);
     }
     const double g1 = ph.share_run();
+    const double g1b = ph.share_starved();
     const double g2 = ic > 0 ? i50 / ic : 0.0;
     const double g3 = fh > 0 ? static_cast<double>(fs) / static_cast<double>(fh) : 0.0;
     std::printf("\n pooled over %zu seeds (%.0f s)\n", rs.size(), secs);
@@ -1429,6 +1437,9 @@ int main(int argc, char** argv)
     print_tally("tick 50", p50);
     std::printf(" %s  G1 processors running at handoff  %5.1f%%  (target >= %.0f%%)\n",
                 g1 >= k_target_g1_running_at_handoff ? "PASS" : "FAIL", pct(g1), pct(k_target_g1_running_at_handoff));
+    std::printf(" %s  G1b processors input-starved at handoff  %5.1f%%  (%d / %d: %d starved now, %d decommissioned after starving; target <= %.0f%%)\n",
+                g1b <= k_target_g1b_starved_max ? "PASS" : "FAIL", pct(g1b), ph.starved(), ph.built(), ph.n[ps_input],
+                ph.decom_after[1], pct(k_target_g1b_starved_max));
     std::printf(" %s  G2 field income play 26-%d mean / settle mean  %5.1f%%  (%.0f / %.0f; target >= %.0f%%)\n",
                 g2 >= k_target_g2_income_ratio ? "PASS" : "FAIL", k_g1_g2_play_tick, pct(g2), i50, ic,
                 pct(k_target_g2_income_ratio));
@@ -1556,7 +1567,7 @@ int main(int argc, char** argv)
             std::printf("\n");
         }
     }
-    std::printf("market_viability: G1 %.1f/70 G2 %.1f/50 G3 %.1f/70", pct(g1), pct(g2), pct(g3));
+    std::printf("market_viability: G1 %.1f/85 G1b %.1f/5 G2 %.1f/50 G3 %.1f/70", pct(g1), pct(g1b), pct(g2), pct(g3));
     if (g_logistics)
     {
         // appended (BL-1223), never reordered: the L row's headline numbers
