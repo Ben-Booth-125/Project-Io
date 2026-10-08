@@ -661,6 +661,114 @@ float corp_should_have_buffer(const world& w, const recipe_registry& reg,
     return buffer;
 }
 
+namespace {
+/// BL-1227 (AI_OPPONENT.md § 2B, "A market with no bid is read by what it
+/// lists"): for a good with NO posted demand in market @p m, does the build
+/// veto fire? true = vetoed (no bid against listed supply, or a dead market
+/// in play); false = a bid exists after all (the silenced want) or no signal
+/// (a market that has never cleared). Only meaningful when demand[r] <= 0.
+bool zero_bid_veto(const world& w, const market_component& m, std::size_t r, int hold_ticks)
+{
+    // WHAT COUNTS AS A BID for the veto test (Ben, 2026-10-07; AI_OPPONENT.md
+    // § 2B): demand PLUS the want the fair-price ceiling silenced
+    // (`hauler_want`, the last clear's aggregate, serialised like demand).
+    // Processors priced out of an input post no demand for it, yet they are
+    // its buyers — vetoing a mine there would refuse it exactly when it is
+    // needed most. A silenced want is a bid with no posted quantity to
+    // forecast against, so the build takes no penalty (no ratio to read).
+    //
+    // PLUS the UNPOSTED bid (Ben, 2026-10-07/08): the space programme, network
+    // upkeep and procurement WANT, filled or not; launch fuel and own-pool
+    // building upkeep; what a running processor here consumes (observable,
+    // DISCOVERY.md § Competitor visibility). Held for the scorer's cadence:
+    // a record no older than `hold_ticks` still counts, so every corporation
+    // that evaluates between two records sees it. A buyer that takes or wants
+    // goods without posting a bid is still a buyer.
+    if (m.hauler_want[r] > 0.0f || unposted_bid_held(m, r, w.current_econ_tick, hold_ticks))
+        return false;
+    // BL-1227 (idle mines, the boom): ZERO BID AGAINST LISTED SUPPLY IS A
+    // GLUT, not a missing signal. Both halves are public: the market lists
+    // supply and nobody bids for it, so the projected ratio
+    // (supply + added) / demand is unbounded — past any veto. Reading it as
+    // "no signal" let the scorer build 1,745 fibre and 461 hides sites into
+    // markets with no buyer (no Weaver, no Tannery, no household bid;
+    // 100% of them at demand 0, fibre's listed supply ~412k), pricing
+    // output nobody buys at the band floor (~0.26 base) as revenue.
+    if (m.supply[r] > 0.0f)
+        return true;
+    // No bid AND nothing listed (Ben, 2026-10-07; AI_OPPONENT.md, "A market
+    // with no bid is read by what it lists"): once the market has CLEARED,
+    // that is a DEAD market — the clear ran and nobody bid or listed — and
+    // the build is vetoed (peat: 80 sites placed this way in play, every
+    // one idled). Only before the market has ever cleared is it no signal.
+    //
+    // "Has cleared" from existing state, no new field: clear_markets runs
+    // once per econ step, AFTER the economy step the scorer runs in, so at
+    // econ step k > 0 every market standing at step k-1 has cleared. A
+    // market that has cleared bids or lists SOMETHING (households bid every
+    // tick wherever people live); one whose every supply and demand slot is
+    // still zero is read as not yet cleared — the market emergence carves
+    // mid-tick (market_clearing.cpp) opens exactly so, with nothing written
+    // until its first clear.
+    if (w.current_econ_tick <= 0)
+        return false; // no clear has run yet: no signal, do not guess
+    for (std::size_t g = 0; g < resource_count; ++g)
+        if (m.supply[g] > 0.0f || m.demand[g] > 0.0f || m.hauler_want[g] > 0.0f
+            || m.unposted_bid[g] > 0.0f)
+            return true; // the market has cleared: dead for this good
+    return false; // never cleared (nothing written yet): no signal
+}
+
+/// The same test at a tile's market: true when a build there of @p target is
+/// vetoed by the zero-bid rule (no demand posted AND zero_bid_veto) — the one
+/// veto the chain start (§ 11) may lift. False with no market, or with demand.
+bool zero_bid_veto_at(const world& w, entity_id tile, resource_type target, int hold_ticks)
+{
+    const entity_id mid = market_for_tile(w, tile);
+    const auto      mit = w.markets.find(mid);
+    if (mid == null_entity || mit == w.markets.end())
+        return false;
+    const std::size_t r = static_cast<std::size_t>(target);
+    return mit->second.demand[r] <= 0.0f && zero_bid_veto(w, mit->second, r, hold_ticks);
+}
+} // namespace
+
+std::vector<extraction_trace_row>*& corp_extraction_trace_sink()
+{
+    thread_local std::vector<extraction_trace_row>* sink = nullptr;
+    return sink;
+}
+
+market_good_draw running_consumer_draws(const world& w, const recipe_registry& reg,
+                                        const economy_report& report)
+{
+    market_good_draw out;
+    for (const building_report& br : report.buildings)
+    {
+        if (br.type != building_type::processing_facility || !br.active || !(br.output_quantity > 0.0f))
+            continue;
+        const auto bit = w.buildings.find(br.building);
+        if (bit == w.buildings.end() || bit->second.decommissioned || bit->second.ticks_remaining > 0)
+            continue;
+        const recipe* rc = reg.get_recipe(br.recipe);
+        if (rc == nullptr)
+            continue;
+        float total_out = 0.0f;
+        for (const float o : rc->outputs)
+            total_out += o;
+        if (!(total_out > 0.0f))
+            continue;
+        const float     runs = br.output_quantity / total_out;
+        const entity_id mid  = market_for_tile(w, bit->second.tile);
+        if (mid == null_entity)
+            continue;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (rc->inputs[r] > 0.0f)
+                out[std::make_pair(mid, r)] += rc->inputs[r] * runs;
+    }
+    return out;
+}
+
 float forecast_glut_multiplier(const world& w, entity_id tile, resource_type target,
                                float added_rate_per_tick, int horizon_ticks,
                                const corp_ai_params& p)
@@ -677,19 +785,7 @@ float forecast_glut_multiplier(const world& w, entity_id tile, resource_type tar
     const std::size_t r = static_cast<std::size_t>(target);
     const float demand = m.demand[r]; // PUBLIC aggregate only (BL-068) — same fact a rival sees.
     if (demand <= 0.0f)
-    {
-        // BL-1227 (idle mines, the boom): ZERO BID AGAINST LISTED SUPPLY IS A
-        // GLUT, not a missing signal. Both halves are public: the market lists
-        // supply and nobody bids for it, so the projected ratio
-        // (supply + added) / demand is unbounded — past any veto. Reading it as
-        // "no signal" let the scorer build 1,745 fibre and 461 hides sites into
-        // markets with no buyer (no Weaver, no Tannery, no household bid;
-        // 100% of them at demand 0, fibre's listed supply ~412k), pricing
-        // output nobody buys at the band floor (~0.26 base) as revenue.
-        // Only a market that has listed NOTHING and bid NOTHING (no clear has
-        // seen the good either way) is genuinely signal-free: do not guess.
-        return m.supply[r] > 0.0f ? 0.0f : 1.0f;
-    }
+        return zero_bid_veto(w, m, r, std::max(1, p.cadence_k)) ? 0.0f : 1.0f; // BL-1227: read by what it lists
     const float horizon = static_cast<float>(std::max(1, horizon_ticks));
     const float projected_supply = m.supply[r] + added_rate_per_tick * horizon;
     const float ratio = projected_supply / demand;
@@ -1163,6 +1259,22 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         const std::size_t scope_buildings_at_open = w.buildings.size();
 #endif
 
+        // BL-1227, the chain start (AI_OPPONENT.md § 11, Ben 2026-10-07/08):
+        // PRIVATE to this corporation and to THIS evaluation — both die at the
+        // end of it (no memory across evaluations). `held_mines` are this corp's
+        // mine candidates the zero-bid veto stopped; `refused_draw` is the
+        // prospective input draw of this corp's own processor candidates refused
+        // ONLY because that input is not obtainable, keyed (market, good). Never
+        // the player's corp, even under spectate.
+        struct held_mine
+        {
+            candidate c;
+            entity_id market = null_entity;
+        };
+        std::vector<held_mine>                              held_mines;
+        std::map<std::pair<entity_id, std::size_t>, float> refused_draw;
+        const bool chain_start_eligible = !(cc.is_player || corp == w.player_entity);
+
         // ---- Build candidates: surveyed, deposit-bearing tiles, top-M ------
         // Site ranking is precomputed once per tick above (BL-253); only the
         // per-corp filter (tech gate, logistics reach) and scoring run here.
@@ -1174,8 +1286,14 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             // Deliberately NOT switched: it would move AI build scoring, hence world
             // evolution, hence every blessed golden, for no player-visible gain.
             const building_economics& ex = reg.economics(building_type::extraction_site);
+            std::vector<extraction_trace_row>* const ext_trace = corp_extraction_trace_sink();
             for (const extraction_site& s : ranked_sites)
             {
+                // BL-1227 diagnosis: write-only, null outside a probe.
+                const auto trace = [&](extraction_trace_outcome o, float tnet, float tscore) {
+                    if (ext_trace != nullptr)
+                        ext_trace->push_back({tick, corp, s.tile, s.target, o, tnet, tscore});
+                };
                 // Deliberately checked WITHOUT the seam's logistics-reach budget
                 // (BL-379 gave the muster-base candidate parity; this site keeps
                 // the default-disabled reach on purpose): enforcing it here would
@@ -1185,7 +1303,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 // the seam refuses as out_of_range costs one wasted seam call
                 // and no build slot (APPLY THEN COUNT, below).
                 if (!placement_rules::can_place_in_world(w, s.tile, building_type::extraction_site, s.target))
+                {
+                    trace(extraction_trace_outcome::placement, 0.0f, 0.0f);
                     continue;
+                }
                 const tile_component& tc  = w.tiles.at(s.tile);
                 const std::size_t     ri  = static_cast<std::size_t>(s.target);
                 const float           wf  = 0.5f; // construct_building staffs at 0.5
@@ -1215,14 +1336,20 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                                           * stack_scalar * price;
                 const float net           = revenue - ex.maintenance - ex.base_wage * wf;
                 if (net <= 0.0f)
+                {
+                    trace(extraction_trace_outcome::net_le0, net, 0.0f);
                     continue; // never build into an expected loss
+                }
                 // BL-1183 (ceiling stalls construction): never start a site
                 // whose materials it cannot get — it would sit paused, paying
                 // its upkeep, while the shelf it waits on serves no one.
                 if (!construction_materials_obtainable(w, reg, reach(), standing(), s.tile,
                                                        building_type::extraction_site, s.target,
                                                        no_recipe))
+                {
+                    trace(extraction_trace_outcome::materials, net, 0.0f);
                     continue;
+                }
                 // BL-709 / NR-592: capex is now CASH PLUS MATERIALS PLUS the
                 // capacity the project will draw. It feeds both `c.score` (via
                 // the net^2/capex curve) and `c.spend` (the solvency gate), so
@@ -1248,9 +1375,37 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 const float added_rate = ex.base_rate * rich * wf * (1.0f - tc.hazard_level)
                                        * stack_scalar;
                 const int   horizon    = static_cast<int>(ex.build_duration_ticks) + p.forecast_clearing_ticks;
-                const float glut       = forecast_glut_multiplier(w, s.tile, s.target, added_rate, horizon, p);
+                float       glut       = forecast_glut_multiplier(w, s.tile, s.target, added_rate, horizon, p);
+                // BL-1227, the chain start (AI_OPPONENT.md § 11): a mine vetoed
+                // ONLY by the zero-bid rule is held back, not dropped — it is
+                // admitted below iff this same corporation, in this same
+                // evaluation, refuses one of its own processor candidates for
+                // want of this good in this market. Lifted, it scores on the
+                // ordinary estimate with no forecast penalty (a bid with no
+                // posted quantity, as the silenced want), and nothing else.
+                bool held = false;
                 if (glut <= 0.0f)
-                    continue; // forecast hard glut — veto, do not even enumerate
+                {
+                    const bool zero_bid = zero_bid_veto_at(w, s.tile, s.target, std::max(1, p.cadence_k));
+                    if (ext_trace != nullptr)
+                    {
+                        // Recorded as the veto branch; a held mine the chain
+                        // start then lifts shows in report.chain_start_lifts.
+                        extraction_trace_outcome o = extraction_trace_outcome::veto_ratio;
+                        if (zero_bid)
+                        {
+                            const auto vm = w.markets.find(market_for_tile(w, s.tile));
+                            o = (vm != w.markets.end() && vm->second.supply[ri] > 0.0f)
+                                    ? extraction_trace_outcome::veto_listed
+                                    : extraction_trace_outcome::veto_dead;
+                        }
+                        trace(o, net, 0.0f);
+                    }
+                    if (!chain_start_eligible || !zero_bid)
+                        continue; // forecast hard glut — veto, do not even enumerate
+                    held = true;
+                    glut = 1.0f;
+                }
 
                 candidate c;
                 c.cmd.tick   = tick;
@@ -1298,7 +1453,13 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 c.spend  = capex;
                 c.reason = corp_decision_reason::best_build;
                 c.bucket = bucket_for_reason(c.reason);
-                cands.push_back(c);
+                if (held)
+                    held_mines.push_back({c, market_for_tile(w, s.tile)});
+                else
+                {
+                    trace(extraction_trace_outcome::emitted, net, c.score);
+                    cands.push_back(c);
+                }
             }
         }
 
@@ -1363,9 +1524,12 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     continue;
                 const entity_id body = tit->second.body;
 
-                // BL-1234: a NEW processor is judged on supply alone, so the
-                // corp's pool and the market's shelf (the stock clause's two
-                // sources) are not read here; resume and recipe switch read them.
+                // BL-1234: a NEW processor is judged and priced on supply
+                // alone; the corp's pool (with the shelf, the stock clause's two
+                // sources) is read only to price a REFUSED candidate for the
+                // chain start (BL-1227). Read const: scoring authors no pool.
+                const stockpile_component* pool =
+                    w.find_pool(corp, pool_key_for_tile(w, tile));
                 const entity_id mid = market_for_tile(w, tile);
 
                 // RECIPE CHOICE. Walk the BROWSE space (this era's roster) and
@@ -1462,7 +1626,46 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         input_cost[r] = landed;
                     }
                     if (!supplied)
+                    {
+                        // BL-1227, the chain start (§ 11): refused ONLY for an
+                        // input it cannot get (since BL-1234, a new processor's
+                        // input gate is the SUPPLY clause)? Then everything else
+                        // the candidate must pass — a profit at its inputs'
+                        // posted cost, placement, its output's forecast, its
+                        // materials — is asked, and if all pass, its draw of each
+                        // input supply does not cover is this corp's private bid
+                        // on it in this market for the rest of this evaluation.
+                        if (!chain_start_eligible || mid == null_entity)
+                            continue;
+                        // Priced as the chain start was ruled: OBTAINABLE cost,
+                        // the posted price for an input it cannot get.
+                        (void)recipe_inputs_obtainable(w, reg, reach(), mid, pool, *abs,
+                                                       batches, null_entity, input_cost);
+                        const resource_type ort = primary_output(*abs);
+                        const building_profit rbp = estimate_prospective_profit(
+                            w, reg, tile, building_type::processing_facility, ort, rid,
+                            nullptr, &input_cost);
+                        if (!rbp.has_data || rbp.net() <= 0.0f)
+                            continue;
+                        if (!placement_rules::can_place_in_world(w, tile, building_type::processing_facility, ort))
+                            continue;
+                        const float out_rate = abs->outputs[static_cast<std::size_t>(ort)] * batches;
+                        const int   out_hz   = static_cast<int>(pe.build_duration_ticks) + p.forecast_clearing_ticks;
+                        if (forecast_glut_multiplier(w, tile, ort, out_rate, out_hz, p) <= 0.0f)
+                            continue;
+                        if (!construction_materials_obtainable(w, reg, reach(), standing(), tile,
+                                                               building_type::processing_facility, ort, rid))
+                            continue;
+                        for (std::size_t r = 0; r < resource_count; ++r)
+                        {
+                            const float in = abs->inputs[r];
+                            if (!(in > 0.0f))
+                                continue;
+                            if (!input_supply_covers(w, reg, reach(), mid, r, in * batches, null_entity))
+                                refused_draw[std::make_pair(mid, r)] += in * batches;
+                        }
                         continue;
+                    }
 
                     const resource_type    rt = primary_output(*abs);
                     // Priced on what the inputs would COST it here (BL-1187),
@@ -1472,6 +1675,19 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         nullptr, &input_cost);
                     if (!bp.has_data)
                         continue;
+                    // BL-1227 (review round 1): the forecast HARD VETO runs here,
+                    // inside the argmax, so a vetoed recipe never claims its
+                    // group's slot. Run after the pick, a vetoed winner left the
+                    // whole group empty though a sibling would have passed — and
+                    // a dead good (no bid, its price drifted to base) tends to
+                    // WIN the net argmax. The taper (0 < glut < 1) still scales
+                    // the chosen candidate's score below.
+                    {
+                        const float added_rate = abs->outputs[static_cast<std::size_t>(rt)] * batches;
+                        const int   horizon    = static_cast<int>(pe.build_duration_ticks) + p.forecast_clearing_ticks;
+                        if (forecast_glut_multiplier(w, tile, rt, added_rate, horizon, p) <= 0.0f)
+                            continue;
+                    }
                     const float n = bp.net();
                     auto  slot = group_best.find(abs->group);
                     if (slot == group_best.end())
@@ -1488,12 +1704,14 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 if (group_best.empty())
                     continue; // nothing this corp can reach, run and profit from
 
-                // ONE candidate per group. Each is scored on the same curve and
-                // vetoed by the same placement and glut gates as before — and
-                // those gates are the second half of why this matters: they used
-                // to run AFTER the argmax, so a tile whose fattest recipe failed
-                // placement or forecast a glut produced NO candidate at all,
-                // rather than falling through to one that would have placed.
+                // ONE candidate per group, scored on the same curve as the
+                // extraction candidate. The forecast's HARD VETO already ran
+                // inside the argmax above (BL-1227), so a glutted or dead-market
+                // recipe never claimed the slot; the taper multiplier is read
+                // again below for the score. Placement and the materials gate
+                // still run AFTER the pick: a group whose winner fails either
+                // yields no candidate this evaluation, rather than falling
+                // through to its runner-up.
                 for (const auto& [grp, pick] : group_best)
                 {
                     (void)grp; // the key is the category; the pick is what to build
@@ -1554,6 +1772,19 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     cands.push_back(c);
                 }
             }
+        }
+
+        // BL-1227, the chain start (§ 11): a held mine whose good this corp's own
+        // refused processor would draw in the mine's market has a bid — lift the
+        // veto and let it compete on its ordinary score. Nothing else changes.
+        for (const held_mine& hm : held_mines)
+        {
+            const auto it = refused_draw.find(
+                std::make_pair(hm.market, static_cast<std::size_t>(hm.c.cmd.target)));
+            if (it == refused_draw.end() || !(it->second > 0.0f))
+                continue;
+            cands.push_back(hm.c);
+            report.chain_start_lifts.push_back({corp, hm.c.cmd.tile, hm.c.cmd.target});
         }
 
         // ---- Road & anchor candidates: extend the network toward ground -----

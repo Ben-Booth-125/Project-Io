@@ -477,8 +477,11 @@ where a processor genuinely differs from a mine:
   discovered as a seam rejection — a candidate that can only ever be refused costs a build slot to
   learn nothing), and **input access** — every input must be **obtainable** at the candidate's
   market (§ Build only what runs), since a processor with no reachable input is an immediate
-  loss-maker. The scorer asks exactly what the seam asks and no more: mirroring a lock
-  the seam does not apply would make the rival stricter than the rules it plays by.
+  loss-maker. The scorer **mirrors every lock the seam applies, and adds no lock of its own** —
+  a rule the seam does not enforce would make the rival play by stricter rules than the player.
+  Input access is not such a lock: the seam lets anyone build a plant that will starve, and the
+  scorer declining to is a judgement inside its own **estimate** (§ Build only what runs; the
+  supply rule below), the same judgement a sensible player makes, not a rule imposed on it.
   **A build is judged on supply, not stock (Ben, 2026-10-08; BL-1234, settle scorer starves).**
   For a NEW processor, an input is obtainable only when the spare reachable output of that input
   covers the plant's draw at `t_idle` — the supply clause alone, the same sized test generation
@@ -697,7 +700,10 @@ the floor; stage B layers priority buckets and predictive spending over it (§ 2
   pool, and building upkeep met from a corporation's own pool (Ben, 2026-10-08), **plus** what a
   **running** processor in that market consumes, fed from a pool or the shelf — a running plant and
   what it consumes are observable (`../ui/DISCOVERY.md` § Competitor visibility; Ben, 2026-10-08);
-  an idled or decommissioned plant consumes nothing and is no buyer. Each of these is held for
+  an idled or decommissioned plant consumes nothing and is no buyer. **Where a want with no holder
+  lands (2026-10-08, NR-984):** a nation's want for a good that no pool or shelf yet holds is
+  recorded at its **capital's** market — so a nation can start one such chain, at its capital,
+  and the want follows the good to wherever it is first held. Each of these is held for
   the scorer's evaluation cadence, so a buyer is seen by every corporation that evaluates between
   two of its draws, not only by one due on the next tick. Otherwise the projected supply/demand ratio is unpenalised at or below
   `glut_taper_ratio` (1.0), tapers the build's score linearly to zero at `glut_veto_ratio` (2.0),

@@ -153,6 +153,9 @@ uint64_t world::state_hash(int tick) const
             // are saved.
             for (const float x : m.household_weight) fnv1a_f32(h, x);
             for (const float x : m.hauler_want) fnv1a_f32(h, x);
+            // BL-1227: the unposted bid the scorer's veto reads, and its tick.
+            for (const float x : m.unposted_bid) fnv1a_f32(h, x);
+            for (const int32_t t : m.unposted_bid_tick) fnv1a_u32(h, static_cast<uint32_t>(t));
         }
     }
 

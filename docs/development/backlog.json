@@ -1455,8 +1455,8 @@
    "design": "CODE DISAGREES WITH A SETTLED DOC (MARKETS.md step 3, inject_background_demand): (1) \"A body's pull is SPLIT across its markets in proportion to their catchment population, never granted whole to each\" - but market_clearing.cpp ~785-797 adds the WHOLE body scale to every market on the body, so a body with N markets bids N times its pull; (2) \"electronics left it when the metropolis rung of the household ladder took it (Ben, 2026-09-15)\" - but scripts/economy.lua background_demand.baskets industrial still lists electronics = 0.15. With lever D adopted (the pull consumes, Ben 2026-10-07) the N-times bid drains shelves 5-30x their stock and starves refined copper's real users (3.4 -> 4.2 per reading). WORK: split by catchment population as the doc says; drop electronics from the basket; a world-mover - measure on the market-viability skill, 5 seeds, before/after, with consumes on."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 50,
    "written": "2026-10-07",
    "requires": [],
@@ -1475,7 +1475,7 @@
     "src/world/economy_system.cpp",
     "src/world/corp_ai.cpp"
    ],
-   "design": "SELL DIAGNOSIS (2c6e8734, 2026-10-08): of 257 mine closures in play beside a market posting >= 1.5x, 150 best markets trade nothing and 179 are unreachable; 222 had no room at any reachable candidate; revenue at the most dispatch could place 3.69/t vs cost 3.95/t - the closures are mostly correct; the reflex misjudges 17 (7%). So more mines (the ranking round ee4c10ca) is not the G1 lever. PATH (Ben, 2026-10-07): f5cbcde7 merged; the ranking round ee4c10ca is merged only after the fibre/hides boom it sets off is diagnosed and fixed (G1 path B: more mines on fresh ground). From the BL-1217 inflow diagnosis (inflow_probe round 2, d04faa9c/f9b3e9e7, 5 seeds, consumes on, cold-checked): processors want ~2-4x the raw silica / copper ore / rare earth ore their bodies produce (49% / 63% / 28% system-wide); not staffing (contention 1.0, targets ~180%), not over-building processors (0.6-0.8 per mine). Site-reads per probe: silica 393 under construction and 77 decommissioned against 630 live; copper ore 280 / 320 against 536; rare earth 302 / 255 against 315. Restarting them (with the other levers) would close 23-69% of the deficit. DIAGNOSE FIRST: why each sits - construction stalled on a material (BL-1183, the ceiling stall; abandonment C3 still unruled), never funded, or decommissioned by the loss reflex (and why the mine lost money). Then fix the cause, not by clamping the reflex (Ben rejects forced outcomes)."
+   "design": "MERGED (778c9f3d, 2026-10-08; five review rounds; save v38): stack-rank estimate; forecast and dead-market vetoes; a bid = demand + silenced want + off-book want (held for the cadence) + launch fuel + own-pool upkeep + running consumers; chain-start grant. Spacecraft-components plants in play 0 -> 22 on 5 seeds; idle mines 1588 -> ~180. Small follow-up in flight (bl1227-followup). SELL DIAGNOSIS (2c6e8734, 2026-10-08): of 257 mine closures in play beside a market posting >= 1.5x, 150 best markets trade nothing and 179 are unreachable; 222 had no room at any reachable candidate; revenue at the most dispatch could place 3.69/t vs cost 3.95/t - the closures are mostly correct; the reflex misjudges 17 (7%). So more mines (the ranking round ee4c10ca) is not the G1 lever. PATH (Ben, 2026-10-07): f5cbcde7 merged; the ranking round ee4c10ca is merged only after the fibre/hides boom it sets off is diagnosed and fixed (G1 path B: more mines on fresh ground). From the BL-1217 inflow diagnosis (inflow_probe round 2, d04faa9c/f9b3e9e7, 5 seeds, consumes on, cold-checked): processors want ~2-4x the raw silica / copper ore / rare earth ore their bodies produce (49% / 63% / 28% system-wide); not staffing (contention 1.0, targets ~180%), not over-building processors (0.6-0.8 per mine). Site-reads per probe: silica 393 under construction and 77 decommissioned against 630 live; copper ore 280 / 320 against 536; rare earth 302 / 255 against 315. Restarting them (with the other levers) would close 23-69% of the deficit. DIAGNOSE FIRST: why each sits - construction stalled on a material (BL-1183, the ceiling stall; abandonment C3 still unruled), never funded, or decommissioned by the loss reflex (and why the mine lost money). Then fix the cause, not by clamping the reflex (Ben rejects forced outcomes)."
   },
   {
    "status": "complete",
@@ -1674,6 +1674,49 @@
     "src/world/construction.cpp"
    ],
    "design": "FOUND (BL-1232 lanes): a power plant started in play took ~87 ticks to build (nominally 8); in the settle 11-13 plants sat at ~3 ticks left and never finished in 100 ticks; idle_mines_probe shows mine sites \"stretched\" by construction capacity (~10x build time) and paused on steel over the ceiling. DIAGNOSE per stalled site: material short (which, why), construction capacity short (yard, grid), owner refused. Read beside BL-1183 (ceiling stalls construction; abandonment unruled)."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "written": "2026-10-08",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Ben (2026-10-08, the power close-out form: file as follow-ups); filed by Claude",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1237",
+   "short_name": "GRID_KEEPS_ITS_GENERATOR",
+   "category": "AI",
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "title": "A recipe switch never takes a grid's last generators off power",
+   "files": [
+    "src/world/economy_system.cpp",
+    "src/world/corp_ai.cpp"
+   ],
+   "design": "FOUND (BL-1232 lane, 2026-10-08, seed 28 grid 15161): at t84 all seven oil-fired plants on a grid switched recipe off power in one tick (to food rations or steel) and the grid went dark; the two earlier generation plants had switched to coal at t22 and been decommissioned at t38. Likely the reflex recipe rescue on floored output (seven corps in one tick; the AI dial is staggered), possibly the margin-chase switch. DIAGNOSE which switch, then: a switch off a power recipe is refused while that plant is among its grid's last generation (the grid would go dark). A rule on the switch, not a clamp on the reflex."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "written": "2026-10-08",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "author": "Ben (2026-10-08, the power close-out form: file as follow-ups); filed by Claude",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1238",
+   "short_name": "HALF_PLANT_ON_SETTLED_NEED",
+   "category": "Generation",
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "title": "The half-a-plant test reads a grid's settled need, so a secondary grid that grows past it is not left dark",
+   "files": [
+    "src/world/corporation_generation.cpp"
+   ],
+   "design": "FOUND (BL-1232 lane, 2026-10-08, seed 43 grid 15125): while power firms are being chartered the grid's need is 12.3-14.1 against the half-plant threshold of 14, so it is \"left to roads\"; it reaches 20 only after the last power firm is placed. Options for Ben: score the test on projected / settled need (after the walk's centres are placed), or let a centre take power for a grid its windows can reach. Ben 2026-10-08: file, not this sprint."
   }
  ]
 }

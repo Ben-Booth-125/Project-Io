@@ -977,9 +977,16 @@ bool commit_convoy(world& w, const recipe_registry& reg, entity_id corp_id, enti
     {
         auto&       quantities  = w.pool_at(corp_id, src_key).quantities;
         const auto& launch_draw = launch_draw_per_convoy();
+        // BL-1227 (AI_OPPONENT.md § 2B, Ben 2026-10-08): launch fuel taken from
+        // the corporation's pool is a buyer that posts no bid.
+        const auto fuel_mit = w.markets.find(src_key);
         for (std::size_t dr = 0; dr < resource_count; ++dr)
             if (launch_draw[dr] > 0.0f)
+            {
                 quantities[dr] -= launch_draw[dr];
+                if (fuel_mit != w.markets.end())
+                    note_unposted_bid(fuel_mit->second, dr, launch_draw[dr], w.current_econ_tick);
+            }
     }
 
     convoy_component c;
