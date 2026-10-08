@@ -1162,7 +1162,16 @@ void run_seed(std::uint32_t seed, int ticks, seed_out& out)
                                                  /*spectating=*/false, &hooks);
         observe(k, res.report, "play");
         snap_targets();
-        if (k == k_t50) read_idle(w, reg, res.report, p, H, seat.seated, out.t50, seed, "t50");
+        if (k == k_t50)
+        {
+            read_idle(w, reg, res.report, p, H, seat.seated, out.t50, seed, "t50");
+            // BL-1235: the --ids-in set's states at tick 50 as well as the handoff.
+            if (g_ids_base.count(seed))
+                for (const entity_id bid : sorted_processors(w))
+                    if (g_ids_base[seed].count(bid))
+                        out.t50.add(std::string("cf503.state.")
+                                    + k_state_name[classify(w.buildings.at(bid), row_of(res.report, bid), reg)]);
+        }
         p.l_armed = false;
     }
     out.secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();

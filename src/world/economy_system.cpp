@@ -2891,6 +2891,15 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
 
                 // (2) Idle a persistent loser (composes with the depletion throttle:
                 // an exhausted deposit drives extraction losses that end in an idle).
+                // BL-1235: a plant the workforce dial set to zero is not losing —
+                // its idle maintenance is the cost the dial chose to carry — so it
+                // counts no streak, and the dial (not this reflex) decides when it
+                // runs again (AI_OPPONENT.md, "A plant the dial idled is not losing").
+                if (dial_idled(b))
+                {
+                    b.loss_streak = 0;
+                    continue;
+                }
                 const building_profit bp = estimate_building_profit(w, reg, report, bid);
                 if (bp.has_data && bp.net() < 0.0f)
                 {
