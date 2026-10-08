@@ -1591,8 +1591,8 @@
    "design": "Ben (2026-10-07, the path form): a wired grid with no generation keeps decaying as written; the answer is more generation, diagnosed first. power_grid_probe (BL-1230, 40e6cec4, 5 seeds): 156 grids for 106 markets, only 6-9 carry a live generator; wired buildings on generator-less grids hold 16.6% of power need at handoff and 10.5% at t50 (seed 28: 52% / 45%); there the pooled price passes the 2x ceiling and buildings stop bidding - the largest single remaining power loss. DIAGNOSE: why generation places so few plants (body-level upkeep demand in body_upkeep_demand vs per-grid draw; the scorer's power-plant scoring grain; fuel and site rules), then fix placement so each grid with power demand gets generation."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 50,
    "written": "2026-10-07",
    "requires": [],
@@ -1609,7 +1609,7 @@
    "files": [
     "src/world/corporation_generation.cpp"
    ],
-   "design": "Ben (2026-10-07, the path form, G1 path C; extends BL-1185, chain-feasible placement). inflow_probe (cold-checked): bodies produce 28-63% of the raw silica / copper ore / rare earth ore their processors want, system-wide; processors per producer 0.6-0.8, but each mine yields a co-extraction basket so its share of any one good is small. BL-1185 made a chain feasible (a site exists); this item makes it SIZED: a processor is placed only where the input supply it can reach (by the market-viability reach rules) covers a run. DIAGNOSE FIRST: per body and good, processors placed vs the extraction that can feed them at handoff, and which generation pass places the surplus processors; then propose the rule (no clamp, a placement consequence)."
+   "design": "MERGED (6cf81da2, 2026-10-08; three cold-review rounds): spare-supply test at t_idle in every pass; spare counted once and bounded per consumer; a refused processor's in-reach want enters derived demand as a shortage of its own; roster to a fixed point. 5 seeds: G1 59.3 -> 73.9, G1b 29.8 -> 20.0, G2 58.8 -> 64.2; generation-built starved 364 -> ~70; the remaining gap is the settle scorer on seed 0 (BL-1234). Ben (2026-10-07, the path form, G1 path C; extends BL-1185, chain-feasible placement). inflow_probe (cold-checked): bodies produce 28-63% of the raw silica / copper ore / rare earth ore their processors want, system-wide; processors per producer 0.6-0.8, but each mine yields a co-extraction basket so its share of any one good is small. BL-1185 made a chain feasible (a site exists); this item makes it SIZED: a processor is placed only where the input supply it can reach (by the market-viability reach rules) covers a run. DIAGNOSE FIRST: per body and good, processors placed vs the extraction that can feed them at handoff, and which generation pass places the surplus processors; then propose the rule (no clamp, a placement consequence)."
   },
   {
    "status": "proposed",
