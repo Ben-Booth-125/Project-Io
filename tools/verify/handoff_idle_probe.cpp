@@ -75,6 +75,12 @@
 //   handoff (cf503.state.*) -- for a counterfactual build of the same seeds.
 // The 2026-10-08 counterfactuals were measurement switches in src (env IO_CF),
 // not committed.
+//
+// ROUND 3 (silenced want as the dial's buyer signal). Each zeroing also records
+// `hauler_want` at the plant's market and demand + hauler_want summed over the
+// body: z503.dem0.sees_buyer_{own,body}_dw, and zall.t-11.<good>.* (demand vs
+// hauler_want at the zeroing markets on settle tick -11). With --ids-in, the
+// set's states are also counted at t50 (t50.cf503.state.*).
 //   input: limiting good, the L class (market_viability's processor block).
 //   every idle state also carries margin.{pos,neg,unpriced}: the recipe's unit
 //   margin (outputs - inputs per run, at its market's current prices) -- would
@@ -241,6 +247,8 @@ struct zero_rec
     int   buyers_body = 0, buyers_off = 0; ///< other markets bidding the good (this body / others)
     int   best_cls = -1;         ///< best export_refusal pair class own market -> a buyer market
     float held = 0;              ///< supply listed by standing sell orders whose floor is over the price
+    float hw_own = 0;            ///< round 3: hauler_want (silenced processor/construction want) at the plant's market
+    float dw_body = 0;           ///< round 3: demand + hauler_want summed over the markets on the plant's body
     int   prev_target = 0;
 };
 
@@ -370,6 +378,9 @@ zero_rec make_zero_rec(world& w, const recipe_registry& reg, entity_id bid, cons
     z.replica_zero = sv.best == 0;
     z.margin_base_pos = sv.rev_base > sv.in;
     z.held = held_listing(w, reg, mid, g);
+    z.hw_own = m.hauler_want[g];
+    for (const auto& [om, omc] : w.markets)
+        if (omc.body == m.body) z.dw_body += omc.demand[g] + omc.hauler_want[g];
     if (!(m.base_price[g] > 0.0f)) z.cls = "unpriced_output";
     else if (!(m.demand[g] > 0.0f)) z.cls = "demand0";
     else if (!(sv.rev_base > sv.in)) z.cls = "inputs_dear";
@@ -900,6 +911,17 @@ void census(world& w, const recipe_registry& reg, const economy_report& rep, con
     {
         if (z.tick >= 0) continue; // settle events only
         c.add("zall.n");
+        if (z.tick == -11 && z.g < resource_count)
+        {
+            // round 3 hypothesis: on tick -11, is the zeroing market's want silenced?
+            const std::string k = "zall.t-11." + gname(z.g) + ".";
+            c.add(k + "n");
+            c.add(k + "demand_pos", z.demand > 0.0f ? 1 : 0);
+            c.add(k + "hw_pos", z.hw_own > 0.0f ? 1 : 0);
+            c.add(k + "demand_sum_x10", static_cast<long>(10.0f * z.demand));
+            c.add(k + "hw_sum_x10", static_cast<long>(10.0f * z.hw_own));
+            c.add(k + "body_dw_pos", z.dw_body > 0.0f ? 1 : 0);
+        }
         c.add("zall.cls." + z.cls);
         c.add(std::string("zall.solver_zero.") + (z.solver_zero ? "1" : "0"));
         c.add(std::string("zall.replica_agree.") + (z.solver_zero == z.replica_zero ? "1" : "0"));
@@ -948,6 +970,8 @@ void census(world& w, const recipe_registry& reg, const economy_report& rep, con
         else
         {
             c.add(std::string("z503.dem0.margin_base_pos.") + (z.margin_base_pos ? "1" : "0"));
+            c.add(std::string("z503.dem0.sees_buyer_own_dw.") + (z.hw_own > 0.0f ? "yes" : "no"));
+            c.add(std::string("z503.dem0.sees_buyer_body_dw.") + (z.dw_body > 0.0f ? "yes" : "no"));
             c.add(std::string("z503.dem0.buyers_body.") + (z.buyers_body > 0 ? "yes" : "none")
                   + (z.buyers_off > 0 ? "+offbody" : ""));
             c.add(std::string("z503.dem0.best_pair.") + pair_cls_name(z.best_cls));
@@ -1163,6 +1187,12 @@ void run_seed(std::uint32_t seed, int ticks, seed_out& out)
         observe(k, res.report, "play");
         snap_targets();
         if (k == k_t50) read_idle(w, reg, res.report, p, H, seat.seated, out.t50, seed, "t50");
+        if (k == k_t50 && g_ids_base.count(seed))
+            for (const entity_id bid : g_ids_base[seed])
+                if (const auto bi = w.buildings.find(bid); bi != w.buildings.end())
+                    out.t50.add(std::string("cf503.state.") + k_state_name[classify(bi->second, row_of(res.report, bid), reg)]);
+                else
+                    out.t50.add("cf503.state.gone");
         p.l_armed = false;
     }
     out.secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
