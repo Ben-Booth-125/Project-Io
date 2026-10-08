@@ -677,7 +677,13 @@ the floor; stage B layers priority buckets and predictive spending over it (§ 2
   and hundreds of thousands of units listed). In play — once a market has cleared — no bid and
   nothing listed is a **dead market**, and the build is vetoed too. Only before a market has ever
   cleared is "no bid, nothing listed" no signal, and that yields no penalty (the AI cannot
-  forecast against a fact it cannot see). Otherwise the projected supply/demand ratio is unpenalised at or below
+  forecast against a fact it cannot see). **What counts as a bid (Ben, 2026-10-07, scoping the
+  veto):** the market's demand **plus** the want the fair-price ceiling silenced (the hauler-only
+  register — an aggregate market fact, like demand; without it a mine is vetoed exactly when its
+  processors are priced out and need it most), **plus** the off-book draws on that market — the
+  space programme's, network upkeep's and procurement's — since a buyer that takes goods without
+  posting a bid is still a buyer (without them no rival could ever build the first spacecraft
+  components or propellant plant in play). Otherwise the projected supply/demand ratio is unpenalised at or below
   `glut_taper_ratio` (1.0), tapers the build's score linearly to zero at `glut_veto_ratio` (2.0),
   and vetoes (removes the candidate entirely) at or above it. Applied only to build candidates;
   dials and survey are unaffected (a body's total surveyed area doesn't glut a market).
