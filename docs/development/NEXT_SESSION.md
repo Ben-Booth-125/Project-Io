@@ -53,7 +53,15 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   own-market misread, not a start-up glut); '~10 points' untested; propellant has no base price
   anywhere (authoring defect). **Round 2 running** (same agent): census of the 503 by demand 0/>0
   with the solver's own forecast, counterfactuals (no settle dial-zeroing / reflex skips dial-idled /
-  solver reads demand pooled over reachable buyers), the sell-order leak. Then merge the probe and
+  solver reads demand pooled over reachable buyers), the sell-order leak. **ROUND 2 DONE, probe
+  merged:** of 503 zeroed: 223 no local bid (180 no bidder ANYWHERE that tick — steel, refined fuel,
+  silicon, clean water; 216 profitable at base), 178 true start-up glut (recover by handoff; not
+  re-dialled), 102 unpriced propellant. Counterfactuals (16 seeds): no settle zeroing G1 83.5 at
+  handoff but 62.7 at t50 (rescued plants mothballed in play); reflex-skip 71.4 / t50 63.4 / G2 76.7;
+  body-pooled demand 72.8. Sell-order leak: not a factor. Hypothesis: processors silenced by the
+  fair-price ceiling never show as demand, so the dial sees no buyer — the dial reading silenced want
+  is a NEW AI input (grant). **Lever form sent to Ben** (dial reads silenced want: measure first /
+  grant / no; hold & reflex; propellant pricing; G1 at t50). Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
 
