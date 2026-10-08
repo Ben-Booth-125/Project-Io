@@ -946,8 +946,11 @@ void app::draw_building_screen()
 {
     poll_worldgen();
 
+    // THE TOP BAND (STARTUP.md § Main menu; Ben, 2026-10-08): the window hangs
+    // from the top edge, horizontally centred, and its title is padded down so
+    // the bar lands on ui::loading_bar_y() -- never the window's vertical centre.
     const ImVec2 disp = ImGui::GetIO().DisplaySize;
-    ImGui::SetNextWindowPos({disp.x * 0.5f, disp.y * 0.5f}, ImGuiCond_Always, {0.5f, 0.5f});
+    ImGui::SetNextWindowPos({disp.x * 0.5f, 0.0f}, ImGuiCond_Always, {0.5f, 0.0f});
     constexpr ImGuiWindowFlags flags =
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
@@ -956,6 +959,10 @@ void app::draw_building_screen()
 
     if (ImGui::Begin("##building", nullptr, flags))
     {
+        // The lead above the bar: the title line, this screen's 10 px gap and
+        // the wait surface's own 10 px gap, each with its item spacing.
+        const float sp = ImGui::GetStyle().ItemSpacing.y;
+        ui::pad_to_loading_band(ImGui::GetTextLineHeightWithSpacing() + 2.0f * (10.0f + sp));
         const char* title = "BUILDING THE WORLD";
         const float tw = ImGui::CalcTextSize(title).x;
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (420.0f - tw) * 0.5f);

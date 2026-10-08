@@ -660,7 +660,10 @@ Power moves only within a grid (`LOGISTICS.md` § 3a), so the world's generation
 it can be used: a body's power gap is the sum over its wired grids of `max(0, need − live output)`,
 and a power firm is placed in a short grid's provinces. A surplus on the core grid never cancels a
 deficit on another. A grid needing less than half of one plant's output is left to a road that
-joins it to a bigger one rather than given a plant of its own. The scorer's power-plant estimate
+joins it to a bigger one rather than given a plant of its own. **Unpowered grids first (Ben,
+2026-10-08):** the body's power firms — a capped number — go first to short grids with no
+generation at all, and only then to grids that already have some, so a core grid's shortfall
+cannot take every firm and leave a secondary grid dark for the campaign. The scorer's power-plant estimate
 reads the same per-grid gap, and counts plants already under construction on that grid as supply
 (`../ai/AI_OPPONENT.md`). Measured before: generation put every plant on the body's core grid on
 four of five seeds, and the settle then started 11–13 plants on a grid needing one.
