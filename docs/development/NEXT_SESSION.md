@@ -75,7 +75,19 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   drop the silenced-want dial lever; keep G1 85% at t50 and EXTEND the sprint; round 4 diagnoses
   industrial demand registration + t50 decay under BL-1235. **Round 4 lane** runs in hand-made
   worktree `.claude/worktrees/s50-round4-demand` (branch `s50-round4-demand`) — Agent isolation
-  refused ("git identity could not be verified") though git answers fine. Then merge the probe and
+  refused ("git identity could not be verified") though git answers fine. **ROUND 4 DONE, probe
+  committed 57c85a35** (copied in; the agent could not commit). Findings: silicon/clean_water
+  healthy (round 2 mislabelled — plants had switched recipe); STEEL consumers (244) live off the
+  generation opening stock (`corporation_generation.cpp:913-948`) for 2 ticks, want-net-of-pool
+  (NR-281) bids nothing, the dial reads that empty -12 register and its hold outlasts demand's
+  arrival at -9; REFINED FUEL has no live consumer (propellant unpriced -> zeroed; ~34 producers
+  per seed vs ~0.6 consumers); reflex rescue `output_ratio` (economy_system.cpp ~2820) reads an
+  unpriced output as 1.0 = healthiest, so floored fuel plants switch INTO propellant (spot-checked,
+  true). t50 (shipped code, NOT bh — agent's src switch was denied): of 665 lost, 408 mid-chain
+  starvation (steel 79 top input), 158 inputs >= revenue; dial little. Fix menu to Ben: opening
+  stock / dial abstains on pre-demand registers (scope) / dial reads composite bid (GRANT) / count
+  stock-fed use as demand (overturns NR-281) / rescue reads unpriced as floored / fuel over-placement.
+  Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
 
