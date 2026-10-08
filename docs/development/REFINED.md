@@ -76,7 +76,7 @@ asserts the overturned claim — grep the OLD wording across docs/ (the same-day
 - [ ] A new processor is judged on supply, not stock (AI_OPPONENT.md, processing-facility candidate)
 - [ ] Targets: G1 >= 85%, G1b <= 5% (market-viability SKILL.md; BL-1217; sprint row)
 - [ ] Road generation schema kept (no doc change; confirm nothing claims otherwise)
-- [ ] Quick Start; loading bars in a top band (STARTUP.md)
+- [ ] Quick Start; loading bars in a top band (STARTUP.md) — built and merged 7c39a626; Ben's live click passed 2026-10-08 ("Quick Start looks good")
 - [ ] Unmet want visible to the player in sprint 51 (BL-1222)
 - [ ] Wrap it as a reusable check (a script listing each sprint's dated rulings against their docs) if the pattern holds — ask Ben before adding a skill
 
