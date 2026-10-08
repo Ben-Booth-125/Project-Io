@@ -187,6 +187,13 @@ int main()
         check(forecast_glut_multiplier(w, tile, resource_type::iron_ore, 5.0f, 3, p) == 1.0f,
               "BL-203 R3: no public demand signal -> no forecast penalty (visibility-honest)");
 
+        // BL-1227 (the boom): zero bid against LISTED supply is a glut, not a
+        // missing signal — both facts are public, the ratio is unbounded.
+        w.markets.at(market).supply[ri(resource_type::iron_ore)] = 50.0f;
+        check(forecast_glut_multiplier(w, tile, resource_type::iron_ore, 5.0f, 3, p) == 0.0f,
+              "BL-1227: zero public demand against listed supply vetoes the build (an unbounded glut)");
+        w.markets.at(market).supply[ri(resource_type::iron_ore)] = 0.0f;
+
         // Demand comfortably absorbs the forecast supply: no penalty.
         w.markets.at(market).demand[ri(resource_type::iron_ore)] = 1000.0f;
         w.markets.at(market).supply[ri(resource_type::iron_ore)] = 0.0f;

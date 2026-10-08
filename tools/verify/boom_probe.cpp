@@ -1,0 +1,319 @@
+// ---------------------------------------------------------------------------
+// boom_probe — BL-1227 (idle mines), review round 2 diagnosis
+// ---------------------------------------------------------------------------
+// QUESTION. With the stack-aware site ranking, play placed ~2,949 new
+// extraction sites over 5 seeds (fibre 1,764, hides 473). Why do fibre and
+// hides look endlessly profitable to the scorer?
+//
+// THE WORLD. Seated as idle_mines_probe / market_viability seat it: the
+// 12-tick settle, seat_player_corporation, then PLAY ticks as the app steps
+// them. A PURE READER: nothing it does writes the world.
+//
+// PER NEW SITE (any watched good, placed in play t >= 1), read at the lap
+// before the scorer ran (lap 0, convoys — the economy step, where the corp AI
+// runs, is lap 1):
+//   * the price the scorer assumed (local_price: cleared price, else base),
+//     the base, the market's PUBLIC demand and supply, its shelf;
+//   * the scorer's own estimate re-derived (rate, rank, revenue, net) and the
+//     glut forecast's ratio (supply + added x horizon) / demand, or
+//     "no demand" when demand is 0 (the forecast then returns 1.0);
+//   * siblings: other new sites of the same good in the same market this tick;
+//   * who buys the good in that market: running processors whose recipe
+//     consumes it, and the household bid.
+// Then over the site's FIRST 20 OPERATING TICKS (after construction): its
+// realised revenue, upkeep and wages (estimate_building_profit, the reflex's
+// own figure), the price after each clear, the shelf, and whether it idled.
+//
+// Usage: build_gen/verify/boom_probe.exe [--seeds a,b] [--ticks N]
+// Build:  ./tools/verify/build_lua_harness.sh boom_probe
+// ---------------------------------------------------------------------------
+
+#include "scripting/lua_state.hpp"
+#include "harness_params.hpp"
+#include "world/building_profit.hpp"
+#include "world/campaign_settle.hpp"
+#include "world/components.hpp"
+#include "world/construction.hpp"
+#include "world/economy_system.hpp"
+#include "world/market_clearing.hpp"
+#include "world/orbital_system.hpp"
+#include "world/placement_rules.hpp"
+#include "world/recipe_registry.hpp"
+#include "world/resource_names.hpp"
+#include "world/spawn_seat.hpp"
+#include "world/survey_system.hpp"
+#include "world/world.hpp"
+
+#include <algorithm>
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <exception>
+#include <map>
+#include <memory>
+#include <set>
+#include <string>
+#include <vector>
+
+namespace {
+
+constexpr int k_op_window = 20;
+
+std::string gname(std::size_t g) { return resource_names::name_of(static_cast<resource_type>(g)); }
+
+struct mkt_snap
+{
+    float price = 0, base = 0, demand = 0, supply = 0, inv = 0, hh_bid = 0;
+};
+
+struct tracked
+{
+    entity_id bid = null_entity, tile = null_entity, market = null_entity;
+    std::size_t r = 0;
+    int placed = 0, rank = 1, siblings = 0, consumers = 0;
+    mkt_snap at;
+    float est_rev = 0, est_net = 0, glut_ratio = -1; // -1: no demand -> no forecast
+    int op_ticks = 0;
+    bool idled = false;
+    double rev = 0, maint = 0, wages = 0, out = 0;
+    float price_first = 0, price_last = 0, inv_first = 0, inv_last = 0, dem_last = 0;
+};
+
+struct good_tally
+{
+    long n = 0, no_demand = 0, base_price = 0, with_consumer = 0;
+    double p_ratio = 0, glut = 0; long glut_n = 0;
+    double est_rev = 0, est_net = 0, siblings = 0, demand = 0, supply = 0, hh = 0;
+    long matured = 0, idled = 0;
+    double rev = 0, maint = 0, wages = 0, out = 0;
+    double pf = 0, pl = 0, invf = 0, invl = 0, deml = 0;
+};
+
+struct ctx
+{
+    const recipe_registry* reg = nullptr;
+    std::set<std::size_t> watch;
+    std::map<entity_id, mkt_snap> pre[resource_count]; // lap-0 snapshot per market, watched goods only
+    std::set<entity_id> seen;
+    std::vector<tracked> sites;
+    int tick = 0;
+};
+
+mkt_snap snap_of(const market_component& m, std::size_t r)
+{
+    mkt_snap s;
+    s.price = m.price[r] > 0.0f ? m.price[r] : m.base_price[r];
+    s.base = m.base_price[r]; s.demand = m.demand[r]; s.supply = m.supply[r];
+    s.inv = m.inventory[r]; s.hh_bid = m.household_bid[r];
+    return s;
+}
+
+void after_lap(const world& w, int lap, void* vp)
+{
+    ctx& c = *static_cast<ctx*>(vp);
+    if (lap == 0)
+    {
+        for (const std::size_t r : c.watch)
+        {
+            c.pre[r].clear();
+            for (const auto& [mid, m] : w.markets) c.pre[r][mid] = snap_of(m, r);
+        }
+        return;
+    }
+    if (lap != 1) return;
+    // new watched sites this tick
+    std::vector<entity_id> fresh;
+    for (const auto& [bid, b] : w.buildings)
+    {
+        if (b.type != building_type::extraction_site) continue;
+        if (!c.seen.insert(bid).second) continue;
+        if (c.tick < 1) continue;
+        if (!c.watch.count(static_cast<std::size_t>(b.target_resource))) continue;
+        fresh.push_back(bid);
+    }
+    if (fresh.empty()) return;
+    // consumers per (market, good): non-idle processors whose recipe takes it
+    std::map<std::pair<entity_id, std::size_t>, int> consumers;
+    for (const auto& [bid, b] : w.buildings)
+    {
+        if (b.type != building_type::processing_facility || b.decommissioned || b.ticks_remaining > 0) continue;
+        const recipe* rc = c.reg->get_recipe(b.recipe);
+        if (!rc) continue;
+        for (const std::size_t r : c.watch)
+            if (rc->inputs[r] > 0.0f) ++consumers[{market_for_tile(w, b.tile), r}];
+    }
+    std::map<std::pair<entity_id, std::size_t>, int> sib;
+    std::vector<tracked> batch;
+    const building_economics& ex = c.reg->economics(building_type::extraction_site);
+    for (const entity_id bid : fresh)
+    {
+        const building_component& b = w.buildings.at(bid);
+        tracked t;
+        t.bid = bid; t.tile = b.tile; t.r = static_cast<std::size_t>(b.target_resource);
+        t.market = market_for_tile(w, b.tile);
+        t.placed = c.tick;
+        t.rank = placement_rules::stack_rank(w, bid);
+        if (const auto it = c.pre[t.r].find(t.market); it != c.pre[t.r].end()) t.at = it->second;
+        const tile_component& tc = w.tiles.at(b.tile);
+        const float rich = placement_rules::is_depositless_site(w, b.tile, b.target_resource)
+            ? placement_rules::depositless_rate_scalar(b.target_resource)
+            : richness_rate_scalar(ex, tc.resource_deposit[t.r]);
+        const float rate = ex.base_rate * rich * 0.5f * (1.0f - tc.hazard_level)
+                         * placement_rules::stack_output_scalar(t.rank);
+        t.est_rev = rate * t.at.price;
+        t.est_net = t.est_rev - ex.maintenance - ex.base_wage * 0.5f;
+        if (t.at.demand > 0.0f)
+        {
+            const float horizon = ex.build_duration_ticks + 1.0f;
+            t.glut_ratio = (t.at.supply + rate * horizon) / t.at.demand;
+        }
+        const auto ci = consumers.find({t.market, t.r});
+        t.consumers = ci != consumers.end() ? ci->second : 0;
+        ++sib[{t.market, t.r}];
+        batch.push_back(t);
+    }
+    for (tracked& t : batch) { t.siblings = sib[{t.market, t.r}] - 1; c.sites.push_back(t); }
+}
+
+void after_tick(const world& w, const recipe_registry& reg, const settle_tick_result& res, ctx& c)
+{
+    for (tracked& t : c.sites)
+    {
+        if (t.op_ticks >= k_op_window) continue;
+        const auto bi = w.buildings.find(t.bid);
+        if (bi == w.buildings.end()) { t.op_ticks = k_op_window; t.idled = true; continue; }
+        const building_component& b = bi->second;
+        if (b.ticks_remaining > 0) continue;
+        if (b.decommissioned) t.idled = true;
+        const building_profit bp = estimate_building_profit(w, reg, res.report, t.bid);
+        if (bp.has_data) { t.rev += bp.revenue; t.maint += bp.maintenance; t.wages += bp.wages; }
+        if (const auto rit = res.report.building_row.find(t.bid);
+            rit != res.report.building_row.end() && rit->second < res.report.buildings.size())
+            t.out += res.report.buildings[rit->second].output_quantity;
+        const auto mit = w.markets.find(t.market);
+        if (mit != w.markets.end())
+        {
+            const mkt_snap s = snap_of(mit->second, t.r);
+            if (t.op_ticks == 0) { t.price_first = s.price / std::max(1e-6f, s.base); t.inv_first = s.inv; }
+            t.price_last = s.price / std::max(1e-6f, s.base); t.inv_last = s.inv; t.dem_last = s.demand;
+        }
+        ++t.op_ticks;
+    }
+}
+
+void fold(const std::vector<tracked>& v, std::map<std::size_t, good_tally>& g)
+{
+    for (const tracked& t : v)
+    {
+        good_tally& a = g[t.r];
+        ++a.n;
+        if (t.at.demand <= 0.0f) ++a.no_demand;
+        if (t.at.base > 0 && t.at.price == t.at.base) ++a.base_price;
+        if (t.consumers > 0) ++a.with_consumer;
+        a.p_ratio += t.at.base > 0 ? t.at.price / t.at.base : 0;
+        if (t.glut_ratio >= 0) { a.glut += t.glut_ratio; ++a.glut_n; }
+        a.est_rev += t.est_rev; a.est_net += t.est_net; a.siblings += t.siblings;
+        a.demand += t.at.demand; a.supply += t.at.supply; a.hh += t.at.hh_bid;
+        if (t.op_ticks >= k_op_window)
+        {
+            ++a.matured; if (t.idled) ++a.idled;
+            a.rev += t.rev / k_op_window; a.maint += t.maint / k_op_window; a.wages += t.wages / k_op_window;
+            a.out += t.out / k_op_window;
+            a.pf += t.price_first; a.pl += t.price_last; a.invf += t.inv_first; a.invl += t.inv_last; a.deml += t.dem_last;
+        }
+    }
+}
+
+void print(const std::map<std::size_t, good_tally>& g)
+{
+    for (const auto& [r, a] : g)
+    {
+        if (!a.n) continue;
+        const double n = double(a.n), m = a.matured ? double(a.matured) : 1.0;
+        std::printf("  %-22s new %5ld | at placement: demand 0 %5.1f%%  price==base %5.1f%%  p/base %.2f  "
+                    "demand %.1f supply %.1f hh_bid %.1f  consumer in mkt %5.1f%%  same-tick siblings %.2f\n",
+                    gname(r).c_str(), a.n, 100.0 * a.no_demand / n, 100.0 * a.base_price / n, a.p_ratio / n,
+                    a.demand / n, a.supply / n, a.hh / n, 100.0 * a.with_consumer / n, a.siblings / n);
+        std::printf("  %-22s       | estimate: rev %.2f net %.2f  glut ratio %.2f (over %ld with demand)\n",
+                    "", a.est_rev / n, a.est_net / n, a.glut_n ? a.glut / a.glut_n : 0.0, a.glut_n);
+        std::printf("  %-22s       | first %d op ticks (%ld matured): out %.2f rev %.2f maint %.2f wages %.2f "
+                    "net %.2f | p/base op1 %.2f op%d %.2f | shelf op1 %.0f op%d %.0f | demand op%d %.1f | idled %5.1f%%\n",
+                    "", k_op_window, a.matured, a.out / m, a.rev / m, a.maint / m, a.wages / m,
+                    (a.rev - a.maint - a.wages) / m, a.pf / m, k_op_window, a.pl / m, a.invf / m, k_op_window,
+                    a.invl / m, k_op_window, a.deml / m, 100.0 * a.idled / m);
+    }
+}
+
+} // namespace
+
+int main(int argc, char** argv)
+{
+    int ticks = 400;
+    std::vector<std::uint32_t> seeds = {0, 43, 10, 28, 38};
+    for (int i = 1; i < argc; ++i)
+    {
+        if (!std::strcmp(argv[i], "--ticks") && i + 1 < argc) ticks = std::max(1, std::atoi(argv[++i]));
+        else if (!std::strcmp(argv[i], "--seeds") && i + 1 < argc)
+        {
+            seeds.clear();
+            std::string s = argv[++i];
+            std::size_t a = 0;
+            while (a <= s.size())
+            {
+                const std::size_t b = s.find(',', a);
+                const std::string tok = s.substr(a, b == std::string::npos ? std::string::npos : b - a);
+                if (!tok.empty()) seeds.push_back(static_cast<std::uint32_t>(std::strtoul(tok.c_str(), nullptr, 10)));
+                if (b == std::string::npos) break;
+                a = b + 1;
+            }
+        }
+        else { std::fprintf(stderr, "usage: boom_probe [--seeds a,b] [--ticks N]\n"); return 2; }
+    }
+    std::map<std::size_t, good_tally> pooled;
+    for (const std::uint32_t seed : seeds)
+    {
+        lua_state lua;
+        world_params wp;
+        wp.seed = seed;
+        auto start = std::make_unique<app_start_world>();
+        try { build_app_start_world(lua, wp, *start); }
+        catch (const std::exception& e) { std::printf("seed %u: build threw %s\n", seed, e.what()); continue; }
+        world& w = start->w;
+        const recipe_registry& reg = start->reg;
+        ctx c;
+        c.reg = &reg;
+        for (const resource_type rt : placement_rules::k_extractable) c.watch.insert(static_cast<std::size_t>(rt));
+        for (const auto& [bid, b] : w.buildings) c.seen.insert(bid);
+        settle_tick_hooks hooks;
+        hooks.after_lap = after_lap;
+        hooks.ctx = &c;
+        for (int step = 0; step < k_campaign_settle_ticks; ++step)
+        {
+            c.tick = step - k_campaign_settle_ticks;
+            run_settle_tick(w, reg, step, 0, true, &hooks);
+        }
+        seat_player_corporation(w, seed, start->land.search.winner_score);
+        constexpr int k_days = 90;
+        for (int k = 1; k <= ticks; ++k)
+        {
+            advance_orbits(w, static_cast<double>(k_days));
+            advance_surveys(w, k_days);
+            w.current_day_tick = k * k_days;
+            c.tick = k;
+            const settle_tick_result res =
+                run_settle_tick(w, reg, k_campaign_settle_ticks + (k - 1), k * k_days, false, &hooks);
+            after_tick(w, reg, res, c);
+        }
+        std::map<std::size_t, good_tally> g;
+        fold(c.sites, g);
+        std::printf("\n=== seed %u: %zu new sites in play ===\n", seed, c.sites.size());
+        print(g);
+        fold(c.sites, pooled);
+        std::fflush(stdout);
+    }
+    std::printf("\n================ POOLED ================\n");
+    print(pooled);
+    return 0;
+}

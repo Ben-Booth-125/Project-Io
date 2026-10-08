@@ -372,8 +372,10 @@ float corp_should_have_buffer(const world& w, const recipe_registry& reg,
 /// aggregates only (visibility-honest — the same facts export_corp_blackboard
 /// would show a rival, per BL-068/DISCOVERY.md) and returns 1.0 (no penalty)
 /// when the forecast supply/demand ratio stays at or below `p.glut_taper_ratio`,
-/// tapering linearly to 0.0 (veto) at `p.glut_veto_ratio`. Exposed for the
-/// harness; also used internally by the build-candidate scorer.
+/// tapering linearly to 0.0 (veto) at `p.glut_veto_ratio`. Zero public demand
+/// against listed supply is an unbounded ratio and vetoes (BL-1227); only a
+/// market listing and bidding nothing at all returns 1.0 (no signal). Exposed
+/// for the harness; also used internally by the build-candidate scorer.
 float forecast_glut_multiplier(const world& w, entity_id tile, resource_type target,
                                float added_rate_per_tick, int horizon_ticks,
                                const corp_ai_params& p = {});

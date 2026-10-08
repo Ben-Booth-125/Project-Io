@@ -1243,13 +1243,13 @@
    "category": "Economy",
    "priority": "A",
    "difficulty": 4,
-   "title": "A built processor gets its inputs, so 70% are running at handoff",
+   "title": "A built processor gets its inputs: 85% running and at most 5% input-starved at handoff",
    "authority_doc": "docs/economy/SUPPLY.md",
    "files": [
     "src/world/economy_system.cpp",
     "src/world/corp_ai.cpp"
    ],
-   "design": "CARRIED from sprint 49 (Ben, the close-out form, 2026-10-07: close with G1 unmet, carry it to sprint 50 as a logistics item). The 16-seed market_viability reading on main after BL-1183 C1: G1 54.7% of built processors running at handoff against Ben's 70% (G2 54.4 and G3 88.9 pass). About a quarter of built processors are already decommissioned by the handoff, and by their last reported state almost all were input-starved (half A: 578 of 674). Diagnose which inputs fail to arrive, at which markets, and why - no producer within reach, a producer whose surplus is not dispatched, or a dispatch the margin refuses - then fix the cause in the network or dispatch, not by clamping the loss reflex. Re-measure construction stalls here too: whether a stalled site is ever abandoned (BL-1183 C3) is still unruled. Judge it on the market-viability skill, 16 seeds."
+   "design": "TARGETS RAISED (Ben, 2026-10-08): G1 >= 85% running at handoff, plus G1b <= 5% input-starved (now, or decommissioned after starving), 16 seeds. 70% had no recorded reason beyond a first stretch from a 17.6% baseline; G1 alone counts a plant idled for want of a buyer as failure, so starvation gets its own target. CARRIED from sprint 49 (Ben, the close-out form, 2026-10-07: close with G1 unmet, carry it to sprint 50 as a logistics item). The 16-seed market_viability reading on main after BL-1183 C1: G1 54.7% of built processors running at handoff against Ben's 70% (G2 54.4 and G3 88.9 pass). About a quarter of built processors are already decommissioned by the handoff, and by their last reported state almost all were input-starved (half A: 578 of 674). Diagnose which inputs fail to arrive, at which markets, and why - no producer within reach, a producer whose surplus is not dispatched, or a dispatch the margin refuses - then fix the cause in the network or dispatch, not by clamping the loss reflex. Re-measure construction stalls here too: whether a stalled site is ever abandoned (BL-1183 C3) is still unruled. Judge it on the market-viability skill, 16 seeds."
   },
   {
    "status": "proposed",

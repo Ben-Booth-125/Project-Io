@@ -678,7 +678,19 @@ float forecast_glut_multiplier(const world& w, entity_id tile, resource_type tar
     const std::size_t r = static_cast<std::size_t>(target);
     const float demand = m.demand[r]; // PUBLIC aggregate only (BL-068) — same fact a rival sees.
     if (demand <= 0.0f)
-        return 1.0f; // no public demand signal to forecast against; do not guess.
+    {
+        // BL-1227 (idle mines, the boom): ZERO BID AGAINST LISTED SUPPLY IS A
+        // GLUT, not a missing signal. Both halves are public: the market lists
+        // supply and nobody bids for it, so the projected ratio
+        // (supply + added) / demand is unbounded — past any veto. Reading it as
+        // "no signal" let the scorer build 1,745 fibre and 461 hides sites into
+        // markets with no buyer (no Weaver, no Tannery, no household bid;
+        // 100% of them at demand 0, fibre's listed supply ~412k), pricing
+        // output nobody buys at the band floor (~0.26 base) as revenue.
+        // Only a market that has listed NOTHING and bid NOTHING (no clear has
+        // seen the good either way) is genuinely signal-free: do not guess.
+        return m.supply[r] > 0.0f ? 0.0f : 1.0f;
+    }
     const float horizon = static_cast<float>(std::max(1, horizon_ticks));
     const float projected_supply = m.supply[r] + added_rate_per_tick * horizon;
     const float ratio = projected_supply / demand;
