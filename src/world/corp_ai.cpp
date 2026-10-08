@@ -684,7 +684,12 @@ bool zero_bid_veto(const world& w, const market_component& m, std::size_t r, int
     // a record no older than `hold_ticks` still counts, so every corporation
     // that evaluates between two records sees it. A buyer that takes or wants
     // goods without posting a bid is still a buyer.
-    if (m.hauler_want[r] > 0.0f || unposted_bid_held(m, r, w.current_econ_tick, hold_ticks))
+    //
+    // The sum is `composite_bid` (components.hpp), the one definition the
+    // workforce dial also reads (§ 11, the dial reads the build bid). Called
+    // only with demand[r] <= 0, so a positive composite here is exactly the
+    // silenced want or the held unposted bid.
+    if (composite_bid(m, r, w.current_econ_tick, hold_ticks) > 0.0f)
         return false;
     // BL-1227 (idle mines, the boom): ZERO BID AGAINST LISTED SUPPLY IS A
     // GLUT, not a missing signal. Both halves are public: the market lists
@@ -1957,7 +1962,8 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             {
                 if (!dial_idled(b))
                     continue;
-                held_proposed = solve_workforce_target(w, reg, b, 1.0f, /*stack_rank=*/1, &held_gain);
+                held_proposed = solve_workforce_target(w, reg, b, 1.0f, /*stack_rank=*/1, &held_gain,
+                                                       /*bid_hold_ticks=*/std::max(1, p.cadence_k));
                 if (held_proposed <= 0)
                     continue;
             }
@@ -2121,7 +2127,8 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 float     gain     = held_gain;
                 const int proposed = (held_proposed >= 0)
                     ? held_proposed
-                    : solve_workforce_target(w, reg, b, 1.0f, /*stack_rank=*/1, &gain);
+                    : solve_workforce_target(w, reg, b, 1.0f, /*stack_rank=*/1, &gain,
+                                             /*bid_hold_ticks=*/std::max(1, p.cadence_k));
                 if (proposed != b.workforce_target && bp.has_data)
                 {
                     if (gain > margin_gate)

@@ -902,9 +902,18 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
 ///                 loss-maker only for cutting, so every dial the solver found in
 ///                 the other direction — the interior optimum it exists to find —
 ///                 scored negative and was silently discarded.
+/// @param bid_hold_ticks BL-1217 (AI_OPPONENT.md § 11, "The workforce dial may
+///                 read the build veto's composite bid", Ben 2026-10-09). -1
+///                 (the default; the player's auto-solver) reads the plant's
+///                 market's posted demand alone. >= 0 (the background scorer
+///                 passes its cadence) reads the composite bid held for that
+///                 many ticks (`composite_bid`), and forecasts an output its
+///                 market neither lists nor bids at its base price ("The dial
+///                 forecasts at base where no fact exists yet").
 int solve_workforce_target(world& w, const recipe_registry& reg,
                            const building_component& b, float contention,
-                           int stack_rank = 1, float* out_gain = nullptr);
+                           int stack_rank = 1, float* out_gain = nullptr,
+                           int bid_hold_ticks = -1);
 
 /// BL-1235 (dial hold outlasts reflex; AI_OPPONENT.md, "A plant the dial idled
 /// is not losing"): a background plant the workforce dial has set to zero. The

@@ -2,6 +2,7 @@
 
 #include "entity.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -1141,6 +1142,23 @@ inline bool unposted_bid_held(const market_component& m, std::size_t r, int tick
     // for its whole lead over the current tick plus the cadence.
     return m.unposted_bid[r] > 0.0f && tick >= m.unposted_bid_tick[r]
         && tick - m.unposted_bid_tick[r] <= hold_ticks;
+}
+
+/// THE COMPOSITE BID for good @p r on market @p m at econ tick @p tick — what
+/// counts as a bid (AI_OPPONENT.md § 2B, Ben 2026-10-07/08): the posted
+/// `demand`, PLUS the want the fair-price ceiling silenced (`hauler_want`),
+/// PLUS the unposted bid held for @p hold_ticks (off-book want, pool-fed launch
+/// fuel and upkeep, what running processors consume). One definition, read by
+/// the build veto (corp_ai.cpp, `zero_bid_veto`) and — by the grant "the
+/// workforce dial may read the build veto's composite bid" (AI_OPPONENT.md
+/// § 11, Ben 2026-10-09, BL-1217) — as the background workforce dial's buyer
+/// signal (`solve_workforce_target`). The plant's own market only: no pooling.
+inline float composite_bid(const market_component& m, std::size_t r, int tick, int hold_ticks)
+{
+    float bid = std::max(0.0f, m.demand[r]) + std::max(0.0f, m.hauler_want[r]);
+    if (unposted_bid_held(m, r, tick, hold_ticks))
+        bid += m.unposted_bid[r];
+    return bid;
 }
 
 /// BL-1227: one off-book WANT a state purchase derivation recorded — what a

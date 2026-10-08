@@ -921,7 +921,7 @@ float wf_target_price(float base, float supply, float demand,
 // (corp_ai.cpp) reuses the one solver. The anonymous namespace re-opens below.
 int solve_workforce_target(world& w, const recipe_registry& reg,
                            const building_component& b, float contention,
-                           int stack_rank, float* out_gain)
+                           int stack_rank, float* out_gain, int bid_hold_ticks)
 {
     if (out_gain)
         *out_gain = 0.0f; // every early return below is "no move, so no gain"
@@ -968,14 +968,36 @@ int solve_workforce_target(world& w, const recipe_registry& reg,
         }
 
     // Clearing price for resource r if this building's supply of it shifts by delta.
+    //
+    // BL-1217 (AI_OPPONENT.md § 11, "The workforce dial may read the build
+    // veto's composite bid", Ben 2026-10-09): on the background dial
+    // (bid_hold_ticks >= 0, passed by the scorer as its cadence) the buyer
+    // signal is the SAME composite bid the build veto reads — demand, silenced
+    // want, the held unposted bid — on this plant's own market
+    // (`composite_bid`, components.hpp). The player's auto-solver passes -1 and
+    // reads posted demand alone, as before. A grid-pooled read (BL-1232) keeps
+    // its pooled demand: the grant admits no cross-market pooling of its own.
+    //
+    // And where the market lists none of the output and no bid has registered
+    // (composite 0), the dial forecasts the output at its BASE price, not the
+    // floor (AI_OPPONENT.md, "The dial forecasts at base where no fact exists
+    // yet", Ben 2026-10-09): an empty shelf with no bidder is an unknown, not a
+    // glut. Background dial only, like the composite read.
     const auto price_of = [&](std::size_t r, float supply_delta) -> float {
         if (mkt == nullptr)
             return 0.0f;
         const bool  pooled = gsd != nullptr && reg.grid_goods().grid(r) && grid_good_crosses_markets(r);
         const float base   = pooled ? grid_good_pricing_supply(*gsd, r, reg.price_band().shelf_supply_ticks)
                                     : mkt->supply[r];
+        float bid = pooled ? gsd->demand[r] : mkt->demand[r];
+        if (!pooled && bid_hold_ticks >= 0)
+        {
+            bid = composite_bid(*mkt, r, w.current_econ_tick, bid_hold_ticks);
+            if (!(mkt->supply[r] > 0.0f) && !(bid > 0.0f))
+                return std::max(0.0f, mkt->base_price[r]); // no fact yet: forecast at base
+        }
         const float supply = std::max(0.0f, base + supply_delta);
-        return wf_target_price(mkt->base_price[r], supply, pooled ? gsd->demand[r] : mkt->demand[r],
+        return wf_target_price(mkt->base_price[r], supply, bid,
                                reg.price_band().floor_mult, reg.price_band().ceil_mult);
     };
 
