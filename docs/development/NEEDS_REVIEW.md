@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*88 entries — 10 open, 78 resolved.*
+*89 entries — 11 open, 78 resolved.*
 
 ---
 
@@ -140,6 +140,11 @@ The sized test's spare (input_reach.cpp reachable_supply) charges each consumer 
 *decision · raised 2026-10-08 · from the BL-1227 (idle mines) round 4 build and re-review*
 
 Your ruling: the space programme's / network upkeep's want counts as a bid "there", filled or not. When no pool or shelf anywhere holds the good, there is no "there" to read, so the build records the want at the nation's CAPITAL market. Effect: one such chain (propellant, spacecraft components) can start per nation, at its capital; once a plant exists the want follows the good. In play this took spacecraft-components plants from 0 to 22 on 5 seeds. TAKEN as built and written into AI_OPPONENT.md § 2B. Alternatives: every market of the nation (more starts, more idle risk), or the market nearest the nation's space infrastructure.
+
+### NR-985 — Decision taken on your behalf: an unpowered grid that no window can feed does not hold up the others (BL-1232)
+*decision · raised 2026-10-08 · from the BL-1232 (power plants per grid) re-review, 2026-10-08*
+
+Your ruling: unpowered grids first - every short grid gets a plant before any gets a second. The re-review found that a short grid NO chartering centre's window can feed (no market centre on it, or its feeding markets outside every window) would hold the rule forever: every power firm narrowed to it, found no ground, and the core stopped getting plants. TAKEN: such a grid is dropped from the unpowered set for that centre, so an unreachable grid never holds up the others; if nothing unpowered is reachable, every short grid is served. Reversible: the strict reading (the rule holds even for an unreachable grid) starves the body's core.
 
 ---
 
