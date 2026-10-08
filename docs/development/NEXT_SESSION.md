@@ -71,7 +71,11 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   plants — the silenced-want lever is moot. Body-pooled 73.1; BL-1235 variant 79.5 handoff but
   **t50 62.2**, G1b t50 ~25%; pooled+BL-1235 80.0. **No variant holds t50 past 62.6.** Open
   question is upstream: why does no market bid steel / refined_fuel / silicon / clean_water at
-  settle start (how industrial demand is registered). Form to Ben pending. Then merge the probe and
+  settle start (how industrial demand is registered). **BEN RULED (2026-10-08, round 4 form):**
+  drop the silenced-want dial lever; keep G1 85% at t50 and EXTEND the sprint; round 4 diagnoses
+  industrial demand registration + t50 decay under BL-1235. **Round 4 lane** runs in hand-made
+  worktree `.claude/worktrees/s50-round4-demand` (branch `s50-round4-demand`) — Agent isolation
+  refused ("git identity could not be verified") though git answers fine. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
 
