@@ -521,13 +521,17 @@ struct result
     std::size_t steel_firms = 0; ///< firms whose holdings include a steel-making processor
 };
 
+/// BL-1233 review round 3: @p spare_richness is that deposit's richness — the
+/// derived-demand row makes it rich enough to feed the standing works AND the
+/// steel firm it charters for, which the sized rule requires (one ordinary site
+/// is wholly drawn by the works).
 /// BL-1197 round 4 (derived demand): @p spare_deposit puts an UNBUILT timber
 /// deposit at (5, 6), inside the centre's window in market A; @p points firm
 /// charters to spend; @p standing_works stands a steel-from-timber works at
 /// (7, 6) in market A before the walk (no corporation holds it); @p no_producer
 /// removes the timber producer, so nothing on the body makes timber.
 result run(bool timber_in_a, bool spare_deposit = false, std::int32_t points = 1,
-           bool standing_works = false, bool no_producer = false)
+           bool standing_works = false, bool no_producer = false, float spare_richness = 1.0f)
 {
     auto w = std::make_unique<world>();
     recipe_registry reg;
@@ -557,7 +561,7 @@ result run(bool timber_in_a, bool spare_deposit = false, std::int32_t points = 1
             tc.substrate = terrain_substrate::barren;
             if ((x == tx && y == 6) || (spare_deposit && x == 5 && y == 6))
             {
-                tc.resource_deposit[timber]   = 1.0f;
+                tc.resource_deposit[timber]   = (spare_deposit && x == 5 && y == 6) ? spare_richness : 1.0f;
                 tc.resource_remaining[timber] = 1000.0f;   // an unspent reserve: a producer
             }
             w->tiles[tid] = tc;
@@ -1526,13 +1530,17 @@ book_result run_book()
     r.twice = book.at(k_steel).draw[k_timber];
     input_reach ir = make_input_reach(*f.w, f.reg);
     std::array<bool, resource_count> none{};
+    // The body is GLUTTED with timber elsewhere (review round 3): its production
+    // dwarfs every demand, so only a want read as a shortage of its own shows.
     std::array<float, resource_count> production{};
+    production[k_timber] = 1000.0f;
+    // What it reads: timber's shortage — demand over the body's production.
     const auto added = [&](entity_id centre, std::array<bool, resource_count> capped,
                            std::array<float, resource_count> prod) {
         std::array<float, resource_count> demand{};
         demand[k_steel] = 100.0f; // the good the refused works serves is short
         add_prospective_draws(*f.w, f.reg, ir, book, centre, demand, prod, capped);
-        return demand[k_timber];
+        return std::max(0.0f, demand[k_timber] - prod[k_timber]);
     };
     r.bare = added(f.markets[0], none, production);
     f.add(13, building_type::extraction_site);            // a timber firm lands in B
@@ -1551,7 +1559,7 @@ book_result run_book()
     }
     {
         prospective_draws keep = book;
-        std::array<float, resource_count> prod{};
+        std::array<float, resource_count> prod = production;
         prod[k_steel] = 1000.0f; // steel no longer short
         added(f.markets[0], none, prod);
         r.kept_not_short = book.count(k_steel) != 0;
@@ -2570,7 +2578,7 @@ int main()
         // by its own timber, so at least one firm makes steel.)
         const chainfx::result dd = chainfx::run(/*timber_in_a=*/false, /*spare_deposit=*/true,
                                                 /*points=*/2, /*standing_works=*/true,
-                                                /*no_producer=*/true);
+                                                /*no_producer=*/true, /*spare_richness=*/4.0f);
         std::printf("  derived demand: firms %zu, timber site at (5, 6) %d, steel firms %zu, "
                     "works anchored at (6, 6) %d, chain_infeasible %lld%s\n", dd.firms,
                     dd.input_mine ? 1 : 0, dd.steel_firms, dd.anchor_at_x ? 1 : 0,
@@ -2672,8 +2680,8 @@ int main()
                     bk.mine_out, bk.kept_capped ? 1 : 0, bk.kept_not_short ? 1 : 0, bk.kept_short ? 1 : 0);
         expect_true("ruling A: a refusal SETS its good's entry; a retry refused again counts it once",
                     bk.set_once == 2.0f && bk.twice == 2.0f && std::fabs(bk.bare - 2.0f) < 1e-5f);
-        expect_true("ruling A: a timber firm out of reach of the refused plant neither satisfies nor "
-                    "clears its want",
+        expect_true("ruling A: on a body glutted with timber, a timber firm out of reach of the "
+                    "refused plant neither satisfies nor clears its want (timber stays short by it)",
                     std::fabs(bk.out_of_reach - 2.0f) < 1e-5f && bk.kept_short);
         expect_true("ruling A: a centre out of reach of the refused plant is not offered its want",
                     bk.far_centre == 0.0f);

@@ -753,8 +753,11 @@ void record_refused_draw(prospective_draws& book, std::size_t good, const refuse
 ///
 /// First the entries whose good the walk has abandoned are withdrawn (erased):
 /// @p capped at its per-good cap, or no longer short — @p demand plus every
-/// entry's want, against @p production. Then each remaining want is added to
-/// @p demand. Ascending good, ascending r; deterministic.
+/// entry's want, against @p production. Then the remaining wants, summed per
+/// input, are a SHORTAGE OF THEIR OWN: an input's demand is lifted to at least
+/// its body-wide @p production before its want is added, so a glut of it out of
+/// the plant's reach does not hide it. Ascending good, ascending r;
+/// deterministic.
 void add_prospective_draws(world& w, const recipe_registry& reg, input_reach& ir,
                            prospective_draws& book, entity_id centre_market,
                            std::array<float, resource_count>& demand,

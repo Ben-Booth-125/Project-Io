@@ -3735,6 +3735,21 @@ void record_refused_draw(prospective_draws& book, std::size_t good, const refuse
     e.draw   = refused.draw;
 }
 
+/// A positive in-reach want of r is a SHORTAGE OF ITS OWN (review round 3): the
+/// refused plant can be fed only from within its reach, so a glut of r elsewhere
+/// on the body does not answer it. r's demand is lifted to at least the body's
+/// production of r before the want is added, so the selection reads r short by
+/// at least the want whatever the body makes of it — and only a producer landing
+/// in reach (which raises the plant's spare) shrinks the want.
+static void raise_by_want(std::array<float, resource_count>& demand,
+                          const std::array<float, resource_count>& production,
+                          const std::array<float, resource_count>& wv)
+{
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (wv[r] > 0.0f)
+            demand[r] = std::max(demand[r], production[r]) + wv[r];
+}
+
 /// One entry's want of each input at a centre whose market is @p centre_market
 /// (see `add_prospective_draws`); @p ir must already describe what stands.
 static std::array<float, resource_count> prospective_want(world& w, const recipe_registry& reg,
@@ -3785,9 +3800,11 @@ void add_prospective_draws(world& w, const recipe_registry& reg, input_reach& ir
         else
             ++it;
     }
+    std::array<float, resource_count> total{};
     for (const auto& [good, wv] : want)
         for (std::size_t r = 0; r < resource_count; ++r)
-            demand[r] += wv[r];
+            total[r] += wv[r];
+    raise_by_want(demand, production, total);
 }
 
 void assign_default_recipes(world& w, const recipe_registry& reg)
@@ -5700,15 +5717,20 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                         // now, not only at the next firm (a centre whose turn has
                         // nothing else short would otherwise stop before it). A
                         // good already in the book is in `demand` already.
+                        //
+                        // THE TURN ONLY (review round 3): the legacy rules mask a
+                        // capped or missed good by lifting `selectable` to the
+                        // demand measured before this raise, so raising it here
+                        // could chart a capped input past its cap. Under them the
+                        // refusal enters at the next firm, before the masks.
                         const bool fresh = bs.prospective.count(gap_r) == 0;
                         record_refused_draw(bs.prospective, gap_r, refused);
-                        if (fresh)
+                        if (fresh && bs.in_turn)
                         {
                             input_reach_refresh(w, reg, chain);
                             const std::array<float, resource_count> wv = prospective_want(
                                 w, reg, chain, bs.prospective.at(gap_r), market_for_tile(w, cc.tile));
-                            for (std::size_t r = 0; r < resource_count; ++r)
-                                demand[r] += wv[r];
+                            raise_by_want(demand, production, wv);
                         }
                     }
                     if (digs && !chain_rejected)

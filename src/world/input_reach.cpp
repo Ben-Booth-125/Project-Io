@@ -517,6 +517,9 @@ reachable_spare reachable_supply(world& w, const recipe_registry& reg, input_rea
         for (const int i : rd.reachers) feed += outp[static_cast<std::size_t>(i)];
         if (!(feed > 0.0f))
             continue;
+        // Approximation, accepted as conservative (review round 3): each consumer
+        // is bounded by its own reachers' output, but several consumers sharing
+        // one producer can together charge it past its output.
         const float charge = std::min(d, feed);
         for (const int i : rd.reachers)
             spare_p[static_cast<std::size_t>(i)] -= charge * (outp[static_cast<std::size_t>(i)] / feed);
