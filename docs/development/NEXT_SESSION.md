@@ -98,6 +98,11 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   too (pre-existing). **MERGED 3bca733a** after a clean cold review (probe hunk dropped, tip's kept);
   app builds. Review raised NR-986 (seat inherits dial-zeroed plants at 0 — back to auto?). **D3+D4
   lane (dial reads build bid + base forecast; rescue unpriced = floored) launched** on the merged tip.
+  **PROPELLANT DONE** (01bd8b63, branch worktree-agent-a14f239f7a0f14bad, base bd1cd032; in cold
+  review): base 41.8 (electrolysis route, 2x(inputs+0.75 wage)+0.1; atmospheric anchor would be
+  64.0 — Ben's call). Alone: G1 71.4 -> 73.2, t50 61.6 -> 59.8, G1b 13.5. Generation now builds far
+  fewer propellant plants (166 -> 17); unpriced-zeroed 102 -> 0. Open: launch propellant is not
+  reserved, so clearing sells the pool each tick (unmeasured — call); PRODUCTION ~494 stale line.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
