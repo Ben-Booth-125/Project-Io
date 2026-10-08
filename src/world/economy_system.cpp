@@ -1025,8 +1025,15 @@ int solve_workforce_target(world& w, const recipe_registry& reg,
                     if (rcp->outputs[r] > 0.0f)
                         revenue += rcp->outputs[r] * runs *
                                    price_of(r, rcp->outputs[r] * (runs - runs_now));
+                    // BL-1232 (PRODUCTION.md, "An input is priced at what the
+                    // draw pays", Ben 2026-10-08): an input is valued at its
+                    // market's POSTED price — the price the draw is billed at
+                    // (FINANCE.md § the ceiling) — never forecast from this
+                    // tick's listings, which read a stocked shelf with little
+                    // listed as a good at the cap and zeroed a plant paying
+                    // ~3.2 a unit for petroleum it was forecast at the ceiling.
                     if (rcp->inputs[r] > 0.0f)
-                        input_cost += rcp->inputs[r] * runs * price_of(r, 0.0f);
+                        input_cost += rcp->inputs[r] * runs * (mkt ? posted_price(*mkt, r) : 0.0f);
                 }
             }
         }

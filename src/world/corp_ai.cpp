@@ -2,7 +2,6 @@
 
 #include "budget_system.hpp"  // compute_building_opex, body_mean_habitability
 #include "construction.hpp"   // construction_capex (BL-1066: the scorer prices a build as the gate does)
-#include "corporation_generation.hpp" // body_power_grid_gap (BL-1232: the power candidate reads the grid's gap)
 #include "building_profit.hpp"
 #include "decision_trace.hpp"  // BL-704: opt-in streaming decision sink
 #include "economy_system.hpp"  // economy_report, agency_event, solve_workforce_target
@@ -1064,11 +1063,6 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
     const std::vector<extraction_site> ranked_sites =
         rank_extraction_sites(w, reg, p.top_k_sites_per_resource, demand_weight);
 
-    // BL-1232: whether power is sized per grid in this band, and one plant's
-    // output (the half-a-plant rule) — registry facts, read once per tick.
-    const bool  power_per_grid     = power_sized_per_grid(reg);
-    const float power_plant_output = one_power_plant_output(reg);
-
     // BL-1187 (build only what runs): the reach context every processor
     // decision below asks "is this input obtainable here?" of — build, recipe
     // switch and resume alike. Built on first use and shared by every corp this
@@ -1359,33 +1353,6 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             const float wf        = 0.5f; // construct_building staffs at 0.5, as above
             const float batches   = pe.base_rate * wf;
 
-            // BL-1232 (power plants per grid; AI_OPPONENT.md, "A power-plant
-            // candidate is priced against its grid's shortfall", Ben 2026-10-07).
-            // Power moves only within its grid (LOGISTICS.md § 3a), so a plant is
-            // a candidate only on a SHORT grid: need less live output less the
-            // output of plants already under construction there. The measure is
-            // the charter walk's own (`body_power_grid_gap`,
-            // corporation_generation.hpp) — the same half-a-plant rule, the same
-            // under-construction count — not a second copy. Read fresh for each
-            // evaluating corp (an earlier corp's build this tick is a plant under
-            // construction by now), memoised per body for this corp only.
-            // Blind to the plants under construction, the settle scorer started
-            // 11-13 plants on a grid needing one. Where power is not sized per
-            // grid (no power upkeep authored, or no power recipe) nothing here is
-            // read and the candidate is what it was.
-            std::map<entity_id, std::set<std::uint32_t>> short_grids_of;
-            const auto grid_is_short = [&](entity_id body, entity_id tile) -> bool {
-                auto it = short_grids_of.find(body);
-                if (it == short_grids_of.end())
-                {
-                    std::set<std::uint32_t> grids;
-                    (void)body_power_grid_gap(w, reg, body, power_plant_output, grids);
-                    it = short_grids_of.emplace(body, std::move(grids)).first;
-                }
-                const std::uint32_t g = tile_power_grid(w, tile);
-                return g != 0 && it->second.count(g) != 0;
-            };
-
             for (const entity_id tile : own_tiles)
             {
                 if (std::binary_search(tiles_with_processor.begin(),
@@ -1519,11 +1486,6 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     const float         primary_q = rc->outputs[static_cast<std::size_t>(target)];
 
                     if (!placement_rules::can_place_in_world(w, tile, building_type::processing_facility, target))
-                        continue;
-
-                    // BL-1232: a generator only where its grid is short (above).
-                    if (power_per_grid && rc->outputs[static_cast<std::size_t>(resource_type::power)] > 0.0f
-                        && !grid_is_short(body, tile))
                         continue;
 
                     const float net = best_net;
