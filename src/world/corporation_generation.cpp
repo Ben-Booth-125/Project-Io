@@ -1861,46 +1861,6 @@ void chain_unplace(world& w, entity_id bid, std::unordered_set<entity_id>& occup
     w.stockpiles.erase(bid);
 }
 
-/// BL-1233 (Ben, 2026-10-07, ruling A; CORPORATION_GENERATION.md § Pass 6,
-/// "Derived demand counts ... the prospective draw of a processor refused for
-/// want of spare input"): what a firm's processor WOULD have drawn of each
-/// input, had the sized rule not turned it away — in the units derived demand
-/// reads (`body_processor_input_demand`: nominal batches x recipe inputs).
-struct refused_draw
-{
-    bool                              set = false;
-    std::array<float, resource_count> draw{};
-};
-
-/// The walk's PROSPECTIVE DRAWS, by the good whose firm was refused: one entry
-/// per good (a refusal SETS it — a retry refused again counts it once), erased
-/// when a firm for the good lands. Before each firm's selection the entries are
-/// added into the body's demand, after withdrawing those whose good the walk has
-/// abandoned: capped (@p capped) or no longer short against the demand with
-/// every prospective draw in it. Ordered by good; deterministic.
-using prospective_draws = std::map<std::size_t, std::array<float, resource_count>>;
-
-template <typename Capped>
-void add_prospective_draws(prospective_draws& p, std::array<float, resource_count>& demand,
-                           const std::array<float, resource_count>& production, Capped&& capped)
-{
-    std::array<float, resource_count> full = demand;
-    for (const auto& [g, d] : p)
-        for (std::size_t r = 0; r < resource_count; ++r)
-            full[r] += d[r];
-    for (auto it = p.begin(); it != p.end();)
-    {
-        const std::size_t g = it->first;
-        if (capped(g) || !(full[g] > production[g]))
-            it = p.erase(it);
-        else
-            ++it;
-    }
-    for (const auto& [g, d] : p)
-        for (std::size_t r = 0; r < resource_count; ++r)
-            demand[r] += d[r];
-}
-
 /// Make one corporation's freshly placed holdings chain-feasible, in place.
 ///
 /// Every processor in @p assets (in asset order) is given a recipe whose inputs
@@ -1996,7 +1956,8 @@ bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
                     const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
                     if (chain_recipe_tier(w, reg, cr, bid, market, rc, &assets) == chain_tier_none)
                         continue;
-                    refused->set = true;
+                    refused->set    = true;
+                    refused->market = market;
                     for (std::size_t r = 0; r < resource_count; ++r)
                         refused->draw[r] = rc.inputs[r] > 0.0f ? batches * rc.inputs[r] : 0.0f;
                     break;
@@ -3169,9 +3130,13 @@ std::vector<entity_id> generate_background_firms(
                 demand[r] += input_need[r];
             // BL-1233 ruling A: and the draw of each firm the sized rule refused,
             // while its good is still wanted.
-            add_prospective_draws(prospective, demand, production, [&](std::size_t g) {
-                return firms_by_resource[g] >= per_resource_firm_cap;
-            });
+            {
+                std::array<bool, resource_count> capped{};
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    capped[r] = firms_by_resource[r] >= per_resource_firm_cap;
+                add_prospective_draws(w, reg, chain, prospective, /*centre_market=*/null_entity,
+                                      demand, production, capped);
+            }
 
             // PER-RESOURCE CAP. Mask out every resource that has already taken
             // its share of this body's firms, then ask for the biggest remaining
@@ -3376,7 +3341,7 @@ std::vector<entity_id> generate_background_firms(
                                          &refused))
                 {
                     if (refused.set)
-                        prospective[gap_r] = refused.draw; // counted once: set, not added
+                        record_refused_draw(prospective, gap_r, refused);
                     // Given back whole. Another nation's turn may anchor in reach,
                     // so the good is masked once it has missed as many times as
                     // the body has nations (the cursor takes them in turn). The
@@ -3759,6 +3724,70 @@ chain_feasibility_audit audit_chain_feasibility(world& w, const recipe_registry&
         }
     }
     return out;
+}
+
+void record_refused_draw(prospective_draws& book, std::size_t good, const refused_draw& refused)
+{
+    if (!refused.set || good >= resource_count)
+        return;
+    prospective_entry& e = book[good]; // SET, never added: a retry refused again counts once
+    e.market = refused.market;
+    e.draw   = refused.draw;
+}
+
+/// One entry's want of each input at a centre whose market is @p centre_market
+/// (see `add_prospective_draws`); @p ir must already describe what stands.
+static std::array<float, resource_count> prospective_want(world& w, const recipe_registry& reg,
+                                                          input_reach& ir,
+                                                          const prospective_entry& e,
+                                                          entity_id centre_market)
+{
+    std::array<float, resource_count> wv{};
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        if (!(e.draw[r] > 0.0f))
+            continue;
+        if (centre_market != null_entity && centre_market != e.market
+            && !market_within_reach(w, reg, ir, centre_market, e.market, r))
+            continue;
+        const float spare = reachable_supply(w, reg, ir, e.market, r, null_entity).spare;
+        wv[r] = std::max(0.0f, e.draw[r] - std::max(0.0f, spare));
+    }
+    return wv;
+}
+
+void add_prospective_draws(world& w, const recipe_registry& reg, input_reach& ir,
+                           prospective_draws& book, entity_id centre_market,
+                           std::array<float, resource_count>& demand,
+                           const std::array<float, resource_count>& production,
+                           const std::array<bool, resource_count>& capped)
+{
+    if (book.empty())
+        return;
+    input_reach_refresh(w, reg, ir);
+    // Each entry's want of each input: its draw less the spare reachable at its
+    // plant's market, offered only at a centre that is or reaches that market.
+    std::map<std::size_t, std::array<float, resource_count>> want;
+    for (const auto& [good, e] : book)
+        want.emplace(good, prospective_want(w, reg, ir, e, centre_market));
+    std::array<float, resource_count> full = demand;
+    for (const auto& [good, wv] : want)
+        for (std::size_t r = 0; r < resource_count; ++r)
+            full[r] += wv[r];
+    for (auto it = book.begin(); it != book.end();)
+    {
+        const std::size_t good = it->first;
+        if (capped[good] || !(full[good] > production[good]))
+        {
+            want.erase(good);
+            it = book.erase(it);
+        }
+        else
+            ++it;
+    }
+    for (const auto& [good, wv] : want)
+        for (std::size_t r = 0; r < resource_count; ++r)
+            demand[r] += wv[r];
 }
 
 void assign_default_recipes(world& w, const recipe_registry& reg)
@@ -5363,9 +5392,13 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                 demand[r] += input_need[r];
             // BL-1233 ruling A: and the draw of each firm the sized rule refused,
             // while its good is still wanted (not at its per-good cap, still short).
-            add_prospective_draws(bs.prospective, demand, production, [&](std::size_t g) {
-                return bs.per_good_cap >= 0 && bs.firms_by_resource[g] >= bs.per_good_cap;
-            });
+            {
+                std::array<bool, resource_count> capped{};
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    capped[r] = bs.per_good_cap >= 0 && bs.firms_by_resource[r] >= bs.per_good_cap;
+                add_prospective_draws(w, reg, chain, bs.prospective, market_for_tile(w, cc.tile),
+                                      demand, production, capped);
+            }
 
             std::array<float, resource_count> selectable = production;
             if (bs.per_good_cap >= 0)
@@ -5660,7 +5693,24 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                     if (!assets.empty())
                         break;
                     if (chain_rejected && refused.set)
-                        bs.prospective[gap_r] = refused.draw; // counted once: set, not added
+                    {
+                        // BL-1233 ruling A: the refusal is a want of THIS selection
+                        // too — the turn picks again from this firm's measurement,
+                        // so the input that would feed the refused works is short
+                        // now, not only at the next firm (a centre whose turn has
+                        // nothing else short would otherwise stop before it). A
+                        // good already in the book is in `demand` already.
+                        const bool fresh = bs.prospective.count(gap_r) == 0;
+                        record_refused_draw(bs.prospective, gap_r, refused);
+                        if (fresh)
+                        {
+                            input_reach_refresh(w, reg, chain);
+                            const std::array<float, resource_count> wv = prospective_want(
+                                w, reg, chain, bs.prospective.at(gap_r), market_for_tile(w, cc.tile));
+                            for (std::size_t r = 0; r < resource_count; ++r)
+                                demand[r] += wv[r];
+                        }
+                    }
                     if (digs && !chain_rejected)
                     {
                         // BL-1197: none of the good's dig-ladder ground in

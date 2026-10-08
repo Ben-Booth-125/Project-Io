@@ -1422,6 +1422,312 @@ contend_result run_contend()
     return r;
 }
 
+/// Set a market's base (and current) price of one good.
+void price(fx& f, std::size_t mi, std::size_t r, float base)
+{
+    market_component& m = f.w->markets.at(f.markets[mi]);
+    m.base_price[r] = base;
+    m.price[r]      = base;
+}
+
+/// REVIEW ROUND 2 — SPARE BOUNDED BY WHAT REACHES THE CONSUMER. C (x 6) holds
+/// mine A and is the asker's market; B (x 14) holds mine B; Q (x 22) holds a
+/// works drawing 10 x a mine's output. C's timber is dear (3), Q's cheap (0.8),
+/// so C's timber cannot reach Q while B's reaches both C and Q. Q may take only
+/// B's output from the set, so A's output stays spare.
+struct bound_result { float oa = 0, ob = 0, dq = 0, spare = 0; bool c_q = true, b_q = false, b_c = false; };
+bound_result run_bound()
+{
+    fx f({ 6, 14, 22 }, { 5, 13 });
+    price(f, 0, k_timber, 3.0f);
+    price(f, 2, k_timber, 0.8f);
+    const entity_id ma = f.add(5, building_type::extraction_site);
+    const entity_id mb = f.add(13, building_type::extraction_site);
+    bound_result r;
+    r.oa = f.output(ma, k_timber);
+    r.ob = f.output(mb, k_timber);
+    recipe rc;
+    rc.name = "fixture_steel_from_timber";
+    rc.inputs[k_timber] = 10.0f * r.oa / 0.5f;
+    rc.outputs[k_steel] = 1.0f;
+    f.reg.add_recipe(rc);
+    const entity_id q = f.add(21, building_type::processing_facility, rc.name.c_str());
+    r.dq = building_draw(f.reg, f.w->buildings.at(q), k_timber);
+    input_reach ir = make_input_reach(*f.w, f.reg);
+    r.c_q = market_within_reach(*f.w, f.reg, ir, f.markets[0], f.markets[2], k_timber);
+    r.b_q = market_within_reach(*f.w, f.reg, ir, f.markets[1], f.markets[2], k_timber);
+    r.b_c = market_within_reach(*f.w, f.reg, ir, f.markets[1], f.markets[0], k_timber);
+    r.spare = reachable_supply(*f.w, f.reg, ir, f.markets[0], k_timber, null_entity).spare;
+    invalidate_logistics_caches(*f.w);
+    return r;
+}
+
+/// REVIEW ROUND 2 — THE QUOTED COST IS A PRODUCER'S WITH SPARE. The asker's
+/// market C (x 6, timber 1). P1 (x 14) sells timber at 0.5 but a works there
+/// draws its whole output, and P1 cannot import (so the works is P1's alone);
+/// P2 (x 22) sells at 2 with spare. The quote is P2's landed cost, not P1's.
+struct quote_result { float landed = -1, spare = 0; bool p1_c = false, p2_c = false, p2_p1 = true; };
+quote_result run_quote()
+{
+    fx f({ 6, 14, 22 }, { 13, 21 });
+    price(f, 1, k_timber, 0.5f);
+    price(f, 2, k_timber, 2.0f);
+    const entity_id m1 = f.add(13, building_type::extraction_site);
+    f.add(21, building_type::extraction_site);
+    recipe rc;
+    rc.name = "fixture_steel_from_timber";
+    rc.inputs[k_timber] = f.output(m1, k_timber) / 0.5f; // draws exactly P1's output
+    rc.outputs[k_steel] = 1.0f;
+    f.reg.add_recipe(rc);
+    f.add(15, building_type::processing_facility, rc.name.c_str());
+    input_reach ir = make_input_reach(*f.w, f.reg);
+    quote_result r;
+    r.p1_c  = market_within_reach(*f.w, f.reg, ir, f.markets[1], f.markets[0], k_timber);
+    r.p2_c  = market_within_reach(*f.w, f.reg, ir, f.markets[2], f.markets[0], k_timber);
+    r.p2_p1 = market_within_reach(*f.w, f.reg, ir, f.markets[2], f.markets[1], k_timber);
+    const reachable_spare rs = reachable_supply(*f.w, f.reg, ir, f.markets[0], k_timber, null_entity);
+    r.landed = rs.landed;
+    r.spare  = rs.spare;
+    invalidate_logistics_caches(*f.w);
+    return r;
+}
+
+/// RULING A — THE BOOK. Market A (x 6) is the refused steel works' market; B
+/// (x 14) cannot send timber to A (A's timber is cheap). The entry wants 2.0
+/// timber a tick. Each step reads what `add_prospective_draws` adds to timber's
+/// demand, and whether the entry survives.
+struct book_result
+{
+    float set_once = 0, twice = 0;           ///< draw after one and two refusals
+    float bare = 0;                          ///< added with no producer anywhere
+    float out_of_reach = 0;                  ///< after a mine lands in B
+    float far_centre = 0;                    ///< at a centre in B (B cannot reach A)
+    float in_reach = 0, mine_out = 0;        ///< after a mine lands in A
+    bool  kept_capped = true, kept_not_short = true, kept_short = false;
+};
+book_result run_book()
+{
+    fx f({ 6, 14 }, { 5, 13 });
+    price(f, 0, k_timber, 0.2f);
+    recipe rc;
+    rc.name = "fixture_steel_from_timber";
+    rc.inputs[k_timber] = 1.0f;
+    rc.outputs[k_steel] = 1.0f;
+    f.reg.add_recipe(rc);
+    refused_draw ref;
+    ref.set    = true;
+    ref.market = f.markets[0];
+    ref.draw[k_timber] = 2.0f;
+    prospective_draws book;
+    record_refused_draw(book, k_steel, ref);
+    book_result r;
+    r.set_once = book.at(k_steel).draw[k_timber];
+    record_refused_draw(book, k_steel, ref); // the retry refused again
+    r.twice = book.at(k_steel).draw[k_timber];
+    input_reach ir = make_input_reach(*f.w, f.reg);
+    std::array<bool, resource_count> none{};
+    std::array<float, resource_count> production{};
+    const auto added = [&](entity_id centre, std::array<bool, resource_count> capped,
+                           std::array<float, resource_count> prod) {
+        std::array<float, resource_count> demand{};
+        demand[k_steel] = 100.0f; // the good the refused works serves is short
+        add_prospective_draws(*f.w, f.reg, ir, book, centre, demand, prod, capped);
+        return demand[k_timber];
+    };
+    r.bare = added(f.markets[0], none, production);
+    f.add(13, building_type::extraction_site);            // a timber firm lands in B
+    r.out_of_reach = added(f.markets[0], none, production);
+    r.far_centre   = added(f.markets[1], none, production);
+    const entity_id ma = f.add(5, building_type::extraction_site); // and one in A
+    r.mine_out = f.output(ma, k_timber);
+    r.in_reach = added(f.markets[0], none, production);
+    {
+        prospective_draws keep = book;
+        std::array<bool, resource_count> capped{};
+        capped[k_steel] = true;
+        added(f.markets[0], capped, production);
+        r.kept_capped = book.count(k_steel) != 0;
+        book = keep;
+    }
+    {
+        prospective_draws keep = book;
+        std::array<float, resource_count> prod{};
+        prod[k_steel] = 1000.0f; // steel no longer short
+        added(f.markets[0], none, prod);
+        r.kept_not_short = book.count(k_steel) != 0;
+        book = keep;
+    }
+    added(f.markets[0], none, production);
+    r.kept_short = book.count(k_steel) != 0;
+    invalidate_logistics_caches(*f.w);
+    return r;
+}
+
+/// RULING A — THE WALK. One market. A standing works draws the whole output of
+/// the one standing timber site (x 10-11, outside the centre's window), so the
+/// market has no spare timber. Free timber lies at the window's four edges
+/// (distance 2 from (6, 6) along each axis). A steel works here needs 0.75 timber at t_idle — more
+/// than the one feed site a processing firm brings (0.5) — so the steel firm is
+/// refused. Its prospective draw must charter a timber firm (two or three sites)
+/// in the window, after which the steel firm places on the retry. A free recipe
+/// (no inputs) heads the registry so an extraction firm's incidental processor
+/// takes it and leaves the timber alone.
+struct walk_result
+{
+    charter_spend_report rep;
+    int  steel_at = -1, timber_after = -1; ///< charter indices; -1 none
+    long long chain_infeasible = 0;
+    bool balanced = false;
+};
+walk_result run_walk(std::int32_t points)
+{
+    fx f({ 4 }, {});
+    const auto deposit = [&](int x, int y, std::size_t r, float rich) {
+        tile_component& tc = f.w->tiles.at(f.at.at({ x, y }));
+        tc.resource_deposit[r]   = rich;
+        tc.resource_remaining[r] = 1000.0f;
+    };
+    for (const auto& xy : { std::make_pair(4, 6), std::make_pair(8, 6), std::make_pair(6, 4),
+                            std::make_pair(6, 8) })
+        deposit(xy.first, xy.second, k_timber, 1.0f);
+    deposit(10, 6, k_timber, 1.0f);
+    {
+        recipe free;
+        free.name = "fixture_free_tools";
+        free.outputs[k_tools] = 1.0f;
+        f.reg.add_recipe(free);
+    }
+    recipe rc;
+    rc.name = "fixture_steel_from_timber";
+    rc.inputs[k_timber] = 0.75f / (0.5f * f.reg.t_idle()); // need 0.75 at t_idle
+    rc.outputs[k_steel] = 1.0f;
+    f.reg.add_recipe(rc);
+    const entity_id site = f.add(10, building_type::extraction_site);
+    // The works draws exactly the site's output (draw = inputs x rate 1 x labour 0.5).
+    {
+        // It makes tools, not steel: a steel firm cannot take this recipe.
+        recipe heavy;
+        heavy.name = "fixture_heavy_tools_from_timber";
+        heavy.outputs[k_tools] = 1.0f;
+        heavy.inputs[k_timber] = f.output(site, k_timber) / 0.5f;
+        f.reg.add_recipe(heavy);
+    }
+    {
+        const entity_id bid = f.w->create_entity();
+        building_component b{};
+        b.tile = f.at.at({ 11, 6 });
+        b.type = building_type::processing_facility;
+        b.recipe = f.reg.recipe_id("fixture_heavy_tools_from_timber");
+        b.workforce_assigned = 0.5f;
+        f.w->buildings[bid] = b;
+        f.w->stockpiles[bid] = stockpile_component{};
+    }
+    const entity_id centre = f.w->create_entity();
+    population_centre_component pc{};
+    pc.scale = 5;
+    f.w->population_centres[centre] = pc;
+    f.w->population_centre_tile[centre] = f.at.at({ 6, 6 });
+    population_demand_params pd;
+    pd.demand_basket[k_steel] = 100.0f;
+    f.reg.set_population_demand(pd);
+
+    charter_spend_params s;
+    s.firm_price_points        = 1;
+    s.specialist_firm_charters = 1000;
+    s.window_radius            = 2;
+    s.province_cap             = false;
+    s.resource_cap_rule        = charter_cap_rule::sqrt_capital;
+    s.per_resource_firm_cap    = 2;
+    s.max_firms_per_body       = 200;
+    s.density_ceiling          = 120;
+    const charter_budget budget(std::map<entity_id, std::int32_t>{ { centre, points } });
+    walk_result out;
+    charter_web_from_budget(*f.w, f.reg, budget, s, /*seed=*/1233u, /*settle=*/nullptr, &out.rep);
+    for (std::size_t i = 0; i < out.rep.charters.size(); ++i)
+        if (out.rep.charters[i].good == k_steel && out.steel_at < 0)
+            out.steel_at = static_cast<int>(i);
+    for (std::size_t i = 0; i < out.rep.charters.size(); ++i)
+        if (out.rep.charters[i].good == k_timber && out.timber_after < 0)
+            out.timber_after = static_cast<int>(i);
+    long long unspent = 0;
+    for (const charter_unspent& u : out.rep.unspent)
+    {
+        unspent += u.points;
+        if (u.reason == charter_unspent_reason::chain_infeasible)
+            out.chain_infeasible += u.points;
+    }
+    out.balanced = out.rep.points_spent + unspent == budget.total();
+    return out;
+}
+
+/// THE REFRESH IS A FULL BUILD. One world mutated step by step — a processor
+/// added, a mine removed, a recipe switched, labour changed, a plant
+/// decommissioned, an unstaffed plant staffed — the refreshed index compared,
+/// entry for entry, with a fresh build after every step.
+struct refresh_result { int steps = 0, equal = 0; };
+bool same_index(const input_reach& a, const input_reach& b)
+{
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        if (a.producers[r].size() != b.producers[r].size() || a.draws[r] != b.draws[r])
+            return false;
+        for (std::size_t i = 0; i < a.producers[r].size(); ++i)
+            if (a.producers[r][i].market != b.producers[r][i].market
+                || a.producers[r][i].building != b.producers[r][i].building
+                || a.producers[r][i].out != b.producers[r][i].out)
+                return false;
+    }
+    return true;
+}
+refresh_result run_refresh()
+{
+    fx f({ 6, 14 }, { 5, 13, 7 });
+    recipe st;
+    st.name = "fixture_steel_from_timber";
+    st.inputs[k_timber] = 1.0f;
+    st.outputs[k_steel] = 1.0f;
+    f.reg.add_recipe(st);
+    recipe tl;
+    tl.name = "fixture_tools_from_steel";
+    tl.inputs[k_steel] = 0.5f;
+    tl.outputs[k_tools] = 1.0f;
+    f.reg.add_recipe(tl);
+    const entity_id m1 = f.add(5, building_type::extraction_site);
+    const entity_id m2 = f.add(13, building_type::extraction_site);
+    const entity_id p1 = f.add(6, building_type::processing_facility, st.name.c_str());
+    const entity_id p2 = f.add(14, building_type::processing_facility, tl.name.c_str());
+    input_reach ir = make_input_reach(*f.w, f.reg);
+    refresh_result out;
+    const auto check = [&]() {
+        input_reach_refresh(*f.w, f.reg, ir);
+        input_reach full = make_input_reach(*f.w, f.reg);
+        reachable_supply(*f.w, f.reg, full, f.markets[0], k_timber, null_entity); // builds it
+        ++out.steps;
+        if (same_index(ir, full))
+            ++out.equal;
+    };
+    check();
+    const entity_id p3 = f.add(15, building_type::processing_facility, st.name.c_str()); // add
+    check();
+    f.w->buildings.erase(m2);                                                     // remove
+    f.w->stockpiles.erase(m2);
+    check();
+    f.w->buildings.at(p1).recipe = f.reg.recipe_id(tl.name);                      // switch
+    check();
+    f.w->buildings.at(p2).workforce_assigned = 0.8f;                              // labour
+    check();
+    f.w->buildings.at(p3).decommissioned = true;                                  // decommission
+    check();
+    const entity_id p4 = f.add(8, building_type::processing_facility, st.name.c_str());
+    f.w->buildings.at(p4).workforce_assigned = 0.0f;                              // unstaffed
+    check();
+    f.w->buildings.at(p4).workforce_assigned = 0.5f;                              // staffed
+    check();
+    (void)m1;
+    invalidate_logistics_caches(*f.w);
+    return out;
+}
+
 } // namespace sizedfx
 
 int main()
@@ -2340,6 +2646,61 @@ int main()
         expect_true("sized roster: a SECOND call changes nothing (re-decides 0, unplaces 0, same digest)",
                     c.second.processors_redecided == 0 && c.second.processors_unplaced == 0
                     && c.d1 == c.d2);
+
+        // REVIEW ROUND 2.
+        const sizedfx::bound_result bd = sizedfx::run_bound();
+        std::printf("  bounded charge: A %.3f (reaches C only) + B %.3f (reaches C and Q), Q draws %.3f; "
+                    "spare at C %.3f (reach C->Q %d, B->Q %d, B->C %d)\n", bd.oa, bd.ob, bd.dq, bd.spare,
+                    bd.c_q ? 1 : 0, bd.b_q ? 1 : 0, bd.b_c ? 1 : 0);
+        expect_true("spare: a consumer is charged only what the set markets reaching it make "
+                    "(A's output stays spare beside a hungry Q)",
+                    !bd.c_q && bd.b_q && bd.b_c && bd.dq > bd.oa + bd.ob
+                    && std::fabs(bd.spare - bd.oa) < 1e-4f);
+        const sizedfx::quote_result qt = sizedfx::run_quote();
+        std::printf("  quoted cost: landed %.3f, spare %.3f (reach P1->C %d, P2->C %d, P2->P1 %d)\n",
+                    qt.landed, qt.spare, qt.p1_c ? 1 : 0, qt.p2_c ? 1 : 0, qt.p2_p1 ? 1 : 0);
+        expect_true("spare: the quoted cost is the cheapest landed among producers WITH spare "
+                    "(P1, fully drawn at 0.5, is passed over for P2 at 2.0)",
+                    qt.p1_c && qt.p2_c && !qt.p2_p1 && qt.spare > 0.0f && qt.landed >= 2.0f);
+
+        // RULING A (Ben, 2026-10-07).
+        const sizedfx::book_result bk = sizedfx::run_book();
+        std::printf("  ruling A book: set %.2f, after a second refusal %.2f; adds %.3f bare, %.3f with a "
+                    "mine out of reach, %.3f at a centre out of reach, %.3f with a mine of %.3f in reach; "
+                    "kept capped %d, not short %d, short %d\n",
+                    bk.set_once, bk.twice, bk.bare, bk.out_of_reach, bk.far_centre, bk.in_reach,
+                    bk.mine_out, bk.kept_capped ? 1 : 0, bk.kept_not_short ? 1 : 0, bk.kept_short ? 1 : 0);
+        expect_true("ruling A: a refusal SETS its good's entry; a retry refused again counts it once",
+                    bk.set_once == 2.0f && bk.twice == 2.0f && std::fabs(bk.bare - 2.0f) < 1e-5f);
+        expect_true("ruling A: a timber firm out of reach of the refused plant neither satisfies nor "
+                    "clears its want",
+                    std::fabs(bk.out_of_reach - 2.0f) < 1e-5f && bk.kept_short);
+        expect_true("ruling A: a centre out of reach of the refused plant is not offered its want",
+                    bk.far_centre == 0.0f);
+        expect_true("ruling A: a firm in reach answers it by its output",
+                    bk.mine_out > 0.0f && std::fabs(bk.in_reach - (2.0f - bk.mine_out)) < 1e-5f);
+        expect_true("ruling A: withdrawn when the good is capped, or no longer short",
+                    !bk.kept_capped && !bk.kept_not_short);
+        const sizedfx::walk_result wk = sizedfx::run_walk(2);
+        std::printf("  ruling A walk goods:");
+        for (const charter_record& c : wk.rep.charters)
+            std::printf(" %u", static_cast<unsigned>(c.good));
+        for (const charter_unspent& u : wk.rep.unspent)
+            std::printf(" | unspent %d x%lld", static_cast<int>(u.reason), static_cast<long long>(u.points));
+        std::printf("\n");
+        std::printf("  ruling A walk: firms %zu, timber charter #%d, steel charter #%d, chain_infeasible %lld%s\n",
+                    wk.rep.firms.size(), wk.timber_after, wk.steel_at, wk.chain_infeasible,
+                    wk.balanced ? "" : " [UNBALANCED]");
+        expect_true("ruling A: the refused steel works' draw charters timber in reach, and the steel "
+                    "firm places on the retry (erased on landing: no chain_infeasible left)",
+                    wk.timber_after >= 0 && wk.steel_at > wk.timber_after && wk.chain_infeasible == 0
+                    && wk.balanced);
+
+        const sizedfx::refresh_result rf = sizedfx::run_refresh();
+        std::printf("  refresh vs full build: %d of %d steps equal\n", rf.equal, rf.steps);
+        expect_true("input_reach_refresh leaves the index a full build makes (add, remove, switch, "
+                    "labour, decommission, staffing)",
+                    rf.steps == 8 && rf.equal == rf.steps);
     }
 
 

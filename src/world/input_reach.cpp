@@ -442,8 +442,8 @@ reachable_spare reachable_supply(world& w, const recipe_registry& reg, input_rea
     build_index(w, reg, ir);
 
     // C's REACH SET — memoised per (C, r): the producer markets within reach of
-    // C landing under the ceiling, and every consumer market any of them reaches,
-    // each consumer's draw counted ONCE (see SPARE OUTPUT, input_reach.hpp).
+    // C landing under the ceiling, and every consumer market any of them reaches
+    // with the set markets that reach it (see SPARE OUTPUT, input_reach.hpp).
     const auto key = std::make_pair(consumer_market, r);
     auto mit = ir.supply_memo.find(key);
     if (mit == ir.supply_memo.end())
@@ -454,7 +454,6 @@ reachable_spare reachable_supply(world& w, const recipe_registry& reg, input_rea
             if (!set.markets.empty() && set.markets.back().market == pr.market)
             {
                 set.markets.back().out += pr.out; // a market already admitted
-                set.out += pr.out;
                 continue;
             }
             // A market refused below is asked again for its next producer; the
@@ -474,16 +473,16 @@ reachable_spare reachable_supply(world& w, const recipe_registry& reg, input_rea
             if (ir.reservation_mult > 0.0f && landed > ir.reservation_mult * cit->second.base_price[r])
                 continue;
             set.markets.push_back({pr.market, pr.out, landed});
-            set.out += pr.out;
         }
         for (const auto& [q, d] : ir.draws[r]) // ascending market
-            for (const input_reach::supply& s : set.markets)
-                if (market_within_reach(w, reg, ir, s.market, q, r))
-                {
-                    set.draw_markets.push_back(q);
-                    set.drawn += d;
-                    break;
-                }
+        {
+            input_reach::reached_draw rd{q, d, {}};
+            for (std::size_t i = 0; i < set.markets.size(); ++i)
+                if (market_within_reach(w, reg, ir, set.markets[i].market, q, r))
+                    rd.reachers.push_back(static_cast<int>(i));
+            if (!rd.reachers.empty())
+                set.draws.push_back(std::move(rd));
+        }
         mit = ir.supply_memo.emplace(key, std::move(set)).first;
     }
     const input_reach::reach_set& set = mit->second;
@@ -501,23 +500,39 @@ reachable_spare reachable_supply(world& w, const recipe_registry& reg, input_rea
             self_draw = building_draw(reg, sit->second, r);
             self_mkt  = market_for_tile(w, sit->second.tile);
         }
-    float spare = set.out - set.drawn;
-    for (const input_reach::supply& s : set.markets)
-        if (s.market == self_mkt)
-            spare -= self_out;
-    if (self_draw > 0.0f
-        && std::binary_search(set.draw_markets.begin(), set.draw_markets.end(), self_mkt))
-        spare += self_draw;
+    // Each market's output with the asker's taken out; then each reached
+    // consumer's charge, min(its draw, what its reachers make), shared among its
+    // reachers by output. A market's spare is its output less its shares.
+    std::vector<float> outp(set.markets.size());
+    for (std::size_t i = 0; i < set.markets.size(); ++i)
+        outp[i] = std::max(0.0f, set.markets[i].out
+                                     - (set.markets[i].market == self_mkt ? self_out : 0.0f));
+    std::vector<float> spare_p = outp;
+    for (const input_reach::reached_draw& rd : set.draws)
+    {
+        const float d = std::max(0.0f, rd.draw - (rd.market == self_mkt ? self_draw : 0.0f));
+        if (!(d > 0.0f))
+            continue;
+        float feed = 0.0f;
+        for (const int i : rd.reachers) feed += outp[static_cast<std::size_t>(i)];
+        if (!(feed > 0.0f))
+            continue;
+        const float charge = std::min(d, feed);
+        for (const int i : rd.reachers)
+            spare_p[static_cast<std::size_t>(i)] -= charge * (outp[static_cast<std::size_t>(i)] / feed);
+    }
+    float spare = 0.0f;
+    for (std::size_t i = 0; i < set.markets.size(); ++i)
+        spare += spare_p[i];
     out.spare = spare;
     if (!(spare > 0.0f))
         return out;
-    for (const input_reach::supply& s : set.markets)
+    for (std::size_t i = 0; i < set.markets.size(); ++i)
     {
-        const float own = (s.market == self_mkt) ? s.out - self_out : s.out;
-        if (!(own > 0.0f))
-            continue; // only the asker produces here
-        if (out.landed < 0.0f || s.landed < out.landed)
-            out.landed = s.landed;
+        if (!(spare_p[i] > 0.0f))
+            continue; // fully drawn: it quotes no price
+        if (out.landed < 0.0f || set.markets[i].landed < out.landed)
+            out.landed = set.markets[i].landed;
     }
     return out;
 }

@@ -47,14 +47,18 @@
 //
 // SPARE OUTPUT is read over a SET, never per producer market (BL-1233 review): for
 // a consumer at market C, the REACH SET is the producer markets within reach of C
-// (each landing under the ceiling, below); its spare is their summed output of r
-// less the NOMINAL draw of r of every standing consumer (a live, laboured
-// processor whose recipe takes r) in a market ANY of them is within reach of —
-// each consumer market's draw counted ONCE. Counting a consumer the set can feed
-// against the whole set is conservative (it may be fed from outside the set too);
-// counting it once per producer that reaches it was not conservative but wrong:
-// two producers of 1.0 each reaching one consumer of 1.5 read -0.5 apiece and
-// summed to nothing, where 0.5 is spare.
+// (each landing under the ceiling, below). Its spare is their summed output of r
+// less what the standing consumers (live, laboured processors whose recipe takes
+// r) can take FROM THE SET: a consumer market Q any of them reaches is charged
+// min(Q's NOMINAL draw, the summed output of the set markets that reach Q) —
+// each consumer counted ONCE, and never for more than the part of the set that
+// can feed it (review round 2: a large producer reaching only C beside a small
+// one that also reaches a hungry Q leaves the large one's output spare).
+// Counting it once per producer that reaches it was wrong (two producers of 1.0
+// each reaching one consumer of 1.5 read -0.5 apiece and summed to nothing,
+// where 0.5 is spare); charging Q's whole draw against the whole set was too.
+// Each charge is shared among the set markets that reach Q in proportion to
+// their output, which gives each producer market its own spare.
 //
 // OBTAINABLE: an input r of a processor at market C, needing `need` units a tick,
 // is obtainable when
@@ -67,8 +71,8 @@
 //       x base at C) covers `need` at `t_idle`. The asking building's own output
 //       and its own standing draw are taken out first, each once.
 // Its OBTAINABLE COST per unit is C's posted price when (1) holds; otherwise the
-// cheapest landed cost over the set's producer markets with output (other than
-// the asker's own).
+// cheapest landed cost over the set's producer markets that have SPARE (their
+// output less their share of the charges, the asker's own taken out).
 //
 // Deterministic: producers and draws are gathered into per-resource SORTED
 // vectors, every scan is ascending by id with strict comparisons, and every memo
@@ -114,12 +118,17 @@ struct input_reach
     /// One producer market of a reach set: its summed output and landed cost.
     struct supply   { entity_id market; float out; float landed; };
     /// A consumer market's REACH SET for one good (see SPARE OUTPUT).
+    /// A consumer market the set reaches: its draw and which set markets reach it.
+    struct reached_draw
+    {
+        entity_id        market;
+        float            draw;
+        std::vector<int> reachers; ///< indices into `markets`, ascending
+    };
     struct reach_set
     {
-        std::vector<supply>    markets;      ///< producer markets, ascending id
-        std::vector<entity_id> draw_markets; ///< consumer markets any of them reaches, ascending
-        float                  out   = 0.0f; ///< summed output of `markets`
-        float                  drawn = 0.0f; ///< summed draw of `draw_markets`, each once
+        std::vector<supply>       markets; ///< producer markets, ascending id
+        std::vector<reached_draw> draws;   ///< consumer markets any of them reaches, ascending
     };
 
     bool index_built = false;
