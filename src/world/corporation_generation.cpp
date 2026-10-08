@@ -1541,7 +1541,8 @@ float one_power_plant_output(const recipe_registry& reg)
 
 float power_grids_to_serve(world& w, const recipe_registry& reg, entity_id body_id,
                            float plant_output, std::set<std::uint32_t>& serve,
-                           const std::set<std::uint32_t>* chartered)
+                           const std::set<std::uint32_t>* chartered,
+                           const std::set<std::uint32_t>* reachable)
 {
     std::set<std::uint32_t> unpowered;
     const float gap = body_power_grid_gap(w, reg, body_id, plant_output, serve, &unpowered);
@@ -1554,6 +1555,14 @@ float power_grids_to_serve(world& w, const recipe_registry& reg, entity_id body_
     if (chartered != nullptr)
         for (auto it = unpowered.begin(); it != unpowered.end();)
             it = chartered->count(*it) != 0 ? unpowered.erase(it) : std::next(it);
+    // An unpowered grid no tile in the deciding centre's windows can FEED
+    // (@p reachable: the feed grids of its windows' tiles) never holds up the
+    // others — it is dropped, and if none is left every short grid is served.
+    // Otherwise an unreachable grid would narrow the serve set to itself and
+    // starve every power firm (main session's reading of Ben's ruling).
+    if (reachable != nullptr)
+        for (auto it = unpowered.begin(); it != unpowered.end();)
+            it = reachable->count(*it) == 0 ? unpowered.erase(it) : std::next(it);
     if (!unpowered.empty())
         serve = std::move(unpowered);
     return gap;
@@ -5064,18 +5073,23 @@ std::vector<entity_id> charter_web_from_budget(world& w,
     // of each of its generators): "powered" for unpowered-grids-first, live
     // output or not. Grid ids are world-unique, so one set serves every body.
     std::set<std::uint32_t> power_chartered;
+    // The grids a centre's windows can FEED (the feed grid of every tile in its
+    // two unfiltered rung windows), memoised per centre: markets and roads do
+    // not move during the walk, and an unfiltered window is fixed.
+    std::map<entity_id, std::set<std::uint32_t>> feedable_of;
     const auto size_power_per_grid =
         [&](entity_id body, const std::array<float, resource_count>& production,
             const std::array<float, resource_count>& consumer,
             const std::array<float, resource_count>& construction_need,
             const std::array<float, resource_count>& input_need,
-            std::array<float, resource_count>& demand, std::set<std::uint32_t>& short_grids) {
+            std::array<float, resource_count>& demand, std::set<std::uint32_t>& short_grids,
+            const std::set<std::uint32_t>* reachable) {
             if (!power_per_grid)
                 return;
             // `short_grids` comes back as the grids the firm may SERVE
             // (unpowered short grids first); the gap is every short grid's.
             const float gap = power_grids_to_serve(w, reg, body, plant_output, short_grids,
-                                                   &power_chartered);
+                                                   &power_chartered, reachable);
             demand[power_i] = production[power_i] + gap
                 + (consumer[power_i] + construction_need[power_i] + input_need[power_i]);
         };
@@ -5390,8 +5404,23 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             // BL-1232: power's gap is the short grids' summed shortfall, and
             // `short_grids` is where its firm may stand.
             std::set<std::uint32_t> short_grids;
+            const std::set<std::uint32_t>* reachable = nullptr;
+            if (power_per_grid)
+            {
+                auto fit = feedable_of.find(cc.centre);
+                if (fit == feedable_of.end())
+                {
+                    std::set<std::uint32_t> fs;
+                    for (const charter_rung rg : k_charter_rungs)
+                        for (const entity_id t : charter_rung_window(w, nc, cc, settle, spend, rg))
+                            if (const std::uint32_t fg = tile_feed_power_grid(w, t); fg != 0)
+                                fs.insert(fg);
+                    fit = feedable_of.emplace(cc.centre, std::move(fs)).first;
+                }
+                reachable = &fit->second;
+            }
             size_power_per_grid(cc.body, production, bs.consumer_demand, construction_need,
-                                input_need, demand, short_grids);
+                                input_need, demand, short_grids, reachable);
 
             std::array<float, resource_count> selectable = production;
             if (bs.per_good_cap >= 0)
@@ -5815,7 +5844,6 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             // BL-1232: the grids this power firm now serves count as powered.
             if (power_per_grid && gap_r == power_i)
             {
-                bool any = false;
                 for (const entity_id a : w.corporations.at(corp_id).assets)
                 {
                     const building_component& ab = w.buildings.at(a);
@@ -5824,15 +5852,11 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                     const recipe* arc = reg.get_recipe(ab.recipe);
                     if (arc == nullptr || !(arc->outputs[power_i] > 0.0f))
                         continue;
+                    // Only a power-PRODUCING processor marks its grid: a power-gap
+                    // firm that ended with none charters nothing on any grid.
                     if (const std::uint32_t fg = tile_feed_power_grid(w, ab.tile); fg != 0)
-                    {
                         power_chartered.insert(fg);
-                        any = true;
-                    }
                 }
-                if (!any)
-                    if (const std::uint32_t fg = tile_feed_power_grid(w, anchor_tile); fg != 0)
-                        power_chartered.insert(fg);
             }
             if (anchor_province != 0)
                 ++bs.firms_by_province[anchor_province];
@@ -5905,7 +5929,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             demand[r] += input_need[r];
         std::set<std::uint32_t> short_grids;   // BL-1232: the walk's own power measure
         size_power_per_grid(body_id, production, bs.consumer_demand, construction_need,
-                            input_need, demand, short_grids);
+                            input_need, demand, short_grids, nullptr);
         int64_t open = 0;
         for (const std::uint16_t r : bs.turn)
             if (demand[r] > production[r] && bs.firms_by_resource[r] < bs.share[r])

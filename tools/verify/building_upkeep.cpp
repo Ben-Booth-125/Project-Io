@@ -1373,6 +1373,25 @@ void r12_a_plant_serves_its_market_centres_grid()
         check(serve == std::set<std::uint32_t>{ gA, gB },
               "R12d every short grid has a firm: a second firm may go to either");
     }
+
+    // --- R12e: an UNREACHABLE unpowered grid never holds up the others ---------
+    // A is powered (a plant at tile 2 feeds it) but short; B is short, unpowered
+    // — and the deciding centre's windows feed only A. Unpowered-first must not
+    // narrow the firm to B, which it cannot reach: the core shortfall is served.
+    {
+        grid_fixture f;
+        f.build(6, 2, "rr..r.", "......", { 0, 0, 0, 1, 1, 1, 4, 5 });
+        const std::uint32_t gA = f.grid_at(0), gB = f.grid_at(4);
+        add_plant(f, 2, P.plant);
+        std::set<std::uint32_t> serve;
+        const std::set<std::uint32_t> none, only_A = { gA }, both = { gA, gB };
+        power_grids_to_serve(f.w, P.reg, f.body, P.plant_output, serve, &none, &both);
+        check(serve == std::set<std::uint32_t>{ gB }, "R12e B reachable: the unpowered grid B is served first");
+        power_grids_to_serve(f.w, P.reg, f.body, P.plant_output, serve, &none, &only_A);
+        check(serve == std::set<std::uint32_t>{ gA, gB },
+              "R12e B unreachable from the windows: it is dropped and every short grid is served (A's ground can take the plant)");
+        check(serve.count(gA) == 1, "R12e ... so the feedable core shortfall gets the plant");
+    }
 }
 
 // ---------------------------------------------------------------------------

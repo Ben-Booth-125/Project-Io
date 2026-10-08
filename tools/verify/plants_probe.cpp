@@ -344,6 +344,17 @@ void print_feed_check(world& w, const recipe_registry& reg)
             std::printf("          grid %u: need %.1f | output on its tiles %.1f | output FEEDING it %.1f | gap read %.1f%s\n",
                         id, a[0], a[1], a[2], (a[0] > a[2] && a[0] >= 0.5 * plant) ? a[0] - a[2] : 0.0,
                         (a[1] != a[2]) ? "  <- tile and feed differ" : "");
+    // Short grids (need >= half a plant, need > feeding output) still fed by 0.
+    long dark_short = 0; double dark_need = 0.0;
+    std::string ids;
+    for (const auto& [id, a] : g)
+        if (a[0] >= 0.5 * plant && a[0] > a[2] && !(a[2] > 0.0))
+        {
+            ++dark_short; dark_need += a[0];
+            ids += " " + std::to_string(id);
+        }
+    std::printf("          short grids fed by NO generator after generation: %ld (need %.1f):%s\n",
+                dark_short, dark_need, ids.empty() ? " none" : ids.c_str());
     double measure = 0.0;
     for (const entity_id body : bodies)
     {

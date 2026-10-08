@@ -734,11 +734,15 @@ float body_power_grid_gap(world& w, const recipe_registry& reg, entity_id body_i
 /// plant before any gets a second"): while any short grid has no power firm
 /// chartered on it (@p chartered, the walk's own record) and no generator
 /// feeding it, only those; else every short grid. A grid is powered the moment
-/// a power firm is chartered on it, live output or not. The charter walk cuts
-/// a power firm's windows to ground FEEDING one of them.
+/// a power firm is chartered on it, live output or not. An unpowered grid
+/// absent from @p reachable (the grids the deciding centre's windows can feed)
+/// never holds up the others: it is dropped, and with no unpowered grid left
+/// every short grid is served. The charter walk cuts a power firm's windows to
+/// ground FEEDING one of them.
 float power_grids_to_serve(world& w, const recipe_registry& reg, entity_id body_id,
                            float plant_output, std::set<std::uint32_t>& serve,
-                           const std::set<std::uint32_t>* chartered = nullptr);
+                           const std::set<std::uint32_t>* chartered = nullptr,
+                           const std::set<std::uint32_t>* reachable = nullptr);
 
 /// The most power one plant makes: the largest power output of any in-band
 /// processing recipe at the nominal run. 0 where no recipe makes power.
