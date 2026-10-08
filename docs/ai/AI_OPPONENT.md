@@ -479,6 +479,15 @@ where a processor genuinely differs from a mine:
   market (§ Build only what runs), since a processor with no reachable input is an immediate
   loss-maker. The scorer asks exactly what the seam asks and no more: mirroring a lock
   the seam does not apply would make the rival stricter than the rules it plays by.
+  **A build is judged on supply, not stock (Ben, 2026-10-08; BL-1234, settle scorer starves).**
+  For a NEW processor, an input is obtainable only when the spare reachable output of that input
+  covers the plant's draw at `t_idle` — the supply clause alone, the same sized test generation
+  places processors by (`../generation/CORPORATION_GENERATION.md` § Pass 3, "Sized to its
+  inputs"). A shelf with nothing replacing it is opening stock being drawn down, not a supply: on
+  seed 0 one steel shelf of 6,313 units with negative spare admitted 63 builds in eight ticks and
+  was empty by the tenth, and 97% of the settle's starved processors were admitted that way. Stock
+  still counts where a plant already stands — a resume, a recipe switch — because there the
+  question is whether to run what exists, not whether to add a draw.
 - **Pricing.** Priced by `estimate_prospective_profit` rather than the extraction candidate's
   inline revenue-minus-wages sum. The inline model survives on the extraction side because
   switching it would move every blessed golden for no player-visible gain; a new candidate had no
@@ -677,7 +686,13 @@ the floor; stage B layers priority buckets and predictive spending over it (§ 2
   and hundreds of thousands of units listed). In play — once a market has cleared — no bid and
   nothing listed is a **dead market**, and the build is vetoed too. Only before a market has ever
   cleared is "no bid, nothing listed" no signal, and that yields no penalty (the AI cannot
-  forecast against a fact it cannot see). Otherwise the projected supply/demand ratio is unpenalised at or below
+  forecast against a fact it cannot see). **What counts as a bid (Ben, 2026-10-07, scoping the
+  veto):** the market's demand **plus** the want the fair-price ceiling silenced (the hauler-only
+  register — an aggregate market fact, like demand; without it a mine is vetoed exactly when its
+  processors are priced out and need it most), **plus** the off-book draws on that market — the
+  space programme's, network upkeep's and procurement's — since a buyer that takes goods without
+  posting a bid is still a buyer (without them no rival could ever build the first spacecraft
+  components or propellant plant in play). Otherwise the projected supply/demand ratio is unpenalised at or below
   `glut_taper_ratio` (1.0), tapers the build's score linearly to zero at `glut_veto_ratio` (2.0),
   and vetoes (removes the candidate entirely) at or above it. Applied only to build candidates;
   dials and survey are unaffected (a body's total surveyed area doesn't glut a market).
@@ -1864,3 +1879,24 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   one does.** Owner: BL-838 (fear of being next); `docs/generation/CIVILISATION.md` and
   `docs/politics/RELATIONS.md` carry the design.
 
+
+  **A rival may read its OWN refused processor as a bid for its own mine (Ben, 2026-10-07/08;
+  BL-1227, idle mines — the chain start).** The dead-market veto (§ 2B) stops a mine where no one
+  bids, and a processor cannot be built where no input is made, so without this a new
+  intermediate chain could not start in play at all. The grant: when the scorer refuses one of
+  the corporation's **own** processor candidates **only** because an input is not obtainable, that
+  candidate's prospective draw counts as a bid on the input, for the **same corporation's** mine
+  candidates in the veto test of the same evaluation — and nothing else.
+
+  **What it admits, and the scope is the whole of the grant.** It removes an impossibility; it
+  adds no motive. Ben (2026-10-08): *"If the problem is AI motivation, then ignore. This should
+  just be statistically possible."* So the refused draw lifts the veto and nothing more: whether
+  the mine is then built stays with the ordinary estimate, unboosted, and a chain that rarely
+  starts is the intended outcome, not a defect to tune.
+
+  **What it does NOT admit.** It is not a plan: no two-building candidate, no reserved site, no
+  memory of the refused processor across evaluations. It is private to the corporation that
+  refused — another firm's refused want is not a public signal (a public register was offered and
+  declined). It does not touch the player's corp. Pure, seeded, deterministic, replayable, legal
+  verbs only, never a planner. The player sees unmet want on a ledger or lens in the visibility
+  pass, not through this grant.
