@@ -1870,3 +1870,24 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   one does.** Owner: BL-838 (fear of being next); `docs/generation/CIVILISATION.md` and
   `docs/politics/RELATIONS.md` carry the design.
 
+
+  **A rival may read its OWN refused processor as a bid for its own mine (Ben, 2026-10-07/08;
+  BL-1227, idle mines — the chain start).** The dead-market veto (§ 2B) stops a mine where no one
+  bids, and a processor cannot be built where no input is made, so without this a new
+  intermediate chain could not start in play at all. The grant: when the scorer refuses one of
+  the corporation's **own** processor candidates **only** because an input is not obtainable, that
+  candidate's prospective draw counts as a bid on the input, for the **same corporation's** mine
+  candidates in the veto test of the same evaluation — and nothing else.
+
+  **What it admits, and the scope is the whole of the grant.** It removes an impossibility; it
+  adds no motive. Ben (2026-10-08): *"If the problem is AI motivation, then ignore. This should
+  just be statistically possible."* So the refused draw lifts the veto and nothing more: whether
+  the mine is then built stays with the ordinary estimate, unboosted, and a chain that rarely
+  starts is the intended outcome, not a defect to tune.
+
+  **What it does NOT admit.** It is not a plan: no two-building candidate, no reserved site, no
+  memory of the refused processor across evaluations. It is private to the corporation that
+  refused — another firm's refused want is not a public signal (a public register was offered and
+  declined). It does not touch the player's corp. Pure, seeded, deterministic, replayable, legal
+  verbs only, never a planner. The player sees unmet want on a ledger or lens in the visibility
+  pass, not through this grant.
