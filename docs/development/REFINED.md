@@ -52,6 +52,34 @@ measured alone on the market-viability skill. G1 70% stays.
 - [x] S3 BL-1229 (steel stays home): merged f785d832 - order is a floor, not a hold. Steel-starved 249 -> 163; G1 flat.
 - [x] B BL-1226 merged (split, razed; electronics kept - NR-981); D ON; 16 seeds G1 54.7 -> 55.4, G2 54.4 -> 52.3, G3 88.9 -> 88.7, starved 47.0 -> 35.0. The 5-seed 65.2 was electronics removal moving generation.
 
+### Close — the doc check (Ben, 2026-10-08: "make sure all the various decisions are documented")
+
+Run once every lane has merged, before the re-bless. For each ruling below: (1) it is written in
+its owning doc, in state-independent words; (2) the code matches it; (3) no sibling doc still
+asserts the overturned claim — grep the OLD wording across docs/ (the same-day-ruling trap);
+(4) a backlog item owns any part not yet built. One NEEDS_REVIEW entry per gap found.
+- [ ] Sprint cut: all nine items, measure-led, extend rather than cut (sprints.json row 50)
+- [ ] Trade-flow lens: player lens over own flows; classes; record tagged by corp (LENSES.md)
+- [ ] Every lens has its own glyph on the strip (LENSES.md § strip; ICONS.md)
+- [ ] Lever D: background demand consumes; numbers at the split pull (MARKETS.md step 3, 12)
+- [ ] Background pull split by catchment; electronics stays until the household rung (MARKETS.md)
+- [ ] Power rides the province grid; market shelf on its centre's grid (LOGISTICS.md § 3a)
+- [ ] An order is a floor, not a hold (MARKETS.md step 4; ACTIONS place_sell_order; NR-982)
+- [ ] A mine candidate is priced at its stack rank (AI_OPPONENT.md)
+- [ ] A processor needs spare reachable supply at t_idle (CORPORATION_GENERATION.md Pass 3)
+- [ ] A refused processor's draw enters derived demand, tied to reach (CORPORATION_GENERATION.md)
+- [ ] Generation sized per power grid (PRODUCTION.md § Power)
+- [ ] The scorer's power estimate reads the grid's shortfall — HELD (AI_OPPONENT.md; mark held)
+- [ ] The solver prices inputs at the posted price; power read on the grid (PRODUCTION.md)
+- [ ] No bid vs listed supply, and a dead market in play, veto a build; what counts as a bid (AI_OPPONENT.md § 2B)
+- [ ] Grant: a rival reads its own refused processor as a bid for its own mine (AI_OPPONENT.md § 11)
+- [ ] A new processor is judged on supply, not stock (AI_OPPONENT.md, processing-facility candidate)
+- [ ] Targets: G1 >= 85%, G1b <= 5% (market-viability SKILL.md; BL-1217; sprint row)
+- [ ] Road generation schema kept (no doc change; confirm nothing claims otherwise)
+- [ ] Quick Start; loading bars in a top band (STARTUP.md)
+- [ ] Unmet want visible to the player in sprint 51 (BL-1222)
+- [ ] Wrap it as a reusable check (a script listing each sprint's dated rulings against their docs) if the pattern holds — ask Ben before adding a skill
+
 ## Sprint 48 — the world moves forward (opened 2026-09-25, CLOSED 2026-10-04)
 
 **Goal.** The world is built once at the Life gate and moves forward through the rounds; Next waits
