@@ -30,6 +30,13 @@
 //      recipe; a third party's spare may. Shared test, the reflex rescue (one
 //      run_economy_step) and the scorer's within-group switch (12 evals); and an
 //      unstaffed plant is judged at a non-zero need (judged_batches).
+//   R7 THE GLUT GATE INSIDE THE ARGMAX (BL-1227): a group's net winner whose
+//      output market is dead yields to its runner-up, not to nothing.
+//   R8 THE CHAIN START (BL-1227, AI_OPPONENT.md § 11): a corp's own processor
+//      refused only for an unobtainable input lifts the dead-market veto on
+//      its OWN mine for that input, in that evaluation only; another corp's
+//      mine stays vetoed; the next evaluation without the refusal is vetoed.
+//   R4-R8 run IN PLAY (current_econ_tick > 0, a market that has cleared).
 //
 // Exits non-zero on any FAIL.
 
@@ -399,9 +406,14 @@ int main()
         auto walk = [&](bool with_mine) {
             scene s = make_scene(); place_bound(s, reg);
             if (with_mine) add_mine(s, 6, 2);
+            // BL-1227: IN PLAY - a cleared market A that bids for the steel the
+            // plant would make (econ tick > 0; at 0 the glut forecast reads a
+            // never-cleared market and proves nothing about play).
+            s.w.markets.at(s.a).demand[r_steel] = 50.0f;
             int first = -1;
             for (int t = 1; t <= 12; ++t)
             {
+                s.w.current_econ_tick = t;
                 economy_report rep;
                 run_corp_strategic_step(s.w, reg, rep, t);
                 if (first < 0 && processors_of(s, s.ai) > 0) first = t;
@@ -424,6 +436,7 @@ int main()
             for (int t = 1; t <= 12; ++t)
             {
                 if (t == mine_at_tick) add_mine(s, mine_col, 2);
+                s.w.current_econ_tick = t; // BL-1227: in play
                 economy_report rep;
                 run_corp_strategic_step(s.w, reg, rep, t);
                 if (resumed < 0 && !s.w.buildings.at(plant).decommissioned) resumed = t;
@@ -533,6 +546,7 @@ int main()
             int at = -1;
             for (int t = 1; t <= 12; ++t)
             {
+                s.w.current_econ_tick = t; // BL-1227: in play
                 economy_report rep;
                 run_corp_strategic_step(s.w, reg, rep, t);
                 if (at < 0 && s.w.buildings.at(p).recipe == temper) at = t;
@@ -545,6 +559,193 @@ int main()
                     own_only, with_3p);
         check(own_only < 0, "R6 scorer: never switches onto its own leftover steel");
         check(with_3p > 0, "R6 scorer: switches when a third party's spare steel covers it");
+    }
+
+    // R7 (BL-1227 review round 1): THE GLUT GATE INSIDE THE ARGMAX, through
+    // the scorer, in play. A second coal recipe joins coal_steel's group
+    // (Foundry): coal -> machinery, whose net dwarfs steel's (machinery base
+    // 400), so it WINS the group's net argmax. When A bids for machinery it is
+    // built; when A has cleared but nobody bids for or lists machinery (a dead
+    // market), the veto must fall through to the runner-up — coal_steel, which
+    // A does bid for — rather than leave the group empty.
+    std::printf("R7 the dead-market veto inside the processor argmax (scorer, in play)\n");
+    {
+        recipe_registry reg7 = make_registry();
+        recipe coal_mach;
+        coal_mach.name  = "coal_mach";
+        coal_mach.group = "Foundry";
+        coal_mach.inputs [r_coal] = 1.0f;
+        coal_mach.outputs[r_mach] = 1.0f;
+        reg7.add_recipe(coal_mach);
+        auto built = [&](bool mach_bid) {
+            scene s = make_scene(); place_bound(s, reg7);
+            add_mine(s, 6, 2);
+            s.w.markets.at(s.a).demand[r_steel] = 50.0f;
+            if (mach_bid)
+                s.w.markets.at(s.a).demand[r_mach] = 50.0f;
+            for (int t = 1; t <= 12; ++t)
+            {
+                s.w.current_econ_tick = t;
+                economy_report rep;
+                run_corp_strategic_step(s.w, reg7, rep, t);
+                for (const entity_id b : s.w.corporations.at(s.ai).assets)
+                    if (const auto it = s.w.buildings.find(b);
+                        it != s.w.buildings.end() && it->second.type == building_type::processing_facility)
+                        return it->second.recipe;
+            }
+            return no_recipe;
+        };
+        const uint16_t with_bid = built(true);
+        const uint16_t dead     = built(false);
+        const auto nm = [&](uint16_t id) {
+            const recipe* r = reg7.get_recipe(id);
+            return r ? r->name.c_str() : "(none)";
+        };
+        std::printf("  first processor: machinery bid -> %s, machinery dead -> %s\n", nm(with_bid), nm(dead));
+        check(with_bid == reg7.recipe_id("coal_mach"),
+              "R7 not vacuous: with a machinery bid the fatter coal_mach wins the group and is built");
+        check(dead == reg7.recipe_id("coal_steel"),
+              "R7 machinery dead in a cleared market: the vetoed winner yields to coal_steel, not to nothing");
+    }
+
+    // R8 (BL-1227, the chain start; AI_OPPONENT.md § 11, Ben 2026-10-07/08). A
+    // coal deposit stands in A, A has cleared (it bids for steel) but nobody
+    // bids for or lists coal there — a dead market for coal, so a coal mine is
+    // vetoed. The AI corp's own coal_steel candidate on its ground in A is
+    // refused ONLY because coal is unobtainable (no producer anywhere). That
+    // refused draw is the corp's private bid on coal in A, for its own mine
+    // candidates, in that one evaluation.
+    std::printf("R8 the chain start: a corp's own refused processor bids for its own mine\n");
+    {
+        auto staged = [&]() {
+            scene s = make_scene(); place_bound(s, reg);
+            s.w.markets.at(s.a).demand[r_steel] = 50.0f;
+            const entity_id ct = tile_at(s.w, s.body, 2, 2);
+            s.w.tiles.at(ct).resource_deposit[r_coal]   = 1.0f;
+            s.w.tiles.at(ct).resource_remaining[r_coal] = 1.0e6f;
+            return s;
+        };
+        auto coal_mines_of = [&](const scene& s, entity_id corp) {
+            int n = 0;
+            for (const entity_id b : s.w.corporations.at(corp).assets)
+                if (const auto it = s.w.buildings.find(b);
+                    it != s.w.buildings.end() && it->second.type == building_type::extraction_site
+                    && it->second.target_resource == resource_type::coal)
+                    ++n;
+            return n;
+        };
+        auto lifts_for = [&](const economy_report& rep, entity_id corp) {
+            int n = 0;
+            for (const auto& l : rep.chain_start_lifts)
+                if (l.corp == corp && l.target == resource_type::coal) ++n;
+            return n;
+        };
+        // The AI corp evaluates at tick % 4 == its index % 4; walk 4 ticks so
+        // it is due exactly once.
+        auto one_eval = [&](scene& s, int& lifts) {
+            lifts = 0;
+            for (int t = 1; t <= 4; ++t)
+            {
+                s.w.current_econ_tick = t;
+                economy_report rep;
+                run_corp_strategic_step(s.w, reg, rep, t);
+                lifts += lifts_for(rep, s.ai);
+            }
+        };
+
+        // (a) the refusing corp: the veto is lifted and the mine is built on
+        // its ordinary score.
+        {
+            scene s = staged();
+            int lifts = 0;
+            one_eval(s, lifts);
+            std::printf("  (a) lifts %d, AI coal mines %d\n", lifts, coal_mines_of(s, s.ai));
+            check(lifts > 0, "R8 (a) a corp's own processor refused only for coal lifts its own coal-mine veto");
+            check(coal_mines_of(s, s.ai) > 0, "R8 (a) ... and the lifted mine, scored on the ordinary estimate, is built");
+        }
+        // (b) a DIFFERENT corp, with no processor candidate of its own, beside
+        // the refusing one: its mine in the same market stays vetoed.
+        {
+            scene s = staged();
+            // The other corp holds ground in A (an anchor) whose tile already
+            // carries a processor, so it offers no processor candidate of its
+            // own (one processor per tile) — and so refuses nothing.
+            auto add_other = [&](scene& sc) {
+                const entity_id id = sc.w.create_entity();
+                corporation_component c;
+                c.name = "Other"; c.balance = 1.0e6f; c.starting_capital = 1.0e6f;
+                c.focus = industrial_focus::extraction;
+                const entity_id t = tile_at(sc.w, sc.body, 3, 1);
+                const entity_id anchor = sc.w.create_entity();
+                building_component a{};
+                a.tile = t; a.type = building_type::extraction_site;
+                a.target_resource = resource_type::iron_ore; a.workforce_assigned = 0.5f;
+                sc.w.buildings[anchor] = a;
+                const entity_id plant = sc.w.create_entity();
+                building_component pb{};
+                pb.tile = t; pb.type = building_type::processing_facility;
+                pb.recipe = reg.recipe_id("steel_forge"); pb.target_resource = resource_type::machinery;
+                pb.workforce_assigned = 0.5f; pb.workforce_auto = false;
+                sc.w.buildings[plant] = pb;
+                c.assets = {anchor, plant};
+                sc.w.corporations[id] = c;
+                return id;
+            };
+            const entity_id other = add_other(s);
+            // The refusing AI corp still refuses (and would lift for itself) but
+            // cannot afford a mine, so the deposit's one slot stays open to Other.
+            s.w.corporations.at(s.ai).balance = 1.0f;
+            int other_lifts = 0;
+            for (int t = 1; t <= 4; ++t)
+            {
+                s.w.current_econ_tick = t;
+                economy_report rep;
+                run_corp_strategic_step(s.w, reg, rep, t);
+                other_lifts += lifts_for(rep, other);
+            }
+            std::printf("  (b) other corp: lifts %d, coal mines %d\n", other_lifts, coal_mines_of(s, other));
+            check(other_lifts == 0 && coal_mines_of(s, other) == 0,
+                  "R8 (b) another corp's refused want is not a bid: its mine in the same dead market stays vetoed");
+            // Not vacuous: the same corp DOES build that mine once A bids for coal.
+            scene s2 = staged();
+            const entity_id other2 = add_other(s2);
+            s2.w.corporations.at(s2.ai).balance = 1.0f;
+            s2.w.markets.at(s2.a).demand[r_coal] = 50.0f;
+            for (int t = 1; t <= 4; ++t)
+            {
+                s2.w.current_econ_tick = t;
+                economy_report rep;
+                run_corp_strategic_step(s2.w, reg, rep, t);
+            }
+            check(coal_mines_of(s2, other2) > 0,
+                  "R8 (b) not vacuous: with a public coal bid in A the other corp builds that mine");
+        }
+        // (c) no memory: an evaluation that lifts but cannot afford the mine,
+        // then the next one with the processor candidate gone (the corp's
+        // ground sold) and the cash back — vetoed again.
+        {
+            scene s = staged();
+            corporation_component& ac = s.w.corporations.at(s.ai);
+            ac.balance = 1.0f;
+            int lifts1 = 0;
+            one_eval(s, lifts1);
+            const int built1 = coal_mines_of(s, s.ai);
+            ac.balance = 1.0e6f;
+            ac.assets.clear();
+            int lifts2 = 0;
+            for (int t = 5; t <= 8; ++t)
+            {
+                s.w.current_econ_tick = t;
+                economy_report rep;
+                run_corp_strategic_step(s.w, reg, rep, t);
+                lifts2 += lifts_for(rep, s.ai);
+            }
+            std::printf("  (c) eval 1 (poor): lifts %d built %d | eval 2 (no refused processor): lifts %d built %d\n",
+                        lifts1, built1, lifts2, coal_mines_of(s, s.ai));
+            check(lifts1 > 0 && built1 == 0, "R8 (c) not vacuous: the first evaluation lifts, but cannot afford the mine");
+            check(lifts2 == 0 && coal_mines_of(s, s.ai) == 0,
+                  "R8 (c) the next evaluation, without the refused candidate, is vetoed again (no memory)");
+        }
     }
 
     std::printf("\n%s (%d failure%s)\n", g_fail == 0 ? "ALL PASS" : "FAILURES", g_fail,

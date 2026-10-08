@@ -272,6 +272,7 @@ int main(int argc, char** argv)
         else { std::fprintf(stderr, "usage: boom_probe [--seeds a,b] [--ticks N]\n"); return 2; }
     }
     std::map<std::size_t, good_tally> pooled;
+    long lifts_all = 0, lifts_built_all = 0; // BL-1227 chain start, play only
     for (const std::uint32_t seed : seeds)
     {
         lua_state lua;
@@ -296,6 +297,7 @@ int main(int argc, char** argv)
         }
         seat_player_corporation(w, seed, start->land.search.winner_score);
         constexpr int k_days = 90;
+        long seed_lifts = 0, seed_built = 0;
         for (int k = 1; k <= ticks; ++k)
         {
             advance_orbits(w, static_cast<double>(k_days));
@@ -305,9 +307,24 @@ int main(int argc, char** argv)
             const settle_tick_result res =
                 run_settle_tick(w, reg, k_campaign_settle_ticks + (k - 1), k * k_days, false, &hooks);
             after_tick(w, reg, res, c);
+            // BL-1227, the chain start: lifted vetoes this tick, and those whose
+            // mine (same corp, tile, good) appeared this tick.
+            for (const auto& l : res.report.chain_start_lifts)
+            {
+                ++lifts_all; ++seed_lifts;
+                bool built = false;
+                for (const tracked& t : c.sites)
+                    if (t.placed == k && t.tile == l.tile && t.r == static_cast<std::size_t>(l.target))
+                        if (const auto ci = w.corporations.find(l.corp); ci != w.corporations.end()
+                            && std::find(ci->second.assets.begin(), ci->second.assets.end(), t.bid)
+                               != ci->second.assets.end())
+                            built = true;
+                if (built) { ++lifts_built_all; ++seed_built; }
+            }
         }
         std::map<std::size_t, good_tally> g;
         fold(c.sites, g);
+        std::printf("\nseed %u chain-start lifts in play: %ld, of them built that tick: %ld\n", seed, seed_lifts, seed_built);
         std::printf("\n=== seed %u: %zu new sites in play ===\n", seed, c.sites.size());
         print(g);
         fold(c.sites, pooled);
@@ -315,5 +332,7 @@ int main(int argc, char** argv)
     }
     std::printf("\n================ POOLED ================\n");
     print(pooled);
+    std::printf("\n  chain-start lifts in play (all seeds): %ld; mines built from them that tick: %ld\n",
+                lifts_all, lifts_built_all);
     return 0;
 }

@@ -409,6 +409,20 @@ struct economy_report
     /// its own order anyway.
     std::vector<budget_claim> budget_claims;
 
+    /// BL-1227 (the chain start; AI_OPPONENT.md § 11, Ben 2026-10-07/08): every
+    /// mine candidate whose zero-bid veto was lifted this tick because the SAME
+    /// corporation, in the same evaluation, refused one of its own processor
+    /// candidates only for want of that input in that market. Reported only —
+    /// the lifted candidate then competes on its ordinary, unboosted score, so a
+    /// row here is not a build. Transient: a report is never saved.
+    struct chain_start_lift
+    {
+        entity_id     corp   = null_entity;
+        entity_id     tile   = null_entity;
+        resource_type target = resource_type::iron_ore;
+    };
+    std::vector<chain_start_lift> chain_start_lifts;
+
     /// What the national budget pass did this tick: per-nation / per-line
     /// detail, the total moved, and every transfer (who paid whom, for what).
     /// "Who is paying me" (BL-555) reads `transfers`; the earmarked dispatch

@@ -206,6 +206,19 @@ int main()
         check(forecast_glut_multiplier(w, tile, resource_type::iron_ore, 5.0f, 3, p) == 0.0f,
               "BL-1227 (b): a cleared market with no bid and nothing listed is dead -> the build is vetoed");
 
+        // BL-1227 (d): what counts as a bid includes the SILENCED want (Ben,
+        // 2026-10-07): processors priced out by the ceiling post no demand but
+        // record hauler_want — a mine there is NOT vetoed, whether or not
+        // the market lists the ore.
+        w.markets.at(market).hauler_want[ri(resource_type::iron_ore)] = 20.0f;
+        check(forecast_glut_multiplier(w, tile, resource_type::iron_ore, 5.0f, 3, p) == 1.0f,
+              "BL-1227 (d): a cleared market whose only bid is the silenced want (demand 0) does not veto a mine");
+        w.markets.at(market).supply[ri(resource_type::iron_ore)] = 50.0f;
+        check(forecast_glut_multiplier(w, tile, resource_type::iron_ore, 5.0f, 3, p) == 1.0f,
+              "BL-1227 (d): ... nor when ore is listed - the silenced buyers are still buyers");
+        w.markets.at(market).supply[ri(resource_type::iron_ore)]      = 0.0f;
+        w.markets.at(market).hauler_want[ri(resource_type::iron_ore)] = 0.0f;
+
         // BL-1227 (c, emerged): econ tick > 0 but the market has written
         // nothing for ANY good yet (a market carved mid-tick, before its first
         // clear) is still never-cleared: no signal, no penalty.
