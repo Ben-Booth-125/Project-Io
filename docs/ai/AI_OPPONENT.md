@@ -700,7 +700,10 @@ the floor; stage B layers priority buckets and predictive spending over it (§ 2
   pool, and building upkeep met from a corporation's own pool (Ben, 2026-10-08), **plus** what a
   **running** processor in that market consumes, fed from a pool or the shelf — a running plant and
   what it consumes are observable (`../ui/DISCOVERY.md` § Competitor visibility; Ben, 2026-10-08);
-  an idled or decommissioned plant consumes nothing and is no buyer. Each of these is held for
+  an idled or decommissioned plant consumes nothing and is no buyer. **Where a want with no holder
+  lands (2026-10-08, NR-984):** a nation's want for a good that no pool or shelf yet holds is
+  recorded at its **capital's** market — so a nation can start one such chain, at its capital,
+  and the want follows the good to wherever it is first held. Each of these is held for
   the scorer's evaluation cadence, so a buyer is seen by every corporation that evaluates between
   two of its draws, not only by one due on the next tick. Otherwise the projected supply/demand ratio is unpenalised at or below
   `glut_taper_ratio` (1.0), tapers the build's score linearly to zero at `glut_veto_ratio` (2.0),

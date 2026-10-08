@@ -1875,6 +1875,15 @@
    "status": "open",
    "source": "the BL-1233 (processors to inputs) round 2 re-review, 2026-10-08",
    "what": "The sized test's spare (input_reach.cpp reachable_supply) charges each consumer market min(its draw, the output of the markets that reach it), split among those markets by output. Where one producer is reached by several hungry consumers it can still be charged past its output (P2 making 10, reached by C, Q1, Q2 each drawing 10 -> spare 0, true 10). This only ever REFUSES a plant that could stand, never admits one that cannot; the exact answer needs a small max-flow per input. TAKEN: accepted as a conservative estimate, with a code comment naming it. Reversible; say if you want the exact (max-flow) reading."
+  },
+  {
+   "id": "NR-984",
+   "title": "Decision taken on your behalf: a nation's want for a good nobody holds yet is recorded at its capital market",
+   "raised": "2026-10-08",
+   "kind": "decision",
+   "status": "open",
+   "source": "the BL-1227 (idle mines) round 4 build and re-review",
+   "what": "Your ruling: the space programme's / network upkeep's want counts as a bid \"there\", filled or not. When no pool or shelf anywhere holds the good, there is no \"there\" to read, so the build records the want at the nation's CAPITAL market. Effect: one such chain (propellant, spacecraft components) can start per nation, at its capital; once a plant exists the want follows the good. In play this took spacecraft-components plants from 0 to 22 on 5 seeds. TAKEN as built and written into AI_OPPONENT.md § 2B. Alternatives: every market of the nation (more starts, more idle risk), or the market nearest the nation's space infrastructure."
   }
  ]
 }
