@@ -936,6 +936,20 @@
     "src/world/world.hpp"
    ],
    "status": "drafted"
+  },
+  "owner_multi_select": {
+   "surface": "Owner multi-select — the Corporation and Company lenses' picked owner set, owned-grey fill, checklist key and shift-click picker",
+   "answers": "Where do I, and the one or two rivals (or firms) I am sizing up, hold ground on this body — against everyone else, who simply 'holds something here'?",
+   "because": "Buildings no longer carry an owner colour on the canvas (RENDERING.md § Installations), so the Corporation and Company lenses became the only place ownership is read at a glance — and with every owner tinted at once they answered 'who owns what' with a map of every colour at once, which answers nothing. A picked set keeps the comparison the player is actually making in colour and folds every other owner into one owned-grey, which still says 'someone holds this' without competing. Ben, 2026-10-08 (the sprint 51 visibility pass). The key copies the Resource lens's search-and-checklist shape so there is no new vocabulary, rows exist only for owners with ground on the body, the Corporation set defaults to the player ('where am I, against everyone'), and shift-click makes the map itself the picker while a plain click keeps its BL-664 meaning. It costs no new screen space: the key fills the one lens chrome region the lens already owned.",
+   "status": "drafted",
+   "backlog_item": "BL-1240",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/ui_state.hpp",
+    "src/ui/presentation.hpp",
+    "src/core/verify_api.cpp",
+    "scripts/verify/owner_multi_select.lua"
+   ]
   }
  }
 }

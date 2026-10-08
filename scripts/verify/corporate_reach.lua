@@ -10,6 +10,14 @@
 -- gameplay mechanic stays deferred in BL-182.
 verify.goto_surface("home")
 verify.set_overlay("corporation")
+-- BL-1240 (owner multi-select): a rival's star now draws only while that rival
+-- is PICKED, and the lens defaults to the player alone. Pick every rival so the
+-- premise above ("every rival shows a star") still holds for this capture.
+for _, c in ipairs(verify.corps()) do
+    if not c.is_player and not c.is_background then
+        verify.toggle_lens_owner(c.id)
+    end
+end
 
 -- Wide view: multiple rival corporations' HQ stars should be visible at once,
 -- reading as the corporate-landscape counterpart to the Country lens's
