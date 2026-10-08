@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**61 surfaces** — 7 settled, 54 awaiting Ben's wording.
+**62 surfaces** — 7 settled, 55 awaiting Ben's wording.
 
 ---
 
@@ -399,6 +399,14 @@ IT LIVES UNDER MY TRADES, NOT IN A FEED. The question it answers is about the pl
 **Because:** Colour alone could not carry both halves once BL-519 split the terrain axes. The substrate and the cover blend into ONE fill, so a rocky slope with a thin wood and a sedimentary plain with a thin wood arrive at neighbouring greens and the player cannot tell which they are siting on. Texture separates the two readings onto separate channels: a faint substrate grain that says what the ground is, and a per-tile cover pattern whose mark count and weight scale with cover_density, so a sparse wood LOOKS thin exactly where the economy already CUTS it thin. It earns its space by being free of any: it adds no chrome, no legend and no control, and it is the only way a cover boundary reads as a boundary now that BL-511's province blend deliberately smooths the fills.
 
 *Demanded by BL-520, BL-519 · `src/ui/hex_render.cpp`, `src/ui/body_surface_canvas.cpp` · id `tile_texture`*
+
+### Trade-flow lens (Planetary canvas) -- the player's market-to-market shipment arrows, a refusal marker per short market, and the class and width key
+
+**Answers:** Where is my surplus going, and why is it not going where it is short?
+
+**Because:** The dispatcher decides where the player's surplus goes every pass, and before this lens that decision surfaced only as its result: Supply shows convoys in flight and Supply-routes the lanes they carved, but neither says what was NOT sent or why. A market short of a good the player holds in surplus reads, without this, as a dispatcher that is broken; with it, as one of eight named reasons (no lane, price gate, no route, costly, no propellant, no room, no funds, room) -- each of which points at a different lever (a port, a road, a price, fuel, cash, a lane). Ben, 2026-10-07 (the lens form): a player lens over the player's own flows only; the whole-world diagnosis stays headless. It is off the strip, keyboard-cycle only, so it takes no slot from the first-sight lenses.
+
+*Demanded by BL-1222 · `src/ui/body_surface_canvas.cpp`, `src/world/supply_system.cpp`, `src/world/world.hpp` · id `trade_flow_lens`*
 
 ### Unit marker (Planetary canvas, the group's own tile)
 

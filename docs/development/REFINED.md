@@ -1,5 +1,36 @@
 # REFINED — active worklist
 
+## Sprint 50 — logistics and trade flow (opened 2026-10-07)
+
+**Goal.** Goods that exist reach the markets and processors that want them: BL-1217 (inputs
+reach processors) to G1 >= 70% pooled on 16 seeds, with flows and refusals visible. The sprint
+row in `sprints.json` carries the waves, risk and done-when. Ben's cut (2026-10-07): all nine
+items, measure-led, diagnostic lens, extend rather than cut. Built on `worktree-sprint-50`.
+
+**Gates.** Every merge: the item's harnesses, `world_determinism` twice, `save_roundtrip` if the
+save moves, a cold `code-reviewer` pass with a fix round budgeted, and the market-viability skill
+before/after for any world-mover (multi-tick rows; baselines read by the main session). Ben's
+live click for any UI item. One re-bless, last.
+
+### Wave 0 — the instrument
+
+**Gate — BL-1223 (gate logistics row).** Lane: `tools/verify/` only.
+- [x] G1 Factor water_pair_probe's dispatcher-order classifier into one shared reader; the
+  probe's water rows read identically (R1).
+- [x] G2 market_viability's logistics row over every good, multi-tick, with the
+  processor-input block (R2), pure reader (R3).
+- [x] G3 SKILL.md section (R4).
+- [x] G4 Main session: read the 16-seed baseline on this branch; it is BL-1217's R1 input.
+
+**Lens — BL-1222 (trade-flow lens).** Settled (Ben, the lens form, 2026-10-07): player lens,
+own flows only; LENSES.md § Trade-flow lens. Lane: `supply_system.*` (a transient record only),
+`body_surface_canvas.cpp`, the overlay enum, `question_log.json`.
+- [x] L1 The dispatcher's transient player record: shipments + best class per (good, market),
+  never read by the sim, never saved; world bit-identical (R1).
+- [x] L2 `trade_flow` overlay: arrows, markers, hover, class and width keys (R2, R3).
+- [x] L3 question_log entry; ACTIONS entry if the cycle changed (R4).
+- [ ] L4 Main session: capture, then Ben's live click.
+
 ## Sprint 48 — the world moves forward (opened 2026-09-25, CLOSED 2026-10-04)
 
 **Goal.** The world is built once at the Life gate and moves forward through the rounds; Next waits

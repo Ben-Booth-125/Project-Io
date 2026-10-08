@@ -6623,6 +6623,148 @@
    "batch": "sprint-48",
    "resolved": "2026-10-03",
    "archived": "docs/development/archive/requirements-2026-Q4.json"
+  },
+  {
+   "brief": "gate-logistics-row",
+   "title": "BL-1223 - The market-viability gate reports a logistics row",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1223 - sprint 50 (cut 2026-10-07, Ben's cut form)",
+   "batch": "sprint-50",
+   "resolved": "2026-10-07",
+   "resolution": "complete",
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: water_pair_probe --seeds 0,43,10 before and after; the water rows read identically"
+     ],
+     "requirement": "The dispatcher-order refusal classifier lives in one shared reader that water_pair_probe and market_viability both call; water_pair_probe's output is unchanged by the move.",
+     "notes": "",
+     "result_metric": "cd6c3fc8..e94f6697: water_pair_probe --seeds 0,43 --ticks 50 --probe 30,50 identical apart from timing lines (lane run, rounds 0-2)."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: market_viability --seeds 0,43 --ticks 100"
+     ],
+     "requirement": "market_viability prints a logistics row at several play ticks: units shipped between markets and the share landing at a market short of the good; dry markets per good; dry markets by best refusal class; and per input-starved processor its scarcest input with that input's best class at its market, pooled by class and by good.",
+     "notes": "Reported, no target.",
+     "result_metric": "Merged cc40b100. 16 seeds on worktree-sprint-50 (972 s): L all, 64 reads: 184 convoys / 683 u per read, 67.8% to a short market, 20.7% to a dry one; 130.3 dry (market, good) of 159.4; input-starved 47.0 per read."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism twice; market_viability G1/G2/G3 unchanged on the same seeds"
+     ],
+     "requirement": "A pure reader: G1-G4 read identically with the row added, and the world is unchanged.",
+     "notes": "",
+     "result_metric": "16 seeds: G1 54.7 / G2 54.4 / G3 88.9, identical to the sprint 49 close; --no-logistics identical G lines on seeds 0,43 (lane). Two static cold reviews: pure."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "review: the SKILL.md section read against the printed row"
+     ],
+     "requirement": "The market-viability skill documents the row, each class, and how to read the processor-input block.",
+     "notes": "",
+     "result_metric": "SKILL.md logistics row (L) section; review rounds 1-2 corrected the class labels and the bias notes."
+    }
+   ]
+  },
+  {
+   "brief": "inputs-reach-processors",
+   "title": "BL-1217 - A built processor gets its inputs, so 70% are running at handoff",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1217 - sprint 50 (cut 2026-10-07, Ben's cut form)",
+   "batch": "sprint-50",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "in-progress",
+     "verification": [
+      "headless: market_viability (BL-1223's row), 16 curated seeds, read on main"
+     ],
+     "requirement": "The diagnosis: which inputs fail to reach processors, at which markets, ranked by refusal class; construction stalls re-measured. The ranking orders the wave 2 fixes.",
+     "notes": "",
+     "result_metric": "BASELINE (2026-10-07, worktree-sprint-50 cc40b100, 16 seeds, play ticks 10/25/50/400, per read): 47.0 input-starved; scarcest input on its own market shelf but priced OVER the fair-price ceiling 24.1 (51%), on the shelf but contended 7.6 (16%), thin 0.7, no shelf surplus anywhere 3.6 (8%), real logistics (noroute/gate/costly/noroom/room) 10.1 (21%). Input priced over the ceiling in any class: 32.2 (69%). Top goods: steel, rare_earth_ore, ree_alloy, refined_copper, copper_ore. CAVEAT: the L row reads play ticks; G1 reads the handoff. G5: 70.6% of shelf reads t20-50 over the reservation, 41.5% at the 10x cap - so BL-1209 (k = 1, suppressed want) took stocked prices off the CAP, not under the 2x reservation. NEXT: trace why a stocked industrial shelf stays between 2x and 10x."
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: market-viability skill, 16 curated seeds, after the re-bless"
+     ],
+     "requirement": "G1 >= 70% of built processors running at handoff, pooled; G2 and G3 still pass. The cause is fixed in the network or dispatch, never by clamping the loss reflex.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "trade-flow-lens",
+   "title": "BL-1222 - A player lens shows my shipments and why my surplus did not go where a market is short",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1222 - sprint 50 (Ben's cut form and lens form, 2026-10-07)",
+   "batch": "sprint-50",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: world_determinism twice; save_roundtrip; market_viability G1-G4 identical on --seeds 0,43 --ticks 50"
+     ],
+     "requirement": "The dispatcher records the player corporation's shipments and best refusal class per (good, destination market) as a transient output; the simulation never reads it, the save never holds it, and the world is bit-identical.",
+     "notes": "",
+     "result_metric": "Merged 3306c300. market_viability --seeds 0,43 --ticks 50 before (cc40b100) and after (3306c300): every non-timing line identical, G1 52.5 / G2 58.5 / G3 100.0 both (main session). world_determinism twice ALL PASS, same digests; save_roundtrip OK (lane, 81e13872). Cold review: no dispatch decision changes; the extra dispatch_room read is pure."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "visual: a verifier-visual capture of the lens on a seated seed"
+     ],
+     "requirement": "The trade_flow lens draws the player's market-to-market arrows (width by units) and a marker on each short market coloured by its best class, with a class key and a width key; no rival flow appears.",
+     "notes": "",
+     "result_metric": "scripts/verify/trade_flow_lens.lua, 8 captures, 6 expects PASS (lane, 81e13872): arrows, 19-25 markers in class colours, both hovers; seat change draws nothing until the new corp's first pass (the review's leak, fixed)."
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "live click: Ben cycles to the lens in the built app and hovers an arrow and a marker"
+     ],
+     "requirement": "The lens is reachable by the keyboard lens-cycle; hovering an arrow shows good, units and landed price; hovering a marker lists the classes by good.",
+     "notes": "Owed: Ben's live click.",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "review: question_log.json entry rendered; ACTIONS entry if the cycle changed"
+     ],
+     "requirement": "The surface carries its question_log entry (\"Where is my surplus going, and why is it not going where it is short?\").",
+     "notes": "",
+     "result_metric": "question_log entry and lens.trade_flow ACTIONS entry (eight classes, empty until the held corp's first pass); canvas.lens_next and lens.throughput corrected; both re-rendered."
+    }
+   ]
   }
  ]
 }

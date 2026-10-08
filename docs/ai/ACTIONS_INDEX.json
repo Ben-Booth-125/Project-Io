@@ -230,6 +230,10 @@
    "Lens strip slot 6, on the minimap (draw_overlay_controls, src/ui/overlay.cpp). Its glyph is a TRUCK in profile (icons::throughput) — its own mark since BL-605, no longer the borrowed convoy chevron, because an on-screen lens carries one distinct glyph."
   ],
   [
+   "lens.trade_flow",
+   "Keyboard lens cycle only -- no lens-bar slot and no dedicated glyph (it borrows the supply mark in the cycle readout). LENSES.md § Trade-flow lens."
+  ],
+  [
    "ledger.nav_acquisitions",
    "Nav rail, slot 5 (Acquisitions icon - two outlined squares with an arrow driven from the small one into the large one)"
   ],

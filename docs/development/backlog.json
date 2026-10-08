@@ -1032,7 +1032,7 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": null,
+   "sprint": 50,
    "written": "2026-10-04",
    "requires": [],
    "blocked_on": null,
@@ -1053,7 +1053,7 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": null,
+   "sprint": 50,
    "written": "2026-10-04",
    "requires": [],
    "blocked_on": null,
@@ -1337,6 +1337,54 @@
     "tools/verify/haulage_measure.cpp"
    ],
    "design": "Ben (the re-bless form, 2026-10-07): sprint 50, beside BL-1217 (inputs reach processors). The per-merge series is in docs/development/drafts/sprint-49-rebless.md. Trace: (1) BL-1209 (shelf k = 1) cuts rival cash by 1.96 M pooled and leaves 13 rivals with negative cash (was 1) - which flow; (2) BL-1203 (water reaches dry markets) runs 25% more convoys yet sells 12.8% less at destination; (3) BL-1198 (the Well) adds 33 water sites and moves haulage not at all, to the decimal; (4) at BL-1200 (lake cap) people in centres rise 11.9% while the settlement record falls 2.4%; (5) whole road networks flip between Highway and Road tiers on single seeds at four merges with no new length (sprint 48 saw the same). Each: name the mechanism, then decide whether it is intended."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 50,
+   "written": "2026-10-07",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1222",
+   "short_name": "TRADE_FLOW_LENS",
+   "author": "Ben (2026-10-07, the sprint 50 cut form: diagnostic scope); filed by Claude",
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "A player lens shows where my surplus ships, at what landed price, and why it did not go where a market is short",
+   "authority_doc": "docs/ui/LENSES.md",
+   "files": [
+    "src/world/supply_system.cpp",
+    "src/world/supply_system.hpp",
+    "src/ui/body_surface_canvas.cpp",
+    "docs/ui/question_log.json",
+    "docs/ai/ACTIONS.json"
+   ],
+   "design": "SETTLED (Ben, 2026-10-07, the lens form): a PLAYER lens over the player's own flows only; the whole-world diagnosis stays headless (BL-1223, gate logistics row). Refusals: a marker per short market coloured by the best class over the player's sources, hover lists classes by good. Design in docs/ui/LENSES.md § Trade-flow lens. WORK: the dispatcher records the player corporation's shipments and best class per (good, destination market) each pass as a transient output the simulation never reads and the save never holds; the `trade_flow` overlay_mode at the enum's end; the Planetary arrows, markers, hover and class key; the question_log entry; the ACTIONS entry for the lens cycle if it changes. Before mint: Ben's cut form 2026-10-07 set DIAGNOSTIC scope (player polish in sprint 51)."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 50,
+   "written": "2026-10-07",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "id": "BL-1223",
+   "short_name": "GATE_LOGISTICS_ROW",
+   "author": "Ben (2026-10-07, the sprint 50 cut form); filed by Claude",
+   "category": "Tooling",
+   "priority": "A",
+   "difficulty": 3,
+   "title": "The market-viability gate reports a logistics row: units moved surplus to shortage, dry markets, refusals by class",
+   "authority_doc": "docs/economy/SUPPLY.md",
+   "files": [
+    "tools/verify/market_viability.cpp",
+    "tools/verify/water_pair_probe.cpp",
+    ".claude/skills/market-viability/SKILL.md"
+   ],
+   "design": "SPRINT 50 WAVE 0 (Ben, 2026-10-07, the cut form; the NEXT_SESSION.md proposal \"extend BL-1184 with a logistics row\"). Reported, no target (G1 stays the target, 70%). Generalise water_pair_probe's per-pair classifier (the dispatcher's rules in its own order) from water to every good, factored into one shared reader both tools use rather than a copy (BL-1165's haulage_measure lesson). Rows: units shipped between markets per tick, and the share landing at a market short of that good; dry markets per good; per dry market its best refusal class; and a PROCESSOR-INPUT block - for each input-starved processor, its scarcest input and that input's best class at its market - which is BL-1217 (inputs reach processors)'s diagnosis. Multi-tick: read at several play ticks, never one. A pure reader."
   }
  ]
 }

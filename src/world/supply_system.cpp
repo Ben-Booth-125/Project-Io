@@ -1461,11 +1461,36 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
         entity_id dest;
         float     haul;
         bool      space;
+        float     price_d; // BL-1222: recorded for the lens only; no rule reads it
     };
     std::vector<candidate> cands;
 
+    // BL-1222 (trade-flow lens) — the PLAYER corporation's record of this pass.
+    // WRITE-ONLY: every line that touches `tf` below records a value the pass has
+    // already computed for its own decision (or, for the classes of candidates the
+    // one-destination rule never reached, one extra `dispatch_room` read — a pure
+    // query); no branch the dispatcher takes reads it. Rolled into the world's
+    // trailing window at the end of the pass.
+    trade_flow_pass tf;
+    tf.corp = w.player_entity;
+    const auto tf_note = [&tf](entity_id dest, std::size_t ri, trade_refusal cls) {
+        const auto key = std::make_pair(dest, static_cast<std::uint16_t>(ri));
+        const auto it  = tf.best.find(key);
+        if (it == tf.best.end())
+            tf.best.emplace(key, cls);
+        else if (static_cast<int>(cls) > static_cast<int>(it->second))
+            it->second = cls;
+    };
+    // A market is SHORT of a good when last clear's demand outran its supply —
+    // the Scarcity lens's public signal (LENSES.md § Scarcity lens).
+    const auto tf_short = [&w](entity_id dest, std::size_t ri) {
+        const market_component& m = w.markets.at(dest);
+        return m.demand[ri] > m.supply[ri];
+    };
+
     for (const entity_id corp_id : corp_ids)
     {
+        const bool tf_player = (corp_id == w.player_entity);
         // This corp's pool keys, ascending (a std::map slice). Collected first
         // so nothing committed below can disturb the walk.
         std::vector<entity_id> src_keys;
@@ -1545,24 +1570,38 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                         continue;
                     const market_component& dm = w.markets.at(dest_id);
                     const float price_d = dispatch_market_price(dm, ri);
+                    const bool  tf_rec  = tf_player && tf_short(dest_id, ri);
                     // net(d) <= price_d (a haul is never negative), so a
                     // destination whose GROSS price cannot clear the gate cannot
                     // clear it net: skip it before routing a leg.
                     if (!(price_d > gate))
+                    {
+                        if (tf_rec)
+                            tf_note(dest_id, ri, trade_refusal::gate);
                         continue;
+                    }
                     const convoy_leg leg = price_convoy_leg(
                         w, reg, nodes, corp_id, src_key, dest_id, ri, probe_qty,
                         logistics_cost_space,
                         dm.body == src_body ? pool_origin() : nullptr);
                     if (!leg.viable)
+                    {
+                        if (tf_rec)
+                            tf_note(dest_id, ri, dm.body == src_body ? trade_refusal::no_route
+                                                                     : trade_refusal::no_lane);
                         continue; // unroutable / unpadded / unfuelled / same market
+                    }
                     const float haul = leg.cost / probe_qty;
                     const float net  = price_d - haul;
                     // The margin gate: net(d) - price_src > margin x price_src.
                     // With no home price this reduces to net(d) > 0.
                     if (!(net - price_src > margin * price_src))
+                    {
+                        if (tf_rec)
+                            tf_note(dest_id, ri, trade_refusal::costly);
                         continue;
-                    cands.push_back({net, dest_id, haul, leg.mode == convoy_mode::space});
+                    }
+                    cands.push_back({net, dest_id, haul, leg.mode == convoy_mode::space, price_d});
                 }
                 if (cands.empty())
                     continue;
@@ -1577,8 +1616,11 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                 // take the cargo at a price above its landed cost, so the next-
                 // best destination that still beats home by the margin takes it,
                 // rather than the cargo defaulting to a home sale.
+                std::size_t tf_tried = 0; // BL-1222: candidates the loop below reached
                 for (const candidate& c : cands)
                 {
+                    ++tf_tried;
+                    const bool  tf_rec = tf_player && tf_short(c.dest, ri);
                     const float landed = price_src + c.haul;
                     const float room =
                         dispatch_room(w, reg, c.dest, ri, landed, corp_ids, memo);
@@ -1588,14 +1630,31 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                     if (c.space && launch_draw[ri] > 0.0f)
                         qty = std::min(qty, pool_qty - launch_draw[ri]);
                     if (!(qty > 0.0f) || !std::isfinite(qty))
+                    {
+                        // BL-1222: the propellant clamp is the source's own limit
+                        // and ranks below the destination's room, so it is named
+                        // whenever it zeroes the send, room or none.
+                        if (tf_rec)
+                            tf_note(c.dest, ri,
+                                    (c.space && launch_draw[ri] > 0.0f
+                                     && !(pool_qty - launch_draw[ri] > 0.0f))
+                                        ? trade_refusal::no_propellant
+                                        : trade_refusal::no_room);
                         continue;
+                    }
 
                     // Re-price the committed leg at its real quantity.
                     const convoy_leg leg = price_convoy_leg(
                         w, reg, nodes, corp_id, src_key, c.dest, ri, qty,
                         logistics_cost_space, c.space ? nullptr : pool_origin());
                     if (!leg.viable)
+                    {
+                        if (tf_rec)
+                            tf_note(c.dest, ri, w.markets.at(c.dest).body == src_body
+                                                    ? trade_refusal::no_route
+                                                    : trade_refusal::no_lane);
                         continue;
+                    }
 
                     // Commit through the shared path: the solvency gate, the
                     // passive-LP gate (BL-597), the pool debit, the propellant
@@ -1614,11 +1673,53 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                         ++out.dispatched;
                         if (sent < qty)
                             ++out.trimmed_by_lp;
+                        if (tf_player)
+                        {
+                            tf.shipments.push_back({src_key, c.dest,
+                                                    static_cast<std::uint16_t>(ri), sent,
+                                                    c.price_d});
+                            if (tf_rec)
+                                tf_note(c.dest, ri, trade_refusal::sent);
+                        }
                     }
-                    else if (refused_no_lp)
-                        ++out.refused_no_lp;
+                    else
+                    {
+                        if (refused_no_lp)
+                            ++out.refused_no_lp;
+                        // Refused at commit: the LP cap (`room`, held back), or
+                        // otherwise solvency — with a viable leg and a known
+                        // corp, commit_convoy's only other refusal.
+                        if (tf_rec)
+                            tf_note(c.dest, ri, refused_no_lp ? trade_refusal::room
+                                                              : trade_refusal::no_funds);
+                    }
                     break; // one destination per (pool, good) per pass
                 }
+
+                // BL-1222: the candidates the one-destination rule never reached.
+                // They cleared the margin; whether they had room is one extra
+                // `dispatch_room` read each — a pure query (its memo is a cache
+                // of values this pass never changes), paid for the player only,
+                // and only for a short destination. The propellant clamp is read
+                // as the loop above reads it; solvency is not knowable without
+                // committing, so an unreached candidate is never `no funds`.
+                if (tf_player)
+                    for (std::size_t k = tf_tried; k < cands.size(); ++k)
+                    {
+                        const candidate& c = cands[k];
+                        if (!tf_short(c.dest, ri))
+                            continue;
+                        if (c.space && launch_draw[ri] > 0.0f
+                            && !(pool_qty - launch_draw[ri] > 0.0f))
+                        {
+                            tf_note(c.dest, ri, trade_refusal::no_propellant);
+                            continue;
+                        }
+                        const float room = dispatch_room(w, reg, c.dest, ri, price_src + c.haul,
+                                                         corp_ids, memo);
+                        tf_note(c.dest, ri,
+                                room > 0.0f ? trade_refusal::room : trade_refusal::no_room);
+                    }
             }
         }
     }
@@ -1626,6 +1727,11 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
     // BL-1071 — A MARKET EXPORTS ITS OWN SHELF, after every corporation has
     // claimed the room it wanted (SUPPLY.md § Dispatch trigger).
     export_market_shelves(w, reg, nodes, corp_ids, market_ids, memo, &pools_by_body, out);
+
+    // BL-1222: roll the player's record into the lens's trailing window.
+    w.player_trade_flow.push_back(std::move(tf));
+    while (w.player_trade_flow.size() > world::trade_flow_window)
+        w.player_trade_flow.erase(w.player_trade_flow.begin());
 
     (void)logistics_cost_land; // intra-body reads reg.logistics_cost(land/sea) directly; this
                                // param is retained for caller/signature stability.

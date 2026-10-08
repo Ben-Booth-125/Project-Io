@@ -17,7 +17,9 @@
 // what is STILL on a surplus shelf after this tick's dispatch, and why it did
 // not go to each dry market.
 //
-// CLASSES (first rule failed, in the dispatcher's own order):
+// CLASSES (first rule failed, in the dispatcher's own order). The classifier
+// itself lives in export_refusal.hpp (BL-1223), shared with market_viability's
+// logistics row so the two tools cannot drift:
 //   body     the dry market is on another body (a market has no space lane)
 //   gate     price_d <= price_src x (1 + dispatch_margin)
 //   noroute  price_market_export_leg is not viable: split into no path at all,
@@ -64,6 +66,7 @@
 
 #include "scripting/lua_state.hpp"
 #include "harness_params.hpp"
+#include "export_refusal.hpp"
 #include "world/campaign_settle.hpp"
 #include "world/components.hpp"
 #include "world/economy_system.hpp"
@@ -91,10 +94,7 @@
 
 namespace {
 
-enum cls : int { c_body = 0, c_noroute, c_gate, c_costly, c_noroom, c_room, c_count };
-const char* k_cls[c_count] = {"body", "noroute", "gate", "costly", "noroom", "room"};
-// best-of order: higher is closer to sending
-const int k_rank[c_count] = {0, 1, 2, 3, 4, 5};
+using namespace export_refusal; // the classifier (BL-1223: shared with market_viability)
 
 struct tally
 {
@@ -166,126 +166,62 @@ void probe_hook(const world& cw, int lap, void* vctx)
     tally& t = *ctx->t;
     ++t.probes;
 
-    const float margin = reg.dispatch_margin();
     const float ceil   = reg.price_band().ceil_mult;
     const float res    = reg.price_band().reservation_mult;
-    const logistics_nodes nodes = collect_logistics_nodes(w);
-    std::vector<entity_id> corp_ids, mids;
-    for (const auto& kv : w.corporations) corp_ids.push_back(kv.first);
-    for (const auto& kv : w.markets) mids.push_back(kv.first);
-    std::sort(corp_ids.begin(), corp_ids.end());
-    std::sort(mids.begin(), mids.end());
-    reservation_memo memo;
-
-    std::vector<entity_id> sur, dry;
-    for (const entity_id m : mids)
-    {
-        const market_component& mc = w.markets.at(m);
-        if (!(mc.base_price[G] > 0.0f)) continue;
-        if (mc.household_bid[G] > 0.0f)
-        {
-            ++t.consuming;
-            if (mc.inventory[G] < 1.0f) dry.push_back(m);
-        }
-        const float s = market_shelf_surplus(w, m, G);
-        if (s >= 1.0f && mc.centre_tile != null_entity)
-        {
-            sur.push_back(m);
-            t.surplus_units += s;
-        }
-    }
+    context x(w, reg);
+    const good_markets gm = scan_good(x, G);
+    const std::vector<entity_id>& sur = gm.sur;
+    t.consuming += gm.consuming;
+    t.surplus_units += gm.surplus_units;
     t.surplus_mkts += static_cast<long>(sur.size());
-    t.dry_mkts += static_cast<long>(dry.size());
+    t.dry_mkts += static_cast<long>(gm.dry.size());
 
     std::map<entity_id, int> room_dests;          // surplus source -> dry dests with room
     std::map<entity_id, double> room_left;        // source -> sum of room
-    for (const entity_id d : dry)
+    for (const entity_id d : gm.dry)
     {
         const market_component& dm = w.markets.at(d);
         const float base = dm.base_price[G];
-        const float p_d  = dispatch_market_price(dm, G);
-        int best = -1;
-        float best_l = 0.0f;
-        for (const entity_id s : sur)
-        {
-            if (s == d) continue;
-            const market_component& sm = w.markets.at(s);
-            const float p_s = dispatch_market_price(sm, G);
-            int c = -1;
-            convoy_mode mode = convoy_mode::land;
-            float landed = 0.0f;
-            if (sm.body != dm.body) c = c_body;
-            else if (!(p_d > p_s + margin * p_s)) c = c_gate;
-            else
+        const best_result br = classify_destination(x, d, G, sur, [&](entity_id s, const pair_result& pr) {
+            ++t.pairs[pr.c];
+            switch (pr.c)
             {
-                const convoy_leg leg = price_market_export_leg(w, reg, nodes, s, d, 1.0f);
-                // sea vs land comparison where both exist (diagnostic)
-                if (!leg.viable)
+            case c_noroute:
+                switch (pr.why)
                 {
-                    c = c_noroute;
-                    const entity_id o = sm.centre_tile, dc = dm.centre_tile;
-                    const logistics_path& p = intra_body_path(w, sm.body, o, dc);
-                    const std::vector<entity_id> ports = body_active_port_tiles(w, sm.body);
-                    if (!p.reachable && ports.size() < 2) ++t.noroute_nopath;
-                    else if (ports.size() < 2) ++t.noroute_ports_lt2;
-                    else
-                    {
-                        bool from_s = false, to_d = false;
-                        for (const entity_id pt : ports)
-                        {
-                            if (!from_s && intra_body_leg_path(w, sm.body, o, pt, leg_domain::land).reachable) from_s = true;
-                            if (!to_d && intra_body_leg_path(w, sm.body, pt, dc, leg_domain::land).reachable) to_d = true;
-                        }
-                        if (!from_s) ++t.noroute_no_port_src;
-                        else if (!to_d) ++t.noroute_no_port_dst;
-                        else ++t.noroute_no_sea;
-                    }
+                case nr_nopath: ++t.noroute_nopath; break;
+                case nr_ports_lt2: ++t.noroute_ports_lt2; break;
+                case nr_no_port_src: ++t.noroute_no_port_src; break;
+                case nr_no_port_dst: ++t.noroute_no_port_dst; break;
+                default: ++t.noroute_no_sea; break;
                 }
-                else
-                {
-                    mode = leg.mode;
-                    const float haul = leg.cost;
-                    landed = p_s + haul;
-                    if (!(p_d - haul - p_s > margin * p_s))
-                    {
-                        c = c_costly;
-                        (mode == convoy_mode::sea ? t.costly_sea : t.costly_land)++;
-                        t.costly_haul_sum += haul;
-                        t.costly_gap_sum += p_d - p_s;
-                    }
-                    else
-                    {
-                        const float absorb = dispatch_absorbable(w, reg, d, G, landed);
-                        const float pend = dispatch_pending(w, reg, d, G, corp_ids, memo)
-                                         + std::max(0.0f, dm.inventory[G]);
-                        if (!(absorb - pend > 0.0f))
-                        {
-                            c = c_noroom;
-                            (mode == convoy_mode::sea ? t.noroom_sea : t.noroom_land)++;
-                            (absorb > 0.0f ? t.noroom_pending : t.noroom_absorb0)++;
-                        }
-                        else
-                        {
-                            c = c_room;
-                            (mode == convoy_mode::sea ? t.room_sea : t.room_land)++;
-                            ++room_dests[s];
-                            room_left[s] += absorb - pend;
-                        }
-                    }
-                }
+                break;
+            case c_costly:
+                (pr.mode == convoy_mode::sea ? t.costly_sea : t.costly_land)++;
+                t.costly_haul_sum += pr.haul;
+                t.costly_gap_sum += pr.gap;
+                break;
+            case c_noroom:
+                (pr.mode == convoy_mode::sea ? t.noroom_sea : t.noroom_land)++;
+                (pr.absorb > 0.0f ? t.noroom_pending : t.noroom_absorb0)++;
+                break;
+            case c_room:
+                (pr.mode == convoy_mode::sea ? t.room_sea : t.room_land)++;
+                ++room_dests[s];
+                room_left[s] += pr.room;
+                break;
+            default: break;
             }
-            ++t.pairs[c];
-            if (c >= c_costly && (best < c_costly || landed < best_l)) best_l = landed;
-            if (best < 0 || k_rank[c] > k_rank[best]) best = c;
-        }
+        });
+        const int best = br.best;
         if (best < 0) continue; // no surplus market at all this tick (dry loop)
         ++t.best[best];
         if (best >= c_costly)
         {
             // room counterfactuals at the cheapest routed landed cost
-            const float L = best_l;
+            const float L = br.best_l;
             const float S = pricing_supply(dm, G, reg.price_band().shelf_supply_ticks);
-            const float pend = dispatch_pending(w, reg, d, G, corp_ids, memo)
+            const float pend = dispatch_pending(w, reg, d, G, x.corp_ids, x.memo)
                              + std::max(0.0f, dm.inventory[G]);
             const float now = std::max(0.0f, dispatch_absorbable(w, reg, d, G, L) - pend);
             const float bid_l = household_bid_at(reg, dm, G, L);
