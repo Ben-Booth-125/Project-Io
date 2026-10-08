@@ -49,7 +49,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 
 ### `gameplay.build` — Tile construction ledger (fold-out column), opened from the Selection band of a selected tile; a shortcut lives on a selected owned building ('Build another here').
 
-**Press.** Single-click a tile on the Planetary canvas (the Selection band appears), click 'Construct Buildings' in the band's action grid, then click 'Build' on a candidate row in the ledger. Rows are one per extractable resource deposited on the tile (plus a coastal Fishing Wharf row even with zero deposit, and a Well row on a land tile with no ice deposit that a river runs along or a lake borders), one per processing recipe, then Port, Launchpad, Inland Logistics Hub, Military Base. Alternate press: with an owned building selected, 'Build another here' repeats its type/target on the same tile, gated by the tile's stack capacity.
+**Press.** Single-click a tile on the Planetary canvas (the Selection band appears), click 'Construct Buildings' in the band's action grid, then click 'Build' on a candidate row in the ledger. Rows are one per extractable resource deposited on the tile (plus a Fishing Wharf row on a land tile bordering the sea with no produce deposit - never on the water itself - and a Well row on a land tile with no ice deposit that a river runs along or a lake borders), one per processing recipe, then Port, Launchpad, Inland Logistics Hub, Military Base. Alternate press: with an owned building selected, 'Build another here' repeats its type/target on the same tile, gated by the tile's stack capacity.
 
 | Arg | Type | Meaning |
 |---|---|---|
