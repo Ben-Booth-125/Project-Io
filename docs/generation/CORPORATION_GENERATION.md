@@ -557,8 +557,15 @@ these goods (`goods_in_g`); it is not a count of goods with demand, since a clos
 have none yet.
 
 Derived
-demand counts what stands or is chartered, never what a refused firm would have wanted: a chain
-none of whose consumers can stand (a cold start) is not begun by it.
+demand counts what stands or is chartered, **and the prospective draw of a processor refused for
+want of spare input (Ben, 2026-10-07; BL-1233, processors to inputs)**: a processor the sized rule
+(§ Pass 3, "Sized to its inputs") turns away enters its input's demand, so the walk charters the
+extraction that would feed it, and the processor is placed on the retry once that firm lands.
+Without it the two rules deadlock — derived demand fills supply to exactly what stands, the sized
+rule then finds no spare, and a chain whose inputs are fully drawn is refused for the rest of the
+pass (measured: household goods' processors vanished and household fill fell by half). What it
+still never counts is a firm refused for any other reason: a chain none of whose consumers can
+stand (a cold start) is not begun by it.
 
 **What Pass 6 does not do.** It does not seed any behavioural state, matching the contract the
 rest of this pipeline holds (§ Generation seeds no behaviour) — no sentiment, no diplomatic
