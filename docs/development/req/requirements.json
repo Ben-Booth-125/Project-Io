@@ -7156,6 +7156,51 @@
      "result_metric": ""
     }
    ]
+  },
+  {
+   "brief": "terrain-variant-families",
+   "title": "BL-1243 - Every terrain family bakes from several procedural variants, hash-picked per tile and cross-faded",
+   "difficulty": 3,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1243 - sprint 51 wave 2 (Ben's design form, 2026-10-08)",
+   "batch": "sprint-51",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "visual: a wide plain, a forest and a range at the two close rungs, before and after"
+     ],
+     "requirement": "Each terrain family (substrate x cover, and each dramatic landform form) carries several procedural variants picked by a hash of grid coordinates and cross-faded across tile boundaries; no variant edge is drawn.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: ground_bake_check new rows (P17+)"
+     ],
+     "requirement": "Deterministic, wrap-exact and chunk-seamless; character keyed on the nominal scale; bake ms per tier recorded before and after.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism twice, digests identical to the base (render-only change)",
+      "live click: Ben looks at a plain and a forest at the close rungs"
+     ],
+     "requirement": "The world is untouched; Ben judges the variety live.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
   }
  ]
 }

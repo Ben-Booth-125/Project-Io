@@ -1085,4 +1085,4 @@ takes a cold review per item. **Wave 2:** BL-1243 (terrain variant families) aft
   - [ ] T1 find which side disagrees (offer or rule) for the wharf and the well; fix it; world_determinism before and after (BL-1218 R1, R2).
   - [ ] T2 the refunds line (BL-1215 R1, R2).
 - [ ] **Main session.** Merge, the review barrier (`verifier-review`), the integrating build, world_determinism, the visual checks, a cold review per item, Ben's live walk, one commit per item.
-- [ ] **Wave 2 — BL-1243 (terrain variant families)** after L5 merges.
+- [ ] **Wave 2 — L7, BL-1243 (terrain variant families)** — launched 2026-10-08 on top of 8bfad073 (all six wave-1 lanes merged). Group `terrain-variant-families`.
