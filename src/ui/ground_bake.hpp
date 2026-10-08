@@ -1,5 +1,6 @@
 #pragma once
 
+#include "structure_stamps.hpp" // BL-1241: the installation pass and its stamp seam
 #include "world/entity.hpp"
 
 #include <cstdint>
@@ -30,6 +31,7 @@
 // ---------------------------------------------------------------------------
 
 struct world;
+class recipe_registry;
 
 namespace ui::ground {
 
@@ -105,6 +107,10 @@ struct bake_params
     float grade_cool[3]   = { 0.93f, 0.97f, 1.05f }; ///< Channel multipliers (r,g,b).
     float grade_lift      = 0.05f;  ///< Haze floor: lift toward the cool haze colour.
     float grade_contrast  = 1.06f;  ///< Mild S-curve about mid-grey.
+    // Installations (BL-1241, structures baked): the structure pass and the
+    // stamp seam it asks. A null sheet = every key draws its procedural form.
+    bool  installations   = true;
+    const stamp_sheet* stamps = nullptr;
 };
 
 /// Per-tile source fields for one body, extracted once per bake batch so the
@@ -122,6 +128,7 @@ struct bake_source
     std::vector<float> jitter;          ///< Per-tile hash jitter in [-1, 1].
     std::vector<std::uint8_t> cover;    ///< terrain_cover per tile — feeds the close-tier feature stamps.
     std::vector<std::uint8_t> density;  ///< cover_density per tile.
+    installation_snapshot     inst;     ///< BL-1241: what stands on each revealed tile.
 };
 
 /// Build the source arrays for @p body. Reads tile fields and the survey mask
@@ -129,7 +136,10 @@ struct bake_source
 /// revealed neighbour — its class excludes it from cross-class interpolation).
 /// @p reveal_all lifts the mask (a fully-surveyed read; the spectator god view
 /// keeps the mask ON here and lifts it at the draw call instead, as today).
-bake_source prepare_source(const world& w, entity_id body, bool reveal_all = false);
+/// @p reg resolves a processing facility's recipe family for its structure
+/// stamp (null: the general form).
+bake_source prepare_source(const world& w, entity_id body, bool reveal_all = false,
+                           const recipe_registry* reg = nullptr);
 
 /// Bake pixels [px0, px0+pw) x [py0, py0+ph) of @p g into @p out (pw*ph RGBA8,
 /// ABGR u32, row-major). Pixels outside the grid's vertical extent bake

@@ -51,6 +51,26 @@ public:
     /// The C-F dials; shipped values are ground_bake.hpp's defaults.
     ui::ground::bake_params params;
 
+    /// BL-1241: bake counters, so a verify run can show what re-bakes and when
+    /// (a re-bake must follow a construction event, never a tick). Monotonic
+    /// across body switches; read-only to callers.
+    struct bake_stats
+    {
+        std::uint64_t far_bakes = 0;
+        std::uint64_t chunk_bakes = 0;
+        std::uint64_t chunk_rebakes = 0; ///< A chunk that was already ready, baked again.
+        std::uint64_t neigh_bakes = 0;
+    };
+    const bake_stats& stats() const { return m_stats; }
+
+    /// BL-1241: a digest of every installation in the current source snapshot
+    /// (0 with no source) — moves exactly when what the structure pass draws does.
+    std::uint64_t installation_digest() const;
+
+    /// BL-1241: the recipe registry a processing facility's structure stamp
+    /// reads its family (recipe group) from. Set by the app; null = general form.
+    const recipe_registry* registry = nullptr;
+
 private:
     struct chunk
     {
@@ -74,7 +94,7 @@ private:
     /// with it, so the worker never reads a ground_layer member.
     struct job
     {
-        int  tier = -1;             ///< -1 = the far page.
+        int  tier = -1;             ///< -1 = the far page; -2 = the neighbourhood page (BL-1241).
         int  ci = 0, cj = 0;
         int  px0 = 0, py0 = 0, pw = 0, ph = 0;
         std::uint64_t hash = 0;
@@ -133,6 +153,23 @@ private:
     bool                    m_quit = false;
 
     std::vector<std::uint32_t> m_scratch; ///< Synchronous-path bake buffer.
+    bake_stats m_stats;
+
+    // BL-1241: the Selection band's neighbourhood page — one small flat bake
+    // around the selected tile at a fixed close tier, re-baked when its window
+    // hash moves (a selection change, a build in view).
+    ui::ground::geometry m_neigh_geom;
+    SDL_Texture*  m_neigh = nullptr;
+    int           m_neigh_w = 0, m_neigh_h = 0;
+    std::uint64_t m_neigh_hash = 0;
+    std::uint64_t m_neigh_want = 0;     ///< Hash of the page last enqueued.
+    entity_id     m_neigh_tile = null_entity;
+    entity_id     m_neigh_want_tile = null_entity;
+    float         m_neigh_rect[4] = { 0, 0, 0, 0 }; ///< Canonical x0, y0, x1, y1 of the ready page.
+    float         m_neigh_want_rect[4] = { 0, 0, 0, 0 };
+    bool          m_neigh_ready  = false;
+    bool          m_neigh_queued = false;
+    static constexpr double k_neigh_px_per_r = 48.0;
 
     static constexpr int    k_chunk_px      = 512;
     static constexpr double k_far_px_per_r  = 6.0;

@@ -334,6 +334,22 @@ struct ground_view
     std::vector<ground_chunk_view> chunks; ///< The active tier's ready chunks.
     ground_chunk_view far;           ///< Low-res whole-body page (tex null until baked).
     bool far_ready = false;
+    /// BL-1241: the Selection band's neighbourhood view, baked as its own small
+    /// page around `neigh_tile` (tex null until baked) — so the zoomed view shows
+    /// the same baked ground, structures included, as the canvas.
+    ground_chunk_view neigh;
+    entity_id neigh_tile = null_entity;
+};
+
+/// The Selection band's neighbourhood-page request (BL-1241): the tile the
+/// view centres on and its ring radius. Written by the panel each frame it
+/// draws the view; read by ground_layer next frame.
+struct ground_neigh_request
+{
+    entity_id body = null_entity;
+    entity_id tile = null_entity;
+    int col = 0, row = 0, radius = 2;
+    bool valid = false;
 };
 
 /// The canvas's bake request: the canonical-space rect visible this frame plus
@@ -359,6 +375,7 @@ struct ui_state
     // --- baked ground (BL-732) ---
     ground_view    ground;          ///< Filled by app each frame from core/ground_layer.
     ground_request ground_req;      ///< Written by the Planetary canvas each frame.
+    ground_neigh_request ground_neigh_req; ///< BL-1241: written by the Selection band's neighbourhood view.
     /// Verify-only: suppress the national border band so a ground-judgement
     /// capture shows the bake bare (BL-732 R1; the band's weight over painterly
     /// ground is BL-734's open call). No player control sets this.

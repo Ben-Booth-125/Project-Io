@@ -148,7 +148,7 @@ not retired).
 **Procedural now, raster later, one seam** (Ben, 2026-10-08). The structures are
 procedural stamps of the same kind as the close tiers' tree canopies: hash-placed from
 grid coordinates, NW-lit with an SE drop shadow, drawn before the grade so they take it
-exactly as the ground does, deterministic and wrap-exact. An authored raster sheet may
+exactly as the ground does, deterministic and wrap-exact (`ground_bake_check` P10). An authored raster sheet may
 later replace a type's procedural stamp **on the same stamp seam** — a stamp is keyed by
 what it depicts, and the bake asks the seam for it — so nothing authored procedurally is
 thrown away when art arrives.

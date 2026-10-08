@@ -16,6 +16,7 @@
 // ---------------------------------------------------------------------------
 
 struct world;
+struct ground_view; // ui_state.hpp (BL-1241: the neighbourhood view's baked page)
 
 namespace ui {
 
@@ -126,7 +127,13 @@ ImVec2 hex_local_centre(int col, int row, float hex_size);
 /// @param origin      Top-left of the render rect, screen px.
 /// @param size        Width/height of the render rect, screen px.
 /// @param radius      Rings of neighbours to show around the centre tile.
+/// @param ground      BL-1241: the published baked ground. When its neighbourhood
+///                    page is ready for @p centre_tile the view draws THAT — the
+///                    canvas's own baked ground, structures included — and only the
+///                    centre highlight over it; until then (or with null) it draws
+///                    the vector hexes as before.
 void draw_tile_neighbourhood(ImDrawList* dl, world& w, entity_id centre_tile,
-                             ImVec2 origin, ImVec2 size, int radius);
+                             ImVec2 origin, ImVec2 size, int radius,
+                             const ::ground_view* ground = nullptr);
 
 } // namespace ui

@@ -52,14 +52,6 @@ alphabetical order.
 
 *Demanded by BL-469, BL-467 · `src/ui/body_surface_canvas.cpp`, `src/ui/icons.cpp`, `src/ui/icons.hpp` · id `battle_marker`*
 
-### Stacked-tile ring (Planetary canvas building marker)
-
-**Answers:** This hex holds more than one building - which KINDS are standing here?
-
-**Because:** A tile carries as many buildings as its richness allows (BL-193, building stack capacity), and the canvas drew exactly one silhouette however many stood there. The '+N' count badge told the player a stack existed but never what was in it, and Ben rejected primary-plus-count for exactly that reason: it is always legible and never says WHICH. The ring is the only one of the three shapes considered that scales with the richness-derived cap AND names its contents - a glyph cluster becomes soup past three. It earns space it does not take from anything else: it occupies the empty annulus between the silhouette (0.48 r) and the rim, adds no chrome, no legend and no control, and it composes with the two marks already there rather than replacing them - the ring says which kinds, the centre glyph says which of them leads, the badge says how many in total. It draws nothing on a single-kind tile, so the world's ordinary built tiles are unchanged. Its LOD bound (draw_r > 10 px) is derived from the arc length one segment needs to read as a segment, and below it the tile degrades to the dominant kind's glyph alone - never to an empty hex.
-
-*Demanded by BL-596, BL-193 · `src/ui/icons.cpp`, `src/ui/icons.hpp`, `src/ui/body_surface_canvas.cpp`, `src/ui/presentation.cpp` · id `building_stack_ring`*
-
 ### Comms dock
 
 **Answers:** What has happened that I did not watch happen?
@@ -287,6 +279,14 @@ IT LIVES UNDER MY TRADES, NOT IN A FEED. The question it answers is about the pl
 **Because:** Roads are terrain, not an overlay: the road ladder (Track / Road / Highway) and the sea lane both discount traversal cost for every convoy and every reach read (LOGISTICS.md sec 1, sec 4b), so a player planning a site or a haul needs them on the plain canvas under every lens. Ben, 2026-10-03, playing the build: "render [roads] as curves rather than lines, and make them thinner" and "sea lanes should always go over ocean, never over ground". So both draw as smooth curves through their tile chains (a quadratic through each tile's two shared-edge midpoints, junctions paired into through-curves), at one named width per tier, half the old straight-segment widths, keeping the 1 : 1.5 : 2 ladder so the tiers still read apart. The sea lane had no stroke on the campaign map at all, though the stamped field shapes every sea leg's cost; it now draws along its own stamped water tiles in the sea blue the wizard's lapse uses, so the curve can never leave the sea.
 
 *Demanded by  · `src/ui/body_surface_canvas.cpp`, `docs/ui/RENDERING.md` · id `planetary_routes`*
+
+### Baked structures (Planetary canvas ground: buildings, settlements, ruins, construction sites) and the Selection band's zoomed neighbourhood view of them
+
+**Answers:** What stands on this ground, roughly what is it, and how built-up is this region - without hovering anything?
+
+**Because:** A glyph layer over painterly ground made every built tile read as a label stuck on a picture, and one mark carried four answers on half a hex (type, kinds, count, owner). Ben's sprint 51 form (2026-10-08) moved the answer into the art: one procedural structure per depicted subject - a head-frame over a mine, a hall and stacks over a foundry, a quay toward the water at a port - so WHAT is made here reads by silhouette; a stacked tile stands a cluster of up to three, the dominant stack largest and in front; a settlement steps its footprint and height with scale and bakes as a pale paved patch at the far page, where the density dot stood; a razed centre bakes as a ruin and a site under construction as scaffolding. It earns its space by taking none: it IS the ground the canvas already draws, adds no chrome, no legend and no control, and frees the hex the ring, badge, emblem tag and skyline occupied. Finer questions moved to surfaces built for them - count and running state to the Production section, ownership to the hover card, the player footprint outline and the owner lenses. The Selection band's zoomed neighbourhood view draws the same baked page, so the picture of a selected tile matches the canvas it was pressed on.
+
+*Demanded by BL-1241 · `src/ui/structure_stamps.cpp`, `src/ui/structure_stamps.hpp`, `src/ui/ground_bake.cpp`, `src/core/ground_layer.cpp`, `src/ui/body_surface_canvas.cpp`, `src/ui/hex_render.cpp`, `docs/ui/RENDERING.md` · id `planetary_structures`*
 
 ### Profile panel
 

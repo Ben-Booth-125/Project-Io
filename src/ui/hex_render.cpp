@@ -2,6 +2,7 @@
 
 #include "terrain_palette.hpp" // BL-732: the pure palette both this and ground_bake read
 #include "icons.hpp" // landform glyphs (BL-231)
+#include "ui_state.hpp" // ground_view — the baked neighbourhood page (BL-1241)
 #include "world/logistics.hpp" // body_tile_grid — O(1) neighbour lookup (BL-077 raster)
 #include "world/world.hpp"
 
@@ -377,7 +378,7 @@ ImVec2 hex_local_centre(int col, int row, float hex_size)
 }
 
 void draw_tile_neighbourhood(ImDrawList* dl, world& w, entity_id centre_tile,
-                             ImVec2 origin, ImVec2 size, int radius)
+                             ImVec2 origin, ImVec2 size, int radius, const ground_view* ground)
 {
     if (size.x <= 4.0f || size.y <= 4.0f || radius < 0)
         return;
@@ -424,6 +425,16 @@ void draw_tile_neighbourhood(ImDrawList* dl, world& w, entity_id centre_tile,
 
     dl->PushClipRect(origin, {origin.x + size.x, origin.y + size.y}, true);
 
+    // BL-1241: the baked neighbourhood page, when it is ready for THIS tile —
+    // the same ground, structures and grade the canvas draws (canonical space
+    // maps to the box by hex_sz, exactly as hex_local_centre does).
+    const bool baked = ground != nullptr && ground->neigh.tex != nullptr
+                    && ground->neigh_tile == centre_tile && ground->body == body;
+    if (baked)
+        dl->AddImage((ImTextureID)(intptr_t)ground->neigh.tex,
+                     { off.x + ground->neigh.x0 * hex_sz, off.y + ground->neigh.y0 * hex_sz },
+                     { off.x + ground->neigh.x1 * hex_sz, off.y + ground->neigh.y1 * hex_sz });
+
     constexpr ImU32 outline_col = IM_COL32(24, 26, 32, 200);
     constexpr ImU32 built_mark  = IM_COL32(150, 160, 190, 255);
     constexpr ImU32 hl_col      = IM_COL32(250, 235, 140, 255); // centre-tile highlight ring
@@ -456,6 +467,20 @@ void draw_tile_neighbourhood(ImDrawList* dl, world& w, entity_id centre_tile,
             const auto tt        = w.tiles.find(tid);
             const bool have_tile = (tt != w.tiles.end());
             const bool is_built  = built.count(tid) != 0;
+            if (baked)
+            {
+                // The page carries the ground and what stands on it; only the
+                // landform glyph (still canvas chrome) and the highlight remain.
+                if (have_tile && !is_built)
+                    icons::landform(dl, lc, hex_sz * 0.42f, tt->second.landform,
+                                    IM_COL32(236, 232, 220, 210));
+                if (tid == centre_tile)
+                {
+                    std::copy(std::begin(verts), std::end(verts), std::begin(hl_verts));
+                    have_hl = true;
+                }
+                continue;
+            }
             // Ground first, built or not. Same landform channel the Planetary
             // canvas draws (BL-231) — this view exists so the two surfaces cannot
             // drift apart.

@@ -90,7 +90,8 @@ geometry make_geometry(int gw, int gh, double target_px_per_r, double tilt_sy)
     return g;
 }
 
-bake_source prepare_source(const world& w, entity_id body, bool reveal_all)
+bake_source prepare_source(const world& w, entity_id body, bool reveal_all,
+                           const recipe_registry* reg)
 {
     bake_source s;
     const auto bit = w.bodies.find(body);
@@ -158,6 +159,7 @@ bake_source prepare_source(const world& w, entity_id body, bool reveal_all)
             s.grad_y[i] = static_cast<float>(
                 (height_at(s, c, r + 1) - height_at(s, c, r - 1)) / (2.0 * 1.5));
         }
+    extract_installations(w, body, reg, s); // BL-1241 (structures baked)
     return s;
 }
 
@@ -255,6 +257,7 @@ void stamp_trees(const bake_source& src, const geometry& g, const bake_params& p
             const double hx = kSqrt3 * (c + odd);
             const double hy = 1.5 * r;
             const std::uint32_t tc = src.colour[i];
+            const float clear_r = installation_clear_radius(src, i); // BL-1241: works stand on cleared ground
             for (int k = 0; k < n; ++k)
             {
                 const float a1 = hash01(cw, r, 0x7E00u + static_cast<std::uint32_t>(k) * 3u);
@@ -262,6 +265,8 @@ void stamp_trees(const bake_source& src, const geometry& g, const bake_params& p
                 const float a3 = hash01(cw, r, 0x7E02u + static_cast<std::uint32_t>(k) * 3u);
                 const double ang = a1 * 6.283185307;
                 const double rad = 0.82 * std::sqrt(a2);
+                if (rad < clear_r)
+                    continue;
                 const double tx  = hx + rad * std::cos(ang);
                 const double ty  = hy + rad * std::sin(ang) * 0.9;
                 const float  cr  = (0.085f + 0.055f * a3) * (forest ? 1.0f : 0.62f);
@@ -764,6 +769,9 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
     if (g.s >= 40.0 && p.tree_density > 0.0f)
         stamp_trees(src, g, p, px0 - A, py0 - A, apw, aph, abuf.data(), atag.data());
 
+    if (p.installations) // BL-1241: structures, after the trees, before the grade
+        stamp_installations(src, g, p, px0 - A, py0 - A, apw, aph, abuf.data(), atag.data());
+
     // The separable near-future grade. Its haze lift falls and its contrast
     // rises with resolution (BL-736): haze is blur-adjacent, and the close
     // tiers need their local contrast more than their atmosphere.
@@ -839,6 +847,7 @@ std::uint64_t region_hash(const bake_source& src, const geometry& g,
             std::memcpy(&hb, &src.height[i], 4);       mix(hb);
             std::memcpy(&hb, &src.relief_bias[i], 4);  mix(hb);
         }
+    mix(installation_hash(src, g, px0, py0, pw, ph)); // BL-1241: builds, razes, scale steps
     return h;
 }
 

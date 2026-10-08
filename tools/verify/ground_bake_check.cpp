@@ -16,6 +16,14 @@
 //   P6  Mask: a source built WITHOUT reveal_all on an unsurveyed body bakes
 //       the lock colour, and leaks no terrain hue.
 //   P7  region_hash moves when a tile field the bake reads moves.
+//   P10 Installations (BL-1241, structures baked): the structure pass is
+//       deterministic and wrap-exact at the flat, oblique and far geometries,
+//       actually draws (on vs off differs), and leaves a masked window exact.
+//   P11 The chunk hash folds installations: a build, a stack, a recipe-family
+//       change, a scale step and a raze each move it; a tile outside the
+//       window's reach does not.
+// Also (not checks): bake ms per tier with the pass off vs on, and a gallery
+// of every procedural form at every tier (structures_gallery_*.png).
 //
 // Exits 0 on PASS, non-zero naming the failed phase.
 
@@ -27,6 +35,7 @@
 #include "world/world.hpp"
 #include "harness_params.hpp"
 
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -269,6 +278,314 @@ int main()
         check(g45.lift > 0.8 && g45.lift < 1.0, "P9", "45-degree lift derives to ~0.9 canonical");
         check(t1 != a48, "P9", "the oblique projection differs from the flat bake");
     }
+
+    // ------------------------------------------------------------------
+    // BL-1241 (structures baked): the installation pass.
+    // ------------------------------------------------------------------
+    {
+        std::printf("installations on the home body: %zu tiles carry one\n", src.inst.list.size());
+
+        // A GALLERY source: the home ground with every procedural form staged
+        // on a land block, so each form is exercised (and previewed) whatever
+        // the seed happened to build. Real snapshots carry no world state the
+        // pass could not also see here — the pass reads only `inst`.
+        const int BW = 16, BH = 10;
+        int best = -1, bc0 = 0, br0 = 0;
+        // Temperate rows, vegetated land preferred: the forms are judged on the
+        // ground most of the game is played on, not on polar ice.
+        for (int r0 = src.gh / 4; r0 + BH < src.gh * 3 / 4; ++r0)
+            for (int c0 = 0; c0 < src.gw; c0 += 2)
+            {
+                int land = 0;
+                for (int r = r0; r < r0 + BH; ++r)
+                    for (int c = c0; c < c0 + BW; ++c)
+                    {
+                        const std::size_t ti = static_cast<std::size_t>(r) * src.gw + (c % src.gw);
+                        if (src.cls[ti] != static_cast<std::uint8_t>(bake_source::tile_class::land))
+                            continue;
+                        const std::uint32_t col = src.colour[ti];
+                        land += 2 + (ui::palette::col_g(col) > ui::palette::col_b(col) + 10 ? 1 : 0);
+                    }
+                if (land > best) { best = land; bc0 = c0; br0 = r0; }
+            }
+        std::printf("gallery block at col %d row %d (%d/%d land)\n", bc0, br0, best, BW * BH);
+
+        struct staged { stamp_key k[3]; int n; stamp_key settle; };
+        std::vector<staged> roster;
+        const auto bld = [](building_type t, int fam) {
+            stamp_key k; k.subject = stamp_subject::building;
+            k.type = static_cast<std::uint8_t>(t); k.family = static_cast<std::uint8_t>(fam);
+            return k;
+        };
+        for (int f = 0; f < static_cast<int>(extraction_family::count); ++f)
+            roster.push_back({ { bld(building_type::extraction_site, f) }, 1, {} });
+        for (int f = 0; f < static_cast<int>(processing_family::count); ++f)
+            roster.push_back({ { bld(building_type::processing_facility, f) }, 1, {} });
+        for (building_type t : { building_type::port, building_type::launchpad,
+                                 building_type::inland_logistics_hub, building_type::military_base,
+                                 building_type::research_institute, building_type::schooling,
+                                 building_type::university })
+            roster.push_back({ { bld(t, 0) }, 1, {} });
+        {
+            stamp_key sc = bld(building_type::processing_facility,
+                               static_cast<int>(processing_family::metal_foundry));
+            sc.subject = stamp_subject::scaffold;
+            roster.push_back({ { sc }, 1, {} });
+        }
+        for (int sc = 1; sc <= 5; ++sc)
+        {
+            stamp_key k; k.subject = stamp_subject::settlement; k.scale = static_cast<std::uint8_t>(sc);
+            roster.push_back({ {}, 0, k });
+        }
+        {
+            stamp_key k; k.subject = stamp_subject::ruin; k.scale = 1;
+            roster.push_back({ {}, 0, k });
+        }
+        // The stacked tile: three stacks, dominant mine in front.
+        roster.push_back({ { bld(building_type::extraction_site, static_cast<int>(extraction_family::mine)),
+                             bld(building_type::processing_facility, static_cast<int>(processing_family::metal_foundry)),
+                             bld(building_type::inland_logistics_hub, 0) }, 3, {} });
+        roster.push_back({ { bld(building_type::extraction_site, static_cast<int>(extraction_family::farm)),
+                             bld(building_type::processing_facility, static_cast<int>(processing_family::food_processing)) }, 2, {} });
+        {
+            stamp_key k; k.subject = stamp_subject::settlement; k.scale = 3;
+            roster.push_back({ { bld(building_type::schooling, 0) }, 1, k });
+        }
+
+        bake_source gal = src;
+        gal.inst.of_tile.assign(gal.cls.size(), -1);
+        gal.inst.list.clear();
+        std::size_t next = 0;
+        std::vector<std::size_t> gal_tiles;
+        for (int r = br0; r < br0 + BH && next < roster.size(); r += 2)
+            for (int c = bc0; c < bc0 + BW && next < roster.size(); c += 2)
+            {
+                const std::size_t i = static_cast<std::size_t>(r) * gal.gw + (c % gal.gw);
+                if (gal.cls[i] != static_cast<std::uint8_t>(bake_source::tile_class::land))
+                    continue;
+                tile_installation ti;
+                const staged& st = roster[next++];
+                for (int j = 0; j < st.n; ++j) ti.stacks[j] = st.k[j];
+                ti.n_stacks = static_cast<std::uint8_t>(st.n);
+                ti.settlement = st.settle;
+                gal.inst.of_tile[i] = static_cast<std::int32_t>(gal.inst.list.size());
+                gal.inst.list.push_back(ti);
+                gal_tiles.push_back(i);
+            }
+        std::printf("gallery staged %zu of %zu forms\n", next, roster.size());
+
+        // P10 — determinism and wrap at flat, oblique and far geometry, aimed
+        // at the stacked tile (the busiest one).
+        // Aim at the three-stack tile (staged third from the end of the roster).
+        const std::size_t aim_i = gal_tiles[gal_tiles.size() >= 3 ? gal_tiles.size() - 3 : 0];
+        const int ar = static_cast<int>(aim_i / gal.gw), ac = static_cast<int>(aim_i % gal.gw);
+        const double axc = 1.7320508075688772 * (ac + ((ar & 1) ? 0.5 : 0.0));
+        const double ayc = 1.5 * ar;
+        struct gcase { const char* name; double ppr; double sy; };
+        for (const gcase& gc : { gcase{ "flat 48", 48.0, 1.0 }, gcase{ "oblique 45 @48", 48.0, 0.70710678 },
+                                 gcase{ "far page 6", 6.0, 1.0 }, gcase{ "flat 24", 24.0, 1.0 } })
+        {
+            const geometry gg = make_geometry(gal.gw, gal.gh, gc.ppr, gc.sy);
+            const int side = gc.ppr < 10 ? 64 : 160;
+            const int px0 = static_cast<int>(axc * gg.s) - side / 2;
+            const int py0 = std::clamp(static_cast<int>((ayc - gg.y_min) * gg.s) - side / 2,
+                                       0, std::max(0, gg.H - side));
+            std::vector<std::uint32_t> a1(static_cast<std::size_t>(side) * side), a2(a1.size()),
+                a3(a1.size()), off(a1.size());
+            bake_region(gal, gg, p, px0, py0, side, side, a1.data());
+            bake_region(gal, gg, p, px0, py0, side, side, a2.data());
+            bake_region(gal, gg, p, px0 + gg.W, py0, side, side, a3.data());
+            bake_params po = p; po.installations = false;
+            bake_region(gal, gg, po, px0, py0, side, side, off.data());
+            char what[128];
+            std::snprintf(what, sizeof what, "%s: structures bake byte-identical twice", gc.name);
+            check(a1 == a2, "P10", what);
+            std::snprintf(what, sizeof what, "%s: structures wrap byte-identical one period east", gc.name);
+            check(a1 == a3, "P10", what);
+            std::snprintf(what, sizeof what, "%s: the pass draws (on differs from off)", gc.name);
+            check(a1 != off, "P10", what);
+        }
+
+        // P10 — mask: a body whose survey hides its ground records no structure.
+        for (const auto& [id, bd] : w.bodies)
+            if (bd.grid_width > 0 && bd.survey.phase == survey_phase::hidden)
+            {
+                const bake_source hsv = prepare_source(w, id);
+                check(hsv.inst.list.empty(), "P10",
+                      "an unsurveyed body snapshots no installation (nothing leaks the mask)");
+                break;
+            }
+
+        // P11 — the hash folds installations, and only within reach.
+        {
+            const geometry gg = make_geometry(gal.gw, gal.gh, 48.0);
+            const int side = 512;
+            const int px0 = static_cast<int>(axc * gg.s) - side / 2;
+            const int py0 = std::clamp(static_cast<int>((ayc - gg.y_min) * gg.s) - side / 2,
+                                       0, std::max(0, gg.H - side));
+            const std::uint64_t h0 = region_hash(gal, gg, px0, py0, side, side);
+            const auto moved = [&](auto&& mutate) {
+                bake_source m = gal;
+                mutate(m);
+                return region_hash(m, gg, px0, py0, side, side) != h0;
+            };
+            tile_installation& base = gal.inst.list[static_cast<std::size_t>(gal.inst.of_tile[aim_i])];
+            (void)base;
+            check(moved([&](bake_source& m) {
+                      auto& t = m.inst.list[static_cast<std::size_t>(m.inst.of_tile[aim_i])];
+                      if (t.n_stacks < 3) { t.stacks[t.n_stacks] = bld(building_type::port, 0); ++t.n_stacks; }
+                      else t.n_stacks = 2; }),
+                  "P11", "adding / removing a stack moves the chunk hash");
+            check(moved([&](bake_source& m) {
+                      auto& t = m.inst.list[static_cast<std::size_t>(m.inst.of_tile[aim_i])];
+                      t.stacks[0].family ^= 1; }),
+                  "P11", "a family (recipe group / target) change moves the chunk hash");
+            check(moved([&](bake_source& m) {
+                      auto& t = m.inst.list[static_cast<std::size_t>(m.inst.of_tile[aim_i])];
+                      t.stacks[0].subject = stamp_subject::scaffold; }),
+                  "P11", "construction start / completion moves the chunk hash");
+            check(moved([&](bake_source& m) {
+                      auto& t = m.inst.list[static_cast<std::size_t>(m.inst.of_tile[aim_i])];
+                      t.settlement.subject = stamp_subject::settlement; t.settlement.scale = 4; }),
+                  "P11", "a settlement scale step moves the chunk hash");
+            check(moved([&](bake_source& m) {
+                      auto& t = m.inst.list[static_cast<std::size_t>(m.inst.of_tile[aim_i])];
+                      t.settlement.subject = stamp_subject::ruin; }),
+                  "P11", "a raze moves the chunk hash");
+            // A build half a body away: outside the window's reach.
+            const int far_r = std::clamp(ar + gal.gh / 2, 0, gal.gh - 1) == ar
+                                  ? std::max(0, ar - gal.gh / 2) : std::clamp(ar + gal.gh / 2, 0, gal.gh - 1);
+            const std::size_t far_i = static_cast<std::size_t>(far_r) * gal.gw
+                                    + static_cast<std::size_t>((ac + gal.gw / 2) % gal.gw);
+            check(!moved([&](bake_source& m) {
+                      if (m.inst.of_tile[far_i] < 0)
+                      {
+                          m.inst.of_tile[far_i] = static_cast<std::int32_t>(m.inst.list.size());
+                          m.inst.list.emplace_back();
+                      }
+                      auto& t = m.inst.list[static_cast<std::size_t>(m.inst.of_tile[far_i])];
+                      t.stacks[0] = bld(building_type::launchpad, 0); t.n_stacks = 1; }),
+                  "P11", "a build outside the window's reach leaves the chunk hash alone");
+        }
+
+        // Bake time per tier, the pass off vs on, over real content: up to six
+        // 512 px chunks spread over the body (the far page whole). Not a check
+        // — the before/after record the requirement asks for.
+        {
+            struct tier { const char* name; double ppr; double sy; };
+            for (const tier& t : { tier{ "far 6 (whole page)", 6.0, 1.0 }, tier{ "12", 12.0, 1.0 },
+                                   tier{ "24", 24.0, 1.0 }, tier{ "48", 48.0, 1.0 },
+                                   tier{ "96", 96.0, 1.0 }, tier{ "48 @22.5", 48.0, 0.92387953 },
+                                   tier{ "96 @45", 96.0, 0.70710678 } })
+            {
+                const geometry gg = make_geometry(src.gw, src.gh, t.ppr, t.sy);
+                double ms[2] = { 0, 0 };
+                int chunks = 0;
+                for (int pass = 0; pass < 2; ++pass)
+                {
+                    bake_params bp = p;
+                    bp.installations = pass == 1;
+                    chunks = 0;
+                    const auto t0 = std::chrono::steady_clock::now();
+                    if (t.ppr < 10)
+                    {
+                        std::vector<std::uint32_t> buf(static_cast<std::size_t>(gg.W) * gg.H);
+                        bake_region(src, gg, bp, 0, 0, gg.W, gg.H, buf.data());
+                        chunks = 1;
+                    }
+                    else
+                    {
+                        std::vector<std::uint32_t> buf(512u * 512u);
+                        const int nx = std::max(1, gg.W / 512), ny = std::max(1, gg.H / 512);
+                        for (int k = 0; k < 6; ++k)
+                        {
+                            const int ci = (k * 7 + 1) % nx, cj = std::min(ny - 1, (k * 3 + ny / 3) % ny);
+                            bake_region(src, gg, bp, ci * 512, cj * 512, 512, 512, buf.data());
+                            ++chunks;
+                        }
+                    }
+                    ms[pass] = std::chrono::duration<double, std::milli>(
+                                   std::chrono::steady_clock::now() - t0).count() / chunks;
+                }
+                std::printf("bake ms/chunk  tier %-18s  off %8.1f   on %8.1f   (+%.0f%%)\n",
+                            t.name, ms[0], ms[1], ms[0] > 0 ? 100.0 * (ms[1] - ms[0]) / ms[0] : 0.0);
+            }
+        }
+
+        // The dense case: one 512 px chunk over the staged gallery, every form
+        // in reach — the pass's worst case rather than the body's average.
+        for (const double ppr : { 24.0, 48.0, 96.0 })
+        {
+            const geometry gg = make_geometry(gal.gw, gal.gh, ppr);
+            const int px0 = static_cast<int>(1.7320508075688772 * (bc0 + 1) * gg.s);
+            const int py0 = std::max(0, static_cast<int>((1.5 * br0 - gg.y_min) * gg.s));
+            std::vector<std::uint32_t> buf(512u * 512u);
+            double ms[2];
+            for (int pass = 0; pass < 2; ++pass)
+            {
+                bake_params bp = p;
+                bp.installations = pass == 1;
+                const auto t0 = std::chrono::steady_clock::now();
+                bake_region(gal, gg, bp, px0, py0, 512, 512, buf.data());
+                ms[pass] = std::chrono::duration<double, std::milli>(
+                               std::chrono::steady_clock::now() - t0).count();
+            }
+            std::printf("bake ms/chunk  gallery (dense) %3.0f px  off %8.1f   on %8.1f\n", ppr, ms[0], ms[1]);
+        }
+
+        // Gallery previews at every tier: the whole staged block, flat tiers
+        // 6 (upscaled x4 for the eye), 12, 24, 48; the 96 and the oblique
+        // rungs on the block's first half, squashed by the camera factor.
+        {
+            const double gx0 = 1.7320508075688772 * (bc0 - 0.6);
+            const double gy0 = 1.5 * br0 - 1.4;
+            const double gx1 = 1.7320508075688772 * (bc0 + BW + 0.2);
+            const double gy1 = 1.5 * (br0 + BH) + 0.4;
+            struct shot { const char* name; double ppr; double sy; double frac; int up; double qx, qy; };
+            for (const shot& sh : { shot{ "far6", 6.0, 1.0, 1.0, 4, 0, 0 }, shot{ "t12", 12.0, 1.0, 1.0, 2, 0, 0 },
+                                    shot{ "t24", 24.0, 1.0, 1.0, 1, 0, 0 }, shot{ "t48", 48.0, 1.0, 1.0, 1, 0, 0 },
+                                    shot{ "t96", 96.0, 1.0, 0.5, 1, 0, 0 },
+                                    shot{ "t48_tilt22", 48.0, 0.92387953, 1.0, 1, 0, 0 },
+                                    shot{ "t96_tilt45", 96.0, 0.70710678, 0.5, 1, 0, 0 },
+                                    shot{ "t96_tilt45_q2", 96.0, 0.70710678, 0.5, 1, 0.5, 0 },
+                                    shot{ "t96_tilt45_q3", 96.0, 0.70710678, 0.5, 1, 0, 0.5 },
+                                    shot{ "t96_tilt45_q4", 96.0, 0.70710678, 0.5, 1, 0.5, 0.5 } })
+            {
+                const geometry gg = make_geometry(gal.gw, gal.gh, sh.ppr, sh.sy);
+                const double xs = gx0 + (gx1 - gx0) * sh.qx, xe = xs + (gx1 - gx0) * sh.frac;
+                const double ys = gy0 + (gy1 - gy0) * sh.qy - (sh.sy < 1.0 ? 1.2 : 0.0);
+                const double ye = gy0 + (gy1 - gy0) * (sh.qy + sh.frac);
+                const int px0 = static_cast<int>(xs * gg.s);
+                const int py0 = std::max(0, static_cast<int>((ys - gg.y_min) * gg.s));
+                const int PW = static_cast<int>((xe - xs) * gg.s);
+                const int PH = std::min(gg.H - py0, static_cast<int>((ye - ys) * gg.s));
+                std::vector<std::uint32_t> buf(static_cast<std::size_t>(PW) * PH);
+                bake_region(gal, gg, p, px0, py0, PW, PH, buf.data());
+                // Camera squash (nearest row) for the oblique rungs.
+                const int OH = static_cast<int>(PH * sh.sy);
+                std::vector<std::uint32_t> sq(static_cast<std::size_t>(PW) * OH);
+                for (int y = 0; y < OH; ++y)
+                {
+                    const int syr = std::min(PH - 1, static_cast<int>(y / sh.sy));
+                    std::memcpy(sq.data() + static_cast<std::size_t>(y) * PW,
+                                buf.data() + static_cast<std::size_t>(syr) * PW,
+                                static_cast<std::size_t>(PW) * 4u);
+                }
+                const int U = sh.up;
+                std::vector<std::uint32_t> up(static_cast<std::size_t>(PW) * U * OH * U);
+                for (int y = 0; y < OH * U; ++y)
+                    for (int x = 0; x < PW * U; ++x)
+                        up[static_cast<std::size_t>(y) * PW * U + x] =
+                            sq[static_cast<std::size_t>(y / U) * PW + x / U];
+                char path[128];
+                std::snprintf(path, sizeof path, "structures_gallery_%s.png", sh.name);
+                write_png_rgba(path, PW * U, OH * U,
+                               reinterpret_cast<const unsigned char*>(up.data()), PW * U * 4);
+                std::printf("preview: %s (%dx%d)\n", path, PW * U, OH * U);
+            }
+        }
+    }
+
 
     // ------------------------------------------------------------------
     // Look previews (not a check): bake one interesting window under several
