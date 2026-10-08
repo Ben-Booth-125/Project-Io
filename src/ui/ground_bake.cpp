@@ -3,6 +3,7 @@
 #include "terrain_palette.hpp"
 #include "world/world.hpp"
 #include "world/survey_system.hpp" // survey_tile_visible — the region mask (BL-067)
+#include "world/hex_neighbors.hpp" // the shared odd-r side table — landform runs, river chains
 
 #include <algorithm>
 #include <cmath>
@@ -65,6 +66,130 @@ inline float height_at(const bake_source& s, int c, int r)
     return s.height[i];
 }
 
+// ---------------------------------------------------------------------------
+// Landform and river features (BL-1242) — shared geometry.
+// ---------------------------------------------------------------------------
+
+/// Centre-to-centre offset to the neighbour across hex side i, canonical units
+/// (pointy-top, odd-r; side order 0=E, 1=NE, 2=NW, 3=W, 4=SW, 5=SE — the
+/// hex_neighbors table). Row-parity independent, which is what lets a pass
+/// carry a pixel's tile-relative position from one tile to the next exactly.
+constexpr double kNbDx[6] = { kSqrt3, kSqrt3 * 0.5, -kSqrt3 * 0.5, -kSqrt3, -kSqrt3 * 0.5, kSqrt3 * 0.5 };
+constexpr double kNbDy[6] = { 0.0, -1.5, -1.5, 0.0, 1.5, 1.5 };
+
+constexpr std::uint8_t k_near_river    = 1u;
+constexpr std::uint8_t k_near_landform = 2u;
+
+/// Raster index of the neighbour across @p side of tile @p i, or -1 past the
+/// top/bottom row. Columns wrap (the cylinder).
+inline int nb_index(const bake_source& s, int i, int side)
+{
+    const int r = i / s.gw, c = i % s.gw;
+    const hex_neighbors::coord nb = hex_neighbors::neighbour(c, r, side);
+    if (nb.gy < 0 || nb.gy >= s.gh)
+        return -1;
+    const int cw = ((nb.gx % s.gw) + s.gw) % s.gw;
+    return nb.gy * s.gw + cw;
+}
+
+/// The four landforms that bake a form of their own (the dramatic set,
+/// PLANETARY.md § Terrain channels).
+inline bool dramatic(std::uint8_t lf)
+{
+    const auto l = static_cast<terrain_landform>(lf);
+    return l == terrain_landform::mountain || l == terrain_landform::canyon
+        || l == terrain_landform::crater   || l == terrain_landform::rift;
+}
+
+/// Bridged-run links, accumulated river flow and the per-tile feature cull,
+/// derived once per source. Pure function of the tile arrays.
+void derive_features(bake_source& s, const std::vector<std::uint8_t>& raw_in,
+                     const std::vector<std::uint8_t>& raw_out)
+{
+    const int n = s.gw * s.gh;
+    const auto land = static_cast<std::uint8_t>(bake_source::tile_class::land);
+
+    // Same-landform links. Crater never spans: a basin is a blob, not a line.
+    for (int i = 0; i < n; ++i)
+    {
+        if (s.cls[i] != land || !dramatic(s.landform[i])
+            || static_cast<terrain_landform>(s.landform[i]) == terrain_landform::crater)
+            continue;
+        std::uint8_t links = 0;
+        for (int side = 0; side < 6; ++side)
+        {
+            const int j = nb_index(s, i, side);
+            if (j >= 0 && s.cls[j] == land && s.landform[j] == s.landform[i])
+                links |= static_cast<std::uint8_t>(1u << side);
+        }
+        s.lf_links[i] = links;
+    }
+
+    // Accumulated flow over the whole river graph: flow(t) = 1 + sum of the
+    // flows of the tiles draining into it. The graph is a forest (the
+    // generator lays it as a strictly-descending walk), walked iteratively in
+    // post-order so a long river cannot blow the stack. Raster-order roots
+    // make it deterministic.
+    std::vector<std::uint8_t> state(static_cast<std::size_t>(n), 0); // 0 new, 1 open, 2 done
+    std::vector<int> stack;
+    for (int root = 0; root < n; ++root)
+    {
+        if (!(raw_in[root] | raw_out[root]) || state[root])
+            continue;
+        stack.push_back(root);
+        while (!stack.empty())
+        {
+            const int t = stack.back();
+            if (state[t] == 0)
+            {
+                state[t] = 1;
+                for (int side = 0; side < 6; ++side)
+                    if (raw_in[t] & (1u << side))
+                    {
+                        const int u = nb_index(s, t, side);
+                        if (u >= 0 && state[u] == 0)
+                            stack.push_back(u);
+                    }
+                continue;
+            }
+            stack.pop_back();
+            if (state[t] == 2)
+                continue;
+            float f = 1.0f;
+            for (int side = 0; side < 6; ++side)
+                if (raw_in[t] & (1u << side))
+                {
+                    const int u = nb_index(s, t, side);
+                    if (u >= 0 && state[u] == 2)
+                        f += s.river_flow[u];
+                }
+            s.river_flow[t] = f;
+            state[t] = 2;
+        }
+    }
+
+    // The cull: a pixel only pays for a pass when its owner tile or one of its
+    // neighbours carries the feature (every form stays within one tile of its
+    // skeleton, so this is exact, not a heuristic).
+    for (int i = 0; i < n; ++i)
+    {
+        std::uint8_t bits = 0;
+        const auto mark = [&](int j)
+        {
+            if (j < 0)
+                return;
+            if (s.river_in[j] | s.river_out[j])
+                bits |= k_near_river;
+            if (s.cls[j] == land && dramatic(s.landform[j]))
+                bits |= k_near_landform;
+        };
+        mark(i);
+        for (int side = 0; side < 6; ++side)
+            mark(nb_index(s, i, side));
+        s.near_feature[i] = bits;
+    }
+}
+
 } // namespace
 
 geometry make_geometry(int gw, int gh, double target_px_per_r, double tilt_sy)
@@ -109,6 +234,16 @@ bake_source prepare_source(const world& w, entity_id body, bool reveal_all)
     s.jitter.assign(n, 0.0f);
     s.cover.assign(n, static_cast<std::uint8_t>(terrain_cover::none));
     s.density.assign(n, 0);
+    s.landform.assign(n, static_cast<std::uint8_t>(terrain_landform::plains));
+    s.lf_links.assign(n, 0);
+    s.river_in.assign(n, 0);
+    s.river_out.assign(n, 0);
+    s.river_flow.assign(n, 0.0f);
+    s.near_feature.assign(n, 0);
+    // The river graph whole, mask-blind: accumulated flow is a property of the
+    // river, and a visible reach's width must not change when ground upstream
+    // is surveyed.
+    std::vector<std::uint8_t> raw_in(n, 0), raw_out(n, 0);
 
     for (const auto& [id, t] : w.tiles)
     {
@@ -117,6 +252,8 @@ bake_source prepare_source(const world& w, entity_id body, bool reveal_all)
         if (t.grid_x < 0 || t.grid_x >= s.gw || t.grid_y < 0 || t.grid_y >= s.gh)
             continue;
         const std::size_t i = static_cast<std::size_t>(t.grid_y) * s.gw + t.grid_x;
+        raw_in[i]  = static_cast<std::uint8_t>(t.river_edges & ~t.river_downstream & 0x3Fu);
+        raw_out[i] = static_cast<std::uint8_t>(t.river_edges &  t.river_downstream & 0x3Fu);
 
         const bool water = t.substrate == terrain_substrate::ocean
                         || t.substrate == terrain_substrate::coast
@@ -142,7 +279,11 @@ bake_source prepare_source(const world& w, entity_id body, bool reveal_all)
         s.jitter[i] = hash01(t.grid_x, t.grid_y, 0xB732u) * 2.0f - 1.0f;
         s.cover[i]   = static_cast<std::uint8_t>(t.cover);
         s.density[i] = t.cover_density;
+        s.landform[i]  = static_cast<std::uint8_t>(t.landform);
+        s.river_in[i]  = raw_in[i];
+        s.river_out[i] = raw_out[i];
     }
+    derive_features(s, raw_in, raw_out);
 
     // Height gradient from neighbour differences — symmetric central
     // differences over the raster (columns wrap, rows clamp). Computed on the
@@ -307,6 +448,17 @@ void stamp_trees(const bake_source& src, const geometry& g, const bake_params& p
 
 namespace {
 
+/// Where a baked pixel stands on the ground (BL-1242): its owner tile and its
+/// position relative to that tile's centre, canonical units, at the WARPED and
+/// (on an oblique tier) height-displaced sample point — so a feature pass draws
+/// on the same organic edges the ground resolved, rides the lifted terrain, and
+/// is wrap-exact (relative to a wrapped owner, never an absolute x).
+struct feature_px
+{
+    float rx = 0.0f, ry = 0.0f;
+    std::int32_t owner = -1; ///< -1: no ground here (margin, lock fill).
+};
+
 /// The per-pixel base bake for one window: interpolated colour, hillshade,
 /// grain, mottle — UNGRADED, stamps and post passes are the orchestrator's
 /// (bake_region below). Fills @p tag (1 = a terrain pixel later passes may
@@ -317,7 +469,7 @@ namespace {
 /// free).
 void bake_window(const bake_source& src, const geometry& g, const bake_params& p,
                  int px0, int py0, int pw, int ph, std::uint32_t* out,
-                 std::uint8_t* tag, std::uint8_t* cover_out)
+                 std::uint8_t* tag, std::uint8_t* cover_out, feature_px* fpx)
 {
     const double period   = g.gw * kSqrt3;
     // Resolution-adaptive character (wave 2). The interpolation radius and the
@@ -403,8 +555,10 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
             struct cand { std::size_t i; double w; };
             cand cands[24];
             int  ncand = 0;
+            double last_sy = y; // the y the owner was resolved at (feature passes)
             const auto gather = [&](double sx, double sy_)
             {
+                last_sy = sy_;
                 best_d2 = 1e30;
                 owner   = -1;
                 ncand   = 0;
@@ -494,6 +648,20 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                 owner_cls == static_cast<std::uint8_t>(bake_source::tile_class::water)
                     ? 100
                     : static_cast<std::uint8_t>(1 + src.cover[static_cast<std::size_t>(owner)]);
+            if (fpx)
+            {
+                // The owner's resolve point: (x, y) flat, or the displaced
+                // re-resolve on an oblique tier (the last gather's point).
+                const int    orow = owner / src.gw, ocol = owner % src.gw;
+                const double ocx  = kSqrt3 * (ocol + ((orow & 1) ? 0.5 : 0.0));
+                const double sy_  = last_sy;
+                double rdx = x - ocx;
+                rdx -= period * std::round(rdx / period);
+                feature_px& f = fpx[static_cast<std::size_t>(py) * pw + px];
+                f.rx    = static_cast<float>(rdx);
+                f.ry    = static_cast<float>(sy_ - 1.5 * orow);
+                f.owner = owner;
+            }
             double wsum = 0.0, cr = 0.0, cg = 0.0, cb = 0.0;
             double hsum = 0.0, gx = 0.0, gy = 0.0, rb = 0.0, jt = 0.0;
 
@@ -734,6 +902,487 @@ void unsharp(std::uint32_t* buf, const std::uint8_t* tag, int pw, int ph, float 
         }
 }
 
+// ---------------------------------------------------------------------------
+// BL-1242 — landform relief and carved rivers (RENDERING.md § Mountains,
+// rivers and terrain variety). Both passes are ANALYTIC: each pixel asks how
+// far it stands from a feature skeleton built out of its owner tile and that
+// tile's six neighbours, in tile-relative coordinates (feature_px), so the
+// result is pure, wrap-exact and chunk-seamless without an apron, and a
+// masked tile (no landform, no river bits in the source) contributes nothing.
+// ---------------------------------------------------------------------------
+
+inline double sq(double v) { return v * v; }
+
+inline double smooth01(double e0, double e1, double x)
+{
+    const double t = std::clamp((x - e0) / (e1 - e0), 0.0, 1.0);
+    return t * t * (3.0 - 2.0 * t);
+}
+
+/// Distance from (px, py) to segment a-b; @p t receives the closest parameter.
+inline double seg_dist(double px, double py, double ax, double ay, double bx, double by,
+                       double& t)
+{
+    const double vx = bx - ax, vy = by - ay;
+    const double l2 = vx * vx + vy * vy;
+    t = l2 > 0.0 ? std::clamp(((px - ax) * vx + (py - ay) * vy) / l2, 0.0, 1.0) : 0.0;
+    const double dx = px - (ax + vx * t), dy = py - (ay + vy * t);
+    return std::sqrt(dx * dx + dy * dy);
+}
+
+/// Canonical-space centre of raster tile @p i (wrapped column).
+inline void tile_centre(const bake_source& s, int i, double& cx, double& cy)
+{
+    const int r = i / s.gw, c = i % s.gw;
+    cx = kSqrt3 * (c + ((r & 1) ? 0.5 : 0.0));
+    cy = 1.5 * r;
+}
+
+inline void blend_px(std::uint32_t& dst, float r, float g, float b)
+{
+    dst = palette::col32(std::clamp(static_cast<int>(r + 0.5f), 0, 255),
+                         std::clamp(static_cast<int>(g + 0.5f), 0, 255),
+                         std::clamp(static_cast<int>(b + 0.5f), 0, 255), 255);
+}
+
+/// LANDFORM RELIEF. Each dramatic tile contributes a skeleton — its centre
+/// plus its half of every shared edge to a same-landform neighbour (the
+/// bridged run: the halves meet at the edge midpoint, so a run is one form) —
+/// and the pass builds an analytic height field from the distance to it:
+///   mountain — a massif tent along the ridge, its crest broken into peaks and
+///              spurs by noise, rock-coloured toward the crest;
+///   canyon   — a cut: a dark floor between steep walls, raised paired rims;
+///   rift     — a near-black jagged fissure between raised, scorched lips;
+///   crater   — a raised-rim bowl with a pale ejecta apron (never spans).
+/// The field is shaded from the NW light by its own gradient. Widths floor at
+/// a pixel scale so every form still reads on the far page.
+void bake_landforms(const bake_source& src, const geometry& g, const bake_params& p,
+                    int pw, int ph, std::uint32_t* out, const std::uint8_t* tag,
+                    const std::uint8_t* cover, const feature_px* fpx)
+{
+    const double period = g.gw * kSqrt3;
+    const auto periodic_cell = [&](double target, int& cells_out) -> double
+    {
+        cells_out = std::max(1, static_cast<int>(std::lround(period / target)));
+        return period / cells_out;
+    };
+    int jag_n, fine_n, crest_n, spur_n;
+    const double jag_c   = periodic_cell(0.55, jag_n);
+    const double fine_c  = periodic_cell(0.17, fine_n);
+    const double crest_c = periodic_cell(0.50, crest_n);
+    const double spur_c  = periodic_cell(0.21, spur_n);
+    int crag_n;
+    const double crag_c  = periodic_cell(0.085, crag_n);
+    const bool   close   = g.s >= 40.0; // the crag octave would alias below this
+    // The far tiers carry the read on fewer pixels: lift the form's light there
+    // (x1.4 at the 6 px far page, easing to x1 by 24 px), so an expensive tile is
+    // never an invisible one at the whole-grid view.
+    const double far_boost = 1.0 + 0.4 * (1.0 - std::clamp((g.s - 6.0) / 18.0, 0.0, 1.0));
+    const double pxc = 1.0 / g.s;                      // one baked pixel, canonical
+    const double eps = std::max(0.6 * pxc, 0.012);     // gradient step
+    const float  Lx = -0.554700196f, Ly = -0.832050323f; // toward the NW light
+    const float  k  = p.landform_strength;
+    const auto   land = static_cast<std::uint8_t>(bake_source::tile_class::land);
+    const auto   L_mountain = static_cast<std::uint8_t>(terrain_landform::mountain);
+    const auto   L_canyon   = static_cast<std::uint8_t>(terrain_landform::canyon);
+    const auto   L_rift     = static_cast<std::uint8_t>(terrain_landform::rift);
+    const auto   L_crater   = static_cast<std::uint8_t>(terrain_landform::crater);
+
+    struct seg { double ax, ay, bx, by; std::uint8_t lf; };
+    struct bowl { double x, y, rc; };
+
+    const std::size_t n = static_cast<std::size_t>(pw) * ph;
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        if (!tag[i] || cover[i] == 100)
+            continue;
+        const feature_px& f = fpx[i];
+        if (f.owner < 0 || !(src.near_feature[f.owner] & k_near_landform))
+            continue;
+        const int o = f.owner;
+
+        // Skeleton, owner-relative. Up to 7 tiles x 6 half-edges.
+        seg  segs[48];
+        int  nseg = 0;
+        bowl bowls[7];
+        int  nbowl = 0;
+        bool has_m = false, has_c = false, has_r = false;
+        for (int kk = -1; kk < 6; ++kk)
+        {
+            const int t = kk < 0 ? o : nb_index(src, o, kk);
+            if (t < 0 || src.cls[t] != land || !dramatic(src.landform[t]))
+                continue;
+            const double ox = kk < 0 ? 0.0 : kNbDx[kk];
+            const double oy = kk < 0 ? 0.0 : kNbDy[kk];
+            const std::uint8_t lf = src.landform[t];
+            const int tr = t / src.gw, tc = t % src.gw;
+            if (lf == L_crater)
+            {
+                bowls[nbowl++] = { ox, oy, 0.44 + 0.14 * hash01(tc, tr, 0xC4A7u) };
+                continue;
+            }
+            has_m |= lf == L_mountain;
+            has_c |= lf == L_canyon;
+            has_r |= lf == L_rift;
+            const std::uint8_t links = src.lf_links[t];
+            if (links)
+            {
+                for (int s = 0; s < 6; ++s)
+                    if (links & (1u << s))
+                        segs[nseg++] = { ox, oy, ox + 0.5 * kNbDx[s], oy + 0.5 * kNbDy[s], lf };
+            }
+            else if (lf == L_mountain)
+            {
+                segs[nseg++] = { ox, oy, ox, oy, lf }; // a lone peak: a cone
+            }
+            else
+            {
+                // A lone cut or fissure keeps a centred form along one of the
+                // three hex axes, chosen by the tile's hash.
+                const int ax_side = static_cast<int>(hash01(tc, tr, 0xA715u) * 3.0f) % 3;
+                const double hl = 0.55;
+                const double ux = kNbDx[ax_side] / kSqrt3, uy = kNbDy[ax_side] / kSqrt3;
+                segs[nseg++] = { ox - hl * ux, oy - hl * uy, ox + hl * ux, oy + hl * uy, lf };
+            }
+        }
+        if (nseg == 0 && nbowl == 0)
+            continue;
+
+        double ocx, ocy;
+        tile_centre(src, o, ocx, ocy);
+        const double abx = ocx + f.rx, aby = ocy + f.ry;
+        // Organic displacement of the query point, sampled once per pixel: a
+        // large octave bends the forms, a fine one roughens a fissure's edge.
+        const double jx = (value_noise(abx, aby, jag_c,  jag_n,  0x1A61u) - 0.5) * 2.0;
+        const double jy = (value_noise(abx, aby, jag_c,  jag_n,  0x1A62u) - 0.5) * 2.0;
+        const double fx = (value_noise(abx, aby, fine_c, fine_n, 0x1A63u) - 0.5) * 2.0;
+        const double fy = (value_noise(abx, aby, fine_c, fine_n, 0x1A64u) - 0.5) * 2.0;
+        // Up close a fissure's edge cracks at a finer grain still.
+        const double ux = close ? (value_noise(abx, aby, crag_c, crag_n, 0x1A69u) - 0.5) * 2.0 : 0.0;
+        const double uy = close ? (value_noise(abx, aby, crag_c, crag_n, 0x1A6Au) - 0.5) * 2.0 : 0.0;
+        const double rift_w = std::max(0.05 + 0.04 * value_noise(abx, aby, fine_c, fine_n, 0x1A67u),
+                                       0.75 * pxc);
+        const double fw = std::max(0.10, 0.9 * pxc); // canyon floor half-width
+        const double ww = 0.20 + pxc;                // canyon wall run, rim to floor
+
+        struct mat { double tm = 0, cut = 0, wall = 0, core = 0, scorch = 0, bowl = 0, ejecta = 0;
+                     bool any = false; };
+        const auto field = [&](double qx, double qy, mat* m) -> double
+        {
+            double dm = 1e9, dc = 1e9, dr = 1e9, tt;
+            for (int s = 0; s < nseg; ++s)
+            {
+                const seg& sg = segs[s];
+                if (sg.lf == L_mountain)
+                    dm = std::min(dm, seg_dist(qx + 0.14 * jx + 0.03 * fx, qy + 0.14 * jy + 0.03 * fy,
+                                               sg.ax, sg.ay, sg.bx, sg.by, tt));
+                else if (sg.lf == L_canyon)
+                    dc = std::min(dc, seg_dist(qx + 0.09 * jx + 0.025 * fx, qy + 0.09 * jy + 0.025 * fy,
+                                               sg.ax, sg.ay, sg.bx, sg.by, tt));
+                else
+                    dr = std::min(dr, seg_dist(qx + 0.05 * jx + 0.05 * fx + 0.03 * ux,
+                                               qy + 0.05 * jy + 0.05 * fy + 0.03 * uy,
+                                               sg.ax, sg.ay, sg.bx, sg.by, tt));
+            }
+            double h = 0.0;
+            // Support: past these distances every term below is zero (or under
+            // 1e-5), so a pixel outside all of them skips the gradient and the
+            // paint — the cull that keeps the pass cheap beside a feature.
+            if (m)
+            {
+                m->any = dm < 1.05 || dc < fw + ww + 0.30 || dr < rift_w + 0.45;
+                for (int b = 0; b < nbowl && !m->any; ++b)
+                    m->any = std::sqrt(sq(qx - bowls[b].x) + sq(qy - bowls[b].y)) < bowls[b].rc + 0.85;
+                if (!m->any)
+                    return 0.0;
+            }
+            if (dm < 1e8)
+            {
+                // Concave flanks under a sharp crest (t^1.5 of a tent), the
+                // crest broken into peaks, the flanks into spurs and, up
+                // close, crags — sampled INSIDE the field so the gradient,
+                // and so the light, sees them.
+                const double t_ = std::max(0.0, 1.0 - dm / 1.0);
+                if (t_ > 0.0)
+                {
+                    const double ax_ = ocx + qx, ay_ = ocy + qy;
+                    const double crest = value_noise(ax_, ay_, crest_c, crest_n, 0x1A65u);
+                    const double spur  = 1.0 - std::fabs(
+                        2.0 * value_noise(ax_, ay_, spur_c, spur_n, 0x1A66u) - 1.0);
+                    double crag = 0.5;
+                    if (close)
+                        crag = 1.0 - std::fabs(
+                            2.0 * value_noise(ax_, ay_, crag_c, crag_n, 0x1A68u) - 1.0);
+                    h += std::pow(t_, 1.5) * (0.6 + 0.8 * crest)
+                       + 0.11 * t_ * (spur - 0.5) + 0.045 * t_ * (crag - 0.5);
+                }
+                if (m) m->tm = t_;
+            }
+            if (dc < 1e8)
+            {
+                const double cut = 1.0 - smooth01(fw, fw + ww, dc);
+                const double rim = std::exp(-sq((dc - (fw + ww + 0.05)) / 0.07));
+                h += -0.25 * cut + 0.04 * rim;
+                if (m)
+                {
+                    m->cut  = cut;
+                    // Position up the wall, 0 at the floor, 1 at the rim — the
+                    // strata banding reads it.
+                    m->wall = std::clamp((dc - fw) / ww, 0.0, 1.0);
+                }
+            }
+            if (dr < 1e8)
+            {
+                const double core = std::clamp((rift_w - dr) / pxc + 0.5, 0.0, 1.0);
+                const double lips = std::exp(-sq((dr - rift_w - 0.09) / 0.08));
+                h += 0.05 * lips; // the core is painted, not lit
+                if (m)
+                {
+                    m->core   = core;
+                    m->scorch = 1.0 - smooth01(rift_w, rift_w + 0.38, dr);
+                }
+            }
+            for (int b = 0; b < nbowl; ++b)
+            {
+                const double d = std::sqrt(sq(qx + 0.03 * jx - bowls[b].x) + sq(qy + 0.03 * jy - bowls[b].y));
+                const double rc = bowls[b].rc;
+                const double in = std::max(0.0, 1.0 - sq(d / rc));
+                h += 0.5 * std::exp(-sq((d - rc) / 0.09)) - 0.55 * in;
+                if (m)
+                {
+                    m->bowl   = std::max(m->bowl, in);
+                    m->ejecta = std::max(m->ejecta, d > rc ? 0.5 * std::exp(-(d - rc) / 0.22) : 0.0);
+                }
+            }
+            return h;
+        };
+
+        mat m;
+        field(f.rx, f.ry, &m);
+        if (!m.any)
+            continue;
+        const double hx = (field(f.rx + eps, f.ry, nullptr) - field(f.rx - eps, f.ry, nullptr)) / (2.0 * eps);
+        const double hy = (field(f.rx, f.ry + eps, nullptr) - field(f.rx, f.ry - eps, nullptr)) / (2.0 * eps);
+        const float shade = static_cast<float>(
+            std::clamp(-(hx * Lx + hy * Ly) * 0.50 * far_boost, -0.55, 0.50));
+
+        std::uint32_t& dst = out[i];
+        float r_ = static_cast<float>(palette::col_r(dst));
+        float g_ = static_cast<float>(palette::col_g(dst));
+        float b_ = static_cast<float>(palette::col_b(dst));
+        // Mountain rock toward the crest, then the crest catches light.
+        const float rock = static_cast<float>(std::min(1.0, m.tm * 1.3) * 0.62) * k;
+        r_ += (142.0f - r_) * rock;
+        g_ += (133.0f - g_) * rock;
+        b_ += (120.0f - b_) * rock;
+        float lum = 1.0f + shade * k + static_cast<float>(0.05 * m.tm * m.tm) * k;
+        // Canyon floor: deep, warm shadow. Crater bowl: shade. Ejecta: pale.
+        lum *= 1.0f - static_cast<float>(0.30 * m.cut + 0.16 * m.bowl + 0.24 * m.scorch) * k;
+        if (close && m.cut > 0.0 && m.cut < 1.0)
+        {
+            // Canyon walls show their strata up close: banded light down the cut.
+            const double band = std::sin(m.wall * 3.14159265 * 5.0);
+            lum *= 1.0f + static_cast<float>(0.10 * band * 4.0 * m.cut * (1.0 - m.cut)) * k;
+        }
+        // A canyon's exposed rock runs warm: the floor and walls redden.
+        {
+            const float warm = static_cast<float>(0.45 * m.cut) * k;
+            r_ += (152.0f - r_) * warm;
+            g_ += (100.0f - g_) * warm;
+            b_ += (74.0f - b_) * warm;
+        }
+        lum *= 1.0f + static_cast<float>(0.10 * m.ejecta) * k;
+        r_ *= lum;
+        g_ *= lum;
+        b_ *= lum;
+        // Rift: the fissure itself, near-black.
+        const float core = static_cast<float>(m.core) * k;
+        r_ += (24.0f - r_) * core;
+        g_ += (18.0f - g_) * core;
+        b_ += (20.0f - b_) * core;
+        blend_px(dst, r_, g_, b_);
+    }
+}
+
+/// River half-width (canonical units) for an accumulated flow — the downstream
+/// widening. sqrt so a long trunk widens without the headwaters vanishing.
+inline double river_hw(float flow)
+{
+    return std::min(0.20, 0.028 + 0.026 * std::sqrt(static_cast<double>(std::max(1.0f, flow))));
+}
+
+/// CARVED RIVERS. A river tile draws, for each inflow, the quadratic from the
+/// inflow edge midpoint to the outflow edge midpoint with its own centre as
+/// control — the roads' B-spline rule, so consecutive tiles meet
+/// tangent-continuous and a confluence's two curves converge into one. A
+/// source is a tapering spoke from the centre; a mouth's sea tile extends the
+/// course a little way into the water as a widening estuary (painted only
+/// where it overlies land, so it closes any gap the warped coast leaves).
+/// Width runs from the upstream tile's flow to this tile's along the curve:
+/// the width gradient says which way the water goes. Around the water, a wet
+/// margin darkens the ground into the bank; inside, the course shelves from
+/// shallow at the edge to deep in the channel.
+void bake_rivers(const bake_source& src, const geometry& g, const bake_params& p,
+                 int pw, int ph, std::uint32_t* out, const std::uint8_t* tag,
+                 const std::uint8_t* cover, const feature_px* fpx)
+{
+    const double period = g.gw * kSqrt3;
+    int mea_n = 1;
+    mea_n = std::max(1, static_cast<int>(std::lround(period / 0.42)));
+    const double mea_c = period / mea_n;
+    const double pxc = 1.0 / g.s;
+    const float  k   = p.river_strength;
+    const auto   water = static_cast<std::uint8_t>(bake_source::tile_class::water);
+    constexpr int kSeg = 10; // polyline steps per quadratic
+
+    struct curve { double p0x, p0y, p1x, p1y, p2x, p2y, hw0, hw1; };
+
+    const std::size_t n = static_cast<std::size_t>(pw) * ph;
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        if (!tag[i] || cover[i] == 100)
+            continue;
+        const feature_px& f = fpx[i];
+        if (f.owner < 0 || !(src.near_feature[f.owner] & k_near_river))
+            continue;
+        const int o = f.owner;
+
+        double ocx, ocy;
+        tile_centre(src, o, ocx, ocy);
+        const double abx = ocx + f.rx, aby = ocy + f.ry;
+        // Meander: the query point wanders, so the course does.
+        const double qx = f.rx + (value_noise(abx, aby, mea_c, mea_n, 0x21F1u) - 0.5) * 0.14;
+        const double qy = f.ry + (value_noise(abx, aby, mea_c, mea_n, 0x21F2u) - 0.5) * 0.14;
+
+        curve cv[48];
+        int   ncv = 0;
+        for (int kk = -1; kk < 6; ++kk)
+        {
+            const int t = kk < 0 ? o : nb_index(src, o, kk);
+            if (t < 0 || !(src.river_in[t] | src.river_out[t]))
+                continue;
+            const double ox = kk < 0 ? 0.0 : kNbDx[kk];
+            const double oy = kk < 0 ? 0.0 : kNbDy[kk];
+            const double hw_t = river_hw(src.river_flow[t]);
+            int out_side = -1;
+            for (int s = 0; s < 6; ++s)
+                if (src.river_out[t] & (1u << s)) { out_side = s; break; }
+            const bool wet = src.cls[t] == water;
+            bool any_in = false;
+            for (int s = 0; s < 6 && ncv < 47; ++s)
+            {
+                if (!(src.river_in[t] & (1u << s)))
+                    continue;
+                any_in = true;
+                const int u = nb_index(src, t, s);
+                const double hw_u = u >= 0 ? river_hw(src.river_flow[u]) : hw_t;
+                const double mx = ox + 0.5 * kNbDx[s], my = oy + 0.5 * kNbDy[s];
+                if (wet)
+                {
+                    // Estuary: on into the sea, widening.
+                    const double ex = ox + 0.2 * kNbDx[s], ey = oy + 0.2 * kNbDy[s];
+                    cv[ncv++] = { mx, my, (mx + ex) * 0.5, (my + ey) * 0.5, ex, ey, hw_u, hw_u * 1.8 };
+                }
+                else if (out_side >= 0)
+                {
+                    cv[ncv++] = { mx, my, ox, oy,
+                                  ox + 0.5 * kNbDx[out_side], oy + 0.5 * kNbDy[out_side], hw_u, hw_t };
+                }
+                else
+                {
+                    cv[ncv++] = { mx, my, (mx + ox) * 0.5, (my + oy) * 0.5, ox, oy, hw_u, hw_u };
+                }
+            }
+            if (!any_in && out_side >= 0 && !wet)
+            {
+                // Source: a spoke from the centre, tapering to its spring.
+                const double ex = ox + 0.5 * kNbDx[out_side], ey = oy + 0.5 * kNbDy[out_side];
+                cv[ncv++] = { ox, oy, (ox + ex) * 0.5, (oy + ey) * 0.5, ex, ey, hw_t * 0.35, hw_t };
+            }
+        }
+        if (ncv == 0)
+            continue;
+
+        // Nearest point over every curve: signed distance to the bank e.
+        double best_e = 1e9, best_hw = 0.0;
+        for (int c = 0; c < ncv; ++c)
+        {
+            const curve& q = cv[c];
+            // The control hull bounds the curve: a pixel farther from it than the
+            // widest bank can reach cannot be painted by this curve.
+            {
+                const double reach = std::max({ q.hw0, q.hw1, 0.6 * pxc }) * 1.6 + 0.06 + pxc;
+                const double lo_x = std::min({ q.p0x, q.p1x, q.p2x }) - reach;
+                const double hi_x = std::max({ q.p0x, q.p1x, q.p2x }) + reach;
+                const double lo_y = std::min({ q.p0y, q.p1y, q.p2y }) - reach;
+                const double hi_y = std::max({ q.p0y, q.p1y, q.p2y }) + reach;
+                if (qx < lo_x || qx > hi_x || qy < lo_y || qy > hi_y)
+                    continue;
+            }
+            double prx = q.p0x, pry = q.p0y;
+            for (int sgi = 1; sgi <= kSeg; ++sgi)
+            {
+                const double t1 = static_cast<double>(sgi) / kSeg;
+                const double a = (1.0 - t1) * (1.0 - t1), b = 2.0 * (1.0 - t1) * t1, cc = t1 * t1;
+                const double nx = a * q.p0x + b * q.p1x + cc * q.p2x;
+                const double ny = a * q.p0y + b * q.p1y + cc * q.p2y;
+                double tt;
+                const double d = seg_dist(qx, qy, prx, pry, nx, ny, tt);
+                const double tc = (sgi - 1 + tt) / kSeg;
+                const double hw = std::max(q.hw0 + (q.hw1 - q.hw0) * tc, 0.6 * pxc);
+                const double e  = d - hw;
+                if (e < best_e)
+                {
+                    best_e  = e;
+                    best_hw = hw;
+                }
+                prx = nx;
+                pry = ny;
+            }
+        }
+        const double bank = 0.05 + 0.6 * best_hw + pxc;
+        if (best_e >= bank)
+            continue;
+
+        std::uint32_t& dst = out[i];
+        float r_ = static_cast<float>(palette::col_r(dst));
+        float g_ = static_cast<float>(palette::col_g(dst));
+        float b_ = static_cast<float>(palette::col_b(dst));
+        // Wet margin: the ground darkens and greens into the bank.
+        const float mg = static_cast<float>(sq(std::clamp(1.0 - best_e / bank, 0.0, 1.0))) * k;
+        r_ *= 1.0f - 0.34f * mg;
+        g_ *= 1.0f - 0.26f * mg;
+        b_ *= 1.0f - 0.30f * mg;
+        // The water: shelving from shallow at the bank to deep mid-channel.
+        const float a = static_cast<float>(std::clamp(0.5 - best_e / pxc, 0.0, 1.0)) * k;
+        if (a > 0.0f)
+        {
+            const float depth = static_cast<float>(std::clamp(-best_e / best_hw, 0.0, 1.0));
+            const float dd = std::sqrt(depth);
+            const float wr = 84.0f + (34.0f - 84.0f) * dd;
+            const float wg = 150.0f + (92.0f - 150.0f) * dd;
+            const float wb = 205.0f + (182.0f - 205.0f) * dd;
+            r_ += (wr - r_) * a;
+            g_ += (wg - g_) * a;
+            b_ += (wb - b_) * a;
+        }
+        blend_px(dst, r_, g_, b_);
+    }
+}
+
+/// The terrain-feature passes, in the bake's table order (RENDERING.md § The
+/// bake, pass by pass): landform relief, then water and rivers — after the
+/// biome brushes, before installations and the grade.
+void bake_terrain_features(const bake_source& src, const geometry& g, const bake_params& p,
+                           int pw, int ph, std::uint32_t* out, const std::uint8_t* tag,
+                           const std::uint8_t* cover, const feature_px* fpx)
+{
+    if (p.landform_strength > 0.0f)
+        bake_landforms(src, g, p, pw, ph, out, tag, cover, fpx);
+    if (p.river_strength > 0.0f)
+        bake_rivers(src, g, p, pw, ph, out, tag, cover, fpx);
+}
+
 } // namespace
 
 void bake_region(const bake_source& src, const geometry& g, const bake_params& p,
@@ -753,8 +1402,9 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
     const std::size_t an = static_cast<std::size_t>(apw) * aph;
     std::vector<std::uint32_t> abuf(an);
     std::vector<std::uint8_t>  atag(an, 0u), acov(an, 0u);
+    std::vector<feature_px>    afpx(an);
     bake_window(src, g, p, px0 - A, py0 - A, apw, aph,
-                abuf.data(), atag.data(), acov.data());
+                abuf.data(), atag.data(), acov.data(), afpx.data());
 
     // Cover-boundary ink BEFORE the stamps: a tree may straddle an inked
     // boundary and should occlude the line, never carry it.
@@ -763,6 +1413,9 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
 
     if (g.s >= 40.0 && p.tree_density > 0.0f)
         stamp_trees(src, g, p, px0 - A, py0 - A, apw, aph, abuf.data(), atag.data());
+
+    // Landform relief and carved rivers (BL-1242).
+    bake_terrain_features(src, g, p, apw, aph, abuf.data(), atag.data(), acov.data(), afpx.data());
 
     // The separable near-future grade. Its haze lift falls and its contrast
     // rises with resolution (BL-736): haze is blur-adjacent, and the close
@@ -838,6 +1491,11 @@ std::uint64_t region_hash(const bake_source& src, const geometry& g,
             std::uint32_t hb; static_assert(sizeof(float) == 4);
             std::memcpy(&hb, &src.height[i], 4);       mix(hb);
             std::memcpy(&hb, &src.relief_bias[i], 4);  mix(hb);
+            // BL-1242: the landform and river passes read these.
+            mix(src.landform[i]);
+            mix(src.lf_links[i]);
+            mix(static_cast<std::uint64_t>(src.river_in[i]) | (static_cast<std::uint64_t>(src.river_out[i]) << 8));
+            std::memcpy(&hb, &src.river_flow[i], 4);   mix(hb);
         }
     return h;
 }

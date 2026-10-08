@@ -936,6 +936,20 @@
     "src/world/world.hpp"
    ],
    "status": "drafted"
+  },
+  "planetary_landforms_rivers": {
+   "surface": "Baked landform relief and carved rivers (Planetary canvas ground) -- mountain as massif and ridge, canyon as a cut between paired rims, crater as a raised-rim bowl, rift as a dark fissure; rivers as curved courses widening downstream",
+   "answers": "Where is the ground expensive to cross, and where does the water run and which way?",
+   "because": "The four dramatic landforms are the <=1.5% of land whose movement cost is x1.3 or worse, so an invisible one is an expensive surprise; a river is an edge that discounts travel one way and gates wells and farms. Both used to be vector chrome laid over the painted ground -- a stroke-only glyph on the hex centre, a straight centre-to-centre stroke with chevrons -- and read as annotation on a painting (Ben, 2026-10-08, the sprint 51 form: mountains and rivers blend into the render). Baked, the same facts read as terrain: a contiguous run is one range, one cut, one fissure; a river is one smooth course whose width says which way it flows, so the chevrons have nothing left to say. The hover card still names the landform and its cost.",
+   "backlog_item": [
+    "BL-1242"
+   ],
+   "files": [
+    "src/ui/ground_bake.cpp",
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/hex_render.cpp"
+   ],
+   "status": "drafted"
   }
  }
 }

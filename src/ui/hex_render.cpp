@@ -1,7 +1,6 @@
 #include "hex_render.hpp"
 
 #include "terrain_palette.hpp" // BL-732: the pure palette both this and ground_bake read
-#include "icons.hpp" // landform glyphs (BL-231)
 #include "world/logistics.hpp" // body_tile_grid — O(1) neighbour lookup (BL-077 raster)
 #include "world/world.hpp"
 
@@ -484,11 +483,9 @@ void draw_tile_neighbourhood(ImDrawList* dl, world& w, entity_id centre_tile,
                 const float m = hex_sz * 0.30f;
                 dl->AddRectFilled({lc.x - m, lc.y - m}, {lc.x + m, lc.y + m}, built_mark, 1.0f);
             }
-            else if (have_tile)
-            {
-                icons::landform(dl, lc, hex_sz * 0.42f, tt->second.landform,
-                                contrast_ink(fill));
-            }
+            // No landform glyph: the Planetary canvas draws none (the dramatic
+            // landforms are baked relief there, RENDERING.md § Mountains, rivers
+            // and terrain variety), and this view draws what the canvas draws.
             if (tid == centre_tile)
             {
                 std::copy(std::begin(verts), std::end(verts), std::begin(hl_verts));
