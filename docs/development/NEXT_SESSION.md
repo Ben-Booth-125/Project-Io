@@ -47,7 +47,13 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   of G1, all generation-built plants; 102 of those are propellant_atmospheric with no output price
   (a generation defect). 430 input-starved (G1b): food_rations -> consumer_goods the largest gap.
   Labour not a cause. Upper bound if the dial-zeroed plants ran: G1 ~82-86%. Ties to BL-1235 (dial
-  hold vs reflex). **Cold check running** (agent `a8ad69a34a722ea4e`); then merge the probe and
+  hold vs reflex). **Cold check DONE:** mechanism confirmed in code (dial zero -> ai_cooldown hold
+  blocks re-raise until ~T+16 -> reflex mothballs at T+8, no exemption); overstated: steel /
+  refined_fuel read demand 0 at their own market EVERY tick (buyers elsewhere — a permanent
+  own-market misread, not a start-up glut); '~10 points' untested; propellant has no base price
+  anywhere (authoring defect). **Round 2 running** (same agent): census of the 503 by demand 0/>0
+  with the solver's own forecast, counterfactuals (no settle dial-zeroing / reflex skips dial-idled /
+  solver reads demand pooled over reachable buyers), the sell-order leak. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
 
