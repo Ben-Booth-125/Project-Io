@@ -602,8 +602,12 @@ void run_seed(std::uint32_t seed, int ticks, seed_out& S)
             for (const auto& [bid, sg] : short_goods)
             {
                 if (printed >= 2) break;
+                // The replica's copy ran an extra step: a building its AI built
+                // there does not exist in the real world. Skip it, never throw.
+                const auto bit = w.buildings.find(bid);
+                if (bit == w.buildings.end()) continue;
                 ++printed;
-                const building_component& b = w.buildings.at(bid);
+                const building_component& b = bit->second;
                 std::printf("      e.g. site %u (%s) scalar %.2f short:", unsigned(bid), gname(k_focus[S.hist[bid].fi]).c_str(), building_supply_scalar(b));
                 for (const auto& gc : sg) std::printf(" %s[%s]", gname(gc.first).c_str(), k_cause[gc.second]);
                 std::printf("\n");

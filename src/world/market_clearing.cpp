@@ -1255,6 +1255,54 @@ void inject_interbody_demand(world& w,
     }
 }
 
+std::uint32_t tile_feed_power_grid(world& w, entity_id tile)
+{
+    const entity_id mid = market_for_tile(w, tile);
+    if (mid == null_entity)
+        return 0;
+    const auto mit = w.markets.find(mid);
+    if (mit == w.markets.end() || mit->second.centre_tile == null_entity)
+        return 0;
+    return tile_power_grid(w, mit->second.centre_tile);
+}
+
+grid_good_pool pool_grid_good_figures(world& w, const recipe_registry& reg)
+{
+    grid_good_pool out;
+    const grid_goods_params& grid_rules = reg.grid_goods();
+    if (!grid_rules.any())
+        return out;
+    std::vector<entity_id> mids;
+    mids.reserve(w.markets.size());
+    for (const auto& [mid, mc] : w.markets)
+    {
+        (void)mc;
+        mids.push_back(mid);
+    }
+    std::sort(mids.begin(), mids.end());
+    for (const entity_id mid : mids)
+    {
+        const market_component& mc = w.markets.at(mid);
+        if (mc.centre_tile == null_entity)
+            continue;
+        const std::uint32_t g = tile_power_grid(w, mc.centre_tile);
+        if (g == 0)
+            continue;
+        out.market_grid.emplace(mid, g);
+        auto& sd = out.grid_sd[g];
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            if (!grid_rules.grid(r) || !grid_good_crosses_markets(r))
+                continue;
+            sd.listed[r] += std::max(0.0f, mc.supply[r]);
+            sd.shelf[r]  += std::max(0.0f, mc.inventory[r]);
+            sd.wants[r]  += std::max(0.0f, mc.demand[r]) + std::max(0.0f, mc.hauler_want[r]);
+            sd.demand[r] += mc.demand[r];
+        }
+    }
+    return out;
+}
+
 std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     world& w,
     const recipe_registry& reg,
@@ -1677,7 +1725,6 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // Sums run over ascending market id, so no hash order reaches a float.
     // Power only (grid_good_crosses_markets): construction capacity, the other
     // grid good, still draws locally, so it still prices locally.
-    std::map<entity_id, std::uint32_t> market_grid;
     //
     // THE SHELF CAP IS APPLIED ONCE, AT THE GRID (review round 2). pricing_supply's
     // shelf share is min(shelf, k x (demand + silenced want)); summed market by
@@ -1686,43 +1733,11 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // empty while one market held plenty. The three registers are pooled
     // separately and the cap taken over the pooled figures: listed + min(sum
     // shelf, k x sum(demand + silenced want)). At one market on a grid this is
-    // exactly pricing_supply.
-    struct grid_figures
-    {
-        std::array<float, resource_count> listed{}, shelf{}, wants{}, demand{};
-    };
-    std::map<std::uint32_t, grid_figures> grid_sd;
-    if (any_grid)
-    {
-        std::vector<entity_id> mids;
-        mids.reserve(w.markets.size());
-        for (const auto& [mid, mc] : w.markets)
-        {
-            (void)mc;
-            mids.push_back(mid);
-        }
-        std::sort(mids.begin(), mids.end());
-        for (const entity_id mid : mids)
-        {
-            const market_component& mc = w.markets.at(mid);
-            if (mc.centre_tile == null_entity)
-                continue;
-            const std::uint32_t g = tile_power_grid(w, mc.centre_tile);
-            if (g == 0)
-                continue;
-            market_grid.emplace(mid, g);
-            auto& sd = grid_sd[g];
-            for (std::size_t r = 0; r < resource_count; ++r)
-            {
-                if (!grid_rules.grid(r) || !grid_good_crosses_markets(r))
-                    continue;
-                sd.listed[r] += std::max(0.0f, mc.supply[r]);
-                sd.shelf[r]  += std::max(0.0f, mc.inventory[r]);
-                sd.wants[r]  += std::max(0.0f, mc.demand[r]) + std::max(0.0f, mc.hauler_want[r]);
-                sd.demand[r] += mc.demand[r];
-            }
-        }
-    }
+    // exactly pricing_supply. The pooling is `pool_grid_good_figures` (BL-1232:
+    // shared with the workforce solver's forecast, so the two cannot drift).
+    const grid_good_pool gpool = any_grid ? pool_grid_good_figures(w, reg) : grid_good_pool{};
+    const auto& market_grid = gpool.market_grid;
+    const auto& grid_sd     = gpool.grid_sd;
     std::unordered_map<entity_id, std::array<float, resource_count>> ref_price;
     for (const auto& [mid, mc] : w.markets)
     {
@@ -1733,7 +1748,7 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         {
             const bool  pooled = (sd != nullptr) && grid_rules.grid(r) && grid_good_crosses_markets(r);
             const float k      = reg.price_band().shelf_supply_ticks;
-            const float supply = pooled ? sd->listed[r] + ((k > 0.0f) ? std::min(sd->shelf[r], k * sd->wants[r]) : 0.0f)
+            const float supply = pooled ? grid_good_pricing_supply(*sd, r, k)
                                         : pricing_supply(mc, r, k);
             const float demand = pooled ? sd->demand[r] : mc.demand[r];
             ref_price[mid][r] = resolve_price(mc.price[r], mc.base_price[r], supply, demand,

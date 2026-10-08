@@ -8,6 +8,8 @@
 #include "world.hpp"
 
 #include <array>
+#include <cstdint>
+#include <map>
 #include <unordered_map>
 #include <vector>
 
@@ -369,6 +371,45 @@ inline float pricing_supply(const market_component& m, std::size_t r, float shel
     const float wants = std::max(0.0f, m.demand[r]) + std::max(0.0f, m.hauler_want[r]);
     const float sells = shelf_supply_ticks * wants;
     return listed + std::min(shelf, sells);
+}
+
+/// BL-1230 (power crosses markets; LOGISTICS.md § 3a): a grid good that crosses
+/// markets (`grid_good_crosses_markets`) prices against its GRID's pooled
+/// registers, not one market's. `grid_good_figures` is one grid's three pooled
+/// registers (listings, shelf, demand + silenced want) and its pooled demand;
+/// `grid_good_pool` maps every market whose centre is wired to its grid and
+/// every grid to its figures. Built by `pool_grid_good_figures` — THE ONE
+/// pooling, read by clear_markets' price resolution and by the workforce
+/// solver's price forecast (BL-1232) alike. Sums run over ascending market id.
+struct grid_good_figures
+{
+    std::array<float, resource_count> listed{}, shelf{}, wants{}, demand{};
+};
+struct grid_good_pool
+{
+    std::map<entity_id, std::uint32_t>          market_grid;
+    std::map<std::uint32_t, grid_good_figures> grid_sd;
+};
+grid_good_pool pool_grid_good_figures(world& w, const recipe_registry& reg);
+
+/// BL-1232 review: the grid a building on @p tile FEEDS. A producer lists into
+/// its tile's market (`market_for_tile`), and a market's shelf is on the grid of
+/// its CENTRE tile's province (LOGISTICS.md § 3a; the grid clear's
+/// `shelves_on`) — so a generator serves the grid of its market's centre, which
+/// need not be its own tile's grid. 0 when the tile has no market or the
+/// centre's province is dark. (Its DRAW side is its own tile's grid,
+/// `tile_power_grid`.)
+std::uint32_t tile_feed_power_grid(world& w, entity_id tile);
+
+/// The pooled pricing supply: listed + min(shelf, k x wants) over the GRID —
+/// the shelf cap taken once, at the grid (review round 2 of BL-1230). At one
+/// market on a grid this is exactly `pricing_supply`.
+inline float grid_good_pricing_supply(const grid_good_figures& sd, std::size_t r,
+                                      float shelf_supply_ticks)
+{
+    return sd.listed[r] + ((shelf_supply_ticks > 0.0f)
+                               ? std::min(sd.shelf[r], shelf_supply_ticks * sd.wants[r])
+                               : 0.0f);
 }
 
 /// Input reservation a corporation needs to keep in ONE goods pool to feed a

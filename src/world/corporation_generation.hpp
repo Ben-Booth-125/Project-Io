@@ -7,6 +7,7 @@
 #include <array>
 #include <cstdint>
 #include <map>
+#include <set>
 #include <vector>
 
 struct input_reach;
@@ -763,3 +764,50 @@ void add_prospective_draws(world& w, const recipe_registry& reg, input_reach& ir
                            std::array<float, resource_count>& demand,
                            const std::array<float, resource_count>& production,
                            const std::array<bool, resource_count>& capped);
+
+/// BL-1232 (power plants per grid; PRODUCTION.md, "Generation is sized per grid,
+/// not per body"; LOGISTICS.md § 3a). Generation's per-grid power measure: the
+/// charter walk sizes power on it. Exported so harnesses read the walk's own
+/// figure. (A scorer half that would also read it is HELD, Ben 2026-10-08, and
+/// kept on branch bl1232-scorer-gate.)
+///
+/// `body_power_grid_gap`: @p body_id's power gap, the sum over its wired grids
+/// of max(0, need - output). Need is the operating buildings' power upkeep,
+/// keyed by each building's own tile grid (the draw side). Output is every
+/// non-decommissioned generator at the nominal rate, keyed by the grid its
+/// MARKET CENTRE is on (`tile_feed_power_grid`: where its listings land, the
+/// feed side) — plants UNDER CONSTRUCTION included, so a plant already started
+/// is counted as the supply it will be. A dark building neither draws nor
+/// feeds. A grid needing under half of @p plant_output is left to roads, not
+/// counted. @p short_grids receives every counted (short) grid;
+/// @p unpowered_short, when given, the short grids no generator feeds at all
+/// (PRODUCTION.md, "Unpowered grids first", Ben 2026-10-08). Deterministic
+/// (ascending building id, std::map over grids).
+float body_power_grid_gap(world& w, const recipe_registry& reg, entity_id body_id,
+                          float plant_output, std::set<std::uint32_t>& short_grids,
+                          std::set<std::uint32_t>* unpowered_short = nullptr);
+
+/// The grids a power firm may SERVE on @p body_id (into @p serve), and the
+/// body's power gap (returned, every short grid's, as `body_power_grid_gap`).
+/// UNPOWERED GRIDS FIRST (PRODUCTION.md, Ben 2026-10-08: "every grid gets a
+/// plant before any gets a second"): while any short grid has no power firm
+/// chartered on it (@p chartered, the walk's own record) and no generator
+/// feeding it, only those; else every short grid. A grid is powered the moment
+/// a power firm is chartered on it, live output or not. An unpowered grid
+/// absent from @p reachable (the grids the deciding centre's windows can feed)
+/// never holds up the others: it is dropped, and with no unpowered grid left
+/// every short grid is served. The charter walk cuts a power firm's windows to
+/// ground FEEDING one of them.
+float power_grids_to_serve(world& w, const recipe_registry& reg, entity_id body_id,
+                           float plant_output, std::set<std::uint32_t>& serve,
+                           const std::set<std::uint32_t>* chartered = nullptr,
+                           const std::set<std::uint32_t>* reachable = nullptr);
+
+/// The most power one plant makes: the largest power output of any in-band
+/// processing recipe at the nominal run. 0 where no recipe makes power.
+float one_power_plant_output(const recipe_registry& reg);
+
+/// True where power is sized per grid at all: some recipe makes power AND the
+/// band authors a power upkeep draw on some building type. Elsewhere the per-grid
+/// measure is not read and the charter walk behaves as before it existed.
+bool power_sized_per_grid(const recipe_registry& reg);

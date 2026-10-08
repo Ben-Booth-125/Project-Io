@@ -32,6 +32,7 @@
 #include "harness_params.hpp"
 #include "world/campaign_settle.hpp"
 #include "world/components.hpp"
+#include "world/corporation_generation.hpp" // BL-1232 review: body_power_grid_gap, one_power_plant_output
 #include "world/economy_system.hpp"
 #include "world/logistics.hpp"
 #include "world/market_clearing.hpp"
@@ -302,6 +303,67 @@ void print_gen_grids(const snapshot& S)
 
 } // namespace
 
+// BL-1232 review round: a generator FEEDS the grid its market's centre is on
+// (tile_feed_power_grid), which need not be its own tile's grid. After
+// generation, count the generators whose two grids differ, and per grid print
+// the need, the output its own tiles hold, the output that actually FEEDS it,
+// and the gap generation's measure reads (body_power_grid_gap, feed-keyed).
+void print_feed_check(world& w, const recipe_registry& reg)
+{
+    const float batches = reg.economics(building_type::processing_facility).base_rate * 0.5f;
+    const float plant = one_power_plant_output(reg);
+    std::vector<entity_id> bids;
+    for (const auto& [bid, b] : w.buildings) { (void)b; bids.push_back(bid); }
+    std::sort(bids.begin(), bids.end());
+    std::map<std::uint32_t, std::array<double, 3>> g;   // need, output on tile grid, output feeding
+    std::set<entity_id> bodies;
+    long gens = 0, differ = 0, dark_feed = 0;
+    const building_upkeep_params& up = reg.building_upkeep();
+    for (const entity_id bid : bids)
+    {
+        const building_component& b = w.buildings.at(bid);
+        if (b.decommissioned) continue;
+        if (const auto tit = w.tiles.find(b.tile); tit != w.tiles.end()) bodies.insert(tit->second.body);
+        const std::uint32_t tg = tile_power_grid(w, b.tile);
+        if (b.ticks_remaining <= 0 && tg != 0)
+            g[tg][0] += building_upkeep_goods(up, b.type, reg.era())[k_power];
+        if (b.type != building_type::processing_facility) continue;
+        const recipe* rc = reg.get_recipe(b.recipe);
+        if (!rc || !(rc->outputs[k_power] > 0.0f)) continue;
+        ++gens;
+        const std::uint32_t fg = tile_feed_power_grid(w, b.tile);
+        const double o = batches * rc->outputs[k_power];
+        if (tg != 0) g[tg][1] += o;
+        if (fg != 0) g[fg][2] += o; else ++dark_feed;
+        if (tg != fg) ++differ;
+    }
+    std::printf("  feed check: generators %ld, tile grid != market-centre grid %ld, market centre dark %ld\n",
+                gens, differ, dark_feed);
+    for (const auto& [id, a] : g)
+        if (a[1] > 0.0 || a[2] > 0.0 || a[0] >= 0.5 * plant)
+            std::printf("          grid %u: need %.1f | output on its tiles %.1f | output FEEDING it %.1f | gap read %.1f%s\n",
+                        id, a[0], a[1], a[2], (a[0] > a[2] && a[0] >= 0.5 * plant) ? a[0] - a[2] : 0.0,
+                        (a[1] != a[2]) ? "  <- tile and feed differ" : "");
+    // Short grids (need >= half a plant, need > feeding output) still fed by 0.
+    long dark_short = 0; double dark_need = 0.0;
+    std::string ids;
+    for (const auto& [id, a] : g)
+        if (a[0] >= 0.5 * plant && a[0] > a[2] && !(a[2] > 0.0))
+        {
+            ++dark_short; dark_need += a[0];
+            ids += " " + std::to_string(id);
+        }
+    std::printf("          short grids fed by NO generator after generation: %ld (need %.1f):%s\n",
+                dark_short, dark_need, ids.empty() ? " none" : ids.c_str());
+    double measure = 0.0;
+    for (const entity_id body : bodies)
+    {
+        std::set<std::uint32_t> sg;
+        measure += body_power_grid_gap(w, reg, body, plant, sg);
+    }
+    std::printf("          body_power_grid_gap summed over bodies: %.1f\n", measure);
+}
+
 int main(int argc, char** argv)
 {
     std::vector<std::uint32_t> seeds = {0, 43, 10, 28, 38};
@@ -341,6 +403,7 @@ int main(int argc, char** argv)
         {
             const snapshot sg = read(w, reg);
             print_gen_grids(sg);
+            print_feed_check(w, reg);
         }
         for (int step = 0; step < k_campaign_settle_ticks; ++step) run_settle_tick(w, reg, step, 0, true);
         std::printf("  after the settle, before the seat:\n");
