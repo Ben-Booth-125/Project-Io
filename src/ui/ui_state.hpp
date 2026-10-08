@@ -394,6 +394,53 @@ struct ui_state
     std::vector<resource_type> lens_resources{ resource_type::iron_ore };
     /// The Resource lens legend's search box text (filters its goods checklist).
     char lens_resource_filter[32] = {};
+    // --- Owner multi-select (BL-1240; LENSES.md § Corporation lens, Owner multi-select) ---
+    // The Corporation and Company lenses draw a PICKED SET of owners: a picked owner's
+    // ground takes its identity colour, an unpicked owner's takes palette::owned_grey.
+    // Two sets, so flipping between the lenses keeps each one's picks. UI state only —
+    // per session, never saved — and keyed by corp id, so it survives a body switch.
+    // The Corporation set defaults to the player; the player id is not known when
+    // ui_state is built, so the canvas seeds it (`seed_lens_corps`) once per seated
+    // player — a seat taken after the first frame still gets its default.
+    std::vector<entity_id> lens_corps;            ///< Picked corporations (player + rivals), in pick order.
+    entity_id              lens_corps_seed = null_entity; ///< The player the default was last applied for.
+    std::vector<entity_id> lens_companies;        ///< Picked background firms; default empty.
+    char                   lens_owner_filter[32] = {}; ///< The owner checklist's search box text.
+    /// Apply the Corporation set's default (the player) once per seated player; a
+    /// player who then unpicks themselves stays unpicked. A new seat REPLACES the
+    /// previous seat's default — the old corp was the default, not a pick.
+    void seed_lens_corps(entity_id player)
+    {
+        if (player == null_entity || player == lens_corps_seed)
+            return;
+        if (lens_corps_seed != null_entity && lens_owner_picked(lens_corps_seed, false))
+            toggle_lens_owner(lens_corps_seed, false);
+        lens_corps_seed = player;
+        if (!lens_owner_picked(player, false))
+            lens_corps.push_back(player);
+    }
+    /// The set a lens reads: companies for a background firm, corporations otherwise.
+    std::vector<entity_id>&       lens_owner_set(bool background)       { return background ? lens_companies : lens_corps; }
+    const std::vector<entity_id>& lens_owner_set(bool background) const { return background ? lens_companies : lens_corps; }
+    bool lens_owner_picked(entity_id corp, bool background) const
+    {
+        for (const entity_id id : lens_owner_set(background))
+            if (id == corp)
+                return true;
+        return false;
+    }
+    /// Toggle @p corp in or out of its lens's set (checklist row or shift-click).
+    void toggle_lens_owner(entity_id corp, bool background)
+    {
+        std::vector<entity_id>& v = lens_owner_set(background);
+        for (auto it = v.begin(); it != v.end(); ++it)
+            if (*it == corp)
+            {
+                v.erase(it);
+                return;
+            }
+        v.push_back(corp);
+    }
     /// Is the lens legend expanded? BL-533 (Ben, 2026-08-22) re-homed every
     /// legend into the right chrome column above the minimap and made it a
     /// dropdown that is COLLAPSED BY DEFAULT — so a lens switch no longer

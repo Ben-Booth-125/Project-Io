@@ -984,6 +984,42 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return true;
     });
     v.set_function("clear_lens_resources", [this]() { m_ui.lens_resources.clear(); });
+    // Owner multi-select (BL-1240): toggle one corporation or background firm in or
+    // out of its lens's picked set, as the checklist row does. The set is chosen by
+    // the corp's own kind, so the call needs no lens argument. Returns false
+    // (nothing changed) for an id that is not a corporation.
+    v.set_function("toggle_lens_owner", [this](unsigned id) -> bool {
+        const auto it = m_world.corporations.find(static_cast<entity_id>(id));
+        if (it == m_world.corporations.end())
+            return false;
+        m_ui.seed_lens_corps(m_world.player_entity); // the default lands first
+        m_ui.toggle_lens_owner(it->first, it->second.is_background);
+        return true;
+    });
+    // The picked set for "corporation" or "company", in pick order, so a script can
+    // assert what a checklist press or a shift-click actually did.
+    v.set_function("lens_owner_picks", [this](const std::string& kind) {
+        m_ui.seed_lens_corps(m_world.player_entity);
+        sol::table out = m_lua.state().create_table();
+        int i = 1;
+        for (const entity_id id : m_ui.lens_owner_set(kind == "company"))
+            out[i++] = static_cast<unsigned>(id);
+        return out;
+    });
+    // A SHIFT-held left click on Planetary tile (col, row), through the real input
+    // path — the owner lenses' map picker. Same centring caveat as click_tile (the
+    // view moves). Shift goes down on the settle frame before the press, because
+    // ImGui trickles a key change queued behind a button change to the next frame.
+    v.set_function("shift_click_tile", [this](int col, int row) -> bool {
+        const ImVec2 p = resolve_tile_screen(col, row);
+        if (p.x < 0.0f)
+            return false;
+        ImGui::GetIO().AddKeyEvent(ImGuiMod_Shift, true);
+        inject_pointer(p.x, p.y, ImGuiMouseButton_Left, 1);
+        ImGui::GetIO().AddKeyEvent(ImGuiMod_Shift, false);
+        render(); // flush the release so the next gesture is unshifted
+        return true;
+    });
     v.set_function("set_lens_resource_filter", [this](const std::string& q) {
         std::snprintf(m_ui.lens_resource_filter, sizeof m_ui.lens_resource_filter, "%s", q.c_str());
     });

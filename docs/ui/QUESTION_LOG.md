@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**62 surfaces** — 7 settled, 55 awaiting Ben's wording.
+**63 surfaces** — 7 settled, 56 awaiting Ben's wording.
 
 ---
 
@@ -279,6 +279,14 @@ IT LIVES UNDER MY TRADES, NOT IN A FEED. The question it answers is about the pl
 **Because:** Every ledger and panel needs exactly one discoverable door, and the rail is where that door is. A surface with no slot is drawn every frame and reachable by nobody; a slot with no surface teaches a system the game does not have.
 
 *Demanded by BL-022, BL-027, BL-028 · `src/ui/nav_pane.cpp` · id `nav_pane`*
+
+### Owner multi-select — the Corporation and Company lenses' picked owner set, owned-grey fill, checklist key and shift-click picker
+
+**Answers:** Where do I, and the one or two rivals (or firms) I am sizing up, hold ground on this body — against everyone else, who simply 'holds something here'?
+
+**Because:** Buildings no longer carry an owner colour on the canvas (RENDERING.md § Installations), so the Corporation and Company lenses became the only place ownership is read at a glance — and with every owner tinted at once they answered 'who owns what' with a map of every colour at once, which answers nothing. A picked set keeps the comparison the player is actually making in colour and folds every other owner into one owned-grey, which still says 'someone holds this' without competing. Ben, 2026-10-08 (the sprint 51 visibility pass). The key copies the Resource lens's search-and-checklist shape so there is no new vocabulary, rows exist only for owners with ground on the body, the Corporation set defaults to the player ('where am I, against everyone'), and shift-click makes the map itself the picker while a plain click keeps its BL-664 meaning. It costs no new screen space: the key fills the one lens chrome region the lens already owned.
+
+*Demanded by BL-1240 · `src/ui/body_surface_canvas.cpp`, `src/ui/ui_state.hpp`, `src/ui/presentation.hpp`, `src/core/verify_api.cpp`, `scripts/verify/owner_multi_select.lua` · id `owner_multi_select`*
 
 ### Roads and sea lanes (Planetary canvas, always-on route strokes)
 

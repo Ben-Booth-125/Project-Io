@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*158 entries — 28 gameplay · 25 canvas · 17 lens · 53 ledger · 35 chrome.*
+*160 entries — 28 gameplay · 25 canvas · 19 lens · 53 ledger · 35 chrome.*
 
 ---
 
@@ -942,7 +942,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 - The app is in-game on a body surface; like every lens it only re-skins the Planetary canvas.
 - If Company is already the active lens, cycling past it clears it (see lens.clear).
 
-**Expected output.** On the Planetary canvas, every tile holding a BACKGROUND FIRM's building tints to that firm's identity colour, and each background firm's seat draws an HQ marker. The mirror of lens.corporation, drawn identically and admitting the opposite population: a corporation is the player and its rivals, a company is a background firm (GLOSSARY.md, Ben 2026-08-28). The two lenses are disjoint — no firm appears under both. Measured on the home body at generation: 373 background-firm buildings across 80 companies, against 33 rival buildings across 7 corporations, so this lens is much the busier of the pair. National borders are NOT drawn while any lens is active (2026-08-28) — neither the inward band nor the coloured frontier rule, and the border's click corridor goes with them. The plain canvas is the only place the national read appears.
+**Expected output.** On the Planetary canvas, every tile holding a BACKGROUND FIRM's building is filled by its owner, drawn identically to lens.corporation and admitting the opposite population: a corporation is the player and its rivals, a company is a background firm (GLOSSARY.md, Ben 2026-08-28). The two lenses are disjoint — no firm appears under both. The fill follows the lens's own PICKED SET (BL-1240): a picked firm's tiles take its identity colour and its seat draws an HQ marker; an unpicked firm's tiles take the owned-grey and draw no marker. The set DEFAULTS TO EMPTY (the player owns no company), so the lens opens with every firm's ground in grey — which already answers 'where do background firms operate' — and the player picks the firms to name with lens.owner_toggle or lens.owner_shift_pick. Its set is separate from the Corporation lens's, so flipping between the two keeps each one's picks. The key is the owner checklist ('Companies (n picked)', search box, a row per firm holding ground on the active body). Measured on the home body at generation: 373 background-firm buildings across 80 companies, against 33 rival buildings across 7 corporations, so this lens is much the busier of the pair. National borders are NOT drawn while any lens is active (2026-08-28).
 
 **Reason to select.** See the commercial population the Corporation lens deliberately excludes — who is operating here besides your actual rivals.
 
@@ -955,9 +955,45 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 - The lens only re-skins the Planetary canvas; selecting it while on Solar or Circumplanetary changes nothing visible until the player descends to a body surface.
 - If Corporation is already the active lens, this same press clears it instead (see lens.clear).
 
-**Expected output.** On the Planetary canvas, every tile holding a corporate building tints to its owning corporation's identity colour (the literal building tile only — no influence radius). The player's tiles additionally get a thin white border. Each rival corporation's HQ-projected reach ring and HQ star draw on that corp's home body in its identity colour. Tiles with no corporate building keep their plain terrain colour — there is no nation underlay. Pointer clicks are NOT lens-dependent: selection resolves the same way under every lens — marker hit-test (building outranks market centre), else the tile under the pointer, with a built tile resolving to its building. The lens changes what is drawn, never what a click selects. No on-canvas colour key yet (glyph highlight + tooltip only). Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour. NARROWED 2026-08-28: only CORPORATIONS tint and only rival corporations draw HQ markers — background firms are excluded and have their own lens (lens.company). National borders are NOT drawn while any lens is active (2026-08-28) — neither the inward band nor the coloured frontier rule, and the border's click corridor goes with them. The plain canvas is the only place the national read appears.
+**Expected output.** On the Planetary canvas, every tile holding a corporate building is filled by its owner (the literal building tile only — no influence radius), and the fill follows a PICKED SET of owners (BL-1240, owner multi-select): a picked corporation's tiles take its identity colour, an unpicked corporation's tiles take one neutral owned-grey, the same for every unpicked owner and distinct from unowned ground. The set defaults to the player alone, so opening the lens shows your holdings in colour and every rival's in grey; add rivals with lens.owner_toggle (the checklist key) or lens.owner_shift_pick (shift-click on their ground). The player's tiles additionally get a thin white border. A rival's HQ star draws on its home body only while that rival is picked; the player's own star is always-on chrome. Tiles with no corporate building keep their plain terrain colour — there is no nation underlay. The key in the lens chrome region (top right, above the minimap) is the owner checklist: header 'Corporations (n picked)', a search box, one swatch row per corporation holding ground on the active body. Hovering owned ground lights that owner's whole tile group whether picked or not. A plain click on owned ground selects that corporation (the corporations table opens aimed at it); ground no corporation holds answers nothing under this lens (BL-664). Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill. Only CORPORATIONS (player and rivals) are admitted — background firms have their own lens (lens.company). National borders are NOT drawn while any lens is active (2026-08-28). The picked set is UI state: per session, not saved, and it survives a body switch.
 
-**Reason to select.** Who owns what: where do rival corporations operate, how does my footprint sit against theirs, and where do their HQ reach rings suggest they will grow? Use it to find uncontested ground to expand into or to size up a rival's holdings before competing.
+**Reason to select.** Who owns what: where is my footprint, and how does it sit against the one or two rivals I am sizing up? Pick the rivals to compare and leave the rest grey, to find uncontested ground or read a rival's holdings before competing.
+
+### `lens.owner_toggle` — The Corporation or Company lens's key in the lens chrome region — the minimap's header, top right: a header with the picked count, a search box, and a checklist of the owners of that lens's kind holding ground on the active body, each row with its identity swatch (filled when picked, empty when not).
+
+**Press.** Type in the search box to filter the checklist by owner name; tick or untick a row's checkbox to pick or unpick that owner.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `owner` | `corporation name (Corporation lens) or company name (Company lens), holding ground on this body` | The owner to add to or remove from the active lens's picked set. |
+
+**Valid when:**
+- The Corporation or Company lens must be active — the checklist only exists inside its chrome.
+- Only owners of the active lens's kind with at least one building on the active body are listed; an owner with nothing on the body earns no row (its pick, if any, stands and is still counted in the header).
+- No cap: identity colours are per owner, not per slot.
+- A toggle under the toggle rule: ticking a checked row unticks it.
+
+**Expected output.** The map re-draws at once: the owner's tiles switch between its identity colour (picked) and the owned-grey (unpicked), its HQ star appears or disappears (the player's own star never moves), the row's swatch fills or empties, and the header count '(n picked)' updates. No selection changes.
+
+**Reason to select.** Name the owners you are comparing — your own holdings against one or two rivals or firms — while everyone else stays a grey 'someone holds this'.
+
+### `lens.owner_shift_pick` — The Planetary canvas under the Corporation or Company lens: any tile an owner of that lens's kind holds.
+
+**Press.** Shift + left-click on the owned tile.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `tile` | `Planetary tile (col,row) holding a building of an owner the active lens admits` | The ground whose owner is toggled — the owner the lens resolves for that tile, the same one hovering it lights. |
+
+**Valid when:**
+- The Corporation or Company lens must be active.
+- The tile must be held by an owner of the lens's kind (a corporation under Corporation, a background firm under Company); a shift-click on any other ground behaves as a plain click.
+- Not in construction placement or march-picking mode — those gestures outrank it.
+- A toggle: shift-clicking a picked owner's ground unpicks it.
+
+**Expected output.** The tile's owner is added to or removed from the active lens's picked set — exactly as ticking its checklist row — and the map re-draws its ground in colour or owned-grey. The selection, the Selection band and every ledger are untouched. A PLAIN click is unchanged: it selects the owner and opens its surface (lens.corporation / lens.company).
+
+**Reason to select.** Use the map itself as the picker: hover finds whose ground this is (the whole group lights), shift-click adds that owner to the comparison without leaving the canvas.
 
 ### `lens.good_selector` — The lens chrome region — the minimap's header, top right (BL-602). One region hosts the selector and whichever key the active lens draws; the selector sits directly above that key while the Market or Scarcity lens is active. One shared combo bound to a single shared lens_resource value, not two separate controls. The Resource lens does NOT use it: it has its own toggled checklist (lens.resource_toggle). It is NOT on the minimap's lens bar, which carries glyphs only.
 

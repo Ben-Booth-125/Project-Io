@@ -941,6 +941,136 @@ void draw_resource_key(const world& w, ui_state& state)
                 full ? "Full: six at most" : "Split tile = several here");
 }
 
+/// Key for the Corporation and Company lenses (BL-1240, owner multi-select;
+/// LENSES.md § Corporation lens). The Resource lens's checklist shape: a header
+/// with the picked count, a search box, and one row per owner of the lens's kind
+/// holding ground on the active body — identity swatch filled when picked, empty
+/// when not. A checkbox press toggles the owner in or out of the lens's own set
+/// (`ui_state::lens_corps` / `lens_companies`). An owner with nothing on this body
+/// earns no row; its pick, if any, stands and is counted in the header.
+void draw_owner_key(const world& w, ui_state& state,
+                    const std::unordered_map<entity_id, entity_id>& tile_to_corp)
+{
+    const bool background = (state.overlay == overlay_mode::company);
+
+    // Owners of the admitted kind with ground here, with their tile count.
+    // tile_to_corp is already scoped to the active body.
+    std::unordered_map<entity_id, int> held;
+    for (const auto& [tile, corp] : tile_to_corp)
+    {
+        const auto cit = w.corporations.find(corp);
+        if (cit != w.corporations.end() && cit->second.is_background == background)
+            ++held[corp];
+    }
+    std::vector<entity_id> present;
+    present.reserve(held.size());
+    for (const auto& [corp, n] : held)
+        present.push_back(corp);
+    // The player first, then by name, then by id — never the map's walk order.
+    std::sort(present.begin(), present.end(), [&](entity_id a, entity_id b) {
+        const bool pa = (a == w.player_entity), pb = (b == w.player_entity);
+        if (pa != pb)
+            return pa;
+        const std::string& na = w.corporations.at(a).name;
+        const std::string& nb = w.corporations.at(b).name;
+        return na != nb ? na < nb : a < b;
+    });
+
+    const auto matches = [&](entity_id corp) {
+        const char* q = state.lens_owner_filter;
+        if (q[0] == '\0')
+            return true;
+        std::string name   = w.corporations.at(corp).name;
+        std::string needle = q;
+        for (char& ch : name)   ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+        for (char& ch : needle) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+        return name.find(needle) != std::string::npos;
+    };
+    std::vector<entity_id> rows;
+    for (const entity_id corp : present)
+        if (matches(corp))
+            rows.push_back(corp);
+
+    const float pad    = 8.0f;
+    const float line_h = ImGui::GetTextLineHeight();
+    const float row_h  = ImGui::GetFrameHeightWithSpacing();
+    const float head_h = line_h + 4.0f;
+    const float note_h = line_h + 2.0f;
+    const float want_h = pad + head_h + kLensComboH + 4.0f
+                       + static_cast<float>(std::max<std::size_t>(rows.size(), 1)) * row_h
+                       + note_h + pad;
+
+    ImDrawList* dl = ImGui::GetBackgroundDrawList();
+    const ui::shell_rect r = open_lens_chrome(dl, state, want_h, "##lens_key_blocker");
+    const float x  = r.x + pad;
+    const float bw = r.w - 2.0f * pad;
+    float       y  = r.y + pad * 0.5f;
+
+    char head[64];
+    std::snprintf(head, sizeof head, "%s  (%d picked)",
+                  background ? "Companies" : "Corporations",
+                  static_cast<int>(state.lens_owner_set(background).size()));
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), head); // fit-exempt: legend box sized to its measured entries (container 2)
+    y += head_h;
+
+    const float note_y = r.y + r.h - pad * 0.5f - note_h;
+    const float list_h = std::max(0.0f, note_y - y);
+
+    ImGui::SetNextWindowPos({x, y}, ImGuiCond_Always);
+    ImGui::SetNextWindowSize({bw, list_h}, ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.0f);
+    constexpr ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoNav    | ImGuiWindowFlags_NoScrollbar |
+        ImGuiWindowFlags_NoSavedSettings;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0.0f, 0.0f});
+    ImGui::Begin("##lens_key_owner_list", nullptr, flags);
+    ImGui::SetNextItemWidth(bw);
+    ImGui::InputTextWithHint("##lens_owner_search",
+                             background ? "Search companies" : "Search corporations",
+                             state.lens_owner_filter, sizeof state.lens_owner_filter);
+    ImGui::Dummy({bw, 2.0f});
+    ImGui::BeginChild("##rows", {bw, std::max(0.0f, list_h - kLensComboH - 4.0f)}, false,
+                      ImGuiWindowFlags_NoBackground);
+    if (rows.empty())
+        ImGui::TextDisabled("%s", present.empty()
+                                      ? (background ? "No companies on this body"
+                                                    : "No corporations on this body")
+                                      : "No match");
+    for (const entity_id corp : rows)
+    {
+        const bool on = state.lens_owner_picked(corp, background);
+        ImGui::PushID(static_cast<int>(corp));
+        bool v = on;
+        if (ImGui::Checkbox("##on", &v))
+            state.toggle_lens_owner(corp, background);
+        ImGui::SameLine();
+        const ImVec2 c   = ImGui::GetCursorScreenPos();
+        ImDrawList*  wdl = ImGui::GetWindowDrawList();
+        const float  sy  = c.y + (ImGui::GetFrameHeight() - 10.0f) * 0.5f;
+        const ImU32  col = palette::corp_identity_colour(corp, w.player_entity);
+        if (on)
+            wdl->AddRectFilled({c.x, sy}, {c.x + 10.0f, sy + 10.0f}, col);
+        else
+            wdl->AddRect({c.x, sy}, {c.x + 10.0f, sy + 10.0f}, col);
+        ImGui::Dummy({14.0f, ImGui::GetFrameHeight()});
+        ImGui::SameLine();
+        ImGui::AlignTextToFramePadding();
+        const std::string& name = w.corporations.at(corp).name;
+        if (on)
+            ImGui::TextUnformatted(name.c_str());
+        else
+            ImGui::TextDisabled("%s", name.c_str());
+        ImGui::PopID();
+    }
+    ImGui::EndChild();
+    ImGui::End();
+    ImGui::PopStyleVar();
+
+    dl->AddText({x, note_y}, IM_COL32(170, 175, 185, 255), // fit-exempt: legend box sized to its measured entries (container 2)
+                "Grey = unpicked owner. Shift-click to pick");
+}
+
 /// On-canvas legend for the Market lens: a diverging cheap↔dear gradient bar plus
 /// the selected good's name and its current price ratio (or an "untraded" note when
 /// the body's market has no entry for it). The one lens chrome region, like every key.
@@ -2774,6 +2904,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         return it != w.corporations.end() && it->second.is_background;
     };
 
+    // BL-1240: the Corporation lens's picked set defaults to the player, applied
+    // once per session (ui_state cannot know the player id when it is built).
+    state.seed_lens_corps(w.player_entity);
+
     auto compute_tile_fill = [&](entity_id id, const tile_component& tile) -> ImU32
     {
         const auto   corp_it    = tile_to_corp.find(id);
@@ -2804,18 +2938,24 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // (GLOSSARY.md), and a lens that mixed them answered neither question —
         // "who are my rivals here" drowned in the background firms that outnumber
         // them. Those get their own lens immediately below, drawn identically.
+        //
+        // OWNER MULTI-SELECT (BL-1240): only a PICKED owner takes its colour; an
+        // unpicked owner of the admitted kind takes the one owned-grey, so "someone
+        // holds this" survives without every rival shouting at once.
         if (state.overlay == overlay_mode::corporation)
         {
             if (has_owner && !is_background_firm(corp_it->second))
-                fill = owner_col;
+                fill = state.lens_owner_picked(corp_it->second, false) ? owner_col
+                                                                       : palette::owned_grey;
         }
         // Company lens: the exact mirror — background firms only, same per-corp
-        // identity tint, so the two lenses are read the same way and differ only
-        // in which population of firms they admit.
+        // identity tint and owned-grey, so the two lenses are read the same way and
+        // differ only in which population of firms they admit (and in the default).
         else if (state.overlay == overlay_mode::company)
         {
             if (has_owner && is_background_firm(corp_it->second))
-                fill = owner_col;
+                fill = state.lens_owner_picked(corp_it->second, true) ? owner_col
+                                                                      : palette::owned_grey;
         }
         // Resource lens (BL-1182): a toggled set of goods. A tile carrying one takes
         // its identity colour SOLID; every other tile takes a white wash that keeps a
@@ -4759,6 +4899,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 continue;
             if (cc.is_background != want_background)
                 continue;
+            // BL-1240: a rival's or firm's seat follows the picked set.
+            if (!state.lens_owner_picked(corp_id, want_background))
+                continue;
             draw_corp_hq(corp_id, cc);
         }
     }
@@ -5025,6 +5168,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // same sprint, and its key with it.
     if (state.overlay == overlay_mode::resource)
         draw_resource_key(w, state);
+    else if (state.overlay == overlay_mode::corporation || state.overlay == overlay_mode::company)
+        draw_owner_key(w, state, tile_to_corp);
     else if (state.overlay == overlay_mode::market)
         draw_market_key(w, state, market_catchment_colour);
     else if (state.overlay == overlay_mode::population)
@@ -5307,12 +5452,35 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // province (open ocean, off-body) is simply ignored: the mode stays
         // armed for the next try rather than silently cancelling on a stray
         // miss.
+        //
+        // OWNER MULTI-SELECT (BL-1240): under the Corporation or Company lens, a
+        // SHIFT-click on ground an owner of the lens's kind holds toggles that owner
+        // in or out of the picked set — the map itself is a picker — and touches no
+        // selection. A plain click, or a shift-click on ground no admitted owner
+        // holds, takes the ordinary resolution below, unchanged.
+        entity_id    shift_pick_owner = null_entity;
+        const bool   owner_lens = (state.overlay == overlay_mode::corporation
+                                   || state.overlay == overlay_mode::company);
+        if (owner_lens && ImGui::GetIO().KeyShift)
+        {
+            entity_id owner = null_entity;
+            const structure_kind k =
+                lens_structure_of_tile(w, state, hovered_tile, tile_to_corp, &owner);
+            if (k == structure_kind::corporation || k == structure_kind::company)
+                shift_pick_owner = owner;
+        }
+
         if (state.pending_march_unit != null_entity)
         {
             const uint32_t march_prov = (hovered_tile != null_entity)
                                         ? w.provinces.province_of(hovered_tile) : 0u;
             if (march_prov != 0)
                 state.pending_march_dest_province = march_prov;
+        }
+        else if (shift_pick_owner != null_entity && !state.construction.active)
+        {
+            state.toggle_lens_owner(shift_pick_owner,
+                                    state.overlay == overlay_mode::company);
         }
         else if (!state.construction.active)
         {

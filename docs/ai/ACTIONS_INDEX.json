@@ -182,6 +182,14 @@
    "Minimap lens bar, slot 1 (the seal-square glyph: filled square with centred inner dot)"
   ],
   [
+   "lens.owner_toggle",
+   "The Corporation or Company lens's key in the lens chrome region — the minimap's header, top right: a header with the picked count, a search box, and a checklist of the owners of that lens's kind holding ground on the active body, each row with its identity swatch (filled when picked, empty when not)."
+  ],
+  [
+   "lens.owner_shift_pick",
+   "The Planetary canvas under the Corporation or Company lens: any tile an owner of that lens's kind holds."
+  ],
+  [
    "lens.good_selector",
    "The lens chrome region — the minimap's header, top right (BL-602). One region hosts the selector and whichever key the active lens draws; the selector sits directly above that key while the Market or Scarcity lens is active. One shared combo bound to a single shared lens_resource value, not two separate controls. The Resource lens does NOT use it: it has its own toggled checklist (lens.resource_toggle). It is NOT on the minimap's lens bar, which carries glyphs only."
   ],

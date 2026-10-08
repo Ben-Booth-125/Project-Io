@@ -137,6 +137,15 @@ inline constexpr ImU32 activity_stale   = IM_COL32(140, 142, 150, 210); ///< Rou
 inline constexpr ImU32 activity_visible = IM_COL32(150, 230, 190, 255); ///< Live lane / player presence.
 inline constexpr ImU32 activity_corridor= IM_COL32(120, 205, 160, 130); ///< Lit trade corridor between bodies.
 
+// --- Owner multi-select (BL-1240; LENSES.md § Corporation lens) ---
+// The ground of an owner NOT in the Corporation/Company lens's picked set: one
+// neutral, desaturated grey for every unpicked owner. Grey says "someone holds
+// this"; colour says "one of the owners you asked about holds this". Light and
+// cool, because the canvas shades every tile fill down by roughly half: at this
+// value it lands near (105,107,112) on screen, clear of the dark, saturated
+// unowned terrain around it, which keeps its plain hue.
+inline constexpr ImU32 owned_grey = IM_COL32(200, 202, 210, 255);
+
 // --- Trade-flow lens (BL-1222; LENSES.md § Trade-flow lens) ---
 // The flow arrows take a neutral logistics hue — a shipment is not an identity.
 // The refusal classes run worst -> best, indexed by `trade_refusal` up to `room`
