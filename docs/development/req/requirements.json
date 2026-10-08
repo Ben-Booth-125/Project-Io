@@ -6917,8 +6917,8 @@
      "verification": [
       "visual: a capture per rung with the HUD reading recorded"
      ],
-     "requirement": "Before and after: the frame HUD texel/px per rung at 1720x1080 and at a 4K-height window; after, no rung reads above 1.0.",
-     "notes": "",
+     "requirement": "Before and after: the frame HUD texel/px (tier px over drawn px) per rung at 1720x1080 and at a 4K-height window; after, every rung reads at or above 1.0 (minified, never magnified).",
+     "notes": "Wording corrected 2026-10-08 (lane L3): texel/px above 1.0 means minified. Lane reading: every rung >= 1.75 at 1720x1080; the 4K top rung reads 0.863 (draw_r 222 past the 192 tier).",
      "result_metric": ""
     },
     {
