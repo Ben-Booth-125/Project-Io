@@ -1819,6 +1819,8 @@ void app::setup_presentation(const world_params& params)
     // from the strip. (Reverses BL-013's Corporation-default.) Single-select with a
     // null state — re-clicking the active lens clears back here. See LENSES.md.
     m_ui.overlay = overlay_mode::none;
+    // Owner-lens picks are keyed by corp id, and ids restart in a new world.
+    m_ui.reset_lens_owners();
 
     // The survey day counter restarts with the view (the survey STATES are
     // world state: `init_survey_states`, run once by whoever built the world).
@@ -2130,6 +2132,9 @@ bool app::load_game_from(const std::string& path)
     m_ui.planetary_zoom    = env.planetary_zoom;
     m_ui.planetary_pan_x   = env.planetary_pan_x;
     m_ui.planetary_pan_y   = env.planetary_pan_y;
+    // Owner-lens picks are per session and keyed by corp id: a loaded world
+    // reuses ids, so a carried pick would name a different corporation.
+    m_ui.reset_lens_owners();
 
     // App-side transients that describe the world just replaced. Left alone
     // they would keep drawing the PREVIOUS campaign's numbers until the next

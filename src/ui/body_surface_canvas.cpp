@@ -955,7 +955,7 @@ void draw_owner_key(const world& w, ui_state& state,
     });
 
     const auto matches = [&](entity_id corp) {
-        const char* q = state.lens_owner_filter;
+        const char* q = state.lens_owner_filter(background);
         if (q[0] == '\0')
             return true;
         std::string name   = w.corporations.at(corp).name;
@@ -1004,9 +1004,10 @@ void draw_owner_key(const world& w, ui_state& state,
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0.0f, 0.0f});
     ImGui::Begin("##lens_key_owner_list", nullptr, flags);
     ImGui::SetNextItemWidth(bw);
-    ImGui::InputTextWithHint("##lens_owner_search",
+    ImGui::InputTextWithHint(background ? "##lens_company_search" : "##lens_corp_search",
                              background ? "Search companies" : "Search corporations",
-                             state.lens_owner_filter, sizeof state.lens_owner_filter);
+                             state.lens_owner_filter(background),
+                             sizeof state.lens_corps_filter); // both filters are char[32]
     ImGui::Dummy({bw, 2.0f});
     ImGui::BeginChild("##rows", {bw, std::max(0.0f, list_h - kLensComboH - 4.0f)}, false,
                       ImGuiWindowFlags_NoBackground);
@@ -2783,7 +2784,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         state.ground_req.x1     = x1c;
         state.ground_req.y0     = 1.5f * static_cast<float>(row_lo) - 1.0f;
         state.ground_req.y1     = 1.5f * static_cast<float>(row_hi) + 1.0f;
-        state.ground_req.draw_r = draw_r; ///< Picks the bake tier (stepped ladder).
+        // The DRAWN ground radius, hex_size * zoom — not draw_r, which is a
+        // 1 px border-inset for the polygon fills. Passing draw_r let a drawn
+        // radius in (T, T+1] pick tier T and draw it magnified (BL-1244).
+        state.ground_req.draw_r = hit_r; ///< Picks the bake tier (stepped ladder).
         state.ground_req.sy     = tilt_sy; ///< The tilted rungs want oblique tiers (BL-737).
         state.ground_req.valid  = raster_ok;
     }
@@ -2832,13 +2836,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (gview.tier_ppr > 0.0)
                 std::snprintf(gbuf, sizeof gbuf,
                               "ground: tier %.0f px/r  ·  %.2f texel/px  ·  %d chunks  ·  %d stand-in",
-                              gview.tier_ppr, gview.tier_ppr / draw_r,
+                              gview.tier_ppr, gview.tier_ppr / hit_r, // texels per DRAWN px
                               static_cast<int>(gview.chunks.size()),
                               static_cast<int>(gview.standin.size()));
             else
                 std::snprintf(gbuf, sizeof gbuf,
                               "ground: far page 6 px/r  ·  %.2f texel/px",
-                              6.0f / draw_r);
+                              6.0f / hit_r);
             // Foreground list: HUD text must not ride the tilt camera's squash.
             ImGui::GetForegroundDrawList()->AddText(
                 { grid_area_origin.x + 8.0f,
@@ -2871,6 +2875,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // BL-1240: the Corporation lens's picked set defaults to the player, applied
     // once per session (ui_state cannot know the player id when it is built).
     state.seed_lens_corps(w.player_entity);
+    // A dissolved owner drops out of both sets rather than lingering in the count.
+    state.prune_lens_owners([&w](entity_id id) { return w.corporations.count(id) > 0; });
 
     auto compute_tile_fill = [&](entity_id id, const tile_component& tile) -> ImU32
     {
@@ -3652,6 +3658,31 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 }
             }
 
+            // Owner multi-select rim (BL-1240): ground held by an UNPICKED owner of
+            // the lens's kind takes owned_grey AND a dark inset rim. The grey alone
+            // is a value, and some terrain sits at that value (urban, regolith,
+            // metallic); the rim is the colour-independent channel that says "held,
+            // not picked" whatever the ground beside it. Drawn after the border
+            // band so the national wash cannot bury it; skipped under coarse_fill,
+            // where a hex is a few pixels and a rim would be the whole tile.
+            if (!coarse_fill && has_owner
+                && (state.overlay == overlay_mode::corporation
+                    || state.overlay == overlay_mode::company))
+            {
+                const bool want_bg = (state.overlay == overlay_mode::company);
+                const auto oit     = w.corporations.find(corp_it->second);
+                if (oit != w.corporations.end()
+                    && oit->second.is_background == want_bg
+                    && !state.lens_owner_picked(corp_it->second, want_bg))
+                {
+                    const float lw = std::max(1.0f, draw_r * 0.10f);
+                    ImVec2 rim[6];
+                    hex_vertices(rim, cx, cy, std::max(1.0f, draw_r - lw * 0.5f));
+                    dl->AddPolyline(rim, 6, IM_COL32(18, 20, 26, 200),
+                                    ImDrawFlags_Closed, lw);
+                }
+            }
+
             // Resource lens deposit outline (Ben, 2026-10-04: "push up the contrast").
             // Pale identities (silica, sand, rare earth) sit close to the white wash, so
             // every deposit blob is ringed with a DARK stroke on each side facing ground
@@ -4055,6 +4086,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         // click. Coarse zoom registers nothing: at draw_r <= 7 px
                         // a tile is barely wider than the corridor, and the whole
                         // canvas would resolve to a nation.
+                        //
+                        // Zones live in GROUND space (pre-squash), and the click
+                        // asks with the ground-space cursor, as hover does. A
+                        // single-building tile's hex OUTRANKS this corridor with no
+                        // lens (SELECTION.md § Multi-building tiles; BL-1241): the
+                        // press resolves its building before the band is asked, so
+                        // the band is reached from the unbuilt or stacked side of a
+                        // border there — and from either side under a lens.
                         if (!coarse_fill)
                         {
                             structure_hit_zone sz;
@@ -5143,7 +5182,16 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             entity_id owner = null_entity;
             const structure_kind k =
                 lens_structure_of_tile(w, state, hovered_tile, tile_to_corp, &owner);
-            if (k == structure_kind::corporation || k == structure_kind::company)
+            // The border band outranks the ground under every lens (BL-601): a
+            // shift-click ON a border still selects the nation. The zones are
+            // registered in ground space, so ask with the ground-space cursor,
+            // as the hover label does.
+            structure_kind band_kind = structure_kind::nation;
+            const bool on_band =
+                resolve_structure_hit(state.structure_hit_zones, mouse_g.x, mouse_g.y,
+                                      &band_kind) != null_entity;
+            if (!on_band
+                && (k == structure_kind::corporation || k == structure_kind::company))
                 shift_pick_owner = owner;
         }
 
@@ -5186,9 +5234,34 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // Resolve marker hit zones in priority order (BL-031): building
             // outranks market-centre; both outrank tile. Shared with hover.
             // Suppressed entirely under a lens by the rule above.
-            const entity_id marker_hit =
+            //
+            // GROUND-SPACE CURSOR (BL-1241 fix round): the zones are registered
+            // in flat ground space and the camera squash maps them onto the
+            // screen, so the press asks with `mouse_g` exactly as hover does.
+            // Asking with the screen `mouse` missed off-centre presses on every
+            // tilted rung — the hover named one thing and the press took another.
+            entity_id marker_hit =
                 lensed ? null_entity
-                       : resolve_marker_hit(state.marker_hit_zones, mouse.x, mouse.y);
+                       : resolve_marker_hit(state.marker_hit_zones, mouse_g.x, mouse_g.y);
+
+            // A SINGLE BUILDING OWNS ITS WHOLE HEX (SELECTION.md § Multi-building
+            // tiles; BL-1241). With the structures baked there is no glyph to aim
+            // at — the hex is the press area — so on a tile carrying exactly one
+            // building the building is resolved HERE, before the border band's
+            // corridor gets a say: a press anywhere on that hex, edge included,
+            // lands on the installation. A unit marker still outranks it (a unit
+            // standing on a built tile must stay reachable on the first press).
+            // A stacked tile is unchanged — it falls through to the tile view —
+            // and so is every lensed press (the lens branch never reaches here).
+            if (!lensed && hovered_tile != null_entity
+                && (marker_hit == null_entity || !w.units.count(marker_hit)))
+            {
+                const auto cnt_it = tile_bld_count.find(hovered_tile);
+                const auto tb     = tile_to_bld.find(hovered_tile);
+                if (cnt_it != tile_bld_count.end() && cnt_it->second == 1
+                    && tb != tile_to_bld.end())
+                    marker_hit = tb->second;
+            }
 
             // STRUCTURE-GRAIN selection (BL-601), between the markers and the
             // tile/province fallback. With no lens a marker is a specific thing
@@ -5209,8 +5282,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             structure_kind struct_kind = structure_kind::nation;
             entity_id structure_hit =
                 (marker_hit == null_entity)
-                    ? resolve_structure_hit(state.structure_hit_zones, mouse.x, mouse.y,
-                                            &struct_kind)
+                    ? resolve_structure_hit(state.structure_hit_zones, mouse_g.x, mouse_g.y,
+                                            &struct_kind) // ground space, as hover asks
                     : null_entity;
 
             // Set when the click resolved to a NON-ENTITY structure (a deposit or

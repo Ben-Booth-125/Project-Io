@@ -425,7 +425,36 @@ struct ui_state
     std::vector<entity_id> lens_corps;            ///< Picked corporations (player + rivals), in pick order.
     entity_id              lens_corps_seed = null_entity; ///< The player the default was last applied for.
     std::vector<entity_id> lens_companies;        ///< Picked background firms; default empty.
-    char                   lens_owner_filter[32] = {}; ///< The owner checklist's search box text.
+    char                   lens_corps_filter[32]     = {}; ///< Corporation checklist's search box text.
+    char                   lens_companies_filter[32] = {}; ///< Company checklist's search box text.
+    /// The search box a lens's checklist reads — one per lens, like the sets.
+    char* lens_owner_filter(bool background) { return background ? lens_companies_filter : lens_corps_filter; }
+    /// Forget every pick, the seed and both searches. Called when a world is
+    /// replaced (new game, load): corp ids restart at 1, so a pick carried over
+    /// would silently name a different corporation in the new world.
+    void reset_lens_owners()
+    {
+        lens_corps.clear();
+        lens_companies.clear();
+        lens_corps_seed          = null_entity;
+        lens_corps_filter[0]     = '\0';
+        lens_companies_filter[0] = '\0';
+    }
+    /// Drop every pick whose corporation no longer exists (`alive(id)` false) —
+    /// a dissolved owner would otherwise sit in the header count with no row.
+    template <typename Alive>
+    void prune_lens_owners(Alive&& alive)
+    {
+        const auto prune = [&](std::vector<entity_id>& v) {
+            std::size_t keep = 0;
+            for (std::size_t i = 0; i < v.size(); ++i)
+                if (alive(v[i]))
+                    v[keep++] = v[i];
+            v.resize(keep);
+        };
+        prune(lens_corps);
+        prune(lens_companies);
+    }
     /// Apply the Corporation set's default (the player) once per seated player; a
     /// player who then unpicks themselves stays unpicked. A new seat REPLACES the
     /// previous seat's default — the old corp was the default, not a pick.
@@ -1066,6 +1095,27 @@ struct ui_state
     entity_id market_ledger_aim_market   = null_entity;
     int       market_ledger_aim_resource = -1;   ///< resource_type index, -1 = none.
     bool      market_ledger_aim_scroll   = false;
+    /// The market the ledger last consumed an aim for — PERSISTENT, unlike
+    /// `market_ledger_aim_market`. The aimed good highlights only on this
+    /// market, and the Production row reads "aimed" (and so toggles the ledger
+    /// shut on a second press) only when its own market is this one.
+    entity_id market_ledger_aimed_market = null_entity;
+
+    /// Verify-only readout of the tile Production section AS DRAWN last frame
+    /// (BL-1239 fix round): one entry per Part 1 stack row and per Part 2 good
+    /// row. Cleared by the Selection dispatcher every frame, so it is empty
+    /// whenever the section did not draw. Exists so a script can assert what a
+    /// RIVAL row withholds (DISCOVERY.md, the operational fog) — an absence a
+    /// capture cannot prove. No player surface reads it.
+    struct tile_production_row
+    {
+        bool        stack = true;  ///< true: a Part 1 stack row; false: a Part 2 good row.
+        std::string label;         ///< Stack: line one as drawn. Good: the good's name.
+        std::string detail;        ///< Stack: line two as drawn. Good: "made" / "deposited".
+        std::string good;          ///< Stack: the good named on line one, "" when none shown.
+        bool        open  = false; ///< Stack: output and state shown (own, or god view).
+    };
+    std::vector<tile_production_row> tile_production_rows;
 
     /// History ledger: 0=Story (the body's biography), 1=Chain (the generation
     /// charts), 2=Ages (the Era -1 political time-lapse, BL-277), 3=Tectonics

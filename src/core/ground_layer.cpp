@@ -39,6 +39,8 @@ void ground_layer::worker_main()
         result d;
         d.tier = j.tier; d.ci = j.ci; d.cj = j.cj; d.pw = j.pw; d.ph = j.ph;
         d.hash = j.hash; d.gen = j.gen;
+        d.neigh_tile = j.neigh_tile;
+        std::copy(std::begin(j.neigh_rect), std::end(j.neigh_rect), std::begin(d.neigh_rect));
         d.px.assign(static_cast<std::size_t>(j.pw) * j.ph, 0u);
         const auto t0 = std::chrono::steady_clock::now();
         ui::ground::bake_region(*j.src, j.geom, j.prm, j.px0, j.py0, j.pw, j.ph, d.px.data());
@@ -102,8 +104,10 @@ void ground_layer::reset(entity_id body, const world& w)
         m_neigh = nullptr;
     }
     m_neigh_ready = m_neigh_queued = false;
-    m_neigh_tile = m_neigh_want_tile = null_entity;
+    m_neigh_tile = null_entity;
+    m_neigh_want = 0;
     m_active_tier = -1;
+    m_standin_tier = -1;
     m_body = body;
     m_src.reset();
     if (body == null_entity || !w.bodies.count(body))
@@ -220,7 +224,11 @@ void ground_layer::upload(SDL_Renderer* r, const result& d)
             m_neigh = SDL_CreateTexture(r, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC,
                                         d.pw, d.ph);
             if (!m_neigh)
+            {
+                m_neigh_ready = false; // the old page's texture is gone with its size
+                m_neigh_want  = 0;     // transient failure: re-requested next tick
                 return;
+            }
             m_neigh_w = d.pw;
             m_neigh_h = d.ph;
             SDL_SetTextureScaleMode(m_neigh, SDL_SCALEMODE_LINEAR);
@@ -229,8 +237,10 @@ void ground_layer::upload(SDL_Renderer* r, const result& d)
         SDL_UpdateTexture(m_neigh, nullptr, d.px.data(), d.pw * 4);
         ++m_bake_counters.neigh_bakes;
         m_neigh_hash = d.hash;
-        m_neigh_tile = m_neigh_want_tile;
-        std::copy(std::begin(m_neigh_want_rect), std::end(m_neigh_want_rect), std::begin(m_neigh_rect));
+        // The result's OWN subject, carried by the job — never the request's
+        // current one, which may have moved on while this baked (F34).
+        m_neigh_tile = d.neigh_tile;
+        std::copy(std::begin(d.neigh_rect), std::end(d.neigh_rect), std::begin(m_neigh_rect));
         m_neigh_ready = true;
         return;
     }
@@ -280,8 +290,10 @@ void ground_layer::upload(SDL_Renderer* r, const result& d)
     ++m_bake_counters.chunk_bakes;
     if (c.ready)
         ++m_bake_counters.chunk_rebakes;
+    ++c.bakes;
     c.hash  = d.hash;
     c.ready = true;
+    c.stale = false;
     c.last_want = m_frame;
 }
 
@@ -311,6 +323,8 @@ void ground_layer::bake_now(SDL_Renderer* r, const job& j)
     result d;
     d.tier = j.tier; d.ci = j.ci; d.cj = j.cj; d.pw = j.pw; d.ph = j.ph;
     d.hash = j.hash; d.gen = j.gen;
+    d.neigh_tile = j.neigh_tile;
+    std::copy(std::begin(j.neigh_rect), std::end(j.neigh_rect), std::begin(d.neigh_rect));
     d.px = m_scratch;
     upload(r, d);
 }
@@ -460,8 +474,19 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
             const int ph  = std::max(1, std::min(g.H - py0,
                                                  static_cast<int>(std::ceil(2.0 * hy * g.s))));
             std::uint64_t h = ui::ground::region_hash(*m_src, g, px0, py0, pw, ph);
-            h ^= (static_cast<std::uint64_t>(static_cast<std::uint32_t>(px0)) << 32)
-               ^ static_cast<std::uint32_t>(py0) ^ (static_cast<std::uint64_t>(pw) << 17);
+            // The window AND the subject: py0 clamps to 0 near the top edge, so
+            // two rows in one column can share a window (and so a hash), and
+            // the page would stick on the old tile (F34). The requested tile,
+            // its grid position and the radius are folded in explicitly.
+            const auto fold = [&h](std::uint64_t v) { h ^= v; h *= 1099511628211ull; };
+            fold(static_cast<std::uint32_t>(px0));
+            fold(static_cast<std::uint32_t>(py0));
+            fold(static_cast<std::uint32_t>(pw));
+            fold(static_cast<std::uint32_t>(ph));
+            fold(static_cast<std::uint64_t>(nq.tile));
+            fold(static_cast<std::uint32_t>(nq.col));
+            fold(static_cast<std::uint32_t>(nq.row));
+            fold(static_cast<std::uint32_t>(nq.radius));
             const bool stale = !m_neigh_ready || h != m_neigh_hash || m_neigh_tile != nq.tile;
             if (stale && (h != m_neigh_want || !m_neigh_ready || bake_everything))
             {
@@ -469,12 +494,12 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
                 j.tier = -2; j.px0 = px0; j.py0 = py0; j.pw = pw; j.ph = ph;
                 j.gen = m_gen; j.src = m_src; j.geom = g; j.prm = params;
                 j.hash = h;
+                j.neigh_tile = nq.tile;
+                j.neigh_rect[0] = static_cast<float>(px0 / g.s);
+                j.neigh_rect[1] = static_cast<float>(py0 / g.s + g.y_min);
+                j.neigh_rect[2] = static_cast<float>((px0 + pw) / g.s);
+                j.neigh_rect[3] = static_cast<float>((py0 + ph) / g.s + g.y_min);
                 m_neigh_want = h;
-                m_neigh_want_tile = nq.tile;
-                m_neigh_want_rect[0] = static_cast<float>(px0 / g.s);
-                m_neigh_want_rect[1] = static_cast<float>(py0 / g.s + g.y_min);
-                m_neigh_want_rect[2] = static_cast<float>((px0 + pw) / g.s);
-                m_neigh_want_rect[3] = static_cast<float>((py0 + ph) / g.s + g.y_min);
                 if (bake_everything)
                     bake_now(r, j);
                 else
@@ -491,36 +516,21 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
     if (req.valid && req.body == m_body && req.draw_r > 0.0f)
     {
         // THE GROUND IS NEVER MAGNIFIED (BL-1244, Ben 2026-10-08): the
-        // smallest tier at or above the drawn hex radius, drawn minified —
-        // never past 2:1 on the x2 ladder — and the far page only where it too
-        // is at or below 1:1. The old 1.2x magnification headroom read as blur
-        // (rungs 4-14% magnified at the reference window). hex_size is
-        // fit-derived, so where a rung lands against its tier still moves with
-        // the window; past the 192 px top tier the ground magnifies — the
-        // ladder's one bound.
+        // smallest tier at or above the DRAWN hex radius (the canvas passes
+        // hex_size * zoom, not its 1 px border-inset), drawn minified — never
+        // past 2:1 on the x2 ladder — and the far page only where it too is
+        // at or below 1:1. hex_size is fit-derived, so where a rung lands
+        // against its tier still moves with the window; past the 192 px top
+        // tier the ground magnifies — the ladder's one bound.
+        const int prev_active = m_active_tier;
         m_active_tier = ui::ground::choose_tier(req.draw_r, k_far_px_per_r,
                                                 k_tier_ppr, k_tiers);
+        // A tier that has just become active is re-hashed IMMEDIATELY, every
+        // ready chunk in view (F34): its chunks may have baked many days ago,
+        // as another rung's stand-in or before the rung was last left.
+        const bool became_active = m_active_tier != prev_active;
 
-        // The top tier is resident only while its rung is active
-        // (RENDERING.md § Level of detail): its memory is the viewport's
-        // chunks, never a body's worth left behind by a zoom-out. The tiers
-        // below keep their LRU sets — they are the stand-ins.
-        if (m_active_tier != k_tiers - 1 && !m_tiers[k_tiers - 1].chunks.empty())
-        {
-            tier_state& top = m_tiers[k_tiers - 1];
-            for (auto it = top.chunks.begin(); it != top.chunks.end();)
-            {
-                if (it->second.queued)
-                {
-                    ++it; // a result is in flight; upload heals it, next sweep drops it
-                    continue;
-                }
-                if (it->second.tex)
-                    SDL_DestroyTexture(it->second.tex);
-                it = top.chunks.erase(it);
-            }
-        }
-
+        int active_ready = 0, active_total = 0;
         if (m_active_tier >= 0)
         {
             tier_state& t = m_tiers[m_active_tier];
@@ -543,13 +553,7 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
                 t.baked_sy = want_sy;
                 ++m_gen;
             }
-            const double s = t.geom.s;
-            const int ci_lo = static_cast<int>(std::floor(req.x0 * s / k_chunk_px)) - 1;
-            const int ci_hi = static_cast<int>(std::ceil (req.x1 * s / k_chunk_px));
-            const int cj_lo = std::max(0, static_cast<int>(
-                std::floor((req.y0 - t.geom.y_min) * s / k_chunk_px)) - 1);
-            const int cj_hi = std::min(t.ch - 1, static_cast<int>(
-                std::ceil((req.y1 - t.geom.y_min) * s / k_chunk_px)));
+            const chunk_window win = window_of(t, req);
 
             int queued_now = 0;
             int fills = 0;
@@ -558,8 +562,8 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
                 queued_now = static_cast<int>(m_jobs.size());
             }
             std::size_t wanted = 0;
-            for (int cj = cj_lo; cj <= cj_hi; ++cj)
-                for (int ci = ci_lo; ci <= ci_hi; ++ci)
+            for (int cj = win.cj_lo; cj <= win.cj_hi; ++cj)
+                for (int ci = win.ci_lo; ci <= win.ci_hi; ++ci)
                 {
                     const int cw = ((ci % t.cw) + t.cw) % t.cw;
                     const std::uint32_t key = static_cast<std::uint32_t>(cj) * t.cw + cw;
@@ -568,17 +572,25 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
                     ++wanted;
                     if (c.queued)
                         continue;
-                    // Hash only what could need work: an unbaked chunk, or a
-                    // staleness sweep of a ready one — amortised live, but
-                    // EVERY tick under --verify: a capture must never show
-                    // stale ground because the sweep phase hadn't come round.
+                    // Hash only what could need work: an unbaked chunk, a
+                    // stale one, or a staleness sweep of a ready one —
+                    // amortised live, but EVERY tick under --verify (a capture
+                    // must never show stale ground because the sweep phase
+                    // hadn't come round) and on the tick the tier becomes
+                    // active.
                     const bool sweep = c.ready
-                        && (bake_everything || (m_frame + key) % 60 == 0);
+                        && (c.stale || bake_everything || became_active
+                            || (m_frame + key) % 60 == 0);
                     if (c.ready && !sweep)
                         continue;
                     job j = make_chunk_job(m_active_tier, cw, cj);
                     if (c.ready && j.hash == c.hash)
+                    {
+                        c.stale = false; // its inputs moved back: the texture is true again
                         continue;
+                    }
+                    if (c.ready && became_active)
+                        c.stale = true; // a texture from a past visit whose inputs moved: hide it
                     if (bake_everything)
                     {
                         // verify_fill_limit: a capture of the MID-FILL frame
@@ -600,10 +612,169 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
             // or eviction and re-bake thrash every frame (review fleet,
             // 2026-09-01): the wanted set, doubled, floors it.
             evict(t, std::max(k_tier_cap[m_active_tier], wanted * 2));
+            coverage(t, win, active_ready, active_total);
+        }
+
+        // THE STAND-IN (BL-1244; F34): while the active tier's view is not
+        // fully ready, ONE other tier carries the frame under its chunks —
+        // the nearest FINER tier resident in view (a zoom-out keeps the crisp
+        // rung it just left, minified), else the nearest coarser one (a
+        // zoom-in shows the rung below for the frames it fills), else the
+        // far page alone. Once the active view is whole there is none.
+        const int prev_standin = m_standin_tier;
+        m_standin_tier = -1;
+        if (m_active_tier >= 0 && active_ready < active_total)
+        {
+            const auto resident = [&](int ti) {
+                int rd = 0, tot = 0;
+                coverage(m_tiers[ti], window_of(m_tiers[ti], req), rd, tot);
+                return rd > 0;
+            };
+            for (int ti = m_active_tier + 1; ti < k_tiers && m_standin_tier < 0; ++ti)
+                if (resident(ti))
+                    m_standin_tier = ti;
+            for (int ti = m_active_tier - 1; ti >= 0 && m_standin_tier < 0; --ti)
+                if (resident(ti))
+                    m_standin_tier = ti;
+        }
+        // A stand-in is RE-HASHED, never baked (F34): its chunks in view ride
+        // the active tier's sweep phase — every tick under --verify, and the
+        // whole view on the tick it becomes the stand-in — and a chunk whose
+        // inputs moved is marked stale and stops drawing, rather than showing
+        // ground that is no longer there.
+        if (m_standin_tier >= 0)
+        {
+            tier_state& st = m_tiers[m_standin_tier];
+            const bool fresh = m_standin_tier != prev_standin;
+            const chunk_window win = window_of(st, req);
+            for (int cj = win.cj_lo; cj <= win.cj_hi; ++cj)
+                for (int ci = win.ci_lo; ci <= win.ci_hi; ++ci)
+                {
+                    const int cw = ((ci % st.cw) + st.cw) % st.cw;
+                    const std::uint32_t key = static_cast<std::uint32_t>(cj) * st.cw + cw;
+                    const auto it = st.chunks.find(key);
+                    if (it == st.chunks.end() || !it->second.ready || it->second.queued)
+                        continue;
+                    chunk& c = it->second;
+                    c.last_want = m_frame;
+                    if (!(c.stale || fresh || bake_everything || (m_frame + key) % 60 == 0))
+                        continue;
+                    c.stale = chunk_hash(st, cw, cj) != c.hash;
+                }
+        }
+
+        // The top tier is resident only while its rung is active or it stands
+        // in (RENDERING.md § Level of detail): its memory is the viewport's
+        // chunks, never a body's worth left behind by a zoom-out — but it is
+        // kept while the rung below fills, so the zoom-out shows it rather
+        // than a coarser tier. Eviction never touches the stand-in.
+        if (m_active_tier != k_tiers - 1 && m_standin_tier != k_tiers - 1
+            && !m_tiers[k_tiers - 1].chunks.empty())
+        {
+            tier_state& top = m_tiers[k_tiers - 1];
+            for (auto it = top.chunks.begin(); it != top.chunks.end();)
+            {
+                if (it->second.queued)
+                {
+                    ++it; // a result is in flight; upload heals it, next sweep drops it
+                    continue;
+                }
+                if (it->second.tex)
+                    SDL_DestroyTexture(it->second.tex);
+                it = top.chunks.erase(it);
+            }
         }
     }
 
     publish(ui);
+}
+
+ground_layer::chunk_window ground_layer::window_of(const tier_state& t,
+                                                   const ground_request& req) const
+{
+    chunk_window win;
+    if (t.cw <= 0 || t.ch <= 0)
+        return win;
+    const double s = t.geom.s;
+    win.ci_lo = static_cast<int>(std::floor(req.x0 * s / k_chunk_px)) - 1;
+    win.ci_hi = static_cast<int>(std::ceil (req.x1 * s / k_chunk_px));
+    win.cj_lo = std::max(0, static_cast<int>(
+        std::floor((req.y0 - t.geom.y_min) * s / k_chunk_px)) - 1);
+    win.cj_hi = std::min(t.ch - 1, static_cast<int>(
+        std::ceil((req.y1 - t.geom.y_min) * s / k_chunk_px)));
+    return win;
+}
+
+void ground_layer::coverage(const tier_state& t, const chunk_window& win,
+                            int& ready, int& total) const
+{
+    ready = total = 0;
+    if (t.cw <= 0)
+        return;
+    for (int cj = win.cj_lo; cj <= win.cj_hi; ++cj)
+        for (int ci = win.ci_lo; ci <= win.ci_hi; ++ci)
+        {
+            ++total;
+            const int cw = ((ci % t.cw) + t.cw) % t.cw;
+            const auto it = t.chunks.find(static_cast<std::uint32_t>(cj) * t.cw + cw);
+            if (it != t.chunks.end() && it->second.ready && !it->second.stale && it->second.tex)
+                ++ready;
+        }
+}
+
+std::uint64_t ground_layer::chunk_hash(const tier_state& t, int ci, int cj) const
+{
+    const int px0 = ci * k_chunk_px;
+    const int py0 = cj * k_chunk_px;
+    return ui::ground::region_hash(*m_src, t.geom, px0, py0,
+                                   std::min(k_chunk_px, t.geom.W - px0),
+                                   std::min(k_chunk_px, t.geom.H - py0));
+}
+
+std::vector<ground_layer::chunk_probe> ground_layer::probe_chunks() const
+{
+    std::vector<chunk_probe> out;
+    if (!m_src)
+        return out;
+    if (m_far_ready && m_far && m_far_geom.W > 0)
+    {
+        chunk_probe p;
+        p.tier  = -1;
+        p.key   = 0;
+        p.bakes = m_bake_counters.far_bakes;
+        p.installation_hash = ui::ground::installation_hash(*m_src, m_far_geom, 0, 0,
+                                                            m_far_geom.W, m_far_geom.H);
+        p.region_hash = ui::ground::region_hash(*m_src, m_far_geom, 0, 0,
+                                                m_far_geom.W, m_far_geom.H);
+        out.push_back(p);
+    }
+    if (m_active_tier < 0)
+        return out;
+    const tier_state& t = m_tiers[m_active_tier];
+    if (t.cw <= 0)
+        return out;
+    for (const auto& [key, c] : t.chunks)
+    {
+        if (!c.ready || !c.tex)
+            continue;
+        const int ci  = static_cast<int>(key % static_cast<std::uint32_t>(t.cw));
+        const int cj  = static_cast<int>(key / static_cast<std::uint32_t>(t.cw));
+        const int px0 = ci * k_chunk_px;
+        const int py0 = cj * k_chunk_px;
+        const int pw  = std::min(k_chunk_px, t.geom.W - px0);
+        const int ph  = std::min(k_chunk_px, t.geom.H - py0);
+        chunk_probe p;
+        p.tier  = m_active_tier;
+        p.key   = key;
+        p.bakes = c.bakes;
+        p.installation_hash = ui::ground::installation_hash(*m_src, t.geom, px0, py0, pw, ph);
+        p.region_hash       = ui::ground::region_hash(*m_src, t.geom, px0, py0, pw, ph);
+        out.push_back(p);
+    }
+    std::sort(out.begin(), out.end(), [](const chunk_probe& a, const chunk_probe& b) {
+        return a.tier != b.tier ? a.tier < b.tier : a.key < b.key;
+    });
+    return out;
 }
 
 std::uint64_t ground_layer::installation_digest() const
@@ -641,8 +812,8 @@ void ground_layer::publish(ui_state& ui) const
     {
         for (const auto& [key, c] : t.chunks)
         {
-            if (!c.ready || !c.tex || t.cw <= 0)
-                continue;
+            if (!c.ready || !c.tex || c.stale || t.cw <= 0)
+                continue; // a stale texture is ground that is no longer there
             const int ci  = static_cast<int>(key % static_cast<std::uint32_t>(t.cw));
             const int cj  = static_cast<int>(key / static_cast<std::uint32_t>(t.cw));
             const int px0 = ci * k_chunk_px;
@@ -661,14 +832,13 @@ void ground_layer::publish(ui_state& ui) const
     if (m_active_tier >= 0)
     {
         v.tier_ppr = m_tiers[m_active_tier].geom_ppr;
-        // THE STAND-IN (BL-1244): while the active tier's chunks fill, the
-        // next tier down carries the frame wherever it is resident — drawn
-        // over the far page, under the active chunks — so the far page shows
-        // only where nothing closer is. (A stand-in baked at another rung's
-        // tilt is off by that tilt's lift for the frames it stands in; the
-        // far page, always flat, already was.)
-        if (m_active_tier > 0)
-            emit(m_tiers[m_active_tier - 1], v.standin);
+        // THE STAND-IN (BL-1244; F34 — chosen in tick): drawn over the far
+        // page, under the active chunks, so the far page shows only where
+        // nothing closer is. (A stand-in baked at another rung's tilt is off
+        // by that tilt's lift for the frames it stands in; the far page,
+        // always flat, already was.)
+        if (m_standin_tier >= 0 && m_standin_tier != m_active_tier)
+            emit(m_tiers[m_standin_tier], v.standin);
         emit(m_tiers[m_active_tier], v.chunks);
     }
 }

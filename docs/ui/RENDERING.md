@@ -293,8 +293,10 @@ drawn radius** — no magnification headroom — and draws it **minified**, neve
 (the ×2 spacing; `SDL_Renderer` has no mipmaps, so that bound is what keeps a step
 transition shimmer-free). Minification under linear filtering softens nothing;
 magnification is what read as blur, at the 4–14% the earlier 1.2× headroom allowed at
-the reference window. While a tier's chunks fill, the stand-in is the next tier down
-where it is resident, and the far page only where nothing closer is.
+the reference window. While a tier's chunks fill, the stand-in is the nearest FINER tier
+with ground ready in view (minifying it is free), else the nearest coarser one, else the
+far page alone; a stand-in tier is never evicted, and its chunks are re-hashed on the
+active tier's sweep so a stand-in never shows ground a build or a survey has since moved.
 
 **Every tier is supersampled.** A tier bakes at **2×** its nominal pixels per hex and is
 box-downsampled to the nominal size before upload, so stamp edges, ridge creases and

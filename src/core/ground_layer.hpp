@@ -24,8 +24,10 @@
 // above it. The canvas's ground_request carries the drawn hex radius; the
 // smallest tier at or above it becomes the ACTIVE tier — drawn minified, never
 // magnified (BL-1244) — and its chunks are baked around the viewport,
-// LRU-capped, with the next tier down standing in while they fill. Every bake
-// is supersampled 2x and downsampled before upload (ui/ground_bake).
+// LRU-capped. While they fill, ONE stand-in tier carries the frame under them:
+// the nearest finer tier resident in the viewport, else the nearest coarser
+// one, else the far page alone. Every bake is supersampled 2x and downsampled
+// before upload (ui/ground_bake).
 //
 // ALL BAKING RUNS ON A WORKER THREAD (wave 2's perf half): the pure bake
 // (ui/ground_bake) executes against an immutable source snapshot; the render
@@ -93,6 +95,22 @@ public:
     /// reads its family (recipe group) from. Set by the app; null = general form.
     const recipe_registry* registry = nullptr;
 
+    /// Verify-only (BL-1241, ground_rebake.lua's per-chunk diff): one row per
+    /// READY chunk of the active tier, plus the far page (tier -1, key 0) —
+    /// its key, how many times it has been uploaded, and the installation and
+    /// region hashes over its OWN window against the current source. A script
+    /// diffs these day to day: a chunk whose bake count moved must have had one
+    /// of its own hashes move.
+    struct chunk_probe
+    {
+        int           tier = -1;
+        std::uint32_t key  = 0;
+        std::uint64_t bakes = 0;
+        std::uint64_t installation_hash = 0;
+        std::uint64_t region_hash = 0;
+    };
+    std::vector<chunk_probe> probe_chunks() const;
+
 private:
     struct chunk
     {
@@ -100,6 +118,11 @@ private:
         std::uint64_t hash = 0;
         bool          ready  = false;
         bool          queued = false;
+        /// Ready, but its region hash has moved since it baked (found by a
+        /// stand-in sweep, which hashes and never bakes): never drawn until
+        /// re-baked, and re-hashed every tick it is wanted (F34, stale stand-in).
+        bool          stale  = false;
+        std::uint64_t bakes  = 0;    ///< Uploads into this slot (verify probe).
         std::uint64_t last_want = 0; ///< Frame stamp for LRU eviction.
     };
 
@@ -124,6 +147,11 @@ private:
         std::shared_ptr<const ui::ground::bake_source> src;
         ui::ground::geometry   geom;
         ui::ground::bake_params prm;
+        // The neighbourhood page's subject travels WITH the job (F34): the
+        // result is shown under the tile and rect it was baked for, never
+        // under whatever the request names by the time it lands.
+        entity_id neigh_tile = null_entity;
+        float     neigh_rect[4] = { 0, 0, 0, 0 };
     };
 
     struct result
@@ -132,8 +160,17 @@ private:
         int  ci = 0, cj = 0, pw = 0, ph = 0;
         std::uint64_t hash = 0;
         std::uint32_t gen  = 0;
+        entity_id neigh_tile = null_entity;
+        float     neigh_rect[4] = { 0, 0, 0, 0 };
         std::vector<std::uint32_t> px;
     };
+
+    /// The chunk window a request covers in tier @p t (ci unwrapped; cj clamped).
+    struct chunk_window { int ci_lo = 0, ci_hi = -1, cj_lo = 0, cj_hi = -1; };
+    chunk_window window_of(const tier_state& t, const ground_request& req) const;
+    /// Ready, not-stale chunks of @p t inside @p win, and the window's size.
+    void coverage(const tier_state& t, const chunk_window& win, int& ready, int& total) const;
+    std::uint64_t chunk_hash(const tier_state& t, int ci, int cj) const;
 
     void reset(entity_id body, const world& w);
     void refresh_source(const world& w);
@@ -151,6 +188,7 @@ private:
     std::uint64_t m_frame = 0;      ///< LRU clock.
     int           m_src_age = 0;    ///< Frames since the source snapshot was taken.
     int           m_active_tier = -1;
+    int           m_standin_tier = -1; ///< Never evicted while it stands in (F34).
     std::shared_ptr<const ui::ground::bake_source> m_src;
 
     static constexpr int k_tiers = ui::ground::k_tier_count;
@@ -192,11 +230,9 @@ private:
     SDL_Texture*  m_neigh = nullptr;
     int           m_neigh_w = 0, m_neigh_h = 0;
     std::uint64_t m_neigh_hash = 0;
-    std::uint64_t m_neigh_want = 0;     ///< Hash of the page last enqueued.
-    entity_id     m_neigh_tile = null_entity;
-    entity_id     m_neigh_want_tile = null_entity;
+    std::uint64_t m_neigh_want = 0;     ///< Hash of the page last enqueued (folds the tile).
+    entity_id     m_neigh_tile = null_entity; ///< The tile the READY page was baked for.
     float         m_neigh_rect[4] = { 0, 0, 0, 0 }; ///< Canonical x0, y0, x1, y1 of the ready page.
-    float         m_neigh_want_rect[4] = { 0, 0, 0, 0 };
     bool          m_neigh_ready  = false;
     bool          m_neigh_queued = false;
     static constexpr double k_neigh_px_per_r = 48.0;

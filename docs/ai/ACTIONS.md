@@ -785,7 +785,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 ### `canvas.select` — The primary canvas (Solar, Circumplanetary, or Planetary rung — whichever fills the window).
 
-**Press.** Single left-click on an entity: a body on the Solar/Circumplanetary rungs, a TILE or marker on the Planetary surface. A LIVE BATTLE OUTRANKS ALL OF THEM (BL-469): if a fight stands in the clicked tile's province, the click selects the battle. UNDER A LENS THIS ALL CHANGES (BL-664, Ben 2026-08-28). A lens collapses selection to ONE TIER: the press resolves to the active lens's structure or to NOTHING, markers take no part ('markers do not outrank lenses'), and there is no repeat-click cycle. Corporation resolves the owner's tile group on this body, Company the same for a background firm, Resource the deposit, Market and Scarcity the catchment, Continent the plate. Population, Industry and Throughput draw a value field with no structure grain and are INERT — a press does nothing and clears the Selection band to resting, as does a press on any ground the active lens has no answer for (unowned ground under Corporation, a tile without the selected resource under Resource). The national border band is NOT an exception: it is suppressed while any lens is up (Ben, 2026-08-28, reaffirmed 2026-09-07), and its hit corridor goes with it - the corridor is built in the same pass as the stroke, and a border that is invisible but still clickable is worse than either state. Everything above this sentence describes the canvas with NO lens active.
+**Press.** Single left-click on an entity: a body on the Solar/Circumplanetary rungs, a TILE or marker on the Planetary surface. A LIVE BATTLE OUTRANKS ALL OF THEM (BL-469): if a fight stands in the clicked tile's province, the click selects the battle. UNDER A LENS THIS ALL CHANGES (BL-664, Ben 2026-08-28). A lens collapses selection to ONE TIER: the press resolves to the active lens's structure or to NOTHING, markers take no part ('markers do not outrank lenses'), and there is no repeat-click cycle. Corporation resolves the owner's tile group on this body, Company the same for a background firm, Resource the deposit, Market and Scarcity the catchment, Continent the plate. Population, Industry and Throughput draw a value field with no structure grain and are INERT — a press does nothing and clears the Selection band to resting, as does a press on any ground the active lens has no answer for (unowned ground under Corporation, a tile without the selected resource under Resource). The national border band is NOT an exception: it is suppressed while any lens is up (Ben, 2026-08-28, reaffirmed 2026-09-07), and its hit corridor goes with it - the corridor is built in the same pass as the stroke, and a border that is invisible but still clickable is worse than either state. Everything above this sentence describes the canvas with NO lens active. ON THE PLAIN CANVAS (sprint 51, BL-1241): on a hex carrying exactly ONE building, a press anywhere on the hex selects the building, outranking the national border band's click corridor (edge included); a stacked hex resolves to the tile. The press resolves in ground space, so on the tilted rungs an off-centre press lands where hover points.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -988,6 +988,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Valid when:**
 - The Corporation or Company lens must be active.
 - The tile must be held by an owner of the lens's kind (a corporation under Corporation, a background firm under Company); a shift-click on any other ground behaves as a plain click.
+- Not on a national border band — the band outranks the ground under every lens, so a shift-click there behaves as a plain click and selects the nation.
 - Not in construction placement or march-picking mode — those gestures outrank it.
 - A toggle: shift-clicking a picked owner's ground unpicks it.
 
@@ -1764,7 +1765,7 @@ TRADES shows FOUR headed sections, each bounded and scrolling inside itself so a
 
 ### `ledger.tile_production_market_door` — Selection band, tile element, Production section — a good row in the 'Sells at <market>' table (goods made on this tile, then goods deposited on it)
 
-**Press.** Click a good row.
+**Press.** Click a good row. A second press on the currently aimed row CLOSES the Market ledger (the Toggle rule). Only goods made by the viewer's own stacks are listed as made on this tile; a rival stack names no good (its recipe is private).
 
 | Arg | Type | Meaning |
 |---|---|---|

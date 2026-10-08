@@ -177,12 +177,14 @@ horizontal columns (Ben, 2026-07-28):
      tile production section): a building
      stands on a tile and a market's catchment is tile-keyed, so a province sum would blur the
      two things this section exists to join. Two parts, top to bottom:
-     - **What stands here and what it makes.** One row per **stack** on the tile — the
-       `placement_rules::stack_members` grouping the Manage Buildings list uses (§ Multi-building
-       tiles) — carrying the type glyph and count (this is where the retired `+N` badge's count
+     - **What stands here and what it makes.** One row per **stack** on the tile — grouped by
+       type, what it makes (extraction target or active recipe) and owner, so two recipes or two
+       owners on one tile are two rows; a rival's rows group by type and owner only, since splitting
+       them by recipe would itself reveal the recipes — carrying the type glyph and count (this is where the retired `+N` badge's count
        is read), the good it makes, its output per tick, and its **running state**: *Running*,
-       *Understaffed*, *Idle* or *Mothballed*, or *Under construction* with its ETA. An idle or
-       understaffed row **says why** — labour short, or an input short, naming the input and its
+       *Understaffed* (labour short), *Partial* (staffed but an input short), *Idle* or
+       *Mothballed*, or *Under construction* with its ETA. An idle, partial or understaffed row
+       **says why** — labour short, or an input short, naming the input and its
        cause (none on the shelf, posted over the fair-price ceiling, no producer in reach). The
        state and its reason come from the one function the building hover card reads
        (`hover_building_detail`'s classification), so the two surfaces cannot disagree. This

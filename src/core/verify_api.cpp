@@ -42,6 +42,7 @@
 #include "world/construction.hpp"
 #include "world/corporation_generation.hpp"
 #include "world/logistics.hpp"
+#include "world/market_clearing.hpp" // BL-1241: stage_one mirrors place_building's market emergence
 #include "world/placement_rules.hpp"
 #include "world/stance.hpp"
 #include "world/survey_system.hpp"
@@ -993,6 +994,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         if (it == m_world.corporations.end())
             return false;
         m_ui.seed_lens_corps(m_world.player_entity); // the default lands first
+        m_ui.prune_lens_owners([this](entity_id c) { return m_world.corporations.count(c) > 0; });
         m_ui.toggle_lens_owner(it->first, it->second.is_background);
         return true;
     });
@@ -1000,6 +1002,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // assert what a checklist press or a shift-click actually did.
     v.set_function("lens_owner_picks", [this](const std::string& kind) {
         m_ui.seed_lens_corps(m_world.player_entity);
+        m_ui.prune_lens_owners([this](entity_id c) { return m_world.corporations.count(c) > 0; });
         sol::table out = m_lua.state().create_table();
         int i = 1;
         for (const entity_id id : m_ui.lens_owner_set(kind == "company"))
@@ -1028,8 +1031,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     v.set_function("set_resource_mode", [](bool) {});
     v.set_function("set_zoom", [this](float z) { m_ui.planetary_zoom = z; });
     // BL-1244 (ground never magnified): the frame HUD's ground line as data —
-    // the drawn hex radius, the active tier, texel/px (tier px per hex over
-    // drawn px per hex: >= 1 is minified, < 1 magnified), per-slot cumulative
+    // the drawn hex radius (hex_size * zoom, the ground quad's own scale — not
+    // the polygon fills' 1 px border-inset, F34), the active tier, texel/px
+    // (tier px per hex over drawn px per hex: >= 1 is minified, < 1
+    // magnified), the camera squash `sy` (cos tilt), per-slot cumulative
     // bake ms / count since ground_stats_reset(), and resident texture bytes.
     // Slot 0 = the far page, slot 1 + t = chunked tier t.
     v.set_function("ground_stats", [this]() {
@@ -1041,7 +1046,9 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         t["draw_r"]      = draw_r;
         t["tier_ppr"]    = ppr;
         t["texel_per_px"] = draw_r > 0.0f ? ppr / draw_r : 0.0;
+        t["sy"]          = m_ui.ground_req.sy;
         t["chunks"]      = static_cast<int>(m_ui.ground.chunks.size());
+        t["standin"]     = static_cast<int>(m_ui.ground.standin.size());
         t["active_slot"] = s.active_slot;
         int ww = 0, wh = 0;
         SDL_GetWindowSize(m_window, &ww, &wh);
@@ -3556,6 +3563,29 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return out;
     });
 
+    // BL-1239 fix round: the tile element's Production section AS DRAWN last
+    // frame — one entry per stack row ({stack=true, label, detail, good, open})
+    // then one per good row ({stack=false, label, detail="made"|"deposited"}).
+    // Empty when the section did not draw. Exists to make a RIVAL row's
+    // withholding assertable (DISCOVERY.md § The operational fog: no recipe
+    // group name, no good, nothing "made here") — an absence no capture proves.
+    v.set_function("tile_production_rows", [this]() {
+        sol::state& st  = m_lua.state();
+        sol::table  out = st.create_table();
+        int n = 0;
+        for (const ui_state::tile_production_row& r : m_ui.tile_production_rows)
+        {
+            sol::table row = st.create_table();
+            row["stack"]  = r.stack;
+            row["label"]  = r.label;
+            row["detail"] = r.detail;
+            row["good"]   = r.good;
+            row["open"]   = r.open;
+            out[++n] = row;
+        }
+        return out;
+    });
+
     // The PROFITABILITY table's row set, as the fold-out lists it (BL-679).
     //
     // Separate from `acquisitions_field` because the two answer different
@@ -4640,6 +4670,19 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         const entity_id id = m_world.create_entity();
         m_world.buildings[id]  = bc;
         m_world.stockpiles[id] = stockpile_component{};
+        // place_building's post-insert consequences, in its order
+        // (world/construction.cpp): the urban transform for a non-extraction
+        // type, market emergence on an instant completion, and the logistics
+        // cache clear for an instantly-complete port / hub. Without them a
+        // staged stack never urbanises and a staged port extends no reach —
+        // the capture would judge a world the game cannot produce.
+        if (bc.type != building_type::extraction_site)
+            placement_rules::maybe_transform_to_urban(m_world, tile);
+        if (bc.ticks_remaining <= 0)
+            if (const auto tit = m_world.tiles.find(tile); tit != m_world.tiles.end())
+                maybe_spawn_market(m_world, m_registry, tit->second.body, tile);
+        if (building_affects_logistics(bc.type) && bc.ticks_remaining <= 0)
+            invalidate_logistics_caches(m_world);
         if (auto cit = m_world.corporations.find(owner); cit != m_world.corporations.end())
             cit->second.assets.push_back(id);
         return id;
@@ -4883,6 +4926,35 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         t["installations"] = std::string(buf);
         t["buildings"]     = static_cast<double>(m_world.buildings.size());
         return t;
+    });
+
+    // BL-1241 / F34: the per-chunk view of the same question. One row per
+    // READY chunk of the active tier, plus the far page (tier -1, key 0):
+    //   { tier, key, bakes, installations, region }
+    // `bakes` counts uploads into that chunk slot; `installations` and `region`
+    // are the installation hash and the full content hash over the chunk's OWN
+    // window, against the current source (hex strings: a 64-bit hash does not
+    // survive a Lua number). A script diffs these day to day — a chunk whose
+    // bake count moved must have had one of its own hashes move. Verify-only;
+    // hashes, never tile data.
+    v.set_function("ground_chunk_probe", [this]() {
+        sol::state& s = m_lua.state();
+        sol::table out = s.create_table();
+        int i = 0;
+        for (const ground_layer::chunk_probe& p : m_ground.probe_chunks())
+        {
+            sol::table r = s.create_table();
+            char ib[24], rb[24];
+            std::snprintf(ib, sizeof ib, "%016llx", static_cast<unsigned long long>(p.installation_hash));
+            std::snprintf(rb, sizeof rb, "%016llx", static_cast<unsigned long long>(p.region_hash));
+            r["tier"]          = p.tier;
+            r["key"]           = static_cast<double>(p.key);
+            r["bakes"]         = static_cast<double>(p.bakes);
+            r["installations"] = std::string(ib);
+            r["region"]        = std::string(rb);
+            out[++i] = r;
+        }
+        return out;
     });
 
     v.set_function("population_centres", [this]() {

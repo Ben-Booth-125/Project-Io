@@ -67,6 +67,7 @@ verify.frames(2)
 local n, list = picks("corporation")
 print("[owner_multi_select] corporation default picks: " .. list)
 verify.expect(n == 1, "the Corporation lens defaults to the player alone")
+local player_list = list -- the player's id, as the default set prints it
 verify.capture("owner_corps_default")
 close("owner_corps_default_close", rivals[1])
 
@@ -108,21 +109,41 @@ close("owner_companies_two_firms_close", firms[1])
 -- moved by one, not which id.
 verify.set_overlay("corporation")
 verify.frames(1)
+verify.expect(#rivals >= 3, "at least three rivals hold ground on the home body (shift-click needs an unpicked one)")
 if #rivals >= 3 then
+    -- No selection going in, so "touches no selection" is a plain comparison.
+    verify.clear_selection()
+    verify.frames(1)
     local before = picks("corporation")
     local t = tile_of[rivals[3]]
     local ok = verify.shift_click_tile(t.x, t.y)
     verify.frames(2)
     local after, after_list = picks("corporation")
-    print(string.format("[owner_multi_select] shift-click (%d,%d) ok=%s picks %d -> %d (%s)",
-                        t.x, t.y, tostring(ok), before, after, after_list))
+    local pt = verify.pointer_target()
+    print(string.format("[owner_multi_select] shift-click (%d,%d) ok=%s picks %d -> %d (%s) selection=%s",
+                        t.x, t.y, tostring(ok), before, after, after_list, tostring(pt.selection_kind)))
     verify.expect(ok and after == before + 1, "a shift-click on an unpicked rival's tile picks it")
+    verify.expect(not pt.has_selection and pt.selected_province == 0,
+                  "a shift-click touches no selection")
     verify.capture("owner_corps_shift_click")
     -- Toggle rule: the same press again unpicks it.
     verify.shift_click_tile(t.x, t.y)
     verify.frames(2)
     local again = picks("corporation")
     verify.expect(again == before, "a second shift-click unpicks it")
+    verify.expect(not verify.pointer_target().has_selection,
+                  "the second shift-click touches no selection either")
+    -- A PLAIN click on the same ground still selects (the lens's own resolution)
+    -- and leaves the picked set alone.
+    verify.click_tile(t.x, t.y)
+    verify.frames(2)
+    local plain = picks("corporation")
+    local pp = verify.pointer_target()
+    print("[owner_multi_select] plain click selection=" .. tostring(pp.selection_kind))
+    verify.expect(pp.has_selection, "a plain click on owned ground still selects")
+    verify.expect(plain == before, "a plain click does not toggle a pick")
+    verify.clear_selection()
+    verify.frames(1)
 end
 
 -- R3: the sets survive a body switch.
@@ -133,5 +154,20 @@ verify.goto_surface("home")
 verify.frames(2)
 local after_corps, after_list = picks("corporation")
 verify.expect(after_list == before_list, "the Corporation set survives a body switch")
+
+-- Reset: picks are per session and keyed by corp id, and ids restart in a new
+-- world — so a load must drop them back to the default (the player alone, no firm).
+local SAVE = "build_gen/verify/owner_multi_select.iosave"
+verify.expect(verify.save(SAVE), "save wrote " .. SAVE)
+verify.expect(#rivals >= 1 and #firms >= 1, "a rival and a firm to pick before the load")
+if #rivals >= 1 then verify.toggle_lens_owner(rivals[1]) end
+if #firms >= 1 then verify.toggle_lens_owner(firms[1]) end
+verify.expect(verify.load(SAVE), "load read " .. SAVE)
+verify.frames(3)
+local rn, rlist = picks("corporation")
+local cn = picks("company")
+print(string.format("[owner_multi_select] after load: corporation picks %s, company picks %d", rlist, cn))
+verify.expect(rn == 1 and rlist == player_list, "a load resets the Corporation set to the player")
+verify.expect(cn == 0, "a load resets the Company set to empty")
 
 verify.set_overlay("none")

@@ -4,7 +4,8 @@
 -- Walks the five stepped zoom rungs (kMinZoom * 2^k, k = 0..4) at the
 -- reference 1720x1080 window and at a 4K-height window, and for each rung
 -- prints the frame HUD's ground line as data (verify.ground_stats): the drawn
--- hex radius, the tier it drew from, texel/px (tier px per hex / drawn px per
+-- hex radius (hex_size * zoom — the ground quad's own scale, not the polygon
+-- fills' 1 px border-inset; F34), the tier it drew from, texel/px (tier px per hex / drawn px per
 -- hex — >= 1.0 is minified, < 1.0 is MAGNIFIED, the thing the rule forbids),
 -- the bake cost of the chunks that rung needed (verify bakes synchronously,
 -- so the timing is the bake itself, not a worker race), and the resident
@@ -13,8 +14,10 @@
 --
 -- Then the R4 mid-fill frame: with the --verify bake-everything path turned
 -- off for ONE frame (verify.ground_fill_limit), a rung change shows what
--- stands in while the new tier's chunks fill — the next tier down where it is
--- resident, the far page only where nothing closer is.
+-- stands in while the new tier's chunks fill — the nearest finer tier resident
+-- in view, else the nearest coarser one, the far page only where nothing
+-- closer is (F34). Then the ZOOM-OUT mid-fill: back down a rung with bakes
+-- frozen, the finer tier just left must stand in (not the far page).
 --
 -- Run: ProjectIo --verify scripts/verify/ground_sharpness.lua
 
@@ -68,13 +71,28 @@ verify.center_tile(189, 70, kMinZoom * 8)
 verify.frames(2)
 do
     local s = verify.ground_stats()
-    print(string.format("GROUND midfill draw_r %.2f  tier %.0f  texel/px %.3f  chunks %d",
-                        s.draw_r, s.tier_ppr, s.texel_per_px, s.chunks))
+    print(string.format("GROUND midfill draw_r %.2f  tier %.0f  texel/px %.3f  chunks %d  stand-in %d",
+                        s.draw_r, s.tier_ppr, s.texel_per_px, s.chunks, s.standin))
 end
 verify.capture("ground_sharpness_midfill")
 verify.ground_fill_limit(-1)
 verify.frames(2)
 verify.capture("ground_sharpness_midfill_filled")
+-- Zoom-out mid-fill: rung 3 is now resident around column 189; step back to
+-- rung 2 framed at column 175 — overlapping that set, west of rung 2's own
+-- resident set around 215 — with bakes frozen. The 96 px tier just left is finer and resident in view, so it
+-- stands in — minified, crisp — rather than the far page.
+verify.ground_fill_limit(0)
+verify.center_tile(175, 70, kMinZoom * 4)
+verify.frames(2)
+do
+    local s = verify.ground_stats()
+    print(string.format("GROUND zoomout-midfill draw_r %.2f  tier %.0f  chunks %d  stand-in %d",
+                        s.draw_r, s.tier_ppr, s.chunks, s.standin))
+end
+verify.capture("ground_sharpness_zoomout_midfill")
+verify.ground_fill_limit(-1)
+verify.frames(2)
 verify.goto_surface("home")
 
 walk("ref", 1720, 1080)

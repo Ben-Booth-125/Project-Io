@@ -213,7 +213,11 @@ nothing on the other two canvases.
 - **Tiles of an unpicked owner** are **greyed** — one neutral, desaturated owned-grey,
   the same for every unpicked owner, distinct from unowned ground (which keeps its plain
   terrain). Grey still says *someone holds this*; colour says *one of the owners you
-  asked about holds this*.
+  asked about holds this*. The grey is a **mid value** (`palette::owned_grey`), clear of
+  both the pale terrain (ice, snow, salt) and the dark (forest, ash); because some ground
+  sits at mid value too, every unpicked owner's tile also carries a **dark inset rim** —
+  the colour-independent channel. Below the coarse level of detail the rim is dropped
+  and the grey carries the read alone.
 - The **player corporation** (`w.player_entity`) uses
   `presentation::faction_colour(0)` for its tile fill and additionally gets a thin
   border in `palette::selection` (white) so the player's holdings contrast against

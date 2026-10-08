@@ -172,7 +172,10 @@ building_running_state classify_building_running(const world& w, const recipe_re
              row->run < 0.999f)
     {
         // Running on a part batch: the scarcest input set the run fraction.
-        s.kind        = building_run_kind::understaffed;
+        // PARTIAL, never "Understaffed" — the labour is there, and naming it
+        // would send the player to the wrong lever. A run of nothing is Idle.
+        s.kind        = (row->run <= 1e-4f) ? building_run_kind::idle
+                                            : building_run_kind::partial;
         s.reason      = building_run_reason::input_short;
         s.input       = row->limiting_input;
         s.input_cause = input_cause_of(w, reg, b, row->limiting_input);
@@ -186,6 +189,7 @@ const char* running_state_word(building_run_kind k)
     {
     case building_run_kind::running:            return "Running";
     case building_run_kind::understaffed:       return "Understaffed";
+    case building_run_kind::partial:            return "Partial";
     case building_run_kind::idle:               return "Idle";
     case building_run_kind::mothballed:         return "Mothballed";
     case building_run_kind::under_construction: return "Under construction";
@@ -242,6 +246,7 @@ ImU32 running_state_colour(building_run_kind k)
     case building_run_kind::idle:               return palette::negative;
     case building_run_kind::mothballed:         return palette::neutral;
     case building_run_kind::understaffed:
+    case building_run_kind::partial:
     case building_run_kind::under_construction: return IM_COL32(225, 180, 90, 255);
     }
     return palette::neutral;

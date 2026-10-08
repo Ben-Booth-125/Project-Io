@@ -20,9 +20,10 @@
 //
 // Requirement group `ground-never-magnified` (BL-1244):
 //
-//   P10 The tier chooser: smallest tier with ppr >= draw_r, far page at or
-//       below 1:1, no radius magnified up to the 192 px top tier, no chunked
-//       tier minified past 2:1.
+//   P10 The tier chooser: smallest tier with ppr >= the DRAWN radius, far
+//       page at or below 1:1, no radius magnified up to the 192 px top tier,
+//       no chunked tier minified past 2:1, and the canvas's border-inset
+//       radius shown to be the wrong feed (F34).
 //   P11 The 2x supersampled bake is pure, wrap-exact, seamless across a chunk
 //       edge, and not a no-op.
 //   P12 (a reading) bake ms per 512 px chunk per tier, 1x vs 2x.
@@ -301,16 +302,22 @@ int main()
     // P10 — the never-magnify chooser (BL-1244, RENDERING.md § Level of
     // detail): the smallest tier at or above the drawn radius; the far page
     // only at or below 1:1; minification never past 2:1 on the ladder; the
-    // 192 px tier exists. Rows include the measured rung radii at 1720x1080
-    // (5.93 / 12.87 / 26.73 / 54.47 / 109.66) and 3840x2160 (13.0 ... 222.41).
+    // 192 px tier exists. The radius is the DRAWN one, hex_size * zoom — the
+    // ground quad's own scale — not the canvas's draw_r, which is that minus a
+    // 1 px polygon border-inset (F34: feeding draw_r let a drawn radius in
+    // (T, T+1] pick tier T and draw it magnified). Rows include the measured
+    // rung radii at 1720x1080, drawn (6.93 / 13.87 / 27.73 / 55.47 / 110.66 —
+    // the BL-1244 measurement's draw_r plus the inset), and 3840x2160 (14.0 ...
+    // 223.41), plus one row inside each (T, T+1] band the old feed got wrong.
     {
         const double* L = k_tier_ladder;
         const int     N = k_tier_count;
         check(N >= 5 && L[N - 1] == 192.0, "P10", "a 192 px chunked tier tops the ladder");
         const struct { double r; int want; } rows[] = {
-            { 5.93, -1 }, { 6.0, -1 }, { 6.01, 0 }, { 12.0, 0 }, { 12.87, 1 }, { 13.0, 1 },
-            { 26.73, 2 }, { 27.0, 2 }, { 54.47, 3 }, { 54.99, 3 }, { 96.0, 3 },
-            { 109.66, 4 }, { 110.98, 4 }, { 192.0, 4 }, { 222.41, 4 },
+            { 5.93, -1 }, { 6.0, -1 }, { 6.01, 0 }, { 6.93, 0 }, { 12.0, 0 }, { 12.5, 1 },
+            { 13.0, 1 }, { 13.87, 1 }, { 14.0, 1 }, { 24.5, 2 }, { 27.0, 2 }, { 27.73, 2 },
+            { 48.5, 3 }, { 54.99, 3 }, { 55.47, 3 }, { 96.0, 3 }, { 96.5, 4 },
+            { 110.66, 4 }, { 192.0, 4 }, { 223.41, 4 },
         };
         bool all = true;
         for (const auto& row : rows)
@@ -334,6 +341,20 @@ int main()
         }
         check(never_mag, "P10", "no radius up to the top tier is magnified (texel/px >= 1)");
         check(within_2, "P10", "no chunked tier is minified past 2:1");
+        // The canvas contract (F34): fed the drawn radius, no radius in a
+        // (T, T+1] band magnifies; fed draw_r = drawn - 1, every such band
+        // would have — the off-by-one this row pins.
+        bool drawn_ok = true, inset_would_magnify = false;
+        for (int t = 0; t < N; ++t)
+        {
+            const double drawn = L[t] + 0.5;
+            const int    td = choose_tier(drawn, k_far_ppr, L, N);
+            const int    ti = choose_tier(drawn - 1.0, k_far_ppr, L, N);
+            if (t + 1 < N && L[td] < drawn) drawn_ok = false;
+            if (L[ti] < drawn) inset_would_magnify = true;
+        }
+        check(drawn_ok, "P10", "the drawn radius (hex_size * zoom) never magnifies in a (T, T+1] band");
+        check(inset_would_magnify, "P10", "the border-inset radius would have (the off-by-one is real)");
     }
 
     // P11 — supersampling (BL-1244): the 2x bake is pure (byte-identical

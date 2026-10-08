@@ -2738,14 +2738,16 @@ void draw_tile_chart_section(ui_state& ui, entity_id sel, const tile_metric& mp,
 // two things the section joins.
 //
 // Two parts, top to bottom:
-//   1. One row per STACK (placement_rules::stack_members — the grouping the
-//      Manage Buildings list uses): type glyph, name and count, the good it
-//      makes, output per tick, running state with its reason. The state comes
-//      from classify_building_running, the function the hover card and the
-//      building card's Status page read, so the three cannot disagree. A
-//      rival's stack shows type, count and owner; output and state read
-//      "private" (DISCOVERY.md, the competitor-visibility rule) — opened only
-//      under spectator god view, as every rival card is (BL-408).
+//   1. One row per STACK, keyed (type, what it makes, owner) — see
+//      production_stack for why that is finer than stack_members: type glyph,
+//      name and count, the good it makes, output per tick, running state with
+//      its reason. The state comes from classify_building_running, the
+//      function the hover card and the building card's Status page read, so
+//      the three cannot disagree. A rival's stack shows its public TYPE, count
+//      and owner only — no recipe name, no good, no good-keyed glyph, nothing
+//      added to part 2 as "made here"; output and state read "private"
+//      (DISCOVERY.md § The operational fog) — opened only under spectator god
+//      view, as every rival card is (BL-408).
 //   2. The market whose catchment holds this tile, named, then one row per
 //      good made here and per good deposited here: posted price and the
 //      market's state for it. Each row is a drill-through door to the Market
@@ -2753,11 +2755,23 @@ void draw_tile_chart_section(ui_state& ui, entity_id sel, const tile_metric& mp,
 namespace {
 
 /// One stack standing on the tile, in stack order (oldest member first).
+///
+/// KEYED BY (type, what it makes, owner) — not by `placement_rules::
+/// stack_members` alone, which groups every non-extraction type by type only:
+/// a Steel foundry and a Refinery on one tile would read as one row naming
+/// one recipe's good, and a rival's building would fold into the player's row
+/// (BL-1239 fix round). What-it-makes is the extraction target or the active
+/// recipe — but only where the viewer may know it. A rival's recipe is private
+/// (DISCOVERY.md § The operational fog), so a closed row keys on type and owner
+/// alone: splitting it by recipe would itself tell the player how many recipes
+/// the rival runs here.
 struct production_stack
 {
-    building_type          type   = building_type::none;
-    resource_type          target = resource_type::iron_ore;
-    std::vector<entity_id> members;   ///< stack_members order: ascending id.
+    building_type          type  = building_type::none;
+    int                    makes = -1;          ///< Target index / recipe id; -1 = not keyed (closed or makes nothing).
+    entity_id              owner = null_entity; ///< owner_corp_of the members.
+    bool                   open  = false;       ///< Viewer's own, or spectator god view.
+    std::vector<entity_id> members;             ///< Ascending id.
 };
 
 /// The good a building makes: an extraction site's target, a processing
@@ -2778,10 +2792,11 @@ bool good_made_by(const recipe_registry& reg, const building_component& b, resou
     return false;
 }
 
-/// The stacks on @p tile, grouped by `placement_rules::stack_members`, in the
-/// order of each stack's oldest member — deterministic, never the unordered
-/// `world::buildings` iteration order.
-std::vector<production_stack> tile_stacks(const world& w, entity_id tile)
+/// The stacks on @p tile, keyed as `production_stack` says, in the order of
+/// each stack's oldest member — deterministic, never the unordered
+/// `world::buildings` iteration order. UI grouping only: the world's own stack
+/// rule (`placement_rules::stack_members`, capacity and placement) is untouched.
+std::vector<production_stack> tile_stacks(const world& w, entity_id tile, bool god)
 {
     std::vector<entity_id> here;
     for (const auto& [id, b] : w.buildings)
@@ -2790,21 +2805,34 @@ std::vector<production_stack> tile_stacks(const world& w, entity_id tile)
     std::sort(here.begin(), here.end());
 
     std::vector<production_stack> stacks;
-    std::vector<entity_id>        placed;
-    for (const entity_id id : here)
+    for (const entity_id id : here) // ascending, so each stack's first member is its oldest
     {
-        if (std::find(placed.begin(), placed.end(), id) != placed.end())
-            continue;
         const building_component& b = w.buildings.at(id);
-        production_stack st;
-        st.type    = b.type;
-        st.target  = b.target_resource;
-        st.members = placement_rules::stack_members(w, tile, b.type, b.target_resource);
-        if (std::find(st.members.begin(), st.members.end(), id) == st.members.end())
-            st.members.insert(st.members.begin(), id); // defensive: never drop the row
-        for (const entity_id m : st.members)
-            placed.push_back(m);
-        stacks.push_back(std::move(st));
+        production_stack key;
+        key.type  = b.type;
+        key.owner = owner_corp_of(w, id);
+        key.open  = god || is_player_owned(w, id);
+        if (key.open)
+        {
+            if (b.type == building_type::extraction_site)
+                key.makes = static_cast<int>(b.target_resource);
+            else if (b.type == building_type::processing_facility)
+                key.makes = (b.recipe == no_recipe) ? -1 : static_cast<int>(b.recipe);
+        }
+        std::size_t at = stacks.size();
+        for (std::size_t k = 0; k < stacks.size(); ++k)
+        {
+            const production_stack& s = stacks[k];
+            if (s.type == key.type && s.makes == key.makes && s.owner == key.owner &&
+                s.open == key.open)
+            {
+                at = k;
+                break;
+            }
+        }
+        if (at == stacks.size())
+            stacks.push_back(std::move(key));
+        stacks[at].members.push_back(id);
     }
     return stacks;
 }
@@ -2851,8 +2879,9 @@ void draw_tile_production_section(const world& w, const recipe_registry& reg,
     // good to "Iro..." and wrapped the state over three lines (measured on the
     // first capture). Line one names the stack and what it makes; line two,
     // indented, carries what is private to the owner — output and running state.
-    const std::vector<production_stack> stacks = tile_stacks(w, sel);
-    std::vector<resource_type> made; // goods made here, first-seen order
+    ui.tile_production_rows.clear(); // the verify readout describes ONE drawing of the section
+    const std::vector<production_stack> stacks = tile_stacks(w, sel, god);
+    std::vector<resource_type> made; // goods made here, first-seen order — OPEN rows only
     if (stacks.empty())
     {
         // Stated positively: an empty table and "Nothing built here" cost the
@@ -2865,13 +2894,22 @@ void draw_tile_production_section(const world& w, const recipe_registry& reg,
         const entity_id           first = st.members.front();
         const building_component& b0    = w.buildings.at(first);
         const bool  mine  = is_player_owned(w, first);
-        const bool  open  = mine || god;
+        const bool  open  = st.open;
         const int   count = static_cast<int>(st.members.size());
 
+        // What the stack makes — only for an OPEN row. A rival's recipe is
+        // private (DISCOVERY.md § The operational fog): its good is neither
+        // named, drawn into the glyph, nor listed in Part 2 as "made here".
         resource_type good  = resource_type::iron_ore;
-        const bool    makes = good_made_by(reg, b0, good);
+        const bool    makes = open && good_made_by(reg, b0, good);
         if (makes && std::find(made.begin(), made.end(), good) == made.end())
             made.push_back(good);
+
+        ui_state::tile_production_row readout;
+        readout.stack = true;
+        readout.open  = open;
+        if (makes)
+            readout.good = resource_name(good);
 
         ImGui::PushID(static_cast<int>(si));
 
@@ -2880,19 +2918,28 @@ void draw_tile_production_section(const world& w, const recipe_registry& reg,
         const float gr = line_h * 0.45f;
         {
             const ImVec2 gp = ImGui::GetCursorScreenPos();
-            // The type-keyed vocabulary the canvas and the Build door draw.
+            // The type-keyed vocabulary the canvas and the Build door draw. A
+            // closed row passes a good neither glyph family keys on (coal: the
+            // extraction ore-chunk and the processing square), so the glyph
+            // says the TYPE and nothing about what it makes.
+            const resource_type ident = makes ? good
+                                      : (open ? b0.target_resource : resource_type::coal);
             icons::building(ImGui::GetWindowDrawList(), {gp.x + gr + 1.0f, gp.y + line_h * 0.5f},
-                            gr, b0.type, makes ? good : b0.target_resource,
+                            gr, b0.type, ident,
                             mine ? IM_COL32(190, 200, 210, 255) : IM_COL32(150, 154, 166, 255));
             ImGui::Dummy({gr * 2.0f + 2.0f, line_h});
             ImGui::SameLine();
 
             char name[96];
-            const std::string gname = building_group_name(w, reg, b0);
+            // Open: the group name ("Steel foundry"), which names the recipe.
+            // Closed: the public building TYPE only.
+            const std::string gname = open ? building_group_name(w, reg, b0)
+                                           : std::string(building_type_name(b0.type));
             if (count > 1)
                 std::snprintf(name, sizeof name, "%s \xc3\x97%d", gname.c_str(), count);
             else
                 std::snprintf(name, sizeof name, "%s", gname.c_str());
+            readout.label = name;
             const float good_w = makes ? ImGui::CalcTextSize(resource_name(good)).x +
                                              ImGui::CalcTextSize(" \xc2\xb7 ").x
                                        : 0.0f;
@@ -2937,9 +2984,13 @@ void draw_tile_production_section(const world& w, const recipe_registry& reg,
                          std::max(24.0f, ImGui::GetContentRegionAvail().x - tail_w));
                 ImGui::SameLine(0.0f, 0.0f);
                 ImGui::TextDisabled("%s", tail);
+                readout.detail = cit->second.name + tail;
             }
             else
+            {
                 ImGui::TextDisabled("Output and state private");
+                readout.detail = "Output and state private";
+            }
         }
         else
         {
@@ -2991,7 +3042,7 @@ void draw_tile_production_section(const world& w, const recipe_registry& reg,
                 line += t0;
             else
             {
-                int n[5] = {0, 0, 0, 0, 0};
+                int n[building_run_kind_count] = {};
                 const building_running_state* owed = nullptr;
                 for (const building_running_state& rs : states)
                 {
@@ -3001,7 +3052,7 @@ void draw_tile_production_section(const world& w, const recipe_registry& reg,
                         owed = &rs;
                 }
                 std::string mixed;
-                for (int k = 0; k < 5; ++k)
+                for (int k = 0; k < building_run_kind_count; ++k)
                 {
                     if (n[k] == 0)
                         continue;
@@ -3021,9 +3072,11 @@ void draw_tile_production_section(const world& w, const recipe_registry& reg,
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(running_state_colour(tint)),
                                "%s", line.c_str());
             ImGui::PopTextWrapPos();
+            readout.detail = line;
         }
         ImGui::Unindent(gr * 2.0f + 2.0f + style.ItemSpacing.x);
         ImGui::PopID();
+        ui.tile_production_rows.push_back(std::move(readout));
     }
 
     ImGui::Dummy({1.0f, style.ItemSpacing.y});
@@ -3087,13 +3140,24 @@ void draw_tile_production_section(const world& w, const recipe_registry& reg,
             // The whole row is the door: a Selectable spanning every column,
             // labelled with the good's own name in its identity colour.
             ImGui::TableSetColumnIndex(0);
-            const bool aimed = ui.show_market_ledger && ui.market_ledger_aim_resource == static_cast<int>(r);
+            // Aimed = the open ledger is pointed at THIS good at THIS market
+            // (the pending one-shot, or the aim the ledger already consumed).
+            const bool aimed = ui.show_market_ledger &&
+                               ui.market_ledger_aim_resource == static_cast<int>(r) &&
+                               (ui.market_ledger_aim_market == mid ||
+                                ui.market_ledger_aimed_market == mid);
             ImGui::PushStyleColor(ImGuiCol_Text,
                 ImGui::ColorConvertU32ToFloat4(presentation_of(rt).colour));
             const bool pressed = ImGui::Selectable(resource_name(rt), aimed,
                                                    ImGuiSelectableFlags_SpanAllColumns);
             ImGui::PopStyleColor();
-            if (pressed)
+            if (pressed && aimed)
+            {
+                // Toggle rule: the active state is visible (the row reads
+                // selected), so pressing it again undoes it — the ledger shuts.
+                ui.show_market_ledger = false;
+            }
+            else if (pressed)
             {
                 close_all_panels(ui);
                 ui.show_market_ledger         = true;
@@ -3103,9 +3167,22 @@ void draw_tile_production_section(const world& w, const recipe_registry& reg,
                 ui.market_ledger_aim_scroll   = true;
             }
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("%s is %s.\nPress to open it in the Market ledger at %s.",
-                                  resource_name(rt), is_made ? "made here" : "deposited here",
-                                  market_city_name(w, mid).c_str());
+            {
+                if (aimed)
+                    ImGui::SetTooltip("%s is %s.\nPress again to close the Market ledger.",
+                                      resource_name(rt), is_made ? "made here" : "deposited here");
+                else
+                    ImGui::SetTooltip("%s is %s.\nPress to open it in the Market ledger at %s.",
+                                      resource_name(rt), is_made ? "made here" : "deposited here",
+                                      market_city_name(w, mid).c_str());
+            }
+            {
+                ui_state::tile_production_row good_row;
+                good_row.stack  = false;
+                good_row.label  = resource_name(rt);
+                good_row.detail = is_made ? "made" : "deposited";
+                ui.tile_production_rows.push_back(std::move(good_row));
+            }
 
             ImGui::TableSetColumnIndex(1);
             if (mc.base_price[r] > 0.0f)
@@ -3970,6 +4047,15 @@ void draw_selection_content(world& w, const recipe_registry& reg,
     ui.construction_ui.open_ledger_y = -1.0f;
     ui.construction_ui.construct_x   = -1.0f;
     ui.construction_ui.construct_y   = -1.0f;
+
+    // Same rule for two more per-frame writes. The neighbourhood-page request
+    // (BL-1241) is re-raised by the two views that draw the zoomed ground (the
+    // tile card, the battle card) every frame they draw; dropped here, so a
+    // selection that draws neither stops the ground layer baking a stale
+    // region. The Production section's verify readout (BL-1239) is refilled
+    // only by a frame that draws the section.
+    ui.ground_neigh_req.valid = false;
+    ui.tile_production_rows.clear();
 
     // BL-598 removed the PROVINCE branch that stood here. BL-511 gave a province
     // its own resolution ahead of `selection_kind_of` — it is not an entity, so

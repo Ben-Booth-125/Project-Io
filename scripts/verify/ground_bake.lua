@@ -125,4 +125,42 @@ verify.frames(3)
 verify.capture("structures_neighbourhood")
 verify.clear_selection()
 
+-- The PRESS AREA (F34; SELECTION.md § Multi-building tiles): a single building
+-- owns its whole hex, a stacked tile falls through to the tile — not just at
+-- the centre but OFF-centre, on the tilted rung (zoom 10) where the press must
+-- resolve in ground space as hover does, and on the flat play rung (zoom 5).
+-- Presses at about +-0.6 drawn radius left/right and up/down (the vertical
+-- offset rides the camera squash). Single and stacked presses ALTERNATE, so
+-- no press repeats the last tile — a repeat press is the selection cycle
+-- (Building -> Tile), not a first press.
+local function press_at(col, row, dx, dy)
+    local p = verify.tile_screen(col, row)   -- centres the tile; returns its screen point
+    if not p.ok then return "unresolved" end
+    local s = verify.ground_stats()
+    local r = s.draw_r
+    local sy = (s.sy and s.sy > 0) and s.sy or 1
+    verify.clear_selection()
+    verify.click(p.x + dx * r, p.y + dy * r * sy)
+    verify.frames(2)
+    return verify.pointer_target().selection_kind
+end
+local offsets = { { 0.6, 0 }, { -0.6, 0 }, { 0, 0.6 }, { 0, -0.6 } }
+for _, z in ipairs({ 10, 5 }) do
+    verify.center_tile(g.single_col, g.single_row, z)
+    verify.frames(2)
+    for _, o in ipairs(offsets) do
+        local ks = press_at(g.single_col, g.single_row, o[1], o[2])
+        local kt = press_at(g.stack_col, g.stack_row, o[1], o[2])
+        print(string.format("PRESS zoom %d offset (%+.1f, %+.1f) r: single -> %s, stacked -> %s",
+                            z, o[1], o[2], ks, kt))
+        verify.expect(ks == "building", string.format(
+            "zoom %d: an off-centre press (%+.1f, %+.1f) r on a single-building tile selects the building (got %s)",
+            z, o[1], o[2], ks))
+        verify.expect(kt == "tile", string.format(
+            "zoom %d: an off-centre press (%+.1f, %+.1f) r on a stacked tile selects the tile (got %s)",
+            z, o[1], o[2], kt))
+    end
+end
+verify.clear_selection()
+
 verify.set_border_band(true)

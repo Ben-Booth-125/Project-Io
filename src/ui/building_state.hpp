@@ -8,7 +8,8 @@
 // § The building element's layout (the Status page): a building is Running,
 // Understaffed, Idle or Mothballed, or Under construction with its ETA, and an
 // idle or understaffed one SAYS WHY — labour short, or an input short, naming
-// the input and its cause.
+// the input and its cause. A processor on a part batch for want of an input is
+// Partial (not Understaffed: labour is named only where labour is the cause).
 //
 // ONE FUNCTION, THREE READERS. The building hover card (hover_content.cpp), the
 // tile element's Production section and the building card's Status page
@@ -37,7 +38,10 @@ class recipe_registry;
 
 namespace ui {
 
-/// The five running states, in the words SELECTION.md uses.
+/// The running states, in the words SELECTION.md uses, plus PARTIAL: a
+/// processor running a part batch because an input is short. It is not
+/// "Understaffed" — that word blames labour, and the labour is there (BL-1239
+/// fix round: labour is named only where labour is the cause).
 enum class building_run_kind : uint8_t
 {
     running,
@@ -45,7 +49,11 @@ enum class building_run_kind : uint8_t
     idle,
     mothballed,
     under_construction,
+    partial,
 };
+
+/// How many `building_run_kind` values there are — for a per-kind tally.
+inline constexpr int building_run_kind_count = 6;
 
 /// Why an idle or understaffed building is not running full.
 enum class building_run_reason : uint8_t
@@ -91,12 +99,13 @@ building_running_state classify_building_running(const world& w, const recipe_re
                                                  const economy_report* report, entity_id id,
                                                  const building_component& b);
 
-/// The state word alone: "Running", "Understaffed", "Idle", "Mothballed",
-/// "Under construction".
+/// The state word alone: "Running", "Understaffed", "Partial", "Idle",
+/// "Mothballed", "Under construction".
 const char* running_state_word(building_run_kind k);
 
 /// The full line, in the Production section's words — "Running",
 /// "Idle — input short: Steel, over the fair-price ceiling",
+/// "Partial — input short: Coal, none on the shelf",
 /// "Under construction — 4 ticks".
 std::string running_state_text(const building_running_state& s);
 
@@ -104,7 +113,7 @@ std::string running_state_text(const building_running_state& s);
 std::string running_state_reason(const building_running_state& s);
 
 /// Text colour for the state: running reads positive, idle negative,
-/// understaffed / under construction amber, mothballed muted.
+/// understaffed / partial / under construction amber, mothballed muted.
 ImU32 running_state_colour(building_run_kind k);
 
 } // namespace ui

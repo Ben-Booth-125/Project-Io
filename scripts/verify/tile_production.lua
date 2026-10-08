@@ -19,13 +19,20 @@
 --   tile_production_unbuilt    R4: a land tile with a deposit and nothing built —
 --                              "Nothing built here", its deposited goods still
 --                              priced at their market.
---   tile_production_rival      R4: a rival's tile — type, count, owner, and
---                              "private" for output and state.
+--   tile_production_rival      R4: a rival's tile (a processing facility by
+--                              preference) — type, count, owner, and "private"
+--                              for output and state. ASSERTED off
+--                              verify.tile_production_rows(): no recipe group
+--                              name, no good, nothing listed as made here.
 --   tile_production_door       R3: a press on a good row opens the Market ledger
 --                              aimed at that market and good (asserted on the
---                              drawn Goods table, captured).
+--                              drawn Goods table, captured); a second press on
+--                              the aimed row closes it (the Toggle rule).
 --   tile_production_idle       R2: the player tile with its workforce set to zero
 --                              and ticks run — the row reads Idle with its reason.
+--   tile_production_mixed      R2: two player processing facilities on one tile
+--                              on different recipes — two rows, two goods, both
+--                              listed as made (skipped, said so, if unstageable).
 --
 -- Buildings and tiles are found through verify.buildings() and
 -- verify.find_deposit_tile, never hard-coded, so a generation change re-aims the
@@ -172,15 +179,70 @@ assert(unbuilt, "tile_production.lua: no unbuilt deposit tile found")
 show_tile(unbuilt.x, unbuilt.y, "tile_production_unbuilt")
 
 -- R4: a rival's tile, other than the stacked one, so the two captures are two
--- different readings.
+-- different readings. A rival PROCESSING tile by preference: its recipe is the
+-- private fact (DISCOVERY.md § The operational fog) the row must withhold.
+local now_all = verify.buildings()
 local rival_site = nil
-for _, b in ipairs(all) do
-    if (not b.player) and (not stacked or b.x ~= stacked.x or b.y ~= stacked.y) then
+for _, b in ipairs(now_all) do
+    if (not b.player) and b.type == "Processing Facility"
+       and (not stacked or b.x ~= stacked.x or b.y ~= stacked.y) then
         rival_site = b; break
+    end
+end
+if not rival_site then
+    print("tile_production: no rival processing facility on the home body; "
+          .. "the rival recipe-leak check falls back to any rival building")
+    for _, b in ipairs(now_all) do
+        if (not b.player) and (not stacked or b.x ~= stacked.x or b.y ~= stacked.y) then
+            rival_site = b; break
+        end
     end
 end
 assert(rival_site, "tile_production.lua: no rival building on the home body")
 show_tile(rival_site.x, rival_site.y, "tile_production_rival")
+
+-- The rival row WITHHOLDS (BL-1239 fix round): no recipe group name, no good,
+-- nothing listed as "made here" — only the public type, count and owner, and
+-- output/state "private". Read off the section as drawn, since an absence is
+-- exactly what a capture cannot prove.
+do
+    local rows = verify.tile_production_rows()
+    verify.expect(#rows > 0, "rival tile: the Production section drew rows")
+    local here = {}
+    for _, b in ipairs(now_all) do
+        if b.x == rival_site.x and b.y == rival_site.y then here[#here + 1] = b end
+    end
+    local any_open, closed = false, 0
+    for _, r in ipairs(rows) do
+        if r.stack and r.open then any_open = true end
+        if r.stack and not r.open then
+            closed = closed + 1
+            verify.expect(r.good == "",
+                          "rival stack row names no good (got '" .. r.good .. "')")
+            verify.expect(r.detail:find("private", 1, true) ~= nil,
+                          "rival stack row reads output/state private: '" .. r.detail .. "'")
+            local typed = false
+            for _, b in ipairs(here) do
+                if not b.player then
+                    if r.label:find(b.type, 1, true) == 1 then typed = true end
+                    if b.group ~= b.type then
+                        verify.expect(r.label:find(b.group, 1, true) == nil,
+                                      "rival stack row hides the recipe group '" .. b.group
+                                      .. "' (label '" .. r.label .. "')")
+                    end
+                end
+            end
+            verify.expect(typed, "rival stack row is labelled by its public type: '" .. r.label .. "'")
+        end
+    end
+    verify.expect(closed > 0, "rival tile: at least one closed (rival) stack row")
+    if not any_open then
+        for _, r in ipairs(rows) do
+            verify.expect(r.stack or r.detail ~= "made",
+                          "rival-only tile lists nothing as made here (got " .. r.label .. ")")
+        end
+    end
+end
 
 -- R3: the door. Back to the player's tile; press a good row. The rows sit under
 -- the stack lines, so their position is not fixed — sweep down the centre column
@@ -188,17 +250,28 @@ show_tile(rival_site.x, rival_site.y, "tile_production_rival")
 verify.select_tile(player_site.x, player_site.y)
 frame_tile(player_site.x, player_site.y, 18)
 verify.frames(3)
-local opened = false
+local opened, door_y = false, nil
 for y = 540, 700, 6 do
     verify.click(560, y)
     verify.frames(3)
     local rows = verify.goods_table()
-    if rows and #rows > 0 then opened = true; break end
+    if rows and #rows > 0 and verify.pointer_target().open_panel == "market" then
+        opened, door_y = true, y; break
+    end
 end
 verify.expect(opened, "a good row press opens the Market ledger's Goods table")
 verify.expect(verify.pointer_target().has_selection,
               "the door leaves the tile selected behind it")
 verify.capture("tile_production_door")
+-- Toggle rule: the aimed row reads selected, so a second press on it shuts the
+-- ledger rather than re-aiming it.
+if door_y then
+    verify.click(560, door_y)
+    verify.frames(3)
+    verify.expect(verify.pointer_target().open_panel ~= "market",
+                  "a second press on the aimed good row closes the Market ledger (got "
+                  .. tostring(verify.pointer_target().open_panel) .. ")")
+end
 verify.show_panel("market", false)
 verify.frames(2)
 
@@ -216,5 +289,71 @@ verify.click(860, 478) -- empty band header: moves the pointer off the rows so n
 show_tile(player_site.x, player_site.y, "tile_production_idle")
 verify.corp_command{ verb = VERB_SET_WORKFORCE_AUTO, subject = player_site.id }
 verify.econ_step(2)
+
+-- A MIXED-RECIPE tile (BL-1239 fix round): two player processing facilities on
+-- one tile running different recipes are TWO rows, each naming its own good,
+-- and Part 2 lists both as made. Staged through the Build door's own seam
+-- (place_mode + build_at, which places the default recipe) and the
+-- construction panel's recipe write (set_building_recipe). Best effort: a
+-- world whose start refuses a processing facility skips it, said so.
+do
+    local opening = verify.player_balance()
+    verify.set_balance(opening + 1000000)
+    verify.place_mode("processing")
+    -- The unbuilt tile only: set_building_recipe writes the FIRST building it
+    -- meets on the tile, so a tile holding anything but the two processors
+    -- would make the write land on the wrong building.
+    local staged = nil
+    if verify.build_at(unbuilt.x, unbuilt.y) == "placed"
+       and verify.build_at(unbuilt.x, unbuilt.y) == "placed" then
+        staged = unbuilt
+    end
+    verify.set_balance(opening)
+    if not staged then
+        print("tile_production: the unbuilt tile did not take two processing facilities; "
+              .. "the mixed-recipe check was skipped")
+    else
+        local tile_id = nil
+        for _, b in ipairs(verify.buildings()) do
+            if b.x == staged.x and b.y == staged.y then tile_id = b.tile; break end
+        end
+        local function open_rows()
+            verify.select_tile(staged.x, staged.y)
+            verify.frames(3)
+            local stacks, made = {}, {}
+            for _, r in ipairs(verify.tile_production_rows()) do
+                if r.stack and r.open then stacks[#stacks + 1] = r end
+                if (not r.stack) and r.detail == "made" then made[r.label] = true end
+            end
+            return stacks, made
+        end
+        local base = #open_rows()
+        local n = (verify.first_processing_building().recipes or 0)
+        local split = false
+        for i = 0, n - 1 do
+            verify.set_building_recipe(tile_id, i)
+            local stacks, made = open_rows()
+            if #stacks == base + 1 then
+                split = true
+                local goods = {}
+                for _, r in ipairs(stacks) do
+                    if r.good ~= "" then
+                        verify.expect(made[r.good] == true,
+                                      "mixed tile: Part 2 lists " .. r.good .. " as made")
+                        goods[r.good] = true
+                    end
+                end
+                local distinct = 0
+                for _ in pairs(goods) do distinct = distinct + 1 end
+                verify.expect(distinct >= 2, "mixed tile: the rows name different goods")
+                frame_tile(staged.x, staged.y, 18)
+                verify.frames(2)
+                verify.capture("tile_production_mixed")
+                break
+            end
+        end
+        verify.expect(split, "two processing facilities on different recipes read as two rows")
+    end
+end
 
 verify.expect_no_clipping("tile_production")

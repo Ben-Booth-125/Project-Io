@@ -1376,11 +1376,10 @@ void draw_item_glyph_placeholder(ImU32 colour, float box)
 std::vector<goods_row_record> g_goods_rows;
 entity_id                     g_goods_market = null_entity;
 
-/// BL-1239: the market the Production section's door last aimed the ledger at.
-/// The aimed good (`ui_state::market_ledger_aim_resource`) highlights only on
-/// THIS market, so browsing to another market never paints a row the door did
-/// not point at.
-entity_id                     g_aim_market   = null_entity;
+// BL-1239: the market the Production section's door last aimed the ledger at
+// lives in `ui_state::market_ledger_aimed_market` (it was a file static here),
+// so the door can read it back: the aimed good highlights only on THAT market,
+// and the Production row toggles the ledger shut only when it is that market.
 
 void draw_goods_tab(const world& w, ui_state& s, entity_id body,
                     entity_id mid, const market_component& mc,
@@ -1390,6 +1389,17 @@ void draw_goods_tab(const world& w, ui_state& s, entity_id body,
 
     g_goods_rows.clear();
     g_goods_market = mid;
+
+    // BL-1239: an aimed good this market does not trade has no row below, so
+    // nothing would ever consume the one-shot scroll and the request would
+    // stand indefinitely. Spend it here instead.
+    if (s.market_ledger_aim_scroll && mid == s.market_ledger_aimed_market)
+    {
+        const int aim = s.market_ledger_aim_resource;
+        if (aim < 0 || aim >= static_cast<int>(resource_count) ||
+            mc.base_price[static_cast<std::size_t>(aim)] <= 0.0f)
+            s.market_ledger_aim_scroll = false;
+    }
 
     // ROW HEIGHT IS THE OPEN MEASUREMENT (Ben, 2026-08-29: "let's compare this at
     // 8 rows, 10 rows, and 12 rows"). It is a ui_state dial rather than a
@@ -1514,7 +1524,8 @@ void draw_goods_tab(const world& w, ui_state& s, entity_id body,
                 // BL-1239: the good a Production-section door aimed at — the
                 // row is washed and, once, scrolled into view, which is what
                 // "aimed at that good" means in a view listing every good.
-                if (mid == g_aim_market && s.market_ledger_aim_resource == static_cast<int>(r))
+                if (mid == s.market_ledger_aimed_market &&
+                    s.market_ledger_aim_resource == static_cast<int>(r))
                 {
                     ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, IM_COL32(70, 110, 160, 110));
                     if (s.market_ledger_aim_scroll)
@@ -1664,7 +1675,7 @@ void draw_market_ledger(world& w, const recipe_registry& reg, ui_state& s,
         {
             selected_body        = fit->second.body;
             pending_focus_market = s.market_ledger_aim_market;
-            g_aim_market         = s.market_ledger_aim_market;
+            s.market_ledger_aimed_market = s.market_ledger_aim_market;
         }
         s.market_ledger_aim_market = null_entity;
     }
