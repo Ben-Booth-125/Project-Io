@@ -8,7 +8,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <iosfwd>
+#include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 struct world;
@@ -378,9 +380,23 @@ float corp_should_have_buffer(const world& w, const recipe_registry& reg,
 /// market that has never cleared (econ tick 0, or no supply/demand written for
 /// any good yet) returns 1.0 for "no bid, nothing listed" (no signal). Exposed
 /// for the harness; also used internally by the build-candidate scorer.
+/// BL-1227 (Ben, 2026-10-07/08: "a buyer that takes goods without posting a bid
+/// is still a buyer"): what RUNNING processors drew of each good in each market
+/// this tick's production pass, keyed (market, good) — derived from the
+/// economy report's per-building rows (`running_consumer_draws`), transient.
+using market_good_draw = std::map<std::pair<entity_id, std::size_t>, float>;
+
+/// Build `market_good_draw` from @p report: every processor row that produced
+/// (active, output > 0) on a building still standing, not decommissioned and
+/// complete, contributes its recipe's inputs x the runs it made, at its tile's
+/// market. An idled or decommissioned processor draws nothing and is no buyer.
+market_good_draw running_consumer_draws(const world& w, const recipe_registry& reg,
+                                        const economy_report& report);
+
 float forecast_glut_multiplier(const world& w, entity_id tile, resource_type target,
                                float added_rate_per_tick, int horizon_ticks,
-                               const corp_ai_params& p = {});
+                               const corp_ai_params& p = {},
+                               const market_good_draw* running_draw = nullptr);
 
 /// The corp's solvency reserve floor under `p` (exposed for the harness).
 float corp_reserve_floor(const world& w, const recipe_registry& reg,

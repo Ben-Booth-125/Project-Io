@@ -748,6 +748,70 @@ int main()
         }
     }
 
+    // R9 (BL-1227 review round 3; Ben 2026-10-07/08: "a buyer that takes goods
+    // without posting a bid is still a buyer"). Market A has cleared (it bids
+    // for steel) and nobody bids for or lists coal there. Its only coal
+    // consumer is the player's coal_steel plant, fed from the player's own
+    // pool — it posts no bid. Through run_economy_step (production, then the
+    // scorer), in play: while that plant RUNS, its draw is a bid and a third
+    // corp builds the coal mine; with the plant IDLED (decommissioned), it
+    // draws nothing, is no buyer, and the mine stays vetoed.
+    std::printf("R9 a running consumer fed from its own pool is a bid (run_economy_step, in play)\n");
+    {
+        auto mines_for = [&](bool plant_idled) {
+            scene s = make_scene(); place_bound(s, reg);
+            s.w.markets.at(s.a).demand[r_steel] = 50.0f;
+            s.w.corporations.at(s.ai).balance = 1.0f; // the processing-focus AI stays out (no chain start)
+            const entity_id ct = tile_at(s.w, s.body, 2, 2);
+            s.w.tiles.at(ct).resource_deposit[r_coal]   = 1.0f;
+            s.w.tiles.at(ct).resource_remaining[r_coal] = 1.0e6f;
+            add_plant(s, reg, s.pl, 0, 3, 1.0f, plant_idled);
+            // The mine-builder: holds ground in A whose tile already carries a
+            // processor, so it offers no processor candidate (and refuses none).
+            const entity_id other = s.w.create_entity();
+            corporation_component oc;
+            oc.name = "Other"; oc.balance = 1.0e6f; oc.starting_capital = 1.0e6f;
+            oc.focus = industrial_focus::extraction;
+            const entity_id t = tile_at(s.w, s.body, 3, 1);
+            const entity_id anchor = s.w.create_entity();
+            building_component a{};
+            a.tile = t; a.type = building_type::extraction_site;
+            a.target_resource = resource_type::iron_ore; a.workforce_assigned = 0.5f;
+            s.w.buildings[anchor] = a;
+            const entity_id plant = s.w.create_entity();
+            building_component pb{};
+            pb.tile = t; pb.type = building_type::processing_facility;
+            pb.recipe = reg.recipe_id("steel_forge"); pb.target_resource = resource_type::machinery;
+            pb.workforce_assigned = 0.5f; pb.workforce_auto = false;
+            s.w.buildings[plant] = pb;
+            oc.assets = {anchor, plant};
+            s.w.corporations[other] = oc;
+            bool ran = false;
+            for (int t2 = 1; t2 <= 4; ++t2)
+            {
+                s.w.pool_at(s.pl, s.a).quantities[r_coal] = 1000.0f;
+                s.w.current_econ_tick = t2;
+                const economy_report rep = run_economy_step(s.w, reg);
+                for (const building_report& br : rep.buildings)
+                    if (br.corp == s.pl && br.type == building_type::processing_facility && br.active) ran = true;
+            }
+            int mines = 0;
+            for (const entity_id b : s.w.corporations.at(other).assets)
+                if (const auto it = s.w.buildings.find(b);
+                    it != s.w.buildings.end() && it->second.type == building_type::extraction_site
+                    && it->second.target_resource == resource_type::coal)
+                    ++mines;
+            return std::make_pair(ran, mines);
+        };
+        const auto [ran_on, mines_on]   = mines_for(false);
+        const auto [ran_off, mines_off] = mines_for(true);
+        std::printf("  plant running: ran %s, coal mines %d | plant idled: ran %s, coal mines %d\n",
+                    ran_on ? "yes" : "no", mines_on, ran_off ? "yes" : "no", mines_off);
+        check(ran_on, "R9 not vacuous: the player's plant runs on its own pool's coal");
+        check(mines_on > 0, "R9 a market whose only consumer is a running processor fed from its own pool does not veto a mine");
+        check(!ran_off && mines_off == 0, "R9 the same market with the processor idled: no buyer, the mine is vetoed");
+    }
+
     std::printf("\n%s (%d failure%s)\n", g_fail == 0 ? "ALL PASS" : "FAILURES", g_fail,
                 g_fail == 1 ? "" : "s");
     return g_fail == 0 ? 0 : 1;
