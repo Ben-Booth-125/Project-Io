@@ -919,7 +919,7 @@ float wf_target_price(float base, float supply, float demand,
 
 // Exported (BL-202): declared in economy_system.hpp so the strategic scorer
 // (corp_ai.cpp) reuses the one solver. The anonymous namespace re-opens below.
-int solve_workforce_target(const world& w, const recipe_registry& reg,
+int solve_workforce_target(world& w, const recipe_registry& reg,
                            const building_component& b, float contention,
                            int stack_rank, float* out_gain)
 {
@@ -940,12 +940,42 @@ int solve_workforce_target(const world& w, const recipe_registry& reg,
     const float               eff = b.workforce_assigned * contention;
     const float               now = std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f);
 
+    // BL-1232 (power plants per grid; LOGISTICS.md § 3a, the BL-1230 ruling): a
+    // grid good that crosses markets (power) is drawn from every shelf on its
+    // grid and PRICES against the grid's pooled registers, so the forecast reads
+    // the same pooled supply and demand clear_markets resolves it on
+    // (`pool_grid_good_figures`, the one pooling) — not this building's own
+    // market, where a plant's buyers elsewhere on the grid bid nothing and the
+    // solver read a glut that zeroed a profitable plant. Pooled only for a
+    // processor whose recipe touches such a good and whose market centre is on
+    // a grid; every other read is the market's own, exactly as before.
+    grid_good_pool             gpool;
+    const grid_good_figures*   gsd = nullptr;
+    if (mkt != nullptr && b.type == building_type::processing_facility && reg.grid_goods().any())
+        if (const recipe* rcp = reg.get_recipe(b.recipe))
+        {
+            bool touches = false;
+            for (std::size_t r = 0; r < resource_count && !touches; ++r)
+                touches = reg.grid_goods().grid(r) && grid_good_crosses_markets(r)
+                       && (rcp->outputs[r] > 0.0f || rcp->inputs[r] > 0.0f);
+            if (touches)
+            {
+                gpool = pool_grid_good_figures(w, reg);
+                if (const auto mg = gpool.market_grid.find(market_for_tile(w, b.tile));
+                    mg != gpool.market_grid.end())
+                    gsd = &gpool.grid_sd.at(mg->second);
+            }
+        }
+
     // Clearing price for resource r if this building's supply of it shifts by delta.
     const auto price_of = [&](std::size_t r, float supply_delta) -> float {
         if (mkt == nullptr)
             return 0.0f;
-        const float supply = std::max(0.0f, mkt->supply[r] + supply_delta);
-        return wf_target_price(mkt->base_price[r], supply, mkt->demand[r],
+        const bool  pooled = gsd != nullptr && reg.grid_goods().grid(r) && grid_good_crosses_markets(r);
+        const float base   = pooled ? grid_good_pricing_supply(*gsd, r, reg.price_band().shelf_supply_ticks)
+                                    : mkt->supply[r];
+        const float supply = std::max(0.0f, base + supply_delta);
+        return wf_target_price(mkt->base_price[r], supply, pooled ? gsd->demand[r] : mkt->demand[r],
                                reg.price_band().floor_mult, reg.price_band().ceil_mult);
     };
 

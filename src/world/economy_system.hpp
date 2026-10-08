@@ -888,6 +888,6 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
 ///                 loss-maker only for cutting, so every dial the solver found in
 ///                 the other direction — the interior optimum it exists to find —
 ///                 scored negative and was silently discarded.
-int solve_workforce_target(const world& w, const recipe_registry& reg,
+int solve_workforce_target(world& w, const recipe_registry& reg,
                            const building_component& b, float contention,
                            int stack_rank = 1, float* out_gain = nullptr);
