@@ -1745,21 +1745,40 @@
   {
    "id": "ledger.selection_section_toggle",
    "family": "ledger",
-   "surface": "The Selection band's tile element — a five-section accordion in the centre column, ordered Buildings, Deposits, Resources, Population, Terrain. It replaced a three-view pager, and the province card that used to sit beside it (BL-598): the province is a SECTION here, not a selection of its own.",
-   "press": "Click a section header to open it; click the open section's header again to close it.",
+   "surface": "The Selection band's tile element — a six-section top nav in the centre column (left/right chevrons straddling the span, title and i/6 count centred between them), ordered Production, Buildings, Deposits, Resources, Population, Terrain. The province is a SECTION here, not a selection of its own (BL-598); Production leads (BL-1239).",
+   "press": "Click the left or right chevron to step to the previous or next section.",
    "args": [
     {
      "name": "direction",
      "type": "enum",
-     "meaning": "'previous' or 'next' page"
+     "meaning": "'previous' or 'next' section"
     }
    ],
    "preconditions": [
-    "A tile is selected. Every other selection kind (building, unit, market, nation) still takes a pager, not an accordion — see NR-605, which asks whether that split should stand.",
-    "One section open at a time; none-open is reachable, because a header shows its own state and is therefore a toggle under the standing Toggle rule."
+    "A land tile is selected. A water tile takes its own facts column and has no section nav.",
+    "One section shows at a time; the nav wraps in both directions, so six presses of either chevron return to the start. A newly selected tile opens on Production."
    ],
-   "expected_output": "The pressed section expands in place and any other closes. Deposits and Population read the PROVINCE of the selected tile, so the province's content is reachable without a province selection existing. The tile's available-buildings tab is unchanged; the province's own buildings roll-up and member-tile list are gone.",
-   "reason_to_select": "The pager hid the LIST of questions the surface can answer behind a press, so a player had to already know a reading existed to go and find it. An accordion shows all five and opens the one you ask for. The order is the other half (Ben, 2026-08-24): it runs from what the player can act on to what the ground merely is, where the pager ran the other way and put the least actionable reading in the default slot."
+   "expected_output": "The next or previous section takes the whole centre body. Production reads THIS tile (what stands here, its running state and reason, and what its goods fetch at the catchment market); Buildings, Deposits and Population read the PROVINCE of the selected tile; Resources and Terrain chart this tile against the field.",
+   "reason_to_select": "To read a different question of the same ground. The order is the argument (Ben, 2026-08-24, and 2026-10-08 for Production): it opens on what is happening here, then runs from what the player can act on to what the ground merely is."
+  },
+  {
+   "id": "ledger.tile_production_market_door",
+   "family": "ledger",
+   "surface": "Selection band, tile element, Production section — a good row in the 'Sells at <market>' table (goods made on this tile, then goods deposited on it)",
+   "press": "Click a good row.",
+   "args": [
+    {
+     "name": "good",
+     "type": "resource",
+     "meaning": "The row's good — one made by a stack on this tile or deposited in it."
+    }
+   ],
+   "preconditions": [
+    "A land tile is selected, its Production section is showing, and a market's catchment holds the tile.",
+    "The tile carries at least one good, made or deposited."
+   ],
+   "expected_output": "Any open fold-out ledger closes and the Market ledger opens on its Goods view, its Body and Market combos jumped to the tile's catchment market, the pressed good's row washed and scrolled into view. The tile stays selected behind the door.",
+   "reason_to_select": "To read the good's full price board — its 8-quarter history and its price against base — at the market that actually prices this ground, without first finding that market and good by hand."
   },
   {
    "id": "chrome.esc",

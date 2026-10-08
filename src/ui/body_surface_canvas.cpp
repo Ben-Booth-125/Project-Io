@@ -5280,7 +5280,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         {
             const entity_id card_eid = state.hover_card_entity;
             draw_hover_card(state.hover_card_anchor, [&]() {
-                draw_hover_content(w, state, card_eid);
+                draw_hover_content(w, state, card_eid, &reg, &report);
             }, &state.hover_card_min, &state.hover_card_max);
         }
     }

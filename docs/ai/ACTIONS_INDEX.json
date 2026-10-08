@@ -403,7 +403,11 @@
   ],
   [
    "ledger.selection_section_toggle",
-   "The Selection band's tile element — a five-section accordion in the centre column, ordered Buildings, Deposits, Resources, Population, Terrain. It replaced a three-view pager, and the province card that used to sit beside it (BL-598): the province is a SECTION here, not a selection of its own."
+   "The Selection band's tile element — a six-section top nav in the centre column (left/right chevrons straddling the span, title and i/6 count centred between them), ordered Production, Buildings, Deposits, Resources, Population, Terrain. The province is a SECTION here, not a selection of its own (BL-598); Production leads (BL-1239)."
+  ],
+  [
+   "ledger.tile_production_market_door",
+   "Selection band, tile element, Production section — a good row in the 'Sells at <market>' table (goods made on this tile, then goods deposited on it)"
   ],
   [
    "chrome.esc",

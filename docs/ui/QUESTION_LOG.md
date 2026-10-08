@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**62 surfaces** — 7 settled, 55 awaiting Ben's wording.
+**63 surfaces** — 7 settled, 56 awaiting Ben's wording.
 
 ---
 
@@ -344,13 +344,21 @@ IT LIVES UNDER MY TRADES, NOT IN A FEED. The question it answers is about the pl
 
 *Demanded by BL-067, BL-068, BL-071, BL-367, BL-593 · `src/ui/selection_panel.cpp` · id `selection_panel`*
 
+### Selection band - the tile element's Production section (first in the section nav)
+
+**Answers:** What stands on this tile, is it running (and if not, why not), and what does what it makes - or what lies in the ground here - fetch at the market that prices it?
+
+**Because:** Running state had no home once the canvas art went static (RENDERING.md, installations): a building that sat idle for want of labour or an input looked exactly like one that ran, and the only place that said otherwise was a hover card that has to be found one building at a time. Ben, 2026-10-08 (the sprint 51 visibility pass): the tile opens on what is HAPPENING there - the initial market conditions, read from the ground the player is looking at. Tile grain is the point, not a shortcut: a building stands on a tile and a market's catchment is tile-keyed, so a province sum would blur exactly the two things this section joins. Part one gives one row per stack (the grouping Manage Buildings uses, and where the retired +N badge's count is now read), with output per tick and the running state WITH ITS REASON - labour short, or an input short named with its cause - classified by the one function the hover card and the building card's Status page also read, so the three cannot disagree. A rival's row shows type, count and owner and says 'private' for the rest (DISCOVERY.md). Part two names the market whose catchment holds the tile and prices every good made here, then every good deposited here, with short / balanced / surplus from public aggregates; each row is a drill-through door to the Market ledger aimed at that market and good. An unbuilt tile still earns the section: 'Nothing built here' is stated positively and its deposits are still priced, which on a fresh campaign is the whole read.
+
+*Demanded by BL-1239 · `src/ui/selection_panel.cpp`, `src/ui/building_state.cpp`, `src/ui/building_state.hpp`, `src/ui/hover_content.cpp`, `src/ui/market_ledger.cpp`, `src/ui/ui_state.hpp` · id `selection_tile_production`*
+
 ### Selection band - the tile element's section top nav
 
-**Answers:** Everything this ground has to say, in the order I can act on it: what can I still build here, what does the locality hold, what does this hex yield, who works here, what is the terrain?
+**Answers:** Everything this ground has to say, opening on what is happening here and then in the order I can act on it: what does this tile make and fetch, what can I still build here, what does the locality hold, what does this hex yield, who works here, what is the terrain?
 
-**Because:** The centre column was a PAGER, and the province was a second element with a pager of its own; both hid the list of questions the surface can answer behind a press. An accordion was built to show that list and was ruled out on sight, on a measurement rather than a taste: five stacked headers spent 169 of the band's 258 px on chrome to leave the open section 89. The nav keeps what the accordion was FOR - a visible sense of how many readings exist - by putting an i/N count beside the title, which costs one row instead of five, and returns the rest of the band to the reading you are actually doing. The chevrons straddle the span so the two presses are as far apart as the element allows; the title centres on the run between them; the full-canvas control is excepted and keeps the rightmost slot, which is where every other surface in the shell puts it. The ORDER is the other half of the argument (Ben, 2026-08-24): Buildings, Deposits, Resources, Population, Terrain runs from what the player can act on to what the ground merely is.
+**Because:** The centre column was a PAGER, and the province was a second element with a pager of its own; both hid the list of questions the surface can answer behind a press. An accordion was built to show that list and was ruled out on sight, on a measurement rather than a taste: five stacked headers spent 169 of the band's 258 px on chrome to leave the open section 89. The nav keeps what the accordion was FOR - a visible sense of how many readings exist - by putting an i/N count beside the title, which costs one row instead of five, and returns the rest of the band to the reading you are actually doing. The chevrons straddle the span so the two presses are as far apart as the element allows; the title centres on the run between them; the full-canvas control is excepted and keeps the rightmost slot, which is where every other surface in the shell puts it. The ORDER is the other half of the argument (Ben, 2026-08-24): Buildings, Deposits, Resources, Population, Terrain runs from what the player can act on to what the ground merely is. Ben, 2026-10-08 (the sprint 51 visibility pass) put Production in front of it - what is HAPPENING here - so the nav is six sections and wraps at six.
 
-*Demanded by BL-598 · `src/ui/selection_panel.cpp`, `src/ui/ui_state.hpp` · id `selection_tile_section_nav`*
+*Demanded by BL-598, BL-1239 · `src/ui/selection_panel.cpp`, `src/ui/ui_state.hpp` · id `selection_tile_section_nav`*
 
 ### Selection band - Unit (Soldier) card (3-column band)
 

@@ -3,6 +3,7 @@
 #include "core/battle_dispatch_text.hpp" // battle_phase_word — SHARED with BL-468's dispatches
 #include "world/battle_system.hpp"      // active_battle, quote_withdrawal, read_battle_phase (BL-469)
 
+#include "building_state.hpp" // BL-1239: the one running-state classification (hover card, Production, Status)
 #include "charts.hpp"
 #include "construction_panel.hpp" // building_group_name - the aim of the open-in-ledger button
 
@@ -517,13 +518,17 @@ void draw_activity_section(const world& w, entity_id body_id)
 // too, by the same ruling — the tile's Available-buildings reading answers the
 // same question at the grain the player actually builds at.
 namespace {
-constexpr const char* k_view_names[] = { "Buildings", "Deposits", "Resources",
-                                         "Population", "Terrain" };
-constexpr int         k_view_count   = 5;
+// BL-1239 (Ben, 2026-10-08, the sprint 51 visibility pass): PRODUCTION opens the
+// nav — what is HAPPENING here, what the tile makes and what that fetches where
+// it sells — ahead of what the player can act on. Six sections; the nav wraps at
+// six.
+constexpr const char* k_view_names[] = { "Production", "Buildings", "Deposits",
+                                         "Resources", "Population", "Terrain" };
+constexpr int         k_view_count   = 6;
 
 // Section indices, named so the draw code below reads as the ruling does.
-enum : int { k_sec_buildings = 0, k_sec_deposits = 1, k_sec_resources = 2,
-             k_sec_population = 3, k_sec_terrain = 4 };
+enum : int { k_sec_production = 0, k_sec_buildings = 1, k_sec_deposits = 2,
+             k_sec_resources = 3, k_sec_population = 4, k_sec_terrain = 5 };
 }
 
 // --- The province building-availability table (BL-534) -----------------------
@@ -1644,8 +1649,8 @@ std::vector<building_page> building_pages(const world& w, const recipe_registry&
 // or the rival's public-only summary (BL-068) — the fallback content for
 // whichever building has no other page, plus the whole story for a rival.
 // @p god_view (BL-408): spectator god view — opens the rival summary's rows.
-void draw_building_status_page(const world& w, const recipe_registry& reg, entity_id id,
-                               bool god_view)
+void draw_building_status_page(const world& w, const recipe_registry& reg,
+                               const economy_report& report, entity_id id, bool god_view)
 {
     if (!is_player_owned(w, id))
     {
@@ -1668,7 +1673,17 @@ void draw_building_status_page(const world& w, const recipe_registry& reg, entit
                            construction_status(rate, b.ticks_remaining).c_str());
     }
     else
-        ImGui::TextDisabled("Operating.");
+    {
+        // BL-1239: the running state WITH ITS REASON, in the Production section's
+        // words and from the same classification the hover card reads — never a
+        // bare "Operating.", which said nothing a running building's existence
+        // did not already say.
+        const building_running_state rs = classify_building_running(w, &reg, &report, id, b);
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(running_state_colour(rs.kind)), "%s",
+                           running_state_text(rs).c_str());
+        ImGui::PopTextWrapPos();
+    }
 }
 
 // Workforce page (2026-08-15 playtest rework, trimmed). The "Workforce"
@@ -1729,7 +1744,7 @@ void draw_building_page(world& w, const recipe_registry& reg, const economy_repo
     {
         case building_page_kind::profitability: draw_building_profit(w, reg, report, id); break;
         case building_page_kind::status:
-            draw_building_status_page(w, reg, id, ui.spectating && ui.god_view); break;
+            draw_building_status_page(w, reg, report, id, ui.spectating && ui.god_view); break;
     }
 }
 
@@ -2696,6 +2711,408 @@ void draw_tile_chart_section(ui_state& ui, entity_id sel, const tile_metric& mp,
     draw_tile_metric_chart(ImGui::GetWindowDrawList(), p, {p.x + cw, p.y + gh}, mp);
 }
 
+// ── The PRODUCTION section (BL-1239, tile production section) ─────────────
+//
+// SELECTION.md § The tile element's layout, the Production bullet (Ben,
+// 2026-10-08, the sprint 51 visibility pass): what this tile makes and what
+// that fetches where it sells — read from the ground the player is looking at.
+// TILE GRAIN, the one section that is: a building stands on a tile and a
+// market's catchment is tile-keyed, so a province sum would blur exactly the
+// two things the section joins.
+//
+// Two parts, top to bottom:
+//   1. One row per STACK (placement_rules::stack_members — the grouping the
+//      Manage Buildings list uses): type glyph, name and count, the good it
+//      makes, output per tick, running state with its reason. The state comes
+//      from classify_building_running, the function the hover card and the
+//      building card's Status page read, so the three cannot disagree. A
+//      rival's stack shows type, count and owner; output and state read
+//      "private" (DISCOVERY.md, the competitor-visibility rule) — opened only
+//      under spectator god view, as every rival card is (BL-408).
+//   2. The market whose catchment holds this tile, named, then one row per
+//      good made here and per good deposited here: posted price and the
+//      market's state for it. Each row is a drill-through door to the Market
+//      ledger aimed at that market and good (DRILL_THROUGH.md).
+namespace {
+
+/// One stack standing on the tile, in stack order (oldest member first).
+struct production_stack
+{
+    building_type          type   = building_type::none;
+    resource_type          target = resource_type::iron_ore;
+    std::vector<entity_id> members;   ///< stack_members order: ascending id.
+};
+
+/// The good a building makes: an extraction site's target, a processing
+/// facility's active recipe's primary output. False for a type that makes none.
+bool good_made_by(const recipe_registry& reg, const building_component& b, resource_type& out)
+{
+    if (b.type == building_type::extraction_site)
+    {
+        out = b.target_resource;
+        return true;
+    }
+    if (b.type == building_type::processing_facility)
+        if (const recipe* rc = reg.get_recipe(b.recipe); rc != nullptr)
+        {
+            out = primary_output_resource(*rc);
+            return true;
+        }
+    return false;
+}
+
+/// The stacks on @p tile, grouped by `placement_rules::stack_members`, in the
+/// order of each stack's oldest member — deterministic, never the unordered
+/// `world::buildings` iteration order.
+std::vector<production_stack> tile_stacks(const world& w, entity_id tile)
+{
+    std::vector<entity_id> here;
+    for (const auto& [id, b] : w.buildings)
+        if (b.tile == tile)
+            here.push_back(id);
+    std::sort(here.begin(), here.end());
+
+    std::vector<production_stack> stacks;
+    std::vector<entity_id>        placed;
+    for (const entity_id id : here)
+    {
+        if (std::find(placed.begin(), placed.end(), id) != placed.end())
+            continue;
+        const building_component& b = w.buildings.at(id);
+        production_stack st;
+        st.type    = b.type;
+        st.target  = b.target_resource;
+        st.members = placement_rules::stack_members(w, tile, b.type, b.target_resource);
+        if (std::find(st.members.begin(), st.members.end(), id) == st.members.end())
+            st.members.insert(st.members.begin(), id); // defensive: never drop the row
+        for (const entity_id m : st.members)
+            placed.push_back(m);
+        stacks.push_back(std::move(st));
+    }
+    return stacks;
+}
+
+/// The market's state for good @p r, from its public aggregates — the Scarcity
+/// lens's own reading (LENSES.md: demand against supply last tick), banded so a
+/// rounding wobble does not flip the word. "no trade" when neither side moved.
+const char* market_state_word(const market_component& mc, std::size_t r, ImU32& colour)
+{
+    constexpr float band = 0.10f; // ±10%: inside it, the market is balanced
+    const float s = mc.supply[r];
+    const float d = mc.demand[r];
+    if (s <= 0.0f && d <= 0.0f)
+    {
+        colour = palette::neutral;
+        return "no trade";
+    }
+    if (s < d * (1.0f - band))
+    {
+        colour = palette::negative;
+        return "short";
+    }
+    if (s > d * (1.0f + band))
+    {
+        colour = palette::positive;
+        return "surplus";
+    }
+    colour = palette::text_secondary;
+    return "balanced";
+}
+
+void draw_tile_production_section(const world& w, const recipe_registry& reg,
+                                  const economy_report& report, ui_state& ui,
+                                  entity_id sel, const tile_component& tile)
+{
+    const ImGuiStyle& style   = ImGui::GetStyle();
+    const float       line_h  = ImGui::GetTextLineHeight();
+    const bool        god     = ui.spectating && ui.god_view;
+
+    // ── Part 1: what stands here and what it makes ──
+    //
+    // TWO LINES PER STACK, not a five-column table. The centre column is ~285 px
+    // at 1280x720; a table of glyph / stack / good / output / state elided the
+    // good to "Iro..." and wrapped the state over three lines (measured on the
+    // first capture). Line one names the stack and what it makes; line two,
+    // indented, carries what is private to the owner — output and running state.
+    const std::vector<production_stack> stacks = tile_stacks(w, sel);
+    std::vector<resource_type> made; // goods made here, first-seen order
+    if (stacks.empty())
+    {
+        // Stated positively: an empty table and "Nothing built here" cost the
+        // same pixels and only one of them reads as an answer.
+        ImGui::TextDisabled("Nothing built here");
+    }
+    for (std::size_t si = 0; si < stacks.size(); ++si)
+    {
+        const production_stack&   st    = stacks[si];
+        const entity_id           first = st.members.front();
+        const building_component& b0    = w.buildings.at(first);
+        const bool  mine  = is_player_owned(w, first);
+        const bool  open  = mine || god;
+        const int   count = static_cast<int>(st.members.size());
+
+        resource_type good  = resource_type::iron_ore;
+        const bool    makes = good_made_by(reg, b0, good);
+        if (makes && std::find(made.begin(), made.end(), good) == made.end())
+            made.push_back(good);
+
+        ImGui::PushID(static_cast<int>(si));
+
+        // Line one: glyph, name and count (the count the retired `+N` badge
+        // used to carry), and the good it makes.
+        const float gr = line_h * 0.45f;
+        {
+            const ImVec2 gp = ImGui::GetCursorScreenPos();
+            // The type-keyed vocabulary the canvas and the Build door draw.
+            icons::building(ImGui::GetWindowDrawList(), {gp.x + gr + 1.0f, gp.y + line_h * 0.5f},
+                            gr, b0.type, makes ? good : b0.target_resource,
+                            mine ? IM_COL32(190, 200, 210, 255) : IM_COL32(150, 154, 166, 255));
+            ImGui::Dummy({gr * 2.0f + 2.0f, line_h});
+            ImGui::SameLine();
+
+            char name[96];
+            const std::string gname = building_group_name(w, reg, b0);
+            if (count > 1)
+                std::snprintf(name, sizeof name, "%s \xc3\x97%d", gname.c_str(), count);
+            else
+                std::snprintf(name, sizeof name, "%s", gname.c_str());
+            const float good_w = makes ? ImGui::CalcTextSize(resource_name(good)).x +
+                                             ImGui::CalcTextSize(" \xc2\xb7 ").x
+                                       : 0.0f;
+            const float name_w = std::max(24.0f, ImGui::GetContentRegionAvail().x - good_w);
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(palette::selection));
+            fit_text(text_box::table_cell, "selection.production.stack", name, name_w);
+            ImGui::PopStyleColor();
+            if (makes)
+            {
+                ImGui::SameLine(0.0f, 0.0f);
+                ImGui::TextDisabled(" \xc2\xb7 ");
+                ImGui::SameLine(0.0f, 0.0f);
+                ImGui::PushStyleColor(ImGuiCol_Text,
+                    ImGui::ColorConvertU32ToFloat4(presentation_of(good).colour));
+                fit_text(text_box::table_cell, "selection.production.good",
+                         resource_name(good), ImGui::GetContentRegionAvail().x);
+                ImGui::PopStyleColor();
+            }
+        }
+
+        // Line two, indented under the name.
+        ImGui::Indent(gr * 2.0f + 2.0f + style.ItemSpacing.x);
+        if (!open)
+        {
+            // Owner: public (DISCOVERY.md). Emblem + name, as the rival hover
+            // card draws it, so the identity reads the same shape everywhere.
+            const entity_id owner = owner_corp_of(w, first);
+            if (const auto cit = w.corporations.find(owner); cit != w.corporations.end())
+            {
+                const ImVec2 oc  = ImGui::GetCursorScreenPos();
+                const float  orr = line_h * 0.36f;
+                icons::corp_emblem(ImGui::GetWindowDrawList(),
+                                   {oc.x + orr, oc.y + line_h * 0.5f}, orr,
+                                   palette::corp_emblem_shape(owner),
+                                   palette::corp_identity_colour(owner, w.player_entity));
+                ImGui::Dummy({orr * 2.0f, line_h});
+                ImGui::SameLine();
+                const char* tail = "  output, state private";
+                const float tail_w = ImGui::CalcTextSize(tail).x;
+                fit_text(text_box::table_cell, "selection.production.owner",
+                         cit->second.name.c_str(),
+                         std::max(24.0f, ImGui::GetContentRegionAvail().x - tail_w));
+                ImGui::SameLine(0.0f, 0.0f);
+                ImGui::TextDisabled("%s", tail);
+            }
+            else
+                ImGui::TextDisabled("Output and state private");
+        }
+        else
+        {
+            // Output and state, classified per member by the ONE function.
+            std::vector<building_running_state> states;
+            states.reserve(st.members.size());
+            float out_sum  = 0.0f;
+            bool  reported = false;
+            for (const entity_id m : st.members)
+            {
+                const building_running_state rs =
+                    classify_building_running(w, &reg, &report, m, w.buildings.at(m));
+                if (rs.reported)
+                {
+                    reported  = true;
+                    out_sum  += rs.output;
+                }
+                states.push_back(rs);
+            }
+
+            // Output only where a member is past construction and not
+            // mothballed: "—/tick" beside "Under construction" says nothing.
+            bool operating = false;
+            for (const building_running_state& rs : states)
+                operating = operating || (rs.kind != building_run_kind::under_construction &&
+                                          rs.kind != building_run_kind::mothballed);
+
+            std::string line;
+            if (makes && operating)
+            {
+                char out[48];
+                if (reported)
+                    std::snprintf(out, sizeof out, "%.2f/tick \xc2\xb7 ", static_cast<double>(out_sum));
+                else
+                    std::snprintf(out, sizeof out, "\xe2\x80\x94/tick \xc2\xb7 ");
+                line = out;
+            }
+
+            // One member, or every member in the same state: that state and its
+            // reason. A mixed stack counts by state word and names the first
+            // reason owed, so the row still says WHY.
+            bool same = true;
+            const std::string t0 = running_state_text(states.front());
+            for (std::size_t k = 1; k < states.size() && same; ++k)
+                same = running_state_text(states[k]) == t0;
+
+            building_run_kind tint = states.front().kind;
+            if (same)
+                line += t0;
+            else
+            {
+                int n[5] = {0, 0, 0, 0, 0};
+                const building_running_state* owed = nullptr;
+                for (const building_running_state& rs : states)
+                {
+                    ++n[static_cast<int>(rs.kind)];
+                    if (owed == nullptr && rs.kind != building_run_kind::under_construction &&
+                        !running_state_reason(rs).empty())
+                        owed = &rs;
+                }
+                std::string mixed;
+                for (int k = 0; k < 5; ++k)
+                {
+                    if (n[k] == 0)
+                        continue;
+                    if (!mixed.empty())
+                        mixed += ", ";
+                    mixed += std::to_string(n[k]) + " " +
+                             running_state_word(static_cast<building_run_kind>(k));
+                }
+                if (owed != nullptr)
+                {
+                    mixed += " \xe2\x80\x94 " + running_state_reason(*owed);
+                    tint = owed->kind;
+                }
+                line += mixed;
+            }
+            ImGui::PushTextWrapPos(0.0f);
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(running_state_colour(tint)),
+                               "%s", line.c_str());
+            ImGui::PopTextWrapPos();
+        }
+        ImGui::Unindent(gr * 2.0f + 2.0f + style.ItemSpacing.x);
+        ImGui::PopID();
+    }
+
+    ImGui::Dummy({1.0f, style.ItemSpacing.y});
+    ImGui::Separator();
+
+    // ── Part 2: what it fetches here ──
+    const entity_id mid = market_for_tile(w, sel);
+    const auto      mit = w.markets.find(mid);
+    if (mid == null_entity || mit == w.markets.end())
+    {
+        ImGui::TextDisabled("No market's catchment holds this tile.");
+        return;
+    }
+    const market_component& mc = mit->second;
+
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Sells at");
+    ImGui::SameLine();
+    ImGui::Text("%s", market_city_name(w, mid).c_str());
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("The market whose catchment holds this tile: what this ground\n"
+                          "makes or yields is priced here. Press a good to open it in\n"
+                          "the Market ledger.");
+
+    // Goods made here first, then goods deposited here — each once.
+    std::vector<resource_type> goods = made;
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (tile.resource_deposit[r] > 0.0f)
+        {
+            const resource_type rt = static_cast<resource_type>(r);
+            if (std::find(goods.begin(), goods.end(), rt) == goods.end())
+                goods.push_back(rt);
+        }
+    if (goods.empty())
+    {
+        ImGui::TextDisabled("Nothing made or deposited here to sell.");
+        return;
+    }
+
+    // Three columns, not four: a "made / deposit" column cost the good's name
+    // its room at ~285 px ("Agricult..."), and the ORDER already says it — goods
+    // made here come first — with the row's tooltip naming which.
+    if (ImGui::BeginTable("##tile_fetches", 3,
+                          ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit))
+    {
+        const float pad = style.CellPadding.x * 2.0f;
+        ImGui::TableSetupColumn("Good",   ImGuiTableColumnFlags_WidthStretch, 1.0f);
+        ImGui::TableSetupColumn("Price",  ImGuiTableColumnFlags_WidthFixed,
+                                ImGui::CalcTextSize("000.00").x + pad);
+        ImGui::TableSetupColumn("State",  ImGuiTableColumnFlags_WidthFixed,
+                                ImGui::CalcTextSize("no trade").x + pad);
+        ImGui::TableHeadersRow();
+
+        for (std::size_t gi = 0; gi < goods.size(); ++gi)
+        {
+            const resource_type rt = goods[gi];
+            const std::size_t   r  = static_cast<std::size_t>(rt);
+            const bool is_made     = gi < made.size();
+            ImGui::PushID(static_cast<int>(r) + 4096);
+            ImGui::TableNextRow();
+
+            // The whole row is the door: a Selectable spanning every column,
+            // labelled with the good's own name in its identity colour.
+            ImGui::TableSetColumnIndex(0);
+            const bool aimed = ui.show_market_ledger && ui.market_ledger_aim_resource == static_cast<int>(r);
+            ImGui::PushStyleColor(ImGuiCol_Text,
+                ImGui::ColorConvertU32ToFloat4(presentation_of(rt).colour));
+            const bool pressed = ImGui::Selectable(resource_name(rt), aimed,
+                                                   ImGuiSelectableFlags_SpanAllColumns);
+            ImGui::PopStyleColor();
+            if (pressed)
+            {
+                close_all_panels(ui);
+                ui.show_market_ledger         = true;
+                ui.market_ledger_view         = 0; // Goods: the view that answers "what is it worth"
+                ui.market_ledger_aim_market   = mid;
+                ui.market_ledger_aim_resource = static_cast<int>(r);
+                ui.market_ledger_aim_scroll   = true;
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s is %s.\nPress to open it in the Market ledger at %s.",
+                                  resource_name(rt), is_made ? "made here" : "deposited here",
+                                  market_city_name(w, mid).c_str());
+
+            ImGui::TableSetColumnIndex(1);
+            if (mc.base_price[r] > 0.0f)
+                ImGui::Text("%.2f", static_cast<double>(posted_price(mc, r)));
+            else
+                ImGui::TextDisabled("unpriced");
+
+            ImGui::TableSetColumnIndex(2);
+            ImU32       sc   = palette::neutral;
+            const char* word = market_state_word(mc, r, sc);
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(sc), "%s", word);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Last tick at this market: supply %.1f, demand %.1f.",
+                                  static_cast<double>(mc.supply[r]),
+                                  static_cast<double>(mc.demand[r]));
+
+            ImGui::PopID();
+        }
+        ImGui::EndTable();
+    }
+}
+
+} // namespace
+
 // ── The WATER variant of the centre column (BL-785) ──────────────────────
 //
 // A water tile selects exactly as a land tile does, and its centre column
@@ -2785,7 +3202,8 @@ void draw_water_facts_column(const world& w, entity_id sel, const tile_component
     ImGui::EndChild();
 }
 
-void draw_tile_selection(world& w, ui_state& ui)
+void draw_tile_selection(world& w, const recipe_registry& reg, const economy_report& report,
+                         ui_state& ui)
 {
     const entity_id sel = ui.selected_entity;
     const auto tit = w.tiles.find(sel);
@@ -2899,7 +3317,7 @@ void draw_tile_selection(world& w, ui_state& ui)
 
         int& open = ui.card_tile_view;
         if (open < -1 || open >= k_view_count)
-            open = k_sec_buildings;
+            open = k_sec_production;
 
         // The metric list splits in two: pages backed by a real deposit (the
         // Resources section) and the tile's own habitability/hazard scalars (the
@@ -2948,7 +3366,7 @@ void draw_tile_selection(world& w, ui_state& ui)
             const float y0     = ImGui::GetCursorPosY();
 
             if (open < 0 || open >= k_view_count)
-                open = k_sec_buildings;   // the nav always has a current section
+                open = k_sec_production;  // the nav always has a current section
 
             if (ImGui::ArrowButton("##sec_prev", ImGuiDir_Left))
                 open = (open + k_view_count - 1) % k_view_count;
@@ -3006,6 +3424,13 @@ void draw_tile_selection(world& w, ui_state& ui)
 
             switch (s)
             {
+            // ── Production — what is HAPPENING here (BL-1239) ─────────────
+            // First by Ben's order (2026-10-08): what this tile makes and what
+            // that fetches where it sells. Tile grain, the one section that is.
+            case k_sec_production:
+                draw_tile_production_section(w, reg, report, ui, sel, tile);
+                break;
+
             // ── Buildings — what you can still put here ───────────────────
             // The tile's available-buildings reading, KEPT by Ben's ruling, and
             // per province throughout (his 2026-08-22 call on the grain, which
@@ -3590,7 +4015,7 @@ void draw_selection_content(world& w, const recipe_registry& reg,
     // the province from this tile.
     if (kind == selection_kind::tile)
     {
-        draw_tile_selection(w, ui);
+        draw_tile_selection(w, reg, report, ui);
         return;
     }
 

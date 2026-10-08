@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*158 entries — 28 gameplay · 25 canvas · 17 lens · 53 ledger · 35 chrome.*
+*159 entries — 28 gameplay · 25 canvas · 17 lens · 54 ledger · 35 chrome.*
 
 ---
 
@@ -1710,21 +1710,37 @@ TRADES shows FOUR headed sections, each bounded and scrolling inside itself so a
 
 **Reason to select.** The band's chart is 260 px tall; the overlay gives it the axis room and legend space to actually compare values.
 
-### `ledger.selection_section_toggle` — The Selection band's tile element — a five-section accordion in the centre column, ordered Buildings, Deposits, Resources, Population, Terrain. It replaced a three-view pager, and the province card that used to sit beside it (BL-598): the province is a SECTION here, not a selection of its own.
+### `ledger.selection_section_toggle` — The Selection band's tile element — a six-section top nav in the centre column (left/right chevrons straddling the span, title and i/6 count centred between them), ordered Production, Buildings, Deposits, Resources, Population, Terrain. The province is a SECTION here, not a selection of its own (BL-598); Production leads (BL-1239).
 
-**Press.** Click a section header to open it; click the open section's header again to close it.
+**Press.** Click the left or right chevron to step to the previous or next section.
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `direction` | `enum` | 'previous' or 'next' page |
+| `direction` | `enum` | 'previous' or 'next' section |
 
 **Valid when:**
-- A tile is selected. Every other selection kind (building, unit, market, nation) still takes a pager, not an accordion — see NR-605, which asks whether that split should stand.
-- One section open at a time; none-open is reachable, because a header shows its own state and is therefore a toggle under the standing Toggle rule.
+- A land tile is selected. A water tile takes its own facts column and has no section nav.
+- One section shows at a time; the nav wraps in both directions, so six presses of either chevron return to the start. A newly selected tile opens on Production.
 
-**Expected output.** The pressed section expands in place and any other closes. Deposits and Population read the PROVINCE of the selected tile, so the province's content is reachable without a province selection existing. The tile's available-buildings tab is unchanged; the province's own buildings roll-up and member-tile list are gone.
+**Expected output.** The next or previous section takes the whole centre body. Production reads THIS tile (what stands here, its running state and reason, and what its goods fetch at the catchment market); Buildings, Deposits and Population read the PROVINCE of the selected tile; Resources and Terrain chart this tile against the field.
 
-**Reason to select.** The pager hid the LIST of questions the surface can answer behind a press, so a player had to already know a reading existed to go and find it. An accordion shows all five and opens the one you ask for. The order is the other half (Ben, 2026-08-24): it runs from what the player can act on to what the ground merely is, where the pager ran the other way and put the least actionable reading in the default slot.
+**Reason to select.** To read a different question of the same ground. The order is the argument (Ben, 2026-08-24, and 2026-10-08 for Production): it opens on what is happening here, then runs from what the player can act on to what the ground merely is.
+
+### `ledger.tile_production_market_door` — Selection band, tile element, Production section — a good row in the 'Sells at <market>' table (goods made on this tile, then goods deposited on it)
+
+**Press.** Click a good row.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `good` | `resource` | The row's good — one made by a stack on this tile or deposited in it. |
+
+**Valid when:**
+- A land tile is selected, its Production section is showing, and a market's catchment holds the tile.
+- The tile carries at least one good, made or deposited.
+
+**Expected output.** Any open fold-out ledger closes and the Market ledger opens on its Goods view, its Body and Market combos jumped to the tile's catchment market, the pressed good's row washed and scrolled into view. The tile stays selected behind the door.
+
+**Reason to select.** To read the good's full price board — its 8-quarter history and its price against base — at the market that actually prices this ground, without first finding that market and good by hand.
 
 ### `ledger.decision_feed_open` — Navigation rail slot 11, "AI decisions"
 
