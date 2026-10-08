@@ -1709,9 +1709,17 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             bit->second.balance -= per_tick;
             sit->second.balance += per_tick;
             ++c.ticks_elapsed;
+            // BL-1227 (AI_OPPONENT.md § 2B): procurement is a buyer that posts
+            // no bid. What it WANTS — the whole contract, filled from stock or
+            // built to order — is an unposted bid on the supplier's home market
+            // on EVERY tick of the lead time, not only the tick it fulfils
+            // (wanted, filled or not).
+            const std::size_t ri = static_cast<std::size_t>(c.resource);
+            if (const auto hmit = w.markets.find(corp_home_pool_key(w, c.supplier, c.body));
+                hmit != w.markets.end())
+                note_unposted_bid(hmit->second, ri, c.quantity, w.current_econ_tick);
             if (c.ticks_elapsed >= c.lead_time_ticks)
             {
-                const std::size_t ri = static_cast<std::size_t>(c.resource);
                 // Draw what the supplier actually holds at the fulfilment body
                 // before building the rest to order, so a contract served out of
                 // existing stock moves goods rather than inventing them.
@@ -1734,12 +1742,6 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                     sq -= take;
                     to_draw -= take;
                 };
-                // BL-1227 (AI_OPPONENT.md § 2B): procurement is a buyer that
-                // posts no bid. What it WANTS here — the whole contract, filled
-                // from stock or built to order — is an unposted bid on the
-                // supplier's home market.
-                if (const auto hmit = w.markets.find(home_key); hmit != w.markets.end())
-                    note_unposted_bid(hmit->second, ri, c.quantity, w.current_econ_tick);
                 if (const auto skit = w.corp_market_pools.find(std::make_pair(c.supplier, home_key));
                     skit != w.corp_market_pools.end())
                     draw_from(skit->second);

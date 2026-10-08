@@ -172,11 +172,17 @@ int main()
         procurement_contract c{};
         c.id = 1; c.buyer = buyer; c.supplier = f.corp; c.body = f.body;
         c.resource = resource_type::machinery; c.delivery_body = f.body;
-        c.quantity = 6.0f; c.unit_price = 1.0f; c.lead_time_ticks = 1;
+        c.quantity = 6.0f; c.unit_price = 1.0f; c.lead_time_ticks = 2;
         f.w.procurement_contracts.push_back(c);
-        check(vetoed(f, resource_type::machinery), "U3 not vacuous: before the contract fulfils, machinery is a dead market");
+        check(vetoed(f, resource_type::machinery), "U3 not vacuous: before the contract runs, machinery is a dead market");
         (void)run_economy_step(f.w, reg);
-        check(f.w.procurement_contracts.empty(), "U3 the contract fulfilled this step");
+        check(!f.w.procurement_contracts.empty()
+                  && f.w.markets.at(f.market).unposted_bid[ri(resource_type::machinery)] == 6.0f
+                  && !vetoed(f, resource_type::machinery),
+              "U3 on a lead-time tick, before it fulfils, the contract's want is already recorded (wanted, filled or not)");
+        f.w.current_econ_tick = 6;
+        (void)run_economy_step(f.w, reg);
+        check(f.w.procurement_contracts.empty(), "U3 the contract fulfilled on its second step");
         check(f.w.markets.at(f.market).unposted_bid[ri(resource_type::machinery)] == 6.0f,
               "U3 its quantity is recorded as wanted at the supplier's home market");
         check(!vetoed(f, resource_type::machinery), "U3 ... and a machinery plant there is not vetoed");
@@ -245,8 +251,12 @@ int main()
         note_unposted_bid(f.w.markets.at(f.market), ri(resource_type::coal), 2.0f, 10);
         f.w.current_econ_tick = 13; // a corp evaluating 3 ticks after the want
         check(!vetoed(f, resource_type::coal), "U6 a corporation evaluating 3 ticks after the want still sees it (cadence 4)");
-        f.w.current_econ_tick = 15;
-        check(vetoed(f, resource_type::coal), "U6 a record older than the cadence no longer counts: dead again");
+        f.w.current_econ_tick = 14; // age == cadence_k: the boundary, still held
+        check(!vetoed(f, resource_type::coal), "U6 boundary: a record exactly cadence_k (4) ticks old is still held");
+        f.w.current_econ_tick = 15; // age == cadence_k + 1
+        check(vetoed(f, resource_type::coal), "U6 boundary: one tick past the cadence it no longer counts: dead again");
+        f.w.current_econ_tick = 8;  // the record is dated AHEAD of the current tick
+        check(vetoed(f, resource_type::coal), "U6 a record dated ahead of the current tick (a settle replayed from tick 1) is never read");
         note_unposted_bid(f.w.markets.at(f.market), ri(resource_type::coal), 1.0f, 15);
         note_unposted_bid(f.w.markets.at(f.market), ri(resource_type::coal), 0.5f, 15);
         check(f.w.markets.at(f.market).unposted_bid[ri(resource_type::coal)] == 1.5f

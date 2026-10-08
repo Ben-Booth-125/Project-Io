@@ -1609,23 +1609,25 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // seed 0 one steel shelf at negative spare admitted 63 builds in
                     // eight ticks. The stock clause still counts where a plant
                     // already stands (resume, recipe switch, the reflex rescue).
-                    if (!recipe_inputs_supplied(w, reg, reach(), mid, *abs, batches,
-                                                null_entity))
-                        continue;
+                    const bool supplied = recipe_inputs_supplied(w, reg, reach(), mid, *abs, batches,
+                                                                 null_entity);
                     // Pricing is unchanged: each input at what it would cost here
-                    // (input_reach.hpp § OBTAINABLE). Every input is covered by
-                    // supply, so this is obtainable by construction.
+                    // (input_reach.hpp § OBTAINABLE). Every input covered by supply
+                    // is obtainable by construction; a refused candidate is priced
+                    // the same way for the chain start below.
                     std::array<float, resource_count> input_cost{};
-                    if (!recipe_inputs_obtainable(w, reg, reach(), mid, pool, *abs, batches,
-                                                  null_entity, input_cost))
+                    const bool obtainable = recipe_inputs_obtainable(w, reg, reach(), mid, pool, *abs,
+                                                                     batches, null_entity, input_cost);
+                    if (!supplied || !obtainable)
                     {
                         // BL-1227, the chain start (§ 11): refused ONLY for an
-                        // unobtainable input? Then everything else the candidate
-                        // must pass — a profit at its inputs' posted cost,
-                        // placement, its output's forecast, its materials — is
-                        // asked, and if all pass, its draw of each unobtainable
-                        // input is this corp's private bid on it in this market
-                        // for the rest of this evaluation.
+                        // input it cannot get (since BL-1234, a new processor's
+                        // input gate is the SUPPLY clause)? Then everything else
+                        // the candidate must pass — a profit at its inputs'
+                        // posted cost, placement, its output's forecast, its
+                        // materials — is asked, and if all pass, its draw of each
+                        // input supply does not cover is this corp's private bid
+                        // on it in this market for the rest of this evaluation.
                         if (!chain_start_eligible || mid == null_entity)
                             continue;
                         const resource_type ort = primary_output(*abs);
@@ -1648,7 +1650,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                             const float in = abs->inputs[r];
                             if (!(in > 0.0f))
                                 continue;
-                            if (!input_obtainable(w, reg, reach(), mid, pool, r, in * batches, null_entity).obtainable)
+                            if (!input_supply_covers(w, reg, reach(), mid, r, in * batches, null_entity))
                                 refused_draw[std::make_pair(mid, r)] += in * batches;
                         }
                         continue;
