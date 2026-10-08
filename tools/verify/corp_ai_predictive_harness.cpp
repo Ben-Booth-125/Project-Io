@@ -182,17 +182,37 @@ int main()
 
         const corp_ai_params p{}; // glut_taper_ratio=1.0, glut_veto_ratio=2.0
 
-        // No public demand signal at all (demand == 0): no penalty — the AI
-        // cannot forecast against a fact it (and a rival) cannot see.
+        // No public demand signal at all (demand == 0) in a market that has
+        // NEVER CLEARED (econ tick 0): no penalty — the AI cannot forecast
+        // against a fact it (and a rival) cannot see. BL-1227 narrowed this
+        // row to the never-cleared market (AI_OPPONENT.md, "A market with no
+        // bid is read by what it lists").
+        w.current_econ_tick = 0;
         check(forecast_glut_multiplier(w, tile, resource_type::iron_ore, 5.0f, 3, p) == 1.0f,
-              "BL-203 R3: no public demand signal -> no forecast penalty (visibility-honest)");
+              "BL-203 R3 / BL-1227 (c): a never-cleared market (no bid, nothing listed) -> no forecast penalty");
 
-        // BL-1227 (the boom): zero bid against LISTED supply is a glut, not a
+        // BL-1227 (a): zero bid against LISTED supply is a glut, not a
         // missing signal — both facts are public, the ratio is unbounded.
         w.markets.at(market).supply[ri(resource_type::iron_ore)] = 50.0f;
         check(forecast_glut_multiplier(w, tile, resource_type::iron_ore, 5.0f, 3, p) == 0.0f,
-              "BL-1227: zero public demand against listed supply vetoes the build (an unbounded glut)");
+              "BL-1227 (a): zero public demand against listed supply vetoes the build (an unbounded glut)");
         w.markets.at(market).supply[ri(resource_type::iron_ore)] = 0.0f;
+
+        // BL-1227 (b): in play, a CLEARED market (econ tick > 0, and the clear
+        // wrote something — here a household bid for another good) with no
+        // bid and nothing listed for this good is a DEAD market: vetoed.
+        w.current_econ_tick = 5;
+        w.markets.at(market).demand[ri(resource_type::water)] = 30.0f;
+        check(forecast_glut_multiplier(w, tile, resource_type::iron_ore, 5.0f, 3, p) == 0.0f,
+              "BL-1227 (b): a cleared market with no bid and nothing listed is dead -> the build is vetoed");
+
+        // BL-1227 (c, emerged): econ tick > 0 but the market has written
+        // nothing for ANY good yet (a market carved mid-tick, before its first
+        // clear) is still never-cleared: no signal, no penalty.
+        w.markets.at(market).demand[ri(resource_type::water)] = 0.0f;
+        check(forecast_glut_multiplier(w, tile, resource_type::iron_ore, 5.0f, 3, p) == 1.0f,
+              "BL-1227 (c): a market with nothing written for any good has not cleared -> no forecast penalty");
+        w.current_econ_tick = 0;
 
         // Demand comfortably absorbs the forecast supply: no penalty.
         w.markets.at(market).demand[ri(resource_type::iron_ore)] = 1000.0f;

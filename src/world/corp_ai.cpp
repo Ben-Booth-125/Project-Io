@@ -686,9 +686,28 @@ float forecast_glut_multiplier(const world& w, entity_id tile, resource_type tar
         // markets with no buyer (no Weaver, no Tannery, no household bid;
         // 100% of them at demand 0, fibre's listed supply ~412k), pricing
         // output nobody buys at the band floor (~0.26 base) as revenue.
-        // Only a market that has listed NOTHING and bid NOTHING (no clear has
-        // seen the good either way) is genuinely signal-free: do not guess.
-        return m.supply[r] > 0.0f ? 0.0f : 1.0f;
+        if (m.supply[r] > 0.0f)
+            return 0.0f;
+        // No bid AND nothing listed (Ben, 2026-10-07; AI_OPPONENT.md, "A market
+        // with no bid is read by what it lists"): once the market has CLEARED,
+        // that is a DEAD market — the clear ran and nobody bid or listed — and
+        // the build is vetoed (peat: 80 sites placed this way in play, every
+        // one idled). Only before the market has ever cleared is it no signal.
+        //
+        // "Has cleared" from existing state, no new field: clear_markets runs
+        // once per econ step, AFTER the economy step the scorer runs in, so at
+        // econ step k > 0 every market standing at step k-1 has cleared. A
+        // market that has cleared bids or lists SOMETHING (households bid every
+        // tick wherever people live); one whose every supply and demand slot is
+        // still zero is read as not yet cleared — the market emergence carves
+        // mid-tick (market_clearing.cpp) opens exactly so, with nothing written
+        // until its first clear.
+        if (w.current_econ_tick <= 0)
+            return 1.0f; // no clear has run yet: no signal, do not guess
+        for (std::size_t g = 0; g < resource_count; ++g)
+            if (m.supply[g] > 0.0f || m.demand[g] > 0.0f)
+                return 0.0f; // the market has cleared: dead for this good
+        return 1.0f; // never cleared (nothing written yet): no signal
     }
     const float horizon = static_cast<float>(std::max(1, horizon_ticks));
     const float projected_supply = m.supply[r] + added_rate_per_tick * horizon;
