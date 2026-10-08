@@ -60,6 +60,9 @@
 #include "world/charter_budget.hpp"
 #include "world/components.hpp"
 #include "world/corporation_generation.hpp"
+#include "world/input_reach.hpp"     // BL-1233: reachable_supply, the sized rule's rows
+#include "world/market_clearing.hpp" // market_for_tile
+#include "world/logistics.hpp"       // invalidate_logistics_caches
 #include "world/landscape_search.hpp"  // apply_landscape_candidate's budget overload (NR-910)
 #include "world/placement_rules.hpp"   // is_wharf_site, the produce ladder's rows (BL-1208)
 #include "world/province.hpp"          // province_anchors, the fixture's province (BL-1146)
@@ -68,6 +71,7 @@
 #include "world/world.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <array>
 #include <cstdint>
 #include <cstdio>
@@ -1196,6 +1200,230 @@ result run_pass6(mode m)
 
 } // namespace producefx
 
+// ---------------------------------------------------------------------------
+// BL-1233 (processors to inputs) — the SIZED rule: a processor needs SPARE
+// reachable supply covering its draw at t_idle (CORPORATION_GENERATION.md § Pass
+// 3, "Sized to its inputs"). One body, timber only; every market prices timber
+// alike, so every market pair with a cheap haul is within reach.
+namespace sizedfx {
+
+constexpr std::size_t k_timber = static_cast<std::size_t>(resource_type::timber);
+constexpr std::size_t k_steel  = static_cast<std::size_t>(resource_type::steel);
+constexpr std::size_t k_tools  = static_cast<std::size_t>(resource_type::tools);
+
+struct fx
+{
+    std::unique_ptr<world> w = std::make_unique<world>();
+    recipe_registry reg;
+    std::map<std::pair<int, int>, entity_id> at;
+    std::vector<entity_id> markets;
+
+    /// A 24x12 body, markets centred at @p centres (x, row 6), timber deposits
+    /// at @p deposits (x, row 6).
+    fx(const std::vector<int>& centres, const std::vector<int>& deposits)
+    {
+        const entity_id body = w->create_entity();
+        body_component bc{};
+        bc.name = "SizedBody";
+        bc.grid_width = 24;
+        bc.grid_height = 12;
+        w->bodies[body] = bc;
+        const entity_id nation = w->create_entity();
+        nation_component nc{};
+        nc.name = "Veyl";
+        for (int y = 0; y < 12; ++y)
+            for (int x = 0; x < 24; ++x)
+            {
+                const entity_id tid = w->create_entity();
+                tile_component tc{};
+                tc.body = body;
+                tc.grid_x = x;
+                tc.grid_y = y;
+                tc.substrate = terrain_substrate::barren;
+                if (y == 6 && std::find(deposits.begin(), deposits.end(), x) != deposits.end())
+                {
+                    tc.resource_deposit[k_timber]   = 1.0f;
+                    tc.resource_remaining[k_timber] = 1000.0f;
+                }
+                w->tiles[tid] = tc;
+                nc.tiles.push_back(tid);
+                w->tile_to_nation[tid] = nation;
+                at[{ x, y }] = tid;
+            }
+        w->nations[nation] = nc;
+        for (const int cx : centres)
+        {
+            const entity_id mid = w->create_entity();
+            market_component m{};
+            m.body = body;
+            m.centre_tile = at.at({ cx, 6 });
+            m.base_price.fill(1.0f);
+            m.price = m.base_price;
+            w->markets[mid] = m;
+            markets.push_back(mid);
+        }
+        building_economics e;
+        e.base_rate = 1.0f;
+        reg.set_economics(building_type::extraction_site, e);
+        reg.set_economics(building_type::processing_facility, e);
+    }
+    entity_id add(int x, building_type t, const char* rname = nullptr)
+    {
+        const entity_id bid = w->create_entity();
+        building_component b{};
+        b.tile = at.at({ x, 6 });
+        b.type = t;
+        b.workforce_assigned = 0.5f;
+        if (t == building_type::extraction_site)
+            b.target_resource = resource_type::timber;
+        if (rname != nullptr)
+            b.recipe = reg.recipe_id(rname);
+        w->buildings[bid] = b;
+        w->stockpiles[bid] = stockpile_component{};
+        return bid;
+    }
+    float output(entity_id bid, std::size_t r) const
+    {
+        return building_output(*w, reg, bid, w->buildings.at(bid), r, nullptr);
+    }
+    entity_id corp(const char* name, industrial_focus f, std::vector<entity_id> assets, bool seat)
+    {
+        const entity_id cid = w->create_entity();
+        corporation_component c;
+        c.name = name;
+        c.focus = f;
+        c.assets = std::move(assets);
+        c.hq_building = c.assets.front();
+        c.is_player = seat;
+        w->corporations[cid] = c;
+        if (seat)
+            w->player_entity = cid;
+        return cid;
+    }
+};
+
+/// One processor whose recipe needs @p need_over_output x the mine's output at
+/// t_idle, beside the mine, in one market. Kept after the roster enforcement?
+struct one_result { float out = 0, need = 0; bool kept = false; };
+one_result run_one(float need_over_output)
+{
+    fx f({ 6 }, { 5 });
+    const entity_id mine = f.add(5, building_type::extraction_site);
+    one_result r;
+    r.out = f.output(mine, k_timber);
+    // need at t_idle = inputs x judged batches (rate 1 x labour 0.5) x t_idle.
+    const float batches = 0.5f;
+    recipe rc;
+    rc.name = "fixture_steel_from_timber";
+    rc.inputs[k_timber] = need_over_output * r.out / (batches * f.reg.t_idle());
+    rc.outputs[k_steel] = 1.0f;
+    f.reg.add_recipe(rc);
+    r.need = rc.inputs[k_timber] * batches * f.reg.t_idle();
+    const entity_id p = f.add(6, building_type::processing_facility, rc.name.c_str());
+    f.corp("Sereth Works", industrial_focus::processing, { p }, true);
+    f.corp("Tolvan Extraction", industrial_focus::extraction, { mine }, false);
+    enforce_chain_feasible_roster(*f.w, f.reg, /*seed=*/1233u);
+    r.kept = f.w->buildings.count(p) != 0 && f.w->buildings.at(p).recipe != no_recipe;
+    return r;
+}
+
+/// Two producer markets (x 2 and x 18) each reaching a consumer market (x 10)
+/// whose standing works draws 0.75 x their summed output: each producer market
+/// alone is overdrawn, the set is not.
+struct twin_result { float o1 = 0, o2 = 0, drawn = 0, spare = 0; bool reach1 = false, reach2 = false; };
+twin_result run_twin()
+{
+    fx f({ 2, 10, 18 }, { 1, 19 });
+    const entity_id m1 = f.add(1, building_type::extraction_site);
+    const entity_id m2 = f.add(19, building_type::extraction_site);
+    twin_result r;
+    r.o1 = f.output(m1, k_timber);
+    r.o2 = f.output(m2, k_timber);
+    recipe rc;
+    rc.name = "fixture_steel_from_timber";
+    rc.inputs[k_timber] = 0.75f * (r.o1 + r.o2) / 0.5f; // draw = inputs x rate 1 x labour 0.5
+    rc.outputs[k_steel] = 1.0f;
+    f.reg.add_recipe(rc);
+    const entity_id q = f.add(10, building_type::processing_facility, rc.name.c_str());
+    r.drawn = building_draw(f.reg, f.w->buildings.at(q), k_timber);
+    input_reach ir = make_input_reach(*f.w, f.reg);
+    const entity_id cm = market_for_tile(*f.w, f.at.at({ 10, 6 }));
+    r.reach1 = market_within_reach(*f.w, f.reg, ir, market_for_tile(*f.w, f.at.at({ 1, 6 })), cm, k_timber);
+    r.reach2 = market_within_reach(*f.w, f.reg, ir, market_for_tile(*f.w, f.at.at({ 19, 6 })), cm, k_timber);
+    r.spare = reachable_supply(*f.w, f.reg, ir, cm, k_timber, null_entity).spare;
+    invalidate_logistics_caches(*f.w);
+    return r;
+}
+
+/// CONTENDED SUPPLY AND A CASCADE: one mine; two steel works P1 (its market)
+/// and P2 (the next market, within the mine's reach), each needing 0.4 x its output at t_idle and drawing 2 x it at full
+/// run, so either fits alone and both together do not; a tools works T in a
+/// third market no timber reaches, fed only by their steel, listed FIRST.
+/// Enforcement suspends P1 and P2 together,
+/// then T for want of steel; re-admission must take P1 back and then T.
+struct contend_result
+{
+    chain_roster_enforcement first, second;
+    std::uint64_t d1 = 0, d2 = 0;
+    int works_kept = 0;
+    bool tools_kept = false;
+    std::string held; ///< what T, P1, P2 hold after the first call
+};
+contend_result run_contend()
+{
+    // P2 stands in a second market (x 14) whose steel is cheap, so no steel
+    // reaches it: it can only be a steel works, never switch to tools.
+    // T stands in a third market (x 22) whose timber is cheap, so no timber
+    // reaches it: it can only be a tools works, fed by steel from A.
+    fx f({ 6, 14, 22 }, { 5 });
+    {
+        market_component& b = f.w->markets.at(f.markets[1]);
+        b.base_price[k_steel] = 0.2f;
+        b.price = b.base_price;
+        market_component& c = f.w->markets.at(f.markets[2]);
+        c.base_price[k_timber] = 0.2f;
+        c.price = c.base_price;
+    }
+    const entity_id mine = f.add(5, building_type::extraction_site);
+    const float out = f.output(mine, k_timber);
+    recipe st;
+    st.name = "fixture_steel_from_timber";
+    st.inputs[k_timber] = 0.4f * out / (0.5f * f.reg.t_idle());
+    st.outputs[k_steel] = 1.0f;
+    f.reg.add_recipe(st);
+    recipe tl;
+    tl.name = "fixture_tools_from_steel";
+    tl.inputs[k_steel] = 0.5f;
+    tl.outputs[k_tools] = 1.0f;
+    f.reg.add_recipe(tl);
+    const entity_id t  = f.add(21, building_type::processing_facility, tl.name.c_str());
+    const entity_id p1 = f.add(6, building_type::processing_facility, st.name.c_str());
+    const entity_id p2 = f.add(13, building_type::processing_facility, st.name.c_str());
+    f.corp("Sereth Works", industrial_focus::processing, { t, p1, p2 }, true);
+    f.corp("Tolvan Extraction", industrial_focus::extraction, { mine }, false);
+    contend_result r;
+    r.first  = enforce_chain_feasible_roster(*f.w, f.reg, /*seed=*/1233u);
+    r.d1     = world_state_digest(*f.w);
+    for (const entity_id b : { t, p1, p2 })
+    {
+        const auto it = f.w->buildings.find(b);
+        const recipe* rc = it == f.w->buildings.end() ? nullptr : f.reg.get_recipe(it->second.recipe);
+        r.held += it == f.w->buildings.end() ? "gone" : (rc ? rc->name : "none");
+        r.held += ' ';
+    }
+    r.second = enforce_chain_feasible_roster(*f.w, f.reg, /*seed=*/1233u);
+    r.d2     = world_state_digest(*f.w);
+    const uint16_t sid = f.reg.recipe_id(st.name);
+    for (const entity_id p : { p1, p2 })
+        if (f.w->buildings.count(p) && f.w->buildings.at(p).recipe == sid)
+            ++r.works_kept;
+    r.tools_kept = f.w->buildings.count(t) != 0
+                && f.w->buildings.at(t).recipe == f.reg.recipe_id(tl.name);
+    return r;
+}
+
+} // namespace sizedfx
+
 int main()
 {
     const charter_budget empty;
@@ -2082,6 +2310,36 @@ int main()
                     "on the one that still qualifies",
                     lost.first.seat_redrawn && lost.first.seat == lost.t && lost.first.holdless == 1
                     && lost.audit.infeasible_held == 0);
+    }
+    {
+        // BL-1233 — THE SIZED RULE.
+        const sizedfx::one_result lean = sizedfx::run_one(1.5f);
+        const sizedfx::one_result fits = sizedfx::run_one(0.5f);
+        std::printf("  sized: mine output %.3f; need at t_idle %.3f -> kept %d; need %.3f -> kept %d\n",
+                    lean.out, lean.need, lean.kept ? 1 : 0, fits.need, fits.kept ? 1 : 0);
+        expect_true("sized: a processor whose t_idle need exceeds the spare reachable supply is unplaced",
+                    lean.out > 0.0f && !lean.kept);
+        expect_true("sized: the same processor is kept where the spare covers its t_idle need",
+                    fits.out > 0.0f && fits.kept);
+        const sizedfx::twin_result tw = sizedfx::run_twin();
+        std::printf("  twin producers: out %.3f + %.3f, drawn %.3f once, spare %.3f (reach %d %d)\n",
+                    tw.o1, tw.o2, tw.drawn, tw.spare, tw.reach1 ? 1 : 0, tw.reach2 ? 1 : 0);
+        expect_true("sized: spare is read over the reach SET, each consumer's draw counted once "
+                    "(two producer markets, each overdrawn alone)",
+                    tw.reach1 && tw.reach2 && tw.drawn > tw.o1 && tw.drawn > tw.o2
+                    && std::fabs(tw.spare - (tw.o1 + tw.o2 - tw.drawn)) < 1e-4f && tw.spare > 0.0f);
+        const sizedfx::contend_result c = sizedfx::run_contend();
+        std::printf("  contended roster: call 1 re-decided %d unplaced %d; call 2 re-decided %d "
+                    "unplaced %d; steel works kept %d, tools kept %d (T P1 P2: %s)\n",
+                    c.first.processors_redecided, c.first.processors_unplaced,
+                    c.second.processors_redecided, c.second.processors_unplaced, c.works_kept,
+                    c.tools_kept ? 1 : 0, c.held.c_str());
+        expect_true("sized roster: of two works contending for one mine exactly one is kept, and the "
+                    "tools works it feeds is re-admitted after it (no cascade loss)",
+                    c.works_kept == 1 && c.tools_kept && c.first.processors_unplaced == 1);
+        expect_true("sized roster: a SECOND call changes nothing (re-decides 0, unplaces 0, same digest)",
+                    c.second.processors_redecided == 0 && c.second.processors_unplaced == 0
+                    && c.d1 == c.d2);
     }
 
 

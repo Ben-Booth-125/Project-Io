@@ -1770,15 +1770,17 @@ int chain_recipe_tier(world& w, const recipe_registry& reg, chain_reach& cr, ent
 // asked: an opening shelf is eaten through, a producer is not.
 //
 // WHICH BUILDINGS COUNT is still this file's rule (the ones standing when the
-// recipe is decided), so the helper's lazy producer/draw index is rebuilt before
-// every processor's decision (`chain_begin_decision`); the haul memo is kept for
-// the pass, as reach is read.
+// recipe is decided), so the helper's producer/draw index is brought up to the
+// buildings standing before every processor's decision (`chain_begin_decision`
+// -> `input_reach_refresh`, which re-reads only what changed: a full rebuild per
+// decision cost the landscape search ~5x, 115k rebuilds and 20 s on seed 0).
+// The haul memo is kept for the pass, as reach is read.
 
-/// Forget the producer/draw index so the next sized test reads the buildings
-/// standing now. Call once before deciding each processor.
-void chain_begin_decision(chain_reach& cr)
+/// Bring the producer/draw index up to the buildings standing now. Call once
+/// before deciding each processor.
+void chain_begin_decision(const world& w, const recipe_registry& reg, chain_reach& cr)
 {
-    input_reach_invalidate(cr);
+    input_reach_refresh(w, reg, cr);
 }
 
 /// The sized test for recipe @p rc at processor @p self (see above).
@@ -1798,10 +1800,14 @@ int chain_recipe_placeable(world& w, const recipe_registry& reg, chain_reach& cr
                            entity_id consumer_market, const recipe& rc,
                            const std::vector<entity_id>* own)
 {
-    const int t = chain_recipe_tier(w, reg, cr, self, consumer_market, rc, own);
-    if (t == chain_tier_none || !chain_recipe_sized(w, reg, cr, self, consumer_market, rc))
+    // The sized test first: it is the cheaper read (the reach-set memo), and it
+    // implies a producer within reach — its supply counts only producers other
+    // than @p self in markets within reach of C, one of which must land a unit —
+    // so a recipe it passes is never `none` by the chain tier, which then only
+    // ranks it (own, market, reach).
+    if (!chain_recipe_sized(w, reg, cr, self, consumer_market, rc))
         return chain_tier_none;
-    return t;
+    return chain_recipe_tier(w, reg, cr, self, consumer_market, rc, own);
 }
 
 /// Browse indices of the in-band processing recipes that output @p good, in the
@@ -1906,7 +1912,7 @@ bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
         }
         const entity_id market = market_for_tile(w, bit->second.tile);
         uint16_t chosen = no_recipe;
-        chain_begin_decision(cr); // BL-1233: spare is read over what stands now
+        chain_begin_decision(w, reg, cr); // BL-1233: spare is read over what stands now
         if (serve != nullptr)
         {
             for (const int i : *serve)
@@ -3439,77 +3445,108 @@ chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_re
     //    BL-1233 (sized to its inputs): a kept recipe must also find its inputs'
     //    SPARE reachable supply covering its draw. Suspending a consumer frees
     //    supply as well as taking a producer away, so a sweep is no longer
-    //    monotone in walk order: each sweep tests every unsuspended processor
-    //    against the SAME standing set and suspends the failures together — the
-    //    walk order still decides nothing. One sweep may suspend two plants
-    //    contending for supply that would feed one; step 2 re-decides both in
-    //    order, so the first is re-admitted.
-    std::vector<bool> suspended(procs.size(), false);
-    for (bool changed = true; changed;)
-    {
-        changed = false;
-        chain_begin_decision(cr);
-        std::vector<std::size_t> failing;
-        for (std::size_t i = 0; i < procs.size(); ++i)
-        {
-            if (suspended[i])
-                continue;
-            building_component& b = w.buildings.at(procs[i].second);
-            const recipe* rc = reg.get_recipe(b.recipe);
-            const bool feasible = rc != nullptr
-                && chain_recipe_placeable(w, reg, cr, procs[i].second, market_for_tile(w, b.tile),
-                                          *rc, nullptr) != chain_tier_none;
-            if (!feasible)
-                failing.push_back(i);
-        }
-        for (const std::size_t i : failing)
-        {
-            w.buildings.at(procs[i].second).recipe = no_recipe;
-            suspended[i] = true;
-            changed      = true;
-        }
-    }
-
+    //    monotone in walk order: each sweep tests every kept processor against
+    //    the SAME standing set and suspends the failures together — the walk
+    //    order still decides nothing.
+    //
     // 2. DECIDE THE SUSPENDED AS FRESH PLACEMENT DOES, in (corp id, asset
     //    order): the feasible recipe nearest its feed (own, market, reach)
-    //    against everything standing with a recipe now — the kept processors
-    //    and those decided before it — or unplace it. A processor decided here
-    //    only ADDS a producer, and an unplaced one supplied nothing, so every
-    //    kept or decided processor stays chain-feasible. BL-1233: it also ADDS a
-    //    draw, judged against the spare left after every standing draw — a
-    //    decision is sized when taken; a later admission is not re-tested
-    //    against an earlier one's margin.
+    //    against everything standing with a recipe now. Suspending together can
+    //    cascade (a plant suspended only because its feed was), so the
+    //    suspended are swept REPEATEDLY until a sweep admits none: a feed
+    //    re-admitted in one sweep lets its consumer in on the next — inputs
+    //    before their consumers. What no sweep admits is unplaced.
+    //
+    //    A decision is sized against the spare left after every standing draw,
+    //    but an admission ADDS a draw, which can take an earlier plant's margin.
+    //    So steps 1 and 2 alternate until step 1 suspends nothing: every kept
+    //    plant is then placeable against the final roster and nothing left
+    //    suspended can be admitted, so a second call changes nothing. Each round
+    //    is bounded; past the bound (never measured to bind) the last step 1's
+    //    fixed point stands and whatever it suspended is unplaced.
+    enum : int { st_kept = 0, st_suspended = 1 };
+    std::vector<int>  state(procs.size(), st_kept);
+    std::vector<bool> ever_suspended(procs.size(), false);
+    const auto keep_sweep = [&]() {
+        bool any = false;
+        for (bool changed = true; changed;)
+        {
+            changed = false;
+            chain_begin_decision(w, reg, cr);
+            std::vector<std::size_t> failing;
+            for (std::size_t i = 0; i < procs.size(); ++i)
+            {
+                if (state[i] != st_kept)
+                    continue;
+                building_component& b = w.buildings.at(procs[i].second);
+                const recipe* rc = reg.get_recipe(b.recipe);
+                const bool feasible = rc != nullptr
+                    && chain_recipe_placeable(w, reg, cr, procs[i].second,
+                                              market_for_tile(w, b.tile), *rc, nullptr)
+                           != chain_tier_none;
+                if (!feasible)
+                    failing.push_back(i);
+            }
+            for (const std::size_t i : failing)
+            {
+                w.buildings.at(procs[i].second).recipe = no_recipe;
+                state[i]          = st_suspended;
+                ever_suspended[i] = true;
+                changed = any     = true;
+            }
+        }
+        return any;
+    };
     const int n = reg.recipe_count(building_type::processing_facility);
+    const auto readmit = [&]() {
+        for (bool admitted = true; admitted;)
+        {
+            admitted = false;
+            for (std::size_t i = 0; i < procs.size(); ++i)
+            {
+                if (state[i] != st_suspended)
+                    continue;
+                const entity_id cid = procs[i].first;
+                const entity_id bid = procs[i].second;
+                building_component& b = w.buildings.at(bid);
+                const entity_id market = market_for_tile(w, b.tile);
+                const std::vector<entity_id>& own = w.corporations.at(cid).assets;
+                uint16_t chosen    = no_recipe;
+                int      best_tier = chain_tier_none;
+                chain_begin_decision(w, reg, cr); // BL-1233: spare over what stands now
+                for (int k = 0; k < n && best_tier != chain_tier_own; ++k)
+                {
+                    const recipe& rc = reg.recipe_at(building_type::processing_facility, k);
+                    const int t = chain_recipe_placeable(w, reg, cr, bid, market, rc, &own);
+                    if (t < best_tier)
+                    {
+                        best_tier = t;
+                        chosen    = reg.recipe_id(rc.name);
+                    }
+                }
+                if (chosen != no_recipe)
+                {
+                    b.recipe = chosen;
+                    state[i] = st_kept;
+                    admitted = true;
+                }
+            }
+        }
+    };
+    keep_sweep();
+    for (std::size_t round = 0; round <= procs.size(); ++round)
+    {
+        readmit();
+        if (!keep_sweep())
+            break;
+    }
     std::map<entity_id, std::vector<entity_id>> unplaced; // corp -> buildings
     for (std::size_t i = 0; i < procs.size(); ++i)
     {
-        if (!suspended[i])
-            continue;
-        const entity_id cid = procs[i].first;
-        const entity_id bid = procs[i].second;
-        building_component& b = w.buildings.at(bid);
-        const entity_id market = market_for_tile(w, b.tile);
-        const std::vector<entity_id>& own = w.corporations.at(cid).assets;
-        uint16_t chosen    = no_recipe;
-        int      best_tier = chain_tier_none;
-        chain_begin_decision(cr); // BL-1233: spare over what stands now
-        for (int k = 0; k < n && best_tier != chain_tier_own; ++k)
-        {
-            const recipe& rc = reg.recipe_at(building_type::processing_facility, k);
-            const int t = chain_recipe_placeable(w, reg, cr, bid, market, rc, &own);
-            if (t < best_tier)
-            {
-                best_tier = t;
-                chosen    = reg.recipe_id(rc.name);
-            }
-        }
-        if (chosen != no_recipe)
-        {
-            b.recipe = chosen;
+        if (state[i] == st_suspended)
+            unplaced[procs[i].first].push_back(procs[i].second);
+        else if (ever_suspended[i])
             ++out.processors_redecided;
-        }
-        else
-            unplaced[cid].push_back(bid);
     }
 
     // 3. Unplace the processors no recipe could feed, and re-seat each touched
