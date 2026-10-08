@@ -1963,7 +1963,7 @@ TRADES shows FOUR headed sections, each bounded and scrolling inside itself so a
 **Valid when:**
 - App is on the main menu screen.
 
-**Expected output.** The screen transitions to the New World wizard (app_screen::generating), opening on round 1 of 3. Nothing is generated or committed by this press; the wizard only previews.
+**Expected output.** The screen transitions to the New World wizard (app_screen::generating), opening on round 1 of 6 (System, Life, Culture, Empires, Exploration, Industrialisation). Nothing is generated or committed by this press; the wizard only previews.
 
 **Reason to select.** To start setting up a new world round by round, choosing the planetology and history leans.
 
