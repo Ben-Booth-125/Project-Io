@@ -38,6 +38,13 @@
 //       by the pass, deterministic, wrap-exact flat and oblique; ground with
 //       no feature near it is untouched.
 //   P16 Rivers (BL-1242): a river mouth's window likewise.
+//   P17-P20 Terrain variant families (BL-1243): the colouring (no shared
+//       neighbour, mask-blind), purity/wrap/seam of the variant pass on a
+//       plain, a forest and a mountain run, the plain's tile-to-tile spread,
+//       and the hash folding family and variant. `--aim` prints the capture
+//       aims for scripts/verify/terrain_variants.lua and exits; `--variants`
+//       runs P17-P20 alone; `--timing` the variant cost reading alone;
+//       `--seam` triages the P11 seam window pass by pass.
 //
 // Also prints bake time per tier (a measurement, not a check) and writes
 // feature_<form>_<tier>.png previews for the eye.
@@ -96,9 +103,48 @@ stats measure(const std::vector<std::uint32_t>& px)
     return s;
 }
 
+/// The tile at the heart of the widest run of one cover (BL-1243): the land tile
+/// whose radius-3 neighbourhood (37 tiles, columns wrapping) holds the most
+/// land tiles of @p cover on plain ground with no dramatic landform or river
+/// near — a "wide plain" or "deep forest" to aim a variant window at.
+/// Temperate rows only. Returns -1 when the body has none.
+int homogeneous_aim(const bake_source& src, terrain_cover cover, int* score_out = nullptr)
+{
+    const auto land = static_cast<std::uint8_t>(bake_source::tile_class::land);
+    const auto cv = static_cast<std::uint8_t>(cover);
+    int best = -1, best_score = 0;
+    for (int r = src.gh / 5 + 3; r < src.gh * 4 / 5 - 3; ++r)
+        for (int c = 0; c < src.gw; ++c)
+        {
+            const std::size_t i = static_cast<std::size_t>(r) * src.gw + c;
+            if (src.cls[i] != land || src.cover[i] != cv || src.near_feature[i])
+                continue;
+            int score = 0;
+            for (int dr = -3; dr <= 3; ++dr)
+                for (int dc = -3; dc <= 3; ++dc)
+                {
+                    if (std::abs(dr) + std::abs(dc) > 4)
+                        continue; // a rough hex disc
+                    const int rr = r + dr;
+                    const int cc = ((c + dc) % src.gw + src.gw) % src.gw;
+                    const std::size_t j = static_cast<std::size_t>(rr) * src.gw + cc;
+                    if (src.cls[j] == land && src.cover[j] == cv && !src.near_feature[j])
+                        ++score;
+                }
+            if (score > best_score)
+            {
+                best_score = score;
+                best = static_cast<int>(i);
+            }
+        }
+    if (score_out)
+        *score_out = best_score;
+    return best;
+}
+
 } // namespace
 
-int main()
+int main(int argc, char** argv)
 {
     generation_report report;
     world w = make_hard_coded_world(no_prehistory(), &report);
@@ -144,6 +190,447 @@ int main()
     check(land_i >= 0 && water_i >= 0, "setup", "found land and water tiles");
     if (g_failures)
         return 1;
+
+    // --aim: print the variant-capture aims (BL-1243) and stop — the tile
+    // coordinates scripts/verify/terrain_variants.lua frames, without the
+    // ten-minute Debug run of every phase.
+    if (argc > 1 && std::strcmp(argv[1], "--aim") == 0)
+    {
+        for (const auto& [name, cov] : { std::pair{ "plain (grass)", terrain_cover::grass },
+                                         std::pair{ "bare (none)",   terrain_cover::none },
+                                         std::pair{ "forest",        terrain_cover::forest },
+                                         std::pair{ "scrub",         terrain_cover::scrub } })
+        {
+            int score = 0;
+            const int t = homogeneous_aim(src, cov, &score);
+            if (t >= 0)
+                std::printf("AIM  %-14s [%d,%d]  %d/%d of its neighbourhood alike\n", name,
+                            t % src.gw, t / src.gw, score, 37);
+            else
+                std::printf("AIM  %-14s none\n", name);
+        }
+        return 0;
+    }
+
+    // --variants: run only the BL-1243 rows (P17-P20) and their previews,
+    // without the timing readings — the fast loop for tuning the tables.
+    const bool variants_only = argc > 1 && std::strcmp(argv[1], "--variants") == 0;
+
+    // --timing: the BL-1243 cost reading alone — one 512 px chunk per tier on
+    // the wide plain, variants off vs on, interleaved, best of 7 each.
+    if (argc > 1 && std::strcmp(argv[1], "--timing") == 0)
+    {
+        const int aim = std::max(0, homogeneous_aim(src, terrain_cover::grass));
+        const int ar = aim / src.gw, ac = aim % src.gw;
+        const double ax = 1.7320508075688772 * (ac + ((ar & 1) ? 0.5 : 0.0));
+        bake_params v_off = p;
+        v_off.variant_strength = 0.0f;
+        std::vector<std::uint32_t> tb(512u * 512u);
+        for (double tp : { 6.0, 12.0, 24.0, 48.0, 96.0, 192.0 })
+        {
+            const geometry gt = make_geometry(hb.grid_width, hb.grid_height, tp);
+            const int cw = std::min(512, gt.W), ch = std::min(512, gt.H);
+            const int x0 = static_cast<int>(ax * gt.s) - cw / 2;
+            const int y0 = std::clamp(static_cast<int>((1.5 * ar - gt.y_min) * gt.s) - ch / 2,
+                                      0, std::max(0, gt.H - ch));
+            double ms[2] = { 1e30, 1e30 };
+            for (int rep = 0; rep < 7; ++rep)
+                for (int k = 0; k < 2; ++k)
+                {
+                    const auto t0 = std::chrono::steady_clock::now();
+                    bake_region(src, gt, k ? p : v_off, x0, y0, cw, ch, tb.data());
+                    ms[k] = std::min(ms[k], std::chrono::duration<double, std::milli>(
+                                                std::chrono::steady_clock::now() - t0).count());
+                }
+            std::printf("TIME  variants  tier %3.0f px/r  chunk %dx%d (plain)  off %8.1f ms  on %8.1f ms  (%+.0f%%)\n",
+                        tp, cw, ch, ms[0], ms[1], 100.0 * (ms[1] / ms[0] - 1.0));
+        }
+        return 0;
+    }
+
+    // --seam: the P11 chunk-seam window alone, with each pass switched off in
+    // turn, naming the first mismatching pixel — the triage for a seam.
+    if (argc > 1 && std::strcmp(argv[1], "--seam") == 0)
+    {
+        const geometry g48 = make_geometry(hb.grid_width, hb.grid_height, 48.0);
+        const int lr = land_i / src.gw, lc = land_i % src.gw;
+        const double lx = 1.7320508075688772 * (lc + ((lr & 1) ? 0.5 : 0.0));
+        const int side = 96;
+        const int px0 = static_cast<int>(lx * g48.s) - side / 2;
+        const int py0 = std::clamp(static_cast<int>((1.5 * lr - g48.y_min) * g48.s) - side / 2,
+                                   0, std::max(0, g48.H - side));
+        std::printf("seam window px0 %d py0 %d (tile [%d,%d])\n", px0, py0, lc, lr);
+        struct variant_case { const char* name; bake_params bp; };
+        std::vector<variant_case> cases;
+        cases.push_back({ "default", p });
+        { bake_params q = p; q.variant_strength = 0.0f;  cases.push_back({ "variants off", q }); }
+        { bake_params q = p; q.tree_density = 0.0f;      cases.push_back({ "trees off", q }); }
+        { bake_params q = p; q.installations = false;    cases.push_back({ "installations off", q }); }
+        { bake_params q = p; q.landform_strength = 0.0f; q.river_strength = 0.0f; cases.push_back({ "features off", q }); }
+        // Ground nudges with the variants OFF: a seam that appears here is
+        // not the variants' — it is a pass whose rounding is window-relative
+        // and merely revealed by whatever ground lies under it.
+        for (float k : { 1.02f, 1.04f, 0.98f })
+        {
+            bake_params q = p; q.variant_strength = 0.0f; q.noise_strength *= k;
+            static char names[3][32];
+            static int ni = 0;
+            std::snprintf(names[ni % 3], sizeof names[0], "variants off, grain x%.2f", k);
+            cases.push_back({ names[ni++ % 3], q });
+        }
+        for (float k : { 1.02f, 1.04f, 0.98f })
+        {
+            bake_params q = p; q.variant_strength = 0.0f; q.noise_strength *= k; q.installations = false;
+            static char names2[3][40];
+            static int ni2 = 0;
+            std::snprintf(names2[ni2 % 3], sizeof names2[0], "  same, installations off x%.2f", k);
+            cases.push_back({ names2[ni2++ % 3], q });
+        }
+        for (const variant_case& vc : cases)
+        {
+            const std::size_t n = static_cast<std::size_t>(side) * side;
+            std::vector<std::uint32_t> whole(n * 2), l(n), r(n);
+            bake_region(src, g48, vc.bp, px0, py0, side * 2, side, whole.data());
+            bake_region(src, g48, vc.bp, px0, py0, side, side, l.data());
+            bake_region(src, g48, vc.bp, px0 + side, py0, side, side, r.data());
+            int bad = 0, fx = -1, fy = -1;
+            for (int y = 0; y < side; ++y)
+                for (int x = 0; x < side * 2; ++x)
+                {
+                    const std::uint32_t wv = whole[static_cast<std::size_t>(y) * side * 2 + x];
+                    const std::uint32_t hv = x < side ? l[static_cast<std::size_t>(y) * side + x]
+                                                      : r[static_cast<std::size_t>(y) * side + x - side];
+                    if (wv != hv) { if (!bad) { fx = x; fy = y; } ++bad; }
+                }
+            std::printf("  %-18s %d mismatching pixels (first at %d,%d)\n", vc.name, bad, fx, fy);
+        }
+        return 0;
+    }
+
+    // ------------------------------------------------------------------
+    // BL-1243 (terrain variant families), RENDERING.md § Mountains, rivers
+    // and terrain variety — "More tile sets".
+    //   P17 The variant colouring: no two neighbours share an index (bar the
+    //       wrap corner), and it is mask-blind (a pure function of the grid).
+    //   P18 A wide plain and a forest at 48/96: the variant pass is pure,
+    //       wrap-exact flat and oblique, chunk-seamless at 2x, and moves the
+    //       bake; tile-to-tile variation across the plain rises.
+    //   P19 A mountain run: the form's variants move it, purely, wrap-exact.
+    //   P20 region_hash folds the family and the variant index.
+    // Also (not checks): bake ms per tier with variants off vs on, and
+    // variants_<subject>_<tier>[_off].png previews.
+    // ------------------------------------------------------------------
+    const auto variant_rows = [&](bool timing)
+    {
+        const auto land = static_cast<std::uint8_t>(bake_source::tile_class::land);
+        // P17 — the colouring.
+        {
+            int conflicts = 0, corner = 0;
+            for (int i = 0; i < static_cast<int>(src.variant.size()); ++i)
+                for (int side = 0; side < 6; ++side)
+                {
+                    const hex_neighbors::coord nb = hex_neighbors::neighbour(i % src.gw, i / src.gw, side);
+                    if (nb.gy < 0 || nb.gy >= src.gh)
+                        continue;
+                    const int j = nb.gy * src.gw + ((nb.gx % src.gw) + src.gw) % src.gw;
+                    if (src.variant[i] == src.variant[j])
+                    {
+                        // The one place the raster colouring may fail: the
+                        // last column against column 0 across the wrap.
+                        const int ci = i % src.gw, cj = j % src.gw;
+                        const bool wrap_pair = (ci == src.gw - 1 && cj == 0) || (ci == 0 && cj == src.gw - 1);
+                        (wrap_pair ? corner : conflicts) += 1;
+                    }
+                }
+            int hist[k_variant_count] = {};
+            for (std::uint8_t v : src.variant)
+                ++hist[v];
+            std::printf("      variants: %d / %d / %d / %d tiles; %d neighbour pairs share one at the wrap seam\n",
+                        hist[0], hist[1], hist[2], hist[3], corner / 2);
+            check(conflicts == 0, "P17", "no two neighbours share a variant away from the wrap seam");
+            const bake_source masked = prepare_source(w, home, /*reveal_all=*/false);
+            check(masked.variant == src.variant, "P17",
+                  "the variant colouring is mask-blind (a pure function of the grid)");
+        }
+
+        const int plain_i  = homogeneous_aim(src, terrain_cover::grass);
+        const int forest_i = homogeneous_aim(src, terrain_cover::forest);
+        int mtn_i = -1, mtn_links = -1;
+        for (int i = 0; i < static_cast<int>(src.cls.size()); ++i)
+            if (src.cls[i] == land && src.landform[i] == static_cast<std::uint8_t>(terrain_landform::mountain))
+            {
+                int links = 0;
+                for (int s = 0; s < 6; ++s)
+                    links += (src.lf_links[i] >> s) & 1;
+                if (links > mtn_links) { mtn_links = links; mtn_i = i; }
+            }
+        check(plain_i >= 0 && forest_i >= 0 && mtn_i >= 0, "P18", "found a plain, a forest and a mountain run");
+
+        const auto vwin = [&](int tile_idx, const geometry& gg, const bake_params& bp, int side,
+                              int dpx, std::vector<std::uint32_t>& out, int wide = 1)
+        {
+            const int r = tile_idx / src.gw, c = tile_idx % src.gw;
+            const double cx = 1.7320508075688772 * (c + ((r & 1) ? 0.5 : 0.0));
+            const double cy = 1.5 * r - src.height[tile_idx] * gg.lift;
+            const int x0 = static_cast<int>(cx * gg.s) - side / 2 + dpx;
+            const int y0 = std::clamp(static_cast<int>((cy - gg.y_min) * gg.s) - side / 2,
+                                      0, std::max(0, gg.H - side));
+            out.assign(static_cast<std::size_t>(side) * side * wide, 0u);
+            bake_region(src, gg, bp, x0, y0, side * wide, side, out.data());
+        };
+        bake_params v_off = p;
+        v_off.variant_strength = 0.0f;
+        const geometry g48v = make_geometry(hb.grid_width, hb.grid_height, 48.0);
+        const geometry g96t = make_geometry(hb.grid_width, hb.grid_height, 96.0, 0.70710678);
+        std::vector<std::uint32_t> a1, a2, a3, a4;
+        struct subj { const char* name; int tile; const char* phase; };
+        for (const subj& sj : { subj{ "plain", plain_i, "P18" }, subj{ "forest", forest_i, "P18" },
+                                subj{ "mountain", mtn_i, "P19" } })
+        {
+            if (sj.tile < 0)
+                continue;
+            char what[160];
+            vwin(sj.tile, g48v, p, 160, 0, a1);
+            vwin(sj.tile, g48v, p, 160, 0, a2);
+            vwin(sj.tile, g48v, p, 160, g48v.W, a3);
+            vwin(sj.tile, g48v, v_off, 160, 0, a4);
+            std::snprintf(what, sizeof what, "%s @48: variants bake byte-identical twice", sj.name);
+            check(a1 == a2, sj.phase, what);
+            std::snprintf(what, sizeof what, "%s @48: variants wrap byte-identical one period east", sj.name);
+            check(a1 == a3, sj.phase, what);
+            std::snprintf(what, sizeof what, "%s @48: the variant pass moves the bake", sj.name);
+            check(a1 != a4, sj.phase, what);
+            vwin(sj.tile, g96t, p, 160, 0, a1);
+            vwin(sj.tile, g96t, p, 160, g96t.W, a3);
+            std::snprintf(what, sizeof what, "%s @96 oblique 45: variants wrap byte-identical", sj.name);
+            check(a1 == a3, sj.phase, what);
+            // Chunk seam at 2x: one window two chunks wide equals its halves.
+            {
+                std::vector<std::uint32_t> whole, l, r;
+                vwin(sj.tile, g48v, p, 128, 0, whole, 2);
+                vwin(sj.tile, g48v, p, 128, 0, l);
+                vwin(sj.tile, g48v, p, 128, 128, r);
+                bool seam_ok = true;
+                for (int y = 0; y < 128 && seam_ok; ++y)
+                    for (int x = 0; x < 128; ++x)
+                        if (whole[static_cast<std::size_t>(y) * 256 + x] != l[static_cast<std::size_t>(y) * 128 + x]
+                            || whole[static_cast<std::size_t>(y) * 256 + 128 + x] != r[static_cast<std::size_t>(y) * 128 + x])
+                        {
+                            std::printf("      first seam mismatch at (%d,%d): whole %08x/%08x, halves %08x/%08x\n",
+                                        x, y, whole[static_cast<std::size_t>(y) * 256 + x],
+                                        whole[static_cast<std::size_t>(y) * 256 + 128 + x],
+                                        l[static_cast<std::size_t>(y) * 128 + x], r[static_cast<std::size_t>(y) * 128 + x]);
+                            seam_ok = false;
+                            break;
+                        }
+                std::snprintf(what, sizeof what, "%s @48: two adjacent windows equal one spanning both (no chunk seam)", sj.name);
+                check(seam_ok, sj.phase, what);
+            }
+        }
+
+        // P18 — the anti-wallpaper reading. A wide plain reads as wallpaper
+        // when every tile has the same CHARACTER — the same hue and the same
+        // texture. Per interior plain tile (all six neighbours the same
+        // cover: an edge tile mixes the next cover in through the warp), a
+        // disc of radius 0.45 about the centre gives a character vector —
+        // mean warm (r - b), mean green (g - (r + b) / 2), local contrast
+        // (luminance SD) — off and on. Two things are read:
+        //   * the spread of that character across the plain, off -> on (a
+        //     reading: cover density already spreads hue tile to tile);
+        //   * the CHECK: the variants are distinct characters, not noise.
+        //     Grouping each tile's shift (on - off) by its variant index,
+        //     the spread BETWEEN the group means must exceed the spread
+        //     WITHIN a group — the variant index explains most of the shift.
+        //     The within-group spread is not all noise: each variant's broad
+        //     patches deliberately vary inside it, and the cross-fade carries
+        //     some of each neighbour into a tile's disc. (First drafted at
+        //     2x; measured 1.69x on the home body's plain — the bar was
+        //     re-stated, not the tables tuned to it: the tables are set by eye.)
+        // Read at the 24 px tier, where a 768 px window holds a plain's
+        // worth of interior tiles.
+        if (plain_i >= 0)
+        {
+            const geometry g24v = make_geometry(hb.grid_width, hb.grid_height, 24.0);
+            const int side = 768;
+            const int r0 = plain_i / src.gw, c0 = plain_i % src.gw;
+            const double cx0 = 1.7320508075688772 * (c0 + ((r0 & 1) ? 0.5 : 0.0));
+            const int x0 = static_cast<int>(cx0 * g24v.s) - side / 2;
+            const int y0 = std::clamp(static_cast<int>((1.5 * r0 - g24v.y_min) * g24v.s) - side / 2,
+                                      0, std::max(0, g24v.H - side));
+            std::vector<std::uint32_t> on(static_cast<std::size_t>(side) * side), off(on.size());
+            bake_region(src, g24v, p,     x0, y0, side, side, on.data());
+            bake_region(src, g24v, v_off, x0, y0, side, side, off.data());
+            struct tile_stat { double c[3]; int v; };
+            std::vector<tile_stat> st_on, st_off;
+            for (int r = 0; r < src.gh; ++r)
+                for (int c = 0; c < src.gw; ++c)
+                {
+                    const std::size_t ti = static_cast<std::size_t>(r) * src.gw + c;
+                    if (src.cls[ti] != land || src.cover[ti] != src.cover[plain_i])
+                        continue;
+                    bool interior = true;
+                    for (int side_ = 0; side_ < 6 && interior; ++side_)
+                    {
+                        const hex_neighbors::coord nb = hex_neighbors::neighbour(c, r, side_);
+                        if (nb.gy < 0 || nb.gy >= src.gh) { interior = false; break; }
+                        const std::size_t nj = static_cast<std::size_t>(nb.gy) * src.gw
+                                             + ((nb.gx % src.gw) + src.gw) % src.gw;
+                        interior = src.cls[nj] == land && src.cover[nj] == src.cover[plain_i];
+                    }
+                    if (!interior)
+                        continue;
+                    const double tx = 1.7320508075688772 * (c + ((r & 1) ? 0.5 : 0.0)) * g24v.s - x0;
+                    const double ty = (1.5 * r - g24v.y_min) * g24v.s - y0;
+                    const double rad = 0.45 * g24v.s;
+                    if (tx - rad < 0 || ty - rad < 0 || tx + rad >= side || ty + rad >= side)
+                        continue;
+                    for (int k = 0; k < 2; ++k)
+                    {
+                        const std::vector<std::uint32_t>& img = k ? on : off;
+                        double sw = 0, sg = 0, sl = 0, sll = 0;
+                        int np = 0;
+                        for (int y = static_cast<int>(ty - rad); y <= static_cast<int>(ty + rad); ++y)
+                            for (int x = static_cast<int>(tx - rad); x <= static_cast<int>(tx + rad); ++x)
+                            {
+                                if ((x - tx) * (x - tx) + (y - ty) * (y - ty) > rad * rad)
+                                    continue;
+                                const std::uint32_t cc = img[static_cast<std::size_t>(y) * side + x];
+                                const double R = ui::palette::col_r(cc), G = ui::palette::col_g(cc),
+                                             B = ui::palette::col_b(cc);
+                                const double L = 0.2126 * R + 0.7152 * G + 0.0722 * B;
+                                sw += R - B;
+                                sg += G - 0.5 * (R + B);
+                                sl += L; sll += L * L;
+                                ++np;
+                            }
+                        const double ml = sl / np;
+                        (k ? st_on : st_off).push_back(
+                            { { sw / np, sg / np, std::sqrt(std::max(0.0, sll / np - ml * ml)) },
+                              src.variant[ti] });
+                    }
+                }
+            const auto spread = [](const std::vector<tile_stat>& v, int which) {
+                double s = 0, ss = 0;
+                for (const tile_stat& t : v) { s += t.c[which]; ss += t.c[which] * t.c[which]; }
+                const double m = s / v.size();
+                return std::sqrt(std::max(0.0, ss / v.size() - m * m));
+            };
+            if (st_on.size() >= 8)
+            {
+                const double chroma_off = std::hypot(spread(st_off, 0), spread(st_off, 1));
+                const double chroma_on  = std::hypot(spread(st_on, 0),  spread(st_on, 1));
+                std::printf("      plain @24: %zu interior tiles; per-tile chroma spread %.2f -> %.2f, "
+                            "local-contrast spread %.2f -> %.2f (variants off -> on)\n",
+                            st_on.size(), chroma_off, chroma_on, spread(st_off, 2), spread(st_on, 2));
+                // Between- vs within-variant spread of the shift, over the
+                // three character axes together.
+                double gm[k_variant_count][3] = {};
+                int gn[k_variant_count] = {};
+                for (std::size_t t = 0; t < st_on.size(); ++t)
+                {
+                    ++gn[st_on[t].v];
+                    for (int a = 0; a < 3; ++a)
+                        gm[st_on[t].v][a] += st_on[t].c[a] - st_off[t].c[a];
+                }
+                double all[3] = {};
+                int groups = 0;
+                for (int v = 0; v < k_variant_count; ++v)
+                    if (gn[v])
+                    {
+                        ++groups;
+                        for (int a = 0; a < 3; ++a) { gm[v][a] /= gn[v]; all[a] += gm[v][a]; }
+                    }
+                for (int a = 0; a < 3; ++a) all[a] /= std::max(1, groups);
+                double between = 0, within = 0;
+                for (int v = 0; v < k_variant_count; ++v)
+                    if (gn[v])
+                        for (int a = 0; a < 3; ++a) between += (gm[v][a] - all[a]) * (gm[v][a] - all[a]);
+                between = std::sqrt(between / std::max(1, groups));
+                for (std::size_t t = 0; t < st_on.size(); ++t)
+                    for (int a = 0; a < 3; ++a)
+                    {
+                        const double d = st_on[t].c[a] - st_off[t].c[a] - gm[st_on[t].v][a];
+                        within += d * d;
+                    }
+                within = std::sqrt(within / st_on.size());
+                std::printf("      plain @24: variant shift spread between variants %.2f, within a variant %.2f "
+                            "(%d variants present)\n", between, within, groups);
+                check(groups >= 3 && between > within, "P18",
+                      "the plain's variants are distinct characters (between-variant spread > within)");
+            }
+            else
+                std::printf("SKIP  P18: fewer than 8 interior plain tiles in the window\n");
+        }
+
+        // P20 — the hash folds family and variant.
+        {
+            const int r0 = plain_i >= 0 ? plain_i / src.gw : 2, c0 = plain_i >= 0 ? plain_i % src.gw : 2;
+            const int x0 = static_cast<int>(1.7320508075688772 * c0 * g48v.s) - 256;
+            const int y0 = std::max(0, static_cast<int>((1.5 * r0 - g48v.y_min) * g48v.s) - 256);
+            const std::size_t ti = static_cast<std::size_t>(r0) * src.gw + c0;
+            const std::uint64_t h0 = region_hash(src, g48v, x0, y0, 512, 512);
+            bake_source m1 = src; m1.family[ti] ^= 1u;
+            bake_source m2 = src; m2.variant[ti] = static_cast<std::uint8_t>((m2.variant[ti] + 1) % k_variant_count);
+            check(region_hash(m1, g48v, x0, y0, 512, 512) != h0, "P20", "region_hash moves with a tile's variant family");
+            check(region_hash(m2, g48v, x0, y0, 512, 512) != h0, "P20", "region_hash moves with a tile's variant index");
+        }
+
+        // Previews and timing (readings).
+        {
+            struct shot { const char* name; int tile; };
+            std::vector<std::uint32_t> pb;
+            for (const shot& sh : { shot{ "plain", plain_i }, shot{ "forest", forest_i }, shot{ "mountain", mtn_i } })
+            {
+                if (sh.tile < 0)
+                    continue;
+                for (double tp : { 24.0, 48.0, 96.0 })
+                {
+                    const geometry gp = make_geometry(hb.grid_width, hb.grid_height, tp);
+                    vwin(sh.tile, gp, p, 512, 0, pb);
+                    char path[128];
+                    std::snprintf(path, sizeof path, "variants_%s_%d.png", sh.name, static_cast<int>(tp));
+                    write_png_rgba(path, 512, 512, reinterpret_cast<const unsigned char*>(pb.data()), 512 * 4);
+                    vwin(sh.tile, gp, v_off, 512, 0, pb);
+                    std::snprintf(path, sizeof path, "variants_%s_%d_off.png", sh.name, static_cast<int>(tp));
+                    write_png_rgba(path, 512, 512, reinterpret_cast<const unsigned char*>(pb.data()), 512 * 4);
+                }
+            }
+            std::vector<std::uint32_t> tb(512u * 512u);
+            const int aim = plain_i >= 0 ? plain_i : land_i;
+            const int ar = aim / src.gw, ac = aim % src.gw;
+            const double ax = 1.7320508075688772 * (ac + ((ar & 1) ? 0.5 : 0.0));
+            for (double tp : { 6.0, 12.0, 24.0, 48.0, 96.0, 192.0 })
+            {
+                if (!timing)
+                    break;
+                const geometry gt = make_geometry(hb.grid_width, hb.grid_height, tp);
+                const int cw = std::min(512, gt.W), ch = std::min(512, gt.H);
+                const int x0 = static_cast<int>(ax * gt.s) - cw / 2;
+                const int y0 = std::clamp(static_cast<int>((1.5 * ar - gt.y_min) * gt.s) - ch / 2,
+                                          0, std::max(0, gt.H - ch));
+                double ms[2] = { 1e30, 1e30 };
+                for (int rep = 0; rep < 3; ++rep) // best of 3, off/on interleaved: load cancels
+                    for (int k = 0; k < 2; ++k)
+                    {
+                        const auto t0 = std::chrono::steady_clock::now();
+                        bake_region(src, gt, k ? p : v_off, x0, y0, cw, ch, tb.data());
+                        ms[k] = std::min(ms[k], std::chrono::duration<double, std::milli>(
+                                                    std::chrono::steady_clock::now() - t0).count());
+                    }
+                std::printf("TIME  variants  tier %3.0f px/r  chunk %dx%d (plain)  off %8.1f ms  on %8.1f ms  (%+.0f%%)\n",
+                            tp, cw, ch, ms[0], ms[1], 100.0 * (ms[1] / ms[0] - 1.0));
+            }
+        }
+    };
+
+    if (variants_only)
+    {
+        variant_rows(/*timing=*/false);
+        std::printf("\n%s (%d failure%s)\n", g_failures ? "FAILED" : "ALL PASS",
+                    g_failures, g_failures == 1 ? "" : "s");
+        return g_failures ? 1 : 0;
+    }
+
 
     auto window_at = [&](int tile_idx, const bake_params& bp,
                          std::vector<std::uint32_t>& out, int side = 96)
@@ -1040,6 +1527,8 @@ int main()
             }
         }
     }
+
+    variant_rows(/*timing=*/true);
 
     // ------------------------------------------------------------------
     // Bake time per tier (BL-1242: recorded before and after the landform

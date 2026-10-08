@@ -128,6 +128,13 @@ struct bake_params
     // 0 disables a pass (the harness's A/B lever).
     float landform_strength = 1.0f; ///< Landform relief pass (massif, cut, bowl, fissure).
     float river_strength    = 1.0f; ///< River pass (course, bank shelving, wet margin).
+    // Terrain variant families (BL-1243, RENDERING.md § Mountains, rivers and
+    // terrain variety): every family (a substrate x cover pair, and each
+    // dramatic landform's form) carries k_variant_count procedural variants,
+    // each tile picking one by its grid coordinates, cross-faded across the
+    // tile boundary. 0 = every tile bakes the family's neutral look (the A/B
+    // lever: every family at its base look, the cross-fade gather unwidened).
+    float variant_strength  = 1.0f;
     // Near-future grade (the separable pass).
     bool  grade_enabled   = true;
     float grade_desat     = 0.34f;  ///< Toward luma.
@@ -164,7 +171,24 @@ struct bake_source
     std::vector<std::uint8_t> river_out;  ///< Hex sides a river flows OUT across (river_edges & river_downstream).
     std::vector<float> river_flow;        ///< Accumulated flow: river tiles draining through this one, itself included (the whole river graph, mask-blind — width is what the visible course shows).
     std::vector<std::uint8_t> near_feature; ///< Bit 0: a river on this tile or a neighbour; bit 1: a dramatic landform likewise. The passes' cull.
+    // Terrain variant families (BL-1243). The variant index is a pure function
+    // of the grid (a hash-preferred colouring in which no two neighbours
+    // share an index), so it never moves with terrain and leaks nothing
+    // through the survey mask; the family and the per-tile parameter vector
+    // derive from the tile's substrate and cover.
+    std::vector<std::uint8_t> family;   ///< Variant family per tile (land only; water/masked/void carry the neutral sentinel).
+    std::vector<std::uint8_t> variant;  ///< 0 .. k_variant_count-1 per tile.
+    std::vector<float>        vparam;   ///< k_vparam_count floats per tile: the ground variant's character (tone, hue, texture-field mix).
 };
+
+/// Variants per terrain family (BL-1243). Four: with six neighbours a proper
+/// colouring needs at least four indices to leave a hash-chosen preference
+/// any freedom (three would force a fixed tiling), and past four the soft
+/// cross-fade (about one tile wide) averages the extra variety away while the
+/// tables to author grow linearly.
+inline constexpr int k_variant_count = 4;
+/// Floats per tile in bake_source::vparam.
+inline constexpr int k_vparam_count = 11;
 
 /// Build the source arrays for @p body. Reads tile fields and the survey mask
 /// (a masked tile bakes as the lock colour and never leaks terrain into a
