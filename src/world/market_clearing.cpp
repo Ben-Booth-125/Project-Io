@@ -1255,6 +1255,17 @@ void inject_interbody_demand(world& w,
     }
 }
 
+std::uint32_t tile_feed_power_grid(world& w, entity_id tile)
+{
+    const entity_id mid = market_for_tile(w, tile);
+    if (mid == null_entity)
+        return 0;
+    const auto mit = w.markets.find(mid);
+    if (mit == w.markets.end() || mit->second.centre_tile == null_entity)
+        return 0;
+    return tile_power_grid(w, mit->second.centre_tile);
+}
+
 grid_good_pool pool_grid_good_figures(world& w, const recipe_registry& reg)
 {
     grid_good_pool out;

@@ -1434,10 +1434,10 @@ std::array<float, resource_count> body_upkeep_demand(const world& w, const recip
 
 } // namespace
 
-// BL-1232: the per-grid power measure is exported (corporation_generation.hpp)
-// so the corp AI's power-plant candidate reads the SAME gap the charter walk
-// sizes generation on (AI_OPPONENT.md, "A power-plant candidate is priced
-// against its grid's shortfall") rather than a second copy of it.
+// BL-1232: the per-grid power measure is generation's (the charter walk sizes
+// power on it). It is exported (corporation_generation.hpp) so harnesses read
+// the walk's own figure; the scorer half that would also read it is HELD (Ben,
+// 2026-10-08) and kept on branch bl1232-scorer-gate.
 
 /// BL-1232 (power plants per grid; PRODUCTION.md, "Generation is sized per
 /// grid, not per body", Ben 2026-10-07): @p body_id's POWER GAP, read per wired
@@ -1445,10 +1445,14 @@ std::array<float, resource_count> body_upkeep_demand(const world& w, const recip
 /// Power moves only within a grid, so a surplus on one grid cannot cancel a
 /// deficit on another: the gap is the sum over the body's grids of
 /// max(0, need - output), where need is the operating buildings' power upkeep
-/// on the grid (`body_upkeep_demand`'s own eligibility and basket) and output
-/// is the grid's generators at `accumulate_body_production`'s nominal rate.
-/// A building in a dark province (grid 0) draws no power (economy_system.cpp,
-/// "no wire, no draw") and a generator there feeds nothing, so neither counts.
+/// on the grid (`body_upkeep_demand`'s own eligibility and basket), keyed by
+/// the building's own tile grid, and output is the generators FEEDING the grid
+/// — keyed by their market centre's grid (`tile_feed_power_grid`), where their
+/// listings land — at `accumulate_body_production`'s nominal rate. A building
+/// in a dark province (grid 0) draws no power (economy_system.cpp, "no wire, no
+/// draw") and a generator whose market centre is dark feeds nothing, so
+/// neither counts. @p unpowered_short, when given, receives the short grids
+/// fed by no generator at all (Unpowered grids first, Ben 2026-10-08).
 ///
 /// A grid whose need is under HALF of one plant's output (@p plant_output: the
 /// most power any in-band recipe makes, at the nominal rate) is left to a road
@@ -1459,9 +1463,12 @@ std::array<float, resource_count> body_upkeep_demand(const world& w, const recip
 /// Sums walk ascending building id (BL-1050: float addition does not
 /// associate); grids are keyed in a std::map. Deterministic.
 float body_power_grid_gap(world& w, const recipe_registry& reg, entity_id body_id,
-                          float plant_output, std::set<std::uint32_t>& short_grids)
+                          float plant_output, std::set<std::uint32_t>& short_grids,
+                          std::set<std::uint32_t>* unpowered_short)
 {
     short_grids.clear();
+    if (unpowered_short != nullptr)
+        unpowered_short->clear();
     const std::size_t pw = static_cast<std::size_t>(resource_type::power);
     const building_upkeep_params& up = reg.building_upkeep();
     std::array<float, building_type_count> need_of{};
@@ -1486,18 +1493,21 @@ float body_power_grid_gap(world& w, const recipe_registry& reg, entity_id body_i
     for (const entity_id bid : bids)
     {
         const building_component& b = w.buildings.at(bid);
-        const std::uint32_t g = tile_power_grid(w, b.tile);
-        if (g == 0)
-            continue;
-        if (b.ticks_remaining <= 0 && static_cast<std::size_t>(b.type) < building_type_count)
+        // NEED is the draw side: a building draws on its OWN tile's grid.
+        if (const std::uint32_t g = tile_power_grid(w, b.tile);
+            g != 0 && b.ticks_remaining <= 0 && static_cast<std::size_t>(b.type) < building_type_count)
         {
             const float n = need_of[static_cast<std::size_t>(b.type)];
             if (n > 0.0f)
                 grids[g].first += n;
         }
+        // OUTPUT is the feed side (review round): a generator lists into its
+        // tile's market, whose shelf is on the grid of the market's CENTRE
+        // (`tile_feed_power_grid`) — that is the grid it serves.
         if (b.type == building_type::processing_facility)
             if (const recipe* rcp = reg.get_recipe(b.recipe); rcp && rcp->outputs[pw] > 0.0f)
-                grids[g].second += batches * rcp->outputs[pw];
+                if (const std::uint32_t gf = tile_feed_power_grid(w, b.tile); gf != 0)
+                    grids[gf].second += batches * rcp->outputs[pw];
     }
 
     float gap = 0.0f;
@@ -1507,6 +1517,10 @@ float body_power_grid_gap(world& w, const recipe_registry& reg, entity_id body_i
             continue;
         gap += no.first - no.second;
         short_grids.insert(g);
+        // Unpowered grids first (Ben, 2026-10-08): a short grid with NO
+        // generation feeding it at all.
+        if (unpowered_short != nullptr && !(no.second > 0.0f))
+            unpowered_short->insert(g);
     }
     return gap;
 }
@@ -1523,6 +1537,20 @@ float one_power_plant_output(const recipe_registry& reg)
     for (int i = 0; i < n; ++i)
         best = std::max(best, reg.recipe_at(building_type::processing_facility, i).outputs[pw]);
     return nominal_processing_batches(reg) * best;
+}
+
+float power_grids_to_serve(world& w, const recipe_registry& reg, entity_id body_id,
+                           float plant_output, std::set<std::uint32_t>& serve)
+{
+    std::set<std::uint32_t> unpowered;
+    const float gap = body_power_grid_gap(w, reg, body_id, plant_output, serve, &unpowered);
+    // UNPOWERED GRIDS FIRST (PRODUCTION.md, Ben 2026-10-08): while any short
+    // grid has no generation feeding it at all, a power firm may serve only
+    // such grids — the capped power firms cannot all go to a core grid's
+    // shortfall and leave a secondary grid dark for the campaign.
+    if (!unpowered.empty())
+        serve = std::move(unpowered);
+    return gap;
 }
 
 bool power_sized_per_grid(const recipe_registry& reg)
@@ -4069,6 +4097,7 @@ std::vector<entity_id> charter_place(world& w, const nation_component& nc,
                                      const std::set<std::uint32_t>* grids = nullptr)
 {
     chain_rejected = false;
+    bool grid_cut = false;   // BL-1232 review: the grid filter took a rung's ground
     // BL-1197 (gap firm digs the gap): with @p dig THE DIG LADDER runs
     // outermost (`dig_ladder`: water a Well site then an ice deposit, produce a
     // produce deposit then a Wharf site) — its first tier in either window, else
@@ -4091,15 +4120,28 @@ std::vector<entity_id> charter_place(world& w, const nation_component& nc,
             std::vector<entity_id> window = (by_province != nullptr && province_rungs != nullptr)
                 ? charter_under_province_cap(w, base, *by_province, *province_rungs)
                 : base;
-            // BL-1232: a power firm stands only on a short grid's provinces
-            // (@p grids, `body_power_grid_gap`) — the window filtered to them,
-            // order kept, before any draw.
+            // BL-1232: a power firm stands only where it FEEDS a grid in
+            // @p grids — the grid of its tile's market centre
+            // (`tile_feed_power_grid`, where its listings land; review round),
+            // never merely on a short grid's ground whose market lists
+            // elsewhere. The window filtered to them, order kept, before any
+            // draw. A rung whose capped window held anchorable ground the
+            // grid cut took all of is remembered for the miss's reason.
             if (grids != nullptr)
+            {
+                const bool held = !window.empty()
+                    && charter_window_anchorable(w, window, focus, occupied,
+                                                 tier != dig_site::none ? dig : nullptr);
                 window.erase(std::remove_if(window.begin(), window.end(),
                                             [&](entity_id t) {
-                                                return grids->count(tile_power_grid(w, t)) == 0;
+                                                const std::uint32_t g = tile_feed_power_grid(w, t);
+                                                return g == 0 || grids->count(g) == 0;
                                             }),
                              window.end());
+                if (held && !charter_window_anchorable(w, window, focus, occupied,
+                                                       tier != dig_site::none ? dig : nullptr))
+                    grid_cut = true;
+            }
             if (window.empty())
                 continue;
             std::vector<entity_id> assets = place_starting_assets(
@@ -4125,6 +4167,11 @@ std::vector<entity_id> charter_place(world& w, const nation_component& nc,
         ? charter_unspent_reason::chain_infeasible
         : charter_place_failure_reason(w, nc, focus, occupied, cc, settle, spend, by_province,
                                        digging ? dig : nullptr);
+    // BL-1232 review: a miss the window would NOT have had but for the grid cut
+    // — anchorable ground under the province cap, none of it feeding a wanted
+    // grid — is its own reason, not `window_exhausted`.
+    if (grid_cut && fail_out == charter_unspent_reason::window_exhausted)
+        fail_out = charter_unspent_reason::no_short_grid_ground;
     return {};
 }
 
@@ -5015,7 +5062,9 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             std::array<float, resource_count>& demand, std::set<std::uint32_t>& short_grids) {
             if (!power_per_grid)
                 return;
-            const float gap = body_power_grid_gap(w, reg, body, plant_output, short_grids);
+            // `short_grids` comes back as the grids the firm may SERVE
+            // (unpowered short grids first); the gap is every short grid's.
+            const float gap = power_grids_to_serve(w, reg, body, plant_output, short_grids);
             demand[power_i] = production[power_i] + gap
                 + (consumer[power_i] + construction_need[power_i] + input_need[power_i]);
         };
@@ -5482,15 +5531,19 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                     if (gap_r == resource_count)
                     {
                         // No good in the turn can take a firm here. Name why.
-                        bool unplaceable = false, capped = false, ground = false;
+                        bool unplaceable = false, capped = false, ground = false, gridless = false;
                         const auto still_wanted = [&](std::size_t r) {
                             if (!skipped[r])
                                 return;
                             unplaceable = true;
                             if (skip_reason[r] == charter_unspent_reason::province_cap)
                                 capped = true;
+                            // BL-1232 review: a power skip for want of ground
+                            // feeding a short grid books its own reason.
+                            if (skip_reason[r] == charter_unspent_reason::no_short_grid_ground)
+                                gridless = true;
                             // BL-1185: a skip for want of ground, not of a chain.
-                            if (skip_reason[r] != charter_unspent_reason::chain_infeasible)
+                            else if (skip_reason[r] != charter_unspent_reason::chain_infeasible)
                                 ground = true;
                         };
                         for (const std::uint16_t r : bs.turn)
@@ -5503,9 +5556,10 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                         charter_unspent_reason stop_why = charter_unspent_reason::no_gap;
                         if (unplaceable)
                         {
-                            stop_why = capped ? charter_unspent_reason::province_cap
-                                     : ground ? charter_unspent_reason::window_exhausted
-                                              : charter_unspent_reason::chain_infeasible;
+                            stop_why = capped   ? charter_unspent_reason::province_cap
+                                     : ground   ? charter_unspent_reason::window_exhausted
+                                     : gridless ? charter_unspent_reason::no_short_grid_ground
+                                                : charter_unspent_reason::chain_infeasible;
                             // NR-905: where the ceiling binds these points waited
                             // for shares this centre could not place; the walk's
                             // end decides how many of them are the share's gap.
@@ -5642,9 +5696,18 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                             // The legacy rules mask it for this firm's selection
                             // and choose again, as a chain miss does.
                             selectable[gap_r] = std::max(selectable[gap_r], demand[gap_r]);
+                            // BL-1232 review: the miss names the grid cut only
+                            // while no other miss named a reason before it
+                            // (province_cap outranks, a dig miss's ground too).
+                            const bool first = !dig_missed_any;
                             dig_missed_any    = true;
                             if (why == charter_unspent_reason::province_cap)
                                 dig_miss_why = charter_unspent_reason::province_cap;
+                            else if (why == charter_unspent_reason::no_short_grid_ground && first)
+                                dig_miss_why = charter_unspent_reason::no_short_grid_ground;
+                            else if (why != charter_unspent_reason::no_short_grid_ground
+                                     && dig_miss_why == charter_unspent_reason::no_short_grid_ground)
+                                dig_miss_why = charter_unspent_reason::window_exhausted;
                             gap_r    = resource_count;
                             recipe_i = -1;
                             continue;

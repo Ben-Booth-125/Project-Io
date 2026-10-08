@@ -392,6 +392,15 @@ struct grid_good_pool
 };
 grid_good_pool pool_grid_good_figures(world& w, const recipe_registry& reg);
 
+/// BL-1232 review: the grid a building on @p tile FEEDS. A producer lists into
+/// its tile's market (`market_for_tile`), and a market's shelf is on the grid of
+/// its CENTRE tile's province (LOGISTICS.md § 3a; the grid clear's
+/// `shelves_on`) — so a generator serves the grid of its market's centre, which
+/// need not be its own tile's grid. 0 when the tile has no market or the
+/// centre's province is dark. (Its DRAW side is its own tile's grid,
+/// `tile_power_grid`.)
+std::uint32_t tile_feed_power_grid(world& w, entity_id tile);
+
 /// The pooled pricing supply: listed + min(shelf, k x wants) over the GRID —
 /// the shelf cap taken once, at the grid (review round 2 of BL-1230). At one
 /// market on a grid this is exactly `pricing_supply`.
