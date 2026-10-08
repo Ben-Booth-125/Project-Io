@@ -1,6 +1,6 @@
 ---
 name: market-viability
-description: Run the sprint 49 market viability gate (BL-1184) — one 16-seed reading on the shipped 1960 start that says whether the market economy is viable from day 1, against Ben's targets (pooled: >= 70% of built processors running at handoff, field income at tick 50 >= 50% of the settle close, >= 70% of firms alive at tick 400). Use it to judge ANY sprint 49 economy or generation change, before and after; a world-mover measures its own before/after with it, in isolation.
+description: Run the sprint 49 market viability gate (BL-1184) — one 16-seed reading on the shipped 1960 start that says whether the market economy is viable from day 1, against Ben's targets (pooled: >= 85% of built processors running at handoff, <= 5% input-starved, field income at tick 50 >= 50% of the settle close, >= 70% of firms alive at tick 400). Use it to judge ANY sprint 49 economy or generation change, before and after; a world-mover measures its own before/after with it, in isolation.
 ---
 
 # market-viability
@@ -51,7 +51,12 @@ keep-awake (`tools/session/keepawake.ps1 -Process market_viability`) on an unatt
   splits it by the state on the last tick it reported — ran, input-starved, other, or never
   reported. `build` is under construction.
   **Share running = run / built processors** (every state but `build`). The share over all
-  processors, construction included, is printed beside it. Target: pooled >= 70% at handoff.
+  processors, construction included, is printed beside it. Target: pooled >= 85% at handoff
+  (Ben, 2026-10-08; it was 70%).
+- **G1b, processors input-starved at handoff** — `input` now, plus `decom` whose last reported
+  state was input-starved (mothballed because its inputs never came), over built processors.
+  Target: pooled <= 5% (Ben, 2026-10-08). G1 alone counts a plant idled for want of a buyer as
+  a failure, which is the economy working; G1b is the starvation the sprint chases.
 - **G2, field income per tick** — the sum of every corporation's filed `quarterly_return::income`,
   as WINDOW MEANS: the play 26-50 mean over the 12-tick settle mean. Pooled = sum / sum.
   Target: pooled >= 50%. The single ticks (settle close, tick 50) print per seed as context.
