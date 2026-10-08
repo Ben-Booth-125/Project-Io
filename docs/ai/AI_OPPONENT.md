@@ -689,10 +689,17 @@ the floor; stage B layers priority buckets and predictive spending over it (§ 2
   forecast against a fact it cannot see). **What counts as a bid (Ben, 2026-10-07, scoping the
   veto):** the market's demand **plus** the want the fair-price ceiling silenced (the hauler-only
   register — an aggregate market fact, like demand; without it a mine is vetoed exactly when its
-  processors are priced out and need it most), **plus** the off-book draws on that market — the
-  space programme's, network upkeep's and procurement's — since a buyer that takes goods without
-  posting a bid is still a buyer (without them no rival could ever build the first spacecraft
-  components or propellant plant in play). Otherwise the projected supply/demand ratio is unpenalised at or below
+  processors are priced out and need it most), **plus** the off-book **want** on that market — what
+  the space programme, network upkeep and procurement **wanted** there, filled or not (Ben,
+  2026-10-08: a buyer exists before its supply does, or no rival could build the first spacecraft
+  components or propellant plant; a record of draws alone only appears once the goods do), **plus**
+  the draws that take goods without posting a bid: space-lane launch fuel taken from a corporation's
+  pool, and building upkeep met from a corporation's own pool (Ben, 2026-10-08), **plus** what a
+  **running** processor in that market consumes, fed from a pool or the shelf — a running plant and
+  what it consumes are observable (`../ui/DISCOVERY.md` § Competitor visibility; Ben, 2026-10-08);
+  an idled or decommissioned plant consumes nothing and is no buyer. Each of these is held for
+  the scorer's evaluation cadence, so a buyer is seen by every corporation that evaluates between
+  two of its draws, not only by one due on the next tick. Otherwise the projected supply/demand ratio is unpenalised at or below
   `glut_taper_ratio` (1.0), tapers the build's score linearly to zero at `glut_veto_ratio` (2.0),
   and vetoes (removes the candidate entirely) at or above it. Applied only to build candidates;
   dials and survey are unaffected (a body's total surveyed area doesn't glut a market).
