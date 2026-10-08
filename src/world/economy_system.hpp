@@ -905,3 +905,19 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
 int solve_workforce_target(world& w, const recipe_registry& reg,
                            const building_component& b, float contention,
                            int stack_rank = 1, float* out_gain = nullptr);
+
+/// BL-1235 (dial hold outlasts reflex; AI_OPPONENT.md, "A plant the dial idled
+/// is not losing"): a background plant the workforce dial has set to zero. The
+/// dial is the only writer of a non-player building's `workforce_target`
+/// (set_workforce clears `workforce_auto`; the auto-solver runs on the player's
+/// corp only), so the stored pair is the whole record: no saved flag is needed.
+/// Its idle maintenance is the cost the dial chose to carry, so the loss reflex
+/// counts no streak against it; and the scorer's hold on it ends the moment its
+/// own forecast (`solve_workforce_target`) picks a target above zero again.
+inline bool dial_idled(const building_component& b)
+{
+    return !b.workforce_auto && b.workforce_target == 0 && !b.decommissioned
+        && b.ticks_remaining == 0
+        && (b.type == building_type::extraction_site
+            || b.type == building_type::processing_facility);
+}
