@@ -196,7 +196,8 @@ Each building type targets a specific class of resource. Placement is valid only
 
 **Fishing Wharf** (BL-168, fishing wharf). The extraction_site's target resource is again
 `agricultural_produce`, but the placement gate is coastal adjacency rather than a deposit: valid on
-any tile with an ocean neighbour, deposit-agnostic. A tile can satisfy Farm's deposit rule, the
+any land tile with a sea neighbour, deposit-agnostic. The Wharf stands on the shore, never in the
+water — a coastal water tile is not a Wharf site, and no building sits on water. A tile can satisfy Farm's deposit rule, the
 Fishing Wharf's coastal rule, both, or neither — they are two independent ways the same generic
 extraction_site can reach agricultural_produce, not two building types (`placement_rules.cpp`
 `can_place` / `can_place_in_world`, mirroring the Port coastal check via `is_coastal`).

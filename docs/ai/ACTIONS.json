@@ -49,7 +49,7 @@
    "id": "gameplay.build",
    "family": "gameplay",
    "surface": "Tile construction ledger (fold-out column), opened from the Selection band of a selected tile; a shortcut lives on a selected owned building ('Build another here').",
-   "press": "Single-click a tile on the Planetary canvas (the Selection band appears), click 'Construct Buildings' in the band's action grid, then click 'Build' on a candidate row in the ledger. Rows are one per extractable resource deposited on the tile (plus a coastal Fishing Wharf row even with zero deposit, and a Well row on a land tile with no ice deposit that a river runs along or a lake borders), one per processing recipe, then Port, Launchpad, Inland Logistics Hub, Military Base. Alternate press: with an owned building selected, 'Build another here' repeats its type/target on the same tile, gated by the tile's stack capacity.",
+   "press": "Single-click a tile on the Planetary canvas (the Selection band appears), click 'Construct Buildings' in the band's action grid, then click 'Build' on a candidate row in the ledger. Rows are one per extractable resource deposited on the tile (plus a Fishing Wharf row on a land tile bordering the sea with no produce deposit - never on the water itself - and a Well row on a land tile with no ice deposit that a river runs along or a lake borders), one per processing recipe, then Port, Launchpad, Inland Logistics Hub, Military Base. Alternate press: with an owned building selected, 'Build another here' repeats its type/target on the same tile, gated by the tile's stack capacity.",
    "args": [
     {
      "name": "tile",
@@ -1319,7 +1319,7 @@
     "Corporation ledger is open",
     "At least one economy quarter has been measured"
    ],
-   "expected_output": "Names that flow and its figure for the quarter - Inputs, Maintenance, Wages, Interest, Levies or Force. A flow that is zero this quarter is ABSENT from the stack rather than drawn flat, so the segment count itself reads the corp's position: Interest appears only while the balance is negative.",
+   "expected_output": "Names that flow and its figure for the quarter - Inputs, Maintenance, Wages, Interest, Levies or Force. A flow that is zero this quarter is ABSENT from the stack rather than drawn flat, so the segment count itself reads the corp's position: Interest appears only while the balance is negative. The Earnings column hovers the same way: Income, Subsidies when a nation paid any, and Refunds when the quarter's return booked one (BL-1215 - construction cancelled when a seat was taken, credited back at what it had paid); a 'Refunds: +N (not earnings)' line under the net names it too, and the net excludes it.",
    "reason_to_select": "The chart says which side is bigger at a glance; the hover says WHICH outflow is the one to act on."
   },
   {

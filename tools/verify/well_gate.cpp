@@ -152,6 +152,13 @@ int main()
           "W3 coastal tile with a produce deposit: a Farm, not a Wharf");
     check(!placement_rules::is_wharf_site(w, lakeshore, food),
           "W4 a lakeshore is not a coast: not a Wharf");
+    // BL-1218 (wharf placed on shore): sea ground bordering more sea is NOT a
+    // Wharf site — the predicate and the gate agree that a Wharf stands on the
+    // shore. Before the fix the ledger offered one here and can_place refused it.
+    const entity_id sea = g_tile[4][2];
+    check(!placement_rules::is_wharf_site(w, sea, food)
+              && food_reason(sea) == placement_reason::ocean,
+          "W0 the sea tile itself: not a Wharf site, refused as water");
     check(!placement_rules::is_wharf_site(w, coast, resource_type::water)
               && !placement_rules::is_well_site(w, coast, food),
           "W1b only a produce target is a Wharf; a Wharf is not a Well");

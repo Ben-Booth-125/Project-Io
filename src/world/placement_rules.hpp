@@ -234,8 +234,9 @@ bool is_well_site(const world& w, entity_id tile_id, resource_type target);
 inline constexpr float k_well_rate_scalar = 1.0f;
 
 /// BL-1199 (fishing wharf yields): is an extraction site targeting `target` on
-/// `tile_id` a **Fishing Wharf** — an `agricultural_produce` site on a tile with
-/// no produce deposit, standing on the coast (`is_coastal`)? The same predicate
+/// `tile_id` a **Fishing Wharf** — an `agricultural_produce` site on a LAND tile
+/// with no produce deposit, standing on the coast (`is_coastal`)? Water ground is
+/// never a Wharf site (BL-1218). The same predicate
 /// `can_place_in_world` gates the Wharf by, so whatever it lets stand, yields. A
 /// tile carrying ANY produce deposit is a Farm — even once that reserve is
 /// spent (`resource_deposit` is never drawn; `resource_remaining` is) — the
