@@ -6765,6 +6765,397 @@
      "result_metric": "question_log entry and lens.trade_flow ACTIONS entry (eight classes, empty until the held corp's first pass); canvas.lens_next and lens.throughput corrected; both re-rendered."
     }
    ]
+  },
+  {
+   "brief": "tile-production-section",
+   "title": "BL-1239 - The tile Selection element opens on a Production section",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1239 - sprint 51 (Ben's design form, 2026-10-08)",
+   "batch": "sprint-51",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "visual: scripts/verify/tile_production.lua captures the band on a built tile"
+     ],
+     "requirement": "The tile nav carries six sections with Production first; the nav wraps at six.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "visual: a stacked tile and an idle building captured",
+      "review: one classification function, two callers"
+     ],
+     "requirement": "Production lists one row per stack (stack_members) with type glyph, count, good, output per tick and running state with its reason; the reason comes from the same classification function the building hover card calls.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "visual: captured",
+      "live click: Ben presses a good row"
+     ],
+     "requirement": "The catchment market is named with one row per good made then per good deposited: price and short/balanced/surplus; a row press opens the Market ledger aimed at that market and good.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "visual: unbuilt and rival tiles captured"
+     ],
+     "requirement": "An unbuilt tile states \"Nothing built here\" and lists its deposited goods at their market; a rival stack row shows type, count, owner and \"private\".",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "visual: captured"
+     ],
+     "requirement": "The building card Status page shows running state with its reason, never a bare \"Operating.\".",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "verification": [
+      "review: question_log entry rendered",
+      "headless: world_determinism twice, digests identical to the base (render-only change)"
+     ],
+     "requirement": "question_log.json carries the section; the world is untouched.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "owner-multi-select",
+   "title": "BL-1240 - Corporation and Company lenses draw a picked owner set",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1240 - sprint 51 (Ben's design form, 2026-10-08)",
+   "batch": "sprint-51",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "visual: lens_modes.lua (or a new owner_multi_select.lua) default captures for both lenses"
+     ],
+     "requirement": "Picked owners tint their identity colour, unpicked owners one owned-grey distinct from unowned ground; Corporation defaults to the player, Company to none.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "visual: two rivals picked via the verify API",
+      "live click: Ben shift-clicks and uses the checklist"
+     ],
+     "requirement": "The key is a checklist (count header, search, swatch rows for owners on the active body); shift-click on an owned tile toggles its owner; a plain click is unchanged.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "visual: captured"
+     ],
+     "requirement": "Rival HQ stars draw only while picked; hover lights the hovered owner group regardless of the set; the sets survive a body switch.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "review: mirrors rendered",
+      "headless: world_determinism twice, digests identical to the base (render-only change)"
+     ],
+     "requirement": "ACTIONS.json and question_log.json updated; the world is untouched.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "ground-never-magnified",
+   "title": "BL-1244 - The ground is never magnified at any rung",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1244 - sprint 51 (Ben's design form, 2026-10-08)",
+   "batch": "sprint-51",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "visual: a capture per rung with the HUD reading recorded"
+     ],
+     "requirement": "Before and after: the frame HUD texel/px per rung at 1720x1080 and at a 4K-height window; after, no rung reads above 1.0.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: ground_bake_check (tier chooser rows)"
+     ],
+     "requirement": "A 192 px chunked tier exists; the chooser takes the smallest tier with ppr >= draw_r; minification never exceeds 2:1.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: bake time per tier, before and after, in the result"
+     ],
+     "requirement": "Every tier bakes at 2x and box-downsamples before upload; bake time per tier is recorded before and after.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "visual: a mid-fill capture"
+     ],
+     "requirement": "While a tier fills, the stand-in is the next tier down where resident, the far page only where nothing closer is.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism twice, digests identical to the base (render-only change)",
+      "live click: Ben walks every rung"
+     ],
+     "requirement": "The world is untouched; Ben judges the sharpness live at every rung.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "structures-baked",
+   "title": "BL-1241 - Buildings and settlements bake into the ground as procedural structures",
+   "difficulty": 5,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1241 - sprint 51 (Ben's design form, 2026-10-08)",
+   "batch": "sprint-51",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: ground_bake_check extended (wrap and determinism rows)",
+      "visual: ground_bake.lua staged buildings of every type"
+     ],
+     "requirement": "An installation pass behind a stamp seam keyed by what a stamp depicts draws one procedural form per placeable building type (processing keyed on the recipe family), NW-lit, before the grade, deterministic and wrap-exact.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "visual: staged stacked tile, settlement ladder, rival plant"
+     ],
+     "requirement": "A stacked tile stands up to three structures, one per stack, dominant largest and front; settlements step by scale, razed as ruin; a site under construction bakes as scaffolding; no owner colour, no state cue.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: re-bake count over a play year recorded"
+     ],
+     "requirement": "The chunk content hash folds installations and nothing tick-rate; re-bakes over a play year follow construction events only.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "visual: captures at every rung",
+      "live click: Ben presses single and stacked tiles"
+     ],
+     "requirement": "The canvas draws no building glyph, stack ring, +N badge, corp emblem tag, settlement or ruin skyline or density dot; hit zones unchanged; the Selection neighbourhood view shows the baked ground.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism twice, digests identical to the base (render-only change)",
+      "live click: Ben looks at every rung including the far page"
+     ],
+     "requirement": "Bake time per tier recorded before and after; the oblique tiers stand structures up; the world is untouched.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "landforms-and-rivers-baked",
+   "title": "BL-1242 - Landforms bake as relief forms and rivers as carved curved courses",
+   "difficulty": 4,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1242 - sprint 51 (Ben's design form, 2026-10-08)",
+   "batch": "sprint-51",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "visual: landform_relief.lua re-pointed at the baked forms",
+      "headless: ground_bake_check rows"
+     ],
+     "requirement": "Mountain (massif, ridge), canyon (cut between rims), crater (raised-rim bowl), rift (fissure) bake as forms; contiguous runs bake as one form; deterministic and wrap-exact.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "visual: a river from source to mouth at two rungs"
+     ],
+     "requirement": "Rivers bake along river_edges as a smooth quadratic B-spline widening downstream with bank shelving.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "visual: captured",
+      "review: the retired draw code is removed, not hidden"
+     ],
+     "requirement": "The canvas draws no landform glyph, landform span, river stroke or chevron.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism twice, digests identical to the base (render-only change)",
+      "live click: Ben looks at a range, a rift and a river mouth"
+     ],
+     "requirement": "The world is untouched; Ben judges the read at every rung.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "wharf-placed-on-shore",
+   "title": "BL-1218 - The Fishing Wharf is offered and placed on a land tile beside the coast",
+   "difficulty": 2,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1218 - sprint 51 (Ben's design form, 2026-10-08)",
+   "batch": "sprint-51",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "live click: Ben places a wharf on a coastal land tile",
+      "visual: construction ledger on a coastal land tile"
+     ],
+     "requirement": "The wharf appears in the construction ledger on a land tile with coast adjacency and places there; on water it is not offered; the Well is checked for the same mismatch.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism before and after"
+     ],
+     "requirement": "Digest movement reported if the placement rule changed (AI placement reads it); never re-blessed.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
+  },
+  {
+   "brief": "refunds-flow-shown",
+   "title": "BL-1215 - The quarterly refunds flow shows on the corporation dashboard and selection panel",
+   "difficulty": 1,
+   "importance": "C",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1215 - sprint 51 (Ben's design form, 2026-10-08)",
+   "batch": "sprint-51",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "visual: the dashboard captured on a seat that received a refund"
+     ],
+     "requirement": "Where the quarterly return lists its flows, refunds is a named line beside them.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism twice, digests identical to the base (render-only change)"
+     ],
+     "requirement": "The world is untouched.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
   }
  ]
 }

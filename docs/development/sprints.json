@@ -92,9 +92,9 @@
   {
    "id": "51",
    "theme": "visibility: initial market conditions and the ground",
-   "state": "proposed",
-   "status_line": "PROPOSED 2026-10-08, designed (Ben's form). Design written on claude/parallel-sprints-collision-check-b5090c; code branches from the sprint 50 UI base merged there. Opens alongside sprint 50: its files are UI and bake, sprint 50's remaining waves are world/*.",
-   "opened_date": null,
+   "state": "open",
+   "status_line": "OPEN 2026-10-08 on claude/parallel-sprints-collision-check-b5090c, beside sprint 50. Wave 1: six lanes in parallel (BL-1239, BL-1240, BL-1244, BL-1241, BL-1242, BL-1218 + BL-1215); wave 2 BL-1243.",
+   "opened_date": "2026-10-08",
    "author": "Ben (2026-10-08, the sprint 51 design form: a visibility pass on the initial market conditions; buildings into the ground, ownership onto the lenses, mountains and rivers into the render, sharper tiles at every zoom); Claude (the write-up)",
    "goal": "The player reads the opening market from the ground they are looking at: what a tile makes and what that fetches where it sells, in the Selection element; what stands where, as structures in the art rather than marks over it; whose it is, on ownership lenses that name only the owners asked about; and a ground that is sharp at every rung, with mountains and rivers part of the painting.",
    "planned": [
@@ -109,7 +109,7 @@
    "notes": "Re-cut 2026-10-08 (Ben): sprint 51 became a visibility pass on the ground and the opening market; the trade loop it first held (the trade verbs, BL-1180 construction rate panel drift, BL-1219 site materials visible) moved to sprint 52, and sprint 52's generation and AI items (BL-1170, BL-1148, BL-1174, BL-1181, BL-1175, BL-1189, BL-1139) to sprint 53. Run beside sprint 50 (collision check 2026-10-08): the shared files are LENSES.md and body_surface_canvas.cpp, both merged from sprint 50 through 68c8d209 as this sprint's base; sprint 50 must not rebase that stretch. Calls taken on Ben's behalf in the write-up: NR-986."
   }
  ],
- "next_up": "SPRINT 50 OPEN (2026-10-07), logistics and trade flow, on worktree-sprint-50: wave 0 instruments (BL-1223 gate logistics row, BL-1222 trade-flow lens), wave 1 diagnoses BL-1217 (inputs reach processors), wave 2 fixes in ranked order, wave 3 network shape (BL-1195, BL-1119), close with BL-1165 and one re-bless. SPRINT 51 PROPOSED and designed (2026-10-08), the visibility pass - tile production, owner multi-select, structures and terrain baked, ground never magnified - on claude/parallel-sprints-collision-check-b5090c beside sprint 50.",
+ "next_up": "SPRINT 50 OPEN (2026-10-07), logistics and trade flow, on worktree-sprint-50: wave 0 instruments (BL-1223 gate logistics row, BL-1222 trade-flow lens), wave 1 diagnoses BL-1217 (inputs reach processors), wave 2 fixes in ranked order, wave 3 network shape (BL-1195, BL-1119), close with BL-1165 and one re-bless. SPRINT 51 OPEN (2026-10-08), the visibility pass - tile production, owner multi-select, structures and terrain baked, ground never magnified - on claude/parallel-sprints-collision-check-b5090c beside sprint 50.",
  "footer_notes": [
   "**The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first."
  ]
