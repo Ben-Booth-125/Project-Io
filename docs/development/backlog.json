@@ -628,7 +628,7 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": 52,
+   "sprint": 53,
    "written": "2026-09-25",
    "blocked_on": null,
    "parked": false,
@@ -702,7 +702,7 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": 50,
+   "sprint": 53,
    "written": "2026-09-26",
    "requires": [
     "BL-1137"
@@ -907,7 +907,7 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": 50,
+   "sprint": 53,
    "written": "2026-10-03",
    "requires": [
     "BL-1148"
@@ -928,7 +928,7 @@
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": 50,
+   "sprint": 53,
    "written": "2026-10-03",
    "requires": [],
    "blocked_on": null,
@@ -949,7 +949,7 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 52,
+   "sprint": 53,
    "written": "2026-10-03",
    "requires": [],
    "blocked_on": null,
@@ -968,7 +968,7 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 51,
+   "sprint": 52,
    "written": "2026-10-03",
    "requires": [],
    "blocked_on": null,
@@ -990,7 +990,7 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 50,
+   "sprint": 53,
    "written": "2026-10-04",
    "requires": [],
    "blocked_on": null,
@@ -1011,7 +1011,7 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 52,
+   "sprint": 53,
    "written": "2026-10-04",
    "requires": [],
    "blocked_on": null,
@@ -1275,7 +1275,7 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 51,
+   "sprint": 52,
    "written": "2026-10-07",
    "requires": [],
    "blocked_on": null,
@@ -1385,6 +1385,153 @@
     ".claude/skills/market-viability/SKILL.md"
    ],
    "design": "SPRINT 50 WAVE 0 (Ben, 2026-10-07, the cut form; the NEXT_SESSION.md proposal \"extend BL-1184 with a logistics row\"). Reported, no target (G1 stays the target, 70%). Generalise water_pair_probe's per-pair classifier (the dispatcher's rules in its own order) from water to every good, factored into one shared reader both tools use rather than a copy (BL-1165's haulage_measure lesson). Rows: units shipped between markets per tick, and the share landing at a market short of that good; dry markets per good; per dry market its best refusal class; and a PROCESSOR-INPUT block - for each input-starved processor, its scarcest input and that input's best class at its market - which is BL-1217 (inputs reach processors)'s diagnosis. Multi-tick: read at several play ticks, never one. A pure reader."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 51,
+   "written": "2026-10-08",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 3,
+   "id": "BL-1239",
+   "short_name": "TILE_PRODUCTION_SECTION",
+   "author": "Ben (the sprint 51 design form, 2026-10-08)",
+   "title": "The tile Selection element opens on a Production section: what stands here, what it makes, and what that fetches at its market",
+   "authority_doc": "docs/ui/SELECTION.md",
+   "files": [
+    "src/ui/selection_panel.cpp",
+    "src/ui/hover_content.cpp",
+    "src/ui/ui_state.hpp",
+    "docs/ui/question_log.json"
+   ],
+   "design": "SETTLED: SELECTION.md § The tile element's layout (the Production section) and § The building element's layout (the Status page). WORK: (1) a sixth section, first in the nav, TILE grain: one row per stack (placement_rules::stack_members) with type glyph, count, good made, output per tick, and running state with its reason - the reason from the SAME classification hover_building_detail reads (extract it to one function both call, never a second copy); rival rows show type, count, owner and \"private\". (2) The tile's catchment market, named, with one row per good made here then per good deposited here: price and state (short / balanced / surplus) from public aggregates; each row a drill-through door to the Market ledger aimed at that market and good. (3) An unbuilt tile states \"Nothing built here\" and still lists its deposited goods at their market. (4) The building card's Status page shows the running state with its reason, never a bare \"Operating.\". (5) question_log.json entry for the section. VERIFY: a visual capture on a built, a stacked, an unbuilt and a rival tile, and a LIVE CLICK (the drill door, the nav wrap at six)."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 51,
+   "written": "2026-10-08",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 3,
+   "id": "BL-1240",
+   "short_name": "OWNER_MULTI_SELECT",
+   "author": "Ben (the sprint 51 design form, 2026-10-08)",
+   "title": "Corporation and Company lenses draw a picked set of owners: picked tinted, the rest greyed, a checklist key and shift-click picking",
+   "authority_doc": "docs/ui/LENSES.md",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/ui_state.hpp",
+    "src/ui/overlay.cpp",
+    "src/ui/presentation.hpp",
+    "docs/ai/ACTIONS.json",
+    "docs/ui/question_log.json"
+   ],
+   "design": "SETTLED: LENSES.md § Corporation lens (owner multi-select) and § Company lens. WORK: ui_state::lens_corps (default: the player) and ui_state::lens_companies (default: empty); compute_tile_fill tints picked owners with their identity colour and every unpicked owner with ONE owned-grey (a new palette entry, distinct from unowned terrain); the scroll-list colour key becomes a Resource-lens-shaped checklist (count header, search, swatch rows for owners holding ground on the active body); shift-click on an owned tile toggles its owner, a plain click unchanged; rival HQ stars draw only while picked; hover lights the hovered owner's group regardless of the set. ACTIONS.json entries for the checklist toggle and the shift-click press (a control change updates its entry). Sits beside BL-1225 (every lens on strip, sprint 50's tag), which gives Company its own strip glyph - take it into this sprint when sprint 50 merges. VERIFY: lens_modes.lua captures with the default and with two rivals picked, and a LIVE CLICK on the shift-click and the checklist."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 51,
+   "written": "2026-10-08",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 5,
+   "id": "BL-1241",
+   "short_name": "STRUCTURES_BAKED",
+   "author": "Ben (the sprint 51 design form, 2026-10-08)",
+   "title": "Buildings and settlements bake into the ground as procedural structures; every building and settlement glyph leaves the Planetary canvas",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "files": [
+    "src/ui/ground_bake.cpp",
+    "src/ui/ground_bake.hpp",
+    "src/core/ground_layer.cpp",
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/selection_panel.cpp",
+    "scripts/verify/ground_bake.lua"
+   ],
+   "design": "SETTLED: RENDERING.md § Installations; PLANETARY.md § Building markers; SELECTION.md § Multi-building tiles. WORK: (1) an installation pass in the bake behind a stamp seam keyed by what a stamp depicts (so an authored raster can replace one later): one procedural form per placeable building type, processing keyed on the active recipe's family; a cluster of up to three per tile, one per stack, dominant largest and front; settlements by scale step, razed as ruin; under construction as scaffolding; standing sprites on the oblique tiers; no owner colour, no state cue. (2) The chunk content hash folds installations (type, recipe identity, stack membership, settlement scale, razed) and nothing tick-rate. (3) Retire from the canvas: icons::building, the stack ring, the +N badge, the corp emblem tag, the settlement and ruin skylines and the density dot; hit zones unchanged. (4) The Selection element's zoomed neighbourhood draws what the canvas draws. MEASURE: bake time per tier before and after (the worker budget), and re-bake count over a play year (must follow construction events only). VERIFY: ground_bake.lua with a staged stacked tile, a settlement ladder, a rival plant; a LIVE look at every rung including the far page (a scale>=3 centre must read as a city)."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 51,
+   "written": "2026-10-08",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 4,
+   "id": "BL-1242",
+   "short_name": "LANDFORMS_AND_RIVERS_BAKED",
+   "author": "Ben (the sprint 51 design form, 2026-10-08)",
+   "title": "Mountains, canyons, craters and rifts bake as relief forms and rivers as carved curved courses; the landform glyphs and river strokes leave the canvas",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "files": [
+    "src/ui/ground_bake.cpp",
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/hex_render.cpp",
+    "scripts/verify/landform_relief.lua"
+   ],
+   "design": "SETTLED: RENDERING.md § Mountains, rivers and terrain variety; PLANETARY.md § Terrain channels. WORK: (1) a landform relief pass - massif and ridge, canyon cut between paired rims, raised-rim crater bowl, rift fissure - with contiguous runs baked as one form, each tile baking its half of the shared edge. (2) Rivers baked along river_edges as a smooth quadratic B-spline (the road rule), widening downstream with accumulated flow, bank shelving and a wet margin. (3) Retire icons::landform, landform_span and the canvas river strokes and chevrons (body_surface_canvas.cpp ~3852-3918, ~4230-4277). Deterministic and wrap-exact (extend ground_bake_check). VERIFY: landform_relief.lua re-pointed at the baked forms; a LIVE look at a mountain range, a rift and a river mouth at every rung."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 51,
+   "written": "2026-10-08",
+   "requires": [
+    "BL-1242"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 3,
+   "id": "BL-1243",
+   "short_name": "TERRAIN_VARIANT_FAMILIES",
+   "author": "Ben (the sprint 51 design form, 2026-10-08)",
+   "title": "Every terrain family bakes from several procedural variants, hash-picked per tile and cross-faded, so one terrain never reads as wallpaper",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "files": [
+    "src/ui/ground_bake.cpp"
+   ],
+   "design": "SETTLED: RENDERING.md § Mountains, rivers and terrain variety (more tile sets - variant families). WORK: per terrain family (substrate x cover, and each dramatic landform) several procedural variants (noise seed, brush scatter, rock and erosion pattern); each tile picks by a hash of grid coordinates; variants cross-fade across the boundary the way base ground interpolates, so no variant edge is drawn. The count per family is set by eye against captures with Ben. Same stamp seam as BL-1241 so an authored set can replace a family. VERIFY: a capture of a wide plain and a forest at the two close rungs before and after; a LIVE look."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 51,
+   "written": "2026-10-08",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 2,
+   "id": "BL-1244",
+   "short_name": "GROUND_NEVER_MAGNIFIED",
+   "author": "Ben (the sprint 51 design form, 2026-10-08)",
+   "title": "The ground is never magnified: the tier chooser minifies the tier above, a 192 px tier tops the ladder, and every tier bakes at 2x and downsamples",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "files": [
+    "src/core/ground_layer.cpp",
+    "src/core/ground_layer.hpp",
+    "src/ui/ground_bake.cpp",
+    "src/ui/body_surface_canvas.cpp"
+   ],
+   "design": "SETTLED: RENDERING.md § Level of detail (Ben, 2026-10-08: never magnify, a 192 px tier, supersample). WORK: (1) k_tier_headroom 1.2 -> the smallest tier with ppr >= draw_r (minify, never past 2:1). (2) A 192 px chunked tier in k_tier_ppr. (3) Bake each tier at 2x and box-downsample before upload; re-tune the unsharp pass against the result. (4) The stand-in while chunks fill is the next tier down where resident, the far page only where nothing closer is. MEASURE FIRST AND AFTER: the frame HUD's texel/px per rung at 1720x1080 and at a 4K-height window; bake time per tier (x4 pixels on the worker); resident chunk memory at the top rung. VERIFY: captures at each rung, and a LIVE look at every rung with Ben (the sharpness call is his eye)."
   }
  ]
 }
