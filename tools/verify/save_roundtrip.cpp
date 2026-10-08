@@ -128,7 +128,8 @@ int main()
         // BL-1203: the hauler's room fields (world_save_version 36).
         w.markets.at(hh_market).household_weight[hh_food] = 3.375f;
         w.markets.at(hh_market).hauler_want[hh_food]      = 9.625f;
-        w.markets.at(hh_market).offbook_drawn[hh_food]    = 4.875f; // BL-1227
+        w.markets.at(hh_market).unposted_bid[hh_food]      = 4.875f; // BL-1227
+        w.markets.at(hh_market).unposted_bid_tick[hh_food] = 1234;   // BL-1227
     }
 
     // BL-614: same treatment for the building record's newest field — the
@@ -282,8 +283,9 @@ int main()
     {
         const auto mit = loaded.markets.find(hh_market);
         check(read_ok && mit != loaded.markets.end()
-                  && mit->second.offbook_drawn[hh_food] == 4.875f,
-              "P1 market offbook_drawn (BL-1227, world_save_version 38) round-trips at its written value");
+                  && mit->second.unposted_bid[hh_food] == 4.875f
+                  && mit->second.unposted_bid_tick[hh_food] == 1234,
+              "P1 market unposted_bid / unposted_bid_tick (BL-1227, world_save_version 38) round-trip at their written values");
     }
 
     // BL-614: likewise for the wage bid.

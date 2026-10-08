@@ -1544,19 +1544,6 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
 
     economy_report report;
 
-    // BL-1227 (AI_OPPONENT.md § 2B, the off-book draws as a bid): roll the
-    // off-book record. What the space programme, network upkeep and procurement
-    // drew from each market over the PREVIOUS tick (`offbook_drawn`, saved)
-    // becomes this tick's read (`offbook_bid`, transient), and the record
-    // starts again. First in the step, so every reader this tick — the corp
-    // scorer's veto test — sees last tick's draws, and procurement drawing
-    // below writes only this tick's record.
-    for (auto& [mid, mc] : w.markets)
-    {
-        (void)mid;
-        mc.offbook_bid = mc.offbook_drawn;
-        mc.offbook_drawn.fill(0.0f);
-    }
 
     // BL-545/BL-546: one tick of the relational substrate's DECAY half, before
     // anything this tick can observe. `run_sentiment_step` is decay-then-fold
@@ -1741,24 +1728,26 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                 // building to order while it sits there would mint goods.
                 const entity_id home_key = corp_home_pool_key(w, c.supplier, c.body);
                 float to_draw = c.quantity;
-                const auto draw_from = [&](stockpile_component& pool, entity_id pool_key) {
+                const auto draw_from = [&](stockpile_component& pool) {
                     float& sq = pool.quantities[ri];
                     const float take = std::min(sq, to_draw); // a pool never goes negative
                     sq -= take;
                     to_draw -= take;
-                    // BL-1227: an off-book bid on the market the pool is keyed to.
-                    if (take > 0.0f)
-                        if (const auto okit = w.markets.find(pool_key); okit != w.markets.end())
-                            okit->second.offbook_drawn[ri] += take;
                 };
+                // BL-1227 (AI_OPPONENT.md § 2B): procurement is a buyer that
+                // posts no bid. What it WANTS here — the whole contract, filled
+                // from stock or built to order — is an unposted bid on the
+                // supplier's home market.
+                if (const auto hmit = w.markets.find(home_key); hmit != w.markets.end())
+                    note_unposted_bid(hmit->second, ri, c.quantity, w.current_econ_tick);
                 if (const auto skit = w.corp_market_pools.find(std::make_pair(c.supplier, home_key));
                     skit != w.corp_market_pools.end())
-                    draw_from(skit->second, home_key);
+                    draw_from(skit->second);
                 for (auto it = w.corp_market_pools.lower_bound({c.supplier, entity_id{0}});
                      to_draw > 0.0f && it != w.corp_market_pools.end() && it->first.first == c.supplier;
                      ++it)
                     if (it->first.second != home_key && pool_key_body(w, it->first.second) == c.body)
-                        draw_from(it->second, it->first.second);
+                        draw_from(it->second);
                 const entity_id land_on = (c.delivery_body != null_entity) ? c.delivery_body : c.body;
                 w.pool_at(c.buyer, corp_home_pool_key(w, c.buyer, land_on)).quantities[ri] += c.quantity;
                 // BL-546: one `contract_completed` occurrence folded into the
@@ -2509,6 +2498,14 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     for (std::size_t i = 0; i < report.buildings.size(); ++i)
         report.building_row.emplace(report.buildings[i].building, i);
     phase_stamp(5); // production (pass 5, the row index)
+
+    // BL-1227 (AI_OPPONENT.md § 2B; DISCOVERY.md, Ben 2026-10-08: a running plant
+    // and what it consumes are observable): what each RUNNING processor drew
+    // this pass is an unposted bid on its market. An idled plant produced
+    // nothing and records nothing.
+    for (const auto& [key, q] : running_consumer_draws(w, reg, report))
+        if (const auto rmit = w.markets.find(key.first); rmit != w.markets.end())
+            note_unposted_bid(rmit->second, key.second, q, w.current_econ_tick);
 
     // Population food demand (BL-190) is injected by inject_population_demand,
     // called from clear_markets AFTER its per-tick demand reset — injected here
@@ -3279,7 +3276,8 @@ bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& rep
                        entity_id corp, entity_id body, entity_id tile,
                        const std::array<float, resource_count>& need,
                        draw_outcome* rec = nullptr,
-                       std::array<float, resource_count>* grid_residual = nullptr)
+                       std::array<float, resource_count>* grid_residual = nullptr,
+                       bool note_pool_take = false)
 {
     // BL-1003: the draw is from the pool of the TILE's market — the shelf the
     // buyer stands at — or the body-level pool on a market-less body, and the
@@ -3338,6 +3336,11 @@ bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& rep
         const float have = std::max(0.0f, pool.quantities[r]);
         const float take = std::min(required, have);
         pool.quantities[r] = have - take; // never negative, by construction
+        // BL-1227 (AI_OPPONENT.md § 2B, Ben 2026-10-08): building upkeep met
+        // from the corporation's OWN pool takes goods without posting a bid —
+        // an unposted bid on the pool's market.
+        if (note_pool_take && m != nullptr)
+            note_unposted_bid(*m, r, take, w.current_econ_tick);
         float shortfall = required - take;
         if (shortfall <= 0.0f)
         {
@@ -3733,7 +3736,7 @@ building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg,
         std::array<float, resource_count> residual{};
         const bool unmet = any_need
             ? draw_goods_or_bid(w, reg, report, corp, body, b.tile, need, nullptr,
-                                (grid_id != 0) ? &residual : nullptr)
+                                (grid_id != 0) ? &residual : nullptr, /*note_pool_take=*/true)
             : false;
 
         bool on_grid = false;

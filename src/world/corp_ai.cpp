@@ -667,18 +667,8 @@ namespace {
 /// veto fire? true = vetoed (no bid against listed supply, or a dead market
 /// in play); false = a bid exists after all (the silenced want) or no signal
 /// (a market that has never cleared). Only meaningful when demand[r] <= 0.
-bool zero_bid_veto(const world& w, const market_component& m, entity_id mid, std::size_t r,
-                   const market_good_draw* running_draw)
+bool zero_bid_veto(const world& w, const market_component& m, std::size_t r, int hold_ticks)
 {
-    // PLUS a RUNNING processor in this market that consumes the good, fed from
-    // its own pool or the shelf without posting a bid (Ben, 2026-10-07/08,
-    // review round 3): its draw this tick's production pass — which runs
-    // before the scorer in the same economy step — is a bid. An idled or
-    // decommissioned processor draws nothing and is not a buyer.
-    if (running_draw != nullptr)
-        if (const auto it = running_draw->find(std::make_pair(mid, r));
-            it != running_draw->end() && it->second > 0.0f)
-            return false;
     // WHAT COUNTS AS A BID for the veto test (Ben, 2026-10-07; AI_OPPONENT.md
     // § 2B): demand PLUS the want the fair-price ceiling silenced
     // (`hauler_want`, the last clear's aggregate, serialised like demand).
@@ -687,12 +677,14 @@ bool zero_bid_veto(const world& w, const market_component& m, entity_id mid, std
     // needed most. A silenced want is a bid with no posted quantity to
     // forecast against, so the build takes no penalty (no ratio to read).
     //
-    // PLUS the off-book draws the ruling also names — the space programme,
-    // network upkeep and procurement take goods without posting a bid; what
-    // they drew from this market LAST tick is `offbook_bid` (rolled from the
-    // saved `offbook_drawn` at the head of the economy step). A buyer that
-    // takes goods without bidding is still a buyer.
-    if (m.hauler_want[r] > 0.0f || m.offbook_bid[r] > 0.0f)
+    // PLUS the UNPOSTED bid (Ben, 2026-10-07/08): the space programme, network
+    // upkeep and procurement WANT, filled or not; launch fuel and own-pool
+    // building upkeep; what a running processor here consumes (observable,
+    // DISCOVERY.md § Competitor visibility). Held for the scorer's cadence:
+    // a record no older than `hold_ticks` still counts, so every corporation
+    // that evaluates between two records sees it. A buyer that takes or wants
+    // goods without posting a bid is still a buyer.
+    if (m.hauler_want[r] > 0.0f || unposted_bid_held(m, r, w.current_econ_tick, hold_ticks))
         return false;
     // BL-1227 (idle mines, the boom): ZERO BID AGAINST LISTED SUPPLY IS A
     // GLUT, not a missing signal. Both halves are public: the market lists
@@ -722,7 +714,7 @@ bool zero_bid_veto(const world& w, const market_component& m, entity_id mid, std
         return false; // no clear has run yet: no signal, do not guess
     for (std::size_t g = 0; g < resource_count; ++g)
         if (m.supply[g] > 0.0f || m.demand[g] > 0.0f || m.hauler_want[g] > 0.0f
-            || m.offbook_bid[g] > 0.0f)
+            || m.unposted_bid[g] > 0.0f)
             return true; // the market has cleared: dead for this good
     return false; // never cleared (nothing written yet): no signal
 }
@@ -730,15 +722,14 @@ bool zero_bid_veto(const world& w, const market_component& m, entity_id mid, std
 /// The same test at a tile's market: true when a build there of @p target is
 /// vetoed by the zero-bid rule (no demand posted AND zero_bid_veto) — the one
 /// veto the chain start (§ 11) may lift. False with no market, or with demand.
-bool zero_bid_veto_at(const world& w, entity_id tile, resource_type target,
-                      const market_good_draw* running_draw)
+bool zero_bid_veto_at(const world& w, entity_id tile, resource_type target, int hold_ticks)
 {
     const entity_id mid = market_for_tile(w, tile);
     const auto      mit = w.markets.find(mid);
     if (mid == null_entity || mit == w.markets.end())
         return false;
     const std::size_t r = static_cast<std::size_t>(target);
-    return mit->second.demand[r] <= 0.0f && zero_bid_veto(w, mit->second, mid, r, running_draw);
+    return mit->second.demand[r] <= 0.0f && zero_bid_veto(w, mit->second, r, hold_ticks);
 }
 } // namespace
 
@@ -780,7 +771,7 @@ market_good_draw running_consumer_draws(const world& w, const recipe_registry& r
 
 float forecast_glut_multiplier(const world& w, entity_id tile, resource_type target,
                                float added_rate_per_tick, int horizon_ticks,
-                               const corp_ai_params& p, const market_good_draw* running_draw)
+                               const corp_ai_params& p)
 {
     if (added_rate_per_tick <= 0.0f)
         return 1.0f;
@@ -794,7 +785,7 @@ float forecast_glut_multiplier(const world& w, entity_id tile, resource_type tar
     const std::size_t r = static_cast<std::size_t>(target);
     const float demand = m.demand[r]; // PUBLIC aggregate only (BL-068) — same fact a rival sees.
     if (demand <= 0.0f)
-        return zero_bid_veto(w, m, mid, r, running_draw) ? 0.0f : 1.0f; // BL-1227: read by what it lists
+        return zero_bid_veto(w, m, r, std::max(1, p.cadence_k)) ? 0.0f : 1.0f; // BL-1227: read by what it lists
     const float horizon = static_cast<float>(std::max(1, horizon_ticks));
     const float projected_supply = m.supply[r] + added_rate_per_tick * horizon;
     const float ratio = projected_supply / demand;
@@ -1165,10 +1156,6 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
     // standing in the world), so they are computed once per tick alongside the
     // site ranking they feed, not once per due corp — the same BL-253 hoist.
     const std::array<float, resource_count> demand_weight = input_demand_weights(w, reg, p);
-    // BL-1227 review round 3: what RUNNING processors drew of each good in each
-    // market this tick (the production pass precedes this step) - a bid for the
-    // zero-bid veto. A world fact for the tick, hoisted like the site ranking.
-    const market_good_draw consumer_draw = running_consumer_draws(w, reg, report);
     const std::vector<extraction_site> ranked_sites =
         rank_extraction_sites(w, reg, p.top_k_sites_per_resource, demand_weight);
 
@@ -1388,7 +1375,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 const float added_rate = ex.base_rate * rich * wf * (1.0f - tc.hazard_level)
                                        * stack_scalar;
                 const int   horizon    = static_cast<int>(ex.build_duration_ticks) + p.forecast_clearing_ticks;
-                float       glut       = forecast_glut_multiplier(w, s.tile, s.target, added_rate, horizon, p, &consumer_draw);
+                float       glut       = forecast_glut_multiplier(w, s.tile, s.target, added_rate, horizon, p);
                 // BL-1227, the chain start (AI_OPPONENT.md § 11): a mine vetoed
                 // ONLY by the zero-bid rule is held back, not dropped — it is
                 // admitted below iff this same corporation, in this same
@@ -1399,7 +1386,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 bool held = false;
                 if (glut <= 0.0f)
                 {
-                    const bool zero_bid = zero_bid_veto_at(w, s.tile, s.target, &consumer_draw);
+                    const bool zero_bid = zero_bid_veto_at(w, s.tile, s.target, std::max(1, p.cadence_k));
                     if (ext_trace != nullptr)
                     {
                         // Recorded as the veto branch; a held mine the chain
@@ -1635,7 +1622,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                             continue;
                         const float out_rate = abs->outputs[static_cast<std::size_t>(ort)] * batches;
                         const int   out_hz   = static_cast<int>(pe.build_duration_ticks) + p.forecast_clearing_ticks;
-                        if (forecast_glut_multiplier(w, tile, ort, out_rate, out_hz, p, &consumer_draw) <= 0.0f)
+                        if (forecast_glut_multiplier(w, tile, ort, out_rate, out_hz, p) <= 0.0f)
                             continue;
                         if (!construction_materials_obtainable(w, reg, reach(), standing(), tile,
                                                                building_type::processing_facility, ort, rid))
@@ -1669,7 +1656,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     {
                         const float added_rate = abs->outputs[static_cast<std::size_t>(rt)] * batches;
                         const int   horizon    = static_cast<int>(pe.build_duration_ticks) + p.forecast_clearing_ticks;
-                        if (forecast_glut_multiplier(w, tile, rt, added_rate, horizon, p, &consumer_draw) <= 0.0f)
+                        if (forecast_glut_multiplier(w, tile, rt, added_rate, horizon, p) <= 0.0f)
                             continue;
                     }
                     const float n = bp.net();
@@ -1729,7 +1716,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         w, reg, tile, building_type::processing_facility, target, best_recipe));
                     const float added_rate = primary_q * batches;
                     const int   horizon    = static_cast<int>(pe.build_duration_ticks) + p.forecast_clearing_ticks;
-                    const float glut       = forecast_glut_multiplier(w, tile, target, added_rate, horizon, p, &consumer_draw);
+                    const float glut       = forecast_glut_multiplier(w, tile, target, added_rate, horizon, p);
                     if (glut <= 0.0f)
                         continue; // forecast hard glut — veto, as the extraction half does
 

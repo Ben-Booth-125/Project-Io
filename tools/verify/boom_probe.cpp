@@ -106,7 +106,7 @@ struct trace_tally
     long emitted_built = 0;        ///< emitted rows whose (tile, good) got a new site that tick
 };
 const char* k_tout[] = {"placement", "net<=0", "materials", "veto: listed, no bid", "veto: dead market",
-                        "veto: ratio", "held", "emitted"};
+                        "veto: ratio", "emitted"};
 
 struct ctx
 {
@@ -117,6 +117,8 @@ struct ctx
     std::set<std::size_t> watch;
     std::map<entity_id, mkt_snap> pre[resource_count]; // lap-0 snapshot per market, watched goods only
     std::set<entity_id> seen;
+    std::set<entity_id> seen_proc;                ///< BL-1227 r4: processors seen
+    std::map<std::string, long>* proc_new = nullptr; ///< new processors in play by recipe
     std::vector<tracked> sites;
     int tick = 0;
 };
@@ -143,6 +145,15 @@ void after_lap(const world& w, int lap, void* vp)
         return;
     }
     if (lap != 1) return;
+    // BL-1227 r4: new processing facilities in play, by recipe
+    for (const auto& [bid, b] : w.buildings)
+    {
+        if (b.type != building_type::processing_facility) continue;
+        if (!c.seen_proc.insert(bid).second) continue;
+        if (c.tick < 1 || c.proc_new == nullptr) continue;
+        const recipe* rc = c.reg->get_recipe(b.recipe);
+        ++(*c.proc_new)[rc ? rc->name : std::string("?")];
+    }
     // new watched sites this tick
     std::vector<entity_id> fresh;
     for (const auto& [bid, b] : w.buildings)
@@ -339,6 +350,7 @@ int main(int argc, char** argv)
     std::map<std::size_t, good_tally> pooled;
     long lifts_all = 0, lifts_built_all = 0; // BL-1227 chain start, play only
     std::map<std::size_t, trace_tally> tt_all;
+    std::map<std::string, long> proc_new_all;
     for (const std::uint32_t seed : seeds)
     {
         lua_state lua;
@@ -352,7 +364,8 @@ int main(int argc, char** argv)
         ctx c;
         c.reg = &reg;
         for (const resource_type rt : placement_rules::k_extractable) c.watch.insert(static_cast<std::size_t>(rt));
-        for (const auto& [bid, b] : w.buildings) c.seen.insert(bid);
+        for (const auto& [bid, b] : w.buildings) { c.seen.insert(bid); c.seen_proc.insert(bid); }
+        c.proc_new = &proc_new_all;
         c.diag = {static_cast<std::size_t>(resource_type::iron_ore),
                   static_cast<std::size_t>(resource_type::petroleum),
                   static_cast<std::size_t>(resource_type::coal),
@@ -413,6 +426,9 @@ int main(int argc, char** argv)
     }
     std::printf("\n================ POOLED ================\n");
     print(pooled);
+    std::printf("\n  NEW processing facilities in play (all seeds), by recipe:");
+    for (const auto& [name, n] : proc_new_all) std::printf(" %s %ld", name.c_str(), n);
+    std::printf("\n");
     std::printf("\n================ SCORER EXTRACTION TRACE (play, candidate-evaluations) ================\n");
     for (const auto& [r, t] : tt_all)
     {

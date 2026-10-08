@@ -367,23 +367,12 @@ const char* corp_decision_reason_label(corp_decision_reason r);
 float corp_should_have_buffer(const world& w, const recipe_registry& reg,
                               const economy_report& report, entity_id corp);
 
-/// Predictive-spending score multiplier for a candidate build of `type`
-/// producing `target` at `tile`, given its expected per-tick output
-/// `added_rate_per_tick` once live. Forecasts the added supply over
-/// `horizon_ticks` against the LOCAL MARKET'S PUBLIC supply/demand
-/// aggregates only (visibility-honest — the same facts export_corp_blackboard
-/// would show a rival, per BL-068/DISCOVERY.md) and returns 1.0 (no penalty)
-/// when the forecast supply/demand ratio stays at or below `p.glut_taper_ratio`,
-/// tapering linearly to 0.0 (veto) at `p.glut_veto_ratio`. Zero public demand
-/// against listed supply is an unbounded ratio and vetoes (BL-1227); so does no
-/// bid and nothing listed in a market that has cleared (a dead market). Only a
-/// market that has never cleared (econ tick 0, or no supply/demand written for
-/// any good yet) returns 1.0 for "no bid, nothing listed" (no signal). Exposed
-/// for the harness; also used internally by the build-candidate scorer.
 /// BL-1227 (Ben, 2026-10-07/08: "a buyer that takes goods without posting a bid
 /// is still a buyer"): what RUNNING processors drew of each good in each market
 /// this tick's production pass, keyed (market, good) — derived from the
-/// economy report's per-building rows (`running_consumer_draws`), transient.
+/// economy report's per-building rows. run_economy_step records it as an
+/// unposted bid (market_component::unposted_bid) right after the production
+/// pass (a running plant and what it consumes are observable, DISCOVERY.md).
 using market_good_draw = std::map<std::pair<entity_id, std::size_t>, float>;
 
 /// Build `market_good_draw` from @p report: every processor row that produced
@@ -393,10 +382,24 @@ using market_good_draw = std::map<std::pair<entity_id, std::size_t>, float>;
 market_good_draw running_consumer_draws(const world& w, const recipe_registry& reg,
                                         const economy_report& report);
 
+/// Predictive-spending score multiplier for a candidate build of `type`
+/// producing `target` at `tile`, given its expected per-tick output
+/// `added_rate_per_tick` once live. Forecasts the added supply over
+/// `horizon_ticks` against the LOCAL MARKET'S supply/demand aggregates and
+/// returns 1.0 (no penalty) when the forecast supply/demand ratio stays at or
+/// below `p.glut_taper_ratio`, tapering linearly to 0.0 (veto) at
+/// `p.glut_veto_ratio`. With NO posted demand (BL-1227, AI_OPPONENT.md § 2B) the
+/// market is read by what it lists and what else bids: the silenced want
+/// (`hauler_want`) or an unposted bid held for the cadence
+/// (`unposted_bid`: off-book want, launch fuel, own-pool upkeep, a running
+/// processor's consumption — observable facts, DISCOVERY.md) is a bid, no
+/// penalty; otherwise listed supply vetoes, and so does a market that has
+/// cleared with nothing listed (a dead market). Only a market that has never
+/// cleared returns 1.0 for "no bid, nothing listed" (no signal). Exposed for
+/// the harness; also used internally by the build-candidate scorer.
 float forecast_glut_multiplier(const world& w, entity_id tile, resource_type target,
                                float added_rate_per_tick, int horizon_ticks,
-                               const corp_ai_params& p = {},
-                               const market_good_draw* running_draw = nullptr);
+                               const corp_ai_params& p = {});
 
 /// The corp's solvency reserve floor under `p` (exposed for the harness).
 float corp_reserve_floor(const world& w, const recipe_registry& reg,
@@ -414,7 +417,6 @@ enum class extraction_trace_outcome : uint8_t
     veto_listed,   ///< glut veto: no bid against listed supply (BL-1227)
     veto_dead,     ///< glut veto: a cleared market with no bid, nothing listed (BL-1227)
     veto_ratio,    ///< glut veto: (supply + added) / demand >= glut_veto_ratio
-    held,          ///< zero-bid veto held for the chain start (lifted or not, see report)
     emitted,       ///< a candidate went to the greedy selection
     count
 };

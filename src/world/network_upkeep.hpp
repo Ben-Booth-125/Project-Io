@@ -133,11 +133,18 @@ struct network_purchase
 ///                derived claims are appended in walk order.
 /// @return        The intents, in emission order (ascending nation, stone
 ///                then timber) — settle after the budget pass.
+/// @param wants  BL-1227 (AI_OPPONENT.md § 2B, Ben 2026-10-08): when non-null,
+///               receives one row per good the line WANTED this tick, filled or
+///               not — at the market it would draw from (the supplier pool's or
+///               the fallback shelf's), or a null market when no pool and no
+///               shelf holds it anywhere (the caller records that at the
+///               nation's capital market). A want exists before its supply does.
 std::vector<network_purchase> derive_network_upkeep_claims(const world& w,
                                                            const std::map<entity_id, nation_budget>& budgets,
                                                            const network_upkeep_params& p,
                                                            float reservation_mult,
-                                                           std::vector<budget_claim>& claims);
+                                                           std::vector<budget_claim>& claims,
+                                                           std::vector<market_want>* wants = nullptr);
 
 /// Settle the derived intents against what `run_national_budget` actually
 /// paid. A paid `logistics_maintenance` transfer funds the first unfunded

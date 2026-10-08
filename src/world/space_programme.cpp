@@ -62,8 +62,14 @@ std::vector<space_purchase> derive_space_programme_claims(const world& w,
                                                           const std::map<entity_id, nation_budget>& budgets,
                                                           const space_programme_params& p,
                                                           float reservation_mult,
-                                                          std::vector<budget_claim>& claims)
+                                                          std::vector<budget_claim>& claims,
+                                                          std::vector<market_want>* wants)
 {
+    // BL-1227: one want row per good the line wanted, filled or not.
+    const auto want = [&](entity_id nation, entity_id market, resource_type good, float q) {
+        if (wants != nullptr && q > 0.0f)
+            wants->push_back({nation, market, good, q});
+    };
     std::vector<space_purchase> out;
 
     // Unauthored lumps mean no programme: the pass reads no float and appends
@@ -218,7 +224,11 @@ std::vector<space_purchase> derive_space_programme_claims(const world& w,
                     }
                 }
                 if (best_mkt == null_entity)
+                {
+                    want(nid, null_entity, good, lump); // BL-1227: wanted, nowhere held
                     continue; // no pool and no shelf holds a whole lump
+                }
+                want(nid, best_mkt, good, lump); // BL-1227: wanted at that shelf
 
                 const market_component& mc = w.markets.at(best_mkt);
                 const float unit = posted_price(mc, ri); // BL-1172: the posted price
@@ -243,6 +253,8 @@ std::vector<space_purchase> derive_space_programme_claims(const world& w,
                 out.push_back(sp);
                 continue;
             }
+
+            want(nid, best_key, good, lump); // BL-1227: wanted at the supplier pool's market
 
             const float unit = unit_price_at(w, best_key, ri);
             if (!std::isfinite(unit) || !(unit > 0.0f))
@@ -312,7 +324,6 @@ void settle_space_purchases(world& w,
             continue; // the shelf thinned between derive and settle: no partial launch
 
         mit->second.inventory[ri] -= sp.quantity;
-        mit->second.offbook_drawn[ri] += sp.quantity; // BL-1227: an off-book bid
         nit->second.treasury      -= sp.credits;
         sp.funded    = true;
         sp.completed = true;
@@ -376,9 +387,6 @@ void settle_space_purchases(world& w,
             // there; it is a sale, and run_nation_step folds it onto the
             // corp's `subsidies` line so `net()` explains the delta.
             pit->second.quantities[ri] -= sp.quantity;
-            // BL-1227: an off-book bid on the market the pool is keyed to.
-            if (const auto okit = w.markets.find(sp.pool); okit != w.markets.end())
-                okit->second.offbook_drawn[ri] += sp.quantity;
             sp.completed = true;
         }
         else

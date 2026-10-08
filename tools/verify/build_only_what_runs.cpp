@@ -746,6 +746,33 @@ int main()
             check(lifts2 == 0 && coal_mines_of(s, s.ai) == 0,
                   "R8 (c) the next evaluation, without the refused candidate, is vetoed again (no memory)");
         }
+        // (d) the PLAYER's corp is never a chain start, even when a spectated
+        // session evaluates it like a rival: the same staging as (a), with the
+        // AI corp made the seat and the scorer told it is spectating.
+        {
+            scene s = staged();
+            s.w.corporations.at(s.ai).is_player = true;
+            s.w.corporations.at(s.pl).is_player = false;
+            s.w.player_entity = s.ai;
+            corp_ai_params sp;
+            sp.spectating = true;
+            int lifts = 0;
+            bool evaluated = false;
+            for (int t = 1; t <= 4; ++t)
+            {
+                s.w.current_econ_tick = t;
+                economy_report rep;
+                run_corp_strategic_step(s.w, reg, rep, t, sp);
+                lifts += lifts_for(rep, s.ai);
+                for (const entity_id c : rep.corps_evaluated)
+                    if (c == s.ai) evaluated = true;
+            }
+            std::printf("  (d) seat under spectate: evaluated %s, lifts %d, coal mines %d\n",
+                        evaluated ? "yes" : "no", lifts, coal_mines_of(s, s.ai));
+            check(evaluated, "R8 (d) not vacuous: under spectate the seat IS evaluated like a rival");
+            check(lifts == 0 && coal_mines_of(s, s.ai) == 0,
+                  "R8 (d) the player's corp is excluded from the chain start: no lift, no mine");
+        }
     }
 
     // R9 (BL-1227 review round 3; Ben 2026-10-07/08: "a buyer that takes goods

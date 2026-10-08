@@ -1078,20 +1078,20 @@ struct market_component
     std::array<float, resource_count> household_weight = {};
     std::array<float, resource_count> hauler_want      = {};
 
-    /// BL-1227 (AI_OPPONENT.md § 2B, Ben 2026-10-07: what counts as a bid for
-    /// the dead-market veto). The OFF-BOOK draws — goods taken from this
-    /// market's shelf or from corporation pools keyed to it by buyers that post
-    /// no bid: the space programme, network upkeep, procurement fulfilment.
-    ///   * `offbook_drawn` accumulates THIS tick's draws where they happen
-    ///     (space_programme.cpp, network_upkeep.cpp, economy_system.cpp's
-    ///     procurement pass). SERIALISED (world_save_version 38): a save between
-    ///     ticks holds the tick's record, which the next tick reads.
-    ///   * `offbook_bid` is the PREVIOUS tick's record, rolled from
-    ///     `offbook_drawn` at the head of run_economy_step (which then zeroes
-    ///     `offbook_drawn`). TRANSIENT, not serialised: it is rewritten before
-    ///     anything reads it. The scorer's veto test reads it.
-    std::array<float, resource_count> offbook_drawn = {};
-    std::array<float, resource_count> offbook_bid   = {};
+    /// BL-1227 (AI_OPPONENT.md § 2B, Ben 2026-10-07/08: what counts as a bid for
+    /// the dead-market veto). The UNPOSTED bid — a buyer of this market that
+    /// takes or wants goods without posting a bid: the space programme, network
+    /// upkeep and procurement (what they WANTED here, filled or not), space-lane
+    /// launch fuel taken from a corporation's pool, building upkeep met from a
+    /// corporation's own pool, and what a RUNNING processor here consumed.
+    /// `unposted_bid[r]` is the latest tick's total, `unposted_bid_tick[r]` the
+    /// econ tick it was recorded on; a later tick's first record overwrites it.
+    /// The scorer reads it as a bid while it is no older than its evaluation
+    /// cadence, so every corporation evaluating between two records sees it
+    /// (HELD FOR THE CADENCE). SERIALISED (world_save_version 38). Written only
+    /// through `note_unposted_bid`.
+    std::array<float, resource_count>   unposted_bid      = {};
+    std::array<int32_t, resource_count> unposted_bid_tick = {};
 
     /// BL-1217 lever D (measurement, behind `economy.background_demand.consumes`,
     /// default off): the BACKGROUND channel's bid at the last clear
@@ -1116,6 +1116,41 @@ struct market_component
 /// Lives beside `market_component` because every buyer reads it: the economy
 /// step's draws, `clear_markets`, the nations' purchases and the scorer's
 /// input check (corp_ai.cpp) — one rule, one definition.
+/// BL-1227: record @p quantity of good @p r as an unposted bid on @p m at econ
+/// tick @p tick (see market_component::unposted_bid). Same-tick records add; the
+/// first record of a later tick overwrites. Non-positive quantities are ignored.
+inline void note_unposted_bid(market_component& m, std::size_t r, float quantity, int tick)
+{
+    if (!(quantity > 0.0f))
+        return;
+    if (m.unposted_bid_tick[r] == tick && m.unposted_bid[r] > 0.0f)
+        m.unposted_bid[r] += quantity;
+    else
+    {
+        m.unposted_bid[r]      = quantity;
+        m.unposted_bid_tick[r] = tick;
+    }
+}
+
+/// BL-1227: is an unposted bid on good @p r held at econ tick @p tick — recorded
+/// no more than @p hold_ticks ago (the scorer passes its cadence)?
+inline bool unposted_bid_held(const market_component& m, std::size_t r, int tick, int hold_ticks)
+{
+    return m.unposted_bid[r] > 0.0f && tick - m.unposted_bid_tick[r] <= hold_ticks;
+}
+
+/// BL-1227: one off-book WANT a state purchase derivation recorded — what a
+/// nation's space programme or network upkeep wanted of @p resource this tick,
+/// filled or not, at @p market (null: no supplier anywhere, so the caller
+/// records it at the nation's capital market).
+struct market_want
+{
+    entity_id     nation   = null_entity;
+    entity_id     market   = null_entity;
+    resource_type resource = resource_type::iron_ore;
+    float         quantity = 0.0f;
+};
+
 inline float posted_price(const market_component& m, std::size_t r)
 {
     return (m.price[r] > 0.0f) ? m.price[r] : m.base_price[r];

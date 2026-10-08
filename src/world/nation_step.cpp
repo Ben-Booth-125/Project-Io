@@ -4,7 +4,8 @@
 #include "condition_set.hpp" // BL-573: evaluate_condition, the contract predicate
 #include "economy_system.hpp"
 #include "hex_neighbors.hpp" // BL-572: border-tile adjacency, mirroring nation_generation.cpp's own
-#include "logistics.hpp"     // BL-572: body_tile_grid, for the same
+#include "logistics.hpp"
+#include "market_clearing.hpp" // market_for_tile (BL-1227 record_market_wants)     // BL-572: body_tile_grid, for the same
 #include "nation_ai.hpp"
 #include "nation_budget.hpp"
 #include "nation_generation.hpp" // BL-572: garrison_strength_in
@@ -22,6 +23,25 @@
 #include <map>
 #include <set>
 #include <vector>
+
+void record_market_wants(world& w, const std::vector<market_want>& wants)
+{
+    for (const market_want& mw : wants)
+    {
+        auto mit = w.markets.find(mw.market);
+        if (mit == w.markets.end())
+        {
+            const auto nit = w.nations.find(mw.nation);
+            if (nit == w.nations.end() || nit->second.capital_tile == null_entity)
+                continue;
+            mit = w.markets.find(market_for_tile(w, nit->second.capital_tile));
+            if (mit == w.markets.end())
+                continue;
+        }
+        note_unposted_bid(mit->second, static_cast<std::size_t>(mw.resource), mw.quantity,
+                          w.current_econ_tick);
+    }
+}
 
 void run_nation_step(world& w, const recipe_registry& reg, economy_report& report,
                      int econ_tick)
@@ -44,9 +64,10 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     // the same walk order everything else is pinned to. The returned intents
     // carry what each claim is FOR (good, quantity, pool) and are settled after
     // the spend.
+    std::vector<market_want> wants; // BL-1227: the off-book want, filled or not
     std::vector<space_purchase> space = derive_space_programme_claims(
         w, w.nation_budgets, reg.space_programme(), reg.price_band().reservation_mult,
-        report.budget_claims);
+        report.budget_claims, &wants);
 
     // ---- 2c. ...and network upkeep (BL-643): the logistics_maintenance
     // line's consumer, the same state-purchase shape one claim kind over —
@@ -55,7 +76,8 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     // shape for a continuous sink where the launch lot's lump is not).
     std::vector<network_purchase> network = derive_network_upkeep_claims(
         w, w.nation_budgets, reg.network_upkeep(), reg.price_band().reservation_mult,
-        report.budget_claims);
+        report.budget_claims, &wants);
+    record_market_wants(w, wants);
     const std::vector<budget_claim>& claims = report.budget_claims;
 
     // ---- 3. Spend: the pure pass -------------------------------------------
