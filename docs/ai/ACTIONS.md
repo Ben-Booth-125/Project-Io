@@ -1331,7 +1331,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 - Corporation ledger is open
 - At least one economy quarter has been measured
 
-**Expected output.** Names that flow and its figure for the quarter - Inputs, Maintenance, Wages, Interest, Levies or Force. A flow that is zero this quarter is ABSENT from the stack rather than drawn flat, so the segment count itself reads the corp's position: Interest appears only while the balance is negative.
+**Expected output.** Names that flow and its figure for the quarter - Inputs, Maintenance, Wages, Interest, Levies or Force. A flow that is zero this quarter is ABSENT from the stack rather than drawn flat, so the segment count itself reads the corp's position: Interest appears only while the balance is negative. The Earnings column hovers the same way: Income, Subsidies when a nation paid any, and Refunds when the quarter's return booked one (BL-1215 - construction cancelled when a seat was taken, credited back at what it had paid); a 'Refunds: +N (not earnings)' line under the net names it too, and the net excludes it.
 
 **Reason to select.** The chart says which side is bigger at a glance; the hover says WHICH outflow is the one to act on.
 

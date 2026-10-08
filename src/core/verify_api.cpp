@@ -3823,8 +3823,9 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["measured"] = r.budget_measured;
         out["balance"]  = static_cast<double>(r.balance);
         out["net"]      = static_cast<double>(r.budget.net());
+        out["refunds"]  = static_cast<double>(r.refunds); // BL-1215
 
-        const ui::balance_columns c = ui::build_balance_columns(r.budget);
+        const ui::balance_columns c = ui::build_balance_columns(r.budget, r.refunds);
         const auto emit = [&st](const ui::charts::stack_segment* segs, std::size_t n) {
             sol::table t = st.create_table();
             for (std::size_t i = 0; i < n; ++i)
