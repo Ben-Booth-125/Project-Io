@@ -25,6 +25,21 @@ void centred_text(const char* s, float pane_w, ImU32 colour)
 
 } // namespace
 
+float loading_bar_y()
+{
+    return ImGui::GetIO().DisplaySize.y * k_loading_band_frac;
+}
+
+void pad_to_loading_band(float lead_px)
+{
+    // The Dummy's own item spacing is taken out, so the NEXT item lands on the
+    // line rather than one spacing below it.
+    const float target = loading_bar_y() - lead_px;
+    const float gap    = target - ImGui::GetCursorScreenPos().y - ImGui::GetStyle().ItemSpacing.y;
+    if (gap > 0.0f)
+        ImGui::Dummy({1.0f, gap});
+}
+
 void draw_generation_wait(generation_progress& prog, float pane_w, const char* caption,
                           bool live_clock)
 {
@@ -37,6 +52,7 @@ void draw_generation_wait(generation_progress& prog, float pane_w, const char* c
     const float f = std::max(prog.fraction(), prog.wait_shown);
     prog.wait_shown = f;
     ImGui::Dummy({pane_w, 10.0f});
+    pad_to_loading_band(0.0f); // the bar's top edge on the band (STARTUP.md § Main menu)
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + bar_x);
     ImGui::ProgressBar(f, {bar_w, 18.0f}, "");
 

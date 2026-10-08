@@ -9,6 +9,8 @@
 #include <map>
 #include <vector>
 
+struct input_reach;
+
 struct generation_progress; // hard_coded_world.hpp; the loading screen's write-only tap
 
 // ---------------------------------------------------------------------------
@@ -704,3 +706,60 @@ std::array<float, resource_count> measure_body_production(const world& w,
                                                           entity_id body_id);
 float measure_production_ratio(const world& w, const recipe_registry& reg,
                                entity_id body_id);
+
+// ---------------------------------------------------------------------------
+// BL-1233 (Ben, 2026-10-07, ruling A; CORPORATION_GENERATION.md § Pass 6,
+// "Derived demand counts ... the prospective draw of a processor refused for
+// want of spare input"). Public so tools/verify/charter_refusal_probe can hold
+// the book to its rules row by row; the walk is its only other caller.
+// ---------------------------------------------------------------------------
+
+/// What a firm's processor WOULD have drawn of each input, had the sized rule
+/// not turned it away — in the units derived demand reads
+/// (`body_processor_input_demand`: nominal batches x recipe inputs) — and the
+/// market it would have stood in.
+struct refused_draw
+{
+    bool                              set    = false;
+    entity_id                         market = null_entity;
+    std::array<float, resource_count> draw{};
+};
+
+/// One refused good's prospective draw.
+struct prospective_entry
+{
+    entity_id                         market = null_entity;
+    std::array<float, resource_count> draw{};
+};
+
+/// THE BOOK: one entry per refused good, ordered by good. A refusal SETS its
+/// good's entry (`record_refused_draw`: a retry refused again counts it once,
+/// never twice); the walk erases it when a firm for the good lands.
+using prospective_draws = std::map<std::size_t, prospective_entry>;
+
+/// Set (never add) @p good's entry from @p refused; nothing when it is unset.
+void record_refused_draw(prospective_draws& book, std::size_t good, const refused_draw& refused);
+
+/// What the book adds to demand at a centre whose market is @p centre_market
+/// (null: no centre, the legacy Pass 6, which reads every entry).
+///
+/// TIED TO REACH (review round 2): an entry's want of input r is what its
+/// refused plant would draw less the SPARE r reachable at the plant's market —
+/// `reachable_supply`, the sized test's own reading, @p ir brought up to the
+/// standing buildings first — so only a producer within reach of that plant
+/// answers it; one landing elsewhere leaves it standing. And it is offered
+/// only at a centre whose market is the plant's or reaches it for r: the walk
+/// charters the extraction that would feed it, not a mine out of its reach.
+///
+/// First the entries whose good the walk has abandoned are withdrawn (erased):
+/// @p capped at its per-good cap, or no longer short — @p demand plus every
+/// entry's want, against @p production. Then the remaining wants, summed per
+/// input, are a SHORTAGE OF THEIR OWN: an input's demand is lifted to at least
+/// its body-wide @p production before its want is added, so a glut of it out of
+/// the plant's reach does not hide it. Ascending good, ascending r;
+/// deterministic.
+void add_prospective_draws(world& w, const recipe_registry& reg, input_reach& ir,
+                           prospective_draws& book, entity_id centre_market,
+                           std::array<float, resource_count>& demand,
+                           const std::array<float, resource_count>& production,
+                           const std::array<bool, resource_count>& capped);

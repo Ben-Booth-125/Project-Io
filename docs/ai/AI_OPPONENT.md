@@ -479,6 +479,15 @@ where a processor genuinely differs from a mine:
   market (§ Build only what runs), since a processor with no reachable input is an immediate
   loss-maker. The scorer asks exactly what the seam asks and no more: mirroring a lock
   the seam does not apply would make the rival stricter than the rules it plays by.
+  **A build is judged on supply, not stock (Ben, 2026-10-08; BL-1234, settle scorer starves).**
+  For a NEW processor, an input is obtainable only when the spare reachable output of that input
+  covers the plant's draw at `t_idle` — the supply clause alone, the same sized test generation
+  places processors by (`../generation/CORPORATION_GENERATION.md` § Pass 3, "Sized to its
+  inputs"). A shelf with nothing replacing it is opening stock being drawn down, not a supply: on
+  seed 0 one steel shelf of 6,313 units with negative spare admitted 63 builds in eight ticks and
+  was empty by the tenth, and 97% of the settle's starved processors were admitted that way. Stock
+  still counts where a plant already stands — a resume, a recipe switch — because there the
+  question is whether to run what exists, not whether to add a draw.
 - **Pricing.** Priced by `estimate_prospective_profit` rather than the extraction candidate's
   inline revenue-minus-wages sum. The inline model survives on the extraction side because
   switching it would move every blessed golden for no player-visible gain; a new candidate had no
@@ -680,10 +689,17 @@ the floor; stage B layers priority buckets and predictive spending over it (§ 2
   forecast against a fact it cannot see). **What counts as a bid (Ben, 2026-10-07, scoping the
   veto):** the market's demand **plus** the want the fair-price ceiling silenced (the hauler-only
   register — an aggregate market fact, like demand; without it a mine is vetoed exactly when its
-  processors are priced out and need it most), **plus** the off-book draws on that market — the
-  space programme's, network upkeep's and procurement's — since a buyer that takes goods without
-  posting a bid is still a buyer (without them no rival could ever build the first spacecraft
-  components or propellant plant in play). Otherwise the projected supply/demand ratio is unpenalised at or below
+  processors are priced out and need it most), **plus** the off-book **want** on that market — what
+  the space programme, network upkeep and procurement **wanted** there, filled or not (Ben,
+  2026-10-08: a buyer exists before its supply does, or no rival could build the first spacecraft
+  components or propellant plant; a record of draws alone only appears once the goods do), **plus**
+  the draws that take goods without posting a bid: space-lane launch fuel taken from a corporation's
+  pool, and building upkeep met from a corporation's own pool (Ben, 2026-10-08), **plus** what a
+  **running** processor in that market consumes, fed from a pool or the shelf — a running plant and
+  what it consumes are observable (`../ui/DISCOVERY.md` § Competitor visibility; Ben, 2026-10-08);
+  an idled or decommissioned plant consumes nothing and is no buyer. Each of these is held for
+  the scorer's evaluation cadence, so a buyer is seen by every corporation that evaluates between
+  two of its draws, not only by one due on the next tick. Otherwise the projected supply/demand ratio is unpenalised at or below
   `glut_taper_ratio` (1.0), tapers the build's score linearly to zero at `glut_veto_ratio` (2.0),
   and vetoes (removes the candidate entirely) at or above it. Applied only to build candidates;
   dials and survey are unaffected (a body's total surveyed area doesn't glut a market).

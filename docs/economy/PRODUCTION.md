@@ -526,6 +526,16 @@ The target is the *heuristic*, not a hard goal: a manual tier chosen in the buil
 
 *Fidelity:* labour contention is held at its current value, input-price response is ignored (inputs valued at the current price), and the tier search is coarse (10 % steps) — so the solved target can hunt by ±one step.
 
+**An input is priced at what the draw pays (Ben, 2026-10-08; BL-1232, power plants per grid).**
+The solver values each input at its market's **posted price** — the price the draw is billed at
+(`FINANCE.md` § the ceiling: a draw reads and pays the posted price) — never at a forecast from
+this tick's listings alone, which reads a stocked shelf with little listed as a good at the 10×
+cap. Measured: a power plant paying about 3.2 a unit for petroleum, with 500–660 units on its
+market's shelf, was forecast at the cap and zeroed while it netted +13 to +17 a tick. **Power is
+read on its grid:** for a building that makes or uses power, the solver reads power's supply and
+demand pooled over the building's grid (`LOGISTICS.md` § 3a), the same pooled figures the market
+prices power on — never its own market's alone.
+
 ---
 
 ## Stockpile and output flow
@@ -650,7 +660,10 @@ Power moves only within a grid (`LOGISTICS.md` § 3a), so the world's generation
 it can be used: a body's power gap is the sum over its wired grids of `max(0, need − live output)`,
 and a power firm is placed in a short grid's provinces. A surplus on the core grid never cancels a
 deficit on another. A grid needing less than half of one plant's output is left to a road that
-joins it to a bigger one rather than given a plant of its own. The scorer's power-plant estimate
+joins it to a bigger one rather than given a plant of its own. **Unpowered grids first (Ben,
+2026-10-08):** the body's power firms — a capped number — go first to short grids with no
+generation at all, and only then to grids that already have some, so a core grid's shortfall
+cannot take every firm and leave a secondary grid dark for the campaign. The scorer's power-plant estimate
 reads the same per-grid gap, and counts plants already under construction on that grid as supply
 (`../ai/AI_OPPONENT.md`). Measured before: generation put every plant on the body's core grid on
 four of five seeds, and the settle then started 11–13 plants on a grid needing one.

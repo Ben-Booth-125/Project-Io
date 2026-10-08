@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <set>
 
 input_reach make_input_reach(const world& w, const recipe_registry& reg)
 {
@@ -28,8 +29,10 @@ void input_reach_invalidate(input_reach& ir)
     ir.index_built = false;
     for (auto& v : ir.producers) v.clear();
     for (auto& v : ir.draws) v.clear();
-    ir.spare_memo.clear();
     ir.supply_memo.clear();
+    ir.refresh_mode = false;
+    ir.seen.clear();
+    for (auto& m : ir.draw_parts) m.clear();
 }
 
 namespace {
@@ -158,6 +161,15 @@ float building_draw(const recipe_registry& reg, const building_component& b, std
 
 namespace {
 
+bool producer_less(const input_reach::producer& a, const input_reach::producer& b)
+{
+    return a.market != b.market ? a.market < b.market : a.building < b.building;
+}
+
+template <typename F>
+void contribute(const world& w, const recipe_registry& reg, const input_reach& ir, entity_id bid,
+                const building_component& b, entity_id& m, F&& emit);
+
 void build_index(const world& w, const recipe_registry& reg, input_reach& ir)
 {
     if (ir.index_built)
@@ -177,11 +189,35 @@ void build_index(const world& w, const recipe_registry& reg, input_reach& ir)
     for (const entity_id bid : ids)
     {
         const building_component& b = w.buildings.at(bid);
+        entity_id m = null_entity;
+        contribute(w, reg, ir, bid, b, m, [&](std::size_t r, float o, float d) {
+            if (o > 0.0f)
+                ir.producers[r].push_back({m, bid, o});
+            if (d > 0.0f)
+                draw_by_market[r][m] += d;
+        });
+    }
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        std::sort(ir.producers[r].begin(), ir.producers[r].end(), producer_less);
+        ir.draws[r].assign(draw_by_market[r].begin(), draw_by_market[r].end());
+    }
+}
+
+/// THE ONE READING of what a building contributes to the index: for each good it
+/// can make or take, its output and draw, in ascending r. @p m receives its
+/// market (null: none — it contributes nothing).
+template <typename F>
+void contribute(const world& w, const recipe_registry& reg, const input_reach& ir, entity_id bid,
+                const building_component& b, entity_id& m, F&& emit)
+{
+    m = null_entity;
+    {
         if (!standing(b))
-            continue;
-        const entity_id m = market_for_tile(w, b.tile);
+            return;
+        m = market_for_tile(w, b.tile);
         if (m == null_entity)
-            continue;
+            return;
         // BL-1205 (scorer cost at density): only the goods this building CAN
         // make or take are asked — every other r answers 0 from both functions
         // below, so skipping it changes nothing but the time. A processor makes
@@ -196,9 +232,9 @@ void build_index(const world& w, const recipe_registry& reg, input_reach& ir)
             if (const auto tit = w.tiles.find(b.tile); tit != w.tiles.end())
                 site_tc = &tit->second;
         if (b.type == building_type::processing_facility && rc == nullptr)
-            continue; // no recipe: neither makes nor takes anything
+            return; // no recipe: neither makes nor takes anything
         if (b.type == building_type::extraction_site && site_tc == nullptr)
-            continue; // no tile: building_output answers 0 for every r
+            return; // no tile: building_output answers 0 for every r
         for (std::size_t r = 0; r < resource_count; ++r)
         {
             const bool may_make = (rc != nullptr)
@@ -209,42 +245,124 @@ void build_index(const world& w, const recipe_registry& reg, input_reach& ir)
             if (!may_make && !may_take)
                 continue;
             const float o = building_output(w, reg, bid, b, r, ir.report);
-            if (o > 0.0f)
-                ir.producers[r].push_back({m, bid, o});
             const float d = building_draw(reg, b, r);
-            if (d > 0.0f)
-                draw_by_market[r][m] += d;
+            if (o > 0.0f || d > 0.0f)
+                emit(r, o, d);
         }
     }
-    for (std::size_t r = 0; r < resource_count; ++r)
+}
+
+
+input_reach::building_sig sig_of(const building_component& b)
+{
+    return { b.type, b.recipe, b.tile, b.target_resource, b.workforce_assigned,
+             building_supply_scalar(b), b.workforce_target, b.ticks_remaining, b.decommissioned };
+}
+
+} // namespace
+
+void input_reach_refresh(const world& w, const recipe_registry& reg, input_reach& ir)
+{
+    if (!ir.refresh_mode)
     {
-        std::sort(ir.producers[r].begin(), ir.producers[r].end(),
-                  [](const input_reach::producer& a, const input_reach::producer& b) {
-                      return a.market != b.market ? a.market < b.market : a.building < b.building;
-                  });
-        ir.draws[r].assign(draw_by_market[r].begin(), draw_by_market[r].end());
+        input_reach_invalidate(ir); // a full build's index is not tracked: start empty
+        ir.refresh_mode = true;
+        ir.index_built  = true;
+    }
+    // What changed, in ascending id (the stores are unordered).
+    std::vector<entity_id> gone, added;
+    for (const auto& [bid, ib] : ir.seen)
+    {
+        const auto bit = w.buildings.find(bid);
+        if (bit == w.buildings.end() || !(sig_of(bit->second) == ib.sig))
+            gone.push_back(bid);
+    }
+    for (const auto& [bid, b] : w.buildings)
+    {
+        if (b.type != building_type::processing_facility && b.type != building_type::extraction_site)
+            continue;
+        const auto sit = ir.seen.find(bid);
+        if (sit == ir.seen.end() || !(sit->second.sig == sig_of(b)))
+            added.push_back(bid);
+    }
+    if (gone.empty() && added.empty())
+        return;
+    std::sort(gone.begin(), gone.end());
+    std::sort(added.begin(), added.end());
+    ir.supply_memo.clear();
+
+    std::set<std::pair<std::size_t, entity_id>> touched; // (r, market) whose draw sum moves
+    for (const entity_id bid : gone)
+    {
+        const input_reach::indexed_building& ib = ir.seen.at(bid);
+        for (const auto& [r, o] : ib.out)
+        {
+            auto& v = ir.producers[r];
+            const input_reach::producer key{ib.market, bid, o};
+            const auto it = std::lower_bound(v.begin(), v.end(), key, producer_less);
+            if (it != v.end() && it->market == ib.market && it->building == bid)
+                v.erase(it);
+        }
+        for (const auto& [r, d] : ib.draw)
+        {
+            (void)d;
+            auto& parts = ir.draw_parts[r][ib.market];
+            parts.erase(bid);
+            touched.insert({r, ib.market});
+        }
+        ir.seen.erase(bid);
+    }
+    for (const entity_id bid : added)
+    {
+        const building_component& b = w.buildings.at(bid);
+        input_reach::indexed_building ib;
+        ib.sig = sig_of(b);
+        entity_id m = null_entity;
+        contribute(w, reg, ir, bid, b, m, [&](std::size_t r, float o, float d) {
+            if (o > 0.0f)
+            {
+                auto& v = ir.producers[r];
+                const input_reach::producer p{m, bid, o};
+                v.insert(std::lower_bound(v.begin(), v.end(), p, producer_less), p);
+                ib.out.push_back({r, o});
+            }
+            if (d > 0.0f)
+            {
+                ir.draw_parts[r][m][bid] = d;
+                ib.draw.push_back({r, d});
+                touched.insert({r, m});
+            }
+        });
+        ib.market = m;
+        ir.seen[bid] = std::move(ib);
+    }
+    // Each touched market's draw, re-added in ascending building id.
+    for (const auto& [r, m] : touched)
+    {
+        auto& v  = ir.draws[r];
+        auto  it = std::lower_bound(v.begin(), v.end(), m,
+                                    [](const std::pair<entity_id, float>& a, entity_id k) {
+                                        return a.first < k;
+                                    });
+        const auto pit = ir.draw_parts[r].find(m);
+        if (pit == ir.draw_parts[r].end() || pit->second.empty())
+        {
+            if (pit != ir.draw_parts[r].end())
+                ir.draw_parts[r].erase(pit);
+            if (it != v.end() && it->first == m)
+                v.erase(it);
+            continue;
+        }
+        float sum = 0.0f;
+        for (const auto& [bid, d] : pit->second) { (void)bid; sum += d; }
+        if (it != v.end() && it->first == m)
+            it->second = sum;
+        else
+            v.insert(it, {m, sum});
     }
 }
 
-/// Spare output of @p r in producer market @p p: its producers' output less the
-/// standing draw of every consumer market @p p is within reach of.
-float spare_at(world& w, const recipe_registry& reg, input_reach& ir, entity_id p, std::size_t r)
-{
-    const auto key = std::make_pair(p, r);
-    if (const auto it = ir.spare_memo.find(key); it != ir.spare_memo.end())
-        return it->second;
-    float out = 0.0f;
-    for (const input_reach::producer& pr : ir.producers[r])
-        if (pr.market == p) out += pr.out;
-    float drawn = 0.0f;
-    for (const auto& [q, d] : ir.draws[r])
-        if (market_within_reach(w, reg, ir, p, q, r))
-            drawn += d;
-    const float spare = out - drawn;
-    ir.spare_memo.emplace(key, spare);
-    return spare;
-}
-
+namespace {
 } // namespace
 
 float input_reach_haul(world& w, const recipe_registry& reg, input_reach& ir,
@@ -323,18 +441,23 @@ reachable_spare reachable_supply(world& w, const recipe_registry& reg, input_rea
         return out;
     build_index(w, reg, ir);
 
-    // The producer markets that can supply C at all — memoised per (C, r).
+    // C's REACH SET — memoised per (C, r): the producer markets within reach of
+    // C landing under the ceiling, and every consumer market any of them reaches
+    // with the set markets that reach it (see SPARE OUTPUT, input_reach.hpp).
     const auto key = std::make_pair(consumer_market, r);
     auto mit = ir.supply_memo.find(key);
     if (mit == ir.supply_memo.end())
     {
-        std::vector<input_reach::supply> list;
-        entity_id last = null_entity;
+        input_reach::reach_set set;
         for (const input_reach::producer& pr : ir.producers[r]) // sorted by market
         {
-            if (pr.market == last)
+            if (!set.markets.empty() && set.markets.back().market == pr.market)
+            {
+                set.markets.back().out += pr.out; // a market already admitted
                 continue;
-            last = pr.market;
+            }
+            // A market refused below is asked again for its next producer; the
+            // answers are memoised (haul) and identical, so it is refused again.
             float haul = 0.0f;
             if (!market_within_reach(w, reg, ir, pr.market, consumer_market, r, &haul))
                 continue;
@@ -349,14 +472,24 @@ reachable_spare reachable_supply(world& w, const recipe_registry& reg, input_rea
             // base` at C can never be bought there.
             if (ir.reservation_mult > 0.0f && landed > ir.reservation_mult * cit->second.base_price[r])
                 continue;
-            list.push_back({pr.market, spare_at(w, reg, ir, pr.market, r), landed});
+            set.markets.push_back({pr.market, pr.out, landed});
         }
-        mit = ir.supply_memo.emplace(key, std::move(list)).first;
+        for (const auto& [q, d] : ir.draws[r]) // ascending market
+        {
+            input_reach::reached_draw rd{q, d, {}};
+            for (std::size_t i = 0; i < set.markets.size(); ++i)
+                if (market_within_reach(w, reg, ir, set.markets[i].market, q, r))
+                    rd.reachers.push_back(static_cast<int>(i));
+            if (!rd.reachers.empty())
+                set.draws.push_back(std::move(rd));
+        }
+        mit = ir.supply_memo.emplace(key, std::move(set)).first;
     }
+    const input_reach::reach_set& set = mit->second;
 
     // The asking building is never its own supplier, and its own standing draw
     // is not a competitor for what it asks (a switching plant already counts
-    // against its producers).
+    // against its producers) — each taken out once.
     float     self_out  = 0.0f;
     float     self_draw = 0.0f;
     entity_id self_mkt  = null_entity;
@@ -367,18 +500,42 @@ reachable_spare reachable_supply(world& w, const recipe_registry& reg, input_rea
             self_draw = building_draw(reg, sit->second, r);
             self_mkt  = market_for_tile(w, sit->second.tile);
         }
-    for (const input_reach::supply& s : mit->second)
+    // Each market's output with the asker's taken out; then each reached
+    // consumer's charge, min(its draw, what its reachers make), shared among its
+    // reachers by output. A market's spare is its output less its shares.
+    std::vector<float> outp(set.markets.size());
+    for (std::size_t i = 0; i < set.markets.size(); ++i)
+        outp[i] = std::max(0.0f, set.markets[i].out
+                                     - (set.markets[i].market == self_mkt ? self_out : 0.0f));
+    std::vector<float> spare_p = outp;
+    for (const input_reach::reached_draw& rd : set.draws)
     {
-        float spare = s.spare;
-        if (s.market == self_mkt)
-            spare -= self_out;
-        if (self_draw > 0.0f && market_within_reach(w, reg, ir, s.market, self_mkt, r))
-            spare += self_draw;
-        if (!(spare > 0.0f))
+        const float d = std::max(0.0f, rd.draw - (rd.market == self_mkt ? self_draw : 0.0f));
+        if (!(d > 0.0f))
             continue;
-        out.spare += spare;
-        if (out.landed < 0.0f || s.landed < out.landed)
-            out.landed = s.landed;
+        float feed = 0.0f;
+        for (const int i : rd.reachers) feed += outp[static_cast<std::size_t>(i)];
+        if (!(feed > 0.0f))
+            continue;
+        // Approximation, accepted as conservative (review round 3): each consumer
+        // is bounded by its own reachers' output, but several consumers sharing
+        // one producer can together charge it past its output.
+        const float charge = std::min(d, feed);
+        for (const int i : rd.reachers)
+            spare_p[static_cast<std::size_t>(i)] -= charge * (outp[static_cast<std::size_t>(i)] / feed);
+    }
+    float spare = 0.0f;
+    for (std::size_t i = 0; i < set.markets.size(); ++i)
+        spare += spare_p[i];
+    out.spare = spare;
+    if (!(spare > 0.0f))
+        return out;
+    for (std::size_t i = 0; i < set.markets.size(); ++i)
+    {
+        if (!(spare_p[i] > 0.0f))
+            continue; // fully drawn: it quotes no price
+        if (out.landed < 0.0f || set.markets[i].landed < out.landed)
+            out.landed = set.markets[i].landed;
     }
     return out;
 }
@@ -420,6 +577,30 @@ float judged_batches(const recipe_registry& reg, const building_component& b)
     return rate * k_authored_assignment;
 }
 
+bool input_supply_covers(world& w, const recipe_registry& reg, input_reach& ir,
+                         entity_id consumer_market, std::size_t r, float need, entity_id self,
+                         float* out_landed)
+{
+    if (r >= resource_count)
+        return false;
+    if (need <= 0.0f)
+        return true;
+    const reachable_spare s = reachable_supply(w, reg, ir, consumer_market, r, self);
+    if (out_landed) *out_landed = s.landed;
+    return s.landed >= 0.0f && s.spare >= need * reg.t_idle();
+}
+
+bool recipe_inputs_supplied(world& w, const recipe_registry& reg, input_reach& ir,
+                            entity_id consumer_market, const recipe& rc, float batches,
+                            entity_id self)
+{
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (rc.inputs[r] > 0.0f
+            && !input_supply_covers(w, reg, ir, consumer_market, r, rc.inputs[r] * batches, self))
+            return false;
+    return true;
+}
+
 input_access input_obtainable(world& w, const recipe_registry& reg, input_reach& ir,
                               entity_id consumer_market, const stockpile_component* pool,
                               std::size_t r, float need, entity_id self,
@@ -459,11 +640,11 @@ input_access input_obtainable(world& w, const recipe_registry& reg, input_reach&
     // (2) SUPPLY — enough spare output within reach.
     if (allow_supply)
     {
-        const reachable_spare s = reachable_supply(w, reg, ir, consumer_market, r, self);
-        if (s.landed >= 0.0f && s.spare >= floor_need)
+        float landed = -1.0f;
+        if (input_supply_covers(w, reg, ir, consumer_market, r, need, self, &landed))
         {
             out.obtainable = true;
-            out.unit_cost  = s.landed;
+            out.unit_cost  = landed;
             return out;
         }
     }
