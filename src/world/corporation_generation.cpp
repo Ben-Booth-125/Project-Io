@@ -2932,10 +2932,8 @@ std::vector<entity_id> generate_corporations(
         {
             // BL-1003: the HQ's tile market pool (body-level if no market yet;
             // rehome_opening_pools moves it once the home markets are carved).
-            stockpile_component& pool =
-                w.pool_at(corp_id, corp_home_pool_key(w, corp_id, home_body));
-            for (std::size_t r = 0; r < resource_count; ++r)
-                pool.quantities[r] += stock[r];
+            // BL-1217 D5: held off the shelf until its market bids for it.
+            seed_opening_stock(w, corp_id, corp_home_pool_key(w, corp_id, home_body), stock);
         }
     }
 
@@ -3072,6 +3070,9 @@ int remove_specialist_roster(world& w)
 
         for (auto it = w.corp_market_pools.begin(); it != w.corp_market_pools.end();)
             it = (it->first.first == cid) ? w.corp_market_pools.erase(it) : std::next(it);
+        // BL-1217 D5: the held opening stock goes with the pools.
+        for (auto it = w.opening_stock_held.begin(); it != w.opening_stock_held.end();)
+            it = (it->first.first == cid) ? w.opening_stock_held.erase(it) : std::next(it);
 
         // Units are keyed by their own id; collect then erase so the map is not
         // mutated under its iterator. Order-insensitive: every erase is by key.
@@ -3578,9 +3579,7 @@ std::vector<entity_id> generate_background_firms(
                 const auto stock = generate_starting_stockpile(
                     focus, /*capital=*/0.0f, /*base_capital=*/0.0f, stock_rng);
                 const entity_id pool_key = corp_home_pool_key(w, corp_id, home_body);
-                stockpile_component& pool = w.pool_at(corp_id, pool_key); // BL-1003: HQ tile market pool
-                for (std::size_t r = 0; r < resource_count; ++r)
-                    pool.quantities[r] += stock[r];
+                seed_opening_stock(w, corp_id, pool_key, stock); // BL-1003 HQ tile pool; BL-1217 D5 held
 
                 // BL-1173: the firm opens with working capital priced from the
                 // stock it was just handed (background_working_capital, above).
@@ -3788,6 +3787,7 @@ chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_re
             stockpile_component& dst = w.pool_at(cid, mv.second);
             for (std::size_t r = 0; r < resource_count; ++r)
                 dst.quantities[r] += moved.quantities[r];
+            move_opening_stock_held(w, { cid, mv.first }, { cid, mv.second }); // BL-1217 D5
         }
     }
 
@@ -5512,12 +5512,8 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                 const auto stock = generate_starting_stockpile(focus, capital,
                                                                capital_params.base_capital,
                                                                stock_rng);
-                if (home_body != null_entity)
-                {
-                    stockpile_component& pool = w.pool_at(corp_id, corp_home_pool_key(w, corp_id, home_body)); // BL-1003: HQ tile market pool
-                    for (std::size_t r = 0; r < resource_count; ++r)
-                        pool.quantities[r] += stock[r];
-                }
+                if (home_body != null_entity) // BL-1003 HQ tile pool; BL-1217 D5 held
+                    seed_opening_stock(w, corp_id, corp_home_pool_key(w, corp_id, home_body), stock);
             }
         }
 
@@ -6136,9 +6132,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                 const auto stock = generate_starting_stockpile(
                     focus, /*capital=*/0.0f, /*base_capital=*/0.0f, stock_rng);
                 const entity_id pool_key = corp_home_pool_key(w, corp_id, home_body);
-                stockpile_component& pool = w.pool_at(corp_id, pool_key); // BL-1003: HQ tile market pool
-                for (std::size_t r = 0; r < resource_count; ++r)
-                    pool.quantities[r] += stock[r];
+                seed_opening_stock(w, corp_id, pool_key, stock); // BL-1003 HQ tile pool; BL-1217 D5 held
 
                 // BL-1173: the firm opens with working capital priced from the
                 // stock it was just handed (background_working_capital, above).

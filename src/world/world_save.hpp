@@ -353,7 +353,13 @@ inline constexpr uint32_t world_save_magic =
 /// cadence. A v37 stream is 2 x resource_count values short per market;
 /// refused whole on the strict-equality contract, no migration. Claimed through
 /// `tools/session/next_save_version.js --kind world --claim`.
-inline constexpr uint32_t world_save_version = 38;
+/// Bumped to 39 by BL-1217 D5 (opening stock held until a bid): a trailing
+/// section after the fold map -- `world::opening_stock_held`, a (corp, pool key)
+/// map of resource-indexed floats, the opening stock no market has yet bid for.
+/// A v38 stream lacks the section; refused whole on the strict-equality
+/// contract, no migration. Claimed through
+/// `tools/session/next_save_version.js --kind world --claim`.
+inline constexpr uint32_t world_save_version = 39;
 
 /// Write @p w as a complete world snapshot.
 ///

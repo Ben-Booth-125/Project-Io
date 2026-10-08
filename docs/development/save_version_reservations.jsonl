@@ -24,3 +24,4 @@
 {"version":36,"kind":"world","owner":"BL-1203 water-reaches-dry-markets room (market household_weight + hauler_want)","ts":"2026-10-05T21:36:38.148Z","branch":"bl-1203-room"}
 {"version":37,"kind":"world","owner":"BL-1206 seat clean slate (building_component::construction_paid)","ts":"2026-10-07T00:07:50.611Z","branch":"worktree-agent-a530461bc2bad5656"}
 {"version":38,"kind":"world","owner":"BL-1227 idle mines (market_component::offbook_drawn)","ts":"2026-10-08T02:10:43.621Z","branch":"bl1227-dead-market"}
+{"version":39,"kind":"world","owner":"BL-1217 D5 opening stock held (world::opening_stock_held)","ts":"2026-10-08T23:28:34.451Z","branch":"worktree-agent-a5d82d46e2c9f9d33"}
