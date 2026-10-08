@@ -1610,6 +1610,70 @@
     "src/world/corporation_generation.cpp"
    ],
    "design": "Ben (2026-10-07, the path form, G1 path C; extends BL-1185, chain-feasible placement). inflow_probe (cold-checked): bodies produce 28-63% of the raw silica / copper ore / rare earth ore their processors want, system-wide; processors per producer 0.6-0.8, but each mine yields a co-extraction basket so its share of any one good is small. BL-1185 made a chain feasible (a site exists); this item makes it SIZED: a processor is placed only where the input supply it can reach (by the market-viability reach rules) covers a run. DIAGNOSE FIRST: per body and good, processors placed vs the extraction that can feed them at handoff, and which generation pass places the surplus processors; then propose the rule (no clamp, a placement consequence)."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 50,
+   "written": "2026-10-08",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "priority": "B",
+   "difficulty": 3,
+   "id": "BL-1234",
+   "short_name": "SETTLE_SCORER_STARVES",
+   "category": "AI",
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "author": "Claude (the BL-1233 placement and sizing lanes, 2026-10-07/08)",
+   "title": "The settle scorer stops building processors that starve on processed inputs",
+   "files": [
+    "src/world/corp_ai.cpp"
+   ],
+   "design": "FOUND by processor_placement_probe (BL-1233): the 12-tick settle scorer adds 221-271 processors by handoff and 96-156 of them are input-starved, nearly all on PROCESSED inputs (consumer goods, ordnance, machinery, propellant); seed 0 alone has 110 of 117 starved after BL-1233. Generation's new sized rule does not reach the scorer. DIAGNOSE: which candidate gate admits them (recipe_inputs_obtainable reading opening stock as cover? the BL-1187 build-only-what-runs test at settle prices?), then fix the estimate inside the scorer grant. Read with BL-1233."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 50,
+   "written": "2026-10-08",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "priority": "B",
+   "difficulty": 3,
+   "id": "BL-1235",
+   "short_name": "DIAL_HOLD_OUTLASTS_REFLEX",
+   "category": "AI",
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "author": "Claude (the BL-1232 scorer lane, 2026-10-08)",
+   "title": "A building the dial means to restore is not decommissioned by the loss reflex while the dial's hold runs",
+   "files": [
+    "src/world/corp_ai.cpp",
+    "src/world/economy_system.cpp"
+   ],
+   "design": "NOVEL INTERACTION, FOR BEN (2026-10-08): the scorer's workforce dial holds a touched building for 4 evaluations at cadence 4 (~16 ticks), longer than the 8-tick loss reflex; a plant the dial zeroed and then wants to restore (gain ~35) is decommissioned by the reflex before the hold lets the dial act (seed 0 power plants, BL-1232). No doc owns how the dial and the reflex compose. Options: the reflex skips a building the dial touched within its hold; the hold shortens below the reflex; the dial's zero-staffing is not a loss streak. Ben's call; no clamp on the reflex."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 50,
+   "written": "2026-10-08",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "priority": "B",
+   "difficulty": 3,
+   "id": "BL-1236",
+   "short_name": "PLANT_BUILDS_STALL",
+   "category": "Economy",
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "author": "Claude (the BL-1232 lanes, 2026-10-08)",
+   "title": "Construction that should take 8 ticks finishes, or the reason it stalls is named",
+   "files": [
+    "src/world/construction.cpp"
+   ],
+   "design": "FOUND (BL-1232 lanes): a power plant started in play took ~87 ticks to build (nominally 8); in the settle 11-13 plants sat at ~3 ticks left and never finished in 100 ticks; idle_mines_probe shows mine sites \"stretched\" by construction capacity (~10x build time) and paused on steel over the ceiling. DIAGNOSE per stalled site: material short (which, why), construction capacity short (yard, grid), owner refused. Read beside BL-1183 (ceiling stalls construction; abandonment unruled)."
   }
  ]
 }
