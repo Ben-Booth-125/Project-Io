@@ -1,7 +1,7 @@
 # Project Io — Planetary Screen
 
-> **Settles:** what the surface rung communicates above the ground · how a building
-> marker reads, and a tile carrying several · at what grain the surface is drawn and
+> **Settles:** what the surface rung communicates above the ground · where a building's
+> facts are read now that the canvas draws no marker over it · at what grain the surface is drawn and
 > selected · how a national border reads without two neighbours blending into a
 > third, and what pressing it selects · which channels carry composition and
 > landform, and which tiles suppress them · which layers draw in what order and what
@@ -38,7 +38,7 @@ This canvas communicates:
 > which of them survive, retire or restyle over painterly ground is owned by BL-734
 > (ground/chrome layer contract), and until that settles every channel below keeps its
 > current spec — except where RENDERING.md's rulings already retire it (the on-ground
-> grid, the building/settlement canvas glyphs).
+> grid, the building/settlement canvas glyphs, the landform glyphs, the river strokes).
 
 **Shape:** Pointy-top hexagons in odd-r offset coordinates. Odd rows are shifted right by half a column. Grid axes: columns (x) run left-to-right, rows (y) run top-to-bottom.
 
@@ -61,8 +61,8 @@ A tile's character has **three axes** ([TILES.md](../economy/TILES.md)):
   each graded by `cover_density` (0–255; 0 iff cover is `none`).
 - **Landform** — the tile's physical shape. Seven values (`terrain_landform`): plains,
   highland, mountain, canyon, valley, crater, rift. Landform renders on its **own
-  channels** — a subtle relief tint (`ui::landform_relief`) plus stroke-only glyphs for
-  the dramatic set, inked by luminance (`ui::contrast_ink`) — never in the hue.
+  channels** — a subtle relief tint (`ui::landform_relief`) plus baked relief forms for
+  the dramatic set (§ Terrain channels) — never in the hue.
 
 Substrate and cover **share** the hex's hue: `ui::terrain_colour` (`src/ui/hex_render.{hpp,cpp}`)
 is the single colour source of truth, and it blends the substrate's own colour toward a
@@ -83,14 +83,13 @@ movement-cost multiplier applies whether or not a lens is active.
 | Axis | Channel | Source |
 |---|---|---|
 | **Composition** (substrate + cover) | **Hue** — the flat hex fill | `ui::terrain_colour` |
-| **Landform** (its physical shape) | **Relief tint** + **glyph** | `ui::landform_relief`, `ui::icons::landform` |
+| **Landform** (its physical shape) | **Relief tint** + **baked landform relief** | `ui::landform_relief`; the bake's relief pass ([RENDERING.md](RENDERING.md) § Mountains, rivers and terrain variety) |
 
 **Why two channels rather than one.** Lens tints composite over the terrain hue at
 0.6–0.80 alpha, so a second signal carried *in that hue* is obliterated exactly when a
 lens is on. This is the rule the Continent lens's plate boundaries established and it
 applies here unchanged: the relief is composited **after** every lens branch, and the
-glyphs are drawn over the finished fill in a contrasting ink (`ui::contrast_ink`, picked
-by the fill's luminance so it reads over the whole palette).
+baked relief forms are shape and light, not hue, so a lens wash tints them without erasing them.
 
 **Why the landform channel splits in two.** The measured mix (`world_audit` § S3) decided
 it. Plains and valley alone are ~95 % of land tiles, while every dramatic landform is
@@ -100,32 +99,31 @@ it. Plains and valley alone are ~95 % of land tiles, while every dramatic landfo
   toward a warm highlight and sunken ground toward a cool shadow, on a small signed
   ordinal scale (mountain highest → canyon lowest). Deliberately subtle: it must read as
   light on terrain, never as a change of composition.
-- **Dramatic landforms — glyph.** Mountain, canyon, crater and rift each draw a stroke-only
-  silhouette ([ICONS.md](ICONS.md) § Landform). These are the ≤ 1.5 % set whose movement cost
-  is ×1.3 or worse, so an invisible surprise there is expensive. A glyph on *every* tile
-  would be far denser than any other glyph family and would fight the building silhouette
-  for the hex centre.
+- **Dramatic landforms — baked relief, no glyph** (Ben, 2026-10-08, the sprint 51 form).
+  Mountain, canyon, crater and rift are the ≤ 1.5 % set whose movement cost is ×1.3 or worse,
+  so an invisible surprise there is expensive — which is why they once carried a stroke-only
+  glyph. The glyph retires from the canvas; the obligation does not. Each dramatic landform
+  bakes its own relief form into the ground — massif and ridge, canyon cut, crater bowl, rift
+  fissure ([RENDERING.md](RENDERING.md) § Mountains, rivers and terrain variety) — authored to
+  read at every rung, and the hover card keeps naming the landform and its movement cost.
 
-**Contiguous runs are bridged.** A run of the same linear landform draws as **one**
-spanning marker rather than the same glyph repeated per tile — mountain as a chain of peaks, rift
-as one continuous fissure, canyon as paired rims — reusing the road span/symmetry idiom (each
-tile draws its own half of the shared edge, so halves meet at the midpoint with no cross-tile state
-and the survey fog clips cleanly). A lone tile keeps its centred glyph, the role the road's centre
-cap plays. Crater never spans. Contiguity was measured before the render was designed
+**Contiguous runs are bridged.** A run of the same linear landform bakes as **one** continuous
+form rather than the same form repeated per tile — mountain as a range, rift as one continuous
+fissure, canyon as one cut between paired rims — each tile baking its own half of the shared edge,
+so halves meet at the midpoint with no cross-tile state and the survey mask clips cleanly. A lone
+tile keeps a centred form. Crater never spans. Contiguity was measured before the render was designed
 (`world_audit` § S4): 71% of mountain and 81% of rift tiles have such a neighbour, so bridging
 fires on the majority — while **no** tile in the system has all four neighbours, which is why there
 is no "filled interior" case.
 
-**The glyphs are named where the player looks.** Every tile hover card states
-`composition · landform` and, on the plain canvas, the landform's movement cost — a glyph
-vocabulary learnable only by clicking each tile through to the Selection panel is not learnable.
+**The landforms are named where the player looks.** Every tile hover card states
+`composition · landform` and, on the plain canvas, the landform's movement cost — a relief
+form learnable only by clicking each tile through to the Selection panel is not learnable.
 Plains stays unnamed: it is the untouched baseline in both channels.
 
-**Suppression rules.** The glyph is skipped on a **built** tile (which already carries an
-enlarged silhouette plus a corp emblem tag, and whose cost is already spent — elevation
-matters when *siting*) and under the **Population/Opportunity** lenses (which claim the hex
-centre for their own value mark). The relief tint is likewise skipped on a built
-tile, whose hex is swapped wholesale for its owner plate as an identity signal.
+**Suppression rules.** The baked landform relief is ground, so it is never suppressed: a
+structure stands on it (RENDERING.md § Installations) and a lens washes over it like any other
+ground. The relief tint composites after every lens branch, as above.
 
 Both channels also render in the Selection band's zoomed tile-neighbourhood view, which is
 why they live in `hex_render` rather than in the canvas — one implementation, so the two
@@ -139,123 +137,50 @@ surfaces cannot drift. Verified by `scripts/verify/landform_relief.lua`.
 |---|---|
 | Background | Dark: `(18, 18, 24)` |
 | Tile | Filled hexagon. Colour from `ui::terrain_colour` (substrate + cover hue), composited with the landform relief tint (§ Terrain types above). A 1 px gap between hexes lets the background show through as a border — achieved by drawing each hex at `circumradius - 1 px` rather than adding explicit borders. |
-| Building marker | A vector glyph centred on the tile at 48 % of the hex circumradius, drawn by `ui::icons::building` over **live ground** — the hex keeps its terrain hue, its texture, its relief and whatever the active lens washes over it. The silhouette encodes the type and the fill encodes the owner; a stacked tile adds the segmented ring. Full spec: [§ Building markers](#building-markers) below. |
+| Buildings | **No marker.** A building is a structure baked into the ground art (RENDERING.md § Installations) — a cluster of up to three on a stacked tile. Type, count, owner and running state are read from the hover card, the Selection element and the ownership lenses: [§ Building markers](#building-markers) below. |
 | Road network | **Always-on** (like terrain, not a lens): the generated road lattice plus player-placed roads render as **continuous, symmetric spans**. Each roaded tile draws its **own half** of every shared road edge — from its centre to the midpoint of the centre-to-neighbour line — toward each roaded, survey-revealed cardinal neighbour; the two tiles' halves meet at the edge midpoint, so a road spans the pair identically whichever tile is "from" (no from/to asymmetry), and a small centre cap rounds junctions and keeps a lone / just-placed road visible. Cylinder-seam edges shift one period to stay short; drawn only toward survey-revealed neighbours, so roads don't leak past the survey fog. Styled by the drawing tile's **tier** — **Track** (`road_level` 1) thin/dim, **Road** (2) medium, **Highway** (3) thick/bright — so a tier change reads as a taper at the midpoint. Spans **dim with the commercial-reach fog**, through the same wash the lens fill takes; a road edge is fogged by the **max** of its two tiles' vision (see [DISCOVERY.md](DISCOVERY.md)). The tier ladder has **no on-canvas key** — it is named contextually in the Selection panel instead (below). |
 | Road-tier legend | **Contextual, not chrome** (Ben's call, 2026-08-09). The three tiers render by line weight and brightness alone, and roads are always-on terrain rather than a lens, so the per-lens legend drawer cannot carry them. Instead, selecting a roaded tile names its tier beside the coordinates in the Selection panel header — `Tile [x, y] · Highway` — with a hover tooltip giving the thin→thick ladder. A roadless tile shows nothing; no persistent chip is added anywhere. |
 | Selection / hover indicator | Hex outline drawn through the shared highlight convention (`src/ui/highlight.hpp`): white for the selected tile, light blue for the hovered tile (per wrap copy), amber for pinned. Precedence is selected > pinned > hovered. |
 | Hover card | The shared glance-then-stick hover card ([TOOLTIP.md](TOOLTIP.md)), content **lens-keyed** (`src/ui/hover_content.cpp`). A tile's default variant: `substrate · landform` header (plains unnamed), habitability, and the landform's movement-cost multiplier when not plains. Under the Resource lens: the selected resource's deposit richness; under Population: habitability + workforce cap. Buildings and market centres carry their own variants (rival buildings show type + owner only — the competitor-visibility rule, [DISCOVERY.md](DISCOVERY.md)). |
 | Body label | Canvas title bar shows the selected body name, type, and grid dimensions. As the Planetary screen is always primary (full size), the title is always shown. A **survey-status suffix** follows it: `UNSURVEYED`, `Survey en route`, or `Surveying k/N` — nothing once surveyed. |
 | Survey region mask | On a body whose survey is incomplete, tiles in **unrevealed regions** render as a flat dark "locked" fill `(12, 14, 20)` with no lens tint, borders, markers, selection outline, or hit-testing; revealed regions render normally. Regions reveal in deterministic raster (row-major) order as the survey scans ([DISCOVERY.md](DISCOVERY.md)). A fully surveyed body (the home planet, or a completed survey) shows everything. |
-| Settlement markers | Always-on civic chrome, not lens-gated: **every** generated population centre draws, and its **form follows the zoom** — the LOD ladder (BL-625, settlement tier glyphs). Far zoom (hex radius ≤ 7 px, the canvas's coarse-fill pivot): only scale ≥ 3 centres carry the tier skyline (`ui::icons::settlement`); everything smaller is a dim civic **density dot**, so a settled region reads as settled without glyph soup. Mid zoom (7–14 px): towns (scale 2) join the skylines. Close zoom (≥ 14 px, the texture pivot): every centre is a skyline, and **razed** centres (BL-624) surface as the ruin mark (`ui::icons::settlement_razed`) — a ruin is a tile-scale fact. Only **City+** centres (scale ≥ 4) carry a name label. Colour is **civic-neutral** (`palette::settlement`) under every lens — tier is carried by the glyph, and ownership is never carried by a settlement's colour. On the plain canvas ownership is read from the national border band; under a lens the band is suppressed, so ownership is not on the canvas at all and is read from the Selection panel. |
+| Settlements | Always-on, not lens-gated: **every** generated population centre is a **settlement structure** baked into the ground (RENDERING.md § Installations) whose footprint and height grow with its scale, and a **razed** centre (BL-624) bakes as a ruin — a ruin is a tile-scale fact. The skyline and ruin glyphs retire from this canvas (Ben, 2026-10-08). Far-zoom legibility is the art's job: a settled region must read as settled at the far page without a glyph. Only **City+** centres (scale ≥ 4) carry a name label. Ownership is never carried by a settlement's colour — tier is carried by the structure. On the plain canvas ownership is read from the national border band; under a lens the band is suppressed, so ownership is not on the canvas at all and is read from the Selection panel. |
 | Home-cluster ring + HQ star | Always-on player-presence chrome on `home_body` only: a translucent ring (player-identity colour) encloses the player's holdings cluster on that body ("my region"), and an `ui::icons::hq` star marks the building nearest the cluster centroid ("my origin"). Composes with, does not duplicate, the per-tile ownership outline. |
 | National border band | **Plain-canvas** political chrome, **suppressed while any lens is up** (Ben, 2026-08-28, reaffirmed 2026-09-07): a nation's identity colour sits at its frontier and falls off inwards over three tiles, and clicking the band selects the nation. Unlike roads, it is not always-on — a lens asks one question, and a national wash competes with the answer. See § The national border band below. |
-| Rivers | Directed river lines drawn along tile edges with downstream chevrons, so a basin reads as flowing rather than as a static blue band. Terrain drawing, not a lens; always on. |
+| Rivers | **Baked into the ground** as carved, curved water courses that widen downstream (RENDERING.md § Mountains, rivers and terrain variety). No canvas stroke and no chevron: the width gradient carries the flow direction. Terrain, not a lens; always on. |
 
 ---
 
 ## Building markers
 
-### The glyph draws over the hex, never on a plate of its own
+### A building is a structure in the ground, not a mark over it
 
-**A building marker paints no background.** The silhouette is drawn straight onto the
-tile's own fill, so terrain hue, substrate grain, cover pattern, landform relief and
-whatever the active lens washes over them all keep rendering underneath and around it.
-Ben, 2026-08-24: *"Remove building background. Buildings should be drawn over the hex,
-not completely on top."* (BL-596, buildings over the hex.)
+**No building marker draws on the Planetary canvas** (Ben, 2026-10-08, the sprint 51 form). What
+stands on a tile is a structure stamped into the ground art by the bake's installation pass —
+[RENDERING.md](RENDERING.md) § Installations. The silhouette glyph, the segmented stacked-tile
+ring, the `+N` count badge and the corp emblem tag all retire from this canvas; their glyphs
+survive on the surfaces that still draw them (panels, ledgers, chrome — [ICONS.md](ICONS.md)).
 
-The argument is that the hex is the thing carrying substrate, cover, ownership and every
-lens; occluding it in order to label it trades away the map to annotate it. A built tile
-is therefore an ordinary tile in every render pass — it takes the province blend, the
-texture pass and the relief tint exactly as the unbuilt ground beside it does.
+The trade is deliberate. A glyph layer over painterly ground made every built tile read as a
+label stuck on a picture, and it carried four answers at once on 48 % of a hex. The art now
+answers *that something stands here and roughly what*; every finer question moves to a surface
+built to answer it:
 
-**Legibility rests on the glyph, not on a backing.** The silhouette is drawn at 48 % of
-the hex circumradius in a pale, owner-tinted fill, carrying the filled family's dark
-outline ([ICONS.md](ICONS.md) § Shared conventions). The pair is self-balancing across the
-terrain palette's full range: over near-white ice the dark outline holds the shape, over
-dark forest the pale fill does. When a glyph is illegible over some terrain, the fix
-belongs in the **glyph** — its weight, or an outline/halo on the stroke itself — never in
-a reinstated plate.
-
-**Ownership keeps three channels and loses none.** The silhouette's *fill* is the owning
-corporation's identity colour lightened toward white; a small `corp_emblem` tag sits in
-the hex's lower-right; and the player's own tiles carry the persistent footprint outline
-on the rim under every lens. The player-identity wash on the plain default applies to a
-built tile like any other tile of theirs, so a cluster reads as one footprint rather than
-as a ring of owned ground around an unowned hole.
-
-### A stacked tile: the segmented ring
-
-A tile carries as many buildings as its richness allows, so "how does one hex say it holds
-more than one thing?" is a real question. Ben's answer, 2026-08-24: **the segmented ring**
-— one arc per building **kind** laid around the inside of the hex rim, with the dominant
-kind's glyph in the centre. Chosen over a glyph cluster (which becomes soup past three) and
-over primary-plus-count (which is always legible but never says *which*): the ring is the
-only one of the three that scales with the richness-derived stack cap and still names its
-contents.
-
-**A kind is a `building_type`, not a named building.** Two extraction sites working
-different deposits are one kind standing twice. Each kind's arc takes its colour from
-`palette::building_kind_colour` — a hand-picked, hue-separated set rather than a hash,
-because the roster is small and closed and the one place these colours are read is exactly
-where two adjacent hues would be indistinguishable.
-
-**Three marks, three questions.** They compose rather than duplicate:
-
-| Mark | Answers |
+| Question the old marks answered | Where it is answered now |
 |---|---|
-| The **ring** | *Which kinds stand here?* |
-| The **centre glyph** | *Which of them leads?* — the dominant (lowest-id) building's silhouette |
-| The **`+N` badge** | *How many buildings in total?* |
+| *What kind of building is this?* (the silhouette) | The structure itself, authored per type; the hover card names it |
+| *Which kinds stand here, and which leads?* (the ring, the centre glyph) | A **cluster** of up to three structures, one per stack ([RENDERING.md](RENDERING.md) § Installations), and the tile Selection element's **Production** section ([SELECTION.md](SELECTION.md) § The tile element's layout) |
+| *How many in total?* (the `+N` badge) | The Production section, one row per stack with its count |
+| *Whose is it?* (the owner-tinted fill, the emblem tag) | The **Corporation** and **Company** lenses' owner multi-select ([LENSES.md](LENSES.md)), the hover card, and — for the player alone — the always-on footprint outline |
+| *Is it running?* | The Selection element only. **The art is static**: no smoke, light or state cue distinguishes a running plant from an idle one |
 
-**Read clockwise from the top.** The first segment sits at 12 o'clock and is the dominant
-kind — the one the centre glyph depicts. The remainder follow in ascending `building_type`
-order, so the ring is stable frame to frame and identical across runs. A single-kind tile
-draws **no ring at all**: its centre glyph already describes it fully, and a ring on every
-built tile in the world would be chrome rather than information.
+**Ownership is harder to read on the plain canvas, and that is accepted.** The player's own
+footprint outline stays always-on (it is the one ownership signal the plain canvas keeps), so
+"where am I" survives; "where is everyone else" is a lens question, which is what a lens is for.
 
-**The rim is the borders' territory, and a ring placed there must not read as one.** Three
-passes claim it: the player's own footprint outline (the loudest), the national border
-band's inset boundary stroke (§ The national border band), and the province edge stroke. Every one of them is
-**hexagonal, continuous and thin**, and four properties separate the ring from all three:
-
-| Property | The ring | The border passes |
-|---|---|---|
-| **Shape** | A circle — curved everywhere | Hexagonal: straight sides, hard corners |
-| **Radius** | Inset to 0.76 r, inside both the edges (0.866 r at their midpoints) and the vertices (1.0 r) | On the rim itself |
-| **Continuity** | **Broken** — a gap between every segment | Continuous; a border is never dashed |
-| **Weight** | `max(2, 0.14 r)`, plus its own dark under-stroke | 1.5–2 px flat |
-
-Shape is the load-bearing one: a curve among hexagons cannot be read as a boundary of a
-hexagonal cell. The gap is the second — no border pass is ever dashed.
-
-### The ring's level of detail — it degrades, it does not vanish
-
-The ring draws only above **`draw_r > 10 px`**, its own bound and a stricter one than the
-`7 px` coarse-fill threshold (§ Fill level-of-detail at far zoom), for the same reason the
-texture pass carries its own stricter bound: the two ask different questions. Coarse fill
-asks whether the corner cut is still drawable; the ring asks whether one *segment* is still
-a segment, and a segment shrunk to the length of its own gap reads as a dotted circle rather
-than as a count.
-
-**The bound is derived.** A segment's drawn arc is `2π × 0.76 × draw_r / kinds × (1 − 0.20)`.
-At the practical worst case — the full placeable roster, six kinds on one tile — that is
-`0.637 × draw_r`, and a stroke needs about 6 px of run before it reads as an arc rather than
-a blob: `0.637 × draw_r ≥ 6` gives `draw_r ≥ 9.4`, rounded up to 10.
-
-**Below the bound the tile falls back to the dominant kind's glyph alone.** That is the
-whole point of stating a bound rather than letting the arcs shrink: never an empty hex,
-and never a ring drawn at a size where its arcs have merged. Because 10 > 7, the ring is
-already gone by the time the fill goes coarse, so there is no band in which a rim is being
-segmented that the fill is no longer drawing.
-
-The ring is suppressed under the **Population** and **Opportunity** lenses, alongside the
-silhouette it surrounds: those lenses replace a tile's installation read with a per-tile
-value mark, and a ring with no centre glyph would be a ring with nothing to be dominant.
-
-**Check:** `scripts/verify/stacked_tile_ring.lua` (`verifier-visual`), which *stages* a
-multi-kind stack rather than hunting for one — a generated world does not reliably produce
-a tile carrying several kinds, and a capture of a state the script could not produce proves
-nothing.
+**Hit-testing is unchanged.** A built tile still resolves to its building across the whole hex
+when it carries exactly one, and to the tile when it carries more (SELECTION.md § Multi-building
+tiles). The structure is what is drawn; the hex is still what is pressed.
 
 ---
 
@@ -471,15 +396,14 @@ is reached: *"click the border itself."*
 Beyond the base grid and the chrome in the table above, the draw pass
 (`body_surface_canvas.cpp`) composites, in broad order:
 
-- **Terrain channels** — substrate/cover hue + landform relief tint and glyph/spans.
+- **Terrain channels** — substrate/cover hue + landform relief tint; the dramatic landforms are baked relief.
   Spec: § Terrain channels — composition and landform, above.
 - **Lens tints** — the lenses keyed on `ui_state::overlay`
   ([LENSES.md](LENSES.md)); relief composites *after* the lens tint so landform
   survives a saturated overlay.
-- **Built-tile installations** — building markers (the silhouette, the stacked-tile
-  ring, the corp emblem tag and the `+N` count badge), road spans, settlement
-  markers (the BL-625 LOD ladder), the home-cluster ring + HQ star. Drawn *over* the hex, which
-  keeps rendering underneath ([§ Building markers](#building-markers)).
+- **Built-tile chrome** — road spans, the home-cluster ring + HQ star. Buildings and
+  settlements are **not** a layer here: they are baked into the ground
+  ([§ Building markers](#building-markers); RENDERING.md § Installations).
 - **Corporate HQ markers** — per-corp seat markers (`draw_corp_hq`; see LENSES.md).
 - **Activity fog + convoy beams** — the intra-body vision layers
   (`permanent_vision`, `convoy_beams` in `ui_state`) and the

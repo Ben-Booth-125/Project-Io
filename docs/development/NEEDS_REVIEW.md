@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*84 entries — 7 open, 77 resolved.*
+*85 entries — 8 open, 77 resolved.*
 
 ---
 
@@ -125,6 +125,11 @@ After the sprint 49 re-bless (the lake cap moved every seed's history), the libr
 *question · raised 2026-10-07 · from the BL-1222 (trade-flow lens) cold review, 2026-10-07*
 
 The lens marks a short market "no room" when the destination cannot absorb more at the landed price. That room subtracts EVERY corporation's convoys in flight to it and stock pooled there, so "no room" tells the player, in aggregate, that someone is already filling that market. It names no rival and no quantity. DISCOVERY.md § Competitor visibility makes market supply/demand aggregates public but does not say whether goods in flight count. Options: (A) accept it as a public market signal (cargo on the road is observable) and say so in DISCOVERY.md; (B) compute the player's room without rivals' in-flight cargo for the lens only (a second room figure the dispatcher does not use, so the lens and the decision could disagree).
+
+### NR-986 — Sprint 51 write-up: five calls taken on Ben's behalf beyond the design form
+*decision taken on your behalf · raised 2026-10-08 · from the sprint 51 design write-up, 2026-10-08 (RENDERING.md, SELECTION.md, LENSES.md, PLANETARY.md; BL-1239..BL-1244)*
+
+The form settled the shape; writing it into the docs needed five smaller calls, each now in its owning doc and reversible there. (a) COMPANY LENS DEFAULT - no firm picked, so every firm's ground opens owned-grey: the player owns no company, so "the player only" has no counterpart (LENSES.md § Company lens). Alternative: every firm picked (the old look). (b) RIVAL ROWS IN THE PRODUCTION SECTION show type, count and owner; output and running state read "private", matching the rival building card (SELECTION.md). Alternative: running state public, since a working plant is observable. (c) SCAFFOLDING - "the art is static" has one exception, a construction site bakes as scaffolding, because start and completion are events rather than ticks and so cost no per-tick re-bake (RENDERING.md § Installations). (d) A FOURTH STACK adds nothing to the ground (the cluster caps at three), and a small settlement may vanish at the far page where the density dot stood; a scale >= 3 centre must still read as a city at every rung. (e) NEVER-MAGNIFY shifts every rung up one tier (13 px rung -> 24 px tier, top rung -> 192), and supersampling bakes the 192 tier at 384 px per hex - four times the bake pixels on the worker. BL-1244 measures bake time and memory before and after; if the 192 x 2 bake is too slow, the lever is to supersample only the tiers below it.
 
 ---
 

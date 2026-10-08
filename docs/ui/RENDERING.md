@@ -3,8 +3,9 @@
 > **Settles:** by what mechanism the Planetary ground is drawn and when that work
 > is done · which art direction the ground is held to, and how the grade relates to
 > the terrain under it · whether a hex grid is ever on screen and what the grid
-> serves instead · how an installation appears if not as a glyph · what moves, what
-> changes with zoom, and how the result is checked.
+> serves instead · how an installation, a settlement, a mountain and a river appear
+> if not as a glyph or a stroke · what moves, what changes with zoom, how sharp each
+> rung is held, and how the result is checked.
 > **Not here:** what the canvas communicates above the ground (PLANETARY) · the
 > ladder and the shared state (CANVASES) · the unsettled style exploration
 > (design/GLOBAL_STYLE_SHEET).
@@ -39,6 +40,12 @@ reference renders:
 5. **Installations are rendered geometry, not glyphs.** Building markers retire from
    the canvas; what stands on a tile is drawn as real-looking structures in the art.
 
+Ruled by Ben, 2026-10-08, in the sprint 51 form (the visibility pass): the installation pass
+is **procedural now, authored raster later on the same stamp seam**; a stacked tile stands a
+**cluster**; the art is **static** — running state is the Selection element's; settlements,
+dramatic landforms and rivers leave the canvas's vector layer for the bake too; and the ground
+is **never magnified** at any rung (§ Level of detail).
+
 ---
 
 ## The mechanism — baked terrain chunks
@@ -60,9 +67,10 @@ untouched by construction):
 | **Base ground** | `substrate`, `height` | Continuous material colour, smoothly interpolated between tile centres — no cell boundary is ever drawn |
 | **Hillshade relief** | `height` (BL-517's continuous field) | Slope lighting from a fixed sun azimuth — the exaggerated topographic read that carried panel C |
 | **Biome brushes** | `cover` × `cover_density` | Authored painterly stamps (forest canopy, scrub, marsh…) scattered by density, hash-seeded from grid coordinates |
-| **Water & rivers** | water substrates, `river_edges` + flow | Sea, lakes, and carved river courses with bank treatment |
+| **Landform relief** | `landform`, `height` | The dramatic landforms' own forms — massif and ridge, canyon cut, crater bowl, rift fissure (§ Mountains, rivers and terrain variety) |
+| **Water & rivers** | water substrates, `river_edges` + flow | Sea, lakes, and carved, curved river courses that widen downstream, with bank treatment (§ Mountains, rivers and terrain variety) |
 | **Roads and sea lanes** | `road_level`, `lane_level` | The road lattice and the stamped lanes, smooth curves along their own tiles at the named tier widths (§ Roads and sea lanes) |
-| **Installations** | buildings, settlements | § Installations below |
+| **Installations** | buildings (type, active recipe, stack membership), settlements (scale, razed) | Structure stamps — § Installations below |
 | **Near-future grade** | — (a colour pass) | Desaturation, cool cast, distance haze — **a separable final pass**, tunable without re-authoring any brush |
 
 **Brush placement is hashed from tile grid coordinates**, never screen position — the
@@ -100,9 +108,12 @@ ground retires only as coverage arrives.
   bake is synchronous on the main thread** — a capture must never race a
   worker.
 - **Invalidation is content-hashed:** each chunk's job carries a hash of the
-  tile fields the bake reads (terrain, height, survey bits); an urban transform
-  or survey reveal changes the hash and the chunk re-bakes on its next sweep.
-  Terrain changes are rare by design, so re-bakes are rare.
+  tile fields the bake reads (terrain, height, survey bits) and of the installations
+  standing on its tiles (building type, recipe identity, stack membership; settlement
+  scale and razed state); an urban transform, a survey reveal, a build, a demolition or
+  a settlement crossing a scale step changes the hash and the chunk re-bakes on its next
+  sweep. Nothing tick-rate enters the hash — staffing, output and ownership do not — so a
+  re-bake follows a construction event, never a tick.
 - The cylinder wrap draws the same chunk at multiple offsets, exactly as tiles do
   today; the seam-crossing chunk bakes with wrapped neighbour reads.
 
@@ -129,22 +140,96 @@ visual weight over painterly ground is BL-734's to settle
 **What stands on a tile is drawn as structures in the art**: buildings, settlements
 and works render as real-looking painterly geometry stamped in the installation
 pass, in the same perspective and light as the ground. The vector building
-silhouette, the stacked-tile ring and the settlement skyline glyphs **retire from
-the canvas** (the glyph vocabulary survives everywhere else — panels, ledgers,
-chrome; [ICONS.md](ICONS.md) is narrowed, not retired).
+silhouette, the stacked-tile ring, the `+N` count badge, the corp emblem tag and the
+settlement skyline and ruin glyphs **retire from the canvas** (the glyph vocabulary
+survives everywhere else — panels, ledgers, chrome; [ICONS.md](ICONS.md) is narrowed,
+not retired).
+
+**Procedural now, raster later, one seam** (Ben, 2026-10-08). The structures are
+procedural stamps of the same kind as the close tiers' tree canopies: hash-placed from
+grid coordinates, NW-lit with an SE drop shadow, drawn before the grade so they take it
+exactly as the ground does, deterministic and wrap-exact. An authored raster sheet may
+later replace a type's procedural stamp **on the same stamp seam** — a stamp is keyed by
+what it depicts, and the bake asks the seam for it — so nothing authored procedurally is
+thrown away when art arrives.
+
+**One structure per type, read by silhouette.** Each placeable building type carries its
+own form, distinct at its tier's scale — an extraction head-frame, a processing hall with
+stacks, a port's quay, a well's housing, a wharf's jetty — and a processing facility's
+form keys on its active recipe's family the way the retired glyph did, so *what is made
+here* reads before a hover. The type is public (DISCOVERY.md, the competitor-visibility
+rule), so a rival's structure draws exactly as the player's.
+
+**A stacked tile stands a cluster** (Ben, 2026-10-08). One structure per **stack** —
+`(type, target)`, `placement_rules::stack_members` — placed by a fixed in-tile layout,
+the dominant (lowest-id) stack largest and in front, **up to three**; a fourth stack and
+beyond adds nothing to the ground. Two buildings of one stack are one structure: the art
+says *what stands here*; the Selection element's Production section says *how many*
+(SELECTION.md § The tile element's layout).
+
+**Settlements are structures too.** A population centre bakes as a settlement whose
+footprint and height step with its scale (Outpost → Metropolis), and a razed centre as a
+ruin. A small centre may vanish into the ground at the far page where the old density dot
+stood, but a scale ≥ 3 centre must read as a city at every rung — the obligation the
+skyline LOD ladder carried, which the art now takes over.
+
+**The art is static** (Ben, 2026-10-08). No smoke, light, flag or animation distinguishes
+a running building from an idle, starved or mothballed one; running state is read in the
+Selection element alone. Two reasons: a state cue on the ground is a glyph by another
+name, and a stamp keyed on tick-rate state would re-bake chunks every tick (§ Chunks,
+cache and invalidation). **Under construction is the one exception** — a site bakes as
+scaffolding, because construction start and completion are events, not ticks.
+
+**Ownership never touches the ground art.** This settles what was the ground/chrome layer
+contract's sharpest open call: a structure carries no owner colour. Ownership is read from
+the hover card, the Selection element, the always-on player footprint outline, and the
+Corporation and Company lenses' owner multi-select ([LENSES.md](LENSES.md)).
 
 Consequences the design accepts and answers:
 
 - **Far-zoom legibility lives in the art**, not in a glyph fallback — an installation
-  must be authored to read at distance (footprint contrast, smoke, light), the way
-  the it3 settlement reads. Ben chose this against a geometry-close/glyphs-far
-  ladder, deliberately.
-- **Ownership, stack contents and counts** — the three questions the silhouette,
-  ring and badge answered — move to hover/selection surfaces and the layer-contract
-  work; how much ownership colour touches the ground art is BL-734's
-  (ground/chrome layer contract) sharpest open call.
+  must be authored to read at distance (footprint contrast, cleared ground, a road
+  stub), the way the it3 settlement reads. Ben chose this against a
+  geometry-close/glyphs-far ladder, deliberately.
+- **The tilted rungs stand structures up.** On the oblique tiers a structure bakes as a
+  standing sprite like a tree — verticals pre-stretched by 1/cos(tilt), shadow left on
+  the ground plane — so the camera squash returns it to true proportion.
+- **Under a lens a structure is ground.** It takes the lens wash like the terrain around
+  it; a lens is an analytic read and stays flat.
 - A structure stamp may **overhang its tile** (chimneys, towers); stamps compose in
-  row order like every other pass.
+  row order like every other pass. **Hit-testing is unchanged**: the hex, not the stamp,
+  is what a press lands on (SELECTION.md § Multi-building tiles).
+
+### Mountains, rivers and terrain variety
+
+Ben, 2026-10-08: mountains and rivers **blend into the render**, with **more tile sets**.
+Both were vector chrome drawn over the bake — a stroke-only landform glyph on the hex
+centre, a straight river line from tile centre to tile centre with downstream chevrons —
+and both read as annotation laid on a painting. They move into the bake.
+
+- **Dramatic landforms bake their own forms.** Mountain bakes as massif and ridge (the
+  ridged relief the close tiers already fold toward, now carrying the read at every
+  tier); canyon as a cut between paired rims; crater as a raised-rim bowl; rift as a dark
+  fissure. A contiguous run bakes as **one** form — a range, one cut, one fissure — each
+  tile baking its half of the shared edge so the halves meet at the midpoint
+  (PLANETARY.md § Terrain channels). The obligation the glyph carried is the form's now:
+  these are the ×1.3-or-worse movement tiles, so the form must read at the far page. The
+  hover card keeps naming the landform and its cost.
+- **Rivers are carved courses.** A river bakes as water along its `river_edges` chain,
+  drawn as a **smooth curve** through the chain by the quadratic B-spline rule roads use
+  (§ Roads and sea lanes), **widening downstream** with accumulated flow, with bank
+  shelving and a wet margin blended into the ground either side. The canvas stroke and
+  its chevrons retire: the width gradient says which way the water flows. Province
+  borders drawn against a river edge keep following it (TILES.md, edge features).
+- **More tile sets — variant families.** Every terrain family — a substrate × cover pair,
+  and each dramatic landform — carries **several procedural variants** (different noise
+  seeds, brush scatter, rock and erosion patterns), and each tile picks one by a hash of
+  its grid coordinates, so neighbouring tiles of one terrain do not repeat and a wide
+  plain does not read as wallpaper. Variants **cross-fade** across the tile boundary the
+  way the base ground already interpolates between tile centres, so no variant edge is
+  ever drawn (the grid rule). The count per family is set by eye against captures, not
+  here; an authored raster set replaces a family's procedural variants on the same seam
+  structures use.
 
 ### Roads and sea lanes — smooth curves on their own tiles
 
@@ -182,8 +267,8 @@ both draw by one rule:
 ### Ambient animation
 
 Motion is **overlay flipbook, not baked**: the ground bake is static, and animated
-passes (water shimmer first; stack smoke with it) draw as looping frame overlays on
-top of the baked chunks. The animation clock is **render-side real time** — never sim
+passes (water shimmer) draw as looping frame overlays on top of the baked chunks. No
+animation keys on an installation's state — the art is static (§ Installations). The animation clock is **render-side real time** — never sim
 state — so ambience continues while paused; under `--verify` the clock is **pinned to
 phase 0** and a check advances it explicitly. The near-future grade applies over
 animated overlays too, so motion cannot break the grade.
@@ -200,24 +285,38 @@ are unaffected). The upper canvas rungs keep continuous zoom.
 Each zoom rung pairs with a **bake tier**, so the ground is near-1:1 texels at every
 step — the stepped ladder's whole point. "Near", not exact: the drawn hex radius is
 **fit-derived** (window height over grid rows, then the rung's ×2 factor), so where a
-rung lands relative to its tier moves with the window. The tier chooser takes the
-smallest tier within a **1.2× magnification headroom** (`k_tier_headroom`) — at the
-reference 1720×1080 window the rungs run ~4–14% magnified, and a tier is never
-minified past 2:1 (the ×2 spacing; `SDL_Renderer` has no mipmaps, so that bound is
-what keeps a step transition shimmer-free):
+rung lands relative to its tier moves with the window.
+
+**The ground is never magnified** (Ben, 2026-10-08, the sprint 51 form: sharpen the
+tiles across all zooms). The tier chooser takes the **smallest tier at or above the
+drawn radius** — no magnification headroom — and draws it **minified**, never past 2:1
+(the ×2 spacing; `SDL_Renderer` has no mipmaps, so that bound is what keeps a step
+transition shimmer-free). Minification under linear filtering softens nothing;
+magnification is what read as blur, at the 4–14% the earlier 1.2× headroom allowed at
+the reference window. While a tier's chunks fill, the stand-in is the next tier down
+where it is resident, and the far page only where nothing closer is.
+
+**Every tier is supersampled.** A tier bakes at **2×** its nominal pixels per hex and is
+box-downsampled to the nominal size before upload, so stamp edges, ridge creases and
+river banks are anti-aliased in the bake rather than stair-stepped. The cost is bake
+time (×4 pixels through the worker), not frame time or resident memory, which see only
+the downsampled texture; the bake's own unsharp pass is re-tuned against the
+supersampled result rather than stacked on it.
+
+At the reference 1720×1080 window:
 
 | Zoom rung (drawn hex radius, reference window) | Bake tier (px per hex circumradius) |
 |---|---|
-| ~6 px (whole grid) | The far page, 6 — whole-body, one texture |
-| ~13 px | 12 — chunked |
-| ~27 px | 24 — chunked |
-| ~55 px | 48 — chunked; the close-grain octave joins the bake |
-| ~110 px | 96 — chunked, close-grain |
+| ~6 px (whole grid) | The far page, 6 — whole-body, one texture (drawn at or below 1:1) |
+| ~13 px | 24 — chunked, minified |
+| ~27 px | 48 — chunked, minified; the close-grain octave joins the bake |
+| ~55 px | 96 — chunked, minified, close-grain |
+| ~110 px | 192 — chunked, minified, close-grain |
 
-**Known bound:** past the 96 px tier there is nothing sharper, so on a much taller
-window than the reference the top rung magnifies beyond the headroom (e.g. ~2× at a
-4K-height canvas). Acceptable for the prototype's windows; a 192 px tier is the lever
-if large-display play starts to matter. The existing 7 px vector pivot remains only in
+The 12 px tier stays in the ladder for windows where a rung lands at or under 12 px.
+**The 192 px tier** exists so the top rung is never magnified at the reference window or
+a taller one, up to a 4K-height canvas. It is chunked like every tier and resident only
+while its rung is active, so its memory cost is the viewport's chunks, not the body's. The existing 7 px vector pivot remains only in
 the fallback path.
 
 ### The stepped tilt — the 2.5D seam, taken
@@ -303,4 +402,7 @@ guarantees about it:
 
 Design owners: BL-732 (ground bake renderer) — the mechanism; BL-733 (biome brush &
 structure art pipeline) — the authored assets; BL-734 (ground/chrome layer contract)
-— the fate of each analytic channel over painterly ground.
+— the fate of each analytic channel over painterly ground. The 2026-10-08 visibility
+pass: BL-1241 (structures baked) — § Installations; BL-1242 (landforms and rivers baked)
+and BL-1243 (terrain variant families) — § Mountains, rivers and terrain variety; BL-1244
+(never magnify the ground) — § Level of detail.

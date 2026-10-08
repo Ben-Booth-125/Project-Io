@@ -121,8 +121,8 @@ lens is asking:
 | **Market centre** | *(default)* | market identity + "Switch to Market lens for prices" |
 
 Every tile variant shares the **terrain header** — `composition · landform`,
-with plains left unnamed as the baseline — so the on-canvas landform glyph
-vocabulary is learnable at the point of looking (PLANETARY.md § Terrain
+with plains left unnamed as the baseline — so the baked landform forms are
+learnable at the point of looking (PLANETARY.md § Terrain
 channels).
 
 Each variant is a title line, one or two stat lines, then a dimmed **"why"

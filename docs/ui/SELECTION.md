@@ -140,15 +140,17 @@ horizontal columns (Ben, 2026-07-28):
 1. **Left quarter — zoomed hex neighbourhood.** A bordered render of the selected tile and its
    immediate ring (`draw_tile_neighbourhood`, radius 2), the selected tile picked out — the
    actual terrain render, not a placeholder image.
-2. **Centre half — a SECTION TOP NAV over five sections**, in this order
+2. **Centre half — a SECTION TOP NAV over six sections**, in this order
    (`ui_state::card_tile_view` holds which is showing):
 
-   > **Buildings → Deposits → Resources → Population → Terrain**
+   > **Production → Buildings → Deposits → Resources → Population → Terrain**
 
-   **The order is the argument, not a shuffle.** It runs from what the player can *act on* —
-   what can still be built here — through what is there to be taken (the stock, its yield, the
-   workforce that would take it) to what the ground merely *is*. The reading you can do
-   nothing about is last.
+   **The order is the argument, not a shuffle.** It opens on what is *happening* here — what
+   the tile makes and what that fetches where it sells (Ben, 2026-10-08, the sprint 51
+   visibility pass: the initial market conditions, read from the ground the player is looking
+   at) — then runs from what the player can *act on* — what can still be built here — through
+   what is there to be taken (the stock, its yield, the workforce that would take it) to what
+   the ground merely *is*. The reading you can do nothing about is last.
 
    **The nav is one row, and the section below it takes the whole body.** Ben, 2026-08-24:
    *"a topnav left and right chevron, with a full canvas expansion button… straddle left and
@@ -164,13 +166,40 @@ horizontal columns (Ben, 2026-07-28):
      the same two-control disclosure idiom every other surface uses, and `disclosure_controls`
      owns its glyph. `in_place` is false here: a section is already the whole body, so the only
      larger state is the canvas.
-   - **The nav wraps** in both directions, so five presses of either chevron return to where
+   - **The nav wraps** in both directions, so six presses of either chevron return to where
      you started.
 
    *A vertical accordion was built first, on Ben's earlier ruling the same day, and ruled out
    on sight. The measurement is why: five stacked headers spent **169 of the band's 258 px** on
    chrome to leave the open section **89**. The nav spends one frame height.*
 
+   - **Production** — **tile grain**, the one section that is (Ben, 2026-10-08; owner BL-1239,
+     tile production section): a building
+     stands on a tile and a market's catchment is tile-keyed, so a province sum would blur the
+     two things this section exists to join. Two parts, top to bottom:
+     - **What stands here and what it makes.** One row per **stack** on the tile — the
+       `placement_rules::stack_members` grouping the Manage Buildings list uses (§ Multi-building
+       tiles) — carrying the type glyph and count (this is where the retired `+N` badge's count
+       is read), the good it makes, its output per tick, and its **running state**: *Running*,
+       *Understaffed*, *Idle* or *Mothballed*, or *Under construction* with its ETA. An idle or
+       understaffed row **says why** — labour short, or an input short, naming the input and its
+       cause (none on the shelf, posted over the fair-price ceiling, no producer in reach). The
+       state and its reason come from the one function the building hover card reads
+       (`hover_building_detail`'s classification), so the two surfaces cannot disagree. This
+       section is where running state lives now that the canvas draws none (RENDERING.md
+       § Installations, the art is static). A **rival's** stack row shows type, count and owner;
+       output and running state read *private* (DISCOVERY.md, the competitor-visibility rule).
+     - **What it fetches here.** The **market whose catchment holds this tile**, named, then one
+       row per good — every good this tile's stacks make, then every good deposited on the tile
+       — with that market's price and its state (*short*, *balanced*, *surplus*), read from the
+       public market aggregates. A row is a drill-through door to the Market ledger aimed at
+       that market and good (DRILL_THROUGH.md), not a control.
+
+     **An unbuilt tile still opens here.** The first part states *Nothing built here*
+     positively, and the second still lists the deposited goods at their market — on a fresh
+     campaign that is the initial market conditions, which is the read this section was added
+     for. A water tile takes its own centre column (§ A water tile is selectable) and has no
+     Production section.
    - **Buildings** — a table **per province throughout** (Ben, 2026-08-22), the selected tile
      serving only to name which province is meant: the province's total building count against
      its ceiling (`-1` is UNKNOWN and is said, never rendered as room), then one row per
@@ -264,18 +293,17 @@ consequences, settled 2026-08-11:
   Iron Ore x3"*, *"Processing: Steel Mill x2"* — before the single-building detail. A tile with
   exactly one building routes straight to its detail, zero extra clicks for the common case.
 - **Click model: the tile selects the aggregate; drilling into a row selects that stack.**
-  On canvas, only ONE marker renders per built tile (the dominant-silhouette convention) — for
-  exactly one building the click lands on that installation directly (Ben, 2026-07-22: the
-  whole hex belongs to the installation); for more than one it falls through to the **tile**,
+  A press lands on the hex, whatever structures stand on it — for exactly one building the
+  click lands on that installation directly (Ben, 2026-07-22: the whole hex belongs to the
+  installation); for more than one it falls through to the **tile**,
   whose Manage Buildings action opens the grouped list. Selecting a row there sets the same
-  `selected_entity` a canvas building-marker click would, so a single-building tile and a
+  `selected_entity` a canvas press on a single-building tile would, so a single-building tile and a
   drilled-into stack reach the identical detail view either way. A **"‹ this tile's buildings"**
   back link on that detail view returns to the list when the tile carries siblings.
-- **On-canvas marker: dominant-stack glyph + a "+N" count badge.** The marker renders the
-  tile's lowest-id (dominant) building's silhouette, and a tile with more than one building
-  gains a small "+N" text badge (N = additional buildings), lower-right, staggered past the
-  corp-identity tag that sits there — the same k/N text-overlay idiom the Solar-canvas survey
-  badge uses. See ICONS.md.
+- **On the canvas: a cluster, no marker.** A built tile draws no glyph and no count badge; it
+  stands a cluster of up to three structures, one per stack, baked into the ground
+  (RENDERING.md § Installations). The count and each stack's running state are read in the
+  tile element's **Production** section, one row per stack.
 
 ### The tile construction ledger
 
@@ -341,9 +369,9 @@ header):
 
 1. **Left quarter — a generic placeholder image, keyed by building type** (Ben: generic per
    building type, not one flat image for everything). Draws `ui::icons::building` — the SAME
-   type-keyed glyph vocabulary the construction ledger and the on-canvas markers use — enlarged
+   type-keyed glyph vocabulary the construction ledger uses — enlarged
    to fill the panel. Identity (which named silhouette a `processing_facility` draws) resolves
-   the same way the on-canvas marker does (`body_surface_canvas.cpp`): the active recipe's
+   the same way the canvas's structure stamp does (RENDERING.md § Installations): the active recipe's
    primary output, falling back to `target_resource` for extraction sites and infrastructure
    types the glyph ignores. Drawn for a rival building too — the type is public
    (DISCOVERY.md, the competitor-visibility rule).
@@ -370,7 +398,9 @@ header):
      `estimate_building_profit` reports `has_data`; a still-building building has nothing here
      (its **Status** page covers it).
    - **Status** (`building_page_kind::status`) — the fallback: construction rate/ETA for a
-     still-building building, "Operating." otherwise. **Rival buildings get ONLY this page** —
+     still-building building; otherwise its **running state with its reason**, in the
+     Production section's words (*Running*; *Idle — input short: Steel, over the fair-price
+     ceiling*), never a bare "Operating.". **Rival buildings get ONLY this page** —
      the public building type plus (via `draw_rival_building_summary`) owner name, tile, and
      explicit `private` rows for production/stockpile; `building_pages()` short-circuits to a
      single Status page for any non-player-owned building rather than testing each page's
