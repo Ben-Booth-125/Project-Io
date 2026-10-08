@@ -92,7 +92,10 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   exists; rescue reads unpriced as floored; opening stock held until bid; no processor beyond its
   output's want; diagnose t50 starvation in parallel. Lanes: GEN D5+D6 (generation-dev, isolated
   worktree) and STARVE D7 (economy-dev probe) running; D3+D4 (dial + rescue) wait for DIALHOLD to
-  merge (same function). The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
+  merge (same function). **DIALHOLD DONE** (c0dde0d3, branch worktree-agent-a1b28029261a2f580;
+  in cold review): G1 71.4 -> 80.1 handoff, t50 61.6 -> 61.9, G1b 12.8 -> 14.6 (worse), G2 75.8,
+  G3 98.1; of the 503, 319 run at handoff / 262 at t50; history_sim R3a2/R3a3 fail on the base
+  too (pre-existing). The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
 
