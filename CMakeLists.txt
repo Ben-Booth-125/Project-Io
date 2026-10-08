@@ -568,6 +568,7 @@ target_compile_options(pregame_balance_harness PRIVATE ${IO_WARNING_FLAGS})
 add_executable(ground_bake_check
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/ground_bake_check.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/ground_bake.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/structure_stamps.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/terrain_palette.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/core/png_writer.cpp"
 )

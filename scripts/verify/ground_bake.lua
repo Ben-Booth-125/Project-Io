@@ -75,3 +75,54 @@ verify.set_overlay("resource")
 verify.frames(1)
 verify.capture("ground_bake_lens_fallback")
 verify.set_overlay("none")
+
+-- BL-1241 (structures baked) — requirement group `structures-baked`.
+-- What stands on a tile is baked into the ground: one procedural form per
+-- depicted subject (RENDERING.md § Installations). verify.stage_gallery()
+-- stages the whole roster around the player's HQ — every extraction family,
+-- every recipe group, every other placeable type, a construction site, a rival
+-- plant, a four-stack tile — and steps the six nearest population centres to a
+-- settlement ladder (scale 1-5) plus a ruin. C++ picks the ground; the script
+-- learns only where it staged. Captured at EVERY rung, far page included, with
+-- the border band off so the structures are judged on bare ground.
+verify.set_overlay("none")
+verify.set_border_band(false)
+local g = verify.stage_gallery()
+verify.expect(g.staged >= 35, "stage_gallery staged the whole roster (" .. tostring(g.staged) .. ")")
+verify.expect(g.centres == 6, "stage_gallery stepped six centres to the ladder (" .. tostring(g.centres) .. ")")
+
+local rungs = { { 1.26, "far" }, { 2.5, "mid" }, { 5, "play" }, { 10, "close" }, { 20, "closest" } }
+for _, r in ipairs(rungs) do
+    verify.center_tile(g.col, g.row, r[1])
+    verify.frames(3)
+    verify.capture("structures_" .. r[2])
+end
+
+-- The stacked tile up close (four stacks staged; three stand, dominant front).
+verify.center_tile(g.stack_col, g.stack_row, 20)
+verify.frames(3)
+verify.capture("structures_stacked_closest")
+verify.center_tile(g.stack_col, g.stack_row, 10)
+verify.frames(3)
+verify.capture("structures_stacked_close")
+
+-- Hit zones unchanged (PLANETARY.md § Building markers): a press on a
+-- single-building tile lands on the building; on a stacked tile, on the tile.
+verify.center_tile(g.single_col, g.single_row, 10)
+verify.frames(2)
+verify.click_tile(g.single_col, g.single_row)
+verify.frames(2)
+verify.expect(verify.pointer_target().selection_kind == "building",
+              "a press on a single-building tile selects the building (hit zone kept)")
+verify.center_tile(g.stack_col, g.stack_row, 10)
+verify.frames(2)
+verify.click_tile(g.stack_col, g.stack_row)
+verify.frames(3)
+verify.expect(verify.pointer_target().selection_kind == "tile",
+              "a press on a stacked tile selects the tile (hit zone kept)")
+-- The Selection band's neighbourhood view shows the baked ground.
+verify.frames(3)
+verify.capture("structures_neighbourhood")
+verify.clear_selection()
+
+verify.set_border_band(true)

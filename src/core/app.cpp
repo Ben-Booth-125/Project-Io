@@ -2318,6 +2318,7 @@ void app::render()
                 // ground_request, then publishes ui_state::ground for the canvas
                 // draw below. Texture work on the render thread, before the
                 // draw data is submitted.
+                m_ground.registry = &m_registry; // BL-1241: processing stamps key on the recipe family
                 m_ground.tick(m_renderer, m_world, m_ui, m_ground_bake_all);
                 // No lens-key anchor argument (Sprint 17b, one chrome home):
                 // every legend now asks ui::lens_chrome_rect for the one region —

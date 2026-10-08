@@ -2344,6 +2344,22 @@ const char* road_tier_name(std::uint8_t road_level)
 /// Resolve the selected battle, or nullptr. Also clears a stale selection — a
 /// battle ends and is erased, and a card pointing at one that finished should
 /// fall back cleanly rather than draw nothing forever.
+/// BL-1241: ask the ground layer for the neighbourhood page around @p tile
+/// (baked next frame, so the view shows the canvas's own baked ground).
+static void request_neighbourhood_page(const world& w, ui_state& ui, entity_id tile, int radius)
+{
+    const auto it = w.tiles.find(tile);
+    if (it == w.tiles.end())
+        return;
+    ground_neigh_request& q = ui.ground_neigh_req;
+    q.body   = it->second.body;
+    q.tile   = tile;
+    q.col    = it->second.grid_x;
+    q.row    = it->second.grid_y;
+    q.radius = radius;
+    q.valid  = true;
+}
+
 const active_battle* selected_battle(const world& w, ui_state& ui)
 {
     if (!ui.has_battle_selection())
@@ -2455,7 +2471,8 @@ void draw_battle_selection(world& w, ui_state& ui)
         const float h     = std::min(avail * 0.55f, 220.0f);
         ImVec2 origin = ImGui::GetCursorScreenPos();
         ImDrawList* dl = ImGui::GetWindowDrawList();
-        draw_tile_neighbourhood(dl, w, frame, origin, ImVec2(avail, h), 2);
+        request_neighbourhood_page(w, ui, frame, 2);
+        draw_tile_neighbourhood(dl, w, frame, origin, ImVec2(avail, h), 2, &ui.ground);
         ImGui::Dummy(ImVec2(avail, h));
     }
 
@@ -3268,7 +3285,8 @@ void draw_tile_selection(world& w, const recipe_registry& reg, const economy_rep
         const ImVec2 p  = ImGui::GetCursorScreenPos();
         const ImVec2 mx = {p.x + left_w, p.y + total_h};
         dl->AddRectFilled(p, mx, IM_COL32(16, 18, 24, 255), 3.0f);
-        draw_tile_neighbourhood(dl, w, sel, p, {left_w, total_h}, /*radius=*/2);
+        request_neighbourhood_page(w, ui, sel, 2);
+        draw_tile_neighbourhood(dl, w, sel, p, {left_w, total_h}, /*radius=*/2, &ui.ground);
         dl->AddRect(p, mx, IM_COL32(90, 90, 100, 255), 3.0f);
         ImGui::Dummy({left_w, total_h});
     }

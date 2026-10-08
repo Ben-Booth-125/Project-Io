@@ -399,8 +399,10 @@ constexpr float k_road_width_highway = 0.12f;
 /// told apart from the road ladder by its sea blue rather than by weight.
 constexpr float k_lane_width         = 0.10f;
 
-/// Building silhouette radius as a fraction of the hex circumradius. The silhouette
-/// scales to the hex rather than being a small pin on it; the value leaves the
+/// Building silhouette radius as a fraction of the hex circumradius — since BL-1241
+/// (structures baked) used ONLY by the construction ghost, the one place a building
+/// glyph still draws on this canvas (an armed placement is chrome, not ground).
+/// The silhouette scales to the hex rather than being a small pin on it; the value leaves the
 /// lower-right corner free for the owner emblem tag and keeps the widest glyph (the
 /// square) inside the hexagon's inradius. Shared with the construction ghost so the
 /// armed preview matches what actually lands.
@@ -410,30 +412,6 @@ constexpr float k_lane_width         = 0.10f;
 /// ground, so its legibility rests on its own dark outline against a live background,
 /// which is what the icon vocabulary is for (ICONS.md § Shared conventions).
 constexpr float kBuiltSilhouetteScale = 0.48f;
-
-/// Level-of-detail floor for the stacked-tile ring (BL-596), in drawn hex
-/// circumradius. Its OWN bound, and a stricter one than the coarse-fill threshold
-/// below, exactly as the terrain texture carries its own stricter bound — because
-/// the two passes fail differently. Coarse fill asks "is the corner cut still
-/// drawable"; the ring asks "is one SEGMENT still a segment", and a segment that has
-/// shrunk to the length of its own gap reads as a dotted circle, not as a count.
-///
-/// **Derived, not chosen.** A segment's drawn arc is
-/// `2 pi * 0.76 * draw_r / kinds * (1 - 0.20)`. At the practical worst case — the
-/// full building_type roster, six placeable kinds on one tile — that is `0.637 *
-/// draw_r`, and a stroke needs about 6 px of run before it reads as an arc rather
-/// than a blob: `0.637 * draw_r >= 6` gives `draw_r >= 9.4`. Rounded up to 10.
-///
-/// Because 10 > k_lod_radius_px (7), the ring is already gone by the time the fill
-/// goes coarse, which is the degrade BL-596's ruling requires: below the threshold
-/// there is no rim left to segment, so the tile falls back to the dominant kind's
-/// glyph alone — never to an empty hex, and never to a ring whose arcs have merged.
-constexpr float kStackRingLodRadiusPx = 10.0f;
-
-/// Upper bound on the kinds one tile's ring can name — the whole `building_type`
-/// roster minus `none`. Sized as a fixed array so the marker pass allocates nothing
-/// per tile per frame.
-constexpr int kStackRingMaxKinds = 7;
 
 /// Shared red→yellow→green ramp for every "red to green" lens (Opportunity,
 /// Population/workforce, Production). `t` in [0, 1]: 0 = red (low), 0.5 = yellow
@@ -2182,12 +2160,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // the signal that a marker click should land on the TILE (grouped stack
     // list) rather than assuming the whole hex is one installation.
     static std::unordered_map<entity_id, int>            tile_bld_count;
-    // BL-596: the DISTINCT building kinds standing on the tile, ascending by
-    // building_type — the segmented ring's contents. Kept separate from
-    // tile_bld_count on purpose, because the two answer different questions: the
-    // count says HOW MANY buildings ("+3"), the kind set says WHICH KINDS. Ben chose
-    // the ring over primary-plus-count precisely because a count "never says which".
-    static std::unordered_map<entity_id, std::vector<building_type>> tile_bld_kinds;
     // Unit groups per province (BL-575) — see the pre-pass below. Keyed on the
     // SAME stamp as the maps above, since a hire/disband changes w.units.size()
     // and a march order's actual tile move only happens on a tick (already
@@ -2209,23 +2181,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         tile_to_bld.clear();
         tile_to_corp.clear();
         tile_bld_count.clear();
-        tile_bld_kinds.clear();
         for (const auto& [bld_id, bld] : w.buildings)
         {
             auto tile_it = w.tiles.find(bld.tile);
             if (tile_it != w.tiles.end() && tile_it->second.body == state.active_body)
             {
                 ++tile_bld_count[bld.tile];
-                // Distinct kinds, inserted in sorted position. w.buildings is an
-                // unordered_map, so accumulate-then-sort would still be
-                // deterministic, but an ordered insert keeps the vector correct at
-                // every step and the sets are at most a handful long.
-                {
-                    std::vector<building_type>& kinds = tile_bld_kinds[bld.tile];
-                    const auto pos = std::lower_bound(kinds.begin(), kinds.end(), bld.type);
-                    if (pos == kinds.end() || *pos != bld.type)
-                        kinds.insert(pos, bld.type);
-                }
                 // Lowest building id wins the tile. w.buildings is an unordered_map, so a
                 // plain last-writer-wins assignment would let its iteration order pick the
                 // representative — fine while a tile holds one building, not once they
@@ -3417,31 +3378,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // BL-596 a built tile fills as terrain like any other.
         const auto   built_it   = built_tiles.find(id);
         const bool   built      = built_it != built_tiles.end();
-        const building_type built_type = built ? built_it->second : building_type::none;
         const auto   corp_it    = tile_to_corp.find(id);
         const bool   has_owner  = corp_it != tile_to_corp.end();
-        const ImU32  owner_col  = has_owner ? corp_identity(corp_it->second)
-                                            : IM_COL32(255, 255, 255, 255);
-
-        // BL-429: the representative building's extraction target / processing
-        // primary output, so the on-canvas marker draws the same named-building
-        // glyph as the Build door and the Buildings tab. Reuses tile_to_bld's
-        // lowest-id-wins representative (BL-367) — resolved once per tile, ahead
-        // of the k-loop below, so every wrap copy shares one identity.
-        resource_type marker_identity = resource_type::iron_ore;
-        if (built)
-        {
-            if (const auto ctb_it = tile_to_bld.find(id); ctb_it != tile_to_bld.end())
-                if (const auto cbld_it = w.buildings.find(ctb_it->second); cbld_it != w.buildings.end())
-                {
-                    const building_component& rep = cbld_it->second;
-                    marker_identity =
-                        (rep.type == building_type::processing_facility
-                         && reg.get_recipe(rep.recipe) != nullptr)
-                            ? primary_output_resource(*reg.get_recipe(rep.recipe))
-                            : rep.target_resource;
-                }
-        }
+        // (BL-1241: the marker's owner colour and type identity retired with the
+        // marker — the structure is baked into the ground, keyed by the bake.)
 
         // Fill starts as the tile's terrain colour, on EVERY tile (BL-596 retired the
         // built tile's owner plate). Lens tints then composite over it — a lens is a
@@ -4211,98 +4151,19 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
             if (built)
             {
-                // `mr` is the legacy marker radius, kept solely as the hit-zone scale
-                // below so click routing is unchanged by the silhouette resize.
-                const float mr    = std::max(2.0f, draw_r * 0.22f);
-                // The silhouette is the tile's content now, so it scales to the hex.
-                const float sil_r = std::max(3.0f, draw_r * kBuiltSilhouetteScale);
-
-                // The structure reads PALE and carries the filled family's dark
-                // outline, so the pair is self-balancing over the live ground BL-596
-                // put back underneath it: over near-white ice the dark outline holds
-                // the shape, over dark forest the pale fill does. Lightening toward
-                // white keeps the owner hue, so identity survives; an unowned tile's
-                // owner_col is already white, so it stays white through the same blend.
-                const ImU32 marker_col =
-                    lerp_colour(owner_col, IM_COL32(255, 255, 255, 255), 0.5f);
-
-                // BL-327 (replacing BL-323 S4's dimming, same-day: Ben found the
-                // desaturated silhouette read as "faded", not "being built"): a
-                // site with ticks_remaining > 0 draws the dedicated crane glyph
-                // IN PLACE OF its type silhouette, at full owner-tinted colour —
-                // identity still reads, the type does not, which is honest: the
-                // installation is not that type yet. ticks_remaining is the single
-                // source of truth economy_system counts down; no separate flag.
-                bool under_construction = false;
-                if (k == 0)
-                {
-                    const auto ctb_it = tile_to_bld.find(id);
-                    if (ctb_it != tile_to_bld.end())
-                    {
-                        const auto cbld_it = w.buildings.find(ctb_it->second);
-                        if (cbld_it != w.buildings.end() && cbld_it->second.ticks_remaining > 0)
-                            under_construction = true;
-                    }
-                }
-
-                {
-                    // Stacked-tile ring (BL-596). Drawn BEFORE the centre glyph so
-                    // the silhouette stays the loudest thing on the tile, and before
-                    // the emblem tag and the "+N" badge so those read as pinned onto
-                    // the ring rather than sliced by it.
-                    //
-                    // The ring names WHICH KINDS stand here; the centre glyph names
-                    // which of them leads (the lowest-id representative, the same one
-                    // tile_to_bld picks); the "+N" badge still names how many
-                    // buildings in total. Three different questions, three marks.
-                    if (draw_r > kStackRingLodRadiusPx)
-                    {
-                        const auto kinds_it = tile_bld_kinds.find(id);
-                        if (kinds_it != tile_bld_kinds.end() && kinds_it->second.size() >= 2)
-                        {
-                            ImU32 seg[kStackRingMaxKinds];
-                            int   n = 0;
-                            // DOMINANT FIRST — it takes the 12 o'clock segment, which
-                            // is the only thing tying an arc to the glyph in the
-                            // middle. The rest follow in the cache's ascending
-                            // building_type order, so the ring is stable frame to
-                            // frame and identical across runs.
-                            seg[n++] = palette::building_kind_colour(built_type);
-                            for (const building_type bt : kinds_it->second)
-                            {
-                                if (bt == built_type || n >= kStackRingMaxKinds)
-                                    continue;
-                                seg[n++] = palette::building_kind_colour(bt);
-                            }
-                            icons::stack_ring(dl, {cx, cy}, draw_r, seg, n);
-                        }
-                    }
-
-                    if (under_construction)
-                        icons::under_construction(dl, {cx, cy}, sil_r, marker_col);
-                    else
-                        icons::building(dl, {cx, cy}, sil_r, built_type, marker_identity, marker_col);
-                }
-
-                // Owner-identity tag (BL-090): a small corp emblem tucked into the
-                // hex's lower-right corner, for BOTH player and rival buildings —
-                // the owning corp is public under the BL-068 visibility model, so this
-                // adds no leak. Shape + colour route through the shared palette source
-                // of truth, so the tag matches the identity card and the Selection
-                // header. Parked past the enlarged silhouette (offsets are fractions of
-                // the hex circumradius, chosen to sit inside the lower-right edges) and
-                // backed by a dark disc so it never gets lost against terrain, lens fill,
-                // the stack ring, or the glyph. Does not affect hit-testing.
-                if (has_owner)
-                {
-                    const entity_id owner = corp_it->second;
-                    const float     er    = std::max(1.5f, draw_r * 0.15f);
-                    const ImVec2    ec    { cx + draw_r * 0.56f, cy + draw_r * 0.40f };
-                    dl->AddCircleFilled(ec, er * 1.40f, IM_COL32(18, 20, 26, 225), 16);
-                    icons::corp_emblem(dl, ec, er,
-                                       palette::corp_emblem_shape(owner),
-                                       palette::corp_identity_colour(owner, w.player_entity));
-                }
+                // BL-1241 (structures baked): NO building mark draws here. What
+                // stands on the tile is a structure baked into the ground art —
+                // a cluster of up to three, one per stack (RENDERING.md
+                // § Installations; ui/structure_stamps.cpp). The silhouette
+                // glyph, the crane, the stacked-tile ring, the corp emblem tag and
+                // the "+N" badge all retired from this canvas with it; the count
+                // and each stack's state are the Selection element's, ownership
+                // the hover card's and the owner lenses'.
+                //
+                // The HIT ZONE stays exactly as it was: the hex, not the stamp,
+                // is what a press lands on (SELECTION.md § Multi-building tiles).
+                // `mr` is the legacy marker radius, kept solely as its scale.
+                const float mr = std::max(2.0f, draw_r * 0.22f);
 
                 // Register hit zone (BL-059). Only the k==0 copy per tile so
                 // wrap copies don't produce duplicate zones; the single zone
@@ -4312,12 +4173,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     const auto bld_it = tile_to_bld.find(id);
                     if (bld_it != tile_to_bld.end())
                     {
-                        // BL-367: one marker still stands for the whole tile (the
-                        // "+N" badge below counts them, and since BL-596 the stack
-                        // ring above names their kinds), so a tile with more than one building no
-                        // longer assumes the whole hex is a single installation —
-                        // the click lands on the TILE (grouped stack list) instead
-                        // of jumping into whichever building sorts lowest-id.
+                        // BL-367: a tile with more than one building does not
+                        // assume the whole hex is one installation — the click
+                        // lands on the TILE (grouped stack list) instead of
+                        // jumping into whichever building sorts lowest-id.
                         const int count = tile_bld_count.count(id) ? tile_bld_count.at(id) : 1;
                         marker_hit_zone hz;
                         hz.id     = (count > 1) ? id : bld_it->second;
@@ -4325,23 +4184,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         hz.centre = {cx, cy};
                         hz.radius = mr * 2.0f;
                         state.marker_hit_zones.push_back(hz);
-
-                        if (count > 1)
-                        {
-                            // "+N" badge, lower-right — staggered past the corp-identity
-                            // tag (also lower-right) per ICONS.md's multi-badge offset
-                            // convention, same k/N text idiom the survey badge uses.
-                            // It survives BL-596's ring rather than being replaced by
-                            // it: the ring says which KINDS, the badge says how MANY,
-                            // and a tile holding three extraction sites is one kind
-                            // standing three times.
-                            char nbuf[8];
-                            std::snprintf(nbuf, sizeof nbuf, "+%d", count - 1);
-                            const ImVec2 bpos{ cx + draw_r * 0.56f, cy + draw_r * 0.68f };
-                            const ImU32  bcol = IM_COL32(230, 230, 235, 235);
-                            dl->AddCircleFilled(bpos, 8.0f, IM_COL32(18, 20, 26, 225), 12);
-                            dl->AddText({bpos.x - 7.0f, bpos.y - 6.0f}, bcol, nbuf); // fit-exempt: on-canvas marker badge, no containing box
-                        }
                     }
                 }
             }
@@ -4731,36 +4573,29 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
-    // Population-centre markers (BL-083; LOD ladder, BL-625). Every generated
-    // settlement is drawn — the world genuinely carries one per province
-    // (BL-623: 1,823 on the canonical homeworld) — and the FORM follows the
-    // zoom, on the canvas's two existing detail pivots (k_lod_radius_px = 7,
-    // the coarse-fill LOD; 14, where terrain texture fades in). Far zoom keeps
-    // the long tail of villages as a density field of dots rather than glyph
-    // soup; close zoom shows every centre as its tier skyline, razed centres
-    // included. This replaces the conurbation clustering (Chebyshev <= 3,
-    // transitive), authored for a 20-40-centre world — at the post-BL-623
-    // density it collapsed the map to 49 marks (the measured diagnosis on
-    // BL-625) and hid the settled world it was meant to organise.
+    // Population centres (BL-083; BL-1241, structures baked). Every generated
+    // settlement is a STRUCTURE baked into the ground art — footprint and height
+    // stepping with its scale, a razed centre as a ruin (RENDERING.md
+    // § Installations; ui/structure_stamps.cpp) — so the skyline glyph, the ruin
+    // glyph and the far-zoom density dot all retired from this canvas. Far-zoom
+    // legibility is the art's job now: a scale >= 3 centre bakes as a pale paved
+    // patch with a dark core at the far page.
+    //
+    // What remains here is the NAME: only City+ centres (scale >= 4, not razed)
+    // carry a label, placed where the old skyline's edge stood.
     if (!w.population_centres.empty())
     {
-        // Ladder rungs. close: every centre is a skyline and ruins surface.
-        // mid: towns (scale 2) join the skylines. far: only scale >= 3 carries
-        // a glyph; smaller centres are the density field.
-        const bool close_zoom = draw_r >= 14.0f;
-        const bool mid_zoom   = draw_r > k_lod_radius_px;
-        const int  skyline_min_scale = close_zoom ? 1 : (mid_zoom ? 2 : 3);
-
         const float visible_top    = grid_area_origin.y - hit_r;
         const float visible_bottom = grid_area_origin.y + grid_area_size.y + hit_r;
 
-        // Sorted gather: the store is an unordered_map, and overlapping marks
+        // Sorted gather: the store is an unordered_map, and overlapping labels
         // must overdraw in one deterministic order for the capture harness.
-        struct pop_centre { int col; int row; int scale; bool razed; entity_id centre; };
+        struct pop_centre { int col; int row; int scale; entity_id centre; };
         std::vector<pop_centre> pcs;
-        pcs.reserve(w.population_centres.size());
         for (const auto& [pid, pc] : w.population_centres)
         {
+            if (pc.scale < 4 || pc.razed)
+                continue;
             const auto tit = w.population_centre_tile.find(pid);
             if (tit == w.population_centre_tile.end())
                 continue;
@@ -4768,40 +4603,30 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (til == w.tiles.end() || til->second.body != state.active_body)
                 continue;
             pcs.push_back({ til->second.grid_x, til->second.grid_y,
-                            std::clamp(pc.scale, 1, 5), pc.razed, pid });
+                            std::clamp(pc.scale, 1, 5), pid });
         }
         std::sort(pcs.begin(), pcs.end(),
                   [](const pop_centre& a, const pop_centre& b) { return a.centre < b.centre; });
 
         for (const pop_centre& a : pcs)
         {
-            // A ruin is a tile-scale fact, not a region-scale one (BL-624):
-            // razed centres surface only at close zoom, as the razed mark.
-            if (a.razed && !close_zoom)
-                continue;
-
             const ImVec2 lc = hex_local_centre(a.col, a.row, hex_size);
             const ImVec2 sc = to_screen(lc);
             if (sc.y < visible_top || sc.y > visible_bottom)
-                continue; // vertical cull — at 1,800+ centres dead marks are real vertices
+                continue;
 
-            // Civic-neutral under every lens (BL-601): tier is carried by the
-            // glyph, ownership by the national border band, never by colour.
-            const ImU32 col = palette::settlement;
-            const float sr  = std::max(3.0f, draw_r * (0.30f + 0.11f * static_cast<float>(a.scale)));
+            // The label's offset from the centre: the old skyline radius, so
+            // names sit where players learned to look for them.
+            const float sr = std::max(3.0f, draw_r * (0.30f + 0.11f * static_cast<float>(a.scale)));
 
-            // A City+ centre is labelled with its PERSISTED name — generated by
-            // the seeded tongue system (generate_city_name, BL-290) and re-named
-            // to the settling culture's speech in name_population_centres, so the
-            // label is deterministic per campaign and speaks the world's own
-            // language. (The old static Earth-flavoured bank was removed, BL-363.)
-            const char* name = nullptr;
-            if (a.scale >= 4 && !a.razed)
-            {
-                const auto name_it = w.population_centre_name.find(a.centre);
-                if (name_it != w.population_centre_name.end() && !name_it->second.empty())
-                    name = name_it->second.c_str();
-            }
+            // The PERSISTED name — generated by the seeded tongue system
+            // (generate_city_name, BL-290) and re-named to the settling culture's
+            // speech in name_population_centres, so the label is deterministic
+            // per campaign and speaks the world's own language.
+            const auto name_it = w.population_centre_name.find(a.centre);
+            if (name_it == w.population_centre_name.end() || name_it->second.empty())
+                continue;
+            const char* name = name_it->second.c_str();
 
             const int k_min = (period_px > 0.0f)
                 ? static_cast<int>(std::ceil((visible_left  - sc.x) / period_px)) : 0;
@@ -4810,26 +4635,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             for (int k = k_min; k <= k_max; ++k)
             {
                 const ImVec2 mc = { sc.x + static_cast<float>(k) * period_px, sc.y };
-                if (a.razed)
-                    icons::settlement_razed(dl, mc, sr, col);
-                else if (a.scale >= skyline_min_scale)
-                    icons::settlement(dl, mc, sr, a.scale, col);
-                else
-                {
-                    // The density field: below its skyline rung a centre is a
-                    // small civic dot — the "many population centres" read at
-                    // region scale, without 1,700 skylines of glyph soup.
-                    const float dot_r = std::max(1.2f, draw_r * 0.16f);
-                    dl->AddCircleFilled(mc, dot_r, (col & 0x00FFFFFFu) | 0xA5000000u);
-                }
-
-                // Label City+ centres (tier >= 4) only, to keep the map legible.
-                if (name)
-                {
-                    const ImVec2 tp{ mc.x + sr + 3.0f, mc.y - sr };
-                    dl->AddText({ tp.x + 1.0f, tp.y + 1.0f }, IM_COL32(20, 22, 28, 200), name); // shadow // fit-exempt: legend box sized to its measured entries (container 2)
-                    dl->AddText(tp, IM_COL32(236, 230, 214, 255), name); // fit-exempt: legend box sized to its measured entries (container 2)
-                }
+                const ImVec2 tp{ mc.x + sr + 3.0f, mc.y - sr };
+                dl->AddText({ tp.x + 1.0f, tp.y + 1.0f }, IM_COL32(20, 22, 28, 200), name); // shadow // fit-exempt: legend box sized to its measured entries (container 2)
+                dl->AddText(tp, IM_COL32(236, 230, 214, 255), name); // fit-exempt: legend box sized to its measured entries (container 2)
             }
         }
     }

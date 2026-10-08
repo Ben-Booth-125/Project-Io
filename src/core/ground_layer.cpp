@@ -96,6 +96,13 @@ void ground_layer::reset(entity_id body, const world& w)
         m_far = nullptr;
     }
     m_far_ready = m_far_queued = false;
+    if (m_neigh)
+    {
+        SDL_DestroyTexture(m_neigh);
+        m_neigh = nullptr;
+    }
+    m_neigh_ready = m_neigh_queued = false;
+    m_neigh_tile = m_neigh_want_tile = null_entity;
     m_active_tier = -1;
     m_body = body;
     m_src.reset();
@@ -105,6 +112,7 @@ void ground_layer::reset(entity_id body, const world& w)
     if (b.grid_width <= 0 || b.grid_height <= 0)
         return; // a gridless body (the star) has no ground to bake
     m_far_geom = ui::ground::make_geometry(b.grid_width, b.grid_height, k_far_px_per_r);
+    m_neigh_geom = ui::ground::make_geometry(b.grid_width, b.grid_height, k_neigh_px_per_r);
     for (int t = 0; t < k_tiers; ++t)
     {
         m_tiers[t].geom_ppr = k_tier_ppr[t];
@@ -119,7 +127,7 @@ void ground_layer::reset(entity_id body, const world& w)
 void ground_layer::refresh_source(const world& w)
 {
     m_src = std::make_shared<const ui::ground::bake_source>(
-        ui::ground::prepare_source(w, m_body));
+        ui::ground::prepare_source(w, m_body, /*reveal_all=*/false, registry));
     m_src_age = 0;
     ++m_gen; // in-flight results against the old source are stale
 }
@@ -152,6 +160,12 @@ void ground_layer::shutdown()
         m_far = nullptr;
     }
     m_far_ready = m_far_queued = false;
+    if (m_neigh)
+    {
+        SDL_DestroyTexture(m_neigh);
+        m_neigh = nullptr;
+    }
+    m_neigh_ready = m_neigh_queued = false;
     m_body = null_entity;
     m_src.reset();
 }
@@ -186,6 +200,40 @@ void ground_layer::upload(SDL_Renderer* r, const result& d)
     // the slot must become re-enqueueable or it is bricked until a body switch.
     // The review fleet confirmed both wedge paths (2026-09-01): a generation
     // bump mid-bake orphaning the result, and SDL_CreateTexture returning null.
+    if (d.tier == -2)
+    {
+        // The neighbourhood page (BL-1241). Same flag discipline as the far
+        // page: the queued flag clears first, whatever happens next.
+        m_neigh_queued = false;
+        if (d.gen != m_gen)
+        {
+            m_neigh_want = 0; // re-requested next tick against the live source
+            return;
+        }
+        if (m_neigh && (m_neigh_w != d.pw || m_neigh_h != d.ph))
+        {
+            SDL_DestroyTexture(m_neigh);
+            m_neigh = nullptr;
+        }
+        if (!m_neigh)
+        {
+            m_neigh = SDL_CreateTexture(r, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC,
+                                        d.pw, d.ph);
+            if (!m_neigh)
+                return;
+            m_neigh_w = d.pw;
+            m_neigh_h = d.ph;
+            SDL_SetTextureScaleMode(m_neigh, SDL_SCALEMODE_LINEAR);
+            SDL_SetTextureBlendMode(m_neigh, SDL_BLENDMODE_BLEND);
+        }
+        SDL_UpdateTexture(m_neigh, nullptr, d.px.data(), d.pw * 4);
+        ++m_bake_counters.neigh_bakes;
+        m_neigh_hash = d.hash;
+        m_neigh_tile = m_neigh_want_tile;
+        std::copy(std::begin(m_neigh_want_rect), std::end(m_neigh_want_rect), std::begin(m_neigh_rect));
+        m_neigh_ready = true;
+        return;
+    }
     if (d.tier < 0)
     {
         m_far_queued = false;
@@ -209,6 +257,7 @@ void ground_layer::upload(SDL_Renderer* r, const result& d)
             SDL_SetTextureBlendMode(m_far, SDL_BLENDMODE_BLEND);
         }
         SDL_UpdateTexture(m_far, nullptr, d.px.data(), d.pw * 4);
+        ++m_bake_counters.far_bakes;
         m_far_hash  = d.hash;
         m_far_ready = true;
         return;
@@ -228,6 +277,9 @@ void ground_layer::upload(SDL_Renderer* r, const result& d)
         SDL_SetTextureBlendMode(c.tex, SDL_BLENDMODE_BLEND);
     }
     SDL_UpdateTexture(c.tex, nullptr, d.px.data(), d.pw * 4);
+    ++m_bake_counters.chunk_bakes;
+    if (c.ready)
+        ++m_bake_counters.chunk_rebakes;
     c.hash  = d.hash;
     c.ready = true;
     c.last_want = m_frame;
@@ -388,6 +440,52 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
         }
     }
 
+    // --- The Selection band's neighbourhood page (BL-1241) ---
+    // A flat close-tier bake of the selected tile's neighbourhood, so the
+    // zoomed view shows the same ground — structures included — as the canvas.
+    {
+        const ground_neigh_request& nq = ui.ground_neigh_req;
+        if (nq.valid && nq.body == m_body && m_src && m_neigh_geom.W > 0 && !m_neigh_queued)
+        {
+            constexpr double kSqrt3_ = 1.7320508075688772;
+            const ui::ground::geometry& g = m_neigh_geom;
+            const double cx = kSqrt3_ * (nq.col + ((nq.row & 1) ? 0.5 : 0.0));
+            const double cy = 1.5 * nq.row;
+            const double hx = (nq.radius + 1.2) * kSqrt3_;
+            const double hy = (nq.radius + 1.2) * 1.5 + 0.6;
+            const int px0 = static_cast<int>(std::floor((cx - hx) * g.s));
+            const int py0 = std::clamp(static_cast<int>(std::floor((cy - hy - g.y_min) * g.s)),
+                                       0, std::max(0, g.H - 1));
+            const int pw  = std::max(1, static_cast<int>(std::ceil(2.0 * hx * g.s)));
+            const int ph  = std::max(1, std::min(g.H - py0,
+                                                 static_cast<int>(std::ceil(2.0 * hy * g.s))));
+            std::uint64_t h = ui::ground::region_hash(*m_src, g, px0, py0, pw, ph);
+            h ^= (static_cast<std::uint64_t>(static_cast<std::uint32_t>(px0)) << 32)
+               ^ static_cast<std::uint32_t>(py0) ^ (static_cast<std::uint64_t>(pw) << 17);
+            const bool stale = !m_neigh_ready || h != m_neigh_hash || m_neigh_tile != nq.tile;
+            if (stale && (h != m_neigh_want || !m_neigh_ready || bake_everything))
+            {
+                job j;
+                j.tier = -2; j.px0 = px0; j.py0 = py0; j.pw = pw; j.ph = ph;
+                j.gen = m_gen; j.src = m_src; j.geom = g; j.prm = params;
+                j.hash = h;
+                m_neigh_want = h;
+                m_neigh_want_tile = nq.tile;
+                m_neigh_want_rect[0] = static_cast<float>(px0 / g.s);
+                m_neigh_want_rect[1] = static_cast<float>(py0 / g.s + g.y_min);
+                m_neigh_want_rect[2] = static_cast<float>((px0 + pw) / g.s);
+                m_neigh_want_rect[3] = static_cast<float>((py0 + ph) / g.s + g.y_min);
+                if (bake_everything)
+                    bake_now(r, j);
+                else
+                {
+                    m_neigh_queued = true;
+                    enqueue(std::move(j));
+                }
+            }
+        }
+    }
+
     // --- The active tier's wanted set ---
     const ground_request& req = ui.ground_req;
     if (req.valid && req.body == m_body && req.draw_r > 0.0f)
@@ -508,6 +606,13 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
     publish(ui);
 }
 
+std::uint64_t ground_layer::installation_digest() const
+{
+    if (!m_src || m_far_geom.W <= 0)
+        return 0;
+    return ui::ground::installation_hash(*m_src, m_far_geom, 0, 0, m_far_geom.W, m_far_geom.H);
+}
+
 void ground_layer::publish(ui_state& ui) const
 {
     ground_view& v = ui.ground;
@@ -518,6 +623,17 @@ void ground_layer::publish(ui_state& ui) const
     v.far.x1    = static_cast<float>(m_far_geom.W / m_far_geom.s);
     v.far.y0    = static_cast<float>(m_far_geom.y_min);
     v.far.y1    = static_cast<float>(m_far_geom.H / m_far_geom.s + m_far_geom.y_min);
+    v.neigh      = ground_chunk_view{};
+    v.neigh_tile = null_entity;
+    if (m_neigh_ready && m_neigh)
+    {
+        v.neigh.tex = m_neigh;
+        v.neigh.x0  = m_neigh_rect[0];
+        v.neigh.y0  = m_neigh_rect[1];
+        v.neigh.x1  = m_neigh_rect[2];
+        v.neigh.y1  = m_neigh_rect[3];
+        v.neigh_tile = m_neigh_tile;
+    }
     v.chunks.clear();
     v.standin.clear();
     v.tier_ppr = 0.0;

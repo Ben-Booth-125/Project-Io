@@ -4584,6 +4584,307 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // Data accessor: return every population centre as a Lua array of
     // {body, x, y, scale, population, habitability} records, so a BL-069 script can
     // centre/select a centre's tile without hard-coding coordinates.
+    // BL-1241 (structures baked): STAGE installations for the ground-bake
+    // captures, bypassing placement rules, funds and the build queue — the
+    // capture judges what the bake DRAWS for each depicted subject, and a
+    // seed's own placement rules would otherwise decide which forms a script
+    // can ever see. Verify-only by construction; a staged building is an
+    // ordinary building_component (owned, stockpiled, in its corp's assets).
+    //
+    //   kind    "extraction" (detail = target resource name), "processing"
+    //           (detail = recipe GROUP, e.g. "Metal Foundry"; the first recipe
+    //           in that group), "port", "launchpad", "logistics_hub",
+    //           "military_base", "research_institute", "schooling", "university".
+    //   rival   owned by the lowest-id non-player corporation, else the player.
+    //   site    staged under construction (the scaffolding stamp).
+    const auto stage_one = [this](entity_id tile, const std::string& kind,
+                                  const std::string& detail, bool rival, bool site) -> entity_id {
+        building_component bc{};
+        bc.tile = tile;
+        bc.workforce_assigned = 0.5f;
+        if      (kind == "extraction")         bc.type = building_type::extraction_site;
+        else if (kind == "processing")         bc.type = building_type::processing_facility;
+        else if (kind == "port")               bc.type = building_type::port;
+        else if (kind == "launchpad")          bc.type = building_type::launchpad;
+        else if (kind == "logistics_hub")      bc.type = building_type::inland_logistics_hub;
+        else if (kind == "military_base")      bc.type = building_type::military_base;
+        else if (kind == "research_institute") bc.type = building_type::research_institute;
+        else if (kind == "schooling")          bc.type = building_type::schooling;
+        else if (kind == "university")         bc.type = building_type::university;
+        else
+            return null_entity;
+        if (bc.type == building_type::extraction_site)
+            bc.target_resource = resource_from_name(detail.empty() ? std::string("iron_ore") : detail);
+        if (bc.type == building_type::processing_facility)
+        {
+            bc.recipe = m_registry.default_recipe_id();
+            for (std::size_t i = 0; i < m_registry.recipe_count(); ++i)
+                if (const recipe* rc = m_registry.get_recipe(static_cast<uint16_t>(i));
+                    rc && rc->group == detail)
+                {
+                    bc.recipe = static_cast<uint16_t>(i);
+                    break;
+                }
+        }
+        bc.ticks_remaining = site ? 60 : 0;
+        entity_id owner = m_world.player_entity;
+        if (rival)
+        {
+            entity_id best = null_entity;
+            for (const auto& [cid, cc] : m_world.corporations)
+                if (cid != m_world.player_entity && (best == null_entity || cid < best))
+                    best = cid;
+            if (best != null_entity)
+                owner = best;
+        }
+        const entity_id id = m_world.create_entity();
+        m_world.buildings[id]  = bc;
+        m_world.stockpiles[id] = stockpile_component{};
+        if (auto cit = m_world.corporations.find(owner); cit != m_world.corporations.end())
+            cit->second.assets.push_back(id);
+        return id;
+    };
+
+    // One installation on the active body's tile (col, row). Returns the new
+    // building's id, or 0 when the tile or kind is unknown.
+    v.set_function("stage_building",
+        [this, stage_one](int col, int row, const std::string& kind, sol::optional<std::string> detail,
+                          sol::optional<sol::table> opts) -> unsigned {
+            entity_id tile = null_entity;
+            for (const auto& [tid, tc] : m_world.tiles)
+                if (tc.body == m_ui.active_body && tc.grid_x == col && tc.grid_y == row)
+                {
+                    tile = tid;
+                    break;
+                }
+            if (tile == null_entity)
+                return 0u;
+            const bool rival = opts ? opts->get_or("rival", false) : false;
+            const bool site  = opts ? opts->get_or("site", false) : false;
+            return static_cast<unsigned>(stage_one(tile, kind, detail.value_or(""), rival, site));
+        });
+
+    // The whole roster at once, around the player's HQ on the active body: one
+    // installation per procedural form (every extraction family, every recipe
+    // group, every other placeable type), a construction site, a rival plant, a
+    // four-stack tile, and the six population centres nearest the HQ stepped to
+    // a settlement ladder (scale 1-5) plus one razed. C++ picks the ground
+    // (unoccupied, revealed land, two tiles apart; the port on a coast), so no
+    // tile data reaches Lua — the script gets back only where it staged:
+    // { col, row } = the HQ anchor, { stack_col, stack_row } = the stacked tile,
+    // staged = installations placed, centres = centres restaged.
+    v.set_function("stage_gallery", [this, stage_one]() {
+        sol::state& s = m_lua.state();
+        sol::table out = s.create_table();
+        out["staged"] = 0;
+        const entity_id body = m_ui.active_body;
+        const auto bit = m_world.bodies.find(body);
+        if (bit == m_world.bodies.end())
+            return out;
+        const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+        if (gw <= 0 || gh <= 0)
+            return out;
+        const std::vector<entity_id>& grid = body_tile_grid(m_world, body);
+        std::unordered_set<entity_id> occupied;
+        for (const auto& [bid, bc] : m_world.buildings)
+            occupied.insert(bc.tile);
+        for (const auto& [cid, tid] : m_world.population_centre_tile)
+            occupied.insert(tid);
+        const auto water = [](const tile_component& t) {
+            return t.substrate == terrain_substrate::ocean || t.substrate == terrain_substrate::coast
+                || t.substrate == terrain_substrate::lake;
+        };
+        const auto tile_at = [&](int c, int r) -> const tile_component* {
+            if (r < 0 || r >= gh || grid.size() < static_cast<std::size_t>(gw) * gh)
+                return nullptr;
+            const int cw = ((c % gw) + gw) % gw;
+            const entity_id id = grid[static_cast<std::size_t>(r) * gw + cw];
+            const auto it = m_world.tiles.find(id);
+            return it == m_world.tiles.end() ? nullptr : &it->second;
+        };
+        // Anchor: the most continental population centre on the body — the one
+        // with the most land in a 17 x 13 window (lowest id on a tie) — so the
+        // roster stands on one landmass rather than scattered over islands.
+        int ax = gw / 2, ay = gh / 2;
+        {
+            std::vector<std::pair<entity_id, entity_id>> centres(m_world.population_centre_tile.begin(),
+                                                                 m_world.population_centre_tile.end());
+            std::sort(centres.begin(), centres.end());
+            int best = -1;
+            for (const auto& [cid, tid] : centres)
+            {
+                const auto t = m_world.tiles.find(tid);
+                if (t == m_world.tiles.end() || t->second.body != body)
+                    continue;
+                int land = 0;
+                for (int dr = -6; dr <= 6; ++dr)
+                    for (int dc = -8; dc <= 8; ++dc)
+                        if (const tile_component* n = tile_at(t->second.grid_x + dc, t->second.grid_y + dr);
+                            n && !water(*n))
+                            ++land;
+                if (land > best)
+                {
+                    best = land;
+                    ax = t->second.grid_x;
+                    ay = t->second.grid_y;
+                }
+            }
+        }
+        out["col"] = ax;
+        out["row"] = ay;
+
+        // Candidate sites, nearest first (deterministic order).
+        struct cand { int d2, r, c; entity_id id; bool coast; };
+        std::vector<cand> cands;
+        for (int r = std::max(0, ay - 14); r <= std::min(gh - 1, ay + 14); ++r)
+            for (int c = ax - 16; c <= ax + 16; ++c)
+            {
+                if (((c - ax) & 1) || ((r - ay) & 1))
+                    continue; // two tiles apart, so each form reads alone
+                const tile_component* t = tile_at(c, r);
+                if (!t || water(*t))
+                    continue;
+                const int cw = ((c % gw) + gw) % gw;
+                const entity_id id = grid[static_cast<std::size_t>(r) * gw + cw];
+                if (occupied.count(id)
+                    || !survey_tile_visible(bit->second.survey, gw, gh, cw, r))
+                    continue;
+                bool coast = false;
+                for (int dr = -1; dr <= 1 && !coast; ++dr)
+                    for (int dc = -1; dc <= 1; ++dc)
+                        if (const tile_component* n = tile_at(c + dc, r + dr); n && water(*n))
+                            coast = true;
+                cands.push_back({ (c - ax) * (c - ax) + (r - ay) * (r - ay), r, cw, id, coast });
+            }
+        std::sort(cands.begin(), cands.end(), [](const cand& a, const cand& b) {
+            return std::tie(a.d2, a.r, a.c) < std::tie(b.d2, b.r, b.c);
+        });
+        std::vector<bool> used(cands.size(), false);
+        const auto take = [&](bool want_coast) -> const cand* {
+            for (std::size_t i = 0; i < cands.size(); ++i)
+                if (!used[i] && (!want_coast || cands[i].coast))
+                {
+                    used[i] = true;
+                    return &cands[i];
+                }
+            return nullptr;
+        };
+        struct item { const char* kind; const char* detail; bool rival; bool site; };
+        const item roster[] = {
+            { "extraction", "iron_ore", false, false },   { "extraction", "stone", false, false },
+            { "extraction", "petroleum", false, false },  { "extraction", "water", false, false },
+            { "extraction", "timber", false, false },     { "extraction", "agricultural_produce", false, false },
+            { "extraction", "coffee", false, false },     { "extraction", "peat", false, false },
+            { "extraction", "furs", false, false },
+            { "processing", "Metal Foundry", false, false },          { "processing", "Fuel Production", false, false },
+            { "processing", "Construction Materials", false, false }, { "processing", "Construction", false, false },
+            { "processing", "Artisan Goods", false, false },          { "processing", "Food Processing", false, false },
+            { "processing", "Chemical Works", false, false },         { "processing", "Refinery", false, false },
+            { "processing", "Power Generation", false, false },       { "processing", "Electronics", false, false },
+            { "processing", "Advanced Fabrication", false, false },   { "processing", "Welfare Goods", false, false },
+            { "launchpad", "", false, false },          { "logistics_hub", "", false, false },
+            { "military_base", "", false, false },      { "research_institute", "", false, false },
+            { "schooling", "", false, false },          { "university", "", false, false },
+            { "processing", "Metal Foundry", false, true },   // a construction site
+            { "processing", "Refinery", true, false },        // a rival plant
+        };
+        int staged = 0;
+        if (const cand* c = take(true))
+            staged += stage_one(c->id, "port", "", false, false) != null_entity;
+        for (const item& it : roster)
+            if (const cand* c = take(false))
+            {
+                if (staged == 0 || !out["single_col"].valid())
+                {
+                    out["single_col"] = c->c; // a single-building tile: the click lands on the building
+                    out["single_row"] = c->r;
+                }
+                staged += stage_one(c->id, it.kind, it.detail, it.rival, it.site) != null_entity;
+            }
+        // The stacked tile: four stacks, so the fourth proves it adds nothing.
+        if (const cand* c = take(false))
+        {
+            staged += stage_one(c->id, "extraction", "iron_ore", false, false) != null_entity;
+            staged += stage_one(c->id, "extraction", "iron_ore", false, false) != null_entity;
+            staged += stage_one(c->id, "processing", "Metal Foundry", false, false) != null_entity;
+            staged += stage_one(c->id, "logistics_hub", "", false, false) != null_entity;
+            staged += stage_one(c->id, "extraction", "coal", true, false) != null_entity;
+            out["stack_col"] = c->c;
+            out["stack_row"] = c->r;
+        }
+        out["staged"] = staged;
+
+        // The settlement ladder: the six centres nearest the anchor.
+        struct pc_d { int d2; entity_id id; };
+        std::vector<pc_d> pcs;
+        for (const auto& [cid, tid] : m_world.population_centre_tile)
+        {
+            const auto t = m_world.tiles.find(tid);
+            if (t == m_world.tiles.end() || t->second.body != body)
+                continue;
+            int dx = std::abs(t->second.grid_x - ax);
+            dx = std::min(dx, gw - dx);
+            const int dy = t->second.grid_y - ay;
+            pcs.push_back({ dx * dx + dy * dy, cid });
+        }
+        std::sort(pcs.begin(), pcs.end(), [](const pc_d& a, const pc_d& b) {
+            return std::tie(a.d2, a.id) < std::tie(b.d2, b.id);
+        });
+        int centres = 0;
+        for (std::size_t i = 0; i < pcs.size() && i < 6; ++i)
+        {
+            auto pit = m_world.population_centres.find(pcs[i].id);
+            if (pit == m_world.population_centres.end())
+                continue;
+            pit->second.scale = i < 5 ? static_cast<int>(i) + 1 : 1;
+            pit->second.razed = i == 5;
+            ++centres;
+        }
+        out["centres"] = centres;
+        return out;
+    });
+
+    // BL-1241: step an EXISTING population centre on the active body to a
+    // settlement-ladder rung (scale 1-5) or raze it. The centre keeps its
+    // entity, name and tile; only scale / razed move. False when no centre
+    // stands on (col, row).
+    v.set_function("stage_centre", [this](int col, int row, int scale, sol::optional<bool> razed) -> bool {
+        for (auto& [cid, pc] : m_world.population_centres)
+        {
+            const auto tit = m_world.population_centre_tile.find(cid);
+            if (tit == m_world.population_centre_tile.end())
+                continue;
+            const auto til = m_world.tiles.find(tit->second);
+            if (til == m_world.tiles.end() || til->second.body != m_ui.active_body
+                || til->second.grid_x != col || til->second.grid_y != row)
+                continue;
+            pc.scale = std::clamp(scale, 1, 5);
+            pc.razed = razed.value_or(false);
+            return true;
+        }
+        return false;
+    });
+
+    // BL-1241: the ground cache's bake counters and the source's installation
+    // digest — a script steps the sim and checks that chunks re-bake only on
+    // the days the installations (or the terrain) actually moved.
+    v.set_function("ground_stats", [this]() {
+        sol::state& s = m_lua.state();
+        sol::table t = s.create_table();
+        const ground_layer::bake_stats& st = m_ground.bake_counters();
+        t["far_bakes"]      = static_cast<double>(st.far_bakes);
+        t["chunk_bakes"]    = static_cast<double>(st.chunk_bakes);
+        t["chunk_rebakes"]  = static_cast<double>(st.chunk_rebakes);
+        t["neigh_bakes"]    = static_cast<double>(st.neigh_bakes);
+        // A string: a 64-bit digest does not survive a Lua number.
+        char buf[24];
+        std::snprintf(buf, sizeof buf, "%016llx",
+                      static_cast<unsigned long long>(m_ground.installation_digest()));
+        t["installations"] = std::string(buf);
+        t["buildings"]     = static_cast<double>(m_world.buildings.size());
+        return t;
+    });
+
     v.set_function("population_centres", [this]() {
         sol::state& s = m_lua.state();
         sol::table  out = s.create_table();
