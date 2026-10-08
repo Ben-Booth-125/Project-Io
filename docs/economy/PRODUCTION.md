@@ -401,9 +401,10 @@ depth: the ancient chain reaches steel in one step (the Bloomery Furnace, ore an
 anchor sits beside the Smelter's rather than three doubling stages above it. A per-band price
 table was considered and rejected (Ben, 2026-09-02).
 
-**What is exempt, and says so.** A recipe whose every output is unpriced (propellant — consumed by
-the Launchpad, never sold) has no market margin to anchor and is listed, not failed. An **unpriced
-input** is a defect, not an exemption: the good cannot be bought at any price.
+**What is exempt, and says so.** A recipe whose every output is unpriced has no market margin to
+anchor and is listed, not failed — no recipe in the roster qualifies, since propellant carries a
+base price (`RESOURCES.md`, Ben 2026-10-08). An **unpriced input** is a defect, not an exemption:
+the good cannot be bought at any price.
 
 **Retune order.** Green is reached from costs and rates first (the per-batch wage and maintenance
 share move every row at once), then input quantities where a recipe is authored at zero or negative

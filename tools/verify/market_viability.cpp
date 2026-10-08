@@ -207,6 +207,7 @@ namespace {
 // a plant idled for want of a buyer is the economy working; a STARVED plant is not.
 constexpr double k_target_g1_running_at_handoff = 0.85; ///< processors running at handoff
 constexpr double k_target_g1b_starved_max       = 0.05; ///< input-starved (now, or decommissioned after starving) / built, at handoff
+constexpr double k_target_g1_running_at_t50     = 0.85; ///< Ben 2026-10-08: the same 85% at play tick 50 — plants rescued at the handoff must still run
 constexpr double k_target_g2_income_ratio       = 0.50; ///< field income tick 50 / settle close
 constexpr double k_target_g3_firms_alive        = 0.70; ///< firms alive at tick 400 / at handoff
 constexpr int    k_g5_idle_window = 100; ///< G5: processors idled up to this play tick are followed
@@ -1440,6 +1441,10 @@ int main(int argc, char** argv)
     std::printf(" %s  G1b processors input-starved at handoff  %5.1f%%  (%d / %d: %d starved now, %d decommissioned after starving; target <= %.0f%%)\n",
                 g1b <= k_target_g1b_starved_max ? "PASS" : "FAIL", pct(g1b), ph.starved(), ph.built(), ph.n[ps_input],
                 ph.decom_after[1], pct(k_target_g1b_starved_max));
+    const double g1_t50 = p50.share_run();
+    std::printf(" %s  G1 processors running at tick %d   %5.1f%%  (target >= %.0f%%)\n",
+                g1_t50 >= k_target_g1_running_at_t50 ? "PASS" : "FAIL", k_g1_g2_play_tick, pct(g1_t50),
+                pct(k_target_g1_running_at_t50));
     std::printf(" %s  G2 field income play 26-%d mean / settle mean  %5.1f%%  (%.0f / %.0f; target >= %.0f%%)\n",
                 g2 >= k_target_g2_income_ratio ? "PASS" : "FAIL", k_g1_g2_play_tick, pct(g2), i50, ic,
                 pct(k_target_g2_income_ratio));
@@ -1567,7 +1572,7 @@ int main(int argc, char** argv)
             std::printf("\n");
         }
     }
-    std::printf("market_viability: G1 %.1f/85 G1b %.1f/5 G2 %.1f/50 G3 %.1f/70", pct(g1), pct(g1b), pct(g2), pct(g3));
+    std::printf("market_viability: G1 %.1f/85 G1t50 %.1f/85 G1b %.1f/5 G2 %.1f/50 G3 %.1f/70", pct(g1), pct(p50.share_run()), pct(g1b), pct(g2), pct(g3));
     if (g_logistics)
     {
         // appended (BL-1223), never reordered: the L row's headline numbers

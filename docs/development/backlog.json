@@ -1633,8 +1633,8 @@
    "design": "MERGED (a6910272 + 88304efb, 2026-10-08; two review rounds): a new processor judged on supply; plants under construction count against spare; landed-cost pricing. 5 seeds: settle builds starved at handoff 110 -> 0; G1 76.7 -> 80.5, G1b 16.2 -> 11.2. NOTE (review): a site stalled indefinitely reserves its draw indefinitely - watch with BL-1236 (plant builds stall). FOUND by processor_placement_probe (BL-1233): the 12-tick settle scorer adds 221-271 processors by handoff and 96-156 of them are input-starved, nearly all on PROCESSED inputs (consumer goods, ordnance, machinery, propellant); seed 0 alone has 110 of 117 starved after BL-1233. Generation's new sized rule does not reach the scorer. DIAGNOSE: which candidate gate admits them (recipe_inputs_obtainable reading opening stock as cover? the BL-1187 build-only-what-runs test at settle prices?), then fix the estimate inside the scorer grant. Read with BL-1233."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "designed",
+   "glyph": "✓",
    "sprint": 50,
    "written": "2026-10-08",
    "requires": [],
@@ -1652,7 +1652,7 @@
     "src/world/corp_ai.cpp",
     "src/world/economy_system.cpp"
    ],
-   "design": "NOVEL INTERACTION, FOR BEN (2026-10-08): the scorer's workforce dial holds a touched building for 4 evaluations at cadence 4 (~16 ticks), longer than the 8-tick loss reflex; a plant the dial zeroed and then wants to restore (gain ~35) is decommissioned by the reflex before the hold lets the dial act (seed 0 power plants, BL-1232). No doc owns how the dial and the reflex compose. Options: the reflex skips a building the dial touched within its hold; the hold shortens below the reflex; the dial's zero-staffing is not a loss streak. Ben's call; no clamp on the reflex."
+   "design": "RULED (Ben, 2026-10-08, the dial lever form): the loss reflex never counts a dial-idled plant's maintenance as a loss streak, and the dial's hold on a zeroed plant ends when its own forecast recovers (AI_OPPONENT.md, the candidate table). NOVEL INTERACTION, FOR BEN (2026-10-08): the scorer's workforce dial holds a touched building for 4 evaluations at cadence 4 (~16 ticks), longer than the 8-tick loss reflex; a plant the dial zeroed and then wants to restore (gain ~35) is decommissioned by the reflex before the hold lets the dial act (seed 0 power plants, BL-1232). No doc owns how the dial and the reflex compose. Options: the reflex skips a building the dial touched within its hold; the hold shortens below the reflex; the dial's zero-staffing is not a loss streak. Ben's call; no clamp on the reflex."
   },
   {
    "status": "proposed",

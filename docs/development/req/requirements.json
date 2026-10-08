@@ -6706,7 +6706,7 @@
      "verification": [
       "headless: market-viability skill, 16 curated seeds, after the re-bless"
      ],
-     "requirement": "G1 >= 85% of built processors running at handoff and G1b <= 5% input-starved (now, or decommissioned after starving), pooled over 16 seeds; G2 and G3 still pass (targets: Ben, 2026-10-08; was G1 >= 70%). The cause is fixed in the network, dispatch or placement, never by clamping the loss reflex.",
+     "requirement": "G1 >= 85% of built processors running at handoff and at play tick 50 and G1b <= 5% input-starved (now, or decommissioned after starving), pooled over 16 seeds; G2 and G3 still pass (targets: Ben, 2026-10-08; was G1 >= 70%). The cause is fixed in the network, dispatch or placement, never by clamping the loss reflex.",
      "notes": "",
      "result_metric": ""
     }

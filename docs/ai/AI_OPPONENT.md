@@ -430,6 +430,14 @@ candidate set is this subset of it:
 | `set_recipe(building, recipe)` | `apply_corp_command` → component write | Tier-0 rescue generalises to margin-chasing |
 | `set_workforce(building, target)` | `solve_workforce_target` | The solver reports its own modelled gain, so the dial is scoreable in both directions |
 | `idle(building)` / `resume` | `decommissioned` flag | Tier-0 loss-streak rule, reversible |
+
+**A plant the dial idled is not losing (Ben, 2026-10-08; BL-1235, dial hold outlasts reflex).**
+When the workforce dial sets a plant to zero, the maintenance it pays while idle is the cost the
+dial chose to carry, not a loss: the loss reflex counts no streak against it. And the dial's hold on
+a plant it zeroed ends the moment that plant's own forecast recovers — the plant is dialled again
+on the corporation's next evaluation, not after the fixed hold. Measured: the dial zeroed 503
+generation-built plants in the settle (178 on a start-up glut that had cleared by the handoff), and
+the 8-tick reflex mothballed most of them before the 16-tick hold let the dial look again.
 | `survey(body)` | survey_system | The AI pays for discovery like the player |
 | `hire_unit(tile, unit_type)` | `hire_unit` at the corp's own completed `military_base` | Availability gated on stockpile/market access, never on cash; spend subject to the solvency gate |
 | `place_sell_order(body, target, quantity, floor)` | the order book | § 2C |
