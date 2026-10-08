@@ -1544,6 +1544,20 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
 
     economy_report report;
 
+    // BL-1227 (AI_OPPONENT.md § 2B, the off-book draws as a bid): roll the
+    // off-book record. What the space programme, network upkeep and procurement
+    // drew from each market over the PREVIOUS tick (`offbook_drawn`, saved)
+    // becomes this tick's read (`offbook_bid`, transient), and the record
+    // starts again. First in the step, so every reader this tick — the corp
+    // scorer's veto test — sees last tick's draws, and procurement drawing
+    // below writes only this tick's record.
+    for (auto& [mid, mc] : w.markets)
+    {
+        (void)mid;
+        mc.offbook_bid = mc.offbook_drawn;
+        mc.offbook_drawn.fill(0.0f);
+    }
+
     // BL-545/BL-546: one tick of the relational substrate's DECAY half, before
     // anything this tick can observe. `run_sentiment_step` is decay-then-fold
     // and the fold half is spread across this tick's writers (a contract
@@ -1727,20 +1741,24 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                 // building to order while it sits there would mint goods.
                 const entity_id home_key = corp_home_pool_key(w, c.supplier, c.body);
                 float to_draw = c.quantity;
-                const auto draw_from = [&](stockpile_component& pool) {
+                const auto draw_from = [&](stockpile_component& pool, entity_id pool_key) {
                     float& sq = pool.quantities[ri];
                     const float take = std::min(sq, to_draw); // a pool never goes negative
                     sq -= take;
                     to_draw -= take;
+                    // BL-1227: an off-book bid on the market the pool is keyed to.
+                    if (take > 0.0f)
+                        if (const auto okit = w.markets.find(pool_key); okit != w.markets.end())
+                            okit->second.offbook_drawn[ri] += take;
                 };
                 if (const auto skit = w.corp_market_pools.find(std::make_pair(c.supplier, home_key));
                     skit != w.corp_market_pools.end())
-                    draw_from(skit->second);
+                    draw_from(skit->second, home_key);
                 for (auto it = w.corp_market_pools.lower_bound({c.supplier, entity_id{0}});
                      to_draw > 0.0f && it != w.corp_market_pools.end() && it->first.first == c.supplier;
                      ++it)
                     if (it->first.second != home_key && pool_key_body(w, it->first.second) == c.body)
-                        draw_from(it->second);
+                        draw_from(it->second, it->first.second);
                 const entity_id land_on = (c.delivery_body != null_entity) ? c.delivery_body : c.body;
                 w.pool_at(c.buyer, corp_home_pool_key(w, c.buyer, land_on)).quantities[ri] += c.quantity;
                 // BL-546: one `contract_completed` occurrence folded into the

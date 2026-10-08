@@ -345,7 +345,15 @@ inline constexpr uint32_t world_save_magic =
 /// building and per return and two per corporation; refused whole on the
 /// strict-equality contract, no migration. Claimed through
 /// `tools/session/next_save_version.js --kind world --claim`.
-inline constexpr uint32_t world_save_version = 37;
+/// Bumped to 38 by BL-1227 (idle mines, the off-book draws as a bid): the
+/// market record gains one resource-indexed float array at its tail, after
+/// `hauler_want` -- `offbook_drawn`, what the space programme, network upkeep
+/// and procurement drew from the market this tick, which the NEXT tick's corp
+/// scorer reads (rolled into the transient `offbook_bid`). A v37 stream is
+/// resource_count floats short per market; refused whole on the
+/// strict-equality contract, no migration. Claimed through
+/// `tools/session/next_save_version.js --kind world --claim`.
+inline constexpr uint32_t world_save_version = 38;
 
 /// Write @p w as a complete world snapshot.
 ///

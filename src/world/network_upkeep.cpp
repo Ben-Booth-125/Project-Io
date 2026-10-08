@@ -386,6 +386,7 @@ void settle_network_purchases(world& w,
             continue;
 
         mit->second.inventory[ri] -= drawn;
+        mit->second.offbook_drawn[ri] += drawn; // BL-1227: an off-book bid
         nit->second.treasury      -= np.credits * fill;
         np.funded    = true;
         np.paid      = np.credits * fill;
@@ -457,6 +458,9 @@ void settle_network_purchases(world& w,
             // run_nation_step folds it onto `subsidies` so `net()` explains
             // the delta.
             pit->second.quantities[ri] -= drawn;
+            // BL-1227: an off-book bid on the market the pool is keyed to.
+            if (const auto okit = w.markets.find(np.pool); okit != w.markets.end())
+                okit->second.offbook_drawn[ri] += drawn;
             np.paid      = t.credits;
             np.drawn     = drawn;
             np.completed = true;

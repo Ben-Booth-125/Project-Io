@@ -386,6 +386,34 @@ float forecast_glut_multiplier(const world& w, entity_id tile, resource_type tar
 float corp_reserve_floor(const world& w, const recipe_registry& reg,
                          entity_id corp, const corp_ai_params& p = {});
 
+/// BL-1227 (diagnosis) — one extraction build candidate's fate in the scorer,
+/// for a verify probe. WRITE-ONLY observability, the
+/// `economy_step_phase_clock_sink` shape: null by default (nothing is written,
+/// nothing reads it back), armed by a harness around its own run.
+enum class extraction_trace_outcome : uint8_t
+{
+    placement = 0, ///< can_place_in_world refused the tile
+    net_le0,       ///< the estimate's net <= 0
+    materials,     ///< construction materials not obtainable
+    veto_listed,   ///< glut veto: no bid against listed supply (BL-1227)
+    veto_dead,     ///< glut veto: a cleared market with no bid, nothing listed (BL-1227)
+    veto_ratio,    ///< glut veto: (supply + added) / demand >= glut_veto_ratio
+    held,          ///< zero-bid veto held for the chain start (lifted or not, see report)
+    emitted,       ///< a candidate went to the greedy selection
+    count
+};
+struct extraction_trace_row
+{
+    int           tick   = 0;
+    entity_id     corp   = null_entity;
+    entity_id     tile   = null_entity;
+    resource_type target = resource_type::iron_ore;
+    extraction_trace_outcome outcome = extraction_trace_outcome::placement;
+    float         net    = 0.0f;
+    float         score  = 0.0f;
+};
+std::vector<extraction_trace_row>*& corp_extraction_trace_sink();
+
 /// Fixed personality jitter for a corp in [0.9, 1.1] — a pure hash of
 /// (personality_seed, corp id); constant for the whole campaign.
 float corp_personality_jitter(entity_id corp, uint64_t personality_seed);

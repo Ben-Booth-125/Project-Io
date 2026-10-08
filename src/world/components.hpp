@@ -1078,6 +1078,21 @@ struct market_component
     std::array<float, resource_count> household_weight = {};
     std::array<float, resource_count> hauler_want      = {};
 
+    /// BL-1227 (AI_OPPONENT.md § 2B, Ben 2026-10-07: what counts as a bid for
+    /// the dead-market veto). The OFF-BOOK draws — goods taken from this
+    /// market's shelf or from corporation pools keyed to it by buyers that post
+    /// no bid: the space programme, network upkeep, procurement fulfilment.
+    ///   * `offbook_drawn` accumulates THIS tick's draws where they happen
+    ///     (space_programme.cpp, network_upkeep.cpp, economy_system.cpp's
+    ///     procurement pass). SERIALISED (world_save_version 38): a save between
+    ///     ticks holds the tick's record, which the next tick reads.
+    ///   * `offbook_bid` is the PREVIOUS tick's record, rolled from
+    ///     `offbook_drawn` at the head of run_economy_step (which then zeroes
+    ///     `offbook_drawn`). TRANSIENT, not serialised: it is rewritten before
+    ///     anything reads it. The scorer's veto test reads it.
+    std::array<float, resource_count> offbook_drawn = {};
+    std::array<float, resource_count> offbook_bid   = {};
+
     /// BL-1217 lever D (measurement, behind `economy.background_demand.consumes`,
     /// default off): the BACKGROUND channel's bid at the last clear
     /// (`inject_background_demand`) and what it DREW off `inventory`

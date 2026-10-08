@@ -34,6 +34,7 @@
 #include "world/campaign_settle.hpp"
 #include "world/components.hpp"
 #include "world/construction.hpp"
+#include "world/corp_ai.hpp"
 #include "world/economy_system.hpp"
 #include "world/market_clearing.hpp"
 #include "world/orbital_system.hpp"
@@ -91,8 +92,27 @@ struct good_tally
     double pf = 0, pl = 0, invf = 0, invl = 0, deml = 0;
 };
 
+/// BL-1227 review round 2: the scorer's extraction trace for the diagnosed goods.
+struct trace_tally
+{
+    std::array<long, static_cast<std::size_t>(extraction_trace_outcome::count)> out{};
+    long veto_rows = 0;            ///< veto_listed + veto_dead rows
+    long veto_consumer_any = 0;    ///< ... with a processor consuming the good in that market (any state)
+    long veto_consumer_running = 0;///< ... with one running (not idled, not under construction)
+    long veto_consumer_starved = 0;///< ... with one standing idled (decommissioned)
+    long veto_consumer_uc = 0;     ///< ... with one under construction
+    long veto_body_bid = 0;        ///< ... and another market on the body bids for the good
+    long veto_no_buyer = 0;        ///< ... no consumer processor in the market at all
+    long emitted_built = 0;        ///< emitted rows whose (tile, good) got a new site that tick
+};
+const char* k_tout[] = {"placement", "net<=0", "materials", "veto: listed, no bid", "veto: dead market",
+                        "veto: ratio", "held", "emitted"};
+
 struct ctx
 {
+    std::vector<extraction_trace_row> trace;
+    std::map<std::size_t, trace_tally> tt;
+    std::set<std::size_t> diag;
     const recipe_registry* reg = nullptr;
     std::set<std::size_t> watch;
     std::map<entity_id, mkt_snap> pre[resource_count]; // lap-0 snapshot per market, watched goods only
@@ -133,6 +153,51 @@ void after_lap(const world& w, int lap, void* vp)
         if (!c.watch.count(static_cast<std::size_t>(b.target_resource))) continue;
         fresh.push_back(bid);
     }
+    // ---- BL-1227 round 2: classify this tick's traced extraction candidates
+    if (c.tick >= 1 && !c.trace.empty())
+    {
+        std::set<std::pair<entity_id, std::size_t>> built;
+        for (const entity_id bid : fresh)
+            built.insert({w.buildings.at(bid).tile, static_cast<std::size_t>(w.buildings.at(bid).target_resource)});
+        // consumers per (market, good) by state
+        std::map<std::pair<entity_id, std::size_t>, std::array<int, 3>> cons; // running, idled, uc
+        for (const auto& [bid, b] : w.buildings)
+        {
+            if (b.type != building_type::processing_facility) continue;
+            const recipe* rc = c.reg->get_recipe(b.recipe);
+            if (!rc) continue;
+            for (const std::size_t r : c.diag)
+                if (rc->inputs[r] > 0.0f)
+                {
+                    auto& a = cons[{market_for_tile(w, b.tile), r}];
+                    if (b.ticks_remaining > 0) ++a[2]; else if (b.decommissioned) ++a[1]; else ++a[0];
+                }
+        }
+        for (const extraction_trace_row& row : c.trace)
+        {
+            const std::size_t r = static_cast<std::size_t>(row.target);
+            if (!c.diag.count(r)) continue;
+            trace_tally& t = c.tt[r];
+            ++t.out[static_cast<std::size_t>(row.outcome)];
+            if (row.outcome == extraction_trace_outcome::emitted && built.count({row.tile, r})) ++t.emitted_built;
+            if (row.outcome == extraction_trace_outcome::veto_listed || row.outcome == extraction_trace_outcome::veto_dead)
+            {
+                ++t.veto_rows;
+                const entity_id mid = market_for_tile(w, row.tile);
+                const auto ci = cons.find({mid, r});
+                const std::array<int, 3> a = ci != cons.end() ? ci->second : std::array<int, 3>{0, 0, 0};
+                if (a[0] + a[1] + a[2] > 0) ++t.veto_consumer_any; else ++t.veto_no_buyer;
+                if (a[0] > 0) ++t.veto_consumer_running;
+                if (a[1] > 0) ++t.veto_consumer_starved;
+                if (a[2] > 0) ++t.veto_consumer_uc;
+                const auto mit = w.markets.find(mid);
+                if (mit != w.markets.end())
+                    for (const auto& [om, m2] : w.markets)
+                        if (om != mid && m2.body == mit->second.body && m2.demand[r] > 0.0f) { ++t.veto_body_bid; break; }
+            }
+        }
+    }
+    c.trace.clear();
     if (fresh.empty()) return;
     // consumers per (market, good): non-idle processors whose recipe takes it
     std::map<std::pair<entity_id, std::size_t>, int> consumers;
@@ -273,6 +338,7 @@ int main(int argc, char** argv)
     }
     std::map<std::size_t, good_tally> pooled;
     long lifts_all = 0, lifts_built_all = 0; // BL-1227 chain start, play only
+    std::map<std::size_t, trace_tally> tt_all;
     for (const std::uint32_t seed : seeds)
     {
         lua_state lua;
@@ -287,6 +353,11 @@ int main(int argc, char** argv)
         c.reg = &reg;
         for (const resource_type rt : placement_rules::k_extractable) c.watch.insert(static_cast<std::size_t>(rt));
         for (const auto& [bid, b] : w.buildings) c.seen.insert(bid);
+        c.diag = {static_cast<std::size_t>(resource_type::iron_ore),
+                  static_cast<std::size_t>(resource_type::petroleum),
+                  static_cast<std::size_t>(resource_type::coal),
+                  static_cast<std::size_t>(resource_type::copper_ore)};
+        corp_extraction_trace_sink() = &c.trace;
         settle_tick_hooks hooks;
         hooks.after_lap = after_lap;
         hooks.ctx = &c;
@@ -322,6 +393,16 @@ int main(int argc, char** argv)
                 if (built) { ++lifts_built_all; ++seed_built; }
             }
         }
+        corp_extraction_trace_sink() = nullptr;
+        for (const auto& [r, t] : c.tt)
+        {
+            trace_tally& a = tt_all[r];
+            for (std::size_t o = 0; o < t.out.size(); ++o) a.out[o] += t.out[o];
+            a.veto_rows += t.veto_rows; a.veto_consumer_any += t.veto_consumer_any;
+            a.veto_consumer_running += t.veto_consumer_running; a.veto_consumer_starved += t.veto_consumer_starved;
+            a.veto_consumer_uc += t.veto_consumer_uc; a.veto_body_bid += t.veto_body_bid;
+            a.veto_no_buyer += t.veto_no_buyer; a.emitted_built += t.emitted_built;
+        }
         std::map<std::size_t, good_tally> g;
         fold(c.sites, g);
         std::printf("\nseed %u chain-start lifts in play: %ld, of them built that tick: %ld\n", seed, seed_lifts, seed_built);
@@ -332,6 +413,16 @@ int main(int argc, char** argv)
     }
     std::printf("\n================ POOLED ================\n");
     print(pooled);
+    std::printf("\n================ SCORER EXTRACTION TRACE (play, candidate-evaluations) ================\n");
+    for (const auto& [r, t] : tt_all)
+    {
+        std::printf("  %-14s", gname(r).c_str());
+        for (std::size_t o = 0; o < t.out.size(); ++o) std::printf(" | %s %ld", k_tout[o], t.out[o]);
+        std::printf("\n  %-14s   emitted and built that tick %ld | zero-bid vetoes %ld: no consumer processor in the market %ld, "
+                    "a consumer there %ld (running %ld, idled %ld, under construction %ld); another market on the body bids %ld\n",
+                    "", t.emitted_built, t.veto_rows, t.veto_no_buyer, t.veto_consumer_any, t.veto_consumer_running,
+                    t.veto_consumer_starved, t.veto_consumer_uc, t.veto_body_bid);
+    }
     std::printf("\n  chain-start lifts in play (all seeds): %ld; mines built from them that tick: %ld\n",
                 lifts_all, lifts_built_all);
     return 0;

@@ -153,6 +153,7 @@ uint64_t world::state_hash(int tick) const
             // are saved.
             for (const float x : m.household_weight) fnv1a_f32(h, x);
             for (const float x : m.hauler_want) fnv1a_f32(h, x);
+            for (const float x : m.offbook_drawn) fnv1a_f32(h, x); // BL-1227
         }
     }
 

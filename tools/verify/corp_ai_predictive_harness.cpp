@@ -219,6 +219,39 @@ int main()
         w.markets.at(market).supply[ri(resource_type::iron_ore)]      = 0.0f;
         w.markets.at(market).hauler_want[ri(resource_type::iron_ore)] = 0.0f;
 
+        // BL-1227 (e): the OFF-BOOK draws are a bid (Ben, 2026-10-07). A
+        // cleared market (it bids for water) whose only buyer of
+        // spacecraft_components / propellant is the space programme — it
+        // drew them last tick (`offbook_bid`), posting no demand — does NOT
+        // veto a processor making them. Without the draw it is a dead market.
+        for (const resource_type space_good : {resource_type::spacecraft_components,
+                                               resource_type::propellant})
+        {
+            market_component& sm = w.markets.at(market);
+            sm.demand[ri(resource_type::water)] = 30.0f;
+            check(forecast_glut_multiplier(w, tile, space_good, 5.0f, 3, p) == 0.0f,
+                  "BL-1227 (e) not vacuous: with no off-book draw, a cleared market with no bid for the space good vetoes");
+            sm.offbook_bid[ri(space_good)] = 4.0f;
+            check(forecast_glut_multiplier(w, tile, space_good, 5.0f, 3, p) == 1.0f,
+                  space_good == resource_type::propellant
+                      ? "BL-1227 (e): a cleared market whose only buyer is the space programme does not veto a propellant plant"
+                      : "BL-1227 (e): a cleared market whose only buyer is the space programme does not veto a spacecraft_components plant");
+            sm.offbook_bid[ri(space_good)]   = 0.0f;
+            sm.demand[ri(resource_type::water)] = 0.0f;
+        }
+        // ... and the record ROLLS: what was drawn this tick (`offbook_drawn`,
+        // saved) is what the next economy step's scorer reads (`offbook_bid`).
+        {
+            const recipe_registry roll_reg;
+            market_component& sm = w.markets.at(market);
+            sm.offbook_drawn[ri(resource_type::propellant)] = 6.0f;
+            (void)run_economy_step(w, roll_reg);
+            check(sm.offbook_bid[ri(resource_type::propellant)] == 6.0f
+                      && sm.offbook_drawn[ri(resource_type::propellant)] == 0.0f,
+                  "BL-1227 (e): the economy step rolls last tick's off-book draws into this tick's bid read");
+            sm.offbook_bid.fill(0.0f);
+        }
+
         // BL-1227 (c, emerged): econ tick > 0 but the market has written
         // nothing for ANY good yet (a market carved mid-tick, before its first
         // clear) is still never-cleared: no signal, no penalty.

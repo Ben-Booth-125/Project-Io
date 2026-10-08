@@ -312,6 +312,7 @@ void settle_space_purchases(world& w,
             continue; // the shelf thinned between derive and settle: no partial launch
 
         mit->second.inventory[ri] -= sp.quantity;
+        mit->second.offbook_drawn[ri] += sp.quantity; // BL-1227: an off-book bid
         nit->second.treasury      -= sp.credits;
         sp.funded    = true;
         sp.completed = true;
@@ -375,6 +376,9 @@ void settle_space_purchases(world& w,
             // there; it is a sale, and run_nation_step folds it onto the
             // corp's `subsidies` line so `net()` explains the delta.
             pit->second.quantities[ri] -= sp.quantity;
+            // BL-1227: an off-book bid on the market the pool is keyed to.
+            if (const auto okit = w.markets.find(sp.pool); okit != w.markets.end())
+                okit->second.offbook_drawn[ri] += sp.quantity;
             sp.completed = true;
         }
         else
