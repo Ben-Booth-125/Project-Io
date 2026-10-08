@@ -161,6 +161,35 @@ float building_draw(const recipe_registry& reg, const building_component& b, std
 
 namespace {
 
+/// BL-1234 (round 2): a processor still UNDER CONSTRUCTION, its recipe fixed
+/// at the build press. It makes nothing yet, but the draw it will take when it
+/// stands is already committed — and under-construction state is public
+/// (DISCOVERY.md), so counting it is a corrected estimate, not hidden
+/// knowledge. Without it every corp due while the site is building passes the
+/// supply clause against the same spare, and the plants starve together the
+/// tick they stand.
+bool pending_processor(const building_component& b)
+{
+    return !b.decommissioned && b.ticks_remaining > 0
+        && b.type == building_type::processing_facility;
+}
+
+/// What the index charges a building for @p r: a standing consumer's draw
+/// (`building_draw`), or a pending processor's draw at the staffing it will
+/// run at (`judged_batches`). Generation's placed buildings are complete, so
+/// there the second term never fires.
+float committed_draw(const recipe_registry& reg, const building_component& b, std::size_t r)
+{
+    if (r < resource_count && pending_processor(b))
+    {
+        const recipe* rc = reg.get_recipe(b.recipe);
+        if (rc == nullptr || !(rc->inputs[r] > 0.0f))
+            return 0.0f;
+        return rc->inputs[r] * judged_batches(reg, b);
+    }
+    return building_draw(reg, b, r);
+}
+
 bool producer_less(const input_reach::producer& a, const input_reach::producer& b)
 {
     return a.market != b.market ? a.market < b.market : a.building < b.building;
@@ -213,7 +242,7 @@ void contribute(const world& w, const recipe_registry& reg, const input_reach& i
 {
     m = null_entity;
     {
-        if (!standing(b))
+        if (!standing(b) && !pending_processor(b))
             return;
         m = market_for_tile(w, b.tile);
         if (m == null_entity)
@@ -245,7 +274,7 @@ void contribute(const world& w, const recipe_registry& reg, const input_reach& i
             if (!may_make && !may_take)
                 continue;
             const float o = building_output(w, reg, bid, b, r, ir.report);
-            const float d = building_draw(reg, b, r);
+            const float d = committed_draw(reg, b, r); // BL-1234: a pending plant's too
             if (o > 0.0f || d > 0.0f)
                 emit(r, o, d);
         }
@@ -497,7 +526,7 @@ reachable_spare reachable_supply(world& w, const recipe_registry& reg, input_rea
         if (const auto sit = w.buildings.find(self); sit != w.buildings.end())
         {
             self_out  = building_output(w, reg, self, sit->second, r, ir.report);
-            self_draw = building_draw(reg, sit->second, r);
+            self_draw = committed_draw(reg, sit->second, r); // the index's own reading
             self_mkt  = market_for_tile(w, sit->second.tile);
         }
     // Each market's output with the asker's taken out; then each reached

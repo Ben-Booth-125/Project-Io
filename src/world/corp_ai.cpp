@@ -1363,14 +1363,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     continue;
                 const entity_id body = tit->second.body;
 
-                // The corp's own stock in this tile's market pool (BL-1003),
-                // plus what that market actually holds — the SAME two sources
-                // the production tick draws inputs from (economy_system.cpp §
-                // run_processing, the BL-130 pool + inventory coverage). Read
-                // const: a candidate that is only being scored must not author
-                // a pool.
-                const stockpile_component* pool =
-                    w.find_pool(corp, pool_key_for_tile(w, tile));
+                // BL-1234: a NEW processor is judged on supply alone, so the
+                // corp's pool and the market's shelf (the stock clause's two
+                // sources) are not read here; resume and recipe switch read them.
                 const entity_id mid = market_for_tile(w, tile);
 
                 // RECIPE CHOICE. Walk the BROWSE space (this era's roster) and
@@ -1432,31 +1427,41 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
 
                     // INPUT ACCESS (BL-1187, build only what runs). A processor
                     // with an input it cannot obtain is an immediate loss-maker, so
-                    // each input must be OBTAINABLE here (input_reach.hpp): the
-                    // production tick's own coverage question — pool + the shelf
-                    // the fair-price ceiling admits, at the idle threshold — OR
-                    // enough SPARE output of it from producers within reach (the
-                    // same market, or a lane the dispatcher's own export gate
-                    // would ship). Opening stock alone does not make a chain run.
+                    // each input must have enough SPARE output from producers
+                    // within reach (the same market, or a lane the dispatcher's
+                    // own export gate would ship). Opening stock alone does not
+                    // make a chain run.
                     //
                     // BL-1234 (settle scorer starves; AI_OPPONENT.md § a build is
                     // judged on supply, not stock): for a NEW processor the gate is
                     // the SUPPLY clause alone — spare reachable output covering the
                     // plant's draw at t_idle, the same sized test generation places
-                    // by (`recipe_inputs_supplied`, input_reach.hpp). A shelf with
+                    // by (`input_supply_covers` per input — the clause
+                    // `recipe_inputs_supplied` asks, input_reach.hpp). A shelf with
                     // nothing replacing it is opening stock being drawn down: on
                     // seed 0 one steel shelf at negative spare admitted 63 builds in
                     // eight ticks. The stock clause still counts where a plant
                     // already stands (resume, recipe switch, the reflex rescue).
-                    if (!recipe_inputs_supplied(w, reg, reach(), mid, *abs, batches,
-                                                null_entity))
-                        continue;
-                    // Pricing is unchanged: each input at what it would cost here
-                    // (input_reach.hpp § OBTAINABLE). Every input is covered by
-                    // supply, so this is obtainable by construction.
+                    //
+                    // And PRICED by the same clause: each input at the landed cost
+                    // of the cheapest producer the supply clause found, never the
+                    // local posted price a glut on the shelf would quote — the
+                    // shelf is not what feeds the plant once it is drawn down.
+                    // Resume and recipe switch keep the OBTAINABLE pricing.
                     std::array<float, resource_count> input_cost{};
-                    if (!recipe_inputs_obtainable(w, reg, reach(), mid, pool, *abs, batches,
-                                                  null_entity, input_cost))
+                    bool supplied = true;
+                    for (std::size_t r = 0; r < resource_count && supplied; ++r)
+                    {
+                        if (!(abs->inputs[r] > 0.0f))
+                            continue;
+                        float landed = -1.0f;
+                        supplied = input_supply_covers(w, reg, reach(), mid, r,
+                                                       abs->inputs[r] * batches,
+                                                       null_entity, &landed)
+                                && landed >= 0.0f;
+                        input_cost[r] = landed;
+                    }
+                    if (!supplied)
                         continue;
 
                     const resource_type    rt = primary_output(*abs);
