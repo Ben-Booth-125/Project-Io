@@ -442,6 +442,20 @@ on the corporation's next evaluation, not after the fixed hold. Measured: the di
 generation-built plants in the settle (178 on a start-up glut that had cleared by the handoff), and
 the 8-tick reflex mothballed most of them before the 16-tick hold let the dial look again.
 
+**The dial forecasts at base where no fact exists yet (Ben, 2026-10-09; BL-1217, G1 plants
+running).** Where a plant's market lists none of its output and no bid for it has yet registered,
+the dial forecasts the output at its base price, not the floor — the same "no clear yet: no
+signal" reading the build veto takes (§ 2B). An empty shelf with no bidder is an unknown, not a
+glut. Once a bid or a listing exists, the dial reads it as usual, through the composite bid
+(§ 11, the dial reads the build bid).
+
+**The reflex rescue reads an unpriced output as floored (Ben, 2026-10-09; BL-1217).** Tier 0's
+recipe rescue switches a floored processor to the recipe whose outputs sell best against their
+base price. An output with no base price is no evidence of health. It reads as floored, so the
+rescue never switches a plant into a recipe it cannot price. Measured before the ruling:
+floored refined-fuel plants switched into unpriced propellant 145 times in the settle, and the
+dial then idled them.
+
 The seam carries further verbs the scorer does not enumerate — `demolish`, `place_road`, the
 convoy pair, the procurement triple, the stance verbs, the unit verbs and `withdraw_from_battle`
 — which an agent on the seam (§ 10) issues directly. Scoring roads and demolition is BL-447
@@ -721,8 +735,10 @@ the floor; stage B layers priority buckets and predictive spending over it (§ 2
   the scorer's evaluation cadence, so a buyer is seen by every corporation that evaluates between
   two of its draws, not only by one due on the next tick. Otherwise the projected supply/demand ratio is unpenalised at or below
   `glut_taper_ratio` (1.0), tapers the build's score linearly to zero at `glut_veto_ratio` (2.0),
-  and vetoes (removes the candidate entirely) at or above it. Applied only to build candidates;
-  dials and survey are unaffected (a body's total surveyed area doesn't glut a market).
+  and vetoes (removes the candidate entirely) at or above it. The taper and veto apply only to
+  build candidates; survey is unaffected (a body's total surveyed area doesn't glut a market). The
+  workforce dial reads the same composite bid as its buyer signal (§ 11, the dial reads the build
+  bid), but is not vetoed by it.
 
 Verified by `tools/verify/corp_ai_predictive_harness.cpp` (R1: the reason→bucket mapping; R2: the
 Should-Have buffer is well-defined and never loosens the floor; R3: the forecast is
@@ -1927,3 +1943,24 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   declined). It does not touch the player's corp. Pure, seeded, deterministic, replayable, legal
   verbs only, never a planner. The player sees unmet want on a ledger or lens in the visibility
   pass, not through this grant.
+
+
+  **The workforce dial may read the build veto's composite bid (Ben, 2026-10-09; BL-1217, G1
+  plants running — the dial's buyer signal).** Until now the dial (`solve_workforce_target`)
+  forecast a plant's output from its own market's posted demand alone. At the settle's start that
+  register is empty for goods whose consumers draw on their opening stock first: 244 steel
+  consumers were running and bidding nothing, so the dial zeroed the steel plants that fed them,
+  and the hold outlasted the demand's arrival two ticks later. The grant: the dial's buyer signal
+  for an output is the **same composite bid** the build veto reads (§ 2B, "What counts as a bid")
+  — demand, silenced want, off-book want, pool-fed launch fuel and upkeep, and what running
+  processors consume — on the plant's own market, held for the same cadence.
+
+  **What it admits.** One input, already defined and already ruled observable (a running plant
+  and what it consumes, `../ui/DISCOVERY.md` § Competitor visibility). It is not a visibility
+  change and adds no new term to the estimate: the dial still weighs that bid against the shelf
+  and the price exactly as it weighs demand today.
+
+  **What it does NOT admit.** No veto on the dial; no read of another corporation's plan, stock,
+  or refused candidates; no body-wide or cross-market pooling beyond what the composite bid
+  already carries; nothing for the player's corp. Pure, seeded, deterministic, replayable, legal
+  verbs only, never a planner.
