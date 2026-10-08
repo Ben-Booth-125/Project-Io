@@ -384,7 +384,7 @@ int main(int argc, char** argv)
                         // the reach set's consumer markets (the draw the spare nets)
                         std::set<entity_id> dm{br.market};
                         if (const auto si = ir.supply_memo.find({br.market, r}); si != ir.supply_memo.end())
-                            dm.insert(si->second.draw_markets.begin(), si->second.draw_markets.end());
+                            for (const auto& d : si->second.draws) dm.insert(d.market);
                         for (const entity_id pid : pipe)
                         {
                             if (pid == bid) continue;

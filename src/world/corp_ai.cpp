@@ -1438,6 +1438,22 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // enough SPARE output of it from producers within reach (the
                     // same market, or a lane the dispatcher's own export gate
                     // would ship). Opening stock alone does not make a chain run.
+                    //
+                    // BL-1234 (settle scorer starves; AI_OPPONENT.md § a build is
+                    // judged on supply, not stock): for a NEW processor the gate is
+                    // the SUPPLY clause alone — spare reachable output covering the
+                    // plant's draw at t_idle, the same sized test generation places
+                    // by (`recipe_inputs_supplied`, input_reach.hpp). A shelf with
+                    // nothing replacing it is opening stock being drawn down: on
+                    // seed 0 one steel shelf at negative spare admitted 63 builds in
+                    // eight ticks. The stock clause still counts where a plant
+                    // already stands (resume, recipe switch, the reflex rescue).
+                    if (!recipe_inputs_supplied(w, reg, reach(), mid, *abs, batches,
+                                                null_entity))
+                        continue;
+                    // Pricing is unchanged: each input at what it would cost here
+                    // (input_reach.hpp § OBTAINABLE). Every input is covered by
+                    // supply, so this is obtainable by construction.
                     std::array<float, resource_count> input_cost{};
                     if (!recipe_inputs_obtainable(w, reg, reach(), mid, pool, *abs, batches,
                                                   null_entity, input_cost))
