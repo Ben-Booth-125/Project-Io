@@ -1540,14 +1540,20 @@ float one_power_plant_output(const recipe_registry& reg)
 }
 
 float power_grids_to_serve(world& w, const recipe_registry& reg, entity_id body_id,
-                           float plant_output, std::set<std::uint32_t>& serve)
+                           float plant_output, std::set<std::uint32_t>& serve,
+                           const std::set<std::uint32_t>* chartered)
 {
     std::set<std::uint32_t> unpowered;
     const float gap = body_power_grid_gap(w, reg, body_id, plant_output, serve, &unpowered);
-    // UNPOWERED GRIDS FIRST (PRODUCTION.md, Ben 2026-10-08): while any short
-    // grid has no generation feeding it at all, a power firm may serve only
-    // such grids — the capped power firms cannot all go to a core grid's
-    // shortfall and leave a secondary grid dark for the campaign.
+    // UNPOWERED GRIDS FIRST (PRODUCTION.md, Ben 2026-10-08: "every grid gets a
+    // plant before any gets a second"): while any short grid has no power firm
+    // chartered on it — and no generation feeding it — a power firm may serve
+    // only such grids. A grid counts as powered the moment a power firm is
+    // CHARTERED on it (@p chartered), live output or not, so the core grid
+    // cannot take every capped firm before a second grid gets one.
+    if (chartered != nullptr)
+        for (auto it = unpowered.begin(); it != unpowered.end();)
+            it = chartered->count(*it) != 0 ? unpowered.erase(it) : std::next(it);
     if (!unpowered.empty())
         serve = std::move(unpowered);
     return gap;
@@ -5054,6 +5060,10 @@ std::vector<entity_id> charter_web_from_budget(world& w,
     // other than upkeep (consumer, construction, processor inputs — all zero for
     // power in the shipped data), plus the per-grid gap over today's output, so
     // `demand - production` is exactly the grids' summed shortfall.
+    // The grids a power firm has been CHARTERED on in this walk (the feed grid
+    // of each of its generators): "powered" for unpowered-grids-first, live
+    // output or not. Grid ids are world-unique, so one set serves every body.
+    std::set<std::uint32_t> power_chartered;
     const auto size_power_per_grid =
         [&](entity_id body, const std::array<float, resource_count>& production,
             const std::array<float, resource_count>& consumer,
@@ -5064,7 +5074,8 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                 return;
             // `short_grids` comes back as the grids the firm may SERVE
             // (unpowered short grids first); the gap is every short grid's.
-            const float gap = power_grids_to_serve(w, reg, body, plant_output, short_grids);
+            const float gap = power_grids_to_serve(w, reg, body, plant_output, short_grids,
+                                                   &power_chartered);
             demand[power_i] = production[power_i] + gap
                 + (consumer[power_i] + construction_need[power_i] + input_need[power_i]);
         };
@@ -5801,6 +5812,28 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             w.corporations[corp_id] = std::move(corp);
             ++bs.firms;
             ++bs.firms_by_resource[gap_r];
+            // BL-1232: the grids this power firm now serves count as powered.
+            if (power_per_grid && gap_r == power_i)
+            {
+                bool any = false;
+                for (const entity_id a : w.corporations.at(corp_id).assets)
+                {
+                    const building_component& ab = w.buildings.at(a);
+                    if (ab.type != building_type::processing_facility)
+                        continue;
+                    const recipe* arc = reg.get_recipe(ab.recipe);
+                    if (arc == nullptr || !(arc->outputs[power_i] > 0.0f))
+                        continue;
+                    if (const std::uint32_t fg = tile_feed_power_grid(w, ab.tile); fg != 0)
+                    {
+                        power_chartered.insert(fg);
+                        any = true;
+                    }
+                }
+                if (!any)
+                    if (const std::uint32_t fg = tile_feed_power_grid(w, anchor_tile); fg != 0)
+                        power_chartered.insert(fg);
+            }
             if (anchor_province != 0)
                 ++bs.firms_by_province[anchor_province];
             if (from_turn)   // the pass moves on past the good that was just served

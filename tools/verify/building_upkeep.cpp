@@ -1352,6 +1352,27 @@ void r12_a_plant_serves_its_market_centres_grid()
               "R12c two short grids, one firm: the UNPOWERED grid (B) is the one served, not the already-powered grid A with the LARGER shortfall");
         check_near(gap, 5.0f, "R12c ... while the gap still counts both shortfalls (3 + 2)");
     }
+
+    // --- R12d: a grid is POWERED once a power firm is CHARTERED on it ----------
+    // "Every grid gets a plant before any gets a second" (Ben, 2026-10-08). No
+    // generator stands anywhere yet; the walk has chartered one power firm on
+    // the core grid A. A is then powered (live output or not) and the next firm
+    // may serve only B — the core grid cannot take every capped firm first.
+    {
+        grid_fixture f;
+        f.build(6, 2, "rr..r.", "......", { 0, 0, 0, 1, 1, 1, 4, 5 });
+        const std::uint32_t gA = f.grid_at(0), gB = f.grid_at(4);
+        std::set<std::uint32_t> serve;
+        const std::set<std::uint32_t> none, onA = { gA }, both = { gA, gB };
+        power_grids_to_serve(f.w, P.reg, f.body, P.plant_output, serve, &none);
+        check(serve == std::set<std::uint32_t>{ gA, gB }, "R12d nothing chartered: both short grids may be served");
+        power_grids_to_serve(f.w, P.reg, f.body, P.plant_output, serve, &onA);
+        check(serve == std::set<std::uint32_t>{ gB },
+              "R12d a firm chartered on A (no output yet): the second firm serves only B, though A's shortfall is larger");
+        power_grids_to_serve(f.w, P.reg, f.body, P.plant_output, serve, &both);
+        check(serve == std::set<std::uint32_t>{ gA, gB },
+              "R12d every short grid has a firm: a second firm may go to either");
+    }
 }
 
 // ---------------------------------------------------------------------------
