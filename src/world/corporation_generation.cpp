@@ -1861,6 +1861,46 @@ void chain_unplace(world& w, entity_id bid, std::unordered_set<entity_id>& occup
     w.stockpiles.erase(bid);
 }
 
+/// BL-1233 (Ben, 2026-10-07, ruling A; CORPORATION_GENERATION.md § Pass 6,
+/// "Derived demand counts ... the prospective draw of a processor refused for
+/// want of spare input"): what a firm's processor WOULD have drawn of each
+/// input, had the sized rule not turned it away — in the units derived demand
+/// reads (`body_processor_input_demand`: nominal batches x recipe inputs).
+struct refused_draw
+{
+    bool                              set = false;
+    std::array<float, resource_count> draw{};
+};
+
+/// The walk's PROSPECTIVE DRAWS, by the good whose firm was refused: one entry
+/// per good (a refusal SETS it — a retry refused again counts it once), erased
+/// when a firm for the good lands. Before each firm's selection the entries are
+/// added into the body's demand, after withdrawing those whose good the walk has
+/// abandoned: capped (@p capped) or no longer short against the demand with
+/// every prospective draw in it. Ordered by good; deterministic.
+using prospective_draws = std::map<std::size_t, std::array<float, resource_count>>;
+
+template <typename Capped>
+void add_prospective_draws(prospective_draws& p, std::array<float, resource_count>& demand,
+                           const std::array<float, resource_count>& production, Capped&& capped)
+{
+    std::array<float, resource_count> full = demand;
+    for (const auto& [g, d] : p)
+        for (std::size_t r = 0; r < resource_count; ++r)
+            full[r] += d[r];
+    for (auto it = p.begin(); it != p.end();)
+    {
+        const std::size_t g = it->first;
+        if (capped(g) || !(full[g] > production[g]))
+            it = p.erase(it);
+        else
+            ++it;
+    }
+    for (const auto& [g, d] : p)
+        for (std::size_t r = 0; r < resource_count; ++r)
+            demand[r] += d[r];
+}
+
 /// Make one corporation's freshly placed holdings chain-feasible, in place.
 ///
 /// Every processor in @p assets (in asset order) is given a recipe whose inputs
@@ -1890,7 +1930,8 @@ void chain_unplace(world& w, entity_id bid, std::unordered_set<entity_id>& occup
 ///         a placement that found no feasible ground).
 bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
                          std::vector<entity_id>& assets, std::unordered_set<entity_id>& occupied,
-                         const std::vector<int>* serve, bool whole = true)
+                         const std::vector<int>* serve, bool whole = true,
+                         refused_draw* refused = nullptr)
 {
     const int n = reg.recipe_count(building_type::processing_facility);
     bool processing_anchor = false;
@@ -1941,6 +1982,26 @@ bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
         }
         if (chosen == no_recipe)
         {
+            // BL-1233 ruling A: a firm's processor turned away by the SIZED rule
+            // — some recipe for its good has a producer of every input within
+            // reach (chain tier not `none`), none has the spare — leaves its
+            // prospective draw: the first such recipe in the good's preference.
+            // A processor with no producer at all leaves none (a cold start is
+            // not begun). Read before it is unplaced, on the ground as it stands.
+            if (refused != nullptr && !refused->set && serve != nullptr)
+            {
+                const float batches = nominal_processing_batches(reg);
+                for (const int i : *serve)
+                {
+                    const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+                    if (chain_recipe_tier(w, reg, cr, bid, market, rc, &assets) == chain_tier_none)
+                        continue;
+                    refused->set = true;
+                    for (std::size_t r = 0; r < resource_count; ++r)
+                        refused->draw[r] = rc.inputs[r] > 0.0f ? batches * rc.inputs[r] : 0.0f;
+                    break;
+                }
+            }
             chain_unplace(w, bid, occupied);
             continue;
         }
@@ -3064,6 +3125,8 @@ std::vector<entity_id> generate_background_firms(
         // since a firm for it last landed, and whether that masks it.
         std::array<int, resource_count>  dig_misses = {};
         std::array<bool, resource_count> dig_masked = {};
+        // BL-1233 ruling A: the prospective draws of firms the sized rule refused.
+        prospective_draws prospective;
         for (int iter = 0; iter < max_iterations_per_body && firms_this_body < max_firms_per_body; ++iter)
         {
             std::array<float, resource_count> production = {};
@@ -3104,6 +3167,11 @@ std::vector<entity_id> generate_background_firms(
                 body_processor_input_demand(w, reg, body_id);
             for (std::size_t r = 0; r < resource_count; ++r)
                 demand[r] += input_need[r];
+            // BL-1233 ruling A: and the draw of each firm the sized rule refused,
+            // while its good is still wanted.
+            add_prospective_draws(prospective, demand, production, [&](std::size_t g) {
+                return firms_by_resource[g] >= per_resource_firm_cap;
+            });
 
             // PER-RESOURCE CAP. Mask out every resource that has already taken
             // its share of this body's firms, then ask for the biggest remaining
@@ -3302,9 +3370,13 @@ std::vector<entity_id> generate_background_firms(
                         if (i != recipe_i)
                             serve.push_back(i);
                 }
+                refused_draw refused;
                 if (!make_chain_feasible(w, reg, chain, assets, occupied_tiles,
-                                         go_processing ? &serve : nullptr))
+                                         go_processing ? &serve : nullptr, /*whole=*/true,
+                                         &refused))
                 {
+                    if (refused.set)
+                        prospective[gap_r] = refused.draw; // counted once: set, not added
                     // Given back whole. Another nation's turn may anchor in reach,
                     // so the good is masked once it has missed as many times as
                     // the body has nations (the cursor takes them in turn). The
@@ -3371,6 +3443,7 @@ std::vector<entity_id> generate_background_firms(
             // nation — its misses no longer stand.
             chain_misses[gap_r] = 0;
             chain_masked[gap_r] = false;
+            prospective.erase(gap_r); // BL-1233: its processor is placed
             // A landing that produces an input of a missed good may bring it
             // within reach — clear that good's count and mask, and only that.
             for (std::size_t g = 0; g < resource_count; ++g)
@@ -4056,7 +4129,8 @@ std::vector<entity_id> charter_place(world& w, const nation_component& nc,
                                      chain_reach* cr,
                                      const std::vector<int>* serve,
                                      bool& chain_rejected,
-                                     const resource_type* dig = nullptr)
+                                     const resource_type* dig = nullptr,
+                                     refused_draw* refused = nullptr)
 {
     chain_rejected = false;
     // BL-1197 (gap firm digs the gap): with @p dig THE DIG LADDER runs
@@ -4088,7 +4162,9 @@ std::vector<entity_id> charter_place(world& w, const nation_component& nc,
                 tier != dig_site::none ? dig : nullptr, tier);
             if (!assets.empty())
             {
-                if (cr != nullptr && !make_chain_feasible(w, reg, *cr, assets, occupied, serve))
+                if (cr != nullptr
+                    && !make_chain_feasible(w, reg, *cr, assets, occupied, serve, /*whole=*/true,
+                                            refused))
                 {
                     chain_rejected = true;
                     continue;
@@ -4134,6 +4210,8 @@ struct charter_body_state
     int64_t                           reference_points = 0;
     /// Firms per good per body; -1 = no per-good cap (`lifted`).
     int32_t                           per_good_cap = -1;
+    /// BL-1233 ruling A: the prospective draws of firms the sized rule refused.
+    prospective_draws                 prospective;
     /// Background firms per body before `density_ceiling`; 0 = no ceiling.
     int32_t                           density_ceiling = 0;
 
@@ -5283,6 +5361,11 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                 body_processor_input_demand(w, reg, cc.body);
             for (std::size_t r = 0; r < resource_count; ++r)
                 demand[r] += input_need[r];
+            // BL-1233 ruling A: and the draw of each firm the sized rule refused,
+            // while its good is still wanted (not at its per-good cap, still short).
+            add_prospective_draws(bs.prospective, demand, production, [&](std::size_t g) {
+                return bs.per_good_cap >= 0 && bs.firms_by_resource[g] >= bs.per_good_cap;
+            });
 
             std::array<float, resource_count> selectable = production;
             if (bs.per_good_cap >= 0)
@@ -5569,12 +5652,15 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                                 serve.push_back(i);
                     }
                     bool chain_rejected = false;
+                    refused_draw refused;
                     assets = charter_place(w, nc, focus, occupied, asset_rng, cc, settle, spend,
                                            by_province, &province_rungs, rung, why,
                                            reg, &chain, go_processing ? &serve : nullptr,
-                                           chain_rejected, digs ? &dig_r : nullptr);
+                                           chain_rejected, digs ? &dig_r : nullptr, &refused);
                     if (!assets.empty())
                         break;
+                    if (chain_rejected && refused.set)
+                        bs.prospective[gap_r] = refused.draw; // counted once: set, not added
                     if (digs && !chain_rejected)
                     {
                         // BL-1197: none of the good's dig-ladder ground in
@@ -5683,6 +5769,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             w.corporations[corp_id] = std::move(corp);
             ++bs.firms;
             ++bs.firms_by_resource[gap_r];
+            bs.prospective.erase(gap_r); // BL-1233: its processor is placed
             if (anchor_province != 0)
                 ++bs.firms_by_province[anchor_province];
             if (from_turn)   // the pass moves on past the good that was just served
