@@ -479,6 +479,15 @@ where a processor genuinely differs from a mine:
   market (§ Build only what runs), since a processor with no reachable input is an immediate
   loss-maker. The scorer asks exactly what the seam asks and no more: mirroring a lock
   the seam does not apply would make the rival stricter than the rules it plays by.
+  **A build is judged on supply, not stock (Ben, 2026-10-08; BL-1234, settle scorer starves).**
+  For a NEW processor, an input is obtainable only when the spare reachable output of that input
+  covers the plant's draw at `t_idle` — the supply clause alone, the same sized test generation
+  places processors by (`../generation/CORPORATION_GENERATION.md` § Pass 3, "Sized to its
+  inputs"). A shelf with nothing replacing it is opening stock being drawn down, not a supply: on
+  seed 0 one steel shelf of 6,313 units with negative spare admitted 63 builds in eight ticks and
+  was empty by the tenth, and 97% of the settle's starved processors were admitted that way. Stock
+  still counts where a plant already stands — a resume, a recipe switch — because there the
+  question is whether to run what exists, not whether to add a draw.
 - **Pricing.** Priced by `estimate_prospective_profit` rather than the extraction candidate's
   inline revenue-minus-wages sum. The inline model survives on the extraction side because
   switching it would move every blessed golden for no player-visible gain; a new candidate had no
