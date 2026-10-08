@@ -1136,7 +1136,11 @@ inline void note_unposted_bid(market_component& m, std::size_t r, float quantity
 /// no more than @p hold_ticks ago (the scorer passes its cadence)?
 inline bool unposted_bid_held(const market_component& m, std::size_t r, int tick, int hold_ticks)
 {
-    return m.unposted_bid[r] > 0.0f && tick - m.unposted_bid_tick[r] <= hold_ticks;
+    // Never read AHEAD: a record dated after `tick` (a settle replayed from
+    // econ tick 1, the --serve path) is not held — it would otherwise count
+    // for its whole lead over the current tick plus the cadence.
+    return m.unposted_bid[r] > 0.0f && tick >= m.unposted_bid_tick[r]
+        && tick - m.unposted_bid_tick[r] <= hold_ticks;
 }
 
 /// BL-1227: one off-book WANT a state purchase derivation recorded — what a

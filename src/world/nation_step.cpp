@@ -4,8 +4,8 @@
 #include "condition_set.hpp" // BL-573: evaluate_condition, the contract predicate
 #include "economy_system.hpp"
 #include "hex_neighbors.hpp" // BL-572: border-tile adjacency, mirroring nation_generation.cpp's own
-#include "logistics.hpp"
-#include "market_clearing.hpp" // market_for_tile (BL-1227 record_market_wants)     // BL-572: body_tile_grid, for the same
+#include "logistics.hpp"     // BL-572: body_tile_grid, for the same
+#include "market_clearing.hpp" // BL-1227: market_for_tile, for record_market_wants
 #include "nation_ai.hpp"
 #include "nation_budget.hpp"
 #include "nation_generation.hpp" // BL-572: garrison_strength_in
