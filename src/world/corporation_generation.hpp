@@ -7,6 +7,7 @@
 #include <array>
 #include <cstdint>
 #include <map>
+#include <set>
 #include <vector>
 
 struct generation_progress; // hard_coded_world.hpp; the loading screen's write-only tap
@@ -704,3 +705,29 @@ std::array<float, resource_count> measure_body_production(const world& w,
                                                           entity_id body_id);
 float measure_production_ratio(const world& w, const recipe_registry& reg,
                                entity_id body_id);
+
+/// BL-1232 (power plants per grid; PRODUCTION.md, "Generation is sized per grid,
+/// not per body"; LOGISTICS.md § 3a). The ONE per-grid power measure, read by the
+/// charter walk and by the corp AI's power-plant candidate alike
+/// (AI_OPPONENT.md, "A power-plant candidate is priced against its grid's
+/// shortfall").
+///
+/// `body_power_grid_gap`: @p body_id's power gap, the sum over its wired grids
+/// of max(0, need - output). Need is the operating buildings' power upkeep on
+/// the grid; output is every non-decommissioned generator on it at the nominal
+/// rate — plants UNDER CONSTRUCTION included, so a plant already started is
+/// counted as the supply it will be. A dark building (grid 0) neither draws nor
+/// feeds. A grid needing under half of @p plant_output is left to roads, not
+/// counted. @p short_grids receives every counted (short) grid. Deterministic
+/// (ascending building id, std::map over grids).
+float body_power_grid_gap(world& w, const recipe_registry& reg, entity_id body_id,
+                          float plant_output, std::set<std::uint32_t>& short_grids);
+
+/// The most power one plant makes: the largest power output of any in-band
+/// processing recipe at the nominal run. 0 where no recipe makes power.
+float one_power_plant_output(const recipe_registry& reg);
+
+/// True where power is sized per grid at all: some recipe makes power AND the
+/// band authors a power upkeep draw on some building type. Elsewhere the per-grid
+/// measure is not read and both callers behave as before it existed.
+bool power_sized_per_grid(const recipe_registry& reg);

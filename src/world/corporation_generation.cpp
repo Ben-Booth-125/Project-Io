@@ -1432,6 +1432,13 @@ std::array<float, resource_count> body_upkeep_demand(const world& w, const recip
     return demand;
 }
 
+} // namespace
+
+// BL-1232: the per-grid power measure is exported (corporation_generation.hpp)
+// so the corp AI's power-plant candidate reads the SAME gap the charter walk
+// sizes generation on (AI_OPPONENT.md, "A power-plant candidate is priced
+// against its grid's shortfall") rather than a second copy of it.
+
 /// BL-1232 (power plants per grid; PRODUCTION.md, "Generation is sized per
 /// grid, not per body", Ben 2026-10-07): @p body_id's POWER GAP, read per wired
 /// grid (`tile_power_grid`, LOGISTICS.md § 3a) rather than across the body.
@@ -1517,6 +1524,20 @@ float one_power_plant_output(const recipe_registry& reg)
         best = std::max(best, reg.recipe_at(building_type::processing_facility, i).outputs[pw]);
     return nominal_processing_batches(reg) * best;
 }
+
+bool power_sized_per_grid(const recipe_registry& reg)
+{
+    if (!(one_power_plant_output(reg) > 0.0f))
+        return false;
+    const std::size_t pw = static_cast<std::size_t>(resource_type::power);
+    for (std::size_t t = 0; t < building_type_count; ++t)
+        if (building_upkeep_goods(reg.building_upkeep(), static_cast<building_type>(t),
+                                  reg.era())[pw] > 0.0f)
+            return true;
+    return false;
+}
+
+namespace {
 
 /// BL-709 — the body's CONSTRUCTION demand: how much construction capacity a
 /// world with this many buildings standing on this body wants per tick, so the
@@ -4981,12 +5002,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
     // elsewhere the walk is the body-wide measure it was, byte for byte.
     const std::size_t power_i     = static_cast<std::size_t>(resource_type::power);
     const float       plant_output = one_power_plant_output(reg);
-    bool              power_per_grid = false;
-    if (plant_output > 0.0f)
-        for (std::size_t t = 0; t < building_type_count && !power_per_grid; ++t)
-            power_per_grid = building_upkeep_goods(reg.building_upkeep(),
-                                                   static_cast<building_type>(t),
-                                                   reg.era())[power_i] > 0.0f;
+    const bool        power_per_grid = power_sized_per_grid(reg);
     // The walk's power measure, re-read per firm: the body-wide demand terms
     // other than upkeep (consumer, construction, processor inputs — all zero for
     // power in the shipped data), plus the per-grid gap over today's output, so
