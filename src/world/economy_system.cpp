@@ -1544,6 +1544,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
 
     economy_report report;
 
+
     // BL-545/BL-546: one tick of the relational substrate's DECAY half, before
     // anything this tick can observe. `run_sentiment_step` is decay-then-fold
     // and the fold half is spread across this tick's writers (a contract
@@ -1733,6 +1734,12 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                     sq -= take;
                     to_draw -= take;
                 };
+                // BL-1227 (AI_OPPONENT.md § 2B): procurement is a buyer that
+                // posts no bid. What it WANTS here — the whole contract, filled
+                // from stock or built to order — is an unposted bid on the
+                // supplier's home market.
+                if (const auto hmit = w.markets.find(home_key); hmit != w.markets.end())
+                    note_unposted_bid(hmit->second, ri, c.quantity, w.current_econ_tick);
                 if (const auto skit = w.corp_market_pools.find(std::make_pair(c.supplier, home_key));
                     skit != w.corp_market_pools.end())
                     draw_from(skit->second);
@@ -2491,6 +2498,14 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     for (std::size_t i = 0; i < report.buildings.size(); ++i)
         report.building_row.emplace(report.buildings[i].building, i);
     phase_stamp(5); // production (pass 5, the row index)
+
+    // BL-1227 (AI_OPPONENT.md § 2B; DISCOVERY.md, Ben 2026-10-08: a running plant
+    // and what it consumes are observable): what each RUNNING processor drew
+    // this pass is an unposted bid on its market. An idled plant produced
+    // nothing and records nothing.
+    for (const auto& [key, q] : running_consumer_draws(w, reg, report))
+        if (const auto rmit = w.markets.find(key.first); rmit != w.markets.end())
+            note_unposted_bid(rmit->second, key.second, q, w.current_econ_tick);
 
     // Population food demand (BL-190) is injected by inject_population_demand,
     // called from clear_markets AFTER its per-tick demand reset — injected here
@@ -3261,7 +3276,8 @@ bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& rep
                        entity_id corp, entity_id body, entity_id tile,
                        const std::array<float, resource_count>& need,
                        draw_outcome* rec = nullptr,
-                       std::array<float, resource_count>* grid_residual = nullptr)
+                       std::array<float, resource_count>* grid_residual = nullptr,
+                       bool note_pool_take = false)
 {
     // BL-1003: the draw is from the pool of the TILE's market — the shelf the
     // buyer stands at — or the body-level pool on a market-less body, and the
@@ -3320,6 +3336,11 @@ bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& rep
         const float have = std::max(0.0f, pool.quantities[r]);
         const float take = std::min(required, have);
         pool.quantities[r] = have - take; // never negative, by construction
+        // BL-1227 (AI_OPPONENT.md § 2B, Ben 2026-10-08): building upkeep met
+        // from the corporation's OWN pool takes goods without posting a bid —
+        // an unposted bid on the pool's market.
+        if (note_pool_take && m != nullptr)
+            note_unposted_bid(*m, r, take, w.current_econ_tick);
         float shortfall = required - take;
         if (shortfall <= 0.0f)
         {
@@ -3715,7 +3736,7 @@ building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg,
         std::array<float, resource_count> residual{};
         const bool unmet = any_need
             ? draw_goods_or_bid(w, reg, report, corp, body, b.tile, need, nullptr,
-                                (grid_id != 0) ? &residual : nullptr)
+                                (grid_id != 0) ? &residual : nullptr, /*note_pool_take=*/true)
             : false;
 
         bool on_grid = false;

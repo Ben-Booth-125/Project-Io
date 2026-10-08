@@ -386,8 +386,17 @@ int main()
         // — vetoed; at cash 300 the same candidate passes (200 > 50).
         {
             const recipe_registry reg = make_registry();
-            auto builds_at = [&](float cash) {
+            // BL-1227 (review round 1): IN PLAY — econ tick 4, a market that
+            // has cleared and BIDS for the ore. At econ tick 0 the forecast reads
+            // a never-cleared market (no signal), which proves nothing about play.
+            auto builds_at = [&](float cash, bool ore_bid = true) {
                 scene s = make_scene(cash);
+                s.w.current_econ_tick = 4;
+                market_component& mc = s.w.markets.at(s.market);
+                if (ore_bid)
+                    mc.demand[ri(resource_type::iron_ore)] = 100.0f;
+                else
+                    mc.demand[ri(resource_type::steel)] = 100.0f; // cleared, but nobody bids for ore
                 economy_report rep; // strategic step needs no production report for builds
                 run_corp_strategic_step(s.w, reg, rep, /*tick=*/4); // AI corp index 0 -> due at tick%4==0
                 for (const corp_decision& d : s.w.ai_decisions.entries)
@@ -399,6 +408,9 @@ int main()
                   "BL-202 R2: the solvency gate blocks a build that breaches the reserve floor");
             check(builds_at(300.0f),
                   "BL-202 R2: the same candidate passes once cash clears the floor (gate, not ban)");
+            check(!builds_at(300.0f, /*ore_bid=*/false),
+                  "BL-1227: through the scorer, in play, a cleared market with no bid and nothing "
+                  "listed for the ore is DEAD - the same affordable mine is never built");
         }
 
         // Hysteresis / expected-loss veto: with a worthless market price the

@@ -345,7 +345,15 @@ inline constexpr uint32_t world_save_magic =
 /// building and per return and two per corporation; refused whole on the
 /// strict-equality contract, no migration. Claimed through
 /// `tools/session/next_save_version.js --kind world --claim`.
-inline constexpr uint32_t world_save_version = 37;
+/// Bumped to 38 by BL-1227 (idle mines, the unposted bid): the market record
+/// gains two resource-indexed arrays at its tail, after `hauler_want` --
+/// `unposted_bid` (float) and `unposted_bid_tick` (int32): the latest record of
+/// a buyer that takes or wants goods without posting a bid, and the econ tick
+/// it was recorded on, which the corp scorer's veto test reads for its
+/// cadence. A v37 stream is 2 x resource_count values short per market;
+/// refused whole on the strict-equality contract, no migration. Claimed through
+/// `tools/session/next_save_version.js --kind world --claim`.
+inline constexpr uint32_t world_save_version = 38;
 
 /// Write @p w as a complete world snapshot.
 ///
