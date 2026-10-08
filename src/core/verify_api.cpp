@@ -4868,7 +4868,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // BL-1241: the ground cache's bake counters and the source's installation
     // digest — a script steps the sim and checks that chunks re-bake only on
     // the days the installations (or the terrain) actually moved.
-    v.set_function("ground_stats", [this]() {
+    v.set_function("ground_bake_counters", [this]() { // BL-1241 (renamed at merge: ground_stats is BL-1244's)
         sol::state& s = m_lua.state();
         sol::table t = s.create_table();
         const ground_layer::bake_stats& st = m_ground.bake_counters();

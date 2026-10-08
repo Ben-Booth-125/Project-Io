@@ -632,10 +632,10 @@ void draw_part(raster& R, const view& v, double lift, const part& p, mode m)
                 quad(P(xl, p.y, zt + p.rh), P(xr, p.y, zt + p.rh), P(xr, yf, zt), P(xl, yf, zt),
                      p.roof, vramp(P(xl, p.y, zt + p.rh), P(xr, yf, zt), 0.82f, 0.64f));
                 // A lit ridge line: the crease is what makes a pitch read as one.
-                if (v.s * p.hd > 3.0)
+                if ((v.s / v.ss) * p.hd > 3.0) // nominal px (BL-1244)
                 {
                     sink s2 = sk; s2.c = p.roof * 1.35f; s2.sh = flat(1.0f); s2.alpha *= 0.8f;
-                    cover_capsule(R, P(xl, p.y, zt + p.rh), P(xr, p.y, zt + p.rh), 0.5f, 0.0f, s2);
+                    cover_capsule(R, P(xl, p.y, zt + p.rh), P(xr, p.y, zt + p.rh), 0.5f * static_cast<float>(v.ss), 0.0f, s2);
                 }
                 return;
             }

@@ -17,14 +17,14 @@ local g = verify.stage_gallery()
 verify.center_tile(g.col, g.row, 5)
 verify.frames(3)
 local days = 30
-local s0 = verify.ground_stats()
+local s0 = verify.ground_bake_counters()
 local prev = s0.installations
 local moved_days, rebake_days, leak_days = 0, 0, 0
 for d = 1, days do
-    local before = verify.ground_stats()
+    local before = verify.ground_bake_counters()
     verify.econ_step(1)
     verify.frames(1)
-    local after = verify.ground_stats()
+    local after = verify.ground_bake_counters()
     local moved = after.installations ~= prev
     local rebaked = (after.chunk_rebakes - before.chunk_rebakes) + (after.far_bakes - before.far_bakes) > 0
     if moved then moved_days = moved_days + 1 end
@@ -32,7 +32,7 @@ for d = 1, days do
     if rebaked and not moved then leak_days = leak_days + 1 end
     prev = after.installations
 end
-local s1 = verify.ground_stats()
+local s1 = verify.ground_bake_counters()
 print(string.format("structures rebake: %d days, installations moved on %d, re-baked on %d (%d without an installation move); chunk re-bakes %d, far bakes %d, buildings %d -> %d",
     days, moved_days, rebake_days, leak_days, s1.chunk_rebakes - s0.chunk_rebakes,
     s1.far_bakes - s0.far_bakes, s0.buildings, s1.buildings))

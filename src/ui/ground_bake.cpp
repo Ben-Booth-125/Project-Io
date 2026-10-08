@@ -1583,7 +1583,10 @@ std::uint64_t region_hash(const bake_source& src, const geometry& g,
     auto mix = [&h](std::uint64_t v) { h ^= v; h *= 1099511628211ull; };
     if (src.gw <= 0 || src.gh <= 0)
         return h;
-    const double margin = 2.0;
+    // 4.5: the blend radius plus what the feature and structure passes read
+    // beyond their owner tile — a river's neighbour-of-neighbour flow (BL-1242)
+    // and a port's water-facing neighbours across the structure reach (BL-1241).
+    const double margin = 4.5;
     const double x0 = px0 / g.s - margin,            x1 = (px0 + pw) / g.s + margin;
     const double y0 = py0 / g.s + g.y_min - margin,  y1 = (py0 + ph) / g.s + g.y_min + margin;
     const int r_lo = std::max(0, static_cast<int>(std::floor(y0 / 1.5)));
