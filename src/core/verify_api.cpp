@@ -1401,6 +1401,30 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     v.set_function("show_menu", [this](bool on) {
         m_screen = on ? app_screen::menu : app_screen::in_game;
     });
+    // Which screen the app is on: "menu", "generating" (the wizard),
+    // "building" (the loading bar), "choosing_seat" or "in_game". Lets a script
+    // that PRESSES a menu button (quick_start.lua) see where the press led.
+    v.set_function("screen", [this]() -> std::string {
+        switch (m_screen)
+        {
+        case app_screen::menu:          return "menu";
+        case app_screen::generating:    return "generating";
+        case app_screen::building:      return "building";
+        case app_screen::choosing_seat: return "choosing_seat";
+        case app_screen::in_game:       return "in_game";
+        }
+        return "unknown";
+    });
+    // Stand the harness where the interactive run stands before its menu: a
+    // person is at the keyboard (a build that lands opens the seat canvas
+    // rather than drawing the seat), and scripts/init.lua is loaded, as run()
+    // loads it first -- the landing's presentation half reads `config` from it
+    // (the autostart path makes the same load for the same reason).
+    // quick_start.lua needs the person's path from a real menu press.
+    v.set_function("as_interactive", [this]() {
+        m_lua.load("scripts/init.lua");
+        m_player_picks_seat = true;
+    });
 
     // Enter (or leave) the BL-167 New World wizard so a script can capture it. It
     // opens on the LAST round, fully populated: the wizard is a walk, and a frame
