@@ -526,6 +526,16 @@ The target is the *heuristic*, not a hard goal: a manual tier chosen in the buil
 
 *Fidelity:* labour contention is held at its current value, input-price response is ignored (inputs valued at the current price), and the tier search is coarse (10 % steps) — so the solved target can hunt by ±one step.
 
+**An input is priced at what the draw pays (Ben, 2026-10-08; BL-1232, power plants per grid).**
+The solver values each input at its market's **posted price** — the price the draw is billed at
+(`FINANCE.md` § the ceiling: a draw reads and pays the posted price) — never at a forecast from
+this tick's listings alone, which reads a stocked shelf with little listed as a good at the 10×
+cap. Measured: a power plant paying about 3.2 a unit for petroleum, with 500–660 units on its
+market's shelf, was forecast at the cap and zeroed while it netted +13 to +17 a tick. **Power is
+read on its grid:** for a building that makes or uses power, the solver reads power's supply and
+demand pooled over the building's grid (`LOGISTICS.md` § 3a), the same pooled figures the market
+prices power on — never its own market's alone.
+
 ---
 
 ## Stockpile and output flow
