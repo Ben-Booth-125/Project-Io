@@ -13,7 +13,8 @@
 // RGBA8 pixel buffers, CPU-side: continuous base colour interpolated between
 // tile centres (no cell boundary drawn), hillshade from the BL-517 height
 // field, wrap-periodic grain noise, water shading, and the C-F near-future
-// grade as a separable final pass.
+// grade as a separable final pass. Dramatic landforms bake their own relief
+// forms and rivers bake as carved curved courses (BL-1242).
 //
 // Deliberately SDL/ImGui/Lua-free so the headless harness
 // (tools/verify/ground_bake_check.cpp) can compile it against the world layer
@@ -119,6 +120,14 @@ struct bake_params
     int   supersample     = 2;
     // Water.
     float water_noise     = 0.03f;
+    // Landform relief and carved rivers (BL-1242, RENDERING.md § Mountains,
+    // rivers and terrain variety). Each pass reads analytic forms built from
+    // the tile skeleton — a dramatic landform's centre plus its half of every
+    // shared edge to a same-landform neighbour, a river's quadratic B-spline
+    // through its chain — so a run is ONE form and a course is ONE curve.
+    // 0 disables a pass (the harness's A/B lever).
+    float landform_strength = 1.0f; ///< Landform relief pass (massif, cut, bowl, fissure).
+    float river_strength    = 1.0f; ///< River pass (course, bank shelving, wet margin).
     // Near-future grade (the separable pass).
     bool  grade_enabled   = true;
     float grade_desat     = 0.34f;  ///< Toward luma.
@@ -147,6 +156,14 @@ struct bake_source
     std::vector<std::uint8_t> cover;    ///< terrain_cover per tile — feeds the close-tier feature stamps.
     std::vector<std::uint8_t> density;  ///< cover_density per tile.
     installation_snapshot     inst;     ///< BL-1241: what stands on each revealed tile.
+    // Landform and river features (BL-1242). Masked and void tiles carry none,
+    // so no form or course is ever baked from unsurveyed ground.
+    std::vector<std::uint8_t> landform;   ///< terrain_landform per tile.
+    std::vector<std::uint8_t> lf_links;   ///< Hex sides (bit i = side i) whose neighbour shares this tile's DRAMATIC landform — the bridged run.
+    std::vector<std::uint8_t> river_in;   ///< Hex sides a river flows IN across (river_edges & ~river_downstream).
+    std::vector<std::uint8_t> river_out;  ///< Hex sides a river flows OUT across (river_edges & river_downstream).
+    std::vector<float> river_flow;        ///< Accumulated flow: river tiles draining through this one, itself included (the whole river graph, mask-blind — width is what the visible course shows).
+    std::vector<std::uint8_t> near_feature; ///< Bit 0: a river on this tile or a neighbour; bit 1: a dramatic landform likewise. The passes' cull.
 };
 
 /// Build the source arrays for @p body. Reads tile fields and the survey mask

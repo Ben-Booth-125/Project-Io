@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**64 surfaces** — 7 settled, 57 awaiting Ben's wording.
+**65 surfaces** — 7 settled, 58 awaiting Ben's wording.
 
 ---
 
@@ -279,6 +279,14 @@ IT LIVES UNDER MY TRADES, NOT IN A FEED. The question it answers is about the pl
 **Because:** Buildings no longer carry an owner colour on the canvas (RENDERING.md § Installations), so the Corporation and Company lenses became the only place ownership is read at a glance — and with every owner tinted at once they answered 'who owns what' with a map of every colour at once, which answers nothing. A picked set keeps the comparison the player is actually making in colour and folds every other owner into one owned-grey, which still says 'someone holds this' without competing. Ben, 2026-10-08 (the sprint 51 visibility pass). The key copies the Resource lens's search-and-checklist shape so there is no new vocabulary, rows exist only for owners with ground on the body, the Corporation set defaults to the player ('where am I, against everyone'), and shift-click makes the map itself the picker while a plain click keeps its BL-664 meaning. It costs no new screen space: the key fills the one lens chrome region the lens already owned.
 
 *Demanded by BL-1240 · `src/ui/body_surface_canvas.cpp`, `src/ui/ui_state.hpp`, `src/ui/presentation.hpp`, `src/core/verify_api.cpp`, `scripts/verify/owner_multi_select.lua` · id `owner_multi_select`*
+
+### Baked landform relief and carved rivers (Planetary canvas ground) -- mountain as massif and ridge, canyon as a cut between paired rims, crater as a raised-rim bowl, rift as a dark fissure; rivers as curved courses widening downstream
+
+**Answers:** Where is the ground expensive to cross, and where does the water run and which way?
+
+**Because:** The four dramatic landforms are the <=1.5% of land whose movement cost is x1.3 or worse, so an invisible one is an expensive surprise; a river is an edge that discounts travel one way and gates wells and farms. Both used to be vector chrome laid over the painted ground -- a stroke-only glyph on the hex centre, a straight centre-to-centre stroke with chevrons -- and read as annotation on a painting (Ben, 2026-10-08, the sprint 51 form: mountains and rivers blend into the render). Baked, the same facts read as terrain: a contiguous run is one range, one cut, one fissure; a river is one smooth course whose width says which way it flows, so the chevrons have nothing left to say. The hover card still names the landform and its cost.
+
+*Demanded by BL-1242 · `src/ui/ground_bake.cpp`, `src/ui/body_surface_canvas.cpp`, `src/ui/hex_render.cpp` · id `planetary_landforms_rivers`*
 
 ### Roads and sea lanes (Planetary canvas, always-on route strokes)
 

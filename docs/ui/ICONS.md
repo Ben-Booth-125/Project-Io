@@ -136,12 +136,14 @@ runs are BL-232 (bridged runs).
 
 | Glyph | Function | Shape | Colour | Drawn for / where |
 |---|---|---|---|---|
-| **Mountain** | `landform(…, mountain, colour)` | Twin peaks sharing a saddle, open at the feet — no baseline, which is what separates it from the *filled* port triangle and the production up-triangle (both sit **on** a line) | Caller stroke — `ui::contrast_ink(fill)` | Unbuilt tile, Planetary canvas + Selection neighbourhood |
+| **Mountain** | `landform(…, mountain, colour)` | Twin peaks sharing a saddle, open at the feet — no baseline, which is what separates it from the *filled* port triangle and the production up-triangle (both sit **on** a line) | Caller stroke — `ui::contrast_ink(fill)` | A surface naming a landform in a small space — not the Planetary canvas or the Selection neighbourhood, which show the baked form |
 | **Canyon** | `landform(…, canyon, colour)` | Two level rim shoulders split by a narrow incision cutting below them; the gorge is the **gap**, and the level rims distinguish it from the Continent lens's diagonal seam | Caller stroke | As above |
 | **Crater** | `landform(…, crater, colour)` | A flattened bowl — a wide, low ellipse with a raised near rim arc inside its lower half. The squashed aspect is load-bearing: it is deliberately **not** concentric circles (the `activity` pulse) nor a circle-plus-cross (the `market_centre`) | Caller stroke | As above |
 | **Rift** | `landform(…, rift, colour)` | A single jagged fissure running top to bottom — the only zigzag in the vocabulary, so it cannot be read as a chevron (which meets at one point) or as the canyon's paired rims | Caller stroke | As above |
 
-**Contiguous runs are bridged into one marker.** A tile with a same-landform cardinal
+**Contiguous runs are bridged into one marker** — the span idiom below was the canvas's; the
+canvas now bakes a run as one relief form by the same half-edge rule (RENDERING.md § Mountains,
+rivers and terrain variety), and no surface draws a span. A tile with a same-landform cardinal
 neighbour draws `landform_span(…)` toward each such neighbour instead of its centred glyph —
 this tile's half of the shared edge, from centre to edge-midpoint, so the neighbour's half
 meets it exactly and a run reads as **one** feature. This is the road span/symmetry idiom

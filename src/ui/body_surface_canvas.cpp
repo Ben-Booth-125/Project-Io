@@ -3932,76 +3932,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 draw_network([](const tile_component& t) { return t.lane_level; },
                              IM_COL32(140, 200, 245, 190), route_r * k_lane_width, true);
 
-            // Rivers (BL-170 data; this render is new, 2026-08-02). Always-on terrain like
-            // roads. Drawn ONCE per edge from the UPSTREAM tile only — river_downstream bit
-            // set on a side means that side is this tile's outflow direction, so checking
-            // both river_edges and river_downstream picks exactly one of the two tiles
-            // sharing the edge as its drawer, and the line direction (this tile -> neighbour)
-            // is always the true flow direction with no separate lookup needed.
-            if (tile.river_edges != 0)
-            {
-                const int (*r_off)[2] = hex_neighbors::offsets(tile.grid_y);
-
-                const ImU32 river_col    = IM_COL32(90, 160, 235, 235);
-                const ImU32 chevron_col  = IM_COL32(220, 235, 255, 245);
-                const float river_thick  = std::max(1.5f, draw_r * 0.16f);
-
-                for (int side = 0; side < 6; ++side)
-                {
-                    const auto bit = static_cast<std::uint8_t>(1u << side);
-                    if (!(tile.river_edges & bit) || !(tile.river_downstream & bit))
-                        continue; // no river here, or this tile is the downstream half (already drawn from upstream)
-
-                    const int nrow = tile.grid_y + r_off[side][1];
-                    if (nrow < 0 || nrow >= gh)
-                        continue;
-                    const int raw_col = tile.grid_x + r_off[side][0];
-                    int ncol = raw_col % gw;
-                    if (ncol < 0)
-                        ncol += gw;
-
-                    if (tile_at_rc(ncol, nrow) == null_entity)
-                        continue;
-                    if (!(survey_tile_visible(body.survey, gw, gh, ncol, nrow) || god_view_lift))
-                        continue; // BL-408: god view draws into the masked region too
-
-                    ImVec2 nb_sc = to_screen(hex_local_centre(ncol, nrow, hex_size));
-                    nb_sc.x += static_cast<float>(k) * period_px;
-                    if (raw_col >= gw)      nb_sc.x += period_px;
-                    else if (raw_col < 0)   nb_sc.x -= period_px;
-
-                    float dirx = nb_sc.x - cx;
-                    float diry = nb_sc.y - cy;
-                    const float len = std::sqrt(dirx * dirx + diry * diry);
-                    if (len <= 0.0f)
-                        continue;
-                    dirx /= len;
-                    diry /= len;
-                    const float px = -diry;
-                    const float py =  dirx;
-
-                    dl->AddLine({cx, cy}, nb_sc, river_col, river_thick);
-
-                    // Chevron cadence ("every 2 tiles"): no per-edge distance-from-source is
-                    // stored (generate_rivers traces tile-by-tile with no persisted path
-                    // index), so this approximates the cadence with the upstream tile's grid
-                    // parity — cheap, deterministic, and roughly-alternating rather than an
-                    // exact along-river count.
-                    if (((tile.grid_x + tile.grid_y) & 1) == 0)
-                    {
-                        const float mx   = (cx + nb_sc.x) * 0.5f;
-                        const float my   = (cy + nb_sc.y) * 0.5f;
-                        const float chev = std::max(2.5f, draw_r * 0.3f);
-                        const ImVec2 tip   = {mx + dirx * chev * 0.5f, my + diry * chev * 0.5f};
-                        const ImVec2 wing1 = {mx - dirx * chev * 0.3f + px * chev * 0.55f,
-                                              my - diry * chev * 0.3f + py * chev * 0.55f};
-                        const ImVec2 wing2 = {mx - dirx * chev * 0.3f - px * chev * 0.55f,
-                                              my - diry * chev * 0.3f - py * chev * 0.55f};
-                        dl->AddLine(wing1, tip, chevron_col, river_thick * 0.9f);
-                        dl->AddLine(wing2, tip, chevron_col, river_thick * 0.9f);
-                    }
-                }
-            }
+            // Rivers draw nothing here: they bake into the ground as carved courses along
+            // river_edges, widening downstream (ground_bake.cpp bake_rivers; RENDERING.md
+            // § Mountains, rivers and terrain variety). The width gradient says which way
+            // the water flows, so the stroke and its chevrons are retired.
 
             // National borders - the coloured rule (BL-601). The band's wash
             // above says "this ground is near a frontier"; this pass says WHICH
@@ -4188,78 +4122,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 }
             }
 
-            // Landform glyph (BL-231): the categorical half of the landform channel.
-            // Only the four DRAMATIC landforms draw — mountain, canyon, crater, rift —
-            // measured at ≤1.5 % of land tiles each (world_audit § S3) and each carrying
-            // a movement cost of ×1.3 or worse, so this is the set where an invisible
-            // surprise is expensive. Plains, highland and valley draw nothing; between
-            // them plains and valley are ~95 % of land, and an icon on nearly every tile
-            // would be far denser than any other glyph family.
-            //
-            // Unbuilt tiles only: a built hex already carries an enlarged silhouette plus
-            // a corp emblem tag, and its cost is spent. Suppressed under the two value
-            // lenses, which claim the hex centre for their own mark below (BL-135). Ink
-            // contrasts against the finished fill, so the glyph reads over any terrain
-            // hue and any lens tint composited on top of it.
-            //
-            // BRIDGING (BL-232): a run of three mountains should read as ONE range, not
-            // three identical icons, so a tile with a same-landform cardinal neighbour
-            // draws SPANS instead of its centred glyph — this tile's half of each shared
-            // edge, exactly as BL-172's roads do, so the neighbour's half meets it at the
-            // midpoint with no cross-tile state and the survey fog clips it cleanly.
-            // Measured (world_audit § S4): 71 % of mountain and 81 % of rift tiles have
-            // such a neighbour, and modal run length is 2-3. Crater never spans — a basin
-            // is a blob, not a line. The all-four-neighbours "filled interior" case that
-            // was designed alongside this was CANCELLED on the same measurement: not one
-            // tile in the system has four, so it would have been dead code on every seed.
-            if (!built)
-            {
-                const ImU32 ink = contrast_ink(fill);
-                bool        spanned = false;
-
-                if (icons::landform_spans(tile.landform))
-                {
-                    const float amp   = std::max(1.5f, draw_r * 0.20f);
-                    const float thick = std::max(1.0f, draw_r * 0.13f);
-
-                    static const int card_off[4][2] = {{+1, 0}, {-1, 0}, {0, +1}, {0, -1}};
-                    for (int n = 0; n < 4; ++n)
-                    {
-                        const int nrow = tile.grid_y + card_off[n][1];
-                        if (nrow < 0 || nrow >= gh)
-                            continue;
-                        const int raw_col = tile.grid_x + card_off[n][0];
-                        int ncol = raw_col % gw;
-                        if (ncol < 0)
-                            ncol += gw;
-
-                        const entity_id nb_id = tile_at_rc(ncol, nrow);
-                        if (nb_id == null_entity)
-                            continue;
-                        const auto nb_tile_it = w.tiles.find(nb_id);
-                        if (nb_tile_it == w.tiles.end()
-                            || nb_tile_it->second.landform != tile.landform)
-                            continue;
-                        if (!(survey_tile_visible(body.survey, gw, gh, ncol, nrow) || god_view_lift))
-                            continue; // BL-408: god view draws into the masked region too
-
-                        ImVec2 nb_sc = to_screen(hex_local_centre(ncol, nrow, hex_size));
-                        nb_sc.x += static_cast<float>(k) * period_px;
-                        if (raw_col >= gw)    nb_sc.x += period_px; // east across the seam
-                        else if (raw_col < 0) nb_sc.x -= period_px; // west across the seam
-
-                        const ImVec2 mid = {(cx + nb_sc.x) * 0.5f, (cy + nb_sc.y) * 0.5f};
-                        icons::landform_span(dl, {cx, cy}, mid, amp, thick, tile.landform, ink);
-                        spanned = true;
-                    }
-                }
-
-                // The lone tile keeps its centred glyph — the same role the road's centre
-                // cap plays, and needed by 29 % of mountain and 50 % of canyon tiles.
-                if (!spanned)
-                    icons::landform(dl, {cx, cy}, std::max(3.0f, draw_r * 0.44f),
-                                    tile.landform, ink);
-            }
+            // Landforms draw nothing here: the dramatic set (mountain, canyon, crater,
+            // rift) bakes its own relief form into the ground, a bridged run as one
+            // form (ground_bake.cpp bake_landforms; RENDERING.md § Mountains, rivers and
+            // terrain variety). The hover card still names the landform and its cost.
 
             // The Workforce (Population) lens's per-tile DOT used to be drawn here
             // (BL-135's value mark). It is gone: the lens tints the tile itself now

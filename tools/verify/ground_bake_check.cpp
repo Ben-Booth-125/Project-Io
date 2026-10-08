@@ -34,6 +34,13 @@
 //       window's reach does not.
 // Also (not checks): bake ms per tier with the pass off vs on, and a gallery
 // of every procedural form at every tier (structures_gallery_*.png).
+//   P15 Landform relief (BL-1242): a bridged mountain run's window is moved
+//       by the pass, deterministic, wrap-exact flat and oblique; ground with
+//       no feature near it is untouched.
+//   P16 Rivers (BL-1242): a river mouth's window likewise.
+//
+// Also prints bake time per tier (a measurement, not a check) and writes
+// feature_<form>_<tier>.png previews for the eye.
 //
 // Exits 0 on PASS, non-zero naming the failed phase.
 
@@ -42,6 +49,7 @@
 #include "core/png_writer.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/survey_system.hpp"
+#include "world/hex_neighbors.hpp"
 #include "world/world.hpp"
 #include "harness_params.hpp"
 
@@ -822,6 +830,279 @@ int main()
             write_png_rgba("ground_preview_v8_tilt45.png", PW, PH,
                            reinterpret_cast<const unsigned char*>(sq.data()), PW * 4);
             std::printf("preview: ground_preview_v8_tilt45.png\n");
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // P15 / P16 — the landform relief and river passes (BL-1242): each moves
+    // the bake where its feature stands, bakes byte-identical twice and one
+    // wrap period east (flat 48 px and the 45-degree oblique tier), and leaves
+    // ground with no feature near it untouched. Feature previews follow, at
+    // the far page, 24 px and 96 px, for the eye.
+    // ------------------------------------------------------------------
+    {
+        const auto land = static_cast<std::uint8_t>(bake_source::tile_class::land);
+        const auto water = static_cast<std::uint8_t>(bake_source::tile_class::water);
+        auto popcount6 = [](std::uint8_t v) { int c = 0; for (int b = 0; b < 6; ++b) c += (v >> b) & 1; return c; };
+        // Aims: the most-linked tile of each linear landform, a crater, and
+        // the highest-flow river mouth (a land tile flowing into water).
+        int aim_lf[7] = { -1, -1, -1, -1, -1, -1, -1 };
+        int best_links[7] = { -1, -1, -1, -1, -1, -1, -1 };
+        int mouth = -1;
+        float mouth_flow = 0.0f;
+        // A river MOUTH is at the sea, not a lake: read substrates off the world.
+        std::vector<std::uint8_t> is_sea(src.cls.size(), 0);
+        for (const auto& [tid, t] : w.tiles)
+            if (t.body == home && t.grid_x >= 0 && t.grid_x < src.gw && t.grid_y >= 0
+                && t.grid_y < src.gh)
+                is_sea[static_cast<std::size_t>(t.grid_y) * src.gw + t.grid_x] =
+                    (t.substrate == terrain_substrate::ocean || t.substrate == terrain_substrate::coast)
+                        ? 1 : 0;
+        for (int i = 0; i < static_cast<int>(src.cls.size()); ++i)
+        {
+            if (src.cls[i] != land)
+                continue;
+            const int lf = src.landform[i];
+            const int lk = popcount6(src.lf_links[i]);
+            if (lf >= 0 && lf < 7 && lk > best_links[lf])
+            {
+                best_links[lf] = lk;
+                aim_lf[lf] = i;
+            }
+            for (int s = 0; s < 6; ++s)
+            {
+                if (!(src.river_out[i] & (1u << s)))
+                    continue;
+                const hex_neighbors::coord nb = hex_neighbors::neighbour(i % src.gw, i / src.gw, s);
+                if (nb.gy < 0 || nb.gy >= src.gh)
+                    continue;
+                const int j = nb.gy * src.gw + ((nb.gx % src.gw) + src.gw) % src.gw;
+                if (src.cls[j] == water && is_sea[j] && src.river_flow[i] > mouth_flow)
+                {
+                    mouth_flow = src.river_flow[i];
+                    mouth = i;
+                }
+            }
+        }
+        const int mtn = aim_lf[static_cast<int>(terrain_landform::mountain)];
+        check(mtn >= 0 && best_links[static_cast<int>(terrain_landform::mountain)] >= 1,
+              "P15", "found a bridged mountain run");
+        check(mouth >= 0, "P16", "found a river mouth");
+        std::printf("      mountain run at [%d,%d] (%d links); rift [%d]; canyon [%d]; crater [%d]; "
+                    "mouth at [%d,%d] flow %.0f\n",
+                    mtn % src.gw, mtn / src.gw,
+                    best_links[static_cast<int>(terrain_landform::mountain)],
+                    aim_lf[static_cast<int>(terrain_landform::rift)],
+                    aim_lf[static_cast<int>(terrain_landform::canyon)],
+                    aim_lf[static_cast<int>(terrain_landform::crater)],
+                    mouth % src.gw, mouth / src.gw, mouth_flow);
+        // Walk the mouth's main stem upstream (largest inflow each step) to its
+        // source, so a capture script can frame the whole river.
+        if (mouth >= 0)
+        {
+            int cur = mouth, steps = 0;
+            for (;;)
+            {
+                int next = -1;
+                float bf = 0.0f;
+                for (int s = 0; s < 6; ++s)
+                {
+                    if (!(src.river_in[cur] & (1u << s)))
+                        continue;
+                    const hex_neighbors::coord nb = hex_neighbors::neighbour(cur % src.gw, cur / src.gw, s);
+                    if (nb.gy < 0 || nb.gy >= src.gh)
+                        continue;
+                    const int j = nb.gy * src.gw + ((nb.gx % src.gw) + src.gw) % src.gw;
+                    if (src.river_flow[j] > bf) { bf = src.river_flow[j]; next = j; }
+                }
+                if (next < 0 || ++steps > 4096)
+                    break;
+                cur = next;
+            }
+            std::printf("      main stem: source [%d,%d] -> mouth [%d,%d], %d tiles\n",
+                        cur % src.gw, cur / src.gw, mouth % src.gw, mouth / src.gw, steps + 1);
+        }
+        for (int i = 0; i < static_cast<int>(src.cls.size()); ++i)
+            if (src.cls[i] == land && src.landform[i] == static_cast<std::uint8_t>(terrain_landform::mountain)
+                && src.lf_links[i] == 0 && i / src.gw > 20 && i / src.gw < src.gh - 20)
+            {
+                std::printf("      lone mountain at [%d,%d]\n", i % src.gw, i / src.gw);
+                break;
+            }
+        for (int lf : { 2, 3, 5, 6 })
+            if (aim_lf[lf] >= 0)
+                std::printf("      landform %d best at [%d,%d] (%d links)\n", lf,
+                            aim_lf[lf] % src.gw, aim_lf[lf] / src.gw, best_links[lf]);
+
+        const auto window = [&](int tile_idx, const geometry& gg, const bake_params& bp,
+                                int side, int dpx, std::vector<std::uint32_t>& out)
+        {
+            const int r = tile_idx / src.gw, c = tile_idx % src.gw;
+            const double cx = 1.7320508075688772 * (c + ((r & 1) ? 0.5 : 0.0));
+            const double cy = 1.5 * r - src.height[tile_idx] * gg.lift;
+            const int x0 = static_cast<int>(cx * gg.s) - side / 2 + dpx;
+            const int y0 = std::clamp(static_cast<int>((cy - gg.y_min) * gg.s) - side / 2,
+                                      0, std::max(0, gg.H - side));
+            out.assign(static_cast<std::size_t>(side) * side, 0u);
+            bake_region(src, gg, bp, x0, y0, side, side, out.data());
+        };
+        const geometry g48f = make_geometry(hb.grid_width, hb.grid_height, 48.0);
+        const geometry g45f = make_geometry(hb.grid_width, hb.grid_height, 96.0, 0.70710678);
+        bake_params no_lf = p;  no_lf.landform_strength = 0.0f;
+        bake_params no_rv = p;  no_rv.river_strength = 0.0f;
+        std::vector<std::uint32_t> a1, a2, a3, a4;
+        if (mtn >= 0)
+        {
+            window(mtn, g48f, p, 160, 0, a1);
+            window(mtn, g48f, p, 160, 0, a2);
+            window(mtn, g48f, p, 160, g48f.W, a3);
+            window(mtn, g48f, no_lf, 160, 0, a4);
+            check(a1 == a2, "P15", "a mountain run bakes byte-identical twice");
+            check(a1 == a3, "P15", "a mountain run wraps byte-identical one period east");
+            check(a1 != a4, "P15", "the landform pass moves a mountain run");
+            window(mtn, g45f, p, 160, 0, a1);
+            window(mtn, g45f, p, 160, g45f.W, a3);
+            check(a1 == a3, "P15", "the oblique mountain run wraps byte-identical");
+        }
+        if (mouth >= 0)
+        {
+            window(mouth, g48f, p, 160, 0, a1);
+            window(mouth, g48f, p, 160, 0, a2);
+            window(mouth, g48f, p, 160, g48f.W, a3);
+            window(mouth, g48f, no_rv, 160, 0, a4);
+            check(a1 == a2, "P16", "a river mouth bakes byte-identical twice");
+            check(a1 == a3, "P16", "a river mouth wraps byte-identical one period east");
+            check(a1 != a4, "P16", "the river pass moves a river mouth");
+            window(mouth, g45f, p, 160, 0, a1);
+            window(mouth, g45f, p, 160, g45f.W, a3);
+            check(a1 == a3, "P16", "the oblique river mouth wraps byte-identical");
+        }
+        // Featureless ground stays byte-identical with both passes off.
+        {
+            int quiet = -1;
+            for (int i = 0; i < static_cast<int>(src.cls.size()) && quiet < 0; ++i)
+            {
+                if (src.cls[i] != land || src.near_feature[i])
+                    continue;
+                bool ok = true;
+                const int r = i / src.gw, c = i % src.gw;
+                for (int dr = -3; dr <= 3 && ok; ++dr)
+                    for (int dc = -3; dc <= 3 && ok; ++dc)
+                    {
+                        const int rr = r + dr;
+                        if (rr < 0 || rr >= src.gh) { ok = false; break; }
+                        const int cc = ((c + dc) % src.gw + src.gw) % src.gw;
+                        if (src.near_feature[static_cast<std::size_t>(rr) * src.gw + cc])
+                            ok = false;
+                    }
+                if (ok)
+                    quiet = i;
+            }
+            if (quiet >= 0)
+            {
+                bake_params off = p; off.landform_strength = 0.0f; off.river_strength = 0.0f;
+                window(quiet, g48f, p, 96, 0, a1);
+                window(quiet, g48f, off, 96, 0, a2);
+                check(a1 == a2, "P15", "ground with no feature near it is untouched by both passes");
+            }
+        }
+
+        // Previews.
+        struct shot { const char* name; int tile; };
+        const shot shots[] = {
+            { "mountain", mtn },
+            { "rift",   aim_lf[static_cast<int>(terrain_landform::rift)] },
+            { "canyon", aim_lf[static_cast<int>(terrain_landform::canyon)] },
+            { "crater", aim_lf[static_cast<int>(terrain_landform::crater)] },
+            { "mouth",  mouth },
+        };
+        const double tiers[] = { 6.0, 24.0, 96.0 };
+        std::vector<std::uint32_t> pb;
+        for (const shot& sh : shots)
+        {
+            if (sh.tile < 0)
+                continue;
+            for (double tp : tiers)
+            {
+                const geometry gp = make_geometry(hb.grid_width, hb.grid_height, tp);
+                const int side = tp < 10.0 ? 160 : 512;
+                window(sh.tile, gp, p, side, 0, pb);
+                char path[128];
+                std::snprintf(path, sizeof path, "feature_%s_%d.png", sh.name, static_cast<int>(tp));
+                write_png_rgba(path, side, side, reinterpret_cast<const unsigned char*>(pb.data()),
+                               side * 4);
+                // The same window with both passes off: the A/B the eye needs.
+                bake_params off = p; off.landform_strength = 0.0f; off.river_strength = 0.0f;
+                window(sh.tile, gp, off, side, 0, pb);
+                std::snprintf(path, sizeof path, "feature_%s_%d_off.png", sh.name, static_cast<int>(tp));
+                write_png_rgba(path, side, side, reinterpret_cast<const unsigned char*>(pb.data()),
+                               side * 4);
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Bake time per tier (BL-1242: recorded before and after the landform
+    // and river passes). Not a check — a measurement. One 512 px chunk per
+    // tier aimed at the body's strongest-relief tile, the two oblique tiers,
+    // and the far page whole. Debug builds time far slower than Release;
+    // compare like with like.
+    // ------------------------------------------------------------------
+    {
+        int aim = land_i;
+        float best = -1.0f;
+        for (int i = 0; i < static_cast<int>(src.relief_bias.size()); ++i)
+            if (src.cls[i] == static_cast<std::uint8_t>(bake_source::tile_class::land)
+                && src.relief_bias[i] > best)
+            {
+                best = src.relief_bias[i];
+                aim  = i;
+            }
+        const int ar = aim / src.gw, ac = aim % src.gw;
+        const double ax = 1.7320508075688772 * (ac + ((ar & 1) ? 0.5 : 0.0));
+        const double ay = 1.5 * ar;
+        struct tier { double px; double sy; const char* name; };
+        const tier tiers[] = { { 12.0, 1.0, "12" }, { 24.0, 1.0, "24" }, { 48.0, 1.0, "48" },
+                               { 96.0, 0.92387953, "96@22.5" }, { 192.0, 0.70710678, "192@45" } };
+        std::vector<std::uint32_t> tb(512u * 512u);
+        // Each row times the default bake AND the same window with the BL-1242
+        // passes off, in one process, so load on the machine cancels out of the
+        // comparison. Best of three each: Debug timing is noisy.
+        bake_params feat_off = p;
+        feat_off.landform_strength = 0.0f;
+        feat_off.river_strength    = 0.0f;
+        const auto best_of3 = [&](const geometry& gg, const bake_params& bp, int x0, int y0,
+                                  int w_, int h_, std::uint32_t* buf) -> double
+        {
+            double best = 1e30;
+            for (int rep = 0; rep < 3; ++rep)
+            {
+                const auto t0 = std::chrono::steady_clock::now();
+                bake_region(src, gg, bp, x0, y0, w_, h_, buf);
+                const auto t1 = std::chrono::steady_clock::now();
+                best = std::min(best, std::chrono::duration<double, std::milli>(t1 - t0).count());
+            }
+            return best;
+        };
+        for (const tier& t : tiers)
+        {
+            const geometry gt = make_geometry(hb.grid_width, hb.grid_height, t.px, t.sy);
+            const int side = 512;
+            const int tpx0 = static_cast<int>(ax * gt.s) - side / 2;
+            const int tpy0 = std::clamp(static_cast<int>((ay - gt.y_min) * gt.s) - side / 2,
+                                        0, std::max(0, gt.H - side));
+            const double on  = best_of3(gt, p, tpx0, tpy0, side, side, tb.data());
+            const double off = best_of3(gt, feat_off, tpx0, tpy0, side, side, tb.data());
+            std::printf("TIME  tier %-8s 512x512 chunk: %8.1f ms (features off %8.1f ms)\n",
+                        t.name, on, off);
+        }
+        {
+            const geometry g6 = make_geometry(hb.grid_width, hb.grid_height, 6.0);
+            std::vector<std::uint32_t> fb(static_cast<std::size_t>(g6.W) * g6.H);
+            const double on  = best_of3(g6, p, 0, 0, g6.W, g6.H, fb.data());
+            const double off = best_of3(g6, feat_off, 0, 0, g6.W, g6.H, fb.data());
+            std::printf("TIME  far page %dx%d: %8.1f ms (features off %8.1f ms)\n",
+                        g6.W, g6.H, on, off);
         }
     }
 

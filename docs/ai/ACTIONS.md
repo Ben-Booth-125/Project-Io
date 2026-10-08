@@ -663,7 +663,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Valid when:**
 - The app is in-game and no ImGui text field has keyboard focus.
 
-**Expected output.** The overlay lens clears to none: the canvas returns to its unskinned terrain render (the state the app opens in — no lens is active on load). Always-on chrome (landform relief/glyphs, civic markers, player-presence ring) is not lens-gated and stays. The minimap bar shows no active glyph. Selection, framing, and speed unchanged.
+**Expected output.** The overlay lens clears to none: the canvas returns to its unskinned terrain render (the baked ground, with the dramatic landforms as relief forms and rivers as carved courses) (the state the app opens in — no lens is active on load). Always-on chrome (the landform relief tint, civic markers, player-presence ring) is not lens-gated and stays. The minimap bar shows no active glyph. Selection, framing, and speed unchanged.
 
 **Reason to select.** Get back to plain terrain in one press from any lens, on-bar or keyboard-only, instead of cycling to the null state.
 

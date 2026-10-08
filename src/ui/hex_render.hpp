@@ -22,7 +22,7 @@ namespace ui {
 
 /// Identity fill colour for a tile's terrain — the single source of truth for
 /// surface tinting. Composition owns **hue**; landform is a separate channel
-/// (`landform_relief` below, plus the `ui::icons::landform` glyphs), because lens
+/// (`landform_relief` below, plus the ground bake's landform relief forms), because lens
 /// tints composite over this hue and would obliterate any second signal carried in it.
 ImU32 terrain_colour(terrain_substrate sub, terrain_cover cov, std::uint8_t density);
 
