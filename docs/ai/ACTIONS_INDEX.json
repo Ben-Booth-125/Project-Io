@@ -442,6 +442,10 @@
    "Main menu, primary button column"
   ],
   [
+   "chrome.menu_quick_start",
+   "Main menu, primary button column, between New Game and Quit"
+  ],
+  [
    "chrome.menu_quit",
    "Main menu, primary button column"
   ],

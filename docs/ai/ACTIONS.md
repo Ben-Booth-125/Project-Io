@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*158 entries — 28 gameplay · 25 canvas · 17 lens · 53 ledger · 35 chrome.*
+*159 entries — 28 gameplay · 25 canvas · 17 lens · 53 ledger · 36 chrome.*
 
 ---
 
@@ -1965,7 +1965,18 @@ TRADES shows FOUR headed sections, each bounded and scrolling inside itself so a
 
 **Expected output.** The screen transitions to the New World wizard (app_screen::generating), opening on round 1 of 3. Nothing is generated or committed by this press; the wizard only previews.
 
-**Reason to select.** To start setting up a new world; this is the only route into play.
+**Reason to select.** To start setting up a new world round by round, choosing the planetology and history leans.
+
+### `chrome.menu_quick_start` — Main menu, primary button column, between New Game and Quit
+
+**Press.** Click Quick Start.
+
+**Valid when:**
+- App is on the main menu screen.
+
+**Expected output.** The world is built straight through on the menu's seed and resources with no wizard round drawn: the screen goes to the loading bar (app_screen::building) while the cold build runs (make_hard_coded_world, then finish_campaign_world, the same calls the wizard's Begin makes), then to the seat canvas (app_screen::choosing_seat), where the player picks the corporation. The same settings give the same world the wizard would have built.
+
+**Reason to select.** To start play on a known seed and resource level without walking the wizard's rounds; the seat is still chosen.
 
 ### `chrome.menu_quit` — Main menu, primary button column
 
