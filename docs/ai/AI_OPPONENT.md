@@ -477,8 +477,11 @@ where a processor genuinely differs from a mine:
   discovered as a seam rejection — a candidate that can only ever be refused costs a build slot to
   learn nothing), and **input access** — every input must be **obtainable** at the candidate's
   market (§ Build only what runs), since a processor with no reachable input is an immediate
-  loss-maker. The scorer asks exactly what the seam asks and no more: mirroring a lock
-  the seam does not apply would make the rival stricter than the rules it plays by.
+  loss-maker. The scorer **mirrors every lock the seam applies, and adds no lock of its own** —
+  a rule the seam does not enforce would make the rival play by stricter rules than the player.
+  Input access is not such a lock: the seam lets anyone build a plant that will starve, and the
+  scorer declining to is a judgement inside its own **estimate** (§ Build only what runs; the
+  supply rule below), the same judgement a sensible player makes, not a rule imposed on it.
   **A build is judged on supply, not stock (Ben, 2026-10-08; BL-1234, settle scorer starves).**
   For a NEW processor, an input is obtainable only when the spare reachable output of that input
   covers the plant's draw at `t_idle` — the supply clause alone, the same sized test generation
