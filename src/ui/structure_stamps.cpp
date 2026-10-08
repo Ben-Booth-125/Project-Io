@@ -206,12 +206,16 @@ void cover_poly(raster& R, const pt* p, int n, float dil, const sink& out)
     const int y1 = std::min(R.ph - 1, static_cast<int>(std::ceil(maxy + dil + 1.0f)));
     if (x0 > x1 || y0 > y1)
         return;
-    // Edge normals, oriented inward by the centroid.
+    // Edge normals, oriented inward by the centroid — computed about a WHOLE-PIXEL
+    // local origin, so the edge constants (and so the coverage) do not depend on
+    // where the window starts: translation-invariant across chunk seams.
+    const float ox = std::floor(p[0].x), oy = std::floor(p[0].y);
+    cx -= ox; cy -= oy;
     float nx[160], ny[160], nc[160];
     int   ne = 0;
     for (int i = 0; i < n && ne < 160; ++i)
     {
-        const pt a = p[i], b = p[(i + 1) % n];
+        const pt a{ p[i].x - ox, p[i].y - oy }, b{ p[(i + 1) % n].x - ox, p[(i + 1) % n].y - oy };
         const float ex = b.x - a.x, ey = b.y - a.y;
         const float len = std::sqrt(ex * ex + ey * ey);
         if (len < 1e-4f)
@@ -229,7 +233,7 @@ void cover_poly(raster& R, const pt* p, int n, float dil, const sink& out)
     for (int y = y0; y <= y1; ++y)
         for (int x = x0; x <= x1; ++x)
         {
-            const float sx = x + 0.5f, sy = y + 0.5f;
+            const float sx = (x - ox) + 0.5f, sy = (y - oy) + 0.5f;
             float d = 1e9f;
             for (int k = 0; k < ne; ++k)
                 d = std::min(d, nx[k] * sx + ny[k] * sy + nc[k]);
@@ -379,11 +383,16 @@ struct instance
     std::size_t first = 0, count = 0; ///< Range into the shared part list.
 };
 
-/// Project canonical (x, y, z) to window pixels.
+/// Project canonical (x, y, z) to window pixels. The ABSOLUTE bake coordinate
+/// is snapped to a 1/256 px grid before the window offset comes off, so a point's
+/// window-relative position is exact in every chunk that draws it and two chunks
+/// sharing an edge rasterise it identically (the chunk-seam rule, ground_bake_check
+/// P11; found by BL-1243's variant pass).
 inline pt proj(const view& v, double lift, double x, double y, double z)
 {
-    return { static_cast<float>(x * v.s - v.px0 + z * v.sh * v.s),
-             static_cast<float>((y - lift - v.y_min) * v.s - v.py0 - z * v.vz * v.s) };
+    const double ax = std::round((x * v.s + z * v.sh * v.s) * 256.0) / 256.0;
+    const double ay = std::round(((y - lift - v.y_min) * v.s - z * v.vz * v.s) * 256.0) / 256.0;
+    return { static_cast<float>(ax - v.px0), static_cast<float>(ay - v.py0) };
 }
 
 /// Ground point under (x, y, z)'s shadow.
