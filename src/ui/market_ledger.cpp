@@ -1376,6 +1376,12 @@ void draw_item_glyph_placeholder(ImU32 colour, float box)
 std::vector<goods_row_record> g_goods_rows;
 entity_id                     g_goods_market = null_entity;
 
+/// BL-1239: the market the Production section's door last aimed the ledger at.
+/// The aimed good (`ui_state::market_ledger_aim_resource`) highlights only on
+/// THIS market, so browsing to another market never paints a row the door did
+/// not point at.
+entity_id                     g_aim_market   = null_entity;
+
 void draw_goods_tab(const world& w, ui_state& s, entity_id body,
                     entity_id mid, const market_component& mc,
                     const market_plot_history& history)
@@ -1505,6 +1511,18 @@ void draw_goods_tab(const world& w, ui_state& s, entity_id body,
                     presentation_of(static_cast<resource_type>(r));
 
                 ImGui::TableSetColumnIndex(0);
+                // BL-1239: the good a Production-section door aimed at — the
+                // row is washed and, once, scrolled into view, which is what
+                // "aimed at that good" means in a view listing every good.
+                if (mid == g_aim_market && s.market_ledger_aim_resource == static_cast<int>(r))
+                {
+                    ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, IM_COL32(70, 110, 160, 110));
+                    if (s.market_ledger_aim_scroll)
+                    {
+                        ImGui::SetScrollHereY(0.5f);
+                        s.market_ledger_aim_scroll = false;
+                    }
+                }
                 draw_item_glyph_placeholder(rp.colour, em * 0.95f);
 
                 ImGui::TableSetColumnIndex(1);
@@ -1634,6 +1652,21 @@ void draw_market_ledger(world& w, const recipe_registry& reg, ui_state& s,
             selected_body        = fit->second.body;
             pending_focus_market = s.selected_entity;
         }
+    }
+
+    // BL-1239: the tile element's Production section aims the ledger through a
+    // one-shot field rather than a selection, so the tile stays selected behind
+    // the door. Consumed here, the same jump the selection route makes.
+    if (s.market_ledger_aim_market != null_entity)
+    {
+        const auto fit = w.markets.find(s.market_ledger_aim_market);
+        if (fit != w.markets.end())
+        {
+            selected_body        = fit->second.body;
+            pending_focus_market = s.market_ledger_aim_market;
+            g_aim_market         = s.market_ledger_aim_market;
+        }
+        s.market_ledger_aim_market = null_entity;
     }
 
     if (selected_body == null_entity || w.bodies.find(selected_body) == w.bodies.end())

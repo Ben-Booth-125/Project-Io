@@ -1,10 +1,11 @@
 #include "hover_content.hpp"
 
+#include "building_state.hpp" // BL-1239: the one running-state classification
+
 #include "icons.hpp"
 #include "presentation.hpp"
 #include "world/components.hpp"
 #include "world/logistics.hpp" // landform_logistics_cost — the landform's real cost (BL-232)
-#include "world/placement_rules.hpp" // is_depositless_site — an idle Well/Wharf is labour-short (BL-1198/1199)
 #include "world/workforce.hpp"
 
 #include <imgui.h>
@@ -185,7 +186,9 @@ void hover_tile_population(const world& w, const tile_component& tile)
 // hover_building_supply so the god view shows a rival THROUGH the same lines the
 // player reads about their own buildings, rather than a second wording that
 // could drift.
-void hover_building_detail(const world& w, const building_component& b)
+void hover_building_detail(const world& w, const recipe_registry* reg,
+                           const economy_report* report, entity_id eid,
+                           const building_component& b)
 {
     // Stat line 1: what it produces / targets.
     if (b.type == building_type::extraction_site)
@@ -195,68 +198,29 @@ void hover_building_detail(const world& w, const building_component& b)
     else
         ImGui::TextUnformatted(building_type_name(b.type));
 
-    // Stat line 2: workforce (proxy for output rate; recipe registry not available here).
+    // Stat line 2: workforce (proxy for output rate).
     ImGui::Text("Workforce: %.0f%%",
                 static_cast<double>(b.workforce_assigned) * 100.0);
 
-    // Why-line: explain operational status. Construction outranks every other
-    // status line — a site with ticks_remaining > 0 has no output to explain
-    // yet regardless of workforce/decommission state (BL-323 S4: at-a-glance
-    // legibility; the Selection panel's construction_status gives the fuller
-    // rate/stall diagnosis on click).
+    // Why-line: the running state and its reason. BL-1239: classified by the ONE
+    // function the tile element's Production section and the building card's
+    // Status page also read (building_state.hpp), so the three surfaces cannot
+    // disagree about whether a building runs or why it does not. Construction
+    // still outranks every other state (BL-323 S4); the Selection panel's
+    // construction_status gives the fuller rate/stall diagnosis on click.
     ImGui::Spacing();
-    if (b.ticks_remaining > 0)
-    {
-        ImGui::TextDisabled("Under construction \xe2\x80\x94 %d tick%s remaining",
-                            b.ticks_remaining, b.ticks_remaining == 1 ? "" : "s");
-    }
-    else if (b.decommissioned)
-    {
-        ImGui::TextDisabled("Decommissioned — no output");
-    }
-    else if (b.workforce_assigned < 0.1f)
-    {
-        // Tile deposit check for extraction sites: no deposit = no input material.
-        if (b.type == building_type::extraction_site)
-        {
-            const auto tile_it = w.tiles.find(b.tile);
-            if (tile_it != w.tiles.end())
-            {
-                const float dep = tile_it->second
-                    .resource_deposit[static_cast<std::size_t>(b.target_resource)];
-                // BL-1198/BL-1199: a Well or Fishing Wharf draws no deposit,
-                // so idle means labour.
-                if (dep <= 0.0f && !placement_rules::is_depositless_site(w, b.tile, b.target_resource))
-                    ImGui::TextDisabled("Idle \xe2\x80\x94 no deposit on this tile");
-                else
-                    ImGui::TextDisabled("Idle \xe2\x80\x94 labour short");
-            }
-            else
-            {
-                ImGui::TextDisabled("Idle \xe2\x80\x94 labour short");
-            }
-        }
-        else
-        {
-            ImGui::TextDisabled("Idle \xe2\x80\x94 no input or labour");
-        }
-    }
-    else if (b.workforce_assigned < 0.5f)
-    {
-        ImGui::TextDisabled("Understaffed \xe2\x80\x94 reduced output");
-    }
-    else
-    {
-        ImGui::TextDisabled("Active");
-    }
+    const building_running_state rs = classify_building_running(w, reg, report, eid, b);
+    ImGui::TextDisabled("%s", running_state_text(rs).c_str());
 }
 
-void hover_building_supply(const world& w, const building_component& b)
+void hover_building_supply(const world& w, const recipe_registry* reg,
+                           const economy_report* report, entity_id eid,
+                           const building_component& b)
 {
     // Title: building type name.
     ImGui::TextUnformatted(building_type_name(b.type));
 
-    hover_building_detail(w, b);
+    hover_building_detail(w, reg, report, eid, b);
 }
 
 // --- BL-068: rival building hover — type + owner only ---------------------------
@@ -269,8 +233,9 @@ void hover_building_supply(const world& w, const building_component& b)
 // nobody the asymmetry protects. The owner attribution stays (a spectator
 // reading a field of corps needs the WHOSE more, not less), and the why-line
 // names god view so the card never passes itself off as normally-public intel.
-void hover_building_rival(const world& w, entity_id eid, const building_component& b,
-                          bool god_view = false)
+void hover_building_rival(const world& w, const recipe_registry* reg,
+                          const economy_report* report, entity_id eid,
+                          const building_component& b, bool god_view = false)
 {
     // Title: building type (public).
     ImGui::TextUnformatted(building_type_name(b.type));
@@ -299,7 +264,7 @@ void hover_building_rival(const world& w, entity_id eid, const building_componen
     if (god_view)
     {
         // The internals, through the SAME lines the player card uses.
-        hover_building_detail(w, b);
+        hover_building_detail(w, reg, report, eid, b);
         ImGui::TextDisabled("Competitor \xe2\x80\x94 god view");
         return;
     }
@@ -387,7 +352,8 @@ void hover_market_default(const world& w, entity_id eid)
 
 // --- Public entry point ---------------------------------------------------------
 
-void draw_hover_content(const world& w, const ui_state& ui, entity_id eid)
+void draw_hover_content(const world& w, const ui_state& ui, entity_id eid,
+                        const recipe_registry* reg, const economy_report* report)
 {
     if (eid == null_entity)
         return;
@@ -441,9 +407,10 @@ void draw_hover_content(const world& w, const ui_state& ui, entity_id eid)
     if (const auto bld_it = w.buildings.find(eid); bld_it != w.buildings.end())
     {
         if (is_player_owned(w, eid))
-            hover_building_supply(w, bld_it->second);
+            hover_building_supply(w, reg, report, eid, bld_it->second);
         else
-            hover_building_rival(w, eid, bld_it->second, ui.spectating && ui.god_view);
+            hover_building_rival(w, reg, report, eid, bld_it->second,
+                                 ui.spectating && ui.god_view);
         return;
     }
 

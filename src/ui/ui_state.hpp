@@ -459,8 +459,9 @@ struct ui_state
     int trade_flow_arrows  = 0;
     int trade_flow_markers = 0;
     int trade_flow_passes  = 0;
-    /// Which section of the tile Selection accordion stands OPEN: 0 Buildings,
-    /// 1 Deposits, 2 Resources, 3 Population, 4 Terrain — or -1 for none open
+    /// Which section of the tile Selection nav stands OPEN: 0 Production
+    /// (BL-1239), 1 Buildings, 2 Deposits, 3 Resources, 4 Population, 5 Terrain
+    /// — or -1 for none open
     /// (BL-598, Ben 2026-08-24). One section at a time: the band is a fixed
     /// ~260 px tall, so five open bodies would each get a sliver.
     ///
@@ -1033,6 +1034,21 @@ struct ui_state
     /// Kept as a dial so the call is one line to revert, and the script reports
     /// both numbers on every run.
     bool market_goods_show_body = false;
+
+    // --- BL-1239 (tile production section): the Market ledger's AIM ---------
+    // A drill-through door (DRILL_THROUGH.md) from the tile element's
+    // Production section: a good row opens the Market ledger aimed at the
+    // market whose catchment holds the tile, and at that good. The ledger
+    // already follows a selected MARKET entity (BL-159), but the door must not
+    // replace the tile selection it was pressed from, so it aims through these
+    // instead. `market_ledger_aim_market` is ONE-SHOT: the ledger consumes it
+    // (jumps its body/market combos) and clears it, so the player can browse
+    // away afterwards. `market_ledger_aim_resource` is the good the Goods view
+    // highlights; it persists while the ledger shows that market, and
+    // `market_ledger_aim_scroll` is the one-shot request to scroll it into view.
+    entity_id market_ledger_aim_market   = null_entity;
+    int       market_ledger_aim_resource = -1;   ///< resource_type index, -1 = none.
+    bool      market_ledger_aim_scroll   = false;
 
     /// History ledger: 0=Story (the body's biography), 1=Chain (the generation
     /// charts), 2=Ages (the Era -1 political time-lapse, BL-277), 3=Tectonics
