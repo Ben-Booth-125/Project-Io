@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*86 entries — 9 open, 77 resolved.*
+*89 entries — 12 open, 77 resolved.*
 
 ---
 
@@ -135,6 +135,21 @@ The form settled the shape; writing it into the docs needed five smaller calls, 
 *question · raised 2026-10-08 · from lane L6, BL-1215 (refunds flow shown), sprint 51*
 
 On a seat that received a refund the header reads NET +332/qtr (the quarterly return net, which includes the 190.3 refund) while the Balance card reads +142.1 (operating net) with a new line "Refunds: +190.3 (not earnings)". The line makes the gap readable but the two headline numbers still differ. Options: (A) leave both, the card explains the gap; (B) the header shows the operating net, excluding refunds, so the two agree; (C) the header keeps the return net and gains a refund marker on hover.
+
+### NR-988 — Structures vanish under every lens: lenses draw over the vector fallback, not the bake
+*question · raised 2026-10-08 · from lane L4, BL-1241 (structures baked), sprint 51*
+
+RENDERING.md § Installations says a structure is ground and takes the lens wash. As built, every lens draws through the old vector fill path, which never shows the bake, so with the canvas glyphs retired a lens shows no buildings at all. That is the gap the cancelled BL-734 (ground/chrome layer contract) was to settle. Options: (A) new sprint 51 work - lenses composite their tint over the baked ground (one item, touches the lens fill path BL-1240 just changed); (B) accept for now - a lens is an analytic read and the Selection element names what stands there; file the bake-under-lens work for a later sprint; (C) under a lens, draw a minimal structure footprint mark in the vector path (a glyph by another name, against the design).
+
+### NR-989 — The player-identity wash tints the player's own baked structures blue
+*question · raised 2026-10-08 · from lane L4, BL-1241 (structures baked), sprint 51*
+
+The always-on player-identity wash (about 30% on the player's tiles on the plain canvas) is applied over the bake, so the player's structures come out tinted, against RENDERING.md "a structure carries no owner colour". Ben kept the always-on player OUTLINE (the sprint 51 form) but did not rule on the wash. Options: (A) drop the wash, keep the outline only; (B) keep the wash but mask it off structure pixels; (C) keep as is and amend the doc.
+
+### NR-990 — Sprint 51 lane calls taken: the market-state band, non-producing buildings read Running, and verify staging that writes world state
+*decision taken on your behalf · raised 2026-10-08 · from lanes L1 (BL-1239) and L4 (BL-1241), sprint 51*
+
+(a) The Production section's short / balanced / surplus reads supply against demand with a +-10% band, borrowed from the Scarcity lens; no doc fixed a threshold. (b) Ports, hubs, launchpads, military bases and other non-producing types now read "Running" in the hover card and the Production section: they staff at zero by design, so "labour short" described a shortage that cannot exist. (c) "No producer in reach" is not derived as an input-shortage cause (it needs the input_reach logistics walk, too heavy per frame); the line falls back to "input short: <good>". (d) NOVEL: L4 added verify-only functions (stage_gallery, stage_building, stage_centre) that insert buildings and restep centres directly, bypassing placement rules, and stage_gallery returns the tile positions it staged to. C++ picks the ground, but positions reach Lua - compare the scoped NR-698 grant (verify.find_deposit_tile). Options for (d): accept as a verify-only staging grant recorded beside NR-698; or require scripts to stage through the real placement seam.
 
 ---
 
