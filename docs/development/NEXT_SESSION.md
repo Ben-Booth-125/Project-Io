@@ -87,7 +87,12 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   starvation (steel 79 top input), 158 inputs >= revenue; dial little. Fix menu to Ben: opening
   stock / dial abstains on pre-demand registers (scope) / dial reads composite bid (GRANT) / count
   stock-fed use as demand (overturns NR-281) / rescue reads unpriced as floored / fuel over-placement.
-  Then merge the probe and
+  **BEN RULED (2026-10-09, round 5 form; docs bb09107e, worklist REFINED § Wave 2b D1-D8):** NEW
+  GRANT — the dial reads the build bid (AI_OPPONENT § 11); dial forecasts at base where no fact
+  exists; rescue reads unpriced as floored; opening stock held until bid; no processor beyond its
+  output's want; diagnose t50 starvation in parallel. Lanes: GEN D5+D6 (generation-dev, isolated
+  worktree) and STARVE D7 (economy-dev probe) running; D3+D4 (dial + rescue) wait for DIALHOLD to
+  merge (same function). The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
 
