@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*89 entries — 11 open, 78 resolved.*
+*90 entries — 12 open, 78 resolved.*
 
 ---
 
@@ -145,6 +145,11 @@ Your ruling: the space programme's / network upkeep's want counts as a bid "ther
 *decision · raised 2026-10-08 · from the BL-1232 (power plants per grid) re-review, 2026-10-08*
 
 Your ruling: unpowered grids first - every short grid gets a plant before any gets a second. The re-review found that a short grid NO chartering centre's window can feed (no market centre on it, or its feeding markets outside every window) would hold the rule forever: every power firm narrowed to it, found no ground, and the core stopped getting plants. TAKEN: such a grid is dropped from the unpowered set for that centre, so an unreachable grid never holds up the others; if nothing unpowered is reachable, every short grid is served. Reversible: the strict reading (the rule holds even for an unreachable grid) starves the body's core.
+
+### NR-986 — Question: should the player's seat get its dial-zeroed plants back on auto at the handoff? (BL-1235)
+*question · raised 2026-10-09 · from cold review of the BL-1235 (dial hold outlasts reflex) merge 3bca733a, sprint 50*
+
+With BL-1235 a plant the scorer's dial zeroed in the settle is no longer mothballed; it reaches the handoff with workforce_auto off and target 0. On the corp the player takes, the scorer and the reflex stop acting, and the player's auto-solver skips it (workforce_auto off), so nothing re-raises it until the player touches each plant. Before, the same plants arrived mothballed, which also needed a player action - not a regression in kind, but it bears on G1 (plants running at handoff) for the seat. CALL: hand the seat's dial-zeroed plants back to auto at the handoff (workforce_auto on), or leave them as the rival left them?
 
 ---
 
