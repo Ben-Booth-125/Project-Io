@@ -40,8 +40,16 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   `worktree-agent-abed8eabc82b0e9cb`): `tools/verify/handoff_idle_probe.cpp`, 16 seeds — classifies
   every non-running processor at handoff (decom by whom/why; nolab; unsupplied; still-starved) with
   a healthy-or-defect verdict and fix family. **Ben chose this as the next step (2026-10-08).**
-  When it reports: cold-check the claims, merge the probe, then bring Ben a lever form. Build nothing
-  before he picks.
+  **REPORTED (1b58926a, unmerged probe):** reproduces G1 71.4 / G1b 12.8 exactly. Of 958
+  non-running: **503 (52.5%) the scorer's workforce dial zeroed on settle tick -11** (reading its
+  own market's opening glut — e.g. food rations 8.50 vs base 13.60; buyers elsewhere), never
+  re-raised in 11 ticks, then the loss reflex mothballed them (maintenance-only loss) — ~10 points
+  of G1, all generation-built plants; 102 of those are propellant_atmospheric with no output price
+  (a generation defect). 430 input-starved (G1b): food_rations -> consumer_goods the largest gap.
+  Labour not a cause. Upper bound if the dial-zeroed plants ran: G1 ~82-86%. Ties to BL-1235 (dial
+  hold vs reflex). **Cold check running** (agent `a8ad69a34a722ea4e`); then merge the probe and
+  bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
+  re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
 
 ## Merged this sprint (all cold-reviewed; see backlog rows for detail)
 
