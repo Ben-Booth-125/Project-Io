@@ -95,7 +95,10 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   merge (same function). **DIALHOLD DONE** (c0dde0d3, branch worktree-agent-a1b28029261a2f580;
   in cold review): G1 71.4 -> 80.1 handoff, t50 61.6 -> 61.9, G1b 12.8 -> 14.6 (worse), G2 75.8,
   G3 98.1; of the 503, 319 run at handoff / 262 at t50; history_sim R3a2/R3a3 fail on the base
-  too (pre-existing). The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
+  too (pre-existing). **MERGED 3bca733a** after a clean cold review (probe hunk dropped, tip's kept);
+  app builds. Review raised NR-986 (seat inherits dial-zeroed plants at 0 — back to auto?). **D3+D4
+  lane (dial reads build bid + base forecast; rescue unpriced = floored) launched** on the merged tip.
+  The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
 
