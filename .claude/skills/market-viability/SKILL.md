@@ -59,6 +59,8 @@ keep-awake (`tools/session/keepawake.ps1 -Process market_viability`) on an unatt
   a failure, which is the economy working; G1b is the starvation the sprint chases.
 - **G1 at tick 50** — the same share running, read at play tick 50. Target: pooled >= 85% (Ben,
   2026-10-08): a plant rescued at the handoff only to be mothballed in play does not count.
+  **Deferred (Ben, 2026-10-09):** long-term viability moves to a later sprint, so this row is
+  reported but does not gate sprint 50; its printed FAIL is expected until that sprint.
 - **G2, field income per tick** — the sum of every corporation's filed `quarterly_return::income`,
   as WINDOW MEANS: the play 26-50 mean over the 12-tick settle mean. Pooled = sum / sum.
   Target: pooled >= 50%. The single ticks (settle close, tick 50) print per seed as context.
