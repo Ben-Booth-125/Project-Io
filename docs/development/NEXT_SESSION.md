@@ -351,6 +351,12 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   status_line updated. LEFT: BL-1252 (running); BL-1119 R4 quiet timing + R6 haulage; live clicks
   (Build door no electrolysis on Kepler; sea-route convoy legs); close — doc check (REFINED § Close,
   ~35 rulings now), BL-1165, the one re-bless (Ben's go), retro, version cut, integrate onto main.
+  **BL-1252 BUILT** (2f1ed0a0, worktree-agent-abf66128b6886e5cc): stamp_edge SNAPS a 2+-tile run
+  beside an existing road onto that road before stamping (pricing/stale reuse unchanged — a NEW
+  mechanism, novelty to file). Parallels d1K8 235 -> 47, time 1.04x, road tiles 79,154 -> 75,696,
+  harness green. BUT 5-seed gate (on a pre-G1b base): G2 89.5 -> 78.7, t50 77.6 -> 70.0 (seed 43
+  built by t50 265 -> 165). Re-measure sent: 16 seeds on the current tip, snap off / thr 2 / thr
+  3, and why income falls. Then a form to Ben.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
