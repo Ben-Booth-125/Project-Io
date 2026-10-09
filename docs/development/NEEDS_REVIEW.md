@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*92 entries — 13 open, 79 resolved.*
+*93 entries — 14 open, 79 resolved.*
 
 ---
 
@@ -155,6 +155,11 @@ Your ruling: the dial forecasts at base 'only on a market that has never cleared
 *decision · raised 2026-10-09 · from the BL-1217 D5/D6 harness audit, sprint 50*
 
 Your rulings bound every processor by want and unplace a recipe-less processor whose default output is unwanted. On the LEGACY landscape apply (no budget, refused budget or no specialists) that leaves 1 non-player roster corporation with no holdings (2 in two cases); the budget path - every shipped campaign - removes the roster right after, and the player is never left holdless. TAKEN: leave the holdless corporation as is (it holds cash and a seat in the roster, acts on nothing). Reversible: remove a non-player roster corporation that ends generation with no holdings.
+
+### NR-989 — Novel work: road generation SNAPS a new road onto an existing one beside it (BL-1252, no parallel roads)
+*novel-work · raised 2026-10-09 · from the BL-1252 lane, sprint 50*
+
+To remove the parallel roads the ruled stale-flood reuse leaves, the lane added a new mechanism rather than re-pricing: before stamp_edge lays a route, any stretch that would lay 2+ consecutive new land tiles within one cell of an existing road is re-walked over that road, kept only if it lays fewer new tiles. Pricing and flood reuse are unchanged. Long parallels 235 -> 47 at 1.04x the time; road tiles -4.4%. LOGISTICS.md section 4 owns it. Flagged because it reshapes what is laid after pricing - a new kind of rule in generation. An income cost on the 5 tuning seeds is being re-measured on the current tip before the merge call.
 
 ---
 
