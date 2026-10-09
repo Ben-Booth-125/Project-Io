@@ -240,6 +240,15 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   (83.2/65.5/15.5/73.2/98.7). App build NOT run by the lane (syntax-only) and the Build-door live
   click is owed at merge. Merge order once D5/D6 round 4 clears: D5/D6 (v39) -> D3/D4 (v40, head
   6d79848a) -> PROPELLANT (v41) -> build_app -> live click -> 16-seed integrated gate.
+  **ALL THREE MERGED (2026-10-09):** 54a22ff7 D5/D6, 6d04dfe1 D3/D4 (v40; save_roundtrip brace trap
+  resolved by hand), 2aeb48ef PROPELLANT (v41; assign_default_recipes = D6's version +
+  default_recipe_id_at per building). build_app BUILD_OK. Harnesses pass: save_roundtrip,
+  dial_bid, unposted_bid, recipe_switch, recipe_margin, charter_refusal_probe, world_determinism
+  (digests unchanged). **Integrated gate running** in two halves -> build_gen/s50_int_a.txt /
+  s50_int_b.txt (pool by hand). Owed: Build-door live click (Kepler tile: no electrolysis row);
+  ai_skill R5 (rivals build 0 processors on the legacy harness world after D5 — check rival
+  processor builds in play on the real seeds); holdless non-player roster corp on legacy worlds
+  (decide: accept as NR decision).
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
