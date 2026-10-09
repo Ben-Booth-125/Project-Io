@@ -157,6 +157,10 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   another sprint, after the various other gameplay loops are settled." Read as: the smaller
   denominator and the fuel cold start are fine; t50 and the D7 starvation findings (construction
   boom, undelivered hauls, pool-held stock) move to a later sprint — reading put to Ben to confirm.
+  **D3 FIX ROUND DONE** (3a5d01ff; re-review running): new `market_component::unposted_rate`
+  (dial reads a per-tick rate; veto unchanged), SAVE v40 (stacks on D5's v39 — merge D5/D6
+  first), shared `market_has_cleared` (D3b now near-inert). 16 seeds: D3fix 81.2/65.9/13.8/73.4;
+  +D4 82.2/71.1/16.2/71.3 (G1/t50/G1b/G2). G1b rise is D4's. Steel zeroings unchanged (D5's).
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
