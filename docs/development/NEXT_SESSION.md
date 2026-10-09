@@ -181,7 +181,41 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   **BEN RULED (2026-10-09, dial form; 3c0bd8a2):** dial NARROWED to posted demand + stock-fed running
   draws (AI_OPPONENT § 11 rewritten; § 2B sentence); **G1 at t50 and all long-term viability work
   DEFERRED** (sprint row done_when, SKILL.md, REFINED). D3 agent resumed with the narrowed rework.
-  Owed: one backlog item for the deferred findings (next_id running in background).
+  Deferred findings FILED as BL-1248 (plants survive to t50), 4acc101f.
+  **D5/D6 FIX ROUND** (9f61b46c, 26867936): G1 85.8 PASS but running 2683 -> 2324 at handoff,
+  3474 -> 2881 t50, play income -18.5%; G1b 13.2. Default-recipe paths (e/g) unbounded — form to
+  Ben (first wanted recipe / not placed / idle). **Re-review:** cause of the running drop is the
+  SECOND-WORKS CUT (a chartered processing firm's second works unplaced once the first covers the
+  gap -> steel/copper/silicon/medical/water firms halve, upstream charters fall), not fuel switching.
+  Defects: walk power want reads the unpowered-serve set; legacy Pass 6 power bound inconsistent;
+  roster keep sweep suspends all over-coverers and cascades; second works' spare refusal drops its
+  draw; save row can pass vacuously. Round 2 sent, with a keep-second-works counterfactual for Ben.
+  **BEN RULED (70664ec1):** a recipe-less processor whose default output is unwanted is not placed
+  (added to D5/D6 round 2).
+  **D3 NARROWED REWORK DONE** (b0a9dbb0; in cold review): `dial_bid` = demand + held
+  `dial_pool_draw` (per-processor room excludes units already posted; one writer after production;
+  v40 now `dial_pool_draw`+tick). 16 seeds: D3 81.6/65.9/13.6/73.6; +D4 82.1/67.9/16.3/71.1. D4 drives
+  the G1b rise; no by-product switches. Steel zeroings 47 (D5's).
+  **D3 rework review:** room logic correct; veto bit-identical; F1 hold double-counts the
+  pool->demand transition (record only written when q>0) — fix: stamp every running-touched key each
+  tick incl. 0, hold bridges only untouched ticks (within ruling); F2 market_has_cleared may read a
+  same-step unposted bid on a new market; F3 two stale comments; F4 vacuous v40 row. D4 G1b
+  hypothesis: closed exit into unpriced propellant keeps fuel plants claiming contended inputs.
+  Round 3 sent. Merge with D5/D6 conflicts: reservations jsonl, world_save.hpp (keep v40 + both),
+  save_roundtrip.cpp (take D5's assertion style).
+  **PROPELLANT COMPLETE** (e07ac0b5 pad, 6deacb4a seat, 4d48ef77 route gate + 64.0, save v41
+  `body_component::atmosphere`; in cold review): 83.2/65.5/15.5/73.2/98.7 (G1/t50/G1b/G2/G3);
+  electrolysis 0 plants anywhere (home bodies have air); 102 unpriced-zeroed -> 0. src/core edits
+  (app.cpp, agent_protocol.cpp, verify_api.cpp) NOT compiled by the lane — build at merge.
+  PROPELLANT review: logic sound; UI doors offer the wrong-air route (fix round sent: doors,
+  ACTIONS.json, remaining default paths, verify name); docs fixed 7ed47883 (anchor clause, pad =
+  body). Ben BACKLOGGED rival scorer/space programme draining pad fuel -> BL-1249.
+  **D5/D6 ROUND 2** (f807e048, a504062b, eff4e96f): at a504062b G1 87.8 PASS (OFF) / 87.5 (keep
+  second works ON: +120 running, +8% income), G1b 11.3. HEAD eff4e96f (default recipes unplaced)
+  REMOVES THE STEEL CHAIN on every seed — the unowned pre-authored Kepler installation
+  (hard_coded_world.cpp:2659) is the only steel seed. Handoff losses of steel/medical/water arise
+  in the settle, not generation. **Form to Ben:** exempt the authored plant / walk seeds chains /
+  accept; keep or cut second works. Do not merge eff4e96f until ruled.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).

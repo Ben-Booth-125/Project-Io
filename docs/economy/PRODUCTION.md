@@ -282,7 +282,7 @@ there (Ben, 2026-10-09):** `propellant_electrolysis` may be set only on an airle
 `propellant_atmospheric` only on a body with an atmosphere — each route is the one its body's
 air allows, never a cheaper choice beside the other. "Airless" is planetology's own reading: an
 atmosphere class of `none` or `thin` (a trace atmosphere at zero surface pressure), the same
-bodies planetology routes to the airless tables (`atmosphere_class`, `src/world/tile_generation.hpp`;
+bodies planetology routes to the airless tables (`atmosphere_class`, `src/world/components.hpp`;
 Ben's ruling 2026-10-09 applied with the existing definition). Closing the in-situ propellant loop there (water → liquid oxygen, refined fuel shipped or synthesised) is the defining Era 2 logistical problem.
 
 #### Electronics Lab
@@ -399,7 +399,10 @@ can still lose under glut.
 lowest marginal cost per unit of primary output — and that route must clear `profit_over_marginal`.
 Every other route clears `alternate_profit_over_marginal` instead (`0` = profitable at base), and
 the floor half regardless. A recipe whose primary output is an extractable raw is always an
-alternate: extraction is that good's cheapest route.
+alternate: extraction is that good's cheapest route. The anchor is chosen among the routes a
+**home body can run**, since the base-price table prices home-body markets: a route that runs only
+on an airless body (§ Chemical Plant, "And it runs only there") is always an alternate (Ben,
+2026-10-09) — so propellant anchors on `propellant_atmospheric`, at 64.0.
 
 **One price table for both bands.** A good's price is the larger of the two bands' anchor-route
 needs, and the bands are kept compatible by keeping their routes to a shared good at comparable

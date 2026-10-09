@@ -229,7 +229,7 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
    covers the same surplus (step 5), so nothing is stranded.
 
    **A pad's pool keeps its propellant (Ben, 2026-10-09; BL-1217).** Where the corporation holds
-   a Launchpad in the pool's catchment, its propellant is part of the reservation: auto-surplus
+   a Launchpad on the pool's body (the body its launches burn from), its propellant is part of the reservation: auto-surplus
    lists none of it, because launches burn from that pool and a fuelled pad is the gate to space
    (`PRODUCTION.md` § Launchpad). The corporation may still sell it by a standing sell order. A
    pool with no pad lists its propellant like any other surplus.
