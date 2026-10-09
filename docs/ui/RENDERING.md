@@ -99,14 +99,31 @@ ground retires only as coverage arrives.
 - **Resident set:** the ACTIVE zoom tier's chunks around the viewport
   (LRU-capped per tier), plus one low-res whole-body far page. Bounded memory;
   no streaming subsystem.
-- **All baking runs on a worker thread** (Ben, 2026-09-01 — the smoothness
-  ruling): the pure bake executes against an immutable source snapshot; the
+- **All baking runs on a pool of worker threads** (Ben, 2026-09-01 — the
+  smoothness ruling; the pool, Ben 2026-10-09 — one worker took 14-22 s to fill
+  a zoom step): the pure bake executes against an immutable source snapshot,
+  shared read-only by every worker — the bake holds no static or shared
+  mutable state, so concurrent bakes are byte-identical to serial ones. The
   render thread only hashes, enqueues, uploads finished buffers and publishes
-  the view. A generation counter discards results that outlive their source or
-  body. Until a chunk lands, the far page carries the frame; until the far page
+  the view.
+  - **Size and priority:** N = max(1, hardware threads − 2) workers — the
+    main/simulation thread and one spare are left free — at below-normal OS
+    priority, so a full-viewport fill never starves the simulation or render
+    threads.
+  - **Order:** one shared queue, popped lowest-priority-value first: the far
+    page before everything (a body switch), then the Selection band's
+    neighbourhood page, then active-tier chunks nearest the viewport centre.
+    The stand-in tier is re-hashed, never baked, so it never competes for a
+    worker. A rung change drops the waiting jobs of the tier just left; the
+    waiting set is capped near N, so the queue stays near the viewport.
+  - **Results are keyed by (generation, tier, chunk):** only the job a slot's
+    pending flag stands for can land in it, so arrival order cannot matter. A
+    generation counter discards results that outlive their source or body.
+
+  Until a chunk lands, the far page carries the frame; until the far page
   lands (a body switch), the vector fallback does. **Under `--verify` every
-  bake is synchronous on the main thread** — a capture must never race a
-  worker.
+  bake is synchronous on the main thread** — a capture must never race the
+  pool.
 - **Invalidation is content-hashed:** each chunk's job carries a hash of the
   tile fields the bake reads (terrain, height, survey bits) and of the installations
   standing on its tiles (building type, recipe identity, stack membership; settlement

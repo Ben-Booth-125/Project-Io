@@ -5,9 +5,29 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 namespace {
 constexpr double kSqrt3 = 1.7320508075688772;
+
+/// An env flag read once (main thread): set and not "0".
+bool env_flag(const char* name)
+{
+    const char* v = SDL_getenv(name);
+    return v && *v && std::strcmp(v, "0") != 0;
+}
+bool fill_log_on()
+{
+    static const bool on = env_flag("IO_GROUND_FILL_LOG") || env_flag("IO_GROUND_BENCH");
+    return on;
+}
+bool bench_async_on()
+{
+    static const bool on = env_flag("IO_GROUND_BENCH");
+    return on;
+}
 }
 
 constexpr double      ground_layer::k_tier_ppr[];
@@ -20,11 +40,30 @@ ground_layer::~ground_layer()
 }
 
 // ---------------------------------------------------------------------------
-// Worker
+// Worker pool
 // ---------------------------------------------------------------------------
+
+int ground_layer::pool_size()
+{
+    static const int n = [] {
+        if (const char* v = SDL_getenv("IO_GROUND_WORKERS"))
+        {
+            const int k = std::atoi(v);
+            if (k > 0)
+                return std::min(k, 64);
+        }
+        // Leave the main/sim thread and one spare.
+        const int hc = static_cast<int>(std::thread::hardware_concurrency());
+        return std::max(1, hc - 2);
+    }();
+    return n;
+}
 
 void ground_layer::worker_main()
 {
+    // Below-normal priority: a full-viewport fill saturates every worker, and
+    // the simulation and render threads must never be starved by it.
+    SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_LOW);
     for (;;)
     {
         job j;
@@ -33,8 +72,17 @@ void ground_layer::worker_main()
             m_cv.wait(lk, [&] { return m_quit || !m_jobs.empty(); });
             if (m_quit)
                 return;
-            j = std::move(m_jobs.front());
-            m_jobs.pop_front();
+            // The lowest (prio, seq): the far page, then the neighbourhood
+            // page, then chunks nearest the viewport centre, FIFO among equals.
+            // The waiting set is capped near the pool size, so a scan is cheap.
+            auto best = m_jobs.begin();
+            for (auto it = m_jobs.begin() + 1; it != m_jobs.end(); ++it)
+                if (it->prio < best->prio || (it->prio == best->prio && it->seq < best->seq))
+                    best = it;
+            j = std::move(*best);
+            if (best != m_jobs.end() - 1)
+                *best = std::move(m_jobs.back());
+            m_jobs.pop_back();
         }
         result d;
         d.tier = j.tier; d.ci = j.ci; d.cj = j.cj; d.pw = j.pw; d.ph = j.ph;
@@ -59,12 +107,40 @@ void ground_layer::enqueue(job j)
 {
     {
         std::lock_guard lk(m_mx);
+        j.seq = m_seq++;
         m_jobs.push_back(std::move(j));
         ++m_inflight;
     }
-    if (!m_worker.joinable())
-        m_worker = std::thread([this] { worker_main(); });
+    if (m_workers.empty())
+    {
+        const int n = pool_size();
+        m_workers.reserve(static_cast<std::size_t>(n));
+        for (int i = 0; i < n; ++i)
+            m_workers.emplace_back([this] { worker_main(); });
+    }
     m_cv.notify_one();
+}
+
+void ground_layer::purge_waiting_except(int keep)
+{
+    std::vector<job> dropped;
+    {
+        std::lock_guard lk(m_mx);
+        auto split = std::partition(m_jobs.begin(), m_jobs.end(), [this, keep](const job& j) {
+            return j.tier < 0 || (j.tier == keep && j.gen == m_gen);
+        });
+        dropped.assign(std::make_move_iterator(split), std::make_move_iterator(m_jobs.end()));
+        m_jobs.erase(split, m_jobs.end());
+        m_inflight -= static_cast<int>(dropped.size());
+    }
+    // These never reach a worker: their slots become re-enqueueable now.
+    for (const job& j : dropped)
+    {
+        tier_state& t = m_tiers[j.tier];
+        const auto it = t.chunks.find(static_cast<std::uint32_t>(j.cj) * t.cw + j.ci);
+        if (it != t.chunks.end() && it->second.job_gen == j.gen)
+            it->second.queued = false;
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -138,15 +214,17 @@ void ground_layer::refresh_source(const world& w)
 
 void ground_layer::shutdown()
 {
-    if (m_worker.joinable())
+    if (!m_workers.empty())
     {
         {
             std::lock_guard lk(m_mx);
             m_quit = true;
             m_jobs.clear();
         }
-        m_cv.notify_one();
-        m_worker.join();
+        m_cv.notify_all();
+        for (std::thread& t : m_workers)
+            t.join();
+        m_workers.clear();
         m_quit = false;
     }
     m_inflight = 0;
@@ -196,7 +274,7 @@ ground_layer::job ground_layer::make_chunk_job(int tier, int ci, int cj) const
     return j;
 }
 
-void ground_layer::upload(SDL_Renderer* r, const result& d)
+void ground_layer::upload(SDL_Renderer* r, const result& d, bool sync)
 {
     // THE PENDING FLAG CLEARS FIRST, UNCONDITIONALLY. Only one job per slot can
     // be outstanding (the queued guards), so the arriving result IS that job —
@@ -207,7 +285,11 @@ void ground_layer::upload(SDL_Renderer* r, const result& d)
     if (d.tier == -2)
     {
         // The neighbourhood page (BL-1241). Same flag discipline as the far
-        // page: the queued flag clears first, whatever happens next.
+        // page: the queued flag clears first, whatever happens next — but only
+        // for the job the flag stands for (the pool: an orphan from a body
+        // switch can land after its slot's next job was enqueued).
+        if (!sync && (!m_neigh_queued || d.gen != m_neigh_job_gen))
+            return;
         m_neigh_queued = false;
         if (d.gen != m_gen)
         {
@@ -246,6 +328,8 @@ void ground_layer::upload(SDL_Renderer* r, const result& d)
     }
     if (d.tier < 0)
     {
+        if (!sync && (!m_far_queued || d.gen != m_far_job_gen))
+            return; // an orphan of a superseded far job (see the chunk case)
         m_far_queued = false;
         if (d.gen != m_gen)
         {
@@ -273,7 +357,15 @@ void ground_layer::upload(SDL_Renderer* r, const result& d)
         return;
     }
     tier_state& t = m_tiers[d.tier];
-    chunk& c = t.chunks[static_cast<std::uint32_t>(d.cj) * t.cw + d.ci];
+    const auto cit = t.chunks.find(static_cast<std::uint32_t>(d.cj) * t.cw + d.ci);
+    // RESULTS ARE KEYED BY (generation, tier, key) (the pool): only the job the
+    // slot's queued flag stands for may clear it. A result from an earlier
+    // incarnation of the slot (reset, tilt change, eviction) is dropped
+    // untouched, so arrival order cannot matter.
+    if (cit == t.chunks.end()
+        || (!sync && (!cit->second.queued || cit->second.job_gen != d.gen)))
+        return; // (the synchronous --verify path bakes the slot it just made)
+    chunk& c = cit->second;
     c.queued = false; // before any early return — see above
     if (d.gen != m_gen)
         return; // baked against a dead body/source; the wanted loop re-enqueues
@@ -305,7 +397,7 @@ void ground_layer::drain_results(SDL_Renderer* r)
         done.swap(m_results);
     }
     for (const result& d : done)
-        upload(r, d);
+        upload(r, d, /*sync=*/false);
 }
 
 void ground_layer::bake_now(SDL_Renderer* r, const job& j)
@@ -326,7 +418,7 @@ void ground_layer::bake_now(SDL_Renderer* r, const job& j)
     d.neigh_tile = j.neigh_tile;
     std::copy(std::begin(j.neigh_rect), std::end(j.neigh_rect), std::begin(d.neigh_rect));
     d.px = m_scratch;
-    upload(r, d);
+    upload(r, d, /*sync=*/true);
 }
 
 void ground_layer::note_bake(int tier, double ms)
@@ -401,10 +493,21 @@ void ground_layer::evict(tier_state& t, std::size_t cap)
 
 void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake_everything)
 {
+    // IO_GROUND_BENCH: the pool path under --verify, so a script can time a
+    // real fill. Off by default; a capture taken in this mode can race.
+    if (bake_everything && bench_async_on())
+        bake_everything = false;
     ++m_frame;
     const entity_id body = ui.active_body;
     if (body != m_body)
+    {
         reset(body, w);
+        if (fill_log_on() && m_src)
+        {
+            m_far_pending = true;
+            m_far_t0 = clock::now();
+        }
+    }
     if (m_body == null_entity || !m_src)
     {
         ui.ground = ground_view{};
@@ -412,6 +515,14 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
     }
 
     drain_results(r);
+    if (m_far_pending && m_far_ready)
+    {
+        m_far_pending = false;
+        std::printf("GROUND_FILL far page %dx%d  %.1f ms  workers %d\n", m_far_geom.W,
+                    m_far_geom.H, std::chrono::duration<double, std::milli>(
+                        clock::now() - m_far_t0).count(), pool_size());
+        std::fflush(stdout);
+    }
 
     // Source refresh on a slow cadence (urban transform, survey reveal move it;
     // nothing else does). Gated on NO WORK IN FLIGHT — not merely an empty
@@ -449,6 +560,8 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
             else
             {
                 m_far_queued = true;
+                m_far_job_gen = j.gen;
+                j.prio = -2.0; // the far page before everything on a body switch
                 enqueue(std::move(j));
             }
         }
@@ -505,6 +618,8 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
                 else
                 {
                     m_neigh_queued = true;
+                    m_neigh_job_gen = j.gen;
+                    j.prio = -1.0;
                     enqueue(std::move(j));
                 }
             }
@@ -529,6 +644,14 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
         // ready chunk in view (F34): its chunks may have baked many days ago,
         // as another rung's stand-in or before the rung was last left.
         const bool became_active = m_active_tier != prev_active;
+        if (became_active && !bake_everything)
+            purge_waiting_except(m_active_tier); // the left rung's backlog yields
+        if (became_active && fill_log_on())
+        {
+            m_fill_pending = m_active_tier >= 0;
+            m_fill_t0 = clock::now();
+            m_fill_bakes0 = m_bake_counters.chunk_bakes;
+        }
 
         int active_ready = 0, active_total = 0;
         if (m_active_tier >= 0)
@@ -552,6 +675,8 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
                 t.ch = (t.geom.H + k_chunk_px - 1) / k_chunk_px;
                 t.baked_sy = want_sy;
                 ++m_gen;
+                if (!bake_everything)
+                    purge_waiting_except(m_active_tier); // its waiting jobs are now stale
             }
             const chunk_window win = window_of(t, req);
 
@@ -561,10 +686,26 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
                 std::lock_guard lk(m_mx);
                 queued_now = static_cast<int>(m_jobs.size());
             }
-            std::size_t wanted = 0;
+            const int max_waiting = pool_size() + k_queue_slack;
+            // Visit order. --verify keeps raster order (its mid-fill frame
+            // under verify_fill_limit depends on it); the pool path visits —
+            // and so enqueues — nearest the viewport centre first.
+            struct cand { int ci, cj; double d2; };
+            std::vector<cand> order;
+            order.reserve(static_cast<std::size_t>(std::max(0, win.ci_hi - win.ci_lo + 1))
+                          * static_cast<std::size_t>(std::max(0, win.cj_hi - win.cj_lo + 1)));
+            const double ccx = 0.5 * (req.x0 + req.x1) * t.geom.s / k_chunk_px - 0.5;
+            const double ccy = (0.5 * (req.y0 + req.y1) - t.geom.y_min) * t.geom.s / k_chunk_px - 0.5;
             for (int cj = win.cj_lo; cj <= win.cj_hi; ++cj)
                 for (int ci = win.ci_lo; ci <= win.ci_hi; ++ci)
+                    order.push_back({ ci, cj, (ci - ccx) * (ci - ccx) + (cj - ccy) * (cj - ccy) });
+            if (!bake_everything)
+                std::stable_sort(order.begin(), order.end(),
+                                 [](const cand& a, const cand& b) { return a.d2 < b.d2; });
+            std::size_t wanted = 0;
+            for (const cand& cd : order)
                 {
+                    const int ci = cd.ci, cj = cd.cj;
                     const int cw = ((ci % t.cw) + t.cw) % t.cw;
                     const std::uint32_t key = static_cast<std::uint32_t>(cj) * t.cw + cw;
                     chunk& c = t.chunks[key];
@@ -582,6 +723,10 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
                         && (c.stale || bake_everything || became_active
                             || (m_frame + key) % 60 == 0);
                     if (c.ready && !sweep)
+                        continue;
+                    // A cold chunk with the queue full: nothing to do this tick
+                    // but its region hash — skip it (the pool path only).
+                    if (!c.ready && !bake_everything && queued_now >= max_waiting)
                         continue;
                     job j = make_chunk_job(m_active_tier, cw, cj);
                     if (c.ready && j.hash == c.hash)
@@ -601,9 +746,11 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
                             ++fills;
                         }
                     }
-                    else if (queued_now < k_max_queued)
+                    else if (queued_now < max_waiting)
                     {
                         c.queued = true;
+                        c.job_gen = j.gen;
+                        j.prio = cd.d2;
                         ++queued_now;
                         enqueue(std::move(j));
                     }
@@ -613,6 +760,16 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
             // 2026-09-01): the wanted set, doubled, floors it.
             evict(t, std::max(k_tier_cap[m_active_tier], wanted * 2));
             coverage(t, win, active_ready, active_total);
+            if (m_fill_pending && active_ready >= active_total)
+            {
+                m_fill_pending = false;
+                std::printf("GROUND_FILL tier %d (%.0f px/r)  chunks %d  baked %llu  %.1f ms  workers %d\n",
+                            m_active_tier, t.geom_ppr, active_total,
+                            static_cast<unsigned long long>(m_bake_counters.chunk_bakes - m_fill_bakes0),
+                            std::chrono::duration<double, std::milli>(clock::now() - m_fill_t0).count(),
+                            pool_size());
+                std::fflush(stdout);
+            }
         }
 
         // THE STAND-IN (BL-1244; F34): while the active tier's view is not

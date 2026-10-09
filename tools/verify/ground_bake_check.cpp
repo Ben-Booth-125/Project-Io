@@ -46,6 +46,10 @@
 //       aims for scripts/verify/terrain_variants.lua and exits; `--variants`
 //       runs P17-P20 alone; `--timing` the variant cost reading alone;
 //       `--seam` triages the P11 seam window pass by pass.
+//   P21 The worker pool (Ben, 2026-10-09): a set of chunk windows across
+//       tiers (flat, 2x supersampled, oblique) baked CONCURRENTLY on the
+//       pool's thread count, sharing one source read-only, is byte-identical
+//       to the same set baked serially. `--pool` runs P21 alone.
 //
 // Also prints bake time per tier (a measurement, not a check) and writes
 // feature_<form>_<tier>.png previews for the eye.
@@ -66,6 +70,8 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <atomic>
+#include <thread>
 #include <vector>
 
 using namespace ui::ground;
@@ -143,6 +149,81 @@ int homogeneous_aim(const bake_source& src, terrain_cover cover, int* score_out 
     return best;
 }
 
+/// P21 - the worker pool's correctness row: chunk windows over several
+/// geometries, aimed at land, a forest, a landform/river and an installation,
+/// baked serially and then concurrently (threads pulling from a shared index,
+/// as the ground_layer pool does), compared byte for byte. Two concurrent
+/// rounds, in opposite job orders, so the interleaving differs.
+void pool_row(const bake_source& src, const body_component& hb, int land_i, const bake_params& p)
+{
+    std::vector<int> aims = { land_i };
+    if (const int f = homogeneous_aim(src, terrain_cover::forest); f >= 0)
+        aims.push_back(f);
+    for (std::size_t i = 0; i < src.near_feature.size(); ++i)
+        if (src.near_feature[i]) { aims.push_back(static_cast<int>(i)); break; }
+    for (std::size_t i = 0; i < src.inst.of_tile.size(); ++i)
+        if (src.inst.of_tile[i] >= 0) { aims.push_back(static_cast<int>(i)); break; }
+
+    struct win { geometry g; bake_params prm; int x0, y0, w, h; };
+    std::vector<win> jobs;
+    struct tier { double ppr; double sy; int ss; };
+    for (const tier t : { tier{ 24.0, 1.0, 2 }, tier{ 48.0, 1.0, 2 }, tier{ 48.0, 0.70710678, 2 },
+                          tier{ 96.0, 1.0, 1 } })
+    {
+        const geometry g = make_geometry(hb.grid_width, hb.grid_height, t.ppr, t.sy);
+        bake_params prm = p;
+        prm.supersample = t.ss;
+        for (const int a : aims)
+        {
+            const int ar = a / src.gw, ac = a % src.gw;
+            const double ax = 1.7320508075688772 * (ac + ((ar & 1) ? 0.5 : 0.0));
+            const int side = 160;
+            // Two abutting windows per aim: the pool bakes neighbours at once.
+            for (int k = 0; k < 2; ++k)
+            {
+                const int h = std::min(side, g.H);
+                win wv{ g, prm, static_cast<int>(ax * g.s) - side + k * side,
+                        std::clamp(static_cast<int>((1.5 * ar - g.y_min) * g.s) - side / 2,
+                                   0, std::max(0, g.H - h)),
+                        side, h };
+                jobs.push_back(wv);
+            }
+        }
+    }
+
+    const auto bake = [&](const win& j, std::vector<std::uint32_t>& out) {
+        out.assign(static_cast<std::size_t>(j.w) * j.h, 0u);
+        bake_region(src, j.g, j.prm, j.x0, j.y0, j.w, j.h, out.data());
+    };
+    std::vector<std::vector<std::uint32_t>> serial(jobs.size());
+    for (std::size_t i = 0; i < jobs.size(); ++i)
+        bake(jobs[i], serial[i]);
+
+    const int hc = static_cast<int>(std::thread::hardware_concurrency());
+    const int n_threads = std::max(2, hc - 2); // the pool's count, at least two
+    bool identical = true;
+    for (int round = 0; round < 2; ++round)
+    {
+        std::vector<std::vector<std::uint32_t>> par(jobs.size());
+        std::atomic<std::size_t> next{ 0 };
+        std::vector<std::thread> pool;
+        for (int t = 0; t < n_threads; ++t)
+            pool.emplace_back([&] {
+                for (std::size_t k; (k = next.fetch_add(1)) < jobs.size();)
+                {
+                    const std::size_t i = round == 0 ? k : jobs.size() - 1 - k;
+                    bake(jobs[i], par[i]);
+                }
+            });
+        for (std::thread& t : pool)
+            t.join();
+        for (std::size_t i = 0; i < jobs.size(); ++i)
+            identical = identical && par[i] == serial[i];
+    }
+    std::printf("P21: %zu windows over %zu aims, %d threads\n", jobs.size(), aims.size(), n_threads);
+    check(identical, "P21", "concurrent bakes on the pool's thread count equal the serial bakes byte for byte");
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -211,6 +292,14 @@ int main(int argc, char** argv)
                 std::printf("AIM  %-14s none\n", name);
         }
         return 0;
+    }
+
+    // --pool: the worker-pool row (P21) alone.
+    if (argc > 1 && std::strcmp(argv[1], "--pool") == 0)
+    {
+        pool_row(src, hb, land_i, p);
+        std::printf("%s (%d failures)\n", g_failures ? "FAIL" : "PASS", g_failures);
+        return g_failures ? 1 : 0;
     }
 
     // --variants: run only the BL-1243 rows (P17-P20) and their previews,
@@ -882,6 +971,9 @@ int main(int argc, char** argv)
                 }
         check(seam_ok, "P11", "two adjacent 2x windows equal one window spanning both (no chunk seam)");
     }
+
+    // P21 - the worker pool: concurrent bakes equal serial ones.
+    pool_row(src, hb, land_i, p);
 
     // P12 — bake cost per tier (a reading, not a check): one 512 px chunk per
     // tier at 1x and 2x, wall-clock ms, so R3's before/after has a number
