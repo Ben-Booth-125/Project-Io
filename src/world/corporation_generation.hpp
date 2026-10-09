@@ -207,6 +207,18 @@ void move_seat_force(world& w, entity_id previous, entity_id corp);
 /// still under construction is refunded rather than disarmed unpaid.
 /// Deterministic and draw-free. Returns the credits refunded.
 float seat_clean_slate(world& w, entity_id corp);
+
+/// NR-986 — AT THE HANDOFF THE SEAT'S DIAL-IDLED PLANTS RETURN TO AUTO (Ben,
+/// 2026-10-09; AI_OPPONENT.md). The scorer stops acting on the corporation the
+/// player takes, so a plant its workforce dial left at zero (`dial_idled`,
+/// economy_system.hpp) would otherwise stay at zero until the player touched
+/// it. Each such plant of @p corp gets `workforce_auto = true`, as every plant
+/// the player builds starts; nothing else is written (the auto-solver sets its
+/// target on the next economy step). Called by both ways a seat is taken at the
+/// handoff — the draw (`seat_player_corporation`) and the pick
+/// (`corp_verb::take_seat`) — and NOT by generation's provisional re-point.
+/// Deterministic and draw-free. Returns the number of plants released.
+int seat_release_dial_idled(world& w, entity_id corp);
 void arm_rivals(world& w);
 void arm_corporation(world& w, entity_id corp);
 void disarm_corporation(world& w, entity_id corp);

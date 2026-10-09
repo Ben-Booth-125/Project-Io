@@ -1976,6 +1976,9 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             // BL-1154: the seat opens unarmed, whichever way it is taken — the
             // same rule as the draw (`move_seat_force`).
             move_seat_force(w, previous, cmd.corp);
+            // NR-986: the seat's dial-idled plants return to auto, the same
+            // rule as the draw (`seat_release_dial_idled`).
+            seat_release_dial_idled(w, cmd.corp);
             return corp_command_result::applied;
         }
     }

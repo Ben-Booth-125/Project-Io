@@ -20,6 +20,7 @@
 
 #include "world/components.hpp"
 #include "world/corp_ai.hpp"
+#include "world/corporation_generation.hpp" // seat_release_dial_idled (U8)
 #include "world/economy_system.hpp"
 #include "world/market_clearing.hpp"
 #include "world/nation_budget.hpp"
@@ -357,6 +358,29 @@ int main()
                       && !launch_burns_from_pool(f.w, f.corp, f.market),
                   "U7d no pad: the auto-surplus reservation holds no propellant, and no launch burns from the pool");
         }
+    }
+
+    // U8 — NR-986 (Ben, 2026-10-09): at the handoff the seat's dial-idled plants
+    // return to auto. Sibling of U-rows only by fixture; the subject is the
+    // dial's hold, which the unposted bid's veto also reads.
+    std::printf("U8 the seat's dial-idled plants return to auto at the handoff\n");
+    {
+        fixture f = make_fixture();
+        building_component& idled = f.w.buildings.at(f.building);
+        idled.workforce_auto = false; idled.workforce_target = 0; idled.ticks_remaining = 0;
+        const entity_id run_id = f.w.create_entity();
+        building_component running{};
+        running.tile = f.tile; running.type = building_type::processing_facility;
+        running.workforce_auto = false; running.workforce_target = 40;
+        f.w.buildings[run_id] = running;
+        f.w.corporations.at(f.corp).assets.push_back(run_id);
+        check(dial_idled(f.w.buildings.at(f.building)) && !dial_idled(f.w.buildings.at(run_id)),
+              "U8 not vacuous: one plant is dial-idled, one is dialled above zero");
+        const int n = seat_release_dial_idled(f.w, f.corp);
+        check(n == 1 && f.w.buildings.at(f.building).workforce_auto,
+              "U8 the dial-idled plant is handed over on auto");
+        check(!f.w.buildings.at(run_id).workforce_auto && f.w.buildings.at(run_id).workforce_target == 40,
+              "U8 ... and a plant the dial left running keeps its dial");
     }
 
     std::printf("\n%s (%d failure%s)\n", g_fail == 0 ? "ALL PASS" : "FAILURES", g_fail,

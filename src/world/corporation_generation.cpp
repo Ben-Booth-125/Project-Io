@@ -2320,6 +2320,23 @@ float seat_clean_slate(world& w, entity_id corp)
     return refund;
 }
 
+int seat_release_dial_idled(world& w, entity_id corp)
+{
+    const auto cit = w.corporations.find(corp);
+    if (cit == w.corporations.end())
+        return 0;
+    int released = 0;
+    for (const entity_id bid : cit->second.assets) // per-building write: order-free
+    {
+        const auto b = w.buildings.find(bid);
+        if (b == w.buildings.end() || !dial_idled(b->second))
+            continue;
+        b->second.workforce_auto = true;
+        ++released;
+    }
+    return released;
+}
+
 void move_seat_force(world& w, entity_id previous, entity_id corp)
 {
     if (previous == corp)
