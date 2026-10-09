@@ -130,6 +130,29 @@ Solar/Circumplanetary representations, where specified, are additive render
 passes guarded behind the same `overlay_mode` — they do not change the Planetary
 behaviour.
 
+### A lens washes the rendered ground (Ben, 2026-10-09, NR-1003)
+
+**Under a lens the Planetary canvas still draws the baked ground** — the same master image,
+at the same 22.5° camera, with its structures, settlements, landform forms and rivers
+([RENDERING.md](RENDERING.md) § Level of detail, § Installations). The lens is a
+**translucent wash over it**, per tile, in the identical geometry, never an opaque fill that
+replaces it. The wash was ruled once the ground became one image per body: before that, a lens
+drew over a vector fill, and with the canvas glyphs retired every building, river and mountain
+vanished the moment any lens was up — which made the owner lenses ask the player to pick owners
+whose buildings they could not see.
+
+- **One wash rule for the roster.** A lens colours a tile by blending its colour over the
+  ground at a wash strength strong enough to read as the lens's answer and weak enough that
+  the structure, form and river beneath still read through it; the strength is one tuned value
+  per lens family (categorical, sequential), set by eye against captures, not here. A tile the
+  lens has no answer for takes **no wash** — the plain ground shows.
+- **The lens's own marks stay vector chrome** above the wash: keys, HQ markers, the owner
+  rim, value marks, arrows, labels.
+- **Hit-testing is unchanged** — a lens still resolves a press to its own structure grain
+  (SELECTION.md § A lens collapses selection to ONE TIER).
+- **Before a body's ground exists** (the far page not yet baked) a lens falls back to the
+  vector fill, as the plain canvas does.
+
 ### Legend placement — one chrome home
 
 **Everything a lens puts on screen beside the canvas lives in one region: the
@@ -208,9 +231,10 @@ pass is guarded entirely behind `overlay_mode::corporation` in
 nothing on the other two canvases.
 
 **Colour.**
-- **Tiles of a picked owner** are tinted that corporation's identity colour — a direct
-  replacement of the terrain hue, not a blend.
-- **Tiles of an unpicked owner** are **greyed** — one neutral, desaturated owned-grey,
+- **Tiles of a picked owner** are washed in that corporation's identity colour over the
+  rendered ground (§ A lens washes the rendered ground), so the owner's buildings show
+  through their own colour.
+- **Tiles of an unpicked owner** are **greyed** — a wash of one neutral, desaturated owned-grey,
   the same for every unpicked owner, distinct from unowned ground (which keeps its plain
   terrain). Grey still says *someone holds this*; colour says *one of the owners you
   asked about holds this*. The grey is a **mid value** (`palette::owned_grey`), clear of
