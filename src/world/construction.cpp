@@ -218,7 +218,9 @@ construction_result construct_building(world& w, const recipe_registry& reg,
         // the player's bar described). Otherwise the historic default, so a freshly
         // built processor is still productive; the player reconfigures it via building
         // management. Mirrors app::load_economy.
-        bc.recipe = (recipe != no_recipe) ? recipe : reg.default_recipe_id(); // BL-429
+        // The default asks the body's air too (default_recipe_id_at), so no
+        // path seeds a route the wrong_air gate above would refuse.
+        bc.recipe = (recipe != no_recipe) ? recipe : reg.default_recipe_id_at(w, tile); // BL-429
     }
 
     w.buildings[bld_id]  = bc;

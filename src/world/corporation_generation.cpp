@@ -3986,10 +3986,11 @@ void assign_default_recipes(world& w, const recipe_registry& reg)
 {
     // BL-429: era-aware, so an ancient campaign does not default every processor
     // to an industrial recipe it could never run.
-    const uint16_t default_recipe = reg.default_recipe_id();
+    // The body's air (Ben, 2026-10-09): the one call, default_recipe_id_at,
+    // per tile — carry this line across any rewrite of this function.
     for (auto& [id, b] : w.buildings)
         if (b.type == building_type::processing_facility && b.recipe == no_recipe)
-            b.recipe = default_recipe;
+            b.recipe = reg.default_recipe_id_at(w, b.tile);
 }
 
 // ---------------------------------------------------------------------------

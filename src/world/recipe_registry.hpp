@@ -1003,6 +1003,18 @@ public:
         return static_cast<uint16_t>(m_allowed.front());
     }
 
+    /// default_recipe_id(), honouring the body's air at @p tile (Ben, 2026-10-09):
+    /// the first era-allowed recipe that `recipe_runs_at_tile`. Every path that
+    /// seeds a processor's recipe without naming one asks THIS, so no default
+    /// can land a route the body cannot run. `no_recipe` if none qualifies.
+    uint16_t default_recipe_id_at(const world& w, entity_id tile) const
+    {
+        for (const std::size_t i : m_allowed)
+            if (recipe_runs_at_tile(w, m_recipes[i], tile))
+                return static_cast<uint16_t>(i);
+        return no_recipe;
+    }
+
     /// BL-434: same contract as default_recipe_id() above, narrowed to one GROUP —
     /// the first era-allowed recipe whose `group` matches. Used by the Build door
     /// to seed a freshly-placed processing_facility with a group's own default
