@@ -308,6 +308,10 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   as BL-1252 (no parallel roads): d1K8 <= 103 pooled, harness green, time within ~1.25x of stale.
   Probe merged aa007264. BL-1252 lane running (measure candidates: targeted refresh / post-pass
   merge / bounded spur search).
+  **BL-1195 FIX ROUND DONE** (e14a76a6; re-review running): swept interdiction
+  (`progress_before`, transient), leg-time head clock (`convoy_route::at`, renderer uses it),
+  real-tick rows R11-R17, body-pool lanes, SUPPLY.md says only origin+ports fixed at dispatch.
+  sea_port_gate 89/0; 5-seed gate identical (no hostility in gate worlds). Live look owed.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
