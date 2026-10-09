@@ -134,6 +134,14 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   (+ procurement whole-contract per tick) — likely the G2 fall; F2 D3b base forecast fires on dead
   markets in play (no never-cleared gate) — likely the G1b rise; F4 probe solver args; F3 D4 also
   switches OUT of unpriced incumbents (ruling-literal, kept). D3/D4 agent resumed with F1/F2/F4.
+  **D5+D6 DONE** (53a8d92c, 359f1b11, branch worktree-agent-a5d82d46e2c9f9d33; in cold review):
+  71.4/61.6/12.8/73.4 -> D5 71.6/60.5/12.7/94.4 -> D5+D6 77.9/67.6/12.0/95.2 (G1/t50/G1b/G2).
+  Built processors at handoff 3351 -> 2752 (denominator shrinks); G2 jump = lower settle-income
+  baseline (held stock not auctioned) — read with care. D5 adds `world::opening_stock_held`, SAVE
+  v39. D6: fuel plants 538 -> 0 at generation (all via make_chain_feasible's no-good-named branch:
+  451 attached to extractors); only the traced path bounded. All 16 digest pins move (expected;
+  re-bless at close with Ben). Agent's open questions: bound the second processor too; want omits
+  refused draws; D5 bid excludes silenced want; convoys may haul held stock.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
