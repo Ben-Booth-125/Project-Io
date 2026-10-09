@@ -2,50 +2,52 @@
 -- docs/ui/RENDERING.md. Requirement groups `ground-bake-renderer` and
 -- `ground-wave-2`.
 --
--- Under --verify the ground cache bakes synchronously on the main thread
--- (app::m_ground_bake_all), so no capture can race the worker. The request →
--- bake → publish loop is one frame behind the canvas, so every zoom change
--- settles with verify.frames(2) before its capture.
+-- Under --verify the ground cache completes everything a frame draws before
+-- the frame returns (app::m_ground_bake_all: the master chunks under the view
+-- bake on the pool and are waited for), so no capture can race the pool. The
+-- request -> bake -> publish loop is one frame behind the canvas, so every
+-- zoom change settles with verify.frames(2) before its capture.
 --
--- Zooms below sit on (or near) the stepped x2 ladder's rungs — kMinZoom * 2^k,
--- k = 0..4 — so each capture exercises one bake tier: far page (6 px/r), then
--- the 12 / 24 / 48 / 96 px chunked tiers.
+-- BL-1246 (one master): every capture reads one level of the body's ONE
+-- 96 px/hex master, at the one camera angle (22.5 degrees, every rung, every
+-- lens). Zooms below sit on (or near) the stepped x2 ladder's rungs —
+-- kMinZoom * 2^k, k = 0..4 — so each capture reads one level: 12, 24, 48 and
+-- 96 px/hex, the top rung reading the master ~1.15x magnified.
 
 verify.goto_surface("home")
 verify.set_overlay("none")
 
--- Rung 0, whole grid: the far page. The wrap seam falls inside this frame;
+-- Rung 0, whole grid: the 12 px level. The wrap seam falls inside this frame;
 -- nothing may mark it. Border band now the muted single-tile ring.
 verify.set_zoom(1.26)
 verify.frames(2)
 verify.capture("ground_bake_wide")
 
--- Rung 1 (~13 px hexes): the 12 px tier — without this frame that tier has no
--- exercise at all (review fleet, 2026-09-01).
+-- Rung 1 (~13 px hexes): the 24 px level.
 verify.set_zoom(2.5)
 verify.frames(2)
 verify.capture("ground_bake_mid")
 
--- Rung 2 (~27 px hexes): the 24 px tier — the working play view.
+-- Rung 2 (~27 px hexes): the 48 px level — the working play view.
 verify.set_zoom(5)
 verify.frames(2)
 verify.capture("ground_bake_play")
 
--- Rung 3 (~51 px hexes): the 48 px tier, close-grain octave active, TILTED
--- 22.5 degrees (BL-737). The bake's own grain carries the ground; the vector
--- texture pass must NOT be drawing.
+-- Rung 3 (~51 px hexes): the 96 px master, minified. The bake's own grain
+-- carries the ground; the vector texture pass must NOT be drawing.
 verify.set_zoom(10)
 verify.frames(2)
 verify.capture("ground_bake_close")
 
--- Rung 4 (~102 px hexes): the 96 px tier — the top of the ladder, TILTED 45
--- degrees: height-displaced hills, standing trees, squashed chrome.
+-- Rung 4 (~102 px hexes): the 96 px master, the top of the ladder:
+-- height-displaced hills, standing trees, squashed chrome — at the same
+-- 22.5 degrees as every other rung.
 verify.set_zoom(20)
 verify.frames(2)
 verify.capture("ground_bake_closest")
 
--- Between rungs (free-form zoom 8): tilt is a pure function of zoom, so this
--- lands on the 22.5-degree side of the rung-2/3 midpoint deterministically.
+-- Between rungs (free-form zoom 8): the same one angle; the level is the
+-- coarsest at or above the drawn radius.
 verify.set_zoom(8)
 verify.frames(2)
 verify.capture("ground_bake_midrung_tilt")
@@ -69,8 +71,9 @@ verify.frames(2)
 verify.capture("ground_bake_bare_play")
 verify.set_border_band(true)
 
--- Fallback: a lens rung renders through the CLASSIC per-tile path, unchanged —
--- the fallback is alive and lens rendering is BL-734's, not ours.
+-- Fallback: a lens rung renders through the CLASSIC per-tile path — the
+-- fallback is alive and lens rendering is BL-734's, not ours (lens over the
+-- bake is NR-988). Under BL-1246 the lens rides the same 22.5-degree camera.
 verify.set_overlay("resource")
 verify.frames(1)
 verify.capture("ground_bake_lens_fallback")
@@ -83,7 +86,7 @@ verify.set_overlay("none")
 -- every recipe group, every other placeable type, a construction site, a rival
 -- plant, a four-stack tile — and steps the six nearest population centres to a
 -- settlement ladder (scale 1-5) plus a ruin. C++ picks the ground; the script
--- learns only where it staged. Captured at EVERY rung, far page included, with
+-- learns only where it staged. Captured at EVERY rung, the 12 px level included, with
 -- the border band off so the structures are judged on bare ground.
 verify.set_overlay("none")
 verify.set_border_band(false)

@@ -6,12 +6,14 @@
 -- day must have had its OWN inputs move that day — its installation hash, or
 -- (counted separately) its terrain — and a chunk whose own hashes held still
 -- on a day the body's installation digest moved elsewhere must not re-bake.
--- verify.ground_chunk_probe() lists each ready chunk of the active tier plus
--- the far page (tier -1) as { tier, key, bakes, installations, region }.
+-- verify.ground_chunk_probe() lists each ready MASTER chunk under the view
+-- (tier 0 — BL-1246: one 96 px/hex master per body; a re-bake re-derives only
+-- that chunk's mip pieces) plus the far page (tier -1) as
+-- { tier, key, bakes, installations, region }.
 --
 -- The far page hashes the whole grid, so it re-bakes on every day anything
 -- on the body moved; its cost is MEASURED here (bakes per 30 days, bake ms
--- from ground_stats slot 0), not judged — whether to re-key it is a call.
+-- from ground_stats slot 0 — per 512 px piece since BL-1246), not judged.
 --
 -- A play year is 365 days; a Debug econ tick on the reference world runs
 -- seconds and the background firms roughly double the building count in a
