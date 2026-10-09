@@ -316,6 +316,11 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   one tick of posted processor want before the background draws. 16 seeds alone: G1 87.5 -> 88.4,
   G1b 11.5 -> 10.6 (c-background 63 -> 38), t50 68.9 -> 72.0, G2 91.0 -> 92.7. Silenced want not
   protected (57 plants) — reviewer checking against FINANCE 2026-10-03.
+  R3 review clean; **BEN RULED (35eb5707): silenced processor want is protected too** (processor
+  part only). R3 round 2 sent (+ real-clear row, stale comments).
+  BL-1195 re-review clean (low items); original agent unresumable (worktree unverifiable) — fresh
+  agent does the tidy round on top of worktree-agent-a2c0cfcb69b515f0f (river-weighted clock,
+  reset on every return, per-frame lane cache, delete convoy_head_index, doc, R17 real tick).
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
