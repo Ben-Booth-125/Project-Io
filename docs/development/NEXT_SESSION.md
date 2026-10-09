@@ -272,6 +272,18 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   **BEN: MEASURE FIRST.** Lane running: probe switch clears caches after every stamp (FRESH) vs
   shipped (STALE), 16 seeds — road tiles by pass, parallel-road count, routes changed, border
   winners changed, loaded pass time, road_generation_harness R2s-b.
+  **G1b DIAGNOSED, probe merged eac0c3e4** (baseline 6ecdd441): 308/314 have the input in reach —
+  they starve on QUANTITY. Classes: (c) outbid/rationed 174 (households 75, 55 of them strategic
+  switches onto consumer_goods; background 63; pro-rata 36 healthy); (e) haul elsewhere never
+  arrives 48 (25 surplus not shipped — one-destination-per-pass / passive LP cap; 23 consumed at
+  source); (g) 52 (25 held in another pool — 18 cargo landing after the draw; 27 short supply);
+  (d) ceiling-silenced with stock 32 (price flips across the ceiling); (a) no producer 6 (switch
+  passed a STOCK test on the opening shelf); (f) 2. 144 decommissioned: reflex 69, strategic idle 75.
+  Fix families: switch uses the SUPPLY test (AI_OPPONENT, grant check); input_reach counts household
+  + background draws (AI scorer input — grant); background draws after processors (MARKETS,
+  re-rules "the cost, accepted"); ceiling hysteresis (MARKETS/FINANCE); dispatcher holds cargo it
+  would send + cargo lists after the draw (SUPPLY). Counterfactuals: pull off 9.6%; ceiling off
+  14.9% (worse); opening-stock release no change. Others untested. **Form to Ben.**
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
