@@ -176,7 +176,20 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   6deacb4a (incl. merged BL-1235): 82.9/66.9/15.7/73.3. Commit 2 (route gate) BLOCKED: no atmosphere
   on body_component — main session chose option A (copy atmosphere_class onto body_component, SAVE
   v41), price 64.0, recipe_margin anchors on the air route; agent resumed. Save order: v39 D5, v40
-  D3, v41 PROPELLANT.
+  D3, v41 PROPELLANT. Airless = atmosphere class none|thin (planetology's own reading; PRODUCTION
+  f8b48923); test worlds default moderate.
+  **BEN RULED (2026-10-09, dial form; 3c0bd8a2):** dial NARROWED to posted demand + stock-fed running
+  draws (AI_OPPONENT § 11 rewritten; § 2B sentence); **G1 at t50 and all long-term viability work
+  DEFERRED** (sprint row done_when, SKILL.md, REFINED). D3 agent resumed with the narrowed rework.
+  Deferred findings FILED as BL-1248 (plants survive to t50), 4acc101f.
+  **D5/D6 FIX ROUND** (9f61b46c, 26867936): G1 85.8 PASS but running 2683 -> 2324 at handoff,
+  3474 -> 2881 t50, play income -18.5%; G1b 13.2. Default-recipe paths (e/g) unbounded — form to
+  Ben (first wanted recipe / not placed / idle). **Re-review:** cause of the running drop is the
+  SECOND-WORKS CUT (a chartered processing firm's second works unplaced once the first covers the
+  gap -> steel/copper/silicon/medical/water firms halve, upstream charters fall), not fuel switching.
+  Defects: walk power want reads the unpowered-serve set; legacy Pass 6 power bound inconsistent;
+  roster keep sweep suspends all over-coverers and cascades; second works' spare refusal drops its
+  draw; save row can pass vacuously. Round 2 sent, with a keep-second-works counterfactual for Ben.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).

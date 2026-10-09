@@ -1717,6 +1717,31 @@
     "src/world/corporation_generation.cpp"
    ],
    "design": "FOUND (BL-1232 lane, 2026-10-08, seed 43 grid 15125): while power firms are being chartered the grid's need is 12.3-14.1 against the half-plant threshold of 14, so it is \"left to roads\"; it reaches 20 only after the last power firm is placed. Options for Ben: score the test on projected / settled need (after the walk's centres are placed), or let a centre take power for a grid its windows can reach. Ben 2026-10-08: file, not this sprint."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "written": "2026-10-09",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "priority": "B",
+   "difficulty": 4,
+   "id": "BL-1248",
+   "short_name": "PLANTS_SURVIVE_TO_T50",
+   "category": "Economy",
+   "authority_doc": "docs/economy/MARKETS.md",
+   "author": "Claude (sprint 50, deferred by Ben 2026-10-09)",
+   "title": "Long-term viability: plants running at handoff are still running at play tick 50",
+   "files": [
+    "src/world/corp_ai.cpp",
+    "src/world/supply_system.cpp",
+    "src/world/market_clearing.cpp",
+    "src/world/corporation_generation.cpp",
+    "tools/verify/starve_trace_probe.cpp"
+   ],
+   "design": "DEFERRED from sprint 50 (Ben, 2026-10-09: 'push the long term viability work for another sprint, after the various other gameplay loops are settled'). Target carried: G1 at tick 50 >= 85% (market-viability; reported, not gated, in sprint 50). FOUND (starve_trace_probe, f98d43df, shipped code before sprint 50's wave 2b): of 665 plants lost handoff->t50, 386 starved. (1) STEEL: a background-firm CONSTRUCTION BOOM - on 33 starving markets 725 sites draw steel at t50, 701 background-owned (ports/hubs 264, food 181, fuel 79); site need ~373/tick vs processors ~35; making builds read steel scarcity is a NEW AI GRANT (raise it). (2) UNDELIVERED HAULS: copper ore - dispatcher 'would send' in 36/47 cases, arrivals ~8/tick; split Logistic Points cap / one-destination-per-pass / goods sent elsewhere (SUPPLY/LOGISTICS). (3) POOL-HELD STOCK: 42 plants starve while stock sits unlisted in other pools at the market; split processor reservation vs sell-order floor (MARKETS). (4) FUEL->PROPELLANT COLD START: with generation bounded by want, neither chain stands at generation and no launchpad exists on any seed; space access depends on settle/play building both (PRODUCTION, ERAS gate). Ruled healthy, keep: fair-price ceiling (cf off: -8.0 G1t50), background pull (cf off: -1.4), households' first draw. Re-measure with the probe after sprint 50 merges before designing."
   }
  ]
 }
