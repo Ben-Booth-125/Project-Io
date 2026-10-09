@@ -105,7 +105,8 @@ entity_id tile_at(world& w, entity_id body, int c, int r)
 scenario make_world(const std::vector<int>& water_cols, int src_col, int dst_col,
                     const std::vector<std::pair<int, int>>& port_cells, float stock = 100.0f,
                     float balance = 1000.0f, int dst_row = 0,
-                    const std::vector<std::pair<int, int>>& land_cells = {})
+                    const std::vector<std::pair<int, int>>& land_cells = {},
+                    int grid_width = 32)
 {
     scenario s;
 
@@ -114,7 +115,8 @@ scenario make_world(const std::vector<int>& water_cols, int src_col, int dst_col
     bc.name              = "Isleward";
     bc.type              = body_type::planet;
     bc.orbital_radius_au = 1.0f;
-    bc.grid_width        = 32; // physical-scale sanity, as convoy_command.cpp
+    bc.grid_width        = grid_width; // physical-scale sanity, as convoy_command.cpp
+                                       // (BL-1195: 256 makes a short haul one tick)
     bc.grid_height       = 4;
     s.w.bodies[s.body] = bc;
     for (int r = 0; r < bc.grid_height; ++r)
@@ -278,19 +280,6 @@ bool tile_is_water(const world& w, entity_id t)
 bool lane_has(const std::vector<entity_id>& lane, entity_id t)
 {
     return std::find(lane.begin(), lane.end(), t) != lane.end();
-}
-
-/// Walk the one convoy's head across the whole lane in fine steps; true when any
-/// step is intercepted. The lane is re-read each step from the convoy.
-bool cut_anywhere(scenario& s)
-{
-    for (int k = 0; k <= 400 && !s.w.convoys.empty(); ++k)
-    {
-        s.w.convoys.front().progress = static_cast<float>(k) / 400.0f;
-        if (!intercept_convoys(s.w, k).empty())
-            return true;
-    }
-    return false;
 }
 
 /// Runs the full R0/R1/R2 scripted sequence once, returning a fingerprint of
@@ -522,17 +511,21 @@ std::string run_sequence(const recipe_registry& reg)
     // crossing, but the Ports sit on row 3 while both markets sit on row 0, so the
     // routed legs (land (0,0) -> port (2,3), sea along row 3, land (5,3) -> (8,0))
     // and the direct centre-to-centre path (straight along row 0, through the water
-    // at (3,0)/(4,0)) are different ground. Every reader of a convoy's position
-    // must walk the legs.
+    // at (3,0)/(4,0)) are different ground. The body is 256 tiles round (~156 km a
+    // tile), so the whole haul takes under one 90-day tick: T = 1, the cadence most
+    // real hauls run at. Every interdiction row below runs through the real tick —
+    // advance_convoys, then intercept_convoys — and never sets progress by hand.
     {
         const auto sea_fixture = [] {
-            return make_world({3, 4, 16, 17}, 0, 8, {{2, 3}, {5, 3}});
+            return make_world({3, 4, 16, 17}, 0, 8, {{2, 3}, {5, 3}}, 100.0f, 1000.0f, 0, {},
+                              /*grid_width=*/256);
         };
         scenario s = sea_fixture();
         const corp_command_result r = apply_corp_command(s.w, reg, dispatch_cmd(s, 25.0f));
         check(r == corp_command_result::applied && s.w.convoys.size() == 1
-                  && s.w.convoys.front().mode == convoy_mode::sea,
-              "R10.0 setup: the row-3 port pair carries the haul by sea");
+                  && s.w.convoys.front().mode == convoy_mode::sea
+                  && s.w.convoys.front().speed == 1.0f,
+              "R10.0 setup: the row-3 port pair carries the haul by sea, in ONE tick (T = 1)");
         if (s.w.convoys.size() == 1)
         {
             const entity_id pa = tile_at(s.w, s.body, 2, 3);
@@ -567,22 +560,24 @@ std::string run_sequence(const recipe_registry& reg)
             for (std::size_t i = 1; i < lane.tiles.size(); ++i)
                 if (lane.tiles[i] == lane.tiles[i - 1])
                     joined = false;
-            check(joined, "R10.4 the legs join at each Port without repeating it");
+            check(joined && lane.at.size() == lane.tiles.size() && lane.at.front() == 0.0f
+                      && lane.at.back() == 1.0f,
+                  "R10.4 the legs join at each Port without repeating it; the clock runs 0 -> 1");
 
             // R11 + R13: a hostile unit on the INLAND leg past the far port, on
-            // ground the direct path never crosses, intercepts; the capture lands
-            // on land and credits that tile's pool.
+            // ground the direct path never crosses, intercepts the T = 1 convoy in
+            // the one tick it travels; the capture lands on land and credits that
+            // tile's pool. Before the sweep, the only tile ever read was the
+            // destination (progress 0 -> 1 in one step).
             std::size_t ib = 0;
             for (std::size_t i = 0; i < lane.tiles.size(); ++i)
                 if (lane.tiles[i] == pb)
                     ib = i;
             entity_id inland = null_entity;
-            std::size_t ii = 0;
             for (std::size_t i = ib + 1; i + 1 < lane.tiles.size(); ++i)
                 if (!lane_has(direct, lane.tiles[i]))
                 {
                     inland = lane.tiles[i];
-                    ii = i;
                     break;
                 }
             check(inland != null_entity && !tile_is_water(s.w, inland),
@@ -590,11 +585,11 @@ std::string run_sequence(const recipe_registry& reg)
             if (inland != null_entity)
             {
                 const entity_id raider = add_raider(s, inland);
-                s.w.convoys.front().progress =
-                    static_cast<float>(ii) / static_cast<float>(lane.tiles.size() - 1);
+                advance_convoys(s.w);
                 const std::vector<interception_record> cuts = intercept_convoys(s.w, 1);
                 check(cuts.size() == 1 && cuts[0].tile == inland && s.w.convoys.empty(),
-                      "R11 a hostile unit on the sea route's inland leg intercepts it");
+                      "R11 a T = 1 sea convoy is cut, in its one tick, by a hostile unit on its "
+                      "inland leg");
                 if (cuts.size() == 1)
                 {
                     const auto pit =
@@ -609,29 +604,111 @@ std::string run_sequence(const recipe_registry& reg)
             }
 
             // R12: one placed on the straight-line water the convoy never enters
-            // does not intercept, wherever the head is.
+            // does not intercept; the convoy arrives.
             if (direct_water != null_entity)
             {
                 scenario s2 = sea_fixture();
                 apply_corp_command(s2.w, reg, dispatch_cmd(s2, 25.0f));
                 add_raider(s2, direct_water);
-                const bool cut = cut_anywhere(s2);
-                check(!s2.w.convoys.empty() && !cut,
+                advance_convoys(s2.w);
+                const std::size_t cut = intercept_convoys(s2.w, 1).size();
+                check(cut == 0 && s2.w.convoys.size() == 1 && s2.w.convoys.front().arrived,
                       "R12 a hostile unit on the direct path's water never intercepts a convoy "
-                      "whose legs go round it");
+                      "whose legs go round it: it arrives");
                 trace << "R12:" << cut << ';';
+            }
+
+            // R12b: the sweep covers the Ports and the sea leg too — a unit on the
+            // loading Port, or on the sea leg's water, cuts the T = 1 convoy.
+            for (const auto& [cx, cy, what] :
+                 { std::tuple{2, 3, "R12b a hostile unit on the loading Port intercepts the T = 1 convoy"},
+                   std::tuple{4, 3, "R12c a hostile unit on the sea leg's water intercepts the T = 1 convoy"} })
+            {
+                scenario s3 = sea_fixture();
+                apply_corp_command(s3.w, reg, dispatch_cmd(s3, 25.0f));
+                const entity_id at_tile = tile_at(s3.w, s3.body, cx, cy);
+                add_raider(s3, at_tile);
+                advance_convoys(s3.w);
+                const std::vector<interception_record> cuts = intercept_convoys(s3.w, 1);
+                check(cuts.size() == 1 && cuts[0].tile == at_tile, what);
             }
         }
     }
 
+    // R15 — BL-1195: THE CLOCK. A land leg is ~5x slower than a sea leg, so the
+    // cargo stands where the leg TIMES put it, not at an even fraction of the tiles.
+    // One-tile land leg (0,0) -> Port (1,0); a 60-column sea crossing to the Port at
+    // (62,0); a 30-tile land leg on to (92,0). The haul takes several ticks; after
+    // three real ticks the cargo is part-way down the FINAL land leg (an even split
+    // of the tiles would still put it at sea, near column 55).
+    {
+        std::vector<int> water;
+        for (int c = 2; c <= 61; ++c)
+            water.push_back(c);
+        water.push_back(200);
+        water.push_back(201); // closes the overland detour round the cylinder
+        scenario s = make_world(water, 0, 92, {{1, 0}, {62, 0}}, 100.0f, 1000.0f, 0, {},
+                                /*grid_width=*/256);
+        const corp_command_result r = apply_corp_command(s.w, reg, dispatch_cmd(s, 25.0f));
+        check(r == corp_command_result::applied && s.w.convoys.size() == 1
+                  && s.w.convoys.front().mode == convoy_mode::sea,
+              "R15.0 setup: the long crossing dispatches by sea");
+        if (s.w.convoys.size() == 1)
+        {
+            const int T = static_cast<int>(std::lround(1.0f / s.w.convoys.front().speed));
+            for (int k = 0; k < 3; ++k)
+            {
+                advance_convoys(s.w);
+                intercept_convoys(s.w, k); // the real tick, nothing standing anywhere
+            }
+            const float p = s.w.convoys.front().progress;
+            const entity_id head = convoy_tile_at(s.w, s.w.convoys.front());
+            const int col = s.w.tiles.count(head) ? s.w.tiles.at(head).grid_x : -1;
+            // Expected, from the leg times the haul was priced on: the days elapsed
+            // (p x the whole route's days) less the first land leg and the crossing,
+            // over the final leg's days per tile (it is all plains: even within it).
+            const entity_id p1 = tile_at(s.w, s.body, 1, 0);
+            const entity_id p2 = tile_at(s.w, s.body, 62, 0);
+            const float d1 = leg_travel_days(
+                s.w, s.body, intra_body_leg_path(s.w, s.body, s.src_tile, p1, leg_domain::land).cost,
+                convoy_mode::land);
+            const float d2 = leg_travel_days(
+                s.w, s.body, intra_body_leg_path(s.w, s.body, p1, p2, leg_domain::sea).cost,
+                convoy_mode::sea);
+            const float d3 = leg_travel_days(
+                s.w, s.body, intra_body_leg_path(s.w, s.body, p2, s.dst_tile, leg_domain::land).cost,
+                convoy_mode::land);
+            const float into = (p * (d1 + d2 + d3) - d1 - d2) / (d3 / 30.0f);
+            const int   want = 62 + static_cast<int>(std::lround(into));
+            check(T >= 4 && into > 1.0f && into < 29.0f && !tile_is_water(s.w, head)
+                      && std::abs(col - want) <= 1,
+                  "R15 after three real ticks the cargo is mid-way down the final land leg, where "
+                  "the leg times put it");
+            std::printf("      (T %d, progress %.3f, head column %d, expected %d)\n", T, p, col, want);
+            trace << "R15:" << col << ';';
+        }
+    }
+
     // R14 — BL-1195: a LAND-FALLBACK route (R4: no port pair, the overland road
-    // round the cylinder) is laid on that road. Its lane holds no water; a hostile
-    // unit on the water the direct path would cross never intercepts it, and one
-    // on the road it does take does.
+    // round the cylinder) is laid on that road. Its lane holds no water; run through
+    // the real tick to arrival, a hostile unit on the water the direct path would
+    // cross never intercepts it, and one on the road it does take does.
     {
         const auto land_fixture = [] {
             return make_scenario(/*src_port=*/true, /*dst_port=*/false, 100.0f, 1000.0f,
                                  /*island=*/false);
+        };
+        // Tick until cut or arrived; true when cut.
+        const auto run_to_end = [](scenario& sc) {
+            for (int k = 0; k < 1000 && !sc.w.convoys.empty(); ++k)
+            {
+                advance_convoys(sc.w);
+                if (!intercept_convoys(sc.w, k).empty())
+                    return true;
+                if (sc.w.convoys.front().arrived)
+                    return false;
+            }
+            return false;
         };
         scenario s = land_fixture();
         apply_corp_command(s.w, reg, dispatch_cmd(s, 25.0f));
@@ -652,16 +729,83 @@ std::string run_sequence(const recipe_registry& reg)
             scenario s2 = land_fixture();
             apply_corp_command(s2.w, reg, dispatch_cmd(s2, 25.0f));
             add_raider(s2, tile_at(s2.w, s2.body, 1, 0));
-            check(!cut_anywhere(s2),
+            check(!run_to_end(s2) && s2.w.convoys.size() == 1,
                   "R14.2 a hostile unit on the water the direct path crosses never intercepts it");
 
             scenario s3 = land_fixture();
             apply_corp_command(s3.w, reg, dispatch_cmd(s3, 25.0f));
             add_raider(s3, tile_at(s3.w, s3.body, 20, 0));
-            check(cut_anywhere(s3),
+            check(run_to_end(s3),
                   "R14.3 a hostile unit on the overland road the convoy takes intercepts it");
             trace << "R14:" << lane.tiles.size() << ';';
         }
+    }
+
+    // R16 — BL-1195: THE ORIGIN TILE. The lane starts where the haul was priced
+    // from. All land (no water bar a far band giving the one Port its coast — the
+    // passive-LP anchor). The corporation's building stands at (1,2), NOT on the
+    // source centre (0,0); it is in the source market's catchment.
+    {
+        const auto origin_fixture = [](float stock) {
+            scenario s = make_world({20, 21}, 0, 8, {{19, 0}}, stock);
+            for (auto& [bid, b] : s.w.buildings)
+                if (b.type == building_type::extraction_site)
+                    b.tile = tile_at(s.w, s.body, 1, 2);
+            s.w.markets.at(s.dst_market).price[r_iron]  = 10.0f;
+            s.w.markets.at(s.dst_market).demand[r_iron] = 30.0f;
+            s.w.markets.at(s.dst_market).supply[r_iron] = 0.0f;
+            return s;
+        };
+        // R16.1 the AUTO-DISPATCH (dispatch_convoys' pool_origin()): the corporation's
+        // convoy leaves from its building.
+        {
+            scenario s = origin_fixture(100.0f);
+            const entity_id bld_tile = tile_at(s.w, s.body, 1, 2);
+            dispatch_convoys(s.w, reg, reg.logistics_cost(convoy_mode::land),
+                             reg.logistics_cost(convoy_mode::space));
+            const convoy_component* cv = nullptr;
+            for (const convoy_component& c : s.w.convoys)
+                if (c.corp == s.corp)
+                    cv = &c;
+            check(cv != nullptr && cv->origin_tile == bld_tile
+                      && convoy_route_tiles(s.w, *cv).tiles.front() == bld_tile
+                      && bld_tile != s.src_tile,
+                  "R16.1 an auto-dispatched convoy records, and its lane starts at, the building "
+                  "it was priced from, not the source centre");
+        }
+        // R16.2 the MARKET EXPORT (export_market_shelves): a market's own shelf
+        // leaves from its centre, whatever buildings stand in its catchment.
+        {
+            scenario s = origin_fixture(0.0f);
+            s.w.markets.at(s.src_market).inventory[r_iron] = 100.0f;
+            const convoy_dispatch_tick ct = dispatch_convoys(
+                s.w, reg, reg.logistics_cost(convoy_mode::land), reg.logistics_cost(convoy_mode::space));
+            const convoy_component* cv = nullptr;
+            for (const convoy_component& c : s.w.convoys)
+                if (c.corp == null_entity)
+                    cv = &c;
+            check(ct.market_exports == 1 && cv != nullptr && cv->origin_tile == s.src_tile
+                      && convoy_route_tiles(s.w, *cv).tiles.front() == s.src_tile,
+                  "R16.2 a market's own export records, and its lane starts at, the market centre");
+        }
+    }
+
+    // R17 — BL-1195: a convoy out of a MARKET-LESS body's pool (BL-1003: its
+    // `source_market` is the body) has a lane, built from its origin tile.
+    {
+        scenario s = make_world({20, 21}, 0, 8, {{19, 0}});
+        convoy_component c;
+        c.id            = s.w.allocate_convoy_id();
+        c.source_market = s.body; // the body-level pool key
+        c.dest_market   = s.dst_market;
+        c.origin_tile   = tile_at(s.w, s.body, 1, 2);
+        c.cargo_qty     = 5.0f;
+        c.speed         = 0.5f;
+        c.corp          = s.corp;
+        const convoy_route lane = convoy_route_tiles(s.w, c);
+        check(lane.body == s.body && !lane.tiles.empty() && lane.tiles.front() == c.origin_tile
+                  && lane.tiles.back() == s.dst_tile,
+              "R17 a body-level-pool convoy's lane runs from its origin tile to the destination");
     }
 
     return trace.str();

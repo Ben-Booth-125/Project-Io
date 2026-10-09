@@ -1164,7 +1164,8 @@ struct ui_state
     /// the convoy's tile route in travel order (src→dst); progress/speed drive a head
     /// that interpolates smoothly along it between econ steps, with a tail that lags
     /// and dims one econ tick's travel behind the head.
-    struct convoy_beam { std::vector<entity_id> path; float progress = 0.0f; float speed = 0.0f; };
+    struct convoy_beam { std::vector<entity_id> path; float progress = 0.0f; float speed = 0.0f;
+                         std::vector<float> at; /* BL-1195: the lane's clock (convoy_route::at) */ };
     std::vector<convoy_beam> convoy_beams;
 
     // --- Throughput lens: this frame's active-LP anchor pools (BL-598) ---

@@ -1885,7 +1885,8 @@ void update_body_vision(world& w, ui_state& state, double now_days)
         convoy_route route = convoy_route_tiles(w, cv);
         if (route.body != body || route.tiles.empty()) continue;
         state.convoy_beams.push_back(
-            { std::move(route.tiles), std::clamp(cv.progress, 0.0f, 1.0f), std::max(cv.speed, 0.0f) });
+            { std::move(route.tiles), std::clamp(cv.progress, 0.0f, 1.0f), std::max(cv.speed, 0.0f),
+              std::move(route.at) });
     }
 }
 
@@ -2502,10 +2503,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             const int n = static_cast<int>(cb.path.size());
             if (n == 0) continue;
             // Head glides: last econ-step progress + this tick's fraction of a step.
+            // BL-1195: read off the lane's clock (convoy_lane_index), so the head
+            // stands where the sim says the cargo is — land legs slower than sea.
             const float p    = std::clamp(cb.progress + cb.speed * frac, 0.0f, 1.0f);
-            const int   head = std::clamp(static_cast<int>(std::lround(p * (n - 1))), 0, n - 1);
+            const int   head = std::clamp(convoy_lane_index(cb.at, p), 0, n - 1);
             // Tail = one econ tick's travel in tiles (>=1), dimming to 0 at its far end.
-            const int   tail = std::max(1, static_cast<int>(std::lround(cb.speed * (n - 1))));
+            const int   tail = std::max(1, head - std::max(0, convoy_lane_index(cb.at, p - cb.speed)));
             for (int i = head; i >= 0 && i >= head - tail; --i)
             {
                 const float inten = 1.0f - static_cast<float>(head - i) / static_cast<float>(tail);

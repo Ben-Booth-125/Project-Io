@@ -1082,7 +1082,9 @@ int main()
         cv.origin_tile = 301; cv.port_a = 302; cv.port_b = 303; // BL-1195 (v42)
         f.convoys.push_back(cv);
         cv.mode = convoy_mode::space; cv.id = 10; cv.held = false; cv.arrived = true;
-        cv.origin_tile = null_entity; cv.port_a = null_entity; cv.port_b = null_entity;
+        // Distinct from convoy 0's, and port_a left null while port_b is set, so a
+        // reader that swapped or dropped a field breaks the by-hand check below.
+        cv.origin_tile = 401; cv.port_a = null_entity; cv.port_b = 403;
         f.convoys.push_back(cv);
 
         f.trade_routes.push_back({ b1, b2, c1, 1234, 7 });
@@ -1151,7 +1153,9 @@ int main()
                       && back.convoys[0].held && back.convoys[0].cargo_qty == 12.5f
                       && back.convoys[1].arrived && back.convoys[1].mode == convoy_mode::space
                       && back.convoys[0].origin_tile == 301 && back.convoys[0].port_a == 302
-                      && back.convoys[0].port_b == 303 && back.convoys[1].port_a == null_entity,
+                      && back.convoys[0].port_b == 303 && back.convoys[1].port_a == null_entity
+                      && back.convoys[1].origin_tile == 401
+                      && back.convoys[1].port_b == 403,
                   "P8 convoy fields land in the right members (BL-1195: the route's waypoints)");
             check(back.body_last_glimpse_tick.at(b2) == -3,
                   "P8 a negative glimpse tick survives (no unsigned round trip)");

@@ -1656,6 +1656,14 @@ struct convoy_component
     entity_id   origin_tile    = null_entity;
     entity_id   port_a         = null_entity;
     entity_id   port_b         = null_entity;
+
+    /// BL-1195: TRANSIENT, never serialised. The progress the convoy stood at before
+    /// this tick's `advance_convoys`, so interdiction sweeps every tile the cargo
+    /// crossed this tick rather than only the tile it stops on. Set by
+    /// `advance_convoys`, consumed and reset to -1 by `intercept_convoys` in the same
+    /// tick; -1 means "did not move this tick: check the head only" (a loaded save,
+    /// a hand-built convoy).
+    float       progress_before = -1.0f;
 };
 
 // ---------------------------------------------------------------------------

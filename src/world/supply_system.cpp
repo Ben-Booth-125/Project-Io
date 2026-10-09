@@ -21,6 +21,9 @@ void advance_convoys(world& w)
 {
     for (auto& convoy : w.convoys)
     {
+        // BL-1195: where this tick's travel starts — interdiction sweeps from here
+        // to the new head. A held convoy does not move, so its sweep is its head.
+        convoy.progress_before = convoy.progress;
         // BL-452: a HELD convoy stops advancing and waits on its lane. It is
         // skipped rather than slowed — hold is a stop, not a throttle — and it
         // costs nothing further, since the haul was paid once at dispatch.
@@ -69,16 +72,29 @@ std::vector<interception_record> intercept_convoys(world& w, int tick)
     std::vector<std::uint32_t> cut_ids;
     for (const convoy_component& cv : w.convoys)
     {
-        const entity_id tile = convoy_tile_at(w, cv);
-        if (tile == null_entity)
+        // BL-1195: THE SWEEP. A tick is 90 days and most hauls take one to three,
+        // so the cargo crosses most of its lane between two reads. Every tile it
+        // crossed this tick — from where it stood before advance_convoys to where
+        // it stands now, in lane order, both ends included — is checked, and the
+        // first holding a hostile unit is where it is cut. Position is read off the
+        // lane's clock (convoy_lane_index), each leg at its own speed.
+        const convoy_route lane = convoy_route_tiles(w, cv);
+        const int head = convoy_lane_index(lane.at, cv.progress);
+        if (head < 0)
             continue; // inter-body leg in transit, or an unresolvable lane
+        const int from = (cv.progress_before >= 0.0f)
+                             ? std::min(convoy_lane_index(lane.at, cv.progress_before), head)
+                             : head;
 
+        entity_id tile             = null_entity;
+        entity_id interceptor_unit = null_entity;
+        entity_id interceptor_corp = null_entity;
+        for (int li = from; li <= head && interceptor_unit == null_entity; ++li)
+        {
+        tile = lane.tiles[static_cast<std::size_t>(li)];
         const auto occ = units_on_tile.find(tile);
         if (occ == units_on_tile.end())
             continue;
-
-        entity_id interceptor_unit = null_entity;
-        entity_id interceptor_corp = null_entity;
         for (const entity_id uid : occ->second)
         {
             const unit_component& uc = w.units.at(uid);
@@ -98,6 +114,7 @@ std::vector<interception_record> intercept_convoys(world& w, int tick)
             interceptor_unit = uid;
             interceptor_corp = uc.owner;
             break; // sorted order: first hit is the lowest-id hostile unit
+        }
         }
         if (interceptor_unit == null_entity)
             continue;
@@ -141,6 +158,11 @@ std::vector<interception_record> intercept_convoys(world& w, int tick)
         cuts.push_back(rec);
         cut_ids.push_back(cv.id);
     }
+
+    // BL-1195: this tick's sweep starts are spent; a later read in the same tick
+    // (or a tick that does not advance) checks the head alone.
+    for (convoy_component& cv : w.convoys)
+        cv.progress_before = -1.0f;
 
     if (!cut_ids.empty())
     {
