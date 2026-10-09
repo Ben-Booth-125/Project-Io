@@ -299,8 +299,11 @@ not a broad presence across the nation.
   reachable output of each of its inputs covers its draw at `t_idle` — a fifth of a full run.
   Spare is the producers' output in reach less the draw of every processor already standing
   there, **and less what households and the background pull draw there** (Ben, 2026-10-09;
-  `../ai/AI_OPPONENT.md` § 11, processors sized against every buyer), judged at the labour a new
-  plant is judged at, the same test the play-time scorer uses
+  `../ai/AI_OPPONENT.md` § 11, processors sized against every buyer; in generation, before any
+  clear, those draws are the household and background baskets whole at base — accepted by Ben,
+  2026-10-09, at the measured cost of a smaller economy: about a third fewer processors placed,
+  15% fewer firms, 29% less play income, and 96% of processors running at the handoff with 2%
+  starved), judged at the labour a new plant is judged at, the same test the play-time scorer uses
   (`recipe_inputs_obtainable` with its supply clause). A good that fails is passed over at that
   centre and retried once a firm producing its input is chartered, by the same retry the
   chain-feasible rule uses. Measured before the rule: one rare-earth site yields about 6 units a
