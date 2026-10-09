@@ -117,6 +117,16 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   base 80.1/61.9/14.6/75.8 -> D3 81.4/63.7/13.9/72.9 -> D3+D4 83.0/67.7/15.6/69.7 (G1/t50/G1b/G2).
   Steel zeroings at -11 unchanged (48) — listed opening stock still reads as glut; D5 owns it. D4:
   switches into propellant 144 -> 0.
+  **D7 DONE, probe merged f98d43df** (`starve_trace_probe.cpp`, shipped code): of 665 lost by t50,
+  386 starved. Causes: ceiling-silenced while shelf holds 105 (symptom of drawdown); background pull
+  55+12 (ruled cost; cf pull-off G1t50 -1.4, net positive); households 25+20 (ruled); other
+  processors 38; opening stock ran out 61 (D5/D6 may move); stock held in other pools unlisted 42
+  (reservation vs order floor unsplit); upstream died 18. Ceiling-off cf: -8.0. STEEL root: a
+  background-firm CONSTRUCTION BOOM — 725 sites drawing steel on 33 starving markets at t50, 701
+  background-owned (ports/hubs 264, food 181, fuel 79...); site need 373/tick vs processors 35.
+  Copper ore: dispatcher "would send" 36/47 yet arrivals ~8/tick (undelivered hauls — SUPPLY,
+  untested). Making builds read steel scarcity = NEW GRANT. 155 inputs>=revenue: 80 underwater at
+  tick 1 (35 unpriced propellant), input side dominates.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
