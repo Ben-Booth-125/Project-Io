@@ -365,6 +365,12 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   BL-1252 review: no correctness bug; gaps — doc overclaims "no second road" (47 left), snap uses
   tile counts not the cost model and is unbounded (3x snake possible), double-visit, g_last_laid
   not thread_local, stale comment, kSnapRun unused. Tidy round sent (cost-bounded snap).
+  **Live clicks attempted 2026-10-10** in the sprint-50 build (computer-use: grant the exe by FULL
+  PATH — "ProjectIo"/"projectio.exe" resolve to stale worktrees and mask the window). Build door
+  folds recipes into one row per group, so the air filter isn't visible there; the method grid
+  needs a finished building; no sea convoy on screen. **Ben: build the scripted visual check
+  instead** — lane running (two scripts/verify checks: air gate on door data + method grid +
+  set_recipe refusal; sea-route convoy lane + leg-time head; each shown able to fail).
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
