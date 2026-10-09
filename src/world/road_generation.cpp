@@ -19,7 +19,13 @@
 #include <utility>
 #include <vector>
 
+bool g_road_probe_fresh_floods = false; // BL-1119 measurement probe (road_generation.hpp)
+
 namespace {
+
+/// Probe-only: the route stamp_edge last laid, copied before the caches clear so the
+/// write-only traces record the route actually laid. Written only when the probe is on.
+std::vector<entity_id> g_probe_last_laid;
 
 // Road tiers (BL-172 three-tier ladder; BL-146 shipped local/trunk). road_traversal_multiplier
 // = 1/(1+0.5*tier): Track(1) x0.67, Road(2) x0.50, Highway(3) x0.40. Generation assigns a tier
@@ -178,14 +184,22 @@ bool stamp_edge(world& w, entity_id body, entity_id ta, entity_id tb, std::uint8
         if (v != crossing_verdict::strait)
             return false;
     }
+    bool raised = false; // probe-only reading
     for (const entity_id t : p.tiles)
     {
         const auto it = w.tiles.find(t);
         if (it == w.tiles.end() || is_water(it->second.substrate)) // BL-516
             continue;
+        raised = raised || it->second.road_level < level;
         it->second.road_level = std::max(it->second.road_level, level);
         if (stamped)
             stamped->push_back(t);
+    }
+    if (g_road_probe_fresh_floods) // BL-1119 probe: price the next route on the field as it stands
+    {
+        g_probe_last_laid = p.tiles; // `p` lives in the cache cleared below
+        if (raised)
+            invalidate_logistics_caches(w);
     }
     return true;
 }
@@ -341,7 +355,8 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
         r.from   = from;
         r.to     = to;
         r.nation = nation;
-        r.path   = intra_body_path(w, body, from, to).tiles;
+        r.path   = g_road_probe_fresh_floods ? g_probe_last_laid // probe: the cache is cleared
+                                             : intra_body_path(w, body, from, to).tiles;
         trace->routes.push_back(std::move(r));
     };
     // Grid geometry (BL-620: the spur and border prefilters measure wrapped grid
@@ -1007,7 +1022,10 @@ void stamp_history_roads(world& w, entity_id body,
         {
             ++hs.laid;
             if (trace != nullptr) // write-only: the route just laid, answered again from the cache
-                trace->routes.push_back({ from, to, tier, intra_body_path(w, body, from, to).tiles });
+                trace->routes.push_back({ from, to, tier,
+                                          g_road_probe_fresh_floods // probe: the cache is cleared
+                                              ? g_probe_last_laid
+                                              : intra_body_path(w, body, from, to).tiles });
         }
     }
     hs.destinations = static_cast<int>(destinations.size());
