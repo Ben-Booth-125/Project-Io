@@ -216,6 +216,25 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   (hard_coded_world.cpp:2659) is the only steel seed. Handoff losses of steel/medical/water arise
   in the settle, not generation. **Form to Ben:** exempt the authored plant / walk seeds chains /
   accept; keep or cut second works. Do not merge eff4e96f until ruled.
+  **BEN RULED (f16e65e9):** authored installation keeps its default; second works kept. Sent to
+  D5/D6 agent.
+  **D3 ROUND 3** (a37f2099; focused re-review running): draw register now written in clear_markets
+  with demand (same tick); stamps 0 for touched keys; market_has_cleared reads only clear-written
+  fields (veto identical over 2.5M calls). D3 81.7/65.4/13.5/71.8; +D4 82.4/67.6/15.9/68.8. D4 G1b
+  cause: fuel plants denied the propellant exit switch into silicon/alloys and starve on
+  silica/ree_alloy (+59) — moot once D6 removes the fuel plants.
+  **D3/D4 READY TO MERGE** (head 6d79848a): round 3 re-review clean; `dial_bid_harness` D1-D6 pass
+  and were shown able to fail. NR-987 filed (cleared-proxy decision). MERGE TRAP with D5/D6 in
+  save_roundtrip.cpp: close D5's `if (held_key...)` block before the v40 block; reservations keep
+  v39+v40(+v41); world_save.hpp constant ends at 41 with all three notes.
+  **D5/D6 DONE** (head 067e0055; final review running): steel chain restored (gen steel 177, alloys
+  16, consumer goods 112, machinery 28); 87.5/67.4/11.6/91.6/96.9; running/built h 2426/2773, t50
+  2854/4234; play income 47,307/seed-tick. Authored installation identified as "the one recipe-less
+  unowned processor" (review asked whether a marker is needed).
+  **D5/D6 final review:** fixes 1,2,5,6 correct; keep sweep counts to-be-suspended plants as
+  coverage (can destroy a covered chain — HIGH); walk books a stale rung refusal; installation by
+  elimination; exception 2 uncapped (bounded by processing_mix); 11 raw-world harnesses unaudited.
+  Round 4 sent (all five).
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
