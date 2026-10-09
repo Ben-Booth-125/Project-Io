@@ -111,7 +111,12 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   Fix options to Ben: (a) reserve launch propellant for a pad's pool (Full, clearing seam) /
   (b) launch burn buys from the shelf / (c) accept + rewrite docs. Also: electrolysis (the
   "airless" route) is cheapest everywhere — nothing gates it to airless bodies (inverts PRODUCTION
-  :280). Merge note must say "world-moving".
+  :280). Merge note must say "world-moving". **Propellant form sent to Ben** (launch fuel a/b/both/
+  drop; gate electrolysis to airless; NR-986 seat back to auto).
+  **D3+D4 DONE** (d0ac1de7, 11acaf69, branch worktree-agent-a472a14f8f39f276e; in cold review):
+  base 80.1/61.9/14.6/75.8 -> D3 81.4/63.7/13.9/72.9 -> D3+D4 83.0/67.7/15.6/69.7 (G1/t50/G1b/G2).
+  Steel zeroings at -11 unchanged (48) — listed opening stock still reads as glut; D5 owns it. D4:
+  switches into propellant 144 -> 0.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
