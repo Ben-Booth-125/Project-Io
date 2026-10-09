@@ -1549,6 +1549,11 @@ recipe_switch_result try_switch_recipe(world& w, const recipe_registry& reg,
     if (!recipe_unlocked(w, reg, corp, new_recipe_id))
         return recipe_switch_result::tech_locked;
 
+    // Propellant routes follow the body's air (Ben, 2026-10-09; PRODUCTION.md
+    // § Chemical Plant): the build door's gate, mirrored at the retool door.
+    if (!recipe_runs_at_tile(w, *new_r, b.tile))
+        return recipe_switch_result::wrong_air;
+
     const float cost = sw.switch_cost;
     if (cit->second.balance < cost)
         return recipe_switch_result::insufficient_funds;
@@ -2864,6 +2869,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                             const float ratio  = output_ratio(reg.recipe_id(cand.name));
                             std::array<float, resource_count> cand_cost{};
                             if (ratio > best_ratio
+                                && recipe_runs_at_tile(w, cand, b.tile) // the body's air (Ben, 2026-10-09)
                                 && recipe_inputs_obtainable(w, reg, rescue_reach(), mid, sw_pool, cand,
                                                             sw_batches, bid, cand_cost))
                             {

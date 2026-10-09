@@ -47,6 +47,15 @@ struct era_basket
     std::array<float, resource_count> demand_basket = {};
 };
 
+/// Which bodies a recipe may run on, by their air (Ben, 2026-10-09). `any` for
+/// every recipe but the two propellant routes.
+enum class recipe_air : uint8_t
+{
+    any,        ///< No restriction.
+    atmosphere, ///< Only on a body with an atmosphere (`!atmosphere_is_airless`).
+    airless,    ///< Only on an airless body (`atmosphere_is_airless`).
+};
+
 /// A processing recipe: per-batch input and output quantities, indexed by
 /// resource_type. Reagents are simply inputs with no matching output. Authored
 /// in scripts/recipes.lua; the recipe's id is its index in recipe_registry::recipes.
@@ -88,6 +97,12 @@ struct recipe
     /// processing_facility type. Overrides the type-level gate's radius when
     /// non-zero — see `placement_gate_for`.
     int centre_proximity_radius = 0;
+    /// Propellant routes follow the body's air (Ben, 2026-10-09; PRODUCTION.md
+    /// § Chemical Plant, "And it runs only there"): which bodies this recipe may
+    /// run on. Authored as `air = "atmosphere"` or `air = "airless"` in
+    /// recipes.lua; absent means `any`. Read through `recipe_runs_on_body`, the
+    /// one predicate every door asks.
+    recipe_air air = recipe_air::any;
     /// BL-613 (qualification fraction; docs/economy/POPULATION.md
     /// § Qualification): the fraction of this recipe's labour that must be
     /// QUALIFIED, in [0, 1]. 0 (the default, and the value for every
@@ -102,6 +117,30 @@ struct recipe
     /// REJECTED otherwise, never clamped.
     float qualified_workforce = 0.0f;
 };
+
+/// THE ONE PREDICATE every door asks of a recipe's air (Ben, 2026-10-09;
+/// PRODUCTION.md § Chemical Plant, "And it runs only there"): may @p rc run on
+/// body @p b? `propellant_electrolysis` only where `atmosphere_is_airless`,
+/// `propellant_atmospheric` only where it is not; every other recipe anywhere.
+/// Asked by construct_building, try_switch_recipe (the set_recipe seam and the
+/// scorer's switch), the reflex rescue, the scorer's build candidates and
+/// generation's chain placement.
+inline bool recipe_runs_on_body(const recipe& rc, const body_component& b)
+{
+    switch (rc.air)
+    {
+        case recipe_air::any:        return true;
+        case recipe_air::atmosphere: return !atmosphere_is_airless(b.atmosphere);
+        case recipe_air::airless:    return atmosphere_is_airless(b.atmosphere);
+    }
+    return true;
+}
+
+/// The predicate at a tile: the tile's body's air. True for an unknown tile or
+/// body (no air to read, nothing to refuse on — the callers' own existence
+/// checks refuse those).
+struct world;
+bool recipe_runs_at_tile(const world& w, const recipe& rc, entity_id tile); // defined in tech_gate.cpp (a Lua-free TU)
 
 /// The primary output resource of a recipe — the argmax of its outputs. Used
 /// to key a processing method's resource pip (construction_panel.cpp) and,

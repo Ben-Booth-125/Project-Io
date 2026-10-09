@@ -142,6 +142,12 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     if (!recipe_unlocked(w, reg, corp, recipe))
         return construction_result::tech_locked;
 
+    // Propellant routes follow the body's air (Ben, 2026-10-09; PRODUCTION.md
+    // § Chemical Plant): the one predicate, asked at the build door.
+    if (type == building_type::processing_facility)
+        if (const ::recipe* rc = reg.get_recipe(recipe); rc != nullptr && !recipe_runs_at_tile(w, *rc, tile))
+            return construction_result::wrong_air;
+
     // Tile-level validity check (ocean / deposit / terrain).
     if (!placement_rules::can_place(tile_it->second, type, target))
         return construction_result::invalid_tile;

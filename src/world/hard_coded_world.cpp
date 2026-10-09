@@ -3419,7 +3419,7 @@ void run_tail(generation_cursor& c)
 
         int with_air = 0;
         for (const auto& b : bs)
-            if (b.state.profile.atmosphere >= atmosphere_class::moderate) ++with_air;
+            if (!atmosphere_is_airless(b.state.profile.atmosphere)) ++with_air; // the one airless rule (components.hpp)
         std::snprintf(buf, sizeof buf, "%d of %d held an atmosphere. The rest are exposed rock.",
                       with_air, static_cast<int>(bs.size()));
         report->stage_lines.emplace_back(buf);

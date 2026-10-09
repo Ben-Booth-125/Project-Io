@@ -246,6 +246,18 @@ void recipe_registry::load_from_lua(lua_state& lua)
         r.qualified_workforce =
             read_unit_rate(*entry, "qualified_workforce", 0.0f, "recipe '" + r.name + "'");
 
+        // Propellant routes follow the body's air (Ben, 2026-10-09). Absent =
+        // any; an unknown string is authored nonsense and rejected at load.
+        {
+            const std::string air = entry->get_or<std::string>("air", "any");
+            if (air == "any")             r.air = recipe_air::any;
+            else if (air == "atmosphere") r.air = recipe_air::atmosphere;
+            else if (air == "airless")    r.air = recipe_air::airless;
+            else
+                throw std::runtime_error("recipe_registry: recipe '" + r.name + "' has unknown air '"
+                                         + air + "' (any | atmosphere | airless)");
+        }
+
         m_recipes.push_back(std::move(r));
     }
 

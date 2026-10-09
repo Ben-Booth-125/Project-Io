@@ -1899,6 +1899,13 @@ int chain_input_tier(world& w, const recipe_registry& reg, chain_reach& cr, enti
 int chain_recipe_tier(world& w, const recipe_registry& reg, chain_reach& cr, entity_id self,
                       entity_id consumer_market, const recipe& rc, const std::vector<entity_id>* own)
 {
+    // Propellant routes follow the body's air (Ben, 2026-10-09): a recipe the
+    // processor's body cannot run is `none` here, so every generation walk that
+    // ranks recipes through this tier (make_chain_feasible, the rung walk, the
+    // refused-draw read) passes it over.
+    if (const auto sb = w.buildings.find(self);
+        sb != w.buildings.end() && !recipe_runs_at_tile(w, rc, sb->second.tile))
+        return chain_tier_none;
     int worst = chain_tier_own;
     for (std::size_t r = 0; r < resource_count; ++r)
     {

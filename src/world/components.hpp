@@ -824,6 +824,26 @@ struct survey_state
 /// (see advance_orbits in orbital_system.hpp); the authored value is the phase
 /// at world construction, frozen into `orbital_epoch_angle_rad` so the econ tick
 /// can reconstruct positions purely from the day tick (orbital_angle_at_tick).
+/// Atmospheric density class. `none` or `thin` gates out organic compositions
+/// (grassland, forest, wetland) and routes a body to the airless tables.
+/// Derived per body by the Planetology pass (`body_profile::atmosphere`,
+/// tile_generation.hpp) and copied onto `body_component::atmosphere` at world
+/// setup. Lives here, not in tile_generation.hpp, so the world record can hold it.
+enum class atmosphere_class : uint8_t { none, thin, moderate, thick };
+
+/// Is a body of this atmosphere class AIRLESS? `none` or `thin` — the
+/// codebase's one definition, and it must not drift from planetology: the
+/// Planetology pass (planetology.cpp, the `airless` flag beside each
+/// `st.profile.atmosphere` assignment) sets `airless = true` exactly when it
+/// assigns `none` or `thin` (surface pressure 0), and the enum's doc above
+/// routes those two to the airless tables. Read by the propellant routes
+/// (PRODUCTION.md § Chemical Plant, "And it runs only there", Ben 2026-10-09)
+/// and by hard_coded_world's "held an atmosphere" stage line.
+inline bool atmosphere_is_airless(atmosphere_class a)
+{
+    return a == atmosphere_class::none || a == atmosphere_class::thin;
+}
+
 struct body_component
 {
     std::string name;
@@ -846,6 +866,14 @@ struct body_component
     /// Defaults to Earth mass so a body built without one still has a sane
     /// scale rather than a zero that would read as "instant travel".
     float       mass_earths = 1.0f;
+
+    /// The body's atmosphere class, copied from its generated
+    /// `body_profile::atmosphere` when the Planetology pass's profile is applied
+    /// (`generate_body_tiles`). Saved (world_save_version 41). A body built with
+    /// no generated profile — a hand-built harness world — reads `moderate`, the
+    /// `body_profile` default: it has air, so it keeps the atmosphere route.
+    /// Airless is `atmosphere_is_airless(atmosphere)`.
+    atmosphere_class atmosphere = atmosphere_class::moderate;
 
     /// Survey progress (BL-067). `home_body` is seeded `surveyed`; all others open
     /// `hidden` until the player dispatches a survey. Advanced by advance_surveys

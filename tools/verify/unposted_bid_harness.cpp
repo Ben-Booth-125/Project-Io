@@ -383,6 +383,37 @@ int main()
               "U8 ... and a plant the dial left running keeps its dial");
     }
 
+    // U9 — propellant routes follow the body's air (Ben, 2026-10-09): the one
+    // predicate's table, over all four atmosphere classes, and the tile form's
+    // read of the tile's body.
+    std::printf("U9 the propellant routes follow the body's air\n");
+    {
+        recipe airless_r, atmos_r, any_r;
+        airless_r.air = recipe_air::airless;
+        atmos_r.air   = recipe_air::atmosphere;
+        const atmosphere_class classes[4] = {atmosphere_class::none, atmosphere_class::thin,
+                                             atmosphere_class::moderate, atmosphere_class::thick};
+        bool table_ok = true;
+        for (int k = 0; k < 4; ++k)
+        {
+            body_component bc{};
+            bc.atmosphere = classes[k];
+            const bool airless = (k <= 1); // none, thin: planetology's own `airless`
+            table_ok = table_ok && atmosphere_is_airless(bc.atmosphere) == airless
+                && recipe_runs_on_body(airless_r, bc) == airless
+                && recipe_runs_on_body(atmos_r, bc) == !airless
+                && recipe_runs_on_body(any_r, bc);
+        }
+        check(table_ok, "U9 none/thin run only the airless route; moderate/thick only the atmosphere route; any runs everywhere");
+        fixture f = make_fixture();
+        check(f.w.bodies.at(f.body).atmosphere == atmosphere_class::moderate
+                  && recipe_runs_at_tile(f.w, atmos_r, f.tile) && !recipe_runs_at_tile(f.w, airless_r, f.tile),
+              "U9 a body built with no generated profile reads moderate: the atmosphere route, never the airless one");
+        f.w.bodies.at(f.body).atmosphere = atmosphere_class::none;
+        check(!recipe_runs_at_tile(f.w, atmos_r, f.tile) && recipe_runs_at_tile(f.w, airless_r, f.tile),
+              "U9 the tile form reads the tile's body: an airless body flips both");
+    }
+
     std::printf("\n%s (%d failure%s)\n", g_fail == 0 ? "ALL PASS" : "FAILURES", g_fail,
                 g_fail == 1 ? "" : "s");
     return g_fail == 0 ? 0 : 1;
