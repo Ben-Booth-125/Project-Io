@@ -231,6 +231,10 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   16, consumer goods 112, machinery 28); 87.5/67.4/11.6/91.6/96.9; running/built h 2426/2773, t50
   2854/4234; play income 47,307/seed-tick. Authored installation identified as "the one recipe-less
   unowned processor" (review asked whether a marker is needed).
+  **D5/D6 final review:** fixes 1,2,5,6 correct; keep sweep counts to-be-suspended plants as
+  coverage (can destroy a covered chain — HIGH); walk books a stale rung refusal; installation by
+  elimination; exception 2 uncapped (bounded by processing_mix); 11 raw-world harnesses unaudited.
+  Round 4 sent (all five).
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
