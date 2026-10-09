@@ -1038,6 +1038,7 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
     {
         flush_gpu();
         m_active = body;
+        m_fresh_view = true; // the first view on a body uploads whole (see the budget below)
         if (body_state* nb = ensure_body(w, body))
         {
             ++nb->visits;
@@ -1303,7 +1304,13 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
     m_pending_uploads = 0;
     if (have_view)
     {
-        int budget = bake_everything ? (1 << 30) : k_upload_budget;
+        // The first view on a body (a body switch, play opening) uploads its
+        // visible chunks whole, in one frame: the frame is a transition
+        // anyway, and a budgeted fill would show the far page for a few
+        // frames over ground that is already baked in RAM.
+        const bool whole_view = bake_everything || m_fresh_view;
+        m_fresh_view = false;
+        int budget = whole_view ? (1 << 30) : k_upload_budget;
         const auto visit = [&](int lv, const window& v, bool publish, bool count) {
             const level_store& s = b.lv[lv];
             struct cand { int idx; double d2; };

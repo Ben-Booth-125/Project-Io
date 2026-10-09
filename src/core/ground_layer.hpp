@@ -327,6 +327,7 @@ private:
     std::vector<std::uint32_t> m_publish_keys; ///< Visible keys of the drawn level, on GPU.
     int           m_publish_level = -1;
     int           m_pending_uploads = 0;
+    bool          m_fresh_view = false;   ///< The next view is the first on this body: upload it whole.
 
     // Pool plumbing. The workers start lazily on the first enqueue.
     std::vector<std::thread> m_workers;
