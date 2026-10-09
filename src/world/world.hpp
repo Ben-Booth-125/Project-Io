@@ -11,6 +11,7 @@
 #include "province.hpp"     // province_partition (BL-466 province partition, below)
 #include "sentiment.hpp"    // sentiment_table (BL-545 relational substrate, below)
 
+#include <atomic>
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -713,6 +714,15 @@ struct world
     bool        power_grid_built = false;
     std::size_t power_grid_stamp = 0;
 
+    /// BL-1195: the LOGISTICS CACHE GENERATION — a stamp that changes every time the
+    /// logistics caches above are dropped (invalidate_logistics_caches,
+    /// clear_derived_state). VIEW-ONLY: read by the UI's per-convoy lane cache to know
+    /// a re-route happened, and by nothing in the simulation. Never serialised, never
+    /// hashed, never compared across worlds. Drawn from one process-wide counter
+    /// (bump_logistics_cache_generation), so two worlds — a freshly loaded save and
+    /// the one it replaced — never share a value.
+    std::uint64_t logistics_cache_generation = 0;
+
     /// Per-body NEAREST LOGISTIC POINT ANCHOR (BL-1117) — see lp_anchor_field. A
     /// derived cache on the same footing as the three above: built lazily by
     /// `nearest_lp_anchor`, cleared by invalidate_logistics_caches and by
@@ -1123,6 +1133,16 @@ struct world
 private:
     uint32_t m_next_id = 1; ///< Zero is null_entity; live IDs start at 1.
 };
+
+/// BL-1195: stamp @p w with a fresh logistics cache generation (see
+/// world::logistics_cache_generation). The counter is process-wide and only ever
+/// grows, so no two invalidations — on any world — share a value. View-only: the
+/// simulation never reads it, so it cannot touch determinism.
+inline void bump_logistics_cache_generation(world& w)
+{
+    static std::atomic<std::uint64_t> s_next{1};
+    w.logistics_cache_generation = s_next.fetch_add(1, std::memory_order_relaxed);
+}
 
 // ---------------------------------------------------------------------------
 // Ownership accessors (BL-068 — competitor information asymmetry)

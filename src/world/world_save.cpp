@@ -832,6 +832,7 @@ void clear_derived_state(world& w)
     w.lp_anchor_fields.clear(); // BL-1117: the nearest-anchor field, same footing
     w.power_grid_of_province.clear(); // BL-1230: the power grid, same footing
     w.power_grid_built = false;
+    bump_logistics_cache_generation(w); // BL-1195: view-only stamp, never serialised
 
     // The market index carries its own staleness stamps; zeroing them is what
     // makes the next `market_for_tile` rebuild rather than trust an empty index.

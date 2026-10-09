@@ -41,6 +41,21 @@ void advance_convoys(world& w)
 std::vector<interception_record> intercept_convoys(world& w, int tick)
 {
     std::vector<interception_record> cuts;
+    // BL-1195: this tick's sweep starts are spent on EVERY return, early or not —
+    // a later read in the same tick (or a tick that does not advance) checks the
+    // head alone (the components.hpp invariant on progress_before). A scope guard,
+    // so no early return below can skip it; it runs after the cut convoys are
+    // erased, which is harmless (the reset touches only survivors).
+    struct sweep_reset
+    {
+        world& w;
+        ~sweep_reset()
+        {
+            for (convoy_component& cv : w.convoys)
+                cv.progress_before = -1.0f;
+        }
+    } const reset_on_exit{w};
+
     if (w.convoys.empty() || w.units.empty() || w.corp_hostile_pairs.empty())
         return cuts; // nothing declared, nothing standing, or nothing in flight
 
@@ -158,11 +173,6 @@ std::vector<interception_record> intercept_convoys(world& w, int tick)
         cuts.push_back(rec);
         cut_ids.push_back(cv.id);
     }
-
-    // BL-1195: this tick's sweep starts are spent; a later read in the same tick
-    // (or a tick that does not advance) checks the head alone.
-    for (convoy_component& cv : w.convoys)
-        cv.progress_before = -1.0f;
 
     if (!cut_ids.empty())
     {

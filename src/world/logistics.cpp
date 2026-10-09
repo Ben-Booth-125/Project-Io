@@ -1404,10 +1404,13 @@ bool append_leg(world& w, entity_id body, entity_id from, entity_id to, leg_doma
 /// time spent when the cargo reaches tile i: 0 at the origin, 1 at the destination.
 /// Each leg takes its own days (caravan overland, coastal by sea — roughly five times
 /// faster), and within a leg the days split over its hops in proportion to each hop's
-/// node-mean traversal weight, the same weight the leg's path cost sums. So a convoy's
-/// progress (the fraction of its travel ticks elapsed) maps to the tile the cargo is
-/// actually on. With no physical scale on the body (no days at all) the tiles are
-/// spaced evenly, which is what every reader did before.
+/// PRICED edge cost — the node mean of the two tiles' traversal weights times the
+/// river discount of the side the hop leaves by, exactly what `flood_edge_cost`
+/// charges and the leg's path cost sums. So the clock reads the same cost the path
+/// was priced on, and a convoy's progress (the fraction of its travel ticks elapsed)
+/// maps to the tile the cargo is actually on, river stretches included. With no
+/// physical scale on the body (no days at all) the tiles are spaced evenly, which is
+/// what every reader did before.
 std::vector<float> lane_clock(const world& w, const std::vector<entity_id>& tiles,
                               const std::vector<lane_leg>& legs)
 {
@@ -1416,9 +1419,30 @@ std::vector<float> lane_clock(const world& w, const std::vector<entity_id>& tile
     if (n < 2)
         return at;
 
-    const auto weight = [&](entity_id t) {
-        const auto it = w.tiles.find(t);
-        return it != w.tiles.end() ? tile_traversal_cost(it->second) : 1.0f;
+    // The cost of the hop a -> b as the flood prices it (flood_edge_cost, and the
+    // sea leg's diagonal port hop): node mean, times river_edge_discount on the side
+    // of `a` facing `b` (the tile being LEFT; downstream cheaper than upstream).
+    // The east-west wrap is undone so a hop across the seam finds its side.
+    const auto hop_cost = [&](entity_id ta, entity_id tb) {
+        const auto ia = w.tiles.find(ta);
+        const auto ib = w.tiles.find(tb);
+        if (ia == w.tiles.end() || ib == w.tiles.end())
+            return 1.0f;
+        const tile_component& a = ia->second;
+        const tile_component& b = ib->second;
+        float mult = 1.0f;
+        const auto bit = w.bodies.find(a.body);
+        const int gw = (bit != w.bodies.end()) ? bit->second.grid_width : 0;
+        int dc = b.grid_x - a.grid_x;
+        if (gw > 2)
+        {
+            if (dc > 1)  dc -= gw;
+            if (dc < -1) dc += gw;
+        }
+        const int side = hex_side_for_offset(dc, b.grid_y - a.grid_y, (a.grid_y & 1) != 0);
+        if (side >= 0)
+            mult = river_edge_discount(a, side);
+        return 0.5f * (tile_traversal_cost(a) + tile_traversal_cost(b)) * mult;
     };
 
     std::vector<float> hop(n - 1, 0.0f); // days spent on hop i -> i+1
@@ -1431,12 +1455,13 @@ std::vector<float> lane_clock(const world& w, const std::vector<entity_id>& tile
             continue;
         float sum = 0.0f;
         for (std::size_t i = a; i < b; ++i)
-            sum += 0.5f * (weight(tiles[i]) + weight(tiles[i + 1]));
+        {
+            hop[i] = hop_cost(tiles[i], tiles[i + 1]);
+            sum += hop[i];
+        }
         for (std::size_t i = a; i < b; ++i)
         {
-            const float share = (sum > 0.0f)
-                                    ? 0.5f * (weight(tiles[i]) + weight(tiles[i + 1])) / sum
-                                    : 1.0f / static_cast<float>(b - a);
+            const float share = (sum > 0.0f) ? hop[i] / sum : 1.0f / static_cast<float>(b - a);
             hop[i] = legs[l].days * share;
         }
         total += legs[l].days;
@@ -1469,9 +1494,9 @@ convoy_route convoy_route_tiles(world& w, const convoy_component& cv)
         return route; // unresolved destination — no lane to stand on
 
     // The source's body. A market source carries its own; a convoy out of a
-    // MARKET-LESS body's pool (BL-1003: `source_market` is then the body, not a
-    // market) takes it from the origin tile recorded at dispatch (BL-1195), so it
-    // has a lane like any other.
+    // BODY-LEVEL pool (BL-1003: commit_convoy stamps its `source_market` null, as
+    // no market sent it) takes it from the origin tile recorded at dispatch
+    // (BL-1195), so it has a lane like any other.
     const auto sm = w.markets.find(cv.source_market);
     entity_id src_body = null_entity;
     if (sm != w.markets.end())
@@ -1554,25 +1579,25 @@ convoy_route convoy_route_tiles(world& w, const convoy_component& cv)
     return route;
 }
 
-int convoy_head_index(std::size_t tile_count, float progress)
-{
-    if (tile_count == 0)
-        return -1;
-    const int n = static_cast<int>(tile_count);
-    const float p = std::isfinite(progress) ? std::clamp(progress, 0.0f, 1.0f) : 0.0f;
-    return std::clamp(static_cast<int>(std::lround(p * static_cast<float>(n - 1))), 0, n - 1);
-}
-
 int convoy_lane_index(const std::vector<float>& at, float progress)
 {
     if (at.empty())
         return -1;
     const float p = std::isfinite(progress) ? std::clamp(progress, 0.0f, 1.0f) : 0.0f;
-    // The tile whose clock reading is nearest p; a tie goes to the later tile (the
-    // half-up rounding convoy_head_index applies on an even clock).
+    // An arrived convoy stands on the destination, always. The clock's tail can
+    // clamp to 1 a tile or more early (float rounding in lane_clock's running sum),
+    // and lower_bound would then answer the FIRST tile reading 1 — leaving the
+    // destination out of the last tick's sweep.
+    const int n = static_cast<int>(at.size());
+    if (p >= 1.0f)
+        return n - 1;
+    // The tile whose clock reading is nearest p. lower_bound finds i, the first
+    // tile reading >= p; p sits between at[i-1] and at[i], and an exact tie between
+    // those two goes to the later tile, i. Where several tiles share one reading (a
+    // hop of zero time), lower_bound lands on the first of them.
     const auto it = std::lower_bound(at.begin(), at.end(), p);
     if (it == at.end())
-        return static_cast<int>(at.size()) - 1;
+        return n - 1;
     const int i = static_cast<int>(it - at.begin());
     if (i == 0)
         return 0;

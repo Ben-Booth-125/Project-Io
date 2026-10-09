@@ -790,22 +790,87 @@ std::string run_sequence(const recipe_registry& reg)
         }
     }
 
-    // R17 — BL-1195: a convoy out of a MARKET-LESS body's pool (BL-1003: its
-    // `source_market` is the body) has a lane, built from its origin tile.
+    // R17 — BL-1195: a convoy out of a BODY-LEVEL pool (BL-1003) has a lane, built
+    // from the origin tile dispatch records, and runs through the real tick on it.
+    // Created by dispatch_convoys from a body-keyed pool (R16's fixture, the stock
+    // moved off the market pool onto the body key), then advanced and intercepted
+    // for real. commit_convoy stamps such a convoy's `source_market` null (no market
+    // sent it), so the origin tile is the only thing that places its lane.
     {
-        scenario s = make_world({20, 21}, 0, 8, {{19, 0}});
-        convoy_component c;
-        c.id            = s.w.allocate_convoy_id();
-        c.source_market = s.body; // the body-level pool key
-        c.dest_market   = s.dst_market;
-        c.origin_tile   = tile_at(s.w, s.body, 1, 2);
-        c.cargo_qty     = 5.0f;
-        c.speed         = 0.5f;
-        c.corp          = s.corp;
-        const convoy_route lane = convoy_route_tiles(s.w, c);
-        check(lane.body == s.body && !lane.tiles.empty() && lane.tiles.front() == c.origin_tile
-                  && lane.tiles.back() == s.dst_tile,
-              "R17 a body-level-pool convoy's lane runs from its origin tile to the destination");
+        const auto body_pool_fixture = [] {
+            scenario s = make_world({20, 21}, 0, 8, {{19, 0}}, /*stock=*/0.0f);
+            for (auto& [bid, b] : s.w.buildings)
+                if (b.type == building_type::extraction_site)
+                    b.tile = tile_at(s.w, s.body, 1, 2);
+            s.w.markets.at(s.dst_market).price[r_iron]  = 10.0f;
+            s.w.markets.at(s.dst_market).demand[r_iron] = 30.0f;
+            s.w.markets.at(s.dst_market).supply[r_iron] = 0.0f;
+            s.w.pool_at(s.corp, s.body).quantities[r_iron] = 100.0f; // the body-level key
+            return s;
+        };
+        const auto dispatch_body_pool = [&reg](scenario& sc) -> const convoy_component* {
+            dispatch_convoys(sc.w, reg, reg.logistics_cost(convoy_mode::land),
+                             reg.logistics_cost(convoy_mode::space));
+            for (const convoy_component& c : sc.w.convoys)
+                if (c.corp == sc.corp && sc.w.markets.count(c.source_market) == 0)
+                    return &c;
+            return nullptr;
+        };
+        // Tick until cut or arrived (<= 1000 ticks); the cut tile, or null.
+        const auto run_to_end = [](scenario& sc, bool& arrived) {
+            arrived = false;
+            for (int k = 0; k < 1000 && !sc.w.convoys.empty(); ++k)
+            {
+                advance_convoys(sc.w);
+                const std::vector<interception_record> cuts = intercept_convoys(sc.w, k);
+                if (!cuts.empty())
+                    return cuts.front().tile;
+                if (sc.w.convoys.front().arrived)
+                {
+                    arrived = true;
+                    return null_entity;
+                }
+            }
+            return null_entity;
+        };
+
+        scenario s = body_pool_fixture();
+        const convoy_component* cv = dispatch_body_pool(s);
+        check(cv != nullptr && cv->origin_tile != null_entity && s.w.convoys.size() == 1
+                  && cv->origin_tile == convoy_origin_tile(s.w, s.w.corporations.at(s.corp), s.body),
+              "R17.0 setup: dispatch_convoys sends a convoy out of the body-level pool, "
+              "recording its origin tile");
+        if (cv != nullptr)
+        {
+            const convoy_route lane = convoy_route_tiles(s.w, *cv);
+            const entity_id dest_centre = s.w.markets.at(cv->dest_market).centre_tile;
+            check(lane.body == s.body && lane.tiles.size() >= 3
+                      && lane.tiles.front() == cv->origin_tile && lane.tiles.back() == dest_centre,
+                  "R17.1 a body-level-pool convoy's lane runs from its origin tile to the "
+                  "destination");
+
+            // Unopposed, it runs the real tick to arrival.
+            bool arrived = false;
+            const entity_id none = run_to_end(s, arrived);
+            check(none == null_entity && arrived,
+                  "R17.2 unopposed, the body-level-pool convoy advances through the real tick "
+                  "and arrives");
+
+            // A hostile unit on a mid-lane tile cuts it there.
+            if (lane.tiles.size() >= 3)
+            {
+                const entity_id mid = lane.tiles[lane.tiles.size() / 2];
+                scenario s2 = body_pool_fixture();
+                const convoy_component* cv2 = dispatch_body_pool(s2);
+                add_raider(s2, mid);
+                bool arrived2 = false;
+                const entity_id cut = (cv2 != nullptr) ? run_to_end(s2, arrived2) : null_entity;
+                check(cut == mid && !arrived2 && s2.w.convoys.empty(),
+                      "R17.3 a hostile unit on its lane intercepts the body-level-pool convoy "
+                      "there, through advance_convoys/intercept_convoys");
+                trace << "R17:" << lane.tiles.size() << ':' << cut << ';';
+            }
+        }
     }
 
     return trace.str();
