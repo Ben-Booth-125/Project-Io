@@ -207,6 +207,15 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   `body_component::atmosphere`; in cold review): 83.2/65.5/15.5/73.2/98.7 (G1/t50/G1b/G2/G3);
   electrolysis 0 plants anywhere (home bodies have air); 102 unpriced-zeroed -> 0. src/core edits
   (app.cpp, agent_protocol.cpp, verify_api.cpp) NOT compiled by the lane — build at merge.
+  PROPELLANT review: logic sound; UI doors offer the wrong-air route (fix round sent: doors,
+  ACTIONS.json, remaining default paths, verify name); docs fixed 7ed47883 (anchor clause, pad =
+  body). Ben BACKLOGGED rival scorer/space programme draining pad fuel -> BL-1249.
+  **D5/D6 ROUND 2** (f807e048, a504062b, eff4e96f): at a504062b G1 87.8 PASS (OFF) / 87.5 (keep
+  second works ON: +120 running, +8% income), G1b 11.3. HEAD eff4e96f (default recipes unplaced)
+  REMOVES THE STEEL CHAIN on every seed — the unowned pre-authored Kepler installation
+  (hard_coded_world.cpp:2659) is the only steel seed. Handoff losses of steel/medical/water arise
+  in the settle, not generation. **Form to Ben:** exempt the authored plant / walk seeds chains /
+  accept; keep or cut second works. Do not merge eff4e96f until ruled.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
