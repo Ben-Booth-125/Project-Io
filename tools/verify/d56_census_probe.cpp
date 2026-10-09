@@ -134,6 +134,7 @@ int main(int argc, char** argv)
     std::vector<std::uint32_t> seeds = {46, 28, 11, 31, 40, 12, 37, 13, 41, 43, 32, 10, 25, 38, 9, 0};
     int ticks = 50;
     bool no_budget = false; // --no-budget: the stockpile budget refused (divisor -1), the legacy world
+    int  raw_seeds = 0;     // --raw N: tier_margin's raw make_hard_coded_world, seeds 0..N-1
     for (int i = 1; i < argc; ++i)
     {
         if (!std::strcmp(argv[i], "--seeds") && i + 1 < argc)
@@ -152,7 +153,49 @@ int main(int argc, char** argv)
         }
         else if (!std::strcmp(argv[i], "--ticks") && i + 1 < argc) ticks = std::atoi(argv[++i]);
         else if (!std::strcmp(argv[i], "--no-budget")) no_budget = true;
+        else if (!std::strcmp(argv[i], "--raw") && i + 1 < argc) raw_seeds = std::atoi(argv[++i]);
         else { std::fprintf(stderr, "usage: d56_census_probe [--seeds a,b] [--ticks N] [--no-budget]\n"); return 2; }
+    }
+    if (raw_seeds > 0)
+    {
+        // THE RAW HARNESS WORLD (tier_margin's sequence, verbatim): a bare
+        // make_hard_coded_world, the default pass, Pass 6, the default pass
+        // again. Reports what the default-recipe rule (BL-1217 D6) unplaces
+        // and whether any corporation — the player above all — is left with
+        // no holdings.
+        lua_state lua;
+        lua.load("scripts/recipes.lua");
+        lua.load("scripts/economy.lua");
+        lua.load("scripts/world_gen.lua");
+        recipe_registry reg;
+        reg.load_from_lua(lua);
+        world_gen_config gen_cfg;
+        gen_cfg.load_from_lua(lua);
+        int tot_first = 0, tot_second = 0, holdless = 0, player_holdless = 0, corps = 0, procs = 0;
+        for (int s = 0; s < raw_seeds; ++s)
+        {
+            world_params p = no_prehistory();
+            p.seed = static_cast<std::uint32_t>(s);
+            world w = make_hard_coded_world(p, nullptr, gen_cfg);
+            const int first = assign_default_recipes(w, reg);
+            generate_background_firms(w, reg, static_cast<std::uint32_t>(s) ^ 0x8A21F00Du);
+            const int second = assign_default_recipes(w, reg);
+            int h = 0, ph = 0, np = 0;
+            for (const auto& [cid, cc] : w.corporations)
+            {
+                if (cc.assets.empty()) { ++h; if (cc.is_player) ++ph; }
+            }
+            for (const auto& [bid, b] : w.buildings)
+                if (b.type == building_type::processing_facility) ++np;
+            std::printf("raw seed %d: default pass unplaced %d then %d; corps %zu, holdless %d (player %d), "
+                        "processors %d\n", s, first, second, w.corporations.size(), h, ph, np);
+            tot_first += first; tot_second += second; holdless += h; player_holdless += ph;
+            corps += static_cast<int>(w.corporations.size()); procs += np;
+        }
+        std::printf("RAW over %d seeds: unplaced %d (first pass) + %d (second); corps %d, holdless %d "
+                    "(player %d); processors %d\n", raw_seeds, tot_first, tot_second, corps, holdless,
+                    player_holdless, procs);
+        return 0;
     }
     std::printf("d56_census_probe - BL-1217 D5/D6: processors by recipe, fuel/propellant, pads, specialists\n");
     reading PG, PH, PT;

@@ -3782,6 +3782,7 @@ struct unplace_tally
 {
     int unplaced = 0; ///< processors removed
     int holdless = 0; ///< corporations left with no seatable holding
+    int player_holdless = 0; ///< of which the player (`is_player`)
 };
 
 /// Unplace @p gone's processors (corp -> buildings) at world build and re-seat
@@ -3819,7 +3820,11 @@ unplace_tally unplace_and_reseat(world& w, const std::map<entity_id, std::vector
         corp.hq_building     = hq.building;
         corp.influence_range = hq.range;
         if (seatable.empty())
+        {
             ++out.holdless;
+            if (corp.is_player)
+                ++out.player_holdless;
+        }
         std::vector<std::pair<entity_id, entity_id>> moves; // (from key, to key)
         for (const auto& [key, pool] : w.corp_market_pools)
         {
@@ -4410,8 +4415,8 @@ int assign_default_recipes(world& w, const recipe_registry& reg, const char* sit
     const int removed = ut.unplaced + static_cast<int>(ownerless.size());
     if (removed > 0 && site != nullptr)
         std::printf("[assign_default_recipes] %s: %d processors unplaced (default output unwanted; "
-                    "%d corps left holdless), %d given the default\n",
-                    site, removed, ut.holdless, given);
+                    "%d corps left holdless, the player %s), %d given the default\n",
+                    site, removed, ut.holdless, ut.player_holdless > 0 ? "AMONG THEM" : "not", given);
     return removed;
 }
 
