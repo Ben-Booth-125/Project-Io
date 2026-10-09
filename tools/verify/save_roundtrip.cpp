@@ -1079,8 +1079,12 @@ int main()
         cv.cargo_resource = resource_type::ordnance; cv.cargo_qty = 12.5f;
         cv.progress = 0.375f; cv.speed = 2.25f; cv.corp = c1; cv.arrived = false;
         cv.id = 9; cv.held = true; cv.cost_paid = 44.5f;
+        cv.origin_tile = 301; cv.port_a = 302; cv.port_b = 303; // BL-1195 (v42)
         f.convoys.push_back(cv);
         cv.mode = convoy_mode::space; cv.id = 10; cv.held = false; cv.arrived = true;
+        // Distinct from convoy 0's, and port_a left null while port_b is set, so a
+        // reader that swapped or dropped a field breaks the by-hand check below.
+        cv.origin_tile = 401; cv.port_a = null_entity; cv.port_b = 403;
         f.convoys.push_back(cv);
 
         f.trade_routes.push_back({ b1, b2, c1, 1234, 7 });
@@ -1147,8 +1151,12 @@ int main()
             // on both sides.
             check(back.convoys.size() == 2 && back.convoys[0].mode == convoy_mode::sea
                       && back.convoys[0].held && back.convoys[0].cargo_qty == 12.5f
-                      && back.convoys[1].arrived && back.convoys[1].mode == convoy_mode::space,
-                  "P8 convoy fields land in the right members");
+                      && back.convoys[1].arrived && back.convoys[1].mode == convoy_mode::space
+                      && back.convoys[0].origin_tile == 301 && back.convoys[0].port_a == 302
+                      && back.convoys[0].port_b == 303 && back.convoys[1].port_a == null_entity
+                      && back.convoys[1].origin_tile == 401
+                      && back.convoys[1].port_b == 403,
+                  "P8 convoy fields land in the right members (BL-1195: the route's waypoints)");
             check(back.body_last_glimpse_tick.at(b2) == -3,
                   "P8 a negative glimpse tick survives (no unsigned round trip)");
             check(back.buy_orders.size() == 1 && back.buy_orders[0].preferred_seller == c1

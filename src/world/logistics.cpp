@@ -1364,39 +1364,193 @@ int convoy_travel_ticks(const world& w, entity_id body, const logistics_path& pa
 // Convoy position (BL-458)
 // ---------------------------------------------------------------------------
 
+namespace {
+
+/// One leg of a convoy's lane while it is being laid: where its tiles start in the
+/// lane (the join tile it shares with the leg before) and the days it takes.
+struct lane_leg
+{
+    std::size_t first = 0;
+    float       days  = 0.0f;
+};
+
+/// Append one leg's tiles to @p out, oriented `from` -> `to`. The leg cache stores
+/// its sequence lo->hi like intra_body_path (the ORIENTATION RULE below), so the
+/// flip is owed here too. A tile shared with the previous leg's last (the port the
+/// two legs meet at) is written once. Records the leg's start and its travel days
+/// (leg_travel_days on the leg's own path cost, at @p mode's speed — the figure the
+/// haul was priced and timed on). False when the leg has no path.
+bool append_leg(world& w, entity_id body, entity_id from, entity_id to, leg_domain domain,
+                convoy_mode mode, std::vector<entity_id>& out, std::vector<lane_leg>& legs)
+{
+    const logistics_path& lp = intra_body_leg_path(w, body, from, to, domain);
+    if (!lp.reachable || lp.tiles.empty())
+        return false;
+    std::vector<entity_id> seq = lp.tiles; // copied: the cache entry stays canonical lo->hi
+    if (from != std::min(from, to))
+        std::reverse(seq.begin(), seq.end());
+    std::size_t k = 0;
+    if (!out.empty() && out.back() == seq.front())
+        k = 1;
+    lane_leg leg;
+    leg.first = (k == 1) ? out.size() - 1 : out.size();
+    leg.days  = leg_travel_days(w, body, lp.cost, mode);
+    out.insert(out.end(), seq.begin() + static_cast<std::ptrdiff_t>(k), seq.end());
+    legs.push_back(leg);
+    return true;
+}
+
+/// THE CLOCK ALONG THE LANE (BL-1195). `at[i]` is the fraction of the whole journey's
+/// time spent when the cargo reaches tile i: 0 at the origin, 1 at the destination.
+/// Each leg takes its own days (caravan overland, coastal by sea — roughly five times
+/// faster), and within a leg the days split over its hops in proportion to each hop's
+/// node-mean traversal weight, the same weight the leg's path cost sums. So a convoy's
+/// progress (the fraction of its travel ticks elapsed) maps to the tile the cargo is
+/// actually on. With no physical scale on the body (no days at all) the tiles are
+/// spaced evenly, which is what every reader did before.
+std::vector<float> lane_clock(const world& w, const std::vector<entity_id>& tiles,
+                              const std::vector<lane_leg>& legs)
+{
+    const std::size_t n = tiles.size();
+    std::vector<float> at(n, 0.0f);
+    if (n < 2)
+        return at;
+
+    const auto weight = [&](entity_id t) {
+        const auto it = w.tiles.find(t);
+        return it != w.tiles.end() ? tile_traversal_cost(it->second) : 1.0f;
+    };
+
+    std::vector<float> hop(n - 1, 0.0f); // days spent on hop i -> i+1
+    float total = 0.0f;
+    for (std::size_t l = 0; l < legs.size(); ++l)
+    {
+        const std::size_t a = legs[l].first;
+        const std::size_t b = (l + 1 < legs.size()) ? legs[l + 1].first : n - 1;
+        if (b <= a || !(legs[l].days > 0.0f) || !std::isfinite(legs[l].days))
+            continue;
+        float sum = 0.0f;
+        for (std::size_t i = a; i < b; ++i)
+            sum += 0.5f * (weight(tiles[i]) + weight(tiles[i + 1]));
+        for (std::size_t i = a; i < b; ++i)
+        {
+            const float share = (sum > 0.0f)
+                                    ? 0.5f * (weight(tiles[i]) + weight(tiles[i + 1])) / sum
+                                    : 1.0f / static_cast<float>(b - a);
+            hop[i] = legs[l].days * share;
+        }
+        total += legs[l].days;
+    }
+
+    if (!(total > 0.0f) || !std::isfinite(total))
+    {
+        for (std::size_t i = 0; i < n; ++i)
+            at[i] = static_cast<float>(i) / static_cast<float>(n - 1);
+        return at;
+    }
+    float run = 0.0f;
+    for (std::size_t i = 1; i < n; ++i)
+    {
+        run += hop[i - 1];
+        at[i] = std::min(run / total, 1.0f);
+    }
+    at[n - 1] = 1.0f;
+    return at;
+}
+
+} // namespace
+
 convoy_route convoy_route_tiles(world& w, const convoy_component& cv)
 {
     convoy_route route;
 
-    const auto sm = w.markets.find(cv.source_market);
     const auto dm = w.markets.find(cv.dest_market);
-    if (sm == w.markets.end() || dm == w.markets.end())
-        return route; // unresolved endpoint — no lane to stand on
-    if (sm->second.body == null_entity || sm->second.body != dm->second.body)
+    if (dm == w.markets.end())
+        return route; // unresolved destination — no lane to stand on
+
+    // The source's body. A market source carries its own; a convoy out of a
+    // MARKET-LESS body's pool (BL-1003: `source_market` is then the body, not a
+    // market) takes it from the origin tile recorded at dispatch (BL-1195), so it
+    // has a lane like any other.
+    const auto sm = w.markets.find(cv.source_market);
+    entity_id src_body = null_entity;
+    if (sm != w.markets.end())
+        src_body = sm->second.body;
+    else if (cv.origin_tile != null_entity)
+    {
+        const auto ot = w.tiles.find(cv.origin_tile);
+        if (ot != w.tiles.end())
+            src_body = ot->second.body;
+    }
+    if (src_body == null_entity || src_body != dm->second.body)
         return route; // inter-body leg: in transit between bodies, on no tile
 
-    const entity_id body = sm->second.body;
-    const entity_id st   = sm->second.centre_tile;
-    const entity_id dt   = dm->second.centre_tile;
+    const entity_id body = src_body;
+    // BL-1195: the lane starts where the haul was priced from — the dispatch's
+    // origin tile — and falls back to the source centre for a convoy that never
+    // passed the dispatch seam (one built by hand, which records no route).
+    const entity_id st = (cv.origin_tile != null_entity)
+                             ? cv.origin_tile
+                             : (sm != w.markets.end() ? sm->second.centre_tile : null_entity);
+    const entity_id dt = dm->second.centre_tile;
     if (st == null_entity || dt == null_entity)
         return route; // an unanchored market has no centre to route from/to
 
-    const logistics_path& lp = intra_body_path(w, body, st, dt);
-    if (!lp.reachable || lp.tiles.empty())
-        return route;
+    std::vector<entity_id> tiles;
+    std::vector<lane_leg>  legs;
+
+    // BL-1195 (SUPPLY.md § Logistical cost): THE LANE IS THE LEGS. A route that
+    // crossed water was priced land -> port -> sea -> port -> land (BL-1186), so its
+    // lane is those three legs end to end, through the two Ports recorded at
+    // dispatch. Reading the direct centre-to-centre path instead put the head, the
+    // vision beam, interdiction and capture on ground the cargo never crosses. The
+    // Ports are fixed at dispatch; each leg's path is read from the network as it
+    // stands now.
+    if (cv.port_a != null_entity && cv.port_b != null_entity)
+    {
+        if (!append_leg(w, body, st, cv.port_a, leg_domain::land, convoy_mode::land, tiles, legs)
+            || !append_leg(w, body, cv.port_a, cv.port_b, leg_domain::sea, convoy_mode::sea,
+                           tiles, legs)
+            || !append_leg(w, body, cv.port_b, dt, leg_domain::land, convoy_mode::land, tiles,
+                           legs))
+            return route; // a leg the dispatch walked no longer exists: no lane
+    }
+    else
+    {
+        // One overland leg, chosen exactly as route_intra_body chose it: the
+        // unconfined cheapest path while it stays on land, else the cheapest
+        // LAND-ONLY path (a pair whose cheapest path crosses water but which has a
+        // road round).
+        const logistics_path& lp = intra_body_path(w, body, st, dt);
+        if (!lp.reachable || lp.tiles.empty())
+            return route;
+        bool laid = false;
+        if (lp.crosses_ocean)
+            laid = append_leg(w, body, st, dt, leg_domain::land, convoy_mode::land, tiles, legs);
+        // No overland road: only a convoy built outside the dispatch seam reaches
+        // here (the router refuses such a pair a land route). It keeps the direct
+        // path, the one lane it can be given.
+        if (!laid)
+        {
+            tiles = lp.tiles; // copied: the cache entry stays canonical lo->hi
+            // THE ORIENTATION RULE (BL-458). intra_body_path stores its sequence
+            // lo->hi under its ordered (src, dst) key (BL-1126), so the cached order
+            // is source->destination only when the source tile is the lower id. Flip
+            // it when it is not. Skipping this puts a convoy's head at the far end of
+            // its own lane about half the time, and the vision beam renders
+            // identically either way, so nothing on screen would report it.
+            if (st != std::min(st, dt))
+                std::reverse(tiles.begin(), tiles.end());
+            legs.clear();
+            legs.push_back({0, leg_travel_days(w, body, lp.cost, cv.mode == convoy_mode::sea
+                                                                     ? convoy_mode::sea
+                                                                     : convoy_mode::land)});
+        }
+    }
 
     route.body  = body;
-    route.tiles = lp.tiles; // copied: the cache entry stays canonical lo->hi
-
-    // THE ORIENTATION RULE (BL-458). intra_body_path stores its sequence lo->hi
-    // under its ordered (src, dst) key (BL-1126), so the cached order is
-    // source->destination only when the source tile is the lower id. Flip it
-    // when it is not. Skipping this puts a convoy's head at
-    // the far end of its own lane about half the time, and the vision beam
-    // renders identically either way, so nothing on screen would report it.
-    if (st != std::min(st, dt))
-        std::reverse(route.tiles.begin(), route.tiles.end());
-
+    route.at    = lane_clock(w, tiles, legs);
+    route.tiles = std::move(tiles);
     return route;
 }
 
@@ -1409,10 +1563,28 @@ int convoy_head_index(std::size_t tile_count, float progress)
     return std::clamp(static_cast<int>(std::lround(p * static_cast<float>(n - 1))), 0, n - 1);
 }
 
+int convoy_lane_index(const std::vector<float>& at, float progress)
+{
+    if (at.empty())
+        return -1;
+    const float p = std::isfinite(progress) ? std::clamp(progress, 0.0f, 1.0f) : 0.0f;
+    // The tile whose clock reading is nearest p; a tie goes to the later tile (the
+    // half-up rounding convoy_head_index applies on an even clock).
+    const auto it = std::lower_bound(at.begin(), at.end(), p);
+    if (it == at.end())
+        return static_cast<int>(at.size()) - 1;
+    const int i = static_cast<int>(it - at.begin());
+    if (i == 0)
+        return 0;
+    const float up   = at[static_cast<std::size_t>(i)] - p;
+    const float down = p - at[static_cast<std::size_t>(i - 1)];
+    return (up <= down) ? i : i - 1;
+}
+
 entity_id convoy_tile_at(world& w, const convoy_component& cv)
 {
     const convoy_route route = convoy_route_tiles(w, cv);
-    const int head = convoy_head_index(route.tiles.size(), cv.progress);
+    const int head = convoy_lane_index(route.at, cv.progress);
     if (head < 0)
         return null_entity;
     return route.tiles[static_cast<std::size_t>(head)];
