@@ -255,6 +255,48 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   per seed-tick. Running at handoff ~unchanged vs wave-2b start (2393 -> 2391); built fell 3351 ->
   2732. Rivals DO build processors in play on real seeds (built 2732 -> 4384 by t50), so ai_skill
   R5's zero is the legacy harness world only. Next: Ben on G1b; Build-door live click owed.
+  **BEN (2026-10-09, sprint 50 form):** diagnose G1b now, extend the sprint; START WAVE 3 NOW.
+  Lanes: G1b diagnosis (probe, baseline = its merged tip); BL-1195 convoy lane follows legs
+  (build); BL-1119 R7 cold review of 8b921ee6. BL-1119 R4 (quiet Release gen_step_costs 16 seeds)
+  waits for a quiet machine; R6 haulage reading after.
+  **BL-1119 R7 DONE (review of 8b921ee6, an ancestor):** direction logic correct and deterministic,
+  BUT reused floods price routes on a STALE road field (caches never cleared mid-pass), against
+  LOGISTICS § 4 "priced on the field as it stands"; round 4's 10x history speed-up IS that reuse
+  (history corridors into different hubs no longer reuse each other's roads -> parallel roads;
+  spurs read town fields from before the backbone; border probes compare mixed vintages). Also:
+  R2's result_metric is stale (row demoted to control; assertion moved to R2s-b, BL-1159) — fix the
+  text after running the harness; spur pass = one whole-body flood per target (~569 on seed 0,
+  ~200 MB peak) — BL-1077's bounded per-village search fixes cost and staleness for spurs;
+  detour test mixes link directions (small); stamp_history_roads early returns leave stats unset.
+  **Form to Ben:** measure parallel roads first / rule stale ok / reshape to price on today's field.
+  **BEN: MEASURE FIRST.** Lane running: probe switch clears caches after every stamp (FRESH) vs
+  shipped (STALE), 16 seeds — road tiles by pass, parallel-road count, routes changed, border
+  winners changed, loaded pass time, road_generation_harness R2s-b.
+  **G1b DIAGNOSED, probe merged eac0c3e4** (baseline 6ecdd441): 308/314 have the input in reach —
+  they starve on QUANTITY. Classes: (c) outbid/rationed 174 (households 75, 55 of them strategic
+  switches onto consumer_goods; background 63; pro-rata 36 healthy); (e) haul elsewhere never
+  arrives 48 (25 surplus not shipped — one-destination-per-pass / passive LP cap; 23 consumed at
+  source); (g) 52 (25 held in another pool — 18 cargo landing after the draw; 27 short supply);
+  (d) ceiling-silenced with stock 32 (price flips across the ceiling); (a) no producer 6 (switch
+  passed a STOCK test on the opening shelf); (f) 2. 144 decommissioned: reflex 69, strategic idle 75.
+  Fix families: switch uses the SUPPLY test (AI_OPPONENT, grant check); input_reach counts household
+  + background draws (AI scorer input — grant); background draws after processors (MARKETS,
+  re-rules "the cost, accepted"); ceiling hysteresis (MARKETS/FINANCE); dispatcher holds cargo it
+  would send + cargo lists after the draw (SUPPLY). Counterfactuals: pull off 9.6%; ceiling off
+  14.9% (worse); opening-stock release no change. Others untested. **Form to Ben.**
+  **BEN RULED (5fde6f22):** every recipe switch (chase + rescue) judged on supply; NEW GRANT spare
+  supply net of household + background draws (§ 11; generation sized rule too); background pull
+  leaves one tick of processor want (MARKETS re-rule). NOT chosen: ceiling damping, haul fixes.
+  Lanes: R1+R2 (switch + spare) and R3 (background order), each measured alone.
+  **BL-1195 DONE** (4963c356; cold review running): lane = priced legs; convoy gains origin_tile/
+  port_a/port_b (SAVE v42 — ledger row says 43, lane's edit refused: Ben to see); gate unchanged;
+  pre-existing fails convoy_command R4.2/4.4/4.5, supply_advance 4, LP-trim 1 (same on base).
+  Live look at a sea-route convoy owed. Save stack now: v39 D5, v40 D3, v41 PROPELLANT, v42 BL-1195;
+  the G1b lanes may claim more — reconcile at merge.
+  BL-1195 review: lane correct, merge clean; BUT interdiction samples one head tile per tick (T=1-3
+  for most hauls, so inland-leg units rarely intercept) and the head is spread evenly by tiles
+  across legs of ~5x different speed. Fix round sent (swept interdiction, time-weighted head,
+  real-tick rows, origin-tile row, body-pool lanes, doc honesty, P8 convoy 1).
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).

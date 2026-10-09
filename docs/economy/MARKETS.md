@@ -221,8 +221,14 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
      split by catchment: input-starved processors per reading fell 47.0 → 35.0 and the share starved
      beside a stocked shelf priced over the ceiling 51% → 25%; processors running at handoff moved
      54.7% → 55.4%, run-rate income 54.4% → 52.3%, firm survival 88.9% → 88.7%. **The cost,
-     accepted:** a shelf the pull drains is a shelf a real processor cannot draw next tick. Tunables in
-     `scripts/economy.lua` § `background_demand` (`consumes`).
+     accepted:** a shelf the pull drains is a shelf a real processor cannot draw next tick.
+     **Re-ruled — the pull draws after the processors (Ben, 2026-10-09; BL-1217, G1b):** the
+     background basket leaves on the shelf one tick of the market's processor want for that good,
+     and draws only what is left above it. The pull still consumes; it no longer takes the input a
+     standing processor came for. Measured before the ruling: the pull took 871 of 943 units a tick
+     on the markets where 63 processors starved beside it, and turning the pull off whole moved the
+     input-starved share 11.5% → 9.6%. Tunables in `scripts/economy.lua` § `background_demand`
+     (`consumes`).
 4. **Auto-surplus** — each `(corp, market)` pool lists everything above its **processor
    reservation** (the inputs its own processors need for a full run next tick) for sale. A
    resource under a standing sell order is exempted — the order governs, and by default the order
