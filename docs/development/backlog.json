@@ -1584,6 +1584,31 @@
     "src/core/ground_layer.cpp"
    ],
    "design": "SETTLED: TECH_FOUNDATIONS.md § Target hardware. WORK: a check (a non-verify timing mode of the app, since --verify bakes synchronously and would measure the wrong thing) that reports, on the machine it runs on: the home-body pre-bake time added to generation (budget 15 s); whether any zoom or pan step on the home body shows a stand-in (budget none); time until a first visit to another body is sharp under the view (budget 2 s); frame time at every rung (budget 16.7 ms); time from a building placed to its ground re-baked (budget 1 s). Prints PASS/FAIL per budget with the number. Wrapped as a skill only with Ben's permission (CLAUDE.md § Tool creation is skill creation)."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 51,
+   "written": "2026-10-09",
+   "requires": [
+    "BL-1246"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "priority": "S",
+   "difficulty": 3,
+   "id": "BL-1250",
+   "short_name": "LENS_WASHES_GROUND",
+   "author": "Ben (2026-10-09: build lens over the bake now, NR-1003)",
+   "title": "Every lens washes the rendered ground: structures, settlements, landforms and rivers stay visible under a lens",
+   "authority_doc": "docs/ui/LENSES.md",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/presentation.hpp",
+    "scripts/verify/lens_modes.lua"
+   ],
+   "design": "SETTLED: LENSES.md § A lens washes the rendered ground; RENDERING.md § Installations (under a lens a structure is ground). WORK: under every lens draw the baked ground (the master level) exactly as the plain canvas does, then each lens's per-tile colour as a translucent wash in the identical geometry; a tile the lens has no answer for takes no wash; one tuned wash strength per lens family (categorical, sequential), set by eye with Ben; the owner lenses' picked identity wash, unpicked owned-grey wash and dark rim; lens marks stay vector chrome above. Vector per-tile fills only before a body's ground exists. Hit-testing unchanged. Verify: lens_modes.lua captures every lens over a built region; LIVE look with Ben. Starts after the 60 fps lane merges (same tile-loop code)."
   }
  ]
 }

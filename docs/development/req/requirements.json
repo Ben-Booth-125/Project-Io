@@ -7201,6 +7201,52 @@
      "result_metric": ""
     }
    ]
+  },
+  {
+   "brief": "lens-washes-ground",
+   "title": "BL-1250 - Every lens washes the rendered ground",
+   "difficulty": 3,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1250 - sprint 51 (Ben, 2026-10-09, NR-1003)",
+   "batch": "sprint-51",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "visual: lens_modes.lua over a built region, every lens"
+     ],
+     "requirement": "Under every lens the baked ground draws with its structures, settlements, landforms and rivers, and the lens colours tiles as a translucent wash in the same geometry; unanswered tiles take no wash.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "visual: owner_multi_select.lua",
+      "live click: Ben picks owners and sees their buildings"
+     ],
+     "requirement": "The owner lenses: picked identity wash, unpicked grey wash plus rim; buildings visible through both.",
+     "notes": "",
+     "result_metric": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "visual: lens press checks still pass",
+      "headless: frame time under a lens at every rung"
+     ],
+     "requirement": "Hit-testing under a lens unchanged; 60 fps at every rung under a lens; the world untouched.",
+     "notes": "",
+     "result_metric": ""
+    }
+   ]
   }
  ]
 }
