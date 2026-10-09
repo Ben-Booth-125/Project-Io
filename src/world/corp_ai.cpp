@@ -1942,8 +1942,25 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             if (bit == w.buildings.end())
                 continue;
             const building_component& b = bit->second;
-            if (b.ticks_remaining > 0 || b.ai_cooldown > 0)
+            if (b.ticks_remaining > 0)
                 continue;
+            // BL-1235 (dial hold outlasts reflex): the hold on a plant the dial
+            // zeroed ends the moment that plant's own forecast recovers — the
+            // solver, asked exactly as the dial candidate below asks it, would
+            // staff it above zero — so it is dialled again on this evaluation,
+            // not after the fixed hold (AI_OPPONENT.md, "A plant the dial idled
+            // is not losing"). Evaluated only for zeroed plants under hold; the
+            // answer is reused by the dial candidate so the two cannot disagree.
+            float     held_gain     = 0.0f;
+            int       held_proposed = -1;
+            if (b.ai_cooldown > 0)
+            {
+                if (!dial_idled(b))
+                    continue;
+                held_proposed = solve_workforce_target(w, reg, b, 1.0f, /*stack_rank=*/1, &held_gain);
+                if (held_proposed <= 0)
+                    continue;
+            }
 
             const building_profit bp = estimate_building_profit(w, reg, report, bid);
             const float incumbent    = bp.has_data ? std::fabs(bp.net()) : 1.0f;
@@ -2101,8 +2118,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 // profitable building's target and CUTTING a loss-maker's — the
                 // interior optimum the solver exists to find scored negative in both
                 // directions and was discarded.
-                float     gain     = 0.0f;
-                const int proposed = solve_workforce_target(w, reg, b, 1.0f, /*stack_rank=*/1, &gain);
+                float     gain     = held_gain;
+                const int proposed = (held_proposed >= 0)
+                    ? held_proposed
+                    : solve_workforce_target(w, reg, b, 1.0f, /*stack_rank=*/1, &gain);
                 if (proposed != b.workforce_target && bp.has_data)
                 {
                     if (gain > margin_gate)
@@ -2118,6 +2137,11 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     }
                 }
             }
+
+            // BL-1235: a recovered forecast lifts the hold for the dial only; the
+            // building's other levers keep the fixed hold.
+            if (held_proposed >= 0)
+                continue;
 
             // Recipe margin-chase (generalises the tier-0 floored-output rescue).
             // BL-430 DECISION: `gain` below is not offset by economy.recipe_switch's

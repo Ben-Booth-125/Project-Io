@@ -52,6 +52,18 @@ measured alone on the market-viability skill. G1 70% stays.
 - [x] S3 BL-1229 (steel stays home): merged f785d832 - order is a floor, not a hold. Steel-starved 249 -> 163; G1 flat.
 - [x] B BL-1226 merged (split, razed; electronics kept - NR-981); D ON; 16 seeds G1 54.7 -> 55.4, G2 54.4 -> 52.3, G3 88.9 -> 88.7, starved 47.0 -> 35.0. The 5-seed 65.2 was electronics removal moving generation.
 
+### Wave 2b — G1 plants running (BL-1217; IDLE16 rounds 1-4, Ben's round 5 form 2026-10-09)
+
+Targets G1 >= 85% at handoff AND at t50, G1b <= 5%; sprint extends. Rulings in bb09107e.
+- [ ] D1 DIALHOLD: BL-1235 (dial hold outlasts reflex) - lane running.
+- [ ] D2 PROPELLANT: base price from inputs (RESOURCES) - lane running.
+- [ ] D3 Dial reads the composite bid (new grant, AI_OPPONENT 11) + forecasts at base where no fact exists. After D1 merges (same function).
+- [ ] D4 Rescue reads an unpriced output as floored (AI_OPPONENT, reflex tier). With D3.
+- [ ] D5 Opening stock held, not listed, until the market bids (CORPORATION_GENERATION Pass 4b).
+- [ ] D6 No processor placed beyond its output's want - trace the ~34 refined-fuel plants per seed first.
+- [ ] D7 Diagnose t50 mid-chain starvation (408 of 665 lost; steel the top input) - probe only, in parallel.
+- [ ] D8 16-seed gate after D1-D6 merge; G1 at handoff and t50.
+
 ### Close — the doc check (Ben, 2026-10-08: "make sure all the various decisions are documented")
 
 Run once every lane has merged, before the re-bless. For each ruling below: (1) it is written in
@@ -75,6 +87,12 @@ asserts the overturned claim — grep the OLD wording across docs/ (the same-day
 - [ ] Grant: a rival reads its own refused processor as a bid for its own mine (AI_OPPONENT.md § 11)
 - [ ] A new processor is judged on supply, not stock (AI_OPPONENT.md, processing-facility candidate)
 - [ ] Targets: G1 >= 85%, G1b <= 5% (market-viability SKILL.md; BL-1217; sprint row)
+- [ ] G1 >= 85% at tick 50 too (market-viability SKILL.md; sprint row)
+- [ ] Propellant priced from its inputs (RESOURCES.md, PRODUCTION.md "What is exempt")
+- [ ] A dial-idled plant is not losing; the hold ends on recovery (AI_OPPONENT.md; BL-1235)
+- [ ] Grant: the dial reads the build bid (AI_OPPONENT.md § 11; § 2B "dials" sentence)
+- [ ] The dial forecasts at base where no fact exists; rescue reads unpriced as floored (AI_OPPONENT.md)
+- [ ] Opening stock held until bid; no processor beyond its output's want (CORPORATION_GENERATION.md)
 - [ ] Road generation schema kept (no doc change; confirm nothing claims otherwise)
 - [ ] Quick Start; loading bars in a top band (STARTUP.md) — built and merged 7c39a626; Ben's live click passed 2026-10-08 ("Quick Start looks good")
 - [ ] Unmet want visible to the player in sprint 51 (BL-1222)

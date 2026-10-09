@@ -75,12 +75,54 @@
 //   handoff (cf503.state.*) -- for a counterfactual build of the same seeds.
 // The 2026-10-08 counterfactuals were measurement switches in src (env IO_CF),
 // not committed.
+//
+// ROUND 3 (silenced want as the dial's buyer signal). Each zeroing also records
+// `hauler_want` at the plant's market and demand + hauler_want summed over the
+// body: z503.dem0.sees_buyer_{own,body}_dw, and zall.t-11.<good>.* (demand vs
+// hauler_want at the zeroing markets on settle tick -11). With --ids-in, the
+// set's states are also counted at t50 (t50.cf503.state.*).
 //   input: limiting good, the L class (market_viability's processor block).
 //   every idle state also carries margin.{pos,neg,unpriced}: the recipe's unit
 //   margin (outputs - inputs per run, at its market's current prices) -- would
 //   running pay before wages.
 //   builder.{gen,settle,play}: present in the world as built / appeared during
 //   the settle (the scored tier, spectating) / appeared in play.
+//
+// ROUND 4 (who bids steel / refined_fuel / silicon / clean_water at the settle
+// start; food_rations is the control). Keys r4.<tick>.*, armed on settle ticks
+// -12 (the first: econ step 0, before any clear), -11 (the dial's big zeroing
+// tick: it reads tick -12's clear), -10, -9, -1, and play 1 and 50, all in the
+// handoff block:
+//   <point>.<good>.*   the market registers at three points: conv (pre-step),
+//                      dial (after the economy step -- what the workforce dial
+//                      read; no clear has run in between), clear (after
+//                      clear_markets): demand / household_bid / background_bid
+//                      / hauler_want / unposted_bid / shelf / supply > 0, and
+//                      markets whose posted price is over the fair-price ceiling.
+//   cons.<good>.<cls>  every processor whose recipe consumes the good, classed
+//                      by run_processing's want rule (economy_system.cpp): unbuilt
+//                      | decom | target0 | supply0 | nolab | pool_covers (its
+//                      owner's pool holds the full-run need, so the want net of
+//                      the pool is 0 and it bids nothing; cover_ticks buckets the
+//                      pool / need) | ceiling (the want goes to hauler_want) |
+//                      bids. cons_recipe on tick -11 only.
+//   site.<good>.*      construction sites whose material row names the good.
+//   report.<good>.*    the tick report's wants / hauler_wants / upkeep_wants;
+//                      upkeep_bldgs, units_drawing, buy_orders, producers(_run).
+//   r4.static.*        consumer recipes, band admission, built counts, basket
+//                      weights (household, background, unit upkeep).
+//   r4.z-11.<good>.<cls>.*  tick -11's zeroed producers of the good, joined to
+//                      the register after that tick's clear (own market / body
+//                      only / off-body only / none).
+//   r4.switch.<settle|play>.<from>.to.<to>  every recipe_switch agency event.
+//   z503.dem0.good_hh.<good>.mkt_{has,no}_households: is the zeroed plant's
+//                      market one no population centre clears at (household
+//                      and background bids land only where a centre does);
+//                      z503.dem0.good_tick: the tick of that zeroing.
+// And, in the t50 block, decay.*: every processor running at the handoff,
+// classed at tick 50 (still_run | starved.<input> | decom.<by>.<why> | nolab |
+// unsup.{dial_target0, supply0, target0_other} | other), with decay_top.* and
+// decay_recipe.* rollups.
 //
 // Usage: build_gen/verify/handoff_idle_probe.exe [--seeds a,b] [--ticks N] [--examples N]
 // Build:  ./tools/verify/build_lua_harness.sh handoff_idle_probe
@@ -241,6 +283,8 @@ struct zero_rec
     int   buyers_body = 0, buyers_off = 0; ///< other markets bidding the good (this body / others)
     int   best_cls = -1;         ///< best export_refusal pair class own market -> a buyer market
     float held = 0;              ///< supply listed by standing sell orders whose floor is over the price
+    float hw_own = 0;            ///< round 3: hauler_want (silenced processor/construction want) at the plant's market
+    float dw_body = 0;           ///< round 3: demand + hauler_want summed over the markets on the plant's body
     int   prev_target = 0;
 };
 
@@ -370,6 +414,9 @@ zero_rec make_zero_rec(world& w, const recipe_registry& reg, entity_id bid, cons
     z.replica_zero = sv.best == 0;
     z.margin_base_pos = sv.rev_base > sv.in;
     z.held = held_listing(w, reg, mid, g);
+    z.hw_own = m.hauler_want[g];
+    for (const auto& [om, omc] : w.markets)
+        if (omc.body == m.body) z.dw_body += omc.demand[g] + omc.hauler_want[g];
     if (!(m.base_price[g] > 0.0f)) z.cls = "unpriced_output";
     else if (!(m.demand[g] > 0.0f)) z.cls = "demand0";
     else if (!(sv.rev_base > sv.in)) z.cls = "inputs_dear";
@@ -405,7 +452,9 @@ struct probe
     std::map<entity_id, zero_rec>* zeros = nullptr;  ///< the last zeroing per processor
     std::vector<zero_rec>* events = nullptr;          ///< every zeroing
     const recipe_registry* reg = nullptr;
-    int lap_pre = -1, lap_econ = -1;
+    int lap_pre = -1, lap_econ = -1, lap_clear = -1;
+    void* r4 = nullptr;                                   ///< round 4 state (r4_state)
+    void (*r4_hook)(const world&, int lap, void* r4) = nullptr;
     bool l_armed = false;
     std::map<entity_id, market_px> px;              ///< at the economy lap, every tick
     std::map<entity_id, proc_snap> snap;            ///< L: pre-step
@@ -530,6 +579,7 @@ void lg_econ_lap(const world& cw, probe& p)
 void after_lap(const world& w, int lap, void* ctx)
 {
     probe& p = *static_cast<probe*>(ctx);
+    if (p.r4_hook) p.r4_hook(w, lap, p.r4);
     if (p.l_armed && lap == p.lap_pre) { lg_snapshot(w, p); snapshot_pool_status(w, *p.reg, p); return; }
     if (lap != p.lap_econ) return;
     p.px.clear();
@@ -904,6 +954,17 @@ void census(world& w, const recipe_registry& reg, const economy_report& rep, con
     {
         if (z.tick >= 0) continue; // settle events only
         c.add("zall.n");
+        if (z.tick == -11 && z.g < resource_count)
+        {
+            // round 3 hypothesis: on tick -11, is the zeroing market's want silenced?
+            const std::string k = "zall.t-11." + gname(z.g) + ".";
+            c.add(k + "n");
+            c.add(k + "demand_pos", z.demand > 0.0f ? 1 : 0);
+            c.add(k + "hw_pos", z.hw_own > 0.0f ? 1 : 0);
+            c.add(k + "demand_sum_x10", static_cast<long>(10.0f * z.demand));
+            c.add(k + "hw_sum_x10", static_cast<long>(10.0f * z.hw_own));
+            c.add(k + "body_dw_pos", z.dw_body > 0.0f ? 1 : 0);
+        }
         c.add("zall.cls." + z.cls);
         c.add(std::string("zall.solver_zero.") + (z.solver_zero ? "1" : "0"));
         c.add(std::string("zall.replica_agree.") + (z.solver_zero == z.replica_zero ? "1" : "0"));
@@ -952,13 +1013,272 @@ void census(world& w, const recipe_registry& reg, const economy_report& rep, con
         else
         {
             c.add(std::string("z503.dem0.margin_base_pos.") + (z.margin_base_pos ? "1" : "0"));
+            c.add(std::string("z503.dem0.sees_buyer_own_dw.") + (z.hw_own > 0.0f ? "yes" : "no"));
+            c.add(std::string("z503.dem0.sees_buyer_body_dw.") + (z.dw_body > 0.0f ? "yes" : "no"));
             c.add(std::string("z503.dem0.buyers_body.") + (z.buyers_body > 0 ? "yes" : "none")
                   + (z.buyers_off > 0 ? "+offbody" : ""));
             c.add(std::string("z503.dem0.best_pair.") + pair_cls_name(z.best_cls));
             c.add("z503.dem0.recipe." + rn + "." + pair_cls_name(z.best_cls));
             const market_component& m = w.markets.at(z.m);
             c.add(std::string("z503.dem0.handoff_demand.") + (m.demand[z.g] > 0.0f ? "pos" : "zero"));
+            // round 4: is the plant on a market no population centre clears at
+            // (household / background bids land only where a centre does)?
+            bool hh = false;
+            for (std::size_t r = 0; r < resource_count && !hh; ++r) hh = m.household_bid[r] > 0.0f;
+            c.add("z503.dem0.good_hh." + gname(z.g) + (hh ? ".mkt_has_households" : ".mkt_no_households"));
+            c.add("z503.dem0.good_tick." + gname(z.g) + "." + std::to_string(z.tick));
         }
+    }
+}
+
+// --- round 4: who bids steel / refined_fuel / silicon / clean_water ----------
+// Every channel that can put a good into `demand` (MARKETS.md § Demand
+// channels), read for the four goods the dial found no bidder for, plus
+// food_rations as the control. Pure reads; keys "r4.<tick>.<...>".
+struct r4_snap
+{
+    entity_id corp = null_entity, m = null_entity;
+    int   target = 0;
+    bool  build = false, decom = false;
+    float supply_scalar = 1.0f;
+    std::vector<float> pool;   ///< owner's pool at its market, per r4 good
+    std::vector<char>  admits; ///< the fair-price ceiling admits the shelf, per r4 good
+};
+
+struct r4_state
+{
+    const recipe_registry* reg = nullptr;
+    std::vector<std::size_t> goods;
+    int  lap_pre = -1, lap_econ = -1, lap_clear = -1;
+    bool armed = false;
+    std::string label;
+    counts* c = nullptr;
+    std::map<entity_id, r4_snap> snap;                     ///< pre-step (convoys lap)
+    std::map<entity_id, std::vector<float>> post_dem;      ///< tick -11, after the clear
+    std::map<entity_id, std::vector<float>> post_hw;       ///< tick -11, hauler_want after the clear
+};
+
+void r4_registers(const world& w, const r4_state& s, const std::string& point, counts& c)
+{
+    for (const std::size_t g : s.goods)
+    {
+        const std::string k = "r4." + s.label + "." + point + "." + gname(g) + ".";
+        c.add(k + "mkts", 0);
+        for (const auto& [mid, mc] : w.markets)
+        {
+            (void)mid;
+            if (!(mc.base_price[g] > 0.0f)) { c.add(k + "unpriced_mkt"); continue; }
+            c.add(k + "mkts");
+            if (mc.demand[g] > 0.0f)         c.add(k + "demand_pos");
+            if (mc.household_bid[g] > 0.0f)  c.add(k + "household_pos");
+            if (mc.background_bid[g] > 0.0f) c.add(k + "background_pos");
+            if (mc.hauler_want[g] > 0.0f)    c.add(k + "hauler_want_pos");
+            if (mc.unposted_bid[g] > 0.0f && mc.unposted_bid_tick[g] == w.current_econ_tick) c.add(k + "unposted_pos");
+            if (mc.inventory[g] >= 1.0f)     c.add(k + "shelf_pos");
+            if (mc.supply[g] > 0.0f)         c.add(k + "supply_pos");
+            if (mc.base_price[g] > 0.0f && posted_price(mc, g) > mc.base_price[g] * s.reg->price_band().reservation_mult)
+                c.add(k + "posted_over_ceiling");
+            c.add(k + "demand_x10", std::lround(10.0f * std::max(0.0f, mc.demand[g])));
+        }
+    }
+}
+
+bool r4_consumes(const recipe_registry& reg, const building_component& b, const std::vector<std::size_t>& goods)
+{
+    if (b.ticks_remaining > 0)
+    {
+        const auto& cost = reg.resource_build_cost_for(b.type, b.target_resource, b.recipe);
+        for (const std::size_t g : goods) if (cost[g] > 0.0f) return true;
+    }
+    if (b.type != building_type::processing_facility) return false;
+    const recipe* rc = reg.get_recipe(b.recipe);
+    if (!rc) return false;
+    for (const std::size_t g : goods) if (rc->inputs[g] > 0.0f) return true;
+    return false;
+}
+
+void r4_snapshot(const world& w, r4_state& s)
+{
+    const recipe_registry& reg = *s.reg;
+    const std::map<entity_id, entity_id> owner = owner_map(w);
+    const float res_mult = reg.price_band().reservation_mult;
+    s.snap.clear();
+    for (const auto& [bid, b] : w.buildings)
+    {
+        if (!r4_consumes(reg, b, s.goods)) continue;
+        r4_snap r;
+        const auto oi = owner.find(bid);
+        r.corp = oi != owner.end() ? oi->second : null_entity;
+        r.m = market_for_tile(w, b.tile);
+        r.target = static_cast<int>(b.workforce_target);
+        r.build = b.ticks_remaining > 0;
+        r.decom = b.decommissioned;
+        r.supply_scalar = building_supply_scalar(b);
+        const auto mi = w.markets.find(r.m);
+        const stockpile_component* pool = r.corp != null_entity ? w.find_pool(r.corp, r.m) : nullptr;
+        for (const std::size_t g : s.goods)
+        {
+            r.pool.push_back(pool ? pool->quantities[g] : 0.0f);
+            r.admits.push_back(mi != w.markets.end() && shelf_admits(mi->second, g, res_mult, /*off_buys=*/true) ? 1 : 0);
+        }
+        s.snap.emplace(bid, std::move(r));
+    }
+}
+
+void r4_hook(const world& w, int lap, void* ctx)
+{
+    r4_state& s = *static_cast<r4_state*>(ctx);
+    if (!s.armed) return;
+    if (lap == s.lap_pre) { r4_snapshot(w, s); r4_registers(w, s, "conv", *s.c); return; }
+    if (lap == s.lap_econ) { r4_registers(w, s, "dial", *s.c); return; }
+    if (lap == s.lap_clear)
+    {
+        r4_registers(w, s, "clear", *s.c);
+        if (s.label == "t-11")
+            for (const auto& [mid, mc] : w.markets)
+            {
+                std::vector<float>& d = s.post_dem[mid];
+                std::vector<float>& h = s.post_hw[mid];
+                for (const std::size_t g : s.goods) { d.push_back(mc.demand[g]); h.push_back(mc.hauler_want[g]); }
+            }
+    }
+}
+
+/// After an armed tick: every consumer of an r4 good, classed by why it did or
+/// did not bid this tick (economy_system.cpp run_processing's want rule, read
+/// from the pre-step snapshot and the tick's report), and every other channel.
+void r4_after_tick(const world& w, const economy_report& rep, r4_state& s, bool detail)
+{
+    const recipe_registry& reg = *s.reg;
+    counts& c = *s.c;
+    const std::string L = "r4." + s.label + ".";
+    const float base_rate = reg.economics(building_type::processing_facility).base_rate;
+    for (const auto& [bid, r] : s.snap)
+    {
+        const auto bi = w.buildings.find(bid);
+        if (bi == w.buildings.end()) continue;
+        const building_component& b = bi->second;
+        const recipe* rc = reg.get_recipe(b.recipe);
+        for (std::size_t i = 0; i < s.goods.size(); ++i)
+        {
+            const std::size_t g = s.goods[i];
+            const std::string G = gname(g);
+            if (r.build)
+            {
+                const auto& cost = reg.resource_build_cost_for(b.type, b.target_resource, b.recipe);
+                if (cost[g] > 0.0f)
+                    c.add(L + "site." + G + "." + (r.corp == null_entity ? "noowner" : r.admits[i] ? "bids" : "ceiling"));
+            }
+            if (b.type != building_type::processing_facility || !rc || !(rc->inputs[g] > 0.0f)) continue;
+            std::string cls;
+            float need = 0.0f;
+            const building_report* row = row_of(rep, bid);
+            if (r.build) cls = "unbuilt";
+            else if (r.decom) cls = "decom";
+            else if (r.target <= 0) cls = "target0";
+            else if (!(r.supply_scalar > 0.0f)) cls = "supply0";
+            else if (!row || !(row->effective_workforce > 0.0f)) cls = "nolab";
+            else
+            {
+                need = rc->inputs[g] * base_rate * row->effective_workforce
+                     * std::clamp(r.target / 100.0f, 0.0f, 2.0f) * r.supply_scalar;
+                if (r.pool[i] >= need) cls = "pool_covers";
+                else if (!r.admits[i]) cls = "ceiling";
+                else cls = "bids";
+            }
+            c.add(L + "cons." + G + "." + cls);
+            if (cls == "bids") c.add(L + "cons." + G + ".bid_x10", std::lround(10.0f * (need - r.pool[i])));
+            if (cls == "pool_covers")
+            {
+                c.add(L + "cons." + G + ".pool_covers_x10", std::lround(10.0f * need));
+                const float cover = need > 0.0f ? r.pool[i] / need : 0.0f; // full-run ticks the pool holds
+                c.add(L + "cons." + G + ".cover_ticks." + (cover < 2.0f ? "lt2" : cover < 6.0f ? "2-6" : cover < 13.0f ? "6-13" : "ge13"));
+            }
+            if (detail) c.add(L + "cons_recipe." + G + "." + rc->name + "." + cls);
+        }
+    }
+    // The report's want registers (processors + sites + upkeep) and the rest.
+    for (const std::size_t g : s.goods)
+    {
+        const std::string G = gname(g);
+        float wants = 0, hw = 0, upk = 0;
+        for (const auto& [k, v] : rep.wants) wants += v[g];
+        for (const auto& [k, v] : rep.hauler_wants) hw += v[g];
+        for (const auto& [k, v] : rep.upkeep_wants) upk += v[g];
+        c.add(L + "report." + G + ".wants_x10", std::lround(10.0f * wants));
+        c.add(L + "report." + G + ".hauler_wants_x10", std::lround(10.0f * hw));
+        c.add(L + "report." + G + ".upkeep_wants_x10", std::lround(10.0f * upk));
+        for (const buy_order& o : w.buy_orders)
+            if (static_cast<std::size_t>(o.resource) == g) c.add(L + "buy_orders." + G);
+        for (const auto& [bid, b] : w.buildings)
+        {
+            if (b.ticks_remaining > 0 || b.decommissioned) continue;
+            if (building_upkeep_goods(reg.building_upkeep(), b.type, w.campaign_band)[g] > 0.0f)
+                c.add(L + "upkeep_bldgs." + G);
+            if (b.type != building_type::processing_facility) continue;
+            const recipe* rc = reg.get_recipe(b.recipe);
+            if (rc && rc->outputs[g] > 0.0f)
+            {
+                c.add(L + "producers." + G);
+                const building_report* row = row_of(rep, bid);
+                if (row && row->active) c.add(L + "producers_run." + G);
+            }
+        }
+        if (reg.military().upkeep.goods_per_head[g] > 0.0f) c.add(L + "units_drawing." + G, static_cast<long>(w.units.size()));
+    }
+}
+
+/// Static, once per seed: which recipes consume each r4 good and whether the
+/// campaign band admits them; the household / background basket weights.
+void r4_static(const world& w, const r4_state& s, counts& c)
+{
+    const recipe_registry& reg = *s.reg;
+    for (const std::size_t g : s.goods)
+    {
+        const std::string G = gname(g);
+        for (std::size_t id = 0; id < reg.recipe_count(); ++id)
+        {
+            const recipe* rc = reg.get_recipe(static_cast<uint16_t>(id));
+            if (!rc || !(rc->inputs[g] > 0.0f)) continue;
+            c.add("r4.static." + G + ".recipe." + rc->name + (era_permits(w.campaign_band, rc->era) ? ".in_band" : ".out_of_band"));
+            long built = 0;
+            for (const auto& [bid, b] : w.buildings)
+                if (b.type == building_type::processing_facility && b.recipe == id) ++built;
+            c.add("r4.static." + G + ".recipe_built." + rc->name, built);
+        }
+        c.add("r4.static." + G + ".household_x100", std::lround(100.0f * reg.population_demand_basket()[g]));
+        c.add("r4.static." + G + ".background_x100", std::lround(100.0f * reg.background_demand_basket()[g]));
+        c.add("r4.static." + G + ".unit_gph_x1000", std::lround(1000.0f * reg.military().upkeep.goods_per_head[g]));
+    }
+}
+
+/// Tick -11's zeroed producers of an r4 good: did their market (or body, or any
+/// market) bid the good AFTER that tick's clear -- the register the dial would
+/// read next -- when it read none before?
+void r4_zero_join(const world& w, const r4_state& s, const std::vector<zero_rec>& events, counts& c)
+{
+    for (const zero_rec& z : events)
+    {
+        if (z.tick != -11 || z.g >= resource_count || z.m == null_entity) continue;
+        const auto gi = std::find(s.goods.begin(), s.goods.end(), z.g);
+        if (gi == s.goods.end()) continue;
+        const std::size_t i = static_cast<std::size_t>(gi - s.goods.begin());
+        const std::string k = "r4.z-11." + gname(z.g) + "." + z.cls + ".";
+        c.add(k + "n");
+        const auto pd = s.post_dem.find(z.m);
+        const bool own = pd != s.post_dem.end() && pd->second[i] > 0.0f;
+        const auto ph = s.post_hw.find(z.m);
+        const bool own_hw = ph != s.post_hw.end() && ph->second[i] > 0.0f;
+        bool body = false, any = false;
+        const entity_id zb = w.markets.count(z.m) ? w.markets.at(z.m).body : null_entity;
+        for (const auto& [mid, d] : s.post_dem)
+        {
+            if (!(d[i] > 0.0f)) continue;
+            any = true;
+            if (w.markets.count(mid) && w.markets.at(mid).body == zb) body = true;
+        }
+        c.add(k + (own ? "own_after_clear_pos" : body ? "body_only_after_clear" : any ? "offbody_only_after_clear" : "none_after_clear"));
+        if (own_hw) c.add(k + "own_hw_after_clear_pos");
     }
 }
 
@@ -982,7 +1302,28 @@ void run_seed(std::uint32_t seed, int ticks, seed_out& out)
     {
         if (std::strcmp(k_campaign_settle_lap_names[i], "convoys") == 0) p.lap_pre = i;
         if (std::strcmp(k_campaign_settle_lap_names[i], "run_economy_step") == 0) p.lap_econ = i;
+        if (std::strcmp(k_campaign_settle_lap_names[i], "clear_markets") == 0) p.lap_clear = i;
     }
+    // round 4
+    r4_state r4;
+    r4.reg = &reg;
+    r4.lap_pre = p.lap_pre; r4.lap_econ = p.lap_econ; r4.lap_clear = p.lap_clear;
+    r4.c = &out.h;
+    for (const char* n : {"steel", "refined_fuel", "silicon", "clean_water", "food_rations"})
+    {
+        bool ok = false;
+        const resource_type rt = resource_names::resource_from_name(n, ok);
+        if (ok) r4.goods.push_back(static_cast<std::size_t>(rt));
+    }
+    p.r4 = &r4;
+    p.r4_hook = r4_hook;
+    r4_static(w, r4, out.h);
+    r4.label = "build";
+    r4_registers(w, r4, "pre", out.h);
+    const auto r4_arm = [&](int t) {
+        r4.armed = (t == -12 || t == -11 || t == -10 || t == -9 || t == -1 || t == 1 || t == k_t50);
+        r4.label = "t" + std::to_string(t);
+    };
 
     std::map<entity_id, int> prev_target;
     std::map<entity_id, zero_rec> zeros;
@@ -1011,9 +1352,27 @@ void run_seed(std::uint32_t seed, int ticks, seed_out& out)
         }
     }
 
+    // round 4: recipe switches (the reflex's floored-output rescue and the
+    // scorer's margin chase), keyed from -> to, settle vs play.
+    std::map<entity_id, uint16_t> r4_prev_recipe;
+    const auto r4_snap_recipes = [&]() {
+        r4_prev_recipe.clear();
+        for (const entity_id bid : sorted_processors(w)) r4_prev_recipe[bid] = w.buildings.at(bid).recipe;
+    };
+    r4_snap_recipes();
+
     std::map<std::string, int> dz_shown;
     // after each tick: rows, transitions, events
     const auto observe = [&](int t, const economy_report& rep, const char* phase) {
+        for (const agency_event& ev : rep.agency_events)
+            if (ev.what == agency_event::kind::recipe_switch)
+            {
+                const auto pr = r4_prev_recipe.find(ev.building);
+                const recipe* from = pr != r4_prev_recipe.end() ? reg.get_recipe(pr->second) : nullptr;
+                const recipe* to = reg.get_recipe(ev.new_recipe);
+                out.h.add(std::string("r4.switch.") + phase + "." + (from ? from->name : std::string("?")) + ".to."
+                          + (to ? to->name : std::string("?")));
+            }
         for (const agency_event& ev : rep.agency_events)
             if (ev.what == agency_event::kind::workforce_set)
                 if (auto hi = H.find(ev.building); hi != H.end())
@@ -1141,8 +1500,11 @@ void run_seed(std::uint32_t seed, int ticks, seed_out& out)
     {
         p.l_armed = (step == k_campaign_settle_ticks - 1);
         p.cur_tick = step - k_campaign_settle_ticks;
+        r4_arm(p.cur_tick);
         settle_tick_result res = run_settle_tick(w, reg, step, /*day_tick=*/0, /*spectating=*/true, &hooks);
+        if (r4.armed) r4_after_tick(w, res.report, r4, p.cur_tick == -11);
         observe(step - k_campaign_settle_ticks, res.report, "settle");
+        r4_snap_recipes();
         snap_targets();
         if (step == k_campaign_settle_ticks - 1) last_settle = std::move(res.report);
     }
@@ -1150,8 +1512,14 @@ void run_seed(std::uint32_t seed, int ticks, seed_out& out)
     if (seat.seated == null_entity) { out.fail = "no corporation seated"; return; }
     read_idle(w, reg, last_settle, p, H, seat.seated, out.h, seed, "h");
     census(w, reg, last_settle, H, zeros, events, out.h, seed);
+    r4_zero_join(w, r4, events, out.h);
+    // round 4, Q2: the processors running at the handoff, followed to tick 50.
+    std::vector<entity_id> run_h;
+    for (const entity_id bid : sorted_processors(w))
+        if (classify(w.buildings.at(bid), row_of(last_settle, bid), reg) == ps_run) run_h.push_back(bid);
     p.l_armed = false;
     p.snap.clear();
+    r4_snap_recipes(); // the seat's clean slate may have demolished some
 
     constexpr int k_econ_tick_days = 90;
     for (int k = 1; k <= ticks; ++k)
@@ -1162,11 +1530,54 @@ void run_seed(std::uint32_t seed, int ticks, seed_out& out)
         w.current_day_tick = day;
         p.l_armed = (k == k_t50);
         p.cur_tick = k;
+        r4_arm(k);
         settle_tick_result res = run_settle_tick(w, reg, k_campaign_settle_ticks + (k - 1), day,
                                                  /*spectating=*/false, &hooks);
+        if (r4.armed) r4_after_tick(w, res.report, r4, false);
         observe(k, res.report, "play");
+        r4_snap_recipes();
+        if (k == k_t50)
+            for (const entity_id bid : run_h)
+            {
+                const auto bi = w.buildings.find(bid);
+                out.t50.add("decay.n");
+                if (bi == w.buildings.end()) { out.t50.add("decay.gone"); continue; }
+                const building_component& b = bi->second;
+                const building_report* row = row_of(res.report, bid);
+                const proc_state s = classify(b, row, reg);
+                const hist* h = H.count(bid) ? &H.at(bid) : nullptr;
+                const recipe* rc = reg.get_recipe(b.recipe);
+                const std::string rn = rc ? rc->name : std::string("?");
+                std::string cls;
+                if (s == ps_run) cls = "still_run";
+                else if (s == ps_input)
+                    cls = std::string("starved.") + (row && static_cast<std::size_t>(row->limiting_input) < resource_count
+                                                     ? gname(static_cast<std::size_t>(row->limiting_input)) : std::string("?"));
+                else if (s == ps_decom)
+                    cls = std::string("decom.") + (h && h->decom ? h->d.by : "untracked") + "." + (h && h->decom ? h->d.why : std::string("?"));
+                else if (s == ps_nolab) cls = "nolab";
+                else if (s == ps_unsup)
+                    cls = building_supply_scalar(b) <= 0.0f ? "unsup.supply0"
+                        : (h && h->wf_value == 0 ? "unsup.dial_target0" : "unsup.target0_other");
+                else cls = std::string("other.") + k_state_name[s];
+                out.t50.add("decay." + cls);
+                if (s != ps_run)
+                {
+                    const std::string top = cls.substr(0, cls.find('.'));
+                    out.t50.add("decay_top." + top);
+                    out.t50.add("decay_recipe." + rn + "." + top);
+                    if (h && h->decom && s == ps_decom && !h->d.lim.empty()) out.t50.add("decay.decom_starved_input." + h->d.lim);
+                    if (h && h->decom && s == ps_decom) out.t50.add(std::string("decay.decom_tick_band.") + (h->d.tick <= 10 ? "1-10" : h->d.tick <= 25 ? "11-25" : "26-50"));
+                }
+            }
         snap_targets();
         if (k == k_t50) read_idle(w, reg, res.report, p, H, seat.seated, out.t50, seed, "t50");
+        if (k == k_t50 && g_ids_base.count(seed))
+            for (const entity_id bid : g_ids_base[seed])
+                if (const auto bi = w.buildings.find(bid); bi != w.buildings.end())
+                    out.t50.add(std::string("cf503.state.") + k_state_name[classify(bi->second, row_of(res.report, bid), reg)]);
+                else
+                    out.t50.add("cf503.state.gone");
         p.l_armed = false;
     }
     out.secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();

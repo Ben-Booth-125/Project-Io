@@ -228,6 +228,12 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
    resource under a standing sell order is exempted — the order governs, and by default the order
    covers the same surplus (step 5), so nothing is stranded.
 
+   **A pad's pool keeps its propellant (Ben, 2026-10-09; BL-1217).** Where the corporation holds
+   a Launchpad in the pool's catchment, its propellant is part of the reservation: auto-surplus
+   lists none of it, because launches burn from that pool and a fuelled pad is the gate to space
+   (`PRODUCTION.md` § Launchpad). The corporation may still sell it by a standing sell order. A
+   pool with no pad lists its propellant like any other surplus.
+
    **A standing sell order is a price floor over the whole surplus (Ben, 2026-10-05).** Most goods
    need no order: auto-surplus sells them. An order is the decision *not to sell below a price*, so
    by default it covers **everything** auto-surplus would have listed — the surplus above the

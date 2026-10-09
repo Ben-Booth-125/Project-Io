@@ -410,6 +410,14 @@ pool warmed only by the pre-game ticks. Generated, not a flat give:
 
 A corp that placed no holdings (a deposit-poor nation) has no home body and gets no pool.
 
+**Opening stock is held, not listed, until someone bids for it (Ben, 2026-10-09; BL-1217, G1
+plants running).** The opening stockpile sits in the corporation's pool. It is not offered on a
+market shelf for a good that market has not yet bid for. Without this, the first clear shows
+steel and refined fuel listed everywhere and bid for nowhere: their consumers are drawing on their
+own opening stock, so the market reads a glut that does not exist, and the plants that make
+those goods are dialled to zero before the real demand registers. Once a market bids for a good,
+opening stock of it is listed by the ordinary sell rules.
+
 ### Pass 5 — Naming
 
 Each corporation receives a generated name from a corporate naming template bank
@@ -566,6 +574,13 @@ rule then finds no spare, and a chain whose inputs are fully drawn is refused fo
 pass (measured: household goods' processors vanished and household fill fell by half). What it
 still never counts is a firm refused for any other reason: a chain none of whose consumers can
 stand (a cold start) is not begun by it.
+
+**No processor is placed beyond its output's want (Ben, 2026-10-09; BL-1217, G1 plants
+running).** Every path that places a processor — the walk's own charter, an extractor's attached
+processor, a background firm — is bounded by the want for what it makes: final demand plus the
+derived demand of what stands or is chartered. A good with no consumer gets no maker for its
+sake. Measured before the ruling: about 34 refined-fuel plants per seed stood against under one
+consumer, and the dial idled them all.
 
 **What Pass 6 does not do.** It does not seed any behavioural state, matching the contract the
 rest of this pipeline holds (§ Generation seeds no behaviour) — no sentiment, no diplomatic
