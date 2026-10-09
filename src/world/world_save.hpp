@@ -384,7 +384,16 @@ inline constexpr uint32_t world_save_magic =
 /// on. A v41 stream is three ids short per convoy; refused whole on the
 /// strict-equality contract, no migration. Claimed through
 /// `tools/session/next_save_version.js --kind world --claim`.
-inline constexpr uint32_t world_save_version = 42;
+/// Bumped to 43 by BL-1217 G1b R2 (spare supply counts what households and the
+/// background take, Ben 2026-10-09; AI_OPPONENT.md § 11): the market record
+/// gains one resource-indexed float array at its tail, after
+/// `dial_pool_draw_tick` -- `background_fill`, what the background channel drew
+/// at the last clear, which the supply clause (input_reach.cpp) now reads
+/// between clears. An older stream is resource_count floats short per market;
+/// refused whole on the strict-equality contract, no migration. Claimed
+/// through `tools/session/next_save_version.js --kind world --claim` (renumbered 45 -> 43 at the
+/// sprint 50 integration, stacked on BL-1195's 42).
+inline constexpr uint32_t world_save_version = 43;
 
 /// Write @p w as a complete world snapshot.
 ///
