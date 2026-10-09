@@ -74,7 +74,7 @@
    "id": "50",
    "theme": "logistics and trade flow",
    "state": "open",
-   "status_line": "OPEN. Integrated 16-seed reading 2026-10-08 (88304efb+: every wave 1-2 lane merged): G1 71.4 FAIL (85), G1b 12.8 FAIL (5), G2 73.4, G3 97.7; starved/read 47.0 -> 24.6; determinism pass. Non-running is now mostly decommissioned / no workforce / unsupplied (30-57 per seed) rather than starved (5-26). Next: Ben's call (diagnosis vs wave 3 vs close).",
+   "status_line": "Integrated 16-seed gate 2026-10-09 (39907baf, all wave 2b + G1b + BL-1195 merged; pooled by hand): G1 96.6 (1739/1801) PASS, G1b 1.9 (35) PASS, G1 t50 86.7 (2283/2633; deferred, passes), G2 95.8 PASS, G3 96.3 PASS; play income 34,922/seed-tick (smaller economy accepted with G1b R2). Sprint start: G1 54.7, G2 54.4, G3 88.9. Owed: BL-1252 no parallel roads (running), BL-1119 R4/R6 (quiet machine), live clicks (Build door wrong-air, sea-route convoy), close (doc check, BL-1165, the one re-bless with Ben, retro, cut, integrate to main).",
    "opened_date": "2026-10-07",
    "author": "Ben (2026-10-07, the sprint 50 cut form: all nine items, measure-led, G1 stays 70%, diagnostic lens, extend rather than cut); Claude (the proposal in NEXT_SESSION.md)",
    "goal": "Goods that exist reach the markets and processors that want them: a built processor gets its inputs (BL-1217, G1 >= 70% at handoff, pooled 16 seeds), surplus reaches shortage, and the flows and refusals are visible on one diagnostic lens.",

@@ -225,7 +225,11 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
      **Re-ruled — the pull draws after the processors (Ben, 2026-10-09; BL-1217, G1b):** the
      background basket leaves on the shelf one tick of the market's processor want for that good,
      and draws only what is left above it. The pull still consumes; it no longer takes the input a
-     standing processor came for. Measured before the ruling: the pull took 871 of 943 units a tick
+     standing processor came for. **That includes want the fair-price ceiling silenced (Ben,
+     2026-10-09):** a processor priced out this tick still came for the input, so its silenced
+     want is left on the shelf too — the processors' part only, never construction's. The ceiling
+     still keeps that want out of the price (`FINANCE.md`); it only keeps the background off the
+     goods. Measured before the ruling: the pull took 871 of 943 units a tick
      on the markets where 63 processors starved beside it, and turning the pull off whole moved the
      input-starved share 11.5% → 9.6%. Tunables in `scripts/economy.lua` § `background_demand`
      (`consumes`).
@@ -309,8 +313,9 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
     bid one pooled quantity, so a short shelf fills each of them in the same share. Markets
     ascending, resources ascending. The fill is what the growth gate reads
     (`POPULATION.md` § Growth, decline and razing). **The background pull draws next**, on the
-    same terms, from what households left: `min(background bid, inventory)` (step 3,
-    `inject_background_demand`).
+    same terms, from what households left, less one tick of the market's processor want:
+    `min(background bid, max(0, inventory − processor want))` (step 3, *the pull draws after the
+    processors*).
 13. **Shelf spoilage** — every good left on every shelf loses its spoilage rate,
     `inventory[r] −= inventory[r] × rate[r]` (§ Price resolution, *The shelf spoils*). After the
     households' draw, so the households' draw is not taxed by its own spoilage (the nation's later

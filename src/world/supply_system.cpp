@@ -21,6 +21,9 @@ void advance_convoys(world& w)
 {
     for (auto& convoy : w.convoys)
     {
+        // BL-1195: where this tick's travel starts — interdiction sweeps from here
+        // to the new head. A held convoy does not move, so its sweep is its head.
+        convoy.progress_before = convoy.progress;
         // BL-452: a HELD convoy stops advancing and waits on its lane. It is
         // skipped rather than slowed — hold is a stop, not a throttle — and it
         // costs nothing further, since the haul was paid once at dispatch.
@@ -38,6 +41,21 @@ void advance_convoys(world& w)
 std::vector<interception_record> intercept_convoys(world& w, int tick)
 {
     std::vector<interception_record> cuts;
+    // BL-1195: this tick's sweep starts are spent on EVERY return, early or not —
+    // a later read in the same tick (or a tick that does not advance) checks the
+    // head alone (the components.hpp invariant on progress_before). A scope guard,
+    // so no early return below can skip it; it runs after the cut convoys are
+    // erased, which is harmless (the reset touches only survivors).
+    struct sweep_reset
+    {
+        world& w;
+        ~sweep_reset()
+        {
+            for (convoy_component& cv : w.convoys)
+                cv.progress_before = -1.0f;
+        }
+    } const reset_on_exit{w};
+
     if (w.convoys.empty() || w.units.empty() || w.corp_hostile_pairs.empty())
         return cuts; // nothing declared, nothing standing, or nothing in flight
 
@@ -69,16 +87,29 @@ std::vector<interception_record> intercept_convoys(world& w, int tick)
     std::vector<std::uint32_t> cut_ids;
     for (const convoy_component& cv : w.convoys)
     {
-        const entity_id tile = convoy_tile_at(w, cv);
-        if (tile == null_entity)
+        // BL-1195: THE SWEEP. A tick is 90 days and most hauls take one to three,
+        // so the cargo crosses most of its lane between two reads. Every tile it
+        // crossed this tick — from where it stood before advance_convoys to where
+        // it stands now, in lane order, both ends included — is checked, and the
+        // first holding a hostile unit is where it is cut. Position is read off the
+        // lane's clock (convoy_lane_index), each leg at its own speed.
+        const convoy_route lane = convoy_route_tiles(w, cv);
+        const int head = convoy_lane_index(lane.at, cv.progress);
+        if (head < 0)
             continue; // inter-body leg in transit, or an unresolvable lane
+        const int from = (cv.progress_before >= 0.0f)
+                             ? std::min(convoy_lane_index(lane.at, cv.progress_before), head)
+                             : head;
 
+        entity_id tile             = null_entity;
+        entity_id interceptor_unit = null_entity;
+        entity_id interceptor_corp = null_entity;
+        for (int li = from; li <= head && interceptor_unit == null_entity; ++li)
+        {
+        tile = lane.tiles[static_cast<std::size_t>(li)];
         const auto occ = units_on_tile.find(tile);
         if (occ == units_on_tile.end())
             continue;
-
-        entity_id interceptor_unit = null_entity;
-        entity_id interceptor_corp = null_entity;
         for (const entity_id uid : occ->second)
         {
             const unit_component& uc = w.units.at(uid);
@@ -98,6 +129,7 @@ std::vector<interception_record> intercept_convoys(world& w, int tick)
             interceptor_unit = uid;
             interceptor_corp = uc.owner;
             break; // sorted order: first hit is the lowest-id hostile unit
+        }
         }
         if (interceptor_unit == null_entity)
             continue;
@@ -460,6 +492,8 @@ struct intra_route
     std::array<route_leg, 3> legs{};
     int         n_legs       = 0;
     int         ports        = 0; ///< ports the cargo passes through; handling is per port
+    entity_id   port_a       = null_entity; ///< BL-1195: the loading Port of a sea route
+    entity_id   port_b       = null_entity; ///< BL-1195: the unloading Port of a sea route
     int         travel_ticks = 1;
     convoy_mode mode         = convoy_mode::land; ///< the convoy's mode: sea when any leg is
 };
@@ -625,6 +659,8 @@ bool route_intra_body(world& w, const recipe_registry& reg, const logistics_node
                 route.legs[1] = sea;
                 route.legs[2] = on.leg;
                 route.ports   = 2;
+                route.port_a  = ports[i];
+                route.port_b  = ports[j];
                 route.mode    = convoy_mode::sea;
                 // Each leg at its own speed (SUPPLY.md): caravan overland, coastal by sea;
                 // summed, then quantised once.
@@ -667,6 +703,8 @@ convoy_leg finish_route(const intra_route& route, float qty, float handling)
     leg.mode         = route.mode;
     leg.cost         = cost;
     leg.travel_ticks = route.travel_ticks < 1 ? 1 : route.travel_ticks;
+    leg.port_a       = route.n_legs == 3 ? route.port_a : null_entity;
+    leg.port_b       = route.n_legs == 3 ? route.port_b : null_entity;
     return leg;
 }
 
@@ -793,7 +831,9 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
         intra_route route;
         if (!route_intra_body(w, reg, nodes, src_body, origin, dest_centre, route))
             return leg;
-        return finish_route(route, qty, reg.port_handling());
+        leg = finish_route(route, qty, reg.port_handling());
+        leg.origin_tile = origin; // BL-1195: the lane starts where the haul was priced from
+        return leg;
     }
 
     convoy_mode mode;
@@ -853,7 +893,9 @@ convoy_leg price_market_export_leg(world& w, const recipe_registry& reg,
     if (!route_intra_body(w, reg, nodes, body, sit->second.centre_tile,
                           dit->second.centre_tile, route))
         return convoy_leg{};
-    return finish_route(route, qty, reg.port_handling());
+    convoy_leg leg = finish_route(route, qty, reg.port_handling());
+    leg.origin_tile = sit->second.centre_tile; // BL-1195: the lane starts at the centre
+    return leg;
 }
 
 namespace {
@@ -1019,6 +1061,9 @@ bool commit_convoy(world& w, const recipe_registry& reg, entity_id corp_id, enti
     c.arrived        = false;
     c.held           = false;
     c.cost_paid      = cost;
+    c.origin_tile    = leg.origin_tile; // BL-1195: the lane follows the priced legs
+    c.port_a         = leg.port_a;
+    c.port_b         = leg.port_b;
     w.convoys.push_back(c);
     if (out_sent)
         *out_sent = send;
@@ -1405,6 +1450,9 @@ void export_market_shelves(world& w, const recipe_registry& reg, const logistics
                 cv.arrived        = false;
                 cv.held           = false;
                 cv.cost_paid      = (send < qty) ? leg.cost * (send / qty) : leg.cost;
+                cv.origin_tile    = leg.origin_tile; // BL-1195: the lane follows the legs
+                cv.port_a         = leg.port_a;
+                cv.port_b         = leg.port_b;
                 w.convoys.push_back(cv);
                 ++out.market_exports;
                 break; // one destination per (market, good) per pass

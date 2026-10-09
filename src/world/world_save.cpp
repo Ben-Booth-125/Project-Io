@@ -200,6 +200,7 @@ void w_market(std::ostream& o, const market_component& m)
     for (const int32_t t : m.unposted_bid_tick) w_i32(o, t); // BL-1227: world_save_version 38
     w_f32_array(o, m.dial_pool_draw);   // BL-1217: world_save_version 40
     for (const int32_t t : m.dial_pool_draw_tick) w_i32(o, t); // BL-1217: world_save_version 40
+    w_f32_array(o, m.background_fill); // BL-1217 G1b R2: world_save_version 43
 }
 
 bool r_i32_array(std::istream& i, std::array<int32_t, resource_count>& a)
@@ -218,7 +219,8 @@ bool r_market(std::istream& i, market_component& m)
         && r_f32_array(i, m.household_bid) && r_f32_array(i, m.household_fill)
         && r_f32_array(i, m.household_weight) && r_f32_array(i, m.hauler_want)
         && r_f32_array(i, m.unposted_bid) && r_i32_array(i, m.unposted_bid_tick)
-        && r_f32_array(i, m.dial_pool_draw) && r_i32_array(i, m.dial_pool_draw_tick); // BL-1217: v40
+        && r_f32_array(i, m.dial_pool_draw) && r_i32_array(i, m.dial_pool_draw_tick) // BL-1217: v40
+        && r_f32_array(i, m.background_fill); // BL-1217 G1b R2: v45
 }
 
 void w_unit(std::ostream& o, const unit_component& u)
@@ -440,6 +442,9 @@ void w_convoy(std::ostream& o, const convoy_component& c)
     w_u32(o, c.id);
     w_bool(o, c.held);
     w_f32(o, c.cost_paid);
+    w_id(o, c.origin_tile); // BL-1195: world_save_version 42 (the lane follows the legs)
+    w_id(o, c.port_a);      // BL-1195: world_save_version 42
+    w_id(o, c.port_b);      // BL-1195: world_save_version 42
 }
 
 bool r_convoy(std::istream& i, convoy_component& c)
@@ -447,7 +452,8 @@ bool r_convoy(std::istream& i, convoy_component& c)
     return r_id(i, c.source_market) && r_id(i, c.dest_market) && r_enum(i, c.mode, max_convoy)
         && r_enum(i, c.cargo_resource, max_resource) && r_f32(i, c.cargo_qty)
         && r_f32(i, c.progress) && r_f32(i, c.speed) && r_id(i, c.corp) && r_bool(i, c.arrived)
-        && r_u32(i, c.id) && r_bool(i, c.held) && r_f32(i, c.cost_paid);
+        && r_u32(i, c.id) && r_bool(i, c.held) && r_f32(i, c.cost_paid)
+        && r_id(i, c.origin_tile) && r_id(i, c.port_a) && r_id(i, c.port_b); // BL-1195: v42
 }
 
 void w_route(std::ostream& o, const trade_route& t)
@@ -828,6 +834,7 @@ void clear_derived_state(world& w)
     w.lp_anchor_fields.clear(); // BL-1117: the nearest-anchor field, same footing
     w.power_grid_of_province.clear(); // BL-1230: the power grid, same footing
     w.power_grid_built = false;
+    bump_logistics_cache_generation(w); // BL-1195: view-only stamp, never serialised
 
     // The market index carries its own staleness stamps; zeroing them is what
     // makes the next `market_for_tile` rebuild rather than trust an empty index.

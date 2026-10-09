@@ -1502,6 +1502,44 @@ one_result run_one(float need_over_output)
     return r;
 }
 
+/// BL-1217 G1b R2 — SPARE IS NET OF THE FINAL BUYERS. run_one's kept case
+/// (need 0.5 x the mine's output at t_idle), with households in the same market
+/// wanting @p hh_over_output x the mine's output of timber per tick: in the
+/// generation form (no clear has run) their draw is the basket at base, and it
+/// is charged against the spare exactly as a standing processor's is.
+struct final_result { float out = 0, need = 0, hh = 0, spare = 0; bool kept = false; };
+final_result run_final(float hh_over_output)
+{
+    fx f({ 6 }, { 5 });
+    const entity_id mine = f.add(5, building_type::extraction_site);
+    final_result r;
+    r.out = f.output(mine, k_timber);
+    // Households (the fixture's one centre, scale 5, market x 6) want timber.
+    population_demand_params pd = f.reg.population_demand();
+    pd.demand_scale = 1.0f;
+    pd.demand_basket[k_timber] = hh_over_output * r.out / 5.0f;
+    f.reg.set_population_demand(pd);
+    r.hh = 5.0f * pd.demand_scale * f.reg.population_demand_basket()[k_timber];
+    const float batches = 0.5f;
+    recipe rc;
+    rc.name = "fixture_steel_from_timber";
+    rc.inputs[k_timber] = 0.5f * r.out / (batches * f.reg.t_idle());
+    rc.outputs[k_steel] = 1.0f;
+    f.reg.add_recipe(rc);
+    r.need = rc.inputs[k_timber] * batches * f.reg.t_idle();
+    {
+        input_reach ir = make_input_reach(*f.w, f.reg);
+        r.spare = reachable_supply(*f.w, f.reg, ir, f.markets[0], k_timber, null_entity).spare;
+        invalidate_logistics_caches(*f.w);
+    }
+    const entity_id p = f.add(6, building_type::processing_facility, rc.name.c_str());
+    f.corp("Sereth Works", industrial_focus::processing, { p }, true);
+    f.corp("Tolvan Extraction", industrial_focus::extraction, { mine }, false);
+    enforce_chain_feasible_roster(*f.w, f.reg, /*seed=*/1233u);
+    r.kept = f.w->buildings.count(p) != 0 && f.w->buildings.at(p).recipe != no_recipe;
+    return r;
+}
+
 /// Two producer markets (x 2 and x 18) each reaching a consumer market (x 10)
 /// whose standing works draws 0.75 x their summed output: each producer market
 /// alone is overdrawn, the set is not.
@@ -1542,6 +1580,7 @@ struct contend_result
     std::uint64_t d1 = 0, d2 = 0;
     int works_kept = 0;
     bool tools_kept = false;
+    bool d_unreached = false; ///< no works market's steel reaches the households' market D
     std::string held; ///< what T, P1, P2 hold after the first call
 };
 contend_result run_contend()
@@ -1550,7 +1589,7 @@ contend_result run_contend()
     // reaches it: it can only be a steel works, never switch to tools.
     // T stands in a third market (x 22) whose timber is cheap, so no timber
     // reaches it: it can only be a tools works, fed by steel from A.
-    fx f({ 6, 14, 22 }, { 5 });
+    fx f({ 6, 14, 22, 1 }, { 5 });
     {
         market_component& b = f.w->markets.at(f.markets[1]);
         b.base_price[k_steel] = 0.2f;
@@ -1558,6 +1597,25 @@ contend_result run_contend()
         market_component& c = f.w->markets.at(f.markets[2]);
         c.base_price[k_timber] = 0.2f;
         c.price = c.base_price;
+    }
+    // BL-1217 G1b R2 (Ben, 2026-10-09: spare is net of the household and
+    // background draw on each market in reach). The fixture's households want
+    // steel so the D6 want test keeps the works here WANTED (T's derived demand
+    // alone leaves a works excess). A, B and C are all in T's steel reach set
+    // (A and B hold the works, C is T's own), so households in any of them
+    // would draw against T's supply and the row would test R2, not the
+    // cascade. So they stand in a fourth market D (x 1) whose steel is so
+    // cheap that no works' steel reaches it — D is in no steel reach set — and
+    // the body's want is unchanged. R2 has its own rows below.
+    {
+        market_component& d = f.w->markets.at(f.markets[3]);
+        d.base_price[k_steel] = 0.05f;
+        d.price = d.base_price;
+    }
+    for (auto& [cid, tile] : f.w->population_centre_tile)
+    {
+        (void)cid;
+        tile = f.at.at({ 1, 6 });
     }
     const entity_id mine = f.add(5, building_type::extraction_site);
     const float out = f.output(mine, k_timber);
@@ -1577,6 +1635,13 @@ contend_result run_contend()
     f.corp("Sereth Works", industrial_focus::processing, { t, p1, p2 }, true);
     f.corp("Tolvan Extraction", industrial_focus::extraction, { mine }, false);
     contend_result r;
+    {
+        input_reach ir = make_input_reach(*f.w, f.reg);
+        r.d_unreached = !market_within_reach(*f.w, f.reg, ir, f.markets[0], f.markets[3], k_steel)
+                     && !market_within_reach(*f.w, f.reg, ir, f.markets[1], f.markets[3], k_steel)
+                     && market_for_tile(*f.w, f.at.at({ 1, 6 })) == f.markets[3];
+        invalidate_logistics_caches(*f.w);
+    }
     r.first  = enforce_chain_feasible_roster(*f.w, f.reg, /*seed=*/1233u);
     r.d1     = world_state_digest(*f.w);
     for (const entity_id b : { t, p1, p2 })
@@ -2819,6 +2884,20 @@ int main()
                     lean.out > 0.0f && !lean.kept);
         expect_true("sized: the same processor is kept where the spare covers its t_idle need",
                     fits.out > 0.0f && fits.kept);
+        // BL-1217 G1b R2 (Ben, 2026-10-09): households' draw on the market in
+        // reach comes off the spare, in generation's form (the basket at base).
+        const sizedfx::final_result hh0 = sizedfx::run_final(0.0f);
+        const sizedfx::final_result hh1 = sizedfx::run_final(0.75f);
+        std::printf("  final buyers: mine output %.3f, need at t_idle %.3f; households 0 -> spare "
+                    "%.3f kept %d; households %.3f -> spare %.3f kept %d\n",
+                    hh0.out, hh0.need, hh0.spare, hh0.kept ? 1 : 0, hh1.hh, hh1.spare,
+                    hh1.kept ? 1 : 0);
+        expect_true("sized (R2): with no household draw the processor is kept (the control)",
+                    hh0.out > 0.0f && hh0.kept && std::fabs(hh0.spare - hh0.out) < 1e-4f);
+        expect_true("sized (R2): households drawing the input in the market leave spare net of "
+                    "their draw, and a processor whose need exceeds it is unplaced",
+                    hh1.hh > 0.0f && std::fabs(hh1.spare - (hh1.out - hh1.hh)) < 1e-4f
+                    && hh1.spare < hh1.need && !hh1.kept);
         const sizedfx::twin_result tw = sizedfx::run_twin();
         std::printf("  twin producers: out %.3f + %.3f, drawn %.3f once, spare %.3f (reach %d %d)\n",
                     tw.o1, tw.o2, tw.drawn, tw.spare, tw.reach1 ? 1 : 0, tw.reach2 ? 1 : 0);
@@ -2833,8 +2912,10 @@ int main()
                     c.second.processors_redecided, c.second.processors_unplaced, c.works_kept,
                     c.tools_kept ? 1 : 0, c.held.c_str());
         expect_true("sized roster: of two works contending for one mine exactly one is kept, and the "
-                    "tools works it feeds is re-admitted after it (no cascade loss)",
-                    c.works_kept == 1 && c.tools_kept && c.first.processors_unplaced == 1);
+                    "tools works it feeds is re-admitted after it (no cascade loss; the households "
+                    "stand where no works' steel reaches, so R2 charges T nothing)",
+                    c.works_kept == 1 && c.tools_kept && c.first.processors_unplaced == 1
+                    && c.d_unreached);
         expect_true("sized roster: a SECOND call changes nothing (re-decides 0, unplaces 0, same digest)",
                     c.second.processors_redecided == 0 && c.second.processors_unplaced == 0
                     && c.d1 == c.d2);

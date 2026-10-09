@@ -33,6 +33,8 @@ void input_reach_invalidate(input_reach& ir)
     ir.refresh_mode = false;
     ir.seen.clear();
     for (auto& m : ir.draw_parts) m.clear();
+    ir.final_built = false;
+    for (auto& v : ir.final_draws) v.clear();
 }
 
 namespace {
@@ -392,6 +394,89 @@ void input_reach_refresh(const world& w, const recipe_registry& reg, input_reach
 }
 
 namespace {
+
+/// BL-1217 G1b R2 (AI_OPPONENT.md § 11, "Spare supply counts what households and
+/// the background take", Ben 2026-10-09): the household and background draw on
+/// every market, per resource (input_reach.hpp § EVERY BUYER). PLAY: what those
+/// channels drew at the last clear. GENERATION: the two baskets at base over the
+/// centres each market serves, as `body_demand` reads final demand.
+void build_final_draws(const world& w, const recipe_registry& reg, input_reach& ir)
+{
+    if (ir.final_built)
+        return;
+    ir.final_built = true;
+    for (auto& v : ir.final_draws) v.clear();
+
+    // An ordered key; every value below is one write or an id-ordered sum.
+    std::map<entity_id, std::array<float, resource_count>> by_market;
+    const bool play = ir.report != nullptr && !ir.report->buildings.empty();
+    if (play)
+    {
+        for (const auto& [mid, mc] : w.markets)
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                const float d = std::max(0.0f, mc.household_fill[r])
+                              + std::max(0.0f, mc.background_fill[r]);
+                if (d > 0.0f)
+                    by_market[mid][r] = d; // value-initialised array: one write per key
+            }
+    }
+    else
+    {
+        // Ascending centre id (BL-1050): the per-market scale is a float sum.
+        std::vector<entity_id> centre_ids;
+        centre_ids.reserve(w.population_centres.size());
+        // The buyers the clear would inject (inject_population_demand /
+        // inject_background_demand): a razed centre has no heads and bids
+        // nothing, and an unpriced good (base <= 0) is never bid. "Whole at
+        // base" (Ben, 2026-10-09) is about the PRICE, not phantom buyers.
+        for (const auto& [cid, pcc] : w.population_centres)
+        {
+            if (pcc.razed)
+                continue;
+            const auto tile_it = w.population_centre_tile.find(cid);
+            if (tile_it == w.population_centre_tile.end())
+                continue;
+            if (w.tiles.find(tile_it->second) == w.tiles.end())
+                continue;
+            centre_ids.push_back(cid);
+        }
+        std::sort(centre_ids.begin(), centre_ids.end());
+        std::map<entity_id, float> market_scale;
+        for (const entity_id cid : centre_ids)
+        {
+            const entity_id mid = market_for_tile(w, w.population_centre_tile.at(cid));
+            if (mid == null_entity)
+                continue;
+            market_scale[mid] += static_cast<float>(w.population_centres.at(cid).scale);
+        }
+        const population_demand_params&          pd = reg.population_demand();
+        const background_demand_params&          bd = reg.background_demand();
+        const std::array<float, resource_count>& pb = reg.population_demand_basket();
+        const std::array<float, resource_count>& bb = reg.background_demand_basket();
+        for (const auto& [mid, scale] : market_scale)
+        {
+            if (!(scale > 0.0f))
+                continue;
+            const auto mit = w.markets.find(mid);
+            if (mit == w.markets.end())
+                continue;
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                if (!(mit->second.base_price[r] > 0.0f))
+                    continue; // unpriced: the injectors bid nothing for it
+                const float d = scale * (pd.demand_scale * pb[r] + bd.demand_scale * bb[r]);
+                if (d > 0.0f)
+                    by_market[mid][r] = d;
+            }
+        }
+    }
+    for (const auto& [mid, arr] : by_market) // ascending market
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (arr[r] > 0.0f)
+                ir.final_draws[r].push_back({mid, arr[r]});
+}
+
 } // namespace
 
 float input_reach_haul(world& w, const recipe_registry& reg, input_reach& ir,
@@ -503,7 +588,32 @@ reachable_spare reachable_supply(world& w, const recipe_registry& reg, input_rea
                 continue;
             set.markets.push_back({pr.market, pr.out, landed});
         }
-        for (const auto& [q, d] : ir.draws[r]) // ascending market
+        // Every buyer's draw per consumer market, ascending: the standing
+        // processors' (`ir.draws`) plus the households' and the background's
+        // (`final_draws`, BL-1217 G1b R2), merged by market. A market with no
+        // final draw keeps its processor draw exactly.
+        build_final_draws(w, reg, ir);
+        std::vector<std::pair<entity_id, float>> all_draws;
+        {
+            const auto& pdv = ir.draws[r];
+            const auto& fdv = ir.final_draws[r];
+            all_draws.reserve(pdv.size() + fdv.size());
+            std::size_t a = 0, b = 0;
+            while (a < pdv.size() || b < fdv.size())
+            {
+                if (b >= fdv.size() || (a < pdv.size() && pdv[a].first < fdv[b].first))
+                    all_draws.push_back(pdv[a++]);
+                else if (a >= pdv.size() || fdv[b].first < pdv[a].first)
+                    all_draws.push_back(fdv[b++]);
+                else
+                {
+                    all_draws.push_back({pdv[a].first, pdv[a].second + fdv[b].second});
+                    ++a;
+                    ++b;
+                }
+            }
+        }
+        for (const auto& [q, d] : all_draws) // ascending market
         {
             input_reach::reached_draw rd{q, d, {}};
             for (std::size_t i = 0; i < set.markets.size(); ++i)
@@ -633,7 +743,7 @@ bool recipe_inputs_supplied(world& w, const recipe_registry& reg, input_reach& i
 input_access input_obtainable(world& w, const recipe_registry& reg, input_reach& ir,
                               entity_id consumer_market, const stockpile_component* pool,
                               std::size_t r, float need, entity_id self,
-                              bool allow_supply)
+                              bool allow_supply, bool allow_stock)
 {
     input_access out;
     if (r >= resource_count)
@@ -659,7 +769,7 @@ input_access input_obtainable(world& w, const recipe_registry& reg, input_reach&
     const float avail = own_good ? 0.0f
                       : (pool ? std::max(0.0f, pool->quantities[r]) : 0.0f)
                       + (shelf ? std::max(0.0f, mkt->inventory[r]) : 0.0f);
-    if (need <= 0.0f || (!own_good && avail >= floor_need))
+    if (need <= 0.0f || (allow_stock && !own_good && avail >= floor_need))
     {
         out.obtainable = true;
         out.unit_cost  = mkt ? posted_price(*mkt, r) : 0.0f;
@@ -685,7 +795,7 @@ bool recipe_inputs_obtainable(world& w, const recipe_registry& reg, input_reach&
                               entity_id consumer_market, const stockpile_component* pool,
                               const recipe& rc, float batches, entity_id self,
                               std::array<float, resource_count>& unit_cost,
-                              bool allow_supply)
+                              bool allow_supply, bool allow_stock)
 {
     bool all = true;
     for (std::size_t r = 0; r < resource_count; ++r)
@@ -695,7 +805,7 @@ bool recipe_inputs_obtainable(world& w, const recipe_registry& reg, input_reach&
         if (!(in > 0.0f))
             continue;
         const input_access a = input_obtainable(w, reg, ir, consumer_market, pool, r,
-                                                in * batches, self, allow_supply);
+                                                in * batches, self, allow_supply, allow_stock);
         unit_cost[r] = a.unit_cost;
         if (!a.obtainable)
             all = false;

@@ -60,6 +60,22 @@
 // Each charge is shared among the set markets that reach Q in proportion to
 // their output, which gives each producer market its own spare.
 //
+// EVERY BUYER, NOT ONLY PROCESSORS (BL-1217 G1b R2; AI_OPPONENT.md § 11, "Spare
+// supply counts what households and the background take", Ben 2026-10-09). A
+// consumer market Q's draw is its standing processors' draw PLUS the household
+// and background draw there — the same reach and the same charge, so a market
+// whose households empty the shelf leaves nothing spare for a new plant. In
+// PLAY (a report with rows) that is the draws those channels MADE at the last
+// clear (`market_component::household_fill + background_fill`), an aggregate
+// market fact. In GENERATION / a hand-built world (no report, no clear has
+// run) it is the GENERATION FORM: the household and background baskets at
+// base, `scale x (population demand_scale x basket + background demand_scale x
+// basket)`, summed over the centres whose tile the market serves — the reading
+// generation's final demand (`body_demand`) already takes, split by market —
+// over the buyers the clear would inject: a razed centre and a good the market
+// has no base price for bid nothing, as in `inject_population_demand` /
+// `inject_background_demand`. No forecast, and nothing per corporation.
+//
 // OBTAINABLE: an input r of a processor at market C, needing `need` units a tick,
 // is obtainable when
 //   (1) STOCK: the corp's own (corp, C) pool plus C's shelf — the shelf only where
@@ -138,6 +154,13 @@ struct input_reach
     std::array<std::vector<std::pair<entity_id, float>>, resource_count>   draws;
     /// (consumer market, r) -> its reach set.
     std::map<std::pair<entity_id, std::size_t>, reach_set>                 supply_memo;
+
+    /// BL-1217 G1b R2: per resource, (market, household + background draw
+    /// there), sorted by market — the final buyers' draw (see EVERY BUYER).
+    /// Built lazily on the first spare question; forgotten by
+    /// `input_reach_invalidate`, never by a refresh (buildings do not move it).
+    bool final_built = false;
+    std::array<std::vector<std::pair<entity_id, float>>, resource_count>   final_draws;
 
     // ---- refresh mode (`input_reach_refresh`, generation's placement) ----
     /// What a building was indexed as: the fields its output and draw read.
@@ -268,11 +291,13 @@ bool recipe_inputs_supplied(world& w, const recipe_registry& reg, input_reach& i
 
 /// Is input @p r obtainable at @p consumer_market for a run needing @p need units?
 /// @p pool is the corp's (corp, market) pool, may be null. @p allow_supply false
-/// asks the STOCK clause alone.
+/// asks the STOCK clause alone; @p allow_stock false asks the SUPPLY clause
+/// alone (a recipe switch, Ben 2026-10-09: it adds a draw, as a build does), and
+/// then prices an obtainable input at the landed cost the supply clause found.
 input_access input_obtainable(world& w, const recipe_registry& reg, input_reach& ir,
                               entity_id consumer_market, const stockpile_component* pool,
                               std::size_t r, float need, entity_id self,
-                              bool allow_supply = true);
+                              bool allow_supply = true, bool allow_stock = true);
 
 /// Every input of recipe @p rc at once: true when each is obtainable; fills
 /// @p unit_cost[r] for each input with its obtainable cost (the posted price for
@@ -281,4 +306,4 @@ bool recipe_inputs_obtainable(world& w, const recipe_registry& reg, input_reach&
                               entity_id consumer_market, const stockpile_component* pool,
                               const recipe& rc, float batches, entity_id self,
                               std::array<float, resource_count>& unit_cost,
-                              bool allow_supply = true);
+                              bool allow_supply = true, bool allow_stock = true);

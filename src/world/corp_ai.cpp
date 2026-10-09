@@ -176,10 +176,13 @@ float local_price(const world& w, entity_id tile, std::size_t r)
 ///
 /// `pool` is the corp's (corp, market) pool; `batches` sizes the run the stock
 /// clause must cover; `self` is the building asking (never its own producer).
+/// `allow_stock` false judges the inputs by the SUPPLY clause alone and prices
+/// them at its landed cost (a recipe switch: AI_OPPONENT.md, "A recipe switch is
+/// judged on supply too", Ben 2026-10-09).
 bool recipe_margin_obtainable(world& w, const recipe_registry& reg, input_reach& ir,
                               entity_id tile, uint16_t recipe_id,
                               const stockpile_component* pool, float batches,
-                              entity_id self, float& margin)
+                              entity_id self, float& margin, bool allow_stock = true)
 {
     margin = 0.0f;
     const recipe* rc = reg.get_recipe(recipe_id);
@@ -187,7 +190,8 @@ bool recipe_margin_obtainable(world& w, const recipe_registry& reg, input_reach&
         return false;
     std::array<float, resource_count> cost{};
     const bool ok = recipe_inputs_obtainable(w, reg, ir, market_for_tile(w, tile), pool,
-                                             *rc, batches, self, cost);
+                                             *rc, batches, self, cost,
+                                             /*allow_supply=*/true, allow_stock);
     for (std::size_t r = 0; r < resource_count; ++r)
     {
         if (rc->outputs[r] > 0.0f) margin += rc->outputs[r] * local_price(w, tile, r);
@@ -1622,7 +1626,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // nothing replacing it is opening stock being drawn down: on
                     // seed 0 one steel shelf at negative spare admitted 63 builds in
                     // eight ticks. The stock clause still counts where a plant
-                    // already stands (resume, recipe switch, the reflex rescue).
+                    // already stands and keeps its recipe (a resume); a recipe
+                    // switch — the chase and the reflex rescue — adds a draw and
+                    // is judged on supply too (Ben, 2026-10-09).
                     //
                     // And PRICED by the same clause: each input at the landed cost
                     // of the cheapest producer the supply clause found, never the
@@ -2242,9 +2248,17 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         continue; // the incumbent is best_m's starting point
                     if (!recipe_runs_at_tile(w, rc, b.tile))
                         continue; // the body's air (Ben, 2026-10-09): the seam refuses it
+                    // BL-1217 G1b R1 (AI_OPPONENT.md, "A recipe switch is judged
+                    // on supply too", Ben 2026-10-09): a switch adds a draw the
+                    // plant did not have, exactly as a build does, so the
+                    // candidate's inputs are judged by the SUPPLY clause alone
+                    // and priced at its landed cost — the opening shelf no
+                    // longer admits it (116 of the settle's 121 switched-and-
+                    // starved plants came this way). The incumbent above keeps
+                    // the stock reading: it is what the plant already draws for.
                     float m = 0.0f;
                     if (!recipe_margin_obtainable(w, reg, reach(), b.tile, rid, sw_pool,
-                                                  sw_batches, bid, m))
+                                                  sw_batches, bid, m, /*allow_stock=*/false))
                         continue; // BL-1187: never switch onto inputs it cannot get
                     if (m > best_m) { best_m = m; best_id = rid; }
                 }

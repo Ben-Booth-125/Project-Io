@@ -167,6 +167,18 @@ uint64_t world::state_hash(int tick) const
                     fnv1a_f32(h, m.dial_pool_draw[r]);
                     fnv1a_u32(h, static_cast<uint32_t>(m.dial_pool_draw_tick[r]));
                 }
+            // BL-1217 G1b R2: the background's draw at the last clear — the
+            // supply clause branches on it (input_reach.cpp) and it is saved.
+            // Folded SPARSELY on the dial register's argument (good index,
+            // value; non-zero slots only), behind a tag so the two sparse runs
+            // cannot alias.
+            for (std::size_t r = 0; r < m.background_fill.size(); ++r)
+                if (m.background_fill[r] != 0.0f)
+                {
+                    fnv1a_u32(h, 0xB6F11u);
+                    fnv1a_u32(h, static_cast<uint32_t>(r));
+                    fnv1a_f32(h, m.background_fill[r]);
+                }
         }
     }
 

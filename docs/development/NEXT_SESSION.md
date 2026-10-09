@@ -308,6 +308,55 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   as BL-1252 (no parallel roads): d1K8 <= 103 pooled, harness green, time within ~1.25x of stale.
   Probe merged aa007264. BL-1252 lane running (measure candidates: targeted refresh / post-pass
   merge / bounded spur search).
+  **BL-1195 FIX ROUND DONE** (e14a76a6; re-review running): swept interdiction
+  (`progress_before`, transient), leg-time head clock (`convoy_route::at`, renderer uses it),
+  real-tick rows R11-R17, body-pool lanes, SUPPLY.md says only origin+ports fixed at dispatch.
+  sea_port_gate 89/0; 5-seed gate identical (no hostility in gate worlds). Live look owed.
+  **G1b R3 DONE** (59e102dd; cold review running): `processor_want` per market (transient) leaves
+  one tick of posted processor want before the background draws. 16 seeds alone: G1 87.5 -> 88.4,
+  G1b 11.5 -> 10.6 (c-background 63 -> 38), t50 68.9 -> 72.0, G2 91.0 -> 92.7. Silenced want not
+  protected (57 plants) — reviewer checking against FINANCE 2026-10-03.
+  R3 review clean; **BEN RULED (35eb5707): silenced processor want is protected too** (processor
+  part only). R3 round 2 sent (+ real-clear row, stale comments).
+  BL-1195 re-review clean (low items); original agent unresumable (worktree unverifiable) — fresh
+  agent does the tidy round on top of worktree-agent-a2c0cfcb69b515f0f (river-weighted clock,
+  reset on every return, per-frame lane cache, delete convoy_head_index, doc, R17 real tick).
+  **G1b R1+R2 DONE** (30a929c8 R1, e0bd50d9 R2 on worktree-agent-a123195de030662e7; base 5fde6f22;
+  NOT reviewed yet): before 87.5/68.9/11.5, run/built h 2391/2732, income 48,805 | R1 89.8/78.0/9.2,
+  2458/2737, 48,238 | R1+R2 96.4/86.0/**2.1**, **1736/1801**, **34,572 (-29%)**, firms 2407->2048.
+  R2's generation form charges households' whole basket at base (play fills 25-94%) -> ~34% fewer
+  processors. R2 makes background_fill SAVED (claims v45). corp_ai_harness R9(c) flipped (asserted
+  the overturned behaviour). charter_refusal_probe fixture households moved. **Form to Ben:**
+  measure R1+R3 and R2-at-expected-fill / accept / R2 in play only.
+  **BEN: ACCEPT R1+R2 AS BUILT (8dcecb83, recorded in CORPORATION_GENERATION Pass 3).** Cold review
+  running. Then merge R1+R2, then R3 (round 2), then the integrated gate.
+  **R3 ROUND 2 DONE** (ea624f40): silenced processor want protected; population_mvp T1-T5 drive the
+  real clear. Alone: G1b 10.6 -> 10.4, c-background 38 -> 2 but d-ceiling 36 -> 65; t50 72.0 ->
+  70.1; G2 92.7 -> 90.9. No save field. Ready to merge after R1+R2.
+  **R1+R2 REVIEW:** core logic clean; gaps — no play-form / shared-charge / rescue rows,
+  background_fill not hashed, run_contend fixture half-tests R2, generation charges razed centres
+  and unpriced goods (fixed as a defect: phantom buyers, not price). Fix round sent. Save stack to
+  renumber at merge: v42 BL-1195 (ledger says 43), v45 R2 -> sequential.
+  **BL-1195 MERGED 3694d297** (tidy round 9ba2bb4a via a fresh agent): save v42, ledger corrected
+  to 42; app BUILD_OK; sea_port_gate 95/0; save_roundtrip OK. Live look at a sea-route convoy
+  still owed. Note: a body-pool convoy records source_market null (not the body); lane falls back
+  to origin_tile. R2 must renumber to v43 at its merge.
+  **G1b MERGED:** 30224883 R1+R2 (fix round bcc4cfed: play-form/shared-charge/rescue rows
+  mutation-checked, background_fill hashed, run_contend fixed, generation skips razed/unpriced —
+  numbers unchanged; save renumbered 45 -> 43), 39907baf R3 (components.hpp comment conflict
+  resolved). Building + integrated 16-seed gate next. Save stack now v39-v43 sequential.
+  **INTEGRATED 16-SEED GATE, ALL PASS (39907baf; s50_int2_a/b pooled):** G1 96.6 (1739/1801), G1b
+  1.9 (35), G1t50 86.7 (2283/2633), G2 95.8, G3 96.3 (1973/2048); play income 34,922/seed-tick.
+  App BUILD_OK; save_roundtrip, population_mvp (45), build_only_what_runs pass. Sprint row
+  status_line updated. LEFT: BL-1252 (running); BL-1119 R4 quiet timing + R6 haulage; live clicks
+  (Build door no electrolysis on Kepler; sea-route convoy legs); close — doc check (REFINED § Close,
+  ~35 rulings now), BL-1165, the one re-bless (Ben's go), retro, version cut, integrate onto main.
+  **BL-1252 BUILT** (2f1ed0a0, worktree-agent-abf66128b6886e5cc): stamp_edge SNAPS a 2+-tile run
+  beside an existing road onto that road before stamping (pricing/stale reuse unchanged — a NEW
+  mechanism, novelty to file). Parallels d1K8 235 -> 47, time 1.04x, road tiles 79,154 -> 75,696,
+  harness green. BUT 5-seed gate (on a pre-G1b base): G2 89.5 -> 78.7, t50 77.6 -> 70.0 (seed 43
+  built by t50 265 -> 165). Re-measure sent: 16 seeds on the current tip, snap off / thr 2 / thr
+  3, and why income falls. Then a form to Ben.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).

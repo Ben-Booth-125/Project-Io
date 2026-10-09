@@ -376,7 +376,24 @@ inline constexpr uint32_t world_save_magic =
 /// refused whole on the strict-equality contract, no migration. 39 (D5,
 /// opening_stock_held) and 40 (D3, unposted_rate) are claimed by other sprint 50
 /// branches; this stacks above them, and the integrator renumbers at the merge.
-inline constexpr uint32_t world_save_version = 41;
+/// Bumped to 42 by BL-1195 (the convoy lane follows the legs it travels;
+/// SUPPLY.md § Logistical cost): the convoy record gains three entity ids at its
+/// tail, after `cost_paid` -- `origin_tile`, `port_a`, `port_b`, the intra-body
+/// route's waypoints recorded at dispatch so position, vision, interdiction and
+/// capture read the land -> port -> sea -> port -> land route the haul was priced
+/// on. A v41 stream is three ids short per convoy; refused whole on the
+/// strict-equality contract, no migration. Claimed through
+/// `tools/session/next_save_version.js --kind world --claim`.
+/// Bumped to 43 by BL-1217 G1b R2 (spare supply counts what households and the
+/// background take, Ben 2026-10-09; AI_OPPONENT.md § 11): the market record
+/// gains one resource-indexed float array at its tail, after
+/// `dial_pool_draw_tick` -- `background_fill`, what the background channel drew
+/// at the last clear, which the supply clause (input_reach.cpp) now reads
+/// between clears. An older stream is resource_count floats short per market;
+/// refused whole on the strict-equality contract, no migration. Claimed
+/// through `tools/session/next_save_version.js --kind world --claim` (renumbered 45 -> 43 at the
+/// sprint 50 integration, stacked on BL-1195's 42).
+inline constexpr uint32_t world_save_version = 43;
 
 /// Write @p w as a complete world snapshot.
 ///
