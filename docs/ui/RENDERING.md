@@ -70,7 +70,8 @@ untouched by construction):
 
 | Pass | Reads | Produces |
 |---|---|---|
-| **Base ground** | `substrate`, `height` | Continuous material colour, smoothly interpolated between tile centres — no cell boundary is ever drawn |
+| **Base ground** | `substrate`, `height` | Each tile's own material colour and texture across its body, blending into a neighbour only in a narrow band at the shared edge (§ Tiles hold their own ground) |
+| **Border sets** | the terrain family on each side of a shared edge | A natural transition along every edge between DIFFERENT families — forest fringe, rock lip, shore shelf, field edge (§ Tiles hold their own ground) |
 | **Hillshade relief** | `height` (BL-517's continuous field) | Slope lighting from a fixed sun azimuth — the exaggerated topographic read that carried panel C |
 | **Biome brushes** | `cover` × `cover_density` | Authored painterly stamps (forest canopy, scrub, marsh…) scattered by density, hash-seeded from grid coordinates |
 | **Landform relief** | `landform`, `height` | The dramatic landforms' own forms — massif and ridge, canyon cut, crater bowl, rift fissure (§ Mountains, rivers and terrain variety) |
@@ -177,14 +178,21 @@ ground retires only as coverage arrives.
 
 ### The grid rule
 
-**No hex grid renders on the ground.** No 1 px gap, no cell borders, no per-tile
-fill boundary — the ground is one continuous surface. The grid surfaces only as
-interaction feedback:
+**No hex grid renders on the ground** — with one amendment (Ben, 2026-10-09, below). No
+1 px gap, no cell borders, no per-tile fill boundary is BAKED into the ground. The grid
+surfaces as interaction feedback:
 
 - **Selection:** a single hex outline on the selected tile in the house amber
   `#E8A33D` (the treatment confirmed against all five it2 panels).
 - **Hover:** the same shape in the highlight convention's hover tint, yielding to
   selection (`highlight.hpp` precedence unchanged).
+- **The close-zoom seam (amended, Ben 2026-10-09):** at the two closest rungs only, a
+  **faint seam** is drawn between every pair of neighbouring tiles — a thin line in a
+  darkened tone of the ground under it, never a colour of its own — so a player can see
+  where one tile of grass ends and the next begins. It is drawn over the ground at those
+  rungs, not baked: the master is one image for every zoom, and a baked seam would darken
+  the far zooms where it would read as a grid. Below the close rungs the seam is absent
+  and the ground is continuous, as before.
 
 Tiles remain fully instrumental — hit-testing, placement, deposits, ownership are
 tile-keyed exactly as before (Ben, 2026-08-21: tiles are "rendered differently, but
@@ -192,6 +200,33 @@ still instrumental unit values"). The province selection outline and the structu
 hit-zones (national border corridor) are unaffected as *interaction* geometry; their
 visual weight over painterly ground is BL-734's to settle
 (ground/chrome layer contract).
+
+### Tiles hold their own ground
+
+Ben, 2026-10-09, after walking the sprint 51 build: *"there's still quite a blur over each
+tile, and it can be hard to see where one tile begins and ends."* The ground was
+interpolated between tile centres by design, and the terrain variants widened that blend to
+about a tile and a half, so neighbouring tiles melted together. Three changes answer it:
+
+- **Each tile keeps its own ground.** A tile's body carries its own material colour, its
+  own variant and its own texture undiluted; it blends into a neighbour only in a **narrow
+  band at the shared edge** (about the outer 15% of the hex). The variant cross-fade
+  (§ Mountains, rivers and terrain variety) narrows to the same band. The edge is still never
+  a drawn line between different terrains — that is the border sets' job.
+- **Border sets between different terrains.** Every edge between two DIFFERENT terrain
+  families bakes a natural **transition set** chosen by the pair: a forest edge as a
+  fringe of scattered trees and undergrowth stepping into the open ground; rock against
+  soil as a lip of broken scree; ground against water as a shore shelf (a pale wet margin
+  and shallows); cultivated or grassland against another family as a field edge (a hedge or
+  furrow line). The pair decides the set, so the transition reads as terrain and the edge
+  stays crisp without an outline. Same-family edges carry no set; the close-zoom seam
+  (§ The grid rule) marks them at the close rungs.
+- **More texture per family.** Each terrain family carries finer, higher-contrast grain
+  and its own **pattern**: furrows on cultivated ground, scree on rock, ripples on dunes,
+  tussocks on grass and scrub, with forest read through its canopy as now. Patterns are
+  procedural on the stamp seam, hash-placed from grid coordinates, keyed on the nominal
+  scale like every pass. **The master bakes at 2×** where the pre-bake still fits its
+  budget (TECH_FOUNDATIONS.md § Target hardware); otherwise at 1×.
 
 ### Installations — rendered geometry, no glyphs
 

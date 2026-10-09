@@ -1609,6 +1609,33 @@
     "scripts/verify/lens_modes.lua"
    ],
    "design": "SETTLED: LENSES.md § A lens washes the rendered ground; RENDERING.md § Installations (under a lens a structure is ground). WORK: under every lens draw the baked ground (the master level) exactly as the plain canvas does, then each lens's per-tile colour as a translucent wash in the identical geometry; a tile the lens has no answer for takes no wash; one tuned wash strength per lens family (categorical, sequential), set by eye with Ben; the owner lenses' picked identity wash, unpicked owned-grey wash and dark rim; lens marks stay vector chrome above. Vector per-tile fills only before a body's ground exists. Hit-testing unchanged. Verify: lens_modes.lua captures every lens over a built region; LIVE look with Ben. Starts after the 60 fps lane merges (same tile-loop code)."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 51,
+   "written": "2026-10-09",
+   "requires": [
+    "BL-1246"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 4,
+   "id": "BL-1251",
+   "short_name": "TILES_HOLD_THEIR_GROUND",
+   "author": "Ben (2026-10-09, the tile sharpness form: tiles blur and their edges are hard to see)",
+   "title": "Tiles hold their own ground: a narrow edge blend, natural border sets between terrains, a faint seam at the close zooms, finer textured tile sets",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "files": [
+    "src/ui/ground_bake.cpp",
+    "src/ui/ground_bake.hpp",
+    "src/ui/body_surface_canvas.cpp",
+    "tools/verify/ground_bake_check.cpp",
+    "scripts/verify/terrain_variants.lua"
+   ],
+   "design": "SETTLED: RENDERING.md § Tiles hold their own ground; § The grid rule (the close-zoom seam amendment, Ben 2026-10-09); the pass table rows Base ground and Border sets. WORK: (1) base ground and the variant cross-fade hold each tile undiluted, blending only in the outer ~15% band at a shared edge; (2) border sets per terrain-family pair baked along every edge between DIFFERENT families: forest fringe, rock/scree lip, shore shelf, field edge (hedge/furrow); (3) per-family finer grain and patterns (furrows, scree, dune ripples, tussocks), procedural on the stamp seam, nominal-keyed; (4) the master bakes 2x if the measured pre-bake fits the 15 s budget, else 1x; (5) the close-zoom seam: a faint line in a darkened tone of the ground between every pair of neighbouring tiles, drawn over the ground at the two closest rungs only, never baked. All deterministic, wrap-exact, window-invariant (the partial re-bake depends on it). Sequencing: bake parts (1-4) after the partial re-bake lane merges (same ground_bake code); the seam (5) with the lens-wash lane after the 60 fps lane merges (same canvas code). Re-measure the pre-bake after."
   }
  ]
 }
