@@ -41,11 +41,21 @@ print(string.format("[owner_multi_select] home body %s: %d rivals, %d firms hold
 
 -- A close framing on one owner's tile, so the tile fill reads at glyph scale.
 -- The owner's tile, the home market area, sits among the player's and rivals'.
+-- The lens washes the baked ground (BL-1250), so wait for the view's chunks: the
+-- structures under the wash are what the capture is for.
+local function settle()
+    for i = 1, 600 do
+        verify.frames(1)
+        local s = verify.ground_stats()
+        if s.pending_uploads == 0 and s.chunks > 0 then return end
+    end
+end
 local function close(name, corp)
     local t = tile_of[corp]
     if t == nil then return end
     verify.center_tile(t.x, t.y, 6.0)
     verify.frames(3)
+    settle()
     verify.capture(name)
     verify.goto_surface("home")   -- back to the whole-body framing
     verify.frames(2)
@@ -68,6 +78,7 @@ local n, list = picks("corporation")
 print("[owner_multi_select] corporation default picks: " .. list)
 verify.expect(n == 1, "the Corporation lens defaults to the player alone")
 local player_list = list -- the player's id, as the default set prints it
+settle()
 verify.capture("owner_corps_default")
 close("owner_corps_default_close", rivals[1])
 
@@ -75,6 +86,7 @@ verify.set_overlay("company")
 verify.frames(2)
 n, list = picks("company")
 verify.expect(n == 0, "the Company lens defaults to no firm")
+settle()
 verify.capture("owner_companies_default")
 close("owner_companies_default_close", firms[1])
 
@@ -89,6 +101,7 @@ verify.frames(2)
 n, list = picks("corporation")
 print("[owner_multi_select] corporation picks after two toggles: " .. list)
 verify.expect(n == 3, "player + two rivals picked")
+settle()
 verify.capture("owner_corps_two_rivals")
 close("owner_corps_two_rivals_close", rivals[1])
 
@@ -101,6 +114,7 @@ verify.set_overlay("company")
 verify.frames(2)
 n, list = picks("company")
 print("[owner_multi_select] company picks after two toggles: " .. list)
+settle()
 verify.capture("owner_companies_two_firms")
 close("owner_companies_two_firms_close", firms[1])
 
