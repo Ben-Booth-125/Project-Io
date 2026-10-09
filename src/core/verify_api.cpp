@@ -1058,6 +1058,16 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         t["active_slot"] = s.active_slot;
         t["master_ready"] = s.master_ready;
         t["master_total"] = s.master_total;
+        t["master_current"] = s.master_current;
+        // Which --verify path the ground is on: true = the pool (IO_GROUND_BENCH,
+        // the master fills by itself); false = synchronous (only what a frame
+        // draws is baked — polling master_ready never completes; call
+        // ground_complete_master).
+        t["pool_path"] = ground_layer::pool_path_under_verify();
+        // A monotonic wall clock (ms) for a script's time bound (the verify Lua
+        // state has no `os`): a fill under load is bounded in seconds, not frames.
+        t["clock_ms"] = std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now().time_since_epoch()).count();
         t["ram_total"]    = static_cast<double>(s.ram_total);
         t["bodies_resident"] = s.bodies_resident;
         t["uploads"]      = static_cast<double>(s.uploads);
@@ -1082,6 +1092,27 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return t;
     });
     v.set_function("ground_stats_reset", [this]() { m_ground.reset_stats(); });
+    // BL-1246: bake the active body's WHOLE master now (blocking; the pool
+    // bakes) and return once it is complete and current against this frame's
+    // world, or after `timeout_s` (default 600). Works on both --verify paths;
+    // the synchronous one never fills the master by itself. Returns
+    // { ok, ready, total, current, ms }. A script that needs the whole master
+    // calls this and errors on `not ok` — never a silent poll.
+    v.set_function("ground_complete_master", [this](sol::optional<double> timeout_s) {
+        const double t = timeout_s.value_or(600.0);
+        const auto t0 = std::chrono::steady_clock::now();
+        const bool ok = std::isfinite(t) && t > 0.0
+                     && m_ground.complete_master(m_world, m_ui.active_body, t * 1000.0);
+        int ready = 0, total = 0;
+        m_ground.master_progress(m_ui.active_body, ready, total);
+        sol::table r = m_lua.state().create_table();
+        r["ok"]      = ok;
+        r["ready"]   = ready;
+        r["total"]   = total;
+        r["current"] = m_ground.master_current(m_ui.active_body);
+        r["ms"]      = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+        return r;
+    });
     // A part-baked frame: at most n master chunk bakes per tick (-1 =
     // unlimited, the --verify default) — a first visit caught mid-bake.
     v.set_function("ground_fill_limit", [this](int n) { m_ground.verify_fill_limit = n; });
@@ -4939,6 +4970,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         t["chunk_bakes"]    = static_cast<double>(st.chunk_bakes);
         t["chunk_rebakes"]  = static_cast<double>(st.chunk_rebakes);
         t["neigh_bakes"]    = static_cast<double>(st.neigh_bakes);
+        t["chunk_patches"]  = static_cast<double>(st.chunk_patches);
         // A string: a 64-bit digest does not survive a Lua number.
         char buf[24];
         std::snprintf(buf, sizeof buf, "%016llx",

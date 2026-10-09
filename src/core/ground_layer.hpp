@@ -118,6 +118,19 @@ public:
     /// its source snapshot next pump rather than at the cadence.
     void touch();
 
+    /// Verify-only: bake @p body's WHOLE master now, from whatever state it is
+    /// in, and return once it is complete AND current against a snapshot of
+    /// @p w taken on entry — or false after @p timeout_ms. Blocks the calling
+    /// (main) thread; the pool bakes. The only way a --verify run reaches a
+    /// whole master on the synchronous path, which by design bakes only what
+    /// each frame draws (pump never feeds the pool there): a script polling
+    /// master_ready on that path waits forever at the view's coverage (2026-10-09:
+    /// 1960 of 2975 at the 1720x1080 home view).
+    bool complete_master(const world& w, entity_id body, double timeout_ms);
+    /// IO_GROUND_BENCH is set: --verify runs the live pool path (pump feeds the
+    /// pool, the master fills in the background), not the synchronous one.
+    static bool pool_path_under_verify();
+
     /// The C-F dials; shipped values are ground_bake.hpp's defaults.
     ui::ground::bake_params params;
 
@@ -138,6 +151,7 @@ public:
         long long ram_total   = 0;   ///< Every body's master + chain + far page, bytes.
         int       bodies_resident = 0;
         int       master_ready = 0, master_total = 0; ///< Active body.
+        bool      master_current = false;            ///< Active body: whole and swept against the latest snapshot.
         std::uint64_t uploads = 0;   ///< Texture uploads since reset_stats().
         int       pending_uploads = 0; ///< Visible chunks of the drawn level not yet on the GPU (last tick).
     };
@@ -414,6 +428,9 @@ private:
     // final, per pre-bake the master's wall time, and per re-bake the time
     // from the sweep that found it dirty to its upload. IO_GROUND_BENCH=1
     // also runs the pool path under --verify, so a script can drive it.
+    // IO_GROUND_STALL_LOG=1 prints every body's chunk states (ready / dirty /
+    // in the pool / needing a job), the queue and the source epochs every 60
+    // pumps — the reading that names why a master is not advancing.
     using clock = std::chrono::steady_clock;
     bool              m_fill_pending = false;
     clock::time_point m_fill_t0{};

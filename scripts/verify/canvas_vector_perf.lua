@@ -28,20 +28,16 @@ local function final_(s) return s.pending_uploads == 0 and s.chunks > 0 end
 
 verify.window(1720, 1080)
 verify.goto_surface("home")
--- The master, until it is whole or stops advancing (2026-10-09: measured stalling
--- at 1960/2975 chunks on the home body; each rung waits on its own chunks below).
+-- The WHOLE master, baked now, on either --verify ground path (BL-1246;
+-- ground_master_complete.lua): the synchronous path bakes only what a frame
+-- draws, so a poll of master_ready never completes there. Fails loudly.
 do
-    local last, still = -1, 0
-    for i = 1, 20000 do
-        verify.frames(1)
-        local s = verify.ground_stats()
-        if s.master_total > 0 and s.master_ready >= s.master_total then break end
-        if s.master_ready == last then still = still + 1 else still, last = 0, s.master_ready end
-        if still >= 120 then
-            print(string.format("CANVAS_MASTER stalled at %d/%d", s.master_ready, s.master_total))
-            break
-        end
+    local r = verify.ground_complete_master(600)
+    if not r.ok or r.ready ~= r.total or not r.current then
+        error(string.format("canvas_vector_perf: the home master did not complete (%d/%d, current %s, %.0f ms)",
+                            r.ready, r.total, tostring(r.current), r.ms))
     end
+    print(string.format("CANVAS_MASTER %d/%d complete in %.0f ms", r.ready, r.total, r.ms))
 end
 
 for _, lens in ipairs({ "none", "market", "population" }) do

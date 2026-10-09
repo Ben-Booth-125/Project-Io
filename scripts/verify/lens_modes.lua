@@ -72,20 +72,16 @@ local function poll(pred, limit)
 end
 verify.window(1720, 1080)
 verify.goto_surface("home")
--- The master, until it is whole or stops advancing (2026-10-09: measured stalling
--- at 1960/2975 chunks on the home body; the framing below waits on its own chunks).
+-- The WHOLE master, baked now, on either --verify ground path (BL-1246;
+-- ground_master_complete.lua): the synchronous path bakes only what a frame
+-- draws, so a poll of master_ready never completes there. Fails loudly.
 do
-    local last, still = -1, 0
-    for i = 1, 20000 do
-        verify.frames(1)
-        local s = verify.ground_stats()
-        if s.master_total > 0 and s.master_ready >= s.master_total then break end
-        if s.master_ready == last then still = still + 1 else still, last = 0, s.master_ready end
-        if still >= 120 then
-            print(string.format("[lens_modes] master stalled at %d/%d", s.master_ready, s.master_total))
-            break
-        end
+    local r = verify.ground_complete_master(600)
+    if not r.ok or r.ready ~= r.total or not r.current then
+        error(string.format("lens_modes: the home master did not complete (%d/%d, current %s, %.0f ms)",
+                            r.ready, r.total, tostring(r.current), r.ms))
     end
+    print(string.format("[lens_modes] master %d/%d complete in %.0f ms", r.ready, r.total, r.ms))
 end
 
 -- The densest built spot: the home-body building with the most others within 5 tiles.
