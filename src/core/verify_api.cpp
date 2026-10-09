@@ -1030,26 +1030,38 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // as a no-op so existing verify scripts that call it keep loading.
     v.set_function("set_resource_mode", [](bool) {});
     v.set_function("set_zoom", [this](float z) { m_ui.planetary_zoom = z; });
-    // BL-1244 (ground never magnified): the frame HUD's ground line as data —
-    // the drawn hex radius (hex_size * zoom, the ground quad's own scale — not
-    // the polygon fills' 1 px border-inset, F34), the active tier, texel/px
-    // (tier px per hex over drawn px per hex: >= 1 is minified, < 1
-    // magnified), the camera squash `sy` (cos tilt), per-slot cumulative
-    // bake ms / count since ground_stats_reset(), and resident texture bytes.
-    // Slot 0 = the far page, slot 1 + t = chunked tier t.
+    // BL-1246 (ground one master): the frame HUD's ground line as data — the
+    // drawn hex radius (hex_size * zoom, the ground quad's own scale — not the
+    // polygon fills' 1 px border-inset, F34), the drawn LEVEL of the master
+    // (`tier_ppr` keeps its old name: the level's px per hex), texel/px (>= 1
+    // minified, < 1 magnified), the camera squash `sy` (the one angle), per-
+    // slot cumulative bake ms / count since ground_stats_reset(), and per-slot
+    // RAM and GPU bytes of the active body. Slot 0 = the far page, slot 1 + l
+    // = level l (1 = the 96 px master: its chunk bakes; 2..5 = the 48/24/12/6
+    // levels: mip pieces derived). `resident_bytes` = RAM + GPU, kept for old
+    // scripts. Also: the active body's master progress, RAM across every
+    // body, texture uploads since the reset, and the visible chunks still
+    // waiting on the upload budget.
     v.set_function("ground_stats", [this]() {
         sol::state& lua = m_lua.state();
         const ground_layer::stats s = m_ground.stats_snapshot();
         sol::table t = lua.create_table();
         const float draw_r = m_ui.ground_req.draw_r;
-        const double ppr = m_ui.ground.tier_ppr > 0.0 ? m_ui.ground.tier_ppr : 6.0;
+        const double ppr = m_ui.ground.level_ppr > 0.0 ? m_ui.ground.level_ppr : 6.0;
         t["draw_r"]      = draw_r;
         t["tier_ppr"]    = ppr;
+        t["level_ppr"]   = ppr;
         t["texel_per_px"] = draw_r > 0.0f ? ppr / draw_r : 0.0;
-        t["sy"]          = m_ui.ground_req.sy;
+        t["sy"]          = ui::ground::k_tilt_sy;
         t["chunks"]      = static_cast<int>(m_ui.ground.chunks.size());
-        t["standin"]     = static_cast<int>(m_ui.ground.standin.size());
+        t["standin"]     = 0; // retired with the per-rung tiers (BL-1246)
         t["active_slot"] = s.active_slot;
+        t["master_ready"] = s.master_ready;
+        t["master_total"] = s.master_total;
+        t["ram_total"]    = static_cast<double>(s.ram_total);
+        t["bodies_resident"] = s.bodies_resident;
+        t["uploads"]      = static_cast<double>(s.uploads);
+        t["pending_uploads"] = s.pending_uploads;
         int ww = 0, wh = 0;
         SDL_GetWindowSize(m_window, &ww, &wh);
         t["window_w"] = ww;
@@ -1058,18 +1070,20 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         for (int i = 0; i < ground_layer::k_stat_slots; ++i)
         {
             sol::table r = lua.create_table();
-            r["ppr"]            = s.tier_ppr[i];
+            r["ppr"]            = s.ppr[i];
             r["bake_ms"]        = s.bake_ms[i];
             r["bakes"]          = s.bakes[i];
-            r["resident_bytes"] = static_cast<double>(s.resident_bytes[i]);
+            r["ram_bytes"]      = static_cast<double>(s.ram_bytes[i]);
+            r["gpu_bytes"]      = static_cast<double>(s.gpu_bytes[i]);
+            r["resident_bytes"] = static_cast<double>(s.ram_bytes[i] + s.gpu_bytes[i]);
             slots[i] = r;
         }
         t["slots"] = slots;
         return t;
     });
     v.set_function("ground_stats_reset", [this]() { m_ground.reset_stats(); });
-    // The mid-fill frame: at most n chunk bakes per tick (-1 = unlimited, the
-    // --verify default). Pair with a rung change to capture the stand-in.
+    // A part-baked frame: at most n master chunk bakes per tick (-1 =
+    // unlimited, the --verify default) — a first visit caught mid-bake.
     v.set_function("ground_fill_limit", [this](int n) { m_ground.verify_fill_limit = n; });
     v.set_function("set_pan",  [this](float x, float y) {
         m_ui.planetary_pan_x = x;
@@ -3096,7 +3110,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 r == construction_result::tech_locked            ? "tech_locked" :
                 r == construction_result::era_locked             ? "era_locked" : "failed";
             if (r == construction_result::placed)
+            {
                 m_ui.selected_entity = built;
+                m_ground.touch(); // as the live construction path does (BL-1246)
+            }
             SDL_Log("verify.build_first_valid: %s at tile (%d,%d)", name, tc.grid_x, tc.grid_y);
             return std::string(name);
         }
@@ -3132,7 +3149,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 r == construction_result::tech_locked            ? "tech_locked" :
                 r == construction_result::era_locked             ? "era_locked" : "failed";
             if (r == construction_result::placed)
+            {
                 m_ui.selected_entity = built;
+                m_ground.touch(); // as the live construction path does (BL-1246)
+            }
             SDL_Log("verify.build_at: %s at tile (%d,%d)", name, col, row);
             return std::string(name);
         }

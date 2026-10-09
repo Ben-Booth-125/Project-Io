@@ -439,6 +439,7 @@ private:
     void poll_worldgen();
     /// The loading screen: a progress bar over generation_progress.
     void draw_building_screen();
+    void draw_painting_screen(); ///< BL-1246: "Painting the ground", after the seat.
     /// The live nation carve + charter marks drawn inside it (BL-305).
     void draw_building_carve();
 
@@ -588,7 +589,9 @@ private:
     // over the settled world once the validation run is over, and only on the
     // interactive path — a path with no player to ask still draws the seat and
     // goes straight to `in_game`. Like every pre-play screen it does not tick.
-    enum class app_screen { menu, generating, building, choosing_seat, in_game };
+    /// painting_ground (BL-1246): after the seat, while the home body's ground
+    /// master finishes baking (STARTUP.md § Handoff).
+    enum class app_screen { menu, generating, building, choosing_seat, painting_ground, in_game };
     app_screen m_screen = app_screen::menu;
     /// Pending `--load` target, consumed by run() before the frame loop.
     std::string m_pending_load;
@@ -1083,6 +1086,21 @@ private:
     /// True while a --verify script drives frames: the ground cache bakes every
     /// chunk synchronously so a capture never races the per-frame bake budget.
     bool            m_ground_bake_all = false;
+    /// BL-1246: set by run() (the live frame loop) — the home master pre-bakes
+    /// when the world is finished, and entering play waits for it. Off on the
+    /// headless paths, which pump no frames.
+    bool            m_ground_prebake_on = false;
+    /// BL-1246: false while the ground pre-bakes from a world the app does not
+    /// hold yet (the wizard's cached round-6 world) — the pump then reads no
+    /// world at all; true once a world is adopted or loaded into m_world.
+    bool            m_ground_world_live = true;
+    /// BL-1246: the wizard cache the running pre-bake was started from (null =
+    /// none): Begin's adoption of that same cache keeps the bake.
+    const void*     m_ground_prebake_token = nullptr;
+    void start_ground_prebake(const world& w, const void* token);
+    /// BL-1246: the "Painting the ground" wait's sink (its bar is the master's
+    /// chunks landed over its total).
+    generation_progress m_paint_wait;
     recipe_registry m_registry;          ///< Recipes + economy constants, loaded from Lua at startup.
     works_registry  m_works;             ///< BL-321 Era -1 works table, loaded from scripts/works.lua at startup.
     tech_tree_registry m_tech_tree;      ///< BL-087 mock tech/quest tree, loaded from Lua at startup; F9 viewer only.

@@ -207,21 +207,50 @@ bake_source prepare_source(const world& w, entity_id body, bool reveal_all = fal
 void bake_region(const bake_source& src, const geometry& g, const bake_params& p,
                  int px0, int py0, int pw, int ph, std::uint32_t* out);
 
-/// The never-magnify tier chooser (BL-1244, RENDERING.md § Level of detail):
-/// the index of the SMALLEST tier whose px per hex is at or above @p draw_r,
-/// so the tier is drawn minified (never past 2:1 on a x2 ladder) and never
-/// magnified. -1 = the far page, which carries the frame only where it too is
-/// drawn at or below 1:1 (@p draw_r <= @p far_ppr). Past the top tier the top
-/// tier is returned and magnifies — the ladder's one bound.
-/// @p tier_ppr must be ascending.
-int choose_tier(double draw_r, double far_ppr, const double* tier_ppr, int n_tiers);
+/// THE ONE CAMERA ANGLE (RENDERING.md § One angle, Ben 2026-10-09): the
+/// planetary ground is viewed at 22.5 degrees at every rung and under every
+/// lens — the canvas squashes y by this, and every bake is oblique by it.
+inline constexpr double k_tilt_sy = 0.92387953251128674; ///< cos(22.5 deg)
 
-/// The shipped tier ladder (RENDERING.md § Level of detail): the far page and
-/// the chunked tiers, px per hex circumradius. One source for ground_layer and
-/// the headless chooser rows.
+/// THE ONE MASTER (RENDERING.md § Level of detail, Ben 2026-10-09): every
+/// body's ground is baked ONCE, whole-body, at k_master_ppr px per hex at the
+/// one angle, in 512 px chunks; every other zoom is a box-downsample of it.
+/// Level 0 is the master; level k is the master halved k times — 96, 48, 24,
+/// 12 and 6 px per hex. The master's W and H are multiples of
+/// k_master_align (= 2^(k_level_count - 1)), so every level is a whole number
+/// of pixels, every master chunk halves exactly at every level, and a level's
+/// wrap period is still exactly its width.
+inline constexpr double k_master_ppr   = 96.0;
+inline constexpr int    k_level_count  = 5;
+inline constexpr int    k_master_align = 1 << (k_level_count - 1);
+inline constexpr double k_level_ppr[k_level_count] = { 96.0, 48.0, 24.0, 12.0, 6.0 };
+/// The fallback page a not-yet-baked body is drawn from: a direct whole-body
+/// bake at 6 px per hex (one job), shown until the master's levels cover the
+/// view. Same angle as the master.
 inline constexpr double k_far_ppr = 6.0;
-inline constexpr int    k_tier_count = 5;
-inline constexpr double k_tier_ladder[k_tier_count] = { 12.0, 24.0, 48.0, 96.0, 192.0 };
+/// Pixel side of one chunk, at every level.
+inline constexpr int    k_chunk_px = 512;
+
+/// The master geometry for a body grid: oblique at k_tilt_sy, ~k_master_ppr
+/// px per hex, W and H rounded to multiples of k_master_align.
+geometry make_master_geometry(int gw, int gh);
+
+/// Level @p level (0 = the master) of @p master: s, W and H halved @p level
+/// times; y_min, lift and tilt unchanged — the same image, smaller.
+geometry level_geometry(const geometry& master, int level);
+
+/// The level a drawn hex radius reads (RENDERING.md § Level of detail): the
+/// COARSEST level whose px per hex is at or above @p draw_r, so it is drawn
+/// minified by at most 2:1; above the master's 96 px the master is drawn
+/// magnified (the top rung's accepted ~1.15x at the reference window).
+int choose_level(double draw_r);
+
+/// Box-downsample @p src (@p sw x @p sh, both even) to half size into @p dst
+/// (sw/2 x sh/2), alpha-weighted so a transparent margin never darkens an
+/// edge. Pure: the mip chain is built with it chunk by chunk, and because a
+/// master chunk's sides are multiples of k_master_align the chunkwise chain
+/// equals the whole-image one byte for byte.
+void downsample_half(const std::uint32_t* src, int sw, int sh, std::uint32_t* dst);
 
 /// Content hash of everything bake_region reads for the given pixel window
 /// (tile fields + mask state of the tiles overlapping it, plus a margin ring).

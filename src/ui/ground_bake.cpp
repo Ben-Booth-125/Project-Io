@@ -2000,14 +2000,69 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
                     static_cast<std::size_t>(pw) * 4u);
 }
 
-int choose_tier(double draw_r, double far_ppr, const double* tier_ppr, int n_tiers)
+geometry make_master_geometry(int gw, int gh)
 {
-    if (draw_r <= far_ppr || n_tiers <= 0)
-        return -1;
-    for (int t = 0; t < n_tiers; ++t)
-        if (tier_ppr[t] >= draw_r)
-            return t;
-    return n_tiers - 1; // past the top tier: magnified, the ladder's bound
+    geometry g = make_geometry(gw, gh, k_master_ppr, k_tilt_sy);
+    const double period = gw * kSqrt3;
+    // W to the nearest multiple of the alignment (s re-derived so wrap copies
+    // still abut exactly), then H up to one: a few transparent rows of margin.
+    const int A = k_master_align;
+    g.W = std::max(A, static_cast<int>(std::lround(period * k_master_ppr / A)) * A);
+    g.s = g.W / period;
+    const double y_max = 1.5 * (gh - 1) + 1.0;
+    const int    h     = std::max(1, static_cast<int>(std::ceil((y_max - g.y_min) * g.s)));
+    g.H = (h + A - 1) / A * A;
+    return g;
+}
+
+geometry level_geometry(const geometry& master, int level)
+{
+    geometry g = master;
+    const int k = std::clamp(level, 0, k_level_count - 1);
+    g.s = master.s / static_cast<double>(1 << k);
+    g.W = master.W >> k;
+    g.H = master.H >> k;
+    return g;
+}
+
+int choose_level(double draw_r)
+{
+    for (int k = k_level_count - 1; k > 0; --k)
+        if (k_level_ppr[k] >= draw_r)
+            return k;
+    return 0; // the master: minified up to 2:1, or magnified past 96 px
+}
+
+void downsample_half(const std::uint32_t* src, int sw, int sh, std::uint32_t* dst)
+{
+    const int dw = sw / 2, dh = sh / 2;
+    for (int y = 0; y < dh; ++y)
+    {
+        const std::uint32_t* r0 = src + static_cast<std::size_t>(2 * y) * sw;
+        const std::uint32_t* r1 = r0 + sw;
+        std::uint32_t*       o  = dst + static_cast<std::size_t>(y) * dw;
+        for (int x = 0; x < dw; ++x)
+        {
+            const std::uint32_t q[4] = { r0[2 * x], r0[2 * x + 1], r1[2 * x], r1[2 * x + 1] };
+            if (q[0] == q[1] && q[0] == q[2] && q[0] == q[3])
+            {
+                o[x] = q[0]; // flat run (lock fill, open sea, margin): exact
+                continue;
+            }
+            int sr = 0, sg = 0, sb = 0, sa = 0;
+            for (const std::uint32_t c : q)
+            {
+                const int a = palette::col_a(c);
+                sr += palette::col_r(c) * a;
+                sg += palette::col_g(c) * a;
+                sb += palette::col_b(c) * a;
+                sa += a;
+            }
+            o[x] = sa == 0 ? 0u
+                 : palette::col32((sr + sa / 2) / sa, (sg + sa / 2) / sa,
+                                  (sb + sa / 2) / sa, (sa + 2) / 4);
+        }
+    }
 }
 
 std::uint64_t region_hash(const bake_source& src, const geometry& g,

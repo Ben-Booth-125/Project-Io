@@ -325,16 +325,13 @@ struct ground_chunk_view
 };
 
 /// Everything the canvas needs to draw the baked ground for one body: the far
-/// page under everything, plus the ACTIVE zoom tier's ready chunks over it
-/// (the tier pairing with the stepped x2 zoom ladder — RENDERING.md § LOD).
+/// page under everything, plus the drawn LEVEL's chunks over it — one level of
+/// the body's one master (RENDERING.md § Level of detail, BL-1246).
 struct ground_view
 {
     entity_id body = null_entity;    ///< Body the bake describes; canvas ignores a mismatch.
-    double    tier_ppr = 0.0;        ///< Active tier's baked px per hex circumradius (0 = far only).
-    std::vector<ground_chunk_view> chunks; ///< The active tier's ready chunks.
-    /// The next tier DOWN's resident chunks — the stand-in while the active
-    /// tier fills (BL-1244); drawn over the far page, under `chunks`.
-    std::vector<ground_chunk_view> standin;
+    double    level_ppr = 0.0;       ///< Drawn level's px per hex circumradius (0 = far page only).
+    std::vector<ground_chunk_view> chunks; ///< The drawn level's chunks on the GPU, in view.
     ground_chunk_view far;           ///< Low-res whole-body page (tex null until baked).
     bool far_ready = false;
     /// BL-1241: the Selection band's neighbourhood view, baked as its own small
@@ -356,14 +353,14 @@ struct ground_neigh_request
 };
 
 /// The canvas's bake request: the canonical-space rect visible this frame plus
-/// the drawn hex radius (which picks the tier). Read by ground_layer next
+/// the drawn hex radius (which picks the level). Read by ground_layer next
 /// frame — one frame of latency, covered by the far page / vector fallback.
+/// No tilt field: the camera has one angle (RENDERING.md § One angle).
 struct ground_request
 {
     entity_id body = null_entity;
     float x0 = 0, y0 = 0, x1 = 0, y1 = 0;
     float draw_r = 0;                ///< Drawn hex circumradius, screen px.
-    float sy     = 1.0f;             ///< Camera squash cos(tilt); < 1 wants an oblique tier (BL-737).
     bool  valid = false;
 };
 

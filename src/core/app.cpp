@@ -343,6 +343,9 @@ int app::run(autostart_mode autostart)
     // corporation they are; the windowed autostart walks the wizard for
     // nobody, so its tail draws (and says so).
     m_player_picks_seat = !windowed_autostart;
+    // BL-1246: the live frame loop pumps the ground pool every frame, so the
+    // home master can pre-bake behind the seat canvas and play can wait on it.
+    m_ground_prebake_on = true;
     // Apply the player's persisted display settings before anything renders, so
     // the window opens at their last size/mode. Interactive-only: run_verify()
     // never touches settings, keeping golden captures at the fixed default size.
@@ -888,7 +891,20 @@ void app::poll_worldgen()
     m_generation_report      = std::move(built->report);
     m_registry               = std::move(built->registry);
     m_landscape_winner_score = built->finish.search.winner_score;
+    // BL-1246 (STARTUP.md § Handoff): the world is finished. On the wizard's
+    // round-6 path the home master has been baking since round 6 landed
+    // (start_ground_prebake, from the cache this IS); on the cold path it
+    // starts now. Either way it bakes behind the seat canvas.
+    const bool prebaked = m_ground_prebake_token != nullptr
+                       && m_ground_prebake_token == static_cast<const void*>(built.get());
     built.reset();
+    m_ground_prebake_token = nullptr;
+    if (!prebaked)
+    {
+        m_ground.forget_world();
+        start_ground_prebake(m_world, nullptr);
+    }
+    m_ground_world_live = true;
     pin_nation_colours_from_report(); // BL-1089: the realms' colours, before the first frame
     start_new_game_prelude();
     // BL-568: the cadence key continues from the settle's twelve steps, which
@@ -1017,6 +1033,70 @@ void app::draw_building_screen()
         draw_building_carve();
     }
     ImGui::End();
+}
+
+/// BL-1246 (STARTUP.md § Handoff): start the home body's ground master on the
+/// pool, from @p w — the wizard's cached round-6 world the moment it lands
+/// (@p token = that cache, so Begin's adoption can tell the bake is its own),
+/// or the adopted world on the cold path (@p token null). The live app only.
+void app::start_ground_prebake(const world& w, const void* token)
+{
+    if (!m_ground_prebake_on || m_ground_bake_all)
+        return;
+    m_ground.forget_world();
+    m_ground.registry = &m_registry;
+    m_ground.prebake(w, w.home_body);
+    m_ground_prebake_token = token;
+    if (token)
+        m_ground_world_live = false; // the app's m_world is not this world yet
+    std::printf("[ground] pre-bake of the home master started (%s)\n",
+                token ? "the wizard's round-6 world" : "the adopted world");
+    std::fflush(stdout);
+}
+
+/// BL-1246 (STARTUP.md § Handoff): the last loading step — the home body's
+/// ground master finishing on the pool after the seat is taken. The same one
+/// wait surface as every other step, captioned "Painting the ground", its bar
+/// the master's chunks landed over its total. When the master is whole, play
+/// opens through finish_new_game exactly as it would have without the wait.
+void app::draw_painting_screen()
+{
+    int ready = 0, total = 0;
+    m_ground.master_progress(m_world.home_body, ready, total);
+    m_paint_wait.weight_total.store(std::max(total, 1), std::memory_order_relaxed);
+    m_paint_wait.weight_done.store(ready, std::memory_order_relaxed);
+
+    const ImVec2 disp = ImGui::GetIO().DisplaySize;
+    ImGui::SetNextWindowPos({disp.x * 0.5f, disp.y * 0.5f}, ImGuiCond_Always, {0.5f, 0.5f});
+    constexpr ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_AlwaysAutoResize |
+        ImGuiWindowFlags_NoBackground;
+    if (ImGui::Begin("##painting", nullptr, flags))
+    {
+        const char* title = "BUILDING THE WORLD";
+        const float tw = ImGui::CalcTextSize(title).x;
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (420.0f - tw) * 0.5f);
+        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(225, 230, 240, 255));
+        ImGui::TextUnformatted(title);
+        ImGui::PopStyleColor();
+        ImGui::Dummy({420.0f, 10.0f});
+        ui::draw_generation_wait(m_paint_wait, 420.0f, "Painting the ground",
+                                 m_golden_dir.empty());
+        ImGui::Dummy({420.0f, 8.0f});
+        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 142, 255));
+        ImGui::TextUnformatted("The home world's ground is baked once, for every zoom.");
+        ImGui::PopStyleColor();
+    }
+    ImGui::End();
+
+    if (total == 0 || ready >= total)
+    {
+        std::printf("[begin] the ground is painted (%d chunks): play opens\n", total);
+        std::fflush(stdout);
+        finish_new_game(); // passes the gate now, rebases the clock, opens play
+    }
 }
 
 /// The live carve (BL-305): the world's politics being DECIDED rather than
@@ -1455,6 +1535,25 @@ void app::start_new_game_prelude()
 
 void app::finish_new_game()
 {
+    // BL-1246 (STARTUP.md § Handoff — the ground pre-bakes behind the
+    // handoff): play does not open on a half-painted ground. If the home
+    // body's master is still baking, wait for it on the loading screen
+    // ("Painting the ground"); that screen calls back here when it lands.
+    // Before the clock rebase below, so the wait never lands as game days.
+    int paint_ready = 0, paint_total = 0;
+    m_ground.master_progress(m_world.home_body, paint_ready, paint_total);
+    if (m_ground_prebake_on && !m_ground_bake_all && paint_total > 0 && paint_ready < paint_total)
+    {
+        if (m_screen != app_screen::painting_ground)
+        {
+            m_paint_wait.begin_wait();
+            m_paint_wait.stage_count.store(1, std::memory_order_relaxed);
+            m_screen = app_screen::painting_ground;
+            std::printf("[begin] painting the ground: waiting on the home master\n");
+            std::fflush(stdout);
+        }
+        return;
+    }
     // THE BALANCE SERIES FROM THE RETURNS THE SETTLE FILED (STARTUP.md
     // § Handoff, item 2; BL-1085). The twelve pre-game ticks ran inside the
     // worker with no presentation half of their own -- no agency comms, no
@@ -2085,6 +2184,9 @@ bool app::load_game_from(const std::string& path)
         return false;
     }
 
+    m_ground.forget_world(); // BL-1246: another world's masters are not this one's
+    m_ground_prebake_token = nullptr;
+    m_ground_world_live    = true;
     m_world               = std::move(w);
     m_generation_report   = std::move(env.report);
     m_active_world_params = env.params;
@@ -2173,6 +2275,12 @@ void app::render()
     pump_injected_input();
     ImGui::NewFrame();
 
+    // BL-1246: the ground pool's per-frame pump, on EVERY screen — the home
+    // body's master pre-bakes behind the seat canvas (STARTUP.md § Handoff).
+    m_ground.registry = &m_registry;
+    m_ground.pump(m_ground_world_live || m_screen == app_screen::in_game ? &m_world : nullptr,
+                  m_ground_bake_all);
+
     // Main menu and the staged generation screen — drawn instead of the canvases
     // when play has not started. Both share the Render/clear/capture tail below, so
     // either is capturable like any frame.
@@ -2180,6 +2288,8 @@ void app::render()
     {
         if (m_screen == app_screen::building)
             draw_building_screen();
+        else if (m_screen == app_screen::painting_ground)
+            draw_painting_screen(); // BL-1246: entering play waits for the home master
         else if (m_screen == app_screen::choosing_seat)
             draw_seat_screen(); // BL-1076: the corporation selection canvas
         else if (m_screen == app_screen::generating)
@@ -2557,6 +2667,10 @@ void app::render()
         switch (r)
         {
             case construction_result::placed:
+                // BL-1246: the ground under it re-bakes now, not at the
+                // source cadence (TECH_FOUNDATIONS.md § Target hardware: a
+                // building placed is re-baked within 1 s).
+                m_ground.touch();
                 // BL-095: placement now only *starts* a durative, material-gated build
                 // (ticks_remaining > 0), so the toast reflects that rather than claiming
                 // it is done — the Selection card carries the live rate / ETA / paused

@@ -15,31 +15,49 @@
 #include <vector>
 
 // ---------------------------------------------------------------------------
-// Ground layer (BL-732 / wave 2) — the SDL half of the baked-chunk ground.
+// Ground layer (BL-732; BL-1246, one master) — the SDL half of the baked ground.
 //
-// Owns the textures the Planetary canvas draws its ground from, in TIERS that
-// pair with the stepped x2 zoom ladder (Ben, 2026-09-01 — stepped zoom so
-// every level is crisp): one whole-body FAR page at ~6 px per hex circumradius
-// for the bottom rung, and chunked tiers at 12/24/48/96/192 px for the rungs
-// above it. The canvas's ground_request carries the drawn hex radius; the
-// smallest tier at or above it becomes the ACTIVE tier — drawn minified, never
-// magnified (BL-1244) — and its chunks are baked around the viewport,
-// LRU-capped. While they fill, ONE stand-in tier carries the frame under them:
-// the nearest finer tier resident in the viewport, else the nearest coarser
-// one, else the far page alone. Every bake is supersampled 2x and downsampled
-// before upload (ui/ground_bake).
+// ONE MASTER PER BODY (docs/ui/RENDERING.md § Level of detail, Ben 2026-10-09:
+// "zooming doesn't add more detail"). Each body's ground is baked ONCE, whole
+// body, at 96 px per hex at the one camera angle (22.5 deg), in 512 px chunks
+// held in SYSTEM RAM. As each master chunk lands, the worker that baked it
+// box-downsamples it into its pieces of the 48 / 24 / 12 / 6 px levels — the
+// mip chain — so every level is a chunked RAM image too. Each frame the
+// Planetary canvas draws ONE level, the coarsest at or above its drawn hex
+// radius (minified <= 2:1), and this layer uploads that level's visible
+// chunks to GPU textures within a per-frame upload budget, keeping an LRU of
+// textures; spare budget prefetches the adjacent levels, so a rung change
+// finds its textures already resident.
 //
-// ALL BAKING RUNS ON A POOL OF WORKER THREADS (wave 2's perf half; the pool,
-// Ben 2026-10-09): N = max(1, hardware threads - 2) workers at below-normal OS
-// priority pull from one shared, priority-ordered job queue — the far page
-// first, then the neighbourhood page, then chunks nearest the viewport centre.
-// The pure bake (ui/ground_bake) executes against an immutable source snapshot
-// shared read-only by every worker; the render thread only hashes, enqueues,
-// uploads finished buffers into SDL textures and publishes the view. A result
-// is identified by (generation, tier, key), so arrival order cannot matter, and
-// a generation counter discards results that outlive their source or body.
-// Under --verify everything bakes synchronously on the main thread instead, so
-// a capture can never race the pool.
+// A body with no master yet draws its FAR PAGE — one direct whole-body bake
+// at 6 px per hex, the first job on a body — and, before that, the canvas's
+// vector fallback. Nothing else stands in.
+//
+// THE POOL (Ben, 2026-10-09): N = max(1, hardware threads - 2) workers at
+// below-normal OS priority pull from one shared queue, popped lowest
+// priority value first: far pages, then hash sweeps, then the Selection
+// band's neighbourhood page, then the active body's master chunks under the
+// view (nearest the centre first), then the rest of that body, then the
+// pre-bake target, then background bodies. The pure bake executes against an
+// immutable source snapshot shared read-only by every worker; the render
+// thread only drains results into RAM, uploads textures and publishes the
+// view. A result lands only in the slot whose outstanding job it is (a job
+// sequence number), so arrival order cannot matter.
+//
+// INVALIDATION IS CONTENT-HASHED, per master chunk. A source snapshot is
+// re-taken on a cadence; when its whole-body digest moves, a sweep job hashes
+// every master chunk against it, and a chunk whose hash moved re-bakes in the
+// master and re-derives only its own mip pieces.
+//
+// RAM: a budget across bodies (k_ram_budget) drops the least-recently-visited
+// body's master and chain, keeping its far page; background bakes start only
+// where they fit without dropping anything.
+//
+// Under --verify everything a frame draws is complete before tick returns: the
+// master chunks under the view are baked on the pool and WAITED for, the far
+// page and neighbourhood page bake on the main thread, and every visible
+// texture is uploaded with no budget — a capture can never race the pool.
+// Pre-bake and background bakes are off under --verify.
 // ---------------------------------------------------------------------------
 
 struct world;
@@ -49,63 +67,88 @@ class ground_layer
 public:
     ~ground_layer();
 
-    /// Per-frame driver. See file header. @p bake_everything = the --verify
-    /// path: synchronous main-thread bakes of the far page plus every chunk
-    /// (all tiers) the last request touches.
+    /// Every frame, on every screen (the pre-bake runs behind the wizard's
+    /// last round and the seat canvas): drains finished bakes into RAM,
+    /// re-takes source snapshots on their cadence, and keeps the pool fed.
+    /// @p w null = the world being pre-baked is not the app's yet (the
+    /// wizard's cached world): drain and feed only. @p verify = the --verify
+    /// run (no pre-bake, no background bodies).
+    void pump(const world* w, bool verify);
+
+    /// The Planetary canvas's per-frame driver: body switch, the request's
+    /// level and window, uploads within the budget, publish. @p
+    /// bake_everything = the --verify path (see file header).
     void tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake_everything);
 
     /// Stop the workers and destroy every texture. Call before the renderer dies.
     void shutdown();
 
+    /// A different world is in play (a new campaign, a load): drop every body.
+    void forget_world();
+
+    /// STARTUP.md § Handoff: start @p body's master on the pool now (the
+    /// homeworld, the moment the world is finished). Not under --verify.
+    void prebake(const world& w, entity_id body);
+    /// Master chunks landed and current / total for @p body (0 / 0 unknown).
+    void master_progress(entity_id body, int& ready, int& total) const;
+    /// Every master chunk of @p body has landed and is current.
+    bool master_complete(entity_id body) const;
+    /// The world just changed under the active body (a build placed): re-take
+    /// its source snapshot next pump rather than at the cadence.
+    void touch();
+
     /// The C-F dials; shipped values are ground_bake.hpp's defaults.
     ui::ground::bake_params params;
 
-    /// Bake-cost and residency instrumentation (BL-1244): cumulative bake
-    /// milliseconds and bake count per slot since the last reset_stats(),
-    /// slot 0 = the far page, slot 1 + t = chunked tier t; plus the resident
-    /// texture bytes per slot NOW. Read by verify.ground_stats().
+    /// Bake-cost and residency instrumentation, read by verify.ground_stats().
+    /// Slot 0 = the far page; slot 1 + l = level l (0 = the master). bake_ms /
+    /// bakes: cumulative since reset_stats() — master chunk bakes in slot 1,
+    /// mip pieces derived in slots 2..5. ram_bytes: the active body's RAM per
+    /// level; gpu_bytes: its uploaded textures per level.
     static constexpr int k_stat_slots = 8;
     struct stats
     {
-        double    bake_ms[k_stat_slots]        = {};
-        int       bakes[k_stat_slots]          = {};
-        long long resident_bytes[k_stat_slots] = {};
-        double    tier_ppr[k_stat_slots]       = {};
+        double    bake_ms[k_stat_slots]   = {};
+        int       bakes[k_stat_slots]     = {};
+        long long ram_bytes[k_stat_slots] = {};
+        long long gpu_bytes[k_stat_slots] = {};
+        double    ppr[k_stat_slots]       = {};
         int       active_slot = -1;
+        long long ram_total   = 0;   ///< Every body's master + chain + far page, bytes.
+        int       bodies_resident = 0;
+        int       master_ready = 0, master_total = 0; ///< Active body.
+        std::uint64_t uploads = 0;   ///< Texture uploads since reset_stats().
+        int       pending_uploads = 0; ///< Visible chunks of the drawn level not yet on the GPU (last tick).
     };
     stats stats_snapshot() const;
     void  reset_stats();
 
-    /// Verify-only: under bake_everything, bake at most this many chunks per
-    /// tick (-1 = no limit) — so a script can capture the deterministic
-    /// MID-FILL frame a rung change shows while its tier fills (BL-1244).
+    /// Verify-only: under bake_everything, bake at most this many master
+    /// chunks per tick (-1 = no limit) — a first-visit frame part-way through.
     int verify_fill_limit = -1;
-    /// BL-1241: bake counters, so a verify run can show what re-bakes and when
-    /// (a re-bake must follow a construction event, never a tick). Monotonic
-    /// across body switches; read-only to callers.
+
+    /// BL-1241: bake counters (a re-bake must follow a construction event,
+    /// never a tick). Monotonic across body switches.
     struct bake_stats
     {
         std::uint64_t far_bakes = 0;
-        std::uint64_t chunk_bakes = 0;
-        std::uint64_t chunk_rebakes = 0; ///< A chunk that was already ready, baked again.
+        std::uint64_t chunk_bakes = 0;   ///< Master chunks landed.
+        std::uint64_t chunk_rebakes = 0; ///< A master chunk that was already ready, baked again.
         std::uint64_t neigh_bakes = 0;
     };
     const bake_stats& bake_counters() const { return m_bake_counters; }
 
-    /// BL-1241: a digest of every installation in the current source snapshot
-    /// (0 with no source) — moves exactly when what the structure pass draws does.
+    /// BL-1241: a digest of every installation in the active body's source.
     std::uint64_t installation_digest() const;
 
-    /// BL-1241: the recipe registry a processing facility's structure stamp
-    /// reads its family (recipe group) from. Set by the app; null = general form.
+    /// BL-1241: the recipe registry a processing facility's stamp reads its
+    /// family from. Set by the app; null = general form.
     const recipe_registry* registry = nullptr;
 
-    /// Verify-only (BL-1241, ground_rebake.lua's per-chunk diff): one row per
-    /// READY chunk of the active tier, plus the far page (tier -1, key 0) —
-    /// its key, how many times it has been uploaded, and the installation and
-    /// region hashes over its OWN window against the current source. A script
-    /// diffs these day to day: a chunk whose bake count moved must have had one
-    /// of its own hashes move.
+    /// Verify-only (ground_rebake.lua): one row per READY master chunk of the
+    /// active body under the last request's view, plus the far page (tier -1,
+    /// key 0): its key, its bake count, and the installation and region
+    /// hashes over its own window against the current source.
     struct chunk_probe
     {
         int           tier = -1;
@@ -116,165 +159,217 @@ public:
     };
     std::vector<chunk_probe> probe_chunks() const;
 
+    /// Per-frame GPU upload budget, chunks (each <= 1 MB): 12 MB a frame keeps
+    /// a 60 fps frame (measured; RENDERING.md § Level of detail).
+    static constexpr int         k_upload_budget = 12;
+    /// GPU texture LRU cap (textures of the active body; each <= 1 MB).
+    static constexpr std::size_t k_gpu_cap = 320;
+    /// RAM budget across bodies (TECH_FOUNDATIONS.md § Target hardware: 16 GB
+    /// minimum): the home body's master + chain is ~3.8 GB.
+    static constexpr long long   k_ram_budget = 6LL * 1024 * 1024 * 1024;
+    /// Master supersampling: 1x (measured 2026-10-09: the 2x whole-home bake
+    /// does not fit the 15 s pre-bake budget — RENDERING.md § Level of detail).
+    static constexpr int         k_master_ss = 1;
+
 private:
-    struct chunk
+    static constexpr int L = ui::ground::k_level_count;
+
+    struct level_store
     {
-        SDL_Texture*  tex  = nullptr;
-        std::uint64_t hash = 0;
-        bool          ready  = false;
-        bool          queued = false;
-        /// Ready, but its region hash has moved since it baked (found by a
-        /// stand-in sweep, which hashes and never bakes): never drawn until
-        /// re-baked, and re-hashed every tick it is wanted (F34, stale stand-in).
-        bool          stale  = false;
-        std::uint32_t job_gen = 0;   ///< Generation of the outstanding job while queued.
-        std::uint64_t bakes  = 0;    ///< Uploads into this slot (verify probe).
-        std::uint64_t last_want = 0; ///< Frame stamp for LRU eviction.
+        ui::ground::geometry geom;
+        int cw = 0, ch = 0;
+        std::vector<std::vector<std::uint32_t>> px; ///< Per chunk; empty = nothing written yet.
+        std::vector<std::uint32_t>              ver; ///< Bumps on every write.
     };
 
-    struct tier_state
+    struct body_state
     {
-        double                geom_ppr = 0.0;
-        double                baked_sy = 1.0; ///< Tilt the tier is baked at (BL-737).
-        ui::ground::geometry  geom;
-        int                   cw = 0, ch = 0;
-        std::unordered_map<std::uint32_t, chunk> chunks; ///< key = cj * cw + ci
+        entity_id id = null_entity;
+        int gw = 0, gh = 0;
+        level_store lv[L];
+        // Per master chunk (index = cj * cw + ci of level 0).
+        std::vector<std::uint64_t> baked_hash; ///< Hash the landed bake was taken against.
+        std::vector<std::uint64_t> want_hash;  ///< The current source's hash (valid when hashes_epoch == src_epoch).
+        std::vector<std::uint64_t> bakes;      ///< Landings per chunk (verify probe).
+        std::vector<std::uint64_t> job;        ///< Sequence of the outstanding job (0 = none).
+        std::vector<std::uint8_t>  ready;      ///< Landed at least once since the master was (re)allocated.
+        std::vector<std::uint8_t>  dirty;      ///< Ready, but its hash moved: re-bake.
+        int n_ready = 0;  ///< ready && !dirty
+        int n_chunks = 0;
+        bool master_alloc = false;             ///< Level buffers are live (false after a RAM drop).
+        std::shared_ptr<const ui::ground::bake_source> src;
+        std::uint32_t src_epoch = 0;
+        std::uint32_t hashes_epoch = ~0u;
+        std::uint64_t src_digest = 0;          ///< Whole-body region hash of src (the far page's).
+        std::uint64_t swept_digest = 0;        ///< Digest the last sweep ran against.
+        std::uint64_t sweep_job = 0;
+        int           src_age = 0;
+        // The far page: one whole-body image, baked as 512 px pieces on the
+        // pool (single-sample: it is the fallback a first visit shows for the
+        // second or so before the master covers the view).
+        ui::ground::geometry far_geom;
+        int           far_cw = 0, far_ch = 0;
+        std::vector<std::uint32_t> far_px;
+        std::vector<std::uint64_t> far_jobs;   ///< Outstanding job per piece (0 = none).
+        int           far_pending = 0;         ///< Pieces of the bake under way not yet landed.
+        std::uint64_t far_baking = 0;          ///< Digest the bake under way was taken against.
+        std::uint64_t far_hash = 0;            ///< Digest the shown page was baked against.
+        bool          far_ready = false;
+        std::uint32_t far_ver = 0;
+        // Visits (RAM budget order) and background order.
+        std::uint64_t last_visit = 0;
+        int           visits = 0;
+        bool          background = false;      ///< Baked speculatively (not visited, not pre-baked).
+        long long     ram = 0;
     };
 
-    /// A self-contained bake job: source snapshot + geometry + params travel
-    /// with it, so the worker never reads a ground_layer member.
+    enum class job_kind : std::uint8_t { far, sweep, master, neigh };
     struct job
     {
-        int  tier = -1;             ///< -1 = the far page; -2 = the neighbourhood page (BL-1241).
-        int  ci = 0, cj = 0;
-        int  px0 = 0, py0 = 0, pw = 0, ph = 0;
-        std::uint64_t hash = 0;
-        std::uint32_t gen  = 0;
-        std::shared_ptr<const ui::ground::bake_source> src;
-        ui::ground::geometry   geom;
-        ui::ground::bake_params prm;
-        // The neighbourhood page's subject travels WITH the job (F34): the
-        // result is shown under the tile and rect it was baked for, never
-        // under whatever the request names by the time it lands.
-        entity_id neigh_tile = null_entity;
-        float     neigh_rect[4] = { 0, 0, 0, 0 };
-        // Queue order (the pool): lower prio pops first, ties in enqueue order.
-        // Far page -2, neighbourhood page -1, a chunk its squared distance in
-        // chunks from the viewport centre.
-        double        prio = 0.0;
+        job_kind      kind = job_kind::master;
+        entity_id     body = null_entity;
+        int           idx  = 0;                ///< Master chunk index (master jobs).
         std::uint64_t seq  = 0;
+        double        prio = 0.0;
+        std::shared_ptr<const ui::ground::bake_source> src;
+        ui::ground::geometry    geom;
+        ui::ground::bake_params prm;
+        int px0 = 0, py0 = 0, pw = 0, ph = 0;
+        std::uint32_t epoch = 0;               ///< Source epoch (sweeps).
+        std::uint64_t hash  = 0;               ///< Neighbourhood page's folded hash.
+        entity_id     neigh_tile = null_entity;
+        float         neigh_rect[4] = { 0, 0, 0, 0 };
     };
-
     struct result
     {
-        int  tier = -1;
-        int  ci = 0, cj = 0, pw = 0, ph = 0;
+        job_kind      kind = job_kind::master;
+        entity_id     body = null_entity;
+        int           idx = 0, pw = 0, ph = 0;
+        std::uint64_t seq = 0;
         std::uint64_t hash = 0;
-        std::uint32_t gen  = 0;
-        entity_id neigh_tile = null_entity;
-        float     neigh_rect[4] = { 0, 0, 0, 0 };
+        std::uint32_t epoch = 0;
         std::vector<std::uint32_t> px;
+        std::vector<std::uint32_t> mip[L];     ///< Levels 1..L-1 pieces (master jobs).
+        std::vector<std::uint64_t> hashes;     ///< Sweep result.
+        entity_id     neigh_tile = null_entity;
+        float         neigh_rect[4] = { 0, 0, 0, 0 };
     };
 
-    /// The chunk window a request covers in tier @p t (ci unwrapped; cj clamped).
-    struct chunk_window { int ci_lo = 0, ci_hi = -1, cj_lo = 0, cj_hi = -1; };
-    chunk_window window_of(const tier_state& t, const ground_request& req) const;
-    /// Ready, not-stale chunks of @p t inside @p win, and the window's size.
-    void coverage(const tier_state& t, const chunk_window& win, int& ready, int& total) const;
-    std::uint64_t chunk_hash(const tier_state& t, int ci, int cj) const;
+    struct gpu_chunk
+    {
+        SDL_Texture*  tex = nullptr;
+        int           w = 0, h = 0;
+        std::uint32_t ver = 0;
+        std::uint64_t last_used = 0;
+    };
 
-    void reset(entity_id body, const world& w);
-    void refresh_source(const world& w);
+    // Bodies.
+    body_state* find(entity_id id);
+    const body_state* find(entity_id id) const;
+    body_state* ensure_body(const world& w, entity_id id);
+    void alloc_master(body_state& b);
+    void drop_master(body_state& b);
+    void refresh_source(body_state& b, const world& w);
+    void make_room(long long need, entity_id keep_a, entity_id keep_b);
+    static long long master_bytes(const body_state& b);
+
+    // Pool.
     void worker_main();
     void enqueue(job j);
-    /// Drop every WAITING chunk job not of tier @p keep or not of the current
-    /// generation (a rung change: the left tier's backlog must not delay the
-    /// new one; a tilt change: the old projection's). Clears their slots'
-    /// queued flags; in-flight jobs land normally. Main thread.
-    void purge_waiting_except(int keep);
-    /// Workers in the pool: max(1, hardware threads - 2), IO_GROUND_WORKERS overrides.
     static int pool_size();
-    void drain_results(SDL_Renderer* r);
-    void upload(SDL_Renderer* r, const result& d, bool sync);
-    void bake_now(SDL_Renderer* r, const job& j); ///< Synchronous (--verify) path.
-    job  make_chunk_job(int tier, int ci, int cj) const;
-    void evict(tier_state& t, std::size_t cap);
-    void publish(ui_state& ui) const;
+    static void run_job(const job& j, result& d, double* level_ms);
+    std::uint64_t next_seq() { return ++m_seq_counter; }
+    job make_master_job(const body_state& b, int idx, double prio);
+    /// Start a far-page bake of @p b against its current source: one job per
+    /// 512 px piece, enqueued on the pool.
+    void start_far(body_state& b);
+    /// --verify: drain results until @p done() holds (the pool bakes; the
+    /// main thread waits — a capture never races it).
+    template <class Pred> void wait_until(Pred done);
+    job make_sweep_job(const body_state& b);
+    int  waiting() const;
+    void feed(bool verify);
+    void drain();
+    void land(result& d, bool sync);
+    void bake_sync(job j);                     ///< Run on the main thread and land.
 
-    entity_id     m_body = null_entity;
-    std::uint32_t m_gen  = 0;       ///< Bumped on body switch and source refresh.
-    std::uint64_t m_frame = 0;      ///< LRU clock.
-    int           m_src_age = 0;    ///< Frames since the source snapshot was taken.
-    int           m_active_tier = -1;
-    int           m_standin_tier = -1; ///< Never evicted while it stands in (F34).
-    std::shared_ptr<const ui::ground::bake_source> m_src;
+    // GPU.
+    void flush_gpu();
+    bool upload(SDL_Renderer* r, body_state& b, int level, int idx);
+    void evict_gpu();
+    void publish(ui_state& ui, const body_state* b) const;
 
-    static constexpr int k_tiers = ui::ground::k_tier_count;
-    static constexpr double k_tier_ppr[k_tiers] = {
-        ui::ground::k_tier_ladder[0], ui::ground::k_tier_ladder[1], ui::ground::k_tier_ladder[2],
-        ui::ground::k_tier_ladder[3], ui::ground::k_tier_ladder[4] };
-    static constexpr std::size_t k_tier_cap[k_tiers] = { 60, 90, 48, 48, 48 };
-    /// Per-tier supersample ceiling (BL-1244), min'd with params.supersample.
-    /// The 192 px tier bakes single-sample: at 2x its fill time at the
-    /// reference window measured ~30 s on the pre-pool single worker (99 chunks x ~305 ms),
-    /// past what the brief allowed — the 2x-at-192 call is Ben's. Raise this
-    /// entry to 2 to take it.
-    static constexpr int k_tier_supersample[k_tiers] = { 2, 2, 2, 2, 1 };
-    tier_state    m_tiers[k_tiers];
+    /// The master-chunk window under a level-l view (ci unwrapped; cj clamped).
+    struct window { int ci_lo = 0, ci_hi = -1, cj_lo = 0, cj_hi = -1; };
+    window window_of(const body_state& b, int level, const ground_request& req, int margin) const;
 
-    ui::ground::geometry m_far_geom;
-    SDL_Texture*  m_far = nullptr;
-    std::uint64_t m_far_hash = 0;
-    std::uint32_t m_far_gen_checked = ~0u; ///< Far hash runs once per source generation.
-    bool          m_far_ready  = false;
-    bool          m_far_queued = false;
-    std::uint32_t m_far_job_gen = 0;     ///< Generation of the outstanding far job.
+    std::unordered_map<entity_id, std::unique_ptr<body_state>> m_bodies;
+    entity_id     m_active = null_entity;   ///< Body the canvas draws (GPU textures are its).
+    entity_id     m_prebake = null_entity;  ///< The pre-bake target.
+    std::uint64_t m_frame = 0;
+    bool          m_in_play = false;        ///< A tick has run: background bodies may bake.
+    const world*  m_world = nullptr;        ///< The world pump last saw (sources are re-taken from it).
+
+    // The last request (what the pump prioritises).
+    bool          m_view_valid = false;
+    int           m_view_level = 0;
+    window        m_view_win;
+    double        m_view_cx = 0.0, m_view_cy = 0.0; ///< View centre, master chunk units.
+
+    // GPU textures of the active body: key = level << 24 | chunk index.
+    std::unordered_map<std::uint32_t, gpu_chunk> m_gpu;
+    SDL_Texture*  m_far_tex = nullptr;
+    std::uint32_t m_far_tex_ver = ~0u;
+    std::vector<std::uint32_t> m_publish_keys; ///< Visible keys of the drawn level, on GPU.
+    int           m_publish_level = -1;
+    int           m_pending_uploads = 0;
 
     // Pool plumbing. The workers start lazily on the first enqueue.
     std::vector<std::thread> m_workers;
     mutable std::mutex      m_mx;
-    std::condition_variable m_cv;
-    std::vector<job>        m_jobs;     ///< Waiting jobs; workers pop the lowest (prio, seq).
-    std::uint64_t           m_seq = 0;  ///< Enqueue counter (guarded by m_mx).
+    std::condition_variable m_cv;      ///< Workers wait on jobs.
+    std::condition_variable m_done_cv; ///< The --verify wait on results.
+    std::vector<job>        m_jobs;
     std::vector<result>     m_results;
-    int                     m_inflight = 0; ///< Jobs enqueued whose results have not landed (guarded by m_mx).
+    int                     m_inflight = 0;
     bool                    m_quit = false;
+    std::uint64_t           m_seq_counter = 0;
 
-    std::vector<std::uint32_t> m_scratch; ///< Synchronous-path bake buffer.
     bake_stats m_bake_counters;
+    stats      m_stats;                 ///< Cumulative parts (guarded by m_mx).
 
-    // BL-1241: the Selection band's neighbourhood page — one small flat bake
-    // around the selected tile at a fixed close tier, re-baked when its window
-    // hash moves (a selection change, a build in view).
+    // BL-1241: the Selection band's neighbourhood page — one small FLAT bake
+    // around the selected tile (the band is a plan view, not the canvas).
     ui::ground::geometry m_neigh_geom;
+    entity_id     m_neigh_body = null_entity;
     SDL_Texture*  m_neigh = nullptr;
     int           m_neigh_w = 0, m_neigh_h = 0;
     std::uint64_t m_neigh_hash = 0;
-    std::uint64_t m_neigh_want = 0;     ///< Hash of the page last enqueued (folds the tile).
-    entity_id     m_neigh_tile = null_entity; ///< The tile the READY page was baked for.
-    float         m_neigh_rect[4] = { 0, 0, 0, 0 }; ///< Canonical x0, y0, x1, y1 of the ready page.
-    bool          m_neigh_ready  = false;
-    bool          m_neigh_queued = false;
-    std::uint32_t m_neigh_job_gen = 0;   ///< Generation of the outstanding neighbourhood job.
+    std::uint64_t m_neigh_want = 0;
+    std::uint64_t m_neigh_job  = 0;
+    entity_id     m_neigh_tile = null_entity;
+    float         m_neigh_rect[4] = { 0, 0, 0, 0 };
+    bool          m_neigh_ready = false;
+    std::vector<std::uint32_t> m_neigh_px;     ///< Landed, waiting for upload.
+    bool          m_neigh_upload = false;
     static constexpr double k_neigh_px_per_r = 48.0;
 
-    void  note_bake(int tier, double ms); ///< Accumulates m_stats; caller holds m_mx.
-    stats m_stats;
-
-    static constexpr int    k_chunk_px      = 512;
-    static constexpr double k_far_px_per_r  = ui::ground::k_far_ppr;
-    /// WAITING-jobs cap = pool size + this: deep enough that no worker idles
-    /// between ticks, shallow enough to keep the queue near the viewport.
-    static constexpr int    k_queue_slack   = 2;
-
     // Fill timing (off by default): IO_GROUND_FILL_LOG=1 prints, per rung
-    // change, the wall time until the active tier covers the viewport, and per
-    // body switch the time until the far page lands. IO_GROUND_BENCH=1 also
-    // runs the pool path under --verify, so a script can drive the rungs.
+    // change, the wall time until the drawn level's visible chunks are all on
+    // the GPU, per body switch the time until the far page and the view are
+    // final, per pre-bake the master's wall time, and per re-bake the time
+    // from the sweep that found it dirty to its upload. IO_GROUND_BENCH=1
+    // also runs the pool path under --verify, so a script can drive it.
     using clock = std::chrono::steady_clock;
     bool              m_fill_pending = false;
     clock::time_point m_fill_t0{};
-    std::uint64_t     m_fill_bakes0 = 0;
+    int               m_fill_level = -1;
+    bool              m_visit_pending = false;
+    clock::time_point m_visit_t0{};
     bool              m_far_pending = false;
-    clock::time_point m_far_t0{};
+    bool              m_master_pending = false; ///< The visited body's whole master, timed from the visit.
+    bool              m_prebake_pending = false;
+    clock::time_point m_prebake_t0{};
+    bool              m_rebake_pending = false;
+    clock::time_point m_rebake_t0{};
 };
