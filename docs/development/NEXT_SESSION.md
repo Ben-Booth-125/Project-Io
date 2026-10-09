@@ -103,6 +103,15 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   64.0 — Ben's call). Alone: G1 71.4 -> 73.2, t50 61.6 -> 59.8, G1b 13.5. Generation now builds far
   fewer propellant plants (166 -> 17); unpriced-zeroed 102 -> 0. Open: launch propellant is not
   reserved, so clearing sells the pool each tick (unmeasured — call); PRODUCTION ~494 stale line.
+  **COLD REVIEW: HELD.** 41.8 correct by the doc (64.0 is not what the doc says); merges clean.
+  SEVERE: auto-surplus (`market_clearing.cpp` ~1491-1511) now lists the whole pool every clear
+  (`processor_reservation` ~228 reserves recipe inputs only), so the launch burn
+  (`supply_system.cpp:356`) sees 0 — the player's `dispatch_convoy` on a space lane is always
+  rejected; breaks ACTIONS dispatch_convoy, PRODUCTION Launchpad ~489-495, ERAS:294 reserve gate.
+  Fix options to Ben: (a) reserve launch propellant for a pad's pool (Full, clearing seam) /
+  (b) launch burn buys from the shelf / (c) accept + rewrite docs. Also: electrolysis (the
+  "airless" route) is cheapest everywhere — nothing gates it to airless bodies (inverts PRODUCTION
+  :280). Merge note must say "world-moving".
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
