@@ -2849,8 +2849,21 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                             if (rc->outputs[r] <= 0.0f)
                                 continue;
                             const float base = m->base_price[r];
-                            if (base <= 0.0f)
+                            // BL-1217 D4 (AI_OPPONENT.md, "The reflex rescue
+                            // reads an unpriced output as floored", Ben
+                            // 2026-10-09): an output with no base price is no
+                            // evidence of health. It reads as floored -- at
+                            // zero, not at the band's floor_mult, so that no
+                            // float rounding of a floored incumbent's price/base
+                            // (which sits at ~floor_mult) can let a recipe the
+                            // rescue cannot price beat it (strictly greater,
+                            // below). An incumbent with an unpriced output reads
+                            // as floored too (<= floored_frac), as ruled.
+                            if (!(base > 0.0f))
+                            {
+                                worst = 0.0f;
                                 continue;
+                            }
                             worst = std::min(worst, m->price[r] / base);
                         }
                         return worst;
