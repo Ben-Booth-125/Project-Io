@@ -223,8 +223,12 @@ destination's cost flood was first built on (Ben, 2026-10-09):** the floods are 
 rebuilt after every stamp, which is what keeps the road passes inside their time budget —
 rebuilding after every stamp measured 2.5–4× slower on the sixteen curated seeds. So a link reuses
 the roads that stood when its destination's flood was built, and one laid later can run beside
-it. A parallel road that this leaves is removed by BL-1252 (no parallel roads), not by
-re-pricing: no second road beside a serviceable one still holds.
+it. **What is laid is snapped, not re-priced** (BL-1252, no parallel roads): before a route
+is stamped, every stretch that would lay two or more consecutive new tiles beside a road
+already on the field (within one cell) is re-walked over that road, and the re-walk is kept
+when it lays fewer new tiles. The snap also catches a route a current flood priced one cell
+off a road it nearly tied with. So no second road beside a serviceable one still holds,
+whichever flood priced the route, and no flood is rebuilt for it.
 
 Three readings, accepted by Ben (2026-10-03) and kept as readings: a trunk link's tier is the gate at the
 **lower** of its two nations' percentiles; **the network route** is the same walk over

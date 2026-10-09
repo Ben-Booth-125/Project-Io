@@ -20,12 +20,13 @@
 #include <vector>
 
 bool g_road_probe_fresh_floods = false; // BL-1119 measurement probe (road_generation.hpp)
+bool g_road_probe_no_snap     = false; // BL-1252 measurement switch (road_generation.hpp)
 
 namespace {
 
-/// Probe-only: the route stamp_edge last laid, copied before the caches clear so the
-/// write-only traces record the route actually laid. Written only when the probe is on.
-std::vector<entity_id> g_probe_last_laid;
+/// The route stamp_edge last laid -- after the BL-1252 snap, and copied before the BL-1119
+/// probe clears the caches -- so the write-only traces record the route actually laid.
+std::vector<entity_id> g_last_laid;
 
 // Road tiers (BL-172 three-tier ladder; BL-146 shipped local/trunk). road_traversal_multiplier
 // = 1/(1+0.5*tier): Track(1) x0.67, Road(2) x0.50, Highway(3) x0.40. Generation assigns a tier
@@ -164,14 +165,208 @@ bool crossings_are_straits(const world& w, const logistics_path& p)
     return crossing_kind(w, p) == crossing_verdict::strait;
 }
 
+//
+// BL-1252 (no parallel roads) -- THE SNAP. LOGISTICS.md § 4 (Ben, 2026-10-09): within
+// a pass a route is priced on the field its destination's cost flood was first built on,
+// and the floods are reused for speed. A road laid after that flood was built is
+// invisible to the route, so the route can run beside it rather than ride it. And a
+// route priced on a current flood can still pick a line one cell off a road when the two
+// nearly tie. Either way the map gains a second road beside a serviceable one, which
+// § 4 forbids.
+//
+// The snap leaves the pricing alone and corrects what is LAID. Before a route is
+// stamped, every stretch of it that would lay at least kSnapRun consecutive NEW land
+// tiles beside a road already on the field is re-walked: a local search from the route
+// tile before the stretch to the one after it, over the stretch's own tiles and the road
+// cells beside them (Chebyshev kSnapDist, columns wrapping, never a cell the route
+// already holds elsewhere). A road cell costs 1 to enter and a new tile kSnapNewCost. The
+// stretch is replaced only when the re-walk lays FEWER new tiles. The re-walk is
+// 4-connected, like every route, so connectivity holds. The route then rides the road it
+// ran beside and lays new ground only to reach it. No flood is built and no cache is
+// touched, so the pass keeps its time.
+//
+// The measure is road_stale_flood_probe's d/K parallel run (LOGISTICS.md § 4). kSnapRun is
+// 2, not the probe's K: a parallel is often laid piecewise, in short stretches by
+// several routes into one hub, each too short to read as a run on its own. Measured on
+// the sixteen curated seeds (BL-1252): d1 K8 pairs 235 unsnapped, 47 at run 2, 17 at run
+// 1; the history routes' cost gap is 1.87% unsnapped, 2.27% at run 2 and 3.17% at run 1.
+// Run 2 keeps the gap closer to the cheapest route.
+//
+// Deterministic: a pure function of the path and the road field. The search orders its
+// frontier on (cost, raster index), and stretches are walked in path order.
+constexpr int kSnapDist    = 1;
+constexpr int kSnapRun     = 2;
+constexpr int kSnapNewCost = 4;
+
+struct road_snapper
+{
+    world&    w;
+    int       gw = 0, gh = 0;
+    const std::vector<entity_id>* grid = nullptr;
+    long long snaps = 0; ///< stretches re-walked onto a road (write-only stats)
+
+    road_snapper(world& w_, entity_id body) : w(w_)
+    {
+        const auto bit = w.bodies.find(body);
+        if (bit == w.bodies.end()) return;
+        gw = bit->second.grid_width;
+        gh = bit->second.grid_height;
+        if (gw <= 0 || gh <= 0) { gw = gh = 0; return; }
+        grid = &body_tile_grid(w, body);
+        if (static_cast<int>(grid->size()) < gw * gh) { gw = gh = 0; grid = nullptr; }
+    }
+    bool usable() const { return grid != nullptr; }
+
+    /// A land cell carrying a road.
+    bool road_cell(int r) const
+    {
+        const entity_id t = (*grid)[static_cast<std::size_t>(r)];
+        if (t == null_entity) return false;
+        const auto it = w.tiles.find(t);
+        return it != w.tiles.end() && !is_water(it->second.substrate) && it->second.road_level > 0;
+    }
+
+    template <class Fn>
+    void for_near(int r, Fn&& fn) const
+    {
+        const int x = r % gw, y = r / gw;
+        for (int dy = -kSnapDist; dy <= kSnapDist; ++dy)
+        {
+            const int yy = y + dy;
+            if (yy < 0 || yy >= gh) continue;
+            for (int dx = -kSnapDist; dx <= kSnapDist; ++dx)
+            {
+                if (dx == 0 && dy == 0) continue;
+                fn(yy * gw + ((x + dx) % gw + gw) % gw);
+            }
+        }
+    }
+
+    /// Re-walk every stretch of @p path that would lay new road beside a road (above).
+    void snap(std::vector<entity_id>& path)
+    {
+        const std::size_t n = path.size();
+        if (n < 3) return;
+        std::vector<int>  ras(n, -1);
+        std::vector<char> land(n, 0), road(n, 0);
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            const auto it = w.tiles.find(path[i]);
+            if (it == w.tiles.end()) continue;
+            ras[i]  = it->second.grid_y * gw + it->second.grid_x;
+            land[i] = is_water(it->second.substrate) ? 0 : 1;
+            road[i] = land[i] && it->second.road_level > 0;
+        }
+        std::vector<int> on_sorted;
+        for (const int r : ras) if (r >= 0) on_sorted.push_back(r);
+        std::sort(on_sorted.begin(), on_sorted.end());
+        const auto on_route = [&](int r) {
+            return std::binary_search(on_sorted.begin(), on_sorted.end(), r);
+        };
+        // A NEW land tile of the route with a road beside it that the route does not hold.
+        std::vector<char> beside(n, 0);
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            if (!land[i] || road[i] || ras[i] < 0) continue;
+            bool b = false;
+            for_near(ras[i], [&](int u) { if (!b && road_cell(u) && !on_route(u)) b = true; });
+            beside[i] = b ? 1 : 0;
+        }
+        std::vector<entity_id> out;
+        out.reserve(n);
+        std::size_t c = 0; // path[c..] not yet copied to `out`
+        bool changed = false;
+        std::size_t i = 0;
+        while (i < n)
+        {
+            if (!beside[i]) { ++i; continue; }
+            const std::size_t run0 = i;
+            std::size_t j = i;
+            while (j + 1 < n && beside[j + 1]) ++j;
+            i = j + 1;
+            // The stretch [s, e]: the run with the route tile either side of it (a run at a
+            // route end keeps that end, the centre the route serves).
+            const std::size_t s = run0 > 0 ? run0 - 1 : run0;
+            const std::size_t e = j + 1 < n ? j + 1 : j;
+            if (static_cast<int>(j - run0 + 1) < kSnapRun || s < c || s == e) continue;
+            const int from = ras[s], to = ras[e];
+            if (from < 0 || to < 0) continue;
+            std::map<int, int> cell; // raster -> cost to enter
+            for (std::size_t k = s; k <= e; ++k)
+                if (ras[k] >= 0) cell[ras[k]] = road[k] ? 1 : kSnapNewCost;
+            for (std::size_t k = s; k <= e; ++k)
+                if (ras[k] >= 0 && beside[k])
+                    for_near(ras[k], [&](int u) { if (!cell.count(u) && road_cell(u)) cell[u] = 1; });
+            // Dijkstra over those cells, 4-cardinal, columns wrapping.
+            std::map<int, int> dist, par;
+            std::set<std::pair<int, int>> pq;
+            dist[from] = 0;
+            par[from]  = -1;
+            pq.insert({ 0, from });
+            while (!pq.empty())
+            {
+                const auto [d, u] = *pq.begin();
+                pq.erase(pq.begin());
+                if (u == to) break;
+                const int x = u % gw, y = u / gw;
+                const int nb[4] = { y > 0 ? u - gw : -1, y + 1 < gh ? u + gw : -1,
+                                    y * gw + (x + gw - 1) % gw, y * gw + (x + 1) % gw };
+                for (const int v : nb)
+                {
+                    if (v < 0) continue;
+                    const auto cit = cell.find(v);
+                    if (cit == cell.end()) continue;
+                    const int  nd  = d + cit->second;
+                    const auto dit = dist.find(v);
+                    if (dit != dist.end() && dit->second <= nd) continue;
+                    if (dit != dist.end()) pq.erase({ dit->second, v });
+                    dist[v] = nd;
+                    par[v]  = u;
+                    pq.insert({ nd, v });
+                }
+            }
+            if (dist.count(to) == 0) continue;
+            std::vector<int> seg;
+            for (int u = to; u != -1; u = par[u]) seg.push_back(u);
+            std::reverse(seg.begin(), seg.end());
+            int new_before = 0, new_after = 0;
+            for (std::size_t k = s + 1; k < e; ++k) new_before += (land[k] && !road[k]) ? 1 : 0;
+            bool folds = false; // a cell the route holds OUTSIDE the stretch would fold it back
+            for (std::size_t k = 1; k + 1 < seg.size(); ++k)
+            {
+                new_after += road_cell(seg[k]) ? 0 : 1;
+                if (on_route(seg[k]))
+                {
+                    bool inside = false;
+                    for (std::size_t q = s; q <= e && !inside; ++q) inside = ras[q] == seg[k];
+                    folds = folds || !inside;
+                }
+            }
+            if (folds || new_after >= new_before) continue;
+            out.insert(out.end(), path.begin() + static_cast<long>(c), path.begin() + static_cast<long>(s));
+            for (std::size_t k = 0; k + 1 < seg.size(); ++k)
+                out.push_back((*grid)[static_cast<std::size_t>(seg[k])]);
+            c = e;
+            changed = true;
+            ++snaps;
+        }
+        if (!changed) return;
+        out.insert(out.end(), path.begin() + static_cast<long>(c), path.end());
+        path = std::move(out);
+    }
+};
+
 /// Stamp a road of @p level along the A* path between two tiles, taking the max on
 /// overlap and skipping WATER OF EVERY KIND (roads are a land feature). No-op if unreachable, or
 /// if the route crosses open sea rather than a strait (see kMaxCrossingTiles). Returns whether
 /// the edge was laid; when @p stamped is given, appends every land tile of the route (BL-620:
 /// the village-spur pass feeds these back as future spur targets). @p too_long, when given,
 /// counts a refusal the bridge cap alone made (a shore crossing longer than kMaxCrossingTiles).
+/// @p snapper, when given, re-walks the route's parallel stretches onto the road beside them
+/// before the stamp (BL-1252, above). The route laid is left in `g_last_laid` for the traces.
 bool stamp_edge(world& w, entity_id body, entity_id ta, entity_id tb, std::uint8_t level,
-                std::vector<entity_id>* stamped = nullptr, int* too_long = nullptr)
+                std::vector<entity_id>* stamped = nullptr, int* too_long = nullptr,
+                road_snapper* snapper = nullptr)
 {
     const logistics_path& p = intra_body_path(w, body, ta, tb);
     if (!p.reachable)
@@ -184,8 +379,13 @@ bool stamp_edge(world& w, entity_id body, entity_id ta, entity_id tb, std::uint8
         if (v != crossing_verdict::strait)
             return false;
     }
+    g_last_laid = p.tiles; // a copy: the cache may be cleared below (the BL-1119 probe)
+    // The snap is the shipped pass's. The BL-1119 fresh-flood probe stays the reference
+    // it was measured as (no snap), and the BL-1252 switch turns it off to read its effect.
+    if (snapper != nullptr && snapper->usable() && !g_road_probe_fresh_floods && !g_road_probe_no_snap)
+        snapper->snap(g_last_laid);
     bool raised = false; // probe-only reading
-    for (const entity_id t : p.tiles)
+    for (const entity_id t : g_last_laid)
     {
         const auto it = w.tiles.find(t);
         if (it == w.tiles.end() || is_water(it->second.substrate)) // BL-516
@@ -195,12 +395,8 @@ bool stamp_edge(world& w, entity_id body, entity_id ta, entity_id tb, std::uint8
         if (stamped)
             stamped->push_back(t);
     }
-    if (g_road_probe_fresh_floods) // BL-1119 probe: price the next route on the field as it stands
-    {
-        g_probe_last_laid = p.tiles; // `p` lives in the cache cleared below
-        if (raised)
-            invalidate_logistics_caches(w);
-    }
+    if (g_road_probe_fresh_floods && raised) // BL-1119 probe: price the next route on the field as it stands
+        invalidate_logistics_caches(w);
     return true;
 }
 
@@ -340,6 +536,7 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
                     road_generation_trace* trace)
 {
     road_generation_stats st{}; // BL-1119 D1: filled as the pass goes, copied out at the end
+    road_snapper          snapper(w, body); // BL-1252: no parallel roads
     // BL-1119 round 4: floods built so far — the per-site deltas in the stats (write-only).
     const auto floods_now = [&w]() {
         return static_cast<long long>(w.logistics_flood_fields.size());
@@ -355,8 +552,7 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
         r.from   = from;
         r.to     = to;
         r.nation = nation;
-        r.path   = g_road_probe_fresh_floods ? g_probe_last_laid // probe: the cache is cleared
-                                             : intra_body_path(w, body, from, to).tiles;
+        r.path   = g_last_laid; // the route stamp_edge just laid (BL-1252: snapped)
         trace->routes.push_back(std::move(r));
     };
     // Grid geometry (BL-620: the spur and border prefilters measure wrapped grid
@@ -661,7 +857,8 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
                     edge_tier(nodes[towns[a]].scale, nodes[towns[b]].scale, qualification);
                 stamped.clear();
                 const bool laid =
-                    stamp_edge(w, body, nodes[towns[a]].tile, nodes[towns[b]].tile, tier, &stamped);
+                    stamp_edge(w, body, nodes[towns[a]].tile, nodes[towns[b]].tile, tier, &stamped,
+                               nullptr, &snapper);
                 if (!laid)
                     ++(is_tree ? st.tree_links_refused : st.loops_refused);
                 else
@@ -730,7 +927,7 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
                         break;
                     stamped.clear();
                     if (!stamp_edge(w, body, nodes[m].tile, best[s].tile, kTrack, &stamped,
-                                    &st.spurs_long_crossing))
+                                    &st.spurs_long_crossing, &snapper))
                         continue; // unreachable or open-sea route: try the next-nearest
                     for (const entity_id t : stamped)
                         if (nation_of(w, t) == nation)
@@ -892,7 +1089,7 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
         const entity_id best_a = toward_a ? best_to : best_from; // nation A's endpoint
         const entity_id best_b = toward_a ? best_from : best_to; // nation B's endpoint
         if (best_from != null_entity
-            && stamp_edge(w, body, best_from, best_to, kTrack, nullptr, &st.border_long_crossing))
+            && stamp_edge(w, body, best_from, best_to, kTrack, nullptr, &st.border_long_crossing, &snapper))
         {
             record(road_generation_trace::kind::border, best_from, best_to, na);
             ++st.border_links;
@@ -904,6 +1101,7 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
     report_units(units_total); // BL-1072: whole, whatever the border walk found
     st.floods_border = floods_now() - st.flood_fields_before_border;
     st.flood_fields = static_cast<long long>(w.logistics_flood_fields.size());
+    st.snaps        = snapper.snaps;
     if (trace != nullptr)
         for (std::size_t i = 0; i < nodes.size(); ++i)
             if (on_network[i])
@@ -987,6 +1185,7 @@ void stamp_history_roads(world& w, entity_id body,
     const int corridor_total = static_cast<int>(std::min<std::size_t>(corridors.size(), 1000000));
     int       corridor_done  = 0;
     std::set<entity_id> destinations; // BL-1119 round 4 stats: the tiles priced toward
+    road_snapper        snapper(w, body); // BL-1252: no parallel roads
     for (const history_corridor& c : corridors)
     {
         if (progress != nullptr && corridor_done < corridor_total)
@@ -1018,18 +1217,16 @@ void stamp_history_roads(world& w, entity_id body,
         if (c.tier >= 3) tier = kHighway;
         ++hs.corridors;
         destinations.insert(to);
-        if (stamp_edge(w, body, from, to, tier, nullptr, &hs.refused_long_crossing))
+        if (stamp_edge(w, body, from, to, tier, nullptr, &hs.refused_long_crossing, &snapper))
         {
             ++hs.laid;
-            if (trace != nullptr) // write-only: the route just laid, answered again from the cache
-                trace->routes.push_back({ from, to, tier,
-                                          g_road_probe_fresh_floods // probe: the cache is cleared
-                                              ? g_probe_last_laid
-                                              : intra_body_path(w, body, from, to).tiles });
+            if (trace != nullptr) // write-only: the route stamp_edge just laid (BL-1252: snapped)
+                trace->routes.push_back({ from, to, tier, g_last_laid });
         }
     }
     hs.destinations = static_cast<int>(destinations.size());
     hs.floods = static_cast<long long>(w.logistics_flood_fields.size()) - floods_at_entry;
+    hs.snaps  = snapper.snaps;
     if (stats != nullptr)
         *stats = hs; // BL-1119 round 4: write-only
 

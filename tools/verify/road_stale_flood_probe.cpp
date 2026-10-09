@@ -10,10 +10,14 @@
 // (the history pass's 10x speed-up). This probe replays both passes on each built
 // world twice:
 //
-//   STALE  the shipped passes (g_road_probe_fresh_floods off);
+//   STALE  the shipped passes (g_road_probe_fresh_floods off), the BL-1252 snap
+//          included;
 //   FRESH  stamp_edge clears every logistics cache after any stamp that raised a
 //          tile (g_road_probe_fresh_floods on), so every later route is priced on
-//          the field as it stands.
+//          the field as it stands -- without the snap: the BL-1119 reference.
+//   or, with --compare unsnapped, UNSNAPPED in FRESH's place: the shipped passes
+//          with the BL-1252 snap off (g_road_probe_no_snap), the field before it --
+//          the snap's effect, and its time, read in one run on one machine.
 //
 // and reports, per seed and pooled:
 //   TILES     distinct land tiles on the laid routes, by pass class (backbone =
@@ -38,9 +42,10 @@
 // must reproduce the built world's road field tile for tile, or the replay is not
 // the pass the build ran.
 //
-// Usage:  road_stale_flood_probe.exe [--examples DIR] [seed ...]   (default: the 16
-//         curated seeds; run from the repo root). DIR receives one tile list per
-//         variant: the longest d=1 parallel run found.
+// Usage:  road_stale_flood_probe.exe [--examples DIR] [--compare fresh|unsnapped] [seed ...]
+//         (default: the 16 curated seeds; run from the repo root). DIR receives one
+//         tile list per variant: the longest d=1 parallel run found (each tile tagged
+//         with the laid routes holding it, by lay order).
 // Build:  bash tools/verify/build_lua_harness.sh road_stale_flood_probe
 
 #include "harness_params.hpp"
@@ -147,12 +152,17 @@ std::vector<history_road_node> history_nodes(const generation_report& rep, entit
     return nodes;
 }
 
+/// The comparator V[1] (BL-1252): FRESH floods (the default), or the shipped passes with
+/// the snap off -- the pre-BL-1252 field, for a same-machine before/after.
+bool g_compare_unsnapped = false;
+
 variant run_variant(world& w, entity_id body, const std::vector<history_road_node>& nodes,
                     const era_minus_one_fixture& fx, bool fresh)
 {
     variant v;
     clear_roads(w, body);
-    g_road_probe_fresh_floods = fresh;
+    g_road_probe_fresh_floods = fresh && !g_compare_unsnapped;
+    g_road_probe_no_snap      = fresh && g_compare_unsnapped;
     road_generation_trace tr;
     const clk::time_point t0 = clk::now();
     generate_roads(w, body, nullptr, kVillageSpurFloorHeads, &v.st, &tr);
@@ -173,6 +183,7 @@ variant run_variant(world& w, entity_id body, const std::vector<history_road_nod
         for (const auto& r : ht.routes) v.routes.push_back({ kHistory, r.from, r.to, r.path });
     }
     g_road_probe_fresh_floods = false;
+    g_road_probe_no_snap      = false;
     v.field = road_field(w, body);
     return v;
 }
@@ -371,6 +382,11 @@ std::tuple<int, entity_id, entity_id> route_key(const world& w, const route& r)
     return { r.c, r.from, r.to };
 }
 
+const char* vname(int v)
+{
+    return v == 0 ? "STALE" : g_compare_unsnapped ? "UNSNAPPED" : "FRESH";
+}
+
 struct pooled
 {
     long long tiles[kClasses] = {}, field = 0;
@@ -382,6 +398,7 @@ struct pooled
     long long gap_routes[kClasses] = {};
     double gen_s = 0, hist_s = 0;
     long long floods_gen = 0, floods_hist = 0;
+    long long snaps_gen = 0, snaps_hist = 0; // BL-1252: stretches the snap re-walked
 };
 
 } // namespace
@@ -394,6 +411,13 @@ int main(int argc, char** argv)
     {
         const std::string a = argv[i];
         if (a == "--examples" && i + 1 < argc) { ex_dir = argv[++i]; continue; }
+        if (a == "--compare" && i + 1 < argc)
+        {
+            const std::string m = argv[++i];
+            if (m == "unsnapped") g_compare_unsnapped = true;
+            else if (m != "fresh") { std::fprintf(stderr, "--compare fresh|unsnapped\n"); return 2; }
+            continue;
+        }
         seeds.push_back(static_cast<uint32_t>(std::strtoul(argv[i], nullptr, 0)));
     }
     if (seeds.empty()) seeds = { 46, 28, 11, 31, 40, 12, 37, 13, 41, 43, 32, 10, 25, 38, 9, 0 };
@@ -490,7 +514,7 @@ int main(int argc, char** argv)
             }
             std::printf("seed %u %s TILES backbone %zu spur %zu border %zu history %zu | field %lld | "
                         "gen %.2f s (%lld floods) history %.2f s (%lld floods)\n",
-                        seed, v ? "FRESH" : "STALE", tiles[0].size(), tiles[1].size(),
+                        seed, vname(v), tiles[0].size(), tiles[1].size(),
                         tiles[2].size(), tiles[3].size(), field_land, X.gen_s, X.st.flood_fields,
                         X.hist_s, X.hs.floods);
             for (int pi = 0; pi < kParN; ++pi)
@@ -498,7 +522,7 @@ int main(int argc, char** argv)
                 std::printf("seed %u %s PARALLEL d%d K%d runs/tiles: backbone %lld/%lld spur %lld/%lld"
                             " border %lld/%lld history %lld/%lld | pairs nat-nat %lld nat-hist %lld"
                             " hist-hist %lld\n",
-                            seed, v ? "FRESH" : "STALE", kPar[pi].d, kPar[pi].k,
+                            seed, vname(v), kPar[pi].d, kPar[pi].k,
                             pr.by[pi].runs[0], pr.by[pi].tiles[0], pr.by[pi].runs[1], pr.by[pi].tiles[1],
                             pr.by[pi].runs[2], pr.by[pi].tiles[2], pr.by[pi].runs[3], pr.by[pi].tiles[3],
                             pr.by[pi].pairs_nn, pr.by[pi].pairs_nh, pr.by[pi].pairs_hh);
@@ -511,9 +535,12 @@ int main(int argc, char** argv)
                 p.par[pi].pairs_nh += pr.by[pi].pairs_nh;
                 p.par[pi].pairs_hh += pr.by[pi].pairs_hh;
             }
+            std::printf("seed %u %s SNAPS gen %lld history %lld\n", seed, vname(v), X.st.snaps, X.hs.snaps);
+            p.snaps_gen  += X.st.snaps;
+            p.snaps_hist += X.hs.snaps;
             std::printf("seed %u %s GAP (laid on final field - cheapest on it): backbone %.1f spur %.1f"
                         " border %.1f history %.1f\n",
-                        seed, v ? "FRESH" : "STALE", gap[0], gap[1], gap[2], gap[3]);
+                        seed, vname(v), gap[0], gap[1], gap[2], gap[3]);
             for (int c = 0; c < kClasses; ++c) p.tiles[c] += static_cast<long long>(tiles[c].size());
             p.field += field_land;
             p.gen_s += X.gen_s;
@@ -540,8 +567,19 @@ int main(int argc, char** argv)
                     for (const entity_id t : S.path) if (rs.count(t) && is_land(w, t)) ++shared;
                     d += std::to_string(shared);
                 }
+                // Which laid routes (by lay order) hold a tile: the run's own and the other's.
+                const auto holders = [&](entity_id t) {
+                    std::string h = "[";
+                    for (std::size_t q = 0; q < X.routes.size(); ++q)
+                        if (std::find(X.routes[q].path.begin(), X.routes[q].path.end(), t)
+                            != X.routes[q].path.end())
+                            h += (h.size() > 1 ? "," : "") + std::to_string(q);
+                    return h + "]";
+                };
+                d += "\n    lay order: route " + std::to_string(pr.longest.route_idx) + ", other "
+                   + std::to_string(pr.longest.other_idx);
                 d += "\n    run (" + std::to_string(pr.longest.len) + " tiles):";
-                for (const entity_id t : pr.longest.run) d += " " + xy(w, t);
+                for (const entity_id t : pr.longest.run) d += " " + xy(w, t) + holders(t);
                 if (pr.longest.other_idx >= 0)
                 {
                     const route& S = X.routes[static_cast<std::size_t>(pr.longest.other_idx)];
@@ -559,7 +597,7 @@ int main(int argc, char** argv)
                             dx = std::min(dx, g.gw - dx);
                             if (dx <= 1 && std::abs(a.grid_y - b.grid_y) <= 1) { near = true; break; }
                         }
-                        if (near) d += " " + xy(w, t);
+                        if (near) d += " " + xy(w, t) + holders(t);
                     }
                 }
                 best_desc[v] = d;
@@ -613,17 +651,18 @@ int main(int argc, char** argv)
         const pooled& p = P[v];
         std::printf("%s TILES backbone %lld spur %lld border %lld history %lld | field %lld | gen %.1f s "
                     "(%lld floods) history %.1f s (%lld floods)\n",
-                    v ? "FRESH" : "STALE", p.tiles[0], p.tiles[1], p.tiles[2], p.tiles[3], p.field,
+                    vname(v), p.tiles[0], p.tiles[1], p.tiles[2], p.tiles[3], p.field,
                     p.gen_s, p.floods_gen, p.hist_s, p.floods_hist);
+        std::printf("%s SNAPS gen %lld history %lld\n", vname(v), p.snaps_gen, p.snaps_hist);
         for (int pi = 0; pi < kParN; ++pi)
             std::printf("%s PARALLEL d%d K%d runs/tiles: backbone %lld/%lld spur %lld/%lld border %lld/%lld"
                         " history %lld/%lld | pairs nat-nat %lld nat-hist %lld hist-hist %lld\n",
-                        v ? "FRESH" : "STALE", kPar[pi].d, kPar[pi].k, p.par[pi].runs[0], p.par[pi].tiles[0],
+                        vname(v), kPar[pi].d, kPar[pi].k, p.par[pi].runs[0], p.par[pi].tiles[0],
                         p.par[pi].runs[1], p.par[pi].tiles[1], p.par[pi].runs[2], p.par[pi].tiles[2],
                         p.par[pi].runs[3], p.par[pi].tiles[3], p.par[pi].pairs_nn, p.par[pi].pairs_nh,
                         p.par[pi].pairs_hh);
         for (int c = 0; c < kClasses; ++c)
-            std::printf("%s GAP %s: %lld routes, laid cost %.1f, gap %.1f (%.2f%%)\n", v ? "FRESH" : "STALE",
+            std::printf("%s GAP %s: %lld routes, laid cost %.1f, gap %.1f (%.2f%%)\n", vname(v),
                         cls_name[c], p.gap_routes[c], p.laid[c], p.gap[c],
                         p.laid[c] > 0 ? 100.0 * p.gap[c] / p.laid[c] : 0.0);
     }
@@ -635,7 +674,7 @@ int main(int argc, char** argv)
                     P[0].cS[c], P[0].cF[c], P[0].cSF[c], P[0].cFF[c]);
     for (int v = 0; v < 2; ++v)
     {
-        std::printf("\nEXAMPLE %s longest d=1 parallel run: %s\n", v ? "FRESH" : "STALE", best_desc[v].c_str());
+        std::printf("\nEXAMPLE %s longest d=1 parallel run: %s\n", vname(v), best_desc[v].c_str());
         if (!ex_dir.empty())
             if (FILE* f = std::fopen((ex_dir + (v ? "/parallel_fresh.txt" : "/parallel_stale.txt")).c_str(), "w"))
             {
