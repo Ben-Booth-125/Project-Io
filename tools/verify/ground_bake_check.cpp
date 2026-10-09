@@ -56,6 +56,9 @@
 //       the chain built chunk by chunk equals the whole image's chain, and the
 //       level chooser reads the coarsest level at or above the drawn radius.
 //       `--master` runs P22 plus the whole-body master bake reading (1x, 2x).
+//   P23 The lock fast path (BL-1246): a window wholly inside survey-masked
+//       ground fills with the lock colour directly, byte-identical to the
+//       full per-pixel bake (masked chunks and a mask-edge chunk).
 //
 // Also prints bake time per tier (a measurement, not a check) and writes
 // feature_<form>_<tier>.png previews for the eye.
@@ -388,6 +391,146 @@ void master_row(const bake_source& src, const body_component& hb, int land_i, co
     check(never_mag && within_2, "P22", "every radius from 6 to 96 px reads a level minified by 1:1 to 2:1");
 }
 
+/// P23 - the lock fast path (BL-1246): a window wholly inside survey-masked
+/// ground is filled with the lock colour directly; it must be byte-identical
+/// to the full per-pixel bake. Checked on master chunks of an unsurveyed body
+/// and on the first masked master chunks of the home body under its mask
+/// (where the path engages), plus one chunk on a mask edge (where it must
+/// not change anything either).
+void lock_fast_row(world& w, entity_id home, const bake_params& p)
+{
+    bake_params fast = p, slow = p;
+    fast.supersample = slow.supersample = 1; // the master's
+    fast.fast_lock = true;
+    slow.fast_lock = false;
+    constexpr std::uint32_t lock = ui::palette::col32(12, 14, 20, 255);
+    int compared = 0, engaged = 0;
+    bool equal = true;
+    double ms_fast = 0.0, ms_slow = 0.0;
+    std::vector<std::uint32_t> a, b;
+    const auto compare = [&](const bake_source& s, const geometry& g, int ci, int cj) {
+        const int x0 = ci * k_chunk_px, y0 = cj * k_chunk_px;
+        const int cw = std::min(k_chunk_px, g.W - x0), chh = std::min(k_chunk_px, g.H - y0);
+        a.assign(static_cast<std::size_t>(cw) * chh, 0u);
+        b.assign(a.size(), 0u);
+        auto t0 = std::chrono::steady_clock::now();
+        bake_region(s, g, fast, x0, y0, cw, chh, a.data());
+        ms_fast += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+        t0 = std::chrono::steady_clock::now();
+        bake_region(s, g, slow, x0, y0, cw, chh, b.data());
+        ms_slow += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+        ++compared;
+        equal = equal && a == b;
+        return std::all_of(a.begin(), a.end(), [&](std::uint32_t c) { return c == lock; });
+    };
+    for (const auto& [id, bd] : w.bodies)
+        if (bd.grid_width > 0 && bd.survey.phase == survey_phase::hidden)
+        {
+            const bake_source hs = prepare_source(w, id);
+            const geometry g = make_master_geometry(bd.grid_width, bd.grid_height);
+            const int cw = (g.W + k_chunk_px - 1) / k_chunk_px, ch = (g.H + k_chunk_px - 1) / k_chunk_px;
+            engaged += compare(hs, g, cw / 2, ch / 2) ? 1 : 0;
+            break;
+        }
+    {
+        const body_component& hb = w.bodies.at(home);
+        const bake_source ms = prepare_source(w, home, /*reveal_all=*/false);
+        const geometry g = make_master_geometry(hb.grid_width, hb.grid_height);
+        const int cw = (g.W + k_chunk_px - 1) / k_chunk_px, ch = (g.H + k_chunk_px - 1) / k_chunk_px;
+        int found = 0, edge = 0;
+        std::vector<std::uint32_t> probe;
+        for (int cj = 1; cj + 1 < ch && (found < 3 || edge < 1); ++cj)
+            for (int ci = 0; ci < cw && (found < 3 || edge < 1); ci += 3)
+            {
+                // Cheap pre-probe: the fast output alone, to find candidates.
+                const int x0 = ci * k_chunk_px, y0 = cj * k_chunk_px;
+                probe.assign(static_cast<std::size_t>(std::min(k_chunk_px, g.W - x0))
+                             * std::min(k_chunk_px, g.H - y0), 0u);
+                bake_region(ms, g, fast, x0, y0, std::min(k_chunk_px, g.W - x0),
+                            std::min(k_chunk_px, g.H - y0), probe.data());
+                const std::size_t n_lock = static_cast<std::size_t>(
+                    std::count(probe.begin(), probe.end(), lock));
+                if (n_lock == probe.size() && found < 3)
+                {
+                    engaged += compare(ms, g, ci, cj) ? 1 : 0;
+                    ++found;
+                }
+                else if (n_lock > 0 && n_lock < probe.size() && edge < 1)
+                {
+                    compare(ms, g, ci, cj); // a mask edge: the path must not engage
+                    ++edge;
+                }
+            }
+    }
+    // A mask EDGE: a body this seed has partly surveyed — every master chunk
+    // in the rows that cross its mask boundary, so the path is exercised
+    // right up to the reach margin where it must stop engaging.
+    int edge_chunks = 0;
+    // No body is part-surveyed in this harness world, so make one: the home
+    // body mid-scan, half its survey regions revealed (restored after).
+    body_component& hbm = w.bodies.at(home);
+    const survey_state saved = hbm.survey;
+    hbm.survey.phase = survey_phase::scanning;
+    hbm.survey.regions_done = survey_region_count(hbm.grid_width, hbm.grid_height) / 2;
+    for (const auto& [id, bd] : w.bodies)
+    {
+        if (bd.grid_width <= 0 || edge_chunks > 0)
+            continue;
+        const bake_source s = prepare_source(w, id);
+        const std::size_t n_masked = static_cast<std::size_t>(std::count(
+            s.cls.begin(), s.cls.end(), static_cast<std::uint8_t>(bake_source::tile_class::masked)));
+        if (n_masked == 0 || n_masked == s.cls.size())
+            continue;
+        const geometry g = make_master_geometry(bd.grid_width, bd.grid_height);
+        const int cw = (g.W + k_chunk_px - 1) / k_chunk_px, ch = (g.H + k_chunk_px - 1) / k_chunk_px;
+        // Is any tile within `reach` canonical units of the chunk's window
+        // NOT masked? (The fast path's own test at reach 4.5.)
+        const auto unmasked_within = [&](int ci, int cj, double reach) {
+            const double x0 = ci * k_chunk_px / g.s, x1 = (ci + 1) * k_chunk_px / g.s;
+            const double y0 = cj * k_chunk_px / g.s + g.y_min, y1 = (cj + 1) * k_chunk_px / g.s + g.y_min;
+            const int r_lo = std::max(0, static_cast<int>(std::floor((y0 - reach) / 1.5)));
+            const int r_hi = std::min(s.gh - 1, static_cast<int>(std::ceil((y1 + reach) / 1.5)));
+            for (int r = r_lo; r <= r_hi; ++r)
+                for (int c = static_cast<int>(std::floor((x0 - reach) / 1.7320508075688772)) - 1;
+                     c <= static_cast<int>(std::ceil((x1 + reach) / 1.7320508075688772)) + 1; ++c)
+                    if (s.cls[static_cast<std::size_t>(r) * s.gw + ((c % s.gw) + s.gw) % s.gw]
+                        != static_cast<std::uint8_t>(bake_source::tile_class::masked))
+                        return true;
+            return false;
+        };
+        // The chunks the path engages on CLOSEST to the mask edge (visible
+        // ground just past the 4.5 reach, within 4.5 + one chunk), and the
+        // mixed chunks beside them: where a reach too short would show.
+        int near = 0, mixed = 0;
+        for (int cj = 1; cj + 1 < ch; ++cj)
+            for (int ci = 0; ci < cw; ++ci)
+            {
+                if (near < 6 && !unmasked_within(ci, cj, 4.5)
+                    && unmasked_within(ci, cj, 4.5 + k_chunk_px / g.s))
+                {
+                    engaged += compare(s, g, ci, cj) ? 1 : 0;
+                    ++near;
+                    ++edge_chunks;
+                    if (mixed < 3 && cj > 0)
+                    {
+                        compare(s, g, ci, cj - 1);
+                        compare(s, g, ci, cj + 1);
+                        ++mixed;
+                    }
+                }
+            }
+        std::printf("P23: partly surveyed body %u (%zu of %zu tiles masked)\n",
+                    static_cast<unsigned>(id), n_masked, s.cls.size());
+    }
+    hbm.survey = saved;
+    std::printf("P23: %d chunks compared, %d wholly lock; fast %.1f ms vs full %.1f ms\n",
+                compared, engaged, ms_fast, ms_slow);
+    check(compared >= 2 && engaged >= 1, "P23", "found masked master chunks to compare");
+    if (edge_chunks == 0)
+        std::printf("SKIP  P23 edge: no partly surveyed body on this seed\n");
+    check(equal, "P23", "the lock fast path is byte-identical to the full bake (masked and mask-edge chunks)");
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -474,11 +617,38 @@ int main(int argc, char** argv)
     if (argc > 1 && std::strcmp(argv[1], "--master") == 0)
     {
         master_row(src, hb, land_i, p);
+        lock_fast_row(w, home, p);
         const bake_source masked = prepare_source(w, home, /*reveal_all=*/false);
         master_bake(masked, p, 1, "masked");
         master_bake(src, p, 1, "revealed");
+        // An unsurveyed body: every tile the lock fill.
+        for (const auto& [id, bd] : w.bodies)
+            if (bd.grid_width > 0 && bd.survey.phase == survey_phase::hidden)
+            {
+                master_bake(prepare_source(w, id), p, 1, "unsurveyed");
+                break;
+            }
         master_bake(masked, p, 2, "masked");
         master_bake(src, p, 2, "revealed");
+        // Where the revealed master's time goes: the whole 1x bake with one
+        // pass switched off at a time (a reading for whoever optimises it).
+        {
+            struct off { const char* name; void (*set)(bake_params&); };
+            const off offs[] = {
+                { "no-installations", [](bake_params& q) { q.installations = false; } },
+                { "no-landforms",     [](bake_params& q) { q.landform_strength = 0.0f; } },
+                { "no-rivers",        [](bake_params& q) { q.river_strength = 0.0f; } },
+                { "no-variants",      [](bake_params& q) { q.variant_strength = 0.0f; } },
+                { "no-trees",         [](bake_params& q) { q.tree_density = 0.0f; } },
+                { "no-edges/unsharp", [](bake_params& q) { q.edge_ink = q.shore_ink = 0.0f; q.unsharp_amount = 0.0f; } },
+            };
+            for (const off& o : offs)
+            {
+                bake_params q = p;
+                o.set(q);
+                master_bake(src, q, 1, o.name);
+            }
+        }
         std::printf("%s (%d failures)\n", g_failures ? "FAIL" : "PASS", g_failures);
         return g_failures ? 1 : 0;
     }
@@ -1061,6 +1231,7 @@ int main(int argc, char** argv)
     // never-magnify chooser it pinned is gone. The one-master chooser, the
     // master's alignment and the chunkwise mip chain are P22.
     master_row(src, hb, land_i, p);
+    lock_fast_row(w, home, p);
 
     // P11 — supersampling (BL-1244): the 2x bake is pure (byte-identical
     // twice), wrap-exact (one period east), seamless (two half windows equal

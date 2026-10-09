@@ -159,9 +159,13 @@ public:
     };
     std::vector<chunk_probe> probe_chunks() const;
 
-    /// Per-frame GPU upload budget, chunks (each <= 1 MB): 12 MB a frame keeps
-    /// a 60 fps frame (measured; RENDERING.md § Level of detail).
-    static constexpr int         k_upload_budget = 12;
+    /// Per-frame GPU upload budget for the drawn view and its ring, chunks
+    /// (each <= 1 MB) — RENDERING.md § Chunks, cache and invalidation.
+    static constexpr int         k_upload_budget = 8;
+    /// Per-frame budget for prefetching the adjacent levels, spent only when
+    /// the drawn view is whole (measured 2026-10-09: an unthrottled prefetch
+    /// of the finer level held a whole-grid pan at ~15 fps).
+    static constexpr int         k_prefetch_budget = 2;
     /// GPU texture LRU cap (textures of the active body; each <= 1 MB).
     static constexpr std::size_t k_gpu_cap = 320;
     /// RAM budget across bodies (TECH_FOUNDATIONS.md § Target hardware: 16 GB

@@ -1093,7 +1093,10 @@ void app::draw_painting_screen()
 
     if (total == 0 || ready >= total)
     {
-        std::printf("[begin] the ground is painted (%d chunks): play opens\n", total);
+        std::printf("[begin] the ground is painted (%d chunks) after a %.1f s wait: play opens\n",
+                    total,
+                    std::chrono::duration<double>(std::chrono::steady_clock::now()
+                                                  - m_paint_wait.wait_began).count());
         std::fflush(stdout);
         finish_new_game(); // passes the gate now, rebases the clock, opens play
     }
@@ -1549,7 +1552,8 @@ void app::finish_new_game()
             m_paint_wait.begin_wait();
             m_paint_wait.stage_count.store(1, std::memory_order_relaxed);
             m_screen = app_screen::painting_ground;
-            std::printf("[begin] painting the ground: waiting on the home master\n");
+            std::printf("[begin] painting the ground: waiting on the home master (%d of %d chunks landed)\n",
+                        paint_ready, paint_total);
             std::fflush(stdout);
         }
         return;

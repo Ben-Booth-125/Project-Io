@@ -1929,6 +1929,45 @@ void bake_region(const bake_source& src, const geometry& g, const bake_params& p
         std::memset(out, 0, static_cast<std::size_t>(pw) * ph * 4u);
         return;
     }
+    // THE LOCK FAST PATH (BL-1246): a window every tile in reach of which is
+    // survey-masked bakes as the flat lock fill and nothing else — the mask
+    // joins no blend, carries no height, cover, feature or installation, and
+    // no pass touches the lock fill (ground_bake_check P6) — so it is filled
+    // directly instead of resolved pixel by pixel. Only well inside the grid's
+    // vertical extent, where every pixel has an owner. Reach = region_hash's
+    // margin, which covers everything any pass reads. Byte-identical to the
+    // full bake (ground_bake_check P23); most of an unsurveyed body is this.
+    if (p.fast_lock)
+    {
+        constexpr double margin = 4.5;
+        const double y0 = py0 / g.s + g.y_min, y1 = (py0 + ph) / g.s + g.y_min;
+        const double x0 = px0 / g.s, x1 = (px0 + pw) / g.s;
+        if (y0 - 1.0 >= 0.0 && y1 + 1.0 <= 1.5 * (src.gh - 1))
+        {
+            const int r_lo = std::max(0, static_cast<int>(std::floor((y0 - margin) / 1.5)));
+            const int r_hi = std::min(src.gh - 1, static_cast<int>(std::ceil((y1 + margin) / 1.5)));
+            const int c_lo = static_cast<int>(std::floor((x0 - margin) / kSqrt3)) - 1;
+            const int c_hi = static_cast<int>(std::ceil((x1 + margin) / kSqrt3)) + 1;
+            bool all_masked = true;
+            for (int r = r_lo; r <= r_hi && all_masked; ++r)
+                for (int c = c_lo; c <= c_hi; ++c)
+                {
+                    const int cw = ((c % src.gw) + src.gw) % src.gw;
+                    if (src.cls[static_cast<std::size_t>(r) * src.gw + cw]
+                        != static_cast<std::uint8_t>(bake_source::tile_class::masked))
+                    {
+                        all_masked = false;
+                        break;
+                    }
+                }
+            if (all_masked)
+            {
+                std::fill(out, out + static_cast<std::size_t>(pw) * ph, k_lock_colour);
+                return;
+            }
+        }
+    }
+
     const int ss = std::max(1, p.supersample);
     if (ss == 1)
     {

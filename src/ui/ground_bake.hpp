@@ -145,6 +145,11 @@ struct bake_params
     // stamp seam it asks. A null sheet = every key draws its procedural form.
     bool  installations   = true;
     const stamp_sheet* stamps = nullptr;
+    // The lock fast path (BL-1246): a window wholly inside survey-masked
+    // ground is filled with the lock colour directly. Byte-identical to the
+    // full bake (ground_bake_check P23); false = always resolve per pixel
+    // (the harness's comparison lever).
+    bool  fast_lock       = true;
 };
 
 /// Per-tile source fields for one body, extracted once per bake batch so the

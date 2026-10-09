@@ -1344,12 +1344,27 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
         visit(level, vis, true, true);
         if (!bake_everything)
         {
-            // The ring (a pan reveals it) and the adjacent levels (a rung
-            // change reads one): uploaded with what the budget leaves.
+            // The ring (a pan reveals it), with what the view leaves.
             visit(level, ring, true, false);
-            for (const int adj : { level - 1, level + 1 })
-                if (adj >= 0 && adj < L)
-                    visit(adj, window_of(b, adj, req, 0), false, false);
+            // The adjacent levels (a rung change reads one) — PREFETCH, on
+            // its own small budget and only once the drawn view is whole, so
+            // it never competes with the view or hitches a pan. The coarser
+            // level's whole view (a quarter of the chunks); the finer one's
+            // central half (what a step in shows; the whole would be four
+            // times the chunks and thrash while panning).
+            if (m_pending_uploads == 0)
+            {
+                budget = std::min(budget, k_prefetch_budget);
+                if (level + 1 < L)
+                    visit(level + 1, window_of(b, level + 1, req, 0), false, false);
+                if (level - 1 >= 0)
+                {
+                    ground_request half = req;
+                    const float qx = 0.25f * (req.x1 - req.x0), qy = 0.25f * (req.y1 - req.y0);
+                    half.x0 += qx; half.x1 -= qx; half.y0 += qy; half.y1 -= qy;
+                    visit(level - 1, window_of(b, level - 1, half, 0), false, false);
+                }
+            }
         }
         evict_gpu();
 
