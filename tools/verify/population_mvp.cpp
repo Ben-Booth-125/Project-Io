@@ -857,6 +857,52 @@ static void test_household_draw_multi_tick()
 }
 
 // ---------------------------------------------------------------------------
+// BL-1217 G1b R3 (MARKETS.md step 3, "Re-ruled — the pull draws after the
+// processors", Ben 2026-10-09): the background basket leaves one tick of the
+// market's PROCESSOR want (`processor_want`, the processors' posted want this
+// clear) on the shelf and draws only what is above it. Pure arithmetic on
+// draw_background_basket — the register is set by hand.
+//   B1 no processor want:           shelf 100, bid 30 -> draws 30, shelf 70
+//   B2 want 80 leaves 20 above it:  shelf 100, bid 30 -> draws 20, shelf 80
+//   B3 want over the shelf:         shelf  50, bid 30 -> draws  0, shelf 50
+//   B4 switch off:                  shelf 100, bid 30 -> draws  0, shelf 100
+// ---------------------------------------------------------------------------
+static void test_background_draw_after_processors()
+{
+    std::printf("--- BL-1217 R3: the background pull draws after one tick of processor want ---\n");
+    const std::size_t g = ri(resource_type::machinery);
+    auto run = [&](bool consumes, float shelf, float bid, float want, float& fill, float& left) {
+        world w;
+        const entity_id mkt = w.create_entity();
+        market_component mc{};
+        mc.inventory[g]      = shelf;
+        mc.background_bid[g] = bid;
+        mc.processor_want[g] = want;
+        w.markets[mkt]       = mc;
+        recipe_registry reg;
+        background_demand_params bd;
+        bd.consumes = consumes;
+        reg.set_background_demand(bd);
+        draw_background_basket(w, reg);
+        fill = w.markets.at(mkt).background_fill[g];
+        left = w.markets.at(mkt).inventory[g];
+    };
+    float f = 0.0f, s = 0.0f;
+    run(true, 100.0f, 30.0f, 0.0f, f, s);
+    std::printf("  B1 shelf 100, bid 30, want 0: drew %.2f, shelf %.2f\n", f, s);
+    check(f == 30.0f && s == 70.0f, "B1 no processor want: the pull draws its whole bid", f, 30.0f);
+    run(true, 100.0f, 30.0f, 80.0f, f, s);
+    std::printf("  B2 shelf 100, bid 30, want 80: drew %.2f, shelf %.2f\n", f, s);
+    check(f == 20.0f && s == 80.0f, "B2 the pull draws only what stands above one tick of processor want", f, 20.0f);
+    run(true, 50.0f, 30.0f, 80.0f, f, s);
+    std::printf("  B3 shelf 50, bid 30, want 80: drew %.2f, shelf %.2f\n", f, s);
+    check(f == 0.0f && s == 50.0f, "B3 a shelf under the processor want is left whole", f, 0.0f);
+    run(false, 100.0f, 30.0f, 0.0f, f, s);
+    std::printf("  B4 switch off: drew %.2f, shelf %.2f\n", f, s);
+    check(f == 0.0f && s == 100.0f, "B4 consumes = false leaves the shelf untouched", f, 0.0f);
+}
+
+// ---------------------------------------------------------------------------
 int main()
 {
     test_population_on_kepler();
@@ -866,6 +912,7 @@ int main()
     test_multi_market_growth_aggregate();
     test_unrecorded_bid_carries_streak();
     test_household_draw_multi_tick();
+    test_background_draw_after_processors();
 
     if (g_failures == 0)
         std::printf("\nALL PASS (%d assertions)\n", g_passes);

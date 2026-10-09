@@ -345,6 +345,15 @@ struct economy_report
     /// sorted-accumulation reason.
     std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> upkeep_wants;
 
+    /// BL-1217 G1b R3 ATTRIBUTION MIRROR: the subset of `wants` posted by
+    /// PROCESSORS (run_processing) — what each wanted from the market for a full
+    /// run, less its own pool, where the fair-price ceiling admitted the bid.
+    /// Every figure here is ALSO in `wants`; this map is never summed into
+    /// `mc.demand` and never paid against. clear_markets copies it to
+    /// `market_component::processor_want`, the shelf the background pull
+    /// leaves (MARKETS.md step 3). Same key, same sorted std::map as `wants`.
+    std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> processor_wants;
+
     /// BL-1203 (water reaches dry markets; SUPPLY.md § Dispatch trigger, "What a
     /// hauler sees as unmet demand", Ben 2026-10-05): the HAULER-ONLY want — a
     /// processor's input and a construction site's material that went unbid

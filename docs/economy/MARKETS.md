@@ -309,8 +309,9 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
     bid one pooled quantity, so a short shelf fills each of them in the same share. Markets
     ascending, resources ascending. The fill is what the growth gate reads
     (`POPULATION.md` § Growth, decline and razing). **The background pull draws next**, on the
-    same terms, from what households left: `min(background bid, inventory)` (step 3,
-    `inject_background_demand`).
+    same terms, from what households left, less one tick of the market's processor want:
+    `min(background bid, max(0, inventory − processor want))` (step 3, *the pull draws after the
+    processors*).
 13. **Shelf spoilage** — every good left on every shelf loses its spoilage rate,
     `inventory[r] −= inventory[r] × rate[r]` (§ Price resolution, *The shelf spoils*). After the
     households' draw, so the households' draw is not taxed by its own spoilage (the nation's later

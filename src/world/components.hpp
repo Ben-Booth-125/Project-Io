@@ -1146,6 +1146,17 @@ struct market_component
     /// next clear, which changes nothing the simulation computes.
     std::array<float, resource_count> background_bid  = {};
     std::array<float, resource_count> background_fill = {};
+
+    /// BL-1217 G1b R3 (MARKETS.md step 3, "the pull draws after the
+    /// processors", Ben 2026-10-09): one tick of this market's PROCESSOR want —
+    /// the want its processors POSTED here this tick (`economy_report::
+    /// processor_wants`, the processor part of the demand register; wanted,
+    /// not drawn; no construction, upkeep, household, background or nation
+    /// part). draw_background_basket leaves this much on the shelf and draws
+    /// only what stands above it. TRANSIENT and NOT serialised: clear_markets
+    /// rewrites it on every market before the draw reads it, inside the same
+    /// clear, so a load that leaves it zero changes nothing the sim computes.
+    std::array<float, resource_count> processor_want = {};
 };
 
 /// BL-1172 — THE POSTED PRICE of good `r` on market `m`: the price that stands
