@@ -293,6 +293,10 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   pre-existing fails convoy_command R4.2/4.4/4.5, supply_advance 4, LP-trim 1 (same on base).
   Live look at a sea-route convoy owed. Save stack now: v39 D5, v40 D3, v41 PROPELLANT, v42 BL-1195;
   the G1b lanes may claim more — reconcile at merge.
+  BL-1195 review: lane correct, merge clean; BUT interdiction samples one head tile per tick (T=1-3
+  for most hauls, so inland-leg units rarely intercept) and the head is spread evenly by tiles
+  across legs of ~5x different speed. Fix round sent (swept interdiction, time-weighted head,
+  real-tick rows, origin-tile row, body-pool lanes, doc honesty, P8 convoy 1).
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
