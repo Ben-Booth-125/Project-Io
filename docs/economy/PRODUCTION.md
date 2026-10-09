@@ -280,7 +280,10 @@ Chemical Plant would ever hold it.
 On a body with an atmosphere, liquid oxygen is produced in Era 1 by cryogenic air separation — the Chemical Plant draws oxygen from the local atmosphere and consumes no stockpiled input (energy cost only, abstracted into the recipe rate). Propellant is therefore an Era 1 capability anywhere refined fuel is available. On airless bodies there is no atmosphere to separate, so the water-electrolysis recipe is the only liquid-oxygen route off-world. **And it runs only
 there (Ben, 2026-10-09):** `propellant_electrolysis` may be set only on an airless body, and
 `propellant_atmospheric` only on a body with an atmosphere — each route is the one its body's
-air allows, never a cheaper choice beside the other. Closing the in-situ propellant loop there (water → liquid oxygen, refined fuel shipped or synthesised) is the defining Era 2 logistical problem.
+air allows, never a cheaper choice beside the other. "Airless" is planetology's own reading: an
+atmosphere class of `none` or `thin` (a trace atmosphere at zero surface pressure), the same
+bodies planetology routes to the airless tables (`atmosphere_class`, `src/world/tile_generation.hpp`;
+Ben's ruling 2026-10-09 applied with the existing definition). Closing the in-situ propellant loop there (water → liquid oxygen, refined fuel shipped or synthesised) is the defining Era 2 logistical problem.
 
 #### Electronics Lab
 
