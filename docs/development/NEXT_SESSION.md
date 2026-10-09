@@ -333,6 +333,10 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   **R3 ROUND 2 DONE** (ea624f40): silenced processor want protected; population_mvp T1-T5 drive the
   real clear. Alone: G1b 10.6 -> 10.4, c-background 38 -> 2 but d-ceiling 36 -> 65; t50 72.0 ->
   70.1; G2 92.7 -> 90.9. No save field. Ready to merge after R1+R2.
+  **R1+R2 REVIEW:** core logic clean; gaps — no play-form / shared-charge / rescue rows,
+  background_fill not hashed, run_contend fixture half-tests R2, generation charges razed centres
+  and unpriced goods (fixed as a defect: phantom buyers, not price). Fix round sent. Save stack to
+  renumber at merge: v42 BL-1195 (ledger says 43), v45 R2 -> sequential.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
