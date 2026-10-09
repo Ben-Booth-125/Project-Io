@@ -211,7 +211,11 @@ surfaces as interaction feedback:
   where one tile of grass ends and the next begins. It is drawn over the ground at those
   rungs, not baked: the master is one image for every zoom, and a baked seam would darken
   the far zooms where it would read as a grid. Below the close rungs the seam is absent
-  and the ground is continuous, as before.
+  and the ground is continuous, as before. **The values:** drawn where the drawn hex
+  radius is **at least 40 px** (between rung 2, ~27 px, and rung 3, ~55 px, at the
+  reference 1720×1080 window); a **1 px anti-aliased black stroke at 16% alpha**, so it is
+  exactly the ground beneath darkened by a sixth and has no hue of its own. It lies over
+  the ground and under every lens wash and stroke, one segment per shared edge.
 
 Tiles remain fully instrumental — hit-testing, placement, deposits, ownership are
 tile-keyed exactly as before (Ben, 2026-08-21: tiles are "rendered differently, but

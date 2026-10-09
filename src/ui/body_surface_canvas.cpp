@@ -360,6 +360,14 @@ inline ImU32 with_alpha(ImU32 c, float a)
     return (c & ~IM_COL32_A_MASK) | (static_cast<ImU32>(ai) << IM_COL32_A_SHIFT);
 }
 
+// --- The close-zoom seam (BL-1251 part 5; RENDERING.md § The grid rule) ---------
+// At the two closest rungs only, a faint line between neighbouring tiles: a
+// low-alpha BLACK stroke, so it is the ground under it darkened, never a colour of
+// its own. Keyed on the drawn radius: 40 px sits between rung 2 (~27 px) and rung 3
+// (~55 px) at the reference 1720x1080 window.
+constexpr float k_seam_min_drawn_r = 40.0f;
+constexpr float k_seam_alpha       = 0.16f;
+
 /// Scale applied to the whole treatment — wash AND stroke — where the frontier
 /// faces UNCLAIMED ground rather than another nation (Ben, 2026-08-24: "reduce
 /// the border band on edges facing unclaimed ground").
@@ -3038,10 +3046,19 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     struct ground_wedges { ImVec2 c; float r; ImU32 cols[ui_state::k_lens_resource_cap]; int n; };
     static std::vector<ground_wedges> lens_wedges;
     lens_wedges.clear();
+    // The close-zoom seam (BL-1251 part 5): one segment per shared tile edge.
+    static std::vector<ImVec2> seam_segs;
+    seam_segs.clear();
+    const bool seam_on = hit_r >= k_seam_min_drawn_r;
     const auto emit_ground = [&] {
         if (!ground_on)
             return;
         dl->ChannelsSetCurrent(1);
+        // The seam first: over the ground, under every wash and stroke. Thin
+        // anti-aliased lines — the texture-AA path, a few vertices a segment.
+        for (std::size_t si = 0; si + 1 < seam_segs.size(); si += 2)
+            dl->AddLine(seam_segs[si], seam_segs[si + 1],
+                        IM_COL32(0, 0, 0, static_cast<int>(k_seam_alpha * 255.0f)), 1.0f);
         // NOT anti-aliased: a wash tiles the plane with its neighbours, and an AA
         // fringe both doubles the vertices and leaves a faint seam where two
         // translucent fringes overlap.
@@ -4090,6 +4107,22 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         }
                         else
                             lens_washes.push_back({ { cx, cy }, step, {}, {}, lc, true });
+                    }
+                }
+                // The close-zoom seam: sides 0-2 (E, NE, NW) of every tile on
+                // the bake — each shared edge is exactly one tile's side in that
+                // set and the other's side + 3, so every edge draws once.
+                if (seam_on)
+                {
+                    ImVec2 sv[6];
+                    hex_vertices(sv, cx, cy, step);
+                    for (int side = 0; side < 3; ++side)
+                    {
+                        const auto nc = hex_neighbors::neighbour(t_col, t_row, side);
+                        if (nc.gy < 0 || nc.gy >= gh)
+                            continue; // off the pole: no neighbour, no seam
+                        seam_segs.push_back(sv[k_side_verts[side][0]]);
+                        seam_segs.push_back(sv[k_side_verts[side][1]]);
                     }
                 }
                 if (is_player_tile)
