@@ -73,7 +73,7 @@ verify.set_border_band(true)
 
 -- Fallback: a lens rung renders through the CLASSIC per-tile path — the
 -- fallback is alive and lens rendering is BL-734's, not ours (lens over the
--- bake is NR-988). Under BL-1246 the lens rides the same 22.5-degree camera.
+-- bake is NR-1003). Under BL-1246 the lens rides the same 22.5-degree camera.
 verify.set_overlay("resource")
 verify.frames(1)
 verify.capture("ground_bake_lens_fallback")
