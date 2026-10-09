@@ -450,10 +450,13 @@ tradeable, and `resolve_price` / the clearing pass ignore everything else
   construction sector's product (`docs/economy/PRODUCTION.md`).
 
 **Propellant has a base price (Ben, 2026-10-08; BL-1217).** It is made in a Chemical Plant and
-burned by a Launchpad and by the nation's space programme, and both buy it — so it trades, and a
-plant that makes it can be judged by what it earns. Unpriced, every propellant plant forecast zero
-revenue and was idled the moment it stood (102 of them across the 16 curated seeds). Its base
-price is derived from its inputs (refined fuel and liquid oxygen) as every Tier 3 product's is.
+burned by a Launchpad from its corporation's own pool; the nation's space programme buys it — so
+it trades, and a plant that makes it can be judged by what it earns. Unpriced, every propellant
+plant forecast zero revenue and was idled the moment it stood (102 of them across the 16 curated
+seeds). Its base price is derived from its inputs as every Tier 3 product's is (`PRODUCTION.md` §
+The recipe margin anchor), on the route a body with an atmosphere runs — `propellant_atmospheric`,
+refined fuel ×2 — since the airless route runs only on airless bodies (Ben, 2026-10-09): marginal
+cost 31.95, so **64.0**. A pad's pool keeps its propellant from auto-surplus (`MARKETS.md` step 4).
 
 Water is in this tradeable set from tick 0: it carries an authored base price on the home-body
 markets and sits in the substrate demand basket (`scripts/economy.lua`, weight 0.40).

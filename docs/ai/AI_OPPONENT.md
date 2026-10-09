@@ -441,6 +441,10 @@ a plant it zeroed ends the moment that plant's own forecast recovers — the pla
 on the corporation's next evaluation, not after the fixed hold. Measured: the dial zeroed 503
 generation-built plants in the settle (178 on a start-up glut that had cleared by the handoff), and
 the 8-tick reflex mothballed most of them before the 16-tick hold let the dial look again.
+**At the handoff the seat's dial-idled plants return to auto (Ben, 2026-10-09; NR-986).** The
+scorer stops acting on the corporation the player takes, so a plant its dial left at zero would
+otherwise stay at zero until the player touched it. Each such plant is handed over with its
+workforce on auto, as every plant the player builds starts.
 
 **The dial forecasts at base where no fact exists yet (Ben, 2026-10-09; BL-1217, G1 plants
 running).** Where a plant's market lists none of its output and no bid for it has yet registered,
