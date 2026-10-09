@@ -255,6 +255,10 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   per seed-tick. Running at handoff ~unchanged vs wave-2b start (2393 -> 2391); built fell 3351 ->
   2732. Rivals DO build processors in play on real seeds (built 2732 -> 4384 by t50), so ai_skill
   R5's zero is the legacy harness world only. Next: Ben on G1b; Build-door live click owed.
+  **BEN (2026-10-09, sprint 50 form):** diagnose G1b now, extend the sprint; START WAVE 3 NOW.
+  Lanes: G1b diagnosis (probe, baseline = its merged tip); BL-1195 convoy lane follows legs
+  (build); BL-1119 R7 cold review of 8b921ee6. BL-1119 R4 (quiet Release gen_step_costs 16 seeds)
+  waits for a quiet machine; R6 haulage reading after.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
