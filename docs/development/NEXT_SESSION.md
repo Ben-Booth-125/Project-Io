@@ -196,6 +196,13 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   `dial_pool_draw` (per-processor room excludes units already posted; one writer after production;
   v40 now `dial_pool_draw`+tick). 16 seeds: D3 81.6/65.9/13.6/73.6; +D4 82.1/67.9/16.3/71.1. D4 drives
   the G1b rise; no by-product switches. Steel zeroings 47 (D5's).
+  **D3 rework review:** room logic correct; veto bit-identical; F1 hold double-counts the
+  pool->demand transition (record only written when q>0) — fix: stamp every running-touched key each
+  tick incl. 0, hold bridges only untouched ticks (within ruling); F2 market_has_cleared may read a
+  same-step unposted bid on a new market; F3 two stale comments; F4 vacuous v40 row. D4 G1b
+  hypothesis: closed exit into unpriced propellant keeps fuel plants claiming contended inputs.
+  Round 3 sent. Merge with D5/D6 conflicts: reservations jsonl, world_save.hpp (keep v40 + both),
+  save_roundtrip.cpp (take D5's assertion style).
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
