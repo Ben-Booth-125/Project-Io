@@ -650,6 +650,15 @@ building_report run_processing(world& w, const recipe_registry& reg,
         auto& want_row = out.wants[std::make_pair(corp, pool_key)];
         for (std::size_t r = 0; r < resource_count; ++r)
             want_row[r] += wanted[r];
+        // BL-1217 G1b R3: the processor part of the same want, mirrored (the
+        // background pull leaves one tick of it on the shelf) — PLUS the want
+        // the fair-price ceiling silenced (Ben, 2026-10-09: a processor priced
+        // out still came for the input). Per input, one of the two is zero (the
+        // ceiling either admits the shelf or not). The silenced part stays out
+        // of `wants` and the price; this register never prices.
+        auto& proc_row = out.processor_wants[std::make_pair(corp, pool_key)];
+        for (std::size_t r = 0; r < resource_count; ++r)
+            proc_row[r] += wanted[r] + suppressed[r];
         // BL-1203: a row only where something was suppressed (a std::map, so
         // the merge in clear_markets walks it sorted).
         if (std::any_of(suppressed.begin(), suppressed.end(), [](float v) { return v > 0.0f; }))

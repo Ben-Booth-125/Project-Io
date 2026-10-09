@@ -1136,16 +1136,28 @@ struct market_component
     std::array<float, resource_count>   dial_pool_draw      = {};
     std::array<int32_t, resource_count> dial_pool_draw_tick = {};
 
-    /// BL-1217 lever D (behind `economy.background_demand.consumes`): the
-    /// BACKGROUND channel's bid at the last clear (`inject_background_demand`)
-    /// and what it DREW off `inventory` (`draw_background_basket`, zero while
-    /// the switch is off). `background_bid` is TRANSIENT (rewritten inside the
-    /// clear before anything reads it; verify harnesses only). `background_fill`
-    /// is SERIALISED (BL-1217 G1b R2, world_save_version 43): the supply clause
-    /// reads it as the background's draw at the last clear (input_reach.hpp
-    /// § EVERY BUYER), between clears, so a load must restore it.
+    /// BL-1217 lever D (behind `economy.background_demand.consumes`, authored
+    /// true in economy.lua): the BACKGROUND channel's bid at the last clear
+    /// (`inject_background_demand`) and what it DREW off `inventory`
+    /// (`draw_background_basket`, zero while the switch is off).
+    /// `background_bid` is TRANSIENT (rewritten inside the clear before anything
+    /// reads it; verify harnesses only). `background_fill` is SERIALISED (BL-1217
+    /// G1b R2, world_save_version 43): the supply clause reads it as the
+    /// background's draw at the last clear (input_reach.hpp § EVERY BUYER),
+    /// between clears, so a load must restore it.
     std::array<float, resource_count> background_bid  = {};
     std::array<float, resource_count> background_fill = {};
+
+    /// BL-1217 G1b R3 (MARKETS.md step 3, "the pull draws after the
+    /// processors", Ben 2026-10-09): one tick of this market's PROCESSOR want —
+    /// the want its processors POSTED here this tick plus the want the
+    /// fair-price ceiling SILENCED (`economy_report::processor_wants`; wanted,
+    /// not drawn; no construction, upkeep, household, background or nation
+    /// part; Ben 2026-10-09). draw_background_basket leaves this much on the shelf and draws
+    /// only what stands above it. TRANSIENT and NOT serialised: clear_markets
+    /// rewrites it on every market before the draw reads it, inside the same
+    /// clear, so a load that leaves it zero changes nothing the sim computes.
+    std::array<float, resource_count> processor_want = {};
 };
 
 /// BL-1172 — THE POSTED PRICE of good `r` on market `m`: the price that stands

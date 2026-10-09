@@ -607,8 +607,8 @@ struct background_demand_params
     float elasticity_min    = 0.30f; ///< clamp lo on the elasticity factor.
     float elasticity_max    = 2.50f; ///< clamp hi on the elasticity factor.
     float demand_scale      = 1.00f; ///< global scale → demand scale.
-    /// BL-1217 lever D (measurement switch, default OFF = the pre-lever
-    /// behaviour bit-for-bit): when true the background basket DRAWS its bid
+    /// BL-1217 lever D: authored TRUE in scripts/economy.lua; false here (the
+    /// pre-lever behaviour, for hand-built registries): when true the background basket DRAWS its bid
     /// off the market's shelf after the households' draw (draw_background_basket).
     bool  consumes          = false;
 };

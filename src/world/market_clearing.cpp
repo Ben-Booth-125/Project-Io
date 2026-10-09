@@ -878,14 +878,21 @@ void inject_background_demand(world& w, const recipe_registry& reg)
 
 void draw_background_basket(world& w, const recipe_registry& reg)
 {
-    // BL-1217 lever D (measurement, behind economy.background_demand.consumes,
-    // default OFF). The background basket stops being a pricing pull only: it
-    // TAKES what it bid off the market's shelf, `min(bid, inventory)` per good,
+    // BL-1217 lever D (behind economy.background_demand.consumes: authored TRUE
+    // in scripts/economy.lua; the C++ struct default is false, so a hand-built
+    // registry does not draw). The background basket is not a pricing pull only:
+    // it TAKES what it bid off the market's shelf,
     // exactly as draw_household_basket does and on the same terms -- NO MONEY
     // MOVES (the market paid the maker when it bought the stock as buyer of
     // last resort), and NO CEILING (the bid's elasticity is its reservation).
     // One bid per (market, good), so a short shelf fills it pro rata trivially.
     // Ascending market id, ascending resource.
+    //
+    // BL-1217 G1b R3 (MARKETS.md step 3, re-ruled Ben 2026-10-09): the pull
+    // draws AFTER the processors. It leaves one tick of the market's processor
+    // want (`processor_want`, written by clear_markets this clear: posted want
+    // plus the want the ceiling silenced, processors only) on the shelf and
+    // draws only what stands above it: min(bid, max(0, shelf - want)).
     const bool consumes = reg.background_demand().consumes;
     std::vector<entity_id> mids;
     mids.reserve(w.markets.size());
@@ -905,7 +912,8 @@ void draw_background_basket(world& w, const recipe_registry& reg)
         {
             const float bid   = std::max(0.0f, mc.background_bid[r]);
             const float shelf = std::max(0.0f, mc.inventory[r]);
-            const float take  = std::min(bid, shelf);
+            const float above = std::max(0.0f, shelf - std::max(0.0f, mc.processor_want[r]));
+            const float take  = std::min(bid, above);
             mc.background_fill[r] = take;
             if (take > 0.0f)
                 mc.inventory[r] = shelf - take;
@@ -1768,6 +1776,26 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
                 mkit->second.demand[r] += wanted[r];
     }
 
+    // BL-1217 G1b R3 (MARKETS.md step 3, "the pull draws after the processors",
+    // Ben 2026-10-09): the PROCESSOR part of the demand just posted, per market —
+    // one tick of processor want, which draw_background_basket leaves on the
+    // shelf. Rewritten whole every clear, on every market; std::map: a sorted
+    // accumulation (ascending corp within a market).
+    for (auto& [mid, mc] : w.markets)
+    {
+        (void)mid;
+        mc.processor_want.fill(0.0f);
+    }
+    for (const auto& [key, wanted] : report.processor_wants)
+    {
+        const auto mkit = w.markets.find(key.second);
+        if (mkit == w.markets.end())
+            continue;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (wanted[r] > 0.0f)
+                mkit->second.processor_want[r] += wanted[r];
+    }
+
     // BL-1217 (AI_OPPONENT.md § 11, the dial reads stock-fed consumers): the
     // dial's pool-draw record, written HERE and only here, beside the demand
     // above — both describe this tick, so a consumer moving between its pool
@@ -2190,8 +2218,9 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     draw_household_basket(w);
 
     // BL-1217 lever D: the background basket draws what the households left,
-    // before spoilage and before the nation's later claims. A no-op on the
-    // shelf while economy.background_demand.consumes is false (the default).
+    // before spoilage and before the nation's later claims, leaving one tick of
+    // processor want (BL-1217 G1b R3). A no-op on the shelf while
+    // economy.background_demand.consumes is false (authored true in economy.lua).
     draw_background_basket(w, reg);
 
     // BL-1179 (shelf spoilage): after the households' draw (the nation's later
