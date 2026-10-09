@@ -233,9 +233,15 @@ about a tile and a half, so neighbouring tiles melted together. Three changes an
 
 - **Each tile keeps its own ground.** A tile's body carries its own material colour, its
   own variant and its own texture undiluted; it blends into a neighbour only in a **narrow
-  band at the shared edge** (about the outer 15% of the hex). The variant cross-fade
-  (§ Mountains, rivers and terrain variety) narrows to the same band. The edge is still never
-  a drawn line between different terrains — that is the border sets' job.
+  band at the shared edge** — **0.13 canonical units each side of it**, 15% of the hex's
+  0.866 inradius, the two tiles a 50/50 mix on the edge itself. The variant cross-fade
+  (§ Mountains, rivers and terrain variety) narrows to the same band, the dramatic forms'
+  variants included. The material edge sits on the hex — frayed by at most 0.07 — so a tile's
+  body is where its seam is drawn; the land|water boundary keeps the full domain warp, so
+  coasts stay organic. Terrain *shape* (height, slope, the oblique lift) is continuous ground,
+  not material, and keeps its smooth interpolation; water keeps its wide blend too, so
+  shallows never tile into hexes. The edge is still never a drawn line between different
+  terrains — that is the border sets' job, and the cover-boundary ink line retires with them.
 - **Border sets between different terrains.** Every edge between two DIFFERENT terrain
   families bakes a natural **transition set** chosen by the pair: a forest edge as a
   fringe of scattered trees and undergrowth stepping into the open ground; rock against
@@ -243,12 +249,34 @@ about a tile and a half, so neighbouring tiles melted together. Three changes an
   and shallows); cultivated or grassland against another family as a field edge (a hedge or
   furrow line). The pair decides the set, so the transition reads as terrain and the edge
   stays crisp without an outline. Same-family edges carry no set; the close-zoom seam
-  (§ The grid rule) marks them at the close rungs.
+  (§ The grid rule) marks them at the close rungs. The families group into border classes,
+  ranked; the higher-ranked class of a pair is the **source** and bakes its own set into
+  the other, the **receiving** tile:
+
+  | Rank | Class (variant families) | Its set, baked into the lower-ranked neighbour |
+  |---|---|---|
+  | 1 | forest | **Forest fringe** — trees and dark undergrowth stepping out, thinning over ~0.5 |
+  | 2 | scrub | **Scrub fringe** — bushes and undergrowth stepping out, over ~0.3 |
+  | 3 | rock (bare, volcanic) | **Scree lip** — broken stones and gravel spilling onto the soil, downhill only |
+  | 4 | grass (cultivated and grassland) | **Field edge** — a hedge or a furrowed headland on the grass side |
+  | 5 | marsh | **Reed fringe** — damp ground and reed flecks |
+  | 6 | sand (dunes, salt, regolith) | **Drift lip** — tongues of pale sand |
+  | 7 | snow and ice | **Snow drift** — white patches |
+  | 8 | urban | none: its neighbours' sets carry its edges |
+
+  Two families of one class (bare against volcanic) carry no set. **Any land against water**
+  bakes the **shore shelf** — a pale wet margin darkening to a waterline on the land, paling
+  shallows and a thin foam line on the water — on the land|water boundary itself. Scattered
+  items exist by a hash of their own lattice point against the density its own tile's edges
+  give it, gated along the edge by a low-frequency field, so a tile ringed by its source
+  reads as ground, never as a dotted outline.
 - **More texture per family.** Each terrain family carries finer, higher-contrast grain
   and its own **pattern**: furrows on cultivated ground, scree on rock, ripples on dunes,
-  tussocks on grass and scrub, with forest read through its canopy as now. Patterns are
-  procedural on the stamp seam, hash-placed from grid coordinates, keyed on the nominal
-  scale like every pass. **The master bakes at 2×** where the pre-bake still fits its
+  tussocks on grass and scrub, with forest read through its canopy as now. Grass is both
+  cultivated and grassland: half its variants are furrowed fields (one furrow direction per
+  tile), the rest tussock sward. Patterns are procedural on the stamp seam, hash-placed from
+  grid coordinates, keyed on the nominal scale like every pass (close rungs only — the far
+  levels are downsamples, so they cannot alias). **The master bakes at 2×** where the pre-bake still fits its
   budget (TECH_FOUNDATIONS.md § Target hardware); otherwise at 1×.
 
 ### Installations — rendered geometry, no glyphs
@@ -341,9 +369,9 @@ and both read as annotation laid on a painting. They move into the bake.
   and each dramatic landform — carries **several procedural variants** (different noise
   seeds, brush scatter, rock and erosion patterns), and each tile picks one by a hash of
   its grid coordinates, so neighbouring tiles of one terrain do not repeat and a wide
-  plain does not read as wallpaper. Variants **cross-fade** across the tile boundary the
-  way the base ground already interpolates between tile centres, so no variant edge is
-  ever drawn (the grid rule). The count per family is set by eye against captures, not
+  plain does not read as wallpaper. Variants **cross-fade** across the tile boundary within
+  the base ground's edge band (§ Tiles hold their own ground), so no variant edge is ever
+  drawn (the grid rule). The count per family is set by eye against captures, not
   here; an authored raster set replaces a family's procedural variants on the same seam
   structures use.
 

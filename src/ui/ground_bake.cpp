@@ -56,6 +56,8 @@ float value_noise(double x, double y, double cell, int period_cells, std::uint32
     return a + (b - a) * ty; // [0, 1)
 }
 
+inline double sq(double v) { return v * v; }
+
 inline float height_at(const bake_source& s, int c, int r)
 {
     const int cw = ((c % s.gw) + s.gw) % s.gw;
@@ -341,6 +343,27 @@ std::uint8_t variant_family(terrain_substrate sub, terrain_cover cov)
     }
 }
 
+/// Eight rotations over a quarter turn (cos, sin): the angular dots' frames.
+constexpr double k_rot8[8][2] = {
+    { 1.0, 0.0 }, { 0.98078528, 0.19509032 }, { 0.92387953, 0.38268343 }, { 0.83146961, 0.55557023 },
+    { 0.70710678, 0.70710678 }, { 0.55557023, 0.83146961 }, { 0.38268343, 0.92387953 }, { 0.19509032, 0.98078528 },
+};
+
+/// Fine-grain multiplier per family (BL-1251, "more texture per family"):
+/// rough ground (scrub, bare, volcanic) carries a coarser, higher-contrast
+/// grain than a meadow; snow is smoother.
+constexpr float k_fam_grain[vf_count] = {
+    1.25f, // grass
+    1.35f, // scrub
+    1.00f, // forest (its canopy carries the read)
+    1.25f, // marsh
+    1.50f, // bare
+    1.15f, // sand
+    1.45f, // volcanic
+    0.80f, // snow
+    1.00f, // urban
+};
+
 /// Tree scatter per forest/scrub variant: {count multiplier, clumping toward a
 /// grove centre (glades open where it pulls the trees away), canopy size,
 /// warm tint}. Row 0 of a neutral tile is {1, 0, 1, 0}.
@@ -428,7 +451,146 @@ void assign_variants(bake_source& s)
         }
 }
 
+// ---------------------------------------------------------------------------
+// Border sets (BL-1251, RENDERING.md § Tiles hold their own ground). Every
+// edge between two DIFFERENT terrain families bakes a natural transition
+// chosen by the pair. The families group into border classes by how their
+// edge reads; the pair's set is the higher-priority class's own set, and the
+// other tile is its RECEIVING side (the open ground a fringe steps into):
+//
+//   forest  > scrub > rock > grass > marsh > sand > snow > urban
+//   forest  fringe: trees and undergrowth stepping out
+//   scrub   fringe: bushes stepping out
+//   rock    scree lip: broken stones spilling onto the soil, a pale lip
+//   grass   field edge: a hedge or a furrowed headland on the grass side
+//   marsh   reed fringe: damp ground and reed flecks
+//   sand    drift lip: pale sand tongues
+//   snow    snow drift: white patches
+//   (urban is never a source: its neighbours' sets carry its edges)
+//   any land against water: the shore shelf, baked from the land|water class
+//   boundary itself (bake_window), not from this table.
+// Same class, no set (bare against volcanic is rock against rock).
+// ---------------------------------------------------------------------------
+
+/// Border class of a variant family: its priority rank (lower = source) and
+/// the set it bakes as a source.
+struct bclass { std::uint8_t rank; std::uint8_t set; };
+inline bclass border_class(std::uint8_t fam)
+{
+    switch (fam)
+    {
+    case vf_forest:   return { 0, bs_forest };
+    case vf_scrub:    return { 1, bs_scrub };
+    case vf_bare:
+    case vf_volcanic: return { 2, bs_scree };
+    case vf_grass:    return { 3, bs_field };
+    case vf_marsh:    return { 4, bs_reed };
+    case vf_sand:     return { 5, bs_drift };
+    case vf_snow:     return { 6, bs_snow };
+    case vf_urban:    return { 7, bs_none };
+    default:          return { 255, bs_none };
+    }
+}
+
+/// Per tile and side, the border set and role; per tile, which RECEIVING
+/// sets lie on it or a neighbour (bit = set id) — the scatter pass's cull.
+/// A pure function of class and family.
+void derive_border_sets(bake_source& s)
+{
+    const int n = s.gw * s.gh;
+    const auto land = static_cast<std::uint8_t>(bake_source::tile_class::land);
+    s.bset.assign(static_cast<std::size_t>(n) * 6u, 0u);
+    s.near_border.assign(static_cast<std::size_t>(n), 0u);
+    // Each field's furrow direction: a pure function of the grid position.
+    s.furrow_cs.assign(static_cast<std::size_t>(n) * 2u, 0.0f);
+    for (int i = 0; i < n; ++i)
+    {
+        const double ang = 3.14159265358979 * hash01(i % s.gw, i / s.gw, 0x5F01u);
+        s.furrow_cs[2u * i]      = static_cast<float>(std::cos(ang));
+        s.furrow_cs[2u * i + 1u] = static_cast<float>(std::sin(ang));
+    }
+    for (int i = 0; i < n; ++i)
+    {
+        if (s.cls[i] != land)
+            continue;
+        const bclass a = border_class(s.family[i]);
+        for (int side = 0; side < 6; ++side)
+        {
+            const int j = nb_index(s, i, side);
+            if (j < 0 || s.cls[j] != land)
+                continue;
+            const bclass b = border_class(s.family[j]);
+            if (a.rank == b.rank || a.rank == 255 || b.rank == 255)
+                continue;
+            const bool src_here = a.rank < b.rank;
+            const std::uint8_t set = src_here ? a.set : b.set;
+            if (set == bs_none)
+                continue;
+            s.bset[static_cast<std::size_t>(i) * 6u + side] =
+                static_cast<std::uint8_t>(set | (src_here ? 0u : k_bs_recv));
+        }
+    }
+    // Which scatter kinds can stand on each tile (a receiving side of the
+    // set; scree also spills a little on its source side), and the same for
+    // the neighbour across each side — the scatter pass's per-pixel cull.
+    s.border_pts.assign(static_cast<std::size_t>(n), 0u);
+    for (int i = 0; i < n; ++i)
+        for (int side = 0; side < 6; ++side)
+        {
+            const std::uint8_t b = s.bset[static_cast<std::size_t>(i) * 6u + side];
+            if ((b & k_bs_recv) || (b & k_bs_mask) == bs_scree)
+                s.border_pts[i] |= static_cast<std::uint8_t>(1u << (b & k_bs_mask));
+        }
+    // Land beside water and water beside land: the shore shelf's cull.
+    s.coastal.assign(static_cast<std::size_t>(n), 0u);
+    const auto water = static_cast<std::uint8_t>(bake_source::tile_class::water);
+    for (int i = 0; i < n; ++i)
+    {
+        if (s.cls[i] != land && s.cls[i] != water)
+            continue;
+        const std::uint8_t other = s.cls[i] == land ? water : land;
+        for (int side = 0; side < 6; ++side)
+        {
+            const int j = nb_index(s, i, side);
+            if (j >= 0 && s.cls[j] == other)
+                s.coastal[i] = 1u;
+        }
+    }
+    s.nb_border_pts.assign(static_cast<std::size_t>(n) * 6u, 0u);
+    for (int i = 0; i < n; ++i)
+        for (int side = 0; side < 6; ++side)
+        {
+            const int j = nb_index(s, i, side);
+            if (j >= 0)
+                s.nb_border_pts[static_cast<std::size_t>(i) * 6u + side] = s.border_pts[j];
+        }
+    for (int i = 0; i < n; ++i)
+    {
+        std::uint8_t bits = 0;
+        const auto mark = [&](int j)
+        {
+            if (j < 0)
+                return;
+            for (int side = 0; side < 6; ++side)
+            {
+                const std::uint8_t b = s.bset[static_cast<std::size_t>(j) * 6u + side];
+                if (b & k_bs_recv)
+                    bits |= static_cast<std::uint8_t>(1u << (b & k_bs_mask));
+            }
+        };
+        mark(i);
+        for (int side = 0; side < 6; ++side)
+            mark(nb_index(s, i, side));
+        s.near_border[i] = bits;
+    }
+}
+
 } // namespace
+
+void rederive_border_sets(bake_source& s)
+{
+    derive_border_sets(s);
+}
 
 geometry make_geometry(int gw, int gh, double target_px_per_r, double tilt_sy)
 {
@@ -537,6 +699,7 @@ bake_source prepare_source(const world& w, entity_id body, bool reveal_all,
         }
     }
     derive_features(s, raw_in, raw_out);
+    derive_border_sets(s); // BL-1251
 
     // Height gradient from neighbour differences — symmetric central
     // differences over the raster (columns wrap, rows clamp). Computed on the
@@ -799,19 +962,52 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
     const double fine_cell = periodic_cell(0.155, fine_cells);
     const bool   fine_on   = nominal_s(g) >= 40.0;
 
-    // Terrain variant families (BL-1243). The variant vectors blend with
-    // their OWN falloff — (Rv^2 - d^2)^2, Rv = 1.5, wider and softer than the
-    // colour's sharpened one — so a variant fades across most of a tile and
-    // the hex mosaic the colour exponent steepens toward never shows in the
-    // variety. The gather reaches Rv for this (candidates past R carry no
+    // Terrain variant families (BL-1243) and tiles holding their own ground
+    // (BL-1251). A land pixel's MATERIAL — colour, per-tile tone, landform
+    // accent, the variant vector, the family pattern — comes from the tiles
+    // whose centres are nearest a lightly frayed material point, weighted by
+    // the pixel's distance e from the bisector to the nearest one: weight 1
+    // for the nearest, smoothstep(1 - e / edge_band) for a neighbour, 0 past
+    // the band. So a tile is undiluted across its body, a shared edge is a
+    // 50/50 mix, and the weights are continuous everywhere (e is a continuous
+    // function of the point). Height and slope keep the wide interpolation
+    // above. The class gather still reaches 1.5 when the shore shelf or the
+    // variants need the far side of a boundary (candidates past R carry no
     // colour weight, and only a centre inside R can own a pixel, so the
-    // colour field and the grid's silhouette are untouched).
+    // grid's silhouette is untouched).
     const float  vs    = p.variant_strength;
     const bool   vary  = vs > 0.0f;
-    const double Rv2   = 1.5 * 1.5;
-    const double Rg    = vary ? std::max(R, 1.5) : R;
-    const double Rg2   = Rg * Rg;
     const float  ns    = static_cast<float>(nominal_s(g));
+    const bool   band_on = p.edge_band > 0.0f;
+    const double band    = std::max(1e-3, static_cast<double>(p.edge_band));
+    const double inv2s3  = 1.0 / (2.0 * kSqrt3); // (d_j^2 - d_i^2) / (2 sqrt3): distance to the i|j bisector
+    const bool   borders = p.border_strength > 0.0f && ns >= 12.0f
+                        && src.bset.size() == src.cls.size() * 6u;
+    const bool   items    = borders && fine_on;   // scattered trees, bushes, stones: sub-tile, close only
+    const bool   patterns = p.pattern_strength > 0.0f && fine_on;
+    const double Rg    = (vary || borders) ? std::max(R, 1.5) : R;
+    const double Rg2   = Rg * Rg;
+    // Border-set and pattern lattices (all periodic in x, so wrap-exact).
+    int ug_cells, hedge_cells, reed_cells, drift_cells, tuss_cells, tuss2_cells;
+    const double ug_cell     = periodic_cell(0.085, ug_cells);    // undergrowth patches
+    const double hedge_cell  = periodic_cell(0.040, hedge_cells); // hedge clumps
+    const double reed_cell   = periodic_cell(0.025, reed_cells);  // reed flecks (across)
+    const double drift_cell  = periodic_cell(0.110, drift_cells); // drift / snow tongues
+    const double tuss_cell   = periodic_cell(0.070, tuss_cells);  // grass tussocks
+    const double tuss2_cell  = periodic_cell(0.085, tuss2_cells); // scrub tussocks
+    int ripple_n;
+    const double ripple_l    = periodic_cell(0.045, ripple_n);    // dune ripple wavelength
+    int scree_n;
+    const double scree_cell  = periodic_cell(0.070, scree_n);     // scree stones (pattern)
+    struct scatter_kind { int set; double cell; int cells; float rmin, rmax, peak; std::uint32_t salt; double reach; };
+    scatter_kind sk[3];
+    {
+        int c0, c1, c2;
+        const double t = periodic_cell(0.16, c0), b = periodic_cell(0.11, c1), st = periodic_cell(0.065, c2);
+        sk[0] = { bs_forest, t,  c0, 0.040f, 0.075f, 0.39f, 0x9A10u, 1.3 * 0.50 + 0.12 };
+        sk[1] = { bs_scrub,  b,  c1, 0.030f, 0.055f, 0.45f, 0x9A20u, 1.3 * 0.30 + 0.12 };
+        sk[2] = { bs_scree,  st, c2, 0.016f, 0.034f, 0.45f, 0x9A30u, 1.3 * 0.34 + 0.12 };
+    }
     // Streaks and cracks are sub-tile line work: they would alias on the far
     // tiers, so they fade in from 12 to 24 (streaks) and 16 to 32 (cracks)
     // nominal px per hex; the stipple is close-tier only, like the fine octave.
@@ -825,6 +1021,490 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
     const double crack_cell    = periodic_cell(0.30, crack_cells);
     const double stip_cell     = periodic_cell(0.10, stip_cells); // finer reads as a value-noise checker
     constexpr double kStreakK  = 0.57735026918962576; // tan 30 degrees: the two oblique streak directions
+    constexpr double kInR      = 0.86602540378443865; // hex inradius: centre to edge midpoint
+
+    const auto sst = [](double e0, double e1, double v) -> double
+    {
+        const double t = std::clamp((v - e0) / (e1 - e0), 0.0, 1.0);
+        return t * t * (3.0 - 2.0 * t);
+    };
+
+    // ---- BL-1251: family patterns. A tile's own pattern, in its own frame
+    // (rx, ry from its centre — wrap-exact) or on a periodic lattice (q).
+    // ---- BL-1251: scattered border items — trees and bushes stepping out
+    // of a wood, stones spilling off rock. A jittered periodic lattice; a
+    // point EXISTS when its hash falls under the density its own tile's
+    // receiving (or source) edges give it, so a point's existence is a
+    // function of the point alone: every pixel, window and wrap copy agrees.
+    const auto tile_at = [&](double x, double y, int& ti, double& rx, double& ry) -> bool
+    {
+        const int rc = static_cast<int>(std::lround(y / 1.5));
+        double best = 1e30;
+        ti = -1;
+        for (int r = rc - 1; r <= rc + 1; ++r)
+        {
+            if (r < 0 || r >= src.gh)
+                continue;
+            const double odd = (r & 1) ? 0.5 : 0.0;
+            const int c0 = static_cast<int>(std::floor(x / kSqrt3 - odd));
+            for (int dc = 0; dc <= 1; ++dc)
+            {
+                const int c = c0 + dc;
+                const double dx = x - kSqrt3 * (c + odd), dy = y - 1.5 * r;
+                const double d2 = dx * dx + dy * dy;
+                if (d2 < best)
+                {
+                    best = d2;
+                    ti = r * src.gw + ((c % src.gw) + src.gw) % src.gw;
+                    rx = dx;
+                    ry = dy;
+                }
+            }
+        }
+        return ti >= 0;
+    };
+    // Along an edge the scatter comes and goes: a low-frequency field gates
+    // the density (gaps, clumps) and stretches the reach, so a receiving tile
+    // ringed by its source reads as ground, not as a dotted outline.
+    int scat_cells;
+    const double scat_cell = periodic_cell(0.32, scat_cells);
+    const auto point_density = [&](int set, double x, double y, std::uint32_t& scol) -> float
+    {
+        int ti; double rx = 0.0, ry = 0.0;
+        if (!tile_at(x, y, ti, rx, ry))
+            return 0.0f;
+        const std::uint8_t* bsp = &src.bset[static_cast<std::size_t>(ti) * 6u];
+        // Early out before the noise: no side of this set, or every one
+        // beyond the longest reach the stretch below can give.
+        {
+            const double longest = 1.3 * (set == bs_forest ? 0.50 : set == bs_scrub ? 0.30 : 0.34) + 0.12;
+            bool near = false;
+            for (int side = 0; side < 6 && !near; ++side)
+                near = (bsp[side] & k_bs_mask) == set
+                    && kInR - (rx * kNbDx[side] + ry * kNbDy[side]) / kSqrt3 < longest;
+            if (!near)
+                return 0.0f;
+        }
+        // Runs with nothing, runs with a little more; the band's inner limit
+        // meanders, so the scatter never traces the straight hex edge.
+        const float  gate  = 1.6f * static_cast<float>(sst(0.40, 0.80,
+                                 value_noise(x, y, scat_cell, scat_cells, 0x9B01u + static_cast<std::uint32_t>(set))));
+        if (gate <= 0.0f)
+            return 0.0f;
+        const double reach = 0.7 + 0.6 * value_noise(x, y, scat_cell, scat_cells, 0x9B11u + static_cast<std::uint32_t>(set));
+        const double wander = 0.12 * (value_noise(x, y, scat_cell, scat_cells, 0x9B21u + static_cast<std::uint32_t>(set)) - 0.5) * 2.0;
+        float best = 0.0f;
+        for (int side = 0; side < 6; ++side)
+        {
+            if ((bsp[side] & k_bs_mask) != set)
+                continue;
+            const double e = std::max(0.0, kInR - (rx * kNbDx[side] + ry * kNbDy[side]) / kSqrt3 + wander) / reach;
+            const bool recv = (bsp[side] & k_bs_recv) != 0;
+            float d = 0.0f;
+            if (set == bs_forest)
+                d = recv && e < 0.50 ? 0.24f * static_cast<float>(1.0 - e / 0.50) : 0.0f;
+            else if (set == bs_scrub)
+                d = recv && e < 0.30 ? 0.28f * static_cast<float>(1.0 - e / 0.30) : 0.0f;
+            else if (set == bs_scree)
+            {
+                // Scree falls: it spills from the higher tile onto the lower,
+                // and barely at all uphill.
+                const int j = nb_index(src, ti, side);
+                const float dh = j >= 0 ? (recv ? src.height[j] - src.height[ti] : src.height[ti] - src.height[j]) : 0.0f;
+                const float fall = std::clamp(0.25f + 20.0f * dh, 0.0f, 1.0f);
+                d = recv ? (e < 0.34 ? 0.28f * fall * static_cast<float>(1.0 - e / 0.34) : 0.0f)
+                         : (e < 0.08 ? 0.18f * fall * static_cast<float>(1.0 - e / 0.08) : 0.0f);
+            }
+            d *= gate;
+            if (d > best)
+            {
+                best = d;
+                // The source's ground colours the item: the neighbour across
+                // a receiving side, the tile itself on the source side.
+                const int j = recv ? nb_index(src, ti, side) : ti;
+                scol = j >= 0 ? src.colour[static_cast<std::size_t>(j)] : src.colour[static_cast<std::size_t>(ti)];
+            }
+        }
+        return best;
+    };
+    // ---- BL-1251: jittered lattices, evaluated ONCE per window. A lattice
+    // point (its existence, position, size, turn, colour) is a pure function of
+    // (lattice, ix, iy) — hashed from the wrapped cell index, periodic in x —
+    // so a window computes each once into an array and every pixel reads it;
+    // a point outside the array (it cannot happen inside the margins below,
+    // but the rule must not depend on that) is evaluated directly. Window-
+    // invariant and wrap-exact by construction.
+    // Compact (32 bytes: a window's lattices stay in cache). The position
+    // stays double: it is unwrapped, and a float would round a point one
+    // period east differently from its copy (the wrap must stay exact).
+    struct lpt { double x = 0.0, y = 0.0; float r = 0.0f, var = 1.0f; std::uint32_t col = 0u;
+                 std::uint8_t rot = 0, on = 0; };
+    struct lattice
+    {
+        double cell; int cells; std::uint32_t salt;
+        int    set;        // > 0: a border scatter, gated by its edge density; 0: a pattern dot field
+        float  keep;       // pattern: a dot where hash < keep; scatter: the density's peak
+        double rlo, rhi;   // pattern: radius as a fraction of the cell; scatter: canonical units
+        int ix0 = 0, iy0 = 0, nx = 0, ny = 0;
+        bool built = false;
+        std::vector<lpt> pt;
+    };
+    const auto eval_point = [&](const lattice& L, int ix, int iy) -> lpt
+    {
+        lpt q;
+        const int ixw = ((ix % L.cells) + L.cells) % L.cells;
+        const float h0 = hash01(ixw, iy, L.salt);
+        if (L.set == 0)
+        {
+            if (h0 >= L.keep)
+                return q;
+            q.x   = (ix + 0.15 + 0.7 * hash01(ixw, iy, L.salt + 1u)) * L.cell;
+            q.y   = (iy + 0.15 + 0.7 * hash01(ixw, iy, L.salt + 2u)) * L.cell;
+            q.r   = static_cast<float>((L.rlo + (L.rhi - L.rlo) * hash01(ixw, iy, L.salt + 3u)) * L.cell);
+            q.rot = static_cast<std::uint8_t>(static_cast<int>(hash01(ixw, iy, L.salt + 4u) * 8.0f) & 7);
+            q.on  = 1;
+            return q;
+        }
+        if (h0 >= L.keep * p.border_strength)
+            return q;
+        q.x = (ix + 0.1 + 0.8 * hash01(ixw, iy, L.salt + 1u)) * L.cell;
+        q.y = (iy + 0.1 + 0.8 * hash01(ixw, iy, L.salt + 2u)) * L.cell;
+        std::uint32_t col = 0u;
+        if (h0 >= point_density(L.set, q.x, q.y, col) * p.border_strength)
+            return q;
+        q.r   = static_cast<float>(L.rlo + (L.rhi - L.rlo) * hash01(ixw, iy, L.salt + 3u));
+        q.var = 0.86f + 0.28f * hash01(ixw, iy, L.salt + 4u);
+        q.rot = static_cast<std::uint8_t>(static_cast<int>(hash01(ixw, iy, L.salt + 5u) * 8.0f) & 7);
+        q.col = col;
+        q.on  = 1;
+        return q;
+    };
+    // The window's ground extent, canonical: the pixels' x, and their y plus
+    // the oblique lift a pixel's ground can ride (heights are normalised, so
+    // lift x 1.5 is a safe bound), widened by two cells either way.
+    const double win_x0 = px0 / g.s, win_x1 = (px0 + pw) / g.s;
+    const double win_y0 = py0 / g.s + g.y_min, win_y1 = (py0 + ph) / g.s + g.y_min + 1.5 * g.lift;
+    lpt spill; // a point outside a lattice's array, evaluated on demand
+    const auto get_point = [&](lattice& L, int ix, int iy) -> const lpt&
+    {
+        if (!L.built)
+        {
+            L.built = true;
+            L.ix0 = static_cast<int>(std::floor(win_x0 / L.cell)) - 2;
+            L.iy0 = static_cast<int>(std::floor(win_y0 / L.cell)) - 2;
+            L.nx  = static_cast<int>(std::floor(win_x1 / L.cell)) + 3 - L.ix0;
+            L.ny  = static_cast<int>(std::floor(win_y1 / L.cell)) + 3 - L.iy0;
+            L.pt.resize(static_cast<std::size_t>(L.nx) * L.ny);
+            for (int j = 0; j < L.ny; ++j)
+                for (int i = 0; i < L.nx; ++i)
+                    L.pt[static_cast<std::size_t>(j) * L.nx + i] = eval_point(L, L.ix0 + i, L.iy0 + j);
+        }
+        const int i = ix - L.ix0, j = iy - L.iy0;
+        if (i >= 0 && i < L.nx && j >= 0 && j < L.ny)
+            return L.pt[static_cast<std::size_t>(j) * L.nx + i];
+        spill = eval_point(L, ix, iy);
+        return spill;
+    };
+
+    // A jittered-lattice dot field: tufts (round) or stones (angular, in a
+    // per-dot rotated frame), lit from the NW with an SE shadow, anti-aliased
+    // at the baked pixel. Returns a luminance delta. Cells whose hash is past
+    // `keep` are gaps, so the ground between the dots stays calm.
+    const double pxw_ = 1.0 / g.s;
+    lattice L_tuss  { tuss_cell,  tuss_cells,  0x5F11u, 0, 0.65f, 0.25, 0.40 };
+    lattice L_tuss2 { tuss2_cell, tuss2_cells, 0x5F21u, 0, 0.70f, 0.28, 0.45 };
+    lattice L_scree { scree_cell, scree_n,     0x5C01u, 0, 0.45f, 0.22, 0.38 };
+    const auto dots = [&](lattice& L, double qx, double qy, bool angular,
+                          float base, float lit, float shade) -> float
+    {
+        const int ix0 = static_cast<int>(std::floor(qx / L.cell));
+        const int iy0 = static_cast<int>(std::floor(qy / L.cell));
+        const double bound = L.rhi * L.cell * 1.5 + pxw_; // the dot, its shadow and its rim
+        float val = 0.0f, cov = 0.0f, shadow = 0.0f;
+        double front = -1e30;
+        // A neighbour cell's dot sits in its middle 70%: skip the cells whose
+        // dot cannot reach this point before fetching them.
+        const double fx = qx / L.cell - ix0, fy = qy / L.cell - iy0, bc = bound / L.cell;
+        for (int dy = -1; dy <= 1; ++dy)
+        {
+            if ((dy < 0 && fy + 0.15 > bc) || (dy > 0 && 1.15 - fy > bc))
+                continue;
+            for (int dx = -1; dx <= 1; ++dx)
+            {
+                if ((dx < 0 && fx + 0.15 > bc) || (dx > 0 && 1.15 - fx > bc))
+                    continue;
+                const lpt& pt = get_point(L, ix0 + dx, iy0 + dy);
+                if (!pt.on)
+                    continue;
+                const double ddx = qx - pt.x, ddy = qy - pt.y;
+                if (std::fabs(ddx) > bound || std::fabs(ddy) > bound)
+                    continue;
+                const double rr = pt.r;
+                double d, ds;
+                const double sx = ddx - 0.35 * rr, sy = ddy - 0.35 * rr;
+                if (angular)
+                {
+                    const double ca = k_rot8[pt.rot][0], sa = k_rot8[pt.rot][1];
+                    d  = std::max(std::fabs(ddx * ca + ddy * sa), std::fabs(-ddx * sa + ddy * ca));
+                    ds = std::max(std::fabs(sx * ca + sy * sa), std::fabs(-sx * sa + sy * ca));
+                }
+                else
+                {
+                    d  = std::sqrt(ddx * ddx + ddy * ddy);
+                    ds = std::sqrt(sx * sx + sy * sy);
+                }
+                const float c = static_cast<float>(std::clamp((rr - d) / pxw_ + 0.5, 0.0, 1.0));
+                shadow = std::max(shadow, static_cast<float>(std::clamp((rr - ds) / pxw_ + 0.5, 0.0, 1.0)));
+                if (c > 0.0f && pt.y > front)
+                {
+                    front = pt.y;
+                    cov = c;
+                    val = base + lit * static_cast<float>(std::clamp(-(ddx + ddy) / (2.0 * rr), -1.0, 1.0));
+                }
+            }
+        }
+        return cov * val - (1.0f - cov) * shadow * shade;
+    };
+    const auto family_pattern = [&](std::size_t t, double rx, double ry, double qx, double qy, double wob) -> float
+    {
+        switch (src.family[t])
+        {
+        case vf_grass:
+            if (src.variant[t] < 2)
+            {
+                // Cultivated: furrows, one direction per field (tile).
+                const double sv  = rx * src.furrow_cs[2 * t] + ry * src.furrow_cs[2 * t + 1];
+                const double ph  = sv / 0.075 + 0.5 * wob; // a ploughed line wanders a little
+                const double tri = std::fabs((ph - std::floor(ph)) - 0.5) * 2.0; // 0 furrow, 1 ridge
+                return static_cast<float>(0.075 * (sst(0.15, 0.85, tri) - 0.5));
+            }
+            // Grassland: tussocks.
+            return dots(L_tuss, qx, qy, false, -0.02f, 0.08f, 0.05f);
+        case vf_scrub:
+            return dots(L_tuss2, qx, qy, false, -0.04f, 0.09f, 0.06f);
+        case vf_bare:
+        case vf_volcanic:
+            // Scree: loose angular stones.
+            return dots(L_scree, qx, qy, true, 0.04f, 0.07f, 0.05f);
+        case vf_sand:
+        {
+            // Ripples: a gentle windward slope and a steep lee, the crests
+            // running along (0.35, 1), wobbling. x-periodic by construction.
+            const double u_ = qx - 0.35 * qy + 0.04 * wob;
+            const double ph = u_ / ripple_l;
+            const double fr = ph - std::floor(ph);
+            const double prof = fr < 0.72 ? fr / 0.72 : (1.0 - fr) / 0.28;
+            return static_cast<float>(0.09 * (prof - 0.5));
+        }
+        default:
+            return 0.0f;
+        }
+    };
+
+    // ---- BL-1251: border-set fields. u is the signed distance across the
+    // edge, + into the receiving tile, - into the source; every profile is
+    // continuous at u = 0, so the two tiles' halves meet without a line.
+    const auto border_field = [&](int set, bool recv, double e, std::size_t oi, int side,
+                                  double qx, double qy, float& R, float& G, float& B)
+    {
+        const float  bs = p.border_strength;
+        const double u  = recv ? e : -e;
+        switch (set)
+        {
+        case bs_forest:
+        case bs_scrub:
+        {
+            // Undergrowth stepping out of the wood, patchy; fading into it.
+            const bool   f    = set == bs_forest;
+            const double out  = f ? 0.20 : 0.16;
+            const double cov  = (f ? 0.70 : 0.50)
+                              * (u >= 0.0 ? 1.0 - sst(0.0, out, u) : 1.0 - sst(0.0, 0.10, -u));
+            if (cov <= 0.0)
+                return;
+            const double patch = sst(0.38, 0.62, value_noise(qx, qy, ug_cell, ug_cells, f ? 0x8A01u : 0x8A02u));
+            const float  a = static_cast<float>(cov * (0.25 + 0.55 * patch)) * bs;
+            if (f) { R *= 1.0f - 0.42f * a; G *= 1.0f - 0.22f * a; B *= 1.0f - 0.40f * a; }
+            else   { R *= 1.0f - 0.25f * a; G *= 1.0f - 0.18f * a; B *= 1.0f - 0.34f * a; }
+            return;
+        }
+        case bs_scree:
+        {
+            // Gravel spilling onto the soil in drifts (the stones are the
+            // scatter's); it fades into the rock without a rim.
+            const double cov = 0.35 * (u >= 0.0 ? 1.0 - sst(0.0, 0.16, u) : 1.0 - sst(0.0, 0.06, -u));
+            if (cov <= 0.0)
+                return;
+            const double patch = sst(0.30, 0.70, value_noise(qx, qy, drift_cell, drift_cells, 0x8A03u));
+            const float  a = static_cast<float>(cov * patch) * bs;
+            R += (138.0f - R) * a; G += (132.0f - G) * a; B += (122.0f - B) * a;
+            return;
+        }
+        case bs_field:
+        {
+            if (recv || e >= 0.13)
+                return; // the field edge is the grass side's, and narrow
+            const int tr = static_cast<int>(oi) / src.gw, tc = static_cast<int>(oi) % src.gw;
+            // A hand-laid line wanders: a fine wobble on the distance, so the
+            // edge never reads as a ruled one.
+            e += 0.014 * (value_noise(qx, qy, drift_cell, drift_cells, 0x8B11u) - 0.5) * 2.0;
+            if (hash01(tc, tr, 0x5E00u + static_cast<std::uint32_t>(side)) < 0.6f)
+            {
+                // A hedge: a broken line of dark bushes a little inside the
+                // field, its shadow falling inward.
+                const double hb = std::max(0.0, 1.0 - sq((e - 0.045) / 0.022));
+                const double sb = std::max(0.0, 1.0 - sq((e - 0.085) / 0.020));
+                if (hb > 0.0)
+                {
+                    const double cl = sst(0.38, 0.60, value_noise(qx, qy, hedge_cell, hedge_cells, 0x8B01u));
+                    const float  a  = static_cast<float>(hb * (0.15 + 0.85 * cl) * 0.9) * bs;
+                    R *= 1.0f - 0.55f * a; G *= 1.0f - 0.35f * a; B *= 1.0f - 0.55f * a;
+                }
+                if (sb > 0.0)
+                {
+                    const float s = 1.0f - static_cast<float>(0.15 * sb) * bs;
+                    R *= s; G *= s; B *= s;
+                }
+            }
+            else
+            {
+                // A furrowed headland: furrows running along the edge.
+                const double fade = sst(0.0, 0.015, e) * (1.0 - sst(0.06, 0.10, e));
+                if (fade <= 0.0)
+                    return;
+                const double st = 0.5 + 0.5 * std::cos(6.283185307 * e / 0.03);
+                const float  a  = static_cast<float>(fade) * bs;
+                const float  l  = 1.0f - static_cast<float>(0.10 * st) * a;
+                R += (120.0f - R) * 0.22f * a; G += (100.0f - G) * 0.22f * a; B += (70.0f - B) * 0.22f * a;
+                R *= l; G *= l; B *= l;
+            }
+            return;
+        }
+        case bs_reed:
+        {
+            const double cov = 0.7 * (u >= 0.0 ? 1.0 - sst(0.0, 0.20, u) : 1.0 - sst(0.0, 0.05, -u));
+            if (cov <= 0.0)
+                return;
+            const float d = 1.0f - static_cast<float>(0.18 * cov) * bs;
+            R *= d; G *= d; B *= d;
+            const double fl = sst(0.62, 0.75, value_noise_aniso(qx, qy, reed_cell, reed_cells, reed_cell * 3.2, 0x8C01u)) * cov;
+            const float  a  = static_cast<float>(fl) * bs;
+            R *= 1.0f - 0.35f * a; G *= 1.0f - 0.20f * a; B *= 1.0f - 0.35f * a;
+            return;
+        }
+        case bs_drift:
+        case bs_snow:
+        {
+            // Tongues of the source's ground lying out over the other.
+            const bool   sn  = set == bs_snow;
+            const double thr = (sn ? 0.35 : 0.40) + (u >= 0.0 ? (sn ? 2.4 : 2.0) * u : (sn ? 4.8 : 4.0) * -u);
+            if (thr >= 1.0)
+                return;
+            const double cov = sst(thr, thr + (sn ? 0.10 : 0.12),
+                                   value_noise(qx, qy, drift_cell, drift_cells, sn ? 0x8D02u : 0x8D01u));
+            const float  a = static_cast<float>(cov * (sn ? 0.75 : 0.55)) * bs;
+            if (sn) { R += (236.0f - R) * a; G += (240.0f - G) * a; B += (244.0f - B) * a; }
+            else    { R += (204.0f - R) * a; G += (188.0f - G) * a; B += (148.0f - B) * a; }
+            return;
+        }
+        default:
+            return;
+        }
+    };
+
+    lattice L_scat[3] = {
+        { sk[0].cell, sk[0].cells, sk[0].salt, sk[0].set, sk[0].peak, sk[0].rmin, sk[0].rmax },
+        { sk[1].cell, sk[1].cells, sk[1].salt, sk[1].set, sk[1].peak, sk[1].rmin, sk[1].rmax },
+        { sk[2].cell, sk[2].cells, sk[2].salt, sk[2].set, sk[2].peak, sk[2].rmin, sk[2].rmax },
+    };
+    const float  sy_up = static_cast<float>(g.tilt_sy); // upright items pre-stretch by 1/tilt_sy
+    const double pxw   = 1.0 / g.s;                     // one baked pixel, canonical
+    const auto border_items = [&](std::uint8_t bits, double qx, double qy, float& r, float& g_, float& b)
+    {
+        for (int kk = 0; kk < 3; ++kk)
+        {
+            const scatter_kind& K = sk[kk];
+            if (!(bits & (1u << K.set)))
+                continue;
+            lattice& L = L_scat[kk];
+            const bool stone = K.set == bs_scree;
+            const int ix0 = static_cast<int>(std::floor(qx / K.cell));
+            const int iy0 = static_cast<int>(std::floor(qy / K.cell));
+            float  a_top = 0.0f, shadow = 0.0f, cr = 0.0f, cg = 0.0f, cb = 0.0f;
+            double front = -1e30;
+            // Scatter points sit in a cell's middle 80%; an item reaches at
+            // most 1.6 x its largest radius (x 1.2 vertically) plus a pixel.
+            const double reach_max = (K.rmax * 1.6 + pxw) * 1.2;
+            const double fx = qx / K.cell - ix0, fy = qy / K.cell - iy0, bc = reach_max / K.cell;
+            for (int dy = -1; dy <= 1; ++dy)
+                for (int dx = -1; dx <= 1; ++dx)
+                {
+                    if ((dy < 0 && fy + 0.1 > bc) || (dy > 0 && 1.1 - fy > bc)
+                        || (dx < 0 && fx + 0.1 > bc) || (dx > 0 && 1.1 - fx > bc))
+                        continue;
+                    const lpt& pt = get_point(L, ix0 + dx, iy0 + dy);
+                    if (!pt.on)
+                        continue;
+                    const double rr  = pt.r;
+                    const double ddx = qx - pt.x, ddy = qy - pt.y;
+                    const double reach = rr * 1.6 + pxw;
+                    if (std::fabs(ddx) > reach || std::fabs(ddy) > reach * 1.2)
+                        continue;
+                    const float sr = static_cast<float>(palette::col_r(pt.col));
+                    const float sg = static_cast<float>(palette::col_g(pt.col));
+                    const float sb = static_cast<float>(palette::col_b(pt.col));
+                    double d, ds;
+                    if (stone)
+                    {
+                        const double ca = k_rot8[pt.rot][0], sa = k_rot8[pt.rot][1];
+                        d = std::max(std::fabs(ddx * ca + ddy * sa), std::fabs(-ddx * sa + ddy * ca));
+                        const double sx = ddx - 0.35 * rr, syy = ddy - 0.35 * rr;
+                        ds = std::max(std::fabs(sx * ca + syy * sa), std::fabs(-sx * sa + syy * ca));
+                    }
+                    else
+                    {
+                        const double vy = ddy * sy_up;
+                        d = std::sqrt(ddx * ddx + vy * vy);
+                        const double sx = ddx - 0.45 * rr, syy = ddy - 0.42 * rr;
+                        ds = std::sqrt(sx * sx + syy * syy);
+                    }
+                    const float a = static_cast<float>(std::clamp((rr - d) / pxw + 0.5, 0.0, 1.0));
+                    const float s = static_cast<float>(std::clamp((rr - ds) / pxw + 0.5, 0.0, 1.0))
+                                  * (stone ? 0.30f : 0.32f);
+                    shadow = std::max(shadow, s);
+                    if (a > 0.0f && pt.y > front)
+                    {
+                        front = pt.y;
+                        a_top = a * 0.95f;
+                        float lt;
+                        if (stone)
+                            lt = 1.0f + 0.35f * static_cast<float>(std::clamp(-(ddx + ddy) / (2.0 * rr), -1.0, 1.0));
+                        else
+                        {
+                            const double lx = ddx + rr * 0.35, ly = ddy * sy_up + rr * 0.35;
+                            lt = static_cast<float>(std::clamp(1.28 - 0.75 * std::sqrt(lx * lx + ly * ly) / rr, 0.55, 1.28));
+                        }
+                        const float k = pt.var * lt;
+                        // Coloured from the source's own ground: a stone is the
+                        // rock it fell from, a tree the wood's leaf (the forest
+                        // stamps' canopy ink), a bush the scrub's.
+                        if (stone)                   { cr = sr * 1.10f * k; cg = sg * 1.10f * k; cb = sb * 1.10f * k; }
+                        else if (K.set == bs_forest) { cr = (sr * 0.55f + 22.0f) * k; cg = (sg * 0.55f + 50.0f) * k; cb = (sb * 0.55f + 20.0f) * k; }
+                        else                         { cr = (sr * 0.70f + 22.0f) * k; cg = (sg * 0.70f + 22.0f) * k; cb = (sb * 0.70f + 10.0f) * k; }
+                    }
+                }
+            if (shadow > 0.0f)
+            {
+                const float m = 1.0f - shadow;
+                r *= m; g_ *= m; b *= m;
+            }
+            if (a_top > 0.0f)
+            {
+                r  += (cr - r)  * a_top;
+                g_ += (cg - g_) * a_top;
+                b  += (cb - b)  * a_top;
+            }
+        }
+    };
 
     for (int py = 0; py < ph; ++py)
     {
@@ -844,12 +1524,13 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
             // only; the detail and grain fields below sample unwarped
             // coordinates, so a strong warp cannot swirl the brushwork.
             const double uy = y0_ - g.y_min;
+            // The small octave alone (+-1) is also the material's fray (BL-1251).
+            const double fray_x = (value_noise(x0_, uy, warp_cell2, warp_cells2, 0xA21Cu) - 0.5) * 2.0;
+            const double fray_y = (value_noise(x0_, uy, warp_cell2, warp_cells2, 0xB32Du) - 0.5) * 2.0;
             const double wax =
-                (value_noise(x0_, uy, warp_cell,  warp_cells,  0xA11Cu) - 0.5) * 2.0
-              + (value_noise(x0_, uy, warp_cell2, warp_cells2, 0xA21Cu) - 0.5) * 0.9;
+                (value_noise(x0_, uy, warp_cell,  warp_cells,  0xA11Cu) - 0.5) * 2.0 + fray_x * 0.45;
             const double way =
-                (value_noise(x0_, uy, warp_cell,  warp_cells,  0xB22Du) - 0.5) * 2.0
-              + (value_noise(x0_, uy, warp_cell2, warp_cells2, 0xB32Du) - 0.5) * 0.9;
+                (value_noise(x0_, uy, warp_cell,  warp_cells,  0xB22Du) - 0.5) * 2.0 + fray_y * 0.45;
             const double x = x0_ + wax * p.warp_amp;
             const double y = y0_ + way * p.warp_amp;
 
@@ -934,6 +1615,7 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
             // A masked re-resolve locks (a peak truncates at the mask edge
             // rather than leaking); the lift is modest, so the projection
             // stays monotonic and needs no occlusion handling.
+            double hlift = 0.0; // the oblique displacement the class resolve used
             if (g.lift > 0.0)
             {
                 double hw = 0.0, ww = 0.0;
@@ -946,7 +1628,8 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                 const double h_est = ww > 0.0
                     ? hw / ww
                     : src.height[static_cast<std::size_t>(owner)];
-                gather(x, y + h_est * g.lift);
+                hlift = h_est * g.lift;
+                gather(x, y + hlift);
                 if (owner < 0)
                 {
                     row_out[px] = 0u;
@@ -1012,32 +1695,187 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
             const float h    = static_cast<float>(hsum * inv);
             const float gxx  = static_cast<float>(gx * inv);
             const float gyy  = static_cast<float>(gy * inv);
-            const float bias = static_cast<float>(rb * inv);
-            const float jtt  = static_cast<float>(jt * inv);
+            float bias = static_cast<float>(rb * inv);
+            float jtt  = static_cast<float>(jt * inv);
 
             const bool land = owner_cls == static_cast<std::uint8_t>(bake_source::tile_class::land);
 
-            // BL-1243: this pixel's variant vector — the land candidates'
-            // vectors under the soft Rv falloff, scaled from neutral by
+            // BL-1251: THE MATERIAL. Land candidates near the frayed material
+            // point (it rides the same oblique lift as the class resolve), the
+            // nearest weighted 1 and each neighbour by the edge band.
+            struct mcand { std::size_t i; double d2, rx, ry; float w; };
+            mcand mc[16];
+            int   nmc = 0;
+            int   mo  = -1;          // the material owner: the nearest land centre
+            double mpx = x0_, mpy = y0_ + hlift;
+            double frx = 0.0, fry = 0.0; // the fray (patterns sample the unfrayed ground point)
+            if (land && band_on)
+            {
+                // The fray: the class warp's small octave, scaled down — the
+                // material edge wanders a little, never off its hex.
+                frx = fray_x * p.material_fray;
+                fry = fray_y * p.material_fray;
+                mpx += frx;
+                mpy += fry;
+                // FAST PATH: the hex the material point stands in (its nearest
+                // centre lies in one of the two rows around it, at the rounded
+                // column). When that tile is of the pixel's class it is the
+                // owner, and only its six neighbours can lie within the band —
+                // the distance to the shared edge is the bisector distance.
+                {
+                    const int r0 = std::clamp(static_cast<int>(std::floor(mpy / 1.5)), 0, src.gh - 1);
+                    int    br = -1, bc = 0;
+                    double bd2 = 1e30, bdx = 0.0, bdy = 0.0;
+                    for (int r = r0; r <= std::min(r0 + 1, src.gh - 1); ++r)
+                    {
+                        const double odd = (r & 1) ? 0.5 : 0.0;
+                        const int    c   = static_cast<int>(std::floor(mpx / kSqrt3 - odd + 0.5));
+                        const double dx  = mpx - kSqrt3 * (c + odd), dy = mpy - 1.5 * r;
+                        const double d2  = dx * dx + dy * dy;
+                        if (d2 < bd2) { bd2 = d2; br = r; bc = c; bdx = dx; bdy = dy; }
+                    }
+                    const std::size_t bi = static_cast<std::size_t>(br) * src.gw
+                                         + static_cast<std::size_t>(((bc % src.gw) + src.gw) % src.gw);
+                    if (br >= 0 && src.cls[bi] == owner_cls)
+                    {
+                        mc[nmc++] = { bi, bd2, bdx, bdy, 1.0f };
+                        mo = 0;
+                        for (int side = 0; side < 6; ++side)
+                        {
+                            const double e = std::max(0.0, 0.86602540378443865
+                                           - (bdx * kNbDx[side] + bdy * kNbDy[side]) / kSqrt3);
+                            if (e >= band)
+                                continue;
+                            const hex_neighbors::coord nb = hex_neighbors::neighbour(bc, br, side);
+                            if (nb.gy < 0 || nb.gy >= src.gh)
+                                continue;
+                            const std::size_t j = static_cast<std::size_t>(nb.gy) * src.gw
+                                                + static_cast<std::size_t>(((nb.gx % src.gw) + src.gw) % src.gw);
+                            if (src.cls[j] != owner_cls)
+                                continue;
+                            const double t = 1.0 - e / band;
+                            mc[nmc++] = { j, 0.0, bdx - kNbDx[side], bdy - kNbDy[side],
+                                          static_cast<float>(t * t * (3.0 - 2.0 * t)) };
+                        }
+                    }
+                }
+                constexpr double MR = 1.55, MR2 = MR * MR; // past the farthest centre a band can reach (sqrt(1.07^2 + 2 sqrt3 * 0.13 + fray))
+                const int r_lo = std::max(0, static_cast<int>(std::ceil((mpy - MR) / 1.5)));
+                const int r_hi = std::min(src.gh - 1, static_cast<int>(std::floor((mpy + MR) / 1.5)));
+                double dmin2 = 1e30;
+                const bool slow = nmc == 0; // the class warp carried land into a non-land hex
+                for (int r = r_lo; slow && r <= r_hi; ++r)
+                {
+                    const double odd = (r & 1) ? 0.5 : 0.0;
+                    const double dy  = mpy - 1.5 * r;
+                    const int    c0  = static_cast<int>(std::floor(mpx / kSqrt3 - odd));
+                    for (int dc = -1; dc <= 2 && nmc < 16; ++dc)
+                    {
+                        const int c = c0 + dc; // unwrapped beside mpx: dx needs no wrap
+                        const double dx = mpx - kSqrt3 * (c + odd);
+                        const double d2 = dx * dx + dy * dy;
+                        if (d2 >= MR2)
+                            continue;
+                        const int cw = ((c % src.gw) + src.gw) % src.gw;
+                        const std::size_t i = static_cast<std::size_t>(r) * src.gw + cw;
+                        if (src.cls[i] != owner_cls)
+                            continue;
+                        mc[nmc++] = { i, d2, dx, dy, 0.0f };
+                        if (d2 < dmin2)
+                        {
+                            dmin2 = d2;
+                            mo = nmc - 1;
+                        }
+                    }
+                }
+                if (!slow)
+                {
+                    // The fast path filled the candidates and weights.
+                }
+                else if (nmc == 0)
+                {
+                    // The class warp carried land past every land centre in
+                    // reach: the class owner's material, alone.
+                    const int orow = owner / src.gw, ocol = owner % src.gw;
+                    double dx = mpx - kSqrt3 * (ocol + ((orow & 1) ? 0.5 : 0.0));
+                    dx -= period * std::round(dx / period);
+                    mc[nmc++] = { static_cast<std::size_t>(owner), 0.0, dx, mpy - 1.5 * orow, 1.0f };
+                    mo = 0;
+                }
+                else
+                {
+                    int kept = 0;
+                    for (int k = 0; k < nmc; ++k)
+                    {
+                        const double e = (mc[k].d2 - dmin2) * inv2s3;
+                        if (e >= band)
+                            continue;
+                        const double t = 1.0 - e / band;
+                        mcand m = mc[k];
+                        m.w = static_cast<float>(t * t * (3.0 - 2.0 * t));
+                        if (k == mo)
+                            mo = kept;
+                        mc[kept++] = m;
+                    }
+                    nmc = kept;
+                }
+                double mws = 0.0, mr = 0.0, mg = 0.0, mb = 0.0, mj = 0.0, mbias = 0.0;
+                for (int k = 0; k < nmc; ++k)
+                {
+                    const double w = mc[k].w;
+                    const std::uint32_t col = src.colour[mc[k].i];
+                    mws   += w;
+                    mr    += w * palette::col_r(col);
+                    mg    += w * palette::col_g(col);
+                    mb    += w * palette::col_b(col);
+                    mj    += w * src.jitter[mc[k].i];
+                    mbias += w * src.relief_bias[mc[k].i];
+                }
+                const double mi = 1.0 / mws;
+                r_   = static_cast<float>(mr * mi);
+                g_   = static_cast<float>(mg * mi);
+                b_   = static_cast<float>(mb * mi);
+                jtt  = static_cast<float>(mj * mi);
+                bias = static_cast<float>(mbias * mi);
+            }
+
+            // BL-1243: this pixel's variant vector, scaled from neutral by
             // variant_strength. Blending the VECTOR (never picking one) is
             // the cross-fade: tone, hue and texture mix slide continuously
-            // from one tile's variant to the next, so no variant edge exists.
+            // from one tile's variant to the next, so no variant edge exists
+            // — now within the material's edge band (BL-1251), so a tile's
+            // variant holds across its body.
             float vv[k_vparam_count];
             const bool vland = vary && land;
             if (vland)
             {
                 double acc[k_vparam_count] = {};
                 double vw = 0.0;
-                for (int k = 0; k < ncand; ++k)
+                if (band_on)
                 {
-                    if (src.cls[cands[k].i] != owner_cls || cands[k].d2 >= Rv2)
-                        continue;
-                    const double t = Rv2 - cands[k].d2;
-                    const double w = t * t;
-                    vw += w;
-                    const float* vp = &src.vparam[cands[k].i * k_vparam_count];
-                    for (int j = 0; j < k_vparam_count; ++j)
-                        acc[j] += w * vp[j];
+                    for (int k = 0; k < nmc; ++k)
+                    {
+                        const double w = mc[k].w;
+                        vw += w;
+                        const float* vp = &src.vparam[mc[k].i * k_vparam_count];
+                        for (int j = 0; j < k_vparam_count; ++j)
+                            acc[j] += w * vp[j];
+                    }
+                }
+                else
+                {
+                    // The pre-BL-1251 soft falloff, (1.5^2 - d^2)^2.
+                    for (int k = 0; k < ncand; ++k)
+                    {
+                        if (src.cls[cands[k].i] != owner_cls || cands[k].d2 >= 2.25)
+                            continue;
+                        const double t = 2.25 - cands[k].d2;
+                        const double w = t * t;
+                        vw += w;
+                        const float* vp = &src.vparam[cands[k].i * k_vparam_count];
+                        for (int j = 0; j < k_vparam_count; ++j)
+                            acc[j] += w * vp[j];
+                    }
                 }
                 const double vinv = vw > 0.0 ? 1.0 / vw : 0.0;
                 for (int j = 0; j < k_vparam_count; ++j)
@@ -1047,6 +1885,25 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                 }
             }
             float vpatch = 0.0f; // the broad patch field, reused by the hue drift below
+
+            // BL-1251: the families' grain and patterns, blended by the
+            // material weights (a tile's own pattern across its body).
+            float grain_mul = 1.0f, pat = 0.0f;
+            if (land && band_on && patterns)
+            {
+                double gm = 0.0, pp = 0.0, ws = 0.0;
+                for (int k = 0; k < nmc; ++k)
+                {
+                    const double w = mc[k].w;
+                    ws += w;
+                    const std::uint8_t fam = src.family[mc[k].i];
+                    gm += w * (fam < vf_count ? k_fam_grain[fam] : 1.0f);
+                    pp += w * family_pattern(mc[k].i, mc[k].rx - frx, mc[k].ry - fry, x0_, uy + hlift,
+                                             0.25 * (fray_x + fray_y)); // +-0.5, the warp's small octave: free
+                }
+                grain_mul = 1.0f + (static_cast<float>(gm / ws) - 1.0f) * p.pattern_strength;
+                pat       = static_cast<float>(pp / ws) * p.pattern_strength;
+            }
 
             float lum = 1.0f;
             if (land)
@@ -1121,12 +1978,13 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                 // now), then fine grain.
                 lum += jtt * p.jitter;
                 const float n2 = value_noise(x0_, uy, noise_cell_b, noise_cells_b, 0xFAB1u);
-                lum += (n2 - 0.5f) * 2.0f * p.noise_strength * noise_mul;
+                lum += (n2 - 0.5f) * 2.0f * p.noise_strength * noise_mul * grain_mul;
                 if (fine_on)
                 {
                     const float n3 = value_noise(x0_, uy, fine_cell, fine_cells, 0x51D3u);
-                    lum += (n3 - 0.5f) * (1.2f + 2.2f * res_t) * p.noise_strength;
+                    lum += (n3 - 0.5f) * (1.2f + 2.2f * res_t) * p.noise_strength * grain_mul;
                 }
+                lum += pat; // BL-1251: furrows, tussocks, scree, ripples
                 if (vland)
                 {
                     // The variant's texture: its tone, then its mix over the
@@ -1204,6 +2062,106 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                     r_ *= (1.0f + 0.045f * wm) * (1.0f - 0.03f * hp);
                     g_ *= (1.0f + 0.010f * wm) * (1.0f + 0.06f * hp);
                     b_ *= (1.0f - 0.050f * wm) * (1.0f - 0.03f * hp);
+                }
+            }
+
+            // BL-1251: the border sets, then the shore shelf.
+            if (borders)
+            {
+                const double qx = x0_, qy = y0_ + hlift; // the ground point (canonical), unfrayed
+                if (land && band_on && mo >= 0)
+                {
+                    const std::size_t oi = mc[mo].i;
+                    const std::uint8_t* bs = &src.bset[oi * 6u];
+                    const double rx = mc[mo].rx, ry = mc[mo].ry; // FRAYED: fields follow the material edge
+                    for (int side = 0; side < 6; ++side)
+                    {
+                        if (!bs[side])
+                            continue;
+                        const double e = 0.86602540378443865
+                                       - (rx * kNbDx[side] + ry * kNbDy[side]) / kSqrt3;
+                        border_field(bs[side] & k_bs_mask, (bs[side] & k_bs_recv) != 0,
+                                     std::max(0.0, e), oi, side, qx, qy, r_, g_, b_);
+                    }
+                    if (items && src.near_border[oi])
+                    {
+                        // Only the kinds whose points can reach this pixel: on
+                        // this tile within a set side's reach, or across a side
+                        // whose neighbour holds them, within an item's reach.
+                        double es[6];
+                        for (int side = 0; side < 6; ++side)
+                            es[side] = 0.86602540378443865 - (rx * kNbDx[side] + ry * kNbDy[side]) / kSqrt3;
+                        const std::uint8_t* nbp = &src.nb_border_pts[oi * 6u];
+                        std::uint8_t need = 0;
+                        for (int kk = 0; kk < 3; ++kk)
+                        {
+                            const int set = sk[kk].set;
+                            const auto bit = static_cast<std::uint8_t>(1u << set);
+                            if (!(src.near_border[oi] & bit) && !(src.border_pts[oi] & bit))
+                                continue;
+                            const double ir = (sk[kk].rmax * 1.6 + pxw) * 1.2 + 0.08; // + the fray
+                            bool nd = false;
+                            for (int side = 0; side < 6 && !nd; ++side)
+                            {
+                                const std::uint8_t b = bs[side];
+                                if ((b & k_bs_mask) == set && ((b & k_bs_recv) || set == bs_scree)
+                                    && es[side] < sk[kk].reach + ir)
+                                    nd = true;
+                                else if ((nbp[side] & bit) && es[side] < ir)
+                                    nd = true;
+                            }
+                            if (nd)
+                                need |= bit;
+                        }
+                        if (need)
+                            border_items(need, qx, qy, r_, g_, b_);
+                    }
+                }
+                // The shore shelf, on the land|water CLASS boundary (the warped
+                // coast): e is the distance to the bisector with the nearest
+                // centre of the other class, from the class gather.
+                const auto other = land ? static_cast<std::uint8_t>(bake_source::tile_class::water)
+                                        : static_cast<std::uint8_t>(bake_source::tile_class::land);
+                double dmin_o = 1e30;
+                // Only a tile with a neighbour of the other class can be within
+                // the shelf's reach of it (a second-ring centre is past 1.45).
+                for (int k = 0; src.coastal[static_cast<std::size_t>(owner)] && k < ncand; ++k)
+                    if (src.cls[cands[k].i] == other)
+                        dmin_o = std::min(dmin_o, cands[k].d2);
+                if (dmin_o < 1e29)
+                {
+                    const double e  = std::max(0.0, (dmin_o - best_d2) * inv2s3);
+                    const float  bs = p.border_strength;
+                    if (land && e < 0.10)
+                    {
+                        // A pale wet margin, darkening to a wet line at the water.
+                        const float t = static_cast<float>(1.0 - e / 0.10);
+                        const float a = 0.40f * t * t * bs;
+                        r_ += (196.0f - r_) * a;
+                        g_ += (184.0f - g_) * a;
+                        b_ += (152.0f - b_) * a;
+                        if (e < 0.022)
+                        {
+                            const float wl = 1.0f - 0.20f * static_cast<float>(1.0 - e / 0.022) * bs;
+                            r_ *= wl; g_ *= wl; b_ *= wl;
+                        }
+                    }
+                    else if (!land && e < 0.32)
+                    {
+                        // The shallows, paling toward the shore, a thin foam line.
+                        const float t = static_cast<float>(1.0 - e / 0.32);
+                        const float a = 0.60f * t * t * bs;
+                        r_ += (104.0f - r_) * a;
+                        g_ += (166.0f - g_) * a;
+                        b_ += (184.0f - b_) * a;
+                        if (e < 0.02)
+                        {
+                            const float f = 0.35f * static_cast<float>(1.0 - e / 0.02) * bs;
+                            r_ += (214.0f - r_) * f;
+                            g_ += (226.0f - g_) * f;
+                            b_ += (228.0f - b_) * f;
+                        }
+                    }
                 }
             }
 
@@ -1316,8 +2274,6 @@ void unsharp(std::uint32_t* buf, const std::uint8_t* tag, int pw, int ph, float 
 // masked tile (no landform, no river bits in the source) contributes nothing.
 // ---------------------------------------------------------------------------
 
-inline double sq(double v) { return v * v; }
-
 inline double smooth01(double e0, double e1, double x)
 {
     const double t = std::clamp((x - e0) / (e1 - e0), 0.0, 1.0);
@@ -1381,6 +2337,8 @@ void bake_landforms(const bake_source& src, const geometry& g, const bake_params
     int crest2_n;
     const double crest2_c = periodic_cell(0.30, crest2_n); // BL-1243: close-set peaks
     const float  vs = p.variant_strength;
+    const bool   band_on = p.edge_band > 0.0f;   // BL-1251: the variant cross-fade narrows to the edge band
+    const double band    = std::max(1e-3, static_cast<double>(p.edge_band));
     const bool   close   = nominal_s(g) >= 40.0; // the crag octave would alias below this (nominal: BL-1244)
     // The far tiers carry the read on fewer pixels: lift the form's light there
     // (x1.4 at the 6 px far page, easing to x1 by 24 px), so an expensive tile is
@@ -1421,6 +2379,10 @@ void bake_landforms(const bake_source& src, const geometry& g, const bake_params
         // falloff the ground's variants use, one blend per landform kind.
         double lacc[4][k_lf_params] = {};
         double lw[4] = {};
+        struct lf_var { int grp; double d2; std::uint8_t var; };
+        lf_var lv[7];
+        int    nlv = 0;
+        double gmin[4] = { 1e30, 1e30, 1e30, 1e30 };
         for (int kk = -1; kk < 6; ++kk)
         {
             const int t = kk < 0 ? o : nb_index(src, o, kk);
@@ -1432,9 +2394,14 @@ void bake_landforms(const bake_source& src, const geometry& g, const bake_params
             if (vs > 0.0f)
             {
                 const double vd2 = sq(f.rx - ox) + sq(f.ry - oy);
-                if (vd2 < 2.25)
+                const int grp = lf == L_mountain ? 0 : lf == L_canyon ? 1 : lf == L_rift ? 2 : 3;
+                if (band_on)
                 {
-                    const int grp = lf == L_mountain ? 0 : lf == L_canyon ? 1 : lf == L_rift ? 2 : 3;
+                    lv[nlv++] = { grp, vd2, src.variant[t] };
+                    gmin[grp] = std::min(gmin[grp], vd2);
+                }
+                else if (vd2 < 2.25)
+                {
                     const double w = sq(2.25 - vd2);
                     lw[grp] += w;
                     for (int j = 0; j < k_lf_params; ++j)
@@ -1473,6 +2440,20 @@ void bake_landforms(const bake_source& src, const geometry& g, const bake_params
         }
         if (nseg == 0 && nbowl == 0)
             continue;
+        // BL-1251: a form's variant holds across its tile and cross-fades
+        // only in the edge band, like the ground's (nearest weighted 1, a
+        // neighbour by smoothstep(1 - e / band)).
+        for (int k2 = 0; k2 < nlv; ++k2)
+        {
+            const double e = (lv[k2].d2 - gmin[lv[k2].grp]) / (2.0 * kSqrt3);
+            if (e >= band)
+                continue;
+            const double t = 1.0 - e / band;
+            const double w = t * t * (3.0 - 2.0 * t);
+            lw[lv[k2].grp] += w;
+            for (int j = 0; j < k_lf_params; ++j)
+                lacc[lv[k2].grp][j] += w * k_lf_var[lv[k2].grp][lv[k2].var][j];
+        }
         float lp[4][k_lf_params];
         for (int grp = 0; grp < 4; ++grp)
             for (int j = 0; j < k_lf_params; ++j)
@@ -1624,8 +2605,8 @@ void bake_landforms(const bake_source& src, const geometry& g, const bake_params
         if (close && m.cut > 0.0 && m.cut < 1.0)
         {
             // Canyon walls show their strata up close: banded light down the cut.
-            const double band = std::sin(m.wall * 3.14159265 * c_bands);
-            lum *= 1.0f + static_cast<float>(0.10 * band * 4.0 * m.cut * (1.0 - m.cut)) * k;
+            const double strata = std::sin(m.wall * 3.14159265 * c_bands);
+            lum *= 1.0f + static_cast<float>(0.10 * strata * 4.0 * m.cut * (1.0 - m.cut)) * k;
         }
         // A canyon's exposed rock runs warm: the floor and walls redden.
         {

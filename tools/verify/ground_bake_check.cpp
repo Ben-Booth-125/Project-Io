@@ -67,6 +67,15 @@
 //       one on the wrap seam; a terrain change or a dense change re-bakes
 //       whole. P25 the windows' own mip pieces equal the whole chain.
 //       `--patch` runs P24/P25 alone.
+//   P26 Tiles hold their own ground (BL-1251, RENDERING.md § Tiles hold their
+//       own ground): a tile's centre region bakes byte-identical whatever its
+//       neighbours' ground (colour, family, variant, border sets) is — and the
+//       pre-BL-1251 wide blend fails the same comparison.
+//   P27 Every border set on the home body, and the shore shelf, is pure,
+//       wrap-exact, seamless across a chunk edge at the master geometry, and
+//       draws. `--border` runs P26/P27 alone and writes bl1251_*.png previews
+//       (legacy look vs now) of each edge and of the wide plain, forest,
+//       scrub and bare ground.
 //
 // Also prints bake time per tier (a measurement, not a check) and writes
 // feature_<form>_<tier>.png previews for the eye.
@@ -91,11 +100,32 @@
 #include <thread>
 #include <vector>
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#undef near // windef.h's 16-bit relics collide with locals
+#undef far
+#endif
+
 using namespace ui::ground;
 
 namespace {
 
 int g_failures = 0;
+
+/// This thread's CPU cycles in millions (QueryThreadCycleTime: high resolution,
+/// and blind to time the thread spent descheduled), or -1 where the platform
+/// does not say. A relative reading: compare configurations, not machines.
+double thread_cpu_ms()
+{
+#ifdef _WIN32
+    ULONG64 cyc = 0;
+    if (QueryThreadCycleTime(GetCurrentThread(), &cyc))
+        return static_cast<double>(cyc) / 1e6;
+#endif
+    return -1.0;
+}
 
 void check(bool ok, const char* phase, const char* what)
 {
@@ -976,6 +1006,253 @@ void patch_row(const bake_source& src, const bake_params& p)
 
 } // namespace
 
+/// P26 / P27 — tiles hold their own ground (BL-1251, RENDERING.md § Tiles hold
+/// their own ground).
+///   P26 The edge band holds: a tile's centre region bakes byte-identical
+///       whatever its neighbours' ground is (colour, family, variant — so
+///       their border sets too); the pre-BL-1251 wide blend (edge_band 0)
+///       fails the same comparison, so the row has teeth.
+///   P27 Every border set found on the home body, and the shore shelf, bakes
+///       deterministically, wrap-exact one period east, seamless across a
+///       chunk edge, at the real master geometry — and actually draws
+///       (border_strength 0 differs).
+/// @p previews also writes bl1251_<subject>_{legacy,now}.png master windows.
+void border_row(const bake_source& src, const body_component& hb, const bake_params& p, bool previews)
+{
+    const auto land = static_cast<std::uint8_t>(bake_source::tile_class::land);
+    const auto water = static_cast<std::uint8_t>(bake_source::tile_class::water);
+    const auto nb = [&](int i, int side) -> int
+    {
+        const hex_neighbors::coord c = hex_neighbors::neighbour(i % src.gw, i / src.gw, side);
+        if (c.gy < 0 || c.gy >= src.gh)
+            return -1;
+        return c.gy * src.gw + ((c.gx % src.gw) + src.gw) % src.gw;
+    };
+    const auto bare_tile = [&](int i) -> bool
+    {
+        return i >= 0 && src.cls[i] == land && !src.near_feature[i]
+            && (static_cast<std::size_t>(i) >= src.inst.of_tile.size() || src.inst.of_tile[i] < 0);
+    };
+    const auto temperate = [&](int i) { const int r = i / src.gw; return r > src.gh / 5 && r < src.gh * 4 / 5; };
+
+    // ---- P26: a tile whose whole ring is quiet land.
+    {
+        int t = -1;
+        for (int i = 0; i < static_cast<int>(src.cls.size()) && t < 0; ++i)
+        {
+            if (!temperate(i) || !bare_tile(i))
+                continue;
+            bool ok = true;
+            for (int s = 0; s < 6 && ok; ++s)
+                ok = bare_tile(nb(i, s));
+            if (ok)
+                t = i;
+        }
+        check(t >= 0, "P26", "found a land tile whose six neighbours are quiet land");
+        if (t >= 0)
+        {
+            // Every neighbour's ground changed: another family (and so another
+            // border set facing t), another colour, another variant.
+            bake_source alt = src;
+            for (int s = 0; s < 6; ++s)
+            {
+                const int j = nb(t, s);
+                alt.family[j]  = static_cast<std::uint8_t>(alt.family[t] == 0 ? 4 : 0); // grass <-> bare
+                alt.colour[j]  = ui::palette::col32(200, 40, 160, 255);
+                alt.variant[j] = static_cast<std::uint8_t>((alt.variant[j] + 1) % k_variant_count);
+                for (int k = 0; k < k_vparam_count; ++k)
+                    alt.vparam[static_cast<std::size_t>(j) * k_vparam_count + k] *= -1.5f;
+            }
+            rederive_border_sets(alt);
+            const geometry gf = make_geometry(hb.grid_width, hb.grid_height, 96.0); // flat: canonical = pixel
+            const int tr = t / src.gw, tc = t % src.gw;
+            const double cx = 1.7320508075688772 * (tc + ((tr & 1) ? 0.5 : 0.0)), cy = 1.5 * tr;
+            const int side = 256;
+            const int px0 = static_cast<int>(cx * gf.s) - side / 2;
+            const int py0 = static_cast<int>((cy - gf.y_min) * gf.s) - side / 2;
+            const auto centre_equal = [&](const bake_params& q, int& compared) -> bool
+            {
+                std::vector<std::uint32_t> a(static_cast<std::size_t>(side) * side), b(a.size());
+                bake_region(src, gf, q, px0, py0, side, side, a.data());
+                bake_region(alt, gf, q, px0, py0, side, side, b.data());
+                compared = 0;
+                bool eq = true;
+                for (int y = 0; y < side; ++y)
+                    for (int x = 0; x < side; ++x)
+                    {
+                        const double dx = (px0 + x + 0.5) / gf.s - cx;
+                        const double dy = (py0 + y + 0.5) / gf.s + gf.y_min - cy;
+                        if (dx * dx + dy * dy > 0.30 * 0.30)
+                            continue;
+                        ++compared;
+                        eq = eq && a[static_cast<std::size_t>(y) * side + x] == b[static_cast<std::size_t>(y) * side + x];
+                    }
+                return eq;
+            };
+            int n_now = 0, n_old = 0;
+            const bool now = centre_equal(p, n_now);
+            bake_params legacy = p;
+            legacy.edge_band = 0.0f;
+            legacy.border_strength = 0.0f;
+            legacy.pattern_strength = 0.0f;
+            const bool old = centre_equal(legacy, n_old);
+            std::printf("P26: tile [%d,%d], %d centre pixels (r 0.30 of the 0.866 inradius)\n", tc, tr, n_now);
+            check(now && n_now > 1000, "P26", "a tile's centre region is its own ground whatever its neighbours are");
+            check(!old, "P26", "the pre-BL-1251 wide blend fails the same comparison (the row has teeth)");
+        }
+    }
+
+    // ---- P27: each border set, and the shore shelf, at the master geometry.
+    const geometry gm = make_master_geometry(hb.grid_width, hb.grid_height);
+    struct subject { const char* name; int tile; int side; };
+    std::vector<subject> subs;
+    static const char* const set_names[bs_count] = { "none", "forest fringe", "scrub fringe", "scree lip",
+                                                     "field edge", "reed fringe", "drift lip", "snow drift" };
+    for (int set = 1; set < bs_count; ++set)
+    {
+        int found = -1, fside = -1;
+        for (int i = 0; i < static_cast<int>(src.cls.size()) && found < 0; ++i)
+        {
+            if (!temperate(i) && set != bs_snow)
+                continue;
+            if (!bare_tile(i))
+                continue;
+            for (int s = 0; s < 6; ++s)
+                if (src.bset[static_cast<std::size_t>(i) * 6 + s] == set && bare_tile(nb(i, s)))
+                {
+                    found = i;
+                    fside = s;
+                    break;
+                }
+        }
+        if (found >= 0)
+            subs.push_back({ set_names[set], found, fside });
+        else
+            std::printf("P27: no %s edge on this body\n", set_names[set]);
+    }
+    {
+        int found = -1, fside = -1;
+        for (int i = 0; i < static_cast<int>(src.cls.size()) && found < 0; ++i)
+        {
+            if (!temperate(i) || !bare_tile(i))
+                continue;
+            for (int s = 0; s < 6; ++s)
+            {
+                const int j = nb(i, s);
+                if (j >= 0 && src.cls[j] == water && !src.near_feature[j])
+                {
+                    found = i;
+                    fside = s;
+                    break;
+                }
+            }
+        }
+        if (found >= 0)
+            subs.push_back({ "shore shelf", found, fside });
+    }
+    const auto has = [&](const char* nm) {
+        for (const subject& s : subs) if (std::strcmp(s.name, nm) == 0) return true;
+        return false;
+    };
+    check(has("forest fringe") && has("scree lip") && has("field edge") && has("shore shelf"), "P27",
+          "found a forest fringe, a scree lip, a field edge and a shore on the home body");
+    static const double kDx[6] = { 1.7320508075688772, 0.8660254037844386, -0.8660254037844386,
+                                   -1.7320508075688772, -0.8660254037844386, 0.8660254037844386 };
+    static const double kDy[6] = { 0.0, -1.5, -1.5, 0.0, 1.5, 1.5 };
+    bake_params off = p;
+    off.border_strength = 0.0f;
+    bool all_det = true, all_wrap = true, all_seam = true, all_draw = true;
+    for (const subject& sj : subs)
+    {
+        const int tr = sj.tile / src.gw, tc = sj.tile % src.gw;
+        const double mx = 1.7320508075688772 * (tc + ((tr & 1) ? 0.5 : 0.0)) + 0.5 * kDx[sj.side];
+        const double my = 1.5 * tr + 0.5 * kDy[sj.side];
+        const int side = 128;
+        const int px0 = static_cast<int>(mx * gm.s) - side;
+        const int py0 = std::clamp(static_cast<int>((my - gm.y_min - 0.3) * gm.s) - side / 2, 0, gm.H - side);
+        const std::size_t n = static_cast<std::size_t>(side) * side * 2;
+        std::vector<std::uint32_t> a(n), b(n), e(n), o(n), l(n / 2), r(n / 2);
+        bake_region(src, gm, p, px0, py0, side * 2, side, a.data());
+        bake_region(src, gm, p, px0, py0, side * 2, side, b.data());
+        bake_region(src, gm, p, px0 + gm.W, py0, side * 2, side, e.data());
+        bake_region(src, gm, off, px0, py0, side * 2, side, o.data());
+        bake_region(src, gm, p, px0, py0, side, side, l.data());
+        bake_region(src, gm, p, px0 + side, py0, side, side, r.data());
+        bool seam = true;
+        for (int y = 0; y < side && seam; ++y)
+            for (int x = 0; x < side; ++x)
+                if (a[static_cast<std::size_t>(y) * side * 2 + x] != l[static_cast<std::size_t>(y) * side + x]
+                    || a[static_cast<std::size_t>(y) * side * 2 + side + x] != r[static_cast<std::size_t>(y) * side + x])
+                {
+                    seam = false;
+                    break;
+                }
+        int diff = 0;
+        for (std::size_t i = 0; i < n; ++i)
+            diff += a[i] != o[i];
+        std::printf("P27: %-13s tile [%d,%d] side %d: %s, %s, %s, %d px drawn\n", sj.name, tc, tr, sj.side,
+                    a == b ? "pure" : "IMPURE", a == e ? "wrap-exact" : "WRAP SEAM", seam ? "seamless" : "CHUNK SEAM", diff);
+        all_det  = all_det && a == b;
+        all_wrap = all_wrap && a == e;
+        all_seam = all_seam && seam;
+        all_draw = all_draw && diff > 200;
+        if (previews)
+        {
+            // A wider look for the eye: 512 x 320 master pixels, legacy vs now.
+            const int W = 512, H = 320;
+            const int qx0 = static_cast<int>(mx * gm.s) - W / 2;
+            const int qy0 = std::clamp(static_cast<int>((my - gm.y_min - 0.3) * gm.s) - H / 2, 0, gm.H - H);
+            bake_params legacy = p;
+            legacy.edge_band = 0.0f; legacy.border_strength = 0.0f; legacy.pattern_strength = 0.0f;
+            legacy.edge_ink = 0.30f;
+            std::vector<std::uint32_t> pb(static_cast<std::size_t>(W) * H);
+            for (int k = 0; k < 2; ++k)
+            {
+                bake_region(src, gm, k ? p : legacy, qx0, qy0, W, H, pb.data());
+                char path[160];
+                std::string nm = sj.name;
+                for (char& c : nm) if (c == ' ') c = '_';
+                std::snprintf(path, sizeof path, "bl1251_%s_%s.png", nm.c_str(), k ? "now" : "legacy");
+                write_png_rgba(path, W, H, reinterpret_cast<const unsigned char*>(pb.data()), W * 4);
+            }
+        }
+    }
+    check(!subs.empty() && all_det,  "P27", "every border set and the shore bake byte-identical twice");
+    check(!subs.empty() && all_wrap, "P27", "every border set and the shore wrap byte-identical one period east");
+    check(!subs.empty() && all_seam, "P27", "every border set and the shore are seamless across a chunk edge");
+    check(!subs.empty() && all_draw, "P27", "every border set and the shore actually draw (strength 0 differs)");
+    if (previews)
+    {
+        // The wide plain and a deep forest's interior, for the patterns.
+        for (const auto& [nm, cov] : { std::pair{ "plain", terrain_cover::grass },
+                                       std::pair{ "forest", terrain_cover::forest },
+                                       std::pair{ "scrub", terrain_cover::scrub },
+                                       std::pair{ "bare", terrain_cover::none } })
+        {
+            const int t = homogeneous_aim(src, cov);
+            if (t < 0)
+                continue;
+            const int tr = t / src.gw, tc = t % src.gw;
+            const double cx = 1.7320508075688772 * (tc + ((tr & 1) ? 0.5 : 0.0));
+            const int W = 640, H = 400;
+            const int qx0 = static_cast<int>(cx * gm.s) - W / 2;
+            const int qy0 = std::clamp(static_cast<int>((1.5 * tr - gm.y_min - 0.3) * gm.s) - H / 2, 0, gm.H - H);
+            bake_params legacy = p;
+            legacy.edge_band = 0.0f; legacy.border_strength = 0.0f; legacy.pattern_strength = 0.0f;
+            legacy.edge_ink = 0.30f;
+            std::vector<std::uint32_t> pb(static_cast<std::size_t>(W) * H);
+            for (int k = 0; k < 2; ++k)
+            {
+                bake_region(src, gm, k ? p : legacy, qx0, qy0, W, H, pb.data());
+                char path[160];
+                std::snprintf(path, sizeof path, "bl1251_%s_%s.png", nm, k ? "now" : "legacy");
+                write_png_rgba(path, W, H, reinterpret_cast<const unsigned char*>(pb.data()), W * 4);
+            }
+            std::printf("preview %s at [%d,%d]\n", nm, tc, tr);
+        }
+    }
+}
+
 int main(int argc, char** argv)
 {
     generation_report report;
@@ -1052,6 +1329,64 @@ int main(int argc, char** argv)
         return g_failures ? 1 : 0;
     }
 
+    // --prof: where a master chunk's time goes under the BL-1251 passes — one
+    // 512 px master chunk (the real geometry, 1x) on the wide plain and on the
+    // forest fringe, best of 3, with each pass off in turn. A reading.
+    if (argc > 1 && std::strcmp(argv[1], "--prof") == 0)
+    {
+        const geometry gm = make_master_geometry(hb.grid_width, hb.grid_height);
+        bake_params base = p;
+        base.supersample = 1;
+        struct cfg { const char* name; bake_params q; };
+        std::vector<cfg> cfgs;
+        cfgs.push_back({ "now", base });
+        { bake_params q = base; q.pattern_strength = 0.0f; cfgs.push_back({ "no patterns", q }); }
+        { bake_params q = base; q.border_strength = 0.0f;  cfgs.push_back({ "no borders", q }); }
+        { bake_params q = base; q.border_strength = 0.0f; q.pattern_strength = 0.0f; cfgs.push_back({ "band only", q }); }
+        { bake_params q = base; q.edge_band = 0.0f; q.border_strength = 0.0f; q.pattern_strength = 0.0f;
+          q.edge_ink = 0.30f; q.shore_ink = 0.42f; cfgs.push_back({ "pre-BL-1251", q }); }
+        std::vector<std::uint32_t> tb(512u * 512u);
+        for (const auto& [nm, cov] : { std::pair{ "plain", terrain_cover::grass },
+                                       std::pair{ "forest", terrain_cover::forest } })
+        {
+            const int aim = std::max(0, homogeneous_aim(src, cov));
+            const int ar = aim / src.gw, ac = aim % src.gw;
+            const double ax = 1.7320508075688772 * (ac + ((ar & 1) ? 0.5 : 0.0));
+            const int x0 = static_cast<int>(ax * gm.s) / 512 * 512;
+            const int y0 = std::clamp(static_cast<int>((1.5 * ar - gm.y_min) * gm.s) / 512 * 512, 0, gm.H - 512);
+            // Interleaved (every configuration once per round, nine rounds)
+            // and the minimum kept, of wall time and of this thread's cycles:
+            // a load spike then costs one sample of one configuration, not
+            // a whole configuration's reading.
+            std::vector<double> wall(cfgs.size(), 1e30), cyc(cfgs.size(), 1e30);
+            for (int rep = 0; rep < 9; ++rep)
+                for (std::size_t k = 0; k < cfgs.size(); ++k)
+                {
+                    const double c0 = thread_cpu_ms();
+                    const auto t0 = std::chrono::steady_clock::now();
+                    bake_region(src, gm, cfgs[k].q, x0, y0, 512, 512, tb.data());
+                    const double c1 = thread_cpu_ms();
+                    wall[k] = std::min(wall[k], std::chrono::duration<double, std::milli>(
+                                                    std::chrono::steady_clock::now() - t0).count());
+                    if (c1 >= 0.0)
+                        cyc[k] = std::min(cyc[k], c1 - c0);
+                }
+            for (std::size_t k = 0; k < cfgs.size(); ++k)
+                std::printf("PROF  %-7s master chunk  %-12s %8.1f ms wall  %8.1f Mcycles  (%+.0f%% vs pre-BL-1251)\n",
+                            nm, cfgs[k].name, wall[k], cyc[k] < 1e29 ? cyc[k] : -1.0,
+                            100.0 * (wall[k] / wall.back() - 1.0));
+        }
+        return 0;
+    }
+
+    // --border: the BL-1251 rows (P26, P27) alone, with previews.
+    if (argc > 1 && std::strcmp(argv[1], "--border") == 0)
+    {
+        border_row(src, hb, p, /*previews=*/true);
+        std::printf("%s (%d failures)\n", g_failures ? "FAIL" : "PASS", g_failures);
+        return g_failures ? 1 : 0;
+    }
+
     // --patch: the partial re-bake rows (P24, P25) alone.
     if (argc > 1 && std::strcmp(argv[1], "--patch") == 0)
     {
@@ -1092,6 +1427,11 @@ int main(int argc, char** argv)
                 { "no-variants",      [](bake_params& q) { q.variant_strength = 0.0f; } },
                 { "no-trees",         [](bake_params& q) { q.tree_density = 0.0f; } },
                 { "no-edges/unsharp", [](bake_params& q) { q.edge_ink = q.shore_ink = 0.0f; q.unsharp_amount = 0.0f; } },
+                { "no-patterns",      [](bake_params& q) { q.pattern_strength = 0.0f; } },
+                { "no-borders",       [](bake_params& q) { q.border_strength = 0.0f; } },
+                { "pre-BL-1251",      [](bake_params& q) { q.edge_band = 0.0f; q.border_strength = 0.0f;
+                                                           q.pattern_strength = 0.0f; q.edge_ink = 0.30f;
+                                                           q.shore_ink = 0.42f; } },
             };
             for (const off& o : offs)
             {
@@ -2461,6 +2801,9 @@ int main(int argc, char** argv)
 
     // P24 / P25 - the partial re-bake (BL-1246).
     patch_row(src, p);
+
+    // P26 / P27 - tiles hold their own ground (BL-1251).
+    border_row(src, hb, p, /*previews=*/false);
 
     std::printf("\n%s (%d failure%s)\n", g_failures ? "FAILED" : "ALL PASS",
                 g_failures, g_failures == 1 ? "" : "s");
