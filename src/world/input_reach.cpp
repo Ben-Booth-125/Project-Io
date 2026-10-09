@@ -633,7 +633,7 @@ bool recipe_inputs_supplied(world& w, const recipe_registry& reg, input_reach& i
 input_access input_obtainable(world& w, const recipe_registry& reg, input_reach& ir,
                               entity_id consumer_market, const stockpile_component* pool,
                               std::size_t r, float need, entity_id self,
-                              bool allow_supply)
+                              bool allow_supply, bool allow_stock)
 {
     input_access out;
     if (r >= resource_count)
@@ -659,7 +659,7 @@ input_access input_obtainable(world& w, const recipe_registry& reg, input_reach&
     const float avail = own_good ? 0.0f
                       : (pool ? std::max(0.0f, pool->quantities[r]) : 0.0f)
                       + (shelf ? std::max(0.0f, mkt->inventory[r]) : 0.0f);
-    if (need <= 0.0f || (!own_good && avail >= floor_need))
+    if (need <= 0.0f || (allow_stock && !own_good && avail >= floor_need))
     {
         out.obtainable = true;
         out.unit_cost  = mkt ? posted_price(*mkt, r) : 0.0f;
@@ -685,7 +685,7 @@ bool recipe_inputs_obtainable(world& w, const recipe_registry& reg, input_reach&
                               entity_id consumer_market, const stockpile_component* pool,
                               const recipe& rc, float batches, entity_id self,
                               std::array<float, resource_count>& unit_cost,
-                              bool allow_supply)
+                              bool allow_supply, bool allow_stock)
 {
     bool all = true;
     for (std::size_t r = 0; r < resource_count; ++r)
@@ -695,7 +695,7 @@ bool recipe_inputs_obtainable(world& w, const recipe_registry& reg, input_reach&
         if (!(in > 0.0f))
             continue;
         const input_access a = input_obtainable(w, reg, ir, consumer_market, pool, r,
-                                                in * batches, self, allow_supply);
+                                                in * batches, self, allow_supply, allow_stock);
         unit_cost[r] = a.unit_cost;
         if (!a.obtainable)
             all = false;

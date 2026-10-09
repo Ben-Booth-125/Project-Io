@@ -2952,17 +2952,19 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                         // output is never its own stock cover (input_reach.cpp
                         // § STOCK) — one rule for the reflex and the scorer.
                         const float sw_batches = judged_batches(reg, b);
-                        const stockpile_component* sw_pool =
-                            w.find_pool(corp, pool_key_for_tile(w, b.tile));
+                        // BL-1217 G1b R1 (AI_OPPONENT.md, "A recipe switch is
+                        // judged on supply too", Ben 2026-10-09): the rescue's
+                        // switch adds a draw the plant did not have, so it is
+                        // judged by the SUPPLY clause alone, as a build is — the
+                        // opening shelf no longer admits it (so no pool is read).
                         for (int i = 0; i < n; ++i)
                         {
                             const recipe& cand = reg.recipe_at(building_type::processing_facility, i);
                             const float ratio  = output_ratio(reg.recipe_id(cand.name));
-                            std::array<float, resource_count> cand_cost{};
                             if (ratio > best_ratio
                                 && recipe_runs_at_tile(w, cand, b.tile) // the body's air (Ben, 2026-10-09)
-                                && recipe_inputs_obtainable(w, reg, rescue_reach(), mid, sw_pool, cand,
-                                                            sw_batches, bid, cand_cost))
+                                && recipe_inputs_supplied(w, reg, rescue_reach(), mid, cand,
+                                                          sw_batches, bid))
                             {
                                 best_ratio = ratio;
                                 best_i     = i;

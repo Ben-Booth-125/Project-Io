@@ -268,11 +268,13 @@ bool recipe_inputs_supplied(world& w, const recipe_registry& reg, input_reach& i
 
 /// Is input @p r obtainable at @p consumer_market for a run needing @p need units?
 /// @p pool is the corp's (corp, market) pool, may be null. @p allow_supply false
-/// asks the STOCK clause alone.
+/// asks the STOCK clause alone; @p allow_stock false asks the SUPPLY clause
+/// alone (a recipe switch, Ben 2026-10-09: it adds a draw, as a build does), and
+/// then prices an obtainable input at the landed cost the supply clause found.
 input_access input_obtainable(world& w, const recipe_registry& reg, input_reach& ir,
                               entity_id consumer_market, const stockpile_component* pool,
                               std::size_t r, float need, entity_id self,
-                              bool allow_supply = true);
+                              bool allow_supply = true, bool allow_stock = true);
 
 /// Every input of recipe @p rc at once: true when each is obtainable; fills
 /// @p unit_cost[r] for each input with its obtainable cost (the posted price for
@@ -281,4 +283,4 @@ bool recipe_inputs_obtainable(world& w, const recipe_registry& reg, input_reach&
                               entity_id consumer_market, const stockpile_component* pool,
                               const recipe& rc, float batches, entity_id self,
                               std::array<float, resource_count>& unit_cost,
-                              bool allow_supply = true);
+                              bool allow_supply = true, bool allow_stock = true);
