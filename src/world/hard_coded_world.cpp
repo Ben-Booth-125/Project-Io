@@ -2665,6 +2665,10 @@ void run_tail(generation_cursor& c)
             .workforce_assigned = 0.50f,
         };
         w.stockpiles[kepler_processor] = stockpile_component{};
+        // BL-1217 D6 (Ben, 2026-10-09): the pre-authored installation keeps its
+        // default recipe whatever the want; assign_default_recipes exempts
+        // exactly this id.
+        w.authored_processor = kepler_processor;
     }
 
     // BL-132 change (3): corporations generate BEFORE markets, not after --

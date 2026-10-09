@@ -15,6 +15,7 @@
 #include "world/spawn_seat.hpp"    // repoint_player — enforce_chain_feasible_roster's seat
 
 #include <algorithm>
+#include <cassert>
 #include <iterator>
 #include <map>
 #include <set>
@@ -2207,10 +2208,12 @@ bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
         // THE SECOND WORKS IS KEPT (Ben, 2026-10-09; CORPORATION_GENERATION.md
         // § Pass 6, the exceptions): a firm chartered FOR a good (@p serve)
         // keeps its works after the first even once the first covers the gap —
-        // the firm's authored pair stands whole. Only that: the FIRST works, an
-        // incidental processor and a specialist's stay bounded by want. A kept
-        // second works the sized rule refuses still leaves its draw (below).
-        const bool second_works = serve != nullptr && serving > 0;
+        // the firm's authored pair stands whole. Only that, and only ONE extra:
+        // the works placed while exactly one serves (the pair's second) is
+        // admitted whatever the want; the FIRST works, any works past the pair,
+        // an incidental processor and a specialist's stay bounded by want. A
+        // kept second works the sized rule refuses still leaves its draw.
+        const bool second_works = serve != nullptr && serving == 1;
         const auto admitted = [&](const recipe& rc) { return second_works || wanted(rc); };
         chain_begin_decision(w, reg, cr); // BL-1233: spare is read over what stands now
         if (serve != nullptr)
@@ -4030,15 +4033,21 @@ chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_re
                 else
                     feasible_kept.push_back(i);
             }
-            for (const std::size_t i : excess_of(feasible_kept))
-                failing.push_back(i);
-            for (const std::size_t i : failing)
-            {
+            const auto suspend = [&](std::size_t i) {
                 w.buildings.at(procs[i].second).recipe = no_recipe;
                 state[i]          = st_suspended;
                 ever_suspended[i] = true;
                 changed = any     = true;
-            }
+            };
+            // The infeasible are suspended BEFORE the excess is read (BL-1217
+            // D6 final review): a plant about to go must not count toward the
+            // production (or a grid's output) that makes a feasible sibling
+            // look like excess, nor toward the derived demand its inputs read.
+            // Feasibility above was tested against one standing set for all.
+            for (const std::size_t i : failing)
+                suspend(i);
+            for (const std::size_t i : excess_of(feasible_kept))
+                suspend(i);
         }
         return any;
     };
@@ -4338,6 +4347,7 @@ int assign_default_recipes(world& w, const recipe_registry& reg, const char* sit
 
     std::map<entity_id, output_want>             wants;    // per body, measured lazily
     std::map<entity_id, std::vector<entity_id>> gone;     // corp -> unplaced
+    std::vector<entity_id>                      ownerless;
     int given = 0;
     for (const entity_id id : ids)
     {
@@ -4346,13 +4356,14 @@ int assign_default_recipes(world& w, const recipe_registry& reg, const char* sit
         // THE PRE-AUTHORED INSTALLATION KEEPS ITS DEFAULT (Ben, 2026-10-09;
         // CORPORATION_GENERATION.md § Pass 6, the exceptions): it is the one
         // steel maker the chain-feasibility test can see at the start, and
-        // unplacing it left no steel chain on any seed. It is the world's one
-        // processor NO corporation holds (`make_hard_coded_world` authors it
-        // before any corporation; measured: exactly one per seed), so a
-        // recipe-less processor with no owner is that installation and is
-        // given the default whatever the want. Booked like any other, so the
-        // processors after it read its output.
-        const bool authored = owner.find(id) == owner.end();
+        // unplacing it left no steel chain on any seed. Exactly the id
+        // `make_hard_coded_world` recorded when it authored it
+        // (`world::authored_processor`) is given the default whatever the want,
+        // booked like any other so the processors after it read its output.
+        const bool authored = (id == w.authored_processor);
+        // Every other recipe-less processor is a corporation's: the exemption
+        // once keyed on "no owner", and this holds that it was the same set.
+        assert(authored || owner.find(id) != owner.end());
         bool keep = (def != nullptr);
         if (keep && authored)
         {
@@ -4386,12 +4397,17 @@ int assign_default_recipes(world& w, const recipe_registry& reg, const char* sit
             ++given;
             continue;
         }
-        gone[owner.at(id)].push_back(id); // only an owned processor reaches here
+        if (const auto oit = owner.find(id); oit != owner.end())
+            gone[oit->second].push_back(id);
+        else
+            ownerless.push_back(id); // release builds: the assert above did not hold
     }
 
     std::unordered_set<entity_id> occupied; // generation's occupancy sets are local to their passes
     const unplace_tally ut = unplace_and_reseat(w, gone, occupied);
-    const int removed = ut.unplaced;
+    for (const entity_id id : ownerless)
+        chain_unplace(w, id, occupied);
+    const int removed = ut.unplaced + static_cast<int>(ownerless.size());
     if (removed > 0 && site != nullptr)
         std::printf("[assign_default_recipes] %s: %d processors unplaced (default output unwanted; "
                     "%d corps left holdless), %d given the default\n",
@@ -4819,13 +4835,22 @@ std::vector<entity_id> charter_place(world& w, const nation_component& nc,
                 tier != dig_site::none ? dig : nullptr, tier);
             if (!assets.empty())
             {
+                // BL-1233 (BL-1217 D6 final review): each rung's refusal is its
+                // own. A firm that LANDS books only its landing rung's (its own
+                // refused works, at its own market) — never a rejected rung's;
+                // a charter that fails on every rung books the first refusal.
+                refused_draw rung_refused;
                 if (cr != nullptr
                     && !make_chain_feasible(w, reg, *cr, assets, occupied, serve, /*whole=*/true,
-                                            refused, want))
+                                            refused != nullptr ? &rung_refused : nullptr, want))
                 {
+                    if (refused != nullptr && !refused->set && rung_refused.set)
+                        *refused = rung_refused;
                     chain_rejected = true;
                     continue;
                 }
+                if (refused != nullptr)
+                    *refused = rung_refused;
                 rung_out = rung;
                 return assets;
             }

@@ -843,6 +843,151 @@ roster_result run_roster(bool s_loses_all)
     return out;
 }
 
+/// BL-1217 D6 final review — THE KEEP SWEEP MUST NOT COUNT A PLANT IT IS
+/// ABOUT TO SUSPEND. The kept-roster body again, timber only in B. Steel is a
+/// PURELY INTERMEDIATE good (no household wants it); households want tools.
+/// Specialist S holds, in id order:
+///   B at (6, 6) in A: steel from timber — INFEASIBLE (no timber reaches A);
+///   A at (12, 6) in B: steel from timber — feasible, makes exactly what C draws;
+///   C at (13, 6) in B: tools from steel — feasible against A, wanted.
+/// Counted while still standing, B's steel makes A look like excess; A falls,
+/// then C (no steel), and readmit brings neither back — a covered chain lost.
+struct excess_result
+{
+    bool a_kept = false, b_gone = false, c_kept = false;
+};
+
+excess_result run_roster_excess()
+{
+    auto w = std::make_unique<world>();
+    recipe_registry reg;
+    const int bw = 24, bh = 12;
+    const entity_id body = w->create_entity();
+    {
+        body_component bc{};
+        bc.name = "ExcessBody";
+        bc.grid_width = bw;
+        bc.grid_height = bh;
+        w->bodies[body] = bc;
+    }
+    const entity_id nation = w->create_entity();
+    nation_component nc{};
+    nc.name = "Veyl";
+    std::map<std::pair<int, int>, entity_id> at;
+    const std::size_t timber = static_cast<std::size_t>(resource_type::timber);
+    const std::size_t steel  = static_cast<std::size_t>(resource_type::steel);
+    const std::size_t tools  = static_cast<std::size_t>(resource_type::tools);
+    for (int y = 0; y < bh; ++y)
+        for (int x = 0; x < bw; ++x)
+        {
+            const entity_id tid = w->create_entity();
+            tile_component tc{};
+            tc.body = body;
+            tc.grid_x = x;
+            tc.grid_y = y;
+            tc.substrate = terrain_substrate::barren;
+            if (x == 14 && y == 6)
+            {
+                tc.resource_deposit[timber]   = 1.0f;
+                tc.resource_remaining[timber] = 1000.0f;
+            }
+            w->tiles[tid] = tc;
+            nc.tiles.push_back(tid);
+            w->tile_to_nation[tid] = nation;
+            at[{ x, y }] = tid;
+        }
+    w->nations[nation] = nc;
+    for (const int cx : { 4, 14 })
+    {
+        const entity_id mid = w->create_entity();
+        market_component m{};
+        m.body = body;
+        m.centre_tile = at.at({ cx, 6 });
+        m.base_price.fill(1.0f);
+        if (cx == 4)
+        {
+            m.base_price[timber] = 0.2f;   // B's timber cannot reach A
+            m.base_price[steel]  = 0.2f;
+        }
+        m.price = m.base_price;
+        w->markets[mid] = m;
+    }
+    // Households want TOOLS only; steel's want is C's draw alone.
+    const entity_id centre = w->create_entity();
+    population_centre_component pc{};
+    pc.scale = 5;
+    w->population_centres[centre] = pc;
+    w->population_centre_tile[centre] = at.at({ 15, 7 });
+    population_demand_params pd;
+    pd.demand_basket[tools] = 100.0f;
+    reg.set_population_demand(pd);
+
+    recipe st;
+    st.name = "fixture_steel_from_timber";
+    st.inputs[timber] = 1.0f;
+    st.outputs[steel] = 1.0f;
+    reg.add_recipe(st);
+    recipe tl;
+    tl.name = "fixture_tools_from_steel";
+    tl.inputs[steel] = 1.0f;
+    tl.outputs[tools] = 1.0f;
+    reg.add_recipe(tl);
+    building_economics e;
+    e.base_rate = 1.0f;
+    reg.set_economics(building_type::extraction_site, e);
+    reg.set_economics(building_type::processing_facility, e);
+
+    const auto add = [&](int x, int y, building_type t, const char* rname) {
+        const entity_id bid = w->create_entity();
+        building_component b{};
+        b.tile = at.at({ x, y });
+        b.type = t;
+        b.workforce_assigned = 0.5f;
+        if (t == building_type::extraction_site)
+            b.target_resource = resource_type::timber;
+        if (rname != nullptr)
+            b.recipe = reg.recipe_id(rname);
+        w->buildings[bid] = b;
+        w->stockpiles[bid] = stockpile_component{};
+        return bid;
+    };
+    // Ids ascend in this order: B, A, C — B is judged first among steel makers.
+    const entity_id pb   = add(6, 6, building_type::processing_facility, "fixture_steel_from_timber");
+    const entity_id pa   = add(12, 6, building_type::processing_facility, "fixture_steel_from_timber");
+    const entity_id pcw  = add(13, 6, building_type::processing_facility, "fixture_tools_from_steel");
+    const entity_id mine = add(14, 6, building_type::extraction_site, nullptr);
+
+    const entity_id s = w->create_entity();
+    {
+        corporation_component c;
+        c.name = "Sereth Works";
+        c.focus = industrial_focus::processing;
+        c.assets = { pb, pa, pcw };
+        c.hq_building = pa;
+        c.is_player = true;
+        w->corporations[s] = c;
+        w->player_entity = s;
+    }
+    const entity_id t = w->create_entity();
+    {
+        corporation_component c;
+        c.name = "Tolvan Extraction";
+        c.focus = industrial_focus::extraction;
+        c.assets = { mine };
+        c.hq_building = mine;
+        w->corporations[t] = c;
+    }
+
+    (void)enforce_chain_feasible_roster(*w, reg, /*seed=*/1217u);
+    excess_result out;
+    out.b_gone = w->buildings.count(pb) == 0;
+    out.a_kept = w->buildings.count(pa) != 0
+              && w->buildings.at(pa).recipe == reg.recipe_id("fixture_steel_from_timber");
+    out.c_kept = w->buildings.count(pcw) != 0
+              && w->buildings.at(pcw).recipe == reg.recipe_id("fixture_tools_from_steel");
+    return out;
+}
+
 } // namespace chainfx
 
 // ---------------------------------------------------------------------------
@@ -2615,6 +2760,14 @@ int main()
                     r.audit.infeasible_held == 0);
         expect_true("roster: the seat stays — S still holds a processor",
                     !r.first.seat_redrawn && r.first.seat == r.s);
+        // BL-1217 D6 final review: the infeasible sibling is suspended before
+        // the excess is read, so the covered chain stands.
+        const chainfx::excess_result ex = chainfx::run_roster_excess();
+        std::printf("  keep sweep excess: B gone %d, A kept %d, C kept %d\n",
+                    ex.b_gone ? 1 : 0, ex.a_kept ? 1 : 0, ex.c_kept ? 1 : 0);
+        expect_true("roster (D6): an infeasible steel maker does not make its feasible sibling "
+                    "excess — B unplaced, A and its consumer C kept",
+                    ex.b_gone && ex.a_kept && ex.c_kept);
         const chainfx::roster_result lost = chainfx::run_roster(/*s_loses_all=*/true);
         std::printf("  seat loses all: unplaced %d holdless %d, seat %u (S %u, T %u)%s\n",
                     lost.first.processors_unplaced, lost.first.holdless,

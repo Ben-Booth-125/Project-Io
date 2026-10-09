@@ -477,6 +477,16 @@ struct world
     /// when the pool goes. A `std::map`, for the `corp_market_pools` reason.
     std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> opening_stock_held;
 
+    /// BL-1217 D6 (Ben, 2026-10-09, the exceptions) — the PRE-AUTHORED
+    /// installation's processor, recorded when `make_hard_coded_world` authors
+    /// it: the one processor `assign_default_recipes` gives its default whatever
+    /// the want. A GENERATION-TIME MARKER, deliberately neither saved nor
+    /// hashed: the default pass runs only on a freshly generated world (a saved
+    /// world holds no recipe-less processor), so a loaded world's null here
+    /// exempts nothing it could ever meet. Copied with the world, like any
+    /// member, so a search candidate's copy carries it.
+    entity_id authored_processor = null_entity;
+
     /// Active convoys — goods in transit. Appended by dispatch_convoys, advanced by
     /// advance_convoys, and retired (erased) by credit_arrived_convoys in
     /// supply_system.hpp. A std::vector (not a map) because convoys have no persistent
