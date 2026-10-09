@@ -216,6 +216,13 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   (hard_coded_world.cpp:2659) is the only steel seed. Handoff losses of steel/medical/water arise
   in the settle, not generation. **Form to Ben:** exempt the authored plant / walk seeds chains /
   accept; keep or cut second works. Do not merge eff4e96f until ruled.
+  **BEN RULED (f16e65e9):** authored installation keeps its default; second works kept. Sent to
+  D5/D6 agent.
+  **D3 ROUND 3** (a37f2099; focused re-review running): draw register now written in clear_markets
+  with demand (same tick); stamps 0 for touched keys; market_has_cleared reads only clear-written
+  fields (veto identical over 2.5M calls). D3 81.7/65.4/13.5/71.8; +D4 82.4/67.6/15.9/68.8. D4 G1b
+  cause: fuel plants denied the propellant exit switch into silicon/alloys and starve on
+  silica/ree_alloy (+59) — moot once D6 removes the fuel plants.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
