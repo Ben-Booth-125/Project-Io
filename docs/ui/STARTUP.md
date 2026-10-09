@@ -619,17 +619,21 @@ presentation half:
    presentation half of their own — no agency comms, history samples or last report come from
    them (delegated reading, 2026-09-24, NEEDS_REVIEW): the ticks have no calendar and no
    seated corp, so nothing they emit has a reader.
-**The ground pre-bakes behind the handoff** (Ben, 2026-10-09). The moment round 6's world is
-finished — `finish_campaign_world` done, on the wizard path or the cold path — the homeworld's
-**ground master** starts baking on the worker pool ([RENDERING.md](RENDERING.md) § Level of
-detail): the one 96 px/hex image every zoom of the Planetary canvas is drawn from. It runs
-behind the seat canvas, so the player's reading of the seat cards is bake time spent for free.
-Play does not open on a half-painted ground: entering play waits for the master, on the
-loading screen with its own labelled step ("Painting the ground"), and the budget is that it
-adds **at most 15 s** to generation on the minimum PC
-([TECH_FOUNDATIONS.md](../tech/TECH_FOUNDATIONS.md) § Target hardware). A building the
-settle places after the bake started only dirties its own chunks, which re-bake. Other
-bodies bake in the background once play opens.
+**The ground pre-bakes behind the wizard** (Ben, 2026-10-09; started at the Life round on
+Ben's ruling the same day, after the first build measured 36-55 s when the bake began at
+round 6). The homeworld's **ground master** ([RENDERING.md](RENDERING.md) § Level of detail) —
+the one 96 px/hex image every zoom of the Planetary canvas is drawn from — starts baking on the
+worker pool as soon as **the Life round has built the homeworld's terrain**, and runs behind the
+rest of the wizard, which the player spends minutes watching. Each later round changes the
+world on its own worker, so the ground layer takes a **fresh source snapshot only at a round
+boundary**, never from a world a round worker is still mutating; whatever a round changed —
+history's urban growth, settlements, roads, the settle's buildings — moves only the content
+hashes of its own chunks, and only those chunks re-bake. Play does not open on a half-painted
+ground: if the master is still unfinished when the player confirms a seat, entering play waits
+on the loading screen with its own labelled step ("Painting the ground"), and the budget is that
+it adds **at most 15 s** on the minimum PC ([TECH_FOUNDATIONS.md](../tech/TECH_FOUNDATIONS.md)
+§ Target hardware). The cold path, with no wizard to hide behind, starts the bake when its world
+is built and waits as needed. Other bodies bake in the background once play opens.
 
 3. **Seat the player**: rank every specialist on phase 6's static landscape score,
    marking the ones below the viability floor, and open the selection canvas
