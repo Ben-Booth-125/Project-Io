@@ -1,6 +1,7 @@
 #pragma once
 
 #include "structure_stamps.hpp" // BL-1241: the installation pass and its stamp seam
+#include "route_paint.hpp"      // BL-1253: the roads and sea lanes pass
 #include "world/entity.hpp"
 
 #include <cstdint>
@@ -168,6 +169,10 @@ struct bake_params
     // stamp seam it asks. A null sheet = every key draws its procedural form.
     bool  installations   = true;
     const stamp_sheet* stamps = nullptr;
+    // Roads and sea lanes (BL-1253, roads painted; route_paint.hpp): the
+    // route pass's strength. 0 = the pass off (the A/B lever; the roaded
+    // cluster layout and the trees' road clearance stay, they are geometry).
+    float route_strength  = 1.0f;
     // The lock fast path (BL-1246): a window wholly inside survey-masked
     // ground is filled with the lock colour directly. Byte-identical to the
     // full bake (ground_bake_check P23); false = always resolve per pixel
@@ -225,6 +230,17 @@ struct bake_source
     /// 1: land with a water neighbour, or water with a land one (the shore
     /// shelf's cull).
     std::vector<std::uint8_t> coastal;
+    // Roads and sea lanes (BL-1253; route_paint.hpp). Masked and void tiles
+    // carry none, so no route is baked from unsurveyed ground. The derived
+    // arrays are a pure function of road, lane, class and installations
+    // (rederive_routes).
+    std::vector<std::uint8_t> road;          ///< Route tier per tile (k_route_*): revealed land only.
+    std::vector<std::uint8_t> lane;          ///< Sea-lane tier per tile: revealed water only.
+    std::vector<std::uint8_t> route_links;   ///< Bits 0-3: road links E, W, S, N; bits 4-7: lane links (rungs skipped).
+    std::vector<std::uint8_t> near_route;    ///< Bit 0: a road on this tile or a neighbour; bit 1: a lane (the pass's cull).
+    std::vector<std::int32_t> route_first;   ///< Per tile: its first piece in route_pieces.
+    std::vector<std::uint8_t> route_count;   ///< Per tile: its piece count.
+    std::vector<route_piece>  route_pieces;
 };
 
 /// The border sets (BL-1251; RENDERING.md § Tiles hold their own ground) —

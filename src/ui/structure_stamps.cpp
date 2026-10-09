@@ -1231,8 +1231,16 @@ void form_scaffold(builder& b, std::uint32_t /*seed*/)
 
 /// A settlement: a paved footprint and a block field that steps with scale.
 void form_settlement(builder& b, int scale, std::uint32_t seed, int cw, int r,
-                     const double* avoid, int n_avoid, double s_px)
+                     const double* avoid, int n_avoid, double s_px,
+                     const bake_source* roads = nullptr)
 {
+    // BL-1253: a road through a town is its street — a block whose footprint
+    // would stand on the road or its verges is left out (route_clearance), so
+    // the painted road runs between the houses. b.k is 1 here: local units are
+    // canonical, and (b.ax, b.ay) is the tile's unwrapped centre.
+    const auto on_road = [&](double x, double y, double half) {
+        return roads && route_clearance(*roads, b.ax + x, b.ay + y) < half;
+    };
     scale = std::clamp(scale, 1, 5);
     static constexpr float k_radius[6] = { 0, 0.34f, 0.48f, 0.62f, 0.78f, 0.92f };
     static constexpr float k_cell[6]   = { 0, 0.20f, 0.19f, 0.18f, 0.17f, 0.16f };
@@ -1275,6 +1283,8 @@ void form_settlement(builder& b, int scale, std::uint32_t seed, int cw, int r,
             }
             if (blocked)
                 continue;
+            if (on_road(cx, cy, cell * 0.55))
+                continue;
             const std::uint32_t salt = static_cast<std::uint32_t>((j + 64) * 131 + (i + 64));
             const float occ = h01(cw * 131 + i, r * 97 + j, 0x5E72u + salt);
             const float p_occ = (0.97f - 0.50f * static_cast<float>(d * d)) * (scale == 1 ? 0.75f : 1.0f);
@@ -1307,7 +1317,7 @@ void form_settlement(builder& b, int scale, std::uint32_t seed, int cw, int r,
                 b.box(x, y, fw, fd, h, roof * 1.05f, wall);
         }
     // A landmark at the heart of a town and above: a civic dome or a spire.
-    if (scale >= 3 && n_avoid == 0)
+    if (scale >= 3 && n_avoid == 0 && !on_road(cell * 0.5, -cell * 0.6, cell * 0.45))
     {
         const float lh = k_hmax[scale];
         if ((seed & 1) || scale >= 4)
@@ -1623,6 +1633,13 @@ void build_tile(const bake_source& src, const geometry& g, const bake_params& p,
     const double hx = kSqrt3 * (c + odd);
     const double hy = 1.5 * r;
     const double lift = src.height[i] * g.lift;
+    // BL-1253: THE ROADED VARIANT. One plan, shared with the route pass
+    // (route_paint.hpp tile_road_plan): where a road meets these works, the
+    // cluster steps to the tile's free side and shrinks, the road bends round
+    // it, and a forecourt apron stands where the road arrives.
+    const road_plan plan = tile_road_plan(src, i);
+    const double ckx = plan.roaded ? plan.kx : 0.0, cky = plan.roaded ? plan.ky : 0.0;
+    const float  csc = plan.roaded ? static_cast<float>(plan.scale) : 1.0f;
 
     const auto begin_instance = [&](double sy, double sx, int tie) {
         instance in;
@@ -1638,8 +1655,25 @@ void build_tile(const bake_source& src, const geometry& g, const bake_params& p,
     {
         begin_instance(hy - 9.0, hx, 0); // pads sort first: ground
         builder pb{ parts, hx, hy, 1.0f, 1.0f, fine };
-        const float pr = 0.66f + 0.06f * (ti.n_stacks - 1);
-        pb.gell(0.0, 0.10, pr * 1.12f, pr * 0.92f, C_dirt, 0.58f, 0.26f);
+        const float pr = (0.66f + 0.06f * (ti.n_stacks - 1)) * csc;
+        pb.gell(ckx, cky + 0.10 * csc, pr * 1.12f, pr * 0.92f, C_dirt, 0.58f, 0.26f * csc);
+        if (plan.roaded)
+        {
+            // The forecourt / yard / loading apron the road arrives at, in the
+            // dominant stack's material: a yard of packed dirt for extraction,
+            // a concrete apron for works that load and ship, paving otherwise.
+            const stamp_key& k0 = ti.stacks[0];
+            const auto bt = static_cast<building_type>(k0.type);
+            const rgb apron = bt == building_type::extraction_site ? C_dirt * 1.08f
+                            : (bt == building_type::processing_facility || bt == building_type::port
+                               || bt == building_type::inland_logistics_hub
+                               || bt == building_type::launchpad || bt == building_type::military_base)
+                                  ? C_concrete * 0.92f
+                                  : C_paved;
+            // A hard-standing rectangle, wider than it is deep, its far edge
+            // on the road.
+            pb.grect(plan.apx, plan.apy, 0.24f * csc, 0.13f * csc, apron, 0.88f);
+        }
         end_instance();
     }
 
@@ -1666,7 +1700,7 @@ void build_tile(const bake_source& src, const geometry& g, const bake_params& p,
         builder sb{ blocks, hx, hy, 1.0f, 1.0f, fine };
         form_settlement(sb, ti.settlement.scale,
                         static_cast<std::uint32_t>(h01(cw, r, 0x5E7Au) * 65535.0f),
-                        cw, r, avoid, n_avoid, nominal_s(g));
+                        cw, r, avoid, n_avoid, nominal_s(g), &src);
         for (std::size_t q = 0; q < blocks.size(); ++q)
         {
             const part& bp = blocks[q];
@@ -1697,11 +1731,12 @@ void build_tile(const bake_source& src, const geometry& g, const bake_params& p,
         const slot& sl = slot_for(ns, j, settled);
         const std::uint32_t seed = static_cast<std::uint32_t>(
             h01(cw, r, 0xB1D0u + static_cast<std::uint32_t>(j)) * 16777216.0f);
-        const double ax = hx + sl.x, ay = hy + sl.y;
+        const double ax = hx + ckx + sl.x * csc, ay = hy + cky + sl.y * csc;
+        const float  ssz = sl.size * csc;
         // Ground features (fields, pits, yards) of a form sort as
         // ground; the standing structure sorts at its slot's front.
         std::vector<part> fp;
-        builder b{ fp, ax, ay, sl.size, (seed & 0x100u) ? -1.0f : 1.0f, fine };
+        builder b{ fp, ax, ay, ssz, (seed & 0x100u) ? -1.0f : 1.0f, fine };
 
         const authored_stamp* art = p.stamps ? p.stamps->find(key) : nullptr;
         if (art)
@@ -1710,7 +1745,7 @@ void build_tile(const bake_source& src, const geometry& g, const bake_params& p,
             // procedural form for this key. Drawn as a ground-anchored
             // sprite in the same instance order.
             // (No sheet ships yet; see stamp_sheet.)
-            begin_instance(ay + sl.size * 0.6, ax, 1 + j);
+            begin_instance(ay + ssz * 0.6, ax, 1 + j);
             end_instance();
             // Blit below, in the draw loop, keyed by this instance's tie.
             inst.back().tie = -(1 + j) * 1000 - static_cast<int>(art - p.stamps->stamps.data());
@@ -1741,7 +1776,7 @@ void build_tile(const bake_source& src, const geometry& g, const bake_params& p,
             if (q.k == pk::gell || q.k == pk::grect)
                 parts.push_back(q);
         end_instance();
-        begin_instance(ay + sl.size * 0.55, ax, 5 + j);
+        begin_instance(ay + ssz * 0.55, ax, 5 + j);
         for (const part& q : fp)
             if (q.k != pk::gell && q.k != pk::grect)
                 parts.push_back(q);
@@ -1754,10 +1789,15 @@ void build_tile(const bake_source& src, const geometry& g, const bake_params& p,
 
 void stamp_installations(const bake_source& src, const geometry& g, const bake_params& p,
                          int px0, int py0, int pw, int ph, std::uint32_t* out,
-                         const std::uint8_t* tag)
+                         const std::uint8_t* tag,
+                         void (*between)(void*), void* between_ctx)
 {
+    const auto run_between = [&]() { if (between) between(between_ctx); };
     if (src.inst.list.empty() || src.inst.of_tile.size() != src.cls.size())
+    {
+        run_between();
         return;
+    }
 
     raster R;
     R.out = out; R.tag = tag; R.pw = pw; R.ph = ph; R.px0 = px0; R.py0 = py0;
@@ -1784,7 +1824,10 @@ void stamp_installations(const bake_source& src, const geometry& g, const bake_p
             build_tile(src, g, p, c, r, fine, parts, inst);
     }
     if (inst.empty())
+    {
+        run_between();
         return;
+    }
 
     // Painter's order: ground first, then back (north) to front (south). The
     // sort key is the UNWRAPPED position, so a wrap copy orders identically.
@@ -1805,6 +1848,9 @@ void stamp_installations(const bake_source& src, const geometry& g, const bake_p
         if (is_ground(in))
             for (std::size_t q = in.first; q < in.first + in.count; ++q)
                 draw_part(R, v, in.lift, parts[q], mode::colour);
+
+    // 1b. Roads and sea lanes (BL-1253): over the ground, under the rest.
+    run_between();
 
     // 2. Shadows: one union over every standing part, applied once — two
     // overlapping shadows never double-darken.
@@ -1938,6 +1984,10 @@ std::uint64_t installation_hash(const bake_source& src, const geometry& g,
 {
     std::uint64_t h = 0x9E3779B97F4A7C15ull;
     auto mix = [&h](std::uint64_t v) { h ^= v + 0x9E3779B97F4A7C15ull + (h << 6) + (h >> 2); };
+    // BL-1253: the route half rides the installation half (route_paint.hpp).
+    const std::uint64_t routes = route_hash(src, g, px0, py0, pw, ph);
+    if (routes != 0) // a source with no route keeps its pre-BL-1253 hash
+        mix(routes);
     if (src.inst.list.empty() || src.inst.of_tile.size() != src.cls.size())
         return h;
     const reach rr = window_reach(src, g, px0, py0, pw, ph);
