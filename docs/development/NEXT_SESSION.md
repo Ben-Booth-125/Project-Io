@@ -203,6 +203,10 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   hypothesis: closed exit into unpriced propellant keeps fuel plants claiming contended inputs.
   Round 3 sent. Merge with D5/D6 conflicts: reservations jsonl, world_save.hpp (keep v40 + both),
   save_roundtrip.cpp (take D5's assertion style).
+  **PROPELLANT COMPLETE** (e07ac0b5 pad, 6deacb4a seat, 4d48ef77 route gate + 64.0, save v41
+  `body_component::atmosphere`; in cold review): 83.2/65.5/15.5/73.2/98.7 (G1/t50/G1b/G2/G3);
+  electrolysis 0 plants anywhere (home bodies have air); 102 unpriced-zeroed -> 0. src/core edits
+  (app.cpp, agent_protocol.cpp, verify_api.cpp) NOT compiled by the lane — build at merge.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
