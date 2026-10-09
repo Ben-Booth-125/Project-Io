@@ -269,6 +269,9 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   ~200 MB peak) — BL-1077's bounded per-village search fixes cost and staleness for spurs;
   detour test mixes link directions (small); stamp_history_roads early returns leave stats unset.
   **Form to Ben:** measure parallel roads first / rule stale ok / reshape to price on today's field.
+  **BEN: MEASURE FIRST.** Lane running: probe switch clears caches after every stamp (FRESH) vs
+  shipped (STALE), 16 seeds — road tiles by pass, parallel-road count, routes changed, border
+  winners changed, loaded pass time, road_generation_harness R2s-b.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
