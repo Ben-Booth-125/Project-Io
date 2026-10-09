@@ -49,6 +49,7 @@
 #include "world/corp_command.hpp"
 #include "world/logistics.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/stance.hpp"
 #include "world/supply_system.hpp"
 #include "world/world.hpp"
 
@@ -249,6 +250,47 @@ std::string fingerprint(const world& w)
         o << "V" << c.id << ':' << c.source_market << '>' << c.dest_market << ':'
           << static_cast<int>(c.mode) << ':' << c.cargo_qty << ':' << c.cost_paid << ';';
     return o.str();
+}
+
+/// BL-1195: a hostile raider corporation with one unit standing on `tile`.
+entity_id add_raider(scenario& s, entity_id tile)
+{
+    const entity_id raider = s.w.create_entity();
+    corporation_component rc;
+    rc.balance = 100.0f;
+    s.w.corporations[raider] = rc;
+    declare_hostile(s.w, raider, s.corp);
+    const entity_id u = s.w.create_entity();
+    unit_component uc{};
+    uc.position = tile;
+    uc.owner    = raider;
+    uc.count    = 3;
+    s.w.units[u] = uc;
+    return raider;
+}
+
+bool tile_is_water(const world& w, entity_id t)
+{
+    const auto it = w.tiles.find(t);
+    return it != w.tiles.end() && is_water(it->second.substrate);
+}
+
+bool lane_has(const std::vector<entity_id>& lane, entity_id t)
+{
+    return std::find(lane.begin(), lane.end(), t) != lane.end();
+}
+
+/// Walk the one convoy's head across the whole lane in fine steps; true when any
+/// step is intercepted. The lane is re-read each step from the convoy.
+bool cut_anywhere(scenario& s)
+{
+    for (int k = 0; k <= 400 && !s.w.convoys.empty(); ++k)
+    {
+        s.w.convoys.front().progress = static_cast<float>(k) / 400.0f;
+        if (!intercept_convoys(s.w, k).empty())
+            return true;
+    }
+    return false;
 }
 
 /// Runs the full R0/R1/R2 scripted sequence once, returning a fingerprint of
@@ -474,6 +516,152 @@ std::string run_sequence(const recipe_registry& reg)
         check(r == corp_command_result::rejected_placement && before == after,
               "R9 a crossing by LAKE is no sea leg: refused, nothing mutated");
         trace << "R9:" << static_cast<int>(r) << ';';
+    }
+
+    // R10-R13 — BL-1195: THE LANE IS THE LEGS (SUPPLY.md § Logistical cost). R5's
+    // crossing, but the Ports sit on row 3 while both markets sit on row 0, so the
+    // routed legs (land (0,0) -> port (2,3), sea along row 3, land (5,3) -> (8,0))
+    // and the direct centre-to-centre path (straight along row 0, through the water
+    // at (3,0)/(4,0)) are different ground. Every reader of a convoy's position
+    // must walk the legs.
+    {
+        const auto sea_fixture = [] {
+            return make_world({3, 4, 16, 17}, 0, 8, {{2, 3}, {5, 3}});
+        };
+        scenario s = sea_fixture();
+        const corp_command_result r = apply_corp_command(s.w, reg, dispatch_cmd(s, 25.0f));
+        check(r == corp_command_result::applied && s.w.convoys.size() == 1
+                  && s.w.convoys.front().mode == convoy_mode::sea,
+              "R10.0 setup: the row-3 port pair carries the haul by sea");
+        if (s.w.convoys.size() == 1)
+        {
+            const entity_id pa = tile_at(s.w, s.body, 2, 3);
+            const entity_id pb = tile_at(s.w, s.body, 5, 3);
+            const convoy_component& c = s.w.convoys.front();
+            check(c.origin_tile == s.src_tile && c.port_a == pa && c.port_b == pb,
+                  "R10.1 dispatch records the route's origin and its two Ports on the convoy");
+            const convoy_route lane = convoy_route_tiles(s.w, c);
+            const std::vector<entity_id> direct =
+                intra_body_path(s.w, s.body, s.src_tile, s.dst_tile).tiles;
+            entity_id direct_water = null_entity;
+            for (const entity_id t : direct)
+                if (tile_is_water(s.w, t) && !lane_has(lane.tiles, t))
+                {
+                    direct_water = t;
+                    break;
+                }
+            check(direct_water != null_entity,
+                  "R10.2 precondition: the direct path crosses water the legs never enter");
+            bool water_on_row3 = true;
+            for (const entity_id t : lane.tiles)
+                if (tile_is_water(s.w, t) && s.w.tiles.at(t).grid_y != 3)
+                    water_on_row3 = false;
+            check(!lane.tiles.empty() && lane.tiles.front() == s.src_tile
+                      && lane.tiles.back() == s.dst_tile && lane_has(lane.tiles, pa)
+                      && lane_has(lane.tiles, pb)
+                      && lane_has(lane.tiles, tile_at(s.w, s.body, 3, 3))
+                      && lane_has(lane.tiles, tile_at(s.w, s.body, 4, 3)) && water_on_row3,
+                  "R10.3 the lane runs origin -> port A -> the sea leg's water -> port B -> "
+                  "destination, not the straight line");
+            bool joined = true; // consecutive tiles are distinct: a port is written once
+            for (std::size_t i = 1; i < lane.tiles.size(); ++i)
+                if (lane.tiles[i] == lane.tiles[i - 1])
+                    joined = false;
+            check(joined, "R10.4 the legs join at each Port without repeating it");
+
+            // R11 + R13: a hostile unit on the INLAND leg past the far port, on
+            // ground the direct path never crosses, intercepts; the capture lands
+            // on land and credits that tile's pool.
+            std::size_t ib = 0;
+            for (std::size_t i = 0; i < lane.tiles.size(); ++i)
+                if (lane.tiles[i] == pb)
+                    ib = i;
+            entity_id inland = null_entity;
+            std::size_t ii = 0;
+            for (std::size_t i = ib + 1; i + 1 < lane.tiles.size(); ++i)
+                if (!lane_has(direct, lane.tiles[i]))
+                {
+                    inland = lane.tiles[i];
+                    ii = i;
+                    break;
+                }
+            check(inland != null_entity && !tile_is_water(s.w, inland),
+                  "R11.0 precondition: the far land leg has a tile off the direct path");
+            if (inland != null_entity)
+            {
+                const entity_id raider = add_raider(s, inland);
+                s.w.convoys.front().progress =
+                    static_cast<float>(ii) / static_cast<float>(lane.tiles.size() - 1);
+                const std::vector<interception_record> cuts = intercept_convoys(s.w, 1);
+                check(cuts.size() == 1 && cuts[0].tile == inland && s.w.convoys.empty(),
+                      "R11 a hostile unit on the sea route's inland leg intercepts it");
+                if (cuts.size() == 1)
+                {
+                    const auto pit =
+                        s.w.corp_market_pools.find({raider, pool_key_for_tile(s.w, inland)});
+                    const float got = pit != s.w.corp_market_pools.end()
+                                          ? pit->second.quantities[r_iron] : 0.0f;
+                    check(cuts[0].outcome == interception_outcome::captured
+                              && !tile_is_water(s.w, cuts[0].tile) && std::fabs(got - 25.0f) < 1e-4f,
+                          "R13 the capture credits the raider's pool at a LAND tile, whole");
+                    trace << "R11:" << cuts[0].tile << ':' << got << ';';
+                }
+            }
+
+            // R12: one placed on the straight-line water the convoy never enters
+            // does not intercept, wherever the head is.
+            if (direct_water != null_entity)
+            {
+                scenario s2 = sea_fixture();
+                apply_corp_command(s2.w, reg, dispatch_cmd(s2, 25.0f));
+                add_raider(s2, direct_water);
+                const bool cut = cut_anywhere(s2);
+                check(!s2.w.convoys.empty() && !cut,
+                      "R12 a hostile unit on the direct path's water never intercepts a convoy "
+                      "whose legs go round it");
+                trace << "R12:" << cut << ';';
+            }
+        }
+    }
+
+    // R14 — BL-1195: a LAND-FALLBACK route (R4: no port pair, the overland road
+    // round the cylinder) is laid on that road. Its lane holds no water; a hostile
+    // unit on the water the direct path would cross never intercepts it, and one
+    // on the road it does take does.
+    {
+        const auto land_fixture = [] {
+            return make_scenario(/*src_port=*/true, /*dst_port=*/false, 100.0f, 1000.0f,
+                                 /*island=*/false);
+        };
+        scenario s = land_fixture();
+        apply_corp_command(s.w, reg, dispatch_cmd(s, 25.0f));
+        check(s.w.convoys.size() == 1 && s.w.convoys.front().mode == convoy_mode::land
+                  && s.w.convoys.front().port_a == null_entity,
+              "R14.0 setup: the land fallback is dispatched, with no Ports recorded");
+        if (s.w.convoys.size() == 1)
+        {
+            const convoy_route lane = convoy_route_tiles(s.w, s.w.convoys.front());
+            bool dry = !lane.tiles.empty();
+            for (const entity_id t : lane.tiles)
+                if (tile_is_water(s.w, t))
+                    dry = false;
+            check(dry && lane.tiles.front() == s.src_tile && lane.tiles.back() == s.dst_tile
+                      && lane_has(lane.tiles, tile_at(s.w, s.body, 31, 0)),
+                  "R14.1 the land fallback's lane is the overland road round the cylinder");
+
+            scenario s2 = land_fixture();
+            apply_corp_command(s2.w, reg, dispatch_cmd(s2, 25.0f));
+            add_raider(s2, tile_at(s2.w, s2.body, 1, 0));
+            check(!cut_anywhere(s2),
+                  "R14.2 a hostile unit on the water the direct path crosses never intercepts it");
+
+            scenario s3 = land_fixture();
+            apply_corp_command(s3.w, reg, dispatch_cmd(s3, 25.0f));
+            add_raider(s3, tile_at(s3.w, s3.body, 20, 0));
+            check(cut_anywhere(s3),
+                  "R14.3 a hostile unit on the overland road the convoy takes intercepts it");
+            trace << "R14:" << lane.tiles.size() << ';';
+        }
     }
 
     return trace.str();

@@ -460,6 +460,8 @@ struct intra_route
     std::array<route_leg, 3> legs{};
     int         n_legs       = 0;
     int         ports        = 0; ///< ports the cargo passes through; handling is per port
+    entity_id   port_a       = null_entity; ///< BL-1195: the loading Port of a sea route
+    entity_id   port_b       = null_entity; ///< BL-1195: the unloading Port of a sea route
     int         travel_ticks = 1;
     convoy_mode mode         = convoy_mode::land; ///< the convoy's mode: sea when any leg is
 };
@@ -625,6 +627,8 @@ bool route_intra_body(world& w, const recipe_registry& reg, const logistics_node
                 route.legs[1] = sea;
                 route.legs[2] = on.leg;
                 route.ports   = 2;
+                route.port_a  = ports[i];
+                route.port_b  = ports[j];
                 route.mode    = convoy_mode::sea;
                 // Each leg at its own speed (SUPPLY.md): caravan overland, coastal by sea;
                 // summed, then quantised once.
@@ -667,6 +671,8 @@ convoy_leg finish_route(const intra_route& route, float qty, float handling)
     leg.mode         = route.mode;
     leg.cost         = cost;
     leg.travel_ticks = route.travel_ticks < 1 ? 1 : route.travel_ticks;
+    leg.port_a       = route.n_legs == 3 ? route.port_a : null_entity;
+    leg.port_b       = route.n_legs == 3 ? route.port_b : null_entity;
     return leg;
 }
 
@@ -793,7 +799,9 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
         intra_route route;
         if (!route_intra_body(w, reg, nodes, src_body, origin, dest_centre, route))
             return leg;
-        return finish_route(route, qty, reg.port_handling());
+        leg = finish_route(route, qty, reg.port_handling());
+        leg.origin_tile = origin; // BL-1195: the lane starts where the haul was priced from
+        return leg;
     }
 
     convoy_mode mode;
@@ -853,7 +861,9 @@ convoy_leg price_market_export_leg(world& w, const recipe_registry& reg,
     if (!route_intra_body(w, reg, nodes, body, sit->second.centre_tile,
                           dit->second.centre_tile, route))
         return convoy_leg{};
-    return finish_route(route, qty, reg.port_handling());
+    convoy_leg leg = finish_route(route, qty, reg.port_handling());
+    leg.origin_tile = sit->second.centre_tile; // BL-1195: the lane starts at the centre
+    return leg;
 }
 
 namespace {
@@ -1019,6 +1029,9 @@ bool commit_convoy(world& w, const recipe_registry& reg, entity_id corp_id, enti
     c.arrived        = false;
     c.held           = false;
     c.cost_paid      = cost;
+    c.origin_tile    = leg.origin_tile; // BL-1195: the lane follows the priced legs
+    c.port_a         = leg.port_a;
+    c.port_b         = leg.port_b;
     w.convoys.push_back(c);
     if (out_sent)
         *out_sent = send;
@@ -1405,6 +1418,9 @@ void export_market_shelves(world& w, const recipe_registry& reg, const logistics
                 cv.arrived        = false;
                 cv.held           = false;
                 cv.cost_paid      = (send < qty) ? leg.cost * (send / qty) : leg.cost;
+                cv.origin_tile    = leg.origin_tile; // BL-1195: the lane follows the legs
+                cv.port_a         = leg.port_a;
+                cv.port_b         = leg.port_b;
                 w.convoys.push_back(cv);
                 ++out.market_exports;
                 break; // one destination per (market, good) per pass

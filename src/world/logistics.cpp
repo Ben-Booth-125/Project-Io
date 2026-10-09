@@ -1364,6 +1364,30 @@ int convoy_travel_ticks(const world& w, entity_id body, const logistics_path& pa
 // Convoy position (BL-458)
 // ---------------------------------------------------------------------------
 
+namespace {
+
+/// Append one leg's tiles to @p out, oriented `from` -> `to`. The leg cache stores
+/// its sequence lo->hi like intra_body_path (the ORIENTATION RULE below), so the
+/// flip is owed here too. A tile shared with the previous leg's last (the port the
+/// two legs meet at) is written once. False when the leg has no path.
+bool append_leg(world& w, entity_id body, entity_id from, entity_id to, leg_domain domain,
+                std::vector<entity_id>& out)
+{
+    const logistics_path& lp = intra_body_leg_path(w, body, from, to, domain);
+    if (!lp.reachable || lp.tiles.empty())
+        return false;
+    std::vector<entity_id> seq = lp.tiles; // copied: the cache entry stays canonical lo->hi
+    if (from != std::min(from, to))
+        std::reverse(seq.begin(), seq.end());
+    std::size_t k = 0;
+    if (!out.empty() && out.back() == seq.front())
+        k = 1;
+    out.insert(out.end(), seq.begin() + static_cast<std::ptrdiff_t>(k), seq.end());
+    return true;
+}
+
+} // namespace
+
 convoy_route convoy_route_tiles(world& w, const convoy_component& cv)
 {
     convoy_route route;
@@ -1376,12 +1400,49 @@ convoy_route convoy_route_tiles(world& w, const convoy_component& cv)
         return route; // inter-body leg: in transit between bodies, on no tile
 
     const entity_id body = sm->second.body;
-    const entity_id st   = sm->second.centre_tile;
-    const entity_id dt   = dm->second.centre_tile;
+    // BL-1195: the lane starts where the haul was priced from — the dispatch's
+    // origin tile — and falls back to the source centre for a convoy that never
+    // passed the dispatch seam (one built by hand, which records no route).
+    const entity_id st = (cv.origin_tile != null_entity) ? cv.origin_tile
+                                                         : sm->second.centre_tile;
+    const entity_id dt = dm->second.centre_tile;
     if (st == null_entity || dt == null_entity)
         return route; // an unanchored market has no centre to route from/to
 
+    // BL-1195 (SUPPLY.md § Logistical cost): THE LANE IS THE LEGS. A route that
+    // crossed water was priced land -> port -> sea -> port -> land (BL-1186), so its
+    // lane is those three legs end to end, through the two Ports recorded at
+    // dispatch. Reading the direct centre-to-centre path instead put the head, the
+    // vision beam, interdiction and capture on ground the cargo never crosses.
+    if (cv.port_a != null_entity && cv.port_b != null_entity)
+    {
+        std::vector<entity_id> tiles;
+        if (!append_leg(w, body, st, cv.port_a, leg_domain::land, tiles)
+            || !append_leg(w, body, cv.port_a, cv.port_b, leg_domain::sea, tiles)
+            || !append_leg(w, body, cv.port_b, dt, leg_domain::land, tiles))
+            return route; // a leg the dispatch walked no longer exists: no lane
+        route.body  = body;
+        route.tiles = std::move(tiles);
+        return route;
+    }
+
+    // One overland leg, chosen exactly as route_intra_body chose it: the
+    // unconfined cheapest path while it stays on land, else the cheapest LAND-ONLY
+    // path (a pair whose cheapest path crosses water but which has a road round).
     const logistics_path& lp = intra_body_path(w, body, st, dt);
+    if (lp.reachable && !lp.tiles.empty() && lp.crosses_ocean)
+    {
+        std::vector<entity_id> tiles;
+        if (append_leg(w, body, st, dt, leg_domain::land, tiles))
+        {
+            route.body  = body;
+            route.tiles = std::move(tiles);
+            return route;
+        }
+        // No overland road: only a convoy built outside the dispatch seam reaches
+        // here (the router refuses such a pair a land route). It keeps the direct
+        // path below, the one lane it can be given.
+    }
     if (!lp.reachable || lp.tiles.empty())
         return route;
 

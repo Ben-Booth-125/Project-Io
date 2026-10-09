@@ -1640,6 +1640,22 @@ struct convoy_component
     /// Convoys tab can report what the cargo in flight has already cost, which
     /// is otherwise unrecoverable once the balance has moved on.
     float       cost_paid      = 0.0f;
+
+    // --- BL-1195: the lane follows the legs the cargo travels (SUPPLY.md) ---
+
+    /// The intra-body route's waypoints, recorded at dispatch so every reader
+    /// (`convoy_route_tiles`: the drawn head, the vision beam, interdiction and
+    /// capture) walks the route the haul was priced on rather than the direct
+    /// centre-to-centre path. `origin_tile` is the tile the cargo left from (the
+    /// dispatch's `convoy_origin_tile`, or a market export's centre); `port_a` /
+    /// `port_b` are the loading and unloading Ports of a land -> sea -> land
+    /// route, both `null_entity` for a single overland leg. All three are
+    /// `null_entity` on a space lane and on a convoy built outside the dispatch
+    /// seam, which then falls back to the source market's centre and the
+    /// overland-or-direct path.
+    entity_id   origin_tile    = null_entity;
+    entity_id   port_a         = null_entity;
+    entity_id   port_b         = null_entity;
 };
 
 // ---------------------------------------------------------------------------

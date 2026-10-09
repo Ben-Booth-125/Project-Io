@@ -376,7 +376,15 @@ inline constexpr uint32_t world_save_magic =
 /// refused whole on the strict-equality contract, no migration. 39 (D5,
 /// opening_stock_held) and 40 (D3, unposted_rate) are claimed by other sprint 50
 /// branches; this stacks above them, and the integrator renumbers at the merge.
-inline constexpr uint32_t world_save_version = 41;
+/// Bumped to 42 by BL-1195 (the convoy lane follows the legs it travels;
+/// SUPPLY.md § Logistical cost): the convoy record gains three entity ids at its
+/// tail, after `cost_paid` -- `origin_tile`, `port_a`, `port_b`, the intra-body
+/// route's waypoints recorded at dispatch so position, vision, interdiction and
+/// capture read the land -> port -> sea -> port -> land route the haul was priced
+/// on. A v41 stream is three ids short per convoy; refused whole on the
+/// strict-equality contract, no migration. Claimed through
+/// `tools/session/next_save_version.js --kind world --claim`.
+inline constexpr uint32_t world_save_version = 42;
 
 /// Write @p w as a complete world snapshot.
 ///
