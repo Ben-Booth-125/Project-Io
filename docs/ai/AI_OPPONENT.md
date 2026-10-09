@@ -516,14 +516,22 @@ where a processor genuinely differs from a mine:
   inputs"). A shelf with nothing replacing it is opening stock being drawn down, not a supply: on
   seed 0 one steel shelf of 6,313 units with negative spare admitted 63 builds in eight ticks and
   was empty by the tenth, and 97% of the settle's starved processors were admitted that way. Stock
-  still counts where a plant already stands — a resume, a recipe switch — because there the
-  question is whether to run what exists, not whether to add a draw. **A plant under construction
+  still counts where a plant already stands and keeps its recipe — a resume — because there the
+  question is whether to run what exists, not whether to add a draw (a recipe switch adds one:
+  below). **A plant under construction
   has already claimed its draw:** spare is net of every processor standing **or under
   construction** in reach, charged at the draw it will take when it stands, so firms deciding in
   the same ticks do not all count on the same spare; and a new plant is priced at the landed cost
   of the supply that admitted it, not at a local shelf it will eat through. The shared reading
   reaches every use of spare — a resume, a recipe switch, the reflex rescue — so a rival's plant
   mid-build can hold back another's resume on the same producers, as the draw it has committed.
+  **A recipe switch is judged on supply too (Ben, 2026-10-09; BL-1217, G1b).** Switching a plant
+  onto a new recipe adds a draw it did not have, exactly as a build does, so the switch's inputs
+  are obtainable only by the supply clause; the opening shelf no longer admits it. That holds for
+  every switch — the strategic recipe chase and the reflex rescue alike. A resume keeps the stock
+  clause: it runs the recipe the plant already drew for. Measured before the ruling: 121 of the
+  314 plants starved at the handoff had been switched in the settle (116 by the strategic chase,
+  70 of them onto consumer goods off a shelf households were already emptying; 5 by the rescue).
 - **Pricing.** Priced by `estimate_prospective_profit` rather than the extraction candidate's
   inline revenue-minus-wages sum. The inline model survives on the extraction side because
   switching it would move every blessed golden for no player-visible gain; a new candidate had no
@@ -1974,3 +1982,24 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   **What it does NOT admit.** No veto on the dial; no read of another corporation's plan, stock,
   or refused candidates; no body-wide or cross-market pooling; nothing for the player's corp.
   Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
+
+
+  **Spare supply counts what households and the background take (Ben, 2026-10-09; BL-1217, G1b —
+  processors sized against every buyer).** The supply clause (§ Build only what runs) judged a
+  processor's input by the producers' output in reach less the draw of the *processors* already
+  standing there. Households and the background pull draw from the same shelves first, so the
+  clause admitted plants into markets whose output those buyers already took: 138 of the 314
+  plants starved at the handoff were outbid that way, with their input produced within reach. The
+  grant: spare reachable supply is net also of the **household and background draw** on each
+  market in reach — the draws those channels made at the last clear, an aggregate market fact like
+  demand. It reaches every use of the supply clause: generation's sized rule
+  (`../generation/CORPORATION_GENERATION.md` § Pass 3, "Sized to its inputs"), the scorer's build,
+  and the recipe switch.
+
+  **What it admits.** One more term in a test the scorer already runs; no new verb, no motive, no
+  read of another corporation's plan or stock. It is not a visibility change: households' and the
+  background's draws are aggregate market facts.
+
+  **What it does NOT admit.** No forecast of future household growth, no reservation against a
+  rival's plan, nothing for the player's corp. Pure, seeded, deterministic, replayable, legal
+  verbs only, never a planner.

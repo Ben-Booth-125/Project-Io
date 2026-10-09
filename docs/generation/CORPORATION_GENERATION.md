@@ -298,7 +298,9 @@ not a broad presence across the nation.
   charter web, Pass 6, the specialists, the seat's kit) places a processor only where the **spare**
   reachable output of each of its inputs covers its draw at `t_idle` — a fifth of a full run.
   Spare is the producers' output in reach less the draw of every processor already standing
-  there, judged at the labour a new plant is judged at, the same test the play-time scorer uses
+  there, **and less what households and the background pull draw there** (Ben, 2026-10-09;
+  `../ai/AI_OPPONENT.md` § 11, processors sized against every buyer), judged at the labour a new
+  plant is judged at, the same test the play-time scorer uses
   (`recipe_inputs_obtainable` with its supply clause). A good that fails is passed over at that
   centre and retried once a firm producing its input is chartered, by the same retry the
   chain-feasible rule uses. Measured before the rule: one rare-earth site yields about 6 units a
