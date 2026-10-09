@@ -138,7 +138,7 @@ surfaces cannot drift. Verified by `scripts/verify/landform_relief.lua`.
 | Background | Dark: `(18, 18, 24)` |
 | Tile | Filled hexagon. Colour from `ui::terrain_colour` (substrate + cover hue), composited with the landform relief tint (§ Terrain types above). A 1 px gap between hexes lets the background show through as a border — achieved by drawing each hex at `circumradius - 1 px` rather than adding explicit borders. |
 | Buildings | **No marker.** A building is a structure baked into the ground art (RENDERING.md § Installations) — a cluster of up to three on a stacked tile. Type, count, owner and running state are read from the hover card, the Selection element and the ownership lenses: [§ Building markers](#building-markers) below. |
-| Road network | **Always-on** (like terrain, not a lens): the generated road lattice plus player-placed roads render as **continuous, symmetric spans**. Each roaded tile draws its **own half** of every shared road edge — from its centre to the midpoint of the centre-to-neighbour line — toward each roaded, survey-revealed cardinal neighbour; the two tiles' halves meet at the edge midpoint, so a road spans the pair identically whichever tile is "from" (no from/to asymmetry), and a small centre cap rounds junctions and keeps a lone / just-placed road visible. Cylinder-seam edges shift one period to stay short; drawn only toward survey-revealed neighbours, so roads don't leak past the survey fog. Styled by the drawing tile's **tier** — **Track** (`road_level` 1) thin/dim, **Road** (2) medium, **Highway** (3) thick/bright — so a tier change reads as a taper at the midpoint. Spans **dim with the commercial-reach fog**, through the same wash the lens fill takes; a road edge is fogged by the **max** of its two tiles' vision (see [DISCOVERY.md](DISCOVERY.md)). The tier ladder has **no on-canvas key** — it is named contextually in the Selection panel instead (below). |
+| Road network | **Always-on** (like terrain, not a lens): the generated road lattice plus player-placed roads render as **continuous, symmetric spans**. Each roaded tile draws its **own half** of every shared road edge — from its centre to the midpoint of the centre-to-neighbour line — toward each roaded, survey-revealed cardinal neighbour; the two tiles' halves meet at the edge midpoint, so a road spans the pair identically whichever tile is "from" (no from/to asymmetry), and a small centre cap rounds junctions and keeps a lone / just-placed road visible. Cylinder-seam edges shift one period to stay short; drawn only toward survey-revealed neighbours, so roads don't leak past the survey fog. Styled by the drawing tile's **tier** — **Track** (`road_level` 1) thin/dim, **Road** (2) medium, **Highway** (3) thick/bright — so a tier change reads as a taper at the midpoint. Spans **dim with the commercial-reach fog**, through the same wash the lens fill takes; a road edge is fogged by the **max** of its two tiles' vision (see [DISCOVERY.md](DISCOVERY.md)). The tier ladder has **no on-canvas key** — it is named contextually in the Selection panel instead (below). Below a 20 px drawn radius each curve is one stroke with no apex joint (RENDERING.md § Roads and sea lanes — the 60 fps budget). |
 | Road-tier legend | **Contextual, not chrome** (Ben's call, 2026-08-09). The three tiers render by line weight and brightness alone, and roads are always-on terrain rather than a lens, so the per-lens legend drawer cannot carry them. Instead, selecting a roaded tile names its tier beside the coordinates in the Selection panel header — `Tile [x, y] · Highway` — with a hover tooltip giving the thin→thick ladder. A roadless tile shows nothing; no persistent chip is added anywhere. |
 | Selection / hover indicator | Hex outline drawn through the shared highlight convention (`src/ui/highlight.hpp`): white for the selected tile, light blue for the hovered tile (per wrap copy), amber for pinned. Precedence is selected > pinned > hovered. |
 | Hover card | The shared glance-then-stick hover card ([TOOLTIP.md](TOOLTIP.md)), content **lens-keyed** (`src/ui/hover_content.cpp`). A tile's default variant: `substrate · landform` header (plains unnamed), habitability, and the landform's movement-cost multiplier when not plains. Under the Resource lens: the selected resource's deposit richness; under Population: habitability + workforce cap. Buildings and market centres carry their own variants (rival buildings show type + owner only — the competitor-visibility rule, [DISCOVERY.md](DISCOVERY.md)). |
@@ -428,10 +428,66 @@ The per-tile loop is **culled and cached**, not all-tiles-per-frame:
   body — a tile with no visible wrap copy costs one multiply-compare, before
   any built/owner/lens work.
 
-Budget reference (pan_perf, 1720×1080, 60 Hz vsync): play-zoom pan costs ~5.0 ms
-work/frame in Release and ~6.7 ms in Debug. The heavy case is the whole-grid view
-(all 15,120 hexes genuinely visible, ~155k vertices), which is
-vertex-emission-bound and is what the fill LOD below exists for.
+- **The band passes cull columns too.** The shade cache and the border depth run one
+  pass ahead of the loop; they walk only the columns with a visible wrap copy, widened
+  by the one-tile neighbourhood they read (blend corners, the frontier test). Even the
+  widest rung shows little more than half the body's width.
+- **Per-tile reads are dense, once a frame.** The band's tile records and nation owners,
+  the vision scalar (permanent vision, then the beam) and a built/owned bit are laid
+  into raster-indexed arrays at the top of the frame; the passes that read a tile and its
+  neighbours read those, not the hash maps. The Market and Scarcity lenses memoise a
+  tile's catchment market the same way, so the fill and the hovered-catchment wash ask
+  once. Values are identical; only where they are read from moved.
+
+**The 60 fps budget (TECH_FOUNDATIONS.md § Target hardware; Ben, 2026-10-09).** The
+canvas must hold 60 fps at every rung, plain and under a lens. Measured
+(`scripts/verify/canvas_vector_perf.lua`, Release, 1720×1080, home body, 300 frames
+of sustained pan per rung; median work ms per frame — build + submit, present excluded):
+
+| Rung (drawn radius) | Plain, before | Plain, after | Market lens, before | Market lens, after |
+|---|---|---|---|---|
+| 0 (~6 px) | 155.5 | 11.5 | 21.4 | 12.4–15.3 |
+| 1 (~13 px) | 52.4 | 7.3 | 14.2 | 7.7 |
+| 2 (~27 px) | 17.0 | 4.1 | 10.6 | 5.0 |
+| 3 (~55 px) | 4.6 | 1.5 | 3.8 | 1.6 |
+| 4 (~110 px) | 2.4 | 1.2 | 2.7 | 1.2 |
+
+Rung 0 under a lens is the tightest case: the lens fill is derived per visible tile
+every frame (no bake carries it), and its p95 sits near the budget on a loaded machine.
+
+**What the cost was.** Not the ground, and mostly not vertex count either. The SDL
+renderer backend converts each draw command's vertex colours from that command's
+vertex offset to the END of the list — once per command — and every ground chunk is a
+texture of its own, so a command of its own. With the ~50 chunk images emitted first,
+each re-converted the whole vector layer behind them: at rung 0 that was ~45 ms of
+submit on its own. So the chunk images are emitted **last, on a vertex offset of their
+own, into the first channel of a three-way split** (ground, washes, strokes): drawn
+first, converted for their own four vertices. Draw order is unchanged.
+
+**What the vector layer gave up at the wide rungs**, each keyed on the drawn radius:
+
+- **Washes over the bake are one channel, not anti-aliased.** The player-identity,
+  construction-suitability and vision-fog washes on baked ground are collected through
+  the tile loop and emitted beneath every stroke. They tile the plane with their
+  neighbours, so an AA fringe bought nothing but doubled vertices and a faint seam where
+  two translucent fringes overlapped. At the coarse fill (`draw_r ≤ 7 px`) a wash is the
+  grid-step rect, and the fog — the one wash on nearly every tile — joins equal
+  neighbours along a row into one rect: ~500 vertices for the whole body where there
+  were ~175k. A road or rule now sits over its neighbour's wash rather than under it;
+  the difference is the width of a fringe.
+- **Roads and lanes below 20 px take the wide-rung curve LOD** — one stroke per curve,
+  two segments a half, no apex joint (RENDERING.md § Roads and sea lanes).
+- **Only frontier tiles draw the border rule** — the depth pass already ran the same
+  neighbour test, so every interior tile skips six reads. Nothing that drew stops drawing.
+
+**No layer is dropped at any rung.** Terrain, relief, survey mask, fog, roads, lanes,
+the border band and rule, markers and labels all draw at every rung they drew at
+before; the captures at rungs 0 and 1 differ from the old ones in under 2.5% of pixels
+by more than 8/255, and in under 0.1% by more than 32/255.
+
+`IO_CANVAS_PASS_LOG=1` prints, every 120 frames, each map pass's vertices and CPU time
+per frame (`CANVAS_PASS ...`); the meter costs ~0.4 ms per pass at rung 0, so read it for
+the split, and `frame_csv` for the totals.
 
 ### Fill level-of-detail at far zoom
 

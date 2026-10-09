@@ -371,8 +371,16 @@ both draw by one rule:
   10 px radius so the tiers stay apart on the whole-grid view): **Track 0.06, Road
   0.09, Highway 0.12** — the 1 : 1.5 : 2 ladder — and the **sea lane 0.10**, told
   from the road ladder by its sea blue rather than its weight.
-- **LOD:** at the coarse fill (drawn radius ≤ 7 px) a curve is drawn as its two
-  chords; the shape is invisible at a few pixels a tile.
+- **LOD:** below a **20 px drawn radius** (`k_route_lod_radius_px` — between the
+  second rung, ~13 px, and the third, ~27 px) a curve is **one stroke**, its two
+  halves joined in a single path, with no round joint at the apex, and each half is
+  tessellated at **two segments**; at the coarse fill (drawn radius ≤ 7 px) at one —
+  its two chords. A curve whose halves fog differently is two strokes, still
+  jointless. At these radii a curve spans a dozen pixels and the joint is under a
+  pixel wide, so nothing is lost to the eye; six segments a half and the joint fan
+  were most of the road layer's vertices, and the wide rungs must hold the 60 fps
+  budget (TECH_FOUNDATIONS.md § Target hardware; Ben, 2026-10-09). The third rung
+  and up draw the curve unchanged.
 - Both are **always-on**, under every lens, and dim with the reach fog and stop at
   the survey mask as roads always have.
 
@@ -447,7 +455,12 @@ At the reference 1720×1080 window:
 | ~55 px | 96 — the master, minified |
 | ~110 px | 96 — the master, ~1.15× magnified |
 
-The vector fill remains only as the fallback before a body's far page exists.
+The vector fill remains only as the fallback before a body's far page exists. What the
+canvas strokes OVER the ground — washes, roads, lanes, the border rule — has its own
+wide-rung level of detail and frame budget: PLANETARY.md § Draw-loop cost model, and
+§ Roads and sea lanes above. The chunk images are submitted after those strokes on a
+vertex offset of their own, drawn first: that ordering is part of the 60 fps budget, not
+a style choice (the same section says why).
 
 ### One angle — the 2.5D seam at a single tilt
 
