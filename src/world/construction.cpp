@@ -142,6 +142,12 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     if (!recipe_unlocked(w, reg, corp, recipe))
         return construction_result::tech_locked;
 
+    // Propellant routes follow the body's air (Ben, 2026-10-09; PRODUCTION.md
+    // § Chemical Plant): the one predicate, asked at the build door.
+    if (type == building_type::processing_facility)
+        if (const ::recipe* rc = reg.get_recipe(recipe); rc != nullptr && !recipe_runs_at_tile(w, *rc, tile))
+            return construction_result::wrong_air;
+
     // Tile-level validity check (ocean / deposit / terrain).
     if (!placement_rules::can_place(tile_it->second, type, target))
         return construction_result::invalid_tile;
@@ -212,7 +218,9 @@ construction_result construct_building(world& w, const recipe_registry& reg,
         // the player's bar described). Otherwise the historic default, so a freshly
         // built processor is still productive; the player reconfigures it via building
         // management. Mirrors app::load_economy.
-        bc.recipe = (recipe != no_recipe) ? recipe : reg.default_recipe_id(); // BL-429
+        // The default asks the body's air too (default_recipe_id_at), so no
+        // path seeds a route the wrong_air gate above would refuse.
+        bc.recipe = (recipe != no_recipe) ? recipe : reg.default_recipe_id_at(w, tile); // BL-429
     }
 
     w.buildings[bld_id]  = bc;

@@ -367,6 +367,15 @@ float launch_draw_available(const world& w, entity_id corp, entity_id src_key,
 
 } // namespace
 
+bool launch_burns_from_pool(const world& w, entity_id corp, entity_id pool_key)
+{
+    const auto cit = w.corporations.find(corp);
+    if (cit == w.corporations.end())
+        return false;
+    const entity_id body = pool_key_body(w, pool_key);
+    return body != null_entity && corp_has_launchpad_on(w, cit->second, body);
+}
+
 entity_id corp_representative_tile(const world& w, const corporation_component& corp, entity_id body)
 {
     entity_id best_building = null_entity;
@@ -1193,7 +1202,7 @@ float dispatch_pending(const world& w, const recipe_registry& reg, entity_id des
         auto mit = memo.find({corp, dest});
         if (mit == memo.end())
             mit = memo.emplace(std::make_pair(corp, dest),
-                               processor_reservation(w, reg, corp, dest)).first;
+                               auto_surplus_reservation(w, reg, corp, dest)).first;
         const float excess = p->quantities[r] - mit->second[r];
         if (excess > 0.0f)
             pending += excess;
@@ -1578,7 +1587,7 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
             auto rit = memo.find({corp_id, src_key});
             if (rit == memo.end())
                 rit = memo.emplace(std::make_pair(corp_id, src_key),
-                                   processor_reservation(w, reg, corp_id, src_key)).first;
+                                   auto_surplus_reservation(w, reg, corp_id, src_key)).first;
             const std::array<float, resource_count> reserve = rit->second;
 
             for (std::size_t ri = 0; ri < resource_count; ++ri)

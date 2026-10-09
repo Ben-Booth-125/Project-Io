@@ -2599,6 +2599,10 @@ void app::render()
                 // research reaches this one, so saying "not researched yet" would
                 // send the player looking for a tech that does not exist.
                 m_ui.construction.last_message = "Not in this era."; break;
+            case construction_result::wrong_air:
+                // Propellant routes follow the body's air (Ben, 2026-10-09).
+                m_ui.construction.last_message =
+                    "This method cannot run on this body's air."; break;
             default:
                 m_ui.construction.last_message = "Construction failed."; break;
         }

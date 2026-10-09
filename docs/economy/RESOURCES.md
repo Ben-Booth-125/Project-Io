@@ -329,7 +329,7 @@ Products are the highest-value goods and the primary driver of market price dive
 |----------|---------------|---------------------|-----------|
 | Machinery | Steel + refined copper | Fabricator | 61.0 |
 | Electronics | Silicon + refined copper + REE alloy | Electronics Lab | 41.6 |
-| Propellant | Refined fuel + liquid oxygen | Chemical Plant | Launchpad, space programme (priced, Ben 2026-10-08) |
+| Propellant | Refined fuel + liquid oxygen | Chemical Plant | 64.0 |
 | Alloys | Steel + REE alloy | Fabricator | 85.0 |
 | Spacecraft components | Alloys + electronics | Assembly Plant | 310.0 |
 | **Ordnance** | **Steel + machinery** | **Fabricator**; also the **Smithy** on the ancient roster | 155.8 |
@@ -446,6 +446,7 @@ tradeable, and `resolve_price` / the clearing pass ignore everything else
   61.0, alloys 85.0, electronics 41.6, spacecraft components 310.0.
 - **The habitability tranche**: clean water 7.7, consumer goods 61.0, medical supplies 14.0.
 - **Ordnance** 140.8 (ancient 113.0).
+- **Propellant** 64.0 — derived below.
 - **Power** 2.6 and **construction capacity** 6.6 — the grid good and the
   construction sector's product (`docs/economy/PRODUCTION.md`).
 

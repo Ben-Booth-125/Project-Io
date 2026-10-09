@@ -30,6 +30,7 @@ constexpr auto max_substrate  = terrain_substrate::coast;
 constexpr auto max_cover      = terrain_cover::urban;
 constexpr auto max_landform   = terrain_landform::rift;
 constexpr auto max_body_type  = body_type::star;
+constexpr auto max_atmosphere = atmosphere_class::thick;
 constexpr auto max_building   = building_type::university; // BL-615: appended schooling/university.
                                                            // A WIDENED range gate, not a format
                                                            // change: no serialised array is sized
@@ -109,6 +110,7 @@ void w_body(std::ostream& o, const body_component& b)
     w_int(o, b.grid_width);
     w_int(o, b.grid_height);
     w_f32(o, b.mass_earths);
+    w_enum(o, b.atmosphere); // world_save_version 41 (propellant routes follow the air)
     w_enum(o, b.survey.phase);
     w_int(o, b.survey.regions_total);
     w_int(o, b.survey.regions_done);
@@ -122,6 +124,7 @@ bool r_body(std::istream& i, body_component& b)
         && r_f32(i, b.orbital_angular_velocity_rad_per_day)
         && r_f32(i, b.orbital_epoch_angle_rad) && r_int(i, b.grid_width)
         && r_int(i, b.grid_height) && r_f32(i, b.mass_earths)
+        && r_enum(i, b.atmosphere, max_atmosphere) // world_save_version 41
         && r_enum(i, b.survey.phase, max_survey) && r_int(i, b.survey.regions_total)
         && r_int(i, b.survey.regions_done) && r_int(i, b.survey.ticks_remaining);
 }

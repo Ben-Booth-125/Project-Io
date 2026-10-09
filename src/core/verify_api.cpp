@@ -3038,7 +3038,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 r == construction_result::slot_occupied          ? "slot_occupied" :
                 r == construction_result::insufficient_materials ? "insufficient_materials" :
                 r == construction_result::tech_locked            ? "tech_locked" :
-                r == construction_result::era_locked             ? "era_locked" : "failed";
+                r == construction_result::era_locked             ? "era_locked" :
+                r == construction_result::wrong_air              ? "wrong_air" : "failed";
             if (r == construction_result::placed)
                 m_ui.selected_entity = built;
             SDL_Log("verify.build_first_valid: %s at tile (%d,%d)", name, tc.grid_x, tc.grid_y);
@@ -3074,7 +3075,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 r == construction_result::slot_occupied          ? "slot_occupied" :
                 r == construction_result::insufficient_materials ? "insufficient_materials" :
                 r == construction_result::tech_locked            ? "tech_locked" :
-                r == construction_result::era_locked             ? "era_locked" : "failed";
+                r == construction_result::era_locked             ? "era_locked" :
+                r == construction_result::wrong_air              ? "wrong_air" : "failed";
             if (r == construction_result::placed)
                 m_ui.selected_entity = built;
             SDL_Log("verify.build_at: %s at tile (%d,%d)", name, col, row);
@@ -3207,6 +3209,14 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             if (n <= 0) return std::string("");
             const int i = std::clamp(index, 0, n - 1);
             const recipe& r = m_registry.recipe_at(b.type, i);
+            // The body's air (Ben, 2026-10-09): a route the tile's body cannot run
+            // is refused here as at every other door — nothing written, "" back.
+            if (!recipe_runs_at_tile(m_world, r, tile))
+            {
+                SDL_Log("verify.set_building_recipe: tile=%u index=%d recipe=%s REFUSED (wrong_air)",
+                        tile_u, i, r.name.c_str());
+                return std::string("");
+            }
             b.active_recipe_index = i;
             b.recipe              = m_registry.recipe_id(r.name);
             SDL_Log("verify.set_building_recipe: tile=%u index=%d recipe=%s",
@@ -3314,6 +3324,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             case corp_command_result::rejected_state:       return "rejected_state";
             case corp_command_result::rejected_tech_locked: return "rejected_tech_locked";
             case corp_command_result::rejected_era_locked:  return "rejected_era_locked";
+            case corp_command_result::rejected_wrong_air:   return "rejected_wrong_air";
             case corp_command_result::rejected_cooldown:    return "rejected_cooldown";
             case corp_command_result::rejected_embargo:     return "rejected_embargo";
             case corp_command_result::rejected_no_capacity: return "rejected_no_capacity";

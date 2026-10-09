@@ -1903,6 +1903,13 @@ int chain_input_tier(world& w, const recipe_registry& reg, chain_reach& cr, enti
 int chain_recipe_tier(world& w, const recipe_registry& reg, chain_reach& cr, entity_id self,
                       entity_id consumer_market, const recipe& rc, const std::vector<entity_id>* own)
 {
+    // Propellant routes follow the body's air (Ben, 2026-10-09): a recipe the
+    // processor's body cannot run is `none` here, so every generation walk that
+    // ranks recipes through this tier (make_chain_feasible, the rung walk, the
+    // refused-draw read) passes it over.
+    if (const auto sb = w.buildings.find(self);
+        sb != w.buildings.end() && !recipe_runs_at_tile(w, rc, sb->second.tile))
+        return chain_tier_none;
     int worst = chain_tier_own;
     for (std::size_t r = 0; r < resource_count; ++r)
     {
@@ -2482,6 +2489,23 @@ float seat_clean_slate(world& w, entity_id corp)
         cc.refund_unbooked += refund;
     }
     return refund;
+}
+
+int seat_release_dial_idled(world& w, entity_id corp)
+{
+    const auto cit = w.corporations.find(corp);
+    if (cit == w.corporations.end())
+        return 0;
+    int released = 0;
+    for (const entity_id bid : cit->second.assets) // per-building write: order-free
+    {
+        const auto b = w.buildings.find(bid);
+        if (b == w.buildings.end() || !dial_idled(b->second))
+            continue;
+        b->second.workforce_auto = true;
+        ++released;
+    }
+    return released;
 }
 
 void move_seat_force(world& w, entity_id previous, entity_id corp)
@@ -4341,7 +4365,7 @@ int assign_default_recipes(world& w, const recipe_registry& reg, const char* sit
         // No default in the band (an unloaded or empty registry): nothing to
         // test a want against, so the pre-ruling assignment stands.
         for (const entity_id id : ids)
-            w.buildings.at(id).recipe = default_recipe;
+            w.buildings.at(id).recipe = reg.default_recipe_id_at(w, w.buildings.at(id).tile);
         return 0;
     }
 
@@ -4358,6 +4382,11 @@ int assign_default_recipes(world& w, const recipe_registry& reg, const char* sit
     {
         building_component& b = w.buildings.at(id);
         const auto tit = w.tiles.find(b.tile);
+        // The body's air (Ben, 2026-10-09; PRODUCTION.md § Chemical Plant): the
+        // default is the first recipe this tile's body can run -- carry this
+        // call across any rewrite of this function.
+        const uint16_t rid  = reg.default_recipe_id_at(w, b.tile);
+        const recipe*  rdef = reg.get_recipe(rid);
         // THE PRE-AUTHORED INSTALLATION KEEPS ITS DEFAULT (Ben, 2026-10-09;
         // CORPORATION_GENERATION.md § Pass 6, the exceptions): it is the one
         // steel maker the chain-feasibility test can see at the start, and
@@ -4369,17 +4398,17 @@ int assign_default_recipes(world& w, const recipe_registry& reg, const char* sit
         // Every other recipe-less processor is a corporation's: the exemption
         // once keyed on "no owner", and this holds that it was the same set.
         assert(authored || owner.find(id) != owner.end());
-        bool keep = (def != nullptr);
+        bool keep = (rdef != nullptr);
         if (keep && authored)
         {
-            b.recipe = default_recipe;
+            b.recipe = rid;
             if (tit != w.tiles.end())
             {
                 const entity_id body = tit->second.body;
                 auto wit = wants.find(body);
                 if (wit == wants.end())
                     wit = wants.emplace(body, measure_output_want(w, reg, body, body_demand(w, reg, body))).first;
-                wit->second.book(w, reg, *def);
+                wit->second.book(w, reg, *rdef);
             }
         }
         else if (keep && tit != w.tiles.end())
@@ -4388,15 +4417,15 @@ int assign_default_recipes(world& w, const recipe_registry& reg, const char* sit
             auto wit = wants.find(body);
             if (wit == wants.end())
                 wit = wants.emplace(body, measure_output_want(w, reg, body, body_demand(w, reg, body))).first;
-            keep = wit->second.short_for(w, *def, b.tile);
+            keep = wit->second.short_for(w, *rdef, b.tile);
             if (keep)
             {
-                b.recipe = default_recipe;
-                wit->second.book(w, reg, *def);
+                b.recipe = rid;
+                wit->second.book(w, reg, *rdef);
             }
         }
         else if (keep)
-            b.recipe = default_recipe; // no body to measure: the pre-ruling default
+            b.recipe = rid; // no body to measure: the pre-ruling default
         if (keep)
         {
             ++given;

@@ -368,7 +368,15 @@ inline constexpr uint32_t world_save_magic =
 /// held for its cadence. A v38/v39 stream is 2 x resource_count values short
 /// per market; refused whole on the strict-equality contract, no migration.
 /// Claimed through `tools/session/next_save_version.js --kind world --claim`.
-inline constexpr uint32_t world_save_version = 40;
+/// Bumped to 41 by sprint 50 PROPELLANT (propellant routes follow the body's air,
+/// Ben 2026-10-09; PRODUCTION.md § Chemical Plant): the body record gains one
+/// byte, `body_component::atmosphere` (an `atmosphere_class`), after
+/// `mass_earths` -- the generated atmosphere, which gates the two propellant
+/// recipes. A v38 stream is one byte short per body, so its next body misreads;
+/// refused whole on the strict-equality contract, no migration. 39 (D5,
+/// opening_stock_held) and 40 (D3, unposted_rate) are claimed by other sprint 50
+/// branches; this stacks above them, and the integrator renumbers at the merge.
+inline constexpr uint32_t world_save_version = 41;
 
 /// Write @p w as a complete world snapshot.
 ///

@@ -185,7 +185,7 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
 // scorer's directed dispatch (corp_ai.cpp), so both size a haul identically.
 // ---------------------------------------------------------------------------
 
-/// Per-pass memo of `processor_reservation` keyed (corp, pool key).
+/// Per-pass memo of `auto_surplus_reservation` keyed (corp, pool key).
 using reservation_memo = std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>>;
 
 /// Last resolved price of good `r` in `mc`, base price as the fallback; 0 when
@@ -338,6 +338,15 @@ convoy_leg price_market_export_leg(world& w, const recipe_registry& reg,
 /// Tile of the corp's lowest-id building on `body` (BL-077's production anchor).
 /// `null_entity` if the corp holds nothing on the body.
 entity_id corp_representative_tile(const world& w, const corporation_component& corp, entity_id body);
+
+/// Does the launch draw burn from pool (`corp`, `pool_key`)? True exactly when
+/// the corp holds a Launchpad on the pool's body (`pool_key_body`) — the SAME
+/// test `price_convoy_leg`'s space-lane gate applies before it reads this pool's
+/// launch draw, so a pool this answers true for is a pool a launch can burn
+/// from, and no other. "A pad's pool keeps its propellant" (MARKETS.md step 4,
+/// Ben 2026-10-09) reserves against exactly these pools. False for an unknown
+/// corp or a key with no body.
+bool launch_burns_from_pool(const world& w, entity_id corp, entity_id pool_key);
 
 /// BL-1003 — where a haul out of the source pool `src_key` starts: for a market
 /// pool, the corp's lowest-id building in that market's catchment, else the

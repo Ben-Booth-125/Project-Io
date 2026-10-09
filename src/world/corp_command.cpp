@@ -727,6 +727,7 @@ corp_command_result map_construction(construction_result r)
         case construction_result::no_tile:                return corp_command_result::rejected_invalid;
         case construction_result::tech_locked:            return corp_command_result::rejected_tech_locked;
         case construction_result::era_locked:             return corp_command_result::rejected_era_locked;
+        case construction_result::wrong_air:              return corp_command_result::rejected_wrong_air;
         case construction_result::invalid_tile:
         case construction_result::out_of_range:
         case construction_result::slot_occupied:
@@ -1016,6 +1017,9 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 // structure-level tech lock returns, so an agent cannot tell
                 // a structure lock from a recipe lock apart on the seam.
                 case recipe_switch_result::tech_locked:         return corp_command_result::rejected_tech_locked;
+                // Propellant routes follow the body's air (Ben, 2026-10-09):
+                // the player's set_recipe is refused with its own reason.
+                case recipe_switch_result::wrong_air:           return corp_command_result::rejected_wrong_air;
             }
             return corp_command_result::rejected_invalid;
         }
@@ -1979,6 +1983,9 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             // BL-1154: the seat opens unarmed, whichever way it is taken — the
             // same rule as the draw (`move_seat_force`).
             move_seat_force(w, previous, cmd.corp);
+            // NR-986: the seat's dial-idled plants return to auto, the same
+            // rule as the draw (`seat_release_dial_idled`).
+            seat_release_dial_idled(w, cmd.corp);
             return corp_command_result::applied;
         }
     }

@@ -305,6 +305,12 @@ spawn_seat_result seat_player_corporation(world& w, std::uint32_t seed,
     spawn_seat_result out = rank_spawn_candidates(w, landscape, params);
     const entity_id chosen = draw_spawn_seat(out, seed);
     if (repoint_player(w, chosen))
+    {
         out.seated = chosen;
+        // NR-986 (Ben, 2026-10-09): the handoff releases the seat's dial-idled
+        // plants to auto. Here, not in repoint_player, which generation's
+        // provisional pick also calls.
+        seat_release_dial_idled(w, chosen);
+    }
     return out;
 }

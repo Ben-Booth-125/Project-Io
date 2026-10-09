@@ -247,6 +247,28 @@ int main()
         w.corporations.at(filing_corp).origin_region = 3;
     }
 
+    // world_save_version 41 (propellant routes follow the body's air, Ben
+    // 2026-10-09): `body_component::atmosphere`, copied from each body's
+    // generated profile. Census first: the generated world must carry BOTH an
+    // airless body and one with air, or the copy never ran (every body would
+    // sit at the `moderate` default) and P1's byte-equality would pass over a
+    // dropped byte on a uniform column.
+    int atmos_by_class[4] = {0, 0, 0, 0};
+    int airless_bodies = 0, aired_bodies = 0;
+    for (const auto& [bid, bc] : w.bodies)
+    {
+        if (bc.type == body_type::star)
+            continue; // no surface, never generated
+        ++atmos_by_class[static_cast<int>(bc.atmosphere) & 3];
+        if (atmosphere_is_airless(bc.atmosphere)) ++airless_bodies; else ++aired_bodies;
+    }
+    std::printf("     bodies by atmosphere (star excluded): none %d  thin %d  moderate %d  thick %d"
+                "  -> airless %d, with air %d\n",
+                atmos_by_class[0], atmos_by_class[1], atmos_by_class[2], atmos_by_class[3],
+                airless_bodies, aired_bodies);
+    check(airless_bodies > 0 && aired_bodies > 0,
+          "P1 v41: the generated world copies each body's atmosphere (an airless body AND one with air)");
+
     // -----------------------------------------------------------------------
     // P1 (R1) -- a round trip preserves every serialised field
     // -----------------------------------------------------------------------
@@ -260,6 +282,17 @@ int main()
     const std::string bytes_twice = read_ok ? to_bytes(loaded) : std::string();
     check(read_ok && bytes_once == bytes_twice,
           "P1 re-serialising the loaded world reproduces the snapshot byte for byte");
+
+    // v41: every body's atmosphere survives by VALUE.
+    {
+        bool same = read_ok && loaded.bodies.size() == w.bodies.size();
+        for (const auto& [bid, bc] : w.bodies)
+        {
+            const auto lit = loaded.bodies.find(bid);
+            same = same && lit != loaded.bodies.end() && lit->second.atmosphere == bc.atmosphere;
+        }
+        check(same, "P1 v41: body_component::atmosphere round-trips by value on every body");
+    }
 
     // BL-613: the qualification fraction survives by VALUE, not just by byte
     // agreement of the two writes.

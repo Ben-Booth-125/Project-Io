@@ -833,11 +833,15 @@ void read_idle(const world& w, const recipe_registry& reg, const economy_report&
         if (s == ps_build) continue;
         c.add("built");
         c.add(std::string("state.") + k_state_name[s]);
-        if (s == ps_run) continue;
-        const auto hi = H.find(bid);
-        const hist* h = hi != H.end() ? &hi->second : nullptr;
         const recipe* rc = reg.get_recipe(b.recipe);
         const std::string rname = rc ? rc->name : std::string("(none)");
+        // Per-recipe built / running (sprint 50 PROPELLANT lane): the share of
+        // one recipe's plants that run, which the state families alone cannot
+        // give (they key only the NON-running states by recipe).
+        c.add("built.recipe." + rname);
+        if (s == ps_run) { c.add("run.recipe." + rname); continue; }
+        const auto hi = H.find(bid);
+        const hist* h = hi != H.end() ? &hi->second : nullptr;
         const auto oi = owner.find(bid);
         const bool is_seat = oi != owner.end() && oi->second == seat;
         const std::string S = k_state_name[s];

@@ -20,6 +20,7 @@
 
 #include "world/components.hpp"
 #include "world/corp_ai.hpp"
+#include "world/corporation_generation.hpp" // seat_release_dial_idled (U8)
 #include "world/economy_system.hpp"
 #include "world/market_clearing.hpp"
 #include "world/nation_budget.hpp"
@@ -262,6 +263,155 @@ int main()
         check(f.w.markets.at(f.market).unposted_bid[ri(resource_type::coal)] == 1.5f
                   && f.w.markets.at(f.market).unposted_bid_tick[ri(resource_type::coal)] == 15,
               "U6 a later tick's first record overwrites; same-tick records add");
+    }
+
+    // U7 — A PAD'S POOL KEEPS ITS PROPELLANT (MARKETS.md step 4, Ben 2026-10-09).
+    // Propellant is priced at M (the fixture prices every good). A corp holding a
+    // Launchpad on the body makes propellant into its pool; a clear runs; the
+    // launch still dispatches. Contrary cases: without a pad the clear's
+    // auto-surplus sells it; with a pad a standing sell order still can.
+    std::printf("U7 a pad's pool keeps its propellant through a clear\n");
+    {
+        const std::size_t prop = ri(resource_type::propellant);
+        const auto& fuel = launch_draw_per_convoy();
+        check(fuel[prop] > 0.0f, "U7 not vacuous: the launch draw burns propellant");
+
+        // One run: optional pad, optional standing order; returns the fixture
+        // after one clear, and the far market id through `far`.
+        auto run = [&](bool pad, bool order, entity_id& far) {
+            fixture f = make_fixture();
+            const entity_id b2 = f.w.create_entity();
+            body_component b2c{};
+            b2c.name = "Far"; b2c.type = body_type::planet; b2c.grid_width = 1; b2c.grid_height = 1;
+            b2c.orbital_radius_au = 1.0f;
+            f.w.bodies[b2] = b2c;
+            const entity_id t2 = f.w.create_entity();
+            tile_component t2c{};
+            t2c.body = b2;
+            f.w.tiles[t2] = t2c;
+            far = f.w.create_entity();
+            market_component m2c{};
+            m2c.body = b2; m2c.centre_tile = t2;
+            for (std::size_t r = 0; r < resource_count; ++r) m2c.base_price[r] = 2.0f;
+            m2c.price = m2c.base_price;
+            f.w.markets[far] = m2c;
+            if (pad)
+            {
+                const entity_id lp = f.w.create_entity();
+                building_component lb{};
+                lb.tile = f.tile; lb.type = building_type::launchpad;
+                f.w.buildings[lp] = lb;
+                f.w.corporations.at(f.corp).assets.push_back(lp);
+            }
+            if (order)
+            {
+                sell_order so;
+                so.id = f.w.allocate_order_id();
+                so.corp = f.corp; so.body = f.body; so.resource = resource_type::propellant;
+                f.w.sell_orders.push_back(so);
+            }
+            stockpile_component& pool = f.w.pool_at(f.corp, f.market);
+            pool.quantities[prop]                         = 5.0f; // this tick's make
+            pool.quantities[ri(resource_type::iron_ore)] = 100.0f;
+            f.w.markets.at(f.market).demand[prop] = 50.0f; // a buyer is there
+            const recipe_registry reg;
+            economy_report rep{};
+            clear_markets(f.w, reg, rep);
+            return f;
+        };
+
+        {
+            entity_id far = null_entity;
+            fixture f = run(/*pad=*/true, /*order=*/false, far);
+            const float left = f.w.pool_at(f.corp, f.market).quantities[prop];
+            check(left == 5.0f, "U7a with a pad on the body, the clear's auto-surplus lists none of the pool's propellant");
+            const recipe_registry reg;
+            const logistics_nodes nodes = collect_logistics_nodes(f.w);
+            const convoy_leg leg = price_convoy_leg(f.w, reg, nodes, f.corp, f.market, far,
+                                                    ri(resource_type::iron_ore), 10.0f, 1.0f);
+            check(leg.viable && leg.mode == convoy_mode::space,
+                  "U7a ... so the space-lane gate still finds the pad fuelled after the clear");
+            const bool sent = leg.viable
+                && commit_convoy(f.w, reg, f.corp, f.body, f.market, far, ri(resource_type::iron_ore),
+                                 10.0f, leg, nullptr, nullptr, false, nullptr);
+            check(sent, "U7a ... and the launch dispatches");
+            check(f.w.pool_at(f.corp, f.market).quantities[prop] == 5.0f - fuel[prop],
+                  "U7a ... burning exactly the launch draw from the pad's pool");
+        }
+        {
+            entity_id far = null_entity;
+            fixture f = run(/*pad=*/false, /*order=*/false, far);
+            check(f.w.pool_at(f.corp, f.market).quantities[prop] == 0.0f,
+                  "U7b with no pad, the clear's auto-surplus sells the pool's propellant like any surplus");
+        }
+        {
+            entity_id far = null_entity;
+            fixture f = run(/*pad=*/true, /*order=*/true, far);
+            check(f.w.pool_at(f.corp, f.market).quantities[prop] < 5.0f,
+                  "U7c with a pad, a standing sell order still sells the pool's propellant");
+        }
+        {
+            fixture f = make_fixture();
+            const recipe_registry reg;
+            f.w.pool_at(f.corp, f.market).quantities[prop] = 5.0f;
+            check(auto_surplus_reservation(f.w, reg, f.corp, f.market)[prop] == 0.0f
+                      && !launch_burns_from_pool(f.w, f.corp, f.market),
+                  "U7d no pad: the auto-surplus reservation holds no propellant, and no launch burns from the pool");
+        }
+    }
+
+    // U8 — NR-986 (Ben, 2026-10-09): at the handoff the seat's dial-idled plants
+    // return to auto. Sibling of U-rows only by fixture; the subject is the
+    // dial's hold, which the unposted bid's veto also reads.
+    std::printf("U8 the seat's dial-idled plants return to auto at the handoff\n");
+    {
+        fixture f = make_fixture();
+        building_component& idled = f.w.buildings.at(f.building);
+        idled.workforce_auto = false; idled.workforce_target = 0; idled.ticks_remaining = 0;
+        const entity_id run_id = f.w.create_entity();
+        building_component running{};
+        running.tile = f.tile; running.type = building_type::processing_facility;
+        running.workforce_auto = false; running.workforce_target = 40;
+        f.w.buildings[run_id] = running;
+        f.w.corporations.at(f.corp).assets.push_back(run_id);
+        check(dial_idled(f.w.buildings.at(f.building)) && !dial_idled(f.w.buildings.at(run_id)),
+              "U8 not vacuous: one plant is dial-idled, one is dialled above zero");
+        const int n = seat_release_dial_idled(f.w, f.corp);
+        check(n == 1 && f.w.buildings.at(f.building).workforce_auto,
+              "U8 the dial-idled plant is handed over on auto");
+        check(!f.w.buildings.at(run_id).workforce_auto && f.w.buildings.at(run_id).workforce_target == 40,
+              "U8 ... and a plant the dial left running keeps its dial");
+    }
+
+    // U9 — propellant routes follow the body's air (Ben, 2026-10-09): the one
+    // predicate's table, over all four atmosphere classes, and the tile form's
+    // read of the tile's body.
+    std::printf("U9 the propellant routes follow the body's air\n");
+    {
+        recipe airless_r, atmos_r, any_r;
+        airless_r.air = recipe_air::airless;
+        atmos_r.air   = recipe_air::atmosphere;
+        const atmosphere_class classes[4] = {atmosphere_class::none, atmosphere_class::thin,
+                                             atmosphere_class::moderate, atmosphere_class::thick};
+        bool table_ok = true;
+        for (int k = 0; k < 4; ++k)
+        {
+            body_component bc{};
+            bc.atmosphere = classes[k];
+            const bool airless = (k <= 1); // none, thin: planetology's own `airless`
+            table_ok = table_ok && atmosphere_is_airless(bc.atmosphere) == airless
+                && recipe_runs_on_body(airless_r, bc) == airless
+                && recipe_runs_on_body(atmos_r, bc) == !airless
+                && recipe_runs_on_body(any_r, bc);
+        }
+        check(table_ok, "U9 none/thin run only the airless route; moderate/thick only the atmosphere route; any runs everywhere");
+        fixture f = make_fixture();
+        check(f.w.bodies.at(f.body).atmosphere == atmosphere_class::moderate
+                  && recipe_runs_at_tile(f.w, atmos_r, f.tile) && !recipe_runs_at_tile(f.w, airless_r, f.tile),
+              "U9 a body built with no generated profile reads moderate: the atmosphere route, never the airless one");
+        f.w.bodies.at(f.body).atmosphere = atmosphere_class::none;
+        check(!recipe_runs_at_tile(f.w, atmos_r, f.tile) && recipe_runs_at_tile(f.w, airless_r, f.tile),
+              "U9 the tile form reads the tile's body: an airless body flips both");
     }
 
     std::printf("\n%s (%d failure%s)\n", g_fail == 0 ? "ALL PASS" : "FAILURES", g_fail,

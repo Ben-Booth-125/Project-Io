@@ -1601,6 +1601,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // refused costs a build slot to learn nothing.
                     if (!recipe_unlocked(w, reg, corp, rid))
                         continue;
+                    // The body's air (Ben, 2026-10-09): construct_building refuses
+                    // a propellant route the body cannot run.
+                    if (!recipe_runs_at_tile(w, *abs, tile))
+                        continue;
 
                     // INPUT ACCESS (BL-1187, build only what runs). A processor
                     // with an input it cannot obtain is an immediate loss-maker, so
@@ -2236,6 +2240,8 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         continue;
                     if (rid == b.recipe)
                         continue; // the incumbent is best_m's starting point
+                    if (!recipe_runs_at_tile(w, rc, b.tile))
+                        continue; // the body's air (Ben, 2026-10-09): the seam refuses it
                     float m = 0.0f;
                     if (!recipe_margin_obtainable(w, reg, reach(), b.tile, rid, sw_pool,
                                                   sw_batches, bid, m))

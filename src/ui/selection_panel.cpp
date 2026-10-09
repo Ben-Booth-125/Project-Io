@@ -1030,6 +1030,12 @@ void glyph_swap(ImDrawList* dl, ImVec2 c, float r, ImU32 col);
 // recipe switcher writing try_switch_recipe. The file-local helpers it calls
 // (tile_icon_button, glyph_swap) stay in the anonymous namespace above; unqualified
 // lookup still finds them from here.
+// The method grid's last refused Switch press (presentation only: which
+// building, and the seam's reason). One slot — only one building's grid is
+// ever on screen.
+static entity_id            s_switch_refused_building = null_entity;
+static recipe_switch_result s_switch_refused_result   = recipe_switch_result::applied;
+
 void draw_production_method_section(world& w, const recipe_registry& reg, entity_id id)
 {
     const auto bit = w.buildings.find(id);
@@ -1071,7 +1077,12 @@ void draw_production_method_section(world& w, const recipe_registry& reg, entity
     for (int i = 0; i < total_n; ++i)
     {
         const recipe& ri = reg.recipe_at(b.type, i);
-        if (cur == nullptr || ri.group == cur->group)
+        // The body's air (Ben, 2026-10-09; BL-593, "the door not showing what the
+        // gate would refuse"): a route try_switch_recipe refuses as `wrong_air`
+        // is never offered. The ACTIVE recipe is always listed, whatever it is.
+        const bool is_active = (cur != nullptr && ri.name == cur->name);
+        if ((cur == nullptr || ri.group == cur->group)
+            && (is_active || recipe_runs_at_tile(w, ri, b.tile)))
             candidates.push_back(i);
     }
 
@@ -1197,8 +1208,11 @@ void draw_production_method_section(world& w, const recipe_registry& reg, entity
             // industry cannot make what this needs yet", drawn greyed) is gone
             // along with the gate behind it. try_switch_recipe no longer refuses
             // on depth, so a greyed row here would be the UI inventing a refusal
-            // the seam would not make. Cooldown is the only thing that disables
-            // the Switch control now.
+            // the seam would not make. try_switch_recipe's other refusals:
+            // cross-group and wrong-air recipes are never candidates (the filter
+            // above), cooldown disables the control here, and a press the seam
+            // still refuses (funds, tech) is said in the status line below — the
+            // result is no longer discarded.
             const std::uint16_t row_id = reg.recipe_id(ri.name);
 
             char tip[96];
@@ -1218,11 +1232,32 @@ void draw_production_method_section(world& w, const recipe_registry& reg, entity
             ImGui::SetCursorPos({row_w - glyph_w, 0.0f});
             if (tile_icon_button("##switch", {glyph_w, row_h}, !on_cooldown,
                                  tip, glyph_swap, switch_glyph_col))
-                try_switch_recipe(w, reg, w.player_entity, b, row_id);
+            {
+                const recipe_switch_result r = try_switch_recipe(w, reg, w.player_entity, b, row_id);
+                s_switch_refused_building = (r == recipe_switch_result::applied) ? null_entity : id;
+                s_switch_refused_result   = r;
+            }
         }
 
         ImGui::EndChild();
         ImGui::PopID();
+    }
+
+    // The last Switch press on THIS building that the seam refused, said rather
+    // than discarded. Cleared by the next press that applies.
+    if (s_switch_refused_building == id)
+    {
+        const char* why = "Switch refused.";
+        switch (s_switch_refused_result)
+        {
+            case recipe_switch_result::insufficient_funds: why = "Switch refused: not enough funds."; break;
+            case recipe_switch_result::tech_locked:        why = "Switch refused: not researched yet."; break;
+            case recipe_switch_result::on_cooldown:        why = "Switch refused: still locked from the last switch."; break;
+            case recipe_switch_result::wrong_air:          why = "Switch refused: that method cannot run on this body's air."; break;
+            case recipe_switch_result::cross_group:        why = "Switch refused: a different kind of facility."; break;
+            default: break;
+        }
+        ImGui::TextDisabled("%s", why);
     }
 }
 
@@ -3871,10 +3906,18 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
     // building_type, never a recipe, so this branch was dead code on every
     // prior campaign.
     cands.erase(std::remove_if(cands.begin(), cands.end(),
-                               [&w, &reg](const candidate& c)
+                               [&w, &reg, tile_id](const candidate& c)
                                {
                                    if (!reg.building_available(c.type))
                                        return true;
+                                   // The body's air (Ben, 2026-10-09): a propellant
+                                   // route this tile's body cannot run is dropped the
+                                   // same way — construct_building refuses it
+                                   // (construction_result::wrong_air).
+                                   if (c.type == building_type::processing_facility)
+                                       if (const recipe* rc = reg.get_recipe(c.recipe);
+                                           rc != nullptr && !recipe_runs_at_tile(w, *rc, tile_id))
+                                           return true;
                                    return !recipe_unlocked(w, reg, w.player_entity, c.recipe);
                                }),
                 cands.end());

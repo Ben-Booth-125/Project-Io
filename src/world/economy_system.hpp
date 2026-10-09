@@ -836,6 +836,8 @@ enum class recipe_switch_result : uint8_t
     // retool, so the value became unreachable.
     tech_locked,          ///< BL-588: the corp has not earned the tech that unlocks the new recipe.
                           ///< The only method lock left at this door — see try_switch_recipe.
+    wrong_air,            ///< The new recipe cannot run on this building's body's air
+                          ///< (`recipe_runs_at_tile`; propellant routes, Ben 2026-10-09).
 };
 
 /// Attempt a PLAYER-grade recipe switch on `b`, gated by `economy.recipe_switch`
