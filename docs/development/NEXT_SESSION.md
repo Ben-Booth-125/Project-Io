@@ -235,6 +235,11 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   coverage (can destroy a covered chain — HIGH); walk books a stale rung refusal; installation by
   elimination; exception 2 uncapped (bounded by processing_mix); 11 raw-world harnesses unaudited.
   Round 4 sent (all five).
+  **PROPELLANT READY** (head a354831b: doors filter wrong-air rows, switch shows refusal, ACTIONS
+  updated, default paths ask `default_recipe_id_at`, verify names wrong_air). World unchanged
+  (83.2/65.5/15.5/73.2/98.7). App build NOT run by the lane (syntax-only) and the Build-door live
+  click is owed at merge. Merge order once D5/D6 round 4 clears: D5/D6 (v39) -> D3/D4 (v40, head
+  6d79848a) -> PROPELLANT (v41) -> build_app -> live click -> 16-seed integrated gate.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
