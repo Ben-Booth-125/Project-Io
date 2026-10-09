@@ -1532,6 +1532,58 @@
     "src/ui/body_surface_canvas.cpp"
    ],
    "design": "SETTLED: RENDERING.md § Level of detail (Ben, 2026-10-08: never magnify, a 192 px tier, supersample). WORK: (1) k_tier_headroom 1.2 -> the smallest tier with ppr >= draw_r (minify, never past 2:1). (2) A 192 px chunked tier in k_tier_ppr. (3) Bake each tier at 2x and box-downsample before upload; re-tune the unsharp pass against the result. (4) The stand-in while chunks fill is the next tier down where resident, the far page only where nothing closer is. MEASURE FIRST AND AFTER: the frame HUD's texel/px per rung at 1720x1080 and at a 4K-height window; bake time per tier (x4 pixels on the worker); resident chunk memory at the top rung. VERIFY: captures at each rung, and a LIVE look at every rung with Ben (the sharpness call is his eye)."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 51,
+   "written": "2026-10-09",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "priority": "S",
+   "difficulty": 4,
+   "id": "BL-1246",
+   "short_name": "GROUND_ONE_MASTER",
+   "author": "Ben (2026-10-09, after walking the sprint 51 build: the ground lag is off-putting; build it now)",
+   "title": "The ground renders instantly: a bake worker pool, one camera angle, one 96 px/hex master per body pre-baked during generation, every zoom a downsample",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "files": [
+    "src/core/ground_layer.hpp",
+    "src/core/ground_layer.cpp",
+    "src/ui/ground_bake.cpp",
+    "src/ui/ground_bake.hpp",
+    "src/ui/body_surface_canvas.cpp",
+    "src/core/app.cpp",
+    "src/ui/generation_wait.cpp"
+   ],
+   "design": "SETTLED: RENDERING.md § Level of detail (one master, every zoom a downsample) and § One angle; § Chunks, cache and invalidation (the worker pool); STARTUP.md § Handoff (the ground pre-bakes behind the handoff); TECH_FOUNDATIONS.md § Target hardware (the budgets). WORK, in order: (1) a pool of N = hardware_concurrency - 2 bake workers at low priority, results keyed so arrival order cannot matter (lane launched 2026-10-09). (2) One camera angle: planetary_tilt_sy is cos(22.5 deg) at every rung and under every lens; the master bakes oblique at 22.5 deg with standing trees and structures; retire the 45 deg tier and the flat/tilted tier split. (3) The master: one whole-body bake at 96 px/hex in 512 px chunks held in system RAM; a mip chain 48/24/12/6 box-downsampled from it chunk by chunk; each frame uploads the visible chunks of the level at or above the drawn radius (minified <= 2:1) within a per-frame upload budget, with an LRU of GPU textures; a RAM budget across bodies drops least-recently-visited masters but keeps their far pages; dirty chunks (builds, survey reveals, urban transforms) re-bake in the master and re-derive their mip pieces. Bake at 1x unless the measured pre-bake fits with 2x. Retire the per-rung tier ladder, the 192 tier and the stand-in machinery that existed to hide per-rung fills. (4) Pre-bake: the homeworld master starts when finish_campaign_world completes, runs behind the seat canvas, and entering play waits for it on a labelled loading step; other bodies bake in the background after, viewport-first on a first visit. Under --verify everything stays synchronous. NR-988 (lens over the bake) becomes cheap once lenses share the master and the camera: note but do not build it here."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 51,
+   "written": "2026-10-09",
+   "requires": [
+    "BL-1246"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "category": "Tooling",
+   "priority": "A",
+   "difficulty": 2,
+   "id": "BL-1247",
+   "short_name": "GROUND_BENCHMARK",
+   "author": "Ben (2026-10-09, after walking the sprint 51 build: the ground lag is off-putting; build it now)",
+   "title": "A ground benchmark reports the five target-hardware budgets on the machine it runs on",
+   "authority_doc": "docs/tech/TECH_FOUNDATIONS.md",
+   "files": [
+    "scripts/verify/ground_benchmark.lua",
+    "src/core/verify_api.cpp",
+    "src/core/ground_layer.cpp"
+   ],
+   "design": "SETTLED: TECH_FOUNDATIONS.md § Target hardware. WORK: a check (a non-verify timing mode of the app, since --verify bakes synchronously and would measure the wrong thing) that reports, on the machine it runs on: the home-body pre-bake time added to generation (budget 15 s); whether any zoom or pan step on the home body shows a stand-in (budget none); time until a first visit to another body is sharp under the view (budget 2 s); frame time at every rung (budget 16.7 ms); time from a building placed to its ground re-baked (budget 1 s). Prints PASS/FAIL per budget with the number. Wrapped as a skill only with Ben's permission (CLAUDE.md § Tool creation is skill creation)."
   }
  ]
 }

@@ -46,6 +46,12 @@ is **procedural now, authored raster later on the same stamp seam**; a stacked t
 dramatic landforms and rivers leave the canvas's vector layer for the bake too; and the ground
 is **never magnified** at any rung (§ Level of detail).
 
+Ruled by Ben, 2026-10-09, after walking the sprint 51 build: the ground is viewed at **one
+angle** (22.5°) at every rung, and **zooming does not add detail** — one 96 px/hex master
+per body, pre-baked during generation and held in RAM, with every other zoom a downsample
+of it (§ Level of detail; § One angle). This supersedes the never-magnify tier ladder and
+the stepped tilt.
+
 ---
 
 ## The mechanism — baked terrain chunks
@@ -191,7 +197,7 @@ Consequences the design accepts and answers:
   must be authored to read at distance (footprint contrast, cleared ground, a road
   stub), the way the it3 settlement reads. Ben chose this against a
   geometry-close/glyphs-far ladder, deliberately.
-- **The tilted rungs stand structures up.** On the oblique tiers a structure bakes as a
+- **Structures stand up.** At the one oblique angle (§ One angle) a structure bakes as a
   standing sprite like a tree — verticals pre-stretched by 1/cos(tilt), shadow left on
   the ground plane — so the camera squash returns it to true proportion.
 - **Under a lens a structure is ground.** It takes the lens wash like the terrain around
@@ -273,7 +279,7 @@ state — so ambience continues while paused; under `--verify` the clock is **pi
 phase 0** and a check advances it explicitly. The near-future grade applies over
 animated overlays too, so motion cannot break the grade.
 
-### Level of detail — the stepped zoom pairing
+### Level of detail — one master, every zoom a downsample
 
 **Planetary zoom is STEPPED** (Ben, 2026-09-01, judging the first bake: *"C-F is a
 detailed image… we could approximate it with stepped zoom, rather than the continuous
@@ -282,74 +288,79 @@ zoom we currently have (2.5D)"*): the player's wheel and keyboard move through a
 (`planetary_zoom_stepped`; verify's `set_zoom` stays free-form so scripted framings
 are unaffected). The upper canvas rungs keep continuous zoom.
 
-Each zoom rung pairs with a **bake tier**, so the ground is near-1:1 texels at every
-step — the stepped ladder's whole point. "Near", not exact: the drawn hex radius is
-**fit-derived** (window height over grid rows, then the rung's ×2 factor), so where a
-rung lands relative to its tier moves with the window.
+**Zooming does not add detail** (Ben, 2026-10-09, after walking the sprint 51 build:
+*"the current lag is very off putting… zooming doesn't add more detail, arguably the
+biggest fix even if we keep a high resolution"*). This supersedes the per-rung bake
+tiers of 2026-09-01 and the never-magnify tier chooser of 2026-10-08: a zoom step had
+been a fresh, expensive bake, and that bake was the lag.
 
-**The ground is never magnified** (Ben, 2026-10-08, the sprint 51 form: sharpen the
-tiles across all zooms). The tier chooser takes the **smallest tier at or above the
-drawn radius** — no magnification headroom — and draws it **minified**, never past 2:1
-(the ×2 spacing; `SDL_Renderer` has no mipmaps, so that bound is what keeps a step
-transition shimmer-free). Minification under linear filtering softens nothing;
-magnification is what read as blur, at the 4–14% the earlier 1.2× headroom allowed at
-the reference window. While a tier's chunks fill, the stand-in is the nearest FINER tier
-with ground ready in view (minifying it is free), else the nearest coarser one, else the
-far page alone; a stand-in tier is never evicted, and its chunks are re-hashed on the
-active tier's sweep so a stand-in never shows ground a build or a survey has since moved.
-
-**Every tier is supersampled.** A tier bakes at **2×** its nominal pixels per hex and is
-box-downsampled to the nominal size before upload, so stamp edges, ridge creases and
-river banks are anti-aliased in the bake rather than stair-stepped. The cost is bake
-time (×4 pixels through the worker), not frame time or resident memory, which see only
-the downsampled texture; the bake's own unsharp pass is re-tuned against the
-supersampled result rather than stacked on it.
+- **One master per body.** The ground is baked ONCE per body, at **96 px per hex**, at
+  the one camera angle (§ One angle), whole-body, in 512 px chunks. Everything the
+  player sees at any rung is this image: the close-tier features (trees, crags, strata,
+  structures) are always in it and simply grow small with distance.
+- **Every other zoom is a downsample.** A **mip chain** — 48, 24, 12 and the 6 px far
+  page — is box-downsampled from the master, chunk by chunk, in milliseconds. A rung
+  draws the level at or above its drawn radius, minified by at most 2:1, so no step
+  shimmers (`SDL_Renderer` has no mipmaps; the chain is ours). Detail never changes
+  with zoom; only scale does.
+- **The master is held in RAM; the GPU holds what is on screen.** The master and its
+  chain live in system memory (about 4 GB for an Earth-sized body); each frame uploads
+  the visible chunks of the level in use, within a per-frame upload budget so a pan
+  never hitches, and keeps an LRU of uploaded textures.
+- **Pre-baked during generation.** The home body's master bakes while the player watches
+  the world generate (STARTUP.md), so the first frame of play is final at every zoom.
+  Other bodies bake in the background after the home body, nearest and most-visited
+  first; a first visit to an unbaked body bakes the area under the view first and the
+  rest behind it. A RAM budget drops the masters of the least-recently-visited bodies,
+  keeping their far pages.
+- **The bake is pooled.** All baking runs on the worker pool (§ Chunks, cache and
+  invalidation); the master is a few thousand chunks, which a pool clears in seconds
+  and a single thread could not.
+- **Supersampling is a measured choice, not a rule.** The master bakes at 1× by default:
+  the downsampled levels are anti-aliased by the downsample itself, and only the top rung
+  — the one rung that reads the master near 1:1 — would gain from a 2× bake, at four
+  times the bake cost. A 2× master is taken only if the pool's measured pre-bake still
+  fits the target in TECH_FOUNDATIONS.md § Target hardware.
+- **The top rung reads the master slightly magnified** at the reference window (~110 px
+  drawn from 96: ~1.15×), and more on a 4K-height window (~2.3×). Accepted for the
+  prototype's windows (Ben, 2026-10-09: 96 over 48, and over a separate 192 tier).
 
 At the reference 1720×1080 window:
 
-| Zoom rung (drawn hex radius, reference window) | Bake tier (px per hex circumradius) |
+| Zoom rung (drawn hex radius) | Level drawn (px per hex) |
 |---|---|
-| ~6 px (whole grid) | The far page, 6 — whole-body, one texture (drawn at or below 1:1) |
-| ~13 px | 24 — chunked, minified |
-| ~27 px | 48 — chunked, minified; the close-grain octave joins the bake |
-| ~55 px | 96 — chunked, minified, close-grain |
-| ~110 px | 192 — chunked, minified, close-grain |
+| ~7 px (whole grid) | 12, minified (~1.7:1) |
+| ~14 px | 24, minified |
+| ~28 px | 48, minified |
+| ~55 px | 96 — the master, minified |
+| ~110 px | 96 — the master, ~1.15× magnified |
 
-The 12 px tier stays in the ladder for windows where a rung lands at or under 12 px.
-**The 192 px tier** exists so the top rung is never magnified at the reference window or
-a taller one, up to a 4K-height canvas. It is chunked like every tier and resident only
-while its rung is active, so its memory cost is the viewport's chunks, not the body's. The existing 7 px vector pivot remains only in
-the fallback path.
+The vector fill remains only as the fallback before a body's far page exists.
 
-### The stepped tilt — the 2.5D seam, taken
+### One angle — the 2.5D seam at a single tilt
 
-The top two rungs **view the land obliquely** (Ben, 2026-09-02, from the reference
-mock: *"a stepped tilt… the land at roughly 45 degrees at max zoom"*): rung 3 at
-22.5°, rung 4 at 45°, axonometric — a y-squash by cos(tilt), no perspective
-convergence — snapping with the zoom step. Tilt is a **pure function of zoom**
-(`planetary_tilt_sy`; thresholds at the rung midpoints), so verify's free-form zooms
-stay deterministic, and it applies on the **plain canvas only**: a lens is an
-analytic read and stays flat.
+The planetary ground is viewed at **one fixed oblique angle, 22.5°, at every rung** (Ben,
+2026-10-09, replacing the 2026-09-02 stepped tilt of 22.5° at rung 3 and 45° at rung 4):
+axonometric — a y-squash by cos(22.5°) ≈ 0.924, no perspective convergence. One angle is
+what makes one master possible: a second angle was a second bake.
 
 Two halves make it:
 
-- **The camera is one vertex squash.** The canvas draws everything in flat ground
-  space; a single transform over the map-space vertex range squashes fills, strokes,
-  images and labels alike about the canvas centre, and one inverse on the cursor
-  keeps every hit test correct. Height displacement is deliberately ignored for
-  hits — a few px on mountain tops.
-- **The tilted rungs bake OBLIQUE tiers** (a tier is keyed by resolution *and*
-  tilt): the height field displaces content upward by `lift = 0.9·tan(tilt)`
-  canonical units per unit height, so hills grow real silhouettes (a masked
-  re-resolve locks, so a peak truncates at the survey mask rather than leaking);
-  trees bake as **standing sprites** — trunk, upright canopy, shadow left on the
-  ground plane — with their verticals pre-stretched by 1/cos(tilt) so the camera
-  squash returns them to true proportion. The lift stays modest, so the projection
-  is monotonic and needs no occlusion handling.
+- **The camera is one vertex squash, applied always.** The canvas draws everything in
+  flat ground space; a single transform over the map-space vertex range squashes fills,
+  strokes, images and labels alike about the canvas centre, and one inverse on the
+  cursor keeps every hit test correct. It applies under every lens too, so switching a
+  lens never moves the map. Height displacement is deliberately ignored for hits — a
+  few px on mountain tops.
+- **The master bakes oblique:** the height field displaces content upward by
+  `lift = 0.9·tan(22.5°)` canonical units per unit height, so hills grow real
+  silhouettes (a masked re-resolve locks, so a peak truncates at the survey mask rather
+  than leaking); trees and structures bake as **standing sprites** — upright, shadow
+  left on the ground plane — with their verticals pre-stretched by 1/cos(22.5°) so the
+  camera squash returns them to true proportion. The lift stays modest, so the
+  projection is monotonic and needs no occlusion handling. Deterministic and
+  wrap-exact (`ground_bake_check` P9).
 
-The far page and the low tiers stay flat; while a tilted tier fills, the squashed
-flat bake stands in — geometry aligns, only the relief displacement arrives with the
-chunks. Deterministic and wrap-exact (`ground_bake_check` P9).
 
 ---
 

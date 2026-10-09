@@ -619,6 +619,18 @@ presentation half:
    presentation half of their own — no agency comms, history samples or last report come from
    them (delegated reading, 2026-09-24, NEEDS_REVIEW): the ticks have no calendar and no
    seated corp, so nothing they emit has a reader.
+**The ground pre-bakes behind the handoff** (Ben, 2026-10-09). The moment round 6's world is
+finished — `finish_campaign_world` done, on the wizard path or the cold path — the homeworld's
+**ground master** starts baking on the worker pool ([RENDERING.md](RENDERING.md) § Level of
+detail): the one 96 px/hex image every zoom of the Planetary canvas is drawn from. It runs
+behind the seat canvas, so the player's reading of the seat cards is bake time spent for free.
+Play does not open on a half-painted ground: entering play waits for the master, on the
+loading screen with its own labelled step ("Painting the ground"), and the budget is that it
+adds **at most 15 s** to generation on the minimum PC
+([TECH_FOUNDATIONS.md](../tech/TECH_FOUNDATIONS.md) § Target hardware). A building the
+settle places after the bake started only dirties its own chunks, which re-bake. Other
+bodies bake in the background once play opens.
+
 3. **Seat the player**: rank every specialist on phase 6's static landscape score,
    marking the ones below the viability floor, and open the selection canvas
    (§ The seat); the player's Confirm re-points `is_player` / `world::player_entity`

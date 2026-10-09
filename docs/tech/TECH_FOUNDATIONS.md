@@ -171,6 +171,33 @@ goldens render identically across machines.
 
 ---
 
+## Target hardware
+
+Set by Ben, 2026-10-09, while making the ground render instant (sprint 51): Project Io is a
+desktop game and does not target low-spec laptops.
+
+| | Minimum | Reference (the development PC) |
+|---|---|---|
+| CPU | 8 cores / 16 threads | 16 threads |
+| RAM | 16 GB | 32 GB |
+| GPU | 8 GB discrete (RTX 3060 / RX 6600 class) | RTX 5060 Ti |
+
+**The benchmark the minimum PC must hold** — each is a measurement a check reports, not a
+hope:
+
+- Zoom and pan on the home body show **no visible stand-in**: the ground under the view is
+  final at every rung.
+- The ground pre-bake **adds at most 15 s** to world generation (STARTUP.md § Handoff).
+- A **first visit to another body** is sharp under the view **within 2 s**.
+- The Planetary canvas holds **60 fps at every zoom**.
+- A **building placed** has its ground re-baked **within 1 s**.
+
+What these budgets cost, and why they fit: the ground is painted on the CPU by a worker pool
+and held in system RAM (about 4 GB per Earth-sized body, with a RAM budget across bodies); the
+GPU holds only the textures on screen and draws them as quads, so GPU time is not the
+constraint (RENDERING.md § Level of detail). A check that misses a budget on the reference PC
+is a defect; one that only the minimum PC would miss is measured on it before release.
+
 ## UI
 
 *Rendering approach and view structure. Per-view detail is deferred to the UI document.*
