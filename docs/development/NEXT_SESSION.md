@@ -127,6 +127,13 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   Copper ore: dispatcher "would send" 36/47 yet arrivals ~8/tick (undelivered hauls — SUPPLY,
   untested). Making builds read steel scarcity = NEW GRANT. 155 inputs>=revenue: 80 underwater at
   tick 1 (35 unpriced propellant), input side dominates.
+  **BEN RULED (2026-10-09, propellant form; docs 2e608ec0):** pad's pool keeps its propellant
+  (reserved from auto-surplus); electrolysis only on airless bodies, atmospheric only under air ->
+  price 64.0; seat's dial-idled plants back to auto at handoff (NR-986 resolved). PROPELLANT agent
+  resumed with all three. **D3/D4 cold review:** F1 dial double-counts shelf-fed running draws
+  (+ procurement whole-contract per tick) — likely the G2 fall; F2 D3b base forecast fires on dead
+  markets in play (no never-cleared gate) — likely the G1b rise; F4 probe solver args; F3 D4 also
+  switches OUT of unpriced incumbents (ruling-literal, kept). D3/D4 agent resumed with F1/F2/F4.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
