@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**65 surfaces** — 7 settled, 58 awaiting Ben's wording.
+**66 surfaces** — 7 settled, 59 awaiting Ben's wording.
 
 ---
 
@@ -148,13 +148,13 @@ alphabetical order.
 
 *Demanded by BL-303 · `src/ui/generation_ledger.cpp` · id `generation_ledger_body`*
 
-### The generation wait - every wizard loading round and the building screen
+### The generation wait - every wizard loading round, the building screen, and the Painting-the-ground step after the seat
 
 **Answers:** Is the world still being built, which step is it on, and how long has it taken?
 
-**Because:** A wait that sits still reads as a crash (Ben, 2026-09-24, watching the Industrialisation round load: the bar held on one step for the whole road pass). STARTUP.md § A wait never looks stopped: the outer bar is weighted by what each step COSTS, measured in Release (generation_step_cost_ms), not counted as equal steps; every step over about a second reports progress within itself on the inner bar (the spans by year, the borders by tile row, the roads by village, the old roads by corridor, the validation run by quarter); a caption names the step in generation's own words (generation_stage_labels); and an elapsed-seconds count shows the run is alive. One surface (ui::draw_generation_wait) draws every wizard loading round and the building screen, so there is one wait, not two. Nothing else is added: the loading round stays one line, the bars and these two lines - no map, no board.
+**Because:** A wait that sits still reads as a crash (Ben, 2026-09-24, watching the Industrialisation round load: the bar held on one step for the whole road pass). STARTUP.md § A wait never looks stopped: the outer bar is weighted by what each step COSTS, measured in Release (generation_step_cost_ms), not counted as equal steps; every step over about a second reports progress within itself on the inner bar (the spans by year, the borders by tile row, the roads by village, the old roads by corridor, the validation run by quarter); a caption names the step in generation's own words (generation_stage_labels); and an elapsed-seconds count shows the run is alive. One surface (ui::draw_generation_wait) draws every wizard loading round and the building screen, so there is one wait, not two. Nothing else is added: the loading round stays one line, the bars and these two lines - no map, no board. BL-1246 (Ben, 2026-10-09) adds ONE step after the seat, on the same surface: "Painting the ground", shown only while the home body's ground master (baking since round 6 landed) has not yet landed, its bar the master's chunks landed over its total. It earns its place because the alternative is worse: play opening on ground that is still painting in. The wait never counts as game days (the clock rebases after it).
 
-*Demanded by BL-1072 · `src/ui/generation_wait.cpp`, `src/ui/startup_screens.cpp`, `src/core/app.cpp`, `src/world/hard_coded_world.cpp` · id `generation_wait`*
+*Demanded by BL-1072, BL-1246 · `src/ui/generation_wait.cpp`, `src/ui/startup_screens.cpp`, `src/core/app.cpp`, `src/world/hard_coded_world.cpp`, `src/core/ground_layer.cpp` · id `generation_wait`*
 
 ### God-view corp/rival readouts (Selection facts column, rival Status rows, rival hover detail) + the survey tell on the Planetary canvas
 
@@ -279,6 +279,14 @@ IT LIVES UNDER MY TRADES, NOT IN A FEED. The question it answers is about the pl
 **Because:** Buildings no longer carry an owner colour on the canvas (RENDERING.md § Installations), so the Corporation and Company lenses became the only place ownership is read at a glance — and with every owner tinted at once they answered 'who owns what' with a map of every colour at once, which answers nothing. A picked set keeps the comparison the player is actually making in colour and folds every other owner into one owned-grey, which still says 'someone holds this' without competing. Ben, 2026-10-08 (the sprint 51 visibility pass). The key copies the Resource lens's search-and-checklist shape so there is no new vocabulary, rows exist only for owners with ground on the body, the Corporation set defaults to the player ('where am I, against everyone'), and shift-click makes the map itself the picker while a plain click keeps its BL-664 meaning. It costs no new screen space: the key fills the one lens chrome region the lens already owned.
 
 *Demanded by BL-1240 · `src/ui/body_surface_canvas.cpp`, `src/ui/ui_state.hpp`, `src/ui/presentation.hpp`, `src/core/verify_api.cpp`, `scripts/verify/owner_multi_select.lua` · id `owner_multi_select`*
+
+### The Planetary canvas ground at every zoom - one baked master per body, viewed at one 22.5-degree angle at every rung and under every lens
+
+**Answers:** What does this ground look like, at any zoom, the instant I look at it?
+
+**Because:** Ben, 2026-10-09, after walking the sprint 51 build: the ground lag was off-putting, because every zoom step had been a fresh bake that arrived late and softer first. One 96 px/hex master per body, pre-baked behind the handoff and held in RAM, makes every rung a downsample of the same picture: a rung change is final on arrival, and detail never changes with zoom, only scale - so the player learns one picture of a world, not five. One camera angle at every rung and under every lens is what makes one master possible (a second angle was a second bake), and it means neither a zoom step nor a lens toggle moves the map under the cursor. It adds no chrome and no control: it replaces the per-rung tiers, the stand-in that hid their fills, and the stepped tilt.
+
+*Demanded by BL-1246 · `src/core/ground_layer.cpp`, `src/core/ground_layer.hpp`, `src/ui/ground_bake.cpp`, `src/ui/body_surface_canvas.cpp` · id `planetary_ground_master`*
 
 ### Baked landform relief and carved rivers (Planetary canvas ground) -- mountain as massif and ridge, canyon as a cut between paired rims, crater as a raised-rim bowl, rift as a dark fissure; rivers as curved courses widening downstream
 
