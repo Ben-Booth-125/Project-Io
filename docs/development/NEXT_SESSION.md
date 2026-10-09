@@ -337,6 +337,10 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   background_fill not hashed, run_contend fixture half-tests R2, generation charges razed centres
   and unpriced goods (fixed as a defect: phantom buyers, not price). Fix round sent. Save stack to
   renumber at merge: v42 BL-1195 (ledger says 43), v45 R2 -> sequential.
+  **BL-1195 MERGED 3694d297** (tidy round 9ba2bb4a via a fresh agent): save v42, ledger corrected
+  to 42; app BUILD_OK; sea_port_gate 95/0; save_roundtrip OK. Live look at a sea-route convoy
+  still owed. Note: a body-pool convoy records source_market null (not the body); lane falls back
+  to origin_tile. R2 must renumber to v43 at its merge.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
