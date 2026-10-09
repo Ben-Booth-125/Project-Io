@@ -5,9 +5,9 @@
 
 #include <SDL3/SDL.h>
 
+#include <chrono>
 #include <condition_variable>
 #include <cstdint>
-#include <deque>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -29,12 +29,17 @@
 // one, else the far page alone. Every bake is supersampled 2x and downsampled
 // before upload (ui/ground_bake).
 //
-// ALL BAKING RUNS ON A WORKER THREAD (wave 2's perf half): the pure bake
-// (ui/ground_bake) executes against an immutable source snapshot; the render
-// thread only hashes, enqueues, uploads finished buffers into SDL textures and
-// publishes the view. A generation counter discards results that outlive their
-// source or body. Under --verify everything bakes synchronously on the main
-// thread instead, so a capture can never race the worker.
+// ALL BAKING RUNS ON A POOL OF WORKER THREADS (wave 2's perf half; the pool,
+// Ben 2026-10-09): N = max(1, hardware threads - 2) workers at below-normal OS
+// priority pull from one shared, priority-ordered job queue — the far page
+// first, then the neighbourhood page, then chunks nearest the viewport centre.
+// The pure bake (ui/ground_bake) executes against an immutable source snapshot
+// shared read-only by every worker; the render thread only hashes, enqueues,
+// uploads finished buffers into SDL textures and publishes the view. A result
+// is identified by (generation, tier, key), so arrival order cannot matter, and
+// a generation counter discards results that outlive their source or body.
+// Under --verify everything bakes synchronously on the main thread instead, so
+// a capture can never race the pool.
 // ---------------------------------------------------------------------------
 
 struct world;
@@ -49,7 +54,7 @@ public:
     /// (all tiers) the last request touches.
     void tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake_everything);
 
-    /// Stop the worker and destroy every texture. Call before the renderer dies.
+    /// Stop the workers and destroy every texture. Call before the renderer dies.
     void shutdown();
 
     /// The C-F dials; shipped values are ground_bake.hpp's defaults.
@@ -122,6 +127,7 @@ private:
         /// stand-in sweep, which hashes and never bakes): never drawn until
         /// re-baked, and re-hashed every tick it is wanted (F34, stale stand-in).
         bool          stale  = false;
+        std::uint32_t job_gen = 0;   ///< Generation of the outstanding job while queued.
         std::uint64_t bakes  = 0;    ///< Uploads into this slot (verify probe).
         std::uint64_t last_want = 0; ///< Frame stamp for LRU eviction.
     };
@@ -152,6 +158,11 @@ private:
         // under whatever the request names by the time it lands.
         entity_id neigh_tile = null_entity;
         float     neigh_rect[4] = { 0, 0, 0, 0 };
+        // Queue order (the pool): lower prio pops first, ties in enqueue order.
+        // Far page -2, neighbourhood page -1, a chunk its squared distance in
+        // chunks from the viewport centre.
+        double        prio = 0.0;
+        std::uint64_t seq  = 0;
     };
 
     struct result
@@ -176,8 +187,15 @@ private:
     void refresh_source(const world& w);
     void worker_main();
     void enqueue(job j);
+    /// Drop every WAITING chunk job not of tier @p keep or not of the current
+    /// generation (a rung change: the left tier's backlog must not delay the
+    /// new one; a tilt change: the old projection's). Clears their slots'
+    /// queued flags; in-flight jobs land normally. Main thread.
+    void purge_waiting_except(int keep);
+    /// Workers in the pool: max(1, hardware threads - 2), IO_GROUND_WORKERS overrides.
+    static int pool_size();
     void drain_results(SDL_Renderer* r);
-    void upload(SDL_Renderer* r, const result& d);
+    void upload(SDL_Renderer* r, const result& d, bool sync);
     void bake_now(SDL_Renderer* r, const job& j); ///< Synchronous (--verify) path.
     job  make_chunk_job(int tier, int ci, int cj) const;
     void evict(tier_state& t, std::size_t cap);
@@ -198,7 +216,7 @@ private:
     static constexpr std::size_t k_tier_cap[k_tiers] = { 60, 90, 48, 48, 48 };
     /// Per-tier supersample ceiling (BL-1244), min'd with params.supersample.
     /// The 192 px tier bakes single-sample: at 2x its fill time at the
-    /// reference window measured ~30 s on the one worker (99 chunks x ~305 ms),
+    /// reference window measured ~30 s on the pre-pool single worker (99 chunks x ~305 ms),
     /// past what the brief allowed — the 2x-at-192 call is Ben's. Raise this
     /// entry to 2 to take it.
     static constexpr int k_tier_supersample[k_tiers] = { 2, 2, 2, 2, 1 };
@@ -210,12 +228,14 @@ private:
     std::uint32_t m_far_gen_checked = ~0u; ///< Far hash runs once per source generation.
     bool          m_far_ready  = false;
     bool          m_far_queued = false;
+    std::uint32_t m_far_job_gen = 0;     ///< Generation of the outstanding far job.
 
-    // Worker plumbing. The worker starts lazily on the first enqueue.
-    std::thread             m_worker;
+    // Pool plumbing. The workers start lazily on the first enqueue.
+    std::vector<std::thread> m_workers;
     mutable std::mutex      m_mx;
     std::condition_variable m_cv;
-    std::deque<job>         m_jobs;
+    std::vector<job>        m_jobs;     ///< Waiting jobs; workers pop the lowest (prio, seq).
+    std::uint64_t           m_seq = 0;  ///< Enqueue counter (guarded by m_mx).
     std::vector<result>     m_results;
     int                     m_inflight = 0; ///< Jobs enqueued whose results have not landed (guarded by m_mx).
     bool                    m_quit = false;
@@ -235,6 +255,7 @@ private:
     float         m_neigh_rect[4] = { 0, 0, 0, 0 }; ///< Canonical x0, y0, x1, y1 of the ready page.
     bool          m_neigh_ready  = false;
     bool          m_neigh_queued = false;
+    std::uint32_t m_neigh_job_gen = 0;   ///< Generation of the outstanding neighbourhood job.
     static constexpr double k_neigh_px_per_r = 48.0;
 
     void  note_bake(int tier, double ms); ///< Accumulates m_stats; caller holds m_mx.
@@ -242,5 +263,18 @@ private:
 
     static constexpr int    k_chunk_px      = 512;
     static constexpr double k_far_px_per_r  = ui::ground::k_far_ppr;
-    static constexpr int    k_max_queued    = 6; ///< Outstanding jobs cap — keeps the queue near the viewport.
+    /// WAITING-jobs cap = pool size + this: deep enough that no worker idles
+    /// between ticks, shallow enough to keep the queue near the viewport.
+    static constexpr int    k_queue_slack   = 2;
+
+    // Fill timing (off by default): IO_GROUND_FILL_LOG=1 prints, per rung
+    // change, the wall time until the active tier covers the viewport, and per
+    // body switch the time until the far page lands. IO_GROUND_BENCH=1 also
+    // runs the pool path under --verify, so a script can drive the rungs.
+    using clock = std::chrono::steady_clock;
+    bool              m_fill_pending = false;
+    clock::time_point m_fill_t0{};
+    std::uint64_t     m_fill_bakes0 = 0;
+    bool              m_far_pending = false;
+    clock::time_point m_far_t0{};
 };
