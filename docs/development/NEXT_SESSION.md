@@ -341,6 +341,10 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   to 42; app BUILD_OK; sea_port_gate 95/0; save_roundtrip OK. Live look at a sea-route convoy
   still owed. Note: a body-pool convoy records source_market null (not the body); lane falls back
   to origin_tile. R2 must renumber to v43 at its merge.
+  **G1b MERGED:** 30224883 R1+R2 (fix round bcc4cfed: play-form/shared-charge/rescue rows
+  mutation-checked, background_fill hashed, run_contend fixed, generation skips razed/unpriced —
+  numbers unchanged; save renumbered 45 -> 43), 39907baf R3 (components.hpp comment conflict
+  resolved). Building + integrated 16-seed gate next. Save stack now v39-v43 sequential.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
