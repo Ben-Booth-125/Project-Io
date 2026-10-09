@@ -95,7 +95,39 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   merge (same function). **DIALHOLD DONE** (c0dde0d3, branch worktree-agent-a1b28029261a2f580;
   in cold review): G1 71.4 -> 80.1 handoff, t50 61.6 -> 61.9, G1b 12.8 -> 14.6 (worse), G2 75.8,
   G3 98.1; of the 503, 319 run at handoff / 262 at t50; history_sim R3a2/R3a3 fail on the base
-  too (pre-existing). The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
+  too (pre-existing). **MERGED 3bca733a** after a clean cold review (probe hunk dropped, tip's kept);
+  app builds. Review raised NR-986 (seat inherits dial-zeroed plants at 0 — back to auto?). **D3+D4
+  lane (dial reads build bid + base forecast; rescue unpriced = floored) launched** on the merged tip.
+  **PROPELLANT DONE** (01bd8b63, branch worktree-agent-a14f239f7a0f14bad, base bd1cd032; in cold
+  review): base 41.8 (electrolysis route, 2x(inputs+0.75 wage)+0.1; atmospheric anchor would be
+  64.0 — Ben's call). Alone: G1 71.4 -> 73.2, t50 61.6 -> 59.8, G1b 13.5. Generation now builds far
+  fewer propellant plants (166 -> 17); unpriced-zeroed 102 -> 0. Open: launch propellant is not
+  reserved, so clearing sells the pool each tick (unmeasured — call); PRODUCTION ~494 stale line.
+  **COLD REVIEW: HELD.** 41.8 correct by the doc (64.0 is not what the doc says); merges clean.
+  SEVERE: auto-surplus (`market_clearing.cpp` ~1491-1511) now lists the whole pool every clear
+  (`processor_reservation` ~228 reserves recipe inputs only), so the launch burn
+  (`supply_system.cpp:356`) sees 0 — the player's `dispatch_convoy` on a space lane is always
+  rejected; breaks ACTIONS dispatch_convoy, PRODUCTION Launchpad ~489-495, ERAS:294 reserve gate.
+  Fix options to Ben: (a) reserve launch propellant for a pad's pool (Full, clearing seam) /
+  (b) launch burn buys from the shelf / (c) accept + rewrite docs. Also: electrolysis (the
+  "airless" route) is cheapest everywhere — nothing gates it to airless bodies (inverts PRODUCTION
+  :280). Merge note must say "world-moving". **Propellant form sent to Ben** (launch fuel a/b/both/
+  drop; gate electrolysis to airless; NR-986 seat back to auto).
+  **D3+D4 DONE** (d0ac1de7, 11acaf69, branch worktree-agent-a472a14f8f39f276e; in cold review):
+  base 80.1/61.9/14.6/75.8 -> D3 81.4/63.7/13.9/72.9 -> D3+D4 83.0/67.7/15.6/69.7 (G1/t50/G1b/G2).
+  Steel zeroings at -11 unchanged (48) — listed opening stock still reads as glut; D5 owns it. D4:
+  switches into propellant 144 -> 0.
+  **D7 DONE, probe merged f98d43df** (`starve_trace_probe.cpp`, shipped code): of 665 lost by t50,
+  386 starved. Causes: ceiling-silenced while shelf holds 105 (symptom of drawdown); background pull
+  55+12 (ruled cost; cf pull-off G1t50 -1.4, net positive); households 25+20 (ruled); other
+  processors 38; opening stock ran out 61 (D5/D6 may move); stock held in other pools unlisted 42
+  (reservation vs order floor unsplit); upstream died 18. Ceiling-off cf: -8.0. STEEL root: a
+  background-firm CONSTRUCTION BOOM — 725 sites drawing steel on 33 starving markets at t50, 701
+  background-owned (ports/hubs 264, food 181, fuel 79...); site need 373/tick vs processors 35.
+  Copper ore: dispatcher "would send" 36/47 yet arrivals ~8/tick (undelivered hauls — SUPPLY,
+  untested). Making builds read steel scarcity = NEW GRANT. 155 inputs>=revenue: 80 underwater at
+  tick 1 (35 unpriced propellant), input side dominates.
+  The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
 

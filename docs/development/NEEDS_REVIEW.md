@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*89 entries — 11 open, 78 resolved.*
+*90 entries — 11 open, 79 resolved.*
 
 ---
 
@@ -1457,4 +1457,11 @@ BL-1197 round 2 (no fallback for water-gap firms) cost seeds 0 and 43 their allo
 MARKETS.md said electronics "left" the background basket when the metropolis rung of the household ladder took it (Ben, 2026-09-15). That rung was BL-996 (stratum demand ladder), cancelled unmerged on 2026-09-16, so no household bids electronics; the BL-1226 lane removed it from the basket to match the doc, which would have left electronics with almost no final buyer (only the Assembly Plant feeding militia-only spacecraft components) and shifted generation's body_demand. TAKEN: kept electronics in the stopgap (what the code always did) and reworded MARKETS.md to "leaves it when the metropolis rung takes it, and not before". Reversible. Your call if instead you want BL-996 revived, or electronics retired some other way.
 
 > **RESOLVED.** Ben, 2026-10-07 (the path form): keep electronics in the stopgap, as now.
+
+### NR-986 — Question: should the player's seat get its dial-zeroed plants back on auto at the handoff? (BL-1235)
+*question · raised 2026-10-09 · from cold review of the BL-1235 (dial hold outlasts reflex) merge 3bca733a, sprint 50*
+
+With BL-1235 a plant the scorer's dial zeroed in the settle is no longer mothballed; it reaches the handoff with workforce_auto off and target 0. On the corp the player takes, the scorer and the reflex stop acting, and the player's auto-solver skips it (workforce_auto off), so nothing re-raises it until the player touches each plant. Before, the same plants arrived mothballed, which also needed a player action - not a regression in kind, but it bears on G1 (plants running at handoff) for the seat. CALL: hand the seat's dial-zeroed plants back to auto at the handoff (workforce_auto on), or leave them as the rival left them?
+
+> **RESOLVED.** Ben, 2026-10-09 (propellant form): yes - the seat's dial-idled plants return to auto at the handoff. Written into AI_OPPONENT.md beside BL-1235.
 
