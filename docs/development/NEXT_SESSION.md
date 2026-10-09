@@ -248,7 +248,13 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   s50_int_b.txt (pool by hand). Owed: Build-door live click (Kepler tile: no electrolysis row);
   ai_skill R5 (rivals build 0 processors on the legacy harness world after D5 — check rival
   processor builds in play on the real seeds); holdless non-player roster corp on legacy worlds
-  (decide: accept as NR decision).
+  (decide: accept as NR decision). -> NR-988 filed (accepted, reversible).
+  **INTEGRATED 16-SEED GATE (2aeb48ef, pooled by hand from s50_int_a/b):** G1 **87.5 PASS**
+  (2391/2732), G1t50 68.9 (3021/4384; deferred), G1b **11.5 FAIL** (314/2732: 170 starved now, 144
+  decommissioned after starving), G2 **91.0 PASS**, G3 **97.3 PASS** (2341/2407); play income 48,805
+  per seed-tick. Running at handoff ~unchanged vs wave-2b start (2393 -> 2391); built fell 3351 ->
+  2732. Rivals DO build processors in play on real seeds (built 2732 -> 4384 by t50), so ai_skill
+  R5's zero is the legacy harness world only. Next: Ben on G1b; Build-door live click owed.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
