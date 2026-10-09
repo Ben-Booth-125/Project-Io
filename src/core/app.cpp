@@ -824,6 +824,7 @@ void app::poll_worldgen()
 
     // --- The finished world: adopted from the wizard, or the cold worker's ---
     std::shared_ptr<wizard_world_cache> built;
+    const bool adopted = m_worldgen_adopted;
     if (m_worldgen_adopted)
     {
         m_worldgen_adopted = false;
@@ -892,18 +893,17 @@ void app::poll_worldgen()
     m_registry               = std::move(built->registry);
     m_landscape_winner_score = built->finish.search.winner_score;
     // BL-1246 (STARTUP.md § Handoff): the world is finished. On the wizard's
-    // round-6 path the home master has been baking since round 6 landed
-    // (start_ground_prebake, from the cache this IS); on the cold path it
-    // starts now. Either way it bakes behind the seat canvas.
-    const bool prebaked = m_ground_prebake_token != nullptr
-                       && m_ground_prebake_token == static_cast<const void*>(built.get());
+    // path the home master has been baking since the Life round, re-taking
+    // its source at every round boundary; adoption is the last boundary (the
+    // world is the main thread's now, survey state and all), so only what the
+    // tail and the settle changed re-bakes. On the cold path it starts now.
+    // Either way the rest bakes behind the seat canvas.
     built.reset();
-    m_ground_prebake_token = nullptr;
+    const bool prebaked = adopted && m_ground_prebake_wizard
+                       && m_ground.resnapshot(m_world, /*assume_surveyed=*/false);
+    m_ground_prebake_wizard = false;
     if (!prebaked)
-    {
-        m_ground.forget_world();
-        start_ground_prebake(m_world, nullptr);
-    }
+        start_ground_prebake(m_world, /*wizard=*/false);
     m_ground_world_live = true;
     pin_nation_colours_from_report(); // BL-1089: the realms' colours, before the first frame
     start_new_game_prelude();
@@ -1036,21 +1036,63 @@ void app::draw_building_screen()
 }
 
 /// BL-1246 (STARTUP.md § Handoff): start the home body's ground master on the
-/// pool, from @p w — the wizard's cached round-6 world the moment it lands
-/// (@p token = that cache, so Begin's adoption can tell the bake is its own),
-/// or the adopted world on the cold path (@p token null). The live app only.
-void app::start_ground_prebake(const world& w, const void* token)
+/// pool, from @p w — the wizard's Life-round gate world the moment it is held
+/// (@p wizard: every later round boundary re-snapshots it, and Begin's
+/// adoption keeps it), or the cold path's built world. The live app only.
+///
+/// THE RACE AUDIT (the pre-bake runs for minutes beside the round workers):
+///  - A source snapshot (`prepare_source`) is taken ONLY on the main thread,
+///    and only from a world no worker writes: a round's landed slot
+///    (m_wiz_slot[k], which every later worker COPIES from and never writes),
+///    round 6's landed cache (its future consumed), or m_world after adoption.
+///  - The cadence snapshot cannot fire before play: m_ground_world_live is
+///    false from here until adoption, so pump() is handed no world.
+///  - The bake workers read only the immutable, shared-const snapshot; they
+///    never see a world.
+void app::start_ground_prebake(const world& w, bool wizard)
 {
     if (!m_ground_prebake_on || m_ground_bake_all)
         return;
     m_ground.forget_world();
     m_ground.registry = &m_registry;
-    m_ground.prebake(w, w.home_body);
-    m_ground_prebake_token = token;
-    if (token)
+    // The wizard's worlds carry no survey state until the finish runs
+    // init_survey_states; the home body is always surveyed in play, so its
+    // master is baked unmasked -- what play will show, hash for hash.
+    m_ground.prebake(w, w.home_body, /*assume_surveyed=*/wizard);
+    m_ground_prebake_wizard = wizard;
+    if (wizard)
         m_ground_world_live = false; // the app's m_world is not this world yet
     std::printf("[ground] pre-bake of the home master started (%s)\n",
-                token ? "the wizard's round-6 world" : "the adopted world");
+                wizard ? "the Life round's gate world" : "the built world");
+    std::fflush(stdout);
+}
+
+void app::ground_round_boundary(const world& w, const char* what)
+{
+    if (!m_ground_prebake_on || m_ground_bake_all)
+        return;
+    if (!m_ground_prebake_wizard)
+    {
+        start_ground_prebake(w, /*wizard=*/true);
+        return;
+    }
+    std::printf("[ground] round boundary: %s\n", what);
+    std::fflush(stdout);
+    if (!m_ground.resnapshot(w, /*assume_surveyed=*/true))
+    {
+        std::printf("[ground] the homeworld changed identity: the master starts again\n");
+        std::fflush(stdout);
+        start_ground_prebake(w, /*wizard=*/true);
+    }
+}
+
+void app::drop_wizard_ground(const char* why)
+{
+    if (!m_ground_prebake_wizard)
+        return;
+    m_ground.forget_world();
+    m_ground_prebake_wizard = false;
+    std::printf("[ground] the wizard's pre-bake is dropped: %s\n", why);
     std::fflush(stdout);
 }
 
@@ -1091,7 +1133,7 @@ void app::draw_painting_screen()
     }
     ImGui::End();
 
-    if (total == 0 || ready >= total)
+    if (total == 0 || m_ground.master_current(m_world.home_body))
     {
         std::printf("[begin] the ground is painted (%d chunks) after a %.1f s wait: play opens\n",
                     total,
@@ -1545,7 +1587,10 @@ void app::finish_new_game()
     // Before the clock rebase below, so the wait never lands as game days.
     int paint_ready = 0, paint_total = 0;
     m_ground.master_progress(m_world.home_body, paint_ready, paint_total);
-    if (m_ground_prebake_on && !m_ground_bake_all && paint_total > 0 && paint_ready < paint_total)
+    // Current, not merely complete: the adoption's snapshot may still be
+    // sweeping, and a chunk it moves is not painted until it re-bakes.
+    if (m_ground_prebake_on && !m_ground_bake_all && paint_total > 0
+        && !m_ground.master_current(m_world.home_body))
     {
         if (m_screen != app_screen::painting_ground)
         {
@@ -1557,6 +1602,19 @@ void app::finish_new_game()
             std::fflush(stdout);
         }
         return;
+    }
+    if (m_ground_prebake_on && !m_ground_bake_all && paint_total > 0)
+    {
+        // The pre-bake's whole cost, said once as play opens: master chunk
+        // bakes, and how many of them were re-bakes a round boundary forced.
+        const ground_layer::bake_stats& bs = m_ground.bake_counters();
+        std::printf("[begin] the ground is painted: %s; %llu master chunk bakes for %d chunks "
+                    "(%llu re-bakes)\n",
+                    m_screen == app_screen::painting_ground ? "after the wait above"
+                                                            : "no wait at the seat",
+                    static_cast<unsigned long long>(bs.chunk_bakes), paint_total,
+                    static_cast<unsigned long long>(bs.chunk_rebakes));
+        std::fflush(stdout);
     }
     // THE BALANCE SERIES FROM THE RETURNS THE SETTLE FILED (STARTUP.md
     // § Handoff, item 2; BL-1085). The twelve pre-game ticks ran inside the
@@ -2189,7 +2247,7 @@ bool app::load_game_from(const std::string& path)
     }
 
     m_ground.forget_world(); // BL-1246: another world's masters are not this one's
-    m_ground_prebake_token = nullptr;
+    m_ground_prebake_wizard = false;
     m_ground_world_live    = true;
     m_world               = std::move(w);
     m_generation_report   = std::move(env.report);

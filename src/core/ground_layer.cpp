@@ -114,6 +114,16 @@ void ground_layer::run_job(const job& j, result& d, double* level_ms)
         d.hash = gb::region_hash(*j.src, j.geom, j.px0, j.py0, j.pw, j.ph);
         if (level_ms)
             level_ms[0] = ms_since(t0);
+        // A master chunk normally bakes in well under a second; one far past
+        // that is a worker held off the CPU (the pool runs below normal
+        // priority) or a pathological window — either way it is the wait's
+        // tail, so the fill log names it.
+        if (fill_log_on() && ms_since(t0) > 1500.0)
+        {
+            std::printf("GROUND_FILL slow chunk %d (px %d,%d): %.0f ms\n", j.idx, j.px0, j.py0,
+                        ms_since(t0));
+            std::fflush(stdout);
+        }
         // The mip pieces: this chunk's share of every coarser level, each a
         // box-downsample of the one above (sides are multiples of 16).
         int lw = j.pw, lh = j.ph;
@@ -302,7 +312,7 @@ ground_layer::body_state* ground_layer::ensure_body(const world& w, entity_id id
 void ground_layer::refresh_source(body_state& b, const world& w)
 {
     b.src = std::make_shared<const gb::bake_source>(
-        gb::prepare_source(w, b.id, /*reveal_all=*/false, registry));
+        gb::prepare_source(w, b.id, b.reveal_all, registry));
     ++b.src_epoch;
     b.src_age = 0;
     // The whole-body digest (the far page's hash): when it holds still,
@@ -312,6 +322,13 @@ void ground_layer::refresh_source(body_state& b, const world& w)
     {
         m_rebake_pending = true;
         m_rebake_t0 = clock::now();
+    }
+    if (dg != b.src_digest && fill_log_on() && b.n_ready > 0)
+    {
+        std::printf("GROUND_FILL source moved: body %u frame %llu (%d of %d ready)\n",
+                    static_cast<unsigned>(b.id), static_cast<unsigned long long>(m_frame),
+                    b.n_ready, b.n_chunks);
+        std::fflush(stdout);
     }
     b.src_digest = dg;
 }
@@ -391,6 +408,7 @@ void ground_layer::forget_world()
     m_bodies.clear();
     m_active = null_entity;
     m_prebake = null_entity;
+    m_boundary_log = false;
     m_in_play = false;
     m_view_valid = false;
     m_publish_level = -1;
@@ -408,11 +426,16 @@ void ground_layer::forget_world()
     m_neigh_upload = false;
 }
 
-void ground_layer::prebake(const world& w, entity_id body)
+void ground_layer::prebake(const world& w, entity_id body, bool assume_surveyed)
 {
     body_state* b = ensure_body(w, body);
     if (!b)
         return;
+    if (b->reveal_all != assume_surveyed)
+    {
+        b->reveal_all = assume_surveyed;
+        refresh_source(*b, w);
+    }
     m_prebake = body;
     b->last_visit = m_frame;
     make_room(master_bytes(*b), body, m_active);
@@ -438,6 +461,56 @@ bool ground_layer::master_complete(entity_id body) const
 {
     const body_state* b = find(body);
     return b && b->n_chunks > 0 && b->n_ready >= b->n_chunks;
+}
+
+bool ground_layer::master_current(entity_id body) const
+{
+    const body_state* b = find(body);
+    return b && b->n_chunks > 0 && b->n_ready >= b->n_chunks && b->sweep_job == 0
+        && b->swept_digest == b->src_digest;
+}
+
+bool ground_layer::resnapshot(const world& w, bool assume_surveyed)
+{
+    body_state* b = find(m_prebake);
+    if (!b)
+        return false;
+    const auto bit = w.bodies.find(b->id);
+    if (bit == w.bodies.end() || bit->second.grid_width != b->gw
+        || bit->second.grid_height != b->gh)
+        return false; // the homeworld is not this one any more
+    const std::uint64_t before = b->src_digest;
+    const std::shared_ptr<const gb::bake_source> old_src = b->src;
+    b->reveal_all = assume_surveyed;
+    refresh_source(*b, w);
+    if (fill_log_on() && old_src && b->src && b->src_digest != before)
+    {
+        // What the boundary moved, per source field, in tiles.
+        const gb::bake_source& o = *old_src;
+        const gb::bake_source& n = *b->src;
+        const auto diff = [](const auto& x, const auto& y) {
+            if (x.size() != y.size()) return -1;
+            int c = 0;
+            for (std::size_t i = 0; i < x.size(); ++i) c += !(x[i] == y[i]);
+            return c;
+        };
+        std::printf("GROUND_FILL boundary diff (tiles): cls %d colour %d height %d cover %d "
+                    "density %d landform %d river_in %d family %d vparam %d installations %zu -> %zu\n",
+                    diff(o.cls, n.cls), diff(o.colour, n.colour), diff(o.height, n.height),
+                    diff(o.cover, n.cover), diff(o.density, n.density), diff(o.landform, n.landform),
+                    diff(o.river_in, n.river_in), diff(o.family, n.family), diff(o.vparam, n.vparam),
+                    o.inst.list.size(), n.inst.list.size());
+        std::fflush(stdout);
+    }
+    if (b->src_digest != before)
+        m_boundary_log = true; // name the sweep this boundary causes
+    std::printf("[ground] round-boundary snapshot of body %u: %s (%d of %d master chunks landed)\n",
+                static_cast<unsigned>(b->id),
+                b->src_digest == before ? "unchanged, nothing re-bakes" : "moved, sweeping",
+                b->n_ready, b->n_chunks);
+    std::fflush(stdout);
+    feed(/*verify=*/false);
+    return true;
 }
 
 void ground_layer::touch()
@@ -611,13 +684,25 @@ void ground_layer::land(result& d, bool sync)
         b.want_hash = std::move(d.hashes);
         b.hashes_epoch = d.epoch;
         b.swept_digest = d.hash;
-        int n_ready = 0;
+        int n_ready = 0, n_dirty = 0, n_unbaked = 0;
         for (int i = 0; i < b.n_chunks; ++i)
         {
             b.dirty[i] = b.ready[i] && b.baked_hash[i] != b.want_hash[i];
             n_ready += b.ready[i] && !b.dirty[i];
+            n_dirty += b.dirty[i];
+            n_unbaked += !b.ready[i];
         }
         b.n_ready = n_ready;
+        // A round boundary's own sweep (resnapshot): say what it costs. Only
+        // the sweep against the CURRENT snapshot -- an older one in flight
+        // when the boundary came lands first and is superseded.
+        if (m_boundary_log && b.id == m_prebake && d.hash == b.src_digest)
+        {
+            m_boundary_log = false;
+            std::printf("[ground] boundary sweep: %d of %d master chunks moved and re-bake "
+                        "(%d not yet baked at all)\n", n_dirty, b.n_chunks, n_unbaked);
+            std::fflush(stdout);
+        }
         return;
     }
     case job_kind::master:
@@ -889,7 +974,11 @@ void ground_layer::pump(const world* wp, bool verify)
     if (!wp)
     {
         // The pre-bake runs from a world the app does not yet hold (the
-        // wizard's cached round-6 world): keep the pool fed, read nothing.
+        // wizard's rounds, each moving the world forward on its own worker):
+        // keep the pool fed, read nothing. NO CADENCE SNAPSHOT HERE -- a
+        // round worker may be mutating the world it would read; the app
+        // re-takes the source only at a round boundary (resnapshot), on the
+        // main thread, from a world no worker holds.
         if (!verify)
             feed(/*verify=*/false);
         return;
