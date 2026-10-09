@@ -176,7 +176,12 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   6deacb4a (incl. merged BL-1235): 82.9/66.9/15.7/73.3. Commit 2 (route gate) BLOCKED: no atmosphere
   on body_component — main session chose option A (copy atmosphere_class onto body_component, SAVE
   v41), price 64.0, recipe_margin anchors on the air route; agent resumed. Save order: v39 D5, v40
-  D3, v41 PROPELLANT.
+  D3, v41 PROPELLANT. Airless = atmosphere class none|thin (planetology's own reading; PRODUCTION
+  f8b48923); test worlds default moderate.
+  **BEN RULED (2026-10-09, dial form; 3c0bd8a2):** dial NARROWED to posted demand + stock-fed running
+  draws (AI_OPPONENT § 11 rewritten; § 2B sentence); **G1 at t50 and all long-term viability work
+  DEFERRED** (sprint row done_when, SKILL.md, REFINED). D3 agent resumed with the narrowed rework.
+  Owed: one backlog item for the deferred findings (next_id running in background).
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
