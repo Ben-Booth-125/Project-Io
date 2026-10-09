@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*91 entries — 12 open, 79 resolved.*
+*92 entries — 13 open, 79 resolved.*
 
 ---
 
@@ -150,6 +150,11 @@ Your ruling: unpowered grids first - every short grid gets a plant before any ge
 *decision · raised 2026-10-09 · from cold re-review of the BL-1217 D3 round 3 (a37f2099), sprint 50*
 
 Your ruling: the dial forecasts at base 'only on a market that has never cleared'; the build veto takes the same 'no clear yet: no signal' reading. Both now read market_has_cleared from fields only the clear writes (supply, demand, hauler_want) - fixing a real hole where a market spawned mid-step read as cleared. TAKEN: kept the state proxy. Gap: a market that HAS cleared but is wholly dead (no supply, demand or silenced want on any good) reads 'never cleared' again, so the veto gives no signal and the dial forecasts at base there - the old test had the same gap. Practically unreachable today (off-world markets get interbody demand; home markets carry people). Reversible: a set-once first-clear tick on the market would close it exactly, at the cost of a saved field (another save bump).
+
+### NR-988 — Decision taken on your behalf: a non-player roster corporation left with no holdings stays on legacy and no-budget worlds (BL-1217 D6)
+*decision · raised 2026-10-09 · from the BL-1217 D5/D6 harness audit, sprint 50*
+
+Your rulings bound every processor by want and unplace a recipe-less processor whose default output is unwanted. On the LEGACY landscape apply (no budget, refused budget or no specialists) that leaves 1 non-player roster corporation with no holdings (2 in two cases); the budget path - every shipped campaign - removes the roster right after, and the player is never left holdless. TAKEN: leave the holdless corporation as is (it holds cash and a seat in the roster, acts on nothing). Reversible: remove a non-player roster corporation that ends generation with no holdings.
 
 ---
 
