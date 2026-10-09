@@ -362,6 +362,9 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   fails both (153 parallels, t50 84.3). Income swings are the start cascade (market folds read the
   road field: seed 43 15 -> 16 markets), not dearer hauls (+0.6%, travel ticks unchanged). NR-989
   novelty filed. Cold review running; merge after.
+  BL-1252 review: no correctness bug; gaps — doc overclaims "no second road" (47 left), snap uses
+  tile counts not the cost model and is unbounded (3x snake possible), double-visit, g_last_laid
+  not thread_local, stale comment, kSnapRun unused. Tidy round sent (cost-bounded snap).
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
