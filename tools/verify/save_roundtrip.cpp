@@ -130,7 +130,8 @@ int main()
         w.markets.at(hh_market).hauler_want[hh_food]      = 9.625f;
         w.markets.at(hh_market).unposted_bid[hh_food]      = 4.875f; // BL-1227
         w.markets.at(hh_market).unposted_bid_tick[hh_food] = 1234;   // BL-1227
-        w.markets.at(hh_market).unposted_rate[hh_food]     = 1.625f; // BL-1217 D3 fix
+        w.markets.at(hh_market).dial_pool_draw[hh_food]      = 1.625f; // BL-1217
+        w.markets.at(hh_market).dial_pool_draw_tick[hh_food] = 4321;   // BL-1217
     }
 
     // BL-614: same treatment for the building record's newest field — the
@@ -292,8 +293,9 @@ int main()
     {
         const auto mit = loaded.markets.find(hh_market);
         check(read_ok && mit != loaded.markets.end()
-                  && mit->second.unposted_rate[hh_food] == 1.625f,
-              "P1 market unposted_rate (BL-1217 D3 fix, world_save_version 40) round-trips at its written value");
+                  && mit->second.dial_pool_draw[hh_food] == 1.625f
+                  && mit->second.dial_pool_draw_tick[hh_food] == 4321,
+              "P1 market dial_pool_draw / dial_pool_draw_tick (BL-1217, world_save_version 40) round-trip at their written values");
     }
 
     // BL-614: likewise for the wage bid.

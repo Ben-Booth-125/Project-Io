@@ -742,29 +742,38 @@ std::vector<extraction_trace_row>*& corp_extraction_trace_sink()
     return sink;
 }
 
+entity_id running_consumer_market(const world& w, const recipe_registry& reg,
+                                  const building_report& br, float* runs_out)
+{
+    if (br.type != building_type::processing_facility || !br.active || !(br.output_quantity > 0.0f))
+        return null_entity;
+    const auto bit = w.buildings.find(br.building);
+    if (bit == w.buildings.end() || bit->second.decommissioned || bit->second.ticks_remaining > 0)
+        return null_entity;
+    const recipe* rc = reg.get_recipe(br.recipe);
+    if (rc == nullptr)
+        return null_entity;
+    float total_out = 0.0f;
+    for (const float o : rc->outputs)
+        total_out += o;
+    if (!(total_out > 0.0f))
+        return null_entity;
+    if (runs_out != nullptr)
+        *runs_out = br.output_quantity / total_out;
+    return market_for_tile(w, bit->second.tile);
+}
+
 market_good_draw running_consumer_draws(const world& w, const recipe_registry& reg,
                                         const economy_report& report)
 {
     market_good_draw out;
     for (const building_report& br : report.buildings)
     {
-        if (br.type != building_type::processing_facility || !br.active || !(br.output_quantity > 0.0f))
-            continue;
-        const auto bit = w.buildings.find(br.building);
-        if (bit == w.buildings.end() || bit->second.decommissioned || bit->second.ticks_remaining > 0)
-            continue;
-        const recipe* rc = reg.get_recipe(br.recipe);
-        if (rc == nullptr)
-            continue;
-        float total_out = 0.0f;
-        for (const float o : rc->outputs)
-            total_out += o;
-        if (!(total_out > 0.0f))
-            continue;
-        const float     runs = br.output_quantity / total_out;
-        const entity_id mid  = market_for_tile(w, bit->second.tile);
+        float           runs = 0.0f;
+        const entity_id mid  = running_consumer_market(w, reg, br, &runs);
         if (mid == null_entity)
             continue;
+        const recipe* rc = reg.get_recipe(br.recipe);
         for (std::size_t r = 0; r < resource_count; ++r)
             if (rc->inputs[r] > 0.0f)
                 out[std::make_pair(mid, r)] += rc->inputs[r] * runs;

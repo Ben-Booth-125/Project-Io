@@ -1093,17 +1093,17 @@ struct market_component
     /// through `note_unposted_bid`.
     std::array<float, resource_count>   unposted_bid      = {};
     std::array<int32_t, resource_count> unposted_bid_tick = {};
-    /// BL-1217 (D3 fix; AI_OPPONENT.md § 11, the dial reads the build bid "exactly
-    /// as it weighs demand today"): the part of `unposted_bid` that is a fresh
-    /// per-tick want no other register already carries — the RATE the workforce
-    /// dial reads as a bid. A running processor's draw counts only its POOL-fed
-    /// part (its shelf-fed want is already in `demand` / `hauler_want`), and a
-    /// procurement contract counts its remaining quantity over its remaining lead
-    /// ticks (`unposted_bid` carries the whole contract on every tick, which the
-    /// veto only tests for > 0). Every other source records its quantity whole.
-    /// Shares `unposted_bid_tick` and the hold; always <= `unposted_bid`.
-    /// SERIALISED (world_save_version 40). Written only through `note_unposted_bid`.
-    std::array<float, resource_count>   unposted_rate     = {};
+    /// BL-1217 (AI_OPPONENT.md § 11, the dial's buyer signal, Ben 2026-10-09 as
+    /// narrowed): what RUNNING processors on this market drew from their
+    /// owners' POOLS on the tick `dial_pool_draw_tick[r]`, EXCLUDING any unit
+    /// the same processor also posted as demand (economy_system.cpp,
+    /// `proc_dial_draw`). The workforce dial reads posted `demand` plus this,
+    /// held for the scorer's cadence, and nothing else. ONE WRITER: the economy
+    /// step, once per tick, right after the production pass
+    /// (`note_dial_pool_draws`) — a key it does not rewrite keeps its last
+    /// record and ages out of the hold. SERIALISED (world_save_version 40).
+    std::array<float, resource_count>   dial_pool_draw      = {};
+    std::array<int32_t, resource_count> dial_pool_draw_tick = {};
 
     /// BL-1217 lever D (measurement, behind `economy.background_demand.consumes`,
     /// default off): the BACKGROUND channel's bid at the last clear
@@ -1131,30 +1131,17 @@ struct market_component
 /// BL-1227: record @p quantity of good @p r as an unposted bid on @p m at econ
 /// tick @p tick (see market_component::unposted_bid). Same-tick records add; the
 /// first record of a later tick overwrites. Non-positive quantities are ignored.
-/// @p rate (BL-1217 D3 fix) is the part of @p quantity the dial reads as a fresh
-/// per-tick bid (`market_component::unposted_rate`), clamped to [0, quantity];
-/// the four-argument form records the whole quantity as the rate.
-inline void note_unposted_bid(market_component& m, std::size_t r, float quantity, int tick,
-                              float rate)
+inline void note_unposted_bid(market_component& m, std::size_t r, float quantity, int tick)
 {
     if (!(quantity > 0.0f))
         return;
-    const float rt = std::clamp(rate > 0.0f ? rate : 0.0f, 0.0f, quantity);
     if (m.unposted_bid_tick[r] == tick && m.unposted_bid[r] > 0.0f)
-    {
-        m.unposted_bid[r]  += quantity;
-        m.unposted_rate[r] += rt;
-    }
+        m.unposted_bid[r] += quantity;
     else
     {
         m.unposted_bid[r]      = quantity;
-        m.unposted_rate[r]     = rt;
         m.unposted_bid_tick[r] = tick;
     }
-}
-inline void note_unposted_bid(market_component& m, std::size_t r, float quantity, int tick)
-{
-    note_unposted_bid(m, r, quantity, tick, quantity);
 }
 
 /// BL-1227: is an unposted bid on good @p r held at econ tick @p tick — recorded
@@ -1169,28 +1156,34 @@ inline bool unposted_bid_held(const market_component& m, std::size_t r, int tick
 }
 
 /// THE COMPOSITE BID for good @p r on market @p m at econ tick @p tick — what
-/// counts as a bid (AI_OPPONENT.md § 2B, Ben 2026-10-07/08): the posted
-/// `demand`, PLUS the want the fair-price ceiling silenced (`hauler_want`),
-/// PLUS the unposted bid held for @p hold_ticks (off-book want, pool-fed launch
-/// fuel and upkeep, what running processors consume). One definition, read by
-/// the build veto (corp_ai.cpp, `zero_bid_veto`) and — by the grant "the
-/// workforce dial may read the build veto's composite bid" (AI_OPPONENT.md
-/// § 11, Ben 2026-10-09, BL-1217) — as the background workforce dial's buyer
-/// signal (`solve_workforce_target`). The plant's own market only: no pooling.
-///
-/// BL-1217 (D3 fix): the two readers ask different questions of the same
-/// sources. The veto asks only whether a bid EXISTS (`bid_reading::presence`,
-/// the held `unposted_bid`); the dial weighs the bid's MAGNITUDE against supply,
-/// so it reads each want once, at a per-tick rate (`bid_reading::rate`, the held
-/// `unposted_rate`) — a shelf-fed processor's want is already in `demand`.
-enum class bid_reading { presence, rate };
-inline float composite_bid(const market_component& m, std::size_t r, int tick, int hold_ticks,
-                           bid_reading reading = bid_reading::presence)
+/// counts as a bid for the BUILD VETO (AI_OPPONENT.md § 2B, Ben 2026-10-07/08):
+/// the posted `demand`, PLUS the want the fair-price ceiling silenced
+/// (`hauler_want`), PLUS the unposted bid held for @p hold_ticks (off-book
+/// want, pool-fed launch fuel and upkeep, what running processors consume).
+/// The veto reads it for PRESENCE only (corp_ai.cpp, `zero_bid_veto`).
+inline float composite_bid(const market_component& m, std::size_t r, int tick, int hold_ticks)
 {
     float bid = std::max(0.0f, m.demand[r]) + std::max(0.0f, m.hauler_want[r]);
     if (unposted_bid_held(m, r, tick, hold_ticks))
-        bid += (reading == bid_reading::rate) ? std::max(0.0f, m.unposted_rate[r])
-                                              : m.unposted_bid[r];
+        bid += m.unposted_bid[r];
+    return bid;
+}
+
+/// THE DIAL'S BID for good @p r on market @p m at econ tick @p tick
+/// (AI_OPPONENT.md § 11, Ben 2026-10-09 as narrowed; BL-1217): posted
+/// `demand` PLUS what running processors drew from their owners' pools and
+/// did not also post as demand (`dial_pool_draw`), held for @p hold_ticks —
+/// and nothing else: no procurement, space programme, launch fuel, upkeep,
+/// nation want or silenced want. The plant's own market only. Read by the
+/// background workforce dial (`solve_workforce_target`) as its buyer signal,
+/// weighed against supply exactly as demand is.
+inline float dial_bid(const market_component& m, std::size_t r, int tick, int hold_ticks)
+{
+    float bid = std::max(0.0f, m.demand[r]);
+    // Never read AHEAD (as unposted_bid_held): a record dated after `tick`.
+    if (m.dial_pool_draw[r] > 0.0f && tick >= m.dial_pool_draw_tick[r]
+        && tick - m.dial_pool_draw_tick[r] <= hold_ticks)
+        bid += m.dial_pool_draw[r];
     return bid;
 }
 
@@ -1212,6 +1205,17 @@ inline bool market_has_cleared(const market_component& m, int tick)
             || m.unposted_bid[g] > 0.0f)
             return true;
     return false;
+}
+
+/// BL-1217 (AI_OPPONENT.md, "The dial forecasts at base where no fact exists
+/// yet", Ben 2026-10-09): does the background dial forecast good @p r at its
+/// BASE price? Only where the market lists none of it, the dial's bid
+/// (`dial_bid`) is zero, AND the market has never cleared — the build veto's
+/// own "no clear yet: no signal". One definition for the solver and its probe.
+inline bool dial_forecasts_at_base(const market_component& m, std::size_t r, int tick, int hold_ticks)
+{
+    return !(m.supply[r] > 0.0f) && !(dial_bid(m, r, tick, hold_ticks) > 0.0f)
+        && !market_has_cleared(m, tick);
 }
 
 /// BL-1227: one off-book WANT a state purchase derivation recorded — what a

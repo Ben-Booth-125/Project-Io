@@ -353,16 +353,15 @@ inline constexpr uint32_t world_save_magic =
 /// cadence. A v37 stream is 2 x resource_count values short per market;
 /// refused whole on the strict-equality contract, no migration. Claimed through
 /// `tools/session/next_save_version.js --kind world --claim`.
-/// Bumped to 40 by BL-1217 (D3 fix, the dial's rate), claimed past BL-1217 D5's
-/// 39 (opening stock held, another branch): the market record gains one
-/// resource-indexed float array at its tail, after `unposted_bid_tick` --
-/// `unposted_rate`, the per-tick part of the unposted bid the background
-/// workforce dial reads (a running processor's pool-fed draw, procurement's
-/// remaining quantity over its remaining lead ticks). Written at the economy
-/// step and read by the scorer on a later tick within its cadence. A v38/v39
-/// stream is resource_count floats short per market; refused whole on the
-/// strict-equality contract, no migration. Claimed through
-/// `tools/session/next_save_version.js --kind world --claim`.
+/// Bumped to 40 by BL-1217 (the dial's buyer signal), claimed past BL-1217
+/// D5's 39 (opening stock held, another branch): the market record gains two
+/// resource-indexed arrays at its tail, after `unposted_bid_tick` --
+/// `dial_pool_draw` (float) and `dial_pool_draw_tick` (int32): what running
+/// processors drew from their owners' pools and did not post as demand, and
+/// the econ tick it was recorded on, which the background workforce dial reads
+/// held for its cadence. A v38/v39 stream is 2 x resource_count values short
+/// per market; refused whole on the strict-equality contract, no migration.
+/// Claimed through `tools/session/next_save_version.js --kind world --claim`.
 inline constexpr uint32_t world_save_version = 40;
 
 /// Write @p w as a complete world snapshot.

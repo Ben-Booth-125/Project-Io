@@ -12,6 +12,7 @@
 #include "logistics.hpp"     // lp_pool_map (BL-596/BL-597, shared active+passive LP pool)
 #include "world.hpp"
 
+#include <algorithm>
 #include <array>
 #include <chrono> // economy_step_phase_clock (BL-1117)
 #include <map>
@@ -244,6 +245,25 @@ struct shelf_phase_audit
 /// Result of one economy step: the per-building reports plus the auto-bought
 /// input shortfalls per (corp, body), which become market demand and corporate
 /// expenditure downstream (market_clearing.hpp / budget_system.hpp).
+/// BL-1217 (AI_OPPONENT.md § 11, the dial reads posted demand plus pool-fed
+/// running processor draws, Ben 2026-10-09 as narrowed): one processor's dial
+/// record for a tick. `room[r]` is set where the want is posted
+/// (run_processing): the full-run need less what it posts as DEMAND, i.e. what
+/// its pool covered then (the whole need where the ceiling silenced the want,
+/// since a silenced want is not demand). Every pool draw, either turn, fills
+/// `drawn` only up to the room left — a top-up draw off a pool a sibling
+/// refilled is a unit this processor already put in demand, and counts once.
+struct proc_dial_draw
+{
+    std::array<float, resource_count> room  = {};
+    std::array<float, resource_count> drawn = {};
+    void take(std::size_t r, float from_pool)
+    {
+        const float c = std::min(from_pool, std::max(0.0f, room[r]));
+        if (c > 0.0f) { drawn[r] += c; room[r] -= c; }
+    }
+};
+
 struct economy_report
 {
     std::vector<building_report> buildings;
@@ -335,15 +355,11 @@ struct economy_report
     /// (`dispatch_absorbable`) reads. Same std::map, same sorted accumulation.
     std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> hauler_wants;
 
-    /// BL-1217 (D3 fix): what processors drew of each input from their OWNER'S
-    /// POOL this tick, keyed (market, good) — both turns (run_processing,
-    /// top_up_processing). The shelf-fed remainder of a processor's want is
-    /// already a posted bid (`wants` -> `mc.demand`) or a silenced one
-    /// (`hauler_wants`), so the workforce dial's rate of a running processor's
-    /// draw (`market_component::unposted_rate`) is this part only. Transient:
-    /// read once, right after the production pass. A processor on a
-    /// market-less body records nothing (it has no market to bid in).
-    std::map<std::pair<entity_id, std::size_t>, float> processor_pool_draws;
+    /// BL-1217 (AI_OPPONENT.md § 11, the dial's buyer signal): per processor on
+    /// a market, its pool-fed draws this tick that it did NOT also post as
+    /// demand (`proc_dial_draw`), across both turns. Transient: read once, right
+    /// after the production pass, by `note_dial_pool_draws`.
+    std::map<entity_id, proc_dial_draw> dial_pool_draws;
 
     /// BL-1209: every draw off a CONTENDED shelf this tick, rationed pro-rata
     /// (`plan_short_shelves`), and each phase's own invariant audit
