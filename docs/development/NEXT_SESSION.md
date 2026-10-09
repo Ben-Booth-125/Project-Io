@@ -357,6 +357,11 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   harness green. BUT 5-seed gate (on a pre-G1b base): G2 89.5 -> 78.7, t50 77.6 -> 70.0 (seed 43
   built by t50 265 -> 165). Re-measure sent: 16 seeds on the current tip, snap off / thr 2 / thr
   3, and why income falls. Then a form to Ben.
+  **BL-1252 RE-MEASURED on the tip** (head 7c8ed047, tooling only): snap at 2 costs nothing —
+  G1 96.6, t50 86.7 -> 88.7, G1b 1.8, G2 96.1, income 34,958; parallels 47; time 0.99x. Threshold 3
+  fails both (153 parallels, t50 84.3). Income swings are the start cascade (market folds read the
+  road field: seed 43 15 -> 16 markets), not dearer hauls (+0.6%, travel ticks unchanged). NR-989
+  novelty filed. Cold review running; merge after.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
