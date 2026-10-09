@@ -312,6 +312,10 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   (`progress_before`, transient), leg-time head clock (`convoy_route::at`, renderer uses it),
   real-tick rows R11-R17, body-pool lanes, SUPPLY.md says only origin+ports fixed at dispatch.
   sea_port_gate 89/0; 5-seed gate identical (no hostility in gate worlds). Live look owed.
+  **G1b R3 DONE** (59e102dd; cold review running): `processor_want` per market (transient) leaves
+  one tick of posted processor want before the background draws. 16 seeds alone: G1 87.5 -> 88.4,
+  G1b 11.5 -> 10.6 (c-background 63 -> 38), t50 68.9 -> 72.0, G2 91.0 -> 92.7. Silenced want not
+  protected (57 plants) — reviewer checking against FINANCE 2026-10-03.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
