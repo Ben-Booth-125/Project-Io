@@ -259,6 +259,16 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   Lanes: G1b diagnosis (probe, baseline = its merged tip); BL-1195 convoy lane follows legs
   (build); BL-1119 R7 cold review of 8b921ee6. BL-1119 R4 (quiet Release gen_step_costs 16 seeds)
   waits for a quiet machine; R6 haulage reading after.
+  **BL-1119 R7 DONE (review of 8b921ee6, an ancestor):** direction logic correct and deterministic,
+  BUT reused floods price routes on a STALE road field (caches never cleared mid-pass), against
+  LOGISTICS § 4 "priced on the field as it stands"; round 4's 10x history speed-up IS that reuse
+  (history corridors into different hubs no longer reuse each other's roads -> parallel roads;
+  spurs read town fields from before the backbone; border probes compare mixed vintages). Also:
+  R2's result_metric is stale (row demoted to control; assertion moved to R2s-b, BL-1159) — fix the
+  text after running the harness; spur pass = one whole-body flood per target (~569 on seed 0,
+  ~200 MB peak) — BL-1077's bounded per-village search fixes cost and staleness for spurs;
+  detour test mixes link directions (small); stamp_history_roads early returns leave stats unset.
+  **Form to Ben:** measure parallel roads first / rule stale ok / reshape to price on today's field.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
