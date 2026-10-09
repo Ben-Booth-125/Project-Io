@@ -2037,6 +2037,47 @@ void chain_unplace(world& w, entity_id bid, std::unordered_set<entity_id>& occup
 /// @p whole false (a roster that already exists, `enforce_chain_feasible_roster`)
 /// only unplaces the infeasible processors and never rejects the rest.
 ///
+/// BL-1217 D6 (Ben, 2026-10-09; CORPORATION_GENERATION.md § Pass 6, "No
+/// processor is placed beyond its output's want"): a body's WANT per good —
+/// final demand (`body_demand`) plus the derived demand of what stands or is
+/// chartered (operating upkeep, construction, every standing processor's
+/// inputs at the nominal rate) — and its PRODUCTION at that same rate
+/// (`accumulate_body_production`), in the units the walk's gap reads.
+struct output_want
+{
+    std::array<float, resource_count> want{};
+    std::array<float, resource_count> production{};
+
+    /// Is the recipe's primary output still short here? A good no consumer
+    /// wants is never short, so it gets no maker for its sake.
+    bool short_of(const recipe& rc) const
+    {
+        const std::size_t p = static_cast<std::size_t>(primary_output_resource(rc));
+        return want[p] > production[p];
+    }
+    /// Book a processor's output at the nominal rate (@p sign -1 removes it).
+    void credit(const recipe_registry& reg, const recipe& rc, float sign = 1.0f)
+    {
+        const float batches = nominal_processing_batches(reg);
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (rc.outputs[r] > 0.0f)
+                production[r] += sign * batches * rc.outputs[r];
+    }
+};
+
+output_want body_output_want(const world& w, const recipe_registry& reg, entity_id body)
+{
+    output_want o;
+    o.want = body_demand(w, reg, body);
+    const std::array<float, resource_count> upkeep       = body_upkeep_demand(w, reg, body);
+    const std::array<float, resource_count> construction = body_construction_demand(w, reg, body);
+    const std::array<float, resource_count> inputs       = body_processor_input_demand(w, reg, body);
+    for (std::size_t r = 0; r < resource_count; ++r)
+        o.want[r] += upkeep[r] + construction[r] + inputs[r];
+    accumulate_body_production(w, reg, body, o.production);
+    return o;
+}
+
 /// @return false when nothing is left placed (the caller treats the charter as
 ///         a placement that found no feasible ground).
 bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
@@ -2045,6 +2086,35 @@ bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
                          refused_draw* refused = nullptr)
 {
     const int n = reg.recipe_count(building_type::processing_facility);
+    // BL-1217 D6: the want bound on the best-tier path (@p serve null — a
+    // specialist's processors, an extraction or trade mix's incidental one, a
+    // Pass 6 firm's). Measured once per call, on the first such processor's
+    // body, before any of this call's decisions; each decision then books its
+    // output, so two processors of one firm cannot both fill the same gap. A
+    // processor of this call that already carries a recipe (a re-decision) is
+    // taken out of production first: the rule reads the ground, not what an
+    // earlier pass wrote. The @p serve path is a firm chartered FOR a good the
+    // walk's gap found short, and is bounded there.
+    output_want ow;
+    bool        ow_ready = false;
+    const auto  ensure_want = [&](entity_id body) {
+        if (ow_ready)
+            return;
+        ow       = body_output_want(w, reg, body);
+        ow_ready = true;
+        for (const entity_id a : assets)
+        {
+            const auto ait = w.buildings.find(a);
+            if (ait == w.buildings.end() || ait->second.type != building_type::processing_facility
+                || ait->second.decommissioned)
+                continue;
+            const auto tit = w.tiles.find(ait->second.tile);
+            if (tit == w.tiles.end() || tit->second.body != body)
+                continue;
+            if (const recipe* had = reg.get_recipe(ait->second.recipe))
+                ow.credit(reg, *had, -1.0f);
+        }
+    };
     bool processing_anchor = false;
     if (!assets.empty())
         if (const auto ait = w.buildings.find(assets.front()); ait != w.buildings.end())
@@ -2079,10 +2149,15 @@ bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
         }
         else
         {
+            const auto tit = w.tiles.find(bit->second.tile);
+            if (tit != w.tiles.end())
+                ensure_want(tit->second.body);
             int best_tier = chain_tier_none;
             for (int i = 0; i < n && best_tier != chain_tier_own; ++i)
             {
                 const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+                if (ow_ready && !ow.short_of(rc))
+                    continue; // BL-1217 D6: no maker for a good with no want left
                 const int t = chain_recipe_placeable(w, reg, cr, bid, market, rc, &assets);
                 if (t < best_tier)
                 {
@@ -2118,6 +2193,9 @@ bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
             continue;
         }
         bit->second.recipe = chosen;
+        if (serve == nullptr && ow_ready)
+            if (const recipe* took = reg.get_recipe(chosen))
+                ow.credit(reg, *took); // BL-1217 D6: this processor's output is booked
         kept.push_back(bid);
         ++serving;
     }
