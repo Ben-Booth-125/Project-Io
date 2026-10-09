@@ -71,8 +71,10 @@
 // run) it is the GENERATION FORM: the household and background baskets at
 // base, `scale x (population demand_scale x basket + background demand_scale x
 // basket)`, summed over the centres whose tile the market serves — the reading
-// generation's final demand (`body_demand`) already takes, split by market.
-// No forecast, and nothing per corporation.
+// generation's final demand (`body_demand`) already takes, split by market —
+// over the buyers the clear would inject: a razed centre and a good the market
+// has no base price for bid nothing, as in `inject_population_demand` /
+// `inject_background_demand`. No forecast, and nothing per corporation.
 //
 // OBTAINABLE: an input r of a processor at market C, needing `need` units a tick,
 // is obtainable when

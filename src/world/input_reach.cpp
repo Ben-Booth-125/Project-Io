@@ -426,9 +426,14 @@ void build_final_draws(const world& w, const recipe_registry& reg, input_reach& 
         // Ascending centre id (BL-1050): the per-market scale is a float sum.
         std::vector<entity_id> centre_ids;
         centre_ids.reserve(w.population_centres.size());
+        // The buyers the clear would inject (inject_population_demand /
+        // inject_background_demand): a razed centre has no heads and bids
+        // nothing, and an unpriced good (base <= 0) is never bid. "Whole at
+        // base" (Ben, 2026-10-09) is about the PRICE, not phantom buyers.
         for (const auto& [cid, pcc] : w.population_centres)
         {
-            (void)pcc;
+            if (pcc.razed)
+                continue;
             const auto tile_it = w.population_centre_tile.find(cid);
             if (tile_it == w.population_centre_tile.end())
                 continue;
@@ -453,8 +458,13 @@ void build_final_draws(const world& w, const recipe_registry& reg, input_reach& 
         {
             if (!(scale > 0.0f))
                 continue;
+            const auto mit = w.markets.find(mid);
+            if (mit == w.markets.end())
+                continue;
             for (std::size_t r = 0; r < resource_count; ++r)
             {
+                if (!(mit->second.base_price[r] > 0.0f))
+                    continue; // unpriced: the injectors bid nothing for it
                 const float d = scale * (pd.demand_scale * pb[r] + bd.demand_scale * bb[r]);
                 if (d > 0.0f)
                     by_market[mid][r] = d;
