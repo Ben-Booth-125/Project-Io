@@ -580,7 +580,9 @@ running).** Every path that places a processor — the walk's own charter, an ex
 processor, a background firm — is bounded by the want for what it makes: final demand plus the
 derived demand of what stands or is chartered. A good with no consumer gets no maker for its
 sake. Measured before the ruling: about 34 refined-fuel plants per seed stood against under one
-consumer, and the dial idled them all.
+consumer, and the dial idled them all. **A processor laid with no recipe is not placed when its
+default output is unwanted (Ben, 2026-10-09):** it is not given another recipe in its place, nor
+left standing idle.
 
 **What Pass 6 does not do.** It does not seed any behavioural state, matching the contract the
 rest of this pipeline holds (§ Generation seeds no behaviour) — no sentiment, no diplomatic
