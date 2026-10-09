@@ -132,6 +132,8 @@ extern bool g_road_probe_fresh_floods;
 /// on one machine). The BL-1119 fresh-flood probe also runs without the snap, so its
 /// reading stays the reference it was measured as.
 extern bool g_road_probe_no_snap;
+/// BL-1252 measurement knob -- verify-only: the snap's run (kSnapRun, 2, in shipped code).
+extern int  g_road_probe_snap_run;
 
 /// The longest contiguous run of WATER tiles (any kind) along @p path, in tiles.
 /// The one measure the cap is read against; exposed so a harness asks it of every

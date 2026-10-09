@@ -21,6 +21,7 @@
 
 bool g_road_probe_fresh_floods = false; // BL-1119 measurement probe (road_generation.hpp)
 bool g_road_probe_no_snap     = false; // BL-1252 measurement switch (road_generation.hpp)
+int  g_road_probe_snap_run     = 2;     // BL-1252 measurement knob: the snap's run (road_generation.hpp)
 
 namespace {
 
@@ -196,6 +197,7 @@ bool crossings_are_straits(const world& w, const logistics_path& p)
 // frontier on (cost, raster index), and stretches are walked in path order.
 constexpr int kSnapDist    = 1;
 constexpr int kSnapRun     = 2;
+static_assert(kSnapRun == 2, "g_road_probe_snap_run defaults to kSnapRun");
 constexpr int kSnapNewCost = 4;
 
 struct road_snapper
@@ -288,7 +290,7 @@ struct road_snapper
             // route end keeps that end, the centre the route serves).
             const std::size_t s = run0 > 0 ? run0 - 1 : run0;
             const std::size_t e = j + 1 < n ? j + 1 : j;
-            if (static_cast<int>(j - run0 + 1) < kSnapRun || s < c || s == e) continue;
+            if (static_cast<int>(j - run0 + 1) < g_road_probe_snap_run || s < c || s == e) continue;
             const int from = ras[s], to = ras[e];
             if (from < 0 || to < 0) continue;
             std::map<int, int> cell; // raster -> cost to enter

@@ -411,6 +411,7 @@ int main(int argc, char** argv)
     {
         const std::string a = argv[i];
         if (a == "--examples" && i + 1 < argc) { ex_dir = argv[++i]; continue; }
+        if (a == "--snap-run" && i + 1 < argc) { g_road_probe_snap_run = std::atoi(argv[++i]); continue; }
         if (a == "--compare" && i + 1 < argc)
         {
             const std::string m = argv[++i];
