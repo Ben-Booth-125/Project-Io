@@ -297,6 +297,13 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   for most hauls, so inland-leg units rarely intercept) and the head is spread evenly by tiles
   across legs of ~5x different speed. Fix round sent (swept interdiction, time-weighted head,
   real-tick rows, origin-tile row, body-pool lanes, doc honesty, P8 convoy 1).
+  **ROADS MEASURED** (4578340a on worktree-agent-a806ebb03681d766e, probe + verify-only switch
+  `g_road_probe_fresh_floods`; switch off == tip digests; NOT merged pending Ben): STALE vs FRESH
+  pooled 16 seeds — road tiles 79,154 vs 73,503; long parallels d1K8 235 vs 103 (hist-hist 176 vs
+  42); history cost gap 1.87% vs 0.96%; time gen+hist 184+88 s vs 416+419 s (loaded); seed 0 gen
+  15->77 s, hist 7->62 s; split nations 47 vs 54; R2s-b passes both (229/229 Highway, 14/16).
+  Half of history corridors change. **Form to Ben:** keep stale (doc ruling) / fresh everywhere /
+  design a cheaper targeted refresh (this sprint or later).
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
