@@ -2135,10 +2135,10 @@ output_want measure_output_want(world& w, const recipe_registry& reg, entity_id 
 /// here (`measure_output_want` with `body_demand`) on the first processor's
 /// body. Each decision books its processor, so a firm's second processor sees
 /// the first. A processor of this call that already carries a recipe (a
-/// re-decision) is taken out first, output and inputs. On the @p serve path a
-/// processor whose good the firm's earlier processors already cover is
-/// unplaced; it leaves no prospective draw (it was refused for want, not for
-/// spare input).
+/// re-decision) is taken out first, output and inputs. ONE EXCEPTION (Ben,
+/// 2026-10-09): on the @p serve path a works after the first one placed is
+/// admitted whatever the want — a chartered processing firm keeps its second
+/// works — and a sized-rule refusal of it still leaves its prospective draw.
 ///
 /// @return false when nothing is left placed (the caller treats the charter as
 ///         a placement that found no feasible ground).
@@ -2204,22 +2204,21 @@ bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
             ensure_want(tit->second.body);
         // BL-1217 D6: a recipe is a candidate only while its output is short.
         const auto wanted = [&](const recipe& rc) { return !ow_ready || ow.short_for(w, rc, ptile); };
-        // MEASUREMENT SWITCH, not a rule (BL-1217 D6 review, the counterfactual
-        // Ben asked for): built with IO_D6_KEEP_SECOND_WORKS, a firm chartered
-        // FOR a good keeps every works on it even once the first covers the
-        // gap. Never defined in the app build.
-#ifdef IO_D6_KEEP_SECOND_WORKS
-        constexpr bool serve_bounded = false;
-#else
-        constexpr bool serve_bounded = true;
-#endif
+        // THE SECOND WORKS IS KEPT (Ben, 2026-10-09; CORPORATION_GENERATION.md
+        // § Pass 6, the exceptions): a firm chartered FOR a good (@p serve)
+        // keeps its works after the first even once the first covers the gap —
+        // the firm's authored pair stands whole. Only that: the FIRST works, an
+        // incidental processor and a specialist's stay bounded by want. A kept
+        // second works the sized rule refuses still leaves its draw (below).
+        const bool second_works = serve != nullptr && serving > 0;
+        const auto admitted = [&](const recipe& rc) { return second_works || wanted(rc); };
         chain_begin_decision(w, reg, cr); // BL-1233: spare is read over what stands now
         if (serve != nullptr)
         {
             for (const int i : *serve)
             {
                 const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
-                if (serve_bounded && !wanted(rc))
+                if (!admitted(rc))
                     continue;
                 if (chain_recipe_placeable(w, reg, cr, bid, market, rc, &assets) != chain_tier_none)
                 {
@@ -2253,14 +2252,16 @@ bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
             // A processor with no producer at all leaves none (a cold start is
             // not begun). Read before it is unplaced, on the ground as it stands.
             // BL-1217 D6: a recipe refused for want (its good already covered)
-            // was not refused by the sized rule, and leaves no draw.
+            // was not refused by the sized rule, and leaves no draw; a kept
+            // second works is admitted whatever the want, so its refusal is
+            // the sized rule's and its draw stands.
             if (refused != nullptr && !refused->set && serve != nullptr)
             {
                 const float batches = nominal_processing_batches(reg);
                 for (const int i : *serve)
                 {
                     const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
-                    if (!wanted(rc))
+                    if (!admitted(rc))
                         continue;
                     if (chain_recipe_tier(w, reg, cr, bid, market, rc, &assets) == chain_tier_none)
                         continue;
@@ -4337,14 +4338,35 @@ int assign_default_recipes(world& w, const recipe_registry& reg, const char* sit
 
     std::map<entity_id, output_want>             wants;    // per body, measured lazily
     std::map<entity_id, std::vector<entity_id>> gone;     // corp -> unplaced
-    std::vector<entity_id>                      ownerless; // no corporation holds it
     int given = 0;
     for (const entity_id id : ids)
     {
         building_component& b = w.buildings.at(id);
         const auto tit = w.tiles.find(b.tile);
+        // THE PRE-AUTHORED INSTALLATION KEEPS ITS DEFAULT (Ben, 2026-10-09;
+        // CORPORATION_GENERATION.md § Pass 6, the exceptions): it is the one
+        // steel maker the chain-feasibility test can see at the start, and
+        // unplacing it left no steel chain on any seed. It is the world's one
+        // processor NO corporation holds (`make_hard_coded_world` authors it
+        // before any corporation; measured: exactly one per seed), so a
+        // recipe-less processor with no owner is that installation and is
+        // given the default whatever the want. Booked like any other, so the
+        // processors after it read its output.
+        const bool authored = owner.find(id) == owner.end();
         bool keep = (def != nullptr);
-        if (keep && tit != w.tiles.end())
+        if (keep && authored)
+        {
+            b.recipe = default_recipe;
+            if (tit != w.tiles.end())
+            {
+                const entity_id body = tit->second.body;
+                auto wit = wants.find(body);
+                if (wit == wants.end())
+                    wit = wants.emplace(body, measure_output_want(w, reg, body, body_demand(w, reg, body))).first;
+                wit->second.book(w, reg, *def);
+            }
+        }
+        else if (keep && tit != w.tiles.end())
         {
             const entity_id body = tit->second.body;
             auto wit = wants.find(body);
@@ -4364,22 +4386,16 @@ int assign_default_recipes(world& w, const recipe_registry& reg, const char* sit
             ++given;
             continue;
         }
-        const auto oit = owner.find(id);
-        if (oit != owner.end())
-            gone[oit->second].push_back(id);
-        else
-            ownerless.push_back(id);
+        gone[owner.at(id)].push_back(id); // only an owned processor reaches here
     }
 
     std::unordered_set<entity_id> occupied; // generation's occupancy sets are local to their passes
     const unplace_tally ut = unplace_and_reseat(w, gone, occupied);
-    for (const entity_id id : ownerless)
-        chain_unplace(w, id, occupied);
-    const int removed = ut.unplaced + static_cast<int>(ownerless.size());
+    const int removed = ut.unplaced;
     if (removed > 0 && site != nullptr)
         std::printf("[assign_default_recipes] %s: %d processors unplaced (default output unwanted; "
-                    "%d ownerless, %d corps left holdless), %d given the default\n",
-                    site, removed, static_cast<int>(ownerless.size()), ut.holdless, given);
+                    "%d corps left holdless), %d given the default\n",
+                    site, removed, ut.holdless, given);
     return removed;
 }
 

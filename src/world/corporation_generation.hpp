@@ -641,7 +641,9 @@ std::vector<entity_id> generate_background_firms(
 /// building id); a recipe-less processor whose default output is NOT short is
 /// UNPLACED — the building, its stockpile, its place in its corporation's
 /// `assets`, with the HQ re-seated and the opening pools re-keyed
-/// (`unplace_and_reseat`). WORLD BUILD ONLY: in play no processor lacks a
+/// (`unplace_and_reseat`). EXCEPT the pre-authored installation — the one
+/// processor no corporation holds — which keeps its default whatever the want
+/// (Ben, 2026-10-09). WORLD BUILD ONLY: in play no processor lacks a
 /// recipe, so a call on a loaded or running world finds nothing to remove.
 /// @p site, when given, labels a log line printed whenever a processor is
 /// unplaced. @return the number unplaced.
