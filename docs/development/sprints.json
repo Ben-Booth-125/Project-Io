@@ -88,7 +88,7 @@
     "PATH (Ben, 2026-10-07): G1 by more mines on fresh ground (BL-1227 ranking, after the fibre/hides boom is fixed) and processors placed to their inputs (BL-1233); power plants per grid (BL-1232); power keyed by market centre; electronics stays in the stopgap."
    ],
    "risk": "Five world-movers on the dispatch seam. Each measures its own before/after on the market-viability skill in isolation, briefed with MULTI-TICK rows, and takes a cold review with a fix round budgeted. Baselines are read on main by the main session, never taken from a lane. Overflow (Ben): extend the sprint, cut nothing.",
-   "done_when": "market-viability, pooled over the 16 curated seeds after the one re-bless (targets raised by Ben, 2026-10-08): G1 >= 85% of built processors running at handoff AND at play tick 50 (Ben, 2026-10-08) AND G1b <= 5% input-starved (now, or decommissioned after starving); G2 and G3 still pass; the logistics row reported with every refusal class named.",
+   "done_when": "market-viability, pooled over the 16 curated seeds after the one re-bless (targets raised by Ben, 2026-10-08): G1 >= 85% of built processors running at handoff AND G1b <= 5% input-starved (now, or decommissioned after starving); G2 and G3 still pass (G1 at tick 50 is reported, not gated: long-term viability deferred to a later sprint, Ben 2026-10-09); the logistics row reported with every refusal class named.",
    "notes": "Ben, 2026-10-07: sprint 51 takes the player trading loop and the visibility suite; BL-1170, BL-1148, BL-1174, BL-1181, BL-1175, BL-1189, BL-1139 sit in sprint 52."
   }
  ],

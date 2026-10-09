@@ -54,15 +54,15 @@ measured alone on the market-viability skill. G1 70% stays.
 
 ### Wave 2b — G1 plants running (BL-1217; IDLE16 rounds 1-4, Ben's round 5 form 2026-10-09)
 
-Targets G1 >= 85% at handoff AND at t50, G1b <= 5%; sprint extends. Rulings in bb09107e.
-- [ ] D1 DIALHOLD: BL-1235 (dial hold outlasts reflex) - lane running.
-- [ ] D2 PROPELLANT: base price from inputs (RESOURCES) - lane running.
-- [ ] D3 Dial reads the composite bid (new grant, AI_OPPONENT 11) + forecasts at base where no fact exists. After D1 merges (same function).
+Targets G1 >= 85% at handoff, G1b <= 5%; sprint extends. Rulings in bb09107e. G1 at t50 deferred with long-term viability (Ben, 2026-10-09).
+- [x] D1 DIALHOLD: BL-1235 (dial hold outlasts reflex) - merged 3bca733a.
+- [ ] D2 PROPELLANT: priced 64.0 on the air route; pad keeps its propellant; seat plants back to auto (NR-986) - rework building (route gate, save v41).
+- [ ] D3 Dial reads stock-fed consumers (grant narrowed 2026-10-09) + base forecast on never-cleared markets - narrowed rework building.
 - [ ] D4 Rescue reads an unpriced output as floored (AI_OPPONENT, reflex tier). With D3.
 - [ ] D5 Opening stock held, not listed, until the market bids (CORPORATION_GENERATION Pass 4b).
 - [ ] D6 No processor placed beyond its output's want - trace the ~34 refined-fuel plants per seed first.
-- [ ] D7 Diagnose t50 mid-chain starvation (408 of 665 lost; steel the top input) - probe only, in parallel.
-- [ ] D8 16-seed gate after D1-D6 merge; G1 at handoff and t50.
+- [x] D7 Diagnose t50 mid-chain starvation - probe merged f98d43df; findings deferred with long-term viability.
+- [ ] D8 16-seed gate after D2-D6 merge (order D5/D6, D3/D4, D2); absolute running/built counts.
 
 ### Close — the doc check (Ben, 2026-10-08: "make sure all the various decisions are documented")
 
@@ -87,10 +87,10 @@ asserts the overturned claim — grep the OLD wording across docs/ (the same-day
 - [ ] Grant: a rival reads its own refused processor as a bid for its own mine (AI_OPPONENT.md § 11)
 - [ ] A new processor is judged on supply, not stock (AI_OPPONENT.md, processing-facility candidate)
 - [ ] Targets: G1 >= 85%, G1b <= 5% (market-viability SKILL.md; BL-1217; sprint row)
-- [ ] G1 >= 85% at tick 50 too (market-viability SKILL.md; sprint row)
+- [ ] G1 at tick 50 deferred with long-term viability (Ben 2026-10-09; sprint row; SKILL.md)
 - [ ] Propellant priced from its inputs (RESOURCES.md, PRODUCTION.md "What is exempt")
 - [ ] A dial-idled plant is not losing; the hold ends on recovery (AI_OPPONENT.md; BL-1235)
-- [ ] Grant: the dial reads the build bid (AI_OPPONENT.md § 11; § 2B "dials" sentence)
+- [ ] Grant: the dial reads stock-fed consumers - narrowed same day (AI_OPPONENT.md § 11; § 2B "dial" sentence)
 - [ ] The dial forecasts at base where no fact exists; rescue reads unpriced as floored (AI_OPPONENT.md)
 - [ ] Opening stock held until bid; no processor beyond its output's want (CORPORATION_GENERATION.md)
 - [ ] Road generation schema kept (no doc change; confirm nothing claims otherwise)
