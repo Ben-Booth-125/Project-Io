@@ -138,6 +138,7 @@
 #include "world/logistics.hpp"
 #include "world/campaign_settle.hpp"
 #include "world/components.hpp"
+#include "world/corp_ai.hpp"
 #include "world/economy_system.hpp"
 #include "world/market_clearing.hpp"
 #include "world/orbital_system.hpp"
@@ -171,6 +172,9 @@ namespace {
 
 constexpr int k_t50 = 50;
 constexpr float k_floored = 0.30f; // economy_system.cpp's floored_frac
+// BL-1217 D3 fix (F4): the scorer asks the solver with its cadence as the
+// composite-bid hold (corp_ai.cpp, the dial candidate); mirror it exactly.
+const int k_dial_hold = std::max(1, corp_ai_params{}.cadence_k);
 int g_examples = 2;
 
 std::vector<std::uint32_t> library_seeds(const char* path)
@@ -409,7 +413,7 @@ zero_rec make_zero_rec(world& w, const recipe_registry& reg, entity_id bid, cons
     z.price_ratio = m.base_price[g] > 0.0f ? m.price[g] / m.base_price[g] : 0.0f;
     building_component copy = b;
     copy.workforce_target = static_cast<float>(prev_target);
-    z.solver_zero = solve_workforce_target(w, reg, copy, 1.0f, 1, nullptr) == 0;
+    z.solver_zero = solve_workforce_target(w, reg, copy, 1.0f, 1, nullptr, k_dial_hold) == 0;
     const solver_view sv = solver_replica(w, reg, copy, prev_target);
     z.replica_zero = sv.best == 0;
     z.margin_base_pos = sv.rev_base > sv.in;
@@ -1002,7 +1006,7 @@ void census(world& w, const recipe_registry& reg, const economy_report& rep, con
             building_component copy = b;
             copy.workforce_target = 100.0f;
             copy.decommissioned = false;
-            const int now = solve_workforce_target(w, reg, copy, 1.0f, 1, nullptr);
+            const int now = solve_workforce_target(w, reg, copy, 1.0f, 1, nullptr, k_dial_hold);
             c.add(std::string("z503.dempos.solver_at_handoff.") + (now > 0 ? "runs" : "zero"));
             c.add("z503.dempos.cls_handoff." + z.cls + "." + (now > 0 ? "runs" : "zero"));
         }

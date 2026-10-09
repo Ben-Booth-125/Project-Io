@@ -692,6 +692,8 @@ building_report run_processing(world& w, const recipe_registry& reg,
         const float need      = in * batches;
         const float from_pool = std::min(pool.quantities[r], need);
         pool.quantities[r] -= from_pool;
+        if (market_id != null_entity && from_pool > 0.0f) // BL-1217 D3 fix: the dial's rate
+            out.processor_pool_draws[std::make_pair(market_id, r)] += from_pool;
         const float remainder = need - from_pool;
         if (remainder <= 0.0f)
             continue;
@@ -772,6 +774,8 @@ bool top_up_processing(world& w, const recipe_registry& reg, entity_id corp,
         const float need      = in * batches;
         const float from_pool = std::min(std::max(0.0f, pool.quantities[r]), need);
         pool.quantities[r] -= from_pool;
+        if (from_pool > 0.0f) // BL-1217 D3 fix: the dial's rate (market_id is non-null here)
+            out.processor_pool_draws[std::make_pair(market_id, r)] += from_pool;
         const float remainder = need - from_pool;
         if (remainder <= 0.0f || !shelf_admits(mc, r, res_mult, /*off_buys=*/true))
             continue;
@@ -979,10 +983,11 @@ int solve_workforce_target(world& w, const recipe_registry& reg,
     // its pooled demand: the grant admits no cross-market pooling of its own.
     //
     // And where the market lists none of the output and no bid has registered
-    // (composite 0), the dial forecasts the output at its BASE price, not the
-    // floor (AI_OPPONENT.md, "The dial forecasts at base where no fact exists
-    // yet", Ben 2026-10-09): an empty shelf with no bidder is an unknown, not a
-    // glut. Background dial only, like the composite read.
+    // (composite 0) on a market that has never cleared, the dial forecasts the
+    // output at its BASE price, not the floor (AI_OPPONENT.md, "The dial
+    // forecasts at base where no fact exists yet", Ben 2026-10-09 — "the same
+    // 'no clear yet: no signal' reading the build veto takes"): an empty shelf
+    // with no bidder is an unknown, not a glut. Background dial only.
     const auto price_of = [&](std::size_t r, float supply_delta) -> float {
         if (mkt == nullptr)
             return 0.0f;
@@ -992,8 +997,15 @@ int solve_workforce_target(world& w, const recipe_registry& reg,
         float bid = pooled ? gsd->demand[r] : mkt->demand[r];
         if (!pooled && bid_hold_ticks >= 0)
         {
-            bid = composite_bid(*mkt, r, w.current_econ_tick, bid_hold_ticks);
-            if (!(mkt->supply[r] > 0.0f) && !(bid > 0.0f))
+            // BL-1217 (D3 fix): each want once, at a per-tick rate — the
+            // magnitude is weighed against supply exactly as demand is.
+            bid = composite_bid(*mkt, r, w.current_econ_tick, bid_hold_ticks, bid_reading::rate);
+            // "No fact yet" is the veto's own no-signal reading: only a market
+            // that has NEVER cleared (`market_has_cleared`). A cleared market
+            // with nothing listed and no bid is dead for this good, and the
+            // dial reads it as it always has (the floor), not at base.
+            if (!(mkt->supply[r] > 0.0f) && !(bid > 0.0f)
+                && !market_has_cleared(*mkt, w.current_econ_tick))
                 return std::max(0.0f, mkt->base_price[r]); // no fact yet: forecast at base
         }
         const float supply = std::max(0.0f, base + supply_delta);
@@ -1776,7 +1788,14 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             const std::size_t ri = static_cast<std::size_t>(c.resource);
             if (const auto hmit = w.markets.find(corp_home_pool_key(w, c.supplier, c.body));
                 hmit != w.markets.end())
-                note_unposted_bid(hmit->second, ri, c.quantity, w.current_econ_tick);
+            {
+                // BL-1217 (D3 fix): the dial's RATE is the remaining quantity
+                // over the remaining lead ticks, this one included (the whole
+                // contract is delivered at the end, so all of it remains).
+                const int left = std::max(1, c.lead_time_ticks - c.ticks_elapsed + 1);
+                note_unposted_bid(hmit->second, ri, c.quantity, w.current_econ_tick,
+                                  c.quantity / static_cast<float>(left));
+            }
             if (c.ticks_elapsed >= c.lead_time_ticks)
             {
                 // Draw what the supplier actually holds at the fulfilment body
@@ -2564,9 +2583,15 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // and what it consumes are observable): what each RUNNING processor drew
     // this pass is an unposted bid on its market. An idled plant produced
     // nothing and records nothing.
+    // BL-1217 (D3 fix): the whole draw stays the veto's presence fact; the
+    // dial's rate is its POOL-fed part only (the shelf-fed want is in demand).
     for (const auto& [key, q] : running_consumer_draws(w, reg, report))
         if (const auto rmit = w.markets.find(key.first); rmit != w.markets.end())
-            note_unposted_bid(rmit->second, key.second, q, w.current_econ_tick);
+        {
+            const auto  pit       = report.processor_pool_draws.find(key);
+            const float pool_part = (pit != report.processor_pool_draws.end()) ? pit->second : 0.0f;
+            note_unposted_bid(rmit->second, key.second, q, w.current_econ_tick, pool_part);
+        }
 
     // Population food demand (BL-190) is injected by inject_population_demand,
     // called from clear_markets AFTER its per-tick demand reset — injected here

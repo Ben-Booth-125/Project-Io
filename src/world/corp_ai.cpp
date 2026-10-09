@@ -715,13 +715,11 @@ bool zero_bid_veto(const world& w, const market_component& m, std::size_t r, int
     // still zero is read as not yet cleared — the market emergence carves
     // mid-tick (market_clearing.cpp) opens exactly so, with nothing written
     // until its first clear.
-    if (w.current_econ_tick <= 0)
-        return false; // no clear has run yet: no signal, do not guess
-    for (std::size_t g = 0; g < resource_count; ++g)
-        if (m.supply[g] > 0.0f || m.demand[g] > 0.0f || m.hauler_want[g] > 0.0f
-            || m.unposted_bid[g] > 0.0f)
-            return true; // the market has cleared: dead for this good
-    return false; // never cleared (nothing written yet): no signal
+    //
+    // The test is `market_has_cleared` (components.hpp), shared with the
+    // workforce dial's base forecast (BL-1217): true = dead for this good,
+    // false = never cleared (nothing written yet), no signal.
+    return market_has_cleared(m, w.current_econ_tick);
 }
 
 /// The same test at a tile's market: true when a build there of @p target is

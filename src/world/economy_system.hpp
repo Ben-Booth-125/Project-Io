@@ -335,6 +335,16 @@ struct economy_report
     /// (`dispatch_absorbable`) reads. Same std::map, same sorted accumulation.
     std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> hauler_wants;
 
+    /// BL-1217 (D3 fix): what processors drew of each input from their OWNER'S
+    /// POOL this tick, keyed (market, good) — both turns (run_processing,
+    /// top_up_processing). The shelf-fed remainder of a processor's want is
+    /// already a posted bid (`wants` -> `mc.demand`) or a silenced one
+    /// (`hauler_wants`), so the workforce dial's rate of a running processor's
+    /// draw (`market_component::unposted_rate`) is this part only. Transient:
+    /// read once, right after the production pass. A processor on a
+    /// market-less body records nothing (it has no market to bid in).
+    std::map<std::pair<entity_id, std::size_t>, float> processor_pool_draws;
+
     /// BL-1209: every draw off a CONTENDED shelf this tick, rationed pro-rata
     /// (`plan_short_shelves`), and each phase's own invariant audit
     /// ([0] construction, [1] processing). Report-only — the verify surface.

@@ -156,6 +156,15 @@ uint64_t world::state_hash(int tick) const
             // BL-1227: the unposted bid the scorer's veto reads, and its tick.
             for (const float x : m.unposted_bid) fnv1a_f32(h, x);
             for (const int32_t t : m.unposted_bid_tick) fnv1a_u32(h, static_cast<uint32_t>(t));
+            // BL-1217 (D3 fix): the dial's rate — the scorer branches on it and
+            // it is saved. Folded SPARSELY (good index + value, nonzero only), so
+            // a world that never recorded one hashes as it did before.
+            for (std::size_t r = 0; r < m.unposted_rate.size(); ++r)
+                if (m.unposted_rate[r] != 0.0f)
+                {
+                    fnv1a_u32(h, static_cast<uint32_t>(r));
+                    fnv1a_f32(h, m.unposted_rate[r]);
+                }
         }
     }
 

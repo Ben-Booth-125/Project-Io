@@ -195,6 +195,7 @@ void w_market(std::ostream& o, const market_component& m)
     w_f32_array(o, m.hauler_want);      // BL-1203: world_save_version 36
     w_f32_array(o, m.unposted_bid);     // BL-1227: world_save_version 38
     for (const int32_t t : m.unposted_bid_tick) w_i32(o, t); // BL-1227: world_save_version 38
+    w_f32_array(o, m.unposted_rate);    // BL-1217 D3 fix: world_save_version 40
 }
 
 bool r_i32_array(std::istream& i, std::array<int32_t, resource_count>& a)
@@ -212,7 +213,8 @@ bool r_market(std::istream& i, market_component& m)
         && r_f32_array(i, m.base_price) && r_f32_array(i, m.inventory)
         && r_f32_array(i, m.household_bid) && r_f32_array(i, m.household_fill)
         && r_f32_array(i, m.household_weight) && r_f32_array(i, m.hauler_want)
-        && r_f32_array(i, m.unposted_bid) && r_i32_array(i, m.unposted_bid_tick);
+        && r_f32_array(i, m.unposted_bid) && r_i32_array(i, m.unposted_bid_tick)
+        && r_f32_array(i, m.unposted_rate); // BL-1217 D3 fix: world_save_version 40
 }
 
 void w_unit(std::ostream& o, const unit_component& u)
