@@ -284,6 +284,59 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   re-rules "the cost, accepted"); ceiling hysteresis (MARKETS/FINANCE); dispatcher holds cargo it
   would send + cargo lists after the draw (SUPPLY). Counterfactuals: pull off 9.6%; ceiling off
   14.9% (worse); opening-stock release no change. Others untested. **Form to Ben.**
+  **BEN RULED (5fde6f22):** every recipe switch (chase + rescue) judged on supply; NEW GRANT spare
+  supply net of household + background draws (§ 11; generation sized rule too); background pull
+  leaves one tick of processor want (MARKETS re-rule). NOT chosen: ceiling damping, haul fixes.
+  Lanes: R1+R2 (switch + spare) and R3 (background order), each measured alone.
+  **BL-1195 DONE** (4963c356; cold review running): lane = priced legs; convoy gains origin_tile/
+  port_a/port_b (SAVE v42 — ledger row says 43, lane's edit refused: Ben to see); gate unchanged;
+  pre-existing fails convoy_command R4.2/4.4/4.5, supply_advance 4, LP-trim 1 (same on base).
+  Live look at a sea-route convoy owed. Save stack now: v39 D5, v40 D3, v41 PROPELLANT, v42 BL-1195;
+  the G1b lanes may claim more — reconcile at merge.
+  BL-1195 review: lane correct, merge clean; BUT interdiction samples one head tile per tick (T=1-3
+  for most hauls, so inland-leg units rarely intercept) and the head is spread evenly by tiles
+  across legs of ~5x different speed. Fix round sent (swept interdiction, time-weighted head,
+  real-tick rows, origin-tile row, body-pool lanes, doc honesty, P8 convoy 1).
+  **ROADS MEASURED** (4578340a on worktree-agent-a806ebb03681d766e, probe + verify-only switch
+  `g_road_probe_fresh_floods`; switch off == tip digests; NOT merged pending Ben): STALE vs FRESH
+  pooled 16 seeds — road tiles 79,154 vs 73,503; long parallels d1K8 235 vs 103 (hist-hist 176 vs
+  42); history cost gap 1.87% vs 0.96%; time gen+hist 184+88 s vs 416+419 s (loaded); seed 0 gen
+  15->77 s, hist 7->62 s; split nations 47 vs 54; R2s-b passes both (229/229 Highway, 14/16).
+  Half of history corridors change. **Form to Ben:** keep stale (doc ruling) / fresh everywhere /
+  design a cheaper targeted refresh (this sprint or later).
+  **BEN RULED (2c898ebd):** keep stale reuse (LOGISTICS § 4 written); parallels fixed THIS SPRINT
+  as BL-1252 (no parallel roads): d1K8 <= 103 pooled, harness green, time within ~1.25x of stale.
+  Probe merged aa007264. BL-1252 lane running (measure candidates: targeted refresh / post-pass
+  merge / bounded spur search).
+  **BL-1195 FIX ROUND DONE** (e14a76a6; re-review running): swept interdiction
+  (`progress_before`, transient), leg-time head clock (`convoy_route::at`, renderer uses it),
+  real-tick rows R11-R17, body-pool lanes, SUPPLY.md says only origin+ports fixed at dispatch.
+  sea_port_gate 89/0; 5-seed gate identical (no hostility in gate worlds). Live look owed.
+  **G1b R3 DONE** (59e102dd; cold review running): `processor_want` per market (transient) leaves
+  one tick of posted processor want before the background draws. 16 seeds alone: G1 87.5 -> 88.4,
+  G1b 11.5 -> 10.6 (c-background 63 -> 38), t50 68.9 -> 72.0, G2 91.0 -> 92.7. Silenced want not
+  protected (57 plants) — reviewer checking against FINANCE 2026-10-03.
+  R3 review clean; **BEN RULED (35eb5707): silenced processor want is protected too** (processor
+  part only). R3 round 2 sent (+ real-clear row, stale comments).
+  BL-1195 re-review clean (low items); original agent unresumable (worktree unverifiable) — fresh
+  agent does the tidy round on top of worktree-agent-a2c0cfcb69b515f0f (river-weighted clock,
+  reset on every return, per-frame lane cache, delete convoy_head_index, doc, R17 real tick).
+  **G1b R1+R2 DONE** (30a929c8 R1, e0bd50d9 R2 on worktree-agent-a123195de030662e7; base 5fde6f22;
+  NOT reviewed yet): before 87.5/68.9/11.5, run/built h 2391/2732, income 48,805 | R1 89.8/78.0/9.2,
+  2458/2737, 48,238 | R1+R2 96.4/86.0/**2.1**, **1736/1801**, **34,572 (-29%)**, firms 2407->2048.
+  R2's generation form charges households' whole basket at base (play fills 25-94%) -> ~34% fewer
+  processors. R2 makes background_fill SAVED (claims v45). corp_ai_harness R9(c) flipped (asserted
+  the overturned behaviour). charter_refusal_probe fixture households moved. **Form to Ben:**
+  measure R1+R3 and R2-at-expected-fill / accept / R2 in play only.
+  **BEN: ACCEPT R1+R2 AS BUILT (8dcecb83, recorded in CORPORATION_GENERATION Pass 3).** Cold review
+  running. Then merge R1+R2, then R3 (round 2), then the integrated gate.
+  **R3 ROUND 2 DONE** (ea624f40): silenced processor want protected; population_mvp T1-T5 drive the
+  real clear. Alone: G1b 10.6 -> 10.4, c-background 38 -> 2 but d-ceiling 36 -> 65; t50 72.0 ->
+  70.1; G2 92.7 -> 90.9. No save field. Ready to merge after R1+R2.
+  **R1+R2 REVIEW:** core logic clean; gaps — no play-form / shared-charge / rescue rows,
+  background_fill not hashed, run_contend fixture half-tests R2, generation charges razed centres
+  and unpriced goods (fixed as a defect: phantom buyers, not price). Fix round sent. Save stack to
+  renumber at merge: v42 BL-1195 (ledger says 43), v45 R2 -> sequential.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
