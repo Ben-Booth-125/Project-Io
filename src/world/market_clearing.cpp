@@ -878,9 +878,10 @@ void inject_background_demand(world& w, const recipe_registry& reg)
 
 void draw_background_basket(world& w, const recipe_registry& reg)
 {
-    // BL-1217 lever D (measurement, behind economy.background_demand.consumes,
-    // default OFF). The background basket stops being a pricing pull only: it
-    // TAKES what it bid off the market's shelf, `min(bid, inventory)` per good,
+    // BL-1217 lever D (behind economy.background_demand.consumes: authored TRUE
+    // in scripts/economy.lua; the C++ struct default is false, so a hand-built
+    // registry does not draw). The background basket is not a pricing pull only:
+    // it TAKES what it bid off the market's shelf,
     // exactly as draw_household_basket does and on the same terms -- NO MONEY
     // MOVES (the market paid the maker when it bought the stock as buyer of
     // last resort), and NO CEILING (the bid's elasticity is its reservation).
@@ -889,8 +890,9 @@ void draw_background_basket(world& w, const recipe_registry& reg)
     //
     // BL-1217 G1b R3 (MARKETS.md step 3, re-ruled Ben 2026-10-09): the pull
     // draws AFTER the processors. It leaves one tick of the market's processor
-    // want (`processor_want`, written by clear_markets this clear) on the shelf
-    // and draws only what stands above it: min(bid, max(0, shelf - want)).
+    // want (`processor_want`, written by clear_markets this clear: posted want
+    // plus the want the ceiling silenced, processors only) on the shelf and
+    // draws only what stands above it: min(bid, max(0, shelf - want)).
     const bool consumes = reg.background_demand().consumes;
     std::vector<entity_id> mids;
     mids.reserve(w.markets.size());
@@ -2216,8 +2218,9 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     draw_household_basket(w);
 
     // BL-1217 lever D: the background basket draws what the households left,
-    // before spoilage and before the nation's later claims. A no-op on the
-    // shelf while economy.background_demand.consumes is false (the default).
+    // before spoilage and before the nation's later claims, leaving one tick of
+    // processor want (BL-1217 G1b R3). A no-op on the shelf while
+    // economy.background_demand.consumes is false (authored true in economy.lua).
     draw_background_basket(w, reg);
 
     // BL-1179 (shelf spoilage): after the households' draw (the nation's later

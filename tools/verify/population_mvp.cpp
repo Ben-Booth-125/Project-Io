@@ -903,6 +903,157 @@ static void test_background_draw_after_processors()
 }
 
 // ---------------------------------------------------------------------------
+// BL-1217 G1b R3 round 2: the SAME rule through the real tick —
+// run_economy_step + clear_markets, nothing set by hand but the opening state.
+// Market A (body 1) holds three buildings of one corp and one population centre
+// (the background pull's scale):
+//   P1  iron_ore -> steel, shelf admitted: draws 20 iron, posts want 20
+//   P2  copper_ore -> refined_copper, copper priced 10x base over the 2x ceiling:
+//       SILENCED — posts no demand, draws nothing, its 20 goes to hauler_wants
+//   S   a construction site wanting 10 steel (shelf has none: paused, still bids)
+// The background pull bids iron and copper on A. Market B (body 2) has no
+// processor and opens with a STALE processor_want; market A opens with a stale
+// iron processor_want of 1000 — a draw read before the copy would see it.
+//   T1 report.processor_wants(corp, A) holds P1's iron 20 and P2's copper 20
+//   T2 construction stays out: steel is in demand, not in processor_want
+//   T3 the silenced copper is protected (shelf 25 - want 20 = 5 above it) and
+//      still out of the price (demand[copper] = the background bid alone)
+//   T4 market B's stale processor_want resets to 0
+//   T5 the copy happens before the draw: iron fill = min(bid, shelf - 20), not
+//      0 (stale 1000) and not min(bid, shelf) (no reserve)
+// ---------------------------------------------------------------------------
+static void test_background_draw_real_clear()
+{
+    std::printf("--- BL-1217 R3: real tick, processor want (posted + silenced) is left; construction is not ---\n");
+    const std::size_t iron = ri(resource_type::iron_ore), steel = ri(resource_type::steel);
+    const std::size_t copper = ri(resource_type::copper_ore), rcopper = ri(resource_type::refined_copper);
+
+    recipe_registry reg;
+    reg.set_thresholds(1.0f, 0.2f);
+    {
+        building_economics pr;
+        pr.base_rate = 20.0f; pr.build_cost = 0.0f; pr.build_duration_ticks = 1.0f;
+        pr.resource_build_cost[steel] = 10.0f;
+        reg.set_economics(building_type::processing_facility, pr);
+    }
+    recipe r_steel;  r_steel.name = "steel";  r_steel.inputs[iron] = 2.0f;   r_steel.outputs[steel] = 1.0f;
+    recipe r_copper; r_copper.name = "rcu";   r_copper.inputs[copper] = 2.0f; r_copper.outputs[rcopper] = 1.0f;
+    const uint16_t steel_id = reg.add_recipe(r_steel);
+    const uint16_t cu_id    = reg.add_recipe(r_copper);
+    {
+        price_band_params pb = reg.price_band();
+        pb.reservation_mult = 2.0f; // the fair-price ceiling: 2 x base
+        reg.set_price_band(pb);
+    }
+    {
+        background_demand_params bd;
+        bd.demand_basket[iron]   = 1.0f;
+        bd.demand_basket[copper] = 4.0f;
+        bd.demand_scale          = 15.0f;
+        bd.consumes              = true;
+        reg.set_background_demand(bd);
+    }
+
+    world w;
+    const entity_id body = w.create_entity(); w.bodies[body] = body_component{};
+    const entity_id body2 = w.create_entity(); w.bodies[body2] = body_component{};
+    const entity_id tile = w.create_entity();
+    { tile_component tc{}; tc.body = body; tc.substrate = terrain_substrate::sedimentary;
+      tc.cover = terrain_cover::grass; tc.cover_density = 150; w.tiles[tile] = tc; }
+    const entity_id mA = w.create_entity();
+    {
+        market_component mc; mc.body = body; mc.centre_tile = tile;
+        mc.base_price[iron] = 2.5f; mc.base_price[steel] = 8.0f;
+        mc.base_price[copper] = 3.0f; mc.base_price[rcopper] = 9.0f;
+        mc.price = mc.base_price;
+        mc.price[copper] = 30.0f;          // 10 x base: over the 2 x ceiling -> P2 silenced
+        mc.inventory[iron]   = 50.0f;
+        mc.inventory[copper] = 25.0f;
+        mc.processor_want[iron] = 1000.0f; // stale: a draw before the copy would leave all
+        w.markets[mA] = mc;
+    }
+    const entity_id mB = w.create_entity();
+    {
+        market_component mc; mc.body = body2;
+        mc.base_price[iron] = 2.5f; mc.price = mc.base_price;
+        mc.processor_want[iron] = 50.0f;   // stale, and B has no processor
+        w.markets[mB] = mc;
+    }
+    const entity_id corp = w.create_entity();
+    { corporation_component cc; cc.balance = 100000.0f; cc.is_player = true; w.corporations[corp] = cc; }
+    auto add_bld = [&](uint16_t recipe_id, int ticks_remaining) {
+        const entity_id b = w.create_entity();
+        building_component bc{}; bc.tile = tile; bc.type = building_type::processing_facility;
+        bc.workforce_assigned = 0.5f; bc.recipe = recipe_id; bc.ticks_remaining = ticks_remaining;
+        w.buildings[b] = bc;
+        w.corporations[corp].assets.push_back(b);
+        return b;
+    };
+    const entity_id p1 = add_bld(steel_id, 0);
+    const entity_id p2 = add_bld(cu_id, 0);
+    const entity_id site = add_bld(steel_id, 1);
+    (void)site;
+    {
+        const entity_id pop = w.create_entity();
+        population_centre_component pcc{};
+        pcc.scale = 1; pcc.population = 20; pcc.habitability = 0.9f;
+        w.population_centres[pop]     = pcc;
+        w.population_centre_tile[pop] = tile;
+    }
+
+    const economy_report rep = run_economy_step(w, reg);
+    const float shelf_iron_pre = w.markets.at(mA).inventory[iron]; // after P1's draw, before the clear
+    const float shelf_cu_pre   = w.markets.at(mA).inventory[copper];
+    clear_markets(w, reg, rep);
+    const market_component& A = w.markets.at(mA);
+    const market_component& B = w.markets.at(mB);
+
+    bool p1_ran = false, p2_idle = false;
+    for (const auto& br : rep.buildings)
+    {
+        if (br.building == p1) p1_ran = !br.idle;
+        if (br.building == p2) p2_idle = br.idle;
+    }
+    std::array<float, resource_count> prow{}, wrow{};
+    if (const auto it = rep.processor_wants.find({ corp, mA }); it != rep.processor_wants.end()) prow = it->second;
+    if (const auto it = rep.wants.find({ corp, mA }); it != rep.wants.end()) wrow = it->second;
+
+    std::printf("  T1 P1 ran %d, P2 idle %d; processor_wants(A): iron %.2f copper %.2f steel %.2f | wants(A): iron %.2f copper %.2f steel %.2f\n",
+                p1_ran, p2_idle, prow[iron], prow[copper], prow[steel], wrow[iron], wrow[copper], wrow[steel]);
+    check(p1_ran && p2_idle, "T1 fixture: P1 runs on the admitted shelf, P2 is silenced by the ceiling");
+    check(std::fabs(prow[iron] - 20.0f) < 1e-3f, "T1 run_processing fills processor_wants with P1's posted want (20 iron)", prow[iron], 20.0f);
+    check(std::fabs(prow[copper] - 20.0f) < 1e-3f, "T1 ... and with P2's SILENCED want (20 copper)", prow[copper], 20.0f);
+
+    std::printf("  T2 steel: wants %.2f demand %.2f processor_want %.2f\n", wrow[steel], A.demand[steel], A.processor_want[steel]);
+    check(wrow[steel] >= 10.0f - 1e-3f && prow[steel] == 0.0f && A.processor_want[steel] == 0.0f,
+          "T2 construction's steel bids in `wants` and never enters processor_want", A.processor_want[steel], 0.0f);
+
+    const float cu_fill_want = std::min(A.background_bid[copper], std::max(0.0f, shelf_cu_pre - 20.0f));
+    std::printf("  T3 copper: shelf %.2f, processor_want %.2f, bg bid %.2f fill %.2f (want %.2f); demand %.2f, wants %.2f\n",
+                shelf_cu_pre, A.processor_want[copper], A.background_bid[copper], A.background_fill[copper],
+                cu_fill_want, A.demand[copper], wrow[copper]);
+    check(std::fabs(A.processor_want[copper] - 20.0f) < 1e-3f, "T3 the silenced want is copied to the market", A.processor_want[copper], 20.0f);
+    check(A.background_bid[copper] > 5.0f && std::fabs(A.background_fill[copper] - cu_fill_want) < 1e-3f,
+          "T3 the pull draws only what stands above the silenced want (25 - 20 = 5)", A.background_fill[copper], cu_fill_want);
+    check(wrow[copper] == 0.0f && std::fabs(A.demand[copper] - A.background_bid[copper]) < 1e-3f,
+          "T3 the ceiling still keeps the silenced want out of the price (demand = background bid alone)",
+          A.demand[copper], A.background_bid[copper]);
+
+    std::printf("  T4 market B processor_want[iron] 50 -> %.2f\n", B.processor_want[iron]);
+    check(B.processor_want[iron] == 0.0f, "T4 a market with no processor resets its stale processor_want to 0", B.processor_want[iron], 0.0f);
+
+    const float iron_fill_want = std::min(A.background_bid[iron], std::max(0.0f, shelf_iron_pre - 20.0f));
+    std::printf("  T5 iron: shelf %.2f, processor_want %.2f (stale 1000), bg bid %.2f fill %.2f (want %.2f; no reserve %.2f)\n",
+                shelf_iron_pre, A.processor_want[iron], A.background_bid[iron], A.background_fill[iron],
+                iron_fill_want, std::min(A.background_bid[iron], shelf_iron_pre));
+    check(std::fabs(A.processor_want[iron] - 20.0f) < 1e-3f, "T5 this tick's processor want replaces the stale 1000", A.processor_want[iron], 20.0f);
+    check(iron_fill_want > 0.0f && iron_fill_want < std::min(A.background_bid[iron], shelf_iron_pre)
+              && std::fabs(A.background_fill[iron] - iron_fill_want) < 1e-3f,
+          "T5 the copy precedes the draw: fill = min(bid, shelf - 20), neither 0 nor the unreserved draw",
+          A.background_fill[iron], iron_fill_want);
+}
+
+// ---------------------------------------------------------------------------
 int main()
 {
     test_population_on_kepler();
@@ -913,6 +1064,7 @@ int main()
     test_unrecorded_bid_carries_streak();
     test_household_draw_multi_tick();
     test_background_draw_after_processors();
+    test_background_draw_real_clear();
 
     if (g_failures == 0)
         std::printf("\nALL PASS (%d assertions)\n", g_passes);

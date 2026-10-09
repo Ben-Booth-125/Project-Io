@@ -78,11 +78,12 @@ float population_met_ratio(const world& w, const recipe_registry& reg, entity_id
 /// per-market arithmetic. Deterministic.
 void draw_household_basket(world& w);
 
-/// BL-1217 lever D (measurement switch `economy.background_demand.consumes`,
-/// default false). When on, every market's background basket TAKES its bid
-/// (`background_bid`, written by inject_background_demand) off the shelf after
-/// the households' draw, leaving one tick of the market's processor want
-/// (`processor_want`, BL-1217 G1b R3) on the shelf:
+/// BL-1217 lever D (switch `economy.background_demand.consumes`: authored TRUE
+/// in scripts/economy.lua; the C++ struct default is false, so a hand-built
+/// registry does not draw). When on, every market's background basket TAKES its
+/// bid (`background_bid`, written by inject_background_demand) off the shelf
+/// after the households' draw, leaving one tick of the market's processor want
+/// (`processor_want`, BL-1217 G1b R3: posted plus ceiling-silenced) on the shelf:
 /// `background_fill[r] = min(bid, max(0, inventory[r] - processor_want[r]))`. No
 /// money moves; no ceiling. When off, the shelf is untouched and
 /// `background_fill` reads zero. Ascending market id and resource.

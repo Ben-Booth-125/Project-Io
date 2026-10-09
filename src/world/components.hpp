@@ -1136,8 +1136,8 @@ struct market_component
     std::array<float, resource_count>   dial_pool_draw      = {};
     std::array<int32_t, resource_count> dial_pool_draw_tick = {};
 
-    /// BL-1217 lever D (measurement, behind `economy.background_demand.consumes`,
-    /// default off): the BACKGROUND channel's bid at the last clear
+    /// BL-1217 lever D (behind `economy.background_demand.consumes`, authored
+    /// true in economy.lua): the BACKGROUND channel's bid at the last clear
     /// (`inject_background_demand`) and what it DREW off `inventory`
     /// (`draw_background_basket`, zero while the switch is off). TRANSIENT and
     /// deliberately NOT serialised: both are rewritten inside the same clear
@@ -1149,10 +1149,10 @@ struct market_component
 
     /// BL-1217 G1b R3 (MARKETS.md step 3, "the pull draws after the
     /// processors", Ben 2026-10-09): one tick of this market's PROCESSOR want —
-    /// the want its processors POSTED here this tick (`economy_report::
-    /// processor_wants`, the processor part of the demand register; wanted,
+    /// the want its processors POSTED here this tick plus the want the
+    /// fair-price ceiling SILENCED (`economy_report::processor_wants`; wanted,
     /// not drawn; no construction, upkeep, household, background or nation
-    /// part). draw_background_basket leaves this much on the shelf and draws
+    /// part; Ben 2026-10-09). draw_background_basket leaves this much on the shelf and draws
     /// only what stands above it. TRANSIENT and NOT serialised: clear_markets
     /// rewrites it on every market before the draw reads it, inside the same
     /// clear, so a load that leaves it zero changes nothing the sim computes.
