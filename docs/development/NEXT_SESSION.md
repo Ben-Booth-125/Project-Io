@@ -284,6 +284,15 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   re-rules "the cost, accepted"); ceiling hysteresis (MARKETS/FINANCE); dispatcher holds cargo it
   would send + cargo lists after the draw (SUPPLY). Counterfactuals: pull off 9.6%; ceiling off
   14.9% (worse); opening-stock release no change. Others untested. **Form to Ben.**
+  **BEN RULED (5fde6f22):** every recipe switch (chase + rescue) judged on supply; NEW GRANT spare
+  supply net of household + background draws (§ 11; generation sized rule too); background pull
+  leaves one tick of processor want (MARKETS re-rule). NOT chosen: ceiling damping, haul fixes.
+  Lanes: R1+R2 (switch + spare) and R3 (background order), each measured alone.
+  **BL-1195 DONE** (4963c356; cold review running): lane = priced legs; convoy gains origin_tile/
+  port_a/port_b (SAVE v42 — ledger row says 43, lane's edit refused: Ben to see); gate unchanged;
+  pre-existing fails convoy_command R4.2/4.4/4.5, supply_advance 4, LP-trim 1 (same on base).
+  Live look at a sea-route convoy owed. Save stack now: v39 D5, v40 D3, v41 PROPELLANT, v42 BL-1195;
+  the G1b lanes may claim more — reconcile at merge.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
