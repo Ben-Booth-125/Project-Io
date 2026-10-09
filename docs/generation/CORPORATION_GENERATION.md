@@ -582,7 +582,12 @@ derived demand of what stands or is chartered. A good with no consumer gets no m
 sake. Measured before the ruling: about 34 refined-fuel plants per seed stood against under one
 consumer, and the dial idled them all. **A processor laid with no recipe is not placed when its
 default output is unwanted (Ben, 2026-10-09):** it is not given another recipe in its place, nor
-left standing idle.
+left standing idle. **Two exceptions (Ben, 2026-10-09, measured).** The world's **pre-authored
+installation** keeps its default: it is the one steel maker the chain-feasibility test can see at
+the start, and unplacing it left no steel, alloys, consumer goods or machinery on any seed. And a
+**chartered processing firm keeps its second works** once the first covers the gap: the
+firm's authored pair stands whole (measured: 120 more plants running at the handoff and 8% more
+play income, the share running unchanged).
 
 **What Pass 6 does not do.** It does not seed any behavioural state, matching the contract the
 rest of this pipeline holds (§ Generation seeds no behaviour) — no sentiment, no diplomatic
