@@ -59,6 +59,14 @@
 //   P23 The lock fast path (BL-1246): a window wholly inside survey-masked
 //       ground fills with the lock colour directly, byte-identical to the
 //       full per-pixel bake (masked chunks and a mask-edge chunk).
+//   P24 The partial re-bake (BL-1246): windows the rule draws around
+//       installations, re-baked and blitted over a master chunk, are
+//       window-invariant (the whole bake is unchanged) and turn the chunk
+//       baked before an installation change into the chunk baked after, byte
+//       for byte — real installations, a structure straddling a chunk corner,
+//       one on the wrap seam; a terrain change or a dense change re-bakes
+//       whole. P25 the windows' own mip pieces equal the whole chain.
+//       `--patch` runs P24/P25 alone.
 //
 // Also prints bake time per tier (a measurement, not a check) and writes
 // feature_<form>_<tier>.png previews for the eye.
@@ -531,6 +539,441 @@ void lock_fast_row(world& w, entity_id home, const bake_params& p)
     check(equal, "P23", "the lock fast path is byte-identical to the full bake (masked and mask-edge chunks)");
 }
 
+/// P24 / P25 - the partial re-bake (BL-1246, RENDERING.md § Chunks, cache and
+/// invalidation: a building's change re-bakes a window around it, not its
+/// whole chunk). On master chunks, exactly as ground_layer bakes them:
+///   P24 window invariance — a chunk baked whole, then the windows the rule
+///       draws around its installations re-baked and blitted over it, is
+///       unchanged byte for byte; and the patch itself — a chunk baked
+///       against the source BEFORE an installation change, patched with the
+///       windows the rule draws from the before/after diff, equals the whole
+///       chunk baked AFTER, byte for byte: real installations, a staged
+///       structure straddling a chunk corner (every chunk it reaches), one on
+///       the wrap seam (both sides), a build, a removal, a family change, a
+///       raze. A terrain change and a dense change fall back to a whole bake.
+///   P25 the mip pieces derived from the windows alone, placed over the old
+///       chunk's chain, equal the new chunk's chain at every level.
+void patch_row(const bake_source& src, const bake_params& p)
+{
+    const geometry m = make_master_geometry(src.gw, src.gh);
+    bake_params p1 = p;
+    p1.supersample = 1; // the master's (ground_layer::k_master_ss)
+    const int cw = (m.W + k_chunk_px - 1) / k_chunk_px;
+    const int ch = (m.H + k_chunk_px - 1) / k_chunk_px;
+    constexpr double kS3 = 1.7320508075688772;
+
+    bake_source bare = src;
+    bare.inst.of_tile.assign(bare.cls.size(), -1);
+    bare.inst.list.clear();
+    const auto staged = [](const bake_source& base, std::size_t i, const tile_installation& ti) {
+        bake_source s = base;
+        if (s.inst.of_tile[i] < 0)
+        {
+            s.inst.of_tile[i] = static_cast<std::int32_t>(s.inst.list.size());
+            s.inst.list.push_back(ti);
+        }
+        else
+            s.inst.list[static_cast<std::size_t>(s.inst.of_tile[i])] = ti;
+        return s;
+    };
+    const auto cleared = [](const bake_source& base, std::size_t i) {
+        bake_source s = base;
+        s.inst.of_tile[i] = -1; // the list entry is left behind, unreferenced
+        return s;
+    };
+    const auto chunk_of = [&](std::size_t i, int& ci, int& cj) {
+        const int r = static_cast<int>(i / src.gw), c = static_cast<int>(i % src.gw);
+        const double x = kS3 * (c + ((r & 1) ? 0.5 : 0.0)) * m.s;
+        const double y = (1.5 * r - m.y_min) * m.s;
+        ci = std::clamp(static_cast<int>(x) / k_chunk_px, 0, cw - 1);
+        cj = std::clamp(static_cast<int>(y) / k_chunk_px, 0, ch - 1);
+    };
+
+    int cases = 0, windows = 0;
+    long long patch_px = 0, chunk_px = 0;
+    bool p24_ok = true, p25_ok = true, inv_ok = true;
+    std::vector<std::uint32_t> base, target, out;
+    std::vector<std::uint32_t> base_mip[k_level_count], target_mip[k_level_count], pm[k_level_count];
+    // One case: chunk (ci, cj) baked against @p base_src, the windows of the
+    // (rect_old -> rect_new) diff re-baked against rect_new and blitted,
+    // compared with the chunk baked whole against rect_new.
+    const auto run = [&](const char* name, const bake_source& base_src, const bake_source& rect_old,
+                         const bake_source& rect_new, int ci, int cj, bool invariance) {
+        const int x0 = ci * k_chunk_px, y0 = cj * k_chunk_px;
+        const int w = std::min(k_chunk_px, m.W - x0), h = std::min(k_chunk_px, m.H - y0);
+        std::vector<pixel_rect> rects;
+        const bool ok = installation_patch_rects(rect_old, rect_new, m, p1, x0, y0, w, h, rects, 1.0);
+        base.assign(static_cast<std::size_t>(w) * h, 0u);
+        target.assign(base.size(), 0u);
+        bake_region(base_src, m, p1, x0, y0, w, h, base.data());
+        bake_region(rect_new, m, p1, x0, y0, w, h, target.data());
+        derive_mip_pieces(base.data(), w, h, base_mip);
+        derive_mip_pieces(target.data(), w, h, target_mip);
+        long long area = 0;
+        for (const pixel_rect& r : rects)
+        {
+            out.assign(static_cast<std::size_t>(r.w) * r.h, 0u);
+            bake_region(rect_new, m, p1, r.x0, r.y0, r.w, r.h, out.data());
+            const int rx = r.x0 - x0, ry = r.y0 - y0;
+            for (int y = 0; y < r.h; ++y)
+                std::memcpy(base.data() + static_cast<std::size_t>(ry + y) * w + rx,
+                            out.data() + static_cast<std::size_t>(y) * r.w, static_cast<std::size_t>(r.w) * 4u);
+            derive_mip_pieces(out.data(), r.w, r.h, pm);
+            int lw = w;
+            for (int l = 1; l < k_level_count; ++l)
+            {
+                lw /= 2;
+                for (int y = 0; y < (r.h >> l); ++y)
+                    std::memcpy(base_mip[l].data() + static_cast<std::size_t>((ry >> l) + y) * lw + (rx >> l),
+                                pm[l].data() + static_cast<std::size_t>(y) * (r.w >> l),
+                                static_cast<std::size_t>(r.w >> l) * 4u);
+            }
+            area += static_cast<long long>(r.w) * r.h;
+        }
+        bool same = ok && base == target;
+        int first = -1;
+        if (!same && ok)
+            for (std::size_t q = 0; q < base.size() && first < 0; ++q)
+                if (base[q] != target[q])
+                    first = static_cast<int>(q);
+        bool chain = ok;
+        for (int l = 1; l < k_level_count && chain; ++l)
+            chain = base_mip[l] == target_mip[l];
+        std::printf("P24: %-34s chunk (%d,%d)  %zu window%s  %.1f%% of the chunk%s",
+                    name, ci, cj, rects.size(), rects.size() == 1 ? "" : "s",
+                    100.0 * area / (static_cast<double>(w) * h), ok ? "" : "  [rule refused]");
+        if (first >= 0)
+            std::printf("  FIRST MISMATCH at chunk px (%d,%d)", first % w, first / w);
+        std::printf("\n");
+        ++cases;
+        windows += static_cast<int>(rects.size());
+        patch_px += area;
+        chunk_px += static_cast<long long>(w) * h;
+        (invariance ? inv_ok : p24_ok) = (invariance ? inv_ok : p24_ok) && same;
+        p25_ok = p25_ok && chain;
+        return rects.size();
+    };
+
+    // --- Real installations: the chunk holding the most of them ---
+    std::vector<int> per_chunk(static_cast<std::size_t>(cw) * ch, 0);
+    std::vector<std::size_t> inst_tiles;
+    for (std::size_t i = 0; i < src.inst.of_tile.size(); ++i)
+        if (src.inst.of_tile[i] >= 0)
+        {
+            int ci = 0, cj = 0;
+            chunk_of(i, ci, cj);
+            ++per_chunk[static_cast<std::size_t>(cj) * cw + ci];
+            inst_tiles.push_back(i);
+        }
+    const auto busiest = std::max_element(per_chunk.begin(), per_chunk.end());
+    if (!inst_tiles.empty() && *busiest > 0)
+    {
+        const int k = static_cast<int>(busiest - per_chunk.begin());
+        const int ci = k % cw, cj = k / cw;
+        std::printf("P24: the real installations' busiest master chunk (%d,%d) holds %d\n", ci, cj, *busiest);
+        run("invariance (real, every structure)", src, bare, src, ci, cj, true);
+        run("real: every structure built", bare, bare, src, ci, cj, false);
+        // One structure in that chunk: built, demolished, re-familied, razed.
+        std::size_t one = inst_tiles.front();
+        for (const std::size_t i : inst_tiles)
+        {
+            int a = 0, b = 0;
+            chunk_of(i, a, b);
+            if (a == ci && b == cj) { one = i; break; }
+        }
+        const bake_source without = cleared(src, one);
+        run("real: one build", without, without, src, ci, cj, false);
+        run("real: one demolition", src, src, without, ci, cj, false);
+        tile_installation ti = src.inst.list[static_cast<std::size_t>(src.inst.of_tile[one])];
+        if (ti.n_stacks > 0)
+            ti.stacks[0].family ^= 1;
+        else
+            ti.settlement.subject = ti.settlement.subject == stamp_subject::ruin
+                                        ? stamp_subject::settlement : stamp_subject::ruin;
+        const bake_source changed = staged(src, one, ti);
+        run("real: one family change / raze", src, src, changed, ci, cj, false);
+    }
+    else
+        std::printf("SKIP  P24 real: this seed's home body stands no installation\n");
+
+    // The biggest staged tile: three stacks and a metropolis.
+    tile_installation big;
+    {
+        const auto bld = [](building_type t, int fam) {
+            stamp_key k; k.subject = stamp_subject::building;
+            k.type = static_cast<std::uint8_t>(t); k.family = static_cast<std::uint8_t>(fam);
+            return k;
+        };
+        big.stacks[0] = bld(building_type::processing_facility, static_cast<int>(processing_family::refinery));
+        big.stacks[1] = bld(building_type::extraction_site, static_cast<int>(extraction_family::mine));
+        big.stacks[2] = bld(building_type::port, 0);
+        big.n_stacks = 3;
+        big.settlement.subject = stamp_subject::settlement;
+        big.settlement.scale = 5;
+    }
+    const auto visible = [&](std::size_t i) {
+        return src.cls[i] == static_cast<std::uint8_t>(bake_source::tile_class::land)
+            || src.cls[i] == static_cast<std::uint8_t>(bake_source::tile_class::water);
+    };
+    // A staged tile built: the rule run on its own master chunk and all eight
+    // around it (columns wrapping) — a chunk the rule leaves unpatched must
+    // come out unchanged too. Returns the chunks given a window, and whether
+    // both sides of the wrap seam were.
+    const auto run_reached = [&](const char* name, std::size_t i, bool& both_seam_sides) {
+        const bake_source before = cleared(src, i);
+        const bake_source after  = staged(src, i, big);
+        int ci0 = 0, cj0 = 0;
+        chunk_of(i, ci0, cj0);
+        int n = 0;
+        bool east = false, west = false;
+        for (int dj = -1; dj <= 1; ++dj)
+            for (int di = -1; di <= 1; ++di)
+            {
+                const int cj = cj0 + dj;
+                const int ci = ((ci0 + di) % cw + cw) % cw;
+                if (cj < 0 || cj >= ch)
+                    continue;
+                if (run(name, before, before, after, ci, cj, false) > 0)
+                {
+                    ++n;
+                    east = east || ci == 0;
+                    west = west || ci == cw - 1;
+                }
+            }
+        both_seam_sides = east && west;
+        return n;
+    };
+
+    // --- A structure straddling a chunk CORNER: the tile whose centre is
+    // nearest a corner of the master chunk lattice, in temperate rows ---
+    {
+        std::size_t best = 0;
+        double best_d = 1e30;
+        for (int r = src.gh / 4; r < src.gh * 3 / 4; ++r)
+            for (int c = 1; c + 1 < src.gw; ++c)
+            {
+                const std::size_t i = static_cast<std::size_t>(r) * src.gw + c;
+                if (!visible(i))
+                    continue;
+                const double x = kS3 * (c + ((r & 1) ? 0.5 : 0.0)) * m.s;
+                const double y = (1.5 * r - m.y_min) * m.s - 40.0; // structures stand up: aim a little high
+                const double dx = std::fabs(x - std::round(x / k_chunk_px) * k_chunk_px);
+                const double dy = std::fabs(y - std::round(y / k_chunk_px) * k_chunk_px);
+                if (dx + dy < best_d) { best_d = dx + dy; best = i; }
+            }
+        bool seam_unused = false;
+        const int n = run_reached("staged: straddling a chunk corner", best, seam_unused);
+        std::printf("P24: the corner tile [%zu,%zu] reaches %d master chunks\n",
+                    best % src.gw, best / src.gw, n);
+        check(n >= 3, "P24", "the corner case reaches at least three chunks (it straddles)");
+
+        // EVERY FORM, one at a time, built on that tile: a window wide enough
+        // for any structure, baked before and after, patched by the rule —
+        // so no form draws a pixel its window misses.
+        const auto bld = [](building_type t, int fam, stamp_subject sj = stamp_subject::building) {
+            stamp_key k; k.subject = sj;
+            k.type = static_cast<std::uint8_t>(t); k.family = static_cast<std::uint8_t>(fam);
+            return k;
+        };
+        std::vector<tile_installation> forms;
+        const auto one = [&](stamp_key a) { tile_installation t; t.stacks[0] = a; t.n_stacks = 1; forms.push_back(t); };
+        for (int f = 0; f < static_cast<int>(extraction_family::count); ++f)
+            one(bld(building_type::extraction_site, f));
+        for (int f = 0; f < static_cast<int>(processing_family::count); ++f)
+            one(bld(building_type::processing_facility, f));
+        for (building_type t : { building_type::port, building_type::launchpad,
+                                 building_type::inland_logistics_hub, building_type::military_base,
+                                 building_type::research_institute, building_type::schooling,
+                                 building_type::university })
+            one(bld(t, 0));
+        one(bld(building_type::processing_facility, static_cast<int>(processing_family::metal_foundry),
+                stamp_subject::scaffold));
+        for (int sc = 1; sc <= 5; ++sc)
+        {
+            tile_installation t; t.settlement.subject = stamp_subject::settlement;
+            t.settlement.scale = static_cast<std::uint8_t>(sc);
+            forms.push_back(t);
+        }
+        {
+            tile_installation t; t.settlement.subject = stamp_subject::ruin; t.settlement.scale = 1;
+            forms.push_back(t);
+        }
+        forms.push_back(big);
+        const int br = static_cast<int>(best / src.gw), bc = static_cast<int>(best % src.gw);
+        const double bx = kS3 * (bc + ((br & 1) ? 0.5 : 0.0)), by = 1.5 * br;
+        const int fx0 = (static_cast<int>((bx - 3.5) * m.s) / k_patch_align) * k_patch_align;
+        const int fy0 = (static_cast<int>((by - 4.0 - m.y_min) * m.s) / k_patch_align) * k_patch_align;
+        const int fw = static_cast<int>(7.5 * m.s) / k_patch_align * k_patch_align;
+        const int fh = static_cast<int>(7.0 * m.s) / k_patch_align * k_patch_align;
+        const bake_source before = cleared(src, best);
+        std::vector<std::uint32_t> fb(static_cast<std::size_t>(fw) * fh), fa(fb.size()), fo;
+        bake_region(before, m, p1, fx0, fy0, fw, fh, fb.data());
+        int forms_ok = 0;
+        double max_frac = 0.0;
+        for (const tile_installation& ti : forms)
+        {
+            const bake_source after = staged(before, best, ti);
+            bake_region(after, m, p1, fx0, fy0, fw, fh, fa.data());
+            std::vector<pixel_rect> rr;
+            std::vector<std::uint32_t> patched = fb;
+            bool good = installation_patch_rects(before, after, m, p1, fx0, fy0, fw, fh, rr, 1.0);
+            long long area = 0;
+            for (const pixel_rect& r : rr)
+            {
+                fo.assign(static_cast<std::size_t>(r.w) * r.h, 0u);
+                bake_region(after, m, p1, r.x0, r.y0, r.w, r.h, fo.data());
+                for (int y = 0; y < r.h; ++y)
+                    std::memcpy(patched.data() + static_cast<std::size_t>(r.y0 - fy0 + y) * fw + (r.x0 - fx0),
+                                fo.data() + static_cast<std::size_t>(y) * r.w, static_cast<std::size_t>(r.w) * 4u);
+                area += static_cast<long long>(r.w) * r.h;
+            }
+            good = good && patched == fa && fa != fb;
+            // And the form's window-invariance at another window origin on the
+            // 16 px lattice: the overlap of a shifted window bakes the same.
+            {
+                const int sx = 48, sy = 32;
+                std::vector<std::uint32_t> sh(fa.size());
+                bake_region(after, m, p1, fx0 + sx, fy0 + sy, fw, fh, sh.data());
+                for (int y = 0; y + sy < fh && good; ++y)
+                    good = std::memcmp(sh.data() + static_cast<std::size_t>(y) * fw,
+                                       fa.data() + static_cast<std::size_t>(y + sy) * fw + sx,
+                                       static_cast<std::size_t>(fw - sx) * 4u) == 0;
+            }
+            max_frac = std::max(max_frac, area / (static_cast<double>(k_chunk_px) * k_chunk_px));
+            if (!good)
+            {
+                int dx0 = fw, dy0 = fh, dx1 = -1, dy1 = -1, miss = 0;
+                for (int y = 0; y < fh; ++y)
+                    for (int x = 0; x < fw; ++x)
+                    {
+                        const std::size_t q = static_cast<std::size_t>(y) * fw + x;
+                        if (fa[q] == fb[q])
+                            continue;
+                        dx0 = std::min(dx0, x); dx1 = std::max(dx1, x);
+                        dy0 = std::min(dy0, y); dy1 = std::max(dy1, y);
+                        miss += patched[q] != fa[q];
+                    }
+                std::printf("      form %s type %d family %d scale %d: the window misses %d pixels it "
+                            "draws (changed px x %d..%d y %d..%d of the %dx%d window",
+                            stamp_name(ti.n_stacks ? ti.stacks[0] : ti.settlement),
+                            ti.stacks[0].type, ti.stacks[0].family, ti.settlement.scale, miss,
+                            dx0, dx1, dy0, dy1, fw, fh);
+                for (const pixel_rect& r : rr)
+                    std::printf("; rect x %d..%d y %d..%d", r.x0 - fx0, r.x0 - fx0 + r.w - 1,
+                                r.y0 - fy0, r.y0 - fy0 + r.h - 1);
+                std::printf(")\n");
+                // Triage: which pass is window-dependent? The rect baked alone
+                // vs the same pixels of the wide window, each pass off in turn.
+                if (!rr.empty())
+                {
+                    const pixel_rect r = rr.front();
+                    struct off { const char* name; void (*set)(bake_params&); };
+                    const off offs[] = {
+                        { "all on",           [](bake_params&) {} },
+                        { "no-installations", [](bake_params& q) { q.installations = false; } },
+                        { "no-unsharp",       [](bake_params& q) { q.unsharp_amount = 0.0f; } },
+                        { "no-ink",           [](bake_params& q) { q.edge_ink = q.shore_ink = 0.0f; } },
+                        { "no-grade",         [](bake_params& q) { q.grade_enabled = false; } },
+                        { "no-trees",         [](bake_params& q) { q.tree_density = 0.0f; } },
+                        { "no-landforms",     [](bake_params& q) { q.landform_strength = 0.0f; } },
+                        { "no-rivers",        [](bake_params& q) { q.river_strength = 0.0f; } },
+                        { "no-variants",      [](bake_params& q) { q.variant_strength = 0.0f; } },
+                    };
+                    std::vector<std::uint32_t> wide(fa.size()), part;
+                    for (const off& o : offs)
+                    {
+                        bake_params q = p1;
+                        o.set(q);
+                        bake_region(after, m, q, fx0, fy0, fw, fh, wide.data());
+                        part.assign(static_cast<std::size_t>(r.w) * r.h, 0u);
+                        bake_region(after, m, q, r.x0, r.y0, r.w, r.h, part.data());
+                        int bad = 0, fx = -1, fy = -1;
+                        for (int y = 0; y < r.h; ++y)
+                            for (int x = 0; x < r.w; ++x)
+                                if (part[static_cast<std::size_t>(y) * r.w + x]
+                                    != wide[static_cast<std::size_t>(r.y0 - fy0 + y) * fw + (r.x0 - fx0 + x)])
+                                {
+                                    if (!bad) { fx = x; fy = y; }
+                                    ++bad;
+                                }
+                        std::printf("        triage %-16s %d px differ (first at rect px %d,%d)\n", o.name, bad, fx, fy);
+                    }
+                }
+            }
+            forms_ok += good ? 1 : 0;
+        }
+        std::printf("P24: %d of %zu forms patched exactly; the largest window is %.0f%% of a chunk\n",
+                    forms_ok, forms.size(), 100.0 * max_frac);
+        check(forms_ok == static_cast<int>(forms.size()), "P24",
+              "every procedural form's window holds every pixel it draws, and the form bakes alike at another window origin");
+    }
+    // --- A structure in a FOREST: the trees its cleared ground removes ---
+    {
+        const int f = homogeneous_aim(src, terrain_cover::forest);
+        if (f >= 0)
+        {
+            bool unused = false;
+            run_reached("staged: in a forest (trees cleared)", static_cast<std::size_t>(f), unused);
+        }
+        else
+            std::printf("SKIP  P24 forest: no forest on this seed's home body\n");
+    }
+    // --- A structure on the WRAP SEAM: column 0, mid-body ---
+    {
+        std::size_t seam = static_cast<std::size_t>(src.gh / 2) * src.gw;
+        for (int r = src.gh / 2; r < src.gh * 3 / 4; r += 2) // even rows: centre at x = 0 exactly
+        {
+            const std::size_t i = static_cast<std::size_t>(r) * src.gw;
+            if (visible(i)) { seam = i; break; }
+        }
+        bool both = false;
+        run_reached("staged: on the wrap seam", seam, both);
+        check(both, "P24", "the wrap-seam structure is patched on both sides of the seam");
+    }
+
+    // --- The fall-backs ---
+    {
+        const int ci = cw / 2, cj = ch / 2;
+        const int x0 = ci * k_chunk_px, y0 = cj * k_chunk_px;
+        const int w = std::min(k_chunk_px, m.W - x0), h = std::min(k_chunk_px, m.H - y0);
+        // A terrain change inside the chunk's reach: never a patch.
+        std::size_t t = 0;
+        for (std::size_t i = 0; i < src.cls.size(); ++i)
+        {
+            int a = 0, b = 0;
+            chunk_of(i, a, b);
+            if (a == ci && b == cj && visible(i)) { t = i; break; }
+        }
+        bake_source terr = staged(src, t, big);
+        terr.colour[t] ^= 0x00101010u;
+        std::vector<pixel_rect> rr;
+        check(!installation_patch_rects(cleared(src, t), terr, m, p1, x0, y0, w, h, rr),
+              "P24", "a terrain change in reach re-bakes the chunk whole");
+        // Every tile of the chunk building at once: past 40%, whole.
+        bake_source dense = bare;
+        for (std::size_t i = 0; i < src.cls.size(); ++i)
+        {
+            int a = 0, b = 0;
+            chunk_of(i, a, b);
+            if (a == ci && b == cj && visible(i))
+            {
+                dense.inst.of_tile[i] = static_cast<std::int32_t>(dense.inst.list.size());
+                dense.inst.list.push_back(big);
+            }
+        }
+        check(!installation_patch_rects(bare, dense, m, p1, x0, y0, w, h, rr),
+              "P24", "windows past 40% of the chunk re-bake it whole");
+        check(installation_patch_rects(src, src, m, p1, x0, y0, w, h, rr) && rr.empty(),
+              "P24", "no change, no window");
+    }
+
+    std::printf("P24: %d cases, %d windows, %.1f%% of their chunks' pixels re-baked\n", cases, windows,
+                chunk_px ? 100.0 * patch_px / chunk_px : 0.0);
+    check(inv_ok, "P24", "windows around installations re-baked and blitted leave a whole-chunk bake byte-identical");
+    check(p24_ok, "P24", "a chunk patched by the window rule equals the chunk baked whole after the change");
+    check(p25_ok, "P25", "the windows' own mip pieces, placed, equal the whole chunk's chain at 48/24/12/6");
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -605,6 +1048,14 @@ int main(int argc, char** argv)
     if (argc > 1 && std::strcmp(argv[1], "--pool") == 0)
     {
         pool_row(src, hb, land_i, p);
+        std::printf("%s (%d failures)\n", g_failures ? "FAIL" : "PASS", g_failures);
+        return g_failures ? 1 : 0;
+    }
+
+    // --patch: the partial re-bake rows (P24, P25) alone.
+    if (argc > 1 && std::strcmp(argv[1], "--patch") == 0)
+    {
+        patch_row(src, p);
         std::printf("%s (%d failures)\n", g_failures ? "FAIL" : "PASS", g_failures);
         return g_failures ? 1 : 0;
     }
@@ -2007,6 +2458,9 @@ int main(int argc, char** argv)
                         g6.W, g6.H, on, off);
         }
     }
+
+    // P24 / P25 - the partial re-bake (BL-1246).
+    patch_row(src, p);
 
     std::printf("\n%s (%d failure%s)\n", g_failures ? "FAILED" : "ALL PASS",
                 g_failures, g_failures == 1 ? "" : "s");

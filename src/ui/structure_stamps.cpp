@@ -113,6 +113,16 @@ struct raster
     int px0 = 0, py0 = 0;
     int W = 1;                    ///< Whole-image width: grain wraps on it.
     std::vector<float> shadow;    ///< Union of every shadow, max-combined.
+    /// BOUNDS MODE (BL-1246, the partial re-bake): nothing is written; every
+    /// pixel a primitive would touch (coverage > 0, any mode) grows the box
+    /// [bx0, bx1] x [by0, by1], window pixels.
+    bool bounds = false;
+    int  bx0 = 1 << 30, by0 = 1 << 30, bx1 = -(1 << 30), by1 = -(1 << 30);
+    void grow(int x, int y)
+    {
+        bx0 = std::min(bx0, x); bx1 = std::max(bx1, x);
+        by0 = std::min(by0, y); by1 = std::max(by1, y);
+    }
 };
 
 /// A linear shade ramp across the primitive: multiplier m0 at (x0, y0), m1 at
@@ -168,6 +178,11 @@ struct sink
     {
         if (cov <= 0.0f)
             return;
+        if (R.bounds)
+        {
+            R.grow(x, y);
+            return;
+        }
         if (m == mode::shadow)
         {
             float& s = R.shadow[static_cast<std::size_t>(y) * R.pw + x];
@@ -185,6 +200,14 @@ struct sink
 
 struct pt { float x, y; };
 
+/// A window-independent offset (BL-1246, found by the partial re-bake's P24):
+/// window coordinates are exact multiples of 1/256 px (proj), but a point
+/// DERIVED from one by a float offset (a shade origin, a lip ellipse) rounded
+/// differently with the window origin's magnitude, and the shade moved one
+/// pixel's colour by a level. Offsets snapped to the same 1/256 grid keep every
+/// derived point exact, so any window rasterises a structure identically.
+inline float q256(float v) { return std::round(v * 256.0f) / 256.0f; }
+
 /// Convex polygon, AA by the minimum signed edge distance. @p dil grows it by
 /// that many pixels (the ink outline). Works for either winding.
 void cover_poly(raster& R, const pt* p, int n, float dil, const sink& out)
@@ -192,14 +215,11 @@ void cover_poly(raster& R, const pt* p, int n, float dil, const sink& out)
     if (n < 3)
         return;
     float minx = p[0].x, maxx = p[0].x, miny = p[0].y, maxy = p[0].y;
-    float cx = 0.0f, cy = 0.0f;
     for (int i = 0; i < n; ++i)
     {
         minx = std::min(minx, p[i].x); maxx = std::max(maxx, p[i].x);
         miny = std::min(miny, p[i].y); maxy = std::max(maxy, p[i].y);
-        cx += p[i].x; cy += p[i].y;
     }
-    cx /= n; cy /= n;
     const int x0 = std::max(0, static_cast<int>(std::floor(minx - dil - 1.0f)));
     const int x1 = std::min(R.pw - 1, static_cast<int>(std::ceil(maxx + dil + 1.0f)));
     const int y0 = std::max(0, static_cast<int>(std::floor(miny - dil - 1.0f)));
@@ -210,7 +230,18 @@ void cover_poly(raster& R, const pt* p, int n, float dil, const sink& out)
     // local origin, so the edge constants (and so the coverage) do not depend on
     // where the window starts: translation-invariant across chunk seams.
     const float ox = std::floor(p[0].x), oy = std::floor(p[0].y);
-    cx -= ox; cy -= oy;
+    // The centroid is summed in the LOCAL frame too (BL-1246, found by the
+    // partial re-bake's P24): summed in window coordinates its rounding moved
+    // with the window origin, and on a near-degenerate sliver (a face seen
+    // edge-on, its centroid on its own edge lines) that flipped an edge's
+    // orientation in one window and not another — one pixel's coverage.
+    float cx = 0.0f, cy = 0.0f;
+    for (int i = 0; i < n; ++i)
+    {
+        cx += p[i].x - ox;
+        cy += p[i].y - oy;
+    }
+    cx /= n; cy /= n;
     float nx[160], ny[160], nc[160];
     int   ne = 0;
     for (int i = 0; i < n && ne < 160; ++i)
@@ -690,7 +721,7 @@ void draw_part(raster& R, const view& v, double lift, const part& p, mode m)
             if (p.cap == top::flat || p.cap == top::open)
             {
                 sink s3 = sk; s3.c = p.cap == top::open ? C_soot : p.roof;
-                shade ts; ts.x0 = tc.x - tr; ts.y0 = tc.y - tr; ts.dx = 2 * tr; ts.dy = 2 * tr;
+                shade ts; ts.x0 = tc.x - q256(tr); ts.y0 = tc.y - q256(tr); ts.dx = 2 * tr; ts.dy = 2 * tr;
                 ts.m0 = p.cap == top::open ? 0.8f : 1.16f; ts.m1 = p.cap == top::open ? 1.1f : 0.92f;
                 s3.sh = ts;
                 cover_ellipse(R, tc.x, tc.y, tr, tr, 0.0f, 1.0f, s3);
@@ -701,7 +732,7 @@ void draw_part(raster& R, const view& v, double lift, const part& p, mode m)
                     s4.alpha *= 0.85f;
                     cover_ellipse(R, tc.x, tc.y, tr, tr, 0.0f, 1.0f, s4);
                     sink s5 = sk; s5.c = C_soot; s5.sh = flat(0.75f);
-                    cover_ellipse(R, tc.x, tc.y + tr * 0.06f, tr * 0.82f, tr * 0.82f, 0.0f, 1.0f, s5);
+                    cover_ellipse(R, tc.x, tc.y + q256(tr * 0.06f), tr * 0.82f, tr * 0.82f, 0.0f, 1.0f, s5);
                 }
             }
             else
@@ -753,7 +784,7 @@ void draw_part(raster& R, const view& v, double lift, const part& p, mode m)
             const pt c = P(p.x, p.y, p.z0 + p.hw);
             const float r = p.hw * px_per;
             sink s2 = sk; s2.c = p.roof;
-            shade cs; cs.x0 = c.x - r * 0.8f; cs.y0 = c.y - r * 0.8f; cs.dx = r * 1.6f; cs.dy = r * 1.6f;
+            shade cs; cs.x0 = c.x - q256(r * 0.8f); cs.y0 = c.y - q256(r * 0.8f); cs.dx = r * 1.6f; cs.dy = r * 1.6f;
             cs.m0 = 1.30f; cs.m1 = 0.60f;
             s2.sh = cs;
             cover_ellipse(R, c.x, c.y, r, r, 0.0f, 1.0f, s2);
@@ -1396,13 +1427,14 @@ double vertical_factor(const geometry& g)
 struct reach { int r_lo, r_hi; double wx0, wx1; };
 reach window_reach(const bake_source& src, const geometry& g, int px0, int py0, int pw, int ph)
 {
-    const double vz = vertical_factor(g);
-    const double up = 1.1 + g.lift + k_max_height * vz;   // a structure SOUTH of the window rising into it
-    const double dn = 1.1 + k_max_height * k_shadow_y;    // a structure NORTH whose base/shadow falls in
-    const double wx0 = px0 / g.s - 1.2 - k_max_height * (k_shadow_x + k_shear * vz);
-    const double wx1 = (px0 + pw) / g.s + 1.2;
-    const double wy0 = py0 / g.s + g.y_min - dn;
-    const double wy1 = (py0 + ph) / g.s + g.y_min + up;
+    // The window grown by the inverse of one tile's extent: a structure SOUTH
+    // of the window rising into it (up), one NORTH whose base or shadow falls
+    // in (down), one WEST whose shadow and east lean reach in (right).
+    const structure_extent e = installation_extent(g);
+    const double wx0 = px0 / g.s - e.right;
+    const double wx1 = (px0 + pw) / g.s + e.left;
+    const double wy0 = py0 / g.s + g.y_min - e.down;
+    const double wy1 = (py0 + ph) / g.s + g.y_min + e.up;
     reach rr;
     rr.r_lo = std::max(0, static_cast<int>(std::floor(wy0 / 1.5)));
     rr.r_hi = std::min(src.gh - 1, static_cast<int>(std::ceil(wy1 / 1.5)));
@@ -1571,6 +1603,155 @@ void extract_installations(const world& w, entity_id body, const recipe_registry
 // The pass
 // =============================================================================
 
+namespace {
+
+/// Every instance and part tile (@p c unwrapped, @p r) stands — its pad, its
+/// settlement or ruin, its stack structures — appended for the painter's sort.
+/// The pass and the partial re-bake's bounds (installation_tile_bounds) build
+/// a tile identically through this one function.
+void build_tile(const bake_source& src, const geometry& g, const bake_params& p, int c, int r,
+                bool fine, std::vector<part>& parts, std::vector<instance>& inst)
+{
+    const double odd = (r & 1) ? 0.5 : 0.0;
+    const int cw = ((c % src.gw) + src.gw) % src.gw;
+    const std::size_t i = static_cast<std::size_t>(r) * src.gw + cw;
+    const std::int32_t li = src.inst.of_tile[i];
+    if (li < 0)
+        return;
+    const tile_installation& ti = src.inst.list[static_cast<std::size_t>(li)];
+    // Hashes on the WRAPPED coordinate, positions on the UNWRAPPED centre.
+    const double hx = kSqrt3 * (c + odd);
+    const double hy = 1.5 * r;
+    const double lift = src.height[i] * g.lift;
+
+    const auto begin_instance = [&](double sy, double sx, int tie) {
+        instance in;
+        in.sort_y = sy; in.sort_x = sx; in.tie = tie; in.lift = lift;
+        in.first = parts.size();
+        inst.push_back(in);
+    };
+    const auto end_instance = [&]() { inst.back().count = parts.size() - inst.back().first; };
+
+    // The pad: cleared ground under the works, so a tile with something
+    // on it reads as WORKED at distance (footprint contrast).
+    if (ti.n_stacks > 0 && ti.settlement.subject == stamp_subject::none)
+    {
+        begin_instance(hy - 9.0, hx, 0); // pads sort first: ground
+        builder pb{ parts, hx, hy, 1.0f, 1.0f, fine };
+        const float pr = 0.66f + 0.06f * (ti.n_stacks - 1);
+        pb.gell(0.0, 0.10, pr * 1.12f, pr * 0.92f, C_dirt, 0.58f, 0.26f);
+        end_instance();
+    }
+
+    // Slots the stack structures take — a settlement's blocks keep off
+    // them, and on a settled tile the works step aside to its edge.
+    const bool settled = ti.settlement.subject != stamp_subject::none;
+    double avoid[9];
+    int    n_avoid = 0;
+    const int ns = ti.n_stacks;
+    for (int j = 0; j < ns; ++j)
+    {
+        const slot& sl = slot_for(ns, j, settled);
+        avoid[3 * n_avoid]     = sl.x;
+        avoid[3 * n_avoid + 1] = sl.y;
+        avoid[3 * n_avoid + 2] = sl.size * 0.80;
+        ++n_avoid;
+    }
+
+    if (ti.settlement.subject == stamp_subject::settlement)
+    {
+        // Each block is its own instance, so blocks interleave
+        // back-to-front with the stack structures on the tile.
+        std::vector<part> blocks;
+        builder sb{ blocks, hx, hy, 1.0f, 1.0f, fine };
+        form_settlement(sb, ti.settlement.scale,
+                        static_cast<std::uint32_t>(h01(cw, r, 0x5E7Au) * 65535.0f),
+                        cw, r, avoid, n_avoid, nominal_s(g));
+        for (std::size_t q = 0; q < blocks.size(); ++q)
+        {
+            const part& bp = blocks[q];
+            const bool ground = bp.k == pk::gell || bp.k == pk::grect;
+            begin_instance(ground ? hy - 8.0 : bp.y + bp.hd, bp.x, 10 + static_cast<int>(q));
+            parts.push_back(bp);
+            end_instance();
+        }
+    }
+    else if (ti.settlement.subject == stamp_subject::ruin)
+    {
+        std::vector<part> bits;
+        builder rb{ bits, hx, hy, 1.0f, 1.0f, fine };
+        form_ruin(rb, cw, r);
+        for (std::size_t q = 0; q < bits.size(); ++q)
+        {
+            const part& bp = bits[q];
+            const bool ground = bp.k == pk::gell || bp.k == pk::grect;
+            begin_instance(ground ? hy - 8.0 : bp.y + bp.hd, bp.x, 10 + static_cast<int>(q));
+            parts.push_back(bp);
+            end_instance();
+        }
+    }
+
+    for (int j = 0; j < ns; ++j)
+    {
+        const stamp_key& key = ti.stacks[j];
+        const slot& sl = slot_for(ns, j, settled);
+        const std::uint32_t seed = static_cast<std::uint32_t>(
+            h01(cw, r, 0xB1D0u + static_cast<std::uint32_t>(j)) * 16777216.0f);
+        const double ax = hx + sl.x, ay = hy + sl.y;
+        // Ground features (fields, pits, yards) of a form sort as
+        // ground; the standing structure sorts at its slot's front.
+        std::vector<part> fp;
+        builder b{ fp, ax, ay, sl.size, (seed & 0x100u) ? -1.0f : 1.0f, fine };
+
+        const authored_stamp* art = p.stamps ? p.stamps->find(key) : nullptr;
+        if (art)
+        {
+            // The authored half of the seam: a raster replaces the
+            // procedural form for this key. Drawn as a ground-anchored
+            // sprite in the same instance order.
+            // (No sheet ships yet; see stamp_sheet.)
+            begin_instance(ay + sl.size * 0.6, ax, 1 + j);
+            end_instance();
+            // Blit below, in the draw loop, keyed by this instance's tie.
+            inst.back().tie = -(1 + j) * 1000 - static_cast<int>(art - p.stamps->stamps.data());
+            continue;
+        }
+
+        if (key.subject == stamp_subject::scaffold)
+            form_scaffold(b, seed);
+        else
+        {
+            const auto bt = static_cast<building_type>(key.type);
+            if (bt == building_type::extraction_site)
+                form_extraction(b, static_cast<extraction_family>(key.family), seed);
+            else if (bt == building_type::processing_facility)
+                form_processing(b, static_cast<processing_family>(key.family), seed);
+            else if (bt == building_type::port)
+            {
+                int wx = 0, wy = 1;
+                water_dir(src, cw, r, wx, wy);
+                form_port(b, wx, wy);
+            }
+            else
+                form_other(b, bt, seed);
+        }
+        // Ground parts first (as one ground instance), standing parts after.
+        begin_instance(hy - 7.0 + 0.01 * j, ax, 2 + j);
+        for (const part& q : fp)
+            if (q.k == pk::gell || q.k == pk::grect)
+                parts.push_back(q);
+        end_instance();
+        begin_instance(ay + sl.size * 0.55, ax, 5 + j);
+        for (const part& q : fp)
+            if (q.k != pk::gell && q.k != pk::grect)
+                parts.push_back(q);
+        end_instance();
+    }
+}
+
+} // namespace
+
+
 void stamp_installations(const bake_source& src, const geometry& g, const bake_params& p,
                          int px0, int py0, int pw, int ph, std::uint32_t* out,
                          const std::uint8_t* tag)
@@ -1600,142 +1781,7 @@ void stamp_installations(const bake_source& src, const geometry& g, const bake_p
         const int c_lo = static_cast<int>(std::floor(rr.wx0 / kSqrt3 - odd)) - 1;
         const int c_hi = static_cast<int>(std::ceil (rr.wx1 / kSqrt3 - odd)) + 1;
         for (int c = c_lo; c <= c_hi; ++c)
-        {
-            const int cw = ((c % src.gw) + src.gw) % src.gw;
-            const std::size_t i = static_cast<std::size_t>(r) * src.gw + cw;
-            const std::int32_t li = src.inst.of_tile[i];
-            if (li < 0)
-                continue;
-            const tile_installation& ti = src.inst.list[static_cast<std::size_t>(li)];
-            // Hashes on the WRAPPED coordinate, positions on the UNWRAPPED centre.
-            const double hx = kSqrt3 * (c + odd);
-            const double hy = 1.5 * r;
-            const double lift = src.height[i] * g.lift;
-
-            const auto begin_instance = [&](double sy, double sx, int tie) {
-                instance in;
-                in.sort_y = sy; in.sort_x = sx; in.tie = tie; in.lift = lift;
-                in.first = parts.size();
-                inst.push_back(in);
-            };
-            const auto end_instance = [&]() { inst.back().count = parts.size() - inst.back().first; };
-
-            // The pad: cleared ground under the works, so a tile with something
-            // on it reads as WORKED at distance (footprint contrast).
-            if (ti.n_stacks > 0 && ti.settlement.subject == stamp_subject::none)
-            {
-                begin_instance(hy - 9.0, hx, 0); // pads sort first: ground
-                builder pb{ parts, hx, hy, 1.0f, 1.0f, fine };
-                const float pr = 0.66f + 0.06f * (ti.n_stacks - 1);
-                pb.gell(0.0, 0.10, pr * 1.12f, pr * 0.92f, C_dirt, 0.58f, 0.26f);
-                end_instance();
-            }
-
-            // Slots the stack structures take — a settlement's blocks keep off
-            // them, and on a settled tile the works step aside to its edge.
-            const bool settled = ti.settlement.subject != stamp_subject::none;
-            double avoid[9];
-            int    n_avoid = 0;
-            const int ns = ti.n_stacks;
-            for (int j = 0; j < ns; ++j)
-            {
-                const slot& sl = slot_for(ns, j, settled);
-                avoid[3 * n_avoid]     = sl.x;
-                avoid[3 * n_avoid + 1] = sl.y;
-                avoid[3 * n_avoid + 2] = sl.size * 0.80;
-                ++n_avoid;
-            }
-
-            if (ti.settlement.subject == stamp_subject::settlement)
-            {
-                // Each block is its own instance, so blocks interleave
-                // back-to-front with the stack structures on the tile.
-                std::vector<part> blocks;
-                builder sb{ blocks, hx, hy, 1.0f, 1.0f, fine };
-                form_settlement(sb, ti.settlement.scale,
-                                static_cast<std::uint32_t>(h01(cw, r, 0x5E7Au) * 65535.0f),
-                                cw, r, avoid, n_avoid, nominal_s(g));
-                for (std::size_t q = 0; q < blocks.size(); ++q)
-                {
-                    const part& bp = blocks[q];
-                    const bool ground = bp.k == pk::gell || bp.k == pk::grect;
-                    begin_instance(ground ? hy - 8.0 : bp.y + bp.hd, bp.x, 10 + static_cast<int>(q));
-                    parts.push_back(bp);
-                    end_instance();
-                }
-            }
-            else if (ti.settlement.subject == stamp_subject::ruin)
-            {
-                std::vector<part> bits;
-                builder rb{ bits, hx, hy, 1.0f, 1.0f, fine };
-                form_ruin(rb, cw, r);
-                for (std::size_t q = 0; q < bits.size(); ++q)
-                {
-                    const part& bp = bits[q];
-                    const bool ground = bp.k == pk::gell || bp.k == pk::grect;
-                    begin_instance(ground ? hy - 8.0 : bp.y + bp.hd, bp.x, 10 + static_cast<int>(q));
-                    parts.push_back(bp);
-                    end_instance();
-                }
-            }
-
-            for (int j = 0; j < ns; ++j)
-            {
-                const stamp_key& key = ti.stacks[j];
-                const slot& sl = slot_for(ns, j, settled);
-                const std::uint32_t seed = static_cast<std::uint32_t>(
-                    h01(cw, r, 0xB1D0u + static_cast<std::uint32_t>(j)) * 16777216.0f);
-                const double ax = hx + sl.x, ay = hy + sl.y;
-                // Ground features (fields, pits, yards) of a form sort as
-                // ground; the standing structure sorts at its slot's front.
-                std::vector<part> fp;
-                builder b{ fp, ax, ay, sl.size, (seed & 0x100u) ? -1.0f : 1.0f, fine };
-
-                const authored_stamp* art = p.stamps ? p.stamps->find(key) : nullptr;
-                if (art)
-                {
-                    // The authored half of the seam: a raster replaces the
-                    // procedural form for this key. Drawn as a ground-anchored
-                    // sprite in the same instance order.
-                    // (No sheet ships yet; see stamp_sheet.)
-                    begin_instance(ay + sl.size * 0.6, ax, 1 + j);
-                    end_instance();
-                    // Blit below, in the draw loop, keyed by this instance's tie.
-                    inst.back().tie = -(1 + j) * 1000 - static_cast<int>(art - p.stamps->stamps.data());
-                    continue;
-                }
-
-                if (key.subject == stamp_subject::scaffold)
-                    form_scaffold(b, seed);
-                else
-                {
-                    const auto bt = static_cast<building_type>(key.type);
-                    if (bt == building_type::extraction_site)
-                        form_extraction(b, static_cast<extraction_family>(key.family), seed);
-                    else if (bt == building_type::processing_facility)
-                        form_processing(b, static_cast<processing_family>(key.family), seed);
-                    else if (bt == building_type::port)
-                    {
-                        int wx = 0, wy = 1;
-                        water_dir(src, cw, r, wx, wy);
-                        form_port(b, wx, wy);
-                    }
-                    else
-                        form_other(b, bt, seed);
-                }
-                // Ground parts first (as one ground instance), standing parts after.
-                begin_instance(hy - 7.0 + 0.01 * j, ax, 2 + j);
-                for (const part& q : fp)
-                    if (q.k == pk::gell || q.k == pk::grect)
-                        parts.push_back(q);
-                end_instance();
-                begin_instance(ay + sl.size * 0.55, ax, 5 + j);
-                for (const part& q : fp)
-                    if (q.k != pk::gell && q.k != pk::grect)
-                        parts.push_back(q);
-                end_instance();
-            }
-        }
+            build_tile(src, g, p, c, r, fine, parts, inst);
     }
     if (inst.empty())
         return;
@@ -1794,7 +1840,7 @@ void stamp_installations(const bake_source& src, const geometry& g, const bake_p
             const pt base = proj(v, in.lift, in.sort_x, in.sort_y, 0.0);
             const float sw = static_cast<float>(wcan * v.s);
             const float shp = static_cast<float>(hcan * v.s * v.vz);
-            const float ox = base.x - a.anchor_x * sw, oy = base.y - a.anchor_y * shp;
+            const float ox = base.x - q256(a.anchor_x * sw), oy = base.y - q256(a.anchor_y * shp);
             for (int y = std::max(0, static_cast<int>(oy)); y < std::min(ph, static_cast<int>(oy + shp) + 1); ++y)
                 for (int x = std::max(0, static_cast<int>(ox)); x < std::min(pw, static_cast<int>(ox + sw) + 1); ++x)
                 {
@@ -1819,6 +1865,72 @@ void stamp_installations(const bake_source& src, const geometry& g, const bake_p
             draw_part(R, v, in.lift, parts[q], mode::colour);
         }
     }
+}
+
+bool installation_tile_bounds(const bake_source& src, const geometry& g, const bake_params& p,
+                              int c, int r, int& x0, int& y0, int& x1, int& y1)
+{
+    if (src.gw <= 0 || r < 0 || r >= src.gh || src.inst.of_tile.size() != src.cls.size())
+        return false;
+    const std::size_t i = static_cast<std::size_t>(r) * src.gw + ((c % src.gw) + src.gw) % src.gw;
+    if (src.inst.of_tile[i] < 0)
+        return false;
+    // A raster window around the tile one canonical unit wider than the
+    // pass's own reach every way: a primitive touching its border means the
+    // form outgrew the extent, and the caller is told to fall back.
+    const structure_extent e = installation_extent(g);
+    const double hx = kSqrt3 * (c + ((r & 1) ? 0.5 : 0.0)), hy = 1.5 * r;
+    const int wx0 = static_cast<int>(std::floor((hx - e.left - 1.0) * g.s));
+    const int wx1 = static_cast<int>(std::ceil ((hx + e.right + 1.0) * g.s));
+    const int wy0 = static_cast<int>(std::floor((hy - e.up - 1.0 - g.y_min) * g.s));
+    const int wy1 = static_cast<int>(std::ceil ((hy + e.down + 1.0 - g.y_min) * g.s));
+    raster R;
+    R.bounds = true;
+    R.pw = wx1 - wx0; R.ph = wy1 - wy0; R.px0 = wx0; R.py0 = wy0;
+    R.W = std::max(1, g.W);
+    view v;
+    v.s = g.s; v.ss = g.ss; v.y_min = g.y_min; v.px0 = wx0; v.py0 = wy0;
+    v.vz = vertical_factor(g);
+    v.sh = k_shear * v.vz * g.tilt_sy;
+    const bool fine = nominal_s(g) >= 30.0;
+    std::vector<part>     parts;
+    std::vector<instance> inst;
+    build_tile(src, g, p, c, r, fine, parts, inst);
+    for (const instance& in : inst)
+    {
+        if (in.tie <= -1000 && p.stamps)
+        {
+            // An authored sprite: its blit rectangle, as the pass draws it.
+            const authored_stamp& a = p.stamps->stamps[static_cast<std::size_t>((-in.tie) % 1000)];
+            if (a.w <= 0 || a.h <= 0)
+                continue;
+            const double wcan = a.width_canonical, hcan = wcan * a.h / a.w;
+            const pt base = proj(v, in.lift, in.sort_x, in.sort_y, 0.0);
+            const float sw = static_cast<float>(wcan * v.s), shp = static_cast<float>(hcan * v.s * v.vz);
+            const float ox = base.x - q256(a.anchor_x * sw), oy = base.y - q256(a.anchor_y * shp);
+            R.grow(static_cast<int>(std::floor(ox)) - 1, static_cast<int>(std::floor(oy)) - 1);
+            R.grow(static_cast<int>(ox + sw) + 1, static_cast<int>(oy + shp) + 1);
+            continue;
+        }
+        for (std::size_t q = in.first; q < in.first + in.count; ++q)
+        {
+            draw_part(R, v, in.lift, parts[q], mode::shadow);
+            draw_part(R, v, in.lift, parts[q], mode::ink);
+            draw_part(R, v, in.lift, parts[q], mode::colour);
+        }
+    }
+    if (R.bx0 > R.bx1)
+        return false; // stands nothing that draws
+    if (R.bx0 <= 0 || R.by0 <= 0 || R.bx1 >= R.pw - 1 || R.by1 >= R.ph - 1)
+    {
+        // Outgrew the extent (cannot happen while the extent bounds every
+        // form): the whole extent window, which is always safe.
+        x0 = wx0; y0 = wy0; x1 = wx1; y1 = wy1;
+        return true;
+    }
+    x0 = wx0 + R.bx0; x1 = wx0 + R.bx1 + 1;
+    y0 = wy0 + R.by0; y1 = wy0 + R.by1 + 1;
+    return true;
 }
 
 std::uint64_t installation_hash(const bake_source& src, const geometry& g,
@@ -1850,6 +1962,61 @@ std::uint64_t installation_hash(const bake_source& src, const geometry& g,
         }
     }
     return h;
+}
+
+structure_extent installation_extent(const geometry& g)
+{
+    const double vz = vertical_factor(g);
+    structure_extent e;
+    e.left  = 1.2;
+    e.right = 1.2 + k_max_height * (k_shadow_x + k_shear * vz);
+    e.up    = 1.1 + g.lift + k_max_height * vz;
+    e.down  = 1.1 + k_max_height * k_shadow_y;
+    return e;
+}
+
+namespace {
+bool same_installation(const bake_source& a, const bake_source& b, std::size_t i)
+{
+    const std::int32_t la = i < a.inst.of_tile.size() ? a.inst.of_tile[i] : -1;
+    const std::int32_t lb = i < b.inst.of_tile.size() ? b.inst.of_tile[i] : -1;
+    static const tile_installation none{};
+    const tile_installation& x = la >= 0 ? a.inst.list[static_cast<std::size_t>(la)] : none;
+    const tile_installation& y = lb >= 0 ? b.inst.list[static_cast<std::size_t>(lb)] : none;
+    if (x.n_stacks != y.n_stacks || !(x.settlement == y.settlement))
+        return false;
+    for (int j = 0; j < x.n_stacks; ++j)
+        if (!(x.stacks[j] == y.stacks[j]))
+            return false;
+    return true;
+}
+} // namespace
+
+int changed_installation_tiles(const bake_source& a, const bake_source& b, const geometry& g,
+                               int px0, int py0, int pw, int ph, std::vector<grid_cell>& out)
+{
+    if (a.gw != b.gw || a.gh != b.gh || a.gw <= 0)
+        return -1;
+    // The same walk the pass and installation_hash make: every tile that can
+    // reach the window, columns UNWRAPPED (positions near the window).
+    const reach rr = window_reach(b, g, px0, py0, pw, ph);
+    int n = 0;
+    for (int r = rr.r_lo; r <= rr.r_hi; ++r)
+    {
+        const double odd = (r & 1) ? 0.5 : 0.0;
+        const int c_lo = static_cast<int>(std::floor(rr.wx0 / kSqrt3 - odd)) - 1;
+        const int c_hi = static_cast<int>(std::ceil (rr.wx1 / kSqrt3 - odd)) + 1;
+        for (int c = c_lo; c <= c_hi; ++c)
+        {
+            const int cw = ((c % b.gw) + b.gw) % b.gw;
+            const std::size_t i = static_cast<std::size_t>(r) * b.gw + cw;
+            if (same_installation(a, b, i))
+                continue;
+            out.push_back({ c, r });
+            ++n;
+        }
+    }
+    return n;
 }
 
 float installation_clear_radius(const bake_source& src, std::size_t i)

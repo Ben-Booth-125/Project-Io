@@ -47,7 +47,11 @@
 // INVALIDATION IS CONTENT-HASHED, per master chunk. A source snapshot is
 // re-taken on a cadence; when its whole-body digest moves, a sweep job hashes
 // every master chunk against it, and a chunk whose hash moved re-bakes in the
-// master and re-derives only its own mip pieces.
+// master and re-derives only its own mip pieces. A chunk whose move is
+// INSTALLATIONS ONLY (terrain unchanged) re-bakes only a window around each
+// changed installation and blits it in (ui::ground::installation_patch_rects,
+// the window rule), re-deriving only those windows' mip pieces; past 40% of
+// the chunk, or on any terrain change, the chunk re-bakes whole.
 //
 // RAM: a budget across bodies (k_ram_budget) drops the least-recently-visited
 // body's master and chain, keeping its far page; background bakes start only
@@ -152,6 +156,12 @@ public:
         std::uint64_t chunk_bakes = 0;   ///< Master chunks landed.
         std::uint64_t chunk_rebakes = 0; ///< A master chunk that was already ready, baked again.
         std::uint64_t neigh_bakes = 0;
+        // BL-1246, the partial re-bake (re-bakes only; first bakes are not counted):
+        std::uint64_t chunk_patches = 0; ///< Re-bakes done as windows (of chunk_rebakes).
+        std::uint64_t patch_windows = 0; ///< Windows those patches baked.
+        std::uint64_t patch_px      = 0; ///< Pixels the windows baked (no apron).
+        std::uint64_t rebake_px     = 0; ///< Pixels whole-chunk re-bakes baked.
+        double        rebake_ms     = 0; ///< Worker time of every re-bake, whole and patched.
     };
     const bake_stats& bake_counters() const { return m_bake_counters; }
 
@@ -212,6 +222,10 @@ private:
         std::vector<std::uint64_t> baked_hash; ///< Hash the landed bake was taken against.
         std::vector<std::uint64_t> want_hash;  ///< The current source's hash (valid when hashes_epoch == src_epoch).
         std::vector<std::uint64_t> bakes;      ///< Landings per chunk (verify probe).
+        /// The source each stored chunk's pixels were baked against (null = none
+        /// stored): a dirty chunk diffs it against the current source to re-bake
+        /// only the windows its installations moved.
+        std::vector<std::shared_ptr<const ui::ground::bake_source>> baked_src;
         std::vector<std::uint64_t> job;        ///< Sequence of the outstanding job (0 = none).
         std::vector<std::uint8_t>  ready;      ///< Landed at least once since the master was (re)allocated.
         std::vector<std::uint8_t>  dirty;      ///< Ready, but its hash moved: re-bake.
@@ -254,6 +268,9 @@ private:
         std::uint64_t seq  = 0;
         double        prio = 0.0;
         std::shared_ptr<const ui::ground::bake_source> src;
+        /// Master jobs: the source the stored chunk was baked against, when the
+        /// chunk may be re-baked as windows (null = bake it whole).
+        std::shared_ptr<const ui::ground::bake_source> old_src;
         ui::ground::geometry    geom;
         ui::ground::bake_params prm;
         int px0 = 0, py0 = 0, pw = 0, ph = 0;
@@ -273,6 +290,20 @@ private:
         std::vector<std::uint32_t> px;
         std::vector<std::uint32_t> mip[L];     ///< Levels 1..L-1 pieces (master jobs).
         std::vector<std::uint64_t> hashes;     ///< Sweep result.
+        std::shared_ptr<const ui::ground::bake_source> src; ///< Master jobs: what it was baked against.
+        bool          rebake = false;          ///< Master jobs: the chunk was already stored.
+        /// A partial re-bake: windows (chunk-relative pixels) and their mip
+        /// pieces, to blit over the stored chunk. Empty with `patched` = the
+        /// chunk's pixels did not change at all.
+        struct patch
+        {
+            ui::ground::pixel_rect     r;
+            std::vector<std::uint32_t> px;
+            std::vector<std::uint32_t> mip[L];
+        };
+        bool               patched = false;
+        std::vector<patch> patches;
+        double             ms = 0.0;           ///< Worker bake time (master jobs).
         entity_id     neigh_tile = null_entity;
         float         neigh_rect[4] = { 0, 0, 0, 0 };
     };
@@ -396,4 +427,9 @@ private:
     bool              m_boundary_log = false; ///< resnapshot() moved the source: log its sweep.
     bool              m_rebake_pending = false;
     clock::time_point m_rebake_t0{};
+    // The partial re-bake reading: a round boundary's sweep snapshots the
+    // counters, and pump() prints what it cost once the master is current.
+    bool              m_boundary_track = false;
+    bake_stats        m_boundary_base{};
+    clock::time_point m_boundary_t0{};
 };

@@ -29,6 +29,13 @@ bool bench_async_on()
     static const bool on = env_flag("IO_GROUND_BENCH");
     return on;
 }
+/// IO_GROUND_NO_PATCH=1 (a measurement switch, BL-1246): every re-bake is a
+/// whole chunk, as before the partial re-bake — the "before" of its reading.
+bool patching_on()
+{
+    static const bool on = !env_flag("IO_GROUND_NO_PATCH");
+    return on;
+}
 double ms_since(std::chrono::steady_clock::time_point t0)
 {
     return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
@@ -109,6 +116,36 @@ void ground_layer::run_job(const job& j, result& d, double* level_ms)
     case job_kind::master:
     {
         auto t0 = std::chrono::steady_clock::now();
+        const auto t_job = t0;
+        d.src = j.src;
+        d.rebake = j.old_src != nullptr;
+        // THE PARTIAL RE-BAKE (BL-1246): a stored chunk whose installations
+        // alone moved re-bakes only the windows around them — the window rule
+        // is ui::ground::installation_patch_rects — and derives only their mip
+        // pieces; the render thread blits both over what it holds.
+        if (j.old_src)
+        {
+            std::vector<gb::pixel_rect> rects;
+            if (gb::installation_patch_rects(*j.old_src, *j.src, j.geom, j.prm, j.px0, j.py0, j.pw, j.ph, rects))
+            {
+                d.patched = true;
+                d.patches.resize(rects.size());
+                for (std::size_t k = 0; k < rects.size(); ++k)
+                {
+                    const gb::pixel_rect& r = rects[k];
+                    result::patch& pc = d.patches[k];
+                    pc.r = { r.x0 - j.px0, r.y0 - j.py0, r.w, r.h };
+                    pc.px.assign(static_cast<std::size_t>(r.w) * r.h, 0u);
+                    gb::bake_region(*j.src, j.geom, j.prm, r.x0, r.y0, r.w, r.h, pc.px.data());
+                    gb::derive_mip_pieces(pc.px.data(), r.w, r.h, pc.mip);
+                }
+                d.hash = gb::region_hash(*j.src, j.geom, j.px0, j.py0, j.pw, j.ph);
+                d.ms = ms_since(t_job);
+                if (level_ms)
+                    level_ms[0] = d.ms;
+                return;
+            }
+        }
         d.px.assign(static_cast<std::size_t>(j.pw) * j.ph, 0u);
         gb::bake_region(*j.src, j.geom, j.prm, j.px0, j.py0, j.pw, j.ph, d.px.data());
         d.hash = gb::region_hash(*j.src, j.geom, j.px0, j.py0, j.pw, j.ph);
@@ -138,6 +175,7 @@ void ground_layer::run_job(const job& j, result& d, double* level_ms)
             if (level_ms)
                 level_ms[l] = ms_since(t0);
         }
+        d.ms = ms_since(t_job);
         return;
     }
     }
@@ -297,6 +335,7 @@ ground_layer::body_state* ground_layer::ensure_body(const world& w, entity_id id
     b.baked_hash.assign(n, 0);
     b.want_hash.assign(n, 0);
     b.bakes.assign(n, 0);
+    b.baked_src.assign(n, nullptr);
     b.job.assign(n, 0);
     b.ready.assign(n, 0);
     b.dirty.assign(n, 0);
@@ -355,6 +394,7 @@ void ground_layer::drop_master(body_state& b)
         }
     }
     std::fill(b.job.begin(), b.job.end(), 0);
+    std::fill(b.baked_src.begin(), b.baked_src.end(), nullptr);
     std::fill(b.ready.begin(), b.ready.end(), 0);
     std::fill(b.dirty.begin(), b.dirty.end(), 0);
     b.n_ready = 0;
@@ -409,6 +449,7 @@ void ground_layer::forget_world()
     m_active = null_entity;
     m_prebake = null_entity;
     m_boundary_log = false;
+    m_boundary_track = false;
     m_in_play = false;
     m_view_valid = false;
     m_publish_level = -1;
@@ -566,6 +607,10 @@ ground_layer::job ground_layer::make_master_job(const body_state& b, int idx, do
     j.py0 = cj * gb::k_chunk_px;
     j.pw  = std::min(gb::k_chunk_px, s.geom.W - j.px0);
     j.ph  = std::min(gb::k_chunk_px, s.geom.H - j.py0);
+    // A stored chunk re-baking: the worker may re-bake only the windows its
+    // installations moved (it falls back to the whole chunk itself).
+    if (b.ready[idx] && !s.px[idx].empty() && b.baked_src[idx] && patching_on())
+        j.old_src = b.baked_src[idx];
     return j;
 }
 
@@ -702,6 +747,12 @@ void ground_layer::land(result& d, bool sync)
             std::printf("[ground] boundary sweep: %d of %d master chunks moved and re-bake "
                         "(%d not yet baked at all)\n", n_dirty, b.n_chunks, n_unbaked);
             std::fflush(stdout);
+            if (n_dirty > 0)
+            {
+                m_boundary_track = true;
+                m_boundary_base  = m_bake_counters;
+                m_boundary_t0    = clock::now();
+            }
         }
         return;
     }
@@ -718,40 +769,91 @@ void ground_layer::land(result& d, bool sync)
     b.job[idx] = 0;
     const bool was_counted = b.ready[idx] && !b.dirty[idx];
     const bool was_ready   = b.ready[idx] != 0;
+    if (d.patched)
     {
+        // A partial re-bake: blit each window over the stored chunk, and its
+        // mip pieces over the chunk's share of every coarser level.
         level_store& s0 = b.lv[0];
-        std::vector<std::uint32_t>& dst = s0.px[idx];
-        b.ram -= static_cast<long long>(dst.size()) * 4;
-        dst = std::move(d.px);
-        b.ram += static_cast<long long>(dst.size()) * 4;
-        ++s0.ver[idx];
-    }
-    const int ci = idx % b.lv[0].cw, cj = idx / b.lv[0].cw;
-    for (int l = 1; l < L; ++l)
-    {
-        level_store& s = b.lv[l];
-        const int li = ci >> l, lj = cj >> l;
-        const int lidx = lj * s.cw + li;
-        const int lw = std::min(gb::k_chunk_px, s.geom.W - li * gb::k_chunk_px);
-        const int lh = std::min(gb::k_chunk_px, s.geom.H - lj * gb::k_chunk_px);
-        std::vector<std::uint32_t>& dst = s.px[lidx];
-        if (dst.empty())
+        std::vector<std::uint32_t>& base = s0.px[idx];
+        if (base.empty())
+            return; // nothing stored to patch (a drop clears the slot first, so unreachable)
+        const int ci = idx % s0.cw, cj = idx / s0.cw;
+        const int cw0 = std::min(gb::k_chunk_px, s0.geom.W - ci * gb::k_chunk_px);
+        for (const result::patch& pc : d.patches)
         {
-            dst.assign(static_cast<std::size_t>(lw) * lh, 0u); // transparent until its pieces land
-            b.ram += static_cast<long long>(dst.size()) * 4;
+            for (int y = 0; y < pc.r.h; ++y)
+                std::memcpy(base.data() + static_cast<std::size_t>(pc.r.y0 + y) * cw0 + pc.r.x0,
+                            pc.px.data() + static_cast<std::size_t>(y) * pc.r.w,
+                            static_cast<std::size_t>(pc.r.w) * 4u);
+            for (int l = 1; l < L; ++l)
+            {
+                level_store& s = b.lv[l];
+                const int li = ci >> l, lj = cj >> l;
+                const int lidx = lj * s.cw + li;
+                const int lw = std::min(gb::k_chunk_px, s.geom.W - li * gb::k_chunk_px);
+                std::vector<std::uint32_t>& dst = s.px[lidx];
+                if (dst.empty())
+                    continue; // never placed (unreachable once the chunk has landed)
+                const int f  = 1 << l;
+                const int ox = (ci & (f - 1)) * (gb::k_chunk_px >> l) + (pc.r.x0 >> l);
+                const int oy = (cj & (f - 1)) * (gb::k_chunk_px >> l) + (pc.r.y0 >> l);
+                const int pw = pc.r.w >> l, ph = pc.r.h >> l;
+                for (int y = 0; y < ph; ++y)
+                    std::memcpy(dst.data() + static_cast<std::size_t>(oy + y) * lw + ox,
+                                pc.mip[l].data() + static_cast<std::size_t>(y) * pw,
+                                static_cast<std::size_t>(pw) * 4u);
+                ++s.ver[lidx];
+            }
+            ++m_bake_counters.patch_windows;
+            m_bake_counters.patch_px += static_cast<std::uint64_t>(pc.r.w) * pc.r.h;
         }
-        const int f  = 1 << l;
-        const int ox = (ci & (f - 1)) * (gb::k_chunk_px >> l);
-        const int oy = (cj & (f - 1)) * (gb::k_chunk_px >> l);
-        const int pw = d.pw >> l, ph = d.ph >> l;
-        const std::vector<std::uint32_t>& piece = d.mip[l];
-        for (int y = 0; y < ph; ++y)
-            std::memcpy(dst.data() + static_cast<std::size_t>(oy + y) * lw + ox,
-                        piece.data() + static_cast<std::size_t>(y) * pw,
-                        static_cast<std::size_t>(pw) * 4u);
-        ++s.ver[lidx];
+        if (!d.patches.empty())
+            ++s0.ver[idx];
+        ++m_bake_counters.chunk_patches;
+    }
+    else
+    {
+        // The whole chunk: store it, place its mip pieces.
+        if (was_ready)
+            m_bake_counters.rebake_px += static_cast<std::uint64_t>(d.pw) * d.ph;
+        {
+            level_store& s0 = b.lv[0];
+            std::vector<std::uint32_t>& dst = s0.px[idx];
+            b.ram -= static_cast<long long>(dst.size()) * 4;
+            dst = std::move(d.px);
+            b.ram += static_cast<long long>(dst.size()) * 4;
+            ++s0.ver[idx];
+        }
+        const int ci = idx % b.lv[0].cw, cj = idx / b.lv[0].cw;
+        for (int l = 1; l < L; ++l)
+        {
+            level_store& s = b.lv[l];
+            const int li = ci >> l, lj = cj >> l;
+            const int lidx = lj * s.cw + li;
+            const int lw = std::min(gb::k_chunk_px, s.geom.W - li * gb::k_chunk_px);
+            const int lh = std::min(gb::k_chunk_px, s.geom.H - lj * gb::k_chunk_px);
+            std::vector<std::uint32_t>& dst = s.px[lidx];
+            if (dst.empty())
+            {
+                dst.assign(static_cast<std::size_t>(lw) * lh, 0u); // transparent until its pieces land
+                b.ram += static_cast<long long>(dst.size()) * 4;
+            }
+            const int f  = 1 << l;
+            const int ox = (ci & (f - 1)) * (gb::k_chunk_px >> l);
+            const int oy = (cj & (f - 1)) * (gb::k_chunk_px >> l);
+            const int pw = d.pw >> l, ph = d.ph >> l;
+            const std::vector<std::uint32_t>& piece = d.mip[l];
+            for (int y = 0; y < ph; ++y)
+                std::memcpy(dst.data() + static_cast<std::size_t>(oy + y) * lw + ox,
+                            piece.data() + static_cast<std::size_t>(y) * pw,
+                            static_cast<std::size_t>(pw) * 4u);
+            ++s.ver[lidx];
+        }
     }
     b.ready[idx] = 1;
+    b.baked_src[idx] = d.src;
+    if (was_ready)
+        m_bake_counters.rebake_ms += d.ms;
     b.baked_hash[idx] = d.hash;
     ++b.bakes[idx];
     // Hashed against an older snapshot than the current table? Then the
@@ -971,6 +1073,27 @@ void ground_layer::pump(const world* wp, bool verify)
         verify = false;
     ++m_frame;
     drain();
+    // A round boundary's re-bake, done: what it cost (BL-1246, the partial
+    // re-bake reading — pixels are load-independent, times are not).
+    if (m_boundary_track && master_current(m_prebake))
+    {
+        m_boundary_track = false;
+        const bake_stats& n = m_bake_counters;
+        const bake_stats& o = m_boundary_base;
+        const auto whole = (n.chunk_rebakes - o.chunk_rebakes) - (n.chunk_patches - o.chunk_patches);
+        const double chunk_px = static_cast<double>(gb::k_chunk_px) * gb::k_chunk_px;
+        std::printf("[ground] boundary re-bake done in %.2f s wall: %llu whole chunks (%.1f Mpx) + "
+                    "%llu patched chunks, %llu windows (%.1f Mpx) = %.1f chunk-equivalents; "
+                    "worker time %.2f s\n",
+                    ms_since(m_boundary_t0) / 1000.0, static_cast<unsigned long long>(whole),
+                    (n.rebake_px - o.rebake_px) / 1e6,
+                    static_cast<unsigned long long>(n.chunk_patches - o.chunk_patches),
+                    static_cast<unsigned long long>(n.patch_windows - o.patch_windows),
+                    (n.patch_px - o.patch_px) / 1e6,
+                    ((n.rebake_px - o.rebake_px) + (n.patch_px - o.patch_px)) / chunk_px,
+                    (n.rebake_ms - o.rebake_ms) / 1000.0);
+        std::fflush(stdout);
+    }
     if (!wp)
     {
         // The pre-bake runs from a world the app does not yet hold (the

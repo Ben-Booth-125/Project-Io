@@ -2104,8 +2104,8 @@ void downsample_half(const std::uint32_t* src, int sw, int sh, std::uint32_t* ds
     }
 }
 
-std::uint64_t region_hash(const bake_source& src, const geometry& g,
-                          int px0, int py0, int pw, int ph)
+std::uint64_t terrain_hash(const bake_source& src, const geometry& g,
+                           int px0, int py0, int pw, int ph)
 {
     // FNV-1a 64 over the tile fields the bake reads, for every tile whose
     // centre could influence the window (the window rect grown by the blend
@@ -2146,8 +2146,148 @@ std::uint64_t region_hash(const bake_source& src, const geometry& g,
             // can move it without moving the colour) and the variant index.
             mix(static_cast<std::uint64_t>(src.family[i]) | (static_cast<std::uint64_t>(src.variant[i]) << 8));
         }
-    mix(installation_hash(src, g, px0, py0, pw, ph)); // BL-1241: builds, razes, scale steps
     return h;
+}
+
+std::uint64_t combine_region_hash(std::uint64_t terrain, std::uint64_t installations)
+{
+    // One more FNV-1a step: exactly what region_hash folded before the split.
+    return (terrain ^ installations) * 1099511628211ull;
+}
+
+std::uint64_t region_hash(const bake_source& src, const geometry& g,
+                          int px0, int py0, int pw, int ph)
+{
+    if (src.gw <= 0 || src.gh <= 0)
+        return 14695981039346656037ull;
+    // BL-1241: builds, razes, scale steps move the installation half.
+    return combine_region_hash(terrain_hash(src, g, px0, py0, pw, ph),
+                               installation_hash(src, g, px0, py0, pw, ph));
+}
+
+void derive_mip_pieces(const std::uint32_t* px, int w, int h,
+                       std::vector<std::uint32_t> (&out)[k_level_count])
+{
+    const std::uint32_t* prev = px;
+    int lw = w, lh = h;
+    for (int l = 1; l < k_level_count; ++l)
+    {
+        out[l].assign(static_cast<std::size_t>(lw / 2) * (lh / 2), 0u);
+        downsample_half(prev, lw, lh, out[l].data());
+        lw /= 2; lh /= 2;
+        prev = out[l].data();
+    }
+}
+
+bool installation_patch_rects(const bake_source& old_src, const bake_source& new_src,
+                              const geometry& g, const bake_params& p,
+                              int px0, int py0, int pw, int ph,
+                              std::vector<pixel_rect>& out, double max_fraction)
+{
+    out.clear();
+    if (pw <= 0 || ph <= 0 || old_src.gw != new_src.gw || old_src.gh != new_src.gh
+        || new_src.gw <= 0 || new_src.gh <= 0)
+        return false;
+    // Terrain first: any field the bake reads moved over the window -> whole.
+    if (terrain_hash(old_src, g, px0, py0, pw, ph) != terrain_hash(new_src, g, px0, py0, pw, ph))
+        return false;
+    std::vector<grid_cell> tiles;
+    if (changed_installation_tiles(old_src, new_src, g, px0, py0, pw, ph, tiles) < 0)
+        return false;
+    if (tiles.empty())
+        return true;
+
+    // One changed tile's reach, in pixels: every pixel its structures touch
+    // before AND after the change — the pass itself rasterised in bounds mode
+    // (installation_tile_bounds: pads, shadows, ink, overhang, authored
+    // sprites) — and, on a forest or scrub tile whose cleared ground grew or
+    // shrank, the trees that clearing removes or restores (stamp_trees:
+    // canopies within 0.82 of the centre or pulled to a grove within 0.9,
+    // crown <= 0.16, the SE shadow, an upright canopy 2.85 crowns tall above
+    // its lifted ground point on an oblique bake). Then k_patch_pad pixels for
+    // the post passes that read across a pixel.
+    const int A = k_patch_align;
+    const auto floor_a = [A](int v) { return v >= 0 ? v / A * A : -((-v + A - 1) / A) * A; };
+    const auto ceil_a  = [&](int v) { return -floor_a(-v); };
+    const int wx1 = px0 + pw, wy1 = py0 + ph;
+    const bool trees = nominal_s(g) >= 40.0 && p.tree_density > 0.0f;
+    const auto land = static_cast<std::uint8_t>(bake_source::tile_class::land);
+    for (const grid_cell& t : tiles)
+    {
+        int x0 = 1 << 30, y0 = 1 << 30, x1 = -(1 << 30), y1 = -(1 << 30);
+        const auto grow = [&](int a0, int b0, int a1, int b1) {
+            x0 = std::min(x0, a0); y0 = std::min(y0, b0);
+            x1 = std::max(x1, a1); y1 = std::max(y1, b1);
+        };
+        int a0, b0, a1, b1;
+        if (installation_tile_bounds(old_src, g, p, t.c, t.r, a0, b0, a1, b1))
+            grow(a0, b0, a1, b1);
+        if (installation_tile_bounds(new_src, g, p, t.c, t.r, a0, b0, a1, b1))
+            grow(a0, b0, a1, b1);
+        const std::size_t i = static_cast<std::size_t>(t.r) * new_src.gw
+                            + ((t.c % new_src.gw) + new_src.gw) % new_src.gw;
+        const auto cov = static_cast<terrain_cover>(new_src.cover[i]);
+        if (trees && new_src.cls[i] == land
+            && (cov == terrain_cover::forest || cov == terrain_cover::scrub)
+            && installation_clear_radius(old_src, i) != installation_clear_radius(new_src, i))
+        {
+            const double hx = kSqrt3 * (t.c + ((t.r & 1) ? 0.5 : 0.0));
+            const double hy = 1.5 * t.r;
+            const double side = 0.9 + 0.16 * 1.5;
+            const double up   = 0.9 + g.lift + 2.85 * 0.16 / g.tilt_sy;
+            const double down = 0.9 + 0.16 * 1.5;
+            grow(static_cast<int>(std::floor((hx - side) * g.s)) - 2,
+                 static_cast<int>(std::floor((hy - up - g.y_min) * g.s)) - 2,
+                 static_cast<int>(std::ceil ((hx + side) * g.s)) + 2,
+                 static_cast<int>(std::ceil ((hy + down - g.y_min) * g.s)) + 2);
+        }
+        if (x0 >= x1 || y0 >= y1)
+            continue; // nothing either side draws
+        x0 -= k_patch_pad; y0 -= k_patch_pad;
+        x1 += k_patch_pad; y1 += k_patch_pad;
+        // Aligned outward (relative to the window origin, which the caller
+        // keeps on the alignment lattice), then clipped to the window.
+        x0 = px0 + floor_a(x0 - px0); y0 = py0 + floor_a(y0 - py0);
+        x1 = px0 + ceil_a(x1 - px0);  y1 = py0 + ceil_a(y1 - py0);
+        x0 = std::max(x0, px0); y0 = std::max(y0, py0);
+        x1 = std::min(x1, wx1); y1 = std::min(y1, wy1);
+        if (x0 >= x1 || y0 >= y1)
+            continue; // its reach falls outside this window
+        out.push_back({ x0, y0, x1 - x0, y1 - y0 });
+    }
+    // Merge overlapping or touching rectangles into their bounding box until
+    // none touch (a handful per chunk: quadratic is fine).
+    for (bool merged = true; merged;)
+    {
+        merged = false;
+        for (std::size_t i = 0; i < out.size() && !merged; ++i)
+            for (std::size_t j = i + 1; j < out.size(); ++j)
+            {
+                const pixel_rect& a = out[i];
+                const pixel_rect& b = out[j];
+                if (a.x0 > b.x0 + b.w || b.x0 > a.x0 + a.w || a.y0 > b.y0 + b.h || b.y0 > a.y0 + a.h)
+                    continue;
+                const int x0 = std::min(a.x0, b.x0), y0 = std::min(a.y0, b.y0);
+                const int x1 = std::max(a.x0 + a.w, b.x0 + b.w), y1 = std::max(a.y0 + a.h, b.y0 + b.h);
+                out[i] = { x0, y0, x1 - x0, y1 - y0 };
+                out.erase(out.begin() + static_cast<std::ptrdiff_t>(j));
+                merged = true;
+                break;
+            }
+    }
+    // Deterministic order (raster by origin).
+    std::sort(out.begin(), out.end(), [](const pixel_rect& a, const pixel_rect& b) {
+        return a.y0 != b.y0 ? a.y0 < b.y0 : a.x0 < b.x0;
+    });
+    long long area = 0;
+    for (const pixel_rect& r : out)
+        area += static_cast<long long>(r.w) * r.h;
+    if (static_cast<double>(area) > max_fraction * static_cast<double>(pw) * ph)
+    {
+        out.clear();
+        return false;
+    }
+    return true;
 }
 
 } // namespace ui::ground
