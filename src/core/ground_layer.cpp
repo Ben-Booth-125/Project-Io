@@ -560,6 +560,69 @@ void ground_layer::touch()
         b->src_age = k_src_cadence;
 }
 
+bool ground_layer::pool_path_under_verify()
+{
+    return bench_async_on();
+}
+
+bool ground_layer::complete_master(const world& w, entity_id body, double timeout_ms)
+{
+    body_state* bp = ensure_body(w, body);
+    if (!bp)
+        return false;
+    body_state& b = *bp;
+    b.last_visit = m_frame;
+    make_room(master_bytes(b), body, m_active);
+    refresh_source(b, w); // the snapshot "current" is measured against
+    const auto t0 = clock::now();
+    const auto chunk_busy = [&] {
+        for (int i = 0; i < b.n_chunks; ++i)
+            if (b.job[i] != 0)
+                return true;
+        return false;
+    };
+    for (;;)
+    {
+        drain();
+        // This snapshot's sweep, on the main thread (a pool sweep in flight is
+        // superseded: its sequence no longer matches and it lands in nothing).
+        bool any = false;
+        for (int i = 0; i < b.n_chunks && !any; ++i)
+            any = b.ready[i] || b.job[i];
+        if (any && b.swept_digest != b.src_digest)
+        {
+            job j = make_sweep_job(b);
+            b.sweep_job = j.seq;
+            bake_sync(std::move(j));
+        }
+        if (master_current(body))
+            return true;
+        // Every chunk not landed, or landed against an older snapshot, and
+        // not already in the pool (a job in flight lands first; if it was
+        // taken against an older source it lands dirty and the next round
+        // re-queues it).
+        for (int i = 0; i < b.n_chunks; ++i)
+            if (b.job[i] == 0 && (!b.ready[i] || b.dirty[i]))
+            {
+                job j = make_master_job(b, i, k_prio_view + i);
+                b.job[i] = j.seq;
+                enqueue(std::move(j));
+            }
+        for (;;)
+        {
+            drain();
+            if (!chunk_busy() && b.sweep_job == 0)
+                break; // (a pool sweep in flight against this snapshot lands first)
+            if (ms_since(t0) > timeout_ms)
+                return false;
+            std::unique_lock lk(m_mx);
+            m_done_cv.wait_for(lk, std::chrono::milliseconds(20), [&] { return !m_results.empty(); });
+        }
+        if (ms_since(t0) > timeout_ms)
+            return master_current(body);
+    }
+}
+
 void ground_layer::shutdown()
 {
     if (!m_workers.empty())
@@ -1069,6 +1132,22 @@ void ground_layer::feed(bool verify)
 
 void ground_layer::pump(const world* wp, bool verify)
 {
+    if (verify)
+    {
+        // Name the path once: a run that meant the pool path but lost the env
+        // var (a POSIX `VAR=1 cmd` prefix in PowerShell or cmd sets nothing)
+        // is on the synchronous one, where the master never fills by itself.
+        static bool named = false;
+        if (!named)
+        {
+            named = true;
+            std::printf("[ground] --verify ground path: %s\n",
+                        bench_async_on() ? "POOL (IO_GROUND_BENCH: the master fills in the background)"
+                                         : "SYNCHRONOUS (only what each frame draws is baked; "
+                                           "verify.ground_complete_master() bakes the rest)");
+            std::fflush(stdout);
+        }
+    }
     if (verify && bench_async_on())
         verify = false;
     ++m_frame;
@@ -1141,6 +1220,47 @@ void ground_layer::pump(const world* wp, bool verify)
             refresh_source(*b, w);
 
     feed(/*verify=*/false);
+
+    static const bool stall_log = env_flag("IO_GROUND_STALL_LOG");
+    if (stall_log && m_frame % 60 == 0)
+    {
+        for (const auto& [id, bp] : m_bodies)
+        {
+            const body_state& b = *bp;
+            int rd = 0, dt = 0, jb = 0, idle = 0, jb_ready = 0;
+            for (int i = 0; i < b.n_chunks; ++i)
+            {
+                rd += b.ready[i] != 0;
+                dt += b.dirty[i] != 0;
+                jb += b.job[i] != 0;
+                jb_ready += b.job[i] != 0 && b.ready[i] && !b.dirty[i];
+                idle += b.job[i] == 0 && (!b.ready[i] || b.dirty[i]);
+            }
+            int q = 0, infl = 0, res = 0, qb = 0;
+            {
+                std::lock_guard lk(m_mx);
+                q = static_cast<int>(m_jobs.size());
+                infl = m_inflight;
+                res = static_cast<int>(m_results.size());
+                for (const job& j : m_jobs)
+                    qb += j.body == b.id && j.kind == job_kind::master;
+            }
+            static const clock::time_point t_start = clock::now();
+            std::printf("GROUND_STALL t%.1fs f%llu body %u%s%s n_ready %d/%d ready %d dirty %d jobs %d "
+                        "(ready-clean with job %d) idle-needing %d | queue %d (this body %d) inflight %d "
+                        "results %d | epoch %u hashes_epoch %u digest %016llx swept %016llx sweep_job %llu "
+                        "far_pending %d far_ready %d ram %.2f GB\n",
+                        ms_since(t_start) / 1000.0,
+                        static_cast<unsigned long long>(m_frame), static_cast<unsigned>(b.id),
+                        b.id == m_active ? " (active)" : "", b.id == m_prebake ? " (prebake)" : "",
+                        b.n_ready, b.n_chunks, rd, dt, jb, jb_ready, idle, q, qb, infl, res,
+                        b.src_epoch, b.hashes_epoch, static_cast<unsigned long long>(b.src_digest),
+                        static_cast<unsigned long long>(b.swept_digest),
+                        static_cast<unsigned long long>(b.sweep_job), b.far_pending, b.far_ready ? 1 : 0,
+                        b.ram / 1073741824.0);
+        }
+        std::fflush(stdout);
+    }
 
     if (m_master_pending && master_complete(m_active))
     {
@@ -1705,6 +1825,7 @@ ground_layer::stats ground_layer::stats_snapshot() const
                 s.ram_bytes[1 + l] += static_cast<long long>(px.size()) * 4;
         s.master_ready = b->n_ready;
         s.master_total = b->n_chunks;
+        s.master_current = master_current(m_active);
         if (m_far_tex && b->far_ready)
             s.gpu_bytes[0] = static_cast<long long>(b->far_geom.W) * b->far_geom.H * 4;
     }

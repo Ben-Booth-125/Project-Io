@@ -156,7 +156,13 @@ ground retires only as coverage arrives.
   thread waits for them; every visible texture uploads with no budget; no
   pre-bake or background bake runs — a capture must never race the pool.
   (In a Debug build the home master is ~2 minutes of pool time, paid by the
-  first whole-body framing of a run.)
+  first whole-body framing of a run.) So the master **never fills by itself**
+  under `--verify`: it holds what the views so far have covered. A script
+  that needs the whole master asks for it (`verify.ground_complete_master`,
+  which bakes the rest and returns once the master is complete and current,
+  or fails); polling the ready count waits forever. `IO_GROUND_BENCH=1` runs
+  the live pool path under `--verify` instead, where the master fills in the
+  background from any state.
 - **Invalidation is content-hashed, per master chunk:** each chunk's hash covers the
   tile fields the bake reads (terrain, height, survey bits) and the installations
   standing on its tiles (building type, recipe identity, stack membership; settlement
@@ -566,6 +572,10 @@ guarantees about it:
   play zoom and far zoom, the grade pass on/off, a river course, an installation
   stamp, selection hex on terrain, an animation overlay frame advanced via the
   pinned clock, and the vector fallback on an unauthored brush key.
+- **Master completion:** `scripts/verify/ground_master_complete.lua` — the home
+  master reaches complete and current from a first visit, after every rung, after a
+  body switch and after a burst of dirty chunks; on the pool path
+  (`IO_GROUND_BENCH=1`) the background fill alone does so within a time bound.
 - **Headless:** chunk invalidation (a build dirties exactly the intersecting
   chunks; nothing else re-bakes) and brush-manifest integrity are display-free
   checks.
