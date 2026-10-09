@@ -1742,6 +1742,28 @@
     "tools/verify/starve_trace_probe.cpp"
    ],
    "design": "DEFERRED from sprint 50 (Ben, 2026-10-09: 'push the long term viability work for another sprint, after the various other gameplay loops are settled'). Target carried: G1 at tick 50 >= 85% (market-viability; reported, not gated, in sprint 50). FOUND (starve_trace_probe, f98d43df, shipped code before sprint 50's wave 2b): of 665 plants lost handoff->t50, 386 starved. (1) STEEL: a background-firm CONSTRUCTION BOOM - on 33 starving markets 725 sites draw steel at t50, 701 background-owned (ports/hubs 264, food 181, fuel 79); site need ~373/tick vs processors ~35; making builds read steel scarcity is a NEW AI GRANT (raise it). (2) UNDELIVERED HAULS: copper ore - dispatcher 'would send' in 36/47 cases, arrivals ~8/tick; split Logistic Points cap / one-destination-per-pass / goods sent elsewhere (SUPPLY/LOGISTICS). (3) POOL-HELD STOCK: 42 plants starve while stock sits unlisted in other pools at the market; split processor reservation vs sell-order floor (MARKETS). (4) FUEL->PROPELLANT COLD START: with generation bounded by want, neither chain stands at generation and no launchpad exists on any seed; space access depends on settle/play building both (PRODUCTION, ERAS gate). Ruled healthy, keep: fair-price ceiling (cf off: -8.0 G1t50), background pull (cf off: -1.4), households' first draw. Re-measure with the probe after sprint 50 merges before designing."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "written": "2026-10-09",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "priority": "C",
+   "difficulty": 2,
+   "id": "BL-1249",
+   "short_name": "PAD_FUEL_DRAINED",
+   "category": "Economy",
+   "authority_doc": "docs/economy/MARKETS.md",
+   "author": "Claude (sprint 50 PROPELLANT cold review; backlogged by Ben 2026-10-09)",
+   "title": "A rival's launch fuel is not drained by its own scorer or the space programme - or it is, by ruling",
+   "files": [
+    "src/world/corp_ai.cpp",
+    "src/world/space_programme.cpp"
+   ],
+   "design": "BACKLOGGED by Ben (2026-10-09, launch fuel form) - both questions open, for a ruling when space access matters. Context: MARKETS.md step 4 reserves a pad pool's propellant from auto-surplus (Ben 2026-10-09; may still be sold by a standing order). Cold review of the PROPELLANT lane found three rival paths that ignore that reservation: (a) corp_ai.cpp listable_surplus (~2572) uses processor_reservation, so the trade candidate places an uncapped sell order that empties the pad pool, re-placed each time stock rebuilds; (b) the scorer's directed dispatch (~2735) has no reservation and can haul pad propellant to the capital market on the same body; (c) space_programme.cpp (~140-175) buys 50-unit lumps from the pool holding most unreserved stock - pad pools are now where propellant piles up. Q1: should the scorer sell/haul only above the pad reservation? Q2: should the space programme buy only the excess? No seed had a launchpad at t50 in sprint 50, so the effect is latent."
   }
  ]
 }
