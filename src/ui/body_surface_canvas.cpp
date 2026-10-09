@@ -12,6 +12,7 @@
 #include "nav_pane.hpp"
 #include "presentation.hpp"
 #include "shell_metrics.hpp"     // right chrome column + minimap rect (BL-533 legend home)
+#include "ground_bake.hpp"      // k_tilt_sy: the one camera angle (BL-1246)
 #include "world/battle_system.hpp" // first_battle_in (BL-469 battle rung)
 #include "world/hex_neighbors.hpp"   // canonical odd-r neighbour offsets (BL-363)
 #include "world/logistics.hpp"       // intra_body_path (convoy vision beam, BL-152)
@@ -2627,16 +2628,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                          ? ImVec2{state.mouse.x, state.mouse.y}
                          : ImVec2{-1.0f, -1.0f}; // off-screen sentinel suppresses hover
 
-    // --- BL-737: the stepped tilt camera -----------------------------------
-    // The top zoom rungs view the land obliquely (22.5°/45°). The canvas keeps
-    // drawing entirely in FLAT ground space; one vertex-range squash at the
-    // end of the map passes is the camera, and this inverse maps the real
-    // cursor into that flat space so every existing hit test works unchanged.
-    // Tilt is a pure function of zoom (verify's free-form zooms included) and
-    // applies on the plain canvas only — a lens is an analytic read and stays
-    // flat, which also keeps its legend chrome out of the squash.
-    const float  tilt_sy    = state.overlay == overlay_mode::none
-                                  ? planetary_tilt_sy(zoom) : 1.0f;
+    // --- The camera: ONE angle (RENDERING.md § One angle; BL-1246) ----------
+    // The land is viewed at 22.5° at every rung and under every lens (Ben,
+    // 2026-10-09 — one angle is what makes one master possible, and toggling
+    // a lens never moves the map). The canvas keeps drawing entirely in FLAT
+    // ground space; one vertex-range squash over the map passes is the camera
+    // (the lens legend's vertices are excluded from it), and this inverse
+    // maps the real cursor into that flat space so every hit test works
+    // unchanged.
+    const float  tilt_sy    = planetary_tilt_sy(zoom);
     const float  tilt_pivot = canvas_centre.y;
     const ImVec2 mouse_g    = { mouse.x,
                                 tilt_pivot + (mouse.y - tilt_pivot) / tilt_sy };
@@ -2787,15 +2787,36 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // The DRAWN ground radius, hex_size * zoom — not draw_r, which is a
         // 1 px border-inset for the polygon fills. Passing draw_r let a drawn
         // radius in (T, T+1] pick tier T and draw it magnified (BL-1244).
-        state.ground_req.draw_r = hit_r; ///< Picks the bake tier (stepped ladder).
-        state.ground_req.sy     = tilt_sy; ///< The tilted rungs want oblique tiers (BL-737).
+        state.ground_req.draw_r = hit_r; ///< Picks the master's level (RENDERING.md § Level of detail).
         state.ground_req.valid  = raster_ok;
     }
     // BL-737: everything from here to the camera squash at the end of the map
     // passes draws in FLAT ground space; the squash over this vertex range IS
     // the tilt. (The background rect, title and chrome above this line stay
-    // screen-space.)
+    // screen-space; so does the lens legend, whose vertex range is cut out.)
     const int v_map_start = dl->VtxBuffer.Size;
+    int v_key_start = -1, v_key_end = -1;
+    // The camera over [from, to) of this list's vertices.
+    const auto squash = [&](int from, int to) {
+        if (tilt_sy >= 1.0f || from < 0)
+            return;
+        ImDrawVert* vtx = dl->VtxBuffer.Data;
+        for (int vi = from; vi < to; ++vi)
+            vtx[vi].pos.y = tilt_pivot + (vtx[vi].pos.y - tilt_pivot) * tilt_sy;
+    };
+    // Every map vertex emitted so far, minus the legend's: called once, at
+    // whichever exit the frame takes (the input early-out included — a
+    // cursor over a panel must not un-tilt the map).
+    const auto apply_camera = [&] {
+        const int n = dl->VtxBuffer.Size;
+        if (v_key_start < 0)
+            squash(v_map_start, n);
+        else
+        {
+            squash(v_map_start, v_key_start);
+            squash(v_key_end, n);
+        }
+    };
 
     if (ground_on)
     {
@@ -2820,9 +2841,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                              { p0.x + off, p0.y }, { p1.x + off, p1.y });
             }
         };
+        // The far page carries only a body whose master has not yet covered
+        // the view (BL-1246): every other frame the level's chunks cover it.
         draw_ground_rect(gview.far);
-        for (const ground_chunk_view& cv : gview.standin) // BL-1244: next tier down while filling
-            draw_ground_rect(cv);
         for (const ground_chunk_view& cv : gview.chunks)
             draw_ground_rect(cv);
 
@@ -2833,12 +2854,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         if (state.show_frame_hud)
         {
             char gbuf[96];
-            if (gview.tier_ppr > 0.0)
+            if (gview.level_ppr > 0.0)
                 std::snprintf(gbuf, sizeof gbuf,
-                              "ground: tier %.0f px/r  ·  %.2f texel/px  ·  %d chunks  ·  %d stand-in",
-                              gview.tier_ppr, gview.tier_ppr / hit_r, // texels per DRAWN px
-                              static_cast<int>(gview.chunks.size()),
-                              static_cast<int>(gview.standin.size()));
+                              "ground: level %.0f px/r  ·  %.2f texel/px  ·  %d chunks",
+                              gview.level_ppr, gview.level_ppr / hit_r, // texels per DRAWN px
+                              static_cast<int>(gview.chunks.size()));
             else
                 std::snprintf(gbuf, sizeof gbuf,
                               "ground: far page 6 px/r  ·  %.2f texel/px",
@@ -4882,6 +4902,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     //
     // The Country row is absent rather than pending: BL-601 retired that lens in the
     // same sprint, and its key with it.
+    //
+    // The key is screen chrome on the canvas's own draw list: its vertices
+    // are cut out of the camera squash (BL-1246 — lenses ride the one angle
+    // now, their legends do not).
+    v_key_start = dl->VtxBuffer.Size;
     if (state.overlay == overlay_mode::resource)
         draw_resource_key(w, state);
     else if (state.overlay == overlay_mode::corporation || state.overlay == overlay_mode::company)
@@ -4910,9 +4935,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     else if (state.overlay == overlay_mode::trade_flow)
         draw_trade_flow_key(dl, state, tf_max_rate, static_cast<int>(tf_arrows.size()),
                             static_cast<int>(tf_markers.size()));
+    v_key_end = dl->VtxBuffer.Size;
 
     if (!input_enabled)
+    {
+        apply_camera();
         return;
+    }
 
     // Trade-flow lens hover (BL-1222). An immediate read at the cursor, like the
     // border band's below: an arrow or a marker is not an entity, so the
@@ -5702,15 +5731,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
     // BL-737: the camera. One squash over every map-space vertex emitted since
     // v_map_start — fills, strokes, ground images, glyphs and labels alike —
-    // about the canvas centre. Chrome drawn before the marker, ImGui windows
-    // (hover card, ledgers) and the foreground list are untouched.
-    if (tilt_sy < 1.0f)
-    {
-        ImDrawVert* vtx = dl->VtxBuffer.Data;
-        const int   n   = dl->VtxBuffer.Size;
-        for (int vi = v_map_start; vi < n; ++vi)
-            vtx[vi].pos.y = tilt_pivot + (vtx[vi].pos.y - tilt_pivot) * tilt_sy;
-    }
+    // about the canvas centre. Chrome drawn before the marker, the lens key,
+    // ImGui windows (hover card, ledgers) and the foreground list are untouched.
+    apply_camera();
 
     // Pan and zoom. Middle mouse button pans; scroll wheel zooms, anchored at
     // the cursor so the point under the mouse stays fixed.
@@ -5744,11 +5767,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             state.planetary_wheel_accum = 0.0f;
             const float new_zoom = planetary_zoom_stepped(zoom, dir);
             // World point under the cursor, kept fixed across the zoom change —
-            // read through the OLD tilt's inverse, re-projected through the NEW
-            // tilt's (a step can cross a tilt threshold; the point under the
-            // cursor must land back under the cursor either side — BL-737).
-            const float new_sy = state.overlay == overlay_mode::none
-                                     ? planetary_tilt_sy(new_zoom) : 1.0f;
+            // read through the tilt's inverse, re-projected through it (one
+            // angle now, so both are the same squash — BL-737, BL-1246).
+            const float new_sy = planetary_tilt_sy(new_zoom);
             const ImVec2 wp = { (mouse.x - view_origin.x) / zoom + grid_cx,
                                 (mouse_g.y - view_origin.y) / zoom + grid_cy };
             const float target_gy = tilt_pivot + (mouse.y - tilt_pivot) / new_sy;
@@ -5775,13 +5796,10 @@ float planetary_zoom_stepped(float current, int direction)
 
 float planetary_tilt_sy(float zoom)
 {
-    // Thresholds at the geometric midpoints between rungs 2/3 and 3/4, so a
-    // free-form zoom lands on the tilt of its nearest rung.
-    if (zoom >= kMinZoom * 11.31f)
-        return 0.70710678f; // 45°
-    if (zoom >= kMinZoom * 5.657f)
-        return 0.92387953f; // 22.5°
-    return 1.0f;
+    // ONE angle at every rung (RENDERING.md § One angle, Ben 2026-10-09; the
+    // stepped 22.5°/45° tilt of 2026-09-02 is retired): cos(22.5°).
+    (void)zoom;
+    return static_cast<float>(ground::k_tilt_sy);
 }
 
 } // namespace ui

@@ -82,9 +82,9 @@ untouched by construction):
 **Brush placement is hashed from tile grid coordinates**, never screen position — the
 established rule (wrap copies of one tile must agree; no crawl under pan).
 
-**The close tiers carry feature stamps and sharpened relief** (Ben, 2026-09-01: *"we
+**The master carries feature stamps and sharpened relief** (Ben, 2026-09-01: *"we
 should be able to render individual trees, and sharper hills"*). At bake resolutions
-≥ 40 px per hex (the 48/96 tiers): forest and scrub tiles scatter **individual tree
+≥ 40 px per hex (the 96 px master — and so, downsampled, every level): forest and scrub tiles scatter **individual tree
 canopies** — hash-positioned, density-counted, NW-lit with an SE drop shadow, drawn
 before the grade so they take it exactly as the ground does, and never painted over
 the survey lock fill; mountain-biased detail noise folds toward a **ridged** variant
@@ -100,11 +100,30 @@ ground retires only as coverage arrives.
 
 ### Chunks, cache and invalidation
 
-- Chunks are fixed pixel windows (512 px) into one whole-body bake space per
-  tier, so adjacent chunks are seamless by construction; pages stay ≤ 4096².
-- **Resident set:** the ACTIVE zoom tier's chunks around the viewport
-  (LRU-capped per tier), plus one low-res whole-body far page. Bounded memory;
-  no streaming subsystem.
+- Chunks are fixed pixel windows (512 px) into one whole-body image per level
+  of the master (§ Level of detail), so adjacent chunks are seamless by
+  construction. The master's width and height are multiples of 16, so every
+  master chunk halves exactly at every level and each level still spans one
+  wrap period.
+- **Resident set — two tiers of memory:**
+  - **System RAM** holds each baked body's master and its mip chain, chunk by
+    chunk (~3.8 GB for the 261×121 home body), plus its far page. A **RAM
+    budget of 6 GB across bodies** drops the least-recently-visited body's
+    master and chain — never the body on screen, never the pre-bake target —
+    and keeps its far page. A background bake starts only where its whole
+    master fits the budget without dropping anything.
+  - **The GPU** holds only the drawn level's chunks in view, a one-chunk ring
+    around them, and the same view at the two adjacent levels — an LRU of at
+    most 320 textures (≤ 1 MB each), flushed on a body switch. Uploads are
+    capped at **8 chunks (≤ 8 MB) a frame** for the view and its ring, nearest
+    the centre first, and **2 a frame** for the adjacent levels — spent only
+    once the view is whole (the coarser level's whole view, the finer level's
+    central half) — so a pan reveals uploaded ground and a rung change finds
+    its level already resident. The first view on a body (a body switch, play
+    opening) uploads whole in one frame: it is a transition anyway.
+  - The **far page** — one direct whole-body bake at 6 px per hex at the one
+    angle, baked as 512 px pieces, single-sample — is all a body shows before
+    its master covers the view; the vector fallback only before that.
 - **All baking runs on a pool of worker threads** (Ben, 2026-09-01 — the
   smoothness ruling; the pool, Ben 2026-10-09 — one worker took 14-22 s to fill
   a zoom step): the pure bake executes against an immutable source snapshot,
@@ -116,27 +135,37 @@ ground retires only as coverage arrives.
     main/simulation thread and one spare are left free — at below-normal OS
     priority, so a full-viewport fill never starves the simulation or render
     threads.
-  - **Order:** one shared queue, popped lowest-priority-value first: the far
-    page before everything (a body switch), then the Selection band's
-    neighbourhood page, then active-tier chunks nearest the viewport centre.
-    The stand-in tier is re-hashed, never baked, so it never competes for a
-    worker. A rung change drops the waiting jobs of the tier just left; the
-    waiting set is capped near N, so the queue stays near the viewport.
-  - **Results are keyed by (generation, tier, chunk):** only the job a slot's
-    pending flag stands for can land in it, so arrival order cannot matter. A
-    generation counter discards results that outlive their source or body.
+  - **Order:** one shared queue, popped lowest-priority-value first: far-page
+    pieces, then hash sweeps, then the Selection band's neighbourhood page,
+    then the drawn body's master chunks under the view (nearest the centre
+    first), then the rest of that body, then the pre-bake target, then — once
+    play is open — one background body at a time (most-visited, then nearest
+    the home body's orbit). The waiting set is capped at 2N and refilled every
+    frame, so the queue follows the view.
+  - **The mip chain is the worker's:** the worker that bakes a master chunk
+    box-downsamples it into its pieces of the 48/24/12/6 levels before
+    returning; the render thread only copies the pieces into place.
+  - **Results are keyed by job:** each slot records the sequence number of
+    its one outstanding job, and only that job's result can land in it, so
+    arrival order cannot matter and a result that outlives its body (a drop,
+    a new world) lands in nothing.
 
-  Until a chunk lands, the far page carries the frame; until the far page
-  lands (a body switch), the vector fallback does. **Under `--verify` every
-  bake is synchronous on the main thread** — a capture must never race the
-  pool.
-- **Invalidation is content-hashed:** each chunk's job carries a hash of the
-  tile fields the bake reads (terrain, height, survey bits) and of the installations
+  **Under `--verify` everything a frame draws is complete before the frame
+  returns:** the master chunks under the view bake on the pool and the main
+  thread waits for them; every visible texture uploads with no budget; no
+  pre-bake or background bake runs — a capture must never race the pool.
+  (In a Debug build the home master is ~2 minutes of pool time, paid by the
+  first whole-body framing of a run.)
+- **Invalidation is content-hashed, per master chunk:** each chunk's hash covers the
+  tile fields the bake reads (terrain, height, survey bits) and the installations
   standing on its tiles (building type, recipe identity, stack membership; settlement
-  scale and razed state); an urban transform, a survey reveal, a build, a demolition or
-  a settlement crossing a scale step changes the hash and the chunk re-bakes on its next
-  sweep. Nothing tick-rate enters the hash — staffing, output and ownership do not — so a
-  re-bake follows a construction event, never a tick.
+  scale and razed state). The drawn body's source snapshot is re-taken every 30 frames —
+  and on the next frame after the player places a building; when its whole-body digest
+  moves, a sweep job hashes every master chunk against it, and a chunk whose hash moved
+  re-bakes in the master and re-derives only its own mip pieces (an urban transform, a
+  survey reveal, a build, a demolition, a settlement crossing a scale step). Nothing
+  tick-rate enters the hash — staffing, output and ownership do not — so a re-bake
+  follows a construction event, never a tick.
 - The cylinder wrap draws the same chunk at multiple offsets, exactly as tiles do
   today; the seam-crossing chunk bakes with wrapped neighbour reads.
 
@@ -218,7 +247,7 @@ Consequences the design accepts and answers:
   standing sprite like a tree — verticals pre-stretched by 1/cos(tilt), shadow left on
   the ground plane — so the camera squash returns it to true proportion.
 - **Under a lens a structure is ground.** It takes the lens wash like the terrain around
-  it; a lens is an analytic read and stays flat.
+  it; a lens is an analytic read, seen at the same one angle as the plain canvas.
 - A structure stamp may **overhang its tile** (chimneys, towers); stamps compose in
   row order like every other pass. **Hit-testing is unchanged**: the hex, not the stamp,
   is what a press lands on (SELECTION.md § Multi-building tiles).
@@ -331,8 +360,14 @@ been a fresh, expensive bake, and that bake was the lag.
   rest behind it. A RAM budget drops the masters of the least-recently-visited bodies,
   keeping their far pages.
 - **The bake is pooled.** All baking runs on the worker pool (§ Chunks, cache and
-  invalidation); the master is a few thousand chunks, which a pool clears in seconds
-  and a single thread could not.
+  invalidation); the home body's master is about 3,000 chunks (2,975 at 261×121), work
+  only a pool can carry. Its cost is a measurement, not an estimate:
+  `ground_bake_check --master` times the whole master, surveyed and masked, at 1× and 2×,
+  and with each pass switched off in turn.
+- **Unsurveyed ground is a fill.** A chunk every tile in reach of which is survey-masked
+  is the flat lock colour and nothing else, so it is filled directly rather than resolved
+  pixel by pixel — byte-identical (`ground_bake_check` P23). An unsurveyed body's master
+  is therefore nearly free, and a first visit to one is final at once.
 - **Supersampling is a measured choice, not a rule.** The master bakes at 1× by default:
   the downsampled levels are anti-aliased by the downsample itself, and only the top rung
   — the one rung that reads the master near 1:1 — would gain from a 2× bake, at four
@@ -367,7 +402,8 @@ Two halves make it:
   flat ground space; a single transform over the map-space vertex range squashes fills,
   strokes, images and labels alike about the canvas centre, and one inverse on the
   cursor keeps every hit test correct. It applies under every lens too, so switching a
-  lens never moves the map. Height displacement is deliberately ignored for hits — a
+  lens never moves the map; the lens key, which is screen chrome drawn on the same list,
+  is cut out of the squash. Height displacement is deliberately ignored for hits — a
   few px on mountain tops.
 - **The master bakes oblique:** the height field displaces content upward by
   `lift = 0.9·tan(22.5°)` canonical units per unit height, so hills grow real

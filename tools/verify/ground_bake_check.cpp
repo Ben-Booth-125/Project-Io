@@ -20,7 +20,7 @@
 //
 // Requirement group `ground-never-magnified` (BL-1244):
 //
-//   P10 The tier chooser: smallest tier with ppr >= the DRAWN radius, far
+//   P10 (retired with the per-rung tiers, BL-1246; see P22) The tier chooser: smallest tier with ppr >= the DRAWN radius, far
 //       page at or below 1:1, no radius magnified up to the 192 px top tier,
 //       no chunked tier minified past 2:1, and the canvas's border-inset
 //       radius shown to be the wrong feed (F34).
@@ -50,6 +50,15 @@
 //       tiers (flat, 2x supersampled, oblique) baked CONCURRENTLY on the
 //       pool's thread count, sharing one source read-only, is byte-identical
 //       to the same set baked serially. `--pool` runs P21 alone.
+//   P22 The one master (BL-1246, RENDERING.md § Level of detail): the master
+//       geometry is aligned (W, H multiples of 16, every level whole pixels
+//       and wrap-exact), a master chunk equals its quadrant of a wider window,
+//       the chain built chunk by chunk equals the whole image's chain, and the
+//       level chooser reads the coarsest level at or above the drawn radius.
+//       `--master` runs P22 plus the whole-body master bake reading (1x, 2x).
+//   P23 The lock fast path (BL-1246): a window wholly inside survey-masked
+//       ground fills with the lock colour directly, byte-identical to the
+//       full per-pixel bake (masked chunks and a mask-edge chunk).
 //
 // Also prints bake time per tier (a measurement, not a check) and writes
 // feature_<form>_<tier>.png previews for the eye.
@@ -167,7 +176,7 @@ void pool_row(const bake_source& src, const body_component& hb, int land_i, cons
     struct win { geometry g; bake_params prm; int x0, y0, w, h; };
     std::vector<win> jobs;
     struct tier { double ppr; double sy; int ss; };
-    for (const tier t : { tier{ 24.0, 1.0, 2 }, tier{ 48.0, 1.0, 2 }, tier{ 48.0, 0.70710678, 2 },
+    for (const tier t : { tier{ 24.0, 1.0, 2 }, tier{ 48.0, 1.0, 2 }, tier{ 48.0, k_tilt_sy, 2 },
                           tier{ 96.0, 1.0, 1 } })
     {
         const geometry g = make_geometry(hb.grid_width, hb.grid_height, t.ppr, t.sy);
@@ -222,6 +231,304 @@ void pool_row(const bake_source& src, const body_component& hb, int land_i, cons
     }
     std::printf("P21: %zu windows over %zu aims, %d threads\n", jobs.size(), aims.size(), n_threads);
     check(identical, "P21", "concurrent bakes on the pool's thread count equal the serial bakes byte for byte");
+}
+
+/// The whole-body master bake on the pool's thread count (RENDERING.md
+/// § Level of detail): every 512 px chunk of the master at @p ss, then its
+/// mip pieces. Returns the bake wall ms; prints the reading.
+double master_bake(const bake_source& src, const bake_params& p, int ss, const char* tag)
+{
+    const geometry g = make_master_geometry(src.gw, src.gh);
+    bake_params prm = p;
+    prm.supersample = ss;
+    const int cw = (g.W + k_chunk_px - 1) / k_chunk_px;
+    const int ch = (g.H + k_chunk_px - 1) / k_chunk_px;
+    const int n  = cw * ch;
+    const int hc = static_cast<int>(std::thread::hardware_concurrency());
+    const int n_threads = std::max(1, hc - 2);
+    std::atomic<int> next{ 0 };
+    std::atomic<long long> chain_us{ 0 };
+    const auto t0 = std::chrono::steady_clock::now();
+    std::vector<std::thread> pool;
+    for (int t = 0; t < n_threads; ++t)
+        pool.emplace_back([&] {
+            std::vector<std::uint32_t> buf, half, cur;
+            for (int k; (k = next.fetch_add(1)) < n;)
+            {
+                const int ci = k % cw, cj = k / cw;
+                const int x0 = ci * k_chunk_px, y0 = cj * k_chunk_px;
+                const int w = std::min(k_chunk_px, g.W - x0), h = std::min(k_chunk_px, g.H - y0);
+                buf.assign(static_cast<std::size_t>(w) * h, 0u);
+                bake_region(src, g, prm, x0, y0, w, h, buf.data());
+                const auto c0 = std::chrono::steady_clock::now();
+                int lw = w, lh = h;
+                cur = buf;
+                for (int l = 1; l < k_level_count; ++l)
+                {
+                    half.assign(static_cast<std::size_t>(lw / 2) * (lh / 2), 0u);
+                    downsample_half(cur.data(), lw, lh, half.data());
+                    cur.swap(half);
+                    lw /= 2; lh /= 2;
+                }
+                chain_us += std::chrono::duration_cast<std::chrono::microseconds>(
+                    std::chrono::steady_clock::now() - c0).count();
+            }
+        });
+    for (std::thread& t : pool)
+        t.join();
+    const double ms = std::chrono::duration<double, std::milli>(
+        std::chrono::steady_clock::now() - t0).count();
+    double bytes = 0.0;
+    for (int l = 0; l < k_level_count; ++l)
+    {
+        const geometry gl = level_geometry(g, l);
+        bytes += static_cast<double>(gl.W) * gl.H * 4.0;
+    }
+    std::printf("MASTER  %-10s %dx%d grid  master %dx%d px (%d chunks)  %dx  %d threads  bake %.1f s"
+                "  (chain %.2f s of thread time)  RAM master+chain %.2f GB\n",
+                tag, src.gw, src.gh, g.W, g.H, n, ss, n_threads, ms / 1000.0,
+                chain_us.load() / 1e6, bytes / (1024.0 * 1024.0 * 1024.0));
+    std::fflush(stdout);
+    return ms;
+}
+
+/// P22 - the one master and its chain (RENDERING.md § Level of detail):
+/// the master geometry is aligned so every level is whole pixels and keeps
+/// the wrap; the chain built chunk by chunk equals the chain of the whole
+/// image; and the level chooser reads the coarsest level at or above the
+/// drawn radius (never past 2:1 minified; the master magnified past 96).
+void master_row(const bake_source& src, const body_component& hb, int land_i, const bake_params& p)
+{
+    const geometry m = make_master_geometry(hb.grid_width, hb.grid_height);
+    bool aligned = m.W % k_master_align == 0 && m.H % k_master_align == 0
+                && std::fabs(m.tilt_sy - k_tilt_sy) < 1e-9 && m.lift > 0.3 && m.lift < 0.45;
+    for (int l = 0; l < k_level_count; ++l)
+    {
+        const geometry gl = level_geometry(m, l);
+        aligned = aligned && gl.W * (1 << l) == m.W && gl.H * (1 << l) == m.H
+               && std::fabs(gl.s * (1 << l) - m.s) < 1e-9
+               && std::fabs(gl.W / gl.s - m.W / m.s) < 1e-6; // same wrap period
+    }
+    std::printf("P22: master %dx%d at %.3f px/hex, tilt sy %.4f, lift %.3f\n", m.W, m.H, m.s,
+                m.tilt_sy, m.lift);
+    check(aligned, "P22", "master W/H are multiples of 16; each level halves exactly and keeps the wrap period");
+
+    // Chunkwise vs whole: a 2x2-chunk master window (1024 px) aimed at land,
+    // on the chunk lattice.
+    const int lr = land_i / src.gw, lc = land_i % src.gw;
+    const double lx = 1.7320508075688772 * (lc + ((lr & 1) ? 0.5 : 0.0));
+    const int side = 2 * k_chunk_px;
+    const int x0 = (static_cast<int>(lx * m.s) / k_chunk_px) * k_chunk_px;
+    const int y0 = std::clamp((static_cast<int>((1.5 * lr - m.y_min) * m.s) / k_chunk_px) * k_chunk_px,
+                              0, std::max(0, (m.H - side) / k_chunk_px * k_chunk_px));
+    bake_params p1 = p;
+    p1.supersample = 1;
+    std::vector<std::uint32_t> whole(static_cast<std::size_t>(side) * side);
+    bake_region(src, m, p1, x0, y0, side, side, whole.data());
+    std::vector<std::uint32_t> wl = whole, tmp;
+    int ws = side;
+    for (int l = 1; l < k_level_count; ++l)
+    {
+        tmp.assign(static_cast<std::size_t>(ws / 2) * (ws / 2), 0u);
+        downsample_half(wl.data(), ws, ws, tmp.data());
+        wl.swap(tmp);
+        ws /= 2;
+    }
+    std::vector<std::uint32_t> placed(static_cast<std::size_t>(ws) * ws, 0u);
+    bool chunk_eq_bake = true;
+    for (int q = 0; q < 4; ++q)
+    {
+        const int qx = (q & 1) * k_chunk_px, qy = (q >> 1) * k_chunk_px;
+        std::vector<std::uint32_t> c(static_cast<std::size_t>(k_chunk_px) * k_chunk_px);
+        bake_region(src, m, p1, x0 + qx, y0 + qy, k_chunk_px, k_chunk_px, c.data());
+        for (int y = 0; y < k_chunk_px && chunk_eq_bake; ++y)
+            chunk_eq_bake = std::memcmp(c.data() + static_cast<std::size_t>(y) * k_chunk_px,
+                                        whole.data() + static_cast<std::size_t>(qy + y) * side + qx,
+                                        k_chunk_px * 4u) == 0;
+        int cs = k_chunk_px;
+        for (int l = 1; l < k_level_count; ++l)
+        {
+            tmp.assign(static_cast<std::size_t>(cs / 2) * (cs / 2), 0u);
+            downsample_half(c.data(), cs, cs, tmp.data());
+            c.swap(tmp);
+            cs /= 2;
+        }
+        for (int y = 0; y < cs; ++y)
+            std::memcpy(placed.data() + static_cast<std::size_t>(qy / 16 + y) * ws + qx / 16,
+                        c.data() + static_cast<std::size_t>(y) * cs, static_cast<std::size_t>(cs) * 4u);
+    }
+    check(chunk_eq_bake, "P22", "a master chunk bakes byte-identical to its quadrant of a 2x2-chunk window (no chunk seam)");
+    check(placed == wl, "P22", "the mip chain built chunk by chunk equals the whole image's chain to the 6 px level");
+    {
+        std::vector<std::uint32_t> flat(16, 0xFF204060u), half(4);
+        downsample_half(flat.data(), 4, 4, half.data());
+        check(half == std::vector<std::uint32_t>(4, 0xFF204060u), "P22",
+              "a flat run (lock fill, open sea) downsamples byte-exact");
+    }
+
+    // The chooser. Rung radii at 1720x1080 (drawn: 6.93 / 13.87 / 27.73 /
+    // 55.47 / 110.66) and 3840x2160 (14.0 ... 223.41).
+    const struct { double r; int want; } rows[] = {
+        { 3.0, 4 }, { 5.93, 4 }, { 6.0, 4 }, { 6.01, 3 }, { 6.93, 3 }, { 12.0, 3 }, { 12.5, 2 },
+        { 13.87, 2 }, { 14.0, 2 }, { 24.5, 1 }, { 27.73, 1 }, { 48.5, 0 }, { 55.47, 0 },
+        { 96.0, 0 }, { 110.66, 0 }, { 223.41, 0 },
+    };
+    bool all = true;
+    for (const auto& row : rows)
+        if (const int got = choose_level(row.r); got != row.want)
+        {
+            std::printf("      draw_r %.2f -> level %d, want %d\n", row.r, got, row.want);
+            all = false;
+        }
+    check(all, "P22", "chooser reads the coarsest level at or above the drawn radius");
+    bool never_mag = true, within_2 = true;
+    for (double r = k_level_ppr[k_level_count - 1] + 0.0625; r <= k_master_ppr; r += 0.0625)
+    {
+        const double ppr = k_level_ppr[choose_level(r)];
+        if (ppr / r < 1.0) never_mag = false;
+        if (ppr / r > 2.0) within_2 = false;
+    }
+    check(never_mag && within_2, "P22", "every radius from 6 to 96 px reads a level minified by 1:1 to 2:1");
+}
+
+/// P23 - the lock fast path (BL-1246): a window wholly inside survey-masked
+/// ground is filled with the lock colour directly; it must be byte-identical
+/// to the full per-pixel bake. Checked on master chunks of an unsurveyed body
+/// and on the first masked master chunks of the home body under its mask
+/// (where the path engages), plus one chunk on a mask edge (where it must
+/// not change anything either).
+void lock_fast_row(world& w, entity_id home, const bake_params& p)
+{
+    bake_params fast = p, slow = p;
+    fast.supersample = slow.supersample = 1; // the master's
+    fast.fast_lock = true;
+    slow.fast_lock = false;
+    constexpr std::uint32_t lock = ui::palette::col32(12, 14, 20, 255);
+    int compared = 0, engaged = 0;
+    bool equal = true;
+    double ms_fast = 0.0, ms_slow = 0.0;
+    std::vector<std::uint32_t> a, b;
+    const auto compare = [&](const bake_source& s, const geometry& g, int ci, int cj) {
+        const int x0 = ci * k_chunk_px, y0 = cj * k_chunk_px;
+        const int cw = std::min(k_chunk_px, g.W - x0), chh = std::min(k_chunk_px, g.H - y0);
+        a.assign(static_cast<std::size_t>(cw) * chh, 0u);
+        b.assign(a.size(), 0u);
+        auto t0 = std::chrono::steady_clock::now();
+        bake_region(s, g, fast, x0, y0, cw, chh, a.data());
+        ms_fast += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+        t0 = std::chrono::steady_clock::now();
+        bake_region(s, g, slow, x0, y0, cw, chh, b.data());
+        ms_slow += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+        ++compared;
+        equal = equal && a == b;
+        return std::all_of(a.begin(), a.end(), [&](std::uint32_t c) { return c == lock; });
+    };
+    for (const auto& [id, bd] : w.bodies)
+        if (bd.grid_width > 0 && bd.survey.phase == survey_phase::hidden)
+        {
+            const bake_source hs = prepare_source(w, id);
+            const geometry g = make_master_geometry(bd.grid_width, bd.grid_height);
+            const int cw = (g.W + k_chunk_px - 1) / k_chunk_px, ch = (g.H + k_chunk_px - 1) / k_chunk_px;
+            engaged += compare(hs, g, cw / 2, ch / 2) ? 1 : 0;
+            break;
+        }
+    {
+        const body_component& hb = w.bodies.at(home);
+        const bake_source ms = prepare_source(w, home, /*reveal_all=*/false);
+        const geometry g = make_master_geometry(hb.grid_width, hb.grid_height);
+        const int cw = (g.W + k_chunk_px - 1) / k_chunk_px, ch = (g.H + k_chunk_px - 1) / k_chunk_px;
+        int found = 0, edge = 0;
+        std::vector<std::uint32_t> probe;
+        for (int cj = 1; cj + 1 < ch && (found < 3 || edge < 1); ++cj)
+            for (int ci = 0; ci < cw && (found < 3 || edge < 1); ci += 3)
+            {
+                // Cheap pre-probe: the fast output alone, to find candidates.
+                const int x0 = ci * k_chunk_px, y0 = cj * k_chunk_px;
+                probe.assign(static_cast<std::size_t>(std::min(k_chunk_px, g.W - x0))
+                             * std::min(k_chunk_px, g.H - y0), 0u);
+                bake_region(ms, g, fast, x0, y0, std::min(k_chunk_px, g.W - x0),
+                            std::min(k_chunk_px, g.H - y0), probe.data());
+                const std::size_t n_lock = static_cast<std::size_t>(
+                    std::count(probe.begin(), probe.end(), lock));
+                if (n_lock == probe.size() && found < 3)
+                {
+                    engaged += compare(ms, g, ci, cj) ? 1 : 0;
+                    ++found;
+                }
+                else if (n_lock > 0 && n_lock < probe.size() && edge < 1)
+                {
+                    compare(ms, g, ci, cj); // a mask edge: the path must not engage
+                    ++edge;
+                }
+            }
+    }
+    // A mask EDGE: a body this seed has partly surveyed — every master chunk
+    // in the rows that cross its mask boundary, so the path is exercised
+    // right up to the reach margin where it must stop engaging.
+    int edge_chunks = 0;
+    // No body is part-surveyed in this harness world, so make one: the home
+    // body mid-scan, half its survey regions revealed (restored after).
+    body_component& hbm = w.bodies.at(home);
+    const survey_state saved = hbm.survey;
+    hbm.survey.phase = survey_phase::scanning;
+    hbm.survey.regions_done = survey_region_count(hbm.grid_width, hbm.grid_height) / 2;
+    for (const auto& [id, bd] : w.bodies)
+    {
+        if (bd.grid_width <= 0 || edge_chunks > 0)
+            continue;
+        const bake_source s = prepare_source(w, id);
+        const std::size_t n_masked = static_cast<std::size_t>(std::count(
+            s.cls.begin(), s.cls.end(), static_cast<std::uint8_t>(bake_source::tile_class::masked)));
+        if (n_masked == 0 || n_masked == s.cls.size())
+            continue;
+        const geometry g = make_master_geometry(bd.grid_width, bd.grid_height);
+        const int cw = (g.W + k_chunk_px - 1) / k_chunk_px, ch = (g.H + k_chunk_px - 1) / k_chunk_px;
+        // Is any tile within `reach` canonical units of the chunk's window
+        // NOT masked? (The fast path's own test at reach 4.5.)
+        const auto unmasked_within = [&](int ci, int cj, double reach) {
+            const double x0 = ci * k_chunk_px / g.s, x1 = (ci + 1) * k_chunk_px / g.s;
+            const double y0 = cj * k_chunk_px / g.s + g.y_min, y1 = (cj + 1) * k_chunk_px / g.s + g.y_min;
+            const int r_lo = std::max(0, static_cast<int>(std::floor((y0 - reach) / 1.5)));
+            const int r_hi = std::min(s.gh - 1, static_cast<int>(std::ceil((y1 + reach) / 1.5)));
+            for (int r = r_lo; r <= r_hi; ++r)
+                for (int c = static_cast<int>(std::floor((x0 - reach) / 1.7320508075688772)) - 1;
+                     c <= static_cast<int>(std::ceil((x1 + reach) / 1.7320508075688772)) + 1; ++c)
+                    if (s.cls[static_cast<std::size_t>(r) * s.gw + ((c % s.gw) + s.gw) % s.gw]
+                        != static_cast<std::uint8_t>(bake_source::tile_class::masked))
+                        return true;
+            return false;
+        };
+        // The chunks the path engages on CLOSEST to the mask edge (visible
+        // ground just past the 4.5 reach, within 4.5 + one chunk), and the
+        // mixed chunks beside them: where a reach too short would show.
+        int near = 0, mixed = 0;
+        for (int cj = 1; cj + 1 < ch; ++cj)
+            for (int ci = 0; ci < cw; ++ci)
+            {
+                if (near < 6 && !unmasked_within(ci, cj, 4.5)
+                    && unmasked_within(ci, cj, 4.5 + k_chunk_px / g.s))
+                {
+                    engaged += compare(s, g, ci, cj) ? 1 : 0;
+                    ++near;
+                    ++edge_chunks;
+                    if (mixed < 3 && cj > 0)
+                    {
+                        compare(s, g, ci, cj - 1);
+                        compare(s, g, ci, cj + 1);
+                        ++mixed;
+                    }
+                }
+            }
+        std::printf("P23: partly surveyed body %u (%zu of %zu tiles masked)\n",
+                    static_cast<unsigned>(id), n_masked, s.cls.size());
+    }
+    hbm.survey = saved;
+    std::printf("P23: %d chunks compared, %d wholly lock; fast %.1f ms vs full %.1f ms\n",
+                compared, engaged, ms_fast, ms_slow);
+    check(compared >= 2 && engaged >= 1, "P23", "found masked master chunks to compare");
+    if (edge_chunks == 0)
+        std::printf("SKIP  P23 edge: no partly surveyed body on this seed\n");
+    check(equal, "P23", "the lock fast path is byte-identical to the full bake (masked and mask-edge chunks)");
 }
 
 } // namespace
@@ -302,6 +609,50 @@ int main(int argc, char** argv)
         return g_failures ? 1 : 0;
     }
 
+    // --master: the whole-body master bake reading (BL-1246; RENDERING.md
+    // § Level of detail; TECH_FOUNDATIONS.md § Target hardware — the pre-bake
+    // must add at most 15 s): the home body's master on the pool's thread
+    // count, 1x and 2x, under the survey mask as play opens and fully
+    // revealed (the worst case), plus P22. A reading; only P22 can fail.
+    if (argc > 1 && std::strcmp(argv[1], "--master") == 0)
+    {
+        master_row(src, hb, land_i, p);
+        lock_fast_row(w, home, p);
+        const bake_source masked = prepare_source(w, home, /*reveal_all=*/false);
+        master_bake(masked, p, 1, "masked");
+        master_bake(src, p, 1, "revealed");
+        // An unsurveyed body: every tile the lock fill.
+        for (const auto& [id, bd] : w.bodies)
+            if (bd.grid_width > 0 && bd.survey.phase == survey_phase::hidden)
+            {
+                master_bake(prepare_source(w, id), p, 1, "unsurveyed");
+                break;
+            }
+        master_bake(masked, p, 2, "masked");
+        master_bake(src, p, 2, "revealed");
+        // Where the revealed master's time goes: the whole 1x bake with one
+        // pass switched off at a time (a reading for whoever optimises it).
+        {
+            struct off { const char* name; void (*set)(bake_params&); };
+            const off offs[] = {
+                { "no-installations", [](bake_params& q) { q.installations = false; } },
+                { "no-landforms",     [](bake_params& q) { q.landform_strength = 0.0f; } },
+                { "no-rivers",        [](bake_params& q) { q.river_strength = 0.0f; } },
+                { "no-variants",      [](bake_params& q) { q.variant_strength = 0.0f; } },
+                { "no-trees",         [](bake_params& q) { q.tree_density = 0.0f; } },
+                { "no-edges/unsharp", [](bake_params& q) { q.edge_ink = q.shore_ink = 0.0f; q.unsharp_amount = 0.0f; } },
+            };
+            for (const off& o : offs)
+            {
+                bake_params q = p;
+                o.set(q);
+                master_bake(src, q, 1, o.name);
+            }
+        }
+        std::printf("%s (%d failures)\n", g_failures ? "FAIL" : "PASS", g_failures);
+        return g_failures ? 1 : 0;
+    }
+
     // --variants: run only the BL-1243 rows (P17-P20) and their previews,
     // without the timing readings — the fast loop for tuning the tables.
     const bool variants_only = argc > 1 && std::strcmp(argv[1], "--variants") == 0;
@@ -316,7 +667,7 @@ int main(int argc, char** argv)
         bake_params v_off = p;
         v_off.variant_strength = 0.0f;
         std::vector<std::uint32_t> tb(512u * 512u);
-        for (double tp : { 6.0, 12.0, 24.0, 48.0, 96.0, 192.0 })
+        for (double tp : { 6.0, 12.0, 24.0, 48.0, 96.0 })
         {
             const geometry gt = make_geometry(hb.grid_width, hb.grid_height, tp);
             const int cw = std::min(512, gt.W), ch = std::min(512, gt.H);
@@ -471,7 +822,7 @@ int main(int argc, char** argv)
         bake_params v_off = p;
         v_off.variant_strength = 0.0f;
         const geometry g48v = make_geometry(hb.grid_width, hb.grid_height, 48.0);
-        const geometry g96t = make_geometry(hb.grid_width, hb.grid_height, 96.0, 0.70710678);
+        const geometry g96t = make_geometry(hb.grid_width, hb.grid_height, 96.0, k_tilt_sy);
         std::vector<std::uint32_t> a1, a2, a3, a4;
         struct subj { const char* name; int tile; const char* phase; };
         for (const subj& sj : { subj{ "plain", plain_i, "P18" }, subj{ "forest", forest_i, "P18" },
@@ -689,7 +1040,7 @@ int main(int argc, char** argv)
             const int aim = plain_i >= 0 ? plain_i : land_i;
             const int ar = aim / src.gw, ac = aim % src.gw;
             const double ax = 1.7320508075688772 * (ac + ((ar & 1) ? 0.5 : 0.0));
-            for (double tp : { 6.0, 12.0, 24.0, 48.0, 96.0, 192.0 })
+            for (double tp : { 6.0, 12.0, 24.0, 48.0, 96.0 })
             {
                 if (!timing)
                     break;
@@ -859,79 +1210,28 @@ int main(int argc, char** argv)
         check(a48 == b48, "P8", "48 px tier bakes byte-identical twice (stamps + ridged active)");
         check(a48 == e48, "P8", "48 px tier wraps byte-identical one period east");
 
-        // P9 — the OBLIQUE bake (BL-737): at 45 degrees the same window bakes
+        // P9 — the OBLIQUE bake (BL-737; BL-1246: the one angle, 22.5
+        // degrees — the 45-degree tier is retired): the same window bakes
         // byte-identical twice and one wrap period east; and the projection
         // actually projects (the tilted window differs from the flat one).
-        const geometry g45 = make_geometry(hb.grid_width, hb.grid_height, 48.0, 0.70710678);
+        const geometry g45 = make_geometry(hb.grid_width, hb.grid_height, 48.0, k_tilt_sy);
         const int tpy0 = std::clamp(
             static_cast<int>((fy - g45.y_min) * g45.s) - side / 2, 0, std::max(0, g45.H - side));
         std::vector<std::uint32_t> t1(a48.size()), t2(a48.size()), t3(a48.size());
         bake_region(src, g45, p, px0, tpy0, side, side, t1.data());
         bake_region(src, g45, p, px0, tpy0, side, side, t2.data());
         bake_region(src, g45, p, px0 + g45.W, tpy0, side, side, t3.data());
-        check(t1 == t2, "P9", "45-degree oblique bake is byte-identical twice");
-        check(t1 == t3, "P9", "45-degree oblique bake wraps byte-identical one period east");
-        check(g45.lift > 0.8 && g45.lift < 1.0, "P9", "45-degree lift derives to ~0.9 canonical");
+        check(t1 == t2, "P9", "22.5-degree oblique bake is byte-identical twice");
+        check(t1 == t3, "P9", "22.5-degree oblique bake wraps byte-identical one period east");
+        check(g45.lift > 0.35 && g45.lift < 0.40, "P9", "22.5-degree lift derives to 0.9 tan(22.5) ~ 0.373 canonical");
         check(t1 != a48, "P9", "the oblique projection differs from the flat bake");
     }
 
-    // P10 — the never-magnify chooser (BL-1244, RENDERING.md § Level of
-    // detail): the smallest tier at or above the drawn radius; the far page
-    // only at or below 1:1; minification never past 2:1 on the ladder; the
-    // 192 px tier exists. The radius is the DRAWN one, hex_size * zoom — the
-    // ground quad's own scale — not the canvas's draw_r, which is that minus a
-    // 1 px polygon border-inset (F34: feeding draw_r let a drawn radius in
-    // (T, T+1] pick tier T and draw it magnified). Rows include the measured
-    // rung radii at 1720x1080, drawn (6.93 / 13.87 / 27.73 / 55.47 / 110.66 —
-    // the BL-1244 measurement's draw_r plus the inset), and 3840x2160 (14.0 ...
-    // 223.41), plus one row inside each (T, T+1] band the old feed got wrong.
-    {
-        const double* L = k_tier_ladder;
-        const int     N = k_tier_count;
-        check(N >= 5 && L[N - 1] == 192.0, "P10", "a 192 px chunked tier tops the ladder");
-        const struct { double r; int want; } rows[] = {
-            { 5.93, -1 }, { 6.0, -1 }, { 6.01, 0 }, { 6.93, 0 }, { 12.0, 0 }, { 12.5, 1 },
-            { 13.0, 1 }, { 13.87, 1 }, { 14.0, 1 }, { 24.5, 2 }, { 27.0, 2 }, { 27.73, 2 },
-            { 48.5, 3 }, { 54.99, 3 }, { 55.47, 3 }, { 96.0, 3 }, { 96.5, 4 },
-            { 110.66, 4 }, { 192.0, 4 }, { 223.41, 4 },
-        };
-        bool all = true;
-        for (const auto& row : rows)
-        {
-            const int got = choose_tier(row.r, k_far_ppr, L, N);
-            if (got != row.want)
-            {
-                std::printf("      draw_r %.2f -> tier %d, want %d\n", row.r, got, row.want);
-                all = false;
-            }
-        }
-        check(all, "P10", "chooser picks the smallest tier with ppr >= draw_r (far page at <= 6)");
-        // Sweep: every radius the ladder covers draws at texel/px in [1, 2].
-        bool never_mag = true, within_2 = true;
-        for (double r = 0.5; r <= L[N - 1]; r += 0.0625)
-        {
-            const int t = choose_tier(r, k_far_ppr, L, N);
-            const double ppr = t < 0 ? k_far_ppr : L[t];
-            if (ppr / r < 1.0) never_mag = false;
-            if (r > k_far_ppr && ppr / r > 2.0) within_2 = false;
-        }
-        check(never_mag, "P10", "no radius up to the top tier is magnified (texel/px >= 1)");
-        check(within_2, "P10", "no chunked tier is minified past 2:1");
-        // The canvas contract (F34): fed the drawn radius, no radius in a
-        // (T, T+1] band magnifies; fed draw_r = drawn - 1, every such band
-        // would have — the off-by-one this row pins.
-        bool drawn_ok = true, inset_would_magnify = false;
-        for (int t = 0; t < N; ++t)
-        {
-            const double drawn = L[t] + 0.5;
-            const int    td = choose_tier(drawn, k_far_ppr, L, N);
-            const int    ti = choose_tier(drawn - 1.0, k_far_ppr, L, N);
-            if (t + 1 < N && L[td] < drawn) drawn_ok = false;
-            if (L[ti] < drawn) inset_would_magnify = true;
-        }
-        check(drawn_ok, "P10", "the drawn radius (hex_size * zoom) never magnifies in a (T, T+1] band");
-        check(inset_would_magnify, "P10", "the border-inset radius would have (the off-by-one is real)");
-    }
+    // P10 retired with the per-rung tier ladder (BL-1246, one master): the
+    // never-magnify chooser it pinned is gone. The one-master chooser, the
+    // master's alignment and the chunkwise mip chain are P22.
+    master_row(src, hb, land_i, p);
+    lock_fast_row(w, home, p);
 
     // P11 — supersampling (BL-1244): the 2x bake is pure (byte-identical
     // twice), wrap-exact (one period east), seamless (two half windows equal
@@ -981,7 +1281,7 @@ int main(int argc, char** argv)
     {
         const int lr = land_i / src.gw, lc = land_i % src.gw;
         const double lx = 1.7320508075688772 * (lc + ((lr & 1) ? 0.5 : 0.0));
-        const double ladder[] = { k_far_ppr, 12.0, 24.0, 48.0, 96.0, 192.0 };
+        const double ladder[] = { k_far_ppr, 12.0, 24.0, 48.0, 96.0 };
         std::vector<std::uint32_t> buf(512u * 512u);
         for (const double ppr : ladder)
         {
@@ -1547,7 +1847,7 @@ int main(int argc, char** argv)
             bake_region(src, gg, bp, x0, y0, side, side, out.data());
         };
         const geometry g48f = make_geometry(hb.grid_width, hb.grid_height, 48.0);
-        const geometry g45f = make_geometry(hb.grid_width, hb.grid_height, 96.0, 0.70710678);
+        const geometry g45f = make_geometry(hb.grid_width, hb.grid_height, 96.0, k_tilt_sy);
         bake_params no_lf = p;  no_lf.landform_strength = 0.0f;
         bake_params no_rv = p;  no_rv.river_strength = 0.0f;
         std::vector<std::uint32_t> a1, a2, a3, a4;
@@ -1665,7 +1965,7 @@ int main(int argc, char** argv)
         const double ay = 1.5 * ar;
         struct tier { double px; double sy; const char* name; };
         const tier tiers[] = { { 12.0, 1.0, "12" }, { 24.0, 1.0, "24" }, { 48.0, 1.0, "48" },
-                               { 96.0, 0.92387953, "96@22.5" }, { 192.0, 0.70710678, "192@45" } };
+                               { 96.0, k_tilt_sy, "96@22.5" } };
         std::vector<std::uint32_t> tb(512u * 512u);
         // Each row times the default bake AND the same window with the BL-1242
         // passes off, in one process, so load on the machine cancels out of the

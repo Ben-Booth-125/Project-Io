@@ -1039,6 +1039,13 @@ void app::drop_wizard_world(const char* why)
     // reference, so its world is freed when that run's future is consumed, and
     // the landing finds no slot to cache.
     const bool held = (m_wiz_world != nullptr) || (m_wiz_world_pending != nullptr);
+    // BL-1246: a ground pre-bake started from this cache is for a world that
+    // will never be played: stop it (the cold path starts its own).
+    if (m_ground_prebake_token && m_ground_prebake_token == static_cast<const void*>(m_wiz_world.get()))
+    {
+        m_ground.forget_world();
+        m_ground_prebake_token = nullptr;
+    }
     m_wiz_world.reset();
     m_wiz_world_pending.reset();
     if (held)
@@ -1164,6 +1171,10 @@ void app::poll_wizard_history()
                         m_wiz_world->params.span_seed[2], m_wiz_world->params.span_seed[3],
                         m_wiz_world->w.corporations.size());
             std::fflush(stdout);
+            // BL-1246 (STARTUP.md § Handoff): finish_campaign_world is done —
+            // the home body's ground master starts baking now, behind the rest
+            // of the wizard and the seat canvas.
+            start_ground_prebake(m_wiz_world->w, m_wiz_world.get());
         }
     }
 
