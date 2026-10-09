@@ -132,7 +132,8 @@ finish_campaign_result finish_campaign_world(world& w, const generation_report& 
     //    the registry exists. A world-generation invariant that used to be
     //    enforced by the UI's startup sequence (2026-08-17), which is how every
     //    headless path once ran processors that could never produce.
-    assign_default_recipes(w, reg);
+    //    BL-1217 D6: an unwanted default unplaces its processor instead.
+    assign_default_recipes(w, reg, "finish: before the search");
 
     // 4. PHASE 6 -- the landscape is SEARCHED, not simply generated (BL-770).
     //    Static scores over candidate landscapes -- no clock, no ticks -- and
@@ -247,7 +248,8 @@ finish_campaign_result finish_campaign_world(world& w, const generation_report& 
     //    background firm authored would keep `no_recipe` for the whole
     //    campaign -- paying maintenance every tick and never producing,
     //    reported as ordinary idleness. Idempotent; one map walk.
-    assign_default_recipes(w, reg);
+    //    BL-1217 D6: an unwanted default unplaces its processor instead.
+    assign_default_recipes(w, reg, "finish: after the winner");
     out.ms_search = ms_between(t_search, fin_clock::now());
     report_step_ms(progress, k_label_search, out.ms_search);
 

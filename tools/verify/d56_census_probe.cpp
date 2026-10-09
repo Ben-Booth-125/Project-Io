@@ -133,6 +133,7 @@ int main(int argc, char** argv)
 {
     std::vector<std::uint32_t> seeds = {46, 28, 11, 31, 40, 12, 37, 13, 41, 43, 32, 10, 25, 38, 9, 0};
     int ticks = 50;
+    bool no_budget = false; // --no-budget: the stockpile budget refused (divisor -1), the legacy world
     for (int i = 1; i < argc; ++i)
     {
         if (!std::strcmp(argv[i], "--seeds") && i + 1 < argc)
@@ -150,7 +151,8 @@ int main(int argc, char** argv)
             }
         }
         else if (!std::strcmp(argv[i], "--ticks") && i + 1 < argc) ticks = std::atoi(argv[++i]);
-        else { std::fprintf(stderr, "usage: d56_census_probe [--seeds a,b] [--ticks N]\n"); return 2; }
+        else if (!std::strcmp(argv[i], "--no-budget")) no_budget = true;
+        else { std::fprintf(stderr, "usage: d56_census_probe [--seeds a,b] [--ticks N] [--no-budget]\n"); return 2; }
     }
     std::printf("d56_census_probe - BL-1217 D5/D6: processors by recipe, fuel/propellant, pads, specialists\n");
     reading PG, PH, PT;
@@ -161,7 +163,9 @@ int main(int argc, char** argv)
         world_params wp;
         wp.seed = seed;
         auto start = std::make_unique<app_start_world>();
-        try { build_app_start_world(lua, wp, *start); }
+        harness_charter_input ci;
+        if (no_budget) ci.stockpile_price_divisor = -1;
+        try { build_app_start_world(lua, wp, *start, ci); }
         catch (const std::exception& e) { std::printf("seed %u: build threw %s\n", seed, e.what()); continue; }
         world& w = start->w;
         const recipe_registry& reg = start->reg;

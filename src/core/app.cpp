@@ -1558,7 +1558,9 @@ void app::load_economy()
     // headless harnesses, --serve, --verify — ran generated processors that could
     // never produce, reported as ordinary idleness. 20.3% of processing
     // building-ticks in tier_margin, silently dragging the BL-436 calibration.
-    assign_default_recipes(m_world, m_registry);
+    // BL-1217 D6: an unwanted default unplaces its processor (world build only;
+    // a loaded or settled world has no recipe-less processor to remove).
+    assign_default_recipes(m_world, m_registry, "load_economy");
 
     finish_economy_presentation();
 }

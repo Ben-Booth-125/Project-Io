@@ -3772,6 +3772,80 @@ std::vector<entity_id> generate_background_firms(
     return firm_ids;
 }
 
+namespace {
+
+struct unplace_tally
+{
+    int unplaced = 0; ///< processors removed
+    int holdless = 0; ///< corporations left with no seatable holding
+};
+
+/// Unplace @p gone's processors (corp -> buildings) at world build and re-seat
+/// each touched corporation: the building and its stockpile go
+/// (`chain_unplace`, @p occupied kept in step), it leaves the corporation's
+/// `assets`, the HQ is re-designated over the NON-MILITARY holdings left
+/// (BL-1154's muster base is not a seat) — so `hq_building` never names a
+/// removed building — and the corporation's opening pools are re-keyed to that
+/// HQ, the held opening stock with them (`rehome_opening_pools`, this corp
+/// only). WORLD BUILD ONLY, before any tick. Ascending corp id (std::map).
+/// Shared by the roster's chain enforcement and the default-recipe pass.
+unplace_tally unplace_and_reseat(world& w, const std::map<entity_id, std::vector<entity_id>>& gone,
+                                 std::unordered_set<entity_id>& occupied)
+{
+    unplace_tally out;
+    for (const auto& [cid, bids] : gone)
+    {
+        corporation_component& corp = w.corporations.at(cid);
+        for (const entity_id bid : bids)
+        {
+            chain_unplace(w, bid, occupied);
+            corp.assets.erase(std::remove(corp.assets.begin(), corp.assets.end(), bid),
+                              corp.assets.end());
+            ++out.unplaced;
+        }
+        std::vector<entity_id> seatable;
+        for (const entity_id bid : corp.assets)
+        {
+            const auto bit = w.buildings.find(bid);
+            if (bit != w.buildings.end() && bit->second.type != building_type::military_base)
+                seatable.push_back(bid);
+        }
+        const entity_id home_body = corp_home_body(w, seatable);
+        const hq_designation hq   = designate_hq(w, seatable, home_body);
+        corp.hq_building     = hq.building;
+        corp.influence_range = hq.range;
+        if (seatable.empty())
+            ++out.holdless;
+        std::vector<std::pair<entity_id, entity_id>> moves; // (from key, to key)
+        for (const auto& [key, pool] : w.corp_market_pools)
+        {
+            (void)pool;
+            if (key.first != cid)
+                continue;
+            const entity_id body = pool_key_body(w, key.second);
+            if (body == null_entity)
+                continue;
+            const entity_id home = corp_home_pool_key(w, cid, body);
+            if (home != key.second)
+                moves.emplace_back(key.second, home);
+        }
+        std::sort(moves.begin(), moves.end());
+        for (const auto& mv : moves)
+        {
+            const auto src = w.corp_market_pools.find({ cid, mv.first });
+            const stockpile_component moved = src->second;
+            w.corp_market_pools.erase(src);
+            stockpile_component& dst = w.pool_at(cid, mv.second);
+            for (std::size_t r = 0; r < resource_count; ++r)
+                dst.quantities[r] += moved.quantities[r];
+            move_opening_stock_held(w, { cid, mv.first }, { cid, mv.second }); // BL-1217 D5
+        }
+    }
+    return out;
+}
+
+} // namespace
+
 chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_registry& reg,
                                                        std::uint32_t seed)
 {
@@ -4027,58 +4101,10 @@ chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_re
     }
 
     // 3. Unplace the processors no recipe could feed, and re-seat each touched
-    //    corporation: its HQ over its NON-MILITARY holdings (BL-1154's muster
-    //    base is not a seat), and its opening pools re-keyed to that HQ.
-    for (const auto& [cid, gone] : unplaced)
-    {
-        corporation_component& corp = w.corporations.at(cid);
-        for (const entity_id bid : gone)
-        {
-            chain_unplace(w, bid, occupied);
-            corp.assets.erase(std::remove(corp.assets.begin(), corp.assets.end(), bid),
-                              corp.assets.end());
-            ++out.processors_unplaced;
-        }
-        std::vector<entity_id> seatable;
-        for (const entity_id bid : corp.assets)
-        {
-            const auto bit = w.buildings.find(bid);
-            if (bit != w.buildings.end() && bit->second.type != building_type::military_base)
-                seatable.push_back(bid);
-        }
-        const entity_id home_body = corp_home_body(w, seatable);
-        const hq_designation hq   = designate_hq(w, seatable, home_body);
-        corp.hq_building     = hq.building;
-        corp.influence_range = hq.range;
-        if (seatable.empty())
-            ++out.holdless;
-        // Opening stock follows the HQ (rehome_opening_pools, for this corp only;
-        // world build, before any tick).
-        std::vector<std::pair<entity_id, entity_id>> moves; // (from key, to key)
-        for (const auto& [key, pool] : w.corp_market_pools)
-        {
-            (void)pool;
-            if (key.first != cid)
-                continue;
-            const entity_id body = pool_key_body(w, key.second);
-            if (body == null_entity)
-                continue;
-            const entity_id home = corp_home_pool_key(w, cid, body);
-            if (home != key.second)
-                moves.emplace_back(key.second, home);
-        }
-        std::sort(moves.begin(), moves.end());
-        for (const auto& mv : moves)
-        {
-            const auto src = w.corp_market_pools.find({ cid, mv.first });
-            const stockpile_component moved = src->second;
-            w.corp_market_pools.erase(src);
-            stockpile_component& dst = w.pool_at(cid, mv.second);
-            for (std::size_t r = 0; r < resource_count; ++r)
-                dst.quantities[r] += moved.quantities[r];
-            move_opening_stock_held(w, { cid, mv.first }, { cid, mv.second }); // BL-1217 D5
-        }
-    }
+    //    corporation (`unplace_and_reseat`).
+    const unplace_tally ut = unplace_and_reseat(w, unplaced, occupied);
+    out.processors_unplaced += ut.unplaced;
+    out.holdless            += ut.holdless;
 
     // 4. THE SEAT (the no-player path): if the seated specialist is now
     //    holdless, or a processing corporation left with no processor, it is
@@ -4279,14 +4305,82 @@ static void raise_by_prospective(world& w, const recipe_registry& reg, input_rea
     raise_by_want(demand, production, total);
 }
 
-void assign_default_recipes(world& w, const recipe_registry& reg)
+int assign_default_recipes(world& w, const recipe_registry& reg, const char* site)
 {
     // BL-429: era-aware, so an ancient campaign does not default every processor
     // to an industrial recipe it could never run.
     const uint16_t default_recipe = reg.default_recipe_id();
-    for (auto& [id, b] : w.buildings)
+    const recipe*  def            = reg.get_recipe(default_recipe);
+
+    // BL-1217 D6: ascending building id — each assignment is booked before the
+    // next is tested, so the order decides who keeps the default.
+    std::vector<entity_id> ids;
+    for (const auto& [id, b] : w.buildings)
         if (b.type == building_type::processing_facility && b.recipe == no_recipe)
-            b.recipe = default_recipe;
+            ids.push_back(id);
+    if (ids.empty())
+        return 0;
+    std::sort(ids.begin(), ids.end());
+    if (def == nullptr)
+    {
+        // No default in the band (an unloaded or empty registry): nothing to
+        // test a want against, so the pre-ruling assignment stands.
+        for (const entity_id id : ids)
+            w.buildings.at(id).recipe = default_recipe;
+        return 0;
+    }
+
+    std::map<entity_id, entity_id> owner;
+    for (const auto& [cid, cc] : w.corporations)
+        for (const entity_id a : cc.assets)
+            owner.emplace(a, cid);
+
+    std::map<entity_id, output_want>             wants;    // per body, measured lazily
+    std::map<entity_id, std::vector<entity_id>> gone;     // corp -> unplaced
+    std::vector<entity_id>                      ownerless; // no corporation holds it
+    int given = 0;
+    for (const entity_id id : ids)
+    {
+        building_component& b = w.buildings.at(id);
+        const auto tit = w.tiles.find(b.tile);
+        bool keep = (def != nullptr);
+        if (keep && tit != w.tiles.end())
+        {
+            const entity_id body = tit->second.body;
+            auto wit = wants.find(body);
+            if (wit == wants.end())
+                wit = wants.emplace(body, measure_output_want(w, reg, body, body_demand(w, reg, body))).first;
+            keep = wit->second.short_for(w, *def, b.tile);
+            if (keep)
+            {
+                b.recipe = default_recipe;
+                wit->second.book(w, reg, *def);
+            }
+        }
+        else if (keep)
+            b.recipe = default_recipe; // no body to measure: the pre-ruling default
+        if (keep)
+        {
+            ++given;
+            continue;
+        }
+        const auto oit = owner.find(id);
+        if (oit != owner.end())
+            gone[oit->second].push_back(id);
+        else
+            ownerless.push_back(id);
+    }
+
+    std::unordered_set<entity_id> occupied; // generation's occupancy sets are local to their passes
+    const unplace_tally ut = unplace_and_reseat(w, gone, occupied);
+    for (const entity_id id : ownerless)
+        chain_unplace(w, id, occupied);
+    const int removed = ut.unplaced + static_cast<int>(ownerless.size());
+    if (removed > 0 && site != nullptr)
+        std::printf("[assign_default_recipes] %s: %d processors unplaced (default output unwanted; "
+                    "%d ownerless, %d corps left holdless), %d given the default\n",
+                    site, removed, static_cast<int>(ownerless.size()), ut.holdless, given);
+    return removed;
 }
 
 // ---------------------------------------------------------------------------

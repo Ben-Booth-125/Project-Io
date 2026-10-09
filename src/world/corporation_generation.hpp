@@ -633,7 +633,19 @@ std::vector<entity_id> generate_background_firms(
 ///
 /// Call it after the registry is loaded and after every generation pass that can
 /// author a processor (`generate_corporations`, `generate_background_firms`).
-void assign_default_recipes(world& w, const recipe_registry& reg);
+///
+/// BL-1217 D6 (Ben, 2026-10-09: "a processor with no recipe whose default
+/// output isn't wanted is not placed"): the default is given only while its
+/// output is short by the shared want test (`output_want`, measured per body
+/// off the world with `body_demand`, each assignment booked in ascending
+/// building id); a recipe-less processor whose default output is NOT short is
+/// UNPLACED — the building, its stockpile, its place in its corporation's
+/// `assets`, with the HQ re-seated and the opening pools re-keyed
+/// (`unplace_and_reseat`). WORLD BUILD ONLY: in play no processor lacks a
+/// recipe, so a call on a loaded or running world finds nothing to remove.
+/// @p site, when given, labels a log line printed whenever a processor is
+/// unplaced. @return the number unplaced.
+int assign_default_recipes(world& w, const recipe_registry& reg, const char* site = nullptr);
 
 /// BL-1185 (chain-feasible placement) — Pass 3's rule applied to a specialist
 /// roster laid BEFORE a recipe registry existed (world generation's own Pass 3,
