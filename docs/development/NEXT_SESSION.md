@@ -190,6 +190,12 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   Defects: walk power want reads the unpowered-serve set; legacy Pass 6 power bound inconsistent;
   roster keep sweep suspends all over-coverers and cascades; second works' spare refusal drops its
   draw; save row can pass vacuously. Round 2 sent, with a keep-second-works counterfactual for Ben.
+  **BEN RULED (70664ec1):** a recipe-less processor whose default output is unwanted is not placed
+  (added to D5/D6 round 2).
+  **D3 NARROWED REWORK DONE** (b0a9dbb0; in cold review): `dial_bid` = demand + held
+  `dial_pool_draw` (per-processor room excludes units already posted; one writer after production;
+  v40 now `dial_pool_draw`+tick). 16 seeds: D3 81.6/65.9/13.6/73.6; +D4 82.1/67.9/16.3/71.1. D4 drives
+  the G1b rise; no by-product switches. Steel zeroings 47 (D5's).
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
