@@ -654,6 +654,12 @@ private:
     /// The planetology round the walk last rerolled (BL-1084: once per round,
     /// or the Life round's gate world never lands and Next never enables).
     int  m_autostart_rerolled_round = -1;
+    /// When the walk arrived on the round it is on (IO_AUTOSTART_DWELL_MS, a
+    /// measurement switch: the walk dwells at least that long on each round,
+    /// as a player watching it would; unset = Next the moment it enables).
+    std::chrono::steady_clock::time_point m_autostart_round_t0{};
+    /// When the walk first saw round 6's world landed (IO_AUTOSTART_BEGIN_DWELL_MS).
+    std::chrono::steady_clock::time_point m_autostart_landed_t0{};
     bool m_wiz_dirty = true; ///< A control moved (or the wizard just opened) — recompute the preview next frame.
     resolved_world m_wiz_resolved{};              ///< The pending preferences resolved against the seed — the params every preview chart is drawn from, plus the reroll cost (attempts / gave_up).
     body_naming m_wiz_names{};                    ///< The coined body catalogue for the pending seed (BL-257) — what the wizard's charts and orrery label bodies with.
@@ -1091,13 +1097,25 @@ private:
     /// headless paths, which pump no frames.
     bool            m_ground_prebake_on = false;
     /// BL-1246: false while the ground pre-bakes from a world the app does not
-    /// hold yet (the wizard's cached round-6 world) — the pump then reads no
-    /// world at all; true once a world is adopted or loaded into m_world.
+    /// hold yet (the wizard's rounds, from the Life round on) — the pump then
+    /// reads no world at all, so no cadence snapshot can race a round worker;
+    /// true once a world is adopted or loaded into m_world.
     bool            m_ground_world_live = true;
-    /// BL-1246: the wizard cache the running pre-bake was started from (null =
-    /// none): Begin's adoption of that same cache keeps the bake.
-    const void*     m_ground_prebake_token = nullptr;
-    void start_ground_prebake(const world& w, const void* token);
+    /// BL-1246: the running pre-bake is the wizard's homeworld, started from
+    /// the Life round's gate world and re-snapshotted at every round boundary
+    /// (STARTUP.md § Handoff). Begin's adoption keeps it; a cold build, a new
+    /// gate world, or leaving the wizard drops it.
+    bool            m_ground_prebake_wizard = false;
+    /// Start the home master from @p w (forgets any other): @p wizard = the
+    /// wizard's Life-round gate world, else the cold path's built world.
+    void start_ground_prebake(const world& w, bool wizard);
+    /// A round boundary (main thread, @p w owned by no worker): re-take the
+    /// wizard pre-bake's source from @p w, or start it if none runs. @p what
+    /// names the boundary in the log.
+    void ground_round_boundary(const world& w, const char* what);
+    /// Leaving the wizard's homeworld (a new gate world is coming, or the
+    /// menu): stop the wizard pre-bake. No-op when none runs.
+    void drop_wizard_ground(const char* why);
     /// BL-1246: the "Painting the ground" wait's sink (its bar is the master's
     /// chunks landed over its total).
     generation_progress m_paint_wait;

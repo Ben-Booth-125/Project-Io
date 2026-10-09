@@ -87,8 +87,25 @@ public:
     void forget_world();
 
     /// STARTUP.md § Handoff: start @p body's master on the pool now (the
-    /// homeworld, the moment the world is finished). Not under --verify.
-    void prebake(const world& w, entity_id body);
+    /// homeworld, from the wizard's Life round, or the cold path's world the
+    /// moment it is built). Not under --verify. @p assume_surveyed bakes the
+    /// body unmasked: the wizard's worlds carry no survey state until the
+    /// finish (`init_survey_states`), and the home body is always surveyed in
+    /// play, so its master is baked as play will show it.
+    void prebake(const world& w, entity_id body, bool assume_surveyed = false);
+    /// A ROUND BOUNDARY (STARTUP.md § Handoff): re-take the pre-bake target's
+    /// source snapshot from @p w NOW, on the calling (main) thread, which must
+    /// own @p w — a round's landed world, or the adopted one. The pre-bake
+    /// takes no snapshot of its own while pump() is handed no world, so this
+    /// is the only way a source moves before play. Only the master chunks
+    /// whose content hash moved re-bake (the sweep). False when there is no
+    /// pre-bake target or @p w no longer holds it at the same grid (the
+    /// homeworld changed identity): the caller starts again.
+    bool resnapshot(const world& w, bool assume_surveyed);
+    /// The master is complete AND current: every chunk landed against the
+    /// latest source snapshot, and that snapshot's sweep has run (a chunk
+    /// a boundary moved is not counted whole until it has re-baked).
+    bool master_current(entity_id body) const;
     /// Master chunks landed and current / total for @p body (0 / 0 unknown).
     void master_progress(entity_id body, int& ready, int& total) const;
     /// Every master chunk of @p body has landed and is current.
@@ -208,6 +225,7 @@ private:
         std::uint64_t swept_digest = 0;        ///< Digest the last sweep ran against.
         std::uint64_t sweep_job = 0;
         int           src_age = 0;
+        bool          reveal_all = false;      ///< Snapshot unmasked (the wizard's home pre-bake).
         // The far page: one whole-body image, baked as 512 px pieces on the
         // pool (single-sample: it is the fallback a first visit shows for the
         // second or so before the master covers the view).
@@ -375,6 +393,7 @@ private:
     bool              m_master_pending = false; ///< The visited body's whole master, timed from the visit.
     bool              m_prebake_pending = false;
     clock::time_point m_prebake_t0{};
+    bool              m_boundary_log = false; ///< resnapshot() moved the source: log its sweep.
     bool              m_rebake_pending = false;
     clock::time_point m_rebake_t0{};
 };

@@ -166,6 +166,12 @@ ground retires only as coverage arrives.
   survey reveal, a build, a demolition, a settlement crossing a scale step). Nothing
   tick-rate enters the hash — staffing, output and ownership do not — so a re-bake
   follows a construction event, never a tick.
+- **Before play there is no cadence.** While a generation round's worker is moving the
+  world forward, nothing reads that world: the pre-bake target's source snapshot is
+  re-taken only at a **round boundary** — a round's world landed and owned by the main
+  thread — and once more at adoption (STARTUP.md § Handoff). The same sweep then re-bakes
+  only the chunks that boundary moved. The home body is snapshotted as play shows it,
+  fully surveyed, though the wizard's worlds carry no survey state until the finish.
 - The cylinder wrap draws the same chunk at multiple offsets, exactly as tiles do
   today; the seam-crossing chunk bakes with wrapped neighbour reads.
 
