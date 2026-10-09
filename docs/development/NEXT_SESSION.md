@@ -345,6 +345,12 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   mutation-checked, background_fill hashed, run_contend fixed, generation skips razed/unpriced —
   numbers unchanged; save renumbered 45 -> 43), 39907baf R3 (components.hpp comment conflict
   resolved). Building + integrated 16-seed gate next. Save stack now v39-v43 sequential.
+  **INTEGRATED 16-SEED GATE, ALL PASS (39907baf; s50_int2_a/b pooled):** G1 96.6 (1739/1801), G1b
+  1.9 (35), G1t50 86.7 (2283/2633), G2 95.8, G3 96.3 (1973/2048); play income 34,922/seed-tick.
+  App BUILD_OK; save_roundtrip, population_mvp (45), build_only_what_runs pass. Sprint row
+  status_line updated. LEFT: BL-1252 (running); BL-1119 R4 quiet timing + R6 haulage; live clicks
+  (Build door no electrolysis on Kepler; sea-route convoy legs); close — doc check (REFINED § Close,
+  ~35 rulings now), BL-1165, the one re-bless (Ben's go), retro, version cut, integrate onto main.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
