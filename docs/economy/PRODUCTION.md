@@ -277,7 +277,10 @@ The two routes are `propellant_atmospheric` and `propellant_electrolysis` (BL-30
 Liquid oxygen has no `resource_type`: it is folded into each recipe, because nothing outside the
 Chemical Plant would ever hold it.
 
-On a body with an atmosphere, liquid oxygen is produced in Era 1 by cryogenic air separation — the Chemical Plant draws oxygen from the local atmosphere and consumes no stockpiled input (energy cost only, abstracted into the recipe rate). Propellant is therefore an Era 1 capability anywhere refined fuel is available. On airless bodies there is no atmosphere to separate, so the water-electrolysis recipe is the only liquid-oxygen route off-world; closing the in-situ propellant loop there (water → liquid oxygen, refined fuel shipped or synthesised) is the defining Era 2 logistical problem.
+On a body with an atmosphere, liquid oxygen is produced in Era 1 by cryogenic air separation — the Chemical Plant draws oxygen from the local atmosphere and consumes no stockpiled input (energy cost only, abstracted into the recipe rate). Propellant is therefore an Era 1 capability anywhere refined fuel is available. On airless bodies there is no atmosphere to separate, so the water-electrolysis recipe is the only liquid-oxygen route off-world. **And it runs only
+there (Ben, 2026-10-09):** `propellant_electrolysis` may be set only on an airless body, and
+`propellant_atmospheric` only on a body with an atmosphere — each route is the one its body's
+air allows, never a cheaper choice beside the other. Closing the in-situ propellant loop there (water → liquid oxygen, refined fuel shipped or synthesised) is the defining Era 2 logistical problem.
 
 #### Electronics Lab
 
@@ -491,8 +494,10 @@ corp's propellant stockpile on the *source* body and burns **1.0 unit per launch
 (`propellant_per_launch`, `src/world/supply_system.cpp`): per launch, not per unit of cargo and
 not per AU — the pad is the thing being fuelled. An unfuelled pad is exactly as shut as no pad at
 all. A convoy exporting propellant itself cannot burn the cargo it carries; the gate subtracts
-the cargo first. Propellant is deliberately **left out of the market's base-price table**, so it
-is made and burned within a corp's own pool rather than traded. See **`docs/economy/ERAS.md`**
+the cargo first. Propellant is priced and trades (`RESOURCES.md`), but **a pad's pool keeps its
+propellant**: where the corporation holds a Launchpad, its propellant is reserved from
+auto-surplus, so a corporation stockpiles launch fuel where it launches (`MARKETS.md` step 4;
+Ben, 2026-10-09). See **`docs/economy/ERAS.md`**
 for the Era 1→2 transition.
 
 *Save-format note.* Appending a `resource_type` value renumbers nothing but changes the length of
