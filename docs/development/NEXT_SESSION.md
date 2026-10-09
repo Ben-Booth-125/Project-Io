@@ -161,6 +161,15 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   (dial reads a per-tick rate; veto unchanged), SAVE v40 (stacks on D5's v39 — merge D5/D6
   first), shared `market_has_cleared` (D3b now near-inert). 16 seeds: D3fix 81.2/65.9/13.8/73.4;
   +D4 82.2/71.1/16.2/71.3 (G1/t50/G1b/G2). G1b rise is D4's. Steel zeroings unchanged (D5's).
+  **RE-REVIEW: F1 NOT CLOSED.** (1) procurement rate = Q/(lead left) climbs to the whole contract on
+  the last tick, then is held after delivery; (2) space-programme lump noted whole every tick it
+  accumulates; (3) top-up pool draws can also sit in posted demand (double count); (4) the register
+  overwrites on a new tick, so sources written after the scorer (upkeep, launch fuel, nation wants)
+  vanish wherever a processor records first. D4: rescue treats an incumbent with ONE unpriced
+  byproduct as floored every tick, onto reach-obtainable (not stocked) recipes — plausible G1b rise;
+  moot once propellant is priced. Doc: § 11 says "same composite bid"; dial now reads a different
+  quantity. Merge mechanics fine (v40 over v39 trivial). **Form to Ben:** narrow the dial to demand +
+  pool-fed running draws / fix every source / hold D3 and measure D4+D5/D6 first; confirm deferral.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
