@@ -10,8 +10,9 @@
 // Ground bake (BL-732) — the PURE half of the baked-chunk ground renderer.
 //
 // Composes the Planetary canvas's painterly ground (docs/ui/RENDERING.md) into
-// RGBA8 pixel buffers, CPU-side: continuous base colour interpolated between
-// tile centres (no cell boundary drawn), hillshade from the BL-517 height
+// RGBA8 pixel buffers, CPU-side: each land tile's own ground, blending into a
+// neighbour only in a narrow band at the shared edge, with border sets between
+// different terrain families (BL-1251; no cell boundary drawn), hillshade from the BL-517 height
 // field, wrap-periodic grain noise, water shading, and the C-F near-future
 // grade as a separable final pass. Dramatic landforms bake their own relief
 // forms and rivers bake as carved curved courses (BL-1242).
@@ -107,8 +108,9 @@ struct bake_params
     // eye reads sharpness from edges, and the interpolated field has none).
     // All post passes run on an internal apron so they cannot seam at a chunk
     // edge, and none touches the lock fill or the transparent margin.
-    float edge_ink        = 0.30f;  ///< Darkening where two cover classes meet (>= 20 px/r).
-    float shore_ink       = 0.42f;  ///< Darkening on the land|water boundary (stronger).
+    float edge_ink        = 0.0f;   ///< Darkening where two cover classes meet (>= 20 px/r). 0 since BL-1251:
+                                    ///< a line between terrains is an outline; the border sets carry the edge.
+    float shore_ink       = 0.18f;  ///< Darkening on the land|water boundary: the waterline (0.42 before BL-1251's shore shelf).
     float unsharp_amount  = 0.50f;  ///< Unsharp-mask strength at >= 40 px/r, single-sample bake.
     float unsharp_amount_ss = 0.35f; ///< The same pass on a SUPERSAMPLED bake: run once, at nominal
                                     ///< resolution AFTER the downsample, re-tuned against the
@@ -135,6 +137,27 @@ struct bake_params
     // tile boundary. 0 = every tile bakes the family's neutral look (the A/B
     // lever: every family at its base look, the cross-fade gather unwidened).
     float variant_strength  = 1.0f;
+    // Tiles hold their own ground (BL-1251, RENDERING.md § Tiles hold their
+    // own ground; Ben 2026-10-09: "there's still quite a blur over each tile").
+    // A land tile's MATERIAL — colour, per-tile tone, landform accent, variant
+    // vector, family pattern — is its own, undiluted, across its body; it
+    // blends into a neighbour only within `edge_band` canonical units of the
+    // shared edge (0.13 = 15% of the hex's 0.866 inradius, each side). The
+    // material is resolved at a lightly frayed point (`material_fray`, the
+    // amplitude of two small periodic warp octaves) so a tile's body sits on its
+    // hex — where the close-zoom seam is drawn — while the land|water class
+    // keeps the full warp (organic coasts). Terrain SHAPE (height, slope,
+    // the oblique lift) keeps the wide smooth interpolation: relief is
+    // continuous ground, not a material. Water keeps the wide blend too.
+    float edge_band         = 0.13f;
+    float material_fray     = 0.07f; ///< Fray of the material point, canonical units (0 = hex-true edges).
+    // Border sets: the natural transition baked along every edge between two
+    // DIFFERENT terrain families (forest fringe, scrub fringe, scree lip,
+    // field edge, reed fringe, drift lip, snow drift, shore shelf). 0 = none
+    // (the A/B lever).
+    float border_strength   = 1.0f;
+    // Family patterns and grain (furrows, tussocks, scree, ripples). 0 = none.
+    float pattern_strength  = 1.0f;
     // Near-future grade (the separable pass).
     bool  grade_enabled   = true;
     float grade_desat     = 0.34f;  ///< Toward luma.
@@ -184,13 +207,41 @@ struct bake_source
     std::vector<std::uint8_t> family;   ///< Variant family per tile (land only; water/masked/void carry the neutral sentinel).
     std::vector<std::uint8_t> variant;  ///< 0 .. k_variant_count-1 per tile.
     std::vector<float>        vparam;   ///< k_vparam_count floats per tile: the ground variant's character (tone, hue, texture-field mix).
+    // Border sets (BL-1251). Per tile, per hex side (6 bytes per tile): the
+    // transition set baked along that side's edge (low 7 bits; 0 = none) and,
+    // in bit 7, whether this tile is the set's RECEIVING side (the open ground
+    // a fringe steps into, the soil a scree lip spills onto). A pure function
+    // of class and family, derived once; terrain_hash covers both inputs.
+    std::vector<std::uint8_t> bset;
+    /// Bit k: a RECEIVING side of border set k lies on this tile or a
+    /// neighbour (the scatter pass's cull).
+    std::vector<std::uint8_t> near_border;
+    /// Per tile, the cultivated pattern's furrow direction (cos, sin): a pure
+    /// function of the grid position, so it never moves with terrain.
+    std::vector<float> furrow_cs;
+    /// Bit k: points of scatter set k can stand on this tile; and per side,
+    /// the same for the neighbour across it.
+    std::vector<std::uint8_t> border_pts, nb_border_pts;
+    /// 1: land with a water neighbour, or water with a land one (the shore
+    /// shelf's cull).
+    std::vector<std::uint8_t> coastal;
 };
+
+/// The border sets (BL-1251; RENDERING.md § Tiles hold their own ground) —
+/// the values of bake_source::bset's low bits. The pairing table lives
+/// beside derive_border_sets in ground_bake.cpp.
+enum bset_id : std::uint8_t
+{
+    bs_none = 0, bs_forest, bs_scrub, bs_scree, bs_field, bs_reed, bs_drift, bs_snow,
+    bs_count
+};
+inline constexpr std::uint8_t k_bs_recv = 0x80u; ///< bset byte: this tile is the receiving side.
+inline constexpr std::uint8_t k_bs_mask = 0x7Fu;
 
 /// Variants per terrain family (BL-1243). Four: with six neighbours a proper
 /// colouring needs at least four indices to leave a hash-chosen preference
-/// any freedom (three would force a fixed tiling), and past four the soft
-/// cross-fade (about one tile wide) averages the extra variety away while the
-/// tables to author grow linearly.
+/// any freedom (three would force a fixed tiling), and the tables to author
+/// grow linearly past four.
 inline constexpr int k_variant_count = 4;
 /// Floats per tile in bake_source::vparam.
 inline constexpr int k_vparam_count = 11;
@@ -204,6 +255,10 @@ inline constexpr int k_vparam_count = 11;
 /// stamp (null: the general form).
 bake_source prepare_source(const world& w, entity_id body, bool reveal_all = false,
                            const recipe_registry* reg = nullptr);
+
+/// Re-derive the border sets (BL-1251) after a caller edits a source's class
+/// or family arrays in place (the harness builds neighbour variations so).
+void rederive_border_sets(bake_source& s);
 
 /// Bake pixels [px0, px0+pw) x [py0, py0+ph) of @p g into @p out (pw*ph RGBA8,
 /// ABGR u32, row-major). Pixels outside the grid's vertical extent bake
