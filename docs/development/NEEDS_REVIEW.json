@@ -1904,6 +1904,15 @@
    "what": "With BL-1235 a plant the scorer's dial zeroed in the settle is no longer mothballed; it reaches the handoff with workforce_auto off and target 0. On the corp the player takes, the scorer and the reflex stop acting, and the player's auto-solver skips it (workforce_auto off), so nothing re-raises it until the player touches each plant. Before, the same plants arrived mothballed, which also needed a player action - not a regression in kind, but it bears on G1 (plants running at handoff) for the seat. CALL: hand the seat's dial-zeroed plants back to auto at the handoff (workforce_auto on), or leave them as the rival left them?",
    "resolution": "Ben, 2026-10-09 (propellant form): yes - the seat's dial-idled plants return to auto at the handoff. Written into AI_OPPONENT.md beside BL-1235.",
    "resolved": "2026-10-09"
+  },
+  {
+   "id": "NR-987",
+   "title": "Decision taken on your behalf: 'never cleared' is read from the market's current state, not a stored first-clear tick (BL-1217 D3b)",
+   "raised": "2026-10-09",
+   "kind": "decision",
+   "status": "open",
+   "source": "cold re-review of the BL-1217 D3 round 3 (a37f2099), sprint 50",
+   "what": "Your ruling: the dial forecasts at base 'only on a market that has never cleared'; the build veto takes the same 'no clear yet: no signal' reading. Both now read market_has_cleared from fields only the clear writes (supply, demand, hauler_want) - fixing a real hole where a market spawned mid-step read as cleared. TAKEN: kept the state proxy. Gap: a market that HAS cleared but is wholly dead (no supply, demand or silenced want on any good) reads 'never cleared' again, so the veto gives no signal and the dial forecasts at base there - the old test had the same gap. Practically unreachable today (off-world markets get interbody demand; home markets carry people). Reversible: a set-once first-clear tick on the market would close it exactly, at the cost of a saved field (another save bump)."
   }
  ]
 }
