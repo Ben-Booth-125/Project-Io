@@ -330,6 +330,9 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   measure R1+R3 and R2-at-expected-fill / accept / R2 in play only.
   **BEN: ACCEPT R1+R2 AS BUILT (8dcecb83, recorded in CORPORATION_GENERATION Pass 3).** Cold review
   running. Then merge R1+R2, then R3 (round 2), then the integrated gate.
+  **R3 ROUND 2 DONE** (ea624f40): silenced processor want protected; population_mvp T1-T5 drive the
+  real clear. Alone: G1b 10.6 -> 10.4, c-background 38 -> 2 but d-ceiling 36 -> 65; t50 72.0 ->
+  70.1; G2 92.7 -> 90.9. No save field. Ready to merge after R1+R2.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
