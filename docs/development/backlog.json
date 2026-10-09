@@ -1636,6 +1636,56 @@
     "scripts/verify/terrain_variants.lua"
    ],
    "design": "SETTLED: RENDERING.md § Tiles hold their own ground; § The grid rule (the close-zoom seam amendment, Ben 2026-10-09); the pass table rows Base ground and Border sets. WORK: (1) base ground and the variant cross-fade hold each tile undiluted, blending only in the outer ~15% band at a shared edge; (2) border sets per terrain-family pair baked along every edge between DIFFERENT families: forest fringe, rock/scree lip, shore shelf, field edge (hedge/furrow); (3) per-family finer grain and patterns (furrows, scree, dune ripples, tussocks), procedural on the stamp seam, nominal-keyed; (4) the master bakes 2x if the measured pre-bake fits the 15 s budget, else 1x; (5) the close-zoom seam: a faint line in a darkened tone of the ground between every pair of neighbouring tiles, drawn over the ground at the two closest rungs only, never baked. All deterministic, wrap-exact, window-invariant (the partial re-bake depends on it). Sequencing: bake parts (1-4) after the partial re-bake lane merges (same ground_bake code); the seam (5) with the lens-wash lane after the 60 fps lane merges (same canvas code). Re-measure the pre-bake after."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 51,
+   "written": "2026-10-09",
+   "requires": [
+    "BL-1246"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 4,
+   "id": "BL-1253",
+   "short_name": "ROADS_PAINTED",
+   "author": "Ben (2026-10-09, after walking the sprint 51 build; the roads and ground form)",
+   "title": "Roads and sea lanes are painted into the ground with a surface per tier; buildings carry a roaded variant; a thin drawn network stays at the two widest rungs",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "files": [
+    "src/ui/ground_bake.cpp",
+    "src/ui/ground_bake.hpp",
+    "src/ui/structure_stamps.cpp",
+    "src/ui/body_surface_canvas.cpp",
+    "tools/verify/ground_bake_check.cpp"
+   ],
+   "design": "SETTLED: RENDERING.md § Roads and sea lanes (the painted-routes paragraph). WORK: (1) a route pass in the bake after base ground and border sets, before structures, following the existing curve rule and tier widths; surfaces: Track dirt ruts + grass crown, Road packed gravel + verges + ditches, Highway asphalt + kerbs + centre line, Rail ballast + sleepers + twin rails (drawn for the rail rung when the world has one - no rung exists yet); (2) roaded building variants: a road entering a built tile arrives at the structure's forecourt/yard/apron, a through-road bends around the cluster on the tile's free side, never across a roof or pad (structure_stamps knows the tile's road links); (3) sea lanes as a faint broken wake on the water; (4) the canvas keeps its thin drawn road/lane network at the two widest rungs only and drops it from the third rung up; (5) the hash folds road_level and lane_level so a road change dirties its window (partial re-bake), window invariance (P24) must hold. Measure the pre-bake wait after (history lays roads; budget 15 s; was 14.2 s on a quiet PC)."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 51,
+   "written": "2026-10-09",
+   "requires": [
+    "BL-1251"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1254",
+   "short_name": "GROUND_CRISPER",
+   "author": "Ben (2026-10-09, after walking the sprint 51 build; the roads and ground form)",
+   "title": "The ground inside a tile is as crisp as the buildings: sharper relief shading, stronger fine grain, contact ink on relief and patterns",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "files": [
+    "src/ui/ground_bake.cpp"
+   ],
+   "design": "SETTLED: RENDERING.md § Tiles hold their own ground (the crisper-texture bullet). WORK: sharpen the relief shading (and decide the hillshade sign, NR-1006 (e), with Ben if it moves the look), strengthen the fine grain, and add light contact ink on relief creases and on the family patterns; nominal-keyed so the far levels do not alias; byte-stable windows (P24). Before/after captures at the close rungs; measure bake cost."
   }
  ]
 }

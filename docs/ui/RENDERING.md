@@ -276,6 +276,10 @@ about a tile and a half, so neighbouring tiles melted together. Three changes an
   items exist by a hash of their own lattice point against the density its own tile's edges
   give it, gated along the edge by a low-frequency field, so a tile ringed by its source
   reads as ground, never as a dotted outline.
+- **Crisper texture inside a tile** (Ben, 2026-10-09: the ground read softer than the
+  buildings). Relief shading is sharper, the fine grain stronger, and relief creases and the
+  family patterns carry a light **contact ink** of their own, the way structures do, so the
+  ground holds the same crispness as what stands on it.
 - **More texture per family.** Each terrain family carries finer, higher-contrast grain
   and its own **pattern**: furrows on cultivated ground, scree on rock, ripples on dunes,
   tussocks on grass and scrub, with forest read through its canopy as now. Grass is both
@@ -382,6 +386,32 @@ and both read as annotation laid on a painting. They move into the bake.
   structures use.
 
 ### Roads and sea lanes — smooth curves on their own tiles
+
+**Roads and sea lanes are painted into the ground** (Ben, 2026-10-09, after walking the
+sprint 51 build: *"roads go over buildings, rather than being painted as an optional part of
+the building tile sets. Roads are also so simplified, we want to paint a texture on roads"*).
+The geometry rule below — a route along its own tiles, a smooth curve through the chain, one
+width per tier — is unchanged; what changes is that the route is now a **pass in the bake**,
+painted into the master after the base ground and border sets and before structures, so it
+takes the light, the grade and the lens wash like the ground does:
+
+- **Each tier has its own surface.** **Track:** dirt wheel ruts with a grass crown. **Road:**
+  packed gravel with grass verges and shallow ditches. **Highway:** asphalt with kerbs and a
+  painted centre line. **Rail:** a ballast bed with sleepers and twin rails — painted on the
+  rail rung of the road ladder (INDUSTRIALISATION.md, the rail sink), wherever the world lays
+  it. Textures are procedural, hash-placed along the curve, nominal-keyed, wrap-exact.
+- **A road meets a built tile through the building's set.** Each structure form carries a
+  **roaded variant**: where a road enters a built tile it arrives at that structure's
+  forecourt, yard or loading apron; a road that continues through the tile **bends around the
+  cluster** along the tile's free side. A road is never painted across a roof or a pad.
+- **Sea lanes are a faint wake** painted on the water — a pale, broken trail along the lane's
+  sea tiles — not a stroke over it.
+- **At the two widest rungs a thin drawn network stays** over the ground (the LOD below), so
+  the logistics web still reads where the painted roads fall below a pixel; from the third
+  rung up, roads and lanes are painted only.
+- A built or upgraded road dirties only the window around its tiles (§ Chunks, cache and
+  invalidation, the partial re-bake), and the survey mask and the reach fog treat a painted
+  road as ground.
 
 Ben, 2026-10-03, playing the build: *"render [roads] as curves rather than lines,
 and make them thinner"*; *"sea lanes should always go over ocean, never over
