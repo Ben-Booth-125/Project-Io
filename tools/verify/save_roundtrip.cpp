@@ -132,6 +132,18 @@ int main()
         w.markets.at(hh_market).unposted_bid_tick[hh_food] = 1234;   // BL-1227
     }
 
+    // BL-1217 D5 (world_save_version 39): the held opening stock. Generation
+    // seeds it, but pin a distinctive value on the lowest pool's food slot so
+    // the round trip is checked by VALUE. The pool is raised to cover it, as
+    // the clear would leave it; the reader rejects only a hold with no pool.
+    std::pair<entity_id, entity_id> held_key{null_entity, null_entity};
+    if (!w.corp_market_pools.empty())
+    {
+        held_key = w.corp_market_pools.begin()->first;
+        w.corp_market_pools.at(held_key).quantities[hh_food] += 5.0f;
+        w.opening_stock_held[held_key][hh_food] = 2.625f;
+    }
+
     // BL-614: same treatment for the building record's newest field — the
     // default is 0 everywhere (nothing sets a wage bid yet), so give one
     // building a distinctive bid before the round trip. Lowest building id.
@@ -286,6 +298,22 @@ int main()
                   && mit->second.unposted_bid[hh_food] == 4.875f
                   && mit->second.unposted_bid_tick[hh_food] == 1234,
               "P1 market unposted_bid / unposted_bid_tick (BL-1227, world_save_version 38) round-trip at their written values");
+    }
+    if (held_key.first != null_entity)
+    {
+        const auto hit = loaded.opening_stock_held.find(held_key);
+        check(read_ok && hit != loaded.opening_stock_held.end()
+                  && hit->second[hh_food] == 2.625f
+                  && loaded.opening_stock_held.size() == w.opening_stock_held.size(),
+              "P1 opening_stock_held (BL-1217 D5, world_save_version 39) round-trips at its written value, every record kept");
+
+        // A hold whose pool is gone cannot have been written (the clear drops
+        // it): the reader refuses the stream whole.
+        world orphan = w;
+        orphan.opening_stock_held[std::make_pair(held_key.first, entity_id{0x7FFFFFF0u})][hh_food] = 1.0f;
+        world sink;
+        check(!from_bytes(to_bytes(orphan), sink),
+              "P1 a held opening-stock record with no pool behind it is rejected (BL-1217 D5)");
     }
 
     // BL-614: likewise for the wage bid.
