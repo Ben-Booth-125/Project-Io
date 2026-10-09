@@ -328,6 +328,8 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   processors. R2 makes background_fill SAVED (claims v45). corp_ai_harness R9(c) flipped (asserted
   the overturned behaviour). charter_refusal_probe fixture households moved. **Form to Ben:**
   measure R1+R3 and R2-at-expected-fill / accept / R2 in play only.
+  **BEN: ACCEPT R1+R2 AS BUILT (8dcecb83, recorded in CORPORATION_GENERATION Pass 3).** Cold review
+  running. Then merge R1+R2, then R3 (round 2), then the integrated gate.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
