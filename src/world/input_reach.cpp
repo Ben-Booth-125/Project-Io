@@ -33,6 +33,8 @@ void input_reach_invalidate(input_reach& ir)
     ir.refresh_mode = false;
     ir.seen.clear();
     for (auto& m : ir.draw_parts) m.clear();
+    ir.final_built = false;
+    for (auto& v : ir.final_draws) v.clear();
 }
 
 namespace {
@@ -392,6 +394,79 @@ void input_reach_refresh(const world& w, const recipe_registry& reg, input_reach
 }
 
 namespace {
+
+/// BL-1217 G1b R2 (AI_OPPONENT.md § 11, "Spare supply counts what households and
+/// the background take", Ben 2026-10-09): the household and background draw on
+/// every market, per resource (input_reach.hpp § EVERY BUYER). PLAY: what those
+/// channels drew at the last clear. GENERATION: the two baskets at base over the
+/// centres each market serves, as `body_demand` reads final demand.
+void build_final_draws(const world& w, const recipe_registry& reg, input_reach& ir)
+{
+    if (ir.final_built)
+        return;
+    ir.final_built = true;
+    for (auto& v : ir.final_draws) v.clear();
+
+    // An ordered key; every value below is one write or an id-ordered sum.
+    std::map<entity_id, std::array<float, resource_count>> by_market;
+    const bool play = ir.report != nullptr && !ir.report->buildings.empty();
+    if (play)
+    {
+        for (const auto& [mid, mc] : w.markets)
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                const float d = std::max(0.0f, mc.household_fill[r])
+                              + std::max(0.0f, mc.background_fill[r]);
+                if (d > 0.0f)
+                    by_market[mid][r] = d; // value-initialised array: one write per key
+            }
+    }
+    else
+    {
+        // Ascending centre id (BL-1050): the per-market scale is a float sum.
+        std::vector<entity_id> centre_ids;
+        centre_ids.reserve(w.population_centres.size());
+        for (const auto& [cid, pcc] : w.population_centres)
+        {
+            (void)pcc;
+            const auto tile_it = w.population_centre_tile.find(cid);
+            if (tile_it == w.population_centre_tile.end())
+                continue;
+            if (w.tiles.find(tile_it->second) == w.tiles.end())
+                continue;
+            centre_ids.push_back(cid);
+        }
+        std::sort(centre_ids.begin(), centre_ids.end());
+        std::map<entity_id, float> market_scale;
+        for (const entity_id cid : centre_ids)
+        {
+            const entity_id mid = market_for_tile(w, w.population_centre_tile.at(cid));
+            if (mid == null_entity)
+                continue;
+            market_scale[mid] += static_cast<float>(w.population_centres.at(cid).scale);
+        }
+        const population_demand_params&          pd = reg.population_demand();
+        const background_demand_params&          bd = reg.background_demand();
+        const std::array<float, resource_count>& pb = reg.population_demand_basket();
+        const std::array<float, resource_count>& bb = reg.background_demand_basket();
+        for (const auto& [mid, scale] : market_scale)
+        {
+            if (!(scale > 0.0f))
+                continue;
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                const float d = scale * (pd.demand_scale * pb[r] + bd.demand_scale * bb[r]);
+                if (d > 0.0f)
+                    by_market[mid][r] = d;
+            }
+        }
+    }
+    for (const auto& [mid, arr] : by_market) // ascending market
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (arr[r] > 0.0f)
+                ir.final_draws[r].push_back({mid, arr[r]});
+}
+
 } // namespace
 
 float input_reach_haul(world& w, const recipe_registry& reg, input_reach& ir,
@@ -503,7 +578,32 @@ reachable_spare reachable_supply(world& w, const recipe_registry& reg, input_rea
                 continue;
             set.markets.push_back({pr.market, pr.out, landed});
         }
-        for (const auto& [q, d] : ir.draws[r]) // ascending market
+        // Every buyer's draw per consumer market, ascending: the standing
+        // processors' (`ir.draws`) plus the households' and the background's
+        // (`final_draws`, BL-1217 G1b R2), merged by market. A market with no
+        // final draw keeps its processor draw exactly.
+        build_final_draws(w, reg, ir);
+        std::vector<std::pair<entity_id, float>> all_draws;
+        {
+            const auto& pdv = ir.draws[r];
+            const auto& fdv = ir.final_draws[r];
+            all_draws.reserve(pdv.size() + fdv.size());
+            std::size_t a = 0, b = 0;
+            while (a < pdv.size() || b < fdv.size())
+            {
+                if (b >= fdv.size() || (a < pdv.size() && pdv[a].first < fdv[b].first))
+                    all_draws.push_back(pdv[a++]);
+                else if (a >= pdv.size() || fdv[b].first < pdv[a].first)
+                    all_draws.push_back(fdv[b++]);
+                else
+                {
+                    all_draws.push_back({pdv[a].first, pdv[a].second + fdv[b].second});
+                    ++a;
+                    ++b;
+                }
+            }
+        }
+        for (const auto& [q, d] : all_draws) // ascending market
         {
             input_reach::reached_draw rd{q, d, {}};
             for (std::size_t i = 0; i < set.markets.size(); ++i)

@@ -200,6 +200,7 @@ void w_market(std::ostream& o, const market_component& m)
     for (const int32_t t : m.unposted_bid_tick) w_i32(o, t); // BL-1227: world_save_version 38
     w_f32_array(o, m.dial_pool_draw);   // BL-1217: world_save_version 40
     for (const int32_t t : m.dial_pool_draw_tick) w_i32(o, t); // BL-1217: world_save_version 40
+    w_f32_array(o, m.background_fill); // BL-1217 G1b R2: world_save_version 45
 }
 
 bool r_i32_array(std::istream& i, std::array<int32_t, resource_count>& a)
@@ -218,7 +219,8 @@ bool r_market(std::istream& i, market_component& m)
         && r_f32_array(i, m.household_bid) && r_f32_array(i, m.household_fill)
         && r_f32_array(i, m.household_weight) && r_f32_array(i, m.hauler_want)
         && r_f32_array(i, m.unposted_bid) && r_i32_array(i, m.unposted_bid_tick)
-        && r_f32_array(i, m.dial_pool_draw) && r_i32_array(i, m.dial_pool_draw_tick); // BL-1217: v40
+        && r_f32_array(i, m.dial_pool_draw) && r_i32_array(i, m.dial_pool_draw_tick) // BL-1217: v40
+        && r_f32_array(i, m.background_fill); // BL-1217 G1b R2: v45
 }
 
 void w_unit(std::ostream& o, const unit_component& u)

@@ -60,6 +60,20 @@
 // Each charge is shared among the set markets that reach Q in proportion to
 // their output, which gives each producer market its own spare.
 //
+// EVERY BUYER, NOT ONLY PROCESSORS (BL-1217 G1b R2; AI_OPPONENT.md § 11, "Spare
+// supply counts what households and the background take", Ben 2026-10-09). A
+// consumer market Q's draw is its standing processors' draw PLUS the household
+// and background draw there — the same reach and the same charge, so a market
+// whose households empty the shelf leaves nothing spare for a new plant. In
+// PLAY (a report with rows) that is the draws those channels MADE at the last
+// clear (`market_component::household_fill + background_fill`), an aggregate
+// market fact. In GENERATION / a hand-built world (no report, no clear has
+// run) it is the GENERATION FORM: the household and background baskets at
+// base, `scale x (population demand_scale x basket + background demand_scale x
+// basket)`, summed over the centres whose tile the market serves — the reading
+// generation's final demand (`body_demand`) already takes, split by market.
+// No forecast, and nothing per corporation.
+//
 // OBTAINABLE: an input r of a processor at market C, needing `need` units a tick,
 // is obtainable when
 //   (1) STOCK: the corp's own (corp, C) pool plus C's shelf — the shelf only where
@@ -138,6 +152,13 @@ struct input_reach
     std::array<std::vector<std::pair<entity_id, float>>, resource_count>   draws;
     /// (consumer market, r) -> its reach set.
     std::map<std::pair<entity_id, std::size_t>, reach_set>                 supply_memo;
+
+    /// BL-1217 G1b R2: per resource, (market, household + background draw
+    /// there), sorted by market — the final buyers' draw (see EVERY BUYER).
+    /// Built lazily on the first spare question; forgotten by
+    /// `input_reach_invalidate`, never by a refresh (buildings do not move it).
+    bool final_built = false;
+    std::array<std::vector<std::pair<entity_id, float>>, resource_count>   final_draws;
 
     // ---- refresh mode (`input_reach_refresh`, generation's placement) ----
     /// What a building was indexed as: the fields its output and draw read.

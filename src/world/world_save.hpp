@@ -376,7 +376,17 @@ inline constexpr uint32_t world_save_magic =
 /// refused whole on the strict-equality contract, no migration. 39 (D5,
 /// opening_stock_held) and 40 (D3, unposted_rate) are claimed by other sprint 50
 /// branches; this stacks above them, and the integrator renumbers at the merge.
-inline constexpr uint32_t world_save_version = 41;
+/// Bumped to 45 by BL-1217 G1b R2 (spare supply counts what households and the
+/// background take, Ben 2026-10-09; AI_OPPONENT.md § 11): the market record
+/// gains one resource-indexed float array at its tail, after
+/// `dial_pool_draw_tick` -- `background_fill`, what the background channel drew
+/// at the last clear, which the supply clause (input_reach.cpp) now reads
+/// between clears. An older stream is resource_count floats short per market;
+/// refused whole on the strict-equality contract, no migration. Claimed
+/// through `tools/session/next_save_version.js --kind world --claim`; 42-44
+/// are claimed by other branches, so this stacks above them and the
+/// integrator renumbers at the merge.
+inline constexpr uint32_t world_save_version = 45;
 
 /// Write @p w as a complete world snapshot.
 ///

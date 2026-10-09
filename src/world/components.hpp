@@ -1136,14 +1136,14 @@ struct market_component
     std::array<float, resource_count>   dial_pool_draw      = {};
     std::array<int32_t, resource_count> dial_pool_draw_tick = {};
 
-    /// BL-1217 lever D (measurement, behind `economy.background_demand.consumes`,
-    /// default off): the BACKGROUND channel's bid at the last clear
-    /// (`inject_background_demand`) and what it DREW off `inventory`
-    /// (`draw_background_basket`, zero while the switch is off). TRANSIENT and
-    /// deliberately NOT serialised: both are rewritten inside the same clear
-    /// before anything reads them, and no simulation code reads them at all --
-    /// they exist for the verify harnesses. A load leaves them zero until the
-    /// next clear, which changes nothing the simulation computes.
+    /// BL-1217 lever D (behind `economy.background_demand.consumes`): the
+    /// BACKGROUND channel's bid at the last clear (`inject_background_demand`)
+    /// and what it DREW off `inventory` (`draw_background_basket`, zero while
+    /// the switch is off). `background_bid` is TRANSIENT (rewritten inside the
+    /// clear before anything reads it; verify harnesses only). `background_fill`
+    /// is SERIALISED (BL-1217 G1b R2, world_save_version 45): the supply clause
+    /// reads it as the background's draw at the last clear (input_reach.hpp
+    /// § EVERY BUYER), between clears, so a load must restore it.
     std::array<float, resource_count> background_bid  = {};
     std::array<float, resource_count> background_fill = {};
 };
