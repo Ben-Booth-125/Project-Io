@@ -170,6 +170,13 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   moot once propellant is priced. Doc: § 11 says "same composite bid"; dial now reads a different
   quantity. Merge mechanics fine (v40 over v39 trivial). **Form to Ben:** narrow the dial to demand +
   pool-fed running draws / fix every source / hold D3 and measure D4+D5/D6 first; confirm deferral.
+  **PROPELLANT REWORK:** e07ac0b5 pad's pool keeps propellant (`auto_surplus_reservation`;
+  dispatch reads it too; corp_ai `listable_surplus` still sees it as sellable — allowed by ruling
+  via order) + 6deacb4a seat's dial-idled plants back to auto (both handoff paths). Measured at
+  6deacb4a (incl. merged BL-1235): 82.9/66.9/15.7/73.3. Commit 2 (route gate) BLOCKED: no atmosphere
+  on body_component — main session chose option A (copy atmosphere_class onto body_component, SAVE
+  v41), price 64.0, recipe_margin anchors on the air route; agent resumed. Save order: v39 D5, v40
+  D3, v41 PROPELLANT.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
