@@ -600,6 +600,8 @@ void dissolve_into(world& w, entity_id acquirer, entity_id target)
             stockpile_component& dst = w.pool_at(acquirer, mv.first);
             for (std::size_t r = 0; r < resource_count; ++r)
                 dst.quantities[r] += mv.second.quantities[r];
+            // BL-1217 D5: held opening stock changes hands with its pool.
+            move_opening_stock_held(w, {target, mv.first}, {acquirer, mv.first});
         }
     }
 
@@ -862,6 +864,7 @@ void run_firm_exits(world& w, const firm_exit_params& p,
                         mc.inventory[r] += pool.quantities[r];
                 }
                 w.corp_market_pools.erase(std::make_pair(target, key));
+                w.opening_stock_held.erase(std::make_pair(target, key)); // BL-1217 D5
             }
         }
 

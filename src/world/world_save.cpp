@@ -995,6 +995,12 @@ void write_world_snapshot(const world& w, std::ostream& out)
               w_id(s, f.centre_tile);
               w_id(s, f.into);
           });
+
+    // BL-1217 D5 (world_save_version 39): the held opening stock -- live state
+    // the clear reads every tick, not derivable from the pools. A `std::map`,
+    // written ascending as held.
+    w_map(out, w.opening_stock_held, w_id_pair,
+          [](std::ostream& s, const std::array<float, resource_count>& a) { w_f32_array(s, a); });
 }
 
 bool read_world_snapshot(world& w, std::istream& in)
@@ -1212,6 +1218,19 @@ bool read_world_snapshot(world& w, std::istream& in)
         if (into == s.markets.end() || into->second.body != fm.body) return false;
         const auto tile = s.tiles.find(fm.centre_tile);
         if (tile == s.tiles.end() || tile->second.body != fm.body) return false;
+    }
+
+    // BL-1217 D5 (v39): the held opening stock. A record must name a pool that
+    // exists and hold finite, non-negative amounts -- the writer can produce
+    // nothing else (the clear drops a record whose pool is gone).
+    if (!r_map(in, s.opening_stock_held, r_id_pair,
+               [](std::istream& st, std::array<float, resource_count>& a) { return r_f32_array(st, a); }))
+        return false;
+    for (const auto& [key, held] : s.opening_stock_held)
+    {
+        if (s.corp_market_pools.count(key) == 0) return false;
+        for (const float h : held)
+            if (!std::isfinite(h) || h < 0.0f) return false;
     }
 
     clear_derived_state(s);

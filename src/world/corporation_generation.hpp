@@ -633,7 +633,21 @@ std::vector<entity_id> generate_background_firms(
 ///
 /// Call it after the registry is loaded and after every generation pass that can
 /// author a processor (`generate_corporations`, `generate_background_firms`).
-void assign_default_recipes(world& w, const recipe_registry& reg);
+///
+/// BL-1217 D6 (Ben, 2026-10-09: "a processor with no recipe whose default
+/// output isn't wanted is not placed"): the default is given only while its
+/// output is short by the shared want test (`output_want`, measured per body
+/// off the world with `body_demand`, each assignment booked in ascending
+/// building id); a recipe-less processor whose default output is NOT short is
+/// UNPLACED — the building, its stockpile, its place in its corporation's
+/// `assets`, with the HQ re-seated and the opening pools re-keyed
+/// (`unplace_and_reseat`). EXCEPT the pre-authored installation —
+/// `world::authored_processor` — which keeps its default whatever the want
+/// (Ben, 2026-10-09). WORLD BUILD ONLY: in play no processor lacks a
+/// recipe, so a call on a loaded or running world finds nothing to remove.
+/// @p site, when given, labels a log line printed whenever a processor is
+/// unplaced. @return the number unplaced.
+int assign_default_recipes(world& w, const recipe_registry& reg, const char* site = nullptr);
 
 /// BL-1185 (chain-feasible placement) — Pass 3's rule applied to a specialist
 /// roster laid BEFORE a recipe registry existed (world generation's own Pass 3,
@@ -781,11 +795,14 @@ void add_prospective_draws(world& w, const recipe_registry& reg, input_reach& ir
 /// feeds. A grid needing under half of @p plant_output is left to roads, not
 /// counted. @p short_grids receives every counted (short) grid;
 /// @p unpowered_short, when given, the short grids no generator feeds at all
-/// (PRODUCTION.md, "Unpowered grids first", Ben 2026-10-08). Deterministic
-/// (ascending building id, std::map over grids).
+/// (PRODUCTION.md, "Unpowered grids first", Ben 2026-10-08). @p need_output,
+/// when given, receives every grid's (need, output) pair, counted or not
+/// (BL-1217 D6: the roster's keep sweep reads a sub-half grid's lone plant).
+/// Deterministic (ascending building id, std::map over grids).
 float body_power_grid_gap(world& w, const recipe_registry& reg, entity_id body_id,
                           float plant_output, std::set<std::uint32_t>& short_grids,
-                          std::set<std::uint32_t>* unpowered_short = nullptr);
+                          std::set<std::uint32_t>* unpowered_short = nullptr,
+                          std::map<std::uint32_t, std::pair<float, float>>* need_output = nullptr);
 
 /// The grids a power firm may SERVE on @p body_id (into @p serve), and the
 /// body's power gap (returned, every short grid's, as `body_power_grid_gap`).

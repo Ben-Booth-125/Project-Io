@@ -175,6 +175,14 @@ uint64_t world::state_hash(int tick) const
         for (const float q : sc.quantities) fnv1a_f32(h, q);
     }
 
+    // BL-1217 D5: the held opening stock — std::map, sorted by (corp, pool key).
+    for (const auto& [key, held] : opening_stock_held)
+    {
+        fnv1a_u32(h, key.first);
+        fnv1a_u32(h, key.second);
+        for (const float q : held) fnv1a_f32(h, q);
+    }
+
     // Tiles: resource_remaining is drawn down by extraction every tick.
     {
         std::vector<entity_id> ids;

@@ -443,7 +443,35 @@ void absorb_body_pool_into_market(world& w, entity_id body, entity_id market)
         stockpile_component& dst = w.pool_at(corp, market);
         for (std::size_t r = 0; r < resource_count; ++r)
             dst.quantities[r] += moved.quantities[r];
+        move_opening_stock_held(w, {corp, body}, {corp, market}); // BL-1217 D5
     }
+}
+
+void seed_opening_stock(world& w, entity_id corp, entity_id key,
+                        const std::array<float, resource_count>& stock)
+{
+    stockpile_component& pool = w.pool_at(corp, key);
+    std::array<float, resource_count>& held = w.opening_stock_held[std::make_pair(corp, key)];
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        pool.quantities[r] += stock[r];
+        held[r]            += stock[r];
+    }
+}
+
+void move_opening_stock_held(world& w, std::pair<entity_id, entity_id> from,
+                             std::pair<entity_id, entity_id> to)
+{
+    if (from == to)
+        return;
+    const auto src = w.opening_stock_held.find(from);
+    if (src == w.opening_stock_held.end())
+        return;
+    const std::array<float, resource_count> moved = src->second;
+    w.opening_stock_held.erase(src);
+    std::array<float, resource_count>& dst = w.opening_stock_held[to];
+    for (std::size_t r = 0; r < resource_count; ++r)
+        dst[r] += moved[r];
 }
 
 entity_id corp_home_pool_key(const world& w, entity_id corp, entity_id body)
@@ -513,6 +541,7 @@ void rehome_opening_pools(world& w)
         stockpile_component& dst = w.pool_at(mv.from.first, dst_key);
         for (std::size_t r = 0; r < resource_count; ++r)
             dst.quantities[r] += moved.quantities[r];
+        move_opening_stock_held(w, mv.from, {mv.from.first, dst_key}); // BL-1217 D5
     }
 }
 
@@ -1472,9 +1501,78 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         return ok;
     };
 
+    // BL-1217 D5 — OPENING STOCK IS HELD, NOT LISTED, UNTIL SOMEONE BIDS FOR IT
+    // (Ben, 2026-10-09; CORPORATION_GENERATION.md § Pass 4b). A market BIDS for
+    // a good this clear when anything puts it in that market's demand register:
+    // the demand injections above, a draw's want (net of the drawer's own pool,
+    // so a corp living off its own stock does not bid), or a standing buy
+    // order. Read here, before either listing path, so the bid that releases a
+    // hold is this clear's. Each held record is first cut to its pool — what
+    // the corp drew down is no longer opening stock — then zeroed for every
+    // good its market bids for. Zeroing is permanent: once a market has bid,
+    // the opening stock of that good lists by the ordinary sell rules. A record
+    // whose pool is gone, or that holds nothing, is dropped. Sorted walks only.
+    if (!w.opening_stock_held.empty())
+    {
+        std::map<entity_id, std::array<bool, resource_count>> bids;
+        for (const auto& [mid, mc] : w.markets)
+        {
+            std::array<bool, resource_count>& row = bids[mid];
+            for (std::size_t r = 0; r < resource_count; ++r)
+                row[r] = mc.demand[r] > 0.0f;
+        }
+        for (const auto& [key, wanted] : report.wants)
+        {
+            const auto bit = bids.find(key.second);
+            if (bit == bids.end())
+                continue;
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (wanted[r] > 0.0f)
+                    bit->second[r] = true;
+        }
+        for (const buy_order& order : standing_buys)
+        {
+            if (order.quantity <= 0.0f)
+                continue;
+            const entity_id mid = buy_order_market(w, by_body, order.corp, order.body);
+            const auto bit = bids.find(mid);
+            const std::size_t r = static_cast<std::size_t>(order.resource);
+            if (bit != bids.end() && r < resource_count)
+                bit->second[r] = true;
+        }
+        for (auto it = w.opening_stock_held.begin(); it != w.opening_stock_held.end();)
+        {
+            const auto pkit = w.corp_market_pools.find(it->first);
+            if (pkit == w.corp_market_pools.end())
+            {
+                it = w.opening_stock_held.erase(it);
+                continue;
+            }
+            const auto bit = bids.find(it->first.second); // a body-level key has no market
+            bool any = false;
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                float& h = it->second[r];
+                h = std::min(h, std::max(0.0f, pkit->second.quantities[r]));
+                if (bit != bids.end() && bit->second[r])
+                    h = 0.0f;
+                if (h > 0.0f)
+                    any = true;
+            }
+            it = any ? std::next(it) : w.opening_stock_held.erase(it);
+        }
+    }
+    // The held opening stock of (corp, market) in good r, after the pass above.
+    auto opening_held = [&w](entity_id corp, entity_id mid, std::size_t r) {
+        const auto hit = w.opening_stock_held.find(std::make_pair(corp, mid));
+        return hit == w.opening_stock_held.end() ? 0.0f : hit->second[r];
+    };
+
     // Auto-surplus: each corp's pool above its processor reservation, listed
     // into the pool's OWN market (BL-1003 — the pool key is the market). A
     // body-level pool (key = a market-less body) has nowhere to list and stays.
+    // BL-1217 D5: and above its held opening stock — the larger of the two
+    // stays, since a processor's reserved draw comes out of the held stock first.
     for (auto& [key, pool] : w.corp_market_pools)
     {
         const entity_id corp = key.first;
@@ -1503,7 +1601,8 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
             if (any_grid && grid_rules.grid(r) && !market_connected(mid))
                 continue;
 
-            const float surplus = pool.quantities[r] - reserve[r];
+            const float surplus =
+                pool.quantities[r] - std::max(reserve[r], opening_held(corp, mid, r));
             if (surplus <= 0.0f)
                 continue;
 
@@ -1586,7 +1685,10 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
                 rit = order_reserve.emplace(std::make_pair(order.corp, mid),
                                             processor_reservation(w, reg, order.corp, mid)).first;
 
-            const float surplus = pkit->second.quantities[r] - rit->second[r];
+            // BL-1217 D5: an order lists what auto-surplus would, so held opening
+            // stock stays off the shelf here too until the market bids for it.
+            const float surplus = pkit->second.quantities[r]
+                                - std::max(rit->second[r], opening_held(order.corp, mid, r));
             if (surplus > 0.0f)
                 pool_has_surplus[oi] = 1; // before any claim: the pool, not this order
 

@@ -1569,8 +1569,12 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                 return &origin_tile;
             };
 
-            // The same reservation auto-surplus holds back: what a seller may
-            // haul is exactly what it would otherwise list at home.
+            // The same processor reservation auto-surplus holds back. NOT the
+            // held opening stock (BL-1217 D5, `world::opening_stock_held`):
+            // auto-surplus keeps that off the HOME shelf until the home market
+            // bids, but a haul goes only where someone wants the good, so held
+            // stock may be hauled. What a seller may haul is therefore what it
+            // would list at home PLUS any opening stock held there.
             auto rit = memo.find({corp_id, src_key});
             if (rit == memo.end())
                 rit = memo.emplace(std::make_pair(corp_id, src_key),

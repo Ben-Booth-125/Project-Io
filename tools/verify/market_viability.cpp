@@ -1573,6 +1573,16 @@ int main(int argc, char** argv)
         }
     }
     std::printf("market_viability: G1 %.1f/85 G1t50 %.1f/85 G1b %.1f/5 G2 %.1f/50 G3 %.1f/70", pct(g1), pct(p50.share_run()), pct(g1b), pct(g2), pct(g3));
+    // BL-1217 D5/D6 review: the ABSOLUTE counts behind the shares, so a share
+    // that rises because the denominator fell reads as such. Running / built
+    // processors at the handoff and at tick 50 (pooled), and the play 26-50
+    // field income per tick per seed. Appended after the G fields, before L.
+    {
+        int ns = 0;
+        for (const seed_reading& r : rs) if (r.built) ++ns;
+        std::printf(" | abs run/built h %d/%d t50 %d/%d inc26-50 %.0f/seed-tick",
+                    ph.n[ps_run], ph.built(), p50.n[ps_run], p50.built(), ns ? i50 / ns : 0.0);
+    }
     if (g_logistics)
     {
         // appended (BL-1223), never reordered: the L row's headline numbers

@@ -464,6 +464,29 @@ struct world
     /// unused in L3.
     std::map<std::pair<entity_id, entity_id>, stockpile_component> corp_market_pools;
 
+    /// BL-1217 D5 — OPENING STOCK IS HELD, NOT LISTED, UNTIL SOMEONE BIDS FOR IT
+    /// (Ben, 2026-10-09; CORPORATION_GENERATION.md § Pass 4b). Per
+    /// `corp_market_pools` key, how much of that pool is still the opening
+    /// stockpile generation seeded (`seed_opening_stock`) and no market has yet
+    /// bid for. `clear_markets` keeps it off the shelf: a pool lists only what
+    /// stands above the larger of its processor reservation and this. Each
+    /// clear, an entry is cut to its pool (what the corp drew down is gone) and
+    /// zeroed for a good its market bids for — permanently, so once a market
+    /// has bid, opening stock of that good lists by the ordinary sell rules.
+    /// Follows its pool wherever a pool moves (rehome, absorb, buyout) and goes
+    /// when the pool goes. A `std::map`, for the `corp_market_pools` reason.
+    std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> opening_stock_held;
+
+    /// BL-1217 D6 (Ben, 2026-10-09, the exceptions) — the PRE-AUTHORED
+    /// installation's processor, recorded when `make_hard_coded_world` authors
+    /// it: the one processor `assign_default_recipes` gives its default whatever
+    /// the want. A GENERATION-TIME MARKER, deliberately neither saved nor
+    /// hashed: the default pass runs only on a freshly generated world (a saved
+    /// world holds no recipe-less processor), so a loaded world's null here
+    /// exempts nothing it could ever meet. Copied with the world, like any
+    /// member, so a search candidate's copy carries it.
+    entity_id authored_processor = null_entity;
+
     /// Active convoys — goods in transit. Appended by dispatch_convoys, advanced by
     /// advance_convoys, and retired (erased) by credit_arrived_convoys in
     /// supply_system.hpp. A std::vector (not a map) because convoys have no persistent
@@ -1153,6 +1176,19 @@ entity_id corp_home_pool_key(const world& w, entity_id corp, entity_id body);
 /// markets stand, puts every unit where the HQ clears. Never call it once play
 /// has begun — it would move produced goods between catchments for free.
 void rehome_opening_pools(world& w);
+
+/// BL-1217 D5 — credit @p stock into (@p corp, @p key)'s pool AND record it as
+/// opening stock, held off the shelf until its market bids for it
+/// (`world::opening_stock_held`). Generation's one door for an opening
+/// stockpile; every generation site that seeds one calls it.
+void seed_opening_stock(world& w, entity_id corp, entity_id key,
+                        const std::array<float, resource_count>& stock);
+
+/// BL-1217 D5 — the held opening stock of pool @p from follows it to pool
+/// @p to (added to whatever @p to already holds); @p from's record goes. Call
+/// wherever a pool's goods move to another key, so the hold travels with them.
+void move_opening_stock_held(world& w, std::pair<entity_id, entity_id> from,
+                             std::pair<entity_id, entity_id> to);
 
 /// Resolve the corporation that owns @p building by scanning each corporation's
 /// `assets`. Siblings of `pool_at` / `workforce_supply`.
