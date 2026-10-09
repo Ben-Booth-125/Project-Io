@@ -223,6 +223,10 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   fields (veto identical over 2.5M calls). D3 81.7/65.4/13.5/71.8; +D4 82.4/67.6/15.9/68.8. D4 G1b
   cause: fuel plants denied the propellant exit switch into silicon/alloys and starve on
   silica/ree_alloy (+59) — moot once D6 removes the fuel plants.
+  **D3/D4 READY TO MERGE** (head 6d79848a): round 3 re-review clean; `dial_bid_harness` D1-D6 pass
+  and were shown able to fail. NR-987 filed (cleared-proxy decision). MERGE TRAP with D5/D6 in
+  save_roundtrip.cpp: close D5's `if (held_key...)` block before the v40 block; reservations keep
+  v39+v40(+v41); world_save.hpp constant ends at 41 with all three notes.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
