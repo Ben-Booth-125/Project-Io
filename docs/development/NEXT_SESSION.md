@@ -227,6 +227,10 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   and were shown able to fail. NR-987 filed (cleared-proxy decision). MERGE TRAP with D5/D6 in
   save_roundtrip.cpp: close D5's `if (held_key...)` block before the v40 block; reservations keep
   v39+v40(+v41); world_save.hpp constant ends at 41 with all three notes.
+  **D5/D6 DONE** (head 067e0055; final review running): steel chain restored (gen steel 177, alloys
+  16, consumer goods 112, machinery 28); 87.5/67.4/11.6/91.6/96.9; running/built h 2426/2773, t50
+  2854/4234; play income 47,307/seed-tick. Authored installation identified as "the one recipe-less
+  unowned processor" (review asked whether a marker is needed).
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
