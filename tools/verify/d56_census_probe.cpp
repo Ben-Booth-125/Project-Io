@@ -166,7 +166,7 @@ int main(int argc, char** argv)
         world& w = start->w;
         const recipe_registry& reg = start->reg;
         std::printf("seed %u\n", seed);
-        reading g; read(w, reg, nullptr, g); print("GEN", g, false); add(PG, g);
+        reading g; read(w, reg, nullptr, g); print("GEN", g, true); add(PG, g);
         economy_report last;
         for (int step = 0; step < k_campaign_settle_ticks; ++step)
         {
@@ -198,7 +198,7 @@ int main(int argc, char** argv)
         std::fflush(stdout);
     }
     std::printf("POOLED over %zu seeds\n", seeds.size());
-    print("GEN", PG, false);
+    print("GEN", PG, true);
     print("HANDOFF", PH, true);
     print("T50", PT, true);
     std::printf("  pads fuelled at some play tick <= %d (max per seed, summed): %d | space convoys dispatched: %d\n",

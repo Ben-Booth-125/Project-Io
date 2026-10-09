@@ -781,11 +781,14 @@ void add_prospective_draws(world& w, const recipe_registry& reg, input_reach& ir
 /// feeds. A grid needing under half of @p plant_output is left to roads, not
 /// counted. @p short_grids receives every counted (short) grid;
 /// @p unpowered_short, when given, the short grids no generator feeds at all
-/// (PRODUCTION.md, "Unpowered grids first", Ben 2026-10-08). Deterministic
-/// (ascending building id, std::map over grids).
+/// (PRODUCTION.md, "Unpowered grids first", Ben 2026-10-08). @p need_output,
+/// when given, receives every grid's (need, output) pair, counted or not
+/// (BL-1217 D6: the roster's keep sweep reads a sub-half grid's lone plant).
+/// Deterministic (ascending building id, std::map over grids).
 float body_power_grid_gap(world& w, const recipe_registry& reg, entity_id body_id,
                           float plant_output, std::set<std::uint32_t>& short_grids,
-                          std::set<std::uint32_t>* unpowered_short = nullptr);
+                          std::set<std::uint32_t>* unpowered_short = nullptr,
+                          std::map<std::uint32_t, std::pair<float, float>>* need_output = nullptr);
 
 /// The grids a power firm may SERVE on @p body_id (into @p serve), and the
 /// body's power gap (returned, every short grid's, as `body_power_grid_gap`).
