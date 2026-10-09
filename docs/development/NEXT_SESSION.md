@@ -152,6 +152,11 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   dispatch comment). **Call for Ben:** with D6, refined fuel -> propellant is a cold start at
   generation (no fuel maker -> propellant not feasible -> fuel has no derived demand); space access
   then depends on settle/play building both. Ruling arguably accepts it; unmeasured.
+  **BEN (2026-10-09):** "So long as most placed industries are running, and we expect most
+  companies to make money, then that's not a problem. We can push the long term viability work for
+  another sprint, after the various other gameplay loops are settled." Read as: the smaller
+  denominator and the fuel cold start are fine; t50 and the D7 starvation findings (construction
+  boom, undelivered hauls, pool-held stock) move to a later sprint — reading put to Ben to confirm.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
