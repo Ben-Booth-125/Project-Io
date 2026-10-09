@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*91 entries — 14 open, 77 resolved.*
+*92 entries — 15 open, 77 resolved.*
 
 ---
 
@@ -160,6 +160,11 @@ The always-on player-identity wash (about 30% on the player's tiles on the plain
 *decision taken on your behalf · raised 2026-10-09 · from the BL-1246 (ground one master) lane, sprint 51*
 
 (a) NOVEL, taken: unsurveyed ground is a FILL, not a bake - a master chunk whose every tile in reach is unsurveyed is filled with the lock colour directly, byte-identical to the full bake (ground_bake_check P23). It is what lets a first visit to an unsurveyed body be sharp in 0.77 s. (b) A Debug --verify run that frames a whole body now pays minutes of synchronous master bake (Debug bakes ~10x slower). Option: compile the bake TUs optimised in Debug (a CMake change), or accept. (c) --autostart-windowed smoke runs now wait 35-55 s on the painting step (until the Life-round pre-bake lands). Option: skip the wait under autostart (the ground fills in live), or accept. (d) The Selection band's neighbourhood page is still its own flat 48 px bake, not a crop of the master - so it does not match the 22.5 deg canvas. Work for a later item unless you want it now.
+
+### NR-1008 — Lens wash and partial re-bake: four calls and two novel pieces
+*decision taken on your behalf · raised 2026-10-09 · from the BL-1250 (lens washes ground) and BL-1246 partial re-bake lanes, sprint 51*
+
+(a) Wash strengths taken: categorical lenses 0.46, sequential 0.54 (LENSES.md). (b) Resource lens: ground with no deposit keeps the WHITE wash Ben ruled 2026-10-04 (0.50) rather than "no wash" - LENSES.md says an unanswered tile takes no wash, so one of the two needs your word. (c) CALL: at the close rungs the Company lens draws the unpicked owners' dark rim on nearly every tile (firms hold most ground), which reads as a heavy hex grid. Options: thin/fade the rim at close zoom; drop the rim where the close-zoom seam already marks edges; accept. (d) NOVEL, fixed: a lit structure's hover wash drew at the inset radius and left a 1 px grid of unlit gaps over the bake; now drawn at full radius. (e) NOVEL, scope grew: the partial re-bake needed a bounds mode in the structure pass (rasterise a tile's parts writing nothing) and a shared build_tile, because a conservative reach only saved ~50%; plus a 1/256 px rounding fix in four structure forms caught by the new window-invariance row. (f) Rung 0 frame time read ~20 ms in the lens lane under heavy machine load (11.5 ms clean in the 60 fps lane); a clean re-measure is owed.
 
 ---
 
