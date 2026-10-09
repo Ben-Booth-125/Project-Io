@@ -127,6 +127,56 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   Copper ore: dispatcher "would send" 36/47 yet arrivals ~8/tick (undelivered hauls — SUPPLY,
   untested). Making builds read steel scarcity = NEW GRANT. 155 inputs>=revenue: 80 underwater at
   tick 1 (35 unpriced propellant), input side dominates.
+  **BEN RULED (2026-10-09, propellant form; docs 2e608ec0):** pad's pool keeps its propellant
+  (reserved from auto-surplus); electrolysis only on airless bodies, atmospheric only under air ->
+  price 64.0; seat's dial-idled plants back to auto at handoff (NR-986 resolved). PROPELLANT agent
+  resumed with all three. **D3/D4 cold review:** F1 dial double-counts shelf-fed running draws
+  (+ procurement whole-contract per tick) — likely the G2 fall; F2 D3b base forecast fires on dead
+  markets in play (no never-cleared gate) — likely the G1b rise; F4 probe solver args; F3 D4 also
+  switches OUT of unpriced incumbents (ruling-literal, kept). D3/D4 agent resumed with F1/F2/F4.
+  **D5+D6 DONE** (53a8d92c, 359f1b11, branch worktree-agent-a5d82d46e2c9f9d33; in cold review):
+  71.4/61.6/12.8/73.4 -> D5 71.6/60.5/12.7/94.4 -> D5+D6 77.9/67.6/12.0/95.2 (G1/t50/G1b/G2).
+  Built processors at handoff 3351 -> 2752 (denominator shrinks); G2 jump = lower settle-income
+  baseline (held stock not auctioned) — read with care. D5 adds `world::opening_stock_held`, SAVE
+  v39. D6: fuel plants 538 -> 0 at generation (all via make_chain_feasible's no-good-named branch:
+  451 attached to extractors); only the traced path bounded. All 16 digest pins move (expected;
+  re-bless at close with Ben). Agent's open questions: bound the second processor too; want omits
+  refused draws; D5 bid excludes silenced want; convoys may haul held stock.
+  **D5/D6 COLD REVIEW: HELD.** G1 gain is mostly denominator — running at handoff FELL ~249
+  (2393 -> ~2144); G2 not evidence (settle baseline moved); measured on the pre-BL-1235 base.
+  D5 sound (bid definition defensible: silenced want excluded per FINANCE 2026-10-03; composite would
+  release on clear 1). D6 bounds one path of several: (d) chartered processing firm, (e) hard-coded
+  roster default recipes, (f) enforce_chain_feasible_roster keep/readmit, (g) assign_default_recipes
+  re-runs — unbounded; want omits refused draws, uses body_demand not walk's consumer_demand, power
+  body-wide. Fix round sent to the D5/D6 agent (+ absolute counts in the gate line, save row,
+  dispatch comment). **Call for Ben:** with D6, refined fuel -> propellant is a cold start at
+  generation (no fuel maker -> propellant not feasible -> fuel has no derived demand); space access
+  then depends on settle/play building both. Ruling arguably accepts it; unmeasured.
+  **BEN (2026-10-09):** "So long as most placed industries are running, and we expect most
+  companies to make money, then that's not a problem. We can push the long term viability work for
+  another sprint, after the various other gameplay loops are settled." Read as: the smaller
+  denominator and the fuel cold start are fine; t50 and the D7 starvation findings (construction
+  boom, undelivered hauls, pool-held stock) move to a later sprint — reading put to Ben to confirm.
+  **D3 FIX ROUND DONE** (3a5d01ff; re-review running): new `market_component::unposted_rate`
+  (dial reads a per-tick rate; veto unchanged), SAVE v40 (stacks on D5's v39 — merge D5/D6
+  first), shared `market_has_cleared` (D3b now near-inert). 16 seeds: D3fix 81.2/65.9/13.8/73.4;
+  +D4 82.2/71.1/16.2/71.3 (G1/t50/G1b/G2). G1b rise is D4's. Steel zeroings unchanged (D5's).
+  **RE-REVIEW: F1 NOT CLOSED.** (1) procurement rate = Q/(lead left) climbs to the whole contract on
+  the last tick, then is held after delivery; (2) space-programme lump noted whole every tick it
+  accumulates; (3) top-up pool draws can also sit in posted demand (double count); (4) the register
+  overwrites on a new tick, so sources written after the scorer (upkeep, launch fuel, nation wants)
+  vanish wherever a processor records first. D4: rescue treats an incumbent with ONE unpriced
+  byproduct as floored every tick, onto reach-obtainable (not stocked) recipes — plausible G1b rise;
+  moot once propellant is priced. Doc: § 11 says "same composite bid"; dial now reads a different
+  quantity. Merge mechanics fine (v40 over v39 trivial). **Form to Ben:** narrow the dial to demand +
+  pool-fed running draws / fix every source / hold D3 and measure D4+D5/D6 first; confirm deferral.
+  **PROPELLANT REWORK:** e07ac0b5 pad's pool keeps propellant (`auto_surplus_reservation`;
+  dispatch reads it too; corp_ai `listable_surplus` still sees it as sellable — allowed by ruling
+  via order) + 6deacb4a seat's dial-idled plants back to auto (both handoff paths). Measured at
+  6deacb4a (incl. merged BL-1235): 82.9/66.9/15.7/73.3. Commit 2 (route gate) BLOCKED: no atmosphere
+  on body_component — main session chose option A (copy atmosphere_class onto body_component, SAVE
+  v41), price 64.0, recipe_margin anchors on the air route; agent resumed. Save order: v39 D5, v40
+  D3, v41 PROPELLANT.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
