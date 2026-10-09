@@ -80,11 +80,14 @@ keep-awake (`tools/session/keepawake.ps1 -Process market_viability`) on an unatt
 The run closes with a per-seed table, the pooled rows, one `PASS`/`FAIL` line per target, and:
 
 ```
-market_viability: G1 x/70 G2 y/50 G3 z/70 | L to-short a% dry/read b starved/read c top-class K d%
+market_viability: G1 x/85 G1t50 x/85 G1b x/5 G2 y/50 G3 z/70 | abs run/built h R/B t50 R/B inc26-50 I/seed-tick | L to-short a% dry/read b starved/read c top-class K d%
 ```
 
-The `| L ...` tail is appended by the logistics row (below); the three G fields keep their
-place. `--no-logistics` drops the row and the tail.
+The G fields keep their place. The `| abs ...` segment gives the ABSOLUTE counts behind the
+shares: processors running / built (pooled) at the handoff and at tick 50, and the play 26-50
+field income per tick per seed. Read it whenever a share moves, since a share rises when its
+denominator falls (BL-1217 D5/D6 review). The `| L ...` tail is appended by the logistics row
+(below). `--no-logistics` drops the row and the tail.
 
 ## The logistics row (L) — BL-1223, reported, no target
 

@@ -2012,6 +2012,96 @@ void chain_unplace(world& w, entity_id bid, std::unordered_set<entity_id>& occup
     w.stockpiles.erase(bid);
 }
 
+/// BL-1217 D6 (Ben, 2026-10-09; CORPORATION_GENERATION.md § Pass 6, "No
+/// processor is placed beyond its output's want") — THE ONE WANT TEST every
+/// generation path that gives a processor a recipe reads.
+///
+/// WANT per good is final demand plus the derived demand of what stands or is
+/// chartered: operating upkeep, construction, every standing processor's
+/// inputs at the nominal rate, and the prospective draws of processors the
+/// sized rule refused (BL-1233). PRODUCTION is at that same nominal rate
+/// (`accumulate_body_production`) — the units the walk's gap reads. Inside the
+/// walk the caller hands in the walk's OWN per-firm arrays, so "short" here is
+/// the walk's gap exactly. POWER is sized per grid where the band sizes it so
+/// (`power_sized_per_grid`), as the walk does: a power recipe is short only
+/// on a processor that feeds a short grid.
+struct output_want
+{
+    entity_id                         body = null_entity;
+    std::array<float, resource_count> want{};
+    std::array<float, resource_count> production{};
+    bool                              power_by_grid = false;
+    std::set<std::uint32_t>           short_grids; ///< power: the grids still short
+
+    /// Is @p rc's primary output still short for a processor on @p tile? A
+    /// good no consumer wants is never short, so it gets no maker for its sake.
+    bool short_for(world& w, const recipe& rc, entity_id tile) const
+    {
+        const std::size_t p = static_cast<std::size_t>(primary_output_resource(rc));
+        if (power_by_grid && p == static_cast<std::size_t>(resource_type::power))
+        {
+            const std::uint32_t g = tile_feed_power_grid(w, tile);
+            return g != 0 && short_grids.count(g) != 0;
+        }
+        return want[p] > production[p];
+    }
+
+    /// Book a processor running @p rc (@p sign -1 takes it out): its outputs
+    /// into production and its inputs into want, at the nominal rate. A power
+    /// recipe re-reads the short grids off the world, where the processor's
+    /// recipe must already be written (or, taking it out, already cleared).
+    void book(world& w, const recipe_registry& reg, const recipe& rc, float sign = 1.0f)
+    {
+        const float batches = nominal_processing_batches(reg);
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            if (rc.outputs[r] > 0.0f)
+                production[r] += sign * batches * rc.outputs[r];
+            if (rc.inputs[r] > 0.0f)
+                want[r] += sign * batches * rc.inputs[r];
+        }
+        // Booking IN only: taking a power processor out happens before its
+        // re-decision, while its recipe still stands in the world, so the grids
+        // it fed read as it left them until the decision books the new one.
+        if (sign > 0.0f && power_by_grid && body != null_entity
+            && rc.outputs[static_cast<std::size_t>(resource_type::power)] > 0.0f)
+        {
+            short_grids.clear();
+            (void)body_power_grid_gap(w, reg, body, one_power_plant_output(reg), short_grids);
+        }
+    }
+};
+
+/// Fill @p o's power half off the world: per grid where the band sizes power
+/// per grid, the grids `body_power_grid_gap` counts short.
+void measure_power_grids(world& w, const recipe_registry& reg, output_want& o)
+{
+    o.power_by_grid = power_sized_per_grid(reg);
+    o.short_grids.clear();
+    if (o.power_by_grid)
+        (void)body_power_grid_gap(w, reg, o.body, one_power_plant_output(reg), o.short_grids);
+}
+
+/// The want test's arrays measured off the world for @p body, with the
+/// caller's FINAL demand (the walk's `consumer_demand`; `body_demand` where a
+/// path has no such capture). Prospective draws are the caller's to raise
+/// (`prospective_total` + `raise_by_want`): only a walk holds a book.
+output_want measure_output_want(world& w, const recipe_registry& reg, entity_id body,
+                                const std::array<float, resource_count>& final_demand)
+{
+    output_want o;
+    o.body = body;
+    o.want = final_demand;
+    const std::array<float, resource_count> upkeep       = body_upkeep_demand(w, reg, body);
+    const std::array<float, resource_count> construction = body_construction_demand(w, reg, body);
+    const std::array<float, resource_count> inputs       = body_processor_input_demand(w, reg, body);
+    for (std::size_t r = 0; r < resource_count; ++r)
+        o.want[r] += upkeep[r] + construction[r] + inputs[r];
+    accumulate_body_production(w, reg, body, o.production);
+    measure_power_grids(w, reg, o);
+    return o;
+}
+
 /// Make one corporation's freshly placed holdings chain-feasible, in place.
 ///
 /// Every processor in @p assets (in asset order) is given a recipe whose inputs
@@ -2037,70 +2127,34 @@ void chain_unplace(world& w, entity_id bid, std::unordered_set<entity_id>& occup
 /// @p whole false (a roster that already exists, `enforce_chain_feasible_roster`)
 /// only unplaces the infeasible processors and never rejects the rest.
 ///
-/// BL-1217 D6 (Ben, 2026-10-09; CORPORATION_GENERATION.md § Pass 6, "No
-/// processor is placed beyond its output's want"): a body's WANT per good —
-/// final demand (`body_demand`) plus the derived demand of what stands or is
-/// chartered (operating upkeep, construction, every standing processor's
-/// inputs at the nominal rate) — and its PRODUCTION at that same rate
-/// (`accumulate_body_production`), in the units the walk's gap reads.
-struct output_want
-{
-    std::array<float, resource_count> want{};
-    std::array<float, resource_count> production{};
-
-    /// Is the recipe's primary output still short here? A good no consumer
-    /// wants is never short, so it gets no maker for its sake.
-    bool short_of(const recipe& rc) const
-    {
-        const std::size_t p = static_cast<std::size_t>(primary_output_resource(rc));
-        return want[p] > production[p];
-    }
-    /// Book a processor's output at the nominal rate (@p sign -1 removes it).
-    void credit(const recipe_registry& reg, const recipe& rc, float sign = 1.0f)
-    {
-        const float batches = nominal_processing_batches(reg);
-        for (std::size_t r = 0; r < resource_count; ++r)
-            if (rc.outputs[r] > 0.0f)
-                production[r] += sign * batches * rc.outputs[r];
-    }
-};
-
-output_want body_output_want(const world& w, const recipe_registry& reg, entity_id body)
-{
-    output_want o;
-    o.want = body_demand(w, reg, body);
-    const std::array<float, resource_count> upkeep       = body_upkeep_demand(w, reg, body);
-    const std::array<float, resource_count> construction = body_construction_demand(w, reg, body);
-    const std::array<float, resource_count> inputs       = body_processor_input_demand(w, reg, body);
-    for (std::size_t r = 0; r < resource_count; ++r)
-        o.want[r] += upkeep[r] + construction[r] + inputs[r];
-    accumulate_body_production(w, reg, body, o.production);
-    return o;
-}
-
+/// BL-1217 D6 (no processor beyond its output's want): every recipe, on either
+/// path, is admitted only while `output_want::short_for` says its primary
+/// output is still short; the want is the caller's (@p want_in) or measured
+/// here (`measure_output_want` with `body_demand`) on the first processor's
+/// body. Each decision books its processor, so a firm's second processor sees
+/// the first. A processor of this call that already carries a recipe (a
+/// re-decision) is taken out first, output and inputs. On the @p serve path a
+/// processor whose good the firm's earlier processors already cover is
+/// unplaced; it leaves no prospective draw (it was refused for want, not for
+/// spare input).
+///
 /// @return false when nothing is left placed (the caller treats the charter as
 ///         a placement that found no feasible ground).
 bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
                          std::vector<entity_id>& assets, std::unordered_set<entity_id>& occupied,
                          const std::vector<int>* serve, bool whole = true,
-                         refused_draw* refused = nullptr)
+                         refused_draw* refused = nullptr,
+                         const output_want* want_in = nullptr)
 {
     const int n = reg.recipe_count(building_type::processing_facility);
-    // BL-1217 D6: the want bound on the best-tier path (@p serve null — a
-    // specialist's processors, an extraction or trade mix's incidental one, a
-    // Pass 6 firm's). Measured once per call, on the first such processor's
-    // body, before any of this call's decisions; each decision then books its
-    // output, so two processors of one firm cannot both fill the same gap. A
-    // processor of this call that already carries a recipe (a re-decision) is
-    // taken out of production first: the rule reads the ground, not what an
-    // earlier pass wrote. The @p serve path is a firm chartered FOR a good the
-    // walk's gap found short, and is bounded there.
     output_want ow;
     bool        ow_ready = false;
     const auto  ensure_want = [&](entity_id body) {
         if (ow_ready)
             return;
-        ow       = body_output_want(w, reg, body);
+        ow       = (want_in != nullptr) ? *want_in
+                                        : measure_output_want(w, reg, body, body_demand(w, reg, body));
+        ow.body  = body;
         ow_ready = true;
         for (const entity_id a : assets)
         {
@@ -2112,7 +2166,7 @@ bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
             if (tit == w.tiles.end() || tit->second.body != body)
                 continue;
             if (const recipe* had = reg.get_recipe(ait->second.recipe))
-                ow.credit(reg, *had, -1.0f);
+                ow.book(w, reg, *had, -1.0f);
         }
     };
     bool processing_anchor = false;
@@ -2133,13 +2187,20 @@ bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
             continue;
         }
         const entity_id market = market_for_tile(w, bit->second.tile);
+        const entity_id ptile  = bit->second.tile;
         uint16_t chosen = no_recipe;
+        if (const auto tit = w.tiles.find(ptile); tit != w.tiles.end())
+            ensure_want(tit->second.body);
+        // BL-1217 D6: a recipe is a candidate only while its output is short.
+        const auto wanted = [&](const recipe& rc) { return !ow_ready || ow.short_for(w, rc, ptile); };
         chain_begin_decision(w, reg, cr); // BL-1233: spare is read over what stands now
         if (serve != nullptr)
         {
             for (const int i : *serve)
             {
                 const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+                if (!wanted(rc))
+                    continue;
                 if (chain_recipe_placeable(w, reg, cr, bid, market, rc, &assets) != chain_tier_none)
                 {
                     chosen = reg.recipe_id(rc.name);
@@ -2149,15 +2210,12 @@ bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
         }
         else
         {
-            const auto tit = w.tiles.find(bit->second.tile);
-            if (tit != w.tiles.end())
-                ensure_want(tit->second.body);
             int best_tier = chain_tier_none;
             for (int i = 0; i < n && best_tier != chain_tier_own; ++i)
             {
                 const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
-                if (ow_ready && !ow.short_of(rc))
-                    continue; // BL-1217 D6: no maker for a good with no want left
+                if (!wanted(rc))
+                    continue;
                 const int t = chain_recipe_placeable(w, reg, cr, bid, market, rc, &assets);
                 if (t < best_tier)
                 {
@@ -2174,12 +2232,16 @@ bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
             // prospective draw: the first such recipe in the good's preference.
             // A processor with no producer at all leaves none (a cold start is
             // not begun). Read before it is unplaced, on the ground as it stands.
+            // BL-1217 D6: a recipe refused for want (its good already covered)
+            // was not refused by the sized rule, and leaves no draw.
             if (refused != nullptr && !refused->set && serve != nullptr)
             {
                 const float batches = nominal_processing_batches(reg);
                 for (const int i : *serve)
                 {
                     const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+                    if (!wanted(rc))
+                        continue;
                     if (chain_recipe_tier(w, reg, cr, bid, market, rc, &assets) == chain_tier_none)
                         continue;
                     refused->set    = true;
@@ -2193,9 +2255,9 @@ bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
             continue;
         }
         bit->second.recipe = chosen;
-        if (serve == nullptr && ow_ready)
+        if (ow_ready)
             if (const recipe* took = reg.get_recipe(chosen))
-                ow.credit(reg, *took); // BL-1217 D6: this processor's output is booked
+                ow.book(w, reg, *took); // BL-1217 D6: the next processor sees this one
         kept.push_back(bid);
         ++serving;
     }
@@ -3566,9 +3628,16 @@ std::vector<entity_id> generate_background_firms(
                             serve.push_back(i);
                 }
                 refused_draw refused;
+                // BL-1217 D6: this firm's own measurement (prospective draws
+                // included), power per grid.
+                output_want firm_want;
+                firm_want.body       = body_id;
+                firm_want.want       = demand;
+                firm_want.production = production;
+                measure_power_grids(w, reg, firm_want);
                 if (!make_chain_feasible(w, reg, chain, assets, occupied_tiles,
                                          go_processing ? &serve : nullptr, /*whole=*/true,
-                                         &refused))
+                                         &refused, &firm_want))
                 {
                     if (refused.set)
                         record_refused_draw(prospective, gap_r, refused);
@@ -3730,15 +3799,62 @@ chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_re
     //    suspended can be admitted, so a second call changes nothing. Each round
     //    is bounded; past the bound (never measured to bind) the last step 1's
     //    fixed point stands and whatever it suspended is unplaced.
+    //
+    // BL-1217 D6 (no processor beyond its output's want; `output_want`): both
+    // steps read the one want test. Step 1 keeps a processor only while its
+    // output would still be short WITHOUT it — tested against the same
+    // standing set as feasibility, so the sweep stays order-free (three plants
+    // where want holds two all fall together, and step 2 re-admits two).
+    // Step 2 admits only a recipe whose output is short, booking each
+    // admission so the next decision sees it. The want is measured off the
+    // world per body (`body_demand` as final demand: a roster has no walk's
+    // capture), fresh for every sweep.
     enum : int { st_kept = 0, st_suspended = 1 };
     std::vector<int>  state(procs.size(), st_kept);
     std::vector<bool> ever_suspended(procs.size(), false);
+    const auto body_of = [&](entity_id bid) {
+        const auto tit = w.tiles.find(w.buildings.at(bid).tile);
+        return tit == w.tiles.end() ? null_entity : tit->second.body;
+    };
+    const auto measure_bodies = [&]() {
+        std::map<entity_id, output_want> by_body;
+        for (const auto& pr : procs)
+        {
+            const entity_id body = body_of(pr.second);
+            if (body != null_entity && by_body.find(body) == by_body.end())
+                by_body.emplace(body, measure_output_want(w, reg, body, body_demand(w, reg, body)));
+        }
+        return by_body;
+    };
+    const auto still_wanted_without = [&](std::map<entity_id, output_want>& wants, entity_id bid,
+                                          const recipe& rc) {
+        const auto wit = wants.find(body_of(bid));
+        if (wit == wants.end())
+            return true;
+        output_want& ow = wit->second;
+        building_component& b = w.buildings.at(bid);
+        const std::size_t p = static_cast<std::size_t>(primary_output_resource(rc));
+        if (ow.power_by_grid && p == static_cast<std::size_t>(resource_type::power))
+        {
+            // Its grid's shortness with this plant's recipe cleared.
+            const uint16_t had = b.recipe;
+            b.recipe = no_recipe;
+            std::set<std::uint32_t> grids;
+            (void)body_power_grid_gap(w, reg, ow.body, one_power_plant_output(reg), grids);
+            b.recipe = had;
+            const std::uint32_t g = tile_feed_power_grid(w, b.tile);
+            return g != 0 && grids.count(g) != 0;
+        }
+        const float own = nominal_processing_batches(reg) * rc.outputs[p];
+        return ow.want[p] > ow.production[p] - own;
+    };
     const auto keep_sweep = [&]() {
         bool any = false;
         for (bool changed = true; changed;)
         {
             changed = false;
             chain_begin_decision(w, reg, cr);
+            std::map<entity_id, output_want> wants = measure_bodies();
             std::vector<std::size_t> failing;
             for (std::size_t i = 0; i < procs.size(); ++i)
             {
@@ -3749,7 +3865,8 @@ chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_re
                 const bool feasible = rc != nullptr
                     && chain_recipe_placeable(w, reg, cr, procs[i].second,
                                               market_for_tile(w, b.tile), *rc, nullptr)
-                           != chain_tier_none;
+                           != chain_tier_none
+                    && still_wanted_without(wants, procs[i].second, *rc);
                 if (!feasible)
                     failing.push_back(i);
             }
@@ -3768,6 +3885,7 @@ chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_re
         for (bool admitted = true; admitted;)
         {
             admitted = false;
+            std::map<entity_id, output_want> wants = measure_bodies(); // BL-1217 D6
             for (std::size_t i = 0; i < procs.size(); ++i)
             {
                 if (state[i] != st_suspended)
@@ -3777,12 +3895,15 @@ chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_re
                 building_component& b = w.buildings.at(bid);
                 const entity_id market = market_for_tile(w, b.tile);
                 const std::vector<entity_id>& own = w.corporations.at(cid).assets;
+                const auto wit = wants.find(body_of(bid));
                 uint16_t chosen    = no_recipe;
                 int      best_tier = chain_tier_none;
                 chain_begin_decision(w, reg, cr); // BL-1233: spare over what stands now
                 for (int k = 0; k < n && best_tier != chain_tier_own; ++k)
                 {
                     const recipe& rc = reg.recipe_at(building_type::processing_facility, k);
+                    if (wit != wants.end() && !wit->second.short_for(w, rc, b.tile))
+                        continue; // BL-1217 D6: no maker for a good with no want left
                     const int t = chain_recipe_placeable(w, reg, cr, bid, market, rc, &own);
                     if (t < best_tier)
                     {
@@ -3795,6 +3916,9 @@ chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_re
                     b.recipe = chosen;
                     state[i] = st_kept;
                     admitted = true;
+                    if (wit != wants.end())
+                        if (const recipe* took = reg.get_recipe(chosen))
+                            wit->second.book(w, reg, *took);
                 }
             }
         }
@@ -4033,6 +4157,38 @@ void add_prospective_draws(world& w, const recipe_registry& reg, input_reach& ir
     for (const auto& [good, wv] : want)
         for (std::size_t r = 0; r < resource_count; ++r)
             total[r] += wv[r];
+    raise_by_want(demand, production, total);
+}
+
+/// BL-1217 D6: `add_prospective_draws` READ ONLY — the same entries, the same
+/// filter (capped, or not short even with the book's want), the same raise,
+/// and the book left as it was. For a want test measured outside the turn's
+/// own per-firm read (the walk's specialist), which must not prune the book
+/// the turn reads next.
+static void raise_by_prospective(world& w, const recipe_registry& reg, input_reach& ir,
+                                 const prospective_draws& book, entity_id centre_market,
+                                 std::array<float, resource_count>& demand,
+                                 const std::array<float, resource_count>& production,
+                                 const std::array<bool, resource_count>& capped)
+{
+    if (book.empty())
+        return;
+    input_reach_refresh(w, reg, ir);
+    std::map<std::size_t, std::array<float, resource_count>> want;
+    for (const auto& [good, e] : book)
+        want.emplace(good, prospective_want(w, reg, ir, e, centre_market));
+    std::array<float, resource_count> full = demand;
+    for (const auto& [good, wv] : want)
+        for (std::size_t r = 0; r < resource_count; ++r)
+            full[r] += wv[r];
+    std::array<float, resource_count> total{};
+    for (const auto& [good, wv] : want)
+    {
+        if (capped[good] || !(full[good] > production[good]))
+            continue;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            total[r] += wv[r];
+    }
     raise_by_want(demand, production, total);
 }
 
@@ -4379,6 +4535,10 @@ charter_unspent_reason charter_place_failure_reason(const world& w, const nation
 ///
 /// On failure @p fail_out names why (`charter_place_failure_reason`).
 ///
+/// BL-1217 D6: @p want, when given, is the caller's want test, handed to every
+/// rung's `make_chain_feasible` as a fresh copy (a rejected rung unplaces its
+/// processors, so the next starts from the same ground).
+///
 /// CHAIN-FEASIBLE (BL-1185 / BL-1188; Pass 3 "Chain-feasible"): with @p cr
 /// given, a rung's placement is kept only if `make_chain_feasible` keeps it — every processor
 /// gets a recipe whose inputs are produced within reach, or is unplaced, and a
@@ -4406,7 +4566,8 @@ std::vector<entity_id> charter_place(world& w, const nation_component& nc,
                                      bool& chain_rejected,
                                      const resource_type* dig = nullptr,
                                      refused_draw* refused = nullptr,
-                                     const std::set<std::uint32_t>* grids = nullptr)
+                                     const std::set<std::uint32_t>* grids = nullptr,
+                                     const output_want* want = nullptr)
 {
     chain_rejected = false;
     bool grid_cut = false;   // BL-1232 review: the grid filter took a rung's ground
@@ -4463,7 +4624,7 @@ std::vector<entity_id> charter_place(world& w, const nation_component& nc,
             {
                 if (cr != nullptr
                     && !make_chain_feasible(w, reg, *cr, assets, occupied, serve, /*whole=*/true,
-                                            refused))
+                                            refused, want))
                 {
                     chain_rejected = true;
                     continue;
@@ -5539,11 +5700,29 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             // recipe whose inputs are produced within reach, or are not placed
             // (Pass 3 "Chain-feasible") — the seat is one of these.
             bool chain_rejected = false;
+            // BL-1217 D6: the specialist's processors read the turn's want —
+            // the body's captured consumer demand, the derived demand standing
+            // now, and the refused draws' book (read only: the turn prunes it).
+            output_want spec_want;
+            const output_want* spec_want_p = nullptr;
+            if (const auto bsit = bodies.find(cc.body); bsit != bodies.end())
+            {
+                const charter_body_state& sbs = bsit->second;
+                spec_want = measure_output_want(w, reg, cc.body, sbs.consumer_demand);
+                std::array<bool, resource_count> capped{};
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    capped[r] = sbs.per_good_cap >= 0 && sbs.firms_by_resource[r] >= sbs.per_good_cap;
+                raise_by_prospective(w, reg, chain, sbs.prospective, market_for_tile(w, cc.tile),
+                                     spec_want.want, spec_want.production, capped);
+                spec_want_p = &spec_want;
+            }
             std::vector<entity_id> assets = charter_place(w, nc, focus, occupied, asset_rng, cc,
                                                           settle, spend, /*by_province=*/nullptr,
                                                           /*province_rungs=*/nullptr, rung, why,
                                                           reg, &chain, /*serve=*/nullptr,
-                                                          chain_rejected);
+                                                          chain_rejected, /*dig=*/nullptr,
+                                                          /*refused=*/nullptr, /*grids=*/nullptr,
+                                                          spec_want_p);
             if (assets.empty())
             {
                 // No ground in either window: the specialist's price stays
@@ -6021,11 +6200,22 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                     refused_draw refused;
                     // BL-1232: a power firm's windows are cut to the short grids.
                     const bool grid_sited = power_per_grid && gap_r == power_i;
+                    // BL-1217 D6: the firm's processors read THIS firm's own
+                    // measurement — the turn's demand and production, prospective
+                    // draws and per-grid power included — so "short" is the gap
+                    // that chose the good.
+                    output_want firm_want;
+                    firm_want.body          = cc.body;
+                    firm_want.want          = demand;
+                    firm_want.production    = production;
+                    firm_want.power_by_grid = power_per_grid;
+                    if (power_per_grid)
+                        firm_want.short_grids = short_grids;
                     assets = charter_place(w, nc, focus, occupied, asset_rng, cc, settle, spend,
                                            by_province, &province_rungs, rung, why,
                                            reg, &chain, go_processing ? &serve : nullptr,
                                            chain_rejected, digs ? &dig_r : nullptr, &refused,
-                                           grid_sited ? &short_grids : nullptr);
+                                           grid_sited ? &short_grids : nullptr, &firm_want);
                     if (!assets.empty())
                         break;
                     if (chain_rejected && refused.set)
