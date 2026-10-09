@@ -321,6 +321,13 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   BL-1195 re-review clean (low items); original agent unresumable (worktree unverifiable) — fresh
   agent does the tidy round on top of worktree-agent-a2c0cfcb69b515f0f (river-weighted clock,
   reset on every return, per-frame lane cache, delete convoy_head_index, doc, R17 real tick).
+  **G1b R1+R2 DONE** (30a929c8 R1, e0bd50d9 R2 on worktree-agent-a123195de030662e7; base 5fde6f22;
+  NOT reviewed yet): before 87.5/68.9/11.5, run/built h 2391/2732, income 48,805 | R1 89.8/78.0/9.2,
+  2458/2737, 48,238 | R1+R2 96.4/86.0/**2.1**, **1736/1801**, **34,572 (-29%)**, firms 2407->2048.
+  R2's generation form charges households' whole basket at base (play fills 25-94%) -> ~34% fewer
+  processors. R2 makes background_fill SAVED (claims v45). corp_ai_harness R9(c) flipped (asserted
+  the overturned behaviour). charter_refusal_probe fixture households moved. **Form to Ben:**
+  measure R1+R3 and R2-at-expected-fill / accept / R2 in play only.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
