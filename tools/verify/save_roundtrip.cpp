@@ -299,6 +299,8 @@ int main()
                   && mit->second.unposted_bid_tick[hh_food] == 1234,
               "P1 market unposted_bid / unposted_bid_tick (BL-1227, world_save_version 38) round-trip at their written values");
     }
+    check(held_key.first != null_entity,
+          "P1 the fixture holds a corporation pool, so the opening_stock_held rows below are not vacuous (BL-1217 D5)");
     if (held_key.first != null_entity)
     {
         const auto hit = loaded.opening_stock_held.find(held_key);
