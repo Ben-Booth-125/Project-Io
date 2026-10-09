@@ -290,7 +290,12 @@ struct convoy_leg
     convoy_mode mode         = convoy_mode::land;
     float       cost         = 0.0f; ///< Total credits the haul costs (already node-discounted).
     int         travel_ticks = 1;    ///< Econ ticks the leg takes; convoy speed is 1/this.
-
+    /// BL-1195: the route's waypoints, copied onto the convoy at commit so its lane
+    /// follows the legs priced here (convoy_component::origin_tile / port_a / port_b).
+    /// All null on a space lane; the ports null on a single overland leg.
+    entity_id   origin_tile  = null_entity;
+    entity_id   port_a       = null_entity;
+    entity_id   port_b       = null_entity;
 };
 
 /// Price one leg. A pure read of the world apart from the A* path cache, which

@@ -225,6 +225,7 @@ inline void invalidate_logistics_caches(world& w)
                                       // on exactly the events the three above do
     w.power_grid_of_province.clear(); // BL-1230: the power grid is a function of road_level
     w.power_grid_built = false;
+    bump_logistics_cache_generation(w); // BL-1195: the UI's lane cache re-reads on this
 }
 
 /// True when a state change on this building TYPE can alter a cached logistics
@@ -427,6 +428,10 @@ struct convoy_route
 {
     entity_id              body = null_entity;
     std::vector<entity_id> tiles;
+    /// BL-1195: the lane's clock — `at[i]` is the fraction of the journey's TIME
+    /// spent on reaching `tiles[i]` (0 at the origin, 1 at the destination), each
+    /// leg at its own speed. Same size as `tiles`. Read through convoy_lane_index.
+    std::vector<float>     at;
 };
 
 /// Derive @p cv's lane, oriented source->destination. Non-const `w` because
@@ -435,11 +440,14 @@ struct convoy_route
 /// `const world&`; that is not achievable without a second, uncached A*.)
 convoy_route convoy_route_tiles(world& w, const convoy_component& cv);
 
-/// Index of the head along a lane of @p tile_count tiles at @p progress (0..1).
-/// Factored out so the renderer's glide — which offsets progress by the
-/// fraction through the current econ tick — and the sim's discrete read share
-/// ONE rounding rule. Returns -1 for an empty lane.
-int convoy_head_index(std::size_t tile_count, float progress);
+/// BL-1195: the index along a lane of the tile the cargo is on at @p progress (the
+/// fraction of its travel time elapsed), read off the lane's clock
+/// (`convoy_route::at`): nearest clock reading, a tie to the later tile, and p >= 1
+/// always the destination (the last index). A land leg
+/// is slower than a sea leg, so this is NOT an even spacing over tiles. The one
+/// rule the sim's position, interdiction's sweep and the renderer's head share.
+/// Returns -1 for an empty lane.
+int convoy_lane_index(const std::vector<float>& at, float progress);
 
 /// The tile @p cv's head occupies right now, or `null_entity` when it has none:
 /// an inter-body leg in transit, an unresolved endpoint, or an unreachable
