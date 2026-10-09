@@ -1645,6 +1645,17 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
                 mkit->second.demand[r] += wanted[r];
     }
 
+    // BL-1217 (AI_OPPONENT.md § 11, the dial reads stock-fed consumers): the
+    // dial's pool-draw record, written HERE and only here, beside the demand
+    // above — both describe this tick, so a consumer moving between its pool
+    // and the shelf is read once (economy_system.cpp, collect_dial_pool_draws).
+    for (const auto& [key, q] : report.dial_pool_sums)
+        if (const auto mkit = w.markets.find(key.first); mkit != w.markets.end())
+        {
+            mkit->second.dial_pool_draw[key.second]      = std::max(0.0f, q);
+            mkit->second.dial_pool_draw_tick[key.second] = w.current_econ_tick;
+        }
+
     // BL-1203 (SUPPLY.md § Dispatch trigger, "What a hauler sees as unmet
     // demand"): the HAULER-ONLY register — the want the fair-price ceiling
     // silenced. Copied to the market for the next tick's dispatch, and NOT into

@@ -685,10 +685,11 @@ bool zero_bid_veto(const world& w, const market_component& m, std::size_t r, int
     // that evaluates between two records sees it. A buyer that takes or wants
     // goods without posting a bid is still a buyer.
     //
-    // The sum is `composite_bid` (components.hpp), the one definition the
-    // workforce dial also reads (§ 11, the dial reads the build bid). Called
-    // only with demand[r] <= 0, so a positive composite here is exactly the
-    // silenced want or the held unposted bid.
+    // The sum is `composite_bid` (components.hpp), the veto's own definition,
+    // read for presence. The workforce dial does NOT read it: its narrower
+    // buyer signal is `dial_bid` (§ 11, the dial reads stock-fed consumers).
+    // Called only with demand[r] <= 0, so a positive composite here is exactly
+    // the silenced want or the held unposted bid.
     if (composite_bid(m, r, w.current_econ_tick, hold_ticks) > 0.0f)
         return false;
     // BL-1227 (idle mines, the boom): ZERO BID AGAINST LISTED SUPPLY IS A

@@ -387,7 +387,7 @@ market_good_draw running_consumer_draws(const world& w, const recipe_registry& r
 /// row: the processor's tile market if @p br is a processor that produced on a
 /// standing, complete, not-decommissioned building with a priced-quantity
 /// recipe (and its runs in @p runs_out), else null_entity. Shared with the
-/// dial's pool-draw register (BL-1217, `note_dial_pool_draws`) so a draw by a
+/// dial's pool-draw register (BL-1217, `collect_dial_pool_draws`) so a draw by a
 /// processor this skips is never credited to its market.
 entity_id running_consumer_market(const world& w, const recipe_registry& reg,
                                   const building_report& br, float* runs_out = nullptr);

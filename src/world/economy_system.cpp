@@ -1605,34 +1605,38 @@ economy_step_phase_clock*& economy_step_phase_clock_sink()
 }
 
 namespace {
-/// BL-1217 (AI_OPPONENT.md § 11, the dial's buyer signal): write the dial
-/// register — the ONE writer of `market_component::dial_pool_draw`. Sums, per
-/// (market, good), the not-posted pool draws (`proc_dial_draw::drawn`) of the
-/// processors `running_consumer_market` counts as running (the same filter as
-/// the unposted bid, so a skipped processor's draw credits no market), and
-/// records each nonzero sum at this tick. A key with nothing this tick keeps
-/// its last record, which ages out of the scorer's hold.
-void note_dial_pool_draws(world& w, const recipe_registry& reg, const economy_report& report)
+/// BL-1217 (AI_OPPONENT.md § 11, the dial reads stock-fed consumers): this
+/// tick's dial record, per (market, good), into `report.dial_pool_sums` —
+/// written to the markets by the CLEAR (clear_markets), beside the demand it
+/// complements, so the scorer always reads a demand and a pool-draw record of
+/// the SAME tick (see market_component::dial_pool_draw).
+///
+/// EVERY processor that posted its want this tick (each has a dial record)
+/// STAMPS every input key it touches, with 0 when it took nothing from its
+/// pool: a consumer that moved from its pool onto the shelf now posts its want
+/// as demand, and its old pool draw must not be held beside it. Only a processor
+/// `running_consumer_market` counts as running contributes its draws (the same
+/// filter as the unposted bid, so a skipped processor's draw credits no market).
+/// A key no processor touched keeps its last record, which ages out of the hold.
+void collect_dial_pool_draws(const world& w, const recipe_registry& reg, economy_report& report)
 {
-    std::map<std::pair<entity_id, std::size_t>, float> sum; // sorted: fixed float order
     for (const building_report& br : report.buildings)
     {
         const auto dit = report.dial_pool_draws.find(br.building);
         if (dit == report.dial_pool_draws.end())
             continue;
-        const entity_id mid = running_consumer_market(w, reg, br);
+        const auto bit = w.buildings.find(br.building);
+        const recipe* rc = reg.get_recipe(br.recipe);
+        if (bit == w.buildings.end() || rc == nullptr)
+            continue;
+        const entity_id mid = market_for_tile(w, bit->second.tile);
         if (mid == null_entity)
             continue;
+        const bool running = running_consumer_market(w, reg, br) == mid;
         for (std::size_t r = 0; r < resource_count; ++r)
-            if (dit->second.drawn[r] > 0.0f)
-                sum[std::make_pair(mid, r)] += dit->second.drawn[r];
+            if (rc->inputs[r] > 0.0f)
+                report.dial_pool_sums[std::make_pair(mid, r)] += running ? dit->second.drawn[r] : 0.0f;
     }
-    for (const auto& [key, q] : sum)
-        if (const auto mit = w.markets.find(key.first); mit != w.markets.end() && q > 0.0f)
-        {
-            mit->second.dial_pool_draw[key.second]      = q;
-            mit->second.dial_pool_draw_tick[key.second] = w.current_econ_tick;
-        }
 }
 } // namespace
 
@@ -2615,11 +2619,10 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         if (const auto rmit = w.markets.find(key.first); rmit != w.markets.end())
             note_unposted_bid(rmit->second, key.second, q, w.current_econ_tick);
 
-    // BL-1217 (AI_OPPONENT.md § 11, the dial's buyer signal): the pool-fed,
-    // not-posted draws of the SAME running processors (running_consumer_market,
-    // the one filter), summed per (market, good) and written once — the dial
-    // register's only writer, so nothing recorded later in the tick can wipe it.
-    note_dial_pool_draws(w, reg, report);
+    // BL-1217 (AI_OPPONENT.md § 11, the dial reads stock-fed consumers): this
+    // tick's pool-fed, not-posted draws, stamped per (market, good); the clear
+    // writes them beside this tick's demand.
+    collect_dial_pool_draws(w, reg, report);
 
     // Population food demand (BL-190) is injected by inject_population_demand,
     // called from clear_markets AFTER its per-tick demand reset — injected here

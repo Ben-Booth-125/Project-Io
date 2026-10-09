@@ -289,10 +289,13 @@ int main()
                   && mit->second.unposted_bid_tick[hh_food] == 1234,
               "P1 market unposted_bid / unposted_bid_tick (BL-1227, world_save_version 38) round-trip at their written values");
     }
-    if (hh_market != null_entity)
+    // BL-1217 (review): not guarded on a market existing -- a fixture with no
+    // market would make the row pass vacuously, so its absence FAILS it.
+    check(hh_market != null_entity,
+          "P1 the fixture carries a market for the v40 dial_pool_draw row (never vacuous)");
     {
         const auto mit = loaded.markets.find(hh_market);
-        check(read_ok && mit != loaded.markets.end()
+        check(read_ok && hh_market != null_entity && mit != loaded.markets.end()
                   && mit->second.dial_pool_draw[hh_food] == 1.625f
                   && mit->second.dial_pool_draw_tick[hh_food] == 4321,
               "P1 market dial_pool_draw / dial_pool_draw_tick (BL-1217, world_save_version 40) round-trip at their written values");

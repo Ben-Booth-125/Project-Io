@@ -1098,10 +1098,13 @@ struct market_component
     /// owners' POOLS on the tick `dial_pool_draw_tick[r]`, EXCLUDING any unit
     /// the same processor also posted as demand (economy_system.cpp,
     /// `proc_dial_draw`). The workforce dial reads posted `demand` plus this,
-    /// held for the scorer's cadence, and nothing else. ONE WRITER: the economy
-    /// step, once per tick, right after the production pass
-    /// (`note_dial_pool_draws`) — a key it does not rewrite keeps its last
-    /// record and ages out of the hold. SERIALISED (world_save_version 40).
+    /// held for the scorer's cadence, and nothing else. ONE WRITER: the clear
+    /// (clear_markets, from `economy_report::dial_pool_sums`), in the same pass
+    /// that writes `demand`, so the two always describe the same tick — a
+    /// consumer that moves between its pool and the shelf is counted once
+    /// either way. Every key a processor's posted want touched is stamped (0
+    /// included); a key nobody touched keeps its last record and ages out of
+    /// the hold. SERIALISED (world_save_version 40).
     std::array<float, resource_count>   dial_pool_draw      = {};
     std::array<int32_t, resource_count> dial_pool_draw_tick = {};
 
@@ -1192,17 +1195,23 @@ inline float dial_bid(const market_component& m, std::size_t r, int tick, int ho
 /// economy step the scorer runs in, so at econ step k > 0 every market standing
 /// at step k-1 has cleared — and a market that has cleared bids or lists
 /// SOMETHING (households bid every tick wherever people live). One whose every
-/// supply / demand / silenced-want / unposted slot is still zero is read as not
-/// yet cleared (the market emergence carves mid-tick opens exactly so). Shared
-/// by the build veto's "no clear yet: no signal" (`zero_bid_veto`) and the
-/// dial's "forecast at base where no fact exists yet" (`solve_workforce_target`).
+/// supply / demand / silenced-want slot is still zero is read as not yet
+/// cleared. Shared by the build veto's "no clear yet: no signal"
+/// (`zero_bid_veto`) and the dial's "forecast at base where no fact exists
+/// yet" (`solve_workforce_target`).
+///
+/// ONLY REGISTERS A CLEAR WRITES (BL-1217, review of the D3 rework): supply,
+/// demand (with every demand injector) and hauler_want are written inside
+/// clear_markets and nowhere else. `unposted_bid` is NOT a clear fact — the
+/// economy step writes it mid-tick — so a market carved by emergence at a
+/// building's completion (economy step, before the clear) could carry one from
+/// the same step's production pass and read as cleared before its first clear.
 inline bool market_has_cleared(const market_component& m, int tick)
 {
     if (tick <= 0)
         return false; // no clear has run yet
     for (std::size_t g = 0; g < resource_count; ++g)
-        if (m.supply[g] > 0.0f || m.demand[g] > 0.0f || m.hauler_want[g] > 0.0f
-            || m.unposted_bid[g] > 0.0f)
+        if (m.supply[g] > 0.0f || m.demand[g] > 0.0f || m.hauler_want[g] > 0.0f)
             return true;
     return false;
 }

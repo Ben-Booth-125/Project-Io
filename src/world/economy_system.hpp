@@ -358,8 +358,15 @@ struct economy_report
     /// BL-1217 (AI_OPPONENT.md § 11, the dial's buyer signal): per processor on
     /// a market, its pool-fed draws this tick that it did NOT also post as
     /// demand (`proc_dial_draw`), across both turns. Transient: read once, right
-    /// after the production pass, by `note_dial_pool_draws`.
+    /// after the production pass, by `collect_dial_pool_draws`.
     std::map<entity_id, proc_dial_draw> dial_pool_draws;
+
+    /// BL-1217: this tick's dial record per (market, good) — every input key a
+    /// processor that posted its want touched, the running ones' not-posted pool
+    /// draws summed (0 where none). clear_markets writes it to
+    /// `market_component::dial_pool_draw` (its only writer), beside this tick's
+    /// demand. Sorted std::map: fixed float order.
+    std::map<std::pair<entity_id, std::size_t>, float> dial_pool_sums;
 
     /// BL-1209: every draw off a CONTENDED shelf this tick, rationed pro-rata
     /// (`plan_short_shelves`), and each phase's own invariant audit
@@ -928,14 +935,16 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
 ///                 loss-maker only for cutting, so every dial the solver found in
 ///                 the other direction — the interior optimum it exists to find —
 ///                 scored negative and was silently discarded.
-/// @param bid_hold_ticks BL-1217 (AI_OPPONENT.md § 11, "The workforce dial may
-///                 read the build veto's composite bid", Ben 2026-10-09). -1
-///                 (the default; the player's auto-solver) reads the plant's
-///                 market's posted demand alone. >= 0 (the background scorer
-///                 passes its cadence) reads the composite bid held for that
-///                 many ticks (`composite_bid`), and forecasts an output its
-///                 market neither lists nor bids at its base price ("The dial
-///                 forecasts at base where no fact exists yet").
+/// @param bid_hold_ticks BL-1217 (AI_OPPONENT.md § 11, "the dial reads
+///                 stock-fed consumers", Ben 2026-10-09). -1 (the default; the
+///                 player's auto-solver) reads the plant's market's posted
+///                 demand alone. >= 0 (the background scorer passes its
+///                 cadence) reads posted demand plus the running processors'
+///                 not-posted pool draws held for that many ticks (`dial_bid`)
+///                 — never the build veto's composite bid — and forecasts an
+///                 output at its base price only on a market that lists none,
+///                 bids none and has never cleared ("The dial forecasts at base
+///                 where no fact exists yet"; `dial_forecasts_at_base`).
 int solve_workforce_target(world& w, const recipe_registry& reg,
                            const building_component& b, float contention,
                            int stack_rank = 1, float* out_gain = nullptr,
