@@ -331,6 +331,43 @@ inline ImU32 washed_resource_ground(ImU32 c, bool water)
     return IM_COL32(ch(r, wr), ch(g, wg), ch(b, wb), 255);
 }
 
+// --- A lens washes the rendered ground (BL-1250; LENSES.md § A lens washes the
+// rendered ground) ---------------------------------------------------------------
+// Under a lens the baked ground stays; each lens's per-tile answer is a translucent
+// wash over it in the tile's own geometry. ONE strength per lens family, set by eye
+// against the lens_modes / owner_multi_select captures:
+//
+//   CATEGORICAL (Corporation, Company, Market, Continent, Resource deposits) — a
+//   hue says WHICH, and a hue reads at a lower alpha than a value does, because the
+//   eye separates hues even over textured ground; the structures, forms and rivers
+//   beneath must still read through, so the wash stays under half.
+//   SEQUENTIAL (Population, Throughput, Scarcity, Industry) — a ramp says HOW MUCH,
+//   and a value read needs more of the ramp colour over the ground's own light and
+//   dark: a little stronger. Where a sequential lens's old blend already scaled with
+//   its value (Scarcity, Industry), the value scales this alpha the same way.
+constexpr float k_lens_wash_categorical = 0.46f;
+constexpr float k_lens_wash_sequential  = 0.54f;
+/// The Resource lens's no-deposit ground: its ruled white wash (Ben, 2026-10-04,
+/// "the white wash should still exist") over the bake, paler than the fill path's
+/// 72% so the ground's forms survive under it while the deposits stay the only
+/// saturated thing.
+constexpr float k_resource_ground_wash_alpha = 0.50f;
+
+/// @p c's RGB at alpha @p a (0..1).
+inline ImU32 with_alpha(ImU32 c, float a)
+{
+    const int ai = static_cast<int>(std::lround(std::clamp(a, 0.0f, 1.0f) * 255.0f));
+    return (c & ~IM_COL32_A_MASK) | (static_cast<ImU32>(ai) << IM_COL32_A_SHIFT);
+}
+
+// --- The close-zoom seam (BL-1251 part 5; RENDERING.md § The grid rule) ---------
+// At the two closest rungs only, a faint line between neighbouring tiles: a
+// low-alpha BLACK stroke, so it is the ground under it darkened, never a colour of
+// its own. Keyed on the drawn radius: 40 px sits between rung 2 (~27 px) and rung 3
+// (~55 px) at the reference 1720x1080 window.
+constexpr float k_seam_min_drawn_r = 40.0f;
+constexpr float k_seam_alpha       = 0.16f;
+
 /// Scale applied to the whole treatment — wash AND stroke — where the frontier
 /// faces UNCLAIMED ground rather than another nation (Ben, 2026-08-24: "reduce
 /// the border band on edges facing unclaimed ground").
@@ -2913,8 +2950,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // and the fallback-by-coverage rule, in one flag. Canonical space is the
     // hex grid at circumradius 1, so canonical -> local is a scale by hex_size.
     const ground_view& gview = state.ground;
-    const bool ground_on = state.overlay == overlay_mode::none
-                        && gview.body == state.active_body
+    // Under EVERY lens too (BL-1250, LENSES.md § A lens washes the rendered
+    // ground): the lens is a wash over the bake, not a fill that replaces it.
+    const bool ground_on = gview.body == state.active_body
                         && gview.far_ready;
     const auto canon_to_screen = [&](float gx_, float gy_) -> ImVec2 {
         return to_screen({ gx_ * hex_size, gy_ * hex_size });
@@ -2997,26 +3035,52 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     struct ground_wash { ImVec2 c; float r; ImVec2 p0, p1; ImU32 col; bool hex; };
     static std::vector<ground_wash> washes;
     washes.clear();
+    // The lens's own washes (BL-1250) are a list of their own, emitted BEFORE the
+    // player/suitability/fog washes so the fog dims the lens answer exactly as it
+    // dimmed the lens fill — and so each list's equal-colour run joining sees its
+    // own previous rect. Tiles never overlap, so splitting the lists moves nothing.
+    static std::vector<ground_wash> lens_washes;
+    lens_washes.clear();
+    int lens_run[4] = { -1, -1, -1, -1 }; // last coarse rect per wrap copy (k & 3)
+    // A Resource-lens split tile's wedges over the bake, at the wash strength.
+    struct ground_wedges { ImVec2 c; float r; ImU32 cols[ui_state::k_lens_resource_cap]; int n; };
+    static std::vector<ground_wedges> lens_wedges;
+    lens_wedges.clear();
+    // The close-zoom seam (BL-1251 part 5): one segment per shared tile edge.
+    static std::vector<ImVec2> seam_segs;
+    seam_segs.clear();
+    const bool seam_on = hit_r >= k_seam_min_drawn_r;
     const auto emit_ground = [&] {
         if (!ground_on)
             return;
         dl->ChannelsSetCurrent(1);
+        // The seam first: over the ground, under every wash and stroke. Thin
+        // anti-aliased lines — the texture-AA path, a few vertices a segment.
+        for (std::size_t si = 0; si + 1 < seam_segs.size(); si += 2)
+            dl->AddLine(seam_segs[si], seam_segs[si + 1],
+                        IM_COL32(0, 0, 0, static_cast<int>(k_seam_alpha * 255.0f)), 1.0f);
         // NOT anti-aliased: a wash tiles the plane with its neighbours, and an AA
         // fringe both doubles the vertices and leaves a faint seam where two
         // translucent fringes overlap.
         const ImDrawListFlags saved = dl->Flags;
         dl->Flags &= ~ImDrawListFlags_AntiAliasedFill;
-        for (const ground_wash& gw_ : washes)
-        {
-            if (gw_.hex)
+        const auto emit_list = [&](const std::vector<ground_wash>& list) {
+            for (const ground_wash& gw_ : list)
             {
-                ImVec2 hv[6];
-                hex_vertices(hv, gw_.c.x, gw_.c.y, gw_.r);
-                dl->AddConvexPolyFilled(hv, 6, gw_.col);
+                if (gw_.hex)
+                {
+                    ImVec2 hv[6];
+                    hex_vertices(hv, gw_.c.x, gw_.c.y, gw_.r);
+                    dl->AddConvexPolyFilled(hv, 6, gw_.col);
+                }
+                else
+                    dl->AddRectFilled(gw_.p0, gw_.p1, gw_.col);
             }
-            else
-                dl->AddRectFilled(gw_.p0, gw_.p1, gw_.col);
-        }
+        };
+        emit_list(lens_washes);
+        for (const ground_wedges& wg : lens_wedges)
+            draw_lens_wedges(dl, wg.c, wg.r, wg.cols, wg.n);
+        emit_list(washes);
         dl->Flags = saved;
         pm.mark(canvas_pass_meter::fill, dl);
         dl->ChannelsSetCurrent(0);
@@ -3449,6 +3513,108 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         return fill;
     };
 
+    // The lens's answer for one tile ON THE BAKED GROUND (BL-1250; LENSES.md § A
+    // lens washes the rendered ground): the colour compute_tile_fill blends in for
+    // the active lens, as a translucent wash at its family's strength. Zero = the
+    // lens has no answer here; the plain ground shows. The lens SEMANTICS are
+    // compute_tile_fill's, line for line — which tiles answer, which colour; only
+    // the composite changed (alpha over the bake, not a lerp over a terrain hue).
+    // Relief, the survey mask and the fog are not here: the bake carries relief,
+    // on_bake is surveyed by definition, and the fog is the wash list after this.
+    const auto lens_wash_of = [&](entity_id id, const tile_component& tile) -> ImU32
+    {
+        const overlay_mode ov = state.overlay;
+        if (ov == overlay_mode::corporation || ov == overlay_mode::company)
+        {
+            const bool maybe_owned = !raster_ok
+                || (tile_flags[static_cast<std::size_t>(tile.grid_y) * gw + tile.grid_x] & 2u) != 0;
+            const auto corp_it = maybe_owned ? tile_to_corp.find(id) : tile_to_corp.end();
+            if (corp_it == tile_to_corp.end())
+                return 0u;
+            const bool want_bg = (ov == overlay_mode::company);
+            if (is_background_firm(corp_it->second) != want_bg)
+                return 0u;
+            const ImU32 c = state.lens_owner_picked(corp_it->second, want_bg)
+                                ? corp_identity(corp_it->second)
+                                : palette::owned_grey;
+            return with_alpha(c, k_lens_wash_categorical);
+        }
+        if (ov == overlay_mode::resource)
+        {
+            resource_type on_tile[ui_state::k_lens_resource_cap];
+            if (lens_resources_on_tile(state, tile, on_tile) > 0)
+                return with_alpha(presentation_of(on_tile[0]).colour, k_lens_wash_categorical);
+            const ImU32 pale = placement_rules::is_water_tile(tile.substrate)
+                                   ? IM_COL32(206, 216, 230, 255) : IM_COL32(244, 242, 236, 255);
+            return with_alpha(pale, k_resource_ground_wash_alpha);
+        }
+        if (ov == overlay_mode::market)
+        {
+            const auto col_it = market_catchment_colour.find(market_of(id, tile));
+            return col_it != market_catchment_colour.end()
+                       ? with_alpha(col_it->second, k_lens_wash_categorical) : 0u;
+        }
+        if (ov == overlay_mode::population)
+        {
+            if (placement_rules::is_water_tile(tile.substrate))
+                return 0u;
+            const float eff = workforce_efficiency(std::clamp(tile.habitability, 0.0f, 1.0f));
+            return with_alpha(ryg_colour(eff), k_lens_wash_sequential);
+        }
+        if (ov == overlay_mode::scarcity)
+        {
+            const auto sf_it = scar_shortfall.find(market_of(id, tile));
+            if (sf_it == scar_shortfall.end() || scar_max_shortfall <= 0.0f)
+                return 0u;
+            const float scar = std::clamp(sf_it->second / scar_max_shortfall, 0.0f, 1.0f);
+            return scar > 0.0f
+                ? with_alpha(IM_COL32(220, 70, 55, 255), k_lens_wash_sequential * scar) : 0u;
+        }
+        if (ov == overlay_mode::industry)
+        {
+            const auto it = industry_field.find(id);
+            if (it == industry_field.end() || industry_max <= 0.0f)
+                return 0u;
+            const float t = std::clamp(it->second / industry_max, 0.0f, 1.0f);
+            // The fill path's 0.15 + 0.6t ramp, rescaled so its top is the family strength.
+            return with_alpha(IM_COL32(210, 150, 70, 255),
+                              k_lens_wash_sequential * (0.15f + 0.6f * t) / 0.75f);
+        }
+        if (ov == overlay_mode::throughput && state.lp_reach_max > 0.0f)
+        {
+            const float rc = tile_reach_cost(w, id);
+            if (rc < 0.0f)
+                return 0u;
+            const float denom = (state.lp_reach_p90 > 0.0f) ? state.lp_reach_p90
+                                                            : state.lp_reach_max;
+            const float t = std::isinf(rc)
+                ? 0.0f
+                : 1.0f - std::sqrt(std::clamp(rc / denom, 0.0f, 1.0f));
+            return with_alpha(throughput_field_colour(t), k_lens_wash_sequential);
+        }
+        if (ov == overlay_mode::continent && plates)
+        {
+            const int idx = tile.grid_x + tile.grid_y * gw;
+            const int me  = plates->plate_id[static_cast<std::size_t>(idx)];
+            bool boundary = false;
+            const int cols[2] = { (tile.grid_x + 1) % gw, (tile.grid_x + gw - 1) % gw };
+            for (const int c : cols)
+                if (plates->plate_id[static_cast<std::size_t>(c + tile.grid_y * gw)] != me) boundary = true;
+            for (const int dy : { -1, 1 })
+            {
+                const int ry = tile.grid_y + dy;
+                if (ry < 0 || ry >= gh) continue;
+                if (plates->plate_id[static_cast<std::size_t>(tile.grid_x + ry * gw)] != me) boundary = true;
+            }
+            // The boundary lift keeps its own channel: toward white, on the plate hue.
+            ImU32 c = plate_colour(me);
+            if (boundary)
+                c = lerp_colour(c, IM_COL32(255, 255, 245, 255), 0.45f);
+            return with_alpha(c, k_lens_wash_categorical);
+        }
+        return 0u;
+    };
+
     // One-pass-ahead shade cache over the visible band (+1 row each way, so a
     // top/bottom-row tile still finds its corner neighbours). Sized to the whole
     // raster and reused across frames; only the band is written each frame, and
@@ -3836,6 +4002,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
 
         pm.mark(canvas_pass_meter::tile_misc, dl);
+        // The lens wash (BL-1250), derived once per tile, not once per wrap copy.
+        ImU32 lens_wc      = 0u;
+        bool  lens_wc_done = false;
         // Wrap copies inside the canvas: k_min/k_max were computed at the top of
         // the loop body (BL-268), where they double as the column cull.
         for (int k = k_min; k <= k_max; ++k)
@@ -3899,6 +4068,63 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     else
                         washes.push_back({ { cx, cy }, step, {}, {}, c, true });
                 };
+                // The lens's answer (BL-1250): a wash of its own list, joined
+                // along a row at the coarse fill exactly as the fog is (a
+                // catchment or a plate is long runs of one colour).
+                if (state.overlay != overlay_mode::none)
+                {
+                    resource_type on_tile[ui_state::k_lens_resource_cap];
+                    const int n_res = (state.overlay == overlay_mode::resource && !coarse_fill)
+                        ? lens_resources_on_tile(state, tile, on_tile) : 0;
+                    if (n_res >= 2)
+                    {
+                        // A split tile: equal wedges, each at the wash strength.
+                        ground_wedges wg{ { cx, cy }, step, {}, n_res };
+                        for (int q = 0; q < n_res; ++q)
+                            wg.cols[q] = with_alpha(presentation_of(on_tile[q]).colour,
+                                                    k_lens_wash_categorical);
+                        lens_wedges.push_back(wg);
+                    }
+                    else if (const ImU32 lc = lens_wc_done
+                                 ? lens_wc
+                                 : (lens_wc_done = true, lens_wc = lens_wash_of(id, tile));
+                             (lc & IM_COL32_A_MASK) != 0u)
+                    {
+                        // The run is per wrap COPY: with two copies on screen the
+                        // list's back is the other copy's rect, never a neighbour.
+                        int& run = lens_run[static_cast<unsigned>(k) & 3u];
+                        ground_wash* last = (run >= 0 && run < static_cast<int>(lens_washes.size()))
+                                                ? &lens_washes[static_cast<std::size_t>(run)] : nullptr;
+                        if (coarse_fill && last && !last->hex && last->col == lc
+                            && last->p0.y == cy - whh
+                            && std::fabs(last->p1.x - (cx - whw)) < 0.01f)
+                            last->p1.x = cx + whw;
+                        else if (coarse_fill)
+                        {
+                            run = static_cast<int>(lens_washes.size());
+                            lens_washes.push_back({ {}, 0.0f, { cx - whw, cy - whh },
+                                                    { cx + whw, cy + whh }, lc, false });
+                        }
+                        else
+                            lens_washes.push_back({ { cx, cy }, step, {}, {}, lc, true });
+                    }
+                }
+                // The close-zoom seam: sides 0-2 (E, NE, NW) of every tile on
+                // the bake — each shared edge is exactly one tile's side in that
+                // set and the other's side + 3, so every edge draws once.
+                if (seam_on)
+                {
+                    ImVec2 sv[6];
+                    hex_vertices(sv, cx, cy, step);
+                    for (int side = 0; side < 3; ++side)
+                    {
+                        const auto nc = hex_neighbors::neighbour(t_col, t_row, side);
+                        if (nc.gy < 0 || nc.gy >= gh)
+                            continue; // off the pole: no neighbour, no seam
+                        seam_segs.push_back(sv[k_side_verts[side][0]]);
+                        seam_segs.push_back(sv[k_side_verts[side][1]]);
+                    }
+                }
                 if (is_player_tile)
                 {
                     const ImU32 pid = corp_identity(w.player_entity);
@@ -3956,7 +4182,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // more toggled resources is cut into equal pie wedges from the centre,
             // one per resource in toggle order. Below the coarse LOD the hex is a
             // few pixels across and the rect keeps the first resource's colour.
-            if (state.overlay == overlay_mode::resource && surveyed && !coarse_fill)
+            // (On the bake the wedges are washes, collected above.)
+            if (state.overlay == overlay_mode::resource && surveyed && !coarse_fill && !on_bake)
             {
                 resource_type on_tile[ui_state::k_lens_resource_cap];
                 const int n = lens_resources_on_tile(state, tile, on_tile);
@@ -4151,7 +4378,21 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 if (member)
                 {
                     constexpr ImU32 lit = IM_COL32(255, 255, 255, 34);
-                    if (coarse_fill)
+                    if (on_bake)
+                    {
+                        // Over the bake it is a wash like the lens's own (BL-1250):
+                        // full radius, in the wash channel, so a lit catchment does
+                        // not draw a 1 px grid of unlit gaps across the ground.
+                        const float step = draw_r + 1.0f;
+                        if (coarse_fill)
+                            washes.push_back({ {}, 0.0f,
+                                               { cx - kSqrt3 * step * 0.5f, cy - 0.75f * step },
+                                               { cx + kSqrt3 * step * 0.5f, cy + 0.75f * step },
+                                               lit, false });
+                        else
+                            washes.push_back({ { cx, cy }, step, {}, {}, lit, true });
+                    }
+                    else if (coarse_fill)
                     {
                         const float step = draw_r + 1.0f;
                         const float hw   = kSqrt3 * step * 0.5f - 0.5f;

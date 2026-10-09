@@ -144,8 +144,21 @@ whose buildings they could not see.
 - **One wash rule for the roster.** A lens colours a tile by blending its colour over the
   ground at a wash strength strong enough to read as the lens's answer and weak enough that
   the structure, form and river beneath still read through it; the strength is one tuned value
-  per lens family (categorical, sequential), set by eye against captures, not here. A tile the
+  per lens family (categorical, sequential), set by eye against captures. A tile the
   lens has no answer for takes **no wash** — the plain ground shows.
+- **The strengths (set against `lens_modes.lua`'s `lens_wash_*` captures, 2026-10-09).**
+  **Categorical** — Corporation, Company, Market, Continent, the Resource lens's deposits —
+  washes at **0.46**: a hue says *which*, and hues separate at under half alpha even over
+  textured ground, so the structures and forms keep reading through. **Sequential** —
+  Population, Throughput, Scarcity, Industry — washes at **0.54**: a ramp says *how much*,
+  and a value read has to beat the ground's own light and dark, so it takes a little more.
+  Where a sequential lens's value already set its strength (Scarcity's shortfall, Industry's
+  density), the value scales the family strength the same way. The Resource lens's
+  no-deposit ground keeps its white wash (§ Resource lens) at **0.50** over the bake, paler
+  than the fill path's 72% so the forms survive it. The owner lenses' picked identity and
+  unpicked owned-grey washes are categorical; the unpicked owner's dark rim stays a stroke.
+  The Continent boundary keeps its lift toward white inside the plate wash. A lit
+  structure's hover wash is a wash too, at full tile radius, so it never draws a grid.
 - **The lens's own marks stay vector chrome** above the wash: keys, HQ markers, the owner
   rim, value marks, arrows, labels.
 - **Hit-testing is unchanged** — a lens still resolves a press to its own structure grain
