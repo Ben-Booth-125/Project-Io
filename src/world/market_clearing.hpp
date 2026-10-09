@@ -422,6 +422,19 @@ inline float grid_good_pricing_supply(const grid_good_figures& sd, std::size_t r
 std::array<float, resource_count> processor_reservation(
     const world& w, const recipe_registry& reg, entity_id corp, entity_id pool_key);
 
+/// What AUTO-SURPLUS holds back in one pool: `processor_reservation`, plus — where
+/// the corp holds a Launchpad that burns from this pool (`launch_burns_from_pool`,
+/// the launch gate's own test) — the WHOLE stock of every launch-drawn good
+/// (`launch_draw_per_convoy`: propellant). "A pad's pool keeps its propellant"
+/// (MARKETS.md step 4, Ben 2026-10-09): auto-surplus lists none of it, so a pad
+/// stays fuelled. A pool with no pad reserves exactly `processor_reservation`.
+/// Shared by clearing's auto-surplus and `dispatch_convoys` (BL-995: what a
+/// seller may haul is exactly what it would list). A STANDING SELL ORDER reads
+/// `processor_reservation` instead, so the corp can still sell its propellant.
+/// @pre `corp` is a key of `w.corporations`.
+std::array<float, resource_count> auto_surplus_reservation(
+    const world& w, const recipe_registry& reg, entity_id corp, entity_id pool_key);
+
 /// Resolve which market a tile clears against (its market catchment). Among the
 /// markets on the tile's body: a body with a single market routes there
 /// unconditionally; with several, the tile clears against the market whose

@@ -264,6 +264,101 @@ int main()
               "U6 a later tick's first record overwrites; same-tick records add");
     }
 
+    // U7 — A PAD'S POOL KEEPS ITS PROPELLANT (MARKETS.md step 4, Ben 2026-10-09).
+    // Propellant is priced at M (the fixture prices every good). A corp holding a
+    // Launchpad on the body makes propellant into its pool; a clear runs; the
+    // launch still dispatches. Contrary cases: without a pad the clear's
+    // auto-surplus sells it; with a pad a standing sell order still can.
+    std::printf("U7 a pad's pool keeps its propellant through a clear\n");
+    {
+        const std::size_t prop = ri(resource_type::propellant);
+        const auto& fuel = launch_draw_per_convoy();
+        check(fuel[prop] > 0.0f, "U7 not vacuous: the launch draw burns propellant");
+
+        // One run: optional pad, optional standing order; returns the fixture
+        // after one clear, and the far market id through `far`.
+        auto run = [&](bool pad, bool order, entity_id& far) {
+            fixture f = make_fixture();
+            const entity_id b2 = f.w.create_entity();
+            body_component b2c{};
+            b2c.name = "Far"; b2c.type = body_type::planet; b2c.grid_width = 1; b2c.grid_height = 1;
+            b2c.orbital_radius_au = 1.0f;
+            f.w.bodies[b2] = b2c;
+            const entity_id t2 = f.w.create_entity();
+            tile_component t2c{};
+            t2c.body = b2;
+            f.w.tiles[t2] = t2c;
+            far = f.w.create_entity();
+            market_component m2c{};
+            m2c.body = b2; m2c.centre_tile = t2;
+            for (std::size_t r = 0; r < resource_count; ++r) m2c.base_price[r] = 2.0f;
+            m2c.price = m2c.base_price;
+            f.w.markets[far] = m2c;
+            if (pad)
+            {
+                const entity_id lp = f.w.create_entity();
+                building_component lb{};
+                lb.tile = f.tile; lb.type = building_type::launchpad;
+                f.w.buildings[lp] = lb;
+                f.w.corporations.at(f.corp).assets.push_back(lp);
+            }
+            if (order)
+            {
+                sell_order so;
+                so.id = f.w.allocate_order_id();
+                so.corp = f.corp; so.body = f.body; so.resource = resource_type::propellant;
+                f.w.sell_orders.push_back(so);
+            }
+            stockpile_component& pool = f.w.pool_at(f.corp, f.market);
+            pool.quantities[prop]                         = 5.0f; // this tick's make
+            pool.quantities[ri(resource_type::iron_ore)] = 100.0f;
+            f.w.markets.at(f.market).demand[prop] = 50.0f; // a buyer is there
+            const recipe_registry reg;
+            economy_report rep{};
+            clear_markets(f.w, reg, rep);
+            return f;
+        };
+
+        {
+            entity_id far = null_entity;
+            fixture f = run(/*pad=*/true, /*order=*/false, far);
+            const float left = f.w.pool_at(f.corp, f.market).quantities[prop];
+            check(left == 5.0f, "U7a with a pad on the body, the clear's auto-surplus lists none of the pool's propellant");
+            const recipe_registry reg;
+            const logistics_nodes nodes = collect_logistics_nodes(f.w);
+            const convoy_leg leg = price_convoy_leg(f.w, reg, nodes, f.corp, f.market, far,
+                                                    ri(resource_type::iron_ore), 10.0f, 1.0f);
+            check(leg.viable && leg.mode == convoy_mode::space,
+                  "U7a ... so the space-lane gate still finds the pad fuelled after the clear");
+            const bool sent = leg.viable
+                && commit_convoy(f.w, reg, f.corp, f.body, f.market, far, ri(resource_type::iron_ore),
+                                 10.0f, leg, nullptr, nullptr, false, nullptr);
+            check(sent, "U7a ... and the launch dispatches");
+            check(f.w.pool_at(f.corp, f.market).quantities[prop] == 5.0f - fuel[prop],
+                  "U7a ... burning exactly the launch draw from the pad's pool");
+        }
+        {
+            entity_id far = null_entity;
+            fixture f = run(/*pad=*/false, /*order=*/false, far);
+            check(f.w.pool_at(f.corp, f.market).quantities[prop] == 0.0f,
+                  "U7b with no pad, the clear's auto-surplus sells the pool's propellant like any surplus");
+        }
+        {
+            entity_id far = null_entity;
+            fixture f = run(/*pad=*/true, /*order=*/true, far);
+            check(f.w.pool_at(f.corp, f.market).quantities[prop] < 5.0f,
+                  "U7c with a pad, a standing sell order still sells the pool's propellant");
+        }
+        {
+            fixture f = make_fixture();
+            const recipe_registry reg;
+            f.w.pool_at(f.corp, f.market).quantities[prop] = 5.0f;
+            check(auto_surplus_reservation(f.w, reg, f.corp, f.market)[prop] == 0.0f
+                      && !launch_burns_from_pool(f.w, f.corp, f.market),
+                  "U7d no pad: the auto-surplus reservation holds no propellant, and no launch burns from the pool");
+        }
+    }
+
     std::printf("\n%s (%d failure%s)\n", g_fail == 0 ? "ALL PASS" : "FAILURES", g_fail,
                 g_fail == 1 ? "" : "s");
     return g_fail == 0 ? 0 : 1;

@@ -1,6 +1,7 @@
 #include "market_clearing.hpp"
 
 #include "law.hpp" // the D4 import tariff: any_import_tariff_enacted / nation_tariff_rate
+#include "supply_system.hpp" // launch_burns_from_pool, launch_draw_per_convoy (a pad's pool keeps its propellant)
 #include "logistics.hpp" // BL-708: body_reach_field / tile_reach_cost — the grid good's listing gate
 
 #include <algorithm>
@@ -253,6 +254,24 @@ std::array<float, resource_count> processor_reservation(
         for (std::size_t r = 0; r < resource_count; ++r)
             reserve[r] += rcp->inputs[r] * batches;
     }
+    return reserve;
+}
+
+std::array<float, resource_count> auto_surplus_reservation(
+    const world& w, const recipe_registry& reg, entity_id corp, entity_id pool_key)
+{
+    std::array<float, resource_count> reserve = processor_reservation(w, reg, corp, pool_key);
+    if (!launch_burns_from_pool(w, corp, pool_key))
+        return reserve;
+    // A pad's pool keeps its propellant (MARKETS.md step 4, Ben 2026-10-09):
+    // every launch-drawn good is reserved whole, so auto-surplus lists none of it.
+    const stockpile_component* p = w.find_pool(corp, pool_key);
+    if (p == nullptr)
+        return reserve;
+    const auto& draw = launch_draw_per_convoy();
+    for (std::size_t r = 0; r < resource_count; ++r) // ascending: a fixed order
+        if (draw[r] > 0.0f)
+            reserve[r] = std::max(reserve[r], p->quantities[r]);
     return reserve;
 }
 
@@ -1488,7 +1507,9 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         const entity_id body = mkit->second.body;
 
         const market_component& mc = mkit->second;
-        const auto reserve = processor_reservation(w, reg, corp, mid);
+        // A pad's pool keeps its propellant (MARKETS.md step 4): the auto-surplus
+        // reservation, not the bare processor one a standing sell order reads.
+        const auto reserve = auto_surplus_reservation(w, reg, corp, mid);
 
         for (std::size_t r = 0; r < resource_count; ++r)
         {
