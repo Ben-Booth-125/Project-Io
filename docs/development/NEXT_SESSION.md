@@ -304,6 +304,10 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   15->77 s, hist 7->62 s; split nations 47 vs 54; R2s-b passes both (229/229 Highway, 14/16).
   Half of history corridors change. **Form to Ben:** keep stale (doc ruling) / fresh everywhere /
   design a cheaper targeted refresh (this sprint or later).
+  **BEN RULED (2c898ebd):** keep stale reuse (LOGISTICS § 4 written); parallels fixed THIS SPRINT
+  as BL-1252 (no parallel roads): d1K8 <= 103 pooled, harness green, time within ~1.25x of stale.
+  Probe merged aa007264. BL-1252 lane running (measure candidates: targeted refresh / post-pass
+  merge / bounded spur search).
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
