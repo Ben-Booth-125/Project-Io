@@ -263,4 +263,46 @@ void downsample_half(const std::uint32_t* src, int sw, int sh, std::uint32_t* ds
 std::uint64_t region_hash(const bake_source& src, const geometry& g,
                           int px0, int py0, int pw, int ph);
 
+/// The TERRAIN half of region_hash (BL-1246, the partial re-bake): every tile
+/// field the bake reads, without the installations. region_hash ==
+/// combine_region_hash(terrain_hash, installation_hash) for the same window.
+std::uint64_t terrain_hash(const bake_source& src, const geometry& g,
+                           int px0, int py0, int pw, int ph);
+std::uint64_t combine_region_hash(std::uint64_t terrain, std::uint64_t installations);
+
+/// A pixel rectangle, absolute bake pixels.
+struct pixel_rect { int x0 = 0, y0 = 0, w = 0, h = 0; };
+
+/// THE PARTIAL RE-BAKE WINDOW RULE (BL-1246, RENDERING.md § Chunks, cache and
+/// invalidation — "a building's change re-bakes a window around it, not its
+/// whole chunk", Ben 2026-10-09). Window [px0, px0+pw) x [py0, py0+ph) was
+/// baked against @p old_src and must now show @p new_src. When the two differ
+/// in INSTALLATIONS ONLY over the window (terrain_hash unchanged), fills @p out
+/// with the rectangles whose re-bake against @p new_src, blitted over the old
+/// pixels, gives the whole window's new bake byte for byte, and returns true:
+///   - each changed tile's reach — every pixel its structures touch before
+///     and after the change (installation_tile_bounds: the pass rasterised in
+///     bounds mode) and, on a forest or scrub tile, the trees its cleared
+///     ground removes or restores — plus k_patch_pad pixels for the post
+///     passes that read across a pixel (unsharp +-2, anti-aliased rims),
+///   - clipped to the window and aligned outward to k_patch_align pixels (so
+///     every mip level's piece of a patch is whole pixels and derives from the
+///     patch alone),
+///   - overlapping or touching rectangles merged into their bounding box.
+/// Returns false — re-bake the window whole — when the terrain moved, the
+/// grids differ, or the rectangles cover more than @p max_fraction of it. An
+/// empty @p out with true means nothing the window shows changed.
+inline constexpr int k_patch_align = k_master_align;
+inline constexpr int k_patch_pad   = 4;
+bool installation_patch_rects(const bake_source& old_src, const bake_source& new_src,
+                              const geometry& g, const bake_params& p,
+                              int px0, int py0, int pw, int ph,
+                              std::vector<pixel_rect>& out, double max_fraction = 0.4);
+
+/// The mip pieces of a @p w x @p h master block (both multiples of
+/// k_master_align): out[l] = the block halved l times, l = 1 .. k_level_count-1
+/// (out[0] untouched). A whole chunk's chain and a patch's are built alike.
+void derive_mip_pieces(const std::uint32_t* px, int w, int h,
+                       std::vector<std::uint32_t> (&out)[k_level_count]);
+
 } // namespace ui::ground

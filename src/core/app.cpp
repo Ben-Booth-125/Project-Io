@@ -1609,11 +1609,15 @@ void app::finish_new_game()
         // bakes, and how many of them were re-bakes a round boundary forced.
         const ground_layer::bake_stats& bs = m_ground.bake_counters();
         std::printf("[begin] the ground is painted: %s; %llu master chunk bakes for %d chunks "
-                    "(%llu re-bakes)\n",
+                    "(%llu re-bakes, %llu of them as %llu windows: %.1f Mpx re-baked whole + "
+                    "%.1f Mpx in windows)\n",
                     m_screen == app_screen::painting_ground ? "after the wait above"
                                                             : "no wait at the seat",
                     static_cast<unsigned long long>(bs.chunk_bakes), paint_total,
-                    static_cast<unsigned long long>(bs.chunk_rebakes));
+                    static_cast<unsigned long long>(bs.chunk_rebakes),
+                    static_cast<unsigned long long>(bs.chunk_patches),
+                    static_cast<unsigned long long>(bs.patch_windows), bs.rebake_px / 1e6,
+                    bs.patch_px / 1e6);
         std::fflush(stdout);
     }
     // THE BALANCE SERIES FROM THE RETURNS THE SETTLE FILED (STARTUP.md

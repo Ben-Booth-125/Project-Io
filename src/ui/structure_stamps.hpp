@@ -177,6 +177,31 @@ void stamp_installations(const bake_source& src, const geometry& g, const bake_p
 std::uint64_t installation_hash(const bake_source& src, const geometry& g,
                                 int px0, int py0, int pw, int ph);
 
+/// How far one tile's structures reach from its centre, canonical units (BL-1246,
+/// the partial re-bake): pads, the SE shadow, the east lean and the standing
+/// height at @p g's angle. The window walk of the pass and of the hash is this
+/// extent inverted, so a pixel outside it cannot be touched by the tile.
+struct structure_extent { double left = 0, right = 0, up = 0, down = 0; };
+structure_extent installation_extent(const geometry& g);
+
+/// A grid cell, column UNWRAPPED (it may lie past either edge of the grid; the
+/// tile is column mod gw) so its centre sits beside the window it was found for.
+struct grid_cell { int c = 0, r = 0; };
+
+/// BL-1246, the partial re-bake: append to @p out every tile that can reach the
+/// window (the pass's own walk) whose installation differs between @p a and
+/// @p b. Returns the count appended, or -1 when the sources' grids differ.
+int changed_installation_tiles(const bake_source& a, const bake_source& b, const geometry& g,
+                               int px0, int py0, int pw, int ph, std::vector<grid_cell>& out);
+
+/// BL-1246, the partial re-bake: the pixel box [x0, x1) x [y0, y1) (absolute
+/// bake pixels, x beside unwrapped column @p c) of every pixel the pass can
+/// touch for tile (@p c, @p r) — its parts rasterised exactly as the pass
+/// draws them, in every mode, writing nothing. False when the tile stands
+/// nothing that draws. Never smaller than what the pass paints for it.
+bool installation_tile_bounds(const bake_source& src, const geometry& g, const bake_params& p,
+                              int c, int r, int& x0, int& y0, int& x1, int& y1);
+
 /// Radius (canonical units, from the tile centre) inside which the tree stamp
 /// leaves raster tile @p i clear — the ground an installation stands on.
 float installation_clear_radius(const bake_source& src, std::size_t i);

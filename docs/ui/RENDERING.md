@@ -166,6 +166,25 @@ ground retires only as coverage arrives.
   survey reveal, a build, a demolition, a settlement crossing a scale step). Nothing
   tick-rate enters the hash — staffing, output and ownership do not — so a re-bake
   follows a construction event, never a tick.
+- **A building's change re-bakes a window around it, not its whole chunk** (Ben,
+  2026-10-09: the settle adds about 1,300 installations at once, and re-baking every
+  chunk they touch whole did not fit the wait after the seat). The chunk hash has two
+  halves, **terrain** and **installations**. When only the installation half moved, the
+  chunk re-bakes only the union of small windows around each installation that changed,
+  blits them into the stored chunk, and re-derives only those windows' mip pieces. The
+  window rule:
+  - **A window covers a changed installation's whole reach** — its tile plus every pixel
+    its structures can touch (overhang, standing height, the SE shadow, the pad, the
+    trees its cleared ground removes or restores) — padded for the post passes that read
+    across a pixel (the unsharp mask, anti-aliased rims).
+  - It is **aligned outward to 16 px**, so every mip level's piece of it is whole pixels
+    and derives from the window alone, and clipped to the chunk. A structure that
+    straddles chunks, or the wrap seam, is a window in each chunk it reaches.
+  - Overlapping or touching windows **merge** into their bounding box.
+  - Past **40 % of the chunk**, or on **any terrain change**, the chunk re-bakes whole.
+  This rests on the bake being **window-invariant**: any window bakes byte-identical to
+  the same pixels of a larger bake, structures, trees, post passes and all
+  (`ground_bake_check` P24, with the mip pieces P25).
 - **Before play there is no cadence.** While a generation round's worker is moving the
   world forward, nothing reads that world: the pre-bake target's source snapshot is
   re-taken only at a **round boundary** — a round's world landed and owned by the main
