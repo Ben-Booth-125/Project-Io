@@ -784,6 +784,19 @@ roster_result run_roster(bool s_loses_all)
     e.base_rate = 1.0f;
     reg.set_economics(building_type::extraction_site, e);
     reg.set_economics(building_type::processing_facility, e);
+    // BL-1217 D6: households want steel and tools far past these works, so the
+    // rows below test FEASIBILITY, not want.
+    {
+        const entity_id centre = w->create_entity();
+        population_centre_component pc{};
+        pc.scale = 5;
+        w->population_centres[centre] = pc;
+        w->population_centre_tile[centre] = at.at({ 0, 0 });
+        population_demand_params pd;
+        pd.demand_basket[steel] = 100.0f;
+        pd.demand_basket[tools] = 100.0f;
+        reg.set_population_demand(pd);
+    }
 
     const auto add = [&](int x, int y, building_type t, const char* rname) {
         const entity_id bid = w->create_entity();
@@ -1415,6 +1428,19 @@ struct fx
         e.base_rate = 1.0f;
         reg.set_economics(building_type::extraction_site, e);
         reg.set_economics(building_type::processing_facility, e);
+        // BL-1217 D6 (no processor beyond its output's want): households want
+        // the fixtures' steel and tools, far past any works here, so every
+        // works these rows place is WANTED and the rows test the sized rule
+        // they were written for. A row that sets its own basket replaces this.
+        const entity_id centre = w->create_entity();
+        population_centre_component pc{};
+        pc.scale = 5;
+        w->population_centres[centre] = pc;
+        w->population_centre_tile[centre] = at.at({ 0, 0 });
+        population_demand_params pd;
+        pd.demand_basket[k_steel] = 100.0f;
+        pd.demand_basket[k_tools] = 100.0f;
+        reg.set_population_demand(pd);
     }
     entity_id add(int x, building_type t, const char* rname = nullptr)
     {
@@ -1782,6 +1808,11 @@ walk_result run_walk(std::int32_t points)
     f.w->population_centre_tile[centre] = f.at.at({ 6, 6 });
     population_demand_params pd;
     pd.demand_basket[k_steel] = 100.0f;
+    // BL-1217 D6: households want tools too, so a timber firm's incidental
+    // works takes the free tools recipe (wanted) as it always did, rather than
+    // turning to steel and eating the timber the refused steel works needs —
+    // the row tests the refused-draw book, not the want bound.
+    pd.demand_basket[k_tools] = 100.0f;
     f.reg.set_population_demand(pd);
 
     charter_spend_params s;
