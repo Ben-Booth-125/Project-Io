@@ -110,6 +110,18 @@ inline constexpr long long kVillageSpurFloorHeads = 40000;
 /// BL-516), which let a bridge span three open tiles of channel.
 inline constexpr int kMaxCrossingTiles = 2;
 
+/// BL-1119 STALE-FLOOD MEASUREMENT PROBE — verify-only, never set by shipped code.
+/// Within a pass the flood fields and the pair cache are reused and never refreshed
+/// after a stamp, so a route is priced on the road field as it stood when its
+/// destination's flood was first built. When this is true, `stamp_edge` (the one
+/// stamper `generate_roads` and `stamp_history_roads` share) clears every logistics
+/// cache after any stamp that raised a tile, so each later route is priced on the field
+/// as it stands (LOGISTICS.md § 4). OFF (the default) the passes are byte-identical to
+/// the shipped ones: the flag is read in two places, and only to clear caches and to
+/// copy the laid path into the write-only traces. road_stale_flood_probe measures it;
+/// road_generation_harness --fresh-floods runs its rows on it.
+extern bool g_road_probe_fresh_floods;
+
 /// The longest contiguous run of WATER tiles (any kind) along @p path, in tiles.
 /// The one measure the cap is read against; exposed so a harness asks it of every
 /// laid route from outside.

@@ -215,10 +215,16 @@ joins its own nation's backbone**: the network it must reach is its nation's own
 nation's towns, never another nation's (a border link is a Track between two networks, not part of
 either backbone), and the join runs over the nation's own land. A market whose nation holds no
 town has no backbone and stays off it, counted.
-**One cost model** (§ 1): every route is priced with `tile_traversal_cost` on the field as it
-stands. The **direct route** walks any land and any strait of up to two shore-water cells, never
-open ocean; every link is laid along it, so it reuses the roads that already shorten it. Catchments
-are grid-nearest, so these roads move no catchment and no fold.
+**One cost model** (§ 1): every route is priced with `tile_traversal_cost`. The **direct route**
+walks any land and any strait of up to two shore-water cells, never open ocean; every link is laid
+along it, so it reuses the roads that already shorten it. Catchments are grid-nearest, so these
+roads move no catchment and no fold. **Within a pass, a route is priced on the field its
+destination's cost flood was first built on (Ben, 2026-10-09):** the floods are reused, not
+rebuilt after every stamp, which is what keeps the road passes inside their time budget —
+rebuilding after every stamp measured 2.5–4× slower on the sixteen curated seeds. So a link reuses
+the roads that stood when its destination's flood was built, and one laid later can run beside
+it. A parallel road that this leaves is removed by BL-1252 (no parallel roads), not by
+re-pricing: no second road beside a serviceable one still holds.
 
 Three readings, accepted by Ben (2026-10-03) and kept as readings: a trunk link's tier is the gate at the
 **lower** of its two nations' percentiles; **the network route** is the same walk over

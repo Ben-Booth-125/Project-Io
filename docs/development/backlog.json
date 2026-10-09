@@ -1764,6 +1764,30 @@
     "src/world/space_programme.cpp"
    ],
    "design": "BACKLOGGED by Ben (2026-10-09, launch fuel form) - both questions open, for a ruling when space access matters. Context: MARKETS.md step 4 reserves a pad pool's propellant from auto-surplus (Ben 2026-10-09; may still be sold by a standing order). Cold review of the PROPELLANT lane found three rival paths that ignore that reservation: (a) corp_ai.cpp listable_surplus (~2572) uses processor_reservation, so the trade candidate places an uncapped sell order that empties the pad pool, re-placed each time stock rebuilds; (b) the scorer's directed dispatch (~2735) has no reservation and can haul pad propellant to the capital market on the same body; (c) space_programme.cpp (~140-175) buys 50-unit lumps from the pool holding most unreserved stock - pad pools are now where propellant piles up. Q1: should the scorer sell/haul only above the pad reservation? Q2: should the space programme buy only the excess? No seed had a launchpad at t50 in sprint 50, so the effect is latent."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 50,
+   "written": "2026-10-09",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "priority": "A",
+   "difficulty": 3,
+   "id": "BL-1252",
+   "short_name": "NO_PARALLEL_ROADS",
+   "category": "Generation",
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "author": "Claude (sprint 50, BL-1119 R7 review + stale-flood measurement; Ben 2026-10-09)",
+   "title": "Road generation lays no long parallel road beside a serviceable one, at near the stale-flood pass time",
+   "files": [
+    "src/world/road_generation.cpp",
+    "src/world/logistics.cpp",
+    "tools/verify/road_stale_flood_probe.cpp",
+    "tools/verify/road_generation_harness.cpp"
+   ],
+   "design": "RULED (Ben, 2026-10-09, the roads form): keep the stale flood reuse for speed (LOGISTICS.md § 4, written same day) and remove the parallel roads it leaves THIS SPRINT. MEASURED (road_stale_flood_probe, merged aa007264; 16 curated seeds pooled): STALE 79,154 road tiles vs FRESH 73,503; long parallel pairs d1 K8 235 vs 103 (history-history 176 vs 42); history route cost gap 1.87% vs 0.96%; pass time gen+hist 184+88 s vs 416+419 s loaded (seed 0 gen 15->77 s, hist 7->62 s). Half of history corridors change under FRESH; split nations 47 vs 54. Example: seed 37, two history corridors from (229,71) run side by side 17 tiles. CANDIDATES (measure, then pick the cheapest that meets the done-when): (1) targeted refresh - after a stamp, rebuild only the floods whose settled region the stamp could shorten (e.g. destinations within a cost radius of the stamped tiles), or re-route a pending corridor whose cached path runs within d of a newer road; (2) post-pass merge - detect parallel runs (the probe's d/K measure) and drop or merge the redundant run onto the existing road, connectivity held; (3) BL-1077's bounded per-village spur search priced on the field as it stands (spurs only). DONE WHEN: long parallel pairs (d1 K8) at or below FRESH's 103 pooled, road_generation_harness green (connectivity, R2s-b), pass time within ~1.25x of STALE, digests move once (re-bless at the sprint close)."
   }
  ]
 }
