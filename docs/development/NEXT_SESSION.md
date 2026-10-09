@@ -142,6 +142,16 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   451 attached to extractors); only the traced path bounded. All 16 digest pins move (expected;
   re-bless at close with Ben). Agent's open questions: bound the second processor too; want omits
   refused draws; D5 bid excludes silenced want; convoys may haul held stock.
+  **D5/D6 COLD REVIEW: HELD.** G1 gain is mostly denominator — running at handoff FELL ~249
+  (2393 -> ~2144); G2 not evidence (settle baseline moved); measured on the pre-BL-1235 base.
+  D5 sound (bid definition defensible: silenced want excluded per FINANCE 2026-10-03; composite would
+  release on clear 1). D6 bounds one path of several: (d) chartered processing firm, (e) hard-coded
+  roster default recipes, (f) enforce_chain_feasible_roster keep/readmit, (g) assign_default_recipes
+  re-runs — unbounded; want omits refused draws, uses body_demand not walk's consumer_demand, power
+  body-wide. Fix round sent to the D5/D6 agent (+ absolute counts in the gate line, save row,
+  dispatch comment). **Call for Ben:** with D6, refined fuel -> propellant is a cold start at
+  generation (no fuel maker -> propellant not feasible -> fuel has no derived demand); space access
+  then depends on settle/play building both. Ruling arguably accepts it; unmeasured.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
