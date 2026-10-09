@@ -130,6 +130,8 @@ int main()
         w.markets.at(hh_market).hauler_want[hh_food]      = 9.625f;
         w.markets.at(hh_market).unposted_bid[hh_food]      = 4.875f; // BL-1227
         w.markets.at(hh_market).unposted_bid_tick[hh_food] = 1234;   // BL-1227
+        w.markets.at(hh_market).dial_pool_draw[hh_food]      = 1.625f; // BL-1217
+        w.markets.at(hh_market).dial_pool_draw_tick[hh_food] = 4321;   // BL-1217
     }
 
     // BL-1217 D5 (world_save_version 39): the held opening stock. Generation
@@ -316,6 +318,17 @@ int main()
         world sink;
         check(!from_bytes(to_bytes(orphan), sink),
               "P1 a held opening-stock record with no pool behind it is rejected (BL-1217 D5)");
+    }
+    // BL-1217 (review): not guarded on a market existing -- a fixture with no
+    // market would make the row pass vacuously, so its absence FAILS it.
+    check(hh_market != null_entity,
+          "P1 the fixture carries a market for the v40 dial_pool_draw row (never vacuous)");
+    {
+        const auto mit = loaded.markets.find(hh_market);
+        check(read_ok && hh_market != null_entity && mit != loaded.markets.end()
+                  && mit->second.dial_pool_draw[hh_food] == 1.625f
+                  && mit->second.dial_pool_draw_tick[hh_food] == 4321,
+              "P1 market dial_pool_draw / dial_pool_draw_tick (BL-1217, world_save_version 40) round-trip at their written values");
     }
 
     // BL-614: likewise for the wage bid.

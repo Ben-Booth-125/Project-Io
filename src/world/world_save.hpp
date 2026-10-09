@@ -359,7 +359,16 @@ inline constexpr uint32_t world_save_magic =
 /// A v38 stream lacks the section; refused whole on the strict-equality
 /// contract, no migration. Claimed through
 /// `tools/session/next_save_version.js --kind world --claim`.
-inline constexpr uint32_t world_save_version = 39;
+/// Bumped to 40 by BL-1217 (the dial's buyer signal), claimed past BL-1217
+/// D5's 39 (opening stock held, another branch): the market record gains two
+/// resource-indexed arrays at its tail, after `unposted_bid_tick` --
+/// `dial_pool_draw` (float) and `dial_pool_draw_tick` (int32): what running
+/// processors drew from their owners' pools and did not post as demand, and
+/// the econ tick it was recorded on, which the background workforce dial reads
+/// held for its cadence. A v38/v39 stream is 2 x resource_count values short
+/// per market; refused whole on the strict-equality contract, no migration.
+/// Claimed through `tools/session/next_save_version.js --kind world --claim`.
+inline constexpr uint32_t world_save_version = 40;
 
 /// Write @p w as a complete world snapshot.
 ///

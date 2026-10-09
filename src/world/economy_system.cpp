@@ -589,6 +589,9 @@ building_report run_processing(world& w, const recipe_registry& reg,
     // inputs never creates an empty row.
     std::array<float, resource_count> wanted{};
     std::array<float, resource_count> suppressed{}; // BL-1203: hauler-only (below)
+    // BL-1217 (the dial's buyer signal): this processor's dial record. Only a
+    // processor on a market has one (a market-less body has no bid to read).
+    proc_dial_draw* dial = (market_id != null_entity) ? &out.dial_pool_draws[building_id] : nullptr;
     float coverage = std::numeric_limits<float>::infinity();
     bool  has_input = false;
     for (std::size_t r = 0; r < resource_count; ++r)
@@ -615,6 +618,13 @@ building_report run_processing(world& w, const recipe_registry& reg,
         // must not push its price. NR-281 records this reading of the item.
         // BL-1172: a draw over the ceiling does not bid either (FINANCE.md,
         // Ben 2026-10-03) — its want leaves the price so the price can ease.
+        // BL-1217: the ROOM this processor's pool draws may fill on the dial —
+        // its full need less what it posts as demand here, i.e. what the pool
+        // covered when the want was posted. A pool draw above it (the top-up,
+        // off a pool a sibling refilled) is a unit already in demand. A want
+        // the ceiling silenced is not demand, so the whole need is room.
+        if (dial != nullptr)
+            dial->room[r] = shelf ? std::min(need, std::max(0.0f, pool.quantities[r])) : need;
         if (mc == nullptr || shelf)
             wanted[r] += std::max(0.0f, need - pool.quantities[r]);
         else
@@ -692,6 +702,8 @@ building_report run_processing(world& w, const recipe_registry& reg,
         const float need      = in * batches;
         const float from_pool = std::min(pool.quantities[r], need);
         pool.quantities[r] -= from_pool;
+        if (dial != nullptr && from_pool > 0.0f) // BL-1217: the dial's pool-fed draw
+            dial->take(r, from_pool);
         const float remainder = need - from_pool;
         if (remainder <= 0.0f)
             continue;
@@ -772,6 +784,9 @@ bool top_up_processing(world& w, const recipe_registry& reg, entity_id corp,
         const float need      = in * batches;
         const float from_pool = std::min(std::max(0.0f, pool.quantities[r]), need);
         pool.quantities[r] -= from_pool;
+        if (from_pool > 0.0f) // BL-1217: the dial's pool-fed draw, capped by turn 1's room
+            if (const auto dit = out.dial_pool_draws.find(rep.building); dit != out.dial_pool_draws.end())
+                dit->second.take(r, from_pool);
         const float remainder = need - from_pool;
         if (remainder <= 0.0f || !shelf_admits(mc, r, res_mult, /*off_buys=*/true))
             continue;
@@ -921,7 +936,7 @@ float wf_target_price(float base, float supply, float demand,
 // (corp_ai.cpp) reuses the one solver. The anonymous namespace re-opens below.
 int solve_workforce_target(world& w, const recipe_registry& reg,
                            const building_component& b, float contention,
-                           int stack_rank, float* out_gain)
+                           int stack_rank, float* out_gain, int bid_hold_ticks)
 {
     if (out_gain)
         *out_gain = 0.0f; // every early return below is "no move, so no gain"
@@ -968,14 +983,36 @@ int solve_workforce_target(world& w, const recipe_registry& reg,
         }
 
     // Clearing price for resource r if this building's supply of it shifts by delta.
+    //
+    // BL-1217 (AI_OPPONENT.md § 11, the dial's buyer signal, Ben 2026-10-09 as
+    // narrowed): on the background dial (bid_hold_ticks >= 0, passed by the
+    // scorer as its cadence) the buyer signal is posted demand PLUS what running
+    // processors drew from their owners' pools and did not post as demand, held
+    // for the cadence (`dial_bid`, components.hpp) — nothing else. The player's
+    // auto-solver passes -1 and reads posted demand alone, as before. A
+    // grid-pooled read (BL-1232) keeps its pooled demand.
+    //
+    // And where the market lists none of the output, no such bid exists and the
+    // market has NEVER cleared, the dial forecasts the output at its BASE price,
+    // not the floor (AI_OPPONENT.md, "The dial forecasts at base where no fact
+    // exists yet" — the veto's "no clear yet: no signal";
+    // `dial_forecasts_at_base`). A cleared market with nothing listed and no
+    // bid is dead for the good and reads as it always has.
     const auto price_of = [&](std::size_t r, float supply_delta) -> float {
         if (mkt == nullptr)
             return 0.0f;
         const bool  pooled = gsd != nullptr && reg.grid_goods().grid(r) && grid_good_crosses_markets(r);
         const float base   = pooled ? grid_good_pricing_supply(*gsd, r, reg.price_band().shelf_supply_ticks)
                                     : mkt->supply[r];
+        float bid = pooled ? gsd->demand[r] : mkt->demand[r];
+        if (!pooled && bid_hold_ticks >= 0)
+        {
+            if (dial_forecasts_at_base(*mkt, r, w.current_econ_tick, bid_hold_ticks))
+                return std::max(0.0f, mkt->base_price[r]); // no fact yet: forecast at base
+            bid = dial_bid(*mkt, r, w.current_econ_tick, bid_hold_ticks);
+        }
         const float supply = std::max(0.0f, base + supply_delta);
-        return wf_target_price(mkt->base_price[r], supply, pooled ? gsd->demand[r] : mkt->demand[r],
+        return wf_target_price(mkt->base_price[r], supply, bid,
                                reg.price_band().floor_mult, reg.price_band().ceil_mult);
     };
 
@@ -1566,6 +1603,42 @@ economy_step_phase_clock*& economy_step_phase_clock_sink()
     thread_local economy_step_phase_clock* sink = nullptr;
     return sink;
 }
+
+namespace {
+/// BL-1217 (AI_OPPONENT.md § 11, the dial reads stock-fed consumers): this
+/// tick's dial record, per (market, good), into `report.dial_pool_sums` —
+/// written to the markets by the CLEAR (clear_markets), beside the demand it
+/// complements, so the scorer always reads a demand and a pool-draw record of
+/// the SAME tick (see market_component::dial_pool_draw).
+///
+/// EVERY processor that posted its want this tick (each has a dial record)
+/// STAMPS every input key it touches, with 0 when it took nothing from its
+/// pool: a consumer that moved from its pool onto the shelf now posts its want
+/// as demand, and its old pool draw must not be held beside it. Only a processor
+/// `running_consumer_market` counts as running contributes its draws (the same
+/// filter as the unposted bid, so a skipped processor's draw credits no market).
+/// A key no processor touched keeps its last record, which ages out of the hold.
+void collect_dial_pool_draws(const world& w, const recipe_registry& reg, economy_report& report)
+{
+    for (const building_report& br : report.buildings)
+    {
+        const auto dit = report.dial_pool_draws.find(br.building);
+        if (dit == report.dial_pool_draws.end())
+            continue;
+        const auto bit = w.buildings.find(br.building);
+        const recipe* rc = reg.get_recipe(br.recipe);
+        if (bit == w.buildings.end() || rc == nullptr)
+            continue;
+        const entity_id mid = market_for_tile(w, bit->second.tile);
+        if (mid == null_entity)
+            continue;
+        const bool running = running_consumer_market(w, reg, br) == mid;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (rc->inputs[r] > 0.0f)
+                report.dial_pool_sums[std::make_pair(mid, r)] += running ? dit->second.drawn[r] : 0.0f;
+    }
+}
+} // namespace
 
 economy_report run_economy_step(world& w, const recipe_registry& reg, bool spectating,
                                 lp_pool_map* shared_lp_pools)
@@ -2546,6 +2619,11 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         if (const auto rmit = w.markets.find(key.first); rmit != w.markets.end())
             note_unposted_bid(rmit->second, key.second, q, w.current_econ_tick);
 
+    // BL-1217 (AI_OPPONENT.md § 11, the dial reads stock-fed consumers): this
+    // tick's pool-fed, not-posted draws, stamped per (market, good); the clear
+    // writes them beside this tick's demand.
+    collect_dial_pool_draws(w, reg, report);
+
     // Population food demand (BL-190) is injected by inject_population_demand,
     // called from clear_markets AFTER its per-tick demand reset — injected here
     // it was erased by that reset the same tick and never reached price
@@ -2827,8 +2905,21 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                             if (rc->outputs[r] <= 0.0f)
                                 continue;
                             const float base = m->base_price[r];
-                            if (base <= 0.0f)
+                            // BL-1217 D4 (AI_OPPONENT.md, "The reflex rescue
+                            // reads an unpriced output as floored", Ben
+                            // 2026-10-09): an output with no base price is no
+                            // evidence of health. It reads as floored -- at
+                            // zero, not at the band's floor_mult, so that no
+                            // float rounding of a floored incumbent's price/base
+                            // (which sits at ~floor_mult) can let a recipe the
+                            // rescue cannot price beat it (strictly greater,
+                            // below). An incumbent with an unpriced output reads
+                            // as floored too (<= floored_frac), as ruled.
+                            if (!(base > 0.0f))
+                            {
+                                worst = 0.0f;
                                 continue;
+                            }
                             worst = std::min(worst, m->price[r] / base);
                         }
                         return worst;

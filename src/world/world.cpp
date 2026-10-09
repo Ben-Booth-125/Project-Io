@@ -156,6 +156,17 @@ uint64_t world::state_hash(int tick) const
             // BL-1227: the unposted bid the scorer's veto reads, and its tick.
             for (const float x : m.unposted_bid) fnv1a_f32(h, x);
             for (const int32_t t : m.unposted_bid_tick) fnv1a_u32(h, static_cast<uint32_t>(t));
+            // BL-1217: the dial's pool-draw register and its tick — the scorer
+            // branches on both and both are saved. Folded SPARSELY (good index,
+            // value, tick; recorded slots only), so a world that never recorded
+            // one hashes as it did before.
+            for (std::size_t r = 0; r < m.dial_pool_draw.size(); ++r)
+                if (m.dial_pool_draw[r] != 0.0f || m.dial_pool_draw_tick[r] != 0)
+                {
+                    fnv1a_u32(h, static_cast<uint32_t>(r));
+                    fnv1a_f32(h, m.dial_pool_draw[r]);
+                    fnv1a_u32(h, static_cast<uint32_t>(m.dial_pool_draw_tick[r]));
+                }
         }
     }
 

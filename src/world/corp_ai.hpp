@@ -16,6 +16,7 @@
 struct world;
 class recipe_registry;
 struct economy_report;
+struct building_report;
 
 // ---------------------------------------------------------------------------
 // Corp AI stage A — the scored utility layer (BL-202, AI_OPPONENT.md § 5)
@@ -381,6 +382,15 @@ using market_good_draw = std::map<std::pair<entity_id, std::size_t>, float>;
 /// market. An idled or decommissioned processor draws nothing and is no buyer.
 market_good_draw running_consumer_draws(const world& w, const recipe_registry& reg,
                                         const economy_report& report);
+
+/// The one RUNNING-CONSUMER filter `running_consumer_draws` applies, per report
+/// row: the processor's tile market if @p br is a processor that produced on a
+/// standing, complete, not-decommissioned building with a priced-quantity
+/// recipe (and its runs in @p runs_out), else null_entity. Shared with the
+/// dial's pool-draw register (BL-1217, `collect_dial_pool_draws`) so a draw by a
+/// processor this skips is never credited to its market.
+entity_id running_consumer_market(const world& w, const recipe_registry& reg,
+                                  const building_report& br, float* runs_out = nullptr);
 
 /// Predictive-spending score multiplier for a candidate build of `type`
 /// producing `target` at `tile`, given its expected per-tick output

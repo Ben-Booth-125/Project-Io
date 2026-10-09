@@ -138,6 +138,7 @@
 #include "world/logistics.hpp"
 #include "world/campaign_settle.hpp"
 #include "world/components.hpp"
+#include "world/corp_ai.hpp"
 #include "world/economy_system.hpp"
 #include "world/market_clearing.hpp"
 #include "world/orbital_system.hpp"
@@ -171,6 +172,9 @@ namespace {
 
 constexpr int k_t50 = 50;
 constexpr float k_floored = 0.30f; // economy_system.cpp's floored_frac
+// BL-1217 D3 fix (F4): the scorer asks the solver with its cadence as the
+// composite-bid hold (corp_ai.cpp, the dial candidate); mirror it exactly.
+const int k_dial_hold = std::max(1, corp_ai_params{}.cadence_k);
 int g_examples = 2;
 
 std::vector<std::uint32_t> library_seeds(const char* path)
@@ -331,7 +335,17 @@ solver_view solver_replica(world& w, const recipe_registry& reg, const building_
     const auto price_of = [&](std::size_t r, float d) {
         const bool pooled = gsd != nullptr && reg.grid_goods().grid(r) && grid_good_crosses_markets(r);
         const float base = pooled ? grid_good_pricing_supply(*gsd, r, pb.shelf_supply_ticks) : mkt->supply[r];
-        return wf_target_price_rep(mkt->base_price[r], std::max(0.0f, base + d), pooled ? gsd->demand[r] : mkt->demand[r],
+        // BL-1217: priced as the background dial prices (solve_workforce_target
+        // at the scorer's hold): the base forecast where no fact exists yet,
+        // else posted demand plus the held pool-fed processor draws.
+        float bid = pooled ? gsd->demand[r] : mkt->demand[r];
+        if (!pooled)
+        {
+            if (dial_forecasts_at_base(*mkt, r, w.current_econ_tick, k_dial_hold))
+                return std::max(0.0f, mkt->base_price[r]);
+            bid = dial_bid(*mkt, r, w.current_econ_tick, k_dial_hold);
+        }
+        return wf_target_price_rep(mkt->base_price[r], std::max(0.0f, base + d), bid,
                                    pb.floor_mult, pb.ceil_mult);
     };
     const auto net_at = [&](int wt, solver_view* sv) {
@@ -409,7 +423,7 @@ zero_rec make_zero_rec(world& w, const recipe_registry& reg, entity_id bid, cons
     z.price_ratio = m.base_price[g] > 0.0f ? m.price[g] / m.base_price[g] : 0.0f;
     building_component copy = b;
     copy.workforce_target = static_cast<float>(prev_target);
-    z.solver_zero = solve_workforce_target(w, reg, copy, 1.0f, 1, nullptr) == 0;
+    z.solver_zero = solve_workforce_target(w, reg, copy, 1.0f, 1, nullptr, k_dial_hold) == 0;
     const solver_view sv = solver_replica(w, reg, copy, prev_target);
     z.replica_zero = sv.best == 0;
     z.margin_base_pos = sv.rev_base > sv.in;
@@ -1002,7 +1016,9 @@ void census(world& w, const recipe_registry& reg, const economy_report& rep, con
             building_component copy = b;
             copy.workforce_target = 100.0f;
             copy.decommissioned = false;
-            const int now = solve_workforce_target(w, reg, copy, 1.0f, 1, nullptr);
+            // The seat is solved by the PLAYER auto-solver after the handoff
+            // (hold -1: posted demand alone), not by the background dial.
+            const int now = solve_workforce_target(w, reg, copy, 1.0f, 1, nullptr, -1);
             c.add(std::string("z503.dempos.solver_at_handoff.") + (now > 0 ? "runs" : "zero"));
             c.add("z503.dempos.cls_handoff." + z.cls + "." + (now > 0 ? "runs" : "zero"));
         }
@@ -1368,6 +1384,30 @@ void run_seed(std::uint32_t seed, int ticks, seed_out& out)
                 const recipe* to = reg.get_recipe(ev.new_recipe);
                 out.h.add(std::string("r4.switch.") + phase + "." + (from ? from->name : std::string("?")) + ".to."
                           + (to ? to->name : std::string("?")));
+                // BL-1217 D4 (F3): a switch OUT of a recipe with an unpriced
+                // output, read at the prices the rescue saw (the econ lap's px,
+                // before the clear). byproduct: the recipe also has a priced
+                // output, and the priced ones are NOT floored (worst price/base
+                // > 0.30) -- left only because the unpriced one reads floored.
+                // Counts the reflex and the scorer alike (one event kind).
+                if (from != nullptr)
+                    if (const auto bi = w.buildings.find(ev.building); bi != w.buildings.end())
+                        if (const auto pxi = p.px.find(market_for_tile(w, bi->second.tile)); pxi != p.px.end())
+                        {
+                            bool unpriced = false, priced = false;
+                            float worst = 1.0f;
+                            for (std::size_t r = 0; r < resource_count; ++r)
+                            {
+                                if (from->outputs[r] <= 0.0f) continue;
+                                if (!(pxi->second.base[r] > 0.0f)) { unpriced = true; continue; }
+                                priced = true;
+                                worst = std::min(worst, pxi->second.price[r] / pxi->second.base[r]);
+                            }
+                            if (unpriced)
+                                out.h.add(std::string("r4.switch_unpriced_out.") + phase + "."
+                                          + (!priced ? "only" : worst > k_floored ? "byproduct" : "priced_floored_too")
+                                          + "." + from->name + ".to." + (to ? to->name : std::string("?")));
+                        }
             }
         for (const agency_event& ev : rep.agency_events)
             if (ev.what == agency_event::kind::workforce_set)

@@ -12,6 +12,7 @@
 #include "logistics.hpp"     // lp_pool_map (BL-596/BL-597, shared active+passive LP pool)
 #include "world.hpp"
 
+#include <algorithm>
 #include <array>
 #include <chrono> // economy_step_phase_clock (BL-1117)
 #include <map>
@@ -244,6 +245,25 @@ struct shelf_phase_audit
 /// Result of one economy step: the per-building reports plus the auto-bought
 /// input shortfalls per (corp, body), which become market demand and corporate
 /// expenditure downstream (market_clearing.hpp / budget_system.hpp).
+/// BL-1217 (AI_OPPONENT.md § 11, the dial reads posted demand plus pool-fed
+/// running processor draws, Ben 2026-10-09 as narrowed): one processor's dial
+/// record for a tick. `room[r]` is set where the want is posted
+/// (run_processing): the full-run need less what it posts as DEMAND, i.e. what
+/// its pool covered then (the whole need where the ceiling silenced the want,
+/// since a silenced want is not demand). Every pool draw, either turn, fills
+/// `drawn` only up to the room left — a top-up draw off a pool a sibling
+/// refilled is a unit this processor already put in demand, and counts once.
+struct proc_dial_draw
+{
+    std::array<float, resource_count> room  = {};
+    std::array<float, resource_count> drawn = {};
+    void take(std::size_t r, float from_pool)
+    {
+        const float c = std::min(from_pool, std::max(0.0f, room[r]));
+        if (c > 0.0f) { drawn[r] += c; room[r] -= c; }
+    }
+};
+
 struct economy_report
 {
     std::vector<building_report> buildings;
@@ -334,6 +354,19 @@ struct economy_report
     /// to `market_component::hauler_want`, which only the dispatcher's room
     /// (`dispatch_absorbable`) reads. Same std::map, same sorted accumulation.
     std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> hauler_wants;
+
+    /// BL-1217 (AI_OPPONENT.md § 11, the dial's buyer signal): per processor on
+    /// a market, its pool-fed draws this tick that it did NOT also post as
+    /// demand (`proc_dial_draw`), across both turns. Transient: read once, right
+    /// after the production pass, by `collect_dial_pool_draws`.
+    std::map<entity_id, proc_dial_draw> dial_pool_draws;
+
+    /// BL-1217: this tick's dial record per (market, good) — every input key a
+    /// processor that posted its want touched, the running ones' not-posted pool
+    /// draws summed (0 where none). clear_markets writes it to
+    /// `market_component::dial_pool_draw` (its only writer), beside this tick's
+    /// demand. Sorted std::map: fixed float order.
+    std::map<std::pair<entity_id, std::size_t>, float> dial_pool_sums;
 
     /// BL-1209: every draw off a CONTENDED shelf this tick, rationed pro-rata
     /// (`plan_short_shelves`), and each phase's own invariant audit
@@ -902,9 +935,20 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
 ///                 loss-maker only for cutting, so every dial the solver found in
 ///                 the other direction — the interior optimum it exists to find —
 ///                 scored negative and was silently discarded.
+/// @param bid_hold_ticks BL-1217 (AI_OPPONENT.md § 11, "the dial reads
+///                 stock-fed consumers", Ben 2026-10-09). -1 (the default; the
+///                 player's auto-solver) reads the plant's market's posted
+///                 demand alone. >= 0 (the background scorer passes its
+///                 cadence) reads posted demand plus the running processors'
+///                 not-posted pool draws held for that many ticks (`dial_bid`)
+///                 — never the build veto's composite bid — and forecasts an
+///                 output at its base price only on a market that lists none,
+///                 bids none and has never cleared ("The dial forecasts at base
+///                 where no fact exists yet"; `dial_forecasts_at_base`).
 int solve_workforce_target(world& w, const recipe_registry& reg,
                            const building_component& b, float contention,
-                           int stack_rank = 1, float* out_gain = nullptr);
+                           int stack_rank = 1, float* out_gain = nullptr,
+                           int bid_hold_ticks = -1);
 
 /// BL-1235 (dial hold outlasts reflex; AI_OPPONENT.md, "A plant the dial idled
 /// is not losing"): a background plant the workforce dial has set to zero. The

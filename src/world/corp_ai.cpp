@@ -684,7 +684,13 @@ bool zero_bid_veto(const world& w, const market_component& m, std::size_t r, int
     // a record no older than `hold_ticks` still counts, so every corporation
     // that evaluates between two records sees it. A buyer that takes or wants
     // goods without posting a bid is still a buyer.
-    if (m.hauler_want[r] > 0.0f || unposted_bid_held(m, r, w.current_econ_tick, hold_ticks))
+    //
+    // The sum is `composite_bid` (components.hpp), the veto's own definition,
+    // read for presence. The workforce dial does NOT read it: its narrower
+    // buyer signal is `dial_bid` (§ 11, the dial reads stock-fed consumers).
+    // Called only with demand[r] <= 0, so a positive composite here is exactly
+    // the silenced want or the held unposted bid.
+    if (composite_bid(m, r, w.current_econ_tick, hold_ticks) > 0.0f)
         return false;
     // BL-1227 (idle mines, the boom): ZERO BID AGAINST LISTED SUPPLY IS A
     // GLUT, not a missing signal. Both halves are public: the market lists
@@ -710,13 +716,11 @@ bool zero_bid_veto(const world& w, const market_component& m, std::size_t r, int
     // still zero is read as not yet cleared — the market emergence carves
     // mid-tick (market_clearing.cpp) opens exactly so, with nothing written
     // until its first clear.
-    if (w.current_econ_tick <= 0)
-        return false; // no clear has run yet: no signal, do not guess
-    for (std::size_t g = 0; g < resource_count; ++g)
-        if (m.supply[g] > 0.0f || m.demand[g] > 0.0f || m.hauler_want[g] > 0.0f
-            || m.unposted_bid[g] > 0.0f)
-            return true; // the market has cleared: dead for this good
-    return false; // never cleared (nothing written yet): no signal
+    //
+    // The test is `market_has_cleared` (components.hpp), shared with the
+    // workforce dial's base forecast (BL-1217): true = dead for this good,
+    // false = never cleared (nothing written yet), no signal.
+    return market_has_cleared(m, w.current_econ_tick);
 }
 
 /// The same test at a tile's market: true when a build there of @p target is
@@ -739,29 +743,38 @@ std::vector<extraction_trace_row>*& corp_extraction_trace_sink()
     return sink;
 }
 
+entity_id running_consumer_market(const world& w, const recipe_registry& reg,
+                                  const building_report& br, float* runs_out)
+{
+    if (br.type != building_type::processing_facility || !br.active || !(br.output_quantity > 0.0f))
+        return null_entity;
+    const auto bit = w.buildings.find(br.building);
+    if (bit == w.buildings.end() || bit->second.decommissioned || bit->second.ticks_remaining > 0)
+        return null_entity;
+    const recipe* rc = reg.get_recipe(br.recipe);
+    if (rc == nullptr)
+        return null_entity;
+    float total_out = 0.0f;
+    for (const float o : rc->outputs)
+        total_out += o;
+    if (!(total_out > 0.0f))
+        return null_entity;
+    if (runs_out != nullptr)
+        *runs_out = br.output_quantity / total_out;
+    return market_for_tile(w, bit->second.tile);
+}
+
 market_good_draw running_consumer_draws(const world& w, const recipe_registry& reg,
                                         const economy_report& report)
 {
     market_good_draw out;
     for (const building_report& br : report.buildings)
     {
-        if (br.type != building_type::processing_facility || !br.active || !(br.output_quantity > 0.0f))
-            continue;
-        const auto bit = w.buildings.find(br.building);
-        if (bit == w.buildings.end() || bit->second.decommissioned || bit->second.ticks_remaining > 0)
-            continue;
-        const recipe* rc = reg.get_recipe(br.recipe);
-        if (rc == nullptr)
-            continue;
-        float total_out = 0.0f;
-        for (const float o : rc->outputs)
-            total_out += o;
-        if (!(total_out > 0.0f))
-            continue;
-        const float     runs = br.output_quantity / total_out;
-        const entity_id mid  = market_for_tile(w, bit->second.tile);
+        float           runs = 0.0f;
+        const entity_id mid  = running_consumer_market(w, reg, br, &runs);
         if (mid == null_entity)
             continue;
+        const recipe* rc = reg.get_recipe(br.recipe);
         for (std::size_t r = 0; r < resource_count; ++r)
             if (rc->inputs[r] > 0.0f)
                 out[std::make_pair(mid, r)] += rc->inputs[r] * runs;
@@ -1957,7 +1970,8 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             {
                 if (!dial_idled(b))
                     continue;
-                held_proposed = solve_workforce_target(w, reg, b, 1.0f, /*stack_rank=*/1, &held_gain);
+                held_proposed = solve_workforce_target(w, reg, b, 1.0f, /*stack_rank=*/1, &held_gain,
+                                                       /*bid_hold_ticks=*/std::max(1, p.cadence_k));
                 if (held_proposed <= 0)
                     continue;
             }
@@ -2121,7 +2135,8 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 float     gain     = held_gain;
                 const int proposed = (held_proposed >= 0)
                     ? held_proposed
-                    : solve_workforce_target(w, reg, b, 1.0f, /*stack_rank=*/1, &gain);
+                    : solve_workforce_target(w, reg, b, 1.0f, /*stack_rank=*/1, &gain,
+                                             /*bid_hold_ticks=*/std::max(1, p.cadence_k));
                 if (proposed != b.workforce_target && bp.has_data)
                 {
                     if (gain > margin_gate)
