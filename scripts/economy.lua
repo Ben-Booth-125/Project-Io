@@ -595,11 +595,11 @@ economy = {
             -- base prices — proposed for Ben with the capacity table (BL-1270).
             port = {
                 ancient    = { charcoal = 0.10, timber = 0.10, stone = 0.10 },     -- 0.65 + 0.15 + 0.10 = 0.90
-                industrial = { coal = 0.40, timber = 0.10, stone = 0.10 }, -- 0.80 + 0.15 + 0.10 = 1.05
+                industrial = { coal = 0.15, timber = 0.10, stone = 0.10 }, -- 0.30 + 0.15 + 0.10 = 0.55
             },
             planetary_marketplace = {
                 ancient    = { charcoal = 0.15, timber = 0.15, stone = 0.15 },     -- 0.98 + 0.23 + 0.15 = 1.36
-                industrial = { coal = 0.60, timber = 0.15, stone = 0.15 }, -- 1.20 + 0.23 + 0.15 = 1.58
+                industrial = { coal = 0.25, timber = 0.15, stone = 0.15 }, -- 0.50 + 0.23 + 0.15 = 0.88
             },
         },
     },
