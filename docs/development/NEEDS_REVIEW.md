@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*94 entries — 15 open, 79 resolved.*
+*94 entries — 14 open, 80 resolved.*
 
 ---
 
@@ -160,11 +160,6 @@ The always-on player-identity wash (about 30% on the player's tiles on the plain
 *decision taken on your behalf · raised 2026-10-09 · from the BL-1250 (lens washes ground) and BL-1246 partial re-bake lanes, sprint 51*
 
 (a) Wash strengths taken: categorical lenses 0.46, sequential 0.54 (LENSES.md). (b) Resource lens: ground with no deposit keeps the WHITE wash Ben ruled 2026-10-04 (0.50) rather than "no wash" - LENSES.md says an unanswered tile takes no wash, so one of the two needs your word. (c) CALL: at the close rungs the Company lens draws the unpicked owners' dark rim on nearly every tile (firms hold most ground), which reads as a heavy hex grid. Options: thin/fade the rim at close zoom; drop the rim where the close-zoom seam already marks edges; accept. (d) NOVEL, fixed: a lit structure's hover wash drew at the inset radius and left a 1 px grid of unlit gaps over the bake; now drawn at full radius. (e) NOVEL, scope grew: the partial re-bake needed a bounds mode in the structure pass (rasterise a tile's parts writing nothing) and a shared build_tile, because a conservative reach only saved ~50%; plus a 1/256 px rounding fix in four structure forms caught by the new window-invariance row. (f) Rung 0 frame time read ~20 ms in the lens lane under heavy machine load (11.5 ms clean in the 60 fps lane); a clean re-measure is owed.
-
-### NR-1010 — Ground look C-F: the vision fog now darkens most of the map, and four smaller look notes
-*question · raised 2026-10-10 · from the BL-1256 (ground look C-F) lane, sprint 51*
-
-(a) CALL: outside the player corporation's vision the canvas washes the ground ~50% toward near-black (the activity fog, DISCOVERY.md). Over the new darker C-F palette the fogged ground sits at median luminance ~33 against ~58 baked, so most of the map in play reads very dark. Options: lighten the fog (e.g. 25-30%), make it a desaturation rather than a darkening, or keep. (b) TAKEN, novel: the bake has its own palette (palette::ground_tile_colour); the vector fallback, minimap and generation preview keep the old colours. (c) Mountain forms still read faceted (the landform pass was not retuned). (d) Rapids read as a white chain along the bank; sea glints as fine specks - art iteration if wanted. (e) The bake costs ~25-31% more per chunk (whole revealed home master 41 -> 52 s at 1x); the wait budget assumes the rounds are read (TECH_FOUNDATIONS).
 
 ---
 
@@ -1480,4 +1475,9 @@ BL-1197 round 2 (no fallback for water-gap firms) cost seeds 0 and 43 their allo
 *question · raised 2026-10-09 · from the BL-1251 (tiles hold their own ground) lane, sprint 51*
 
 (a) CALL: with each tile holding its own tone and variant and blending only in a 0.13-unit edge band, the ground at the 48 px rung reads as a HEXAGON MOSAIC (forest and fields especially); forest loses its organic outline. Options: accept; soften the tone/variant differences between tiles of one family (keeps edges, loses some of the per-tile read); a larger edge wobble (organic edges, but the close-zoom seam would no longer match the baked edges). (b) RISK: land chunks bake 25-35% slower (patterns +10-14%, border sets +8-20%), so the painting wait after Confirm may now sit near or over 15 s on a quiet PC (12-17 s in the best loaded runs vs 5-10 s before); a quiet re-measure is owed before the sprint closes. The master stays 1x (2x: 122 s). (c) TAKEN, novel: the border-set pairing table (ranked families: forest fringe, scrub fringe, scree lip downhill, field edge as hedge or furrowed headland, reed fringe, drift lip, snow drift; shore shelf for any land against water), the grass split (half its variants are furrowed fields), and the scatter design - RENDERING.md § Tiles hold their own ground records them. (d) Fringe bushes read as dark specks at 48 px and hedges as dashed lines - art iteration if wanted. RULED (Ben, 2026-10-10): (a) the honeycomb stays ("I like the honeycomb"); (b) measured on a quiet PC in Ben's own session: the painting wait was 14.2 s after Confirm, inside 15 s (before roads are painted, BL-1253 re-measures); (c) the pairing table stands; also ruled: the stronger grain stays on bare and volcanic ground even where it quiets the crack variant.
+
+### NR-1010 — Ground look C-F: the vision fog now darkens most of the map, and four smaller look notes
+*question · raised 2026-10-10 · from the BL-1256 (ground look C-F) lane, sprint 51*
+
+(a) CALL: outside the player corporation's vision the canvas washes the ground ~50% toward near-black (the activity fog, DISCOVERY.md). Over the new darker C-F palette the fogged ground sits at median luminance ~33 against ~58 baked, so most of the map in play reads very dark. Options: lighten the fog (e.g. 25-30%), make it a desaturation rather than a darkening, or keep. (b) TAKEN, novel: the bake has its own palette (palette::ground_tile_colour); the vector fallback, minimap and generation preview keep the old colours. (c) Mountain forms still read faceted (the landform pass was not retuned). (d) Rapids read as a white chain along the bank; sea glints as fine specks - art iteration if wanted. (e) The bake costs ~25-31% more per chunk (whole revealed home master 41 -> 52 s at 1x); the wait budget assumes the rounds are read (TECH_FOUNDATIONS). RULED (Ben, 2026-10-10): (a) lighten the fog to 20% (DISCOVERY.md, k_fog_strength). Ben walked the build: the look reads well, lenses look good, the painting wait felt quick (his session measured 53.3 s with a fast click-through - the separately tracked case). (b)-(e) stand as recorded.
 

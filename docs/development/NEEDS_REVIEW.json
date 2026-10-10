@@ -1942,9 +1942,10 @@
    "title": "Ground look C-F: the vision fog now darkens most of the map, and four smaller look notes",
    "raised": "2026-10-10",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "the BL-1256 (ground look C-F) lane, sprint 51",
-   "what": "(a) CALL: outside the player corporation's vision the canvas washes the ground ~50% toward near-black (the activity fog, DISCOVERY.md). Over the new darker C-F palette the fogged ground sits at median luminance ~33 against ~58 baked, so most of the map in play reads very dark. Options: lighten the fog (e.g. 25-30%), make it a desaturation rather than a darkening, or keep. (b) TAKEN, novel: the bake has its own palette (palette::ground_tile_colour); the vector fallback, minimap and generation preview keep the old colours. (c) Mountain forms still read faceted (the landform pass was not retuned). (d) Rapids read as a white chain along the bank; sea glints as fine specks - art iteration if wanted. (e) The bake costs ~25-31% more per chunk (whole revealed home master 41 -> 52 s at 1x); the wait budget assumes the rounds are read (TECH_FOUNDATIONS)."
+   "what": "(a) CALL: outside the player corporation's vision the canvas washes the ground ~50% toward near-black (the activity fog, DISCOVERY.md). Over the new darker C-F palette the fogged ground sits at median luminance ~33 against ~58 baked, so most of the map in play reads very dark. Options: lighten the fog (e.g. 25-30%), make it a desaturation rather than a darkening, or keep. (b) TAKEN, novel: the bake has its own palette (palette::ground_tile_colour); the vector fallback, minimap and generation preview keep the old colours. (c) Mountain forms still read faceted (the landform pass was not retuned). (d) Rapids read as a white chain along the bank; sea glints as fine specks - art iteration if wanted. (e) The bake costs ~25-31% more per chunk (whole revealed home master 41 -> 52 s at 1x); the wait budget assumes the rounds are read (TECH_FOUNDATIONS). RULED (Ben, 2026-10-10): (a) lighten the fog to 20% (DISCOVERY.md, k_fog_strength). Ben walked the build: the look reads well, lenses look good, the painting wait felt quick (his session measured 53.3 s with a fast click-through - the separately tracked case). (b)-(e) stand as recorded.",
+   "resolved": "2026-10-10"
   }
  ]
 }
