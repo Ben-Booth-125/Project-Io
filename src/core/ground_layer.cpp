@@ -8,6 +8,17 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
+#include <system_error>
+#ifdef _WIN32
+#include <process.h> // _getpid
+// The executable's path, for the cache stamp. Declared here rather than via
+// <windows.h>, whose `near` / `far` macros would rewrite job_kind::far.
+extern "C" __declspec(dllimport) unsigned long __stdcall GetModuleFileNameW(void* module, wchar_t* name,
+                                                                            unsigned long size);
+#else
+#include <unistd.h>  // getpid
+#endif
 
 namespace {
 
@@ -55,6 +66,179 @@ constexpr double k_prio_body       = 1.0e6;   ///< The rest of the active body
 constexpr double k_prio_prebake    = 2.0e6;
 constexpr double k_prio_background = 3.0e6;
 
+// ---------------------------------------------------------------------------
+// The disk cache's file format (BL-1259). One file per master chunk:
+//
+//   header (56 bytes): "IOGC", u32 format, u64 stamp, u32 body, u32 chunk
+//   index, i32 width, i32 height, u64 content hash (the region_hash the chunk
+//   was baked against), u32 levels, u32 payload bytes, u64 payload check;
+//   payload: the chunk's piece of every level (master first), each encoded
+//   as below.
+//
+// A piece is mode 1 when every fully transparent pixel is exactly 0 — its
+// alpha plane run-length coded (alpha byte, varint run) and the RGB bytes of
+// the non-transparent pixels raw — else mode 0, raw RGBA. Lossless either way;
+// the alpha plane of baked ground is almost entirely runs of 255 (and the
+// transparent margin above and below the body), so mode 1 is ~3/4 the size.
+// The check is over the payload bytes: a truncated or bit-rotted file fails
+// it, and a failed load re-bakes.
+// ---------------------------------------------------------------------------
+constexpr std::uint32_t k_cache_format = 1;
+constexpr std::size_t   k_header_bytes = 56;
+
+std::uint64_t fold64(std::uint64_t h, std::uint64_t v)
+{
+    h ^= v + 0x9E3779B97F4A7C15ull + (h << 6) + (h >> 2);
+    h *= 0xBF58476D1CE4E5B9ull;
+    return h ^ (h >> 31);
+}
+
+/// A fast 64-bit check over bytes (8 at a time).
+std::uint64_t bytes_check(const std::uint8_t* p, std::size_t n, std::uint64_t h = 0x243F6A8885A308D3ull)
+{
+    std::size_t i = 0;
+    for (; i + 8 <= n; i += 8)
+    {
+        std::uint64_t w;
+        std::memcpy(&w, p + i, 8);
+        h ^= w;
+        h *= 0x9E3779B97F4A7C15ull;
+        h ^= h >> 29;
+    }
+    std::uint64_t tail = 0;
+    for (std::size_t k = 0; i < n; ++i, ++k)
+        tail |= static_cast<std::uint64_t>(p[i]) << (8 * k);
+    return fold64(h, tail ^ (static_cast<std::uint64_t>(n) << 3));
+}
+
+template <class T> void put(std::vector<std::uint8_t>& out, T v)
+{
+    const std::size_t at = out.size();
+    out.resize(at + sizeof(T));
+    std::memcpy(out.data() + at, &v, sizeof(T));
+}
+template <class T> T get_at(const std::uint8_t* p, std::size_t at)
+{
+    T v;
+    std::memcpy(&v, p + at, sizeof(T));
+    return v;
+}
+void put_varint(std::vector<std::uint8_t>& out, std::uint32_t v)
+{
+    while (v >= 0x80)
+    {
+        out.push_back(static_cast<std::uint8_t>(v | 0x80));
+        v >>= 7;
+    }
+    out.push_back(static_cast<std::uint8_t>(v));
+}
+bool get_varint(const std::uint8_t*& p, const std::uint8_t* end, std::uint32_t& v)
+{
+    v = 0;
+    for (int shift = 0; shift < 35; shift += 7)
+    {
+        if (p >= end)
+            return false;
+        const std::uint8_t b = *p++;
+        v |= static_cast<std::uint32_t>(b & 0x7F) << shift;
+        if (!(b & 0x80))
+            return true;
+    }
+    return false;
+}
+
+/// Encode @p n pixels (RGBA32, alpha the high byte of the word).
+void encode_piece(const std::uint32_t* px, std::size_t n, std::vector<std::uint8_t>& out)
+{
+    bool clean = true; // every alpha-0 pixel is exactly 0
+    for (std::size_t i = 0; i < n && clean; ++i)
+        clean = (px[i] >> 24) != 0 || px[i] == 0;
+    if (!clean)
+    {
+        out.push_back(0);
+        const std::size_t at = out.size();
+        out.resize(at + n * 4);
+        std::memcpy(out.data() + at, px, n * 4);
+        return;
+    }
+    out.push_back(1);
+    std::size_t i = 0;
+    while (i < n)
+    {
+        const std::uint8_t a = static_cast<std::uint8_t>(px[i] >> 24);
+        std::size_t j = i + 1;
+        while (j < n && static_cast<std::uint8_t>(px[j] >> 24) == a)
+            ++j;
+        out.push_back(a);
+        put_varint(out, static_cast<std::uint32_t>(j - i));
+        i = j;
+    }
+    for (std::size_t k = 0; k < n; ++k)
+        if (px[k] >> 24)
+        {
+            out.push_back(static_cast<std::uint8_t>(px[k]));
+            out.push_back(static_cast<std::uint8_t>(px[k] >> 8));
+            out.push_back(static_cast<std::uint8_t>(px[k] >> 16));
+        }
+}
+
+bool decode_piece(const std::uint8_t*& p, const std::uint8_t* end, std::uint32_t* dst, std::size_t n)
+{
+    if (p >= end)
+        return false;
+    const std::uint8_t mode = *p++;
+    if (mode == 0)
+    {
+        if (static_cast<std::size_t>(end - p) < n * 4)
+            return false;
+        std::memcpy(dst, p, n * 4);
+        p += n * 4;
+        return true;
+    }
+    if (mode != 1)
+        return false;
+    std::size_t i = 0;
+    while (i < n)
+    {
+        if (p >= end)
+            return false;
+        const std::uint32_t a = *p++;
+        std::uint32_t run = 0;
+        if (!get_varint(p, end, run) || run == 0 || run > n - i)
+            return false;
+        for (std::uint32_t k = 0; k < run; ++k)
+            dst[i + k] = a << 24;
+        i += run;
+    }
+    for (std::size_t k = 0; k < n; ++k)
+        if (dst[k] >> 24)
+        {
+            if (end - p < 3)
+                return false;
+            dst[k] |= static_cast<std::uint32_t>(p[0]) | (static_cast<std::uint32_t>(p[1]) << 8)
+                    | (static_cast<std::uint32_t>(p[2]) << 16);
+            p += 3;
+        }
+    return true;
+}
+
+std::filesystem::path utf8_path(const char* s)
+{
+    return std::filesystem::path(reinterpret_cast<const char8_t*>(s));
+}
+std::string path_utf8(const std::filesystem::path& p)
+{
+    const std::u8string s = p.u8string();
+    return std::string(s.begin(), s.end());
+}
+
+std::filesystem::path chunk_file(const std::filesystem::path& dir, int idx)
+{
+    char name[32];
+    std::snprintf(name, sizeof name, "c%05d.gch", idx);
+    return dir / name;
+}
+
 } // namespace
 
 ground_layer::~ground_layer()
@@ -88,6 +272,21 @@ void ground_layer::run_job(const job& j, result& d, double* level_ms)
     d.pw = j.pw; d.ph = j.ph;
     switch (j.kind)
     {
+    case job_kind::load:
+    {
+        // BL-1259: a spilled chunk back from the disk cache. A file that is
+        // missing, foreign or corrupt lands as a failure and re-bakes.
+        const auto t0 = std::chrono::steady_clock::now();
+        d.loaded = load_chunk_file(j, d);
+        if (!d.loaded)
+        {
+            d.px.clear();
+            for (auto& m : d.mip)
+                m.clear();
+        }
+        d.ms = ms_since(t0);
+        return;
+    }
     case job_kind::sweep:
     {
         // Every master chunk's content hash against this snapshot.
@@ -262,6 +461,7 @@ void ground_layer::drain()
     }
     for (result& d : done)
         land(d, /*sync=*/false);
+    drain_disk();
 }
 
 void ground_layer::bake_sync(job j)
@@ -339,6 +539,12 @@ ground_layer::body_state* ground_layer::ensure_body(const world& w, entity_id id
     b.job.assign(n, 0);
     b.ready.assign(n, 0);
     b.dirty.assign(n, 0);
+    b.disk_has.assign(n, 0);
+    b.disk_hash.assign(n, 0);
+    b.disk_same.assign(n, 0);
+    b.disk_pending.assign(n, 0);
+    b.disk_size.assign(n, 0);
+    b.disk_raw.assign(n, 0);
     b.far_geom = gb::make_geometry(b.gw, b.gh, gb::k_far_ppr, gb::k_tilt_sy);
     b.far_cw = (b.far_geom.W + gb::k_chunk_px - 1) / gb::k_chunk_px;
     b.far_ch = (b.far_geom.H + gb::k_chunk_px - 1) / gb::k_chunk_px;
@@ -385,7 +591,7 @@ void ground_layer::drop_master(body_state& b)
     {
         std::lock_guard lk(m_mx);
         const auto split = std::partition(m_jobs.begin(), m_jobs.end(), [&](const job& j) {
-            return !(j.body == b.id && j.kind == job_kind::master);
+            return !(j.body == b.id && (j.kind == job_kind::master || j.kind == job_kind::load));
         });
         m_inflight -= static_cast<int>(m_jobs.end() - split);
         m_jobs.erase(split, m_jobs.end());
@@ -407,22 +613,32 @@ void ground_layer::drop_master(body_state& b)
     b.background = false;
 }
 
-void ground_layer::make_room(long long need, entity_id keep_a, entity_id keep_b)
+long long ground_layer::budget_total() const
 {
     long long total = 0;
     for (const auto& [id, bp] : m_bodies)
-        total += bp->ram;
+        if (!pinned(id))
+            total += bp->ram;
+    return total;
+}
+
+void ground_layer::make_room(long long need, entity_id keep_a, entity_id keep_b)
+{
+    // BL-1259: the home body is pinned — outside the budget, never a victim.
+    long long total = budget_total();
     // `need` is what @p keep_a will hold once whole; count what it holds now
     // as part of it.
-    if (const body_state* k = find(keep_a))
+    if (pinned(keep_a))
+        need = 0;
+    else if (const body_state* k = find(keep_a))
         total -= k->ram;
-    while (total + need > k_ram_budget)
+    while (total + need > ram_budget)
     {
         body_state* victim = nullptr;
         for (auto& [id, bp] : m_bodies)
         {
             body_state& c = *bp;
-            if (c.id == keep_a || c.id == keep_b)
+            if (c.id == keep_a || c.id == keep_b || pinned(c.id))
                 continue;
             if (c.ram <= static_cast<long long>(c.far_px.size()) * 4)
                 continue; // nothing but its far page
@@ -433,11 +649,18 @@ void ground_layer::make_room(long long need, entity_id keep_a, entity_id keep_b)
         if (!victim)
             return;
         const long long before = victim->ram;
-        drop_master(*victim);
+        if (m_cache_live)
+            cache_init();
+        if (cache_live())
+            spill_master(*victim, /*sync=*/false, nullptr); // prints its own line
+        else
+        {
+            drop_master(*victim);
+            std::printf("[ground] RAM budget: dropped the master of body %u (%.2f GB freed)\n",
+                        static_cast<unsigned>(victim->id), (before - victim->ram) / 1073741824.0);
+            std::fflush(stdout);
+        }
         total -= before - victim->ram;
-        std::printf("[ground] RAM budget: dropped the master of body %u (%.2f GB freed)\n",
-                    static_cast<unsigned>(victim->id), (before - victim->ram) / 1073741824.0);
-        std::fflush(stdout);
     }
 }
 
@@ -451,8 +674,28 @@ void ground_layer::forget_world()
     }
     flush_gpu();
     m_bodies.clear();
+    // BL-1259: the cache is this world's: its files go (on the writer, after
+    // any write still queued), and a writer result still in flight lands in
+    // nothing.
+    ++m_world_gen;
+    for (const std::filesystem::path& dir : m_session_dirs)
+    {
+        disk_task t;
+        t.k = disk_task::kind::remove_dir;
+        t.dir = dir;
+        std::lock_guard lk(m_wmx);
+        m_wtasks.push_back(std::move(t));
+    }
+    if (!m_session_dirs.empty())
+    {
+        m_session_dirs.clear();
+        if (!m_writer.joinable())
+            m_writer = std::thread([this] { writer_main(); });
+        m_wcv.notify_one();
+    }
     m_active = null_entity;
     m_prebake = null_entity;
+    m_home = null_entity;
     m_boundary_log = false;
     m_boundary_track = false;
     m_in_play = false;
@@ -483,6 +726,7 @@ void ground_layer::prebake(const world& w, entity_id body, bool assume_surveyed)
         refresh_source(*b, w);
     }
     m_prebake = body;
+    m_home = body; // the pre-bake target is the homeworld: pinned (BL-1259)
     b->last_visit = m_frame;
     make_room(master_bytes(*b), body, m_active);
     if (fill_log_on())
@@ -604,7 +848,7 @@ bool ground_layer::complete_master(const world& w, entity_id body, double timeou
     const auto t0 = clock::now();
     const auto chunk_busy = [&] {
         for (int i = 0; i < b.n_chunks; ++i)
-            if (b.job[i] != 0)
+            if (b.job[i] != 0 || b.disk_pending[i])
                 return true;
         return false;
     };
@@ -629,9 +873,9 @@ bool ground_layer::complete_master(const world& w, entity_id body, double timeou
         // taken against an older source it lands dirty and the next round
         // re-queues it).
         for (int i = 0; i < b.n_chunks; ++i)
-            if (b.job[i] == 0 && (!b.ready[i] || b.dirty[i]))
+            if (b.job[i] == 0 && !b.disk_pending[i] && (!b.ready[i] || b.dirty[i]))
             {
-                job j = make_master_job(b, i, k_prio_view + i);
+                job j = make_chunk_job(b, i, k_prio_view + i, cache_live());
                 b.job[i] = j.seq;
                 enqueue(std::move(j));
             }
@@ -667,6 +911,34 @@ void ground_layer::shutdown()
     }
     m_inflight = 0;
     m_results.clear();
+    // BL-1259: the writer stops (writes still queued are abandoned — the
+    // cache is this session's), then this session's cache directories go.
+    std::deque<disk_task> abandoned;
+    if (m_writer.joinable())
+    {
+        {
+            std::lock_guard lk(m_wmx);
+            m_wquit = true;
+            abandoned.swap(m_wtasks);
+        }
+        m_wcv.notify_all();
+        m_writer.join();
+        m_writer = std::thread();
+        m_wquit = false;
+        m_wresults.clear();
+    }
+    for (const disk_task& t : abandoned) // a previous world's directories, not yet removed
+        if (t.k == disk_task::kind::remove_dir)
+        {
+            std::error_code ec;
+            std::filesystem::remove_all(t.dir, ec);
+        }
+    for (const std::filesystem::path& dir : m_session_dirs)
+    {
+        std::error_code ec;
+        std::filesystem::remove_all(dir, ec);
+    }
+    m_session_dirs.clear();
     forget_world();
     if (m_far_tex)
     {
@@ -702,6 +974,32 @@ ground_layer::job ground_layer::make_master_job(const body_state& b, int idx, do
     if (b.ready[idx] && !s.px[idx].empty() && b.baked_src[idx] && patching_on())
         j.old_src = b.baked_src[idx];
     return j;
+}
+
+ground_layer::job ground_layer::make_chunk_job(body_state& b, int idx, double prio, bool allow_disk)
+{
+    if (allow_disk && !m_disk_root.empty() && !b.ready[idx] && b.disk_has[idx] && !b.disk_pending[idx])
+    {
+        // The current hash table says the file is stale: bake, do not load.
+        const bool hashes_known = b.hashes_epoch != ~0u && b.swept_digest == b.src_digest
+                               && b.want_hash.size() == static_cast<std::size_t>(b.n_chunks);
+        if (hashes_known && b.disk_hash[idx] != b.want_hash[idx])
+            ++m_bake_counters.load_skipped;
+        else
+        {
+            // A load. When the hashes are not yet known (the sweep is still
+            // queued), the landing — or the sweep after it — marks it dirty
+            // if it moved, and it re-bakes then.
+            job j = make_master_job(b, idx, prio);
+            j.kind    = job_kind::load;
+            j.old_src = nullptr;
+            j.file    = chunk_file(b.disk_dir, idx);
+            j.stamp   = m_disk_stamp ^ bytes_check(reinterpret_cast<const std::uint8_t*>(&params),
+                                                   sizeof params);
+            return j;
+        }
+    }
+    return make_master_job(b, idx, prio);
 }
 
 void ground_layer::start_far(body_state& b)
@@ -847,6 +1145,7 @@ void ground_layer::land(result& d, bool sync)
         return;
     }
     case job_kind::master:
+    case job_kind::load:
         break;
     case job_kind::neigh:
         return;
@@ -857,6 +1156,26 @@ void ground_layer::land(result& d, bool sync)
     if (idx < 0 || idx >= b.n_chunks || d.seq != b.job[idx])
         return; // not the job this slot is waiting on (dropped, superseded)
     b.job[idx] = 0;
+    const bool from_disk = d.kind == job_kind::load;
+    if (from_disk)
+    {
+        m_bake_counters.load_ms += d.ms;
+        m_bake_counters.load_read_ms += d.read_ms;
+    }
+    if (from_disk && !d.loaded)
+    {
+        // BL-1259: a missing, foreign or corrupt file — forget it; the next
+        // feed bakes the chunk, silently.
+        if (!b.disk_pending[idx])
+        {
+            b.disk_has[idx] = 0;
+            b.disk_size[idx] = 0;
+            b.disk_raw[idx] = 0;
+        }
+        b.disk_same[idx] = 0;
+        ++m_bake_counters.load_failures;
+        return;
+    }
     const bool was_counted = b.ready[idx] && !b.dirty[idx];
     const bool was_ready   = b.ready[idx] != 0;
     if (d.patched)
@@ -941,17 +1260,26 @@ void ground_layer::land(result& d, bool sync)
         }
     }
     b.ready[idx] = 1;
-    b.baked_src[idx] = d.src;
+    // A load knows its hash, not the source it was baked against: a later
+    // re-bake of it is a whole chunk.
+    b.baked_src[idx] = from_disk ? nullptr : d.src;
     if (was_ready)
         m_bake_counters.rebake_ms += d.ms;
     b.baked_hash[idx] = d.hash;
-    ++b.bakes[idx];
     // Hashed against an older snapshot than the current table? Then the
     // landing itself says whether it is already stale.
     b.dirty[idx] = b.swept_digest == b.src_digest && b.hashes_epoch != ~0u
                 && d.hash != b.want_hash[idx];
     const bool now_counted = !b.dirty[idx];
     b.n_ready += (now_counted ? 1 : 0) - (was_counted ? 1 : 0);
+    if (from_disk)
+    {
+        b.disk_same[idx] = 1; // its file holds exactly these pixels
+        ++m_bake_counters.chunk_loads;
+        return;
+    }
+    b.disk_same[idx] = 0;
+    ++b.bakes[idx];
     ++m_bake_counters.chunk_bakes;
     if (was_ready)
         ++m_bake_counters.chunk_rebakes;
@@ -991,7 +1319,7 @@ void ground_layer::feed(bool verify)
         }
         bool any = false;
         for (int i = 0; i < b.n_chunks && !any; ++i)
-            any = b.ready[i] || b.job[i];
+            any = b.ready[i] || b.job[i] || b.disk_has[i]; // a spilled chunk needs the table too
         if (any && b.swept_digest != b.src_digest && b.sweep_job == 0)
         {
             job j = make_sweep_job(b);
@@ -1000,6 +1328,7 @@ void ground_layer::feed(bool verify)
             ++queued;
         }
     };
+    const bool disk = cache_live();
     body_state* act = find(m_active);
     body_state* pre = m_prebake != m_active ? find(m_prebake) : nullptr;
     if (act)
@@ -1008,7 +1337,8 @@ void ground_layer::feed(bool verify)
         housekeep(*pre);
 
     const auto needs = [](const body_state& b, int i) {
-        return b.job[i] == 0 && (!b.ready[i] || b.dirty[i]);
+        // A chunk whose spill is still being written waits for it (then loads).
+        return b.job[i] == 0 && !b.disk_pending[i] && (!b.ready[i] || b.dirty[i]);
     };
     // Every unbaked or dirty chunk of @p b, nearest (cx, cy) first.
     const auto fill_body = [&](body_state& b, double base, double cx, double cy) {
@@ -1033,7 +1363,7 @@ void ground_layer::feed(bool verify)
                           [](const cand& a, const cand& bb) { return a.d2 < bb.d2 || (a.d2 == bb.d2 && a.i < bb.i); });
         for (std::size_t n = 0; n < k; ++n)
         {
-            job j = make_master_job(b, c[n].i, base + c[n].d2);
+            job j = make_chunk_job(b, c[n].i, base + c[n].d2, disk);
             b.job[c[n].i] = j.seq;
             enqueue(std::move(j));
             ++queued;
@@ -1070,7 +1400,7 @@ void ground_layer::feed(bool verify)
                     break;
                 if (!needs(*act, e.i))
                     continue; // a wrap copy already queued it
-                job j = make_master_job(*act, e.i, k_prio_view + e.d2);
+                job j = make_chunk_job(*act, e.i, k_prio_view + e.d2, disk);
                 act->job[e.i] = j.seq;
                 enqueue(std::move(j));
                 ++queued;
@@ -1118,9 +1448,7 @@ void ground_layer::feed(bool verify)
         if (a.dist != b.dist) return a.dist < b.dist;
         return a.id < b.id;
     });
-    long long total = 0;
-    for (const auto& [id, bp] : m_bodies)
-        total += bp->ram;
+    const long long total = budget_total(); // the home body is pinned outside it
     for (const bcand& c : order)
     {
         if (queued >= cap)
@@ -1138,14 +1466,14 @@ void ground_layer::feed(bool verify)
                 const gb::geometry gl = gb::level_geometry(m, l);
                 est += static_cast<long long>(gl.W) * gl.H * 4;
             }
-            if (total + est > k_ram_budget)
+            if (!pinned(c.id) && total + est > ram_budget)
                 continue;
             b = ensure_body(w, c.id);
             if (!b)
                 continue;
             b->background = true;
         }
-        else if (total - b->ram + master_bytes(*b) > k_ram_budget)
+        else if (!pinned(c.id) && total - b->ram + master_bytes(*b) > ram_budget)
             continue;
         housekeep(*b);
         fill_body(*b, k_prio_background, b->lv[0].cw * 0.5, b->lv[0].ch * 0.5);
@@ -1177,6 +1505,7 @@ void ground_layer::pump(const world* wp, bool verify)
     }
     if (verify && bench_async_on())
         verify = false;
+    m_cache_live = !verify; // the --verify synchronous path: a budget drop is a plain drop
     ++m_frame;
     drain();
     // A round boundary's re-bake, done: what it cost (BL-1246, the partial
@@ -1214,6 +1543,8 @@ void ground_layer::pump(const world* wp, bool verify)
     }
     const world& w = *wp;
     m_world = wp;
+    if (w.home_body != null_entity)
+        m_home = w.home_body; // pinned in RAM (BL-1259)
 
     // A body that left the world (or changed its grid) is forgotten.
     for (auto it = m_bodies.begin(); it != m_bodies.end();)
@@ -1390,7 +1721,10 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
         bake_everything = false;
     if (!bake_everything)
         m_in_play = true;
+    m_cache_live = !bake_everything;
     m_world = &w;
+    if (w.home_body != null_entity)
+        m_home = w.home_body;
 
     const entity_id body = ui.active_body;
     if (body != m_active)
@@ -1661,6 +1995,7 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
     m_publish_keys.clear();
     m_publish_level = level;
     m_pending_uploads = 0;
+    m_view_final = false;
     if (have_view)
     {
         // The first view on a body (a body switch, play opening) uploads its
@@ -1733,6 +2068,30 @@ void ground_layer::tick(SDL_Renderer* r, const world& w, ui_state& ui, bool bake
             }
         }
         evict_gpu();
+
+        // The view is final: every master chunk under it landed and current,
+        // and the drawn level's visible chunks on the GPU at their version
+        // (ground_stats().view_final — BL-1259's return-to-a-body reading).
+        m_view_final = m_pending_uploads == 0;
+        if (m_view_final)
+            for (const int i : under_view(vis))
+                if (!b.ready[i] || b.dirty[i])
+                {
+                    m_view_final = false;
+                    break;
+                }
+        if (m_view_final)
+        {
+            const level_store& s = b.lv[level];
+            for (int lj = vis.cj_lo; lj <= vis.cj_hi && m_view_final; ++lj)
+                for (int li = vis.ci_lo; li <= vis.ci_hi && m_view_final; ++li)
+                {
+                    const int idx = lj * s.cw + ((li % s.cw) + s.cw) % s.cw;
+                    const auto it = m_gpu.find((static_cast<std::uint32_t>(level) << 24)
+                                               | static_cast<std::uint32_t>(idx));
+                    m_view_final = it != m_gpu.end() && it->second.ver == s.ver[idx];
+                }
+        }
 
         // Fill timing: the drawn level's visible chunks all final.
         if ((m_fill_pending || m_visit_pending || m_rebake_pending) && m_pending_uploads == 0)
@@ -1861,6 +2220,7 @@ ground_layer::stats ground_layer::stats_snapshot() const
             s.gpu_bytes[1 + (key >> 24)] += static_cast<long long>(g.w) * g.h * 4;
     s.active_slot = m_publish_level >= 0 ? 1 + m_publish_level : 0;
     s.pending_uploads = m_pending_uploads;
+    s.view_final = m_view_final;
     return s;
 }
 
@@ -1919,4 +2279,812 @@ std::uint64_t ground_layer::installation_digest() const
     if (!b || !b->src || b->far_geom.W <= 0)
         return 0;
     return gb::installation_hash(*b->src, b->far_geom, 0, 0, b->far_geom.W, b->far_geom.H);
+}
+
+// ---------------------------------------------------------------------------
+// The disk cache (BL-1259; RENDERING.md § Chunks, cache and invalidation)
+//
+// LOCATION: %LOCALAPPDATA%\ProjectIo\ground_cache on Windows ($XDG_CACHE_HOME
+// or ~/.cache /ProjectIo/ground_cache elsewhere; IO_GROUND_CACHE_DIR
+// overrides). Local app data, not the save directory: it is the per-machine,
+// non-roaming place for a regenerable cache — a save folder is the player's
+// (and may sync to a cloud drive), and gigabytes of ground there would follow
+// it. One directory per body: s<stamp>-w<world>-b<body>-<W>x<H>-p<pid>, where
+// the stamp folds the file format, the executable's size and write time (a
+// rebuilt bake can never read an old one) and the master constants; the world
+// key is the body's terrain hash at its first spill (the ground layer does not
+// hold the seed; this keys the same thing more tightly — seed and wizard
+// dials); pid keeps two running copies apart. The bake dials are folded into
+// every file's stamp, so a changed dial reads as a miss. SESSION-SCOPED: this
+// run's directories are deleted at exit and on a new world, and a directory
+// nobody has written for an hour is purged at the first spill (a crashed
+// run's).
+// ---------------------------------------------------------------------------
+
+void ground_layer::cache_init()
+{
+    if (m_disk_init)
+        return;
+    m_disk_init = true;
+    namespace fs = std::filesystem;
+    fs::path root;
+    if (const char* v = SDL_getenv("IO_GROUND_CACHE_DIR"); v && *v)
+        root = utf8_path(v);
+    else if (const char* la = SDL_getenv("LOCALAPPDATA"); la && *la)
+        root = utf8_path(la) / "ProjectIo" / "ground_cache";
+    else if (const char* xc = SDL_getenv("XDG_CACHE_HOME"); xc && *xc)
+        root = utf8_path(xc) / "ProjectIo" / "ground_cache";
+    else if (const char* home = SDL_getenv("HOME"); home && *home)
+        root = utf8_path(home) / ".cache" / "ProjectIo" / "ground_cache";
+    std::error_code ec;
+    if (!root.empty())
+        fs::create_directories(root, ec);
+    if (root.empty() || ec || !fs::is_directory(root, ec))
+    {
+        std::printf("[ground] disk cache: no usable location -- a budget drop re-bakes on return\n");
+        std::fflush(stdout);
+        return;
+    }
+    m_disk_root = root;
+    if (const char* v = SDL_getenv("IO_GROUND_CACHE_CAP_GB"))
+        if (const double gbs = std::atof(v); gbs > 0.0)
+            m_disk_cap = static_cast<long long>(gbs * 1073741824.0);
+
+    // The stamp: format x executable identity x master constants.
+    std::uint64_t st = fold64(0x47524F554E44ull, k_cache_format);
+    fs::path exe_path;
+#ifdef _WIN32
+    wchar_t exe[1024] = {};
+    const unsigned long n = GetModuleFileNameW(nullptr, exe, 1024);
+    if (n > 0 && n < 1024)
+        exe_path = exe;
+#else
+    exe_path = fs::read_symlink("/proc/self/exe", ec);
+    ec.clear();
+#endif
+    if (!exe_path.empty())
+    {
+        const auto sz = fs::file_size(exe_path, ec);
+        if (!ec)
+            st = fold64(st, static_cast<std::uint64_t>(sz));
+        ec.clear();
+        const auto wt = fs::last_write_time(exe_path, ec);
+        if (!ec)
+            st = fold64(st, static_cast<std::uint64_t>(wt.time_since_epoch().count()));
+        ec.clear();
+    }
+    st = fold64(st, static_cast<std::uint64_t>(gb::k_chunk_px));
+    st = fold64(st, static_cast<std::uint64_t>(L));
+    st = fold64(st, static_cast<std::uint64_t>(k_master_ss));
+    m_disk_stamp = st;
+
+    // A crashed run's directories: nobody has written them for an hour.
+    bool queued = false;
+    const auto now = fs::file_time_type::clock::now();
+    for (fs::directory_iterator it(root, ec), end; !ec && it != end; it.increment(ec))
+    {
+        std::error_code e2;
+        if (!it->is_directory(e2))
+            continue;
+        const auto wt = fs::last_write_time(it->path(), e2);
+        if (!e2 && now - wt > std::chrono::hours(1))
+        {
+            disk_task t;
+            t.k = disk_task::kind::remove_dir;
+            t.dir = it->path();
+            std::lock_guard lk(m_wmx);
+            m_wtasks.push_back(std::move(t));
+            queued = true;
+        }
+    }
+    if (queued)
+    {
+        if (!m_writer.joinable())
+            m_writer = std::thread([this] { writer_main(); });
+        m_wcv.notify_one();
+    }
+    std::printf("[ground] disk cache: %s (cap %.0f GB, session-scoped)\n",
+                path_utf8(m_disk_root).c_str(), m_disk_cap / 1073741824.0);
+    std::fflush(stdout);
+}
+
+void ground_layer::ensure_disk_keys(body_state& b)
+{
+    if (!b.disk_dir.empty() || m_disk_root.empty())
+        return;
+    std::uint64_t wfp = 0;
+    if (b.src)
+        wfp = gb::terrain_hash(*b.src, b.far_geom, 0, 0, b.far_geom.W, b.far_geom.H);
+#ifdef _WIN32
+    const unsigned pid = static_cast<unsigned>(_getpid());
+#else
+    const unsigned pid = static_cast<unsigned>(getpid());
+#endif
+    char name[128];
+    std::snprintf(name, sizeof name, "s%016llx-w%016llx-b%u-%dx%d-p%u",
+                  static_cast<unsigned long long>(m_disk_stamp), static_cast<unsigned long long>(wfp),
+                  static_cast<unsigned>(b.id), b.lv[0].geom.W, b.lv[0].geom.H, pid);
+    b.disk_dir = m_disk_root / name;
+    m_session_dirs.push_back(b.disk_dir);
+}
+
+int ground_layer::spill_master(body_state& b, bool sync, int* skipped, const char* why)
+{
+    cache_init();
+    if (m_disk_root.empty())
+    {
+        drop_master(b);
+        return -1;
+    }
+    ensure_disk_keys(b);
+    // Waiting master / load jobs of this body go; in-flight ones are orphaned
+    // (their slots are cleared below, so they land in nothing).
+    {
+        std::lock_guard lk(m_mx);
+        const auto split = std::partition(m_jobs.begin(), m_jobs.end(), [&](const job& j) {
+            return !(j.body == b.id && (j.kind == job_kind::master || j.kind == job_kind::load));
+        });
+        m_inflight -= static_cast<int>(m_jobs.end() - split);
+        m_jobs.erase(split, m_jobs.end());
+    }
+    disk_task t;
+    t.k     = disk_task::kind::spill;
+    t.body  = b.id;
+    t.gen   = m_world_gen;
+    t.dir   = b.disk_dir;
+    t.purge = !b.disk_purged;
+    t.stamp = m_disk_stamp ^ bytes_check(reinterpret_cast<const std::uint8_t*>(&params), sizeof params);
+    b.disk_purged = true;
+    int skip = 0;
+    const level_store& s0 = b.lv[0];
+    for (int i = 0; i < b.n_chunks; ++i)
+    {
+        // A chunk whose hash moved holds stale pixels: not worth a file (a
+        // file it already has still holds ITS hash's content, and stays).
+        if (!b.ready[i] || b.dirty[i] || s0.px[i].empty())
+            continue;
+        if (b.disk_has[i] && b.disk_same[i] && b.disk_hash[i] == b.baked_hash[i])
+        {
+            ++skip; // its file already holds these pixels
+            continue;
+        }
+        const int ci = i % s0.cw, cj = i / s0.cw;
+        spill_chunk c;
+        c.idx  = i;
+        c.pw   = std::min(gb::k_chunk_px, s0.geom.W - ci * gb::k_chunk_px);
+        c.ph   = std::min(gb::k_chunk_px, s0.geom.H - cj * gb::k_chunk_px);
+        c.hash = b.baked_hash[i];
+        t.chunks.push_back(c);
+        b.disk_has[i]     = 1;
+        b.disk_hash[i]    = b.baked_hash[i];
+        b.disk_same[i]    = 1;
+        b.disk_pending[i] = 1;
+    }
+    // Every level leaves RAM now: into the task when there is something to
+    // write (the writer frees it as it goes), else straight away.
+    for (int l = 0; l < L; ++l)
+    {
+        level_store& s = b.lv[l];
+        t.cw[l] = s.cw;
+        t.lw[l] = s.geom.W;
+        t.lh[l] = s.geom.H;
+        if (!t.chunks.empty())
+            t.lv[l] = std::move(s.px);
+        else
+            std::vector<std::vector<std::uint32_t>>().swap(s.px);
+        s.px.clear();
+        s.px.resize(static_cast<std::size_t>(s.cw) * s.ch);
+        for (std::uint32_t& v : s.ver)
+            ++v;
+    }
+    std::fill(b.job.begin(), b.job.end(), 0);
+    std::fill(b.baked_src.begin(), b.baked_src.end(), nullptr);
+    std::fill(b.ready.begin(), b.ready.end(), 0);
+    std::fill(b.dirty.begin(), b.dirty.end(), 0);
+    const long long freed = b.ram - static_cast<long long>(b.far_px.size()) * 4;
+    b.n_ready = 0;
+    b.ram = static_cast<long long>(b.far_px.size()) * 4;
+    b.background = false;
+    ++m_bake_counters.spills;
+    m_bake_counters.write_skipped += static_cast<std::uint64_t>(skip);
+    if (skipped)
+        *skipped = skip;
+    // The cap's eviction order: other bodies with files, least recently visited first.
+    std::vector<const body_state*> others;
+    for (const auto& [id, bp] : m_bodies)
+        if (id != b.id && !bp->disk_dir.empty())
+            others.push_back(bp.get());
+    std::sort(others.begin(), others.end(), [](const body_state* x, const body_state* y) {
+        return x->last_visit < y->last_visit || (x->last_visit == y->last_visit && x->id < y->id);
+    });
+    for (const body_state* o : others)
+        t.evict_order.push_back({ o->id, o->disk_dir });
+    const int n = static_cast<int>(t.chunks.size());
+    std::printf("[ground] %s: spilled the master of body %u to the disk cache (%d chunks to write, "
+                "%d already on disk; %.2f GB freed)\n",
+                why, static_cast<unsigned>(b.id), n, skip, freed / 1073741824.0);
+    std::fflush(stdout);
+    if (sync)
+    {
+        std::vector<disk_result> out;
+        run_disk_task(t, out);
+        for (const disk_result& r : out)
+            land_disk(r);
+    }
+    else
+    {
+        {
+            std::lock_guard lk(m_wmx);
+            m_wtasks.push_back(std::move(t));
+        }
+        if (!m_writer.joinable())
+            m_writer = std::thread([this] { writer_main(); });
+        m_wcv.notify_one();
+    }
+    return n;
+}
+
+void ground_layer::writer_main()
+{
+    // Below normal, as the pool: the writer must never take the render or
+    // simulation thread's core.
+    SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_LOW);
+    for (;;)
+    {
+        disk_task t;
+        {
+            std::unique_lock lk(m_wmx);
+            m_wcv.wait(lk, [&] { return m_wquit || !m_wtasks.empty(); });
+            if (m_wquit)
+                return;
+            t = std::move(m_wtasks.front());
+            m_wtasks.pop_front();
+            m_wbusy = true;
+        }
+        std::vector<disk_result> out;
+        run_disk_task(t, out);
+        t = disk_task{}; // the level buffers go before the writer says it is idle
+        {
+            std::lock_guard lk(m_wmx);
+            for (disk_result& r : out)
+                m_wresults.push_back(r);
+            m_wbusy = false;
+        }
+        m_widle_cv.notify_all();
+    }
+}
+
+void ground_layer::run_disk_task(disk_task& t, std::vector<disk_result>& out)
+{
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    const std::string key = path_utf8(t.dir);
+    if (t.k == disk_task::kind::remove_dir)
+    {
+        fs::remove_all(t.dir, ec);
+        std::lock_guard lk(m_wmx);
+        m_wdir_bytes.erase(key);
+        return;
+    }
+    const auto fail_rest = [&](std::size_t from) {
+        for (std::size_t k = from; k < t.chunks.size(); ++k)
+            out.push_back({ t.body, t.gen, t.chunks[k].idx, false, 0u, 0u });
+    };
+    if (t.purge)
+    {
+        fs::remove_all(t.dir, ec);
+        std::lock_guard lk(m_wmx);
+        m_wdir_bytes.erase(key);
+    }
+    ec.clear();
+    fs::create_directories(t.dir, ec);
+    if (ec)
+    {
+        fail_rest(0);
+        return;
+    }
+    // The cap: the bytes this spill may add (an upper bound: raw RGBA and its
+    // mip pieces) over what the session holds; past it, evict whole bodies,
+    // least recently visited first. And never fill the disk: keep 2 GB free.
+    long long add = 0;
+    for (const spill_chunk& c : t.chunks)
+        add += static_cast<long long>(c.pw) * c.ph * 4 * 4 / 3 + 4096;
+    {
+        long long held = 0;
+        {
+            std::lock_guard lk(m_wmx);
+            for (const auto& [k, v] : m_wdir_bytes)
+                held += v;
+        }
+        for (const auto& [id, dir] : t.evict_order)
+        {
+            if (held + add <= m_disk_cap)
+                break;
+            const std::string dk = path_utf8(dir);
+            long long had = 0;
+            {
+                std::lock_guard lk(m_wmx);
+                const auto it = m_wdir_bytes.find(dk);
+                if (it == m_wdir_bytes.end())
+                    continue;
+                had = it->second;
+                m_wdir_bytes.erase(it);
+            }
+            fs::remove_all(dir, ec);
+            ec.clear();
+            held -= had;
+            out.push_back({ id, t.gen, -1, false, 0u, 0u }); // its files are gone
+            std::printf("[ground] disk cache: cap %.0f GB -- evicted body %u (%.2f GB)\n",
+                        m_disk_cap / 1073741824.0, static_cast<unsigned>(id), had / 1073741824.0);
+            std::fflush(stdout);
+        }
+        const fs::space_info sp = fs::space(t.dir, ec);
+        if (!ec && static_cast<long long>(sp.available) < add + (2LL << 30))
+        {
+            std::printf("[ground] disk cache: under 2 GB free -- body %u not written (re-bakes on return)\n",
+                        static_cast<unsigned>(t.body));
+            std::fflush(stdout);
+            fail_rest(0);
+            return;
+        }
+        ec.clear();
+    }
+    // Free as we go: chunks in block order (the 2^(L-1) square a coarsest
+    // level chunk covers), each level chunk released once the last chunk that
+    // reads it is written — the spill's RAM drains with its writes rather than
+    // all at the end (a whole home master is ~6.7 GB).
+    {
+        const int cw0 = t.cw[0];
+        const int sh = L - 1;
+        std::stable_sort(t.chunks.begin(), t.chunks.end(), [cw0, sh](const spill_chunk& a, const spill_chunk& c) {
+            const int ai = a.idx % cw0, aj = a.idx / cw0, ci2 = c.idx % cw0, cj2 = c.idx / cw0;
+            if ((aj >> sh) != (cj2 >> sh)) return (aj >> sh) < (cj2 >> sh);
+            if ((ai >> sh) != (ci2 >> sh)) return (ai >> sh) < (ci2 >> sh);
+            return a.idx < c.idx;
+        });
+    }
+    std::vector<std::vector<int>> refs(L);
+    for (int l = 1; l < L; ++l)
+    {
+        refs[l].assign(t.lv[l].size(), 0);
+        for (const spill_chunk& c : t.chunks)
+        {
+            const int ci = c.idx % t.cw[0], cj = c.idx / t.cw[0];
+            const std::size_t lidx = static_cast<std::size_t>(cj >> l) * t.cw[l] + (ci >> l);
+            if (lidx < refs[l].size())
+                ++refs[l][lidx];
+        }
+        for (std::size_t i = 0; i < refs[l].size(); ++i)
+            if (refs[l][i] == 0)
+                std::vector<std::uint32_t>().swap(t.lv[l][i]); // read by no chunk being written
+    }
+    {
+        // The master chunks not being written go now too.
+        std::vector<std::uint8_t> keep(t.lv[0].size(), 0);
+        for (const spill_chunk& c : t.chunks)
+            if (static_cast<std::size_t>(c.idx) < keep.size())
+                keep[static_cast<std::size_t>(c.idx)] = 1;
+        for (std::size_t i = 0; i < t.lv[0].size(); ++i)
+            if (!keep[i])
+                std::vector<std::uint32_t>().swap(t.lv[0][i]);
+    }
+    std::vector<std::uint8_t> buf;
+    std::vector<std::uint32_t> piece;
+    for (std::size_t k = 0; k < t.chunks.size(); ++k)
+    {
+        {
+            std::lock_guard lk(m_wmx);
+            if (m_wquit)
+                return; // shutting down: the session's files go anyway
+        }
+        const spill_chunk& c = t.chunks[k];
+        buf.clear();
+        buf.resize(k_header_bytes);
+        std::uint32_t raw = 0;
+        bool ok = true;
+        const int cw0 = t.cw[0];
+        const int ci = c.idx % cw0, cj = c.idx / cw0;
+        for (int l = 0; l < L && ok; ++l)
+        {
+            const int pw = c.pw >> l, ph = c.ph >> l;
+            const std::size_t n = static_cast<std::size_t>(pw) * ph;
+            if (l == 0)
+            {
+                const std::vector<std::uint32_t>& src = t.lv[0][static_cast<std::size_t>(c.idx)];
+                if (src.size() != n)
+                {
+                    ok = false;
+                    break;
+                }
+                encode_piece(src.data(), n, buf);
+            }
+            else
+            {
+                // This chunk's share of level l (the placement land() made).
+                const int li = ci >> l, lj = cj >> l;
+                const std::size_t lidx = static_cast<std::size_t>(lj) * t.cw[l] + li;
+                const int lw = std::min(gb::k_chunk_px, t.lw[l] - li * gb::k_chunk_px);
+                const int f  = 1 << l;
+                const int ox = (ci & (f - 1)) * (gb::k_chunk_px >> l);
+                const int oy = (cj & (f - 1)) * (gb::k_chunk_px >> l);
+                if (lidx >= t.lv[l].size() || t.lv[l][lidx].empty())
+                {
+                    ok = false;
+                    break;
+                }
+                const std::vector<std::uint32_t>& src = t.lv[l][lidx];
+                piece.resize(n);
+                for (int y = 0; y < ph; ++y)
+                    std::memcpy(piece.data() + static_cast<std::size_t>(y) * pw,
+                                src.data() + static_cast<std::size_t>(oy + y) * lw + ox,
+                                static_cast<std::size_t>(pw) * 4u);
+                encode_piece(piece.data(), n, buf);
+            }
+            raw += static_cast<std::uint32_t>(n * 4);
+        }
+        // The master piece is no longer needed, nor any level chunk this was
+        // the last reader of: free them as we go.
+        std::vector<std::uint32_t>().swap(t.lv[0][static_cast<std::size_t>(c.idx)]);
+        for (int l = 1; l < L; ++l)
+        {
+            const std::size_t lidx = static_cast<std::size_t>(cj >> l) * t.cw[l] + (ci >> l);
+            if (lidx < refs[l].size() && --refs[l][lidx] == 0)
+                std::vector<std::uint32_t>().swap(t.lv[l][lidx]);
+        }
+        if (!ok)
+        {
+            out.push_back({ t.body, t.gen, c.idx, false, 0u, 0u });
+            continue;
+        }
+        const std::uint32_t payload = static_cast<std::uint32_t>(buf.size() - k_header_bytes);
+        std::uint8_t* h = buf.data();
+        const std::uint32_t fmt = k_cache_format;
+        const std::uint32_t lv = static_cast<std::uint32_t>(L), body = static_cast<std::uint32_t>(t.body);
+        const std::uint32_t idx = static_cast<std::uint32_t>(c.idx);
+        const std::uint64_t check = bytes_check(buf.data() + k_header_bytes, payload);
+        std::memcpy(h, "IOGC", 4);
+        std::memcpy(h + 4, &fmt, 4);
+        std::memcpy(h + 8, &t.stamp, 8);
+        std::memcpy(h + 16, &body, 4);
+        std::memcpy(h + 20, &idx, 4);
+        std::memcpy(h + 24, &c.pw, 4);
+        std::memcpy(h + 28, &c.ph, 4);
+        std::memcpy(h + 32, &c.hash, 8);
+        std::memcpy(h + 40, &lv, 4);
+        std::memcpy(h + 44, &payload, 4);
+        std::memcpy(h + 48, &check, 8);
+        // Atomic: a temp file, closed, then renamed over the chunk's name — a
+        // crash leaves a .tmp (never loaded) or the whole file, never half.
+        const fs::path fin = chunk_file(t.dir, c.idx);
+        fs::path tmp = fin;
+        tmp.replace_extension(".tmp");
+        {
+            std::ofstream f(tmp, std::ios::binary | std::ios::trunc);
+            f.write(reinterpret_cast<const char*>(buf.data()), static_cast<std::streamsize>(buf.size()));
+            f.close();
+            ok = !f.fail();
+        }
+        if (ok)
+        {
+            fs::rename(tmp, fin, ec);
+            if (ec)
+            {
+                ec.clear();
+                fs::remove(fin, ec);
+                ec.clear();
+                fs::rename(tmp, fin, ec);
+            }
+            ok = !ec;
+            ec.clear();
+        }
+        if (!ok)
+        {
+            fs::remove(tmp, ec);
+            ec.clear();
+            out.push_back({ t.body, t.gen, c.idx, false, 0u, 0u });
+            continue;
+        }
+        {
+            std::lock_guard lk(m_wmx);
+            m_wdir_bytes[key] += static_cast<long long>(buf.size());
+        }
+        out.push_back({ t.body, t.gen, c.idx, true, static_cast<std::uint32_t>(buf.size()), raw });
+    }
+}
+
+bool ground_layer::load_chunk_file(const job& j, result& d)
+{
+    const auto t0 = std::chrono::steady_clock::now();
+    std::ifstream f(j.file, std::ios::binary | std::ios::ate);
+    if (!f)
+        return false;
+    const std::streamoff size = f.tellg();
+    if (size < static_cast<std::streamoff>(k_header_bytes) || size > (64LL << 20))
+        return false;
+    std::vector<std::uint8_t> buf(static_cast<std::size_t>(size));
+    f.seekg(0);
+    f.read(reinterpret_cast<char*>(buf.data()), size);
+    if (!f)
+        return false;
+    f.close();
+    d.read_ms = ms_since(t0);
+    const std::uint8_t* h = buf.data();
+    if (std::memcmp(h, "IOGC", 4) != 0 || get_at<std::uint32_t>(h, 4) != k_cache_format
+        || get_at<std::uint64_t>(h, 8) != j.stamp
+        || get_at<std::uint32_t>(h, 16) != static_cast<std::uint32_t>(j.body)
+        || get_at<std::uint32_t>(h, 20) != static_cast<std::uint32_t>(j.idx)
+        || get_at<std::int32_t>(h, 24) != j.pw || get_at<std::int32_t>(h, 28) != j.ph
+        || get_at<std::uint32_t>(h, 40) != static_cast<std::uint32_t>(L)
+        || get_at<std::uint32_t>(h, 44) != buf.size() - k_header_bytes)
+        return false;
+    const std::uint8_t* p = buf.data() + k_header_bytes;
+    const std::uint8_t* end = buf.data() + buf.size();
+    if (bytes_check(p, static_cast<std::size_t>(end - p)) != get_at<std::uint64_t>(h, 48))
+        return false;
+    for (int l = 0; l < L; ++l)
+    {
+        std::vector<std::uint32_t>& dst = l == 0 ? d.px : d.mip[l];
+        const std::size_t n = static_cast<std::size_t>(j.pw >> l) * static_cast<std::size_t>(j.ph >> l);
+        dst.assign(n, 0u);
+        if (!decode_piece(p, end, dst.data(), n))
+            return false;
+    }
+    if (p != end)
+        return false;
+    d.hash = get_at<std::uint64_t>(h, 32);
+    return true;
+}
+
+void ground_layer::drain_disk()
+{
+    std::vector<disk_result> done;
+    {
+        std::lock_guard lk(m_wmx);
+        done.swap(m_wresults);
+    }
+    for (const disk_result& r : done)
+        land_disk(r);
+}
+
+void ground_layer::land_disk(const disk_result& r)
+{
+    if (r.gen != m_world_gen)
+        return; // a previous world's
+    body_state* bp = find(r.body);
+    if (!bp)
+        return;
+    body_state& b = *bp;
+    if (r.idx < 0)
+    {
+        forget_disk(b); // evicted by the cap
+        return;
+    }
+    if (r.idx >= b.n_chunks)
+        return;
+    const std::size_t i = static_cast<std::size_t>(r.idx);
+    b.disk_pending[i] = 0;
+    if (r.ok)
+    {
+        b.disk_size[i] = r.bytes;
+        b.disk_raw[i]  = r.raw;
+        ++m_bake_counters.chunk_writes;
+    }
+    else
+    {
+        b.disk_has[i]  = 0;
+        b.disk_same[i] = 0;
+        b.disk_size[i] = 0;
+        b.disk_raw[i]  = 0;
+        ++m_bake_counters.write_failures;
+    }
+}
+
+void ground_layer::forget_disk(body_state& b)
+{
+    for (int i = 0; i < b.n_chunks; ++i)
+        if (!b.disk_pending[i])
+        {
+            b.disk_has[i]  = 0;
+            b.disk_same[i] = 0;
+            b.disk_size[i] = 0;
+            b.disk_raw[i]  = 0;
+        }
+}
+
+ground_layer::cache_info ground_layer::cache_snapshot() const
+{
+    cache_info c;
+    c.root = path_utf8(m_disk_root);
+    c.cap  = m_disk_cap;
+    c.live = cache_live();
+    std::vector<const body_state*> order;
+    for (const auto& [id, bp] : m_bodies)
+        order.push_back(bp.get());
+    std::sort(order.begin(), order.end(), [](const body_state* x, const body_state* y) { return x->id < y->id; });
+    for (const body_state* b : order)
+    {
+        cache_body cb;
+        cb.body = b->id;
+        for (int i = 0; i < b->n_chunks; ++i)
+        {
+            if (b->disk_has[i] && b->disk_size[i] > 0)
+            {
+                cb.bytes += b->disk_size[i];
+                cb.raw_bytes += b->disk_raw[i];
+                ++cb.files;
+            }
+            cb.pending += b->disk_pending[i] != 0;
+        }
+        cb.resident = b->ram > static_cast<long long>(b->far_px.size()) * 4;
+        cb.pinned   = pinned(b->id);
+        c.bytes   += cb.bytes;
+        c.pending += cb.pending;
+        c.bodies.push_back(cb);
+    }
+    return c;
+}
+
+int ground_layer::spill_body(entity_id body, bool sync, int* skipped)
+{
+    body_state* b = find(body);
+    if (!b)
+        return -1;
+    cache_init();
+    if (m_disk_root.empty())
+        return -1;
+    return spill_master(*b, sync, skipped, "verify");
+}
+
+void ground_layer::wait_cache_idle()
+{
+    {
+        std::unique_lock lk(m_wmx);
+        m_widle_cv.wait(lk, [&] { return m_wtasks.empty() && !m_wbusy; });
+    }
+    drain_disk();
+}
+
+ground_layer::restore_result ground_layer::restore_body(const world& w, entity_id body, double timeout_ms)
+{
+    restore_result rr;
+    const auto t0 = clock::now();
+    wait_cache_idle();
+    drain();
+    body_state* bp = find(body);
+    if (!bp || m_disk_root.empty())
+        return rr;
+    body_state& b = *bp;
+    refresh_source(b, w);
+    // This snapshot's table first, so a moved chunk is known before its load.
+    if (b.swept_digest != b.src_digest)
+    {
+        job j = make_sweep_job(b);
+        b.sweep_job = j.seq;
+        bake_sync(std::move(j));
+    }
+    const std::uint64_t loads0 = m_bake_counters.chunk_loads;
+    const std::uint64_t fails0 = m_bake_counters.load_failures;
+    std::vector<int> set;
+    for (int i = 0; i < b.n_chunks; ++i)
+        if (!b.ready[i] && b.disk_has[i] && b.job[i] == 0)
+            set.push_back(i);
+    const auto run = [&](bool allow_disk) {
+        for (const int i : set)
+            if (!b.ready[i] && b.job[i] == 0)
+            {
+                job j = make_chunk_job(b, i, k_prio_view + i, allow_disk);
+                if (j.kind == job_kind::master)
+                    ++rr.rebaked;
+                b.job[i] = j.seq;
+                enqueue(std::move(j));
+            }
+        for (;;)
+        {
+            drain();
+            bool busy = false;
+            for (const int i : set)
+                busy = busy || b.job[i] != 0;
+            if (!busy)
+                return true;
+            if (ms_since(t0) > timeout_ms)
+                return false;
+            std::unique_lock lk(m_mx);
+            m_done_cv.wait_for(lk, std::chrono::milliseconds(20), [&] { return !m_results.empty(); });
+        }
+    };
+    bool ok = run(true);
+    // A load that failed left its chunk unbaked: bake it now.
+    ok = ok && run(false);
+    rr.loaded = static_cast<int>(m_bake_counters.chunk_loads - loads0);
+    rr.failed = static_cast<int>(m_bake_counters.load_failures - fails0);
+    rr.ok = ok;
+    for (const int i : set)
+        rr.ok = rr.ok && b.ready[i] && !b.dirty[i];
+    rr.ms = ms_since(t0);
+    return rr;
+}
+
+std::uint64_t ground_layer::master_digest(entity_id body, int* chunks) const
+{
+    std::uint64_t h = 0xCBF29CE484222325ull;
+    int n = 0;
+    if (const body_state* bp = find(body))
+    {
+        const body_state& b = *bp;
+        const level_store& s0 = b.lv[0];
+        std::vector<std::uint32_t> piece;
+        for (int i = 0; i < b.n_chunks; ++i)
+        {
+            if (!b.ready[i] || s0.px[i].empty())
+                continue;
+            ++n;
+            h = fold64(h, static_cast<std::uint64_t>(i));
+            h = bytes_check(reinterpret_cast<const std::uint8_t*>(s0.px[i].data()), s0.px[i].size() * 4, h);
+            const int ci = i % s0.cw, cj = i / s0.cw;
+            const int pw0 = std::min(gb::k_chunk_px, s0.geom.W - ci * gb::k_chunk_px);
+            const int ph0 = std::min(gb::k_chunk_px, s0.geom.H - cj * gb::k_chunk_px);
+            for (int l = 1; l < L; ++l)
+            {
+                const level_store& s = b.lv[l];
+                const int li = ci >> l, lj = cj >> l;
+                const std::size_t lidx = static_cast<std::size_t>(lj) * s.cw + li;
+                const int lw = std::min(gb::k_chunk_px, s.geom.W - li * gb::k_chunk_px);
+                const int f  = 1 << l;
+                const int ox = (ci & (f - 1)) * (gb::k_chunk_px >> l);
+                const int oy = (cj & (f - 1)) * (gb::k_chunk_px >> l);
+                const int pw = pw0 >> l, ph = ph0 >> l;
+                if (s.px[lidx].empty())
+                {
+                    h = fold64(h, 0xDEADull);
+                    continue;
+                }
+                piece.resize(static_cast<std::size_t>(pw) * ph);
+                for (int y = 0; y < ph; ++y)
+                    std::memcpy(piece.data() + static_cast<std::size_t>(y) * pw,
+                                s.px[lidx].data() + static_cast<std::size_t>(oy + y) * lw + ox,
+                                static_cast<std::size_t>(pw) * 4u);
+                h = bytes_check(reinterpret_cast<const std::uint8_t*>(piece.data()), piece.size() * 4, h);
+            }
+        }
+    }
+    if (chunks)
+        *chunks = n;
+    return h;
+}
+
+void ground_layer::drop_body(entity_id body)
+{
+    body_state* b = find(body);
+    if (!b)
+        return;
+    wait_cache_idle();
+    drop_master(*b);
+    forget_disk(*b);
+}
+
+int ground_layer::corrupt_cached_chunk(entity_id body)
+{
+    wait_cache_idle();
+    body_state* b = find(body);
+    if (!b)
+        return -1;
+    for (int i = 0; i < b->n_chunks; ++i)
+    {
+        if (!b->disk_has[i] || b->disk_size[i] <= k_header_bytes + 64)
+            continue;
+        const std::filesystem::path p = chunk_file(b->disk_dir, i);
+        std::fstream f(p, std::ios::binary | std::ios::in | std::ios::out);
+        if (!f)
+            return -1;
+        const std::streamoff at = static_cast<std::streamoff>(b->disk_size[i] / 2);
+        char bytes[16];
+        f.seekg(at);
+        f.read(bytes, sizeof bytes);
+        for (char& c : bytes)
+            c = static_cast<char>(c ^ 0x5A);
+        f.seekp(at);
+        f.write(bytes, sizeof bytes);
+        return f ? i : -1;
+    }
+    return -1;
 }
