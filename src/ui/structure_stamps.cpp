@@ -394,6 +394,14 @@ struct part
     top    cap = top::flat;
     bool   cast = true;    ///< Casts a shadow.
     bool   inked = true;   ///< Takes the silhouette contact line.
+    /// BL-1258: a flat-roofed box's storey height (canonical); > 0 draws a
+    /// dark window band per storey on its south and east walls where a storey
+    /// is tall enough in nominal pixels to carry one.
+    float  storey = 0.0f;
+    /// BL-1258: draws in the PREVIOUS part's instance (a roof unit on its
+    /// block, a tower's setback on its tower), so the painter's sort never
+    /// puts it behind what it stands on.
+    bool   attach = false;
 };
 
 struct view
@@ -667,6 +675,23 @@ void draw_part(raster& R, const view& v, double lift, const part& p, mode m)
             }
             quad(P(xl, yf, p.z0), P(xr, yf, p.z0), P(xr, yf, zt), P(xl, yf, zt),
                  p.wall, vramp(P(xl, yf, zt), P(xl, yf, p.z0), 0.86f, 0.62f));
+            // BL-1258: storey bands — a dark window row per storey on the
+            // south and east walls, so a block reads as multi-storey. Every
+            // point goes through P (the 1/256 grid): window-invariant.
+            if (p.k == pk::box && p.storey > 0.0f
+                && p.storey * v.vz * (v.s / v.ss) >= 2.2) // nominal px per storey (BL-1244)
+            {
+                const int floors = static_cast<int>(p.h / p.storey + 0.01f);
+                const double inx = p.hw * 0.10, iny = p.hd * 0.12;
+                for (int f = 0; f < floors && f < 40; ++f)
+                {
+                    const double za = p.z0 + (f + 0.30) * p.storey, zb = p.z0 + (f + 0.66) * p.storey;
+                    quad(P(xl + inx, yf, za), P(xr - inx, yf, za), P(xr - inx, yf, zb), P(xl + inx, yf, zb),
+                         p.wall * 0.46f, flat(1.0f));
+                    quad(P(xr, yf - iny, za), P(xr, yb + iny, za), P(xr, yb + iny, zb), P(xr, yf - iny, zb),
+                         p.wall * 0.30f, flat(1.0f));
+                }
+            }
             if (p.k == pk::gable)
             {
                 quad(P(xl, p.y, zt + p.rh), P(xr, p.y, zt + p.rh), P(xr, yf, zt), P(xl, yf, zt),
@@ -1229,103 +1254,319 @@ void form_scaffold(builder& b, std::uint32_t /*seed*/)
     b.beam(-0.05, -0.42, 1.30, -0.05, -0.42, 0.62, 0.012, C_soot, false);
 }
 
-/// A settlement: a paved footprint and a block field that steps with scale.
+/// BL-1258 (towns denser) — RENDERING.md § Art direction and palette (the
+/// towns bullet) and § Installations. A settlement is a street grid of
+/// compact blocks whose footprint, block count and height step with scale:
+/// grey and warm-grey stone and concrete, lit roofs, shaded sides, storey
+/// bands, chimney stacks in a works quarter, a landmark at the heart.
+struct town_form
+{
+    float R;           ///< Field radius (canonical): a ragged blend of disc and hex.
+    float pitch;       ///< Street-grid pitch: one block plus its street.
+    float street;      ///< A side street's half-width.
+    float main;        ///< The main streets' half-width: the E-W spine at y = 0, the N-S at the grid origin.
+    int   fmin, fmax;  ///< Storeys of an ordinary block, field edge to heart.
+    int   ftower;      ///< Storeys of a heart tower (0: none).
+    int   stacks;      ///< Chimney stacks in the works quarter.
+};
+constexpr town_form k_town[6] = {
+    { 0, 0, 0, 0, 0, 0, 0, 0 },
+    { 0.27f, 0.00f, 0.000f, 0.000f, 1,  2,  0, 0 }, // Outpost: a hamlet round a yard
+    { 0.44f, 0.20f, 0.024f, 0.034f, 1,  2,  0, 0 },
+    { 0.58f, 0.22f, 0.026f, 0.040f, 1,  4,  0, 1 },
+    { 0.72f, 0.23f, 0.027f, 0.042f, 2,  5, 10, 2 },
+    { 0.84f, 0.24f, 0.028f, 0.044f, 2,  7, 16, 3 },
+};
+constexpr float k_storey = 0.036f; ///< One storey, canonical.
+
+/// A settlement: a paved footprint, a street grid of blocks that steps with scale.
 void form_settlement(builder& b, int scale, std::uint32_t seed, int cw, int r,
                      const double* avoid, int n_avoid, double s_px,
                      const bake_source* roads = nullptr)
 {
-    // BL-1253: a road through a town is its street — a block whose footprint
-    // would stand on the road or its verges is left out (route_clearance), so
-    // the painted road runs between the houses. b.k is 1 here: local units are
-    // canonical, and (b.ax, b.ay) is the tile's unwrapped centre.
-    const auto on_road = [&](double x, double y, double half) {
-        return roads && route_clearance(*roads, b.ax + x, b.ay + y) < half;
-    };
     scale = std::clamp(scale, 1, 5);
-    static constexpr float k_radius[6] = { 0, 0.34f, 0.48f, 0.62f, 0.78f, 0.92f };
-    static constexpr float k_cell[6]   = { 0, 0.20f, 0.19f, 0.18f, 0.17f, 0.16f };
-    static constexpr float k_hmax[6]   = { 0, 0.07f, 0.11f, 0.17f, 0.30f, 0.44f };
-    const float R = k_radius[scale];
-    // At low bake resolution the grid coarsens so a block is never sub-pixel:
-    // the far page then reads a city as a pale patch with dark massing.
-    const float cell = std::max(k_cell[scale], static_cast<float>(2.6 / std::max(1.0, s_px)));
+    const town_form& T = k_town[scale];
+    const float R = T.R;
+    // BL-1253: a road through a town is its street. The town is not
+    // re-planned (tile_road_plan leaves it alone); its blocks keep off the
+    // road and its verges (route_clearance) — a lot the road would cross is
+    // trimmed back toward its block's interior, so the frontage still lines
+    // the road, and dropped only when no trim clears it. The E-W main street
+    // lies on y = 0, the line an E-W road takes through the tile, so such a
+    // road runs down the town's spine. Clearance is asked at the WRAPPED tile
+    // centre, so every wrap copy lays the town identically. b.k is 1 here:
+    // local units are canonical.
+    const double wcx = kSqrt3 * (cw + ((r & 1) ? 0.5 : 0.0)), wcy = 1.5 * r;
+    const auto clear_of_road = [&](double x, double y, double hw, double hd) {
+        if (!roads)
+            return true;
+        const double xs[3] = { x - hw, x, x + hw }, ys[3] = { y - hd, y, y + hd };
+        for (const double xx : xs)
+            for (const double yy : ys)
+                if (route_clearance(*roads, wcx + xx, wcy + yy) < 0.006)
+                    return false;
+        return true;
+    };
+    const auto clear_of_works = [&](double x, double y, double hw, double hd) {
+        for (int a = 0; a < n_avoid; ++a)
+        {
+            const double dx = std::max(0.0, std::fabs(x - avoid[3 * a]) - hw);
+            const double dy = std::max(0.0, std::fabs(y - avoid[3 * a + 1]) - hd);
+            if (dx * dx + dy * dy < avoid[3 * a + 2] * avoid[3 * a + 2])
+                return false;
+        }
+        return true;
+    };
+    struct lot
+    {
+        double x, y;
+        float  hw, hd;
+        float  d;             ///< Field distance (0 heart, 1 edge).
+        std::uint32_t salt;
+        std::uint8_t  kind;   ///< 0 block, 1 tower, 2 works hall, 3 landmark, 4 house (outpost)
+    };
+    // Trim a lot off the road toward one of its corners; false = no fit.
+    const auto fit = [&](lot& L) {
+        bool ok = clear_of_road(L.x, L.y, L.hw, L.hd);
+        for (int t = 0; t < 2 && !ok; ++t)
+        {
+            const float sc = t == 0 ? 0.66f : 0.42f;
+            for (int k = 0; k < 4 && !ok; ++k)
+            {
+                const float nhw = L.hw * sc, nhd = L.hd * sc;
+                const double nx = L.x + ((k & 1) ? 1.0 : -1.0) * (L.hw - nhw);
+                const double ny = L.y + ((k & 2) ? 1.0 : -1.0) * (L.hd - nhd);
+                if (clear_of_road(nx, ny, nhw, nhd))
+                {
+                    L.x = nx; L.y = ny; L.hw = nhw; L.hd = nhd;
+                    ok = true;
+                }
+            }
+        }
+        return ok && clear_of_works(L.x, L.y, L.hw, L.hd);
+    };
+    const auto field = [&](double x, double y) {
+        const double ax = std::fabs(x), ay = std::fabs(y);
+        const double hexd = std::max(ax, 0.5 * ax + 0.8660254 * ay) / (0.8660254 * R);
+        return static_cast<float>(0.5 * hexd + 0.5 * std::sqrt(x * x + y * y) / R);
+    };
+
     const bool coarse = s_px < 12.0;
     if (coarse)
     {
-        // The far page: a settlement is a pale paved patch with a dark core of
-        // massing — how a city reads from orbit — sized up so a scale >= 3
-        // centre is several pixels across where the old density dot stood.
-        b.gell(0.0, 0.0, R * 1.25f, R * 1.10f, C_paved * 1.12f, std::min(0.95f, 0.50f + 0.12f * scale), R * 0.30f);
-        b.gell(0.0, -0.04, R * 0.62f, R * 0.52f, C_slate * 0.80f, std::min(0.85f, 0.25f + 0.13f * scale), R * 0.25f);
+        // The far page: a pale paved patch with a dark core of massing — how a
+        // city reads from orbit — so a scale >= 3 centre is several pixels
+        // across where the old density dot stood.
+        b.gell(0.0, 0.0, R * 1.20f, R * 1.08f, C_paved * 1.12f, std::min(0.95f, 0.50f + 0.12f * scale), R * 0.30f);
+        b.gell(0.0, -0.04, R * 0.66f, R * 0.56f, C_soot * 1.15f, std::min(0.90f, 0.25f + 0.14f * scale), R * 0.25f);
     }
     else
-        b.gell(0.0, 0.0, R * 1.10f, R * 0.98f, C_paved, std::min(0.92f, 0.55f + 0.09f * scale), R * 0.35f);
+        b.gell(0.0, 0.0, R * 1.10f, R * 1.02f, C_paved * 0.94f, std::min(0.94f, 0.62f + 0.08f * scale), R * 0.24f);
 
-    const float off_x = (h01(cw, r, 0x5E70u) - 0.5f) * cell;
-    const float off_y = (h01(cw, r, 0x5E71u) - 0.5f) * cell;
-    const int   n = static_cast<int>(std::ceil(R / cell)) + 1;
-    for (int j = -n; j <= n; ++j)
-        for (int i = -n; i <= n; ++i)
-        {
-            // Streets: a spine each way through the larger settlements.
-            if (scale >= 3 && (i == 0 || j == 1))
-                continue;
-            const double cx = i * cell + off_x, cy = j * cell + off_y;
-            const double d  = std::sqrt(cx * cx + cy * cy) / R;
-            if (d > 1.0)
-                continue;
-            bool blocked = false;
-            for (int a = 0; a < n_avoid; ++a)
-            {
-                const double ax = cx - avoid[3 * a], ay = cy - avoid[3 * a + 1];
-                if (ax * ax + ay * ay < avoid[3 * a + 2] * avoid[3 * a + 2])
-                    blocked = true;
-            }
-            if (blocked)
-                continue;
-            if (on_road(cx, cy, cell * 0.55))
-                continue;
-            const std::uint32_t salt = static_cast<std::uint32_t>((j + 64) * 131 + (i + 64));
-            const float occ = h01(cw * 131 + i, r * 97 + j, 0x5E72u + salt);
-            const float p_occ = (0.97f - 0.50f * static_cast<float>(d * d)) * (scale == 1 ? 0.75f : 1.0f);
-            if (occ > p_occ)
-                continue;
-            const float jx = (h01(cw, r, 0x5E80u + salt) - 0.5f) * cell * 0.18f;
-            const float jy = (h01(cw, r, 0x5E81u + salt) - 0.5f) * cell * 0.18f;
-            const float fw = cell * (0.34f + 0.11f * h01(cw, r, 0x5E82u + salt));
-            const float fd = cell * (0.31f + 0.10f * h01(cw, r, 0x5E83u + salt));
-            const float central = static_cast<float>(1.0 - d);
-            const float hr = h01(cw, r, 0x5E84u + salt);
-            float h = k_hmax[scale] * (0.25f + 0.75f * central * central) * (0.55f + 0.45f * hr);
-            h = std::max(h, 0.035f);
-            // One roofscape per settlement — its dominant roof with a minority
-            // of others — so a town reads as a place, not a heap of crates.
-            const rgb tile_roof = mix(C_tile, C_slate, 0.18f);
-            const rgb roofs[4] = { tile_roof, C_slate * 1.05f, tile_roof * 0.88f, C_concrete * 0.88f };
-            const int dominant = (seed >> 1) % 2 + (scale >= 4 ? 1 : 0);
-            const float pick = h01(cw, r, 0x5E85u + salt);
-            const rgb roof = pick < 0.68f ? roofs[dominant] : roofs[static_cast<int>(pick * 13.0f) & 3];
-            const rgb walls[3] = { C_plaster, C_plaster * 0.92f, C_stone_pale * 0.94f };
-            const rgb wall = walls[static_cast<int>(occ * 30.0f) % 3];
-            const double x = cx + jx, y = cy + jy;
-            // b.k is 1 for settlements: local units are canonical.
-            if (h < 0.12f)
-                b.gable(x, y, fw, fd, h * 0.62f, h * 0.55f, roof, wall);
-            else if (scale >= 4 && central > 0.55f && hr > 0.55f)
-                b.box(x, y, fw * 0.85f, fd * 0.85f, h * 1.6f, C_concrete, C_glass * 0.95f);
-            else
-                b.box(x, y, fw, fd, h, roof * 1.05f, wall);
-        }
-    // A landmark at the heart of a town and above: a civic dome or a spire.
-    if (scale >= 3 && n_avoid == 0 && !on_road(cell * 0.5, -cell * 0.6, cell * 0.45))
+    std::vector<lot> lots;
+    lots.reserve(256);
+    if (scale == 1)
     {
-        const float lh = k_hmax[scale];
-        if ((seed & 1) || scale >= 4)
-            b.cyl(cell * 0.5, -cell * 0.6, cell * 0.42f, lh * 0.9f, top::dome, cell * 0.42f,
-                  { 150, 162, 156 }, C_stone_pale);
-        else
-            b.cyl(cell * 0.5, -cell * 0.6, cell * 0.22f, lh * 1.8f, top::cone, lh * 0.8f,
-                  C_slate, C_stone_pale);
+        // An outpost: a handful of pitched houses and a barn round a yard.
+        const int n = 4 + static_cast<int>(seed % 3u);
+        for (int k = 0; k < n; ++k)
+        {
+            const std::uint32_t s = 0x5E90u + static_cast<std::uint32_t>(k) * 11u;
+            const double a = (k + 0.5 * h01(cw, r, s)) * (6.283185307 / n);
+            const double rad = k == 0 ? 0.02 : 0.10 + 0.12 * h01(cw, r, s + 1);
+            float hw = (k == 0 ? 0.070f : 0.042f) + 0.018f * h01(cw, r, s + 2);
+            float hd = (k == 0 ? 0.046f : 0.030f) + 0.010f * h01(cw, r, s + 3);
+            if (k != 0 && h01(cw, r, s + 4) > 0.5f)
+                std::swap(hw, hd);
+            lot L{ q256(static_cast<float>(rad * std::cos(a))), q256(static_cast<float>(rad * std::sin(a))),
+                   hw, hd, static_cast<float>(rad / R), 0x5EA0u + static_cast<std::uint32_t>(k), 4 };
+            if (fit(L))
+                lots.push_back(L);
+        }
+    }
+    else
+    {
+        const float P = std::max(T.pitch, static_cast<float>(2.6 / std::max(1.0, s_px)));
+        const float ox = q256((h01(cw, r, 0x5E70u) - 0.5f) * P * 0.6f);
+        const int   n = static_cast<int>(std::ceil(R * 1.2f / P)) + 1;
+        const auto half_w = [&](int line) { return line == 0 ? T.main : T.street; };
+        const float empty = scale == 2 ? 0.16f : scale == 3 ? 0.08f : 0.04f;
+        for (int j = -n; j < n; ++j)
+            for (int i = -n; i < n; ++i)
+            {
+                const double bx0 = ox + i * P + half_w(i), bx1 = ox + (i + 1) * P - half_w(i + 1);
+                const double by0 = j * P + half_w(j), by1 = (j + 1) * P - half_w(j + 1);
+                const double bcx = 0.5 * (bx0 + bx1), bcy = 0.5 * (by0 + by1);
+                const float  bd  = field(bcx, bcy);
+                if (bd > 1.25f)
+                    continue;
+                const std::uint32_t bsalt = static_cast<std::uint32_t>((j + 64) * 131 + (i + 64));
+                const float bh = h01(cw * 131 + i, r * 97 + j, 0x5E72u + bsalt);
+                // A heart tower: one tall block standing back from its block's edges.
+                if (T.ftower > 0 && bd < (scale >= 5 ? 0.50f : 0.36f) && bh > (scale >= 5 ? 0.38f : 0.55f))
+                {
+                    lot L{ bcx, bcy, static_cast<float>((bx1 - bx0) * 0.5 * 0.78),
+                           static_cast<float>((by1 - by0) * 0.5 * 0.78), bd, bsalt, 1 };
+                    if (fit(L))
+                        lots.push_back(L);
+                    continue;
+                }
+                // Otherwise a compact block: one mass, or split into two or
+                // four lots of differing height that share their walls.
+                const int nx = bh > 0.55f ? 2 : 1, ny = (scale <= 2 || bh < 0.25f) ? 2 : 1;
+                const double lw = (bx1 - bx0) / nx, ld = (by1 - by0) / ny;
+                for (int v = 0; v < ny; ++v)
+                    for (int u = 0; u < nx; ++u)
+                    {
+                        const std::uint32_t salt = bsalt * 4u + static_cast<std::uint32_t>(v * 2 + u);
+                        const double x = bx0 + (u + 0.5) * lw, y = by0 + (v + 0.5) * ld;
+                        const float d = field(x, y);
+                        if (d > 1.0f + 0.16f * (h01(cw, r, 0x5E86u + salt) - 0.5f))
+                            continue;
+                        if (h01(cw, r, 0x5E87u + salt) < empty * (1.0f + d))
+                            continue; // a yard, a square, a garden
+                        lot L{ x, y, static_cast<float>(lw * 0.5 - 0.0015), static_cast<float>(ld * 0.5 - 0.0015),
+                               d, salt, 0 };
+                        if (fit(L))
+                            lots.push_back(L);
+                    }
+            }
+        // The works quarter: the ordinary lot nearest a hashed point toward
+        // the edge stands a sawtooth hall and the town's chimney stacks.
+        const auto nearest = [&](double tx, double ty) {
+            int best = -1;
+            double bd2 = 1e9;
+            for (std::size_t q = 0; q < lots.size(); ++q)
+            {
+                if (lots[q].kind != 0)
+                    continue;
+                const double dx = lots[q].x - tx, dy = lots[q].y - ty, d2 = dx * dx + dy * dy;
+                if (d2 < bd2) { bd2 = d2; best = static_cast<int>(q); }
+            }
+            return best;
+        };
+        if (T.stacks > 0)
+        {
+            const double th = h01(cw, r, 0x5E88u) * 6.283185307;
+            const int w = nearest(0.68 * R * std::cos(th), 0.68 * R * std::sin(th));
+            if (w >= 0)
+                lots[static_cast<std::size_t>(w)].kind = 2;
+        }
+        // The landmark at the heart: a civic dome or a spire.
+        if (scale >= 3)
+        {
+            const int l = nearest(ox + P * 0.5, -P * 0.5);
+            if (l >= 0)
+                lots[static_cast<std::size_t>(l)].kind = 3;
+        }
+    }
+
+    // --- The palette: grey and warm-grey stone and concrete, never coloured.
+    const rgb pitched[3] = { mix(C_tile, C_concrete_d, 0.70f), rgb{ 96, 97, 100 }, rgb{ 104, 98, 90 } };
+    const rgb flat_roof[3] = { rgb{ 196, 190, 176 }, rgb{ 156, 151, 142 }, rgb{ 108, 104, 98 } };
+    const rgb walls[4] = { rgb{ 128, 122, 114 }, rgb{ 110, 106, 100 }, mix(C_brick, C_concrete_d, 0.62f) * 0.9f,
+                           C_stone_pale * 0.78f };
+    const rgb tower_wall = mix(C_glass, C_concrete_d, 0.70f);
+    const int dom = static_cast<int>((seed >> 1) % 3u);
+    const bool detail = s_px >= 30.0; // roof units: nominal-keyed like `fine` (BL-1244)
+
+    for (const lot& L : lots)
+    {
+        const float hr = h01(cw, r, 0x5E84u + L.salt);
+        const float pick = h01(cw, r, 0x5E85u + L.salt);
+        const float central = std::clamp(1.0f - L.d, 0.0f, 1.0f);
+        const rgb wall = walls[static_cast<int>(h01(cw, r, 0x5E83u + L.salt) * 4.0f) & 3];
+        switch (L.kind)
+        {
+            case 4: // an outpost house or barn
+            {
+                const rgb roof = pick < 0.6f ? pitched[dom] : pitched[static_cast<int>(pick * 7.0f) % 3];
+                const float h = 0.040f + 0.012f * hr;
+                b.gable(L.x, L.y, L.hw, L.hd, h, std::min(0.032f, L.hd * 0.8f), roof, wall);
+                break;
+            }
+            case 2: // the works hall and its stacks
+            {
+                b.saw(L.x, L.y, L.hw, L.hd, 0.075f, 3, C_metal * 0.88f, walls[2]);
+                const rgb stack = mix(C_brick, C_concrete_d, 0.45f);
+                for (int k = 0; k < T.stacks; ++k)
+                {
+                    const double sx = L.x - L.hw * 0.55 + k * std::min(0.05, L.hw * 0.55);
+                    const double sy = L.y - L.hd * 0.55 + (k & 1) * 0.02;
+                    b.cyl(sx, sy, 0.024, 0.40 + 0.09 * k + 0.05 * hr, top::open, 0.0, C_soot, stack, 0.0, 0.019);
+                }
+                break;
+            }
+            case 3: // the landmark
+            {
+                const float rr = std::min(L.hw, L.hd);
+                if ((seed & 1) || scale >= 4)
+                {
+                    b.box(L.x, L.y, L.hw, L.hd, 0.06f + 0.01f * scale, C_stone_pale, C_stone_pale * 0.92f);
+                    b.out.back().storey = k_storey;
+                    part& dome = b.add(pk::cyl, L.x, L.y - L.hd * 0.1);
+                    dome.hw = dome.hd = rr * 0.80f; dome.z0 = 0.06f + 0.01f * scale; dome.h = 0.05f;
+                    dome.rh = rr * 0.80f; dome.cap = top::dome;
+                    dome.roof = { 140, 150, 146 }; dome.wall = C_stone_pale;
+                    dome.attach = true;
+                }
+                else
+                {
+                    b.gable(L.x, L.y + L.hd * 0.3, L.hw, L.hd * 0.6, 0.10, 0.05, C_slate, C_stone_pale);
+                    b.cyl(L.x - L.hw * 0.4, L.y - L.hd * 0.4, rr * 0.36, 0.34 + 0.06 * scale, top::cone,
+                          0.14, C_slate, C_stone_pale);
+                }
+                break;
+            }
+            case 1: // a heart tower
+            {
+                const int st = std::max(T.fmax + 1, static_cast<int>(T.ftower * (0.45f + 0.30f * central + 0.25f * hr)));
+                const float h = st * k_storey;
+                b.box(L.x, L.y, L.hw, L.hd, h, C_concrete * 1.02f, tower_wall);
+                b.out.back().storey = k_storey;
+                if (h > 0.45f && detail)
+                {
+                    // A setback crown: the tower's top storeys stepped in.
+                    b.box(L.x - L.hw * 0.12, L.y - L.hd * 0.12, L.hw * 0.62f, L.hd * 0.62f, 2 * k_storey,
+                          C_concrete * 0.92f, tower_wall, h);
+                    b.out.back().storey = k_storey;
+                    b.out.back().attach = true;
+                }
+                break;
+            }
+            default: // an ordinary block
+            {
+                const float t = std::pow(central, 1.3f) * (0.45f + 0.55f * hr);
+                int st = T.fmin + static_cast<int>(std::lround((T.fmax - T.fmin) * t));
+                // The frontage south of the E-W spine stays low: its walls
+                // rise over the street (and any road on it) in the one angle.
+                if (L.y > 0.0 && L.y - L.hd < T.main + 0.012)
+                    st = std::min(st, 2);
+                const float h = st * k_storey;
+                const bool gabled = scale == 2 ? hr < 0.75f || st <= 1
+                                  : scale == 3 ? st <= 2 && hr < 0.55f
+                                               : st <= 3 && L.d > 0.75f && hr < 0.45f;
+                if (gabled)
+                {
+                    const rgb roof = pick < 0.65f ? pitched[dom] : pitched[static_cast<int>(pick * 7.0f) % 3];
+                    b.gable(L.x, L.y, L.hw, L.hd, h * 0.85f, std::min(0.034f, L.hd * 0.7f), roof, wall);
+                    break;
+                }
+                const rgb roof = pick < 0.45f ? flat_roof[dom % 2] : flat_roof[static_cast<int>(pick * 9.0f) % 3];
+                b.box(L.x, L.y, L.hw, L.hd, h, roof, wall);
+                b.out.back().storey = k_storey;
+                const float ru = h01(cw, r, 0x5E89u + L.salt);
+                if (detail && L.hw > 0.03f && ru > 0.74f)
+                {
+                    // A roof unit: plant room or stair head, lit on the roof.
+                    const double ux = (ru - 0.87f) * 3.0f * L.hw, uy = (hr - 0.5f) * 0.8f * L.hd;
+                    b.box(L.x + ux, L.y + uy, L.hw * 0.28f, L.hd * 0.30f, 0.020f,
+                          C_concrete * 0.94f, C_concrete_d, h);
+                    b.out.back().attach = true;
+                }
+                break;
+            }
+        }
     }
 }
 
@@ -1704,6 +1945,13 @@ void build_tile(const bake_source& src, const geometry& g, const bake_params& p,
         for (std::size_t q = 0; q < blocks.size(); ++q)
         {
             const part& bp = blocks[q];
+            if (bp.attach && q > 0)
+            {
+                // BL-1258: a roof unit / setback rides its block's instance.
+                parts.push_back(bp);
+                end_instance();
+                continue;
+            }
             const bool ground = bp.k == pk::gell || bp.k == pk::grect;
             begin_instance(ground ? hy - 8.0 : bp.y + bp.hd, bp.x, 10 + static_cast<int>(q));
             parts.push_back(bp);
@@ -2080,8 +2328,8 @@ float installation_clear_radius(const bake_source& src, std::size_t i)
     float r = 0.0f;
     if (ti.n_stacks > 0)
         r = 0.72f + 0.04f * (ti.n_stacks - 1);
-    if (ti.settlement.subject == stamp_subject::settlement)
-        r = std::max(r, 0.22f + 0.15f * ti.settlement.scale);
+    if (ti.settlement.subject == stamp_subject::settlement) // BL-1258: the town's field and paving
+        r = std::max(r, k_town[std::clamp<int>(ti.settlement.scale, 1, 5)].R * 1.12f + 0.04f);
     if (ti.settlement.subject == stamp_subject::ruin)
         r = std::max(r, 0.45f);
     return r;

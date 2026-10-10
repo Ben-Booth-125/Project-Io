@@ -89,6 +89,11 @@
 //       surface; the road / structure agreement; a route change re-baking
 //       only its window. `--routes` runs them alone with routes_*.png previews.
 //
+//   --towns (BL-1258, a reading, not a check): the settlement ladder, a
+//       highway town, a crossed city, a metropolis on a road and a town
+//       beside works at the master and its 48/24/12 levels and the far page
+//       (towns_*.png), with each town chunk's bake cost and bounds box.
+//
 // Also prints bake time per tier (a measurement, not a check) and writes
 // feature_<form>_<tier>.png previews for the eye.
 //
@@ -838,6 +843,16 @@ void patch_row(const bake_source& src, const bake_params& p)
         }
         {
             tile_installation t; t.settlement.subject = stamp_subject::ruin; t.settlement.scale = 1;
+            forms.push_back(t);
+        }
+        {
+            // BL-1258: a city beside works — the blocks keep off the works'
+            // slots, the works stand at the edge; every lot, stack, roof unit
+            // and tower crown inside the window.
+            tile_installation t; t.settlement.subject = stamp_subject::settlement; t.settlement.scale = 4;
+            t.stacks[0] = bld(building_type::processing_facility, static_cast<int>(processing_family::metal_foundry));
+            t.stacks[1] = bld(building_type::extraction_site, static_cast<int>(extraction_family::mine));
+            t.n_stacks = 2;
             forms.push_back(t);
         }
         forms.push_back(big);
@@ -1852,6 +1867,170 @@ void route_row(world& w, entity_id home, const bake_source& src0, const bake_par
     }
 }
 
+// ---------------------------------------------------------------------------
+// --towns (BL-1258, towns denser; a reading + previews, no check): the
+// settlement ladder (Outpost -> Metropolis), a town a highway runs through
+// (its street), a city two roads cross, a metropolis a road runs through and
+// a town beside works, staged on the widest plain and baked at the MASTER
+// geometry. Previews: the master (towns_master.png), the 48 / 24 / 12 px
+// levels it mips to — the mid rungs read these (rung 2 draws ~28 px: the 48
+// level minified) — upscaled for the eye, and the far page (towns_far.png,
+// x8). The camera squash is applied. Then the bake cost of a 512 px master
+// chunk centred on each staged town, installations on vs off, best of 5, and
+// the bounds mode's cost and box for the town's tile.
+// ---------------------------------------------------------------------------
+void towns_row(const bake_source& src0, const bake_params& p)
+{
+    constexpr double kS3 = 1.7320508075688772;
+    const auto land = static_cast<std::uint8_t>(bake_source::tile_class::land);
+    const geometry m = make_master_geometry(src0.gw, src0.gh);
+    bake_params p1 = p;
+    p1.supersample = 1;
+    const auto idx = [&](int c, int r) {
+        return static_cast<std::size_t>(r) * src0.gw + ((c % src0.gw) + src0.gw) % src0.gw;
+    };
+    bake_source s = src0;
+    s.inst.of_tile.assign(s.cls.size(), -1);
+    s.inst.list.clear();
+    s.road.assign(s.cls.size(), 0);
+    s.lane.assign(s.cls.size(), 0);
+    const int aim = std::max(0, homogeneous_aim(src0, terrain_cover::grass));
+    const int ar = aim / s.gw, ac = aim % s.gw;
+    struct staged_town { const char* name; int c, r; };
+    std::vector<staged_town> towns;
+    const auto stand = [&](const char* name, int c, int r, int scale, int n_works) {
+        const std::size_t i = idx(c, r);
+        if (s.cls[i] != land)
+        {
+            std::printf("towns: [%d,%d] is not land; %s not staged\n", c, r, name);
+            return;
+        }
+        tile_installation ti;
+        ti.settlement.subject = stamp_subject::settlement;
+        ti.settlement.scale = static_cast<std::uint8_t>(scale);
+        if (n_works > 0)
+        {
+            ti.stacks[0].subject = stamp_subject::building;
+            ti.stacks[0].type = static_cast<std::uint8_t>(building_type::processing_facility);
+            ti.stacks[0].family = static_cast<std::uint8_t>(processing_family::metal_foundry);
+        }
+        if (n_works > 1)
+        {
+            ti.stacks[1].subject = stamp_subject::building;
+            ti.stacks[1].type = static_cast<std::uint8_t>(building_type::extraction_site);
+            ti.stacks[1].family = static_cast<std::uint8_t>(extraction_family::mine);
+        }
+        ti.n_stacks = static_cast<std::uint8_t>(n_works);
+        s.inst.of_tile[i] = static_cast<std::int32_t>(s.inst.list.size());
+        s.inst.list.push_back(ti);
+        towns.push_back({ name, c, r });
+    };
+    const auto lay = [&](int c, int r, std::uint8_t tier) {
+        if (r >= 0 && r < s.gh && s.cls[idx(c, r)] == land)
+            s.road[idx(c, r)] = tier;
+    };
+    // Row ar: the ladder, every other column (a clear hex between towns).
+    stand("outpost (1)",    ac - 4, ar, 1, 0);
+    stand("village (2)",    ac - 2, ar, 2, 0);
+    stand("town (3)",       ac,     ar, 3, 0);
+    stand("city (4)",       ac + 2, ar, 4, 0);
+    stand("metropolis (5)", ac + 4, ar, 5, 0);
+    // Row ar + 3: a highway town, a crossed city, a metropolis on a road, a
+    // town beside works.
+    const int rr = ar + 3;
+    for (int c = ac - 6; c <= ac - 2; ++c) lay(c, rr, k_route_highway);
+    stand("town on a highway (3)", ac - 4, rr, 3, 0);
+    for (int c = ac - 1; c <= ac + 4; ++c) lay(c, rr, k_route_road);
+    for (int r = rr - 2; r <= rr + 2; ++r) lay(ac + 1, r, k_route_track);
+    stand("city, two roads crossing (4)", ac + 1, rr, 4, 0);
+    stand("metropolis, road through (5)", ac + 3, rr, 5, 0);
+    stand("town beside works (3+2)", ac + 5, rr, 3, 2);
+    rederive_routes(s);
+    std::printf("towns: staged %zu at aim [%d,%d], %zu route pieces\n", towns.size(), ac, ar,
+                s.route_pieces.size());
+
+    const auto squash_up = [](const std::vector<std::uint32_t>& buf, int PW, int PH, double sy, int U,
+                              const char* path) {
+        const int OH = static_cast<int>(PH * sy);
+        std::vector<std::uint32_t> up(static_cast<std::size_t>(PW) * U * OH * U);
+        for (int y = 0; y < OH * U; ++y)
+        {
+            const int syr = std::min(PH - 1, static_cast<int>((y / U) / sy));
+            for (int x = 0; x < PW * U; ++x)
+                up[static_cast<std::size_t>(y) * PW * U + x] = buf[static_cast<std::size_t>(syr) * PW + x / U];
+        }
+        write_png_rgba(path, PW * U, OH * U, reinterpret_cast<const unsigned char*>(up.data()), PW * U * 4);
+        std::printf("preview: %s (%dx%d)\n", path, PW * U, OH * U);
+    };
+    {
+        const double x0 = kS3 * (ac - 6.2), x1 = kS3 * (ac + 6.4);
+        const double y0 = 1.5 * (ar - 1) - 0.8, y1 = 1.5 * (rr + 1) + 0.2;
+        int px0 = static_cast<int>(x0 * m.s) / 16 * 16;
+        int py0 = std::max(0, static_cast<int>((y0 - m.y_min) * m.s) / 16 * 16);
+        int PW = static_cast<int>((x1 - x0) * m.s) / 16 * 16;
+        int PH = std::min(m.H - py0, static_cast<int>((y1 - y0) * m.s)) / 16 * 16;
+        std::vector<std::uint32_t> buf(static_cast<std::size_t>(PW) * PH);
+        bake_region(s, m, p1, px0, py0, PW, PH, buf.data());
+        squash_up(buf, PW, PH, m.tilt_sy, 1, "towns_master.png");
+        int w = PW, h = PH;
+        std::vector<std::uint32_t> cur = buf, nxt;
+        const struct { const char* name; int up; } lv[3] = { { "towns_l48.png", 2 }, { "towns_l24.png", 4 },
+                                                             { "towns_l12.png", 8 } };
+        for (int l = 0; l < 3; ++l)
+        {
+            nxt.assign(static_cast<std::size_t>(w / 2) * (h / 2), 0u);
+            downsample_half(cur.data(), w, h, nxt.data());
+            w /= 2; h /= 2;
+            cur.swap(nxt);
+            squash_up(cur, w, h, m.tilt_sy, lv[l].up, lv[l].name);
+        }
+        // The far page: a direct bake at k_far_ppr, the same angle.
+        const geometry f = make_geometry(s.gw, s.gh, k_far_ppr, k_tilt_sy);
+        px0 = static_cast<int>(x0 * f.s);
+        py0 = std::max(0, static_cast<int>((y0 - f.y_min) * f.s));
+        PW = static_cast<int>((x1 - x0) * f.s);
+        PH = std::min(f.H - py0, static_cast<int>((y1 - y0) * f.s));
+        buf.assign(static_cast<std::size_t>(PW) * PH, 0u);
+        bake_region(s, f, p1, px0, py0, PW, PH, buf.data());
+        squash_up(buf, PW, PH, f.tilt_sy, 8, "towns_far.png");
+    }
+
+    // Cost: the 512 px master chunk centred on each town, best of 5, in
+    // this thread's Mcycles (thread_cpu_ms; ~ms at ~1 GHz-equivalent).
+    std::vector<std::uint32_t> tb(512u * 512u);
+    double sum_on = 0, sum_off = 0;
+    for (const staged_town& t : towns)
+    {
+        const double cx = kS3 * (t.c + ((t.r & 1) ? 0.5 : 0.0)) * m.s;
+        const double cy = (1.5 * t.r - m.y_min) * m.s;
+        const int x0 = static_cast<int>(cx - 256) / 16 * 16;
+        const int y0 = std::clamp(static_cast<int>(cy - 256) / 16 * 16, 0, m.H - 512);
+        double best[2] = { 1e30, 1e30 };
+        for (int rep = 0; rep < 5; ++rep)
+            for (int on = 0; on < 2; ++on)
+            {
+                bake_params q = p1;
+                q.installations = on == 1;
+                // This thread's cycles (millions): blind to time descheduled,
+                // so a busy machine does not drown the reading.
+                const double c0 = thread_cpu_ms();
+                bake_region(s, m, q, x0, y0, 512, 512, tb.data());
+                best[on] = std::min(best[on], thread_cpu_ms() - c0);
+            }
+        sum_off += best[0]; sum_on += best[1];
+        int bx0 = 0, by0 = 0, bx1 = 0, by1 = 0;
+        const auto b0 = std::chrono::steady_clock::now();
+        const bool any = installation_tile_bounds(s, m, p1, t.c, t.r, bx0, by0, bx1, by1);
+        const double bms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - b0).count();
+        std::printf("towns: %-30s chunk Mcyc  off %7.1f  on %7.1f  (+%5.1f)   bounds %s %dx%d px in %.1f ms\n",
+                    t.name, best[0], best[1], best[1] - best[0], any ? "box" : "none",
+                    bx1 - bx0, by1 - by0, bms);
+    }
+    if (!towns.empty())
+        std::printf("towns: mean chunk Mcyc  off %.1f  on %.1f  (+%.1f per town chunk)\n",
+                    sum_off / towns.size(), sum_on / towns.size(), (sum_on - sum_off) / towns.size());
+}
+
 int main(int argc, char** argv)
 {
     generation_report report;
@@ -2012,6 +2191,13 @@ int main(int argc, char** argv)
     if (argc > 1 && std::strcmp(argv[1], "--route-prof") == 0)
     {
         route_row(w, home, src, p, /*previews=*/false, /*prof=*/true);
+        return 0;
+    }
+
+    // --towns: the BL-1258 settlement ladder previews and cost (a reading).
+    if (argc > 1 && std::strcmp(argv[1], "--towns") == 0)
+    {
+        towns_row(src, p);
         return 0;
     }
 
