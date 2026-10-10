@@ -16,7 +16,8 @@
 //
 //   R1  A REJECTED COMMAND MUTATES NOTHING. Every rejection path (unknown corp,
 //       bad market, the same market twice, a good trade does not carry, bad
-//       resource, non-positive points, another corp's trade, a foreign or
+//       resource, non-positive points, a source market where the actor holds
+//       no trade building (NR-1018), another corp's trade, a foreign or
 //       nonexistent convoy) is asserted against a FULL world fingerprint taken
 //       before the command, not against a spot check. The seam is an untrusted
 //       input boundary (io-standing-rules.md, 2026-08-14).
@@ -168,8 +169,14 @@ entity_id tile_at(world& w, entity_id body, int c, int r)
                                    + static_cast<std::size_t>(c)];
 }
 
-/// A corporation holding one staffed Planetary Marketplace on the body (one
-/// trade point a tick at the registry's rate), far off every haul route.
+/// A corporation holding one staffed Planetary Marketplace in the SOURCE
+/// market's catchment (one trade point a tick at the registry's rate), far off
+/// every haul route. NR-1018 (Ben, 2026-10-10): a trade building makes its
+/// points for the market it stands in, and trades leave only from such a
+/// market — so the building must route to the source. (20, 0) is 12 columns
+/// (wrapped) from both centres, 0 rows from the source and 3 from the
+/// destination. It stood at (20, 2) before the ruling, which routes to the
+/// DESTINATION: every manual trade from the source was then refused.
 entity_id add_trader(scenario& s, float balance)
 {
     const entity_id c = s.w.create_entity();
@@ -178,7 +185,7 @@ entity_id add_trader(scenario& s, float balance)
     cc.is_player = true; // keep the BL-202 strategic tier out of this harness
     const entity_id mp = s.w.create_entity();
     building_component b{};
-    b.tile               = tile_at(s.w, s.body, 20, 2);
+    b.tile               = tile_at(s.w, s.body, 20, 0);
     b.type               = building_type::planetary_marketplace;
     b.workforce_assigned = 1.0f;
     s.w.buildings[mp] = b;
@@ -468,6 +475,17 @@ int main()
                            "R1.11 clear_trade with a zero id is rejected_invalid and mutates nothing");
         }
 
+        {   // NR-1018: a manual trade leaves only from a market where the owner
+            // holds a trade building. The corp's Marketplace stands in the
+            // source's catchment; the destination has none of its buildings.
+            corp_command c = trade_cmd(s, 1.0f);
+            c.subject      = s.dst_market;
+            c.counterparty = s.src_market;
+            check_rejected(s, reg, c, corp_command_result::rejected_invalid,
+                           "R1.18 a trade LEAVING a market where the owner holds no trade "
+                           "building is rejected_invalid and mutates nothing (NR-1018)");
+        }
+
         check(s.w.convoys.empty() && s.w.trades.empty() && std::fabs(pool_iron(s) - 50.0f) < 1e-4f,
               "R1.12 after the rejections: no trade, no convoy, and the shelf is untouched");
 
@@ -485,7 +503,9 @@ int main()
             trade_pass(s, reg);
             check(s.w.convoys.size() == 1 && s.w.convoys.back().corp == rival,
                   "R1.14 fixture: the rival's trade ships its own convoy");
-            const uint32_t rival_trade  = s.w.trades.front().id;
+            // Guarded: a refused R1.13 left no trade, and front() on an empty
+            // vector is undefined (it was this harness's segfault).
+            const uint32_t rival_trade  = s.w.trades.empty() ? 0u : s.w.trades.front().id;
             const uint32_t rival_convoy = s.w.convoys.empty() ? 0u : s.w.convoys.back().id;
             check_rejected(s, reg, hold_cmd(s.corp, rival_convoy),
                            corp_command_result::rejected_invalid,

@@ -95,6 +95,9 @@ fixture make_fixture()
     f.market = f.w.create_entity();
     market_component mc{};
     mc.body = f.body;
+    // Priced: an unpriced shelf (base 0) is unbuyable, so `corp_shelf_stock`
+    // does not count it as stock the corp could draw.
+    mc.base_price[static_cast<std::size_t>(resource_type::iron_ore)] = 40.0f;
     mc.price[static_cast<std::size_t>(resource_type::iron_ore)] = 40.0f;
     mc.inventory[static_cast<std::size_t>(resource_type::iron_ore)] = 120.0f;
     f.w.markets[f.market] = mc;
@@ -159,6 +162,19 @@ int main()
         check(measure_condition(c, w, f.corp) == 120.0f, "C2d stockpile reads the iron ore on the corp's market shelf");
         c.resource = resource_type::copper_ore;
         check(measure_condition(c, w, f.corp) == 0.0f, "C2e stockpile reads 0 for an unstocked good");
+    }
+    {
+        // NR-1015 (Ben, 2026-10-10): `produced` reads produced_ever, 1/0 —
+        // not the shelf: the corp's market holds 120 iron ore it never made.
+        condition c = make(condition_subject::produced, condition_comparator::at_least, 1.0f);
+        c.resource = resource_type::iron_ore;
+        check(measure_condition(c, w, f.corp) == 0.0f,
+              "C2p1 produced reads 0 for a good on the shelf the corp never made");
+        world w2 = w;
+        w2.corporations.at(f.corp).produced_ever[static_cast<std::size_t>(resource_type::copper_ore)] = true;
+        c.resource = resource_type::copper_ore;
+        check(measure_condition(c, w2, f.corp) == 1.0f,
+              "C2p2 produced reads 1 for a good the corp has produced, with none on any shelf");
     }
     {
         condition c = make(condition_subject::market, condition_comparator::at_least, 0.0f);

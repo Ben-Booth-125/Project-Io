@@ -3,7 +3,8 @@
 // BL-1266 (TRADE.md § Auto and reserved trade): the dispatcher retired, and the
 // rule it carried — the seller chasing a NET PRICE — is AUTO TRADE's. A
 // corporation's unreserved trade points go, best margin first, to the routes
-// among the markets its trade buildings reach, each route sized to what the
+// leaving the markets its trade buildings stand in, to any market a leg reaches
+// (NR-1018, Ben 2026-10-10), each route sized to what the
 // destination can absorb above the landed cost and what the source SHELF
 // holds. At last tick's resolved prices:
 //
@@ -21,8 +22,9 @@
 // column 30 genuinely 30 tiles from A), three markets on row 0 —
 //     A (source) at column 0, N (near) at column 6, F (far) at column 30.
 // Every market's iron base price is 10; A resolves at 10. The trader holds one
-// staffed Planetary Marketplace (one trade point; iron's capacity per point
-// is far above any room here, so points never bind).
+// staffed Planetary Marketplace in A's catchment (one trade point; iron's
+// capacity per point is far above any room here, so points never bind); (g)
+// gives it a second in F's.
 //
 //   (a) FARTHER AND DEARER BEATS NEARER: N resolves at 15, F at 30 — F.
 //   (b) THE MARGIN: a best margin under dispatch_margin x home price moves
@@ -153,6 +155,20 @@ entity_id add_trader(scenario& s, int col)
     return c;
 }
 
+/// A second staffed Planetary Marketplace for @p corp at column @p col, row 2
+/// — NR-1018: a trade building's points pay for trades leaving the market it
+/// stands in, so trading FROM a market needs one there.
+void add_marketplace(scenario& s, entity_id corp, int col)
+{
+    const entity_id mp = s.w.create_entity();
+    building_component b{};
+    b.tile               = tile_at(s.w, s.body, col, 2);
+    b.type               = building_type::planetary_marketplace;
+    b.workforce_assigned = 1.0f;
+    s.w.buildings[mp] = b;
+    s.w.corporations.at(corp).assets.push_back(mp);
+}
+
 // One plains body, a trader, and a supply anchor off the haul's row for the
 // passive-LP gate.
 scenario make_scenario(float price_n, float price_f)
@@ -278,8 +294,27 @@ int main()
         check(price_target(k_base, 100.0f, 900.0f, reg.price_band().floor_mult,
                            reg.price_band().ceil_mult) == 30.0f,
               "K.4 price_target is the unsmoothed law: base 10, D/S = 9 -> 30");
-        check(corp_trade_markets(s.w, s.corp).size() == 3,
-              "K.5 the trader's Marketplace reaches all three markets on the body");
+        // NR-1018 (Ben, 2026-10-10): the trader trades FROM the market its
+        // Marketplace stands in (column 2 -> A) and reaches every market a
+        // leg reaches from A's centre — here N and F. (Before the ruling every
+        // market on the body was a source; K.5 asserted that.)
+        const std::vector<entity_id> src = corp_trade_markets(s.w, s.corp);
+        s.w.markets.at(s.market_a).inventory[r_iron] = 1000.0f;
+        const logistics_nodes nodes = collect_logistics_nodes(s.w);
+        trade_haul_memo memo;
+        std::vector<trade_route_offer> routes;
+        rank_trade_routes(s.w, reg, nodes, memo, s.corp, src, routes);
+        bool to_n = false, to_f = false, off_a = false;
+        for (const trade_route_offer& r : routes)
+        {
+            if (r.a != s.market_a) off_a = true;
+            if (r.b == s.market_n) to_n = true;
+            if (r.b == s.market_f) to_f = true;
+        }
+        check(src.size() == 1 && src.front() == s.market_a,
+              "K.5 the trader trades FROM exactly A, the market its Marketplace stands in");
+        check(to_n && to_f && !off_a,
+              "K.6 ...and its routes from A reach both other markets on the body, N and F");
     }
 
     // -----------------------------------------------------------------------
@@ -538,6 +573,10 @@ int main()
     {
         const recipe_registry reg = base_registry();
         scenario s = make_scenario(15.0f, 30.0f);
+        // NR-1018: the corp also trades FROM F (a Marketplace in F's
+        // catchment), so (g).2's hold is the shelf's doing, not a missing
+        // trade building, and (g).3's control can move the shelved stock.
+        add_marketplace(s, s.corp, 30);
         set_book(s, s.market_n, 0.0f, 0.0f); // N not a target yet: the cargo goes to F alone
         set_book(s, s.market_f, 100.0f, consistent_demand(100.0f, 30.0f));
         s.w.markets.at(s.market_a).inventory[r_iron] = 1000.0f;

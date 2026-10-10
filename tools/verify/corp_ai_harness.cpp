@@ -54,6 +54,23 @@
 
 namespace {
 
+/// Stock @p qty of good @p r on market @p m's shelf, PRICED. BL-1265 cold
+/// review (e5173b81): an unpriced shelf (base 0) is unbuyable, so
+/// `corp_shelf_stock` / `buy_from_corp_shelves` -- what the hire gate and the
+/// hire debit read -- do not count it. The fixture's market prices only iron
+/// ore; a good stocked for a hire row gets a nominal base price of 1.
+void shelve(world& w, entity_id m, resource_type r, float qty)
+{
+    market_component& mc = w.markets.at(m);
+    const std::size_t i = static_cast<std::size_t>(r);
+    mc.inventory[i] = qty;
+    if (!(mc.base_price[i] > 0.0f))
+    {
+        mc.base_price[i] = 1.0f;
+        mc.price[i]      = 1.0f;
+    }
+}
+
 int g_failures = 0;
 void check(bool ok, const char* label)
 {
@@ -541,8 +558,8 @@ int main()
                 s.w.buildings[hb] = b;
                 s.w.corporations.at(s.ai_corp).assets.push_back(hb);
             }
-            s.w.markets.at(k_home).inventory[ri(resource_type::steel)]   = 3.0f;
-            s.w.markets.at(k_hidden).inventory[ri(resource_type::steel)] = 4.0f;
+            shelve(s.w, k_home, resource_type::steel, 3.0f);
+            shelve(s.w, k_hidden, resource_type::steel, 4.0f);
             const auto r = hire(s, iron_foot);
             check(r == corp_command_result::applied && s.w.units.size() == 1,
                   "BL-352 R4: goods on the corp's shelves make the gated row hireable through the seam");
@@ -571,7 +588,7 @@ int main()
         {
             scene s = make_scene(1000.0f);
             add_muster_base(s);
-            s.w.markets.at(s.market).inventory[ri(resource_type::steel)] = 3.0f;
+            shelve(s.w, s.market, resource_type::steel, 3.0f);
             const auto r = hire(s, iron_foot);
             check(r == corp_command_result::rejected_funds && s.w.units.empty() &&
                   s.w.markets.at(s.market).inventory[ri(resource_type::steel)] == 3.0f,
@@ -582,7 +599,7 @@ int main()
         {
             scene s = make_scene(1000.0f);
             add_muster_base(s);
-            s.w.markets.at(s.market).inventory[ri(resource_type::steel)] = 7.0f;
+            shelve(s.w, s.market, resource_type::steel, 7.0f);
             const auto r = hire(s, levy);
             check(r == corp_command_result::applied && s.w.units.size() == 1 &&
                   s.w.markets.at(s.market).inventory[ri(resource_type::steel)] == 7.0f,
@@ -649,7 +666,7 @@ int main()
         // nothing else, so it cannot acquire a candidate the debit lacks.
         {
             scene s = make_scene(1000.0f);
-            s.w.markets.at(s.market).inventory[ri(resource_type::machinery)] = 1000.0f;
+            shelve(s.w, s.market, resource_type::machinery, 1000.0f);
             const campaign_roster_gate_input g = campaign_gate_input(s.w, s.ai_corp);
             check(g.ore_q == 0 && g.farm_q == 0 && g.energy_q == 0,
                   "BL-498 R5: a resource absent from the table opens no axis");
@@ -667,7 +684,7 @@ int main()
                 scene s = make_scene(1000.0f);
                 for (std::size_t a = 0; a < hire_axis_count; ++a)
                     for (const resource_type r : hire_axis_resources(static_cast<hire_axis>(a)))
-                        s.w.markets.at(s.market).inventory[ri(r)] = 1000.0f;
+                        shelve(s.w, s.market, r, 1000.0f);
                 add_bldg(s, building_type::port);
                 const auto  rows  = available_rows(s.w, s.ai_corp, band);
                 const auto& table = unit_roster_table();
@@ -699,9 +716,9 @@ int main()
                     if (a == ax) continue;
                     const resource_type other =
                         hire_axis_resources(static_cast<hire_axis>(a)).candidates[0];
-                    s.w.markets.at(s.market).inventory[ri(other)] = 1000.0f;
+                    shelve(s.w, s.market, other, 1000.0f);
                 }
-                s.w.markets.at(s.market).inventory[ri(cand)] = hire_axis_cost;
+                shelve(s.w, s.market, cand, hire_axis_cost);
 
                 corp_command cmd{};
                 cmd.tick = 1; cmd.corp = s.ai_corp; cmd.verb = corp_verb::hire_unit;
