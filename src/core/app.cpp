@@ -2671,8 +2671,8 @@ void app::render()
     // one of the mutually-exclusive column occupants (ledgers + Selection).
     ui::draw_construction_panel(m_world, m_registry, m_last_econ_report, m_ui, &m_ui.show_construction_panel);
     // Market ledger — Goods and Trades. It takes a NON-CONST world and the recipe
-    // registry because the Trades tab's potential-trade read prices real convoy
-    // legs through `price_convoy_leg` (which warms the A* cache and mutates no
+    // registry because the Trades tab's potential-trade read prices real trade
+    // routes through `rank_trade_routes`, the trade pass's own ranking (which warms the A* cache and mutates no
     // game state), rather than inventing a second haulage model that could
     // disagree with the one that actually bills the player.
     ui::draw_market_ledger(m_world, m_registry, m_ui, m_market_history, m_ui.show_market_ledger);
@@ -2902,45 +2902,6 @@ void app::render()
         m_ui.construction.pending_hire_tile = null_entity; // consume the request
     }
 
-    // Execute a convoy-dispatch request queued this frame by the market
-    // Selection card's dispatch form (BL-607). Routes through the same
-    // `dispatch_convoy` corp_verb the AI's own directed dispatch and the wire
-    // seam use (SUPPLY.md § Dispatch trigger: "the auto-dispatch body above
-    // with the shortfall scan removed") — the player's convoy costs, travels
-    // and picks a mode exactly like a rival's. Unlike the order-book presses
-    // above, the result IS surfaced: a dispatch can fail for reasons the form
-    // cannot fully pre-check (no viable route, insufficient funds at commit
-    // time), and a rejection mutates nothing, so the player needs to be told why.
-    if (m_ui.construction.pending_dispatch_source != null_entity)
-    {
-        corp_command cmd;
-        cmd.tick         = static_cast<int>(m_sim_loop.day_tick());
-        cmd.corp         = m_world.player_entity;
-        cmd.verb         = corp_verb::dispatch_convoy;
-        cmd.subject      = m_ui.construction.pending_dispatch_source;
-        cmd.counterparty = m_ui.construction.pending_dispatch_dest;
-        cmd.target       = m_ui.construction.pending_dispatch_good;
-        cmd.quantity     = m_ui.construction.pending_dispatch_qty;
-        const corp_command_result r = apply_corp_command(m_world, m_registry, cmd);
-        switch (r)
-        {
-            case corp_command_result::applied:
-                m_ui.construction.last_message = "Convoy dispatched."; break;
-            case corp_command_result::rejected_state:
-                m_ui.construction.last_message = "Not enough stock on hand to dispatch that much."; break;
-            case corp_command_result::rejected_placement:
-                m_ui.construction.last_message = "No viable route to that market."; break;
-            case corp_command_result::rejected_funds:
-                m_ui.construction.last_message = "Can't afford the haul."; break;
-            case corp_command_result::rejected_no_lp:
-                m_ui.construction.last_message =
-                    "No Logistic Points left at the source anchor this tick."; break;
-            default:
-                m_ui.construction.last_message = "Dispatch failed."; break;
-        }
-        m_ui.construction.pending_dispatch_source = null_entity; // consume the request
-    }
-
     // Execute a demolition queued this frame by the building Selection element. The
     // selection is cleared on success: the entity it pointed at no longer exists, and
     // leaving it dangling would leave the panel resolving a dead id.
@@ -3045,16 +3006,47 @@ void app::render()
         m_ui.pending_disband_unit = null_entity; // consume the request
     }
 
-    // Order-book presses (BL-293) — same seam-consuming shape as the survey
-    // dispatch above, applied through apply_corp_command so the player's press
-    // and a rival corp's command share one implementation. A rejection is not
-    // reported to the surface: the ledger's own form already enforces the same
-    // preconditions, so a rejection here means a race (the body's market gone,
-    // the order already removed) and the correct response is to do nothing.
+    // Ledger presses (BL-293; the trade presses since BL-1269) — same
+    // seam-consuming shape as the survey dispatch above, applied through
+    // apply_corp_command so the player's press and a rival corp's command share
+    // one implementation. A TRADE press's result is surfaced on the Trades tab
+    // (`ui_state::trade_message`), and a refusal mutates nothing, so the player
+    // is told why. What `set_trade` refuses is exactly `trade_is_valid` plus two
+    // bounds (corp_command.cpp): rejected_invalid for a source market where the
+    // corporation holds no trade building (Ben, 2026-10-10), points that are not
+    // finite, not > 0 or above max_trade_points, the same market at both ends, a
+    // market that no longer exists, a good trade does not carry (capacity 0, or
+    // a grid good), or no acting corporation; rejected_placement when no leg
+    // reaches the destination from the source market's centre; rejected_state when the
+    // corporation already holds max_trades_per_corp trades. The form pre-checks
+    // most of these, so a refusal here is mostly a race or an edge the form let
+    // through; the message names the whole set rather than guessing one. Other presses' rejections mean a race (the target
+    // already gone) and the correct response is to do nothing.
     for (corp_command& cmd : m_ui.pending_order_commands)
     {
         cmd.tick = static_cast<int>(m_sim_loop.day_tick());
-        apply_corp_command(m_world, m_registry, cmd);
+        const corp_command_result r = apply_corp_command(m_world, m_registry, cmd);
+        const bool applied = (r == corp_command_result::applied);
+        switch (cmd.verb)
+        {
+            case corp_verb::set_trade:
+                m_ui.trade_message = applied ? "Trade set."
+                    : (r == corp_command_result::rejected_state)
+                        ? "You hold as many trades as a corporation may."
+                    : (r == corp_command_result::rejected_placement)
+                        ? "Refused: no route reaches that market from here."
+                        : "Refused: it must leave a market where you hold a Marketplace or Port, "
+                          "go to a different market, carry a good trade carries, and have points above 0.";
+                break;
+            case corp_verb::clear_trade:
+                m_ui.trade_message = applied ? "Trade removed." : "That trade is already gone.";
+                break;
+            case corp_verb::set_trade_reserve:
+                m_ui.trade_message = applied ? "Reserve set." : "That reserve is out of range.";
+                break;
+            default:
+                break;
+        }
     }
     m_ui.pending_order_commands.clear(); // consume the requests
 

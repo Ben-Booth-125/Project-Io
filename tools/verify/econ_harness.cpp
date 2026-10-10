@@ -80,10 +80,9 @@ int main()
     mc.base_price[ri(resource_type::iron_ore)] = 2.5f;
     mc.base_price[ri(resource_type::steel)]    = 8.0f;
     mc.price = mc.base_price;
-    // BL-130: real inventory now gates what a processor can draw beyond its own
-    // pool. Ample stock here restores this fixture's original intent — a market
-    // backs P's shortfall so it runs a full batch, same as the pre-BL-130
-    // unconditional auto-buy did when a market existed at all.
+    // BL-130: real inventory gates what a processor can draw. Ample stock here
+    // restores this fixture's original intent — a market backs P's need so it
+    // runs a full batch. BL-1265: with no pools, the shelf is P's WHOLE source.
     mc.inventory[ri(resource_type::iron_ore)] = 1000.0f;
     w.markets[market] = mc;
 
@@ -129,7 +128,7 @@ int main()
         w.corporations[corp_e] = cc;
     }
 
-    // --- processing corp P: steel recipe, workforce 0.5, seeded pool of iron ---
+    // --- processing corp P: steel recipe, workforce 0.5, fed off the shelf ---
     const entity_id tile_p = w.create_entity();
     {
         tile_component tc{};
@@ -156,8 +155,7 @@ int main()
         cc.is_player = true; // not AI-driven — see corp_e above
         w.corporations[corp_p] = cc;
     }
-    // Seed P's pool with 4 iron ore -> coverage 4/8 = 0.5 (between t_idle and t_full).
-    w.pool_at(corp_p, pool_key_for_body(w, body)).quantities[ri(resource_type::iron_ore)] = 4.0f;
+    // BL-1265: no pool to seed — P buys its whole need (8 iron) off the shelf.
 
     // --- run one tick ---
     economy_report rep = run_economy_step(w, reg);
@@ -166,7 +164,7 @@ int main()
 
     std::printf("Layer 3 economy harness\n");
 
-    // Extraction: output = 20 * 2.0 * 0.5 * 1.0 = 20 (then all sold -> pool 0).
+    // Extraction: output = 20 * 2.0 * 0.5 * 1.0 = 20 (landed, and sold at the clear).
     // Find E's report.
     float e_out = 0.0f, p_out = 0.0f; bool p_idle = true; bool p_has_lim = false;
     for (const auto& br : rep.buildings)
@@ -176,45 +174,47 @@ int main()
     }
     check(near(e_out, 20.0f), "R3.1 extraction output = base*richness*workforce*(1-hazard)", e_out, 20.0f);
 
-    // Processing: batches_full = 8*0.5 = 4 -> steel produced = 4; iron bought = 8-4 = 4.
+    // Processing: batches_full = 8*0.5 = 4 -> steel produced = 4; iron bought = 8 (no pool).
     check(near(p_out, 4.0f), "R3.2 processing produces full batch outputs", p_out, 4.0f);
     check(!p_idle && p_has_lim, "R3.2 processor active with a limiting input", p_idle ? 1.0f : 0.0f, 0.0f);
-    check(near(rep.purchases[{corp_p, pool_key_for_body(w, body)}][ri(resource_type::iron_ore)], 4.0f),
-          "R4.2 auto-bought shortfall = need - pool = 4", rep.purchases[{corp_p, pool_key_for_body(w, body)}][ri(resource_type::iron_ore)], 4.0f);
+    check(near(rep.purchases[{corp_p, market}][ri(resource_type::iron_ore)], 8.0f),
+          "R4.2 bought off the shelf = the whole need = 8 (BL-1265: no pool covers part of it)",
+          rep.purchases[{corp_p, market}][ri(resource_type::iron_ore)], 8.0f);
 
     // Deposit depletion (Brief B, R2): the reserve is drawn down by the output.
     check(near(w.tiles[tile_e].resource_remaining[ri(resource_type::iron_ore)], 1.0e6f - 20.0f),
           "B.R2 extraction draws the reserve down by its output",
           w.tiles[tile_e].resource_remaining[ri(resource_type::iron_ore)], 1.0e6f - 20.0f);
 
-    // Market supply/demand (R4.1/R4.2): steel supply 4, iron demand 4.
+    // Market supply/demand (R4.1/R4.2): steel supply 4 (P's landing), iron demand 8.
     const market_component& m = w.markets[market];
-    check(near(m.supply[ri(resource_type::steel)], 4.0f), "R4.1 market supply = listed surplus (steel 4)", m.supply[ri(resource_type::steel)], 4.0f);
-    check(near(m.demand[ri(resource_type::iron_ore)], 4.0f), "R4.2 market demand = auto-bought (iron 4)", m.demand[ri(resource_type::iron_ore)], 4.0f);
+    check(near(m.supply[ri(resource_type::steel)], 4.0f), "R4.1 market supply = the landed output (steel 4)", m.supply[ri(resource_type::steel)], 4.0f);
+    check(near(m.demand[ri(resource_type::iron_ore)], 8.0f), "R4.2 market demand = the posted want (iron 8)", m.demand[ri(resource_type::iron_ore)], 8.0f);
 
     // Price resolution (Brief A, R1/R2): target = base*sqrt(D/S), clamped, EMA from base.
     // BL-1172/BL-1209 (MARKETS.md § Price resolution): S is the listings plus
     // the shelf's share min(inventory, k x (demand + silenced want)); shipped
-    // k = 1 (Ben, 2026-10-07), silenced want 0 here (the ceiling is OFF):
-    //   iron: S = 20 + min(996, 1 x 4) = 24, D = 4 -> base2.5 * sqrt(4/24) = 1.0206;
-    //         EMA 2.5 + 0.5*(1.0206-2.5) = 1.760310
-    //         (HISTORICAL k = 0, listings only: 1.809017; k = 4: 1.6667)
+    // k = 1 (Ben, 2026-10-07), silenced want 0 here (the ceiling is OFF).
+    // BL-1265 moved this row: P buys all 8 off the shelf (it drew 4 from its
+    // pool before), so D = 8 and the shelf's share is 8:
+    //   iron: S = 20 (E's landing) + min(992, 1 x 8) = 28, D = 8
+    //         -> base 2.5 * sqrt(8/28) = 1.336306; EMA 2.5 + 0.5*(1.336306-2.5) = 1.918153
+    //         (was 1.760310 with P's pool covering 4)
     //   steel: S=4 D=0  -> target 0 -> floor 0.25*8=2.0; EMA 8 + 0.5*(2-8) = 5.0
-    check(near(m.price[ri(resource_type::iron_ore)], 1.760310f),
-          "A.R1/R2 iron price eased toward base*sqrt(D/S), S = listings + the shelf's share (shipped k = 1)", m.price[ri(resource_type::iron_ore)], 1.760310f);
+    check(near(m.price[ri(resource_type::iron_ore)], 1.918153f),
+          "A.R1/R2 iron price eased toward base*sqrt(D/S), S = landings + the shelf's share (shipped k = 1)", m.price[ri(resource_type::iron_ore)], 1.918153f);
     check(near(m.price[ri(resource_type::steel)], 5.0f),
           "A.R2 steel price floored (no demand) and eased from base", m.price[ri(resource_type::steel)], 5.0f);
 
     // Budget (Brief A, R3 + L3 R5): sales valued at the resolved price; a shelf
     // draw billed at the POSTED price it was decided against (BL-1172, FINANCE.md
     // § Standing-force upkeep, Ben 2026-10-03: "A draw pays the posted price").
-    //   E: income 20*1.760310=35.206, maint 5, wage 0.5*8=4 -> +26.206 -> 1026.206
-    //      (HISTORICAL k = 0: 1027.180; 1024.333 at k = 4)
-    //   P: income 4*5=20, expend 4*2.5 (iron posted at base) = 10, maint 10,
-    //      wage 0.5*12=6 -> -6 -> 994.000   (was 4*1.809 = 7.236 -> 996.764 under
-    //      the resolved-price billing the ruling retired)
-    check(near(w.corporations[corp_e].balance, 1026.206f), "A.R3 extraction corp balance at resolved price (shipped k = 1)", w.corporations[corp_e].balance, 1026.206f);
-    check(near(w.corporations[corp_p].balance, 994.0f),    "A.R3 processing corp balance: sales at resolved, the shelf draw at posted", w.corporations[corp_p].balance, 994.0f);
+    //   E: income 20*1.918153=38.363 (its LANDING, paid at the clearing price),
+    //      maint 5, wage 0.5*8=4 -> +29.363 -> 1029.363   (was 1026.206)
+    //   P: income 4*5=20, expend 8*2.5 (iron posted at base) = 20, maint 10,
+    //      wage 0.5*12=6 -> -16 -> 984.000   (was 994.000: its pool covered 4)
+    check(near(w.corporations[corp_e].balance, 1029.363f), "A.R3 extraction corp balance: its landing paid at the resolved price (shipped k = 1)", w.corporations[corp_e].balance, 1029.363f);
+    check(near(w.corporations[corp_p].balance, 984.0f),    "A.R3 processing corp balance: sales at resolved, the shelf draw at posted", w.corporations[corp_p].balance, 984.0f);
 
     // R3.3 idle below t_idle: zero P's workforce-pool scenario -> empty pool, run again.
     {
@@ -228,11 +228,11 @@ int main()
         bc.workforce_assigned = 0.5f; bc.recipe = steel_id; w2.buildings[pb] = bc;
         const entity_id pc = w2.create_entity();
         corporation_component cc; cc.balance = 0.0f; cc.assets.push_back(pb); w2.corporations[pc] = cc;
-        // empty pool -> coverage 0 < t_idle -> idle
+        // no pool, no market -> coverage 0 < t_idle -> idle
         economy_report r = run_economy_step(w2, r2);
         bool idle = false;
         for (const auto& br : r.buildings) if (br.building == pb) idle = br.idle;
-        check(idle, "R3.3 processor idles below t_idle (empty pool)");
+        check(idle, "R3.3 processor idles below t_idle (nothing to buy)");
     }
 
     // --- Brief B: deposit depletion taper + exhaustion (R3, R4) ---
@@ -243,6 +243,7 @@ int main()
         {
             world wd;
             const entity_id bd = wd.create_entity(); wd.bodies[bd] = body_component{};
+            { market_component mc{}; mc.body = bd; wd.markets[wd.create_entity()] = mc; } // BL-1265: output lands on a market
             const entity_id td = wd.create_entity();
             tile_component tc{}; tc.body = bd;
             tc.resource_deposit[ri(resource_type::iron_ore)]   = 1.0f;
@@ -287,6 +288,7 @@ int main()
     {
         world ww;
         const entity_id wb = ww.create_entity(); ww.bodies[wb] = body_component{};
+        { market_component mc{}; mc.body = wb; ww.markets[ww.create_entity()] = mc; } // BL-1265: output lands on a market
         corporation_component cc; cc.balance = 1000.0f;
         cc.is_player = true; // not AI-driven — see corp_e above
         std::vector<entity_id> site_ids;
@@ -350,6 +352,7 @@ int main()
     {
         world ww;
         const entity_id wb = ww.create_entity(); ww.bodies[wb] = body_component{};
+        { market_component mc{}; mc.body = wb; ww.markets[ww.create_entity()] = mc; } // BL-1265: output lands on a market
         corporation_component cc; cc.balance = 1000.0f;
         cc.is_player = true;
         std::vector<entity_id> site_ids;
@@ -393,13 +396,13 @@ int main()
               before - ww.corporations[wc].balance, 48.0f);
     }
 
-    // --- Player sell orders: the floor is a reservation price (BL-386) ---
-    // A corp pool holds 10 steel on a body whose market trades steel at base 8 with
+    // --- A landing sells at the RESOLVED price (BL-1265; was BL-386's sell order) ---
+    // A corp lands 10 steel on a body whose market trades steel at base 8 with
     // no demand. Resolved price floors: target base*sqrt(0/10)=0 -> 0.25*8=2, EMA
-    // from prior 8 -> 5.0. An order at floor 4 (below the market) clears all 10 at
-    // the RESOLVED price 5 — never at the floor, never above the market. An order
-    // whose floor exceeds the resolved price holds instead (order_book_harness R6
-    // covers the hold side in depth).
+    // from prior 8 -> 5.0. The landing sells all 10 at the RESOLVED price 5 — the
+    // market is the counterparty, bid or no bid (MARKETS.md § The shelf economy).
+    // The sell order, its floor, and the BL-351 over-commit rows retired with
+    // the order book.
     {
         world ws;
         const entity_id b = ws.create_entity(); ws.bodies[b] = body_component{};
@@ -410,103 +413,23 @@ int main()
         ws.markets[m] = mc;
         const entity_id corp = ws.create_entity();
         { corporation_component cc; cc.balance = 0.0f; ws.corporations[corp] = cc; }
-        ws.pool_at(corp, pool_key_for_body(ws, b)).quantities[ri(resource_type::steel)] = 10.0f;
-
-        // The order goes into the WORLD's book (BL-293), not into a vector handed
-        // to clear_markets — clearing reads the book itself now.
-        sell_order o; o.id = ws.allocate_order_id();
-        o.corp = corp; o.body = b; o.resource = resource_type::steel;
-        o.quantity = 10.0f; o.floor_price = 4.0f;
-        ws.sell_orders.push_back(o);
+        ws.land_goods(corp, m, ri(resource_type::steel), 10.0f);
 
         economy_report empty; // no production this scenario
         auto f = clear_markets(ws, reg, empty);
         check(near(ws.markets[m].price[ri(resource_type::steel)], 5.0f),
               "SO.1 steel price floored+eased to 5.0", ws.markets[m].price[ri(resource_type::steel)], 5.0f);
         check(near(f[corp].income, 50.0f),
-              "SO.2 standing order sells 10 at the resolved price 5, not the floor (income 50)", f[corp].income, 50.0f);
-        check(near(ws.pool_at(corp, pool_key_for_body(ws, b)).quantities[ri(resource_type::steel)], 0.0f),
-              "SO.3 pool debited by the order", ws.pool_at(corp, pool_key_for_body(ws, b)).quantities[ri(resource_type::steel)], 0.0f);
+              "SO.2 the landing sells all 10 at the resolved price 5 (income 50)", f[corp].income, 50.0f);
+        check(near(ws.markets[m].inventory[ri(resource_type::steel)], 10.0f) && ws.landed_this_tick.empty(),
+              "SO.3 the landing is spent onto the shelf (inventory 10)",
+              ws.markets[m].inventory[ri(resource_type::steel)], 10.0f);
     }
 
-    // --- BL-351: duplicate sell orders cannot over-commit the pool ---
-    // Two identical orders (qty 10, floor 4) against a pool of 10 steel: the
-    // second lists only the running remainder (0), so at most the pool clears,
-    // the pool floors at 0, and income prices only the cleared quantity.
-    // Price as SO.1: no demand -> ref 5.0; floor 4 permits, clearing pays 5.
-    {
-        world ws;
-        const entity_id b = ws.create_entity(); ws.bodies[b] = body_component{};
-        const entity_id m = ws.create_entity();
-        market_component mc{}; mc.body = b;
-        mc.base_price[ri(resource_type::steel)] = 8.0f;
-        mc.price = mc.base_price;
-        ws.markets[m] = mc;
-        const entity_id corp = ws.create_entity();
-        { corporation_component cc; cc.balance = 0.0f; ws.corporations[corp] = cc; }
-        ws.pool_at(corp, pool_key_for_body(ws, b)).quantities[ri(resource_type::steel)] = 10.0f;
-
-        // BL-293: the book is world state, so the duplicate orders are placed on
-        // the world rather than handed to clear_markets.
-        sell_order o; o.corp = corp; o.body = b; o.resource = resource_type::steel;
-        o.quantity = 10.0f; o.floor_price = 4.0f;
-        o.id = ws.allocate_order_id(); ws.sell_orders.push_back(o);
-        o.id = ws.allocate_order_id(); ws.sell_orders.push_back(o);
-
-        economy_report empty;
-        auto f = clear_markets(ws, reg, empty);
-        const float pool_after = ws.pool_at(corp, pool_key_for_body(ws, b)).quantities[ri(resource_type::steel)];
-        const float cleared    = 10.0f - pool_after;
-        check(cleared <= 10.0f + 1e-3f && near(cleared, 10.0f),
-              "BL351.1 duplicate orders clear at most the pool (10 total)", cleared, 10.0f);
-        check(pool_after >= 0.0f && near(pool_after, 0.0f),
-              "BL351.2 pool floors at zero (never negative)", pool_after, 0.0f);
-        check(near(f[corp].income, cleared * 5.0f),
-              "BL351.3 income == cleared quantity x resolved price (10*5)", f[corp].income, cleared * 5.0f);
-    }
-
-    // --- BL-351: a multi-order seller's unmatched remainder clears per order ---
-    // One seller lists two orders of 5 (floor 2); one buyer takes 5. The matched 5
-    // drains one order; the OTHER order's own remainder (5) auto-clears at the
-    // resolved price (floor 2 permits) — the old per-seller aggregate zeroed both
-    // orders' remainder.
-    // Ref price: S=10 D=5 base 8 -> target 8*sqrt(0.5)=5.657, EMA -> 6.828.
-    // Income = 5*2 (matched at ask) + 5*6.828 (auto-clear) = 44.142.
-    {
-        world ws;
-        const entity_id b = ws.create_entity(); ws.bodies[b] = body_component{};
-        const entity_id m = ws.create_entity();
-        market_component mc{}; mc.body = b;
-        mc.base_price[ri(resource_type::steel)] = 8.0f;
-        mc.price = mc.base_price;
-        ws.markets[m] = mc;
-        const entity_id seller = ws.create_entity();
-        { corporation_component cc; cc.balance = 0.0f; ws.corporations[seller] = cc; }
-        const entity_id buyer = ws.create_entity();
-        { corporation_component cc; cc.balance = 0.0f; ws.corporations[buyer] = cc; }
-        ws.pool_at(seller, pool_key_for_body(ws, b)).quantities[ri(resource_type::steel)] = 10.0f;
-
-        // BL-293: both sides of the book are world state now.
-        sell_order so; so.corp = seller; so.body = b; so.resource = resource_type::steel;
-        so.quantity = 5.0f; so.floor_price = 2.0f;
-        so.id = ws.allocate_order_id(); ws.sell_orders.push_back(so);
-        so.id = ws.allocate_order_id(); ws.sell_orders.push_back(so);
-        buy_order bo; bo.corp = buyer; bo.body = b; bo.resource = resource_type::steel;
-        bo.quantity = 5.0f; bo.max_price = 10.0f;
-        bo.id = ws.allocate_order_id(); ws.buy_orders.push_back(bo);
-
-        economy_report empty;
-        auto f = clear_markets(ws, reg, empty);
-        check(near(f[seller].income, 5.0f * 2.0f + 5.0f * 6.828427f),
-              "BL351.4 multi-order seller: matched order + other order's auto-clear",
-              f[seller].income, 44.142f);
-        check(near(ws.pool_at(seller, pool_key_for_body(ws, b)).quantities[ri(resource_type::steel)], 0.0f),
-              "BL351.5 pool debited by both orders' full listed quantity",
-              ws.pool_at(seller, pool_key_for_body(ws, b)).quantities[ri(resource_type::steel)], 0.0f);
-        check(near(f[buyer].expenditure, 5.0f * 2.0f),
-              "BL351.6 buyer pays the matched quantity at the ask", f[buyer].expenditure, 10.0f);
-    }
-
+    // --- BL-351 rows (duplicate sell orders cannot over-commit the pool; a
+    // multi-order seller's remainder clears per order) RETIRED with the order
+    // book and corporation pools (BL-1265, MARKETS.md § The shelf economy):
+    // there are no orders to duplicate and no pool to over-commit. ---
     // --- Multiple markets per body: nearest-centre catchment routing ---
     // A body carries two markets centred on tiles 100 columns apart. A tile near
     // each centre resolves (market_for_tile) to that centre's market, and a corp
@@ -542,17 +465,17 @@ int main()
         { corporation_component cc; const entity_id bid = wm.create_entity();
           building_component bld{}; bld.tile = tile_b; wm.buildings[bid] = bld;
           cc.assets.push_back(bid); wm.corporations[corp_b] = cc; }
-        // BL-1003: each corp's stock sits in ITS building's catchment pool.
-        wm.pool_at(corp_a, pool_key_for_tile(wm, tile_a)).quantities[ri(resource_type::steel)] = 10.0f;
-        wm.pool_at(corp_b, pool_key_for_tile(wm, tile_b)).quantities[ri(resource_type::steel)] = 10.0f;
+        // BL-1265: each corp's goods LAND on ITS building's catchment market.
+        wm.land_goods(corp_a, market_for_tile(wm, tile_a), ri(resource_type::steel), 10.0f);
+        wm.land_goods(corp_b, market_for_tile(wm, tile_b), ri(resource_type::steel), 10.0f);
 
         economy_report empty;
         clear_markets(wm, reg, empty);
         check(near(wm.markets[mkt_a].supply[ri(resource_type::steel)], 10.0f),
-              "MM.3 corp A surplus lists in catchment market A",
+              "MM.3 corp A's landing lists in catchment market A",
               wm.markets[mkt_a].supply[ri(resource_type::steel)], 10.0f);
         check(near(wm.markets[mkt_b].supply[ri(resource_type::steel)], 10.0f),
-              "MM.4 corp B surplus lists in catchment market B",
+              "MM.4 corp B's landing lists in catchment market B",
               wm.markets[mkt_b].supply[ri(resource_type::steel)], 10.0f);
     }
 
@@ -596,7 +519,11 @@ int main()
             corporation_component cc; cc.balance = 1000.0f; cc.is_player = true;
             cc.assets.push_back(eb);
             qw.corporations[ec] = cc;
-            qw.pool_at(ec, pool_key_for_body(qw, qb)).quantities[ri(resource_type::iron_ore)] = 100.0f;
+            // BL-1265: the iron is on a market's shelf on the body (no pools).
+            const entity_id qm = qw.create_entity();
+            { market_component qmc{}; qmc.body = qb;
+              qmc.base_price[ri(resource_type::iron_ore)] = 2.5f; qmc.price = qmc.base_price;
+              qmc.inventory[ri(resource_type::iron_ore)]  = 100.0f; qw.markets[qm] = qmc; }
             economy_report r = run_economy_step(qw, reg);
             float out = -1.0f;
             for (const auto& br : r.buildings)

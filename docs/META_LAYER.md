@@ -54,7 +54,8 @@ inventing where evidence already exists."*
 |---|---|---|
 | `research` | has the corp earned this tech (1/0) | `key`, a tech id |
 | `structure` | count of that building the corp owns | `structure` |
-| `stockpile` | units across all the corp's pools | `resource` |
+| `stockpile` | units on the shelves of the markets the corp sits in | `resource` |
+| `produced` | has the corp ever made this good (1/0) (Ben, 2026-10-10) | `resource` |
 | `market` | mean resolved price across every market | `resource` |
 | `surplus` | the corp's cash balance | — |
 | `era` | campaign era of the corp | — |

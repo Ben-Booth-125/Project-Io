@@ -114,7 +114,9 @@ std::vector<tech_gate> build_gates()
     converter_practice.add_effect(tech_effect::unlock(std::string("steel_bessemer")));
     {
         condition c;
-        c.subject    = condition_subject::stockpile;
+        // NR-1015 (Ben, 2026-10-10): corporations hold no stock under the
+        // shelf economy, so "holds machinery" is read as "has made machinery".
+        c.subject    = condition_subject::produced;
         c.resource   = resource_type::machinery;
         c.comparator = condition_comparator::at_least;
         c.operand    = 1.0f;

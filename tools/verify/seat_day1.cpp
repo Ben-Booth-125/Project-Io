@@ -151,8 +151,7 @@ void snap_pre_draw(const world& w, int lap, void* ctx)
         for (std::size_t r = 0; r < resource_count; ++r) pr[r] = posted_price(mc, r);
         s->price[mid] = pr;
     }
-    for (const auto& [k, sp] : w.corp_market_pools)
-        if (k.first == s->corp) s->pool[k.second] = sp.quantities;
+    // BL-1265: corporations hold no pools; `pool` stays empty (reads 0).
 }
 
 struct holding
@@ -203,12 +202,13 @@ int input_tier(world& w, const recipe_registry& reg, input_reach& ir, entity_id 
     return 3;
 }
 
+/// BL-1265: corporations hold no pools — what the corp "holds" is read as the
+/// stock on the shelves of the markets it sits in (`corp_shelf_stock`).
 double pool_units(const world& w, entity_id corp)
 {
     double s = 0;
-    for (const auto& [k, sp] : w.corp_market_pools)
-        if (k.first == corp)
-            for (float q : sp.quantities) s += q;
+    for (std::size_t r = 0; r < resource_count; ++r)
+        s += corp_shelf_stock(w, corp, r);
     return s;
 }
 
@@ -288,8 +288,7 @@ void run_seed(std::uint32_t seed, int play)
                     cc.name.c_str(), static_cast<int>(cc.focus), bal_gen[s], cc.balance,
                     static_cast<double>(cc.refund_unbooked), stock_gen[s], pool_units(w, s));
         std::array<double, resource_count> by{};
-        for (const auto& [k, sp] : w.corp_market_pools)
-            if (k.first == s) for (std::size_t r = 0; r < resource_count; ++r) by[r] += sp.quantities[r];
+        for (std::size_t r = 0; r < resource_count; ++r) by[r] = corp_shelf_stock(w, s, r); // BL-1265
         std::vector<std::pair<double, std::size_t>> top;
         for (std::size_t r = 0; r < resource_count; ++r) if (by[r] >= 0.5) top.emplace_back(by[r], r);
         std::sort(top.rbegin(), top.rend());

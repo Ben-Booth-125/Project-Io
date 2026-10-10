@@ -47,6 +47,8 @@
 
 #include "world/components.hpp"
 #include "world/corp_command.hpp"
+#include "world/economy_system.hpp" // economy_report (commit_trade_shipment)
+#include "world/market_clearing.hpp" // market_for_tile
 #include "world/logistics.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/stance.hpp"
@@ -189,7 +191,9 @@ scenario make_world(const std::vector<int>& water_cols, int src_col, int dst_col
     dm.price              = dm.base_price;
     s.w.markets[s.dst_market] = dm;
 
-    s.w.pool_at(s.corp, pool_key_for_body(s.w, s.body)).quantities[r_iron] = stock;
+    // BL-1265: the stock is on the SOURCE MARKET's shelf (corporations hold no
+    // pools); a trade buys it there.
+    s.w.markets.at(s.src_market).inventory[r_iron] = stock;
     return s;
 }
 
@@ -214,22 +218,31 @@ scenario make_scenario(bool src_port, bool dst_port, float stock = 100.0f,
     return make_world(water, 0, 3, ports, stock, balance);
 }
 
-corp_command dispatch_cmd(const scenario& s, float qty)
+/// BL-1266: the `dispatch_convoy` verb retired (it is REJECTED); a convoy is a
+/// TRADE's shipment. One shipment of @p qty iron from the source market to the
+/// destination, priced (`price_trade_leg`) and committed
+/// (`commit_trade_shipment`) exactly as the trade pass ships — answered in the
+/// verb's old terms so every row reads as it did: `applied` when the convoy
+/// commits, `rejected_placement` when no viable leg exists (no route, no port
+/// pair), `rejected_state` when the commit itself refuses. A refused leg
+/// mutates nothing.
+corp_command_result ship_cmd(scenario& s, const recipe_registry& reg, float qty)
 {
-    corp_command cmd;
-    cmd.corp         = s.corp;
-    cmd.verb         = corp_verb::dispatch_convoy;
-    cmd.subject      = s.src_market;
-    cmd.counterparty = s.dst_market;
-    cmd.target       = resource_type::iron_ore;
-    cmd.quantity     = qty;
-    return cmd;
+    economy_report rep; // the purchase is billed at a clear this harness never runs
+    const logistics_nodes nodes = collect_logistics_nodes(s.w);
+    const convoy_leg leg = price_trade_leg(s.w, reg, nodes, s.corp, s.src_market, s.dst_market,
+                                           r_iron, qty);
+    if (!leg.viable)
+        return corp_command_result::rejected_placement;
+    return commit_trade_shipment(s.w, reg, rep, s.corp, s.src_market, s.dst_market, r_iron, qty, leg)
+               ? corp_command_result::applied
+               : corp_command_result::rejected_state;
 }
 
+/// The source SHELF's iron (BL-1265: was the corporation's pool).
 float pool_iron(const scenario& s)
 {
-    const auto it = s.w.corp_market_pools.find({s.corp, pool_key_for_body(s.w, s.body)});
-    return it != s.w.corp_market_pools.end() ? it->second.quantities[r_iron] : 0.0f;
+    return s.w.markets.at(s.src_market).inventory[r_iron];
 }
 
 std::string fingerprint(const world& w)
@@ -241,10 +254,13 @@ std::string fingerprint(const world& w)
     std::sort(corp_ids.begin(), corp_ids.end());
     for (const entity_id id : corp_ids)
         o << "C" << id << ':' << w.corporations.at(id).balance << ';';
-    for (const auto& [key, sc] : w.corp_market_pools)
+    std::vector<entity_id> mids; // BL-1265: the shelves, not pools
+    for (const auto& kv : w.markets) mids.push_back(kv.first);
+    std::sort(mids.begin(), mids.end());
+    for (const entity_id m : mids)
     {
-        o << "P" << key.first << '/' << key.second << ':';
-        for (const float q : sc.quantities) o << q << ',';
+        o << "M" << m << ':';
+        for (const float q : w.markets.at(m).inventory) o << q << ',';
         o << ';';
     }
     o << "N" << w.next_convoy_id << ';';
@@ -292,7 +308,7 @@ std::string run_sequence(const recipe_registry& reg)
     {
         scenario s = make_scenario(/*src_port=*/true, /*dst_port=*/true);
         const float bal_before = s.w.corporations.at(s.corp).balance;
-        const corp_command_result r = apply_corp_command(s.w, reg, dispatch_cmd(s, 25.0f));
+        const corp_command_result r = ship_cmd(s, reg, 25.0f);
         check(r == corp_command_result::applied,
               "R0.1 both endpoints Port-equipped: dispatch_convoy applies");
         check(s.w.convoys.size() == 1, "R0.2 exactly one convoy is created");
@@ -315,7 +331,7 @@ std::string run_sequence(const recipe_registry& reg)
                   "R0.5 cost = (sea_unit_cost x A*(water-weighted) + 2 x handling) x qty");
             trace << "R0:" << static_cast<int>(c.mode) << ':' << c.cost_paid << ';';
         }
-        check(std::fabs(pool_iron(s) - 75.0f) < 1e-4f, "R0.6 source pool debited by exactly 25");
+        check(std::fabs(pool_iron(s) - 75.0f) < 1e-4f, "R0.6 source shelf debited by exactly 25");
     }
 
     // R1 — missing a Port at either endpoint, on the island: no port PAIR and no
@@ -326,7 +342,7 @@ std::string run_sequence(const recipe_registry& reg)
     {
         scenario s = make_scenario(src_port, dst_port);
         const std::string before = fingerprint(s.w);
-        const corp_command_result r = apply_corp_command(s.w, reg, dispatch_cmd(s, 25.0f));
+        const corp_command_result r = ship_cmd(s, reg, 25.0f);
         const std::string after = fingerprint(s.w);
         const bool ok = r == corp_command_result::rejected_placement && before == after;
         std::string what = std::string("R1 ungated sea leg (") + label
@@ -343,7 +359,7 @@ std::string run_sequence(const recipe_registry& reg)
             if (bc.tile == s.dst_tile && bc.type == building_type::port)
                 bc.decommissioned = true;
         const std::string before = fingerprint(s.w);
-        const corp_command_result r = apply_corp_command(s.w, reg, dispatch_cmd(s, 25.0f));
+        const corp_command_result r = ship_cmd(s, reg, 25.0f);
         const std::string after = fingerprint(s.w);
         check(r == corp_command_result::rejected_placement && before == after,
               "R2.1 a decommissioned destination Port does not gate sea mode open");
@@ -356,7 +372,7 @@ std::string run_sequence(const recipe_registry& reg)
             if (bc.tile == s.dst_tile && bc.type == building_type::port)
                 bc.ticks_remaining = 5;
         const std::string before = fingerprint(s.w);
-        const corp_command_result r = apply_corp_command(s.w, reg, dispatch_cmd(s, 25.0f));
+        const corp_command_result r = ship_cmd(s, reg, 25.0f);
         const std::string after = fingerprint(s.w);
         check(r == corp_command_result::rejected_placement && before == after,
               "R2.2 an unbuilt (under-construction) destination Port does not gate sea mode open");
@@ -371,7 +387,7 @@ std::string run_sequence(const recipe_registry& reg)
         scenario s = make_scenario(/*src_port=*/true, /*dst_port=*/false, 100.0f, 1000.0f,
                                    /*island=*/false);
         const float bal_before = s.w.corporations.at(s.corp).balance;
-        const corp_command_result r = apply_corp_command(s.w, reg, dispatch_cmd(s, 25.0f));
+        const corp_command_result r = ship_cmd(s, reg, 25.0f);
         check(r == corp_command_result::applied,
               "R4.1 no port pair but an overland road: dispatch_convoy applies (B2)");
         if (s.w.convoys.size() == 1)
@@ -396,7 +412,7 @@ std::string run_sequence(const recipe_registry& reg)
     // centre and refused this; the route is now three legs.
     {
         scenario s = make_world({3, 4, 16, 17}, 0, 8, {{2, 0}, {5, 0}});
-        const corp_command_result r = apply_corp_command(s.w, reg, dispatch_cmd(s, 25.0f));
+        const corp_command_result r = ship_cmd(s, reg, 25.0f);
         check(r == corp_command_result::applied,
               "R5.1 inland markets, coastal Ports: dispatch_convoy applies (B1)");
         if (s.w.convoys.size() == 1)
@@ -434,7 +450,7 @@ std::string run_sequence(const recipe_registry& reg)
         const recipe_registry& reg = reg6; // R6's rates, shadowing the shipped ones
         scenario s = make_world({3, 4, 16, 17}, 0, 8, {{2, 0}, {5, 0}, {5, 3}}, 100.0f,
                                 1000.0f, /*dst_row=*/3);
-        const corp_command_result r = apply_corp_command(s.w, reg, dispatch_cmd(s, 25.0f));
+        const corp_command_result r = ship_cmd(s, reg, 25.0f);
         check(r == corp_command_result::applied, "R6.1 two far-shore Ports: dispatch applies");
         if (s.w.convoys.size() == 1)
         {
@@ -457,7 +473,7 @@ std::string run_sequence(const recipe_registry& reg)
     {
         scenario s = make_world({3, 4, 16, 17}, 0, 9, {{2, 0}, {7, 0}});
         const std::string before = fingerprint(s.w);
-        const corp_command_result r = apply_corp_command(s.w, reg, dispatch_cmd(s, 25.0f));
+        const corp_command_result r = ship_cmd(s, reg, 25.0f);
         const std::string after = fingerprint(s.w);
         check(r == corp_command_result::rejected_placement && before == after,
               "R7 a Port off the water is no sea end: refused, nothing mutated");
@@ -473,7 +489,7 @@ std::string run_sequence(const recipe_registry& reg)
     {
         scenario s = make_world({3, 4, 16, 17}, 0, 8, {{2, 1}, {5, 0}}, 100.0f, 1000.0f,
                                 /*dst_row=*/0, /*land_cells=*/{{3, 1}});
-        const corp_command_result r = apply_corp_command(s.w, reg, dispatch_cmd(s, 25.0f));
+        const corp_command_result r = ship_cmd(s, reg, 25.0f);
         check(r == corp_command_result::applied,
               "R8.1 a Port whose sea lies only across a hex diagonal is a usable sea end");
         if (s.w.convoys.size() == 1)
@@ -500,7 +516,7 @@ std::string run_sequence(const recipe_registry& reg)
             if (tc.body == s.body && (tc.grid_x == 3 || tc.grid_x == 4))
                 tc.substrate = terrain_substrate::lake;
         const std::string before = fingerprint(s.w);
-        const corp_command_result r = apply_corp_command(s.w, reg, dispatch_cmd(s, 25.0f));
+        const corp_command_result r = ship_cmd(s, reg, 25.0f);
         const std::string after = fingerprint(s.w);
         check(r == corp_command_result::rejected_placement && before == after,
               "R9 a crossing by LAKE is no sea leg: refused, nothing mutated");
@@ -521,7 +537,7 @@ std::string run_sequence(const recipe_registry& reg)
                               /*grid_width=*/256);
         };
         scenario s = sea_fixture();
-        const corp_command_result r = apply_corp_command(s.w, reg, dispatch_cmd(s, 25.0f));
+        const corp_command_result r = ship_cmd(s, reg, 25.0f);
         check(r == corp_command_result::applied && s.w.convoys.size() == 1
                   && s.w.convoys.front().mode == convoy_mode::sea
                   && s.w.convoys.front().speed == 1.0f,
@@ -592,13 +608,12 @@ std::string run_sequence(const recipe_registry& reg)
                       "inland leg");
                 if (cuts.size() == 1)
                 {
-                    const auto pit =
-                        s.w.corp_market_pools.find({raider, pool_key_for_tile(s.w, inland)});
-                    const float got = pit != s.w.corp_market_pools.end()
-                                          ? pit->second.quantities[r_iron] : 0.0f;
+                    // BL-1265: the capture LANDS for the raider on the market
+                    // under the interception tile.
+                    const float got = s.w.landed(raider, market_for_tile(s.w, inland), r_iron);
                     check(cuts[0].outcome == interception_outcome::captured
                               && !tile_is_water(s.w, cuts[0].tile) && std::fabs(got - 25.0f) < 1e-4f,
-                          "R13 the capture credits the raider's pool at a LAND tile, whole");
+                          "R13 the capture lands for the raider at a LAND tile, whole");
                     trace << "R11:" << cuts[0].tile << ':' << got << ';';
                 }
             }
@@ -608,7 +623,7 @@ std::string run_sequence(const recipe_registry& reg)
             if (direct_water != null_entity)
             {
                 scenario s2 = sea_fixture();
-                apply_corp_command(s2.w, reg, dispatch_cmd(s2, 25.0f));
+                ship_cmd(s2, reg, 25.0f);
                 add_raider(s2, direct_water);
                 advance_convoys(s2.w);
                 const std::size_t cut = intercept_convoys(s2.w, 1).size();
@@ -625,7 +640,7 @@ std::string run_sequence(const recipe_registry& reg)
                    std::tuple{4, 3, "R12c a hostile unit on the sea leg's water intercepts the T = 1 convoy"} })
             {
                 scenario s3 = sea_fixture();
-                apply_corp_command(s3.w, reg, dispatch_cmd(s3, 25.0f));
+                ship_cmd(s3, reg, 25.0f);
                 const entity_id at_tile = tile_at(s3.w, s3.body, cx, cy);
                 add_raider(s3, at_tile);
                 advance_convoys(s3.w);
@@ -649,7 +664,7 @@ std::string run_sequence(const recipe_registry& reg)
         water.push_back(201); // closes the overland detour round the cylinder
         scenario s = make_world(water, 0, 92, {{1, 0}, {62, 0}}, 100.0f, 1000.0f, 0, {},
                                 /*grid_width=*/256);
-        const corp_command_result r = apply_corp_command(s.w, reg, dispatch_cmd(s, 25.0f));
+        const corp_command_result r = ship_cmd(s, reg, 25.0f);
         check(r == corp_command_result::applied && s.w.convoys.size() == 1
                   && s.w.convoys.front().mode == convoy_mode::sea,
               "R15.0 setup: the long crossing dispatches by sea");
@@ -711,7 +726,7 @@ std::string run_sequence(const recipe_registry& reg)
             return false;
         };
         scenario s = land_fixture();
-        apply_corp_command(s.w, reg, dispatch_cmd(s, 25.0f));
+        ship_cmd(s, reg, 25.0f);
         check(s.w.convoys.size() == 1 && s.w.convoys.front().mode == convoy_mode::land
                   && s.w.convoys.front().port_a == null_entity,
               "R14.0 setup: the land fallback is dispatched, with no Ports recorded");
@@ -727,13 +742,13 @@ std::string run_sequence(const recipe_registry& reg)
                   "R14.1 the land fallback's lane is the overland road round the cylinder");
 
             scenario s2 = land_fixture();
-            apply_corp_command(s2.w, reg, dispatch_cmd(s2, 25.0f));
+            ship_cmd(s2, reg, 25.0f);
             add_raider(s2, tile_at(s2.w, s2.body, 1, 0));
             check(!run_to_end(s2) && s2.w.convoys.size() == 1,
                   "R14.2 a hostile unit on the water the direct path crosses never intercepts it");
 
             scenario s3 = land_fixture();
-            apply_corp_command(s3.w, reg, dispatch_cmd(s3, 25.0f));
+            ship_cmd(s3, reg, 25.0f);
             add_raider(s3, tile_at(s3.w, s3.body, 20, 0));
             check(run_to_end(s3),
                   "R14.3 a hostile unit on the overland road the convoy takes intercepts it");
@@ -741,138 +756,35 @@ std::string run_sequence(const recipe_registry& reg)
         }
     }
 
-    // R16 — BL-1195: THE ORIGIN TILE. The lane starts where the haul was priced
-    // from. All land (no water bar a far band giving the one Port its coast — the
-    // passive-LP anchor). The corporation's building stands at (1,2), NOT on the
-    // source centre (0,0); it is in the source market's catchment.
+    // R16 — BL-1195 / BL-1266: THE ORIGIN TILE. A trade's haul leaves from the
+    // SOURCE MARKET'S CENTRE — where the shelf it bought from stands (TRADE.md
+    // § A trade; supply_system.cpp `price_market_leg`) — whatever buildings its
+    // owner holds in that market's catchment. All land (no water bar a far band
+    // giving the one Port its coast — the passive-LP anchor). The corporation's
+    // building stands at (1,2), NOT on the source centre (0,0).
+    //
+    // RETIRED with BL-1265/1266: R16.1 (a corporation's auto-dispatched convoy
+    // leaves from its BUILDING — the pool origin) and R17 (a convoy out of a
+    // BODY-LEVEL pool): there are no pools and no dispatcher, so neither origin
+    // exists. R16.2 (a market's own export leaves from its centre) is the rule
+    // every shipment now follows, asserted here for a trade.
     {
-        const auto origin_fixture = [](float stock) {
-            scenario s = make_world({20, 21}, 0, 8, {{19, 0}}, stock);
-            for (auto& [bid, b] : s.w.buildings)
-                if (b.type == building_type::extraction_site)
-                    b.tile = tile_at(s.w, s.body, 1, 2);
-            s.w.markets.at(s.dst_market).price[r_iron]  = 10.0f;
-            s.w.markets.at(s.dst_market).demand[r_iron] = 30.0f;
-            s.w.markets.at(s.dst_market).supply[r_iron] = 0.0f;
-            return s;
-        };
-        // R16.1 the AUTO-DISPATCH (dispatch_convoys' pool_origin()): the corporation's
-        // convoy leaves from its building.
-        {
-            scenario s = origin_fixture(100.0f);
-            const entity_id bld_tile = tile_at(s.w, s.body, 1, 2);
-            dispatch_convoys(s.w, reg, reg.logistics_cost(convoy_mode::land),
-                             reg.logistics_cost(convoy_mode::space));
-            const convoy_component* cv = nullptr;
-            for (const convoy_component& c : s.w.convoys)
-                if (c.corp == s.corp)
-                    cv = &c;
-            check(cv != nullptr && cv->origin_tile == bld_tile
-                      && convoy_route_tiles(s.w, *cv).tiles.front() == bld_tile
-                      && bld_tile != s.src_tile,
-                  "R16.1 an auto-dispatched convoy records, and its lane starts at, the building "
-                  "it was priced from, not the source centre");
-        }
-        // R16.2 the MARKET EXPORT (export_market_shelves): a market's own shelf
-        // leaves from its centre, whatever buildings stand in its catchment.
-        {
-            scenario s = origin_fixture(0.0f);
-            s.w.markets.at(s.src_market).inventory[r_iron] = 100.0f;
-            const convoy_dispatch_tick ct = dispatch_convoys(
-                s.w, reg, reg.logistics_cost(convoy_mode::land), reg.logistics_cost(convoy_mode::space));
-            const convoy_component* cv = nullptr;
-            for (const convoy_component& c : s.w.convoys)
-                if (c.corp == null_entity)
-                    cv = &c;
-            check(ct.market_exports == 1 && cv != nullptr && cv->origin_tile == s.src_tile
-                      && convoy_route_tiles(s.w, *cv).tiles.front() == s.src_tile,
-                  "R16.2 a market's own export records, and its lane starts at, the market centre");
-        }
+        scenario s = make_world({20, 21}, 0, 8, {{19, 0}}, 100.0f);
+        for (auto& [bid, b] : s.w.buildings)
+            if (b.type == building_type::extraction_site)
+                b.tile = tile_at(s.w, s.body, 1, 2);
+        const corp_command_result r = ship_cmd(s, reg, 25.0f);
+        const convoy_component* cv = nullptr;
+        for (const convoy_component& c : s.w.convoys)
+            if (c.corp == s.corp)
+                cv = &c;
+        check(r == corp_command_result::applied && cv != nullptr && cv->origin_tile == s.src_tile
+                  && convoy_route_tiles(s.w, *cv).tiles.front() == s.src_tile
+                  && tile_at(s.w, s.body, 1, 2) != s.src_tile,
+              "R16 a trade shipment records, and its lane starts at, the source market centre — "
+              "not its owner's building");
+        trace << "R16:" << (cv ? cv->origin_tile : null_entity) << ';';
     }
-
-    // R17 — BL-1195: a convoy out of a BODY-LEVEL pool (BL-1003) has a lane, built
-    // from the origin tile dispatch records, and runs through the real tick on it.
-    // Created by dispatch_convoys from a body-keyed pool (R16's fixture, the stock
-    // moved off the market pool onto the body key), then advanced and intercepted
-    // for real. commit_convoy stamps such a convoy's `source_market` null (no market
-    // sent it), so the origin tile is the only thing that places its lane.
-    {
-        const auto body_pool_fixture = [] {
-            scenario s = make_world({20, 21}, 0, 8, {{19, 0}}, /*stock=*/0.0f);
-            for (auto& [bid, b] : s.w.buildings)
-                if (b.type == building_type::extraction_site)
-                    b.tile = tile_at(s.w, s.body, 1, 2);
-            s.w.markets.at(s.dst_market).price[r_iron]  = 10.0f;
-            s.w.markets.at(s.dst_market).demand[r_iron] = 30.0f;
-            s.w.markets.at(s.dst_market).supply[r_iron] = 0.0f;
-            s.w.pool_at(s.corp, s.body).quantities[r_iron] = 100.0f; // the body-level key
-            return s;
-        };
-        const auto dispatch_body_pool = [&reg](scenario& sc) -> const convoy_component* {
-            dispatch_convoys(sc.w, reg, reg.logistics_cost(convoy_mode::land),
-                             reg.logistics_cost(convoy_mode::space));
-            for (const convoy_component& c : sc.w.convoys)
-                if (c.corp == sc.corp && sc.w.markets.count(c.source_market) == 0)
-                    return &c;
-            return nullptr;
-        };
-        // Tick until cut or arrived (<= 1000 ticks); the cut tile, or null.
-        const auto run_to_end = [](scenario& sc, bool& arrived) {
-            arrived = false;
-            for (int k = 0; k < 1000 && !sc.w.convoys.empty(); ++k)
-            {
-                advance_convoys(sc.w);
-                const std::vector<interception_record> cuts = intercept_convoys(sc.w, k);
-                if (!cuts.empty())
-                    return cuts.front().tile;
-                if (sc.w.convoys.front().arrived)
-                {
-                    arrived = true;
-                    return null_entity;
-                }
-            }
-            return null_entity;
-        };
-
-        scenario s = body_pool_fixture();
-        const convoy_component* cv = dispatch_body_pool(s);
-        check(cv != nullptr && cv->origin_tile != null_entity && s.w.convoys.size() == 1
-                  && cv->origin_tile == convoy_origin_tile(s.w, s.w.corporations.at(s.corp), s.body),
-              "R17.0 setup: dispatch_convoys sends a convoy out of the body-level pool, "
-              "recording its origin tile");
-        if (cv != nullptr)
-        {
-            const convoy_route lane = convoy_route_tiles(s.w, *cv);
-            const entity_id dest_centre = s.w.markets.at(cv->dest_market).centre_tile;
-            check(lane.body == s.body && lane.tiles.size() >= 3
-                      && lane.tiles.front() == cv->origin_tile && lane.tiles.back() == dest_centre,
-                  "R17.1 a body-level-pool convoy's lane runs from its origin tile to the "
-                  "destination");
-
-            // Unopposed, it runs the real tick to arrival.
-            bool arrived = false;
-            const entity_id none = run_to_end(s, arrived);
-            check(none == null_entity && arrived,
-                  "R17.2 unopposed, the body-level-pool convoy advances through the real tick "
-                  "and arrives");
-
-            // A hostile unit on a mid-lane tile cuts it there.
-            if (lane.tiles.size() >= 3)
-            {
-                const entity_id mid = lane.tiles[lane.tiles.size() / 2];
-                scenario s2 = body_pool_fixture();
-                const convoy_component* cv2 = dispatch_body_pool(s2);
-                add_raider(s2, mid);
-                bool arrived2 = false;
-                const entity_id cut = (cv2 != nullptr) ? run_to_end(s2, arrived2) : null_entity;
-                check(cut == mid && !arrived2 && s2.w.convoys.empty(),
-                      "R17.3 a hostile unit on its lane intercepts the body-level-pool convoy "
-                      "there, through advance_convoys/intercept_convoys");
-                trace << "R17:" << lane.tiles.size() << ':' << cut << ';';
-            }
-        }
-    }
-
     return trace.str();
 }
 

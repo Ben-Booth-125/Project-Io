@@ -171,6 +171,13 @@ finish_campaign_result finish_campaign_world(world& w, const generation_report& 
     // branch left untouched holds no charter and publishes nothing, so a world
     // with no budget keeps the rows generation published.
     publish_charter_web(progress, w, out.charter);
+    // BL-1268 -- THE RETROFIT (TRADE.md § Trade in generation): the history's
+    // trade record is spent on completed Planetary Marketplaces, on the markets
+    // whose trade it carried, owned by the corporations chartered there. After
+    // the winner's charters (the owners exist) and before the settle (which
+    // trades on them); not inside the search, so no candidate is scored on them.
+    out.retrofit = retrofit_marketplaces(w, reg);
+    print_marketplace_retrofit(out.retrofit);
     // BL-1099: THE CHARTERS ARE DATED against the Industrialisation record --
     // the cradle's own, the one body the span ran for (every other entry is
     // empty, and an empty record dates every firm at the epoch). Once, on the

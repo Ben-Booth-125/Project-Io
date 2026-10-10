@@ -320,6 +320,21 @@ economy = {
             requires_centre  = true,
             min_centre_scale = 4,
         },
+        -- BL-1266: Planetary Marketplace (TRADE.md § The Planetary Marketplace) —
+        -- makes trade points for its owner each tick at its staffed rate
+        -- (economy.trade.points below) and produces no good. Priced between a
+        -- port and a logistics hub: a market hall and warehouses, a civic-grade
+        -- building. Costed in timber/stone so the same basket is obtainable in
+        -- both era bands (the schooling basket's reason). Its upkeep in fuel and
+        -- building materials is in building_upkeep.goods below.
+        planetary_marketplace = {
+            base_rate   = 0.0,
+            maintenance = 10.0,
+            base_wage   = 8.0,
+            build_cost  = 200.0,
+            build_duration_ticks = 3.0,
+            resource_costs = { timber = 14.0, stone = 10.0 },
+        },
     },
 
     -- BL-332: research accumulation rate. Flat per-tick credit to the owning
@@ -568,6 +583,71 @@ economy = {
                 ancient    = { tools = 0.0, planks = 0.0, construction_capacity = 0.0 }, -- derived 0.14 / 0.30; capacity BL-709
                 industrial = { machinery = 0.0, electronics = 0.0, power = 0.40, timber = 0.08, stone = 0.08, construction_capacity = 0.0 }, -- derived 0.15 / 0.06; power BL-708; repair BL-738 stage 2; capacity BL-709
             },
+            -- BL-1266 (Ben, 2026-10-10): TRADE BUILDINGS CARRY AN UPKEEP OF FUEL
+            -- AND BUILDING MATERIALS, bought off their own market's shelf like any
+            -- upkeep; a trade building whose upkeep goes unmet that tick makes no
+            -- trade points (TRADE.md § The Planetary Marketplace). Fuel is the
+            -- band's bulk fuel (charcoal ancient, coal industrial — refined fuel was tried first and
+            -- stood over the fair-price ceiling at every Marketplace's market on the 16-seed gate, so no
+            -- trade building ever met its upkeep); building
+            -- materials are the repair line's timber and stone. First cut, sized
+            -- at roughly a fifth of each building's credit maintenance at authored
+            -- base prices — proposed for Ben with the capacity table (BL-1270).
+            port = {
+                ancient    = { charcoal = 0.10, timber = 0.10, stone = 0.10 },     -- 0.65 + 0.15 + 0.10 = 0.90
+                industrial = { coal = 0.15, timber = 0.10, stone = 0.10 }, -- 0.30 + 0.15 + 0.10 = 0.55
+            },
+            planetary_marketplace = {
+                ancient    = { charcoal = 0.15, timber = 0.15, stone = 0.15 },     -- 0.98 + 0.23 + 0.15 = 1.36
+                industrial = { coal = 0.25, timber = 0.15, stone = 0.15 }, -- 0.50 + 0.23 + 0.15 = 0.88
+            },
+        },
+    },
+
+    -- ===================================================================
+    -- BL-1266 — TRADE (docs/economy/TRADE.md). Trade is the only way goods
+    -- move between markets (Ben, 2026-10-10).
+    -- ===================================================================
+    --
+    -- points: trade points a trade building makes per tick. A Planetary
+    --   Marketplace makes `planetary_marketplace` per unit of EFFECTIVE
+    --   workforce (its staffed rate, as a processor's base_rate is its output
+    --   per unit of effective workforce): staffed at the placement default 0.5
+    --   it makes 10 points a tick. A Port makes `port` flat — it staffs at zero
+    --   — at the lower rate the ruling names. Points are a rate: made and spent
+    --   within the tick, never banked.
+    --
+    -- capacity: the units of a good ONE trade point moves per tick (TRADE.md
+    --   § Trade capacity), authored per good; there is no formula behind the
+    --   number. FIRST PROPOSAL (BL-1270, proposed by measurement, approved by
+    --   Ben — not final): a point moves about 40 credits' worth of a good at
+    --   authored base price, rounded, so a point moves many units of a bulk raw
+    --   and few of a dense product. Grid goods (power, construction capacity)
+    --   are never cargo and carry none.
+    trade = {
+        points = {
+            planetary_marketplace = 20.0,
+            port                  = 4.0,
+        },
+        capacity = {
+            -- bulk raws
+            iron_ore = 16, coal = 20, petroleum = 11, silica = 20, copper_ore = 13,
+            rare_earth_ore = 7, agricultural_produce = 13, water = 27,
+            iron_nickel_ore = 13, platinum_group_metals = 1, regolith = 40,
+            stone = 40, timber = 27, sand = 40, clay = 33, peat = 33,
+            hides = 16, fibre = 30,
+            -- endemic goods
+            tobacco = 8, spices = 8, coffee = 8, furs = 8,
+            -- processed goods
+            charcoal = 6, iron_blooms = 1.6, trade_goods_misc = 5, steel = 2.5,
+            refined_fuel = 2.6, food_rations = 3, propellant = 0.6, silicon = 4,
+            refined_copper = 3, ree_alloy = 1.6, clean_water = 5,
+            medical_supplies = 2.9, ceramics = 6, dressed_stone = 6.5, planks = 5,
+            leather = 3.4, cloth = 6, rigging = 1,
+            -- dense products
+            machinery = 0.66, alloys = 0.47, electronics = 1.0,
+            spacecraft_components = 0.13, consumer_goods = 0.66, ordnance = 0.26,
+            tools = 0.44,
         },
     },
 
@@ -1728,7 +1808,7 @@ logistics = {
         cap            = 0.50, -- ceiling on the summed node discount (fraction of the haul cost).
     },
 
-    -- BL-995 (trade reaches for price; docs/economy/SUPPLY.md § Dispatch trigger): the
+    -- BL-995 (trade reaches for price; docs/economy/SUPPLY.md § A shipment): the
     -- auto-dispatch margin threshold. A (corp, market) pool's good is hauled to market d only
     -- when its net price there (price_d less the per-unit haul) beats the home price by more
     -- than dispatch_margin x home price. 0.05: a gap under 5% of the home price is noise —

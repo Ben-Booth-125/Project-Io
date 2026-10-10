@@ -443,6 +443,236 @@
         "docs/politics/NATIONS.md"
       ],
       "resolution": "Ben, 2026-10-10: OVERTURNED - the nation is a real buyer on the order book for military equipment. Written into CONCEPT § Development through ages, MILITARY § The muster interface, and NATIONS (the table, 'touches the market for one thing only', § 2. Conservation's one exception). The space programme stays a procurement transfer; the 2026-08-22 'payment to corps is direct' ruling stands for everything else."
+    },
+    "NR-1029": {
+      "id": "NR-1029",
+      "title": "Opening stock placed on the shelves unpaid, split by where the corporation's buildings stand",
+      "raised": "2026-10-10",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "BL-1265 (shelf economy) / BL-1266 (trade core) build session, 2026-10-10",
+      "what": "CORPORATION_GENERATION.md § Pass 4b says the opening stock goes on the shelves of the markets each corporation sits in, its share split over its own markets, and \"is the market's from then on\". Built: the split weights each market by how many of the corporation's buildings its catchment holds (the HQ market alone if none); no money moves at placement. Before, the corporation was paid when the held stock sold at a clear.",
+      "why_it_matters": "Corporations open with less income than before (they no longer sell their opening stock); G2's settle mean is the denominator that moves.",
+      "options": [
+        "Keep: unpaid, split by building count (built)",
+        "Pay the corporation the stock at base price on placement",
+        "Split evenly over its markets instead of by building count"
+      ],
+      "recommendation": "Keep. The doc says the stock is the market's; paying at placement would re-create the windfall the held-stock rule existed to tame.",
+      "files": [
+        "src/world/market_clearing.cpp (place_opening_stock)"
+      ],
+      "resolution": "Ben, 2026-10-10 (review form): accepted as built.",
+      "renumbered_from": "NR-1011 (sprint 50 branch; collided with main's NR-1011, 2026-10-10 merge)"
+    },
+    "NR-1012": {
+      "id": "NR-1012",
+      "title": "Trade points: a Marketplace makes them at its staffed rate, a Port flat",
+      "raised": "2026-10-10",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "BL-1265 (shelf economy) / BL-1266 (trade core) build session, 2026-10-10",
+      "what": "TRADE.md: a Marketplace makes points \"at its staffed rate, as a processor makes goods\"; Ports make points \"at a lower rate the data sets\". Built: Marketplace points = trade.points.planetary_marketplace x workforce_assigned x labour contention x workforce-target scalar (staffed 0.5 at placement, so 20 x 0.5 = 10 points); a Port, which staffs at zero, makes trade.points.port (4) flat. A building whose goods upkeep went unmet that tick makes none.",
+      "why_it_matters": "Port points make every existing Port a small trade source; staffing makes Marketplace points move with labour like any producer.",
+      "options": [
+        "Keep (built)",
+        "Ports also staffed (a world-mover: every Port starts drawing labour and wages)"
+      ],
+      "recommendation": "Keep.",
+      "files": [
+        "src/world/trade.cpp (building_trade_points)",
+        "scripts/economy.lua (economy.trade)"
+      ],
+      "resolution": "Ben, 2026-10-10 (review form): accepted as built."
+    },
+    "NR-1013": {
+      "id": "NR-1013",
+      "title": "May a rival BUILD a Planetary Marketplace? (an AI_OPPONENT.md § 11 widening)",
+      "raised": "2026-10-10",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1265 (shelf economy) / BL-1266 (trade core) build session, 2026-10-10",
+      "what": "The 2026-10-10 grant lets a rival set its own trades with the points \"its own Planetary Marketplaces make\". It does not say a rival may build one, and the scorer's build candidates today are producers, a bootstrap port/hub and the muster base. Without a build grant, a rival's trade capacity is what generation retrofits plus its Ports, for the whole campaign. Not built; raised per the standing rule (a new widening is raised, never assumed).",
+      "why_it_matters": "Trade is the only way goods move between markets. If rivals cannot add capacity, inter-market flow is fixed at the 1960 retrofit and the player alone can grow trade.",
+      "options": [
+        "Grant: a rival may build a Marketplace, scored on the trade margin its points would earn (public prices, network haul)",
+        "No grant: capacity comes only from generation's retrofit and Ports",
+        "Defer to after the gate reads"
+      ],
+      "recommendation": "Grant, scored like the bootstrap port: a flat, modest score that never outbids an economic build, gated on the corporation having routes with margin.",
+      "files": [
+        "src/world/corp_ai.cpp",
+        "docs/ai/AI_OPPONENT.md § 11"
+      ],
+      "resolution": "Ben, 2026-10-10 (review form): GRANTED - a rival may build a Planetary Marketplace, with a modest flat score (the bootstrap-port shape). Written into AI_OPPONENT.md § 11. SUPERSEDED the same day (Ben, 2026-10-10, in session): the flat score raised a Marketplace in nearly every market a rival sat in, so the Marketplace is now scored as every build is - net (the profit of the trades its points would carry, read from what the last tick left over: spare goods and the anchor's Logistic Points left) less maintenance, wage and upkeep, over capex. AI_OPPONENT.md § 11 carries it."
+    },
+    "NR-1014": {
+      "id": "NR-1014",
+      "title": "Procurement under the shelf economy: the supplier buys its stock off the shelf; the delivery lands on the buyer's market",
+      "raised": "2026-10-10",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "BL-1265 (shelf economy) / BL-1266 (trade core) build session, 2026-10-10",
+      "what": "MARKETS.md: procurement contracts \"deliver from and to shelves\". Built: at fulfilment the supplier BUYS what its home market's shelf on the fulfilment body holds (posted price, under the ceiling) and builds the rest to order, as before; the delivery LANDS on the buyer's home market on the delivery body, so — landing being selling — the buyer is paid it at that tick's clearing price and the goods stand on the shelf for whoever buys next (the buyer included).",
+      "why_it_matters": "A procurement buyer now holds money, not goods, after delivery; a buyer that needs the goods buys them back off the shelf.",
+      "options": [
+        "Keep (built)",
+        "Deliver unpaid onto the buyer's shelf (the buyer paid the contract already)"
+      ],
+      "recommendation": "Keep — \"landing is selling\" is the one rule; an unpaid landing would be a second kind.",
+      "files": [
+        "src/world/economy_system.cpp (procurement completion)"
+      ],
+      "resolution": "Ben, 2026-10-10 (review form): accepted as built."
+    },
+    "NR-1015": {
+      "id": "NR-1015",
+      "title": "Readings of \"what a corporation holds\" now read the shelves of the markets it sits in",
+      "raised": "2026-10-10",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "BL-1265 (shelf economy) / BL-1266 (trade core) build session, 2026-10-10",
+      "what": "Three readers asked what a corporation holds: the condition subject `stockpile` (the E1-EC-01 Converter Practice tech gate reads \"holds machinery\"), the hire gate and hire debit (hire_axis_cost of an axis good). Built: all three read the stock on the shelves of the markets the corporation sits in (`corp_shelf_stock`); a hire BUYS its kit there at the posted price (ceiling off, since the gate counted the whole shelf).",
+      "why_it_matters": "Converter Practice is now satisfied by machinery on the corporation's shelves — anyone's machinery, not its own production. A tighter reading would be \"the corporation has produced machinery\" (corporation_component::produced_ever).",
+      "options": [
+        "Keep: shelf stock where it sits (built)",
+        "Converter Practice reads produced_ever instead (its stated intent: the machine-tool chain is running)"
+      ],
+      "recommendation": "Switch the Converter Practice gate to produced_ever; keep the hire on the shelves.",
+      "files": [
+        "src/world/condition_set.cpp",
+        "src/world/unit_roster.cpp",
+        "src/world/corp_command.cpp (debit_from_corp)"
+      ],
+      "resolution": "Ben, 2026-10-10 (review form): switch the Converter Practice gate to what the corporation has PRODUCED (machinery), not shelf stock."
+    },
+    "NR-1016": {
+      "id": "NR-1016",
+      "title": "Auto trade: reach, margin floor, and a trade's purchase bids",
+      "raised": "2026-10-10",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "BL-1265 (shelf economy) / BL-1266 (trade core) build session, 2026-10-10",
+      "what": "Built (TRADE.md § Auto and reserved trade leaves these open): (1) an owner's auto trade reaches every market on a body where it holds a completed trade building (Marketplace or Port); between bodies it also needs a Launchpad and propellant on the source shelf; (2) a route earns only above the network's dispatch_margin (5%) of the source price, so rounding-error routes do not churn; (3) each route is sized to what the destination absorbs above its landed cost (the old dispatcher's room rule) and what the source shelf holds; (4) a trade's purchase posts as want on the source market, so trading reads to the price like any bid.",
+      "why_it_matters": "Reach is the biggest lever on how much trade moves; a Port anywhere on a body makes every market on it reachable.",
+      "options": [
+        "Keep (built)",
+        "Reach limited to the markets within logistic reach of the trade building"
+      ],
+      "recommendation": "Keep; measure first.",
+      "files": [
+        "src/world/trade.cpp"
+      ],
+      "resolution": "Ben, 2026-10-10 (review form): accepted as built (refined by NR-1018: reach is per market)."
+    },
+    "NR-1017": {
+      "id": "NR-1017",
+      "title": "Production lands at the tick's clear; a producer with no market under it makes nothing",
+      "raised": "2026-10-10",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "BL-1265 (shelf economy) / BL-1266 (trade core) build session, 2026-10-10",
+      "what": "Built: output goes into a per-tick landing register and onto the shelf at that tick's clear, paid at the clearing price there (so it is listed as this tick's supply and the price law reads it once). A processor therefore cannot draw a sibling's output made the same tick; before, a corporation's own processors could draw its own same-tick output from its pool. A site or plant with no market under it has no shelf, so it makes nothing (completing a building spawns the body's first market, so this is an edge). A grid good made at a market off the grid is not made (BL-708's store-ceiling rule, read at the shelf).",
+      "why_it_matters": "A one-tick lag on own-corporation chains at start; steady-state throughput is unchanged.",
+      "options": [
+        "Keep (built)",
+        "Land on the shelf at production time and subtract same-tick landings from the price law's shelf share"
+      ],
+      "recommendation": "Keep.",
+      "files": [
+        "src/world/economy_system.cpp",
+        "src/world/market_clearing.cpp"
+      ],
+      "resolution": "Ben, 2026-10-10 (review form): accepted as built."
+    },
+    "NR-1018": {
+      "id": "NR-1018",
+      "title": "Manual trades: any two markets, and one reserve per corporation",
+      "raised": "2026-10-10",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1266 (trade core) cold review, 2026-10-10",
+      "what": "Two places TRADE.md leaves room the build filled narrowly. (1) REACH: auto trade runs only among the markets on bodies where the owner holds a trade building; a MANUAL trade may name any two markets anywhere (the seam checks only that both stand and differ), so a corporation with one Port can ship between two markets on a body where it holds nothing. (2) RESERVE: TRADE.md says the reserve is chosen \"per Marketplace or for all of them\"; built is one reserve per corporation (the \"for all of them\" case).",
+      "why_it_matters": "Reach decides whether a Marketplace is a place or just a points source; the per-Marketplace reserve is a UI and save shape.",
+      "options": [
+        "Keep both as built",
+        "Limit manual trades to the auto reach (markets on bodies holding one of its trade buildings)",
+        "Add a per-Marketplace reserve beside the corporation-wide one"
+      ],
+      "recommendation": "Limit manual trades to the auto reach (one rule for both); keep the single reserve until a surface asks for more.",
+      "files": [
+        "src/world/trade.cpp (trade_is_valid, corp_trade_markets)",
+        "src/world/corp_command.cpp (set_trade)"
+      ],
+      "resolution": "Ben, 2026-10-10 (review form): limit manual trades to auto's reach; keep one reserve. Ben's note: \"each building gives trade points for the market it's built in, and the reach rules apply from market centre to market centre.\" Written into TRADE.md."
+    },
+    "NR-1019": {
+      "id": "NR-1019",
+      "title": "Marketplace retrofit: the record, the rates, the owner and siting rules (proposed by measurement)",
+      "raised": "2026-10-10",
+      "kind": "novel-work",
+      "status": "resolved",
+      "source": "BL-1268 (trade in generation) lane, 2026-10-10",
+      "what": "Built: through Exploration and Industrialisation each nation earns a trade record at its capital each round - its trade flows' volume (both ends) and the years of standing mutual treaties (tribute excluded). After generation the record is converted to points (flow_points_per_1000 = 40, relation_points_per_year = 1) and each market whose history traded buys min(3, points / 40000) completed Planetary Marketplaces. OWNER: the non-seat corporation with the most buildings in that market's catchment (ties to the lower id); a market with no corporation gets none. SITE: the free catchment tile nearest the market centre that passes placement. Measured on 16 seeds: 164 Marketplaces (2 to 19 per seed), all on the home body, held by 86 of ~2,040 corporations (about 17 specialists). The rates are the proposal TRADE.md asks Ben to approve; the owner and siting rules are new surface no doc states yet. Part B (trade points replacing the Exploration flows) is planned, not built: it moves the Trade reading, treaties, treasuries, lanes and the tariff postures, and needs a sweep and a re-bless.",
+      "why_it_matters": "Retrofitted Marketplaces are most of the campaign's opening trade capacity.",
+      "options": [
+        "Approve the rates, owner and siting rules as built",
+        "Change the price per Marketplace (30k -> 210 placed, 50k -> 135, 80k -> 69)",
+        "Prefer specialists as owners",
+        "Build Part B now"
+      ],
+      "recommendation": "Approve as built after the 16-seed gate reads; write the owner and siting rules into TRADE.md § Trade in generation; Part B as its own item after the re-bless.",
+      "files": [
+        "src/world/history_sim.cpp (accumulate_trade_record)",
+        "src/world/corporation_generation.cpp (retrofit_marketplaces)",
+        "scripts/world_gen.lua (trade_retrofit)",
+        "tools/verify/trade_retrofit_probe.cpp"
+      ],
+      "resolution": "Ben, 2026-10-10 (review form): approved as built; the owner and siting rules written into TRADE.md § Trade in generation. Part B as its own item after the re-bless."
+    },
+    "NR-1030": {
+      "id": "NR-1030",
+      "title": "Trade capacity table, point rates and trade-building upkeep: the proposal and its 16-seed reading (BL-1270)",
+      "raised": "2026-10-10",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1270 (trade capacity table), main session, 2026-10-10",
+      "what": "Proposed (scripts/economy.lua economy.trade and building_upkeep.goods): capacity ~40 credits of base value per point per good; Marketplace 20 points per unit of effective workforce (10/tick staffed at 0.5), Port 4 flat; upkeep Port charcoal|coal 0.15 + timber 0.10 + stone 0.10, Marketplace charcoal 0.15|coal 0.25 + timber 0.15 + stone 0.15 (refined fuel was tried first and stood over the fair-price ceiling at every Marketplace market, so none ever made points). Retrofit rates in NR-1019. 16-seed gate, 400 ticks, on the integrated branch: G1 93.6 (base 96.7), G1b 5.3 FAIL vs <= 5 (base 1.7), G1 t50 90.0 (base 87.3), G2 116.7 (base 95.6), G3 96.6 at t400. Trade per seed-tick: ~87 points made, ~27 spent, ~154 units moved; 125 of 163 Marketplaces making points at t50. Most unspent points are refused by the passive Logistic Point cap at the source anchor. With trade nearly silent (the refined-fuel run) G1b read 4.6: moving goods costs ~0.7 points of G1b and buys G1 t50 and G2. Leaving one tick of processor want on the source shelf in auto trade was measured and did not help (5.5); it is not built.",
+      "why_it_matters": "The gate passes every target but G1b, by 0.3 points; the values are Ben's to approve.",
+      "options": [
+        "Approve as proposed and accept G1b 5.3 (target or table to move)",
+        "Raise passive LP so points are spent (moves every convoy)",
+        "Lower capacity so trade moves less",
+        "Diagnose the 65 plants decommissioned after starving before approving"
+      ],
+      "recommendation": "Diagnose the starved-then-decommissioned plants first (BL-1248 territory); approve the table otherwise.",
+      "files": [
+        "scripts/economy.lua",
+        "tools/verify/market_viability.cpp (T trade row)"
+      ],
+      "resolution": "Ben, 2026-10-10 (review form): approved as is; G1b 5.3% accepted.",
+      "renumbered_from": "NR-1020 (sprint 50 branch; collided with main's NR-1020, 2026-10-10 merge)"
+    },
+    "NR-1021": {
+      "id": "NR-1021",
+      "title": "The exchange ring now covers about six ticks",
+      "raised": "2026-10-10",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1269 trades_tab check, 2026-10-10",
+      "what": "Every landing and every shelf draw files an exchange row, ~1,170 rows a tick on the verify world (one market alone 6,295 rows in six ticks), so the 8,192-row ring holds ticks 10..15. The ring's sizing comment extrapolated ~120 rows a quarter. The Trades tab's Recent exchanges therefore show only the last few ticks, and a market that clears nothing shows none (trades_tab.lua now aims at the busiest home-body market).",
+      "why_it_matters": "History the player reads; widening the ring is a save-format change.",
+      "options": [
+        "Widen the ring (save change, measure size)",
+        "Aggregate rows per (market, good, side, tick)",
+        "Accept the short window"
+      ],
+      "recommendation": "Aggregate per (market, good, side, tick): the history keeps its span without growing the save.",
+      "files": [
+        "src/world/components.hpp (exchange_record_ring)",
+        "src/world/market_clearing.cpp (record_exchange)"
+      ],
+      "resolution": "Ben, 2026-10-10 (review form): aggregate exchange rows per market, good, side and tick."
     }
   }
 }

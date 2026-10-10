@@ -164,7 +164,7 @@ int main()
         synthetic.target_resource    = resource_type::iron_ore;
         const building_opex opex = compute_building_opex(
             synthetic, reg.economics(building_type::extraction_site),
-            /*contention=*/1.0f, body_mean_habitability(w, body));
+            /*contention=*/1.0f, body_mean_habitability(w, body), reg.idle_maintenance_floor());
         check(near(est_ext.maintenance, opex.maintenance),
               "P.R2 maintenance == compute_building_opex", est_ext.maintenance, opex.maintenance);
         check(near(est_ext.wages, opex.wages),
@@ -263,7 +263,7 @@ int main()
               "P.R5 construct_building seeds the CHOSEN recipe (BL-162 seam)");
         // Give the corp the inputs the recipe needs so the run is not input-starved,
         // and pin the BL-181 dial for the same reason as P.R3 above.
-        wp.pool_at(corp, pool_key_for_body(wp, body)).quantities[ri(resource_type::iron_ore)] = 1000.0f;
+        wp.markets.at(market).inventory[ri(resource_type::iron_ore)] = 1000.0f; // BL-1265: on the shelf
         wp.buildings[built].workforce_auto   = false;
         wp.buildings[built].workforce_target = 100;
         const economy_report rep = run_economy_step(wp, reg);

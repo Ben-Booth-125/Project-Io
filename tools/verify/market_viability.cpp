@@ -477,6 +477,20 @@ struct seed_reading
     double inc_close = 0.0, inc_t50 = 0.0;
     double inc_settle_mean = 0.0;      ///< mean over the 12 settle ticks (the reading's "settle close")
     double inc_t26_50_mean = 0.0;      ///< mean over play ticks 26..50 (firm_attrition_trace's window)
+    // T (BL-1266, reported, no target): the trade pass over play ticks 1..50 —
+    // points made, shipments, units moved, corporations that made points, and
+    // the trade buildings standing at tick 50.
+    double t_points = 0.0, t_spent = 0.0, t_units = 0.0;
+    long long t_ship_manual = 0, t_ship_auto = 0, t_refused_lp = 0;
+    int t_ticks = 0, t_corps_max = 0, t_marketplaces_t50 = 0, t_ports_t50 = 0;
+    int t_marketplaces_handoff = 0; ///< Marketplaces standing (built or building) at the handoff
+    // Why a trade building is silent at t50 (first reason that applies):
+    // decommissioned, no workforce target, no effective staffing, upkeep unmet,
+    // else making points.
+    int t_mp_decom = 0, t_mp_notarget = 0, t_mp_unstaffed = 0, t_mp_unmet = 0, t_mp_making = 0;
+    // For an upkeep-unmet Marketplace: which basket good its market could not
+    // supply at t50 (empty shelf, or posted over the fair-price ceiling).
+    int t_short_empty[resource_count] = {}, t_short_ceiling[resource_count] = {};
     double secs_build = 0.0, secs_settle = 0.0, secs_play = 0.0;
     int    decom_at_build = 0, proc_at_build = 0; ///< processors when the world is handed to the settle
     int    firms_handoff = 0, firms_survived = 0, firms_end = 0, last_tick = 0;
@@ -734,13 +748,11 @@ void lg_snapshot(const world& w, lg_probe& p)
         if (mi == w.markets.end()) continue; // nomarket: labelled after the tick
         proc_snap s;
         s.m = m;
-        const auto oi = owner.find(bid);
-        const stockpile_component* pool = oi != owner.end() ? w.find_pool(oi->second, m) : nullptr;
         for (std::size_t g = 0; g < resource_count; ++g)
         {
             if (!(rc->inputs[g] > 0.0f)) continue;
             s.shelf[g]  = mi->second.inventory[g];
-            s.pool[g]   = pool ? pool->quantities[g] : 0.0f;
+            s.pool[g]   = 0.0f; // BL-1265: corporations hold no pools
             s.admits[g] = shelf_admits(mi->second, g, res_mult, /*off_buys=*/true);
         }
         p.snap.emplace(bid, s);
@@ -757,31 +769,11 @@ void lg_snapshot(const world& w, lg_probe& p)
 /// ordered-only entry is resolved per destination at read time (no_shelf_class).
 void snapshot_pool_status(const world& w, const recipe_registry& reg, lg_probe& p)
 {
+    // BL-1265: corporations hold no pools, so no good is ever "held in a pool"
+    // or "under an order" — the status is always absent (`none`).
+    (void)w;
+    (void)reg;
     p.pool_status.clear();
-    const order_floor_map ordered = collect_order_floors(w);
-    const grid_goods_params& grid = reg.grid_goods();
-    for (const auto& [key, pool] : w.corp_market_pools) // std::map: sorted
-    {
-        if (!w.corporations.count(key.first)) continue;
-        const entity_id body = pool_key_body(w, key.second);
-        if (body == null_entity) continue;
-        bool any = false;
-        for (std::size_t g = 0; g < resource_count && !any; ++g) any = pool.quantities[g] >= 1.0f;
-        if (!any) continue;
-        const std::array<float, resource_count> res = processor_reservation(w, reg, key.first, key.second);
-        for (std::size_t g = 0; g < resource_count; ++g)
-        {
-            if (grid.grid(g) || !(pool.quantities[g] >= 1.0f)) continue;
-            const float surplus = pool.quantities[g] - res[g] - dispatch_arrived(w, key.first, key.second, g);
-            if (!(surplus >= 1.0f)) continue;
-            const auto [it, fresh] = p.pool_status.try_emplace(std::make_pair(body, g));
-            lg_probe::pool_stat& ps = it->second;
-            if (!ordered.count({key.first, body, g})) { ps.st = x_poolheld; continue; }
-            if (ps.st != x_ordered) continue;
-            const float src = dispatch_source_price(w, ordered, key.first, key.second, g);
-            if (fresh || src < ps.src) { ps.src = src; ps.home = dispatch_home_price(w, key.second, g); }
-        }
-    }
 }
 
 void lg_after_lap(const world& cw, int lap, void* vctx)
@@ -1095,6 +1087,9 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
 
     // --- G1 at the handoff (the settle's last report, the world after the seat) ---
     r.g1_handoff = tally_processors(w, last_settle, reg, last_row);
+    for (const auto& [bid, b] : w.buildings)
+        if (b.type == building_type::planetary_marketplace && !b.decommissioned)
+            ++r.t_marketplaces_handoff;
     if (r.g1_handoff.total() == 0) r.fail = "zero processors at the handoff";
     if (r.inc_close <= 0.0 && r.fail.empty()) r.fail = "zero field income at the settle close";
     if (r.seat == null_entity && r.fail.empty()) r.fail = "no corporation seated";
@@ -1175,6 +1170,47 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
                                                  /*spectating=*/false, &hooks);
         if (lg.armed) lg_after_tick(w, res.report, reg, lg);
         for (const convoy_component& c : w.convoys) lg.max_id = std::max(lg.max_id, c.id);
+        if (k <= k_g1_g2_play_tick)
+        {
+            r.t_points      += res.trades.points_made;
+            r.t_spent       += res.trades.points_spent;
+            r.t_units       += res.trades.units_shipped;
+            r.t_ship_manual += res.trades.manual_shipments;
+            r.t_ship_auto   += res.trades.auto_shipments;
+            r.t_refused_lp  += res.trades.refused_no_lp;
+            r.t_corps_max    = std::max(r.t_corps_max, res.trades.corps_trading);
+            ++r.t_ticks;
+        }
+        if (k == k_g1_g2_play_tick)
+            for (const auto& [bid, b] : w.buildings)
+            {
+                if (b.type == building_type::planetary_marketplace && b.ticks_remaining <= 0)
+                {
+                    if (b.decommissioned)               ++r.t_mp_decom;
+                    else if (b.workforce_target <= 0)   ++r.t_mp_notarget;
+                    else if (!(b.workforce_assigned > 0.0f)) ++r.t_mp_unstaffed;
+                    else if (res.report.upkeep_unmet.count(bid))
+                    {
+                        ++r.t_mp_unmet;
+                        const entity_id mid = market_for_tile(w, b.tile);
+                        const auto basket = building_upkeep_goods(reg.building_upkeep(),
+                                                                  building_type::planetary_marketplace, reg.era());
+                        if (const auto mit = w.markets.find(mid); mit != w.markets.end())
+                            for (std::size_t g = 0; g < resource_count; ++g)
+                            {
+                                if (!(basket[g] > 0.0f)) continue;
+                                if (!shelf_admits(mit->second, g, reg.price_band().reservation_mult, false))
+                                    ++r.t_short_ceiling[g];
+                                else if (mit->second.inventory[g] < basket[g])
+                                    ++r.t_short_empty[g];
+                            }
+                    }
+                    else                                ++r.t_mp_making;
+                }
+                if (b.ticks_remaining > 0 || b.decommissioned) continue;
+                if (b.type == building_type::planetary_marketplace) ++r.t_marketplaces_t50;
+                else if (b.type == building_type::port)             ++r.t_ports_t50;
+            }
         if (k == k_idle_market_ticks)
         {
             for (const auto& [mid, mc] : w.markets)
@@ -1350,6 +1386,23 @@ int main(int argc, char** argv)
                     r.firms_handoff, r.last_tick, r.firms_survived,
                     r.firms_handoff ? pct(static_cast<double>(r.firms_survived) / r.firms_handoff) : 0.0,
                     r.firms_end);
+        if (r.t_ticks > 0)
+            std::printf(" T trade (play 1-%d, per tick): points made %.1f spent %.1f | shipments auto %.1f manual %.1f"
+                        " | units %.1f | LP-refused %.1f | corps trading (max) %d | at t%d: %d Marketplaces, %d Ports\n",
+                        r.t_ticks, r.t_points / r.t_ticks, r.t_spent / r.t_ticks,
+                        static_cast<double>(r.t_ship_auto) / r.t_ticks,
+                        static_cast<double>(r.t_ship_manual) / r.t_ticks, r.t_units / r.t_ticks,
+                        static_cast<double>(r.t_refused_lp) / r.t_ticks, r.t_corps_max,
+                        k_g1_g2_play_tick, r.t_marketplaces_t50, r.t_ports_t50);
+        if (r.t_ticks > 0)
+            std::printf("   Marketplaces at t%d: decommissioned %d, no workforce target %d, unstaffed %d,"
+                        " upkeep unmet %d, making points %d; at the handoff %d\n",
+                        k_g1_g2_play_tick, r.t_mp_decom, r.t_mp_notarget, r.t_mp_unstaffed,
+                        r.t_mp_unmet, r.t_mp_making, r.t_marketplaces_handoff);
+        for (std::size_t g = 0; g < resource_count; ++g)
+            if (r.t_short_empty[g] + r.t_short_ceiling[g] > 0)
+                std::printf("     upkeep short: good #%zu empty %d over-ceiling %d\n",
+                            g, r.t_short_empty[g], r.t_short_ceiling[g]);
         std::printf(" G4 seat %llu \"%s\"  operating net, last %d settle quarters:",
                     static_cast<unsigned long long>(r.seat), r.seat_name.c_str(), k_seat_settle_window);
         double sm = 0;

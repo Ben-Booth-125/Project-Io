@@ -29,3 +29,4 @@
 {"version":41,"kind":"world","owner":"sprint 50 PROPELLANT, BL-1217 propellant routes follow the body air (body_component::atmosphere); 39 D5 and 40 D3 claimed on other branches","ts":"2026-10-09T12:00:00.000Z","branch":"worktree-agent-a14f239f7a0f14bad"}
 {"version":42,"kind":"world","owner":"BL-1195 CONVOY_LANE_FOLLOWS_LEGS (convoy origin_tile/port_a/port_b)","ts":"2026-10-09T05:01:39.978Z","branch":"worktree-agent-a2c0cfcb69b515f0f"}
 {"version":43,"kind":"world","owner":"BL-1217 G1b R2 spare-net-of-final-buyers (market background_fill)","ts":"2026-10-09T06:30:50.071Z","branch":"worktree-agent-a123195de030662e7"}
+{"version":46,"kind":"world","owner":"BL-1265 shelf economy","ts":"2026-10-10T04:23:33.493Z","branch":"claude/shelf-economy-trade-42f8f4"}

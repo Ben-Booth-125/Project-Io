@@ -38,6 +38,7 @@ bool condition_subject_is_integral(condition_subject s)
         // BL-570: province_held is a 1/0 fact (held or not), exactly like
         // research above — never a fractional "0.5 held".
         case condition_subject::province_held:
+        case condition_subject::produced: // NR-1015: made it or not, 1/0
             return true;
         case condition_subject::stockpile:
         case condition_subject::market:
@@ -78,14 +79,11 @@ float measure_condition(const condition& c, const world& w, entity_id subject_co
 
         case condition_subject::stockpile:
         {
-            // corp_market_pools is a std::map, so this walks in key order; a corp-wide
-            // sum across every (corp, market) pool (BL-1003).
-            const std::size_t ri = static_cast<std::size_t>(c.resource);
-            float total = 0.0f;
-            for (const auto& [key, pool] : w.corp_market_pools)
-                if (key.first == subject_corp)
-                    total += pool.quantities[ri];
-            return total;
+            // BL-1265 (MARKETS.md § The shelf economy): corporations hold no
+            // stockpiles, so "what the corp holds" is read as the stock on the
+            // SHELVES of the markets it sits in — every market whose catchment
+            // holds one of its buildings, each counted once, ascending id.
+            return corp_shelf_stock(w, subject_corp, static_cast<std::size_t>(c.resource));
         }
 
         case condition_subject::market:
@@ -168,6 +166,13 @@ float measure_condition(const condition& c, const world& w, entity_id subject_co
         // branch here.
         case condition_subject::province_held:
             return (province_holder_for(w, c.province) == subject_corp) ? 1.0f : 0.0f;
+
+        // NR-1015: has the subject corp ever produced the resource (1/0).
+        case condition_subject::produced:
+        {
+            const std::size_t ri = static_cast<std::size_t>(c.resource);
+            return (ri < resource_count && cc.produced_ever[ri]) ? 1.0f : 0.0f;
+        }
     }
     return 0.0f;
 }
@@ -246,6 +251,7 @@ std::string condition_text(const condition& c,
         // stays exhaustive with no `default:` — the compiler catches the next
         // subject that forgets a label here.
         case condition_subject::province_held:     subject = "Province";          break;
+        case condition_subject::produced:          subject = "Produced";          break;
     }
 
     const char* cmp = "";
@@ -263,7 +269,8 @@ std::string condition_text(const condition& c,
     {
         qualifier = " " + c.key;
     }
-    else if (c.subject == condition_subject::stockpile || c.subject == condition_subject::market)
+    else if (c.subject == condition_subject::stockpile || c.subject == condition_subject::market
+             || c.subject == condition_subject::produced)
     {
         qualifier = resource_label
                     ? std::string(" of ") + resource_label(c.resource)

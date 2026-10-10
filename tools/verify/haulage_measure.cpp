@@ -14,7 +14,7 @@
 // scripts/economy.lua can be re-derived rather than trusted.
 //
 // WHAT IT MEASURES. Exactly the cost a market's own export leg is charged:
-// `price_market_export_leg` (supply_system.cpp) at one unit, the router the
+// `price_market_leg` (supply_system.cpp) at one unit, the router the
 // dispatcher and placement both ask (BL-1186). Per leg,
 //
 //     logistics_cost(mode) * leg path cost * (1 - node_discount)
@@ -123,6 +123,7 @@
 #include "world/supply_system.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/tech_gate.hpp"
+#include "world/trade.hpp"
 #include "world/works_roster.hpp"
 #include "world/world.hpp"
 #include "world/world_gen_config.hpp"
@@ -247,8 +248,9 @@ entity_id sellers_nearest_market(world& w, const recipe_registry& reg,
     {
         if (mid == home)
             continue;
-        const convoy_leg leg = price_convoy_leg(w, reg, nodes, corp, src_key, mid, r, 1.0f,
-                                                reg.logistics_cost(convoy_mode::space));
+        // BL-1266: the trade leg (the dispatcher's price_convoy_leg retired);
+        // `src_key` is the source MARKET.
+        const convoy_leg leg = price_trade_leg(w, reg, nodes, corp, src_key, mid, r, 1.0f);
         if (!leg.viable)
             continue;
         if (leg.cost < best_cost)
@@ -613,10 +615,9 @@ far_seed_result run_far_seed(const far_options& o, std::uint32_t seed, recipe_re
                            ? static_cast<double>(mit->second.inventory[std::get<2>(k)])
                            : 0.0;
             }
-            const auto pit = w.corp_market_pools.find({std::get<0>(k), std::get<1>(k)});
-            return pit != w.corp_market_pools.end()
-                       ? static_cast<double>(pit->second.quantities[std::get<2>(k)])
-                       : 0.0;
+            // BL-1265: an arrival LANDS (corp, destination market) and is sold at
+            // the clear; before the clear it is read off the tick's landings.
+            return static_cast<double>(w.landed(std::get<0>(k), std::get<1>(k), std::get<2>(k)));
         };
         for (const convoy_component& cv : w.convoys)
             if (cv.arrived)
@@ -664,9 +665,8 @@ far_seed_result run_far_seed(const far_options& o, std::uint32_t seed, recipe_re
         }
 
         economy_report rep = run_economy_step(w, reg, /*spectating=*/true, &lp);
-        adopt_new(window); // the scorer's own dispatch_convoy verbs (BL-600)
-        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
-                         reg.logistics_cost(convoy_mode::space), &lp);
+        adopt_new(window); // the scorer's own shipments, if any
+        run_trades(w, reg, rep, &lp); // BL-1266: the trade pass (was dispatch_convoys)
         adopt_new(window);
 
         const std::size_t rows_before = w.exchanges.total;
@@ -1043,7 +1043,7 @@ int main(int argc, char** argv)
                     if (tb == null_entity)
                         continue;
                     // THE ROUTER'S OWN PRICE (BL-1165, after BL-1186): one unit
-                    // priced by price_market_export_leg — the call the dispatcher
+                    // priced by price_market_leg — the call the dispatcher
                     // and BL-1185's placement both ask — never a local copy of the
                     // per-leg arithmetic. It routes land, or land -> port -> sea ->
                     // port -> land through two active Ports, applies the node
@@ -1052,7 +1052,7 @@ int main(int argc, char** argv)
                     // no convoy can run, so it is no neighbour here either. The
                     // retired copy priced the whole unconfined A* path at the sea
                     // rate whenever it touched water, undiscounted and unhandled.
-                    const convoy_leg leg = price_market_export_leg(w, reg, nodes, a, b, 1.0f);
+                    const convoy_leg leg = price_market_leg(w, reg, nodes, a, b, 1.0f);
                     if (!leg.viable)
                         continue;
                     const bool   sea  = leg.mode == convoy_mode::sea;
@@ -1146,10 +1146,9 @@ int main(int argc, char** argv)
             // economy -> dispatch -> clear -> budget.
             advance_convoys(w);
             credit_arrived_convoys(w, t);
-            const economy_report report = run_economy_step(w, reg);
-            seen = w.convoys.size(); // what is appended past here is this dispatch
-            dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
-                             reg.logistics_cost(convoy_mode::space));
+            economy_report report = run_economy_step(w, reg);
+            seen = w.convoys.size(); // what is appended past here is this tick's trade
+            run_trades(w, reg, report); // BL-1266: the trade pass (was dispatch_convoys)
             // Count only convoys appended THIS tick — w.convoys is append-only
             // within a tick and compacted by advance/credit, so walking from the
             // previous size is the honest dispatch count.

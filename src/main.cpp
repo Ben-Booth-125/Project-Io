@@ -18,6 +18,7 @@
 #include "world/survey_system.hpp"
 #include "world/stockpile_budget.hpp" // BL-1042: the budget the search-less paths state
 #include "world/tech_gate.hpp"
+#include "world/trade.hpp" // BL-1266: run_trades
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -178,12 +179,11 @@ int run_serve(int ticks, long long as_corp, bool as_any)
         // contend, per LOGISTICS.md's bifold table and the "war flips the
         // queue" finding. Local to this tick; never persisted.
         lp_pool_map tick_lp_pools;
-        // BL-995: advance -> arrivals -> economy -> dispatch -> clearing (app.cpp's order).
+        // BL-1266: advance -> arrivals -> economy -> trade -> clearing (app.cpp's order).
         advance_convoys(w);
         credit_arrived_convoys(w, t);
         economy_report report = run_economy_step(w, reg, /*spectating=*/false, &tick_lp_pools);
-        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
-                         reg.logistics_cost(convoy_mode::space), &tick_lp_pools);
+        run_trades(w, reg, report, &tick_lp_pools); // BL-1266: trade, before the clear
         auto flows = clear_markets(w, reg, report);
         apply_budget(w, reg, flows, report.workforce_contention, &report.budgets,
                      &report.buildings,        // BL-343: law enforcement seam
@@ -282,8 +282,11 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
                      static_cast<unsigned>(cre.seat), cre.seat_redrawn ? " (redrawn)" : "");
         // BL-365: real background corporations, generated now that reg is loaded.
         generate_background_firms(w, reg, /*seed=*/0x8A21F00Du);
+        place_opening_stock(w); // BL-1265: the firms' opening stock goes on the shelves
     }
     else
+    {
+        place_opening_stock(w); // BL-1265: the spent roster's opening stock goes on the shelves
         std::fprintf(stderr, "[stockpile_budget] headless run: %lld points spent on the seed candidate "
                              "(%zu specialists, %zu firms)%s\n",
                      static_cast<long long>(scs.report.points_spent),
@@ -291,6 +294,7 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
                      scs.report.refused     ? " — spend REFUSED, the no-budget world"
                      : scs.report.fell_back ? " — no specialist affordable, the no-budget world (NR-910)"
                                             : "");
+    }
 
     for (int t = 1; t <= ticks; ++t)
     {
@@ -299,12 +303,11 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
         // BL-597: see step_one_tick's own comment above — one shared LP pool
         // per tick for both the passive (convoy) and active (march) draws.
         lp_pool_map tick_lp_pools;
-        // BL-995: advance -> arrivals -> economy -> dispatch -> clearing (app.cpp's order).
+        // BL-1266: advance -> arrivals -> economy -> trade -> clearing (app.cpp's order).
         advance_convoys(w);
         credit_arrived_convoys(w, t);
         economy_report report = run_economy_step(w, reg, /*spectating=*/false, &tick_lp_pools);
-        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
-                         reg.logistics_cost(convoy_mode::space), &tick_lp_pools);
+        run_trades(w, reg, report, &tick_lp_pools); // BL-1266: trade, before the clear
         auto flows = clear_markets(w, reg, report);
         apply_budget(w, reg, flows, report.workforce_contention, &report.budgets,
                      &report.buildings,        // BL-343: law enforcement seam

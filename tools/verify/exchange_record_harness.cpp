@@ -7,10 +7,11 @@
 //   E1  Clearing PRODUCES rows -- a tick that moves goods writes history.
 //   E2  The rows MATCH WHAT MOVED: per corp, the sum of quantity * unit_price
 //       over its rows is exactly the income/expenditure clearing accrued, and
-//       the summed quantity is exactly what left the pool.
-//   E3  `unit_price` is the price CLEARING RESOLVED, not the floor the order
-//       carried -- an order listed well under the market clears at the market's
-//       price, and the record must carry what the seller GOT.
+//       the summed quantity is exactly what the seller LANDED (BL-1265: landing
+//       is selling; corporations hold no pools).
+//   E3  `unit_price` is the price CLEARING RESOLVED, not the price posted
+//       before the clear -- the record must carry what the seller GOT. (Was:
+//       not a sell order's floor; the order book retired with BL-1265.)
 //   E4  The append order is DETERMINISTIC: two runs of the same world produce
 //       identical row sequences, AND a world whose markets were inserted into
 //       the unordered_map in the opposite order produces the same sequence.
@@ -126,11 +127,12 @@ fixture build(world& w, bool reverse_market_insert)
     { corporation_component cc; cc.balance = 10000.0f; cc.is_player = true;  w.corporations[f.c1] = cc; }
     { corporation_component cc; cc.balance = 10000.0f; cc.is_player = false; w.corporations[f.c2] = cc; }
 
-    // Surplus in both corps' pools, in two resources, so the per-resource walk
-    // has something to order too.
-    w.pool_at(f.c1, pool_key_for_body(w, f.body)).quantities[ri(resource_type::iron_ore)] = 40.0f;
-    w.pool_at(f.c1, pool_key_for_body(w, f.body)).quantities[ri(resource_type::coal)]     = 25.0f;
-    w.pool_at(f.c2, pool_key_for_body(w, f.body)).quantities[ri(resource_type::iron_ore)] = 10.0f;
+    // BL-1265: goods LAND on a market and are sold at its clear (corporations
+    // hold no pools). Landings by both corps, in two resources, across both
+    // markets, so the per-market and per-resource walks have something to order.
+    w.land_goods(f.c1, f.m1, ri(resource_type::iron_ore), 40.0f);
+    w.land_goods(f.c1, f.m2, ri(resource_type::coal),     25.0f);
+    w.land_goods(f.c2, f.m2, ri(resource_type::iron_ore), 10.0f);
 
     w.current_econ_tick = 7;
     return f;
@@ -152,9 +154,11 @@ int main()
         world w;
         const fixture f = build(w, false);
 
-        const float pool_before_c1_iron = w.pool_at(f.c1, pool_key_for_body(w, f.body)).quantities[ri(resource_type::iron_ore)];
-        const float pool_before_c1_coal = w.pool_at(f.c1, pool_key_for_body(w, f.body)).quantities[ri(resource_type::coal)];
-        const float pool_before_c2_iron = w.pool_at(f.c2, pool_key_for_body(w, f.body)).quantities[ri(resource_type::iron_ore)];
+        // What each corp LANDED this tick — what the clear sells for it.
+        float landed_c1 = 0.0f, landed_c2 = 0.0f;
+        for (const auto& [key, sp] : w.landed_this_tick)
+            for (const float q : sp.quantities)
+                (key.first == f.c1 ? landed_c1 : landed_c2) += q;
 
         const auto flows = clear_markets(w, reg, empty_report);
 
@@ -198,18 +202,15 @@ int main()
         check(revenue_matches,
               "E2 sum(quantity * unit_price) per seller EQUALS the income clearing accrued");
 
-        // ...and the quantity is what actually left the pool.
-        const float moved_c1 = (pool_before_c1_iron + pool_before_c1_coal)
-            - (w.pool_at(f.c1, pool_key_for_body(w, f.body)).quantities[ri(resource_type::iron_ore)]
-               + w.pool_at(f.c1, pool_key_for_body(w, f.body)).quantities[ri(resource_type::coal)]);
-        const float moved_c2 = pool_before_c2_iron
-            - w.pool_at(f.c2, pool_key_for_body(w, f.body)).quantities[ri(resource_type::iron_ore)];
-        check(near(qty_by_seller[f.c1], moved_c1, 1e-2f),
-              "E2 the recorded quantity is exactly what left the seller's pool (corp 1)");
-        check(near(qty_by_seller[f.c2], moved_c2, 1e-2f),
-              "E2 the recorded quantity is exactly what left the seller's pool (corp 2)");
+        // ...and the quantity is exactly what the seller landed (BL-1265:
+        // landing is selling — every landed unit sells at the clear).
+        check(near(qty_by_seller[f.c1], landed_c1, 1e-2f),
+              "E2 the recorded quantity is exactly what the seller landed (corp 1)");
+        check(near(qty_by_seller[f.c2], landed_c2, 1e-2f),
+              "E2 the recorded quantity is exactly what the seller landed (corp 2)");
+        check(w.landed_this_tick.empty(), "E2 the clear spends every landing");
 
-        // The market as counterparty. Auto-surplus has no buying corp, so the
+        // The market as counterparty. A landing is sold TO THE MARKET, so the
         // buyer side is null_entity BY DESIGN and a reader must render it as the
         // market -- asserting it here is what stops a later change quietly
         // filling it with something that looks like a corp id.
@@ -218,51 +219,46 @@ int main()
             if (w.exchanges.oldest_first(i).buyer == null_entity)
                 market_side_null = true;
         check(market_side_null,
-              "E2 an auto-surplus sale records null_entity for the buyer (the market itself)");
+              "E2 a landing's sale records null_entity for the buyer (the market itself)");
     }
 
     // -----------------------------------------------------------------------
-    // E3 -- unit_price is what clearing RESOLVED, not the order's floor
+    // E3 -- unit_price is what clearing RESOLVED, not the price posted before it
     // -----------------------------------------------------------------------
-    // A standing sell order carrying a floor far BELOW the market's resolved
-    // price. It clears (the floor is a reservation price, not an ask the market
-    // is held to), and the row must carry the resolved price -- recording the
-    // floor would under-report the seller's revenue by 75% here, and would not
-    // reconcile against the income clearing actually paid.
+    // BL-1265: a landing is paid "the quantity at that tick's clearing price"
+    // (MARKETS.md § The shelf economy). 40 iron landing on m1 with no buyer
+    // drives m1's price off its posted 4.0, and the row must carry the price
+    // the clear RESOLVED -- what the seller GOT -- not the posted price the
+    // tick opened on. (Was: a sell order's floor, which retired with the order
+    // book; the claim — the row records what the seller got — is unchanged.)
     {
         world w;
         const fixture f = build(w, false);
-
-        sell_order o;
-        o.id          = w.next_order_id++;
-        o.corp        = f.c1;
-        o.body        = f.body;
-        o.resource    = resource_type::iron_ore;
-        o.quantity    = 10.0f;
-        o.floor_price = 1.0f; // the market's base price for iron is 4.0
-        w.sell_orders.push_back(o);
+        const float posted = w.markets.at(f.m1).price[ri(resource_type::iron_ore)];
 
         const auto flows = clear_markets(w, reg, empty_report);
+        const float resolved = w.markets.at(f.m1).price[ri(resource_type::iron_ore)];
 
-        bool found = false, carries_resolved = false, carries_floor = false;
+        bool found = false, carries_resolved = false, carries_posted = false;
         float recorded = 0.0f;
         for (std::size_t i = 0; i < w.exchanges.size(); ++i)
         {
             const exchange_record& e = w.exchanges.oldest_first(i);
-            if (e.seller != f.c1 || e.resource != resource_type::iron_ore)
+            if (e.seller != f.c1 || e.resource != resource_type::iron_ore || e.market != f.m1)
                 continue;
             found = true;
             recorded = e.unit_price;
-            if (near(e.unit_price, o.floor_price))
-                carries_floor = true;
-            else
+            if (near(e.unit_price, resolved))
                 carries_resolved = true;
+            if (near(e.unit_price, posted))
+                carries_posted = true;
         }
-        check(found, "E3 the order's sale is recorded");
-        check(!carries_floor && carries_resolved,
-              "E3 the row carries the RESOLVED price, never the floor the order carried");
-        std::printf("        floor asked %.3f, price recorded %.3f\n",
-                    (double)o.floor_price, (double)recorded);
+        check(found, "E3 the landing's sale is recorded");
+        check(!near(resolved, posted), "E3 fixture: the clear moved m1's iron price off the posted price");
+        check(carries_resolved && !carries_posted,
+              "E3 the row carries the RESOLVED price, never the price posted before the clear");
+        std::printf("        posted %.3f, resolved %.3f, price recorded %.3f\n",
+                    (double)posted, (double)resolved, (double)recorded);
 
         // And the reconciliation still holds with an order in play, which is the
         // check that would catch recording the floor by another route.
@@ -354,7 +350,7 @@ int main()
     // -----------------------------------------------------------------------
     {
         world w;
-        build(w, false);
+        const fixture f = build(w, false);
         std::printf("\n  tick   rows this tick   ring size\n");
         std::size_t prev = 0;
         for (int t = 0; t < 5; ++t)
@@ -362,8 +358,8 @@ int main()
             w.current_econ_tick = t;
             // Re-stock, so each tick has something to clear rather than trailing
             // off to zero -- the measurement wants a BUSY tick, not a quiet one.
-            for (auto& [key, pool] : w.corp_market_pools)
-                pool.quantities[static_cast<std::size_t>(resource_type::iron_ore)] += 20.0f;
+            for (const entity_id c : { f.c1, f.c2 }) // BL-1265: a landing per corp
+                w.land_goods(c, f.m1, static_cast<std::size_t>(resource_type::iron_ore), 20.0f);
             clear_markets(w, reg, empty_report);
             std::printf("  %4d   %14llu   %9llu\n", t,
                         (unsigned long long)(w.exchanges.total - prev),

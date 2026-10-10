@@ -127,6 +127,7 @@
 #include "world/network_upkeep.hpp"  // BL-643: the Infrastructure channel's derivation, re-run for the census
 #include "world/space_programme.hpp" // BL-644: the State channel's derivation, re-run for the census
 #include "world/supply_system.hpp"
+#include "world/trade.hpp"
 #include "world/survey_system.hpp" // init_survey_states - the app runs it, this census did not
 #include "world/tech_gate.hpp"
 #include "world/unit_roster.hpp"
@@ -426,8 +427,7 @@ economy_report tick_to_clearing(world& w, const recipe_registry& reg, int t, lp_
     advance_convoys(w);
     credit_arrived_convoys(w, t); // app order: arrivals before the economy
     economy_report rep = run_economy_step(w, reg, /*spectating=*/false, &lp);
-    dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land), // BL-995: before the clear
-                     reg.logistics_cost(convoy_mode::space), &lp);
+    run_trades(w, reg, rep, &lp); // BL-1266: the trade pass (was dispatch_convoys), before the clear
     return rep;
 }
 

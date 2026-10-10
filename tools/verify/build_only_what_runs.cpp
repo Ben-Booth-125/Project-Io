@@ -472,12 +472,12 @@ int main()
         auto make = [&](bool third_party, float price_steel_mult) {
             scene s = make_scene(); place_bound(s, reg);
             const entity_id p = add_plant(s, reg, s.ai, 1, 2, 1.0f, /*idled=*/false);
-            s.w.pool_at(s.ai, s.a).quantities[r_steel] = 100.0f;
+            s.w.markets.at(s.a).inventory[r_steel] = /* BL-1265: on the shelf, not a pool */ 100.0f;
             entity_id third = null_entity;
             if (third_party)
             {
                 third = add_plant(s, reg, s.pl, 0, 3, 1.0f, /*idled=*/false);
-                s.w.pool_at(s.pl, s.a).quantities[r_coal] = 1000.0f;
+                s.w.markets.at(s.a).inventory[r_coal] = /* BL-1265: on the shelf, not a pool */ 1000.0f;
             }
             for (auto& [mid, m] : s.w.markets)
             {
@@ -491,7 +491,7 @@ int main()
             auto [s, p, third] = make(false, 1.0f);
             (void)third;
             input_reach ir = make_input_reach(s.w, reg);
-            const stockpile_component* pool = s.w.find_pool(s.ai, s.a);
+            const stockpile_component* pool = nullptr; // BL-1265: no pools; the stock is on A's shelf
             const float need = judged_batches(reg, s.w.buildings.at(p)) * forge->inputs[r_steel];
             check(!input_obtainable(s.w, reg, ir, s.a, pool, r_steel, need, p).obtainable,
                   "R6 shared: the steel plant's own leftover steel does NOT admit a steel-eating run");
@@ -503,7 +503,7 @@ int main()
             auto [s, p, third] = make(true, 1.0f);
             (void)third;
             input_reach ir = make_input_reach(s.w, reg);
-            const stockpile_component* pool = s.w.find_pool(s.ai, s.a);
+            const stockpile_component* pool = nullptr; // BL-1265: no pools; the stock is on A's shelf
             const float need = judged_batches(reg, s.w.buildings.at(p)) * forge->inputs[r_steel];
             check(input_obtainable(s.w, reg, ir, s.a, pool, r_steel, need, p).obtainable,
                   "R6 shared: a third party's steel plant in A (spare) admits it");
@@ -822,7 +822,7 @@ int main()
             bool ran = false;
             for (int t2 = 1; t2 <= 4; ++t2)
             {
-                s.w.pool_at(s.pl, s.a).quantities[r_coal] = 1000.0f;
+                s.w.markets.at(s.a).inventory[r_coal] = /* BL-1265: on the shelf, not a pool */ 1000.0f;
                 s.w.current_econ_tick = t2;
                 const economy_report rep = run_economy_step(s.w, reg);
                 for (const building_report& br : rep.buildings)
@@ -873,7 +873,7 @@ int main()
             }
             const entity_id p = add_plant(s, reg10, s.ai, 1, 2, 1.0f, /*idled=*/false);
             s.w.buildings.at(p).ai_cooldown = 1000; // any switch is the reflex's
-            s.w.pool_at(s.ai, s.a).quantities[r_iron] = 1000.0f;
+            s.w.markets.at(s.a).inventory[r_iron] = /* BL-1265: on the shelf, not a pool */ 1000.0f;
             entity_id mine = null_entity;
             if (iron_mine)
             {

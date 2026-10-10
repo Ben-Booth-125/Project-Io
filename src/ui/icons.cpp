@@ -88,6 +88,36 @@ void shield(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
     dl->AddPolyline(v, 5, outline, ImDrawFlags_Closed, 1.0f);
 }
 
+// Market-stall silhouette — the Planetary Marketplace marker (BL-1266/BL-1269;
+// TRADE.md § The Planetary Marketplace). An awning — a trapezoid flaring out over
+// its counter — on a narrower stall block, both FILLED and outlined like every
+// building glyph, with a dark counter line across the block. The flared awning is
+// what no other marker has: it never reads as the port's triangle, the hub's
+// hexagon, the shield's point or the processing square.
+void market_stall(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    const float split = c.y - r * 0.10f; // awning bottom == stall top
+    const ImVec2 awning[4] = {
+        { c.x - r * 0.55f, c.y - r },  // top-left
+        { c.x + r * 0.55f, c.y - r },  // top-right
+        { c.x + r,         split },    // bottom-right, flared
+        { c.x - r,         split },    // bottom-left, flared
+    };
+    const ImVec2 stall[4] = {
+        { c.x - r * 0.70f, split },
+        { c.x + r * 0.70f, split },
+        { c.x + r * 0.70f, c.y + r },
+        { c.x - r * 0.70f, c.y + r },
+    };
+    dl->AddConvexPolyFilled(stall, 4, fill);
+    dl->AddPolyline(stall, 4, outline, ImDrawFlags_Closed, 1.0f);
+    dl->AddConvexPolyFilled(awning, 4, fill);
+    dl->AddPolyline(awning, 4, outline, ImDrawFlags_Closed, 1.0f);
+    // The counter: one dark line across the stall, a third of the way down.
+    const float counter_y = split + (c.y + r - split) * 0.38f;
+    dl->AddLine({c.x - r * 0.70f, counter_y}, {c.x + r * 0.70f, counter_y}, outline, 1.0f);
+}
+
 // --- BL-429: named-building glyphs -------------------------------------------
 // One shape per (extraction target / processing primary-output) resource that
 // the ancient roster gave a building name to (BL-429 slice 2). Two or more
@@ -441,6 +471,7 @@ void building(ImDrawList* dl, ImVec2 centre, float r, building_type type,
             }
             break;
         case building_type::port:                 triangle(dl, centre, r, fill);  break;
+        case building_type::planetary_marketplace: market_stall(dl, centre, r, fill); break; // BL-1269
         case building_type::inland_logistics_hub: hub_node(dl, centre, r, fill);  break; // BL-149
         case building_type::military_base:        shield(dl, centre, r, fill);    break; // BL-325
         case building_type::research_institute:   research(dl, centre, r, fill);  break; // BL-332

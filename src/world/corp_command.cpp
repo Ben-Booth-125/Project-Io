@@ -16,7 +16,8 @@
 #include "province.hpp"       // BL-511: march_unit's destination is a province
 #include "recipe_registry.hpp"
 #include "stance.hpp" // BL-448: corp stance verbs (declare_hostile / offer_friendship / accept_friendship / return_to_neutral)
-#include "supply_system.hpp" // BL-452: the shared dispatch (price_convoy_leg / commit_convoy)
+#include "supply_system.hpp"
+#include "trade.hpp" // BL-1266: trade_is_valid (set_trade)
 #include "survey_system.hpp"
 #include "unit_roster.hpp"
 #include "world.hpp"
@@ -86,25 +87,15 @@ bool corp_can_afford_axis(const world& w, entity_id corp, hire_axis axis)
     return false;
 }
 
-/// Debit @p amount of @p res from @p corp's goods pools, draining in ascending
-/// pool-key order (the map's own key order, so deterministic). Only called
-/// after affordability is confirmed, so this should never under-run — but walks
-/// defensively rather than assuming a single pool holds the whole amount.
-///
-/// BL-1003 CALL: a hire names no tile, and the gate sums the corp's stock
-/// everywhere, so the debit stays corp-wide across every (corp, market) pool,
-/// lowest key first — exactly the reach it had across (corp, body) pools.
+/// BUY @p amount of @p res for @p corp's hire off the shelves of the markets it
+/// sits in, lowest market id first, at each shelf's posted price (BL-1265,
+/// MARKETS.md § The shelf economy: a hire buys its kit like any buyer). Only
+/// called after affordability is confirmed against the same shelves
+/// (`corp_shelf_stock`). The fair-price ceiling is off for a hire's draw (0):
+/// the gate counted the whole shelf, so the debit must be able to take it.
 void debit_from_corp(world& w, entity_id corp, resource_type res, float amount)
 {
-    for (auto it = w.corp_market_pools.lower_bound({corp, entity_id{0}});
-         it != w.corp_market_pools.end() && it->first.first == corp; ++it)
-    {
-        if (amount <= 0.0f) return;
-        float& q = it->second.quantities[static_cast<std::size_t>(res)];
-        const float take = std::min(q, amount);
-        q      -= take;
-        amount -= take;
-    }
+    buy_from_corp_shelves(w, corp, static_cast<std::size_t>(res), amount, 0.0f);
 }
 
 /// Debit the roster row's gated axes from the corp's pools. All-or-nothing:
@@ -305,15 +296,6 @@ bool supplier_has_input_access(const world& w, const recipe_registry& reg, entit
     return true; // extraction (or no recipe found) — nothing to check
 }
 
-/// Number of standing sell orders `corp` currently holds, across all bodies.
-std::size_t corp_order_count(const world& w, entity_id corp)
-{
-    std::size_t n = 0;
-    for (const sell_order& o : w.sell_orders)
-        if (o.corp == corp)
-            ++n;
-    return n;
-}
 
 // ---------------------------------------------------------------------------
 // BL-628 — the whole-firm buyout's dissolution walk
@@ -514,17 +496,13 @@ void merge_returns(std::vector<quarterly_return>& dst,
 // two paths cannot drift — one rule, two callers, exactly as FINANCE.md's
 // dissolution table intends.
 
-/// CANCEL: open market orders (both sides of the book — a promise made by a
-/// party that no longer exists) and unaccepted procurement quotes (nothing has
-/// been paid; the counterparty simply asks again).
+/// CANCEL: unaccepted procurement quotes (nothing has been paid; the
+/// counterparty simply asks again). BL-1265: the order book retired, so there
+/// are no open market orders to cancel. A dissolved firm's MANUAL TRADES are
+/// handled by each caller: a buyout hands them to the acquirer, a wind-up drops
+/// them (`drop_trades_of`).
 void sever_orders_and_quotes(world& w, entity_id target)
 {
-    w.sell_orders.erase(std::remove_if(w.sell_orders.begin(), w.sell_orders.end(),
-                                       [&](const sell_order& o) { return o.corp == target; }),
-                        w.sell_orders.end());
-    w.buy_orders.erase(std::remove_if(w.buy_orders.begin(), w.buy_orders.end(),
-                                      [&](const buy_order& o) { return o.corp == target; }),
-                       w.buy_orders.end());
     w.procurement_quotes.erase(
         std::remove_if(w.procurement_quotes.begin(), w.procurement_quotes.end(),
                        [&](const procurement_quote& q)
@@ -583,26 +561,24 @@ void dissolve_into(world& w, entity_id acquirer, entity_id target)
     // --- TRANSFER: filed returns -------------------------------------------
     merge_returns(acq.returns, tgt.returns);
 
-    // --- TRANSFER: (corp, market) goods pools ------------------------------
-    // Collected first, then merged, then erased: `pool_at` INSERTS, and mutating
-    // the map mid-walk is the kind of thing that reads fine and is wrong. The
-    // walk is over a std::map, so it is a sorted walk by (corp, key) — BL-158.
-    // BL-1003: each pool keeps its KEY — the target's stock in market M becomes
-    // the acquirer's stock in market M; goods do not move by changing hands.
+    // --- TRANSFER: manual trades (BL-1266) ----------------------------------
+    // BL-1265: corporations hold no goods, so there is no stock to hand over —
+    // the target's goods were the market's from the moment they landed. Its
+    // standing trades change hands with its Marketplaces: each keeps its id and
+    // its place in the spending order, now spending the acquirer's reserve.
+    // Up to the acquirer's own cap (`max_trades_per_corp`): trades past it are
+    // dropped, in placement order, so the bound the seam keeps still holds.
     {
-        std::vector<std::pair<entity_id, stockpile_component>> moving;
-        for (auto it = w.corp_market_pools.lower_bound({target, entity_id{0}});
-             it != w.corp_market_pools.end() && it->first.first == target; ++it)
-            moving.emplace_back(it->first.second, it->second);
-        for (const auto& mv : moving)
-        {
-            w.corp_market_pools.erase(std::make_pair(target, mv.first));
-            stockpile_component& dst = w.pool_at(acquirer, mv.first);
-            for (std::size_t r = 0; r < resource_count; ++r)
-                dst.quantities[r] += mv.second.quantities[r];
-            // BL-1217 D5: held opening stock changes hands with its pool.
-            move_opening_stock_held(w, {target, mv.first}, {acquirer, mv.first});
-        }
+        std::size_t held = 0;
+        for (const standing_trade& t : w.trades)
+            if (t.owner == acquirer)
+                ++held;
+        for (standing_trade& t : w.trades)
+            if (t.owner == target)
+                t.owner = (held++ < max_trades_per_corp) ? acquirer : null_entity;
+        w.trades.erase(std::remove_if(w.trades.begin(), w.trades.end(),
+                                      [](const standing_trade& t) { return t.owner == null_entity; }),
+                       w.trades.end());
     }
 
     // --- TRANSFER: workforce supply overrides ------------------------------
@@ -845,29 +821,11 @@ void run_firm_exits(world& w, const firm_exit_params& p,
                     ++rec.holdings;
         }
 
-        // LIQUIDATE pools: dumped to the local market's REAL inventory — the
-        // conservation law (inventory gains what pools lose). BL-1003: a market
-        // pool dumps into ITS market; a body-level pool (a market-less body)
-        // loses the goods; stated, not hidden.
-        {
-            std::vector<std::pair<entity_id, stockpile_component>> pools;
-            for (auto it = w.corp_market_pools.lower_bound({target, entity_id{0}});
-                 it != w.corp_market_pools.end() && it->first.first == target; ++it)
-                pools.emplace_back(it->first.second, it->second);
-            for (const auto& [key, pool] : pools)
-            {
-                const entity_id mid = (w.markets.find(key) != w.markets.end())
-                    ? key : any_market_on_body(w, key);
-                if (mid != null_entity)
-                {
-                    market_component& mc = w.markets.at(mid);
-                    for (std::size_t r = 0; r < resource_count; ++r)
-                        mc.inventory[r] += pool.quantities[r];
-                }
-                w.corp_market_pools.erase(std::make_pair(target, key));
-                w.opening_stock_held.erase(std::make_pair(target, key)); // BL-1217 D5
-            }
-        }
+        // BL-1265: no pools to liquidate — every good was already on a shelf.
+        // DROP its manual trades (BL-1266): a promise its owner can no longer keep.
+        w.trades.erase(std::remove_if(w.trades.begin(), w.trades.end(),
+                                      [&](const standing_trade& t) { return t.owner == target; }),
+                       w.trades.end());
 
         // LIQUIDATE units: disbanded. Sorted ids so the erase order is fixed.
         {
@@ -1195,69 +1153,18 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
         // player's press and the AI's command cannot diverge if there is only one
         // implementation of what the press means.
 
+        // ── TOMBSTONES: THE ORDER BOOK AND THE CORPORATION CONVOY RETIRED ─────
+        // (BL-1265 / BL-1266; MARKETS.md § The shelf economy, TRADE.md § What
+        // trade replaces, Ben 2026-10-10.) Standing sell orders and the
+        // directed convoy went with corporation pools: production sells on
+        // landing, and goods move between markets only by a TRADE
+        // (`set_trade`). The three slots survive by the append-only rule and
+        // are REJECTED, mutating nothing — a caller is told No rather than
+        // quietly ignored (the AI-facing-seam rule).
         case corp_verb::place_sell_order:
-        {
-            const entity_id body = cmd.subject;
-            if (w.bodies.find(body) == w.bodies.end())
-                return corp_command_result::rejected_invalid;
-
-            const entity_id mid = any_market_on_body(w, body);
-            if (mid == null_entity)
-                return corp_command_result::rejected_invalid; // "This body has no market."
-
-            const std::size_t r = static_cast<std::size_t>(cmd.target);
-            if (r >= resource_count)
-                return corp_command_result::rejected_invalid;
-            if (w.markets.at(mid).base_price[r] <= 0.0f)
-                return corp_command_result::rejected_invalid; // unpriced here
-
-            // BL-1201 (orders are price floors): quantity 0 is NO CAP — the order
-            // covers the whole surplus above the processor reservation, tick by
-            // tick. A positive quantity is a per-tick cap. Negative, NaN and
-            // infinite quantities are refused: `!(q >= 0)` is true for NaN, and
-            // an infinite cap would be "no cap" spelt in a way nothing writes.
-            if (!(cmd.quantity >= 0.0f) || !std::isfinite(cmd.quantity) ||
-                !(cmd.floor_price >= 0.0f) || !std::isfinite(cmd.floor_price))
-                return corp_command_result::rejected_invalid;
-
-            if (corp_order_count(w, cmd.corp) >= max_sell_orders_per_corp)
-                return corp_command_result::rejected_state; // book full
-
-            sell_order o;
-            o.id          = w.allocate_order_id();
-            o.corp        = cmd.corp;
-            o.body        = body;
-            o.resource    = cmd.target;
-            o.quantity    = cmd.quantity;
-            o.floor_price = cmd.floor_price;
-            w.sell_orders.push_back(o); // appended: insertion order is time priority
-            return corp_command_result::applied;
-        }
-
         case corp_verb::remove_sell_order:
-        {
-            if (cmd.order == 0)
-                return corp_command_result::rejected_invalid;
-
-            const auto it = std::find_if(w.sell_orders.begin(), w.sell_orders.end(),
-                                         [&](const sell_order& o) { return o.id == cmd.order; });
-            // A nonexistent order and someone ELSE'S order answer identically
-            // (BL-397). Distinguishing them (`rejected_invalid` vs
-            // `rejected_not_owner`) made the result an existence oracle: order
-            // ids are one global monotonic sequence, so sweeping the id space
-            // mapped the whole book — whose orders exist, corp by corp. Any id
-            // not in the caller's own book is simply invalid. In-process
-            // callers only ever remove their own orders, so they never see the
-            // collapsed case.
-            if (it == w.sell_orders.end() || it->corp != cmd.corp)
-                return corp_command_result::rejected_invalid;
-
-            // Erase by id, never by index: every surviving order keeps its handle,
-            // so a removal cannot invalidate a command already composed against
-            // another order.
-            w.sell_orders.erase(it);
-            return corp_command_result::applied;
-        }
+        case corp_verb::dispatch_convoy:
+            return corp_command_result::rejected_invalid;
 
         case corp_verb::request_quote:
         {
@@ -1445,74 +1352,76 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             return corp_command_result::applied;
         }
 
-        // --- BL-452: the logistics layer ------------------------------------
-        // Layer 5 had no player verb at all: supply_system, logistics, four
-        // rendering paths and the only coupling between two markets' prices,
-        // entirely automatic. These two verbs are the seam onto it.
-        //
-        // dispatch_convoy is deliberately NOT a second implementation of a
-        // dispatch. It is the auto-dispatcher's own body with the shortfall
-        // scan removed — price_convoy_leg + commit_convoy (supply_system.hpp),
-        // the same two calls dispatch_convoys makes with the same arguments.
-        // Anything the player's convoy does differently from a rival's would be
-        // a divergence, not a feature.
 
-        case corp_verb::dispatch_convoy:
+        // ── BL-1266: TRADE JOINS THE SEAM (TRADE.md § A trade, § Auto and
+        // reserved trade). The player's, and a rival's under the AI_OPPONENT.md
+        // § 11 grant (a rival may set its own trades). Validated as the value
+        // that lands — every field range-checked against the real domain, the
+        // whole command rejected on any violation, nothing mutated on refusal.
+        case corp_verb::set_trade:
         {
-            // UNTRUSTED INPUT BOUNDARY (io-standing-rules.md, 2026-08-14). Every
-            // field is validated as the value that lands in the destination,
-            // before anything is read from it, and the whole command is refused
-            // on violation — never clamped, truncated or wrapped. Nothing below
-            // mutates until the single commit at the end.
-            const auto src_it = w.markets.find(cmd.subject);
-            if (src_it == w.markets.end())
-                return corp_command_result::rejected_invalid; // subject is not a market
-            const auto dest_it = w.markets.find(cmd.counterparty);
-            if (dest_it == w.markets.end())
-                return corp_command_result::rejected_invalid; // counterparty is not a market
-
-            const std::size_t r = static_cast<std::size_t>(cmd.target);
-            if (r >= resource_count)
+            standing_trade t;
+            t.owner       = cmd.corp;
+            t.resource    = cmd.target;
+            t.from_market = cmd.subject;
+            t.to_market   = cmd.counterparty;
+            t.points      = cmd.quantity;
+            if (!(t.points <= max_trade_points) || !trade_is_valid(w, reg, t))
                 return corp_command_result::rejected_invalid;
+            // NR-1018: reach runs from market centre to market centre — a leg
+            // must reach the destination (same body, overland or by Ports;
+            // another body, the owner's pad and propellant).
+            {
+                const logistics_nodes nodes = collect_logistics_nodes(w);
+                if (!price_trade_leg(w, reg, nodes, cmd.corp, t.from_market, t.to_market,
+                                     static_cast<std::size_t>(t.resource), 1.0f).viable)
+                    return corp_command_result::rejected_placement;
+            }
+            if (cmd.order != 0)
+            {
+                // CHANGE an existing trade, keeping its id and its place in the
+                // spending order. Someone else's trade answers exactly as a
+                // nonexistent one does (BL-397: no existence oracle).
+                const auto it = std::find_if(w.trades.begin(), w.trades.end(),
+                                             [&](const standing_trade& x) { return x.id == cmd.order; });
+                if (it == w.trades.end() || it->owner != cmd.corp)
+                    return corp_command_result::rejected_invalid;
+                t.id = it->id;
+                *it  = t;
+                return corp_command_result::applied;
+            }
+            std::size_t held = 0;
+            for (const standing_trade& x : w.trades)
+                if (x.owner == cmd.corp)
+                    ++held;
+            if (held >= max_trades_per_corp)
+                return corp_command_result::rejected_state; // the book of trades is full
+            t.id = w.allocate_trade_id();
+            w.trades.push_back(t); // appended: placement order is spending order
+            return corp_command_result::applied;
+        }
 
-            // Finiteness FIRST: an infinity or a NaN passes `> 0.0f` (or fails
-            // it) without meaning anything, and would reach the cost product
-            // and the pool debit as a value no later comparison can catch.
-            if (!std::isfinite(cmd.quantity) || !(cmd.quantity > 0.0f))
+        case corp_verb::clear_trade:
+        {
+            if (cmd.order == 0)
                 return corp_command_result::rejected_invalid;
+            const auto it = std::find_if(w.trades.begin(), w.trades.end(),
+                                         [&](const standing_trade& x) { return x.id == cmd.order; });
+            if (it == w.trades.end() || it->owner != cmd.corp)
+                return corp_command_result::rejected_invalid; // BL-397: no existence oracle
+            w.trades.erase(it); // by id: every surviving trade keeps its handle
+            return corp_command_result::applied;
+        }
 
-            // The corp must actually HOLD the cargo. The source pool is keyed
-            // by (corp, market) — BL-1003: the pool AT the named source market,
-            // not the corp's stock anywhere on its body — so reading the acting
-            // corp's own pool is the ownership check; there is no way to name
-            // someone else's stock.
-            const entity_id src_body = src_it->second.body;
-            const stockpile_component* sp = w.find_pool(cmd.corp, cmd.subject);
-            const float     stock    = (sp != nullptr) ? sp->quantities[r] : 0.0f;
-            if (cmd.quantity > stock)
-                return corp_command_result::rejected_state; // the goods are not there
-
-            // Price the leg through the shared path. `viable == false` is the
-            // lane refusing the haul: no production anchor, no reachable route,
-            // no launchpad on the source body, no propellant to launch with, or
-            // a cost that is not a finite number.
-            const logistics_nodes nodes = collect_logistics_nodes(w);
-            const convoy_leg      leg   = price_convoy_leg(
-                w, reg, nodes, cmd.corp, cmd.subject, cmd.counterparty, r, cmd.quantity,
-                reg.logistics_cost(convoy_mode::space));
-            if (!leg.viable)
-                return corp_command_result::rejected_placement;
-
-            // The solvency gate, and (BL-597) the passive-LP admissibility
-            // gate, live inside commit_convoy, in one place for both
-            // callers; a refusal there mutates nothing. `refused_no_lp`
-            // distinguishes "no passive LP at the source anchor" from plain
-            // insolvency so the player sees the right reason.
-            bool refused_no_lp = false;
-            if (!commit_convoy(w, reg, cmd.corp, src_body, cmd.subject, cmd.counterparty,
-                               r, cmd.quantity, leg, nullptr, &refused_no_lp))
-                return refused_no_lp ? corp_command_result::rejected_no_lp
-                                      : corp_command_result::rejected_funds;
+        case corp_verb::set_trade_reserve:
+        {
+            // The points held back for manual trades; the rest is auto. Clamped
+            // to what the corporation makes at use, so any finite amount in
+            // range is a legal setting — 0 is "all auto".
+            if (!std::isfinite(cmd.quantity) || !(cmd.quantity >= 0.0f)
+                || !(cmd.quantity <= max_trade_points))
+                return corp_command_result::rejected_invalid;
+            w.corporations.at(cmd.corp).trade_reserve = cmd.quantity;
             return corp_command_result::applied;
         }
 

@@ -1117,6 +1117,83 @@ static int trade_road_line_q(const trade_context& ctx, int seller, int buyer)
     return land_q;
 }
 
+// ---------------------------------------------------------------------------
+// BL-1268 -- the trade record (TRADE.md sec Trade in generation)
+// ---------------------------------------------------------------------------
+
+static void credit_trade_record(std::vector<trade_record_cell>& record, int32_t polity_id,
+                                int32_t region_id, int64_t flow_volume, int64_t relation_years)
+{
+    const auto it = std::lower_bound(
+        record.begin(), record.end(), std::pair<int32_t, int32_t>{polity_id, region_id},
+        [](const trade_record_cell& c, const std::pair<int32_t, int32_t>& k) {
+            if (c.polity != k.first) return c.polity < k.first;
+            return c.region < k.second;
+        });
+    if (it != record.end() && it->polity == polity_id && it->region == region_id)
+    {
+        it->flow_volume    += flow_volume;
+        it->relation_years += relation_years;
+        return;
+    }
+    record.insert(it, trade_record_cell{polity_id, region_id, flow_volume, relation_years});
+}
+
+void accumulate_trade_record(std::vector<trade_record_cell>&   record,
+                             const std::vector<trade_flow>&    flows,
+                             const std::vector<dated_object>&  treaties,
+                             const std::vector<polity>&        polities,
+                             std::size_t                       region_count,
+                             int                               step_years)
+{
+    if (step_years <= 0) return;
+    // The capital a living polity earns at this round; -1 earns nothing.
+    const auto seat = [&](int id) -> int32_t {
+        if (id < 0 || static_cast<std::size_t>(id) >= polities.size()) return -1;
+        const polity& q = polities[static_cast<std::size_t>(id)];
+        if (!q.alive || q.capital < 0 || static_cast<std::size_t>(q.capital) >= region_count) return -1;
+        return static_cast<int32_t>(q.capital);
+    };
+
+    // Flows: both ends, each at its own capital (the earn rule). `flows` is
+    // sorted by (seller, buyer, good), so the walk is in a fixed order.
+    for (const trade_flow& f : flows)
+    {
+        if (f.volume_q <= 0) continue;
+        const int64_t v = static_cast<int64_t>(f.volume_q) * step_years;
+        if (const int32_t r = seat(f.seller); r >= 0) credit_trade_record(record, f.seller, r, v, 0);
+        if (const int32_t r = seat(f.buyer); r >= 0) credit_trade_record(record, f.buyer, r, v, 0);
+    }
+
+    // Good relations: each distinct living pair holding a standing MUTUAL
+    // clause (a binding forms all four together; tribute is not one). Pairs
+    // collected, sorted and de-duplicated, so insertion order never matters.
+    std::vector<std::pair<int32_t, int32_t>> pairs;
+    for (const dated_object& d : treaties)
+    {
+        const treaty_clause k = static_cast<treaty_clause>(d.kind);
+        if (d.kind < 0 || d.kind >= treaty_clause_count || k == treaty_clause::tribute) continue;
+        if (d.a == d.b) continue;
+        pairs.emplace_back(std::min(d.a, d.b), std::max(d.a, d.b));
+    }
+    std::sort(pairs.begin(), pairs.end());
+    pairs.erase(std::unique(pairs.begin(), pairs.end()), pairs.end());
+    for (const auto& [a, b] : pairs)
+    {
+        const int32_t ra = seat(a), rb = seat(b);
+        if (ra < 0 || rb < 0) continue; // a relation with the dead is not one
+        credit_trade_record(record, a, ra, 0, step_years);
+        credit_trade_record(record, b, rb, 0, step_years);
+    }
+}
+
+void merge_trade_record(std::vector<trade_record_cell>& into,
+                        const std::vector<trade_record_cell>& from)
+{
+    for (const trade_record_cell& c : from)
+        credit_trade_record(into, c.polity, c.region, c.flow_volume, c.relation_years);
+}
+
 void run_exploration_upkeep(std::vector<region>&                 regions,
                             std::vector<polity>&                 polities,
                             const std::vector<history_corridor>& corridors,
@@ -5353,6 +5430,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
             run_exploration_upkeep(ss.regions, out.polities, out.supply_corridors,
                                    params, y, step_years, &upkeep_spend,
                                    &out.dated_objects, &out.trade_flows, &spend_ctx, works);
+            // BL-1268: the round's trade and good relations, into the record
+            // the campaign's Marketplaces are retrofitted from. Read by nothing
+            // in the sim, so it moves no history.
+            accumulate_trade_record(out.trade_record, out.trade_flows, out.dated_objects,
+                                    out.polities, ss.regions.size(), step_years);
             note_trade_legs(); // BL-1140: the round's trade across water, the fourth writer
             out.road_rule_lost_no_navy_q  += road_rule_lost[0]; // BL-1171 diagnostic
             out.road_rule_lost_no_port_q  += road_rule_lost[1];
@@ -12691,6 +12773,9 @@ exploration_output make_exploration_output(const settlement_state&  ss,
 
     o.holdings            = derive_holdings(o.regions, o.polities);
     o.surviving_corridors = filter_surviving_corridors(hs.supply_corridors, o.regions, o.polities);
+
+    // BL-1268: the span's trade record crosses whole (see the field).
+    o.trade_record = hs.trade_record;
 
     // BL-1097: the sea-leg record crosses WHOLE -- no dead filter, because a
     // lane outlives the polity that made it (see the field). Already sorted

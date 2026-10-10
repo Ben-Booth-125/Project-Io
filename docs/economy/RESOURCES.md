@@ -415,7 +415,7 @@ The `resource_type` enum holds **38 values**: 7 Earth-sourced raws, 4 space-sour
 ambient raws, 4 endemic goods, 3 prototype refined goods, 3 ancient intermediates, propellant,
 7 processing-chain goods, 3 habitability goods, and ordnance. Adding a resource changes
 `resource_count` and with it the width of every serialised `std::array<float, resource_count>` —
-tile deposits and reserves, market supply/demand/price/base-price, stockpiles, nation abundance
+tile deposits and reserves, market supply/demand/price/base-price and shelf inventory, nation abundance
 and substrate capacity. **Extending the enum IS a save-format retrofit**, but every one of those
 arrays is sized off `resource_count` rather than a hardcoded width, so an extension needs no
 per-array edit — only the enum value plus base-price and recipe authoring.
@@ -451,13 +451,14 @@ tradeable, and `resolve_price` / the clearing pass ignore everything else
   construction sector's product (`docs/economy/PRODUCTION.md`).
 
 **Propellant has a base price (Ben, 2026-10-08; BL-1217, inputs reach processors).** It is made in a Chemical Plant and
-burned by a Launchpad from its corporation's own pool; the nation's space programme buys it — so
+bought off the source shelf for every launch a trade makes; the nation's space programme buys it — so
 it trades, and a plant that makes it can be judged by what it earns. Unpriced, every propellant
 plant forecast zero revenue and was idled the moment it stood (102 of them across the 16 curated
 seeds). Its base price is derived from its inputs as every Tier 3 product's is (`PRODUCTION.md` §
 The recipe margin anchor), on the route a body with an atmosphere runs — `propellant_atmospheric`,
 refined fuel ×2 — since the airless route runs only on airless bodies (Ben, 2026-10-09): marginal
-cost 31.95, so **64.0**. A pad's pool keeps its propellant from auto-surplus (`MARKETS.md` step 4).
+cost 31.95, so **64.0**. There is no reserve of launch fuel: a launch buys its propellant off the
+shelf it leaves from (`PRODUCTION.md` § Launchpad).
 
 Water is in this tradeable set from tick 0: it carries an authored base price on the home-body
 markets and sits in the substrate demand basket (`scripts/economy.lua`, weight 0.40).

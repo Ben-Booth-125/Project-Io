@@ -11,7 +11,7 @@
 
 Production converts tile resource deposits into tradeable goods through two stages: **extraction**, which harvests raw materials from tiles, and **processing**, which refines or manufactures higher-tier goods from those inputs. Workforce shapes throughput at both stages.
 
-See **`docs/economy/RESOURCES.md`** for the full resource list, tier definitions, and prototype subset. The market model production sells into — clearing, price resolution, the order book — is **`docs/economy/MARKETS.md`**. The network goods move over — reach, roads, travel time, throughput — is **`docs/economy/LOGISTICS.md`**.
+See **`docs/economy/RESOURCES.md`** for the full resource list, tier definitions, and prototype subset. The market model production sells into — the shelf, clearing, price resolution — is **`docs/economy/MARKETS.md`**; how goods move from one market to another is **`docs/economy/TRADE.md`**. The network goods move over — reach, roads, travel time, throughput — is **`docs/economy/LOGISTICS.md`**.
 
 **The admission rule.** A `resource_type` value earns its place by being consumed by an authored recipe or contracted for by a named actor, and nothing else gets in. A raw with an authored deposit and no price is *minable but unsellable* — a processing building drawing on it stalls forever — so every deposit raw carries a base price, and every priced good has a producer and a consumer reachable in the same era band. `tools/verify/chain_depth.cpp` (rows R1 and R1b) holds the line.
 
@@ -20,7 +20,7 @@ already been walked through: `chain_depth`'s exemption table lets a good pass by
 consumer — "sold to the market", "mercantile demand" — and a name is not a pass that injects
 demand. Ten goods were admitted on a mercantile demand that was never built, which is how the
 ancient roster came to terminate in artisan goods nobody buys. The rule is therefore sharpened:
-**an exemption must name a pass that actually adds to a market's demand or draws from a pool**, and
+**an exemption must name a pass that actually adds to a market's demand or draws from a shelf**, and
 the row fails when it cannot find one. The register of legitimate passes is
 [`MARKETS.md`](MARKETS.md) § Demand channels.
 
@@ -28,7 +28,7 @@ the row fails when it cannot find one. The register of legitimate passes is
 
 ## Extraction
 
-An extraction building placed on a tile reads the tile's deposit for its authored target resource (`building_component.target_resource`) and credits a fractional quantity to its corporation's stockpile pool **at each economy tick**.
+An extraction building placed on a tile reads the tile's deposit for its authored target resource (`building_component.target_resource`) and lands a fractional quantity on its market's shelf **at each economy tick**, sold to the market for its owner (§ Output and the shelf).
 
 Output rate is the product of four factors:
 
@@ -231,15 +231,16 @@ The Quarry and Lumber Camp exist specifically to harvest ambient resources (ston
 
 A processing building holds a **recipe** (`building_component.recipe`, indexing the Lua recipe registry): a set of input resources consumed and a set of outputs produced per economy tick, with a fixed conversion rate authored in Lua. Recipes support multiple inputs and outputs and reagents (e.g. coal in the steel recipe is an input that yields no separate product).
 
-Processing buildings draw inputs from — and add outputs to — the shared per-`(corporation, body)` stockpile pool (inputs are taken pool-first; any shortfall draws the local market's real inventory, see § Stockpile and output flow and MARKETS.md § Real market inventory). They use the same workforce scalar as extraction buildings.
+Processing buildings buy every input off their own market's shelf and land their outputs on it (§ Output and the shelf; MARKETS.md § Real market inventory). They use the same workforce scalar as extraction buildings.
 
 When the inputs available cannot cover a full conversion, the building does **not** simply halt: it follows a **two-threshold partial run**. If the limiting input covers at least `T_full` of one conversion, the building runs at full rate; between `T_idle` and `T_full` it scales its output down to what the limiting input allows; below `T_idle` it idles. The two thresholds are tunable economic constants.
 
 **The thresholds govern every body uniformly.** A market's stock is real and finite
-(`market_component.inventory`, MARKETS.md), so it earns its place in the SAME coverage calculation
-the no-market case uses: coverage = `(pool + market inventory) / need` per input, full rate
-at/above `T_full`, scaled between `T_idle`/`T_full`, idle below `T_idle`. There is one model, not
-a market special case.
+(`market_component.inventory`, MARKETS.md), and it is the only stock there is: coverage =
+`market inventory / need` per input, full rate at/above `T_full`, scaled between
+`T_idle`/`T_full`, idle below `T_idle`. A short shelf is shared pro-rata among the processors that
+draw on it (MARKETS.md § Price resolution). An input whose posted price stands over the fair-price
+ceiling is not bought, and counts as no cover. There is one model, not a market special case.
 
 ### Recipes by building type
 
@@ -446,7 +447,7 @@ Amenity buildings are placed on tiles and lock them to amenity land use — no e
 
 ### Habitability production buildings
 
-These produce habitability goods (see `docs/economy/RESOURCES.md`) consumed by population centres. They use processing building mechanics (recipe, workforce scalar, stockpile) and differ from industrial processing buildings only in that their outputs feed population demand rather than further industrial chains. The three are the **Welfare Goods** group of `processing_facility` recipes (BL-368, habitability tranche):
+These produce habitability goods (see `docs/economy/RESOURCES.md`) consumed by population centres. They use processing building mechanics (recipe, workforce scalar, the shelf) and differ from industrial processing buildings only in that their outputs feed population demand rather than further industrial chains. The three are the **Welfare Goods** group of `processing_facility` recipes (BL-368, habitability tranche):
 
 | Recipe | Inputs | Output | Era |
 |---|---|---|---|
@@ -470,14 +471,15 @@ Infrastructure buildings affect logistical or economic capacity rather than extr
 
 | Building | Function | Era |
 |----------|----------|-----|
-| Port | Enables stockpile exchange and convoy dispatch on the body; coastal placement (`is_coastal`) | 0 |
-| Launchpad | Required to dispatch convoys to off-world bodies; consumes propellant per launch | 0 (built), 1 (operational) |
+| Port | A sea-lane node for shipments on the body, and a maker of **trade points** for its owner (`TRADE.md` § The Planetary Marketplace); coastal placement (`is_coastal`) | 0 |
+| Planetary Marketplace | Makes **trade points** for its owner each tick at its staffed rate — the capacity a trade spends to move goods between markets (`building_type::planetary_marketplace`; `TRADE.md` owns the rule). Cost and maintenance in `economy.buildings.planetary_marketplace`. | any |
+| Launchpad | Required on the source body for any trade between bodies; each launch burns propellant the trader buys off the source shelf | 0 (built), 1 (operational) |
 | Inland Logistics Hub | Land-mode logistics node (`building_type::inland_logistics_hub`, BL-149): its tile joins the population-centre set that discounts the A\* haul cost of any intra-body convoy routed through it (LOGISTICS.md). The player-placeable counterpart to a city's free-hub discount — extends the cheap land network out to remote sites. Produces nothing (0 workforce); cost in `economy.buildings.inland_logistics_hub`. | 0 |
 | Military Base | Unit muster building (`building_type::military_base`, BL-325). Produces nothing, staffs at zero, and is deliberately **not** a supply anchor — military reach IS the economic reach field. `docs/military/MILITARY.md`. | any |
 | Research Institute | The "how does tech get done" building (`building_type::research_institute`, BL-332). Passive: a flat per-tick credit to its owner's `corporation_component::science`, a market-invisible accumulator, not a resource. | any |
 | Schooling | Education building any settlement can host (`building_type::schooling`, BL-615 — stratum placement gates). Passive like the Research Institute; its qualification-raising effect belongs to POPULATION.md § Qualification. Placement is what defines it: it must stand **in** a population centre, of any stratum (POPULATION.md § Strata gate buildings). | any |
 | University | The Schooling building's City-tier sibling (`building_type::university`, BL-615). Passive; must stand in a centre of stratum **City (4) or above** — "you can't build a university in a town" (Ben, 2026-08-25). | any |
-| Orbital Port | Receives off-world convoys; required on any non-terrestrial body to accept supply | 1 |
+| Orbital Port | Receives off-world shipments; required on any non-terrestrial body to accept supply | 1 |
 
 **Stratum placement gates are authored data, not code** (BL-615, stratum placement gates;
 POPULATION.md § Strata gate buildings owns the design). A building definition carries a
@@ -491,21 +493,25 @@ reads the gate generically and refuses with a distinct reason per axis (`needs_c
 The Orbital Port is design vocabulary with no enum value. Storage capacity and per-node
 throughput are **Logistic Points** — `docs/economy/LOGISTICS.md` § Logistic Points (BL-464):
 a per-tick rate not a stock, a cap not a price, the node half only. There is no Warehouse or
-Storage Depot building; pools hold unbounded quantities, and the constraint on moving goods is
+Storage Depot building; a shelf holds unbounded quantities, and the constraint on moving goods is
 the network.
 
-**The Launchpad is the physical gate to space**: a corp must hold one on the source body before
-any inter-body convoy can depart (`corp_has_launchpad_on`, `src/world/supply_system.cpp`), and
-the pad must be **fuelled** as well as present. `dispatch_convoys` gates the space lane on the
-corp's propellant stockpile on the *source* body and burns **1.0 unit per launch**
-(`propellant_per_launch`, `src/world/supply_system.cpp`): per launch, not per unit of cargo and
-not per AU — the pad is the thing being fuelled. An unfuelled pad is exactly as shut as no pad at
-all. A convoy exporting propellant itself cannot burn the cargo it carries; the gate subtracts
-the cargo first. Propellant is priced and trades (`RESOURCES.md`), but **a pad's pool keeps its
-propellant**: where the corporation holds a Launchpad, its propellant is reserved from
-auto-surplus, so a corporation stockpiles launch fuel where it launches (`MARKETS.md` step 4;
-Ben, 2026-10-09). See **`docs/economy/ERAS.md`**
-for the Era 1→2 transition.
+**Trade buildings carry upkeep in goods (Ben, 2026-10-10).** A Planetary Marketplace and a Port
+each buy **fuel and building materials** off their own market's shelf every tick, as any building
+upkeep is bought — charcoal, timber and stone in the ancient band, refined fuel, timber and stone
+in the industrial (`economy.building_upkeep.goods`). A trade building whose upkeep goes unmet
+makes no trade points that tick (`TRADE.md` § The Planetary Marketplace).
+
+**The Launchpad is the physical gate to space**: a trader must hold one on the source body before
+any trade between bodies can ship (`corp_has_launchpad_on`, `src/world/supply_system.cpp`), and
+the launch must be **fuelled** as well as the pad present. Each launch burns **1.0 unit of
+propellant** (`launch_draw_per_convoy`, `src/world/supply_system.cpp`): per launch, not per unit
+of cargo and not per AU — the pad is the thing being fuelled. **The trader buys that propellant
+off the source market's shelf** at the posted price, under the fair-price ceiling, with the
+shipment it launches (Ben, 2026-10-10); there is no reserve of launch fuel held anywhere. A shelf
+with no propellant, or propellant priced over the ceiling, shuts the pad exactly as no pad at all
+would. A shipment of propellant itself cannot burn the cargo it carries; the launch's own draw is
+taken off the shelf first. See **`docs/economy/ERAS.md`** for the Era 1→2 transition.
 
 *Save-format note.* Appending a `resource_type` value renumbers nothing but changes the length of
 every per-resource array; every such array is sized off `resource_count`, so the append costs a
@@ -551,35 +557,63 @@ prices power on — never its own market's alone.
 
 ---
 
-## Stockpile and output flow
+## Output and the shelf
 
-Extraction and processing outputs accrue into a shared stockpile pool held per **`(corporation, market)`** (a world-level map, not the per-building `stockpile_component`, which the economy does not use). At the economy tick boundary:
+**A corporation holds no stock; its output lands on a market's shelf and is sold there (Ben,
+2026-10-10).** `MARKETS.md` § The shelf economy owns the rule; this section is production's side
+of it.
 
-**POOLS ARE PER MARKET, NOT PER BODY (Ben, 2026-09-15).** A building's output enters the pool of
-the market whose catchment holds the building's tile (`market_for_tile`), and its inputs draw from
-that same pool and that market's inventory. A corporation with works in two catchments on one body
-therefore holds two pools, and moving goods between them is a haul.
+**A building clears in its own tile's market.** Its output lands on the shelf of the market whose
+catchment holds the building's tile (`market_for_tile`), and its inputs and upkeep are bought off
+that same shelf (Ben, 2026-09-15: the market, not the body, is the unit). A corporation with works
+in two catchments on one body sells into and buys from two markets, and moving goods between them
+is a trade (`TRADE.md`).
 
-**Why, and what it fixed.** Keyed per body, a convoy between two markets on the same body debited
-and credited one pool: the corp paid the haul, waited the travel time, and sold the goods back at
-its home market. Every same-body market-to-market haul was a cost with no effect, and a seller
-could not reach a better-priced market on its own continent at any price. A pool at the market
-makes the delivery real — an arrived convoy credits the destination market's pool, and the
-ordinary auto-surplus sells it *there* (`SUPPLY.md` § Convoy entity).
+**Landing is selling.** At the tick's clear the owner is paid the quantity landed at that tick's
+clearing price, the market the counterparty whether or not anyone bids, and the goods move onto
+the shelf (`MARKETS.md` § The clearing tick). A glut drives that price to the floor, and the maker
+feels it: that is the signal to make less or ship elsewhere.
 
-**What it costs, stated.** A firm whose works straddle a catchment line no longer feeds a
-processor from a mine in the neighbouring catchment for free; it hauls, or it buys. Generation
-anchors a firm's holdings within about a tile of its home region, so most firms sit in one
-catchment, but the landscape search must now score a straddling roster as the logistics problem it
-is. Labour pools stay per `(corp, body)` (`POPULATION.md` § The labour pool) — people commute
-within a body; goods do not teleport within one. A body with no market yet keeps one body-level
-pool until its first building completes and spawns one. Goods a corporation holds on a body but
-not at any building — its opening stock — sit in the pool of its HQ tile's market. The pool key is
-save-format state.
+**Vertical integration is a location, not a free transfer.** A smelter beside its owner's mine
+buys the ore off the shelf the mine sold it onto, at the posted price, under the fair-price ceiling
+— the same as a rival's smelter would. What the owner gains by placing the two together is the
+haul it does not pay, not goods it does not buy.
 
-1. **Supply** is the goods each corporation lists for sale — its surplus above what its own processors will consume that tick (auto-surplus), plus its standing sell orders.
-2. **Demand** is what processing buildings and construction sites set out to buy this tick (the *want*, net of the corp's own pool — MARKETS.md § Want and fill), plus population and background demand.
-3. **Transactions clear at the resolved market price.** Sales credit, and purchases debit, the corporation's balance at `market_component.price`, resolved each Tick from the supply/demand ratio as `base × √(demand/supply)`, clamped to the `[0.25×, 10×]` band and EMA-smoothed. Demand and supply come from real actors: population centres and the offstage economy on the demand side, real background firms on the supply side. See `docs/economy/MARKETS.md` for the clearing model.
+**Output lands at the clear, not when it is made.** A processor cannot draw a sibling's output from
+the same tick; the goods reach the shelf at the clear, for the next tick's draws.
+
+**What it costs, stated.** A firm whose works straddle a catchment line does not feed a processor
+from a mine in the neighbouring catchment by moving goods between its own buildings; it trades, or
+its processor buys what its own market holds. Generation anchors a firm's holdings within about a
+tile of its home region, so most firms sit in one catchment, but the landscape search must score a
+straddling roster as the logistics problem it is. Labour pools stay per `(corp, body)`
+(`POPULATION.md` § The labour pool) — people commute within a body; goods do not teleport within
+one.
+
+**A producer with no market under it makes nothing.** With no shelf to land on, there is nowhere
+for its output to go; a body's first completed building spawns its market
+(`MARKETS.md` § Spontaneous market emergence). A grid good (power) made at a market off the grid
+is likewise not made (§ Power).
+
+**The opening stock is on the shelves.** Generation's opening stock is placed on the shelves of the
+markets each corporation sits in, split by how many of its buildings each market's catchment holds
+(its HQ market if none), and no money moves for it (`../generation/CORPORATION_GENERATION.md`
+§ Pass 4b).
+
+At the economy tick boundary:
+
+1. **Supply** is everything that landed on the market this tick — buildings' output, trades'
+   cargo, captured cargo, procurement deliveries — plus the shelf's share of the stock already
+   standing there (`MARKETS.md` § Price resolution).
+2. **Demand** is what processing buildings, construction sites, upkeep and trades set out to buy
+   this tick (the *want*, the whole need — MARKETS.md § Want and fill), plus population and
+   background demand.
+3. **Transactions clear at the market.** A landing is paid at the tick's clearing price, and a
+   draw off the shelf is billed at the posted price it was drawn at, against the corporation's
+   balance. The price is resolved each Tick from the supply/demand ratio as
+   `base × √(demand/supply)`, clamped to the `[0.25×, 10×]` band and EMA-smoothed. Demand and
+   supply come from real actors: population centres and the offstage economy on the demand side,
+   real background firms on the supply side. See `docs/economy/MARKETS.md` for the clearing model.
 
 ---
 
@@ -657,14 +691,15 @@ the purchase is its upkeep draw. Ben, 2026-08-31, settling this:
 So power is:
 
 - **A bought good.** It has a price, it clears on the market, and a short building **bids for it** —
-  exactly the shape § Settled: a short pool BUYS gives every goods draw. Power upkeep is the first
+  exactly the shape § Settled: every draw BUYS gives every goods draw. Power upkeep is the first
   channel built on that rule rather than an exception to it.
 - **Never cargo.** It has a price but no convoy: transmission is the road network itself
   (`docs/economy/LOGISTICS.md` § 3a), so it is the first good whose **movement and market are
   separate questions**.
 - **Connection-gated.** A buyer can only match a seller its network reaches. That is what keeps
   power a *regional* price rather than a world one, and it is the whole reason a road matters twice.
-- **Stockpiled, with a ceiling.** Unlike every other good, its store is capped. A generator running
+- **Stored, with a ceiling.** Unlike every other good, its store is capped: the ceiling is read
+  against the market's shelf plus what lands there this tick. A generator running
   into a full store is producing nothing anyone will ever buy — a real decision rather than an
   accounting detail.
 
@@ -694,7 +729,7 @@ power is bought rather than self-supplied, **both links of the chain bid on the 
     fuel  --(bought by the generator)-->  power  --(bought by every building)-->  consumed
 
 The generator's fuel purchase is an ordinary processing input. The building's power purchase is an
-upkeep bid. Neither is a pool draw, so neither severs the chain — which is MARKETS.md property 3
+upkeep bid. Both bid, so neither severs the chain — which is MARKETS.md property 3
 satisfied twice over, and property 4's *derived demand propagates through links that bid* working
 exactly as designed.
 
@@ -812,9 +847,9 @@ building under construction:
   the resolved price for them, plus the same fraction of the flat `build_cost`;
 - progresses at a **rate set by how much of that per-tick material need the local market can
   supply** — read from, and drained from, the real stock of the market whose catchment holds the
-  site (`market_component.inventory`, MARKETS.md § Real market inventory), never the owner's pool:
-  the pool is what the corp's processors hold back, and its surplus reaches the site by being listed
-  and bought like anyone's. Market supplies the full need → full speed; supplies part
+  site (`market_component.inventory`, MARKETS.md § Real market inventory) — the only stock there
+  is, the owner's own output included, which reached the shelf by landing and is bought like
+  anyone's. Market supplies the full need → full speed; supplies part
   → **stretched** (up to `max_stretch ≈ 10×` the base duration); supplies less than
   `1/max_stretch` → **paused** until supply recovers.
 
@@ -1047,7 +1082,8 @@ cleared. **`tech_locked` is the only recipe-level lock**; the era band decides w
 campaign sees, and within that roster tech decides what a corp may run.
 First-cut authored gates (`tech_gate.cpp`): `E0-EC-01` unlocks the Toolmaker (BL-586) on owning a
 processing facility and a Cr 500 surplus; `E1-EC-01` unlocks the Bessemer Converter (BL-587) on
-already holding `machinery` in stockpile — the Converter's own reagent, not a cash figure, after a
+already holding `machinery` — the `stockpile` condition subject, which reads the stock on the
+shelves of the markets the corporation sits in — the Converter's own reagent, not a cash figure, after a
 surplus-only first draft proved satisfiable by any solvent corp regardless of what it had actually
 built (caught by `tech_gate_harness`'s T3 fixture, corrected before landing); `E0-EC-03` unlocks
 `refined_copper` (BL-589) on owning a processing facility and a Cr 400 surplus — the roster's
@@ -1288,8 +1324,8 @@ The hand-calibrated core the economy is tuned on:
 - Extraction for the seven prototype resources (RESOURCES.md § Prototype subset) through the generic `extraction_site`.
 - Processing for iron ore → steel, petroleum → refined fuel, and agricultural produce → food rations.
 - Workforce scalar applied to both extraction and processing output.
-- The shared per-`(corporation, body)` stockpile pool, with quantities incrementing each economy tick.
-- Per-body market supply/demand aggregation with live price resolution — `base × √(demand/supply)`, banded and EMA-smoothed (`src/world/market_clearing.cpp`; the full model is `docs/economy/MARKETS.md`).
+- Output landing on the market's shelf each economy tick, sold to the market at the clearing price.
+- Per-market supply/demand aggregation with live price resolution — `base × √(demand/supply)`, banded and EMA-smoothed (`src/world/market_clearing.cpp`; the full model is `docs/economy/MARKETS.md`).
 - A running per-corporation balance: sales income less input purchases, maintenance, and wages (`docs/economy/FINANCE.md`).
 - The economy panel making all of the above observable.
 

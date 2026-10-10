@@ -90,6 +90,14 @@ enum class condition_subject : uint8_t
     // save seam — see world_save.cpp's `max_cond_subj`), so a value may be
     // appended but never inserted or reordered.
     province_held,     ///< 1 if `condition::province` is held by the subject corp, else 0.
+
+    // --- produced (Ben, 2026-10-10, NR-1015) --------------------------------
+    // Appended LAST for the same serialisation reason. Corporations hold no
+    // stock under the shelf economy (MARKETS.md § The shelf economy), so "the
+    // corporation holds machinery" is read as "it has made machinery": the
+    // production chain it stands for is running. Reads
+    // `corporation_component::produced_ever`.
+    produced,          ///< Qualified by `resource`. 1 if the subject corp has ever produced it, else 0.
 };
 
 /// How a measured value is compared against `condition::operand`.

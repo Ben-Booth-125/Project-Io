@@ -8,6 +8,7 @@
 
 #include "world/components.hpp"
 #include "world/construction.hpp"
+#include "world/economy_system.hpp" // economy_report (commit_trade_shipment)
 #include "world/logistics.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/river_generation.hpp" // river_edge_discount (BL-1126 T4b-T4d)
@@ -218,137 +219,115 @@ int main()
         check(infra == land_use_component::type::infrastructure, "land_use has an infrastructure value");
     }
 
-    // T7 — intra-body dispatch: a short market is served from the corp's on-body pool via a
-    // land convoy whose cost uses the A* tile distance (not the space lane).
+    // T7 — intra-body haul (BL-1265/1266: the dispatcher retired; a convoy is a
+    // TRADE's shipment). A trade buys 10 units on a source market's shelf at
+    // (0,0) and hauls them to a market at (0,2) as a land convoy whose cost uses
+    // the A* tile distance (not the space lane). The column is two wide so the
+    // passive-LP anchor every same-body shipment needs (BL-597) — a hub at
+    // (1,0) — sits OFF the (0,0)->(0,2) path and discounts nothing.
+    //
+    // Shared setup: returns the trader's balance before the shipment.
+    struct haul_fixture
     {
-        world w;
-        const entity_id corp = w.create_entity();
-        corporation_component cc{};
-        cc.is_player = true;
-        cc.balance   = 1000.0f;
-
-        const entity_id body = make_grid(w, 1, 3, terrain_landform::plains); // 3-tall plains column
-        const entity_id anchor = tile_at(w, body, 0, 0); // corp production anchor
-        const entity_id bld = w.create_entity();
-        building_component bc{};
-        bc.tile = anchor;
-        w.buildings[bld] = bc;
-        cc.assets.push_back(bld);
-        w.corporations[corp] = cc;
-        w.player_entity = corp;
-
-        constexpr std::size_t ri = 0;
-        w.pool_at(corp, pool_key_for_body(w, body)).quantities[ri] = 100.0f; // on-body stockpile surplus
-
-        const entity_id short_market = w.create_entity();
-        market_component mm{};
-        mm.body        = body;
-        mm.centre_tile = tile_at(w, body, 0, 2); // far end of the column
-        mm.demand[ri]  = 10.0f;
-        mm.supply[ri]  = 0.0f;
-        // BL-995: auto-dispatch chases a net price, so the short market must
-        // PRICE the good; the body-level pool has no home market (price 0), so
-        // any positive net sends it, and a zero-supply market takes its unmet 10.
-        mm.base_price[ri] = 5.0f;
-        mm.price          = mm.base_price;
-        w.markets[short_market] = mm;
-
+        world           w;
         recipe_registry reg; // default per-mode logistics costs {land .02, sea .05, air .15, space 1}
-        const std::size_t convoys_before = w.convoys.size();
-        const float bal_before = w.corporations[corp].balance;
-        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
-                         reg.logistics_cost(convoy_mode::space));
-
-        check(w.convoys.size() == convoys_before + 1, "intra-body shortfall dispatches one convoy");
-        if (w.convoys.size() == convoys_before + 1)
+        entity_id       corp = null_entity, src = null_entity, dst = null_entity;
+        entity_id       mid_tile = null_entity; ///< the tile the path crosses
+    };
+    auto make_haul = [](haul_fixture& f) {
+        military_capability_params mil = f.reg.military();
+        mil.active_lp_per_anchor_tick = 1000.0f; // the cap is not under test here
+        f.reg.set_military(mil);
+        f.corp = f.w.create_entity();
+        corporation_component cc{}; cc.is_player = true; cc.balance = 1000.0f;
+        const entity_id body = make_grid(f.w, 2, 3, terrain_landform::plains);
+        f.w.corporations[f.corp] = cc;
+        f.w.player_entity = f.corp;
+        const entity_id hub = f.w.create_entity();
+        building_component hb{};
+        hb.tile = tile_at(f.w, body, 1, 0); hb.type = building_type::inland_logistics_hub;
+        f.w.buildings[hub] = hb;
+        f.src = f.w.create_entity();
+        market_component ms{}; ms.body = body; ms.centre_tile = tile_at(f.w, body, 0, 0);
+        ms.base_price[0] = 1.0f; ms.price = ms.base_price; ms.inventory[0] = 100.0f;
+        f.w.markets[f.src] = ms;
+        f.dst = f.w.create_entity();
+        market_component md{}; md.body = body; md.centre_tile = tile_at(f.w, body, 0, 2);
+        md.demand[0] = 10.0f; md.base_price[0] = 5.0f; md.price = md.base_price;
+        f.w.markets[f.dst] = md;
+        f.mid_tile = tile_at(f.w, body, 0, 1);
+        return f.w.corporations[f.corp].balance;
+    };
+    // Price the leg and commit one 10-unit shipment; the haul is debited now
+    // (the purchase is billed at the clear, which this harness does not run).
+    auto ship = [](haul_fixture& f) {
+        economy_report rep;
+        const logistics_nodes nodes = collect_logistics_nodes(f.w);
+        const convoy_leg leg = price_trade_leg(f.w, f.reg, nodes, f.corp, f.src, f.dst, 0, 10.0f);
+        return commit_trade_shipment(f.w, f.reg, rep, f.corp, f.src, f.dst, 0, 10.0f, leg);
+    };
+    {
+        haul_fixture f;
+        const float bal_before = make_haul(f);
+        const std::size_t convoys_before = f.w.convoys.size();
+        const bool sent = ship(f);
+        check(sent && f.w.convoys.size() == convoys_before + 1, "an intra-body trade shipment commits one convoy");
+        if (f.w.convoys.size() == convoys_before + 1)
         {
-            const convoy_component& cv = w.convoys.back();
+            const convoy_component& cv = f.w.convoys.back();
             check(cv.mode == convoy_mode::land, "intra-body plains route uses land mode, not space");
-            check(cv.corp == corp, "convoy attributed to the dispatching corp");
+            check(cv.corp == f.corp, "convoy attributed to the trading corp");
         }
-        const float spent = bal_before - w.corporations[corp].balance;
+        const float spent = bal_before - f.w.corporations[f.corp].balance;
         check(spent > 0.0f, "intra-body logistics cost is debited from the corp balance");
-        // A* (0,0)->(0,2) = 2 plains edges = 2.0; qty = min(100,10) = 10; land unit cost 0.02.
+        // A* (0,0)->(0,2) = 2 plains edges = 2.0; qty 10; land unit cost 0.02.
         check(approx(spent, 0.02f * 2.0f * 10.0f), "intra-body cost = land(0.02) * A*(2.0) * qty(10) = 0.4");
     }
-
-    // Shared T7-shape setup for the BL-148/149 node-discount tests: a 3-tall plains column,
-    // a corp with an anchor at (0,0) + a pool surplus, a short market at (0,2). The path
-    // (0,0)->(0,2) crosses tile (0,1). Undiscounted cost is 0.02*2.0*10 = 0.4; a logistics
-    // node on the path discounts it. Returns the credits spent on the single dispatched convoy.
-    auto dispatch_spend = [](world& w, entity_id& out_corp, entity_id& out_mid_tile) -> float {
-        const entity_id corp = w.create_entity();
-        corporation_component cc{}; cc.is_player = true; cc.balance = 1000.0f;
-        const entity_id body = make_grid(w, 1, 3, terrain_landform::plains);
-        const entity_id anchor = tile_at(w, body, 0, 0);
-        const entity_id bld = w.create_entity();
-        building_component bc{}; bc.tile = anchor;
-        w.buildings[bld] = bc;
-        cc.assets.push_back(bld);
-        w.corporations[corp] = cc;
-        w.player_entity = corp;
-        w.pool_at(corp, pool_key_for_body(w, body)).quantities[0] = 100.0f;
-        const entity_id short_market = w.create_entity();
-        market_component mm{}; mm.body = body; mm.centre_tile = tile_at(w, body, 0, 2);
-        mm.demand[0] = 10.0f; mm.supply[0] = 0.0f;
-        mm.base_price[0] = 5.0f; mm.price = mm.base_price; // BL-995: see T7
-        w.markets[short_market] = mm;
-        out_corp     = corp;
-        out_mid_tile = tile_at(w, body, 0, 1); // the tile the path crosses
-        return w.corporations[corp].balance;
-    };
 
     // T8 — BL-148 city discount: a population centre (scale 3) on the crossed tile discounts
     // the haul by city_per_scale(0.04) * 3 = 0.12, so cost 0.4 -> 0.352.
     {
-        world w; entity_id corp, mid;
-        const float bal_before = dispatch_spend(w, corp, mid);
-        const entity_id centre = w.create_entity();
+        haul_fixture f;
+        const float bal_before = make_haul(f);
+        const entity_id centre = f.w.create_entity();
         population_centre_component pc{}; pc.scale = 3;
-        w.population_centres[centre]    = pc;
-        w.population_centre_tile[centre] = mid;
-        recipe_registry reg; // default node discount: city_per_scale 0.04, hub 0.12, cap 0.50
-        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
-                         reg.logistics_cost(convoy_mode::space));
-        const float spent = bal_before - w.corporations[corp].balance;
-        check(spent < 0.4f, "a route through a city costs less than the undiscounted 0.4");
+        f.w.population_centres[centre]     = pc;
+        f.w.population_centre_tile[centre] = f.mid_tile;
+        ship(f); // default node discount: city_per_scale 0.04, hub 0.12, cap 0.50
+        const float spent = bal_before - f.w.corporations[f.corp].balance;
+        check(spent > 0.0f && spent < 0.4f, "a route through a city costs less than the undiscounted 0.4");
         check(approx(spent, 0.4f * (1.0f - 0.12f)), "city scale-3 discount: 0.4 * (1 - 0.12) = 0.352");
     }
 
     // T9 — BL-149 hub discount: a completed Inland Logistics Hub on the crossed tile discounts
     // the haul by the flat hub rate (0.12), reusing the same node-scan, so cost 0.4 -> 0.352.
     {
-        world w; entity_id corp, mid;
-        const float bal_before = dispatch_spend(w, corp, mid);
-        const entity_id hub = w.create_entity();
+        haul_fixture f;
+        const float bal_before = make_haul(f);
+        const entity_id hub = f.w.create_entity();
         building_component hb{};
-        hb.tile = mid; hb.type = building_type::inland_logistics_hub; hb.ticks_remaining = 0;
-        w.buildings[hub] = hb;
-        recipe_registry reg;
-        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
-                         reg.logistics_cost(convoy_mode::space));
-        const float spent = bal_before - w.corporations[corp].balance;
-        check(spent < 0.4f, "a route through an inland logistics hub costs less than 0.4");
+        hb.tile = f.mid_tile; hb.type = building_type::inland_logistics_hub; hb.ticks_remaining = 0;
+        f.w.buildings[hub] = hb;
+        ship(f);
+        const float spent = bal_before - f.w.corporations[f.corp].balance;
+        check(spent > 0.0f && spent < 0.4f, "a route through an inland logistics hub costs less than 0.4");
         check(approx(spent, 0.4f * (1.0f - 0.12f)), "hub flat discount: 0.4 * (1 - 0.12) = 0.352");
     }
 
     // T9b — a DECOMMISSIONED hub confers NO discount: an inert hub is treated like the
     // production loop treats it (economy_system.cpp), so the haul pays the full 0.4.
     {
-        world w; entity_id corp, mid;
-        const float bal_before = dispatch_spend(w, corp, mid);
-        const entity_id hub = w.create_entity();
+        haul_fixture f;
+        const float bal_before = make_haul(f);
+        const entity_id hub = f.w.create_entity();
         building_component hb{};
-        hb.tile = mid; hb.type = building_type::inland_logistics_hub;
+        hb.tile = f.mid_tile; hb.type = building_type::inland_logistics_hub;
         hb.ticks_remaining = 0; hb.decommissioned = true;
-        w.buildings[hub] = hb;
-        recipe_registry reg;
-        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
-                         reg.logistics_cost(convoy_mode::space));
-        const float spent = bal_before - w.corporations[corp].balance;
+        f.w.buildings[hub] = hb;
+        ship(f);
+        const float spent = bal_before - f.w.corporations[f.corp].balance;
         check(approx(spent, 0.4f), "a decommissioned hub confers no discount (full 0.4 cost)");
     }
-
     // T10 — BL-147/BL-172 road placement: place_road(tier) on a road-free land tile raises
     // road_level to that tier, debits the tier's flat cost (no market -> no materials), and
     // invalidates the A* cache. Upgrade-in-place: a higher tier on the same tile succeeds; the

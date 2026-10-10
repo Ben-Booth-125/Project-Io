@@ -78,7 +78,7 @@ tools/session/rulings/sprint-50.json`; list every dated ruling: `--since 2026-10
 - [x] Lever D: background demand consumes; numbers at the split pull (MARKETS.md step 3, 12)
 - [x] Background pull split by catchment; electronics stays until the household rung (MARKETS.md)
 - [x] Power rides the province grid; market shelf on its centre's grid (LOGISTICS.md § 3a) — grid-level shelf cap added to LOGISTICS § 3a
-- [x] An order is a floor, not a hold (MARKETS.md step 4; ACTIONS place_sell_order; NR-982) — SUPPLY § Dispatch trigger now says it too
+- [x] An order is a floor, not a hold (MARKETS.md step 4; ACTIONS place_sell_order; NR-982) — SUPPLY § A shipment now says it too
 - [x] A mine candidate is priced at its stack rank (AI_OPPONENT.md)
 - [x] A processor needs spare reachable supply at t_idle (CORPORATION_GENERATION.md Pass 3)
 - [x] A refused processor's draw enters derived demand, tied to reach (CORPORATION_GENERATION.md)
@@ -109,6 +109,36 @@ tools/session/rulings/sprint-50.json`; list every dated ruling: `--since 2026-10
 - [x] ADDED: The seat's dial-idled plants return to auto at the handoff (AI_OPPONENT.md; NR-986)
 - [x] ADDED: A recipe-less processor with an unwanted default is not placed; the authored installation and a chartered firm's second works excepted (CORPORATION_GENERATION.md Pass 6)
 - [x] ADDED: Roads - a route is priced on the field its destination's flood was built on; the snap bounded at 1.75x (LOGISTICS.md § 4; BL-1252, no parallel roads) — detour-test sentence no longer claims no second road on the raster
+
+### Wave 3 — the shelf economy and trade (extended 2026-10-10; HANDOFF_SHELF_TRADE.md)
+
+Branch `claude/shelf-economy-trade-42f8f4`, cut from `worktree-sprint-50`; merges back there.
+Design: TRADE.md, MARKETS.md § The shelf economy. Save v46 (claimed). Calls taken on Ben's
+behalf: NR-1029, NR-1012..NR-1017 (NR-1013 is a question: may a rival build a Marketplace).
+Baseline on this tip (16 seeds, 50 ticks): G1 96.7, G1b 1.7, G1 t50 87.3, G2 95.6, G3 100;
+run/built at handoff 1739/1798.
+- [x] S1 BL-1265 (shelf economy) core, main session: pools, held stock, dial draw register, order
+  book, auto-surplus, processor and pad reservations retire; every landing (production, arrival,
+  capture, procurement) sells at the clear; every buyer buys off the shelf; opening stock placed
+  on the shelves; tariff charged at arrival (MARKETS § Tariffs); save v46. World + core compile.
+- [x] S2 BL-1266 (trade core), main session: Planetary Marketplace (type, economics, upkeep);
+  trade points (Marketplace staffed, Port flat; none on unmet upkeep); capacity table (first
+  proposal); manual trades + reserve + verbs; auto trade; `run_trades` in the tick; shipments
+  buy at the source, pay the haul, pass the LP cap, land and sell; space lane buys propellant.
+- [x] S3 Core harnesses: save_roundtrip (80 PASS), money_conservation (ALL PASS),
+  determinism_harness (PASS); world_audit / world_determinism / spectator / history_sim running.
+- [x] S4 Harness sweep lane (economy-dev): every other tools/verify harness adapted or retired.
+- [x] S5 BL-1269 (trade UI) lane (ui-dev): app compiles; trade surface; Marketplace in Build;
+  ACTIONS.json; question_log; scripts. Ben's live click.
+- [x] S6 BL-1268 (trade in generation) lane (generation-dev): the history's trade record and the
+  Marketplace retrofit at the charter walk; rates proposed by measurement; Part B (points replace
+  the Exploration flows) as a plan for Ben.
+- [x] S7 BL-1267 (AI trades) lane (economy-dev): pin / unpin / reserve under the § 11 grant.
+- [x] S8 Docs lane: sibling docs rewritten to the shelf model; ruling-check.
+- [x] S9 BL-1270 (trade capacity table): measured (NR-1030: G1b 5.3 FAIL, the rest pass); awaiting Ben. Put capacity, point rates and
+  upkeep to Ben.
+- [ ] S10 (all lanes merged and cold-reviewed with fix rounds; 16-seed gate run; air_gate, sea_lane, trades_tab pass; ruling register 0 MISS. OWED: Ben's live clicks, his calls on NR-1012..1019, NR-1021, NR-1029, NR-1030, the re-bless, the merge back.) Integrate every lane; cold code-reviewer round per lane; 16-seed gate; scripted visual
+  checks (air_gate, sea_lane); ruling-check; then the one re-bless with Ben's go.
 
 ## Sprint 48 — the world moves forward (opened 2026-09-25, CLOSED 2026-10-04)
 

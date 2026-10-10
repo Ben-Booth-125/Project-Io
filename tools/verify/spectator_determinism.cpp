@@ -408,7 +408,10 @@ verb_family family_of(corp_verb v)
         case corp_verb::remove_sell_order:
         case corp_verb::request_quote:
         case corp_verb::accept_quote:
-        case corp_verb::cancel_contract:    return verb_family::trade;
+        case corp_verb::cancel_contract:
+        case corp_verb::set_trade:          // BL-1266
+        case corp_verb::clear_trade:
+        case corp_verb::set_trade_reserve:  return verb_family::trade;
         case corp_verb::demolish:
         case corp_verb::place_road:
         case corp_verb::hire_unit:          return verb_family::other;
@@ -448,6 +451,9 @@ const char* verb_name(corp_verb v)
         case corp_verb::request_quote:      return "request_quote";
         case corp_verb::accept_quote:       return "accept_quote";
         case corp_verb::cancel_contract:    return "cancel_contract";
+        case corp_verb::set_trade:          return "set_trade";          // BL-1266
+        case corp_verb::clear_trade:        return "clear_trade";
+        case corp_verb::set_trade_reserve:  return "set_trade_reserve";
     }
     return "?";
 }

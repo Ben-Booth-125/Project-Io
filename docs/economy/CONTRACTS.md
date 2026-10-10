@@ -56,13 +56,12 @@ claim it.** Contracts buy the *means*; what force is then worth is
 ## Procurement — the buy side
 
 A procurement contract is **a build order placed with someone else**: the commit-on-affordability,
-draw-materials-per-tick, pay-across-the-build shape of construction pacing, with the materials
-drawn against the **supplier's** market and the output delivered to the **buyer's** pool. The
+draw-materials-per-tick, pay-across-the-build shape of construction pacing, with the goods
+bought off the **supplier's** market and the output landed on the **buyer's** market. The
 counterparty is a NAMED corp with a price, a lead time, and a possible refusal — not a purchase
-order against an unlimited market, and not an order-book entry (the book is price-time priority
-over anonymous asks; it has no representation for a named counterparty or a lead time). It joins
-the same `corp_command` seam the order book does, for the same reason: the player's press and the
-AI's command are one implementation.
+off an anonymous shelf, which has no representation for a named counterparty or a lead time
+(`MARKETS.md` § Procurement is not the market). It joins the same `corp_command` seam every other
+verb does, for the same reason: the player's press and the AI's command are one implementation.
 
 - **Three verbs** (`corp_verb::request_quote` / `accept_quote` / `cancel_contract`, declared in
   `src/world/corp_command.hpp` and appended after `set_workforce_auto` — the enum is append-only,
@@ -84,7 +83,7 @@ AI's command are one implementation.
   its own throughput in the price it quotes).
 
 **It is on the serialisation seam.** `procurement.cpp` is a flat-binary stream in `world/*`,
-alongside `history_log` and `order_book`: leading magic + version, count-prefixed records,
+alongside `history_log`: leading magic + version, count-prefixed records,
 **rejection rather than reinterpretation**, and a `static_assert` on record size as the tripwire.
 **No relational value crosses it at all** — the sentiment substrate carries its own leg of the
 seam, and the whole-world snapshot carries the per-pair record.
@@ -110,9 +109,9 @@ The seam is only half the deal; the other half is the terms, and three of them a
 1. **Goods land on the BUYER's body.** A contract carries a **`delivery_body`** — the buyer's own
    body, taken as the body of the lowest-id building they own (lowest id, not first-in-`assets`,
    because a demolish permutes that list and the quote must be reproducible). It degrades to the
-   supplier's fulfilment body only when the buyer owns nothing anywhere. Delivering to the
-   supplier's body instead would land goods on a body where the buyer holds no processor
-   reservation, and the auto-surplus path would liquidate the whole delivery the tick it arrived.
+   supplier's fulfilment body only when the buyer owns nothing anywhere. The delivery lands on the
+   buyer's home market on that body. Delivering to the supplier's body instead would land the
+   goods on a shelf far from the buyer's works, which buy only off their own markets' shelves.
 2. **A commitment buys a discount.** The quote is spot less a **volume discount**, asymptotic in
    the order size — `volume_discount_max × q / (q + volume_discount_half_quantity)`, authored in
    `scripts/economy.lua` under `economy.procurement` — so no order however large drives the price
@@ -133,9 +132,15 @@ carriage; a same-body delivery pays nothing.
 
 **Every credit this seam moves is a TRANSFER.** The supplier is credited exactly what the buyer is
 debited, in the same statement, deposit, instalments and freight alike — the supplier arranges the
-carriage, so paying them for it keeps the flow closed. On completion the goods are **drawn from
-the supplier's pool** at the fulfilment body as far as their stock goes, with any shortfall built
-to order (which is what a build order placed with someone else means).
+carriage, so paying them for it keeps the flow closed.
+
+**On completion the goods move from shelf to shelf (Ben, 2026-10-10).** A corporation holds no
+stock (`MARKETS.md` § The shelf economy), so the supplier **buys** what its home market's shelf
+holds of the good, at the posted price under the fair-price ceiling, and builds the rest to order
+(which is what a build order placed with someone else means). The delivery then **lands** on the
+buyer's home market on the delivery body, and like every landing is sold to the market at that
+tick's clearing price, the buyer the owner it is paid to; the goods stand on that shelf for the
+buyer's works to buy (`MARKETS.md` § The clearing tick).
 
 Verified by `tools/verify/money_conservation.cpp`.
 

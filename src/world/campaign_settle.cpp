@@ -11,6 +11,7 @@
 #include "world/standing.hpp"          // compute_corp_standings
 #include "world/supply_system.hpp"     // advance / credit / dispatch convoys
 #include "world/tech_gate.hpp"         // advance_tech_gates
+#include "world/trade.hpp"             // run_trades (BL-1266)
 
 #include <atomic>
 
@@ -46,7 +47,7 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int eco
     lp_pool_map tick_lp_pools;
     // BL-1066 / BL-995 (Ben, 2026-09-23): the convoy ORDER within the tick is
     // advance -> credit arrivals -> economy -> DISPATCH -> clearing -> budget
-    // (SUPPLY.md § Dispatch trigger, "One beat per haul"). A delivery lands
+    // (SUPPLY.md § A shipment, "One beat per haul"). A delivery lands
     // BEFORE its destination clears, so it lists and sells there first; the
     // dispatch sits before the clear because auto-surplus sells every unit a
     // pool holds above its reservation, so a seller that has not chosen to
@@ -61,13 +62,13 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int eco
     // corp, the player's included: the prohibition the flag lifts has no
     // subject to protect, and every corp files real returns.
     out.report = run_economy_step(w, reg, spectating, &tick_lp_pools);
-    // BL-995: dispatch BEFORE the clear -- the seller hauls before it sells. It
+    // BL-1266 (TRADE.md): the trade pass, BEFORE the clear -- a trade buys on
+    // its source shelf this tick and the clear bills it at the posted price. It
     // draws the same tick's LP pool the march (inside run_economy_step) already
     // drew from: armies claim first (the goods-vs-force priority LOGISTICS.md
     // says must be chosen, not inherited).
-    dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
-                     reg.logistics_cost(convoy_mode::space), &tick_lp_pools);
-    lap_done(1); // economy step (production + corp AI) + dispatch
+    out.trades = run_trades(w, reg, out.report, &tick_lp_pools);
+    lap_done(1); // economy step (production + corp AI) + trade
 
     out.flows = clear_markets(w, reg, out.report);
     lap_done(2); // market clearing
@@ -105,6 +106,11 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int eco
 void run_settle(world& w, const recipe_registry& reg, int ticks,
                 const settle_tick_hooks* hooks, generation_progress* progress)
 {
+    // BL-1265 (CORPORATION_GENERATION.md § Pass 4b): every opening stock still
+    // held — a roster regenerated after the base world placed its own — goes on
+    // the shelves before the first tick. Idempotent: a no-op when none is held.
+    place_opening_stock(w);
+    w.gen_opening_placed.clear(); // generation is over: nothing is unplaced after this
     // Every settle tick is spectating (nobody is seated: the seat is drawn from
     // what these ticks produce) at day tick 0 (the sim loop is rebuilt at Begin
     // and never advanced on the building screen). Econ steps 0..ticks-1: live

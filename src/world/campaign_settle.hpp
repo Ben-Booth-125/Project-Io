@@ -24,6 +24,7 @@
 #include "world/economy_system.hpp"  // economy_report
 #include "world/market_clearing.hpp" // corp_cash_flow
 #include "world/standing.hpp"        // corp_standing
+#include "world/trade.hpp"           // trade_tick (BL-1266)
 #include "world/world.hpp"
 
 #include <array>
@@ -57,6 +58,7 @@ struct settle_tick_result
     economy_report                                 report;
     std::unordered_map<entity_id, corp_cash_flow>  flows;
     std::vector<corp_standing>                     standings;
+    trade_tick                                     trades; ///< BL-1266: this tick's trade pass
 };
 
 /// READ hooks into a tick. Neither may write the world.

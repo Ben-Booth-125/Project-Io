@@ -304,7 +304,7 @@ non-deterministic parts).
 ### A. Scored utility AI over the existing local-agency seam — **the first build**
 Extend the background-corp per-building triggers (BL-079, background-corp agency) into a
 **strategic scoring layer**: enumerate candidate actions (build X on tile T, switch recipe, set
-workforce dial, list surplus), score each with tunable weighted heuristics, apply hysteresis,
+workforce dial, set a trade), score each with tunable weighted heuristics, apply hysteresis,
 execute top-N within a per-tick action budget.
 - **Dev cost:** low–medium (natural extension of what exists). **Determinism:** perfect (pure
   function of world state; seed the tie-break RNG). **Legibility:** excellent. **Skill ceiling:**
@@ -432,7 +432,7 @@ candidate set is this subset of it:
 | `idle(building)` / `resume` | `decommissioned` flag | Tier-0 loss-streak rule, reversible |
 | `survey(body)` | survey_system | The AI pays for discovery like the player |
 | `hire_unit(tile, unit_type)` | `hire_unit` at the corp's own completed `military_base` | Availability gated on stockpile/market access, never on cash; spend subject to the solvency gate |
-| `place_sell_order(body, target, quantity, floor)` | the order book | § 2C |
+| `set_trade(from, to, good, points)` / `clear_trade(id)` / `set_trade_reserve(points)` | the trade pass (`../economy/TRADE.md`) | § 2C; the corporation's own manual trades on its own trade points |
 
 **A plant the dial idled is not losing (Ben, 2026-10-08; BL-1235, dial hold outlasts reflex).**
 When the workforce dial sets a plant to zero, the maintenance it pays while idle is the cost the
@@ -451,8 +451,8 @@ running).** Where a plant's market lists none of its output and no bid for it ha
 the dial forecasts the output at its base price, not the floor — the same "no clear yet: no
 signal" reading the build veto takes (§ 2B): only on a market that has never cleared. An empty
 shelf with no bidder before any clear is an unknown, not a glut; after a clear it is a dead
-market. Otherwise the dial reads its buyer signal as usual (§ 11, the dial reads stock-fed
-consumers).
+market. Otherwise the dial reads its buyer signal as usual (§ 11, the dial reads posted
+demand).
 
 **The reflex rescue reads an unpriced output as floored (Ben, 2026-10-09; BL-1217, inputs reach processors).** Tier 0's
 recipe rescue switches a floored processor to the recipe whose outputs sell best against their
@@ -461,8 +461,8 @@ rescue never switches a plant into a recipe it cannot price. Measured before the
 floored refined-fuel plants switched into unpriced propellant 145 times in the settle, and the
 dial then idled them.
 
-The seam carries further verbs the scorer does not enumerate — `demolish`, `place_road`, the
-convoy pair, the procurement triple, the stance verbs, the unit verbs and `withdraw_from_battle`
+The seam carries further verbs the scorer does not enumerate — `demolish`, `place_road`,
+`hold_convoy`, the procurement triple, the stance verbs, the unit verbs and `withdraw_from_battle`
 — which an agent on the seam (§ 10) issues directly. Scoring roads and demolition is BL-447
 (scorer never demolishes or roads); scoring stance is BL-450 (rivals score stance).
 
@@ -494,8 +494,8 @@ and the same solvency, glut and reserve-floor gates as the extraction candidate,
 where a processor genuinely differs from a mine:
 
 - **Siting.** No deposit ranks a processor, so `ranked_sites` offers it nothing. It is sited on the
-  **corp's own asset tiles** — the same body, so the same stockpile pool its extraction feeds; the
-  same tile, so the same market. Cheap (`O(assets)`, not another `O(tiles)` scan) and legible.
+  **corp's own asset tiles** — the same tile, so the same market, and the same shelf its
+  extraction lands on. Cheap (`O(assets)`, not another `O(tiles)` scan) and legible.
   One processor per tile, or a corp would stack them on its best tile every evaluation.
 - **Recipe choice.** Walks the **browse** space (this era's roster) and crosses to the **absolute**
   id through `recipe_id(name)` — the two id spaces `recipe_registry.hpp` keeps apart. The recipe
@@ -549,17 +549,17 @@ not be able to pay.**
 
 An input *r* is **obtainable** at market *C* when either holds:
 
-1. **Stock.** The corp's own (corp, *C*) pool plus *C*'s shelf — the shelf only where the fair-price
-   ceiling admits it — covers the run at the idle threshold. This is the production tick's own
-   coverage question.
+1. **Stock.** *C*'s shelf — only where the fair-price ceiling admits it — covers the run at the
+   idle threshold. This is the production tick's own coverage question; a corporation holds no
+   stock of its own (`../economy/MARKETS.md` § The shelf economy).
 2. **Supply.** The **spare output** of *r* over the producers **within reach** of *C* covers the
-   run at the idle threshold. **Within reach** is the dispatcher's own test, so a lane called in
-   reach is one a convoy would actually run: the same market, or the market export leg is viable
-   **and** the export gate passes. In play that is literally the dispatcher's test,
-   `price_C − haul > (1 + dispatch_margin) × price_P`, on each market's current resolved price. In
-   generation or a hand-built world, where no price has resolved, it is
+   run at the idle threshold. **Within reach** is auto trade's own test, so a lane called in
+   reach is one a trade would actually run: the same market, or the market-to-market leg is
+   viable **and** the margin clears the threshold (`../economy/TRADE.md` § Auto and reserved
+   trade). In play that is `price_C − haul > (1 + dispatch_margin) × price_P`, on each market's
+   current resolved price. In generation or a hand-built world, where no price has resolved, it is
    `reservation_mult × base_C − haul > (1 + dispatch_margin) × base_P` on each market's own base
-   (the price band's `ceil_mult` when the ceiling is off): the dispatcher ships because the
+   (the price band's `ceil_mult` when the ceiling is off): a trade ships because the
    destination is short, and a short market prices up to the ceiling. Equal bases and a cheap haul
    are in reach. This is the one reach rule; chain-feasible placement (BL-1185) calls it too once it
    merges onto the helper. The fair-price ceiling is not part of reach — it is a separate check, so
@@ -582,7 +582,7 @@ carries its own copy of the reach rule until it merges onto this helper.
   incumbent and the siblings alike on obtainable cost. The incumbent is priced but not gated: a
   facility whose own inputs are out of reach may still move to a sibling that runs.
 - **Resume** asks both clauses too. Stock alone is not enough: an idled processor posts no
-  demand, so a convoy-fed input may never restock its shelf, and a stock-only gate would leave it
+  demand, so a trade-fed input may never restock its shelf, and a stock-only gate would leave it
   idled for good. The spare-supply clause brings it back when its input is genuinely being made
   within reach — not merely when a producer stands there.
 
@@ -590,8 +590,8 @@ Each corp in the scorer's walk sees the buildings as the corps before it left th
 index is rebuilt for every evaluating corp.
 
 This prices existing verbs better and adds none; it sits inside the scored-utility grant (§ 11).
-Reach makes a chain *possible*, not *running*: goods still have to cross markets, which is the
-shipping layer's question, not the scorer's.
+Reach makes a chain *possible*, not *running*: goods still have to cross markets, which is
+trade's question (`../economy/TRADE.md`), not the build scorer's.
 
 ### Selection must be scale-free (Ben, 2026-08-31)
 
@@ -737,12 +737,10 @@ the floor; stage B layers priority buckets and predictive spending over it (§ 2
   the space programme, network upkeep and procurement **wanted** there, filled or not (Ben,
   2026-10-08: a buyer exists before its supply does, or no rival could build the first spacecraft
   components or propellant plant; a record of draws alone only appears once the goods do), **plus**
-  the draws that take goods without posting a bid: space-lane launch fuel taken from a corporation's
-  pool, and building upkeep met from a corporation's own pool (Ben, 2026-10-08), **plus** what a
-  **running** processor in that market consumes, fed from a pool or the shelf — a running plant and
+  what a **running** processor in that market consumes off the shelf — a running plant and
   what it consumes are observable (`../ui/DISCOVERY.md` § Competitor visibility; Ben, 2026-10-08);
   an idled or decommissioned plant consumes nothing and is no buyer. **Where a want with no holder
-  lands (2026-10-08, NR-984):** a nation's want for a good that no pool or shelf yet holds is
+  lands (2026-10-08, NR-984):** a nation's want for a good that no shelf yet holds is
   recorded at its **capital's** market — so a nation can start one such chain, at its capital,
   and the want follows the good to wherever it is first held. Each of these is held for
   the scorer's evaluation cadence, so a buyer is seen by every corporation that evaluates between
@@ -750,8 +748,8 @@ the floor; stage B layers priority buckets and predictive spending over it (§ 2
   `glut_taper_ratio` (1.0), tapers the build's score linearly to zero at `glut_veto_ratio` (2.0),
   and vetoes (removes the candidate entirely) at or above it. The taper and veto apply only to
   build candidates; survey is unaffected (a body's total surveyed area doesn't glut a market). The
-  workforce dial reads a narrower buyer signal — posted demand plus what running processors draw
-  from their owners' pools (§ 11, the dial reads stock-fed consumers) — and is not vetoed.
+  workforce dial reads a narrower buyer signal — posted demand alone (§ 11, the dial reads posted
+  demand) — and is not vetoed.
 
 Verified by `tools/verify/corp_ai_predictive_harness.cpp` (R1: the reason→bucket mapping; R2: the
 Should-Have buffer is well-defined and never loosens the floor; R3: the forecast is
@@ -763,52 +761,59 @@ regression-checked against `corp_ai_harness.cpp`.
 
 Ben, 2026-08-07, resolving NR-083: *"Order book needs to be a background process, the AI must be
 able to trade as a player does."* A player-only fence over the trade verbs was proposed and
-explicitly rejected, so the scorer reaches the order book exactly as it reaches build and survey
-— `place_sell_order` is a `corp_verb`, and rival corps are the corps that drive the seam.
+explicitly rejected, so the scorer reaches trade exactly as it reaches build and survey — through
+the player's own verbs on the corp-command seam. The order book and its sell orders retired with
+corporation pools (`../economy/MARKETS.md` § The shelf economy); what a corporation trades now is
+the **manual trade** (`../economy/TRADE.md` § A trade), under the § 11 grant *a rival may set its
+own trades* (Ben, 2026-10-10).
 
-**This is a grant of reach, not of skill, and the distinction is the design.** "Can trade" is not
-"trades well": a scorer that dumps stock at the floor price is genuinely *worse* than one that
-does not trade, because it drags the resolved price down for everyone including itself — and the
-auto-surplus path clears that stock at the reference price anyway. So the rule is the narrowest
-thing that is still trading:
+**Auto trade is not a decision.** A corporation's unreserved trade points are spent by the trade
+pass on the best-margin routes every tick, for every owner alike (`TRADE.md` § Auto and reserved
+trade). The scorer decides only which routes to **pin** as manual trades, which to **clear**, and
+how many points to **reserve** for them.
 
-- **Candidate**: for each body, each resource the local market prices, the corp's stock summed
-  across its market pools on that body (`PRODUCTION.md` § Stockpile and output flow) above
-  `trade_hold_threshold` (50 units) — well clear of any processor's per-tick draw, so listing can
-  never compete with feeding the corp's own chain.
-- **Quantity**: none — the order is placed **uncapped**. An order is a price floor over the whole
-  surplus (`MARKETS.md` step 4, Ben 2026-10-05): clearing lists everything above the processor
-  reservation under it, tick by tick, so it keeps pace with what the corp produces, and an order
-  whose pool stands empty closes itself. The scorer has nothing to size and nothing to withdraw.
-- **Floor**: `trade_floor_multiple` × the market's `base_price` — the rarity-derived value floor,
-  the closest per-resource cost reference the world exposes. The authored value is **0.25**,
-  which is the price band's own floor (the lowest price a glutted market can resolve), so surplus
-  always clears at whatever the market resolves; anything above 0.25 makes the corp hold on a
-  deep glut — a strategy call, not a default.
-- **Score**: expected cash valued *at the floor*, not at the current price. The conservative
-  estimate, so a listing on a crashed market cannot outscore a genuinely profitable dial.
-- **Bucket**: Should-Have. Listing accumulated stock carries no capex — it brings cash *in* — so
-  it can never starve a higher bucket, which is the only test the buckets apply.
-- **Anti-thrash**: never a second order on a `(corp, body, resource)` that already has one, and
-  at most `max_trades` (1) order-book command per evaluation. A trade command's subject is a body,
-  not a building, so it takes no dial slot and records no building cooldown.
+**One estimate, one code path.** The scorer ranks routes with the trade pass's own ranking
+(`rank_trade_routes`): every route among the markets the corporation's own Marketplaces and Ports
+reach whose margin per unit — destination price less source price less the network's haul per
+unit — beats `dispatch_margin` of the source price, ordered by **margin per point** (margin per
+unit × the good's trade capacity), ties by source, destination and good. It reads public prices
+and the network's haul only — never another corporation's trades, points or plans.
 
-Both numbers are `corp_ai_params` fields, so tuning is a data change. Two limits are part of
-the shape: `base_price` is a rarity floor and not a production cost, so on a resource whose real
-cost sits above its rarity floor the AI will sell at a loss (the blackboard's lack of a reference
-price is BL-385, blackboard exports no reference price); and the book is **one-sided** — a corp
-can release stock and cannot bid for it, the dormant buy side being BL-383 (remove dormant buy
-side). A real strategy (price trend, timed release, targeting a rival's shortage) is later work.
+- **Eligible**: a corporation whose trade buildings made trade points on the last trade pass.
+  Never the player's corporation — not even under spectate, where every other family scores the
+  seat (§ 11 names "nothing for the player's corp", and that is not widened here).
+- **Pin** (`set_trade`): the best-ranked route the corporation does not already hold as a manual
+  trade, sized to what the destination can absorb above the landed cost (`trade_room`) and the
+  source shelf holds, and capped so its manual trades together hold at most `trade_pin_share`
+  (0.5) of the points it makes — the rest stays with auto. **Score**: the expected cash per tick,
+  margin per unit × the units its points move, × the personality jitter. **Spend**: one tick's
+  outlay at the landed cost, under the solvency gate. Bucket Nice-to-Have: a route lays cash out
+  at the source before its landing pays it back.
+- **Unpin** (`clear_trade`): a manual trade of its own whose route now loses — margin per unit
+  at or below zero at current prices and haul — or can no longer run. **Score**: the loss
+  avoided per tick, −margin × the units its points move (zero for a route that cannot run: it
+  ships nothing and costs nothing, and is cleared only to free its points). Bucket Must-Have, as
+  an idle is: a losing trade runs until its owner changes it, so it is a standing bleed. The gap
+  between the pin's margin floor and the unpin's zero is the hysteresis.
+- **Reserve** (`set_trade_reserve`): after any pin or unpin, the reserve is set to the sum of the
+  corporation's manual trades' points in the same evaluation, so a new pin is supplied on the very
+  next trade pass. Bookkeeping: no spend, outside the trade budget.
+- **Budget**: at most `max_trades` (1) pin or unpin per evaluation. A trade command's subject is a
+  market or a trade, never a building, so it takes no dial slot and records no building cooldown.
 
-Verified by `tools/verify/order_book_harness.cpp` § R5, which asserts the conservatism as
-behaviour rather than as intent: never below the rarity floor, never on a pool under the
-threshold, never a duplicate, and never on the player's own corp.
+`trade_pin_share` and `max_trades` are `corp_ai_params` fields. The rule is a grant of reach, not
+of skill: no price trend, no timing, no reading of a rival's shortage. Verified by
+`tools/verify/ai_trade_harness.cpp`: a rival pins the ranking's best route within its share,
+keeps its reserve equal to its manual points, unpins a route turned losing, never acts for the
+player's corporation, and two runs from one start issue the identical commands.
+There is no directed dispatch: a rival does not name a one-off convoy. Every shipment is a trade's
+(`../economy/SUPPLY.md` § A shipment).
 
 ### Hysteresis & action budget
 
 - **Do-nothing bias**: a dial candidate must beat the incumbent (or doing nothing) by a relative
   margin `theta` (0.15) — the anti-thrash rule. Applied inside the **dial** enumeration only;
-  build, survey, hire and trade candidates pass through no hysteresis test.
+  build, survey and hire candidates pass through no hysteresis test.
 - **Cooldowns**: a building that changed recipe/workforce/state holds for `cooldown_evals` (4)
   evaluations. **Both tiers set it** — the reflex tier idles a building directly on
   `building_component` and records the cooldown its state change warrants, so the strategic tier
@@ -829,7 +834,8 @@ threshold, never a duplicate, and never on the player's own corp.
   scored for cutting its target and a loss-maker for raising it; a sign taken from the building's
   current variable margin would only ever find one direction.
 - **Budget**: per evaluation, at most `max_builds` (1) construction + `max_dials` (3) dial
-  changes + `max_trades` (1) order-book command + one hire per corp; total committed spend capped
+  changes + `max_trades` (1) trade pin or unpin + one hire per corp (the trade reserve's
+  correction is outside it); total committed spend capped
   by the solvency gate, each accepted candidate reserving its spend against the later ones in the
   same evaluation.
 - **Determinism**: stable iteration (sorted `corp_ids`, stored asset order, tile-index order);
@@ -851,9 +857,9 @@ refused every evaluation — enough, on the shipped world, to make the top refus
 every decision a corp took.
 
 **Scored within one budget family, never across.** The candidate families — build, dial, survey,
-hire, trade, dispatch — are the six action budgets above, and each is scored by **one formula in
+hire, trade — are the action budgets above, and each is scored by **one formula in
 one unit**: a build by `net / capex`, a dial by the estimator's modelled per-tick gain, a trade
-by `quantity × floor`, a dispatch by `revenue − leg cost`. Those scales are unrelated, so a
+by the cash per tick a route pin earns or an unpin saves. Those scales are unrelated, so a
 comparison across families states nothing, and an evaluation-wide maximum makes
 `runner_up ≥ winning_score` the ordinary case — which is a decision surface that reports the same
 thing about every decision. The runner-up is therefore **the best option foregone in the winner's
@@ -893,7 +899,7 @@ export). A compact, tick-tagged, per-corp view of `corp_fact` records — `(tick
 predicate, value, confidence, provenance)`, schema-versioned, deterministically ordered
 (subject-kind section, then entity id, then predicate), emitted as JSONL — that is
 **visibility-honest**: it contains only what that corp could see under the BL-068 rules and its
-own fog state — own buildings/pools/cash in full; public market prices/aggregates; rival
+own fog state — own buildings, trades and cash in full; public market prices/aggregates; rival
 *buildings* but not their internals; its own routes and survey state. The AI reads through the
 same information asymmetry the player does; anything else is the fog cheat the calibration
 research warns against.
@@ -1314,12 +1320,11 @@ progresses and reveals tiles an agent can then build on.
 
 **Enumeration.** `CORPS` returns one JSON line per corp (`id`, `name`, `is_player`,
 `home_nation`) then `END`, because corp ids in a generated world are non-obvious (NR-061).
-`BODIES` is its sibling: `survey`, `place_sell_order` and `request_quote` all take a body id as
-`subject`, while the blackboard keys pool facts by the corp's own pool key — a **market** id
-where the body has markets, the body id only where it has none — and market facts by **market**
-id. A pool fact's subject is therefore not a body to pass to those verbs: resolve it with the
-market's `body` (or `BODIES`). Without `BODIES` an agent could never name a body it has no pool
-and no activity on, which is every body worth surveying.
+`BODIES` is its sibling: `survey` and `request_quote` take a body id as `subject`, while the
+blackboard keys market facts — its own trades included — by **market** id. A market fact's
+subject is therefore not a body to pass to those verbs: resolve it with the market's `body` (or
+`BODIES`). Without `BODIES` an agent could never name a body it has no activity on, which is every
+body worth surveying.
 
 **The wrapper.** `tools/mcp/server.js` spawns that process and speaks MCP-over-stdio to it —
 hand-rolled JSON-RPC 2.0 (no SDK dependency) covering `initialize`, `tools/list`, `tools/call`,
@@ -1333,7 +1338,7 @@ live session instead of spawning a child (§ 10j).
 
 **The committed checks.** `tools/mcp/smoke.js` drives `--serve` over the raw line protocol and
 asserts the *shape* rather than the economics: every opcode answers, every verb reaches the seam
-and returns a code that is actually in `corp_command_result`, a well-formed sell order is
+and returns a code that is actually in `corp_command_result`, a well-formed command is
 distinguishable from a malformed one, and `SHUTDOWN` is acknowledged. It asserts nothing about
 whether a given command *should* succeed — that is the `tools/verify/` harnesses' business.
 `tools/mcp/session.js` is its sibling for play (§ 10h). The rule both encode: **a seam nobody
@@ -1621,6 +1626,14 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   any planner that is not deterministic. Authority: `docs/ai/AI_OPPONENT.md`.
 
 
+  *Current reading (Ben, 2026-10-10, the shelf economy).* The order book retired with corporation
+  pools (`docs/economy/MARKETS.md` § The shelf economy): there are no standing sell orders to
+  place, and a rival sells everything it makes on landing, as every owner does. The reach this
+  entry granted — to trade as a player does — is now exercised through trades, under the
+  2026-10-10 entry below (*a rival may set its own trades*); the sell-order candidate has no
+  subject.
+
+
   **Player-corp exception (BL-181, landed 2026-07-15):** the *workforce target* of a
 
 
@@ -1901,6 +1914,12 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   (rival directed dispatch).
 
 
+  *Current reading (Ben, 2026-10-10, the shelf economy).* Half (1) stands. Half (2) has no
+  subject: the corporation convoy and its directed dispatch retired with corporation pools, and
+  every convoy is a trade's shipment (`docs/economy/SUPPLY.md` § A shipment). A rival moves goods
+  between markets through the 2026-10-10 trade grant below, not through a directed convoy.
+
+
 
 
   **The Era −1 scorer may read the GRUDGE LEDGER, scoped to fear of annihilation (Ben,
@@ -1983,6 +2002,13 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   or refused candidates; no body-wide or cross-market pooling; nothing for the player's corp.
   Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
 
+  *Current reading (Ben, 2026-10-10, the shelf economy).* **The dial's buyer signal is posted
+  demand alone.** With no corporation pool, no plant draws on its owner's stock: a processor buys
+  its whole need off the shelf, and the whole need is posted want (`docs/economy/MARKETS.md`
+  § Want and fill). The second term of the narrowed grant — what running processors drew from
+  their owners' pools — is therefore empty by construction, and the register that carried it is
+  gone. The grant is otherwise unchanged; it admits nothing new.
+
 
   **Spare supply counts what households and the background take (Ben, 2026-10-09; BL-1217, G1b —
   processors sized against every buyer).** The supply clause (§ Build only what runs) judged a
@@ -2020,6 +2046,26 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   **What it does NOT admit.** No coordination between corporations; no trade on another owner's
   points; nothing for the player's corp beyond its own opt-out dial. Pure, seeded,
   deterministic, replayable, legal verbs only, never a planner.
+
+  **A rival may build a Planetary Marketplace (Ben, 2026-10-10; `../economy/TRADE.md`).**
+  Without it a rival's trade capacity would be fixed at what generation retrofits and the Ports it
+  holds. The grant: the scorer may propose building a Marketplace in a market where the
+  corporation already holds ground and no trade building. **It is scored as every build is
+  (Ben, 2026-10-10, superseding the flat score given the same day):** its net is the profit of
+  the trades its points would carry — the trade pass's own route ranking (public prices, the
+  network's haul), best first — less its maintenance, wage and upkeep goods, over its build
+  cost. The estimate reads what the last tick actually left over, never the standing shelf: a
+  good's spare on a market is what landed there less what its buyers wanted; a route on the body
+  is filled no further than the Logistic Points the market's anchor had left after the last
+  trade pass; and a market whose spare cannot carry the Marketplace's own upkeep is no site. Only
+  one trade building is under construction at a time.
+
+  **What it admits.** One build candidate through the ordinary build verb, sited at the free tile
+  of that market's catchment nearest its centre, under the usual placement, reach and materials
+  gates and the solvency gate.
+
+  **What it does NOT admit.** No forecast of a rival's trade, no race for a market, nothing for the
+  player's corp. Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
 
   **The player is a nation — a NARROWING, and one subject RAISED (Ben, 2026-10-10;
   `../CONCEPT.md` § Player identity).** The player plays a major nation and operates its champion.

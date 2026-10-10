@@ -259,12 +259,7 @@ void after_lap(const world& w, int lap, void* ctx)
                 r.admits[g] = shelf_admits(mc, g, res_mult, /*off_buys=*/true);
             }
         }
-        for (const auto& [key, pool] : w.corp_market_pools)
-        {
-            const auto it = M.find(key.second);
-            if (it == M.end()) continue;
-            for (std::size_t g = 0; g < resource_count; ++g) it->second.pools[g] += std::max(0.0f, pool.quantities[g]);
-        }
+        // BL-1265: corporations hold no pools; the pools column reads 0.
         std::set<uint32_t> now;
         for (const convoy_component& c : w.convoys) now.insert(c.id);
         for (const auto& [id, cs] : p.convoys)
@@ -299,9 +294,8 @@ void after_lap(const world& w, int lap, void* ctx)
             const auto oi = p.owner->find(bid);
             if (bi == w.buildings.end() || oi == p.owner->end()) continue;
             const entity_id mid = market_for_tile(w, bi->second.tile);
-            const stockpile_component* pool = w.find_pool(oi->second, mid);
+            (void)mid; // BL-1265: no own pool — slot reads 0
             arr a{};
-            if (pool) for (std::size_t g = 0; g < resource_count; ++g) a[g] = pool->quantities[g];
             (*p.own_pool)[bid][0] = a; // slot 0: this tick
         }
         return;

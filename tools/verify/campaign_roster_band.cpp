@@ -93,14 +93,25 @@ int main()
 
         // Satisfy every campaign gate axis (steel/ore, food, port, energy) so
         // gate failure cannot be confused with era gating.
-        stockpile_component& pool = w.pool_at(corp, pool_key_for_body(w, body));
-        pool.quantities[static_cast<std::size_t>(resource_type::steel)]          = 1000.0f;
-        pool.quantities[static_cast<std::size_t>(resource_type::food_rations)]   = 1000.0f;
-        pool.quantities[static_cast<std::size_t>(resource_type::coal)]           = 1000.0f;
+        // BL-1265: corporations hold no pools — the gate reads the shelves of
+        // the markets the corp sits in (`corp_shelf_stock`), so the fixture
+        // needs a real tile and a market on the body, stocked.
+        w.bodies[body] = body_component{};
+        const entity_id tile = w.create_entity();
+        { tile_component tc{}; tc.body = body; w.tiles[tile] = tc; }
+        const entity_id market = w.create_entity();
+        {
+            market_component mc{};
+            mc.body = body;
+            mc.inventory[static_cast<std::size_t>(resource_type::steel)]        = 1000.0f;
+            mc.inventory[static_cast<std::size_t>(resource_type::food_rations)] = 1000.0f;
+            mc.inventory[static_cast<std::size_t>(resource_type::coal)]         = 1000.0f;
+            w.markets[market] = mc;
+        }
 
         building_component port_bldg{};
         port_bldg.type = building_type::port;
-        port_bldg.tile = body; // any valid-looking entity id; unread by this gate
+        port_bldg.tile = tile; // the corp sits in `market` through this building
         const entity_id port_id = w.create_entity();
         w.buildings[port_id] = port_bldg;
         w.corporations[corp].assets.push_back(port_id);

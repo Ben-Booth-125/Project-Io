@@ -8,7 +8,24 @@
 Read this first after a compaction or in a new session. Then `REFINED.md` § Sprint 50 and the
 sprint 50 row in `sprints.json`. Mode for this work: **Delivery — Full**.
 
-## SPRINT 50 IS EXTENDED — read HANDOFF_SHELF_TRADE.md first (Ben, 2026-10-10)
+## SHELF ECONOMY AND TRADE MERGED; RE-BLESS DONE — next is the cut (2026-10-10, later)
+
+The shelf/trade branch is merged into `worktree-sprint-50` with the sprint's ONE re-bless, authorised
+by Ben against the shape (`docs/development/drafts/sprint-50-shelf-rebless.md`; DEVLOG 2026-10-10
+(later)). BL-1265..BL-1270 complete (BL-1268 on Part A only). Gate at merge: G1 93.3, G1 t50 87.5,
+G1b 5.7 (accepted by Ben), G2 113.4, G3 99.8. Ben (2026-10-10): **move towards cutting**; the fixes
+(trade about 87% lower, cities demoted, G1b, the estimate's optimism) wait for a later sprint whose
+items he files himself — do NOT file them. No trade-flow floor in the gate.
+
+**Done at the shelf close (2026-10-10):** visual checks on the merged tip — trades_tab 49/49 (the
+script now grants the player a Marketplace: the seat opens with no trade building, so a manual trade
+had nowhere to leave from; the tab's refusal now names that rule), sea_lane and air_gate pass;
+`ruling-check` — nine 2026-10-10 rulings added to the sprint 50 register (54, 0 failing; 82 dated
+rulings, 0 flagged), three stale passages fixed; archive — 20 landed backlog items and 91 resolved
+review entries cold (69 / 16 open remain). **Owed:** retro, version cut, integration onto main (Ben
+brings the branch onto main in another session); a live click of the Trades tab's new refusal text.
+
+## (superseded) SPRINT 50 IS EXTENDED — read HANDOFF_SHELF_TRADE.md first (Ben, 2026-10-10)
 
 Ben redesigned the economy's spine mid-close: corporation pools retire (every good is on a market-owned
 shelf), and trade becomes the only way goods move between markets (Planetary Marketplaces and Ports make

@@ -130,21 +130,36 @@ int main()
         w.markets.at(hh_market).hauler_want[hh_food]      = 9.625f;
         w.markets.at(hh_market).unposted_bid[hh_food]      = 4.875f; // BL-1227
         w.markets.at(hh_market).unposted_bid_tick[hh_food] = 1234;   // BL-1227
-        w.markets.at(hh_market).dial_pool_draw[hh_food]      = 1.625f; // BL-1217
-        w.markets.at(hh_market).dial_pool_draw_tick[hh_food] = 4321;   // BL-1217
+
         w.markets.at(hh_market).background_fill[hh_food]     = 5.875f; // BL-1217 G1b R2
+        w.markets.at(hh_market).trade_lp_spare               = 6.125f; // v46: rival Marketplace estimate
     }
 
-    // BL-1217 D5 (world_save_version 39): the held opening stock. Generation
-    // seeds it, but pin a distinctive value on the lowest pool's food slot so
-    // the round trip is checked by VALUE. The pool is raised to cover it, as
-    // the clear would leave it; the reader rejects only a hold with no pool.
-    std::pair<entity_id, entity_id> held_key{null_entity, null_entity};
-    if (!w.corp_market_pools.empty())
+    // BL-1266 (world_save_version 46): a MANUAL TRADE and a corporation's trade
+    // reserve and points, pinned at distinctive values so the round trip is
+    // checked by VALUE. The trade names a live corporation and two standing
+    // markets (the reader rejects anything else).
+    entity_id trade_corp = null_entity, trade_m1 = null_entity, trade_m2 = null_entity;
+    for (const auto& [cid, cc] : w.corporations)
+        if (trade_corp == null_entity || cid < trade_corp)
+            trade_corp = cid;
     {
-        held_key = w.corp_market_pools.begin()->first;
-        w.corp_market_pools.at(held_key).quantities[hh_food] += 5.0f;
-        w.opening_stock_held[held_key][hh_food] = 2.625f;
+        std::vector<entity_id> mids;
+        for (const auto& [mid, mc] : w.markets)
+            mids.push_back(mid);
+        std::sort(mids.begin(), mids.end());
+        if (mids.size() >= 2)
+        {
+            trade_m1 = mids[0];
+            trade_m2 = mids[1];
+        }
+    }
+    if (trade_corp != null_entity && trade_m2 != null_entity)
+    {
+        w.trades.push_back({ w.allocate_trade_id(), trade_corp, resource_type::steel,
+                             trade_m1, trade_m2, 2.625f });
+        w.corporations.at(trade_corp).trade_reserve = 1.75f;
+        w.corporations.at(trade_corp).trade_points  = 3.125f;
     }
 
     // BL-614: same treatment for the building record's newest field — the
@@ -335,34 +350,34 @@ int main()
                   && mit->second.unposted_bid_tick[hh_food] == 1234,
               "P1 market unposted_bid / unposted_bid_tick (BL-1227, world_save_version 38) round-trip at their written values");
     }
-    check(held_key.first != null_entity,
-          "P1 the fixture holds a corporation pool, so the opening_stock_held rows below are not vacuous (BL-1217 D5)");
-    if (held_key.first != null_entity)
+    check(trade_m2 != null_entity && !w.trades.empty(),
+          "P1 the fixture holds a manual trade, so the trade rows below are not vacuous (BL-1266)");
+    if (trade_m2 != null_entity && !w.trades.empty())
     {
-        const auto hit = loaded.opening_stock_held.find(held_key);
-        check(read_ok && hit != loaded.opening_stock_held.end()
-                  && hit->second[hh_food] == 2.625f
-                  && loaded.opening_stock_held.size() == w.opening_stock_held.size(),
-              "P1 opening_stock_held (BL-1217 D5, world_save_version 39) round-trips at its written value, every record kept");
+        check(read_ok && loaded.trades.size() == w.trades.size()
+                  && loaded.trades.back().id == w.trades.back().id
+                  && loaded.trades.back().owner == trade_corp
+                  && loaded.trades.back().resource == resource_type::steel
+                  && loaded.trades.back().from_market == trade_m1
+                  && loaded.trades.back().to_market == trade_m2
+                  && loaded.trades.back().points == 2.625f
+                  && loaded.next_trade_id == w.next_trade_id,
+              "P1 a manual trade (BL-1266, world_save_version 46) round-trips at its written values");
+        check(read_ok && loaded.corporations.at(trade_corp).trade_reserve == 1.75f
+                  && loaded.corporations.at(trade_corp).trade_points == 3.125f,
+              "P1 a corporation's trade_reserve / trade_points (BL-1266, v46) round-trip at their written values");
 
-        // A hold whose pool is gone cannot have been written (the clear drops
-        // it): the reader refuses the stream whole.
+        // A trade naming a market that does not stand cannot have been written
+        // (the seam refuses it): the reader refuses the stream whole.
         world orphan = w;
-        orphan.opening_stock_held[std::make_pair(held_key.first, entity_id{0x7FFFFFF0u})][hh_food] = 1.0f;
+        orphan.trades.back().to_market = entity_id{0x7FFFFFF0u};
         world sink;
         check(!from_bytes(to_bytes(orphan), sink),
-              "P1 a held opening-stock record with no pool behind it is rejected (BL-1217 D5)");
-    }
-    // BL-1217 (review): not guarded on a market existing -- a fixture with no
-    // market would make the row pass vacuously, so its absence FAILS it.
-    check(hh_market != null_entity,
-          "P1 the fixture carries a market for the v40 dial_pool_draw row (never vacuous)");
-    {
-        const auto mit = loaded.markets.find(hh_market);
-        check(read_ok && hh_market != null_entity && mit != loaded.markets.end()
-                  && mit->second.dial_pool_draw[hh_food] == 1.625f
-                  && mit->second.dial_pool_draw_tick[hh_food] == 4321,
-              "P1 market dial_pool_draw / dial_pool_draw_tick (BL-1217, world_save_version 40) round-trip at their written values");
+              "P1 a manual trade naming no standing market is rejected (BL-1266)");
+        world orphan2 = w;
+        orphan2.trades.back().owner = entity_id{0x7FFFFFF1u};
+        check(!from_bytes(to_bytes(orphan2), sink),
+              "P1 a manual trade whose owner is not a corporation is rejected (BL-1266)");
     }
     {
         const auto mit = loaded.markets.find(hh_market);
@@ -467,10 +482,10 @@ int main()
         world victim;
         victim.player_entity = 12345;
         victim.home_body     = 999;
-        victim.next_order_id = 77;
+        victim.next_trade_id = 77;
         const entity_id keep_player = victim.player_entity;
         const entity_id keep_home   = victim.home_body;
-        const uint32_t  keep_order  = victim.next_order_id;
+        const uint32_t  keep_order  = victim.next_trade_id;
 
         {
             std::string bad = bytes_once;
@@ -681,7 +696,7 @@ int main()
         }
 
         check(victim.player_entity == keep_player && victim.home_body == keep_home
-                  && victim.next_order_id == keep_order && victim.tiles.empty()
+                  && victim.next_trade_id == keep_order && victim.tiles.empty()
                   && victim.bodies.empty(),
               "P3 every rejected load left the destination world untouched");
         check(victim.nations.empty() && victim.nation_budgets.empty()
@@ -883,14 +898,13 @@ int main()
             { "nation_budgets", w.nation_budgets.size(), loaded.nation_budgets.size() },
             { "tile_to_nation", w.tile_to_nation.size(), loaded.tile_to_nation.size() },
             { "corporations", w.corporations.size(), loaded.corporations.size() },
-            { "corp_market_pools", w.corp_market_pools.size(), loaded.corp_market_pools.size() },
+
             { "workforce_supply_overrides", w.workforce_supply_overrides.size(), loaded.workforce_supply_overrides.size() },
             { "sentiment", w.sentiment.pairs.size(), loaded.sentiment.pairs.size() },
             { "convoys", w.convoys.size(), loaded.convoys.size() },
             { "trade_routes", w.trade_routes.size(), loaded.trade_routes.size() },
             { "body_last_glimpse_tick", w.body_last_glimpse_tick.size(), loaded.body_last_glimpse_tick.size() },
-            { "sell_orders", w.sell_orders.size(), loaded.sell_orders.size() },
-            { "buy_orders", w.buy_orders.size(), loaded.buy_orders.size() },
+            { "trades", w.trades.size(), loaded.trades.size() },
             { "procurement_quotes", w.procurement_quotes.size(), loaded.procurement_quotes.size() },
             { "procurement_contracts", w.procurement_contracts.size(), loaded.procurement_contracts.size() },
             { "corp_embargo_conditions", w.corp_embargo_conditions.size(), loaded.corp_embargo_conditions.size() },
@@ -955,7 +969,7 @@ int main()
         }
         check(loaded.next_entity_id() == w.next_entity_id()
                   && loaded.next_convoy_id == w.next_convoy_id
-                  && loaded.next_order_id == w.next_order_id
+                  && loaded.next_trade_id == w.next_trade_id
                   && loaded.next_procurement_id == w.next_procurement_id,
               "P7 every id counter survives, allocator cursor included");
         check(loaded.belt.inner_radius_au == w.belt.inner_radius_au
@@ -1098,12 +1112,10 @@ int main()
         f.body_last_glimpse_tick[b1] = 555;
         f.body_last_glimpse_tick[b2] = -3; // negative on purpose: signedness bugs hide in ticks
 
-        // BL-1201 (v33): `empty_ticks` follows `resource`, nonzero on one record so
-        // a reader that dropped it breaks byte-equality; and the second order is
-        // UNCAPPED (quantity 0), the default order since the same item.
-        f.sell_orders.push_back({ 5, c1, b1, resource_type::steel, 3, 30.0f, 2.5f });
-        f.sell_orders.push_back({ 6, c2, b2, resource_type::propellant, 0, 0.0f, 0.0f });
-        f.buy_orders.push_back({ 7, c2, b1, resource_type::machinery, 8.0f, 99.5f, c1 });
+        // BL-1266 (v46): a second manual trade, every field distinct from P1's.
+        if (trade_m2 != null_entity)
+            f.trades.push_back({ f.allocate_trade_id(), trade_corp, resource_type::propellant,
+                                 trade_m2, trade_m1, 0.375f });
 
         f.procurement_quotes.push_back({ 3, c1, c2, b1, b2, resource_type::alloys,
                                          15.0f, 3.25f, 6, 12.5f });
@@ -1166,9 +1178,12 @@ int main()
                   "P8 convoy fields land in the right members (BL-1195: the route's waypoints)");
             check(back.body_last_glimpse_tick.at(b2) == -3,
                   "P8 a negative glimpse tick survives (no unsigned round trip)");
-            check(back.buy_orders.size() == 1 && back.buy_orders[0].preferred_seller == c1
-                      && back.buy_orders[0].max_price == 99.5f,
-                  "P8 the buy side keeps its preferred seller");
+            check(trade_m2 == null_entity
+                      || (back.trades.size() == f.trades.size()
+                          && back.trades.back().resource == resource_type::propellant
+                          && back.trades.back().from_market == trade_m2
+                          && back.trades.back().points == 0.375f),
+                  "P8 a second manual trade keeps its fields in the right members (BL-1266)");
             check(back.procurement_contracts.size() == 1
                       && back.procurement_contracts[0].delivery_body == b1
                       && back.procurement_contracts[0].ticks_elapsed == 3,

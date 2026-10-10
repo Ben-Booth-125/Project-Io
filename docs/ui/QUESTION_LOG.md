@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**66 surfaces** — 7 settled, 59 awaiting Ben's wording.
+**64 surfaces** — 7 settled, 57 awaiting Ben's wording.
 
 ---
 
@@ -176,9 +176,9 @@ alphabetical order.
 
 **Answers:** Am I solvent, and what is the date?
 
-**Because:** The two facts that condition every other decision, needed at a glance without opening anything. Runway (BL-073) is here rather than in the ledger precisely because it is a warning, not an analysis.
+**Because:** The two facts that condition every other decision, needed at a glance without opening anything. Runway (BL-073) is here rather than in the ledger precisely because it is a warning, not an analysis. The middle figure reads CARGO (BL-1269): with no corporation holding a stockpile under the shelf economy (BL-1265), the only goods the player owns are its trades' cargo in transit, valued at the price where they land.
 
-*Demanded by BL-073, BL-171, BL-177 · `src/ui/header_panel.cpp` · id `header_panel`*
+*Demanded by BL-073, BL-171, BL-177, BL-1269 · `src/ui/header_panel.cpp` · id `header_panel`*
 
 ### Hover card
 
@@ -228,33 +228,19 @@ alphabetical order.
 
 *Demanded by BL-688 · `src/ui/market_ledger.cpp` · id `market_ledger_nation_row`*
 
-### Market Ledger - Trades tab
+### Market Ledger - Trades tab (and the market Selection card's 'Trades' door onto it)
 
-**Answers:** What positions do I hold here, what else is standing, and what could I be doing?
+**Answers:** What am I moving in and out of this market, how much of my trade capacity do I steer, and what could I be moving?
 
-**Because:** IT IS CALLED TRADES BECAUSE THE WORD CARRIES THE WIDENING (Ben, 2026-08-29). A sell order is one direction and one actor; a trade is a position either way round, held by anyone in the market, and -- now that the clearing tick retains a per-exchange record -- one that has already happened. The tab it replaces answered only 'what am I currently offering, at what floor?', which is the narrowest of the four things a player standing at a market wants to know.
+**Because:** TRADE IS THE ONLY WAY GOODS MOVE BETWEEN MARKETS (Ben, 2026-10-10; TRADE.md). The order book this tab used to read retired with corporation pools (BL-1265): production lands on the market's shelf and sells at the clearing price, so there is nothing left for a sell order to hold back, and the self-closing-order notice and the Selection card's Dispatch convoy form went with it. What the player steers now is a TRADE -- good R from market A to market B with P trade points -- and the reserve that decides how much of the points their Planetary Marketplaces and Ports make is theirs to steer and how much auto spends. Both are world state written only by the set_trade / clear_trade / set_trade_reserve verbs, and this tab is the only place a player can issue them, so without it the player could build trade capacity and never direct it.
 
-It earns its space because markets are the public intelligence channel under the visibility rule: a rival's production and stockpiles are private, so price and the ORDER BOOK are the only honest read the player has on a competitor -- and the book was visible nowhere. THREE READS, KEPT VISIBLY DISTINCT, because they are not equally cheap to know and presenting them as one table would claim they were: my standing trades (a filter on my own orders), the market's standing trades (the same book past a gate), and potential trades (a derivation with no store behind it -- buy price here against sell price there, less the haulage the route would cost, priced through the same price_convoy_leg the auto-dispatcher and the player's own dispatch verb use, so the figure the player acts on is the figure that would bill them).
+IT LIVES WHERE THE SELL ORDERS LIVED because the question is still asked standing at a market: which of my routes leave or land HERE. A trade touches two markets, so it lists under both, and a count says how many of the player's trades run elsewhere. THE READS STAY VISIBLY DISTINCT because they are not equally cheap to know: the trade-points line is one corporation record; my trades a filter on world::trades; all trades here the same list past the 'player owns a building on that body' gate (Ben, 2026-08-29, kept from the book it replaced); potential trades a derivation with no store at all, taken from rank_trade_routes -- the trade pass's own route ranking -- so a row is a route the pass itself would consider, at the margin it would see.
 
-THE GATE ON THE SECOND READ IS 'the player owns a building on that body' (Ben, 2026-08-29, choosing it over 'an order here', 'either', and 'any discovered market'). Orders are world state and the deliberate public signal, so this is a reading question rather than a disclosure one -- but 'operates in' is a real predicate and is enforced, not assumed: a player reads the books of markets they trade at, not of the whole system.
+THE POTENTIAL TRADE IS ONE PRESS FROM A REAL ONE, BUT NOT THE PRESS ITSELF. Its '+' fills the add form (good, from here, to there) and opens it; the player still sets the points and presses Add. Ranking stays permitted here (CONCEPT.md: rank where the top row is one input among several) because a ranked row cannot become a trade without the player choosing what it costs in points -- points auto would otherwise spend.
 
-THE HISTORY COLUMN IS REVENUE, NEVER PROFIT, and the limit is structural. stockpile_component is quantities[] and nothing else, so no cost basis exists anywhere in the model and the margin on a sale cannot be derived from it; quantity * unit_price is honest and a profit column would be a number the clearing loop never computed and a player would act on. An ABSENT counterparty renders as the market and not as 'unknown' -- three of the four clearing paths trade against the market as counterparty of last resort and they carry the volume, so blanking or skipping those rows would empty the section.
+THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (both markets must trade the good; the corporation's trades are capped at 64) and a refusal mutates nothing; the player is told why under the form. THE HISTORY COLUMN IS STILL REVENUE, NEVER PROFIT (no cost basis exists anywhere in the model), and an absent counterparty is still the market.
 
-RANKING IS PERMITTED HERE and this is the one surface where that has been ruled on explicitly (CONCEPT.md: rank where the top row is one input among several, not where it IS the move). Ben, same day: 'Market prices is a vital pillar of gameplay, but the strategy "just build the most profitable" is a red herring.' A potential trade sorted by margin is still weighed against reach, stock, competition and what the price does next.
-
-EACH LONG SECTION IS BOUNDED AND SCROLLS INSIDE ITSELF -- measured, not preferred: the book runs to 24 rows on the shipped fixture and the exchange read to 120, so laid out end to end the first fills the column and the other three reads are below the fold on open. A tab whose headline question is 'what could I be doing?' cannot open on a list of rival orders with the answer three screens down.
-
-*Demanded by BL-687 · `src/ui/market_ledger.cpp`, `src/ui/market_ledger.hpp` · id `market_ledger_trades`*
-
-### Market Ledger - Trades tab - 'Closed' table under My trades
-
-**Answers:** Which of my standing sell orders closed themselves, and why?
-
-**Because:** AN ORDER THAT CLOSES ITSELF IS A ROW THAT SILENTLY VANISHES. MARKETS.md step 4: an order whose pool stands empty for 4 quarters is removed by the clearing pass and the good returns to auto-surplus. The rule is right — a dead order should not hold a book slot forever — but a player who set a floor ON PURPOSE then finds the good selling at the market price when stock returns, and nothing on screen says the order is gone or why. The clearing pass already logs the close (an agency-topic history line, tagged with corp and body); nothing read it.
-
-IT LIVES UNDER MY TRADES, NOT IN A FEED. The question it answers is about the player's positions on this body, which is exactly what My trades lists; a closed order is the row that used to be there. The decision feed is the rivals' reasoning and the chat feed is economy_report events — routing an order-book fact into either would make the player look for it somewhere other than where the order stood. It is a notice, not a history: the newest 3 closes within the last 4 quarters, Closed (month) · Good · Floor, the log line itself on hover. DRAWN ONLY WHEN THERE IS ONE, so the section's measured height budget is untouched in the ordinary case.
-
-*Demanded by BL-1202 · `src/ui/market_ledger.cpp`, `src/ui/market_ledger.hpp`, `src/world/market_clearing.cpp` · id `market_ledger_trades_closed`*
+*Demanded by BL-687, BL-1269 · `src/ui/market_ledger.cpp`, `src/ui/market_ledger.hpp`, `src/ui/selection_panel.cpp`, `src/core/app.cpp` · id `market_ledger_trades`*
 
 ### National border band (Planetary canvas, plain-canvas chrome)
 
@@ -351,14 +337,6 @@ IT LIVES UNDER MY TRADES, NOT IN A FEED. The question it answers is about the pl
 **Because:** The building card takes the SAME 3-column band shape as the tile card (zoomed tile render / paged accordion / action grid), so 'select a thing, get its picture, a pager and its actions' is one shape across the two entity kinds that actually get selected in play. Its CENTRE presents data and never holds levers (Ben, 2026-08-29): a dial that changes the world belongs to a ledger, so Method and Workforce - two pages whose whole content was a control - moved to the Construction ledger's Buildings view, and what remains reports (Profitability, Status). The boundary runs around the CENTRE, not the element: the right-hand action grid is the designated place to act and keeps Mothball, Dismantle and Auto. The move would have left a building selected on the MAP with no route to its own levers, so the grid gained a fourth button that opens the Buildings view AIMED at this building - its type group expanded, the building selected, the levers on screen in one press. That button is a door rather than a toggle (its active state is not visible here), and it is ABSENT on a rival's card, because the Buildings view is the player's estate and aiming a rival building at it would open an empty aim. A rival card is Status only, by a short-circuit in building_pages that never tests a player page's own guard - a competitor-visibility guarantee rather than a convenience.
 
 *Demanded by BL-683, BL-682, BL-431, BL-430, BL-074 · `src/ui/selection_panel.cpp`, `src/ui/selection_panel.hpp`, `src/ui/selection_card.cpp`, `src/ui/detail_level.hpp`, `src/ui/ui_state.hpp` · id `selection_building_card`*
-
-### Selection band - Market card, Dispatch convoy form
-
-**Answers:** How much of what do I send from the market I'm looking at, to where?
-
-**Because:** SUPPLY.md always specified this front door -- 'a dispatch starts from a source you are looking at, and it is a resource + quantity + destination-market form, not a press' -- but BL-452 only ever wired dispatch_convoy onto the wire/agent dictionary; no UI site issued it, so the player's own corp had no way to direct a convoy at all (only the automatic shortfall scan moved goods). The form reuses the Sell Orders tab's own tradeable-resource test and the Convoys tab's market_city_name identity, so it cannot show a resource or destination the player couldn't already see traded or in flight, and a rejection (no route, insufficient funds) is surfaced inline rather than silently dropped.
-
-*Demanded by BL-607, BL-452 · `src/ui/selection_panel.cpp` · id `selection_market_dispatch`*
 
 ### Selection element
 

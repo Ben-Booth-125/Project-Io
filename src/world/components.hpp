@@ -653,6 +653,10 @@ enum class building_type : uint8_t
     university          = 9, ///< BL-615: the schooling building's City-tier sibling. Same passive
                              ///< shape; placement-gated to a centre of stratum City (4) or above —
                              ///< "you can't build a university in a town" (Ben, 2026-08-25).
+    planetary_marketplace = 10, ///< BL-1266 (TRADE.md § The Planetary Marketplace): makes TRADE
+                                ///< POINTS for its owner each tick at its staffed rate, as a processor
+                                ///< makes goods; carries a fuel and building-material upkeep (unmet:
+                                ///< no points that tick). Produces no good.
 };
 
 /// One past the last building type — the wire parser's range gate (BL-396:
@@ -662,7 +666,7 @@ enum class building_type : uint8_t
 /// enum's tail, the same way resource_count derives from resource_type::count:
 /// appending a type means moving this with it.
 static constexpr uint8_t building_type_count =
-    static_cast<uint8_t>(building_type::university) + 1;
+    static_cast<uint8_t>(building_type::planetary_marketplace) + 1;
 
 /// BL-615 stratum placement gates (docs/economy/POPULATION.md § Strata gate
 /// buildings): which relationship to the population-centre scale ladder a
@@ -1089,7 +1093,7 @@ struct market_component
     std::array<float, resource_count> household_bid  = {};
     std::array<float, resource_count> household_fill = {};
 
-    /// BL-1203 (water reaches dry markets; SUPPLY.md § Dispatch trigger, "What a
+    /// BL-1203 (water reaches dry markets; SUPPLY.md § A shipment, "What a
     /// hauler sees as unmet demand", Ben 2026-10-05). Two reads of the last
     /// clear for DISPATCH — neither ever bids (BL-1172 unchanged); the price law
     /// reads `hauler_want` only as the cap on the shelf's share of supply
@@ -1121,20 +1125,6 @@ struct market_component
     /// through `note_unposted_bid`.
     std::array<float, resource_count>   unposted_bid      = {};
     std::array<int32_t, resource_count> unposted_bid_tick = {};
-    /// BL-1217 (AI_OPPONENT.md § 11, the dial's buyer signal, Ben 2026-10-09 as
-    /// narrowed): what RUNNING processors on this market drew from their
-    /// owners' POOLS on the tick `dial_pool_draw_tick[r]`, EXCLUDING any unit
-    /// the same processor also posted as demand (economy_system.cpp,
-    /// `proc_dial_draw`). The workforce dial reads posted `demand` plus this,
-    /// held for the scorer's cadence, and nothing else. ONE WRITER: the clear
-    /// (clear_markets, from `economy_report::dial_pool_sums`), in the same pass
-    /// that writes `demand`, so the two always describe the same tick — a
-    /// consumer that moves between its pool and the shelf is counted once
-    /// either way. Every key a processor's posted want touched is stamped (0
-    /// included); a key nobody touched keeps its last record and ages out of
-    /// the hold. SERIALISED (world_save_version 40).
-    std::array<float, resource_count>   dial_pool_draw      = {};
-    std::array<int32_t, resource_count> dial_pool_draw_tick = {};
 
     /// BL-1217 lever D (behind `economy.background_demand.consumes`, authored
     /// true in economy.lua): the BACKGROUND channel's bid at the last clear
@@ -1158,6 +1148,14 @@ struct market_component
     /// rewrites it on every market before the draw reads it, inside the same
     /// clear, so a load that leaves it zero changes nothing the sim computes.
     std::array<float, resource_count> processor_want = {};
+    /// The Logistic Points left at the anchor nearest this market's centre at
+    /// the end of the last trade pass (`run_trades`) — units of cargo a further
+    /// overland shipment leaving here could still have passed that tick; 0 when
+    /// no anchor reaches the centre. Read by the rival Marketplace build's
+    /// estimate (corp_ai.cpp; AI_OPPONENT.md § 11), which must not count on
+    /// shipments the Logistic Point cap would refuse. SERIALISED
+    /// (world_save_version 46).
+    float trade_lp_spare = 0.0f;
 };
 
 /// BL-1172 — THE POSTED PRICE of good `r` on market `m`: the price that stands
@@ -1212,22 +1210,17 @@ inline float composite_bid(const market_component& m, std::size_t r, int tick, i
     return bid;
 }
 
-/// THE DIAL'S BID for good @p r on market @p m at econ tick @p tick
-/// (AI_OPPONENT.md § 11, Ben 2026-10-09 as narrowed; BL-1217): posted
-/// `demand` PLUS what running processors drew from their owners' pools and
-/// did not also post as demand (`dial_pool_draw`), held for @p hold_ticks —
-/// and nothing else: no procurement, space programme, launch fuel, upkeep,
-/// nation want or silenced want. The plant's own market only. Read by the
+/// THE DIAL'S BID for good @p r on market @p m (AI_OPPONENT.md § 11): posted
+/// `demand`, and nothing else. With no corporation pools every want is posted
+/// (BL-1265, MARKETS.md § The shelf economy), so the stock-fed draw register
+/// the dial once added (BL-1217) retired with the pool; the grant's reading
+/// collapses to posted demand. The plant's own market only. Read by the
 /// background workforce dial (`solve_workforce_target`) as its buyer signal,
-/// weighed against supply exactly as demand is.
-inline float dial_bid(const market_component& m, std::size_t r, int tick, int hold_ticks)
+/// weighed against supply exactly as demand is. `tick` and `hold_ticks` are
+/// kept so the callers' shape is unchanged; nothing here is held.
+inline float dial_bid(const market_component& m, std::size_t r, int /*tick*/, int /*hold_ticks*/)
 {
-    float bid = std::max(0.0f, m.demand[r]);
-    // Never read AHEAD (as unposted_bid_held): a record dated after `tick`.
-    if (m.dial_pool_draw[r] > 0.0f && tick >= m.dial_pool_draw_tick[r]
-        && tick - m.dial_pool_draw_tick[r] <= hold_ticks)
-        bid += m.dial_pool_draw[r];
-    return bid;
+    return std::max(0.0f, m.demand[r]);
 }
 
 /// BL-1227 / BL-1217 (D3 fix): has market @p m EVER CLEARED, read from existing
@@ -1338,77 +1331,31 @@ struct body_route_cache
     std::vector<entity_id> route;
 };
 
-/// A standing sell order — the manual side of the market. Each economy tick the
-/// order lists up to `quantity` of `resource` from the (corp, body) pool for sale
-/// at no less than `floor_price` (the order clears at `max(resolved_price,
-/// floor_price)`; an unmet floor simply means less or nothing sells that tick).
-/// Defined here (rather than in market_clearing.hpp) so the clearing system, the
-/// command seam and the UI can all name it without an include cycle.
-///
-/// HELD IN `world::sell_orders` (BL-293, 2026-08-07). It used to live in
-/// `ui_state` and be handed to `clear_markets` by the caller, which made it
-/// unreachable by `corp_command` (a verb mutates `world&`, and there was nothing
-/// in the world to mutate) and invisible to the save seam. It is world state now:
-/// the player and a rival corp place orders through the same verb, and the
-/// clearing tick reads the book itself.
-///
-/// SAVE-FORMAT RECORD — see order_book.hpp. `id` leads the struct because it is
-/// the order's identity, and identity is what `remove_sell_order` names; the
-/// remaining fields keep their original order and meaning.
-struct sell_order
+// THE ORDER BOOK RETIRED (BL-1265; MARKETS.md § The shelf economy, Ben
+// 2026-10-10): `sell_order` and `buy_order` are gone with it — no standing
+// orders; everyone buys at the posted price and production sells on landing.
+
+/// A MANUAL TRADE (BL-1266; TRADE.md § A trade): a standing route an owner sets
+/// — move good `resource` from market `from_market` to market `to_market` with
+/// `points` of its reserved trade points. Each tick it ships up to
+/// `points x capacity(resource)` units: it buys on `from_market`'s shelf at the
+/// posted price (under the fair-price ceiling), pays the haul, and the goods
+/// land and sell on `to_market`'s shelf. A trade that loses money still runs
+/// until its owner changes it. Held in `world::trades`, in placement order —
+/// the order the owner's reserve is spent in. Written only through the
+/// `set_trade` / `clear_trade` corp verbs (the player's, and a rival's under
+/// the AI_OPPONENT.md § 11 grant). SERIALISED (world_save_version 46).
+struct standing_trade
 {
-    /// Stable handle, allocated by `world::allocate_order_id()`. Nonzero on any
-    /// order that has been placed; 0 marks a default-constructed order that never
-    /// entered the book. Stable across a tick, an erase of a *different* order,
-    /// and a save/load round-trip — which an index into the vector is not.
+    /// Stable handle from `world::allocate_trade_id()`: nonzero once placed,
+    /// never reused, stable across an erase of another trade and a round-trip.
     uint32_t      id          = 0;
-    entity_id     corp        = null_entity;
-    entity_id     body        = null_entity;
+    entity_id     owner       = null_entity;
     resource_type resource    = resource_type::iron_ore;
-    /// BL-1201 (orders are price floors): consecutive clearing ticks the POOL
-    /// under this order has held no surplus — no stock above the processor
-    /// reservation in any of the corp's market pools on its body, read BEFORE any
-    /// order's claim. It keys on the pool, not on what this order listed: a
-    /// second order on a triple whose surplus an earlier order claimed whole is
-    /// not empty. Reset by any tick the pool has surplus; at
-    /// `sell_order_empty_close_ticks` the clearing pass removes the order and
-    /// the good returns to auto-surplus (MARKETS.md step 4). Sits in the
-    /// padding byte after `resource`, so the record stays 24 bytes; it IS a
-    /// saved field (world_save_version 33, order_book_version 2).
-    uint8_t       empty_ticks = 0;
-    /// Per-tick listing CAP. **0 = no cap** (BL-1201, Ben 2026-10-05): the order
-    /// covers the whole surplus auto-surplus would have listed, tick by tick.
-    /// A positive cap lists at most that much per tick and the rest waits.
-    float         quantity    = 0.0f;
-    float         floor_price = 0.0f; ///< Minimum acceptable unit price; 0 = sell at the market price.
+    entity_id     from_market = null_entity;
+    entity_id     to_market   = null_entity;
+    float         points      = 0.0f; ///< Trade points assigned per tick (> 0).
 };
-
-/// A buy order for one resource — the demand side of the order book. Each
-/// economy tick the clearing system matches buy orders against sell orders
-/// by price-time priority (cheapest seller first; highest bidder first).
-/// Held in `world::buy_orders`, alongside `sell_orders`; see that struct for why
-/// the book is world state and what `id` is for. No press authors one yet — the
-/// buy side exists in the clearing algorithm and in the save format, waiting for
-/// its verb.
-struct buy_order
-{
-    uint32_t      id               = 0;           ///< Stable handle; see sell_order::id.
-    entity_id     corp             = null_entity;
-    entity_id     body             = null_entity;
-    resource_type resource         = resource_type::iron_ore;
-    float         quantity         = 0.0f;
-    float         max_price        = 0.0f; ///< Maximum acceptable unit price; 999 = pay anything.
-    entity_id     preferred_seller = null_entity; ///< Optional counterparty preference.
-};
-
-// Save-format guards, following `molecular_event`'s precedent in
-// chemistry_tables.hpp: the order book is written field-by-field rather than as a
-// raw blob, but a silent layout change is still the failure mode a stale save
-// exhibits, and it is far easier to diagnose at compile time than at load time.
-// Tripping one of these means the record changed — bump `order_book_version`
-// (order_book.hpp) in the same edit, then update the size here.
-static_assert(sizeof(sell_order) == 24, "sell_order is a save-format record — see order_book.hpp");
-static_assert(sizeof(buy_order)  == 28, "buy_order is a save-format record — see order_book.hpp");
 
 /// A live price quote (BL-350) — the answer to `request_quote`, before it is
 /// accepted into a `procurement_contract`. Parallel to the order book rather
@@ -1418,7 +1365,7 @@ static_assert(sizeof(buy_order)  == 28, "buy_order is a save-format record — s
 /// id, converting it into a contract.
 struct procurement_quote
 {
-    uint32_t      id           = 0;              ///< Stable handle; see sell_order::id.
+    uint32_t      id           = 0;              ///< Stable handle: nonzero once issued, never reused (world::next_procurement_id).
     entity_id     buyer        = null_entity;
     entity_id     supplier     = null_entity;
     entity_id     body         = null_entity;    ///< Where the supplier fulfils from.
@@ -1445,7 +1392,7 @@ struct procurement_quote
 /// Held in `world::procurement_contracts`.
 struct procurement_contract
 {
-    uint32_t      id              = 0;             ///< Stable handle; see sell_order::id.
+    uint32_t      id              = 0;             ///< Stable handle: nonzero once issued, never reused (world::next_procurement_id).
     entity_id     buyer           = null_entity;
     entity_id     supplier        = null_entity;
     entity_id     body            = null_entity;
@@ -1638,7 +1585,7 @@ struct convoy_component
     /// and is then erased — but `hold_convoy` has to name one, and naming it by
     /// vector index would let one convoy's arrival re-point a command already
     /// composed against another. Same "stable across erase, never reused"
-    /// contract as `sell_order::id` (world.hpp § next_order_id), and carried in
+    /// contract as a procurement id (world.hpp § next_procurement_id), and carried in
     /// `corp_command::order` for the same reason: it is a handle, not an entity.
     uint32_t    id             = 0;
     /// True while the convoy is **held** — `advance_convoys` skips it, so it
@@ -2016,6 +1963,19 @@ struct corporation_component
     /// `world_save_version` 27 moved with them.
     int32_t founded_year  = 0;
     int32_t origin_region = -1;
+
+    /// BL-1266 (TRADE.md § Auto and reserved trade): the trade points this
+    /// corporation RESERVES for its manual trades each tick; the rest of what
+    /// its Marketplaces and Ports make is auto. Clamped to what it makes at use.
+    /// Set by the player (and, under the AI_OPPONENT.md § 11 grant, by a rival)
+    /// through `set_trade_reserve`. SERIALISED (world_save_version 46).
+    float trade_reserve = 0.0f;
+    /// BL-1266: the trade points this corporation's trade buildings MADE on its
+    /// last trade pass (`run_trades`) — a rate, never banked (TRADE.md § The
+    /// Planetary Marketplace); kept for the surfaces and the scorer to read
+    /// between passes. SERIALISED (world_save_version 46) so a load reads what
+    /// the next tick's readers would have read.
+    float trade_points = 0.0f;
 };
 
 /// BL-428: how far down the production graph @p c has actually reached — the
@@ -2230,6 +2190,16 @@ struct exchange_record
     /// render such a side as the market, never blank the row.
     entity_id     seller     = null_entity;
     entity_id     buyer      = null_entity;
+    /// NR-1021 (Ben, 2026-10-10): one row per (market, good, side, tick) — every
+    /// corporation's landings of a good on a market in a tick fold into ONE sale
+    /// row, every draw into ONE purchase row (the player's own kept apart, so its
+    /// history still reads "what I bought"). `side` 0 = a sale TO the market
+    /// (`buyer` is the market), 1 = a purchase FROM it (`seller` is the market).
+    /// `parties` counts the corporations folded in; with more than one the
+    /// corporation side is `null_entity` and a reader renders "N corporations".
+    /// `unit_price` is then the row's volume-weighted price.
+    std::uint8_t  side       = 0;
+    std::uint16_t parties    = 1;
 };
 
 /// Fixed-capacity ring of the most recent exchanges, world-wide — capped the way

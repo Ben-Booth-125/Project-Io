@@ -31,7 +31,7 @@ constexpr auto max_cover      = terrain_cover::urban;
 constexpr auto max_landform   = terrain_landform::rift;
 constexpr auto max_body_type  = body_type::star;
 constexpr auto max_atmosphere = atmosphere_class::thick;
-constexpr auto max_building   = building_type::university; // BL-615: appended schooling/university.
+constexpr auto max_building   = building_type::planetary_marketplace; // BL-1266 (v46); BL-615 before it.
                                                            // A WIDENED range gate, not a format
                                                            // change: no serialised array is sized
                                                            // by building_type (unlike resource_
@@ -46,7 +46,7 @@ constexpr auto max_ideology   = ideology::isolationist;
 constexpr auto max_posture    = expansionism::aggressive;
 constexpr auto max_econ_focus = economic_focus::trade;
 constexpr auto max_law_effect = law_effect_kind::import_tariff;
-constexpr auto max_cond_subj  = condition_subject::province_held; // BL-570: appended after science
+constexpr auto max_cond_subj  = condition_subject::produced; // NR-1015 appended after province_held (BL-570)
 constexpr auto max_cond_cmp   = condition_comparator::less_than;
 constexpr auto max_mod_subj   = modifier_subject::collapse_strain;
 constexpr auto max_mod_op     = modifier_op::multiply;
@@ -198,9 +198,9 @@ void w_market(std::ostream& o, const market_component& m)
     w_f32_array(o, m.hauler_want);      // BL-1203: world_save_version 36
     w_f32_array(o, m.unposted_bid);     // BL-1227: world_save_version 38
     for (const int32_t t : m.unposted_bid_tick) w_i32(o, t); // BL-1227: world_save_version 38
-    w_f32_array(o, m.dial_pool_draw);   // BL-1217: world_save_version 40
-    for (const int32_t t : m.dial_pool_draw_tick) w_i32(o, t); // BL-1217: world_save_version 40
+    // BL-1265 (v46): the dial's pool-draw register (v40) retired with the pool.
     w_f32_array(o, m.background_fill); // BL-1217 G1b R2: world_save_version 43
+    w_f32(o, m.trade_lp_spare);        // world_save_version 46
 }
 
 bool r_i32_array(std::istream& i, std::array<int32_t, resource_count>& a)
@@ -219,8 +219,9 @@ bool r_market(std::istream& i, market_component& m)
         && r_f32_array(i, m.household_bid) && r_f32_array(i, m.household_fill)
         && r_f32_array(i, m.household_weight) && r_f32_array(i, m.hauler_want)
         && r_f32_array(i, m.unposted_bid) && r_i32_array(i, m.unposted_bid_tick)
-        && r_f32_array(i, m.dial_pool_draw) && r_i32_array(i, m.dial_pool_draw_tick) // BL-1217: v40
-        && r_f32_array(i, m.background_fill); // BL-1217 G1b R2: v45
+        && r_f32_array(i, m.background_fill) // BL-1217 G1b R2: v45
+        && r_f32(i, m.trade_lp_spare)         // v46: finite, never negative
+        && std::isfinite(m.trade_lp_spare) && m.trade_lp_spare >= 0.0f;
 }
 
 void w_unit(std::ostream& o, const unit_component& u)
@@ -396,6 +397,8 @@ void w_corp(std::ostream& o, const corporation_component& c)
     w_i32(o, c.origin_region);     // BL-1099: world_save_version 27
     w_f32(o, c.refund_unbooked);   // BL-1206: world_save_version 37
     w_f32(o, c.refund_opening);    // BL-1206 review: world_save_version 37
+    w_f32(o, c.trade_reserve);     // BL-1266: world_save_version 46
+    w_f32(o, c.trade_points);      // BL-1266: world_save_version 46
 }
 
 bool r_corp(std::istream& i, corporation_component& c)
@@ -412,7 +415,13 @@ bool r_corp(std::istream& i, corporation_component& c)
           && r_f32(i, c.influence_range) && r_f32(i, c.science)
           && r_bool_array(i, c.produced_ever) && r_vec(i, c.returns, r_return)
           && r_i32(i, c.founded_year) && r_i32(i, c.origin_region)
-          && r_f32(i, c.refund_unbooked) && r_f32(i, c.refund_opening)))
+          && r_f32(i, c.refund_unbooked) && r_f32(i, c.refund_opening)
+          && r_f32(i, c.trade_reserve) && r_f32(i, c.trade_points))) // BL-1266: v46
+        return false;
+    // BL-1266: a reserve and a points figure are finite and never negative —
+    // the only values the seam and the trade pass write. Refused, never clamped.
+    if (!(std::isfinite(c.trade_reserve) && c.trade_reserve >= 0.0f
+          && std::isfinite(c.trade_points) && c.trade_points >= 0.0f))
         return false;
     // BL-1206: an unbooked refund is a credit awaiting its return — finite and
     // never negative; the balance it was credited onto is finite. Refused,
@@ -471,42 +480,27 @@ bool r_route(std::istream& i, trade_route& t)
         && r_int(i, t.convoy_count);
 }
 
-void w_sell(std::ostream& o, const sell_order& s)
+// --- manual trades (BL-1266, world_save_version 46) -------------------------
+// One record in `standing_trade`'s declaration order. The reader refuses what
+// the writer cannot produce: a zero id, a non-finite or non-positive points
+// figure. Cross-references (owner, markets) are checked once the whole world
+// has been read, in `read_world_snapshot`.
+void w_trade(std::ostream& o, const standing_trade& t)
 {
-    w_u32(o, s.id);
-    w_id(o, s.corp);
-    w_id(o, s.body);
-    w_enum(o, s.resource);
-    w_u8(o, s.empty_ticks); // BL-1201: world_save_version 33
-    w_f32(o, s.quantity);
-    w_f32(o, s.floor_price);
+    w_u32(o, t.id);
+    w_id(o, t.owner);
+    w_enum(o, t.resource);
+    w_id(o, t.from_market);
+    w_id(o, t.to_market);
+    w_f32(o, t.points);
 }
 
-bool r_sell(std::istream& i, sell_order& s)
+bool r_trade(std::istream& i, standing_trade& t)
 {
-    return r_u32(i, s.id) && r_id(i, s.corp) && r_id(i, s.body)
-        && r_enum(i, s.resource, max_resource) && r_u8(i, s.empty_ticks)
-        && r_f32(i, s.quantity) && r_f32(i, s.floor_price)
-        // BL-1201: 0 = no cap, otherwise a positive cap; nothing else is writable.
-        && std::isfinite(s.quantity) && s.quantity >= 0.0f;
-}
-
-void w_buy(std::ostream& o, const buy_order& b)
-{
-    w_u32(o, b.id);
-    w_id(o, b.corp);
-    w_id(o, b.body);
-    w_enum(o, b.resource);
-    w_f32(o, b.quantity);
-    w_f32(o, b.max_price);
-    w_id(o, b.preferred_seller);
-}
-
-bool r_buy(std::istream& i, buy_order& b)
-{
-    return r_u32(i, b.id) && r_id(i, b.corp) && r_id(i, b.body)
-        && r_enum(i, b.resource, max_resource) && r_f32(i, b.quantity) && r_f32(i, b.max_price)
-        && r_id(i, b.preferred_seller);
+    return r_u32(i, t.id) && r_id(i, t.owner) && r_enum(i, t.resource, max_resource)
+        && r_id(i, t.from_market) && r_id(i, t.to_market) && r_f32(i, t.points)
+        && t.id != 0 && std::isfinite(t.points) && t.points > 0.0f
+        && t.points <= 1.0e6f; // corp_command.hpp's max_trade_points: the seam's own bound
 }
 
 // --- the exchange record (BL-685) ------------------------------------------
@@ -523,13 +517,16 @@ void w_exchange(std::ostream& o, const exchange_record& e)
     w_f32(o, e.unit_price);
     w_id(o, e.seller);
     w_id(o, e.buyer);
+    w_u8(o, e.side);     // NR-1021: world_save_version 46
+    w_u16(o, e.parties); // NR-1021: world_save_version 46
 }
 
 bool r_exchange(std::istream& i, exchange_record& e)
 {
     return r_int(i, e.tick) && r_id(i, e.market) && r_enum(i, e.resource, max_resource)
         && r_f32(i, e.quantity) && r_f32(i, e.unit_price) && r_id(i, e.seller)
-        && r_id(i, e.buyer);
+        && r_id(i, e.buyer) && r_u8(i, e.side) && r_u16(i, e.parties)
+        && e.side <= 1 && e.parties >= 1;
 }
 
 void w_quote(std::ostream& o, const procurement_quote& q)
@@ -879,7 +876,7 @@ void write_world_snapshot(const world& w, std::ostream& out)
     w_f32(out, w.belt.outer_radius_au);
     w_u32(out, w.next_entity_id());
     w_u32(out, w.next_convoy_id);
-    w_u32(out, w.next_order_id);
+    w_u32(out, w.next_trade_id); // BL-1266 (v46): the retired order book's id slot
     w_u32(out, w.next_procurement_id);
     // BL-1101 (format v26): the world's own recipe band, one byte. Written
     // here with the other top-level scalars because it is one — a verdict the
@@ -912,7 +909,8 @@ void write_world_snapshot(const world& w, std::ostream& out)
     w_store(out, w.corporations, w_corp);
 
     // --- pair-keyed economy tables ------------------------------------------
-    w_map(out, w.corp_market_pools, w_id_pair, w_stockpile); // BL-1003: (corp, market|body) keys
+    // BL-1265 (v46): the corporation pools (BL-1003) retired — every good is
+    // on a market's shelf, written with the markets above.
     w_map(out, w.workforce_supply_overrides, w_id_pair,
           [](std::ostream& s, const float& v) { w_f32(s, v); });
     // BL-546: `corp_reputation` (one float per pair) became `sentiment` (two,
@@ -929,9 +927,9 @@ void write_world_snapshot(const world& w, std::ostream& out)
     w_map(out, w.body_last_glimpse_tick, [](std::ostream& s, const entity_id& k) { w_id(s, k); },
           [](std::ostream& s, const int& v) { w_int(s, v); });
 
-    // --- the order book and procurement -------------------------------------
-    w_vec(out, w.sell_orders, w_sell);
-    w_vec(out, w.buy_orders, w_buy);
+    // --- manual trades and procurement --------------------------------------
+    // BL-1265 (v46): the order book retired; its slot carries the manual trades.
+    w_vec(out, w.trades, w_trade);
     w_vec(out, w.procurement_quotes, w_quote);
     w_vec(out, w.procurement_contracts, w_contract);
     w_store(out, w.corp_embargo_conditions, w_condition_set);
@@ -1009,11 +1007,8 @@ void write_world_snapshot(const world& w, std::ostream& out)
               w_id(s, f.into);
           });
 
-    // BL-1217 D5 (world_save_version 39): the held opening stock -- live state
-    // the clear reads every tick, not derivable from the pools. A `std::map`,
-    // written ascending as held.
-    w_map(out, w.opening_stock_held, w_id_pair,
-          [](std::ostream& s, const std::array<float, resource_count>& a) { w_f32_array(s, a); });
+    // BL-1265 (v46): the held opening stock (BL-1217 D5, v39) retired — the
+    // opening stock is on the shelves before the first tick.
 }
 
 bool read_world_snapshot(world& w, std::istream& in)
@@ -1032,13 +1027,13 @@ bool read_world_snapshot(world& w, std::istream& in)
     world s;
 
     entity_id player = null_entity, star = null_entity, home = null_entity;
-    uint32_t  next_entity = 1, next_convoy = 1, next_order = 1, next_proc = 1;
+    uint32_t  next_entity = 1, next_convoy = 1, next_trade = 1, next_proc = 1;
 
     if (!(r_id(in, player) && r_id(in, star) && r_id(in, home)))
         return false;
     if (!(r_f32(in, s.belt.inner_radius_au) && r_f32(in, s.belt.outer_radius_au)))
         return false;
-    if (!(r_u32(in, next_entity) && r_u32(in, next_convoy) && r_u32(in, next_order)
+    if (!(r_u32(in, next_entity) && r_u32(in, next_convoy) && r_u32(in, next_trade)
           && r_u32(in, next_proc)))
         return false;
 
@@ -1047,7 +1042,7 @@ bool read_world_snapshot(world& w, std::istream& in)
     s.home_body     = home;
     s.set_next_entity_id(next_entity);
     s.next_convoy_id      = next_convoy;
-    s.next_order_id       = next_order;
+    s.next_trade_id       = next_trade; // BL-1266 (v46)
     s.next_procurement_id = next_proc;
 
     // BL-1101 (format v26). A byte past `industrial` cannot have been written
@@ -1102,8 +1097,6 @@ bool read_world_snapshot(world& w, std::istream& in)
     if (!r_store(in, s.corporations, r_corp))
         return false;
 
-    if (!r_map(in, s.corp_market_pools, r_id_pair, r_stockpile))
-        return false;
     if (!r_map(in, s.workforce_supply_overrides, r_id_pair,
                [](std::istream& st, float& v) { return r_f32(st, v); }))
         return false;
@@ -1133,9 +1126,7 @@ bool read_world_snapshot(world& w, std::istream& in)
                [](std::istream& st, int& v) { return r_int(st, v); }))
         return false;
 
-    if (!r_vec(in, s.sell_orders, r_sell))
-        return false;
-    if (!r_vec(in, s.buy_orders, r_buy))
+    if (!r_vec(in, s.trades, r_trade)) // BL-1266 (v46)
         return false;
     if (!r_vec(in, s.procurement_quotes, r_quote))
         return false;
@@ -1233,17 +1224,20 @@ bool read_world_snapshot(world& w, std::istream& in)
         if (tile == s.tiles.end() || tile->second.body != fm.body) return false;
     }
 
-    // BL-1217 D5 (v39): the held opening stock. A record must name a pool that
-    // exists and hold finite, non-negative amounts -- the writer can produce
-    // nothing else (the clear drops a record whose pool is gone).
-    if (!r_map(in, s.opening_stock_held, r_id_pair,
-               [](std::istream& st, std::array<float, resource_count>& a) { return r_f32_array(st, a); }))
-        return false;
-    for (const auto& [key, held] : s.opening_stock_held)
+    // BL-1266 (v46): every manual trade names a live owner and two distinct
+    // standing markets, and holds an id below the next one to be issued, all
+    // ids distinct — the only trades the seam can write. Refused whole.
     {
-        if (s.corp_market_pools.count(key) == 0) return false;
-        for (const float h : held)
-            if (!std::isfinite(h) || h < 0.0f) return false;
+        std::set<uint32_t> ids;
+        std::map<entity_id, std::size_t> per_owner;
+        for (const standing_trade& t : s.trades)
+        {
+            if (++per_owner[t.owner] > 64) return false; // max_trades_per_corp
+            if (s.corporations.count(t.owner) == 0) return false;
+            if (t.from_market == t.to_market) return false;
+            if (s.markets.count(t.from_market) == 0 || s.markets.count(t.to_market) == 0) return false;
+            if (t.id >= s.next_trade_id || !ids.insert(t.id).second) return false;
+        }
     }
 
     clear_derived_state(s);

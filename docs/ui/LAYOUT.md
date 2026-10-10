@@ -133,7 +133,7 @@ This is a static identity readout in the prototype — no interaction beyond, ev
 A strip across the top of the canvas area, between the identity tile and the time column. Its left edge is the shell column's right edge (`x = W`). It stands the **full identity-tile height** (`profile_panel_height`, ~92 px) and top-aligns at `y = 0`, so the header and the identity tile read as **one level top band**; its content row is vertically centred within that strip. It is the player's persistent financial dashboard, wired to the live economy:
 
 - **Balance** — the player corporation's running treasury balance (negatives flagged red).
-- **Stockpile valuation** — an estimated liquid value of everything the player holds: its `(corporation, body)` pools summed at each body's current market price. A single money figure, not a per-resource inventory.
+- **Cargo valuation** — an estimated value of the goods the player owns: its trades' cargo in transit, at each destination market's current price (`HEADER.md`). A single money figure, not a per-resource inventory.
 - **Net + trend** — the last economy tick's net change as a coloured per-quarter figure, alongside a small sparkline of recent balances.
 
 The header answers "can I afford this, and which way is it trending?" without opening a ledger. Detailed, per-body breakdowns stay in their respective ledgers.
@@ -299,8 +299,8 @@ Fold-out ledgers with more than one question split their content across a **butt
 (`ui::nav_button`, `foldout_column.hpp` — a manual `Selectable`/`Button` strip, since
 `ImGui::BeginTabBar` does not render in this build), each view drawing exclusively. The splits:
 the **Construction** panel — **Construction / Buildings** (defaults to Buildings; the build
-front door is the tile Selection element's and sell orders are the Market Ledger's); the
-**Market Ledger** — **Prices / Sell Orders**; the **History** ledger — Story / Chain /
+front door is the tile Selection element's and trades are the Market Ledger's); the
+**Market Ledger** — **Goods / Trades**; the **History** ledger — Story / Chain /
 Ages. The **Balance** and **Corporation** ledgers are single-question — no split. The principle
 is *one question per view, a menu to move between views* — not a mandate to split every panel.
 
