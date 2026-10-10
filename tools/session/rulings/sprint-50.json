@@ -1,50 +1,313 @@
 {
  "_note": "Sprint 50 rulings for tools/session/ruling_check.js --register. anchor = a regex the owning doc must carry; stale = OLD wording that must not survive in docs/ outside docs/development. Code match is a reading, not checked here.",
  "rulings": [
-  {"ruling": "Sprint cut: all nine items, measure-led, extend rather than cut", "doc": "docs/development/sprints.json", "anchor": "all nine items, measure-led", "owner": "sprint row 50"},
-  {"ruling": "Trade-flow lens: a player lens over the player's own flows", "doc": "docs/ui/LENSES.md", "anchor": "player lens over the player's own flows", "owner": "BL-1222 (trade-flow lens)"},
-  {"ruling": "Every lens has its own glyph on the strip", "doc": "docs/ui/LENSES.md", "anchor": "Every lens has a glyph on the strip", "stale": ["remains? off[- ]strip", "lens(es)? (is|are) not on the strip"], "owner": "built (BL-1225, every lens on strip)"},
-  {"ruling": "Lever D: background demand consumes what it buys", "doc": "docs/economy/MARKETS.md", "anchor": "The pull consumes what it buys", "stale": ["background[^.]{0,60}(never|does not) (consume|draw|take)"], "owner": "built"},
-  {"ruling": "Background pull split by catchment; electronics stays until the household rung", "doc": "docs/economy/MARKETS.md", "anchor": "SPLIT across its markets in proportion to their catchment", "owner": "built (BL-1226, background pull per doc)"},
-  {"ruling": "Re-ruled: the pull draws after one tick of processor want", "doc": "docs/economy/MARKETS.md", "anchor": "the pull draws after the processors", "owner": "built"},
-  {"ruling": "Silenced processor want is left on the shelf too (processors' part only)", "doc": "docs/economy/MARKETS.md", "anchor": "includes want the fair-price ceiling silenced", "owner": "built"},
-  {"ruling": "Power's grid cell is the province; wired provinces joined by roads", "doc": "docs/economy/LOGISTICS.md", "anchor": "The province is the grid's cell", "stale": ["power[^.]{0,60}(body-wide|never crosses|does not cross) (a )?market"], "owner": "built (BL-1230, power crosses markets)"},
-  {"ruling": "A market's shelf is on its centre's grid", "doc": "docs/economy/LOGISTICS.md", "anchor": "A market's shelf is on its centre's grid", "owner": "built"},
-  {"ruling": "An order is a floor, not a hold", "doc": "docs/economy/MARKETS.md", "anchor": "An order is a floor, not a hold", "stale": ["order[^.]{0,40}(holds|keeps) (the )?goods (back|home)"], "owner": "built (BL-1229, steel stays home)"},
-  {"ruling": "Dispatch: what a pool may haul is what it would list (floor stands in; pad keeps propellant)", "doc": "docs/economy/SUPPLY.md", "anchor": "What a pool may haul is what it would list", "owner": "built"},
-  {"ruling": "A mine candidate is priced at its stack rank", "doc": "docs/ai/AI_OPPONENT.md", "anchor": "priced at the rank it would take", "owner": "built (BL-1227, idle mines)"},
-  {"ruling": "No bid vs listed supply, and a dead market in play, veto a build", "doc": "docs/ai/AI_OPPONENT.md", "anchor": "A\\s+market with no bid is read by what it lists", "owner": "built (BL-1227, idle mines)"},
-  {"ruling": "What counts as a bid: demand + silenced want + off-book want + launch fuel + own-pool upkeep + running consumers", "doc": "docs/ai/AI_OPPONENT.md", "anchor": "What counts as a bid", "owner": "built"},
-  {"ruling": "A running plant and what it consumes are observable", "doc": "docs/ui/DISCOVERY.md", "anchor": "That a plant is running, and what it consumes, is observable", "owner": "built"},
-  {"ruling": "A nation's unheld want lands at its capital's market (NR-984)", "doc": "docs/ai/AI_OPPONENT.md", "anchor": "capital's\\*\\* market", "owner": "built"},
-  {"ruling": "Grant: a rival reads its own refused processor as a bid for its own mine", "doc": "docs/ai/AI_OPPONENT.md", "anchor": "A rival may read its OWN refused processor", "owner": "built"},
-  {"ruling": "A processor needs spare reachable supply at t_idle", "doc": "docs/generation/CORPORATION_GENERATION.md", "anchor": "processor needs SPARE reachable supply", "owner": "built (BL-1233, processors to inputs)"},
-  {"ruling": "A refused processor's draw enters derived demand, tied to reach", "doc": "docs/generation/CORPORATION_GENERATION.md", "anchor": "prospective draw of a processor refused", "owner": "built"},
-  {"ruling": "Generation sized per power grid; unpowered grids first", "doc": "docs/economy/PRODUCTION.md", "anchor": "Generation is sized per grid, not per body", "stale": ["power (gap|need) (is )?(measured|summed) (per|over the) body"], "owner": "built (BL-1232, power plants per grid)"},
-  {"ruling": "The scorer's power-plant estimate reads the grid's shortfall - HELD", "doc": "docs/ai/AI_OPPONENT.md", "anchor": "power-plant candidate is priced against its grid's shortfall", "owner": "none open - NR (power gate held)"},
-  {"ruling": "The solver prices inputs at the posted price; power read on its grid", "doc": "docs/economy/PRODUCTION.md", "anchor": "An input is priced at what the draw pays", "owner": "built (power as an input: see the report)"},
-  {"ruling": "A new processor is judged on supply, not stock", "doc": "docs/ai/AI_OPPONENT.md", "anchor": "A build is judged on supply, not stock", "owner": "built (BL-1234, settle scorer starves)"},
-  {"ruling": "Every recipe switch (chase and rescue) is judged on supply; a resume keeps stock", "doc": "docs/ai/AI_OPPONENT.md", "anchor": "A recipe switch is judged on supply too", "stale": ["stock still counts for[^.]{0,40}recipe switch"], "owner": "built"},
-  {"ruling": "Grant: spare supply is net of household and background draws", "doc": "docs/ai/AI_OPPONENT.md", "anchor": "Spare supply counts what households and the background take", "owner": "built"},
-  {"ruling": "Generation charges household and background baskets whole at base (accepted as built)", "doc": "docs/generation/CORPORATION_GENERATION.md", "anchor": "household and background baskets whole at base", "owner": "built"},
-  {"ruling": "Targets: G1 >= 85%, G1b <= 5%", "doc": ".claude/skills/market-viability/SKILL.md", "anchor": "pooled >= 85% at handoff", "stale": ["G1 >= ?70"], "owner": "BL-1217 (inputs reach processors)"},
-  {"ruling": "G1 at tick 50 deferred with long-term viability", "doc": ".claude/skills/market-viability/SKILL.md", "anchor": "Deferred \\(Ben, 2026-10-09\\)", "owner": "BL-1248 (plants survive to t50)"},
-  {"ruling": "Propellant has a base price, 64.0, anchored on the atmospheric route", "doc": "docs/economy/RESOURCES.md", "anchor": "Propellant\\*\\* 64\\.0", "stale": ["41\\.8", "propellant[^.]{0,60}(no base price|carries no base|never sold|pool-only)"], "owner": "built"},
-  {"ruling": "Electrolysis only on airless bodies; atmospheric only under air", "doc": "docs/economy/PRODUCTION.md", "anchor": "And it runs only\\s+there", "stale": ["electrolysis[^.]{0,60}cheapest"], "owner": "built"},
-  {"ruling": "A pad's pool keeps its propellant from auto-surplus", "doc": "docs/economy/MARKETS.md", "anchor": "A pad's pool keeps its propellant", "owner": "built; rival drain is BL-1249 (pad fuel drained)"},
-  {"ruling": "The seat's dial-idled plants return to auto at the handoff (NR-986)", "doc": "docs/ai/AI_OPPONENT.md", "anchor": "seat's dial-idled plants return to auto", "owner": "built"},
-  {"ruling": "A dial-idled plant is not losing; the hold ends on recovery", "doc": "docs/ai/AI_OPPONENT.md", "anchor": "A plant the dial idled is not losing", "owner": "built (BL-1235, dial hold outlasts reflex)"},
-  {"ruling": "Grant: the dial reads stock-fed consumers (narrowed same day)", "doc": "docs/ai/AI_OPPONENT.md", "anchor": "Narrowed the same day", "stale": ["dial[^.]{0,40}reads the (same )?composite bid"], "owner": "built"},
-  {"ruling": "The dial forecasts at base where no fact exists (never-cleared market)", "doc": "docs/ai/AI_OPPONENT.md", "anchor": "The dial forecasts at base where no fact exists", "owner": "built"},
-  {"ruling": "The reflex rescue reads an unpriced output as floored", "doc": "docs/ai/AI_OPPONENT.md", "anchor": "rescue reads an unpriced output as floored", "owner": "built"},
-  {"ruling": "Opening stock held, not listed, until bid", "doc": "docs/generation/CORPORATION_GENERATION.md", "anchor": "Opening stock is held, not listed", "owner": "built"},
-  {"ruling": "No processor placed beyond its output's want", "doc": "docs/generation/CORPORATION_GENERATION.md", "anchor": "No processor is placed beyond its output's want", "owner": "built"},
-  {"ruling": "A recipe-less processor whose default output is unwanted is not placed", "doc": "docs/generation/CORPORATION_GENERATION.md", "anchor": "not placed when its\\s+default output is unwanted", "owner": "built"},
-  {"ruling": "Authored installation keeps its default; a chartered processing firm keeps its second works", "doc": "docs/generation/CORPORATION_GENERATION.md", "anchor": "Two exceptions", "owner": "built"},
-  {"ruling": "Roads: a route is priced on the field its destination's flood was built on (stale reuse kept)", "doc": "docs/economy/LOGISTICS.md", "anchor": "priced on the field its\\s+destination's cost flood was first built on", "stale": ["priced on the field as it stands"], "owner": "built"},
-  {"ruling": "No parallel roads: the snap, bounded at 1.75x", "doc": "docs/economy/LOGISTICS.md", "anchor": "1\\.75", "stale": ["second road beside a serviceable one\\s+is never built"], "owner": "built (BL-1252, no parallel roads; status flip owed)"},
-  {"ruling": "Road generation schema kept", "doc": null, "anchor": null, "owner": "no change"},
-  {"ruling": "Quick Start on the main menu; loading bars in a top band", "doc": "docs/ui/STARTUP.md", "anchor": "Every loading bar sits in a top band", "owner": "built"},
-  {"ruling": "Unmet want visible to the player in sprint 51", "doc": "docs/ui/LENSES.md", "anchor": "The player sees unmet\\s+want", "owner": "BL-1222 (trade-flow lens)"}
+  {
+   "ruling": "Sprint cut: all nine items, measure-led, extend rather than cut",
+   "doc": "docs/development/sprints.json",
+   "anchor": "all nine items, measure-led",
+   "owner": "sprint row 50"
+  },
+  {
+   "ruling": "Trade-flow lens: a player lens over the player's own flows",
+   "doc": "docs/ui/LENSES.md",
+   "anchor": "player lens over the player's own flows",
+   "owner": "BL-1222 (trade-flow lens)"
+  },
+  {
+   "ruling": "Every lens has its own glyph on the strip",
+   "doc": "docs/ui/LENSES.md",
+   "anchor": "Every lens has a glyph on the strip",
+   "stale": [
+    "remains? off[- ]strip",
+    "lens(es)? (is|are) not on the strip"
+   ],
+   "owner": "built (BL-1225, every lens on strip)"
+  },
+  {
+   "ruling": "Lever D: background demand consumes what it buys",
+   "doc": "docs/economy/MARKETS.md",
+   "anchor": "The pull consumes what it buys",
+   "stale": [
+    "background[^.]{0,60}(never|does not) (consume|draw|take)"
+   ],
+   "owner": "built"
+  },
+  {
+   "ruling": "Background pull split by catchment; electronics stays until the household rung",
+   "doc": "docs/economy/MARKETS.md",
+   "anchor": "SPLIT across its markets in proportion to their catchment",
+   "owner": "built (BL-1226, background pull per doc)"
+  },
+  {
+   "ruling": "Re-ruled: the pull draws after one tick of processor want",
+   "doc": "docs/economy/MARKETS.md",
+   "anchor": "the pull draws after the processors",
+   "owner": "built"
+  },
+  {
+   "ruling": "Silenced processor want is left on the shelf too (processors' part only)",
+   "doc": "docs/economy/MARKETS.md",
+   "anchor": "includes want the fair-price ceiling silenced",
+   "owner": "built"
+  },
+  {
+   "ruling": "Power's grid cell is the province; wired provinces joined by roads",
+   "doc": "docs/economy/LOGISTICS.md",
+   "anchor": "The province is the grid's cell",
+   "stale": [
+    "power[^.]{0,60}(body-wide|never crosses|does not cross) (a )?market"
+   ],
+   "owner": "built (BL-1230, power crosses markets)"
+  },
+  {
+   "ruling": "A market's shelf is on its centre's grid",
+   "doc": "docs/economy/LOGISTICS.md",
+   "anchor": "A market's shelf is on its centre's grid",
+   "owner": "built"
+  },
+  {
+   "ruling": "An order is a floor, not a hold - SUPERSEDED (Ben, 2026-10-10, the shelf economy)",
+   "doc": "docs/economy/MARKETS.md",
+   "anchor": "The order book retires",
+   "stale": [
+    "order[^.]{0,40}(holds|keeps) (the )?goods (back|home)"
+   ],
+   "owner": "superseded by BL-1265 (shelf economy)"
+  },
+  {
+   "ruling": "Dispatch: what a pool may haul is what it would list (floor stands in; pad keeps propellant) - SUPERSEDED (Ben, 2026-10-10, trade replaces the dispatcher)",
+   "doc": "docs/economy/SUPPLY.md",
+   "anchor": "A shipment",
+   "owner": "superseded by BL-1266 (trade core)"
+  },
+  {
+   "ruling": "A mine candidate is priced at its stack rank",
+   "doc": "docs/ai/AI_OPPONENT.md",
+   "anchor": "priced at the rank it would take",
+   "owner": "built (BL-1227, idle mines)"
+  },
+  {
+   "ruling": "No bid vs listed supply, and a dead market in play, veto a build",
+   "doc": "docs/ai/AI_OPPONENT.md",
+   "anchor": "A\\s+market with no bid is read by what it lists",
+   "owner": "built (BL-1227, idle mines)"
+  },
+  {
+   "ruling": "What counts as a bid: demand + silenced want + off-book want + launch fuel + own-pool upkeep + running consumers",
+   "doc": "docs/ai/AI_OPPONENT.md",
+   "anchor": "What counts as a bid",
+   "owner": "built"
+  },
+  {
+   "ruling": "A running plant and what it consumes are observable",
+   "doc": "docs/ui/DISCOVERY.md",
+   "anchor": "That a plant is running, and what it consumes, is observable",
+   "owner": "built"
+  },
+  {
+   "ruling": "A nation's unheld want lands at its capital's market (NR-984)",
+   "doc": "docs/ai/AI_OPPONENT.md",
+   "anchor": "capital's\\*\\* market",
+   "owner": "built"
+  },
+  {
+   "ruling": "Grant: a rival reads its own refused processor as a bid for its own mine",
+   "doc": "docs/ai/AI_OPPONENT.md",
+   "anchor": "A rival may read its OWN refused processor",
+   "owner": "built"
+  },
+  {
+   "ruling": "A processor needs spare reachable supply at t_idle",
+   "doc": "docs/generation/CORPORATION_GENERATION.md",
+   "anchor": "processor needs SPARE reachable supply",
+   "owner": "built (BL-1233, processors to inputs)"
+  },
+  {
+   "ruling": "A refused processor's draw enters derived demand, tied to reach",
+   "doc": "docs/generation/CORPORATION_GENERATION.md",
+   "anchor": "prospective draw of a processor refused",
+   "owner": "built"
+  },
+  {
+   "ruling": "Generation sized per power grid; unpowered grids first",
+   "doc": "docs/economy/PRODUCTION.md",
+   "anchor": "Generation is sized per grid, not per body",
+   "stale": [
+    "power (gap|need) (is )?(measured|summed) (per|over the) body"
+   ],
+   "owner": "built (BL-1232, power plants per grid)"
+  },
+  {
+   "ruling": "The scorer's power-plant estimate reads the grid's shortfall - HELD",
+   "doc": "docs/ai/AI_OPPONENT.md",
+   "anchor": "power-plant candidate is priced against its grid's shortfall",
+   "owner": "none open - NR (power gate held)"
+  },
+  {
+   "ruling": "The solver prices inputs at the posted price; power read on its grid",
+   "doc": "docs/economy/PRODUCTION.md",
+   "anchor": "An input is priced at what the draw pays",
+   "owner": "built (power as an input: see the report)"
+  },
+  {
+   "ruling": "A new processor is judged on supply, not stock",
+   "doc": "docs/ai/AI_OPPONENT.md",
+   "anchor": "A build is judged on supply, not stock",
+   "owner": "built (BL-1234, settle scorer starves)"
+  },
+  {
+   "ruling": "Every recipe switch (chase and rescue) is judged on supply; a resume keeps stock",
+   "doc": "docs/ai/AI_OPPONENT.md",
+   "anchor": "A recipe switch is judged on supply too",
+   "stale": [
+    "stock still counts for[^.]{0,40}recipe switch"
+   ],
+   "owner": "built"
+  },
+  {
+   "ruling": "Grant: spare supply is net of household and background draws",
+   "doc": "docs/ai/AI_OPPONENT.md",
+   "anchor": "Spare supply counts what households and the background take",
+   "owner": "built"
+  },
+  {
+   "ruling": "Generation charges household and background baskets whole at base (accepted as built)",
+   "doc": "docs/generation/CORPORATION_GENERATION.md",
+   "anchor": "household and background baskets whole at base",
+   "owner": "built"
+  },
+  {
+   "ruling": "Targets: G1 >= 85%, G1b <= 5%",
+   "doc": ".claude/skills/market-viability/SKILL.md",
+   "anchor": "pooled >= 85% at handoff",
+   "stale": [
+    "G1 >= ?70"
+   ],
+   "owner": "BL-1217 (inputs reach processors)"
+  },
+  {
+   "ruling": "G1 at tick 50 deferred with long-term viability",
+   "doc": ".claude/skills/market-viability/SKILL.md",
+   "anchor": "Deferred \\(Ben, 2026-10-09\\)",
+   "owner": "BL-1248 (plants survive to t50)"
+  },
+  {
+   "ruling": "Propellant has a base price, 64.0, anchored on the atmospheric route",
+   "doc": "docs/economy/RESOURCES.md",
+   "anchor": "Propellant\\*\\* 64\\.0",
+   "stale": [
+    "41\\.8",
+    "propellant[^.]{0,60}(no base price|carries no base|never sold|pool-only)"
+   ],
+   "owner": "built"
+  },
+  {
+   "ruling": "Electrolysis only on airless bodies; atmospheric only under air",
+   "doc": "docs/economy/PRODUCTION.md",
+   "anchor": "And it runs only\\s+there",
+   "stale": [
+    "electrolysis[^.]{0,60}cheapest"
+   ],
+   "owner": "built"
+  },
+  {
+   "ruling": "A pad's pool keeps its propellant from auto-surplus - SUPERSEDED (Ben, 2026-10-10, the shelf economy)",
+   "doc": "docs/economy/MARKETS.md",
+   "anchor": "a launch's propellant",
+   "owner": "superseded by BL-1265 (shelf economy)"
+  },
+  {
+   "ruling": "The seat's dial-idled plants return to auto at the handoff (NR-986)",
+   "doc": "docs/ai/AI_OPPONENT.md",
+   "anchor": "seat's dial-idled plants return to auto",
+   "owner": "built"
+  },
+  {
+   "ruling": "A dial-idled plant is not losing; the hold ends on recovery",
+   "doc": "docs/ai/AI_OPPONENT.md",
+   "anchor": "A plant the dial idled is not losing",
+   "owner": "built (BL-1235, dial hold outlasts reflex)"
+  },
+  {
+   "ruling": "Grant: the dial reads stock-fed consumers (narrowed same day)",
+   "doc": "docs/ai/AI_OPPONENT.md",
+   "anchor": "Narrowed the same day",
+   "stale": [
+    "dial[^.]{0,40}reads the (same )?composite bid"
+   ],
+   "owner": "built"
+  },
+  {
+   "ruling": "The dial forecasts at base where no fact exists (never-cleared market)",
+   "doc": "docs/ai/AI_OPPONENT.md",
+   "anchor": "The dial forecasts at base where no fact exists",
+   "owner": "built"
+  },
+  {
+   "ruling": "The reflex rescue reads an unpriced output as floored",
+   "doc": "docs/ai/AI_OPPONENT.md",
+   "anchor": "rescue reads an unpriced output as floored",
+   "owner": "built"
+  },
+  {
+   "ruling": "Opening stock held, not listed, until bid - SUPERSEDED (Ben, 2026-10-10, the shelf economy)",
+   "doc": "docs/generation/CORPORATION_GENERATION.md",
+   "anchor": "The opening stock goes on the shelves",
+   "owner": "superseded by BL-1265 (shelf economy)"
+  },
+  {
+   "ruling": "No processor placed beyond its output's want",
+   "doc": "docs/generation/CORPORATION_GENERATION.md",
+   "anchor": "No processor is placed beyond its output's want",
+   "owner": "built"
+  },
+  {
+   "ruling": "A recipe-less processor whose default output is unwanted is not placed",
+   "doc": "docs/generation/CORPORATION_GENERATION.md",
+   "anchor": "not placed when its\\s+default output is unwanted",
+   "owner": "built"
+  },
+  {
+   "ruling": "Authored installation keeps its default; a chartered processing firm keeps its second works",
+   "doc": "docs/generation/CORPORATION_GENERATION.md",
+   "anchor": "Two exceptions",
+   "owner": "built"
+  },
+  {
+   "ruling": "Roads: a route is priced on the field its destination's flood was built on (stale reuse kept)",
+   "doc": "docs/economy/LOGISTICS.md",
+   "anchor": "priced on the field its\\s+destination's cost flood was first built on",
+   "stale": [
+    "priced on the field as it stands"
+   ],
+   "owner": "built"
+  },
+  {
+   "ruling": "No parallel roads: the snap, bounded at 1.75x",
+   "doc": "docs/economy/LOGISTICS.md",
+   "anchor": "1\\.75",
+   "stale": [
+    "second road beside a serviceable one\\s+is never built"
+   ],
+   "owner": "built (BL-1252, no parallel roads; status flip owed)"
+  },
+  {
+   "ruling": "Road generation schema kept",
+   "doc": null,
+   "anchor": null,
+   "owner": "no change"
+  },
+  {
+   "ruling": "Quick Start on the main menu; loading bars in a top band",
+   "doc": "docs/ui/STARTUP.md",
+   "anchor": "Every loading bar sits in a top band",
+   "owner": "built"
+  },
+  {
+   "ruling": "Unmet want visible to the player in sprint 51",
+   "doc": "docs/ui/LENSES.md",
+   "anchor": "The player sees unmet\\s+want",
+   "owner": "BL-1222 (trade-flow lens)"
+  }
  ]
 }

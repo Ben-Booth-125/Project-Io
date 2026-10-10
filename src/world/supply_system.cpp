@@ -1079,7 +1079,7 @@ float dispatch_absorbable(const world& w, const recipe_registry& reg, entity_id 
     // destination at zero margin and pushed its local sellers down to the
     // importer's landed cost. L' = L x (1 + margin) is the price aimed at.
     const float aim = landed_cost * (1.0f + reg.dispatch_margin());
-    // BL-1203 (SUPPLY.md § Dispatch trigger, "What a hauler sees as unmet
+    // BL-1203 (SUPPLY.md § A shipment, "What a hauler sees as unmet
     // demand", Ben 2026-10-05): D is the demand a hauler landing at L' meets —
     // the households' bid RE-READ at that price (their elastic factor
     // clamp((base / L')^e) in place of the one their posted bid carries;

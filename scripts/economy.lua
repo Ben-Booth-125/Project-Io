@@ -1808,7 +1808,7 @@ logistics = {
         cap            = 0.50, -- ceiling on the summed node discount (fraction of the haul cost).
     },
 
-    -- BL-995 (trade reaches for price; docs/economy/SUPPLY.md § Dispatch trigger): the
+    -- BL-995 (trade reaches for price; docs/economy/SUPPLY.md § A shipment): the
     -- auto-dispatch margin threshold. A (corp, market) pool's good is hauled to market d only
     -- when its net price there (price_d less the per-unit haul) beats the home price by more
     -- than dispatch_margin x home price. 0.05: a gap under 5% of the home price is noise —

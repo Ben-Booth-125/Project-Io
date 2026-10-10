@@ -515,9 +515,9 @@ own docs:
 
 | Rule that kept trade local | Ruled | Where it now lives |
 |---|---|---|
-| Goods pools per body, so a same-body haul returned to the pool it left and sold at home | Pools per **market** | `../economy/PRODUCTION.md` § Stockpile and output flow |
+| Goods pools per body, so a same-body haul returned to the pool it left and sold at home | Pools per **market** | `../economy/PRODUCTION.md` § Output and the shelf |
 | A corp sells through its lowest-id building's market | A corp clears in every market it holds a pool in | `../economy/MARKETS.md` § Market centres and seeding |
-| Dispatch chases **shortfall**, never price | The **seller chases net price**, bounded by what the gap absorbs | `../economy/SUPPLY.md` § Dispatch trigger |
+| Dispatch chases **shortfall**, never price | The **seller chases net price**, bounded by what the gap absorbs | `../economy/SUPPLY.md` § A shipment |
 | Sea costs **more** per distance than land | Sea **cheapest** per distance, with a handling fee at each port | `SUPPLY.md` § Logistical cost |
 | Tariffs apply only to matched order-book trades, so none fire | Duty on **convoy arrival across a border**, paid by the shipper | `MARKETS.md` § Tariffs — the first flow that pays a nation |
 | One `base_price` per good in every market | **Kept** — gaps come from forces, not from authored prices | `MARKETS.md` § Price resolution |

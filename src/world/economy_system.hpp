@@ -342,7 +342,7 @@ struct economy_report
     /// leaves (MARKETS.md step 3). Same key, same sorted std::map as `wants`.
     std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> processor_wants;
 
-    /// BL-1203 (water reaches dry markets; SUPPLY.md § Dispatch trigger, "What a
+    /// BL-1203 (water reaches dry markets; SUPPLY.md § A shipment, "What a
     /// hauler sees as unmet demand", Ben 2026-10-05): the HAULER-ONLY want — a
     /// processor's input and a construction site's material that went unbid
     /// because the posted price stood over the fair-price ceiling (BL-1172: a

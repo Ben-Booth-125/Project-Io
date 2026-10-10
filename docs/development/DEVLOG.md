@@ -10,6 +10,53 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-10-10 — Sprint 50 extended: the shelf economy and trade built (BL-1265..BL-1270)
+
+**Runtime:** one session, 2026-10-10; mode Delivery Full. Branch `claude/shelf-economy-trade-42f8f4`,
+cut from `worktree-sprint-50`; not yet merged back (the re-bless waits for Ben's go).
+
+### Built
+- **BL-1265 (shelf economy), main session.** Corporation pools, the held opening stock, the dial's
+  pool-draw register, the order book, auto-surplus, the processor and pad reservations retire.
+  Every landing (production, a trade's arrival, a capture, a procurement delivery) sells at the
+  tick's clear; every buyer buys off the shelf at the posted price under the ceiling. Opening
+  stock is placed on the shelves where each corporation's buildings stand. The import tariff is
+  charged at a convoy's arrival (MARKETS.md § Tariffs, now its only point of charge). Save v46.
+- **BL-1266 (trade core), main session.** Planetary Marketplace; trade points (Marketplace staffed,
+  Port flat, none on unmet upkeep); capacity table; manual trades, reserve, three verbs; auto
+  trade; `run_trades` in place of the dispatcher; a shipment buys at source, pays the haul,
+  passes the LP cap, lands and sells.
+- **BL-1267 (AI trades)** lane: pin / unpin / reserve under the § 11 grant; cut back over the share.
+- **BL-1268 (trade in generation)** lane: the history's trade record and the Marketplace retrofit
+  (164 on 16 seeds); Part B (points replace the Exploration flows) planned only.
+- **BL-1269 (trade UI)** lane: the Trades tab (points, reserve, my trades, add form, potential
+  trades from the pass's own ranking), Marketplace in the Build door, CARGO in the header.
+- Harness sweep: every harness adapted or retired (ten probes of retired systems removed).
+- Docs lane: sibling docs rewritten to the shelf model; ruling register re-pointed.
+
+### Reviews
+Four cold reviews. The core review found the opening stock left behind by a removed roster, an
+overdraw hole in trade solvency, absorbable room double-counting landings, an unledgered hire
+purchase, a procurement landing nowhere — all fixed. The UI review found a reserve button that
+could never fire — fixed and now clicked for real by `trades_tab.lua`.
+
+### Measured (16 seeds; base on this branch's start)
+| | base | built |
+|---|---|---|
+| G1 handoff | 96.7 | 93.6 |
+| G1b | 1.7 | **5.3 (FAIL, <= 5)** |
+| G1 t50 | 87.3 | 90.0 |
+| G2 | 95.6 | 116.7 |
+| G3 | 100 (t50) | 96.6 (t400) |
+Trade per seed-tick: ~87 points, ~154 units; refined fuel as trade-building upkeep left every
+Marketplace silent (over the ceiling), so they burn coal.
+
+### Open for Ben
+NR-1011..NR-1021 (decisions taken, the rival-builds-a-Marketplace grant, manual-trade reach, the
+capacity table and retrofit rates, the exchange ring window). The re-bless, the live clicks
+(Trades tab, Build door, CARGO), and the merge back to `worktree-sprint-50`.
+---
+
 ## 2026-10-04 — Sprint 48 closes: three branches ruled, reviewed and merged; the overseas reach designed
 
 **Runtime:** 2026-10-03 evening to 2026-10-04; modes Delivery Full (the three held branches), then
@@ -1677,7 +1724,7 @@ round doing both "complicates the story for the user". Authority: `docs/generati
 
 ### What moved the design
 
-**The tie's consumer was dormant.** `MARKETS.md` § Where the order book lives: no press and no
+**The tie's consumer was dormant.** `MARKETS.md` § The shelf economy: no press and no
 `corp_verb` submits a buy order, so the preferred-seller routing the design had seeded ties into
 runs for nobody. The tie became a **sea lane** — a stamped discount on sea-leg traversal cost, the
 water analogue of the ancient roads — read by convoys, reach and placement alike because traversal

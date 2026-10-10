@@ -1241,7 +1241,7 @@ public:
     /// BL-995 (trade reaches for price): the auto-dispatch margin threshold
     /// (logistics.dispatch_margin in Lua). A pool's good is hauled to market d
     /// only when `net(d) - price_src > dispatch_margin() * price_src`
-    /// (SUPPLY.md § Dispatch trigger). Never zero: see m_dispatch_margin.
+    /// (SUPPLY.md § A shipment). Never zero: see m_dispatch_margin.
     float dispatch_margin() const { return m_dispatch_margin; }
     /// BL-1203: whether the dispatcher's room reads the hauler's view (households
     /// at the landed price + the ceiling-suppressed want). Always on in the game

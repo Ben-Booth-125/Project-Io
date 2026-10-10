@@ -47,7 +47,7 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int eco
     lp_pool_map tick_lp_pools;
     // BL-1066 / BL-995 (Ben, 2026-09-23): the convoy ORDER within the tick is
     // advance -> credit arrivals -> economy -> DISPATCH -> clearing -> budget
-    // (SUPPLY.md § Dispatch trigger, "One beat per haul"). A delivery lands
+    // (SUPPLY.md § A shipment, "One beat per haul"). A delivery lands
     // BEFORE its destination clears, so it lists and sells there first; the
     // dispatch sits before the clear because auto-surplus sells every unit a
     // pool holds above its reservation, so a seller that has not chosen to

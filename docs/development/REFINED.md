@@ -78,7 +78,7 @@ tools/session/rulings/sprint-50.json`; list every dated ruling: `--since 2026-10
 - [x] Lever D: background demand consumes; numbers at the split pull (MARKETS.md step 3, 12)
 - [x] Background pull split by catchment; electronics stays until the household rung (MARKETS.md)
 - [x] Power rides the province grid; market shelf on its centre's grid (LOGISTICS.md § 3a) — grid-level shelf cap added to LOGISTICS § 3a
-- [x] An order is a floor, not a hold (MARKETS.md step 4; ACTIONS place_sell_order; NR-982) — SUPPLY § Dispatch trigger now says it too
+- [x] An order is a floor, not a hold (MARKETS.md step 4; ACTIONS place_sell_order; NR-982) — SUPPLY § A shipment now says it too
 - [x] A mine candidate is priced at its stack rank (AI_OPPONENT.md)
 - [x] A processor needs spare reachable supply at t_idle (CORPORATION_GENERATION.md Pass 3)
 - [x] A refused processor's draw enters derived demand, tied to reach (CORPORATION_GENERATION.md)
@@ -127,17 +127,17 @@ run/built at handoff 1739/1798.
   buy at the source, pay the haul, pass the LP cap, land and sell; space lane buys propellant.
 - [x] S3 Core harnesses: save_roundtrip (80 PASS), money_conservation (ALL PASS),
   determinism_harness (PASS); world_audit / world_determinism / spectator / history_sim running.
-- [ ] S4 Harness sweep lane (economy-dev): every other tools/verify harness adapted or retired.
-- [ ] S5 BL-1269 (trade UI) lane (ui-dev): app compiles; trade surface; Marketplace in Build;
+- [x] S4 Harness sweep lane (economy-dev): every other tools/verify harness adapted or retired.
+- [x] S5 BL-1269 (trade UI) lane (ui-dev): app compiles; trade surface; Marketplace in Build;
   ACTIONS.json; question_log; scripts. Ben's live click.
-- [ ] S6 BL-1268 (trade in generation) lane (generation-dev): the history's trade record and the
+- [x] S6 BL-1268 (trade in generation) lane (generation-dev): the history's trade record and the
   Marketplace retrofit at the charter walk; rates proposed by measurement; Part B (points replace
   the Exploration flows) as a plan for Ben.
-- [ ] S7 BL-1267 (AI trades) lane (economy-dev): pin / unpin / reserve under the § 11 grant.
-- [ ] S8 Docs lane: sibling docs rewritten to the shelf model; ruling-check.
-- [ ] S9 BL-1270 (trade capacity table): measure on 16 seeds; put capacity, point rates and
+- [x] S7 BL-1267 (AI trades) lane (economy-dev): pin / unpin / reserve under the § 11 grant.
+- [x] S8 Docs lane: sibling docs rewritten to the shelf model; ruling-check.
+- [x] S9 BL-1270 (trade capacity table): measured (NR-1020: G1b 5.3 FAIL, the rest pass); awaiting Ben. Put capacity, point rates and
   upkeep to Ben.
-- [ ] S10 Integrate every lane; cold code-reviewer round per lane; 16-seed gate; scripted visual
+- [ ] S10 (all lanes merged and cold-reviewed with fix rounds; 16-seed gate run; air_gate, sea_lane, trades_tab pass; ruling register 0 MISS. OWED: Ben's live clicks, his calls on NR-1011..1021, the re-bless, the merge back.) Integrate every lane; cold code-reviewer round per lane; 16-seed gate; scripted visual
   checks (air_gate, sea_lane); ruling-check; then the one re-bless with Ben's go.
 
 ## Sprint 48 — the world moves forward (opened 2026-09-25, CLOSED 2026-10-04)

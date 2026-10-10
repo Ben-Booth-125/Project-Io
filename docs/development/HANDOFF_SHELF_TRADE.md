@@ -51,7 +51,7 @@ measurement and approved by Ben**.
 Sibling docs that still describe pools, auto-surplus, sell orders, the corporation convoy or the
 market export — **rewrite each to the new model as its code changes** (the doc rule: a ruling lands
 in its owning doc; grep the OLD wording across docs/). Known: MARKETS.md steps 4–5 and 9 (auto-surplus,
-sell orders), § Real market inventory; PRODUCTION.md § Stockpile and output flow, § Launchpad (the
+sell orders), § Real market inventory; PRODUCTION.md § Output and the shelf, § Launchpad (the
 pad's pool reserve); SUPPLY.md (dispatch trigger, the convoy as a pool haul; keep the convoy as the
 trade's shipment); FINANCE.md (where a sale's money comes from); CONTRACTS.md (procurement delivery
 from a pool); LOGISTICS.md § Logistic Points (passive LP "serves automatic trading" — now serves

@@ -1093,7 +1093,7 @@ struct market_component
     std::array<float, resource_count> household_bid  = {};
     std::array<float, resource_count> household_fill = {};
 
-    /// BL-1203 (water reaches dry markets; SUPPLY.md § Dispatch trigger, "What a
+    /// BL-1203 (water reaches dry markets; SUPPLY.md § A shipment, "What a
     /// hauler sees as unmet demand", Ben 2026-10-05). Two reads of the last
     /// clear for DISPATCH — neither ever bids (BL-1172 unchanged); the price law
     /// reads `hauler_want` only as the cap on the shelf's share of supply
