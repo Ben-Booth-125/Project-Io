@@ -3110,18 +3110,16 @@ std::vector<entity_id> generate_corporations(
         // production / trade have materials from turn one. Generated for every
         // corp (fixed RNG-draw order) so the stream stays deterministic even
         // when a holdless corp has no body to seed; only corps with a home body
-        // receive a pool. Populates the existing corp_market_pools map (no new
-        // save field). The pre-game warm-start then evolves this seed.
+        // receive stock. BL-1265: held until the markets stand, then placed on
+        // the shelves of the markets it sits in (`place_opening_stock`,
+        // CORPORATION_GENERATION.md § Pass 4b).
         const auto stock = generate_starting_stockpile(
             corp_focuses[static_cast<std::size_t>(c)],
             corp_capitals[static_cast<std::size_t>(c)],
             params.base_capital, stock_rng);
         if (home_body != null_entity)
         {
-            // BL-1003: the HQ's tile market pool (body-level if no market yet;
-            // rehome_opening_pools moves it once the home markets are carved).
-            // BL-1217 D5: held off the shelf until its market bids for it.
-            seed_opening_stock(w, corp_id, corp_home_pool_key(w, corp_id, home_body), stock);
+            seed_opening_stock(w, corp_id, stock);
         }
     }
 
@@ -3256,11 +3254,8 @@ int remove_specialist_roster(world& w)
             w.stockpiles.erase(cc.hq_building);
         }
 
-        for (auto it = w.corp_market_pools.begin(); it != w.corp_market_pools.end();)
-            it = (it->first.first == cid) ? w.corp_market_pools.erase(it) : std::next(it);
-        // BL-1217 D5: the held opening stock goes with the pools.
-        for (auto it = w.opening_stock_held.begin(); it != w.opening_stock_held.end();)
-            it = (it->first.first == cid) ? w.opening_stock_held.erase(it) : std::next(it);
+        // BL-1265: its held opening stock goes with it (never placed).
+        w.gen_opening_stock.erase(cid);
 
         // Units are keyed by their own id; collect then erase so the map is not
         // mutated under its iterator. Order-insensitive: every erase is by key.
@@ -3782,8 +3777,11 @@ std::vector<entity_id> generate_background_firms(
             {
                 const auto stock = generate_starting_stockpile(
                     focus, /*capital=*/0.0f, /*base_capital=*/0.0f, stock_rng);
-                const entity_id pool_key = corp_home_pool_key(w, corp_id, home_body);
-                seed_opening_stock(w, corp_id, pool_key, stock); // BL-1003 HQ tile pool; BL-1217 D5 held
+                // The market its stock is priced at for working capital: its
+                // home market there, else (none carved yet) the body itself.
+                const entity_id home_mkt = corp_home_market(w, corp_id, home_body);
+                const entity_id pool_key = (home_mkt != null_entity) ? home_mkt : home_body;
+                seed_opening_stock(w, corp_id, stock); // BL-1265: placed on the shelves later
 
                 // BL-1173: the firm opens with working capital priced from the
                 // stock it was just handed (background_working_capital, above).
@@ -3849,30 +3847,8 @@ unplace_tally unplace_and_reseat(world& w, const std::map<entity_id, std::vector
             if (corp.is_player)
                 ++out.player_holdless;
         }
-        std::vector<std::pair<entity_id, entity_id>> moves; // (from key, to key)
-        for (const auto& [key, pool] : w.corp_market_pools)
-        {
-            (void)pool;
-            if (key.first != cid)
-                continue;
-            const entity_id body = pool_key_body(w, key.second);
-            if (body == null_entity)
-                continue;
-            const entity_id home = corp_home_pool_key(w, cid, body);
-            if (home != key.second)
-                moves.emplace_back(key.second, home);
-        }
-        std::sort(moves.begin(), moves.end());
-        for (const auto& mv : moves)
-        {
-            const auto src = w.corp_market_pools.find({ cid, mv.first });
-            const stockpile_component moved = src->second;
-            w.corp_market_pools.erase(src);
-            stockpile_component& dst = w.pool_at(cid, mv.second);
-            for (std::size_t r = 0; r < resource_count; ++r)
-                dst.quantities[r] += moved.quantities[r];
-            move_opening_stock_held(w, { cid, mv.first }, { cid, mv.second }); // BL-1217 D5
-        }
+        // BL-1265: no pools to re-key — the opening stock is held per
+        // corporation until `place_opening_stock` reads the buildings it keeps.
     }
     return out;
 }
@@ -6025,8 +6001,8 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                 const auto stock = generate_starting_stockpile(focus, capital,
                                                                capital_params.base_capital,
                                                                stock_rng);
-                if (home_body != null_entity) // BL-1003 HQ tile pool; BL-1217 D5 held
-                    seed_opening_stock(w, corp_id, corp_home_pool_key(w, corp_id, home_body), stock);
+                if (home_body != null_entity) // BL-1265: placed on the shelves later
+                    seed_opening_stock(w, corp_id, stock);
             }
         }
 
@@ -6671,8 +6647,11 @@ std::vector<entity_id> charter_web_from_budget(world& w,
             {
                 const auto stock = generate_starting_stockpile(
                     focus, /*capital=*/0.0f, /*base_capital=*/0.0f, stock_rng);
-                const entity_id pool_key = corp_home_pool_key(w, corp_id, home_body);
-                seed_opening_stock(w, corp_id, pool_key, stock); // BL-1003 HQ tile pool; BL-1217 D5 held
+                // The market its stock is priced at for working capital: its
+                // home market there, else (none carved yet) the body itself.
+                const entity_id home_mkt = corp_home_market(w, corp_id, home_body);
+                const entity_id pool_key = (home_mkt != null_entity) ? home_mkt : home_body;
+                seed_opening_stock(w, corp_id, stock); // BL-1265: placed on the shelves later
 
                 // BL-1173: the firm opens with working capital priced from the
                 // stock it was just handed (background_working_capital, above).

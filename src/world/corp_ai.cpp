@@ -83,14 +83,16 @@ entity_id resolve_command_body(const world& w, const corp_command& cmd)
             return (mit != w.markets.end()) ? mit->second.body : null_entity;
         }
         case corp_verb::remove_sell_order:
+            return null_entity; // BL-1265: retired, rejected — names nothing
+        case corp_verb::set_trade:
         {
-            // The order names no body directly; resolve it from the book while
-            // the order still exists (this runs before the command applies).
-            for (const sell_order& o : w.sell_orders)
-                if (o.id == cmd.order)
-                    return o.body;
-            return null_entity;
+            // BL-1266: subject is the SOURCE MARKET, as dispatch_convoy's was.
+            const auto mit = w.markets.find(cmd.subject);
+            return (mit != w.markets.end()) ? mit->second.body : null_entity;
         }
+        case corp_verb::clear_trade:
+        case corp_verb::set_trade_reserve:
+            return null_entity; // names a trade or the corp, not a place
         default:
         {
             const auto bit = w.buildings.find(cmd.subject);
@@ -550,42 +552,9 @@ float standing_economic(const world& w, const recipe_registry& reg,
         worth += reg.economics(bit->second.type).build_cost;
     }
 
-    // HELD STOCK, at the resolved price of the pool's OWN market (BL-1003: the
-    // pool key IS the market; a body-level pool sits on a market-less body and
-    // is valued at nothing, as before). `corp_market_pools` is a std::map, so
-    // this walk is key-ordered.
-    //
-    // Unlike the building term this one IS marked to market, and the asymmetry
-    // is the right call rather than an oversight. A balance sheet must not move
-    // on prices, because it feeds an acquisition price a buyer has to be able
-    // to reproduce. Standing is a COMPARATIVE index read once per tick, and
-    // every corp in the field is marked at the same prices on the same tick, so
-    // a price move lifts or drops holders together rather than reordering them
-    // spuriously — and stock really is worth less on a market that pays less
-    // for it.
-    //
-    // A good the local market does not price contributes NOTHING, which is the
-    // honest answer rather than a gap: there is nowhere to sell it.
-    for (auto it = w.corp_market_pools.lower_bound({corp, entity_id{0}});
-         it != w.corp_market_pools.end() && it->first.first == corp; ++it)
-    {
-        const stockpile_component& pool = it->second;
-        const auto mit = w.markets.find(it->first.second);
-        if (mit == w.markets.end())
-            continue; // body-level pool: no market prices it
-        const market_component& mc = mit->second;
-        for (std::size_t r = 0; r < resource_count; ++r)
-        {
-            if (mc.base_price[r] <= 0.0f)
-                continue; // this market does not price the good
-            // The RESOLVED price where there is one, falling back to the
-            // rarity base — the same two-step the dispatch candidate makes, so
-            // a market that has not cleared yet still values stock rather than
-            // valuing it at zero.
-            const float price = (mc.price[r] > 0.0f) ? mc.price[r] : mc.base_price[r];
-            worth += static_cast<double>(pool.quantities[r]) * static_cast<double>(price);
-        }
-    }
+    // BL-1265 (MARKETS.md § The shelf economy): corporations hold no stock —
+    // every good is the market's from the moment it lands — so there is no
+    // held-stock term; worth is cash and buildings.
 
     return static_cast<float>(worth);
 }
@@ -1542,11 +1511,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 const entity_id body = tit->second.body;
 
                 // BL-1234: a NEW processor is judged and priced on supply
-                // alone; the corp's pool (with the shelf, the stock clause's two
-                // sources) is read only to price a REFUSED candidate for the
-                // chain start (BL-1227). Read const: scoring authors no pool.
-                const stockpile_component* pool =
-                    w.find_pool(corp, pool_key_for_tile(w, tile));
+                // alone; the shelf is the stock clause's one source (BL-1265:
+                // corporations hold no pools), read only to price a REFUSED
+                // candidate for the chain start (BL-1227).
+                const stockpile_component* pool = nullptr;
                 const entity_id mid = market_for_tile(w, tile);
 
                 // RECIPE CHOICE. Walk the BROWSE space (this era's roster) and
@@ -2055,7 +2023,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     const float res_batches = judged_batches(reg, b);
                     inputs_ok = recipe_inputs_obtainable(
                         w, reg, reach(), market_for_tile(w, b.tile),
-                        w.find_pool(corp, pool_key_for_tile(w, b.tile)),
+                        /*pool=*/nullptr, // BL-1265: no corporation pools; the shelf alone
                         *res_rc, res_batches, bid, input_cost);
                 }
                 const building_profit pp = inputs_ok
@@ -2191,8 +2159,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 // clean-water plants still leave for consumer goods at tick 3
                 // (no water is dug on that seed, so clean water is the recipe
                 // that cannot run; BL-1193 H5 is that fix, not this one).
-                const stockpile_component* sw_pool =
-                    w.find_pool(corp, pool_key_for_tile(w, b.tile));
+                const stockpile_component* sw_pool = nullptr; // BL-1265: the shelf alone
                 // BL-1206: judged at the staffing it would run at, never a zero
                 // need (input_reach.hpp § judged_batches).
                 const float sw_batches = judged_batches(reg, b);
@@ -2533,331 +2500,12 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             }
         }
 
-        // ---- Trade candidates: list accumulated stock, floored (BL-293) ------
-        //
-        // Ben, 2026-08-07: "the AI must be able to trade as a player does." This
-        // is the scored-utility layer reaching the order book through the same
-        // corp_command seam it reaches build/demolish/survey through — no
-        // separate trading brain, no privileged path.
-        //
-        // The rule is deliberately the narrowest thing that is still trading:
-        // stock past the hold threshold, half of the excess listed, floored at
-        // the market's rarity floor. It exists so the AI does not sit on a
-        // mountain of unsold goods while the auto-surplus path clears them at
-        // whatever the ratio says; it is NOT a market strategy, and the three
-        // numbers behind it are corp_ai_params fields precisely so tuning it
-        // never needs this code changed. See AI_OPPONENT.md § 6.
-        {
-            // corp_market_pools is a std::map, so this walk is already ordered by
-            // (corp, market) — the deterministic iteration the whole scorer rests on.
-            //
-            // BL-1003 CALL: `place_sell_order` names a BODY, and clearing lists
-            // it across the corp's market pools on that body (market_clearing.cpp).
-            // So the candidate is per (body, resource): its excess is the corp's
-            // listable surplus summed over the body (`listable_surplus`), and its floor is
-            // read off the lowest-id market pool on the body that prices the
-            // good — the first one this sorted walk reaches. Seen once per eval.
-            std::set<std::pair<entity_id, std::size_t>> seen_triple;
-
-            // BL-1201 review: the excess is the quantity CLEARING WILL LIST under
-            // an uncapped order — each of the corp's market pools on the body
-            // above its processor reservation, the grid gate applied exactly as
-            // clearing applies it (market_clearing.cpp, standing sell orders) —
-            // not the raw stock. Reading raw stock placed an order on goods the
-            // corp's own processors had reserved: it listed nothing, closed
-            // itself after `sell_order_empty_close_ticks`, and was placed again
-            // at the next evaluation, forever, spending the trade slot each time.
-            const grid_goods_params& grid_rules = reg.grid_goods();
-            std::map<entity_id, std::array<float, resource_count>> reserve_memo; // by market
-            std::map<entity_id, bool> on_grid_memo;                              // by market
-            auto listable_surplus = [&](entity_id body, std::size_t r) {
-                float sum = 0.0f;
-                for (auto q = w.corp_market_pools.lower_bound({corp, entity_id{0}});
-                     q != w.corp_market_pools.end() && q->first.first == corp; ++q)
-                {
-                    const entity_id mid = q->first.second;
-                    const auto qm = w.markets.find(mid);
-                    if (qm == w.markets.end() || qm->second.body != body)
-                        continue;
-                    if (grid_rules.any() && grid_rules.grid(r))
-                    {
-                        auto g = on_grid_memo.find(mid);
-                        if (g == on_grid_memo.end())
-                        {
-                            bool ok = false;
-                            if (qm->second.centre_tile != null_entity)
-                            {
-                                body_reach_field(w, body);
-                                const float rc = tile_reach_cost(w, qm->second.centre_tile);
-                                ok = (rc >= 0.0f) && std::isfinite(rc);
-                            }
-                            g = on_grid_memo.emplace(mid, ok).first;
-                        }
-                        if (!g->second)
-                            continue; // off the network: clearing will not list it
-                    }
-                    auto rm = reserve_memo.find(mid);
-                    if (rm == reserve_memo.end())
-                        rm = reserve_memo.emplace(mid, processor_reservation(w, reg, corp, mid)).first;
-                    const float s = q->second.quantities[r] - rm->second[r];
-                    if (s > 0.0f)
-                        sum += s;
-                }
-                return sum;
-            };
-
-            for (auto pit = w.corp_market_pools.lower_bound({corp, entity_id{0}});
-                 pit != w.corp_market_pools.end() && pit->first.first == corp; ++pit)
-            {
-                const auto mit = w.markets.find(pit->first.second);
-                if (mit == w.markets.end())
-                    continue; // body-level pool: nowhere to list it
-                const market_component& mc = mit->second;
-                const entity_id body = mc.body;
-
-                for (std::size_t r = 0; r < resource_count; ++r)
-                {
-                    if (mc.base_price[r] <= 0.0f)
-                        continue; // this market does not price the good
-                    if (!seen_triple.emplace(body, r).second)
-                        continue; // an earlier market pool on this body spoke for it
-
-                    const float excess = listable_surplus(body, r) - p.trade_hold_threshold;
-                    if (excess <= 0.0f)
-                        continue;
-
-                    // Never duplicate a standing order on the same triple: a
-                    // second order would not sell more (the pool is the cap), it
-                    // would just grow the book every evaluation forever.
-                    bool already = false;
-                    for (const sell_order& o : w.sell_orders)
-                        if (o.corp == corp && o.body == body &&
-                            static_cast<std::size_t>(o.resource) == r)
-                        { already = true; break; }
-                    if (already)
-                        continue;
-
-                    // BL-1201 (orders are price floors, Ben 2026-10-05): the order
-                    // is placed UNCAPPED (quantity 0). Clearing lists the whole
-                    // surplus above the processor reservation under it, every
-                    // tick, so it keeps pace with whatever the corp produces and
-                    // there is nothing to size. (It was half the excess at this
-                    // moment, never revised — which trapped every unit produced
-                    // past it.) An order whose pool stands empty closes itself in
-                    // clearing, so the scorer needs no withdraw move either.
-                    const float floor = mc.base_price[r] * p.trade_floor_multiple;
-
-                    // Score in the same currency every other candidate uses —
-                    // expected cash — so it competes honestly against a dial or a
-                    // build rather than needing a hand-tuned weight. Valued at the
-                    // floor, not at the current price: the floor is what the corp
-                    // is actually willing to accept, so this is the conservative
-                    // estimate, and it keeps a listing on a crashed market from
-                    // outscoring a genuinely profitable dial.
-                    candidate c;
-                    c.cmd.tick        = tick;
-                    c.cmd.corp        = corp;
-                    c.cmd.verb        = corp_verb::place_sell_order;
-                    c.cmd.subject     = body;
-                    c.cmd.target      = static_cast<resource_type>(r);
-                    c.cmd.quantity    = 0.0f; // no cap (BL-1201)
-                    c.cmd.floor_price = floor;
-                    // The score keeps the scale it had when the order listed a
-                    // fraction of the excess (`trade_score_fraction`, 0.5), so
-                    // this item is no AI tuning change; trade candidates compete
-                    // only inside their own family budget, where a common factor
-                    // cannot reorder them.
-                    c.score  = p.trade_score_fraction * excess * floor * jitter;
-                    c.reason = corp_decision_reason::trade_surplus;
-                    c.bucket = bucket_for_reason(c.reason);
-                    cands.push_back(c);
-                }
-            }
-        }
-
-        // ---- Directed-dispatch candidate: haul toward a better net price -----
-        // (BL-600, LOGISTICS.md § Logistic Points / SUPPLY.md § Dispatch
-        // trigger; the same dated grant BL-599 lands under). `dispatch_convoy`
-        // reaches the corp-command seam exactly as `place_sell_order` does
-        // (§ 2C) — through `apply_corp_command`, which already prices and
-        // commits it via `price_convoy_leg` + `commit_convoy`
-        // (corp_command.cpp): the SAME two functions the auto-dispatcher's
-        // net-price rule calls (SUPPLY.md's "no fourth code path" rule). It
-        // prices with the shared function to RANK opportunities, and the seam
-        // re-prices and commits for real at apply time.
-        //
-        // BL-995: it reads the auto-dispatcher's OWN rule, not a rule of its
-        // own. A destination qualifies when its net price (last resolved price
-        // less the per-unit haul) beats the home price by more than the
-        // authored margin, and the haul is sized by the same room
-        // (`dispatch_room`: absorbable against the unsmoothed target, less every
-        // corp's pending cargo) — so the scorer never values a haul the market
-        // cannot take. Markets and resolved prices are the public aggregates
-        // `export_corp_blackboard` shows a rival (BL-068/DISCOVERY.md). It keeps
-        // only the single best-scoring opportunity — the one-candidate-per-eval
-        // shape `max_trades` gives the order-book verb.
-        {
-            // BL-1003: the source is a (corp, market) pool, so no "market on
-            // this body" pick is needed any more — the pool key IS the market.
-            const logistics_nodes nodes = collect_logistics_nodes(w);
-
-            // ASCENDING MARKET ID (BL-1050). The destination scan below is a
-            // strict `score > best_score` over every market, and `w.markets` is
-            // an unordered store — so two candidates with an EXACTLY equal score
-            // were separated by nothing but that store's bucket layout, which a
-            // save/load rebuilds (world_save.cpp re-inserts in id order) and
-            // another standard library lays out differently again. The walk is
-            // sorted here and the tie-break is written out below, so the winner
-            // is named by the ids either way.
-            std::vector<entity_id> market_ids;
-            market_ids.reserve(w.markets.size());
-            for (const auto& [mid, mc] : w.markets)
-            {
-                (void)mc;
-                market_ids.push_back(mid);
-            }
-            std::sort(market_ids.begin(), market_ids.end());
-
-            // Sorted corp ids for `dispatch_room`'s pending sum (a fixed float
-            // order), and a reservation memo shared across this corp's eval.
-            std::vector<entity_id> all_corp_ids;
-            all_corp_ids.reserve(w.corporations.size());
-            for (const auto& [cid, cc] : w.corporations)
-            {
-                (void)cc;
-                all_corp_ids.push_back(cid);
-            }
-            std::sort(all_corp_ids.begin(), all_corp_ids.end());
-            reservation_memo memo;
-            const float margin = reg.dispatch_margin();
-            // BL-1229 (an order is a floor, not a hold): an ordered pool's source
-            // price is max(home, floor) — the auto-dispatcher's own rule, shared
-            // through dispatch_source_price, so the scorer never values a haul
-            // the corp's own order would refuse.
-            const order_floor_map order_floors = collect_order_floors(w);
-
-            entity_id   best_market   = null_entity;
-            entity_id   best_src_key  = null_entity;
-            std::size_t best_ri       = 0;
-            float       best_qty      = 0.0f;
-            float       best_score    = 0.0f;
-            convoy_leg  best_leg;
-
-            // BL-1003: sources are the corp's (corp, market) pools. The verb
-            // names its source MARKET, so a body-level pool (a market-less
-            // body) cannot be dispatched from here, exactly as before.
-            for (auto pit = w.corp_market_pools.lower_bound({corp, entity_id{0}});
-                 pit != w.corp_market_pools.end() && pit->first.first == corp; ++pit)
-            {
-                const stockpile_component& pool = pit->second;
-                const entity_id src_key = pit->first.second;
-                if (w.markets.find(src_key) == w.markets.end())
-                    continue;
-
-                for (std::size_t r = 0; r < resource_count; ++r)
-                {
-                    // Same hold rule as the trade candidate above (BL-293):
-                    // never divert stock below the threshold the corp's own
-                    // chain might still want. This tick's deliveries are not
-                    // shippable (BL-995: a delivery meets a clear first).
-                    const float surplus = pool.quantities[r] - p.trade_hold_threshold
-                                          - dispatch_arrived(w, corp, src_key, r);
-                    if (!(surplus > 0.0f))
-                        continue;
-
-                    // The goods are already the corp's and would sell at home
-                    // at the next clear, so a haul earns only the GAP over the
-                    // home price (SUPPLY.md § Dispatch trigger) — or over the
-                    // floor of the corp's own standing order on the good, where
-                    // that is the higher (BL-1229).
-                    const float home_price =
-                        dispatch_source_price(w, order_floors, corp, src_key, r);
-                    const float gate       = home_price + margin * home_price;
-                    const float probe_qty  = std::min(surplus, 1.0f);
-
-                    for (const entity_id mid : market_ids)
-                    {
-                        // Same-body IS a real haul (BL-096 multi-market bodies);
-                        // its own market is not a destination (BL-1003).
-                        if (mid == src_key)
-                            continue;
-                        const market_component& mc = w.markets.at(mid);
-                        const float price = dispatch_market_price(mc, r);
-                        if (!(price > gate))
-                            continue; // cannot beat home net of any haul
-
-                        // Priced through the SHARED function on a one-unit leg
-                        // (cost is linear in quantity), purely to RANK — nothing
-                        // here mutates the world beyond the A* path cache
-                        // `price_convoy_leg` itself warms. The seam re-prices
-                        // and commits for real at apply time.
-                        const convoy_leg probe = price_convoy_leg(
-                            w, reg, nodes, corp, src_key, mid, r, probe_qty,
-                            reg.logistics_cost(convoy_mode::space));
-                        if (!probe.viable)
-                            continue; // unroutable / unpadded / unfuelled lane
-                        const float haul = probe.cost / probe_qty;
-                        const float net  = price - haul;
-                        if (!(net - home_price > margin * home_price))
-                            continue; // under the dispatch margin
-
-                        const float room = dispatch_room(w, reg, mid, r, home_price + haul,
-                                                         all_corp_ids, memo);
-                        const float qty = std::min(surplus, room);
-                        if (!(qty > 0.0f) || !std::isfinite(qty))
-                            continue;
-
-                        const float cost  = haul * qty;
-                        const float score = qty * (price - home_price) - cost;
-                        if (score <= 0.0f)
-                            continue; // never haul at a loss
-
-                        // THE TIE-BREAK IS WRITTEN OUT (BL-1050), not left to
-                        // the walk: on an exactly equal score the lane with the
-                        // lowest (source market, resource, market id) wins.
-                        const bool better =
-                            (score > best_score) ||
-                            (score == best_score && best_market != null_entity &&
-                             std::make_tuple(src_key, r, mid) <
-                                 std::make_tuple(best_src_key, best_ri, best_market));
-                        if (better)
-                        {
-                            best_score    = score;
-                            best_market   = mid;
-                            best_src_key  = src_key;
-                            best_ri       = r;
-                            best_qty      = qty;
-                            best_leg      = probe;
-                            best_leg.cost = cost;
-                        }
-                    }
-                }
-            }
-
-            if (best_market != null_entity)
-            {
-                const entity_id src_market = best_src_key; // a market, by the filter above
-                if (src_market != null_entity)
-                {
-                    candidate c;
-                    c.cmd.tick        = tick;
-                    c.cmd.corp        = corp;
-                    c.cmd.verb        = corp_verb::dispatch_convoy;
-                    c.cmd.subject     = src_market;                              // source market
-                    c.cmd.counterparty = best_market;                            // destination market
-                    c.cmd.target      = static_cast<resource_type>(best_ri);     // cargo
-                    c.cmd.quantity    = best_qty;                                // units
-                    // Same currency every other candidate scores in — expected
-                    // cash, so a haul competes honestly against a dial or a
-                    // build with no hand-tuned weight of its own.
-                    c.score  = best_score * jitter;
-                    c.spend  = best_leg.cost;
-                    c.reason = corp_decision_reason::best_build;
-                    c.bucket = bucket_for_reason(c.reason);
-                    cands.push_back(c);
-                }
-            }
-        }
+        // ---- The sell-order and directed-dispatch candidates RETIRED --------
+        // (BL-1265 / BL-1266; MARKETS.md § The shelf economy, TRADE.md § What
+        // trade replaces.) With no corporation pools there is no stock to list
+        // and no pool to haul: production sells on landing, and goods move
+        // between markets only by a trade. A rival's own trades are the
+        // AI_OPPONENT.md § 11 grant "a rival may set its own trades" (BL-1267).
 
 #ifndef NDEBUG
         assert(w.buildings.size() == scope_buildings_at_open
@@ -3204,6 +2852,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 // missing one.
                 case corp_verb::dispatch_convoy:
                 case corp_verb::hold_convoy:
+                // BL-1266's trade verbs: no feed vocabulary for a trade yet.
+                case corp_verb::set_trade:
+                case corp_verb::clear_trade:
+                case corp_verb::set_trade_reserve:
                     ev.corp = null_entity; // sentinel: "no feed event for this verb"
                     break;
             }
@@ -3325,18 +2977,17 @@ corp_blackboard export_corp_blackboard(const world& w, entity_id corp, int tick)
             add_fact(bb, tick, bid, "building_workforce_target", b.workforce_target, 1.0f, fact_provenance::own_asset);
             add_fact(bb, tick, bid, "building_decommissioned", b.decommissioned ? 1.0 : 0.0, 1.0f, fact_provenance::own_asset);
         }
-        // BL-1003 CALL: the fact's subject is the POOL KEY — a market id (or a
-        // body id for a market-less body's pool) — not the body, so an agent
-        // reads where its stock actually sits and sells.
-        for (const auto& [key, pool] : w.corp_market_pools) // std::map: sorted
-        {
-            if (key.first != corp)
-                continue;
-            for (std::size_t r = 0; r < resource_count; ++r)
-                if (pool.quantities[r] > 0.0f)
-                    add_fact(bb, tick, key.second, res_pred("pool", r),
-                             pool.quantities[r], 1.0f, fact_provenance::own_asset);
-        }
+        // BL-1265 / BL-1266: no pools (the corporation holds no stock); its own
+        // TRADE state instead — the points it made, its reserve, and each of its
+        // manual trades as a fact on the trade's source market whose predicate
+        // names the good and whose value is the points it assigns.
+        add_fact(bb, tick, corp, "trade_points", cc.trade_points, 1.0f, fact_provenance::own_asset);
+        add_fact(bb, tick, corp, "trade_reserve", cc.trade_reserve, 1.0f, fact_provenance::own_asset);
+        for (const standing_trade& t : w.trades) // placement order: the spending order
+            if (t.owner == corp)
+                add_fact(bb, tick, t.from_market,
+                         res_pred("trade_points", static_cast<std::size_t>(t.resource)),
+                         t.points, 1.0f, fact_provenance::own_asset);
 
         // BL-470 Rider 1 — the blackboard export takes over BL-393's open
         // half (units were write-only and inert, so no scorer could see them

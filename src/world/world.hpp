@@ -451,32 +451,17 @@ struct world
     /// SERIALISED, empty after a load.
     std::vector<carve_dropped_slot> gen_carve_dropped;
 
-    /// Shared goods pool keyed by (corporation, POOL KEY) — BL-1003, PRODUCTION.md
-    /// § Stockpile and output flow. The pool key is the MARKET whose catchment
-    /// holds the building's tile (`pool_key_for_tile`), or — on a body with no
-    /// market yet — the body id itself, until `maybe_spawn_market` folds that
-    /// body-level pool into the new market's (`absorb_body_pool_into_market`).
-    /// Entity ids are globally unique, so a market key and a body key never
-    /// collide. This is the Layer 3 economy's working store — extraction and
-    /// processing credit/draw it, the market lists surplus from it into the
-    /// keyed market. A `std::map` (not unordered) so iteration is deterministic,
-    /// mirroring the `tile_to_nation` design rationale. Labour pools stay per
-    /// (corp, body) and are NOT here. The per-building `stockpile_component` is
-    /// unused in L3.
-    std::map<std::pair<entity_id, entity_id>, stockpile_component> corp_market_pools;
-
-    /// BL-1217 D5 — OPENING STOCK IS HELD, NOT LISTED, UNTIL SOMEONE BIDS FOR IT
-    /// (Ben, 2026-10-09; CORPORATION_GENERATION.md § Pass 4b). Per
-    /// `corp_market_pools` key, how much of that pool is still the opening
-    /// stockpile generation seeded (`seed_opening_stock`) and no market has yet
-    /// bid for. `clear_markets` keeps it off the shelf: a pool lists only what
-    /// stands above the larger of its processor reservation and this. Each
-    /// clear, an entry is cut to its pool (what the corp drew down is gone) and
-    /// zeroed for a good its market bids for — permanently, so once a market
-    /// has bid, opening stock of that good lists by the ordinary sell rules.
-    /// Follows its pool wherever a pool moves (rehome, absorb, buyout) and goes
-    /// when the pool goes. A `std::map`, for the `corp_market_pools` reason.
-    std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> opening_stock_held;
+    /// BL-1265 (the shelf economy; MARKETS.md § The shelf economy, Ben 2026-10-10):
+    /// CORPORATIONS HOLD NO STOCKPILES. Every good is on a market's shelf
+    /// (`market_component::inventory`). This is the one place a corporation's
+    /// goods wait, and only during generation: the opening stockpile each
+    /// corporation is seeded (`seed_opening_stock`) is held here, per corp,
+    /// until the markets stand, then `place_opening_stock` puts every unit on
+    /// the shelves of the markets the corporation sits in and empties this
+    /// (CORPORATION_GENERATION.md § Pass 4b). GENERATION-TIME ONLY: empty before
+    /// the first tick, so it is neither saved nor hashed. A `std::map` so the
+    /// placement walks ascending corp id.
+    std::map<entity_id, stockpile_component> gen_opening_stock;
 
     /// BL-1217 D6 (Ben, 2026-10-09, the exceptions) — the PRE-AUTHORED
     /// installation's processor, recorded when `make_hard_coded_world` authors
@@ -501,29 +486,35 @@ struct world
     /// below; the index remains the storage order and nothing else.
     std::vector<convoy_component> convoys;
 
-    /// BL-995 — this tick's DELIVERIES, per (corp, market): what
-    /// `credit_arrived_convoys` credited into each pool this tick. TRANSIENT:
-    /// cleared at the top of every `credit_arrived_convoys` call, never saved,
-    /// never folded into a state hash. SUPPLY.md § Dispatch trigger: a delivery
-    /// reaches its destination's clear before it can move again, so
-    /// `dispatch_convoys` subtracts this from a pool's shippable surplus.
+    /// BL-1265 (MARKETS.md § The shelf economy: "landing is selling") — what
+    /// LANDED this tick, per (owner, market): a building's output, a trade's
+    /// cargo arriving, a captured cargo. Every landing goes here; the tick's
+    /// `clear_markets` lists it as this tick's supply, pays its owner the
+    /// quantity at the market's clearing price (the market is the counterparty,
+    /// bid or no bid), moves it onto the shelf, and empties this. So goods land
+    /// on the shelf in the tick they are made, at that tick's clear.
     ///
-    /// Safe to leave out of the save: saves are taken BETWEEN ticks, and the
-    /// only reader (dispatch) runs later in the same tick as the writer (credit),
-    /// which clears it first — so a loaded world with an empty map behaves
-    /// exactly as the saved one would have on its next tick.
-    std::map<std::pair<entity_id, entity_id>, stockpile_component> arrived_this_tick;
+    /// TRANSIENT, never saved, never hashed: every writer runs in the tick
+    /// before its clear (arrivals, production, capture), and the clear empties
+    /// it — saves are taken between ticks, when it is always empty. A
+    /// `std::map`: the clear walks it in ascending (owner, market) order.
+    std::map<std::pair<entity_id, entity_id>, stockpile_component> landed_this_tick;
 
-    /// BL-1229 (an order is a floor, not a hold) — the (corp, body, good) triples
-    /// under a standing sell order that THIS tick's `dispatch_convoys` hauled
-    /// from. TRANSIENT: written by dispatch (cleared at its top), read by the
-    /// SAME tick's `clear_markets` — which counts a hauled pool as NOT empty for
-    /// the order's auto-close, so an order stays alive (and keeps its floor on
-    /// the haul) while its goods are travelling — and cleared again at the end
-    /// of that clear, so a clear run without a dispatch never reads a stale set.
-    /// Never saved, never in a state hash: saves are taken BETWEEN ticks, when
-    /// it is always empty (the same argument as `arrived_this_tick`).
-    std::set<std::tuple<entity_id, entity_id, std::size_t>> hauled_ordered_this_tick;
+    /// Land @p qty of good @p r for @p owner on @p market this tick (see
+    /// `landed_this_tick`). Non-positive or non-finite quantities are ignored.
+    void land_goods(entity_id owner, entity_id market, std::size_t r, float qty)
+    {
+        if (!(qty > 0.0f) || !std::isfinite(qty) || r >= resource_count || market == null_entity)
+            return;
+        landed_this_tick[std::make_pair(owner, market)].quantities[r] += qty;
+    }
+
+    /// What @p owner has landed on @p market this tick in good @p r (0 if none).
+    float landed(entity_id owner, entity_id market, std::size_t r) const
+    {
+        const auto it = landed_this_tick.find(std::make_pair(owner, market));
+        return (it == landed_this_tick.end() || r >= resource_count) ? 0.0f : it->second.quantities[r];
+    }
 
     /// BL-1222 (trade-flow lens) — what the PLAYER corporation's dispatcher did
     /// over its last few passes, for the Trade-flow lens (LENSES.md § Trade-flow
@@ -864,39 +855,26 @@ struct world
     mutable std::size_t   body_centre_index_count  = 0; ///< population_centres.size() at build.
     mutable std::uint32_t body_centre_index_cursor = 0; ///< next_entity_id() at build.
 
-    /// THE ORDER BOOK (BL-293) — standing sell orders, world-wide, in the order
-    /// they were placed. Read by `clear_markets` every economy tick; written only
-    /// through the `place_sell_order` / `remove_sell_order` corp verbs, by the
-    /// player and by rival corps alike (Ben, 2026-08-07: "the AI must be able to
-    /// trade as a player does").
-    ///
-    /// It lived on `ui_state` until 2026-08-07, which had two costs: a
-    /// `corp_command` had nothing to mutate, so no text-driven player could trade;
-    /// and a standing order sat outside the save seam entirely. Both are the same
-    /// mistake — the player's game-intent was being held by the surface that draws
-    /// it rather than by the world that runs it.
-    ///
-    /// A `std::vector`, insertion-ordered, exactly like `convoys` and
-    /// `trade_routes`: the order book is a queue, and price-time priority means
-    /// TIME is load-bearing, so insertion order is semantic and must not be
-    /// re-sorted. Erasure is by `id`, not by index, so a removal never renumbers a
-    /// surviving order.
-    std::vector<sell_order> sell_orders;
+    // THE ORDER BOOK RETIRED (BL-1265; MARKETS.md § The shelf economy, Ben
+    // 2026-10-10): no standing buy or sell orders — everyone buys at the posted
+    // price, under the fair-price ceiling, and production is sold on landing.
+    // Procurement (below) is not the order book and stays.
 
-    /// The buy side of the same book. `clear_markets` matches it against
-    /// `sell_orders`; no press authors one yet (see buy_order).
-    std::vector<buy_order> buy_orders;
+    /// BL-1266 (TRADE.md § A trade) — every MANUAL trade, world-wide, in the
+    /// order it was set: the order each owner's reserved points are spent in.
+    /// Written only through the `set_trade` / `clear_trade` corp verbs; read by
+    /// `run_trades` every tick. Auto trade is not stored: it is chosen afresh
+    /// each tick from prices. A `std::vector`, insertion-ordered like
+    /// `convoys`; erasure is by `id`, so a removal never renumbers a survivor.
+    std::vector<standing_trade> trades;
 
-    /// Next stable order handle. Save-format state: it must persist, or a load
-    /// followed by a placement would mint an id a live order already holds.
-    /// Monotonic and never reused — an erased order's id does not come back.
-    uint32_t next_order_id = 1;
+    /// Next stable trade handle. Save-format state: a load followed by a new
+    /// trade must not mint an id a live trade already holds. Monotonic.
+    uint32_t next_trade_id = 1;
 
-    /// Allocate the next stable order id. Deterministic (a plain counter, in
-    /// command-application order); the single point ids are minted from.
-    ///
-    /// @return A fresh, never-before-issued order handle (always nonzero).
-    uint32_t allocate_order_id() { return next_order_id++; }
+    /// Allocate the next stable trade id (always nonzero). Deterministic: a
+    /// plain counter, in command-application order.
+    uint32_t allocate_trade_id() { return next_trade_id++; }
 
     /// Live procurement quotes (BL-350) — the answer to `request_quote`,
     /// before `accept_quote` converts one into a `procurement_contract`. A
@@ -1035,26 +1013,6 @@ struct world
     /// the ring's own run-to-run identity directly instead.
     exchange_record_ring exchanges;
 
-    /// Goods pool for a (corporation, pool key) pair, inserting an empty pool on
-    /// first access. The key is a market id, or a body id on a market-less body
-    /// — resolve it with `pool_key_for_tile` / `pool_key_for_body`, never pass a
-    /// body id on a body that has markets.
-    ///
-    /// @param corp Corporation entity id.
-    /// @param key  Pool key (market id, or body id on a market-less body).
-    /// @return     Reference to the (corp, key) stockpile, created if absent.
-    stockpile_component& pool_at(entity_id corp, entity_id key)
-    {
-        return corp_market_pools[std::make_pair(corp, key)];
-    }
-
-    /// Read-only lookup of a (corporation, pool key) pool; nullptr if absent.
-    const stockpile_component* find_pool(entity_id corp, entity_id key) const
-    {
-        const auto it = corp_market_pools.find(std::make_pair(corp, key));
-        return it == corp_market_pools.end() ? nullptr : &it->second;
-    }
-
     /// Authored effective workforce supply per (corp, body) — Layer 4 step 1 of the
     /// labour-pool model (docs/economy/POPULATION.md § Workforce model). Absent
     /// entries fall back to `default_workforce_supply`; population centres replace
@@ -1154,61 +1112,61 @@ inline void bump_logistics_cache_generation(world& w)
 // the accessor is the stable seam either way.
 
 // ---------------------------------------------------------------------------
-// Goods-pool keys (BL-1003 — pools per market). Defined in market_clearing.cpp,
+// Shelf helpers (BL-1265 — the shelf economy). Defined in market_clearing.cpp,
 // beside `market_for_tile`, whose catchment partition they resolve through.
 // ---------------------------------------------------------------------------
 
-/// The goods-pool key for @p tile: the market whose catchment holds it
-/// (`market_for_tile`), or the tile's body id when that body has no market.
-/// `null_entity` for an unknown tile.
-entity_id pool_key_for_tile(const world& w, entity_id tile);
+/// The lowest-id market on @p body, or `null_entity` when the body has none —
+/// for a caller that genuinely names no tile.
+entity_id market_on_body(const world& w, entity_id body);
 
-/// The goods-pool key for a body with no tile named: the body id when it has no
-/// market, else its lowest-id market. Only for callers that genuinely have no
-/// tile (a body-level delivery); anything tied to a building uses
-/// `pool_key_for_tile`.
-entity_id pool_key_for_body(const world& w, entity_id body);
+/// The body a market sits on, or `null_entity` for an unknown market.
+entity_id market_body(const world& w, entity_id market);
 
-/// The body a pool key sits on: the market's body for a market key, the key
-/// itself for a body key, `null_entity` for anything else.
-entity_id pool_key_body(const world& w, entity_id key);
+/// A corporation's HOME market on @p body — the shelf it buys from and lands
+/// on when nothing names a tile (a hire, a procurement delivery): the market
+/// of its HQ tile if the HQ is on @p body, else of its lowest-id building
+/// there, else `market_on_body`. `null_entity` when the body has no market.
+entity_id corp_home_market(const world& w, entity_id corp, entity_id body);
 
-/// What @p corp holds on @p body across every pool key there (each market pool
-/// plus any body-level pool), summed in ascending key order. A READ-ONLY
-/// aggregate — never draw or deposit through it.
-stockpile_component body_pool_total(const world& w, entity_id corp, entity_id body);
+/// The corporation's home market on its own HQ's body (`corp_home_market`
+/// there), or `null_entity` for a corp with no HQ on a body with a market.
+entity_id corp_hq_market(const world& w, entity_id corp);
 
-/// Fold every corporation's body-level pool on @p body into @p market's pool
-/// and erase the body-level entries. Called when a market spawns on a body that
-/// had none (PRODUCTION.md § Stockpile and output flow). Ascending corp order.
-void absorb_body_pool_into_market(world& w, entity_id body, entity_id market);
+/// The markets @p corp SITS IN: every market whose catchment holds one of its
+/// buildings, ascending id, each once. The shelves "the corporation's stock" is
+/// read from now corporations hold none (MARKETS.md § The shelf economy).
+std::vector<entity_id> corp_markets(const world& w, entity_id corp);
 
-/// A corporation's HOME pool key on @p body — where goods that belong to the
-/// corp on that body but to no particular building land (generation's opening
-/// stock). The pool key of the corp's HQ tile if the HQ is on @p body, else of
-/// its lowest-id building there, else `pool_key_for_body`.
-entity_id corp_home_pool_key(const world& w, entity_id corp, entity_id body);
+/// The stock of good @p r on the shelves of the markets @p corp sits in
+/// (`corp_markets`), summed ascending. What a reading of "what the corporation
+/// holds" means under the shelf economy: what it can buy where it stands.
+float corp_shelf_stock(const world& w, entity_id corp, std::size_t r);
 
-/// WORLD BUILD ONLY: re-key every pool into its corporation's
-/// `corp_home_pool_key` on that pool's body. World build seeds opening stock
-/// before the home body's markets are carved (into a body-level pool, or into a
-/// BL-910 capital market the carve then out-competes); this pass, run once the
-/// markets stand, puts every unit where the HQ clears. Never call it once play
-/// has begun — it would move produced goods between catchments for free.
-void rehome_opening_pools(world& w);
+/// BUY @p qty of good @p r off the shelves of the markets @p corp sits in,
+/// lowest market id first, at each shelf's POSTED price, debiting the buyer's
+/// balance now (a purchase outside the economy step, such as a hire). Buys only
+/// where the fair-price ceiling admits the shelf (@p reservation_mult; 0 = the
+/// ceiling is off). Returns the units bought (at most @p qty); the caller
+/// checks `corp_shelf_stock` first when it needs all-or-nothing.
+float buy_from_corp_shelves(world& w, entity_id corp, std::size_t r, float qty,
+                            float reservation_mult);
 
-/// BL-1217 D5 — credit @p stock into (@p corp, @p key)'s pool AND record it as
-/// opening stock, held off the shelf until its market bids for it
-/// (`world::opening_stock_held`). Generation's one door for an opening
-/// stockpile; every generation site that seeds one calls it.
-void seed_opening_stock(world& w, entity_id corp, entity_id key,
-                        const std::array<float, resource_count>& stock);
+/// GENERATION ONLY (CORPORATION_GENERATION.md § Pass 4b): add @p stock to
+/// @p corp's opening stockpile, held in `world::gen_opening_stock` until
+/// `place_opening_stock` puts it on the shelves. Generation's one door for an
+/// opening stockpile; every generation site that seeds one calls it.
+void seed_opening_stock(world& w, entity_id corp, const std::array<float, resource_count>& stock);
 
-/// BL-1217 D5 — the held opening stock of pool @p from follows it to pool
-/// @p to (added to whatever @p to already holds); @p from's record goes. Call
-/// wherever a pool's goods move to another key, so the hold travels with them.
-void move_opening_stock_held(world& w, std::pair<entity_id, entity_id> from,
-                             std::pair<entity_id, entity_id> to);
+/// GENERATION ONLY: place every corporation's held opening stock on the
+/// shelves of the markets it sits in, split over them by how many of its
+/// buildings each market's catchment holds (ascending market id; the HQ market
+/// alone when it has no building on a market), and empty
+/// `world::gen_opening_stock`. No money moves: the stock is the market's from
+/// then on (MARKETS.md § The shelf economy). A corporation with no market at
+/// all places nothing. Idempotent; called once the markets stand, and again
+/// (as a no-op, or for a roster regenerated since) before the first tick.
+void place_opening_stock(world& w);
 
 /// Resolve the corporation that owns @p building by scanning each corporation's
 /// `assets`. Siblings of `pool_at` / `workforce_supply`.

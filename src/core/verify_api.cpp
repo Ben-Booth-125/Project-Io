@@ -2837,21 +2837,65 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return out;
     });
 
-    // The WORLD's own count of standing orders on a body, independent of the
-    // surface — the second read that makes `market_trades` an assertion rather
-    // than a restatement, and the one that catches a gate quietly widened to
-    // "every market".
+    // BL-1266: the WORLD's own count of manual trades touching a body,
+    // independent of any surface: `out` leave a market on the body, `in` land
+    // on one, `mine` are the player's among either. (The order book this read
+    // once counted retired with corporation pools — BL-1265.)
     v.set_function("world_orders_on_body", [this](entity_id body) {
         sol::table out = m_lua.state().create_table();
-        int sells = 0, buys = 0, mine = 0;
-        for (const sell_order& o : m_world.sell_orders)
-            if (o.body == body) { ++sells; if (o.corp == m_world.player_entity) ++mine; }
-        for (const buy_order& o : m_world.buy_orders)
-            if (o.body == body) { ++buys;  if (o.corp == m_world.player_entity) ++mine; }
-        out["sells"] = sells;
-        out["buys"]  = buys;
+        int outs = 0, ins = 0, mine = 0;
+        const auto on_body = [&](entity_id mid) {
+            const auto it = m_world.markets.find(mid);
+            return it != m_world.markets.end() && it->second.body == body;
+        };
+        for (const standing_trade& t : m_world.trades)
+        {
+            const bool o = on_body(t.from_market), i = on_body(t.to_market);
+            if (o) ++outs;
+            if (i) ++ins;
+            if ((o || i) && t.owner == m_world.player_entity) ++mine;
+        }
+        out["sells"] = outs;
+        out["buys"]  = ins;
         out["mine"]  = mine;
         return out;
+    });
+
+    // BL-1266 (TRADE.md): set a MANUAL trade for the player through the real
+    // `set_trade` verb — `res` from market `from` to market `to` with `points`
+    // trade points a tick. Returns the corp_command_result name.
+    v.set_function("set_trade", [this](const std::string& res, unsigned from, unsigned to,
+                                       double points) -> std::string {
+        bool ok = false;
+        const resource_type r = resource_names::resource_from_name(res, ok);
+        if (!ok || !std::isfinite(points))
+            return std::string("rejected_invalid");
+        corp_command cmd;
+        cmd.tick         = static_cast<int>(m_sim_loop.day_tick());
+        cmd.corp         = m_world.player_entity;
+        cmd.verb         = corp_verb::set_trade;
+        cmd.subject      = static_cast<entity_id>(from);
+        cmd.counterparty = static_cast<entity_id>(to);
+        cmd.target       = r;
+        cmd.quantity     = static_cast<float>(points);
+        const corp_command_result cr = apply_corp_command(m_world, m_registry, cmd);
+        return std::string(cr == corp_command_result::applied ? "applied" : "rejected");
+    });
+
+    // BL-1266: the player's trade reserve := `points`, through `set_trade_reserve`.
+    v.set_function("set_trade_reserve", [this](double points) -> bool {
+        corp_command cmd;
+        cmd.tick     = static_cast<int>(m_sim_loop.day_tick());
+        cmd.corp     = m_world.player_entity;
+        cmd.verb     = corp_verb::set_trade_reserve;
+        cmd.quantity = static_cast<float>(points);
+        return apply_corp_command(m_world, m_registry, cmd) == corp_command_result::applied;
+    });
+
+    // BL-1266: the trade points the player's trade buildings made on the last pass.
+    v.set_function("player_trade_points", [this]() -> double {
+        const auto it = m_world.corporations.find(m_world.player_entity);
+        return it == m_world.corporations.end() ? 0.0 : static_cast<double>(it->second.trade_points);
     });
 
     // Does the player own a building on this body — read from the world, not
@@ -3741,13 +3785,13 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // FIXTURE: a pair of markets on the ACTIVE body whose cheapest haul for the
     // player runs land -> port -> sea -> port -> land (SUPPLY.md § Logistical
     // cost). Ordered market pairs are tried in id order; a pair is taken when
-    // `price_convoy_leg` — the dispatch's own pricing — answers a three-leg route.
+    // `price_market_leg` — every shipment's own pricing — answers a three-leg route.
     // Where the body's existing Ports give no such pair, a finished Port is laid on
     // the last land tile before, and the first after, the water the pair's direct
     // path crosses (the sea_port_gate.cpp idiom), and the pair is re-priced; Ports
-    // that did not produce a sea route are removed again. Grants `qty` of `res` to
-    // the player's pool at the source market so the script can dispatch through
-    // the real `dispatch_convoy` verb. Returns {ok, src, dst, port_a, port_b,
+    // that did not produce a sea route are removed again. Puts `qty` of `res` on
+    // the source market's SHELF (BL-1265) so the script can ship it by the real
+    // `set_trade` verb (BL-1266). Returns {ok, src, dst, port_a, port_b,
     // seeded_ports}; market ids and Port TILE ids, no tile data.
     v.set_function("sea_route_fixture", [this](const std::string& res, double qty_d,
                                                sol::optional<int> min_span_opt) {
@@ -3776,16 +3820,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
 
         const auto price = [&](entity_id a, entity_id b) -> convoy_leg {
             const logistics_nodes nodes = collect_logistics_nodes(m_world);
-            auto& pool = m_world.pool_at(corp, a);
-            const float before = pool.quantities[ri];
-            pool.quantities[ri] = std::max(before, qty);
-            const convoy_leg leg = price_convoy_leg(m_world, m_registry, nodes, corp, a, b, ri,
-                                                    qty, m_registry.logistics_cost(convoy_mode::space));
-            pool.quantities[ri] = before;
-            return leg;
+            return price_market_leg(m_world, m_registry, nodes, a, b, qty);
         };
         const auto take = [&](entity_id a, entity_id b, const convoy_leg& leg, int seeded) {
-            m_world.pool_at(corp, a).quantities[ri] += qty;
+            m_world.markets.at(a).inventory[ri] += qty;
             out["ok"]           = true;
             out["src"]          = static_cast<unsigned>(a);
             out["dst"]          = static_cast<unsigned>(b);
@@ -3866,8 +3904,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             for (const entity_id b : mkts)
             {
                 if (a == b) continue;
-                const entity_id ca =
-                    convoy_origin_tile(m_world, m_world.corporations.at(corp), a);
+                const entity_id ca = m_world.markets.at(a).centre_tile; // BL-1266: shipments leave the centre
                 const entity_id cb = m_world.markets.at(b).centre_tile;
                 if (ca == null_entity || ca == cb) continue;
                 std::vector<entity_id> path;
@@ -4327,31 +4364,11 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return out;
     });
 
-    v.set_function("place_sell_order",
-        [this](const std::string& res, double qty, double floor) -> int {
-            corp_command cmd;
-            cmd.tick        = static_cast<int>(m_sim_loop.day_tick());
-            cmd.corp        = m_world.player_entity;
-            cmd.verb        = corp_verb::place_sell_order;
-            cmd.subject     = m_world.home_body;
-            cmd.target      = resource_from_name(res);
-            cmd.quantity    = static_cast<float>(qty);
-            cmd.floor_price = static_cast<float>(floor);
-            const corp_command_result r = apply_corp_command(m_world, m_registry, cmd);
+    // BL-1265: `place_sell_order` retired with the order book (the verb is
+    // rejected; there is no verify call for it).
 
-            int n = 0;
-            for (const sell_order& o : m_world.sell_orders)
-                if (o.corp == m_world.player_entity) ++n;
-            SDL_Log("verify.place_sell_order: %s x%.0f >= %.1f (applied=%d, n=%d)",
-                    res.c_str(), qty, floor,
-                    r == corp_command_result::applied ? 1 : 0, n);
-            return n;
-        });
-
-    // Read the resolved market price of `res` on the player's home body — lets a
-    // sell-order script assert the floor was honoured (a placed floor above the
-    // clearing price prevents a below-floor dump; the pool retains stock rather than
-    // selling under the floor). Returns -1 if the home body has no market.
+    // Read the resolved market price of `res` on the player's home body.
+    // Returns -1 if the home body has no market.
     v.set_function("econ_tick", [this]() -> int { return m_world.current_econ_tick; });
 
     v.set_function("home_market_price", [this](const std::string& res) -> double {
@@ -4362,16 +4379,12 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return -1.0;
     });
 
-    // Read the player's home-body pool quantity of `res` — the stock a sell order
-    // draws from. A floored order that cannot clear leaves stock in the pool; a
-    // script asserts the floor was honoured by comparing pool before/after a tick.
-    // BL-1003: pools key (corp, market) and a sell order on a body lists from
-    // every one of them, so this reads the corp's aggregate on the home body.
-    v.set_function("home_pool", [this](const std::string& res) -> double {
+    // BL-1265: the stock of `res` on the shelves of the markets the player's
+    // corporation sits in (`corp_shelf_stock`) — corporations hold no pools.
+    v.set_function("home_shelf", [this](const std::string& res) -> double {
         const resource_type rt = resource_from_name(res);
-        const stockpile_component total =
-            body_pool_total(m_world, m_world.player_entity, m_world.home_body);
-        return static_cast<double>(total.quantities[static_cast<std::size_t>(rt)]);
+        return static_cast<double>(
+            corp_shelf_stock(m_world, m_world.player_entity, static_cast<std::size_t>(rt)));
     });
 
     // --- US-011: survey dispatch --------------------------------------------
@@ -4735,11 +4748,13 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         const auto it = m_world.corporations.find(m_world.player_entity);
         if (it == m_world.corporations.end())
             return false;
-        // BL-1003: the player's HOME pool on the home body (the HQ's market).
-        auto& pool = m_world.pool_at(m_world.player_entity,
-                                     corp_home_pool_key(m_world, m_world.player_entity,
-                                                        m_world.home_body));
-        pool.quantities[static_cast<std::size_t>(resource_from_name(res))] +=
+        // BL-1265: onto the SHELF of the player's home market on the home body
+        // (the HQ's market) — where a hire buys its kit. Corporations hold no
+        // pools, so a lent good is stock the hire then BUYS at the posted price.
+        const entity_id mid = corp_home_market(m_world, m_world.player_entity, m_world.home_body);
+        if (mid == null_entity)
+            return false;
+        m_world.markets.at(mid).inventory[static_cast<std::size_t>(resource_from_name(res))] +=
             static_cast<float>(qty);
         return true;
     });
@@ -4765,12 +4780,15 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             const int n = m_registry.recipe_count(b.type);
             if (n <= 0) return 0;
             const recipe& r = m_registry.recipe_at(b.type, std::clamp(b.active_recipe_index, 0, n - 1));
-            auto& pool = m_world.pool_at(m_world.player_entity, pool_key_for_tile(m_world, tile));
+            // BL-1265: onto the SHELF the building buys from (its tile's market).
+            const entity_id mid = market_for_tile(m_world, tile);
+            if (mid == null_entity) return -1;
+            auto& shelf = m_world.markets.at(mid).inventory;
             int stocked = 0;
             for (std::size_t i = 0; i < r.inputs.size(); ++i)
             {
                 if (r.inputs[i] <= 0.0f) continue;
-                pool.quantities[i] += static_cast<float>(qty);
+                shelf[i] += static_cast<float>(qty);
                 ++stocked;
             }
             SDL_Log("verify.stock_building_inputs: tile=%u recipe=%s inputs=%d qty=%.1f",
@@ -4879,14 +4897,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             SDL_Log("economy balance: %-26s %.1f%s",
                     cc.name.c_str(), cc.balance,
                     cc.balance < 0.0f ? "  [NEGATIVE]" : "");
-        for (const auto& [key, pool] : m_world.corp_market_pools)
-            for (std::size_t r = 0; r < resource_count; ++r)
-                if (pool.quantities[r] > 0.0f)
-                    SDL_Log("economy pool: corp=%u pool=%u %s=%.1f", // BL-1003: market (or body) key
-                            static_cast<unsigned>(key.first),
-                            static_cast<unsigned>(key.second),
-                            ui::resource_name(static_cast<resource_type>(r)),
-                            pool.quantities[r]);
+        for (const auto& [cid, cc] : m_world.corporations) // BL-1266: trade, not pools
+            if (cc.trade_points > 0.0f)
+                SDL_Log("economy trade points: %-26s %.1f (reserve %.1f)",
+                        cc.name.c_str(), cc.trade_points, cc.trade_reserve);
         for (const auto& [mid, mc] : m_world.markets)
             for (std::size_t r = 0; r < resource_count; ++r)
                 if (mc.supply[r] > 0.0f || mc.demand[r] > 0.0f)
@@ -4939,24 +4953,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                   << (cc.balance - cc.starting_capital) << "," << cc.assets.size() << "\n";
             }
         }
-        // stockpiles.csv — one row per (corp, pool, resource) with stock > 0.
-        // BL-1003: pools key (corp, market); body_id is the pool's body, and the
-        // trailing pool_key column (appended, so existing readers keep working)
-        // names the market (or the body, for a market-less body's pool).
-        {
-            std::ofstream f(path("stockpiles.csv"));
-            f << "corp_id,corp_name,body_id,body_name,resource,quantity,pool_key\n";
-            for (const auto& [key, pool] : m_world.corp_market_pools)
-            {
-                const entity_id body = pool_key_body(m_world, key.second);
-                for (std::size_t r = 0; r < resource_count; ++r)
-                    if (pool.quantities[r] > 0.0f)
-                        f << key.first << ",\"" << corp_name(key.first) << "\"," << body
-                          << ",\"" << body_name(body) << "\","
-                          << ui::resource_name(static_cast<resource_type>(r)) << ","
-                          << pool.quantities[r] << "," << key.second << "\n";
-            }
-        }
+        // stockpiles.csv RETIRED (BL-1265): corporations hold no pools; every
+        // good is on a market's shelf, which the market rows below export.
         // Per-market display label = its generated city name (population centre anchoring
         // the market's centre tile), or the body name as a fallback. Shared with the
         // market ledger's city selector so the CSV and the game agree.

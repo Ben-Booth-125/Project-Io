@@ -443,6 +443,25 @@ struct price_band_params
     float shelf_supply_ticks = 0.0f;
 };
 
+/// BL-1266 — TRADE'S AUTHORED DATA (economy.trade in scripts/economy.lua;
+/// docs/economy/TRADE.md). Every field defaults to the inert value: no building
+/// makes points and no good has capacity, so a hand-built harness registry ships
+/// nothing by trade.
+struct trade_params
+{
+    /// TRADE.md § Trade capacity: the units of each good ONE trade point moves
+    /// per tick, authored per resource (Ben, 2026-10-10). 0 = trade moves none
+    /// of it. Proposed by measurement, approved by Ben (BL-1270).
+    std::array<float, resource_count> capacity{};
+    /// TRADE.md § The Planetary Marketplace: trade points a Marketplace makes
+    /// per tick per unit of effective workforce — its staffed rate, as a
+    /// processor's `base_rate` is its output per unit of effective workforce.
+    float marketplace_points = 0.0f;
+    /// Trade points a completed Port makes per tick (Ben, 2026-10-10: "Ports
+    /// make trade points too", at a lower rate). Flat: a Port staffs at zero.
+    float port_points = 0.0f;
+};
+
 /// BL-708 — what makes a good a GRID GOOD, as authored data.
 ///
 /// `power` is the roster's first good whose MOVEMENT and MARKET are separate
@@ -1168,6 +1187,8 @@ public:
     /// per-type, era-banded goods vector plus the one decay curve. Every rate
     /// defaults to zero, so a hand-built harness registry draws nothing.
     const building_upkeep_params& building_upkeep() const { return m_building_upkeep; }
+    /// BL-1266: trade's authored data (economy.trade; TRADE.md).
+    const trade_params& trade() const { return m_trade; }
 
     /// BL-350 procurement/contract tunables (economy.procurement in Lua).
     const procurement_params& procurement() const { return m_procurement; }
@@ -1418,6 +1439,7 @@ public:
     void set_construction(const construction_params& c) { m_construction = c; }
     void set_military(const military_capability_params& m) { m_military = m; }
     void set_building_upkeep(const building_upkeep_params& b) { m_building_upkeep = b; }
+    void set_trade(const trade_params& t) { m_trade = t; }
     /// BL-546: seeds the two `contract_*` Trust weights from @p p in the same
     /// call, so a harness that sets a procurement rate never gets a registry
     /// whose sentiment table disagrees with it.
@@ -1685,6 +1707,7 @@ private:
     /// keeps every pre-BL-641 harness (all of which hand-build their registry)
     /// bit-identical.
     building_upkeep_params m_building_upkeep = {};
+    trade_params m_trade = {}; ///< BL-1266: see trade()
 
     /// BL-350 procurement tunables. Defaults match economy.lua.
     procurement_params m_procurement = {};

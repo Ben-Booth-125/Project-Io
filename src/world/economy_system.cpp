@@ -302,6 +302,18 @@ building_report run_extraction(world& w, const recipe_registry& reg,
     tile_component& tc = tile_it->second;
     const std::size_t ri = static_cast<std::size_t>(b.target_resource);
 
+    // BL-1265 (MARKETS.md § The shelf economy): output LANDS on the shelf of the
+    // site's own tile market and is sold there at this tick's clear. A site with
+    // no market under it has no shelf to land on, so it works nothing — the
+    // reserve is not drawn for goods that would land nowhere. (Completing a
+    // building spawns its body's first market, so a working site has one.)
+    const entity_id land_market = market_for_tile(w, b.tile);
+    if (land_market == null_entity)
+    {
+        rep.idle = true;
+        return rep;
+    }
+
     // Rate the deposit would yield at full reserve (richness sets the rate),
     // diminished by this site's rank in the tile's stack (BL-193): the second site
     // yields 0.8 of the first, the third 0.64, and so on. Stacking therefore pays
@@ -322,12 +334,11 @@ building_report run_extraction(world& w, const recipe_registry& reg,
     // there is no taper and no exhaustion, and it does not co-extract the
     // tile's deposits (BL-437's basket is the share-out of a DEPOSIT site's
     // capacity; this site's capacity is the one good it lifts). Output is its
-    // nominal, all target, into the pool of its own tile market — exactly where
+    // nominal, all target, onto the shelf of its own tile market — exactly where
     // a deposit site's output lands.
     if (placement_rules::is_depositless_site(w, b.tile, b.target_resource))
     {
-        stockpile_component& pool = w.pool_at(corp, pool_key_for_tile(w, b.tile));
-        pool.quantities[ri] += nominal;
+        w.land_goods(corp, land_market, ri, nominal);
         mark_produced(w, corp, b.target_resource);
         rep.active          = true;
         rep.output_quantity = nominal;
@@ -395,8 +406,7 @@ building_report run_extraction(world& w, const recipe_registry& reg,
     float produced_total = 0.0f;
     if (capacity > 0.0f && richness_total > 0.0f)
     {
-        // BL-1003: output enters the pool of the site's own tile market.
-        stockpile_component& pool = w.pool_at(corp, pool_key_for_tile(w, b.tile));
+        // BL-1265: output lands on the shelf of the site's own tile market.
         for (const resource_type r : placement_rules::k_extractable)
         {
             const std::size_t rr    = static_cast<std::size_t>(r);
@@ -411,7 +421,7 @@ building_report run_extraction(world& w, const recipe_registry& reg,
             if (got <= 0.0f)
                 continue;
             tc.resource_remaining[rr] -= got;
-            pool.quantities[rr]       += got;
+            w.land_goods(corp, land_market, rr, got);
             mark_produced(w, corp, r); // BL-428 growth spine, now for every good worked
             produced_total += got;
         }
@@ -432,9 +442,6 @@ building_report run_extraction(world& w, const recipe_registry& reg,
     return rep;
 }
 
-/// Processing: run the recipe pool-first, then against the local market's real
-/// inventory (BL-130) under the two-threshold model, recording the drawn
-/// quantity into `purchases`.
 /// A processor's full-run batch count — the one expression run_processing and
 /// BL-1209's processor pre-pass both read, so the pre-pass claims exactly the
 /// need the draw will meet. Same operand order as before the split (float).
@@ -461,10 +468,42 @@ struct proc_shelf_turn
     std::array<float, resource_count> drawn{};
 };
 
-/// Credit one run's outputs to the pool under the BL-708 stockpile ceiling.
-/// Returns what was produced. Shared by the draw and BL-1209's top-up.
+/// BL-1265: the stock a market's shelf will hold of each good once this tick's
+/// landings so far reach it — what the BL-708 store ceiling is read against.
+/// With no corporation pools the store a generator runs into is the shelf.
+std::array<float, resource_count> shelf_stock_with_landings(const world& w, entity_id market)
+{
+    std::array<float, resource_count> q{};
+    const auto mit = w.markets.find(market);
+    if (mit == w.markets.end())
+        return q;
+    for (std::size_t r = 0; r < resource_count; ++r)
+        q[r] = std::max(0.0f, mit->second.inventory[r]);
+    for (auto it = w.landed_this_tick.begin(); it != w.landed_this_tick.end(); ++it)
+        if (it->first.second == market)
+            for (std::size_t r = 0; r < resource_count; ++r)
+                q[r] += it->second.quantities[r];
+    return q;
+}
+
+/// BL-1265: is @p market's centre on the network a grid good travels? A grid
+/// good made at a market off the grid has no wire to sell it down, so it is not
+/// made (the BL-708 rule, "it stays where the store ceiling stops the
+/// generator", now read at the shelf). Warmed reach field; finite = wired.
+bool market_wired(world& w, entity_id market)
+{
+    const auto mit = w.markets.find(market);
+    if (mit == w.markets.end() || mit->second.centre_tile == null_entity)
+        return false;
+    body_reach_field(w, mit->second.body);
+    const float rc = tile_reach_cost(w, mit->second.centre_tile);
+    return rc >= 0.0f && std::isfinite(rc);
+}
+
+/// Land one run's outputs on @p market under the BL-708 store ceiling. Returns
+/// what was produced. Shared by the draw and BL-1209's top-up.
 float credit_processing_outputs(world& w, const recipe_registry& reg, entity_id corp,
-                                const recipe& rcp, stockpile_component& pool, float batches)
+                                entity_id market, const recipe& rcp, float batches)
 {
     // BL-708 — THE STOCKPILE CEILING, and it is power's one genuinely novel
     // property against the rest of the roster (PRODUCTION.md § Power: "a
@@ -472,42 +511,64 @@ float credit_processing_outputs(world& w, const recipe_registry& reg, entity_id 
     // buy — a real decision rather than an accounting detail").
     //
     // Applied HERE, where output ACCRUES, so the overflow is never produced
-    // rather than produced and then deleted. That distinction is the whole
-    // point: `rep.output_quantity` is what the profitability model and the corp
-    // AI's idle reflex both read, so a plant backed up against a full store must
-    // report the truth — it made nothing this tick — or the AI would keep paying
-    // wages for output that evaporated after the fact.
+    // rather than produced and then deleted: `rep.output_quantity` is what the
+    // profitability model and the corp AI's idle reflex both read, so a plant
+    // backed up against a full store must report that it made nothing. BL-1265:
+    // the store is the market's shelf (plus what has already landed on it this
+    // tick), since no corporation holds goods.
     //
     // ZERO CEILING = UNCAPPED, which is every other good in the roster, so this
     // block is arithmetically inert in a world that authors no ceiling.
     const grid_goods_params& grid = reg.grid_goods();
 
+    std::array<float, resource_count> stock{};
+    bool stock_read = false;
     float produced = 0.0f;
     for (std::size_t r = 0; r < resource_count; ++r)
     {
         float outq = rcp.outputs[r] * batches;
         if (outq <= 0.0f)
             continue;
+        if (grid.any() && grid.grid(r) && !market_wired(w, market))
+            continue; // BL-708: no wire to sell it down
         const float cap = grid.ceiling(r);
         if (cap > 0.0f)
         {
-            const float room = cap - pool.quantities[r];
+            if (!stock_read)
+            {
+                stock = shelf_stock_with_landings(w, market);
+                stock_read = true;
+            }
+            const float room = cap - stock[r];
             outq = std::max(0.0f, std::min(outq, room)); // a store already over cap makes nothing
             if (outq <= 0.0f)
                 continue;
+            stock[r] += outq;
         }
-        pool.quantities[r] += outq;
-        produced           += outq;
+        w.land_goods(corp, market, r, outq);
+        produced += outq;
         mark_produced(w, corp, static_cast<resource_type>(r)); // BL-428 growth spine
     }
     return produced;
 }
 
+/// BL-1265: does any of @p rcp's outputs carry a BL-708 store ceiling? Only
+/// then is the shelf stock read for `store_run_limit`.
+bool any_capped_output(const recipe_registry& reg, const recipe& rcp)
+{
+    const grid_goods_params& grid = reg.grid_goods();
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (rcp.outputs[r] > 0.0f && grid.ceiling(r) > 0.0f)
+            return true;
+    return false;
+}
+
 /// BL-1209: the most extra run a processor's outputs can still be credited for
 /// under the BL-708 store ceiling. Infinite while any output is uncapped (a run
 /// still makes that output); else the largest run any capped output has room for.
+/// @p stock is the shelf as `shelf_stock_with_landings` reads it.
 float store_run_limit(const recipe_registry& reg, const recipe& rcp,
-                      const std::array<float, resource_count>& pool, float batches_full)
+                      const std::array<float, resource_count>& stock, float batches_full)
 {
     const grid_goods_params& grid = reg.grid_goods();
     float limit = 0.0f;
@@ -521,15 +582,19 @@ float store_run_limit(const recipe_registry& reg, const recipe& rcp,
         const float cap = grid.ceiling(r);
         if (!(cap > 0.0f))
             return std::numeric_limits<float>::infinity();
-        limit = std::max(limit, std::max(0.0f, cap - pool[r]) / outq);
+        limit = std::max(limit, std::max(0.0f, cap - stock[r]) / outq);
     }
     return any_output ? limit : std::numeric_limits<float>::infinity();
 }
 
+/// Processing: run the recipe off the local market's shelf (BL-130, BL-1265 —
+/// a processor holds no stock of its own and buys every input there, under the
+/// two-threshold model), recording the want into `wants` and the drawn quantity
+/// into `purchases`; its outputs land on the same market's shelf.
+///
 /// `turn` (BL-1209): set when this processor draws a CONTENDED shelf. It may
 /// take its full need from what the shelf holds beyond the floors reserved for
-/// the draws after it (`reserved_after`); null = the shelf as it stands (an
-/// uncontended shelf, exactly the pre-BL-1209 draw).
+/// the draws after it (`reserved_after`); null = the shelf as it stands.
 building_report run_processing(world& w, const recipe_registry& reg,
                                entity_id corp, entity_id building_id,
                                const building_component& b,
@@ -539,8 +604,7 @@ building_report run_processing(world& w, const recipe_registry& reg,
                                proc_shelf_turn* turn = nullptr)
 {
     // What the shelf offers this draw of good r. With nothing reserved it is
-    // max(0, inventory) exactly (x - 0.0f == x), so an uncontended draw is the
-    // old draw bit for bit.
+    // max(0, inventory) exactly.
     auto access_of = [&](const market_component& m, std::size_t r) {
         const float held = (turn != nullptr) ? (*turn->reserved_after)[r] : 0.0f;
         return std::max(0.0f, m.inventory[r] - held);
@@ -562,36 +626,26 @@ building_report run_processing(world& w, const recipe_registry& reg,
     const recipe* rcp = reg.get_recipe(b.recipe);
     const float batches_full = processing_batches_full(reg, b, contention);
 
-    if (body == null_entity || rcp == nullptr || batches_full <= 0.0f)
+    // BL-1265: a processor with no market under it has no shelf to buy from or
+    // land on, so it cannot run.
+    if (body == null_entity || rcp == nullptr || batches_full <= 0.0f || market_id == null_entity)
     {
-        rep.idle = true; // misconfigured, unstaffed, or detached
+        rep.idle = true; // misconfigured, unstaffed, detached, or market-less
         return rep;
     }
 
-    // BL-1003: the processor draws and credits the pool of its own tile market
-    // (`market_id` IS `market_for_tile(b.tile)`), or the body-level pool on a
-    // market-less body. Want and fill book under the same key.
-    const entity_id pool_key = (market_id != null_entity) ? market_id : body;
-    stockpile_component& pool = w.pool_at(corp, pool_key);
-    // BL-130: a processor's real available stock is its own pool PLUS the local
-    // market's real inventory — a genuine finite draw, not an unconditional
-    // auto-buy. Mutable: this function actually consumes what it draws, below.
-    market_component* mc = (market_id != null_entity) ? &w.markets.at(market_id) : nullptr;
+    market_component& mc = w.markets.at(market_id);
     const float res_mult = reg.price_band().reservation_mult; // BL-1172: the fair-price ceiling
 
-    // Coverage of a full run = the scarcest input's (pool + market inventory) fraction.
+    // Coverage of a full run = the scarcest input's admitted-shelf fraction.
     //
     // BL-441: this loop is also where the WANT becomes known, so it is where the
     // want is recorded. `need` here is the FULL-RUN need — what the building set
     // out to consume — computed before any coverage decision, so it is the same
     // number whether the draw goes on to succeed, run short, or fail outright.
-    // Accumulated into a local first and merged below, so a building with no
-    // inputs never creates an empty row.
+    // BL-1265: the whole need is a bid on the shelf — no pool covers any of it.
     std::array<float, resource_count> wanted{};
     std::array<float, resource_count> suppressed{}; // BL-1203: hauler-only (below)
-    // BL-1217 (the dial's buyer signal): this processor's dial record. Only a
-    // processor on a market has one (a market-less body has no bid to read).
-    proc_dial_draw* dial = (market_id != null_entity) ? &out.dial_pool_draws[building_id] : nullptr;
     float coverage = std::numeric_limits<float>::infinity();
     bool  has_input = false;
     for (std::size_t r = 0; r < resource_count; ++r)
@@ -602,36 +656,21 @@ building_report run_processing(world& w, const recipe_registry& reg,
         has_input = true;
         const float need   = in * batches_full;
         // BL-1172: the shelf counts only where the ceiling admits the posted price.
-        const bool  shelf  = mc && shelf_admits(*mc, r, res_mult, /*off_buys=*/true);
+        const bool  shelf  = shelf_admits(mc, r, res_mult, /*off_buys=*/true);
         // BL-1209: a short shelf offers this draw its pro-rata share only.
-        const float offer  = shelf ? access_of(*mc, r) : 0.0f;
+        const float offer  = shelf ? access_of(mc, r) : 0.0f;
         if (turn != nullptr)
             turn->access[r] = offer;
-        const float avail  = pool.quantities[r] + offer;
-        const float cov    = (need > 0.0f) ? avail / need : std::numeric_limits<float>::infinity();
+        const float cov    = (need > 0.0f) ? offer / need : std::numeric_limits<float>::infinity();
 
-        // The want registered is the want OF THE MARKET: the full-run need less
-        // what the corp already holds in its own pool. mc.demand is compared
-        // against mc.supply, which is an OFFER to the market, so demand has to be
-        // the BID to the market for the comparison to mean anything — a corp
-        // feeding its smelter from its own mine is not bidding for the input and
-        // must not push its price. NR-281 records this reading of the item.
-        // BL-1172: a draw over the ceiling does not bid either (FINANCE.md,
-        // Ben 2026-10-03) — its want leaves the price so the price can ease.
-        // BL-1217: the ROOM this processor's pool draws may fill on the dial —
-        // its full need less what it posts as demand here, i.e. what the pool
-        // covered when the want was posted. A pool draw above it (the top-up,
-        // off a pool a sibling refilled) is a unit already in demand. A want
-        // the ceiling silenced is not demand, so the whole need is room.
-        if (dial != nullptr)
-            dial->room[r] = shelf ? std::min(need, std::max(0.0f, pool.quantities[r])) : need;
-        if (mc == nullptr || shelf)
-            wanted[r] += std::max(0.0f, need - pool.quantities[r]);
+        // BL-1172: a draw over the ceiling does not bid (FINANCE.md, Ben
+        // 2026-10-03) — its want leaves the price so the price can ease. BL-1203:
+        // the want the ceiling silenced goes to the HAULER-ONLY register instead
+        // (never `wanted`, never the price).
+        if (shelf)
+            wanted[r] += need;
         else
-            // BL-1203: the want the ceiling silenced is not dropped — it goes to
-            // the HAULER-ONLY register (never `wanted`, never the price), so a
-            // dispatcher landing under the ceiling can see it as room.
-            suppressed[r] += std::max(0.0f, need - pool.quantities[r]);
+            suppressed[r] += need;
 
         if (cov < coverage)
         {
@@ -647,23 +686,21 @@ building_report run_processing(world& w, const recipe_registry& reg,
     // precisely when the market most needs to hear it.
     if (has_input)
     {
-        auto& want_row = out.wants[std::make_pair(corp, pool_key)];
+        auto& want_row = out.wants[std::make_pair(corp, market_id)];
         for (std::size_t r = 0; r < resource_count; ++r)
             want_row[r] += wanted[r];
         // BL-1217 G1b R3: the processor part of the same want, mirrored (the
         // background pull leaves one tick of it on the shelf) — PLUS the want
         // the fair-price ceiling silenced (Ben, 2026-10-09: a processor priced
-        // out still came for the input). Per input, one of the two is zero (the
-        // ceiling either admits the shelf or not). The silenced part stays out
-        // of `wants` and the price; this register never prices.
-        auto& proc_row = out.processor_wants[std::make_pair(corp, pool_key)];
+        // out still came for the input). This register never prices.
+        auto& proc_row = out.processor_wants[std::make_pair(corp, market_id)];
         for (std::size_t r = 0; r < resource_count; ++r)
             proc_row[r] += wanted[r] + suppressed[r];
         // BL-1203: a row only where something was suppressed (a std::map, so
         // the merge in clear_markets walks it sorted).
         if (std::any_of(suppressed.begin(), suppressed.end(), [](float v) { return v > 0.0f; }))
         {
-            auto& hw = out.hauler_wants[std::make_pair(corp, pool_key)];
+            auto& hw = out.hauler_wants[std::make_pair(corp, market_id)];
             for (std::size_t r = 0; r < resource_count; ++r)
                 hw[r] += suppressed[r];
         }
@@ -672,11 +709,7 @@ building_report run_processing(world& w, const recipe_registry& reg,
     if (!has_input)
         coverage = 1.0f; // degenerate no-input recipe runs full
 
-    // Run fraction — the two-threshold model, uniformly, whether or not a
-    // market backs this body. BL-130 retires the old "a market body always
-    // runs full batch" special case: a market's inventory is now real and
-    // finite, so it earns its place in `coverage` above rather than bypassing
-    // the threshold model outright (docs/economy/PRODUCTION.md, corrected).
+    // Run fraction — the two-threshold model.
     float run = 0.0f;
     if (coverage >= reg.t_full())
     {
@@ -688,48 +721,38 @@ building_report run_processing(world& w, const recipe_registry& reg,
     }
     else
     {
-        rep.idle = true; // too little between pool and market to bootstrap
+        rep.idle = true; // too little on the shelf to bootstrap
         return rep;
     }
     rep.run = run;
 
     const float batches = batches_full * run;
 
-    // Consume inputs pool-first; the remainder draws on the market's real
-    // inventory (BL-130) — guaranteed sufficient at this `run` level by the
-    // coverage-min construction above (every input's avail/need_full >= run).
-    // Recorded into `bought` — the FILL, what actually arrived. Since BL-441 this
-    // is no longer what prices the resource (that is `out.wants`, above); it is
-    // strictly the receipt, and it is what the corp is billed for. The two must
-    // not be swapped: paying against the want would credit deliveries nobody made.
-    auto& bought = out.purchases[std::make_pair(corp, pool_key)];
+    // Buy the inputs off the shelf — guaranteed sufficient at this `run` level
+    // by the coverage-min construction above. Recorded into `bought` — the
+    // FILL, what actually arrived, and what the corp is billed for at the
+    // posted price. Since BL-441 this is not what prices the resource (that is
+    // `out.wants`, above).
+    auto& bought = out.purchases[std::make_pair(corp, market_id)];
     for (std::size_t r = 0; r < resource_count; ++r)
     {
         const float in = rcp->inputs[r];
         if (in <= 0.0f)
             continue;
-        const float need      = in * batches;
-        const float from_pool = std::min(pool.quantities[r], need);
-        pool.quantities[r] -= from_pool;
-        if (dial != nullptr && from_pool > 0.0f) // BL-1217: the dial's pool-fed draw
-            dial->take(r, from_pool);
-        const float remainder = need - from_pool;
-        if (remainder <= 0.0f)
-            continue;
+        const float need = in * batches;
         // BL-1172: never off a shelf the ceiling refuses (coverage above already
-        // excluded it, so the remainder there is zero up to rounding).
-        const bool  shelf       = mc && shelf_admits(*mc, r, res_mult, /*off_buys=*/true);
-        const float from_market = shelf ? std::min(std::min(std::max(0.0f, mc->inventory[r]), remainder),
-                                                   access_of(*mc, r))
-                                        : 0.0f;
-        if (shelf)
-            mc->inventory[r] = std::max(0.0f, mc->inventory[r] - from_market);
+        // excluded it, so the need there is zero up to rounding).
+        if (!shelf_admits(mc, r, res_mult, /*off_buys=*/true))
+            continue;
+        const float from_market = std::min(std::min(std::max(0.0f, mc.inventory[r]), need),
+                                           access_of(mc, r));
+        mc.inventory[r] = std::max(0.0f, mc.inventory[r] - from_market);
         bought[r] += from_market;
         if (turn != nullptr)
             turn->drawn[r] += from_market;
     }
 
-    const float produced = credit_processing_outputs(w, reg, corp, *rcp, pool, batches);
+    const float produced = credit_processing_outputs(w, reg, corp, market_id, *rcp, batches);
 
     rep.active          = true;
     rep.output_quantity = produced;
@@ -738,15 +761,12 @@ building_report run_processing(world& w, const recipe_registry& reg,
 
 /// BL-1209 — A PROCESSOR'S SECOND TURN at the shelves (MARKETS.md § Price
 /// resolution, "A short shelf is shared pro-rata"). After every processor has
-/// drawn, one left short (run < 1, idle included) runs the increment its pool
-/// and the shelves now hold: `new_run = min(1, run + min over inputs of
-/// (pool + admitted shelf) / full need)`, taken only if it reaches t_idle. The
-/// increment draws pool-first then shelf and credits its outputs, exactly as the
-/// first turn does (the run is linear). Nothing is reserved any more: every draw
-/// has had its turn. The increment is also capped at what the BL-708 store
-/// ceiling lets its outputs take (`store_run_limit`): a plant whose every output
-/// is clamped full draws nothing for a run that would make nothing. Returns true
-/// iff it ran more.
+/// drawn, one left short (run < 1, idle included) runs the increment the
+/// shelves now hold: `new_run = min(1, run + min over inputs of (admitted
+/// shelf) / full need)`, taken only if it reaches t_idle. The increment draws
+/// the shelf and lands its outputs, exactly as the first turn does (the run is
+/// linear). The increment is also capped at what the BL-708 store ceiling lets
+/// its outputs take (`store_run_limit`). Returns true iff it ran more.
 bool top_up_processing(world& w, const recipe_registry& reg, entity_id corp,
                        const building_component& b, entity_id market_id, float contention,
                        economy_report& out, building_report& rep, proc_shelf_turn* turn)
@@ -757,7 +777,6 @@ bool top_up_processing(world& w, const recipe_registry& reg, entity_id corp,
     const float batches_full = processing_batches_full(reg, b, contention);
     if (rcp == nullptr || !(batches_full > 0.0f))
         return false;
-    stockpile_component& pool = w.pool_at(corp, market_id);
     market_component& mc = w.markets.at(market_id);
     const float res_mult = reg.price_band().reservation_mult;
 
@@ -771,12 +790,13 @@ bool top_up_processing(world& w, const recipe_registry& reg, entity_id corp,
         has_input = true;
         const float need  = in * batches_full;
         const bool  shelf = shelf_admits(mc, r, res_mult, /*off_buys=*/true);
-        const float avail = std::max(0.0f, pool.quantities[r]) + (shelf ? std::max(0.0f, mc.inventory[r]) : 0.0f);
+        const float avail = shelf ? std::max(0.0f, mc.inventory[r]) : 0.0f;
         extra = std::min(extra, avail / need);
     }
     if (!has_input)
         return false;
-    extra = std::min(extra, store_run_limit(reg, *rcp, pool.quantities, batches_full));
+    if (any_capped_output(reg, *rcp))
+        extra = std::min(extra, store_run_limit(reg, *rcp, shelf_stock_with_landings(w, market_id), batches_full));
     const float new_run = std::min(1.0f, rep.run + extra);
     // A meaningful increment only: float dust left by the first turn is not a run.
     if (!(new_run >= reg.t_idle()) || !(new_run - rep.run > 1e-5f))
@@ -790,22 +810,16 @@ bool top_up_processing(world& w, const recipe_registry& reg, entity_id corp,
         const float in = rcp->inputs[r];
         if (in <= 0.0f)
             continue;
-        const float need      = in * batches;
-        const float from_pool = std::min(std::max(0.0f, pool.quantities[r]), need);
-        pool.quantities[r] -= from_pool;
-        if (from_pool > 0.0f) // BL-1217: the dial's pool-fed draw, capped by turn 1's room
-            if (const auto dit = out.dial_pool_draws.find(rep.building); dit != out.dial_pool_draws.end())
-                dit->second.take(r, from_pool);
-        const float remainder = need - from_pool;
-        if (remainder <= 0.0f || !shelf_admits(mc, r, res_mult, /*off_buys=*/true))
+        const float need = in * batches;
+        if (!shelf_admits(mc, r, res_mult, /*off_buys=*/true))
             continue;
-        const float from_market = std::min(std::max(0.0f, mc.inventory[r]), remainder);
+        const float from_market = std::min(std::max(0.0f, mc.inventory[r]), need);
         mc.inventory[r] = std::max(0.0f, mc.inventory[r] - from_market);
         bought[r] += from_market;
         if (turn != nullptr)
             turn->drawn[r] += from_market;
     }
-    rep.output_quantity += credit_processing_outputs(w, reg, corp, *rcp, pool, batches);
+    rep.output_quantity += credit_processing_outputs(w, reg, corp, market_id, *rcp, batches);
     rep.run    = new_run;
     rep.active = true;
     rep.idle   = false;
@@ -817,8 +831,7 @@ bool top_up_processing(world& w, const recipe_registry& reg, entity_id corp,
         if (in <= 0.0f)
             continue;
         const bool  shelf = shelf_admits(mc, r, res_mult, /*off_buys=*/true);
-        const float cov = (std::max(0.0f, pool.quantities[r]) + (shelf ? std::max(0.0f, mc.inventory[r]) : 0.0f))
-                        / (in * batches_full);
+        const float cov = (shelf ? std::max(0.0f, mc.inventory[r]) : 0.0f) / (in * batches_full);
         if (cov < scarcest)
         {
             scarcest           = cov;
@@ -830,20 +843,18 @@ bool top_up_processing(world& w, const recipe_registry& reg, entity_id corp,
 }
 
 /// BL-1209 — THE PROCESSING PHASE'S INVARIANT, AUDITED INDEPENDENTLY of the
-/// top-up (report-only; writes nothing, inserts no pool). After the phase,
-/// every processor that ran under its labour-granted run (run < 1) is checked
-/// against the REAL pools and shelves: could it run more, by at least 1e-4 and
-/// to at least t_idle, within its store ceiling, with some input of that
-/// increment taken off a shelf holding stock? Each such draw is stranded stock,
-/// counted on a shelf that was contended as the phase opened (`contended`) or
-/// not.
+/// top-up (report-only; writes nothing). After the phase, every processor that
+/// ran under its labour-granted run (run < 1) is checked against the REAL
+/// shelves: could it run more, by at least 1e-4 and to at least t_idle, within
+/// its store ceiling, with some input of that increment taken off a shelf
+/// holding stock? Each such draw is stranded stock, counted on a shelf that
+/// was contended as the phase opened (`contended`) or not.
 void audit_processing_shelves(const world& w, const recipe_registry& reg, const economy_report& report,
                               const std::set<std::pair<entity_id, std::size_t>>& contended,
                               const std::function<float(entity_id, entity_id, entity_id)>& labour_for,
                               shelf_phase_audit& audit)
 {
     const float res_mult = reg.price_band().reservation_mult;
-    static const std::array<float, resource_count> empty{};
     for (const building_report& rep : report.buildings)
     {
         if (rep.type != building_type::processing_facility || !(rep.run < 1.0f))
@@ -859,8 +870,6 @@ void audit_processing_shelves(const world& w, const recipe_registry& reg, const 
         const float bf = processing_batches_full(reg, b, labour_for(rep.building, rep.corp, building_body(w, b)));
         if (!(bf > 0.0f))
             continue;
-        const auto pit = w.corp_market_pools.find(std::make_pair(rep.corp, mid));
-        const std::array<float, resource_count>& pool = (pit != w.corp_market_pools.end()) ? pit->second.quantities : empty;
         const market_component& mc = w.markets.at(mid);
         float more = std::numeric_limits<float>::infinity();
         for (std::size_t r = 0; r < resource_count; ++r)
@@ -869,15 +878,16 @@ void audit_processing_shelves(const world& w, const recipe_registry& reg, const 
             if (in <= 0.0f)
                 continue;
             const float on_shelf = shelf_admits(mc, r, res_mult, true) ? std::max(0.0f, mc.inventory[r]) : 0.0f;
-            more = std::min(more, (std::max(0.0f, pool[r]) + on_shelf) / (in * bf));
+            more = std::min(more, on_shelf / (in * bf));
         }
         if (!std::isfinite(more))
             continue; // no inputs
-        more = std::min(more, store_run_limit(reg, *rcp, pool, bf));
+        if (any_capped_output(reg, *rcp))
+            more = std::min(more, store_run_limit(reg, *rcp, shelf_stock_with_landings(w, mid), bf));
         const float could = std::min(1.0f, rep.run + more);
         if (!(could >= reg.t_idle()) || !(could - rep.run > 1e-4f))
             continue;
-        // The increment must reach a shelf: some input its pool cannot cover.
+        // The increment must reach a shelf holding stock.
         bool on_contended = false, on_shelf = false;
         float units = 0.0f;
         for (std::size_t r = 0; r < resource_count; ++r)
@@ -885,7 +895,7 @@ void audit_processing_shelves(const world& w, const recipe_registry& reg, const 
             const float in = rcp->inputs[r];
             if (in <= 0.0f)
                 continue;
-            const float from_shelf = in * bf * (could - rep.run) - std::max(0.0f, pool[r]);
+            const float from_shelf = in * bf * (could - rep.run);
             if (from_shelf > 1e-6f && mc.inventory[r] > 1e-6f)
             {
                 on_shelf = true;
@@ -1618,42 +1628,6 @@ economy_step_phase_clock*& economy_step_phase_clock_sink()
     return sink;
 }
 
-namespace {
-/// BL-1217 (AI_OPPONENT.md § 11, the dial reads stock-fed consumers): this
-/// tick's dial record, per (market, good), into `report.dial_pool_sums` —
-/// written to the markets by the CLEAR (clear_markets), beside the demand it
-/// complements, so the scorer always reads a demand and a pool-draw record of
-/// the SAME tick (see market_component::dial_pool_draw).
-///
-/// EVERY processor that posted its want this tick (each has a dial record)
-/// STAMPS every input key it touches, with 0 when it took nothing from its
-/// pool: a consumer that moved from its pool onto the shelf now posts its want
-/// as demand, and its old pool draw must not be held beside it. Only a processor
-/// `running_consumer_market` counts as running contributes its draws (the same
-/// filter as the unposted bid, so a skipped processor's draw credits no market).
-/// A key no processor touched keeps its last record, which ages out of the hold.
-void collect_dial_pool_draws(const world& w, const recipe_registry& reg, economy_report& report)
-{
-    for (const building_report& br : report.buildings)
-    {
-        const auto dit = report.dial_pool_draws.find(br.building);
-        if (dit == report.dial_pool_draws.end())
-            continue;
-        const auto bit = w.buildings.find(br.building);
-        const recipe* rc = reg.get_recipe(br.recipe);
-        if (bit == w.buildings.end() || rc == nullptr)
-            continue;
-        const entity_id mid = market_for_tile(w, bit->second.tile);
-        if (mid == null_entity)
-            continue;
-        const bool running = running_consumer_market(w, reg, br) == mid;
-        for (std::size_t r = 0; r < resource_count; ++r)
-            if (rc->inputs[r] > 0.0f)
-                report.dial_pool_sums[std::make_pair(mid, r)] += running ? dit->second.drawn[r] : 0.0f;
-    }
-}
-} // namespace
-
 economy_report run_economy_step(world& w, const recipe_registry& reg, bool spectating,
                                 lp_pool_map* shared_lp_pools)
 {
@@ -1839,43 +1813,35 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             // on EVERY tick of the lead time, not only the tick it fulfils
             // (wanted, filled or not).
             const std::size_t ri = static_cast<std::size_t>(c.resource);
-            if (const auto hmit = w.markets.find(corp_home_pool_key(w, c.supplier, c.body));
+            if (const auto hmit = w.markets.find(corp_home_market(w, c.supplier, c.body));
                 hmit != w.markets.end())
                 note_unposted_bid(hmit->second, ri, c.quantity, w.current_econ_tick);
             if (c.ticks_elapsed >= c.lead_time_ticks)
             {
-                // Draw what the supplier actually holds at the fulfilment body
-                // before building the rest to order, so a contract served out of
-                // existing stock moves goods rather than inventing them.
-                //
-                // BL-1003 CALL: a contract names bodies, not markets. The supplier
-                // is drawn from, and the buyer credited in, each corp's HOME pool
-                // on the named body (`corp_home_pool_key`: the HQ's tile market,
-                // else the lowest-id building's). A contract that names markets
-                // is the fuller answer.
-                //
-                // The HOME pool first, then every other pool the supplier holds on
-                // that body in ascending key order (cold review 2026-09-23): stock
-                // the supplier holds in another catchment is still its stock, and
-                // building to order while it sits there would mint goods.
-                const entity_id home_key = corp_home_pool_key(w, c.supplier, c.body);
-                float to_draw = c.quantity;
-                const auto draw_from = [&](stockpile_component& pool) {
-                    float& sq = pool.quantities[ri];
-                    const float take = std::min(sq, to_draw); // a pool never goes negative
-                    sq -= take;
-                    to_draw -= take;
-                };
-                if (const auto skit = w.corp_market_pools.find(std::make_pair(c.supplier, home_key));
-                    skit != w.corp_market_pools.end())
-                    draw_from(skit->second);
-                for (auto it = w.corp_market_pools.lower_bound({c.supplier, entity_id{0}});
-                     to_draw > 0.0f && it != w.corp_market_pools.end() && it->first.first == c.supplier;
-                     ++it)
-                    if (it->first.second != home_key && pool_key_body(w, it->first.second) == c.body)
-                        draw_from(it->second);
+                // BL-1265 (MARKETS.md § The shelf economy: procurement delivers
+                // "from and to shelves"). The supplier holds no stock, so it BUYS
+                // what its home market's shelf on the fulfilment body holds, at
+                // the posted price and under the fair-price ceiling, like any
+                // buyer, and builds the rest to order. The delivery LANDS on the
+                // buyer's home market on the delivery body — landing is selling,
+                // so the buyer is paid it at that tick's clearing price and the
+                // goods stand on the shelf for whoever buys them next, the buyer
+                // included. A contract names bodies, not markets: each side's
+                // HOME market there (`corp_home_market`).
+                const entity_id supply_mid = corp_home_market(w, c.supplier, c.body);
+                if (const auto smit = w.markets.find(supply_mid); smit != w.markets.end()
+                    && shelf_admits(smit->second, ri, reg.price_band().reservation_mult, /*off_buys=*/true))
+                {
+                    float& shelf = smit->second.inventory[ri];
+                    const float take = std::min(std::max(0.0f, shelf), c.quantity);
+                    if (take > 0.0f)
+                    {
+                        shelf -= take;
+                        report.purchases[std::make_pair(c.supplier, supply_mid)][ri] += take;
+                    }
+                }
                 const entity_id land_on = (c.delivery_body != null_entity) ? c.delivery_body : c.body;
-                w.pool_at(c.buyer, corp_home_pool_key(w, c.buyer, land_on)).quantities[ri] += c.quantity;
+                w.land_goods(c.buyer, corp_home_market(w, c.buyer, land_on), ri, c.quantity);
                 // BL-546: one `contract_completed` occurrence folded into the
                 // relational substrate, at the weight economy.lua authors
                 // (seeded from `reputation_on_complete`, so the magnitude is
@@ -2407,10 +2373,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // listed in pass 5's own visit order BEFORE anything is drawn, so a short
     // shelf is shared in the same share of each want rather than emptied by the
     // lowest ids. The claim is what run_processing would take off the shelf at a
-    // full run: its need, less its corp pool's stock (walked in the same order,
-    // each processor taking its full need off a scratch copy of the pool — so a
-    // corp's own stock is still its own, and a claim is never smaller than the
-    // draw it stands for), on goods the ceiling admits. Nothing here writes the
+    // full run: its whole need (BL-1265 — no pool covers any of it), on goods
+    // the ceiling admits. Nothing here writes the
     // world; with no shelf contended, nothing is reserved and pass 5 is unchanged.
     // `plan_short_shelves` (economy_system.hpp) gives each draw on a contended
     // shelf a FLOOR; the draw takes its need from what the shelf holds beyond the
@@ -2422,7 +2386,6 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     std::vector<std::size_t> proc_report_row;
     {
         const float res_mult = reg.price_band().reservation_mult;
-        std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> scratch_pool;
         for (const entity_id corp : corp_ids)
         {
             const corporation_component& cc = w.corporations.at(corp);
@@ -2445,15 +2408,6 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                 if (!(batches_full > 0.0f))
                     continue;
                 const market_component& mc = w.markets.at(market_id);
-                auto sp = scratch_pool.find(std::make_pair(corp, market_id));
-                if (sp == scratch_pool.end())
-                {
-                    std::array<float, resource_count> q{};
-                    const auto pit = w.corp_market_pools.find(std::make_pair(corp, market_id));
-                    if (pit != w.corp_market_pools.end())
-                        q = pit->second.quantities;
-                    sp = scratch_pool.emplace(std::make_pair(corp, market_id), q).first;
-                }
                 shelf_claimant c;
                 c.building  = building_id;
                 c.market    = market_id;
@@ -2465,14 +2419,11 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                     if (in <= 0.0f)
                         continue;
                     const float need = in * batches_full;
-                    const float take = std::min(std::max(0.0f, sp->second[r]), need);
-                    sp->second[r] -= take;
                     c.need[r]  = need;
-                    c.own[r]   = take;
                     c.gates[r] = true;
-                    if (need - take > 0.0f && shelf_admits(mc, r, res_mult, /*off_buys=*/true))
+                    if (need > 0.0f && shelf_admits(mc, r, res_mult, /*off_buys=*/true))
                     {
-                        c.claim[r] = need - take;
+                        c.claim[r] = need;
                         claims = true;
                     }
                 }
@@ -2633,10 +2584,6 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         if (const auto rmit = w.markets.find(key.first); rmit != w.markets.end())
             note_unposted_bid(rmit->second, key.second, q, w.current_econ_tick);
 
-    // BL-1217 (AI_OPPONENT.md § 11, the dial reads stock-fed consumers): this
-    // tick's pool-fed, not-posted draws, stamped per (market, good); the clear
-    // writes them beside this tick's demand.
-    collect_dial_pool_draws(w, reg, report);
 
     // Population food demand (BL-190) is injected by inject_population_demand,
     // called from clear_markets AFTER its per-tick demand reset — injected here
@@ -3432,20 +3379,15 @@ bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& rep
                        entity_id corp, entity_id body, entity_id tile,
                        const std::array<float, resource_count>& need,
                        draw_outcome* rec = nullptr,
-                       std::array<float, resource_count>* grid_residual = nullptr,
-                       bool note_pool_take = false)
+                       std::array<float, resource_count>* grid_residual = nullptr)
 {
-    // BL-1003: the draw is from the pool of the TILE's market — the shelf the
-    // buyer stands at — or the body-level pool on a market-less body, and the
-    // want/fill book under that same key.
+    // BL-1265: the draw is from the shelf of the TILE's market — the shelf the
+    // buyer stands at — and the want/fill book under that market. A buyer with
+    // no market under it has no shelf: every good is short.
+    (void)body;
     const entity_id  mid = market_for_tile(w, tile);
     market_component* m  = (mid != null_entity) ? &w.markets.at(mid) : nullptr;
-    const entity_id pool_key = (mid != null_entity) ? mid : body;
-
-    // pool_at INSERTS on first access, so callers reach this only when there is
-    // something to draw — an all-zero basket never creates a pool, which is what
-    // keeps a zero-rate world byte-identical down to its pool set.
-    stockpile_component& pool = w.pool_at(corp, pool_key);
+    const entity_id pool_key = mid;
     const float res_mult = reg.price_band().reservation_mult;
     if (rec != nullptr)
     {
@@ -3489,21 +3431,7 @@ bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& rep
             continue; // met stays 0: contributes 0 to the share
         }
 
-        const float have = std::max(0.0f, pool.quantities[r]);
-        const float take = std::min(required, have);
-        pool.quantities[r] = have - take; // never negative, by construction
-        // BL-1227 (AI_OPPONENT.md § 2B, Ben 2026-10-08): building upkeep met
-        // from the corporation's OWN pool takes goods without posting a bid —
-        // an unposted bid on the pool's market.
-        if (note_pool_take && m != nullptr)
-            note_unposted_bid(*m, r, take, w.current_econ_tick);
-        float shortfall = required - take;
-        if (shortfall <= 0.0f)
-        {
-            if (rec != nullptr)
-                rec->met[r] = required;
-            continue;
-        }
+        float shortfall = required; // BL-1265: no pool — the whole need is a bid
 
         // --- the market backstop, gated on the reservation ceiling ----------
         // `base <= 0` is untradeable, and its ceiling is 0, so no price clears
@@ -3800,10 +3728,13 @@ building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg,
     // lights go dim, not out — so an unmet draw scales output down and
     // never to zero. A factor already below the floor (a save from before
     // the rule) is lifted to it on its next unmet tick.
-    auto step_building = [&](building_component& b, bool unmet) {
+    auto step_building = [&](entity_id bid, building_component& b, bool unmet) {
         const int before = b.supply_factor_permille;
         if (unmet)
+        {
             ++out.unmet;
+            report.upkeep_unmet.insert(bid); // BL-1266: no trade points this tick
+        }
         b.supply_factor_permille = step_building_supply(b.supply_factor_permille, unmet, up);
         if (b.supply_factor_permille < before)      ++out.weakened;
         else if (b.supply_factor_permille > before) ++out.recovered;
@@ -3892,7 +3823,7 @@ building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg,
         std::array<float, resource_count> residual{};
         const bool unmet = any_need
             ? draw_goods_or_bid(w, reg, report, corp, body, b.tile, need, nullptr,
-                                (grid_id != 0) ? &residual : nullptr, /*note_pool_take=*/true)
+                                (grid_id != 0) ? &residual : nullptr)
             : false;
 
         bool on_grid = false;
@@ -3910,7 +3841,7 @@ building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg,
             continue;
         }
 
-        step_building(b, unmet);
+        step_building(bid, b, unmet);
     }
 
     // BL-1230 — THE GRID CLEAR. Every shelf on a grid is one pool: the power its
@@ -3998,7 +3929,7 @@ building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg,
             for (std::size_t r = 0; r < resource_count && !unmet; ++r)
                 if (gw.residual[r] > 0.0f)
                     unmet = true;
-            step_building(w.buildings.at(gw.building), unmet);
+            step_building(gw.building, w.buildings.at(gw.building), unmet);
         }
     }
 

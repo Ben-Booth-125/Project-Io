@@ -393,7 +393,17 @@ inline constexpr uint32_t world_save_magic =
 /// refused whole on the strict-equality contract, no migration. Claimed
 /// through `tools/session/next_save_version.js --kind world --claim` (renumbered 45 -> 43 at the
 /// sprint 50 integration, stacked on BL-1195's 42).
-inline constexpr uint32_t world_save_version = 43;
+/// Bumped to 46 by BL-1265 (the shelf economy) and BL-1266 (trade core),
+/// Ben 2026-10-10 (MARKETS.md § The shelf economy; TRADE.md): the
+/// corporation pools, the held opening stock (v39), the market's dial
+/// pool-draw register (v40) and the order book (sell and buy orders) are
+/// gone; the order book's id slot carries `next_trade_id`, its vector slot the
+/// manual trades (`standing_trade`), and the corporation record gains
+/// `trade_reserve` and `trade_points` at its tail. Refused whole on the
+/// strict-equality contract, no migration. Claimed through
+/// `tools/session/next_save_version.js --kind world --claim` (v44/v45 were
+/// claimed by other branches).
+inline constexpr uint32_t world_save_version = 46;
 
 /// Write @p w as a complete world snapshot.
 ///

@@ -560,6 +560,7 @@ void recipe_registry::load_from_lua(lua_state& lua)
             { "research_institute",   building_type::research_institute },   // BL-332
             { "schooling",            building_type::schooling },            // BL-615
             { "university",           building_type::university },           // BL-615
+            { "planetary_marketplace", building_type::planetary_marketplace }, // BL-1266
         };
         for (const named_type& nt : types)
         {
@@ -738,6 +739,7 @@ void recipe_registry::load_from_lua(lua_state& lua)
             { "research_institute",   building_type::research_institute },
             { "schooling",            building_type::schooling },
             { "university",           building_type::university },
+            { "planetary_marketplace", building_type::planetary_marketplace }, // BL-1266
         };
         struct named_band { const char* key; era_band band; };
         const named_band bands[] = {
@@ -800,6 +802,31 @@ void recipe_registry::load_from_lua(lua_state& lua)
             }
         }
         m_building_upkeep = bp;
+    }
+
+    // BL-1266 trade (economy.trade; TRADE.md). ABSENT TABLE = no building makes
+    // trade points and no good has capacity, so no trade ever ships. A negative
+    // or non-finite rate is refused by name (the authoring boundary's rule).
+    sol::optional<sol::table> trade = (*econ)["trade"];
+    if (trade)
+    {
+        trade_params tp;
+        sol::optional<sol::table> pts = (*trade)["points"];
+        if (pts)
+        {
+            tp.marketplace_points = pts->get_or("planetary_marketplace", tp.marketplace_points);
+            tp.port_points        = pts->get_or("port",                  tp.port_points);
+        }
+        if (!(std::isfinite(tp.marketplace_points) && tp.marketplace_points >= 0.0f)
+            || !(std::isfinite(tp.port_points) && tp.port_points >= 0.0f))
+            throw std::runtime_error("recipe_registry: trade.points must be finite and >= 0");
+        sol::optional<sol::table> cap = (*trade)["capacity"];
+        if (cap)
+            read_resource_map(*cap, tp.capacity, "trade.capacity");
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (!(std::isfinite(tp.capacity[r]) && tp.capacity[r] >= 0.0f))
+                throw std::runtime_error("recipe_registry: trade.capacity must be finite and >= 0");
+        m_trade = tp;
     }
 
     // BL-350 procurement/contract tunables (economy.procurement).

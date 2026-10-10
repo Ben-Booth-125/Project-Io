@@ -41,8 +41,8 @@ enum class corp_verb : uint8_t
     // --- BL-293: the order book joins the seam (2026-08-07) ---
     // Appended AFTER hire_unit: the enum is serialised and append-only, and
     // hire_unit already holds its value in main's dictionary and harnesses.
-    place_sell_order,   ///< Push a standing sell order onto world.sell_orders (subject = body).
-    remove_sell_order,  ///< Erase the standing sell order with id `order`.
+    place_sell_order,   ///< RETIRED (BL-1265), REJECTED. Pushed a standing sell order; the order book retired with corporation pools. The slot is kept by the append-only rule.
+    remove_sell_order,  ///< RETIRED (BL-1265), REJECTED. Erased a standing sell order. The slot is kept by the append-only rule.
     set_workforce_auto, ///< building_component.workforce_auto := true (hand the dial back).
     // --- BL-350: the procurement/contract seam joins the seam (2026-08-11) ---
     // Appended AFTER set_workforce_auto, same append-only rule.
@@ -54,7 +54,7 @@ enum class corp_verb : uint8_t
     // coupling between two markets' prices — was entirely automatic until this
     // pair: fifteen verbs named a building, an order, a contract, a body or a
     // tile, and not one named a convoy.
-    dispatch_convoy,  ///< Put a convoy on a lane: `subject` = source market, `counterparty` = destination market, `target` = cargo, `quantity` = units.
+    dispatch_convoy,  ///< RETIRED (BL-1266), REJECTED. Put a corporation's pooled goods on a lane; goods now move only by a trade (`set_trade`). The slot is kept by the append-only rule.
     hold_convoy,      ///< Toggle convoy `order` between held and moving. NOT a cancel — see the verb's comment in corp_command.cpp.
     // --- BL-448: corp stance joins the seam (2026-08-19) ---
     // Appended AFTER hold_convoy, same append-only rule. Data model + verbs
@@ -141,6 +141,13 @@ enum class corp_verb : uint8_t
     // exists and is a specialist. DELIBERATELY NOT in corp_ai.cpp's candidate
     // list — no rival picks anyone's seat.
     take_seat,         ///< `corp` becomes the player's corporation: `is_player` / `world::player_entity` re-point onto it. `corp` must be a SPECIALIST (not a background firm). Pre-play only — the in-play hosts refuse it.
+    // --- BL-1266: trade joins the seam (2026-10-10) ---
+    // Appended AFTER take_seat, same append-only rule. TRADE.md § A trade and
+    // § Auto and reserved trade. The player's, and a rival's under the
+    // AI_OPPONENT.md § 11 grant (a rival may set its own trades).
+    set_trade,         ///< Set a MANUAL trade: move good `target` from market `subject` to market `counterparty` with `quantity` trade points per tick. `order` 0 adds a trade; a nonzero `order` changes the caller's own trade with that id in place.
+    clear_trade,       ///< Erase the caller's own manual trade with id `order`.
+    set_trade_reserve, ///< `corp`'s trade points reserved for manual trades := `quantity` (finite, >= 0; clamped to what it makes at use). The rest is auto.
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -150,15 +157,17 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::take_seat) + 1;
+    static_cast<uint8_t>(corp_verb::set_trade_reserve) + 1;
 
-/// Ceiling on one corporation's outstanding sell orders. The book is now
-/// reachable by command, so it is reachable by a scorer with a bug in it — this
-/// is the bound that keeps a runaway from growing the save format without limit.
-/// Far above any real book: the Market Ledger lists a handful per body, and the
-/// AI places at most one per evaluation. `place_sell_order` returns
-/// `rejected_state` at the cap rather than silently dropping the order.
-inline constexpr std::size_t max_sell_orders_per_corp = 64;
+/// BL-1266: ceiling on one corporation's manual trades. Reachable by command,
+/// so by a scorer with a bug in it — the bound that keeps a runaway from
+/// growing the save without limit. `set_trade` answers `rejected_state` at it.
+inline constexpr std::size_t max_trades_per_corp = 64;
+
+/// BL-1266: the largest trade points a trade or a reserve may name — far above
+/// anything a corporation makes, and finite, so a wire value cannot carry an
+/// infinity or a float the arithmetic cannot hold into the trade pass.
+inline constexpr float max_trade_points = 1.0e6f;
 
 /// Fixed capacity of this command's `units` field below. It once mirrored a
 /// `mercenary_contract`'s committed force exactly; that record retired with the

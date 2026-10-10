@@ -734,13 +734,11 @@ void lg_snapshot(const world& w, lg_probe& p)
         if (mi == w.markets.end()) continue; // nomarket: labelled after the tick
         proc_snap s;
         s.m = m;
-        const auto oi = owner.find(bid);
-        const stockpile_component* pool = oi != owner.end() ? w.find_pool(oi->second, m) : nullptr;
         for (std::size_t g = 0; g < resource_count; ++g)
         {
             if (!(rc->inputs[g] > 0.0f)) continue;
             s.shelf[g]  = mi->second.inventory[g];
-            s.pool[g]   = pool ? pool->quantities[g] : 0.0f;
+            s.pool[g]   = 0.0f; // BL-1265: corporations hold no pools
             s.admits[g] = shelf_admits(mi->second, g, res_mult, /*off_buys=*/true);
         }
         p.snap.emplace(bid, s);
@@ -757,31 +755,11 @@ void lg_snapshot(const world& w, lg_probe& p)
 /// ordered-only entry is resolved per destination at read time (no_shelf_class).
 void snapshot_pool_status(const world& w, const recipe_registry& reg, lg_probe& p)
 {
+    // BL-1265: corporations hold no pools, so no good is ever "held in a pool"
+    // or "under an order" — the status is always absent (`none`).
+    (void)w;
+    (void)reg;
     p.pool_status.clear();
-    const order_floor_map ordered = collect_order_floors(w);
-    const grid_goods_params& grid = reg.grid_goods();
-    for (const auto& [key, pool] : w.corp_market_pools) // std::map: sorted
-    {
-        if (!w.corporations.count(key.first)) continue;
-        const entity_id body = pool_key_body(w, key.second);
-        if (body == null_entity) continue;
-        bool any = false;
-        for (std::size_t g = 0; g < resource_count && !any; ++g) any = pool.quantities[g] >= 1.0f;
-        if (!any) continue;
-        const std::array<float, resource_count> res = processor_reservation(w, reg, key.first, key.second);
-        for (std::size_t g = 0; g < resource_count; ++g)
-        {
-            if (grid.grid(g) || !(pool.quantities[g] >= 1.0f)) continue;
-            const float surplus = pool.quantities[g] - res[g] - dispatch_arrived(w, key.first, key.second, g);
-            if (!(surplus >= 1.0f)) continue;
-            const auto [it, fresh] = p.pool_status.try_emplace(std::make_pair(body, g));
-            lg_probe::pool_stat& ps = it->second;
-            if (!ordered.count({key.first, body, g})) { ps.st = x_poolheld; continue; }
-            if (ps.st != x_ordered) continue;
-            const float src = dispatch_source_price(w, ordered, key.first, key.second, g);
-            if (fresh || src < ps.src) { ps.src = src; ps.home = dispatch_home_price(w, key.second, g); }
-        }
-    }
 }
 
 void lg_after_lap(const world& cw, int lap, void* vctx)

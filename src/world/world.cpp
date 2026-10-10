@@ -74,6 +74,14 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_f32(h, cc.refund_unbooked);
                 fnv1a_f32(h, cc.refund_opening);
             }
+            // BL-1266: the trade reserve and the points made — sparse, so a
+            // corporation that never traded hashes as before.
+            if (cc.trade_reserve != 0.0f || cc.trade_points != 0.0f)
+            {
+                fnv1a_u32(h, 0x7AADEu);
+                fnv1a_f32(h, cc.trade_reserve);
+                fnv1a_f32(h, cc.trade_points);
+            }
         }
         fnv1a_u32(h, player_entity);
     }
@@ -156,22 +164,10 @@ uint64_t world::state_hash(int tick) const
             // BL-1227: the unposted bid the scorer's veto reads, and its tick.
             for (const float x : m.unposted_bid) fnv1a_f32(h, x);
             for (const int32_t t : m.unposted_bid_tick) fnv1a_u32(h, static_cast<uint32_t>(t));
-            // BL-1217: the dial's pool-draw register and its tick — the scorer
-            // branches on both and both are saved. Folded SPARSELY (good index,
-            // value, tick; recorded slots only), so a world that never recorded
-            // one hashes as it did before.
-            for (std::size_t r = 0; r < m.dial_pool_draw.size(); ++r)
-                if (m.dial_pool_draw[r] != 0.0f || m.dial_pool_draw_tick[r] != 0)
-                {
-                    fnv1a_u32(h, static_cast<uint32_t>(r));
-                    fnv1a_f32(h, m.dial_pool_draw[r]);
-                    fnv1a_u32(h, static_cast<uint32_t>(m.dial_pool_draw_tick[r]));
-                }
             // BL-1217 G1b R2: the background's draw at the last clear — the
             // supply clause branches on it (input_reach.cpp) and it is saved.
-            // Folded SPARSELY on the dial register's argument (good index,
-            // value; non-zero slots only), behind a tag so the two sparse runs
-            // cannot alias.
+            // Folded SPARSELY (good index, value; non-zero slots only), behind
+            // a tag so it cannot alias a neighbouring run.
             for (std::size_t r = 0; r < m.background_fill.size(); ++r)
                 if (m.background_fill[r] != 0.0f)
                 {
@@ -190,21 +186,8 @@ uint64_t world::state_hash(int tick) const
         fnv1a_u32(h, fm.into);
     }
 
-    // Corp/market goods pools (BL-1003) — std::map, already sorted by (corp, pool key).
-    for (const auto& [key, sc] : corp_market_pools)
-    {
-        fnv1a_u32(h, key.first);
-        fnv1a_u32(h, key.second);
-        for (const float q : sc.quantities) fnv1a_f32(h, q);
-    }
-
-    // BL-1217 D5: the held opening stock — std::map, sorted by (corp, pool key).
-    for (const auto& [key, held] : opening_stock_held)
-    {
-        fnv1a_u32(h, key.first);
-        fnv1a_u32(h, key.second);
-        for (const float q : held) fnv1a_f32(h, q);
-    }
+    // BL-1265: corporations hold no pools — every good is on a market's shelf,
+    // folded with the markets above.
 
     // Tiles: resource_remaining is drawn down by extraction every tick.
     {
@@ -257,37 +240,20 @@ uint64_t world::state_hash(int tick) const
         }
     }
 
-    // The order book (BL-293). Hashed in STORED order, not sorted: the book is a
-    // price-TIME priority queue, so its sequence is part of the state, and two
-    // books holding the same orders in a different order really are different
-    // worlds. That makes this the one section here whose determinism rests on the
-    // container rather than on a re-sort — which is exactly why it is hashed:
-    // insertion order is only stable because every write goes through the command
-    // seam, and this is the assertion that catches it if that ever stops being
-    // true. `next_order_id` is folded too, so a world that has issued and erased
-    // an order does not hash equal to one that never issued it.
-    fnv1a_u32(h, next_order_id);
-    fnv1a_u32(h, static_cast<uint32_t>(sell_orders.size()));
-    for (const sell_order& o : sell_orders)
+    // The manual trades (BL-1266). Hashed in STORED order, not sorted: an
+    // owner's reserve is spent in placement order, so the sequence is part of
+    // the state. `next_trade_id` is folded too, so a world that has set and
+    // cleared a trade does not hash equal to one that never set one.
+    fnv1a_u32(h, next_trade_id);
+    fnv1a_u32(h, static_cast<uint32_t>(trades.size()));
+    for (const standing_trade& t : trades)
     {
-        fnv1a_u32(h, o.id);
-        fnv1a_u32(h, o.corp);
-        fnv1a_u32(h, o.body);
-        fnv1a_u32(h, static_cast<uint32_t>(o.resource));
-        fnv1a_u32(h, o.empty_ticks); // BL-1201: it decides when the order closes
-        fnv1a_f32(h, o.quantity);
-        fnv1a_f32(h, o.floor_price);
-    }
-    fnv1a_u32(h, static_cast<uint32_t>(buy_orders.size()));
-    for (const buy_order& o : buy_orders)
-    {
-        fnv1a_u32(h, o.id);
-        fnv1a_u32(h, o.corp);
-        fnv1a_u32(h, o.body);
-        fnv1a_u32(h, static_cast<uint32_t>(o.resource));
-        fnv1a_f32(h, o.quantity);
-        fnv1a_f32(h, o.max_price);
-        fnv1a_u32(h, o.preferred_seller);
+        fnv1a_u32(h, t.id);
+        fnv1a_u32(h, t.owner);
+        fnv1a_u32(h, static_cast<uint32_t>(t.resource));
+        fnv1a_u32(h, t.from_market);
+        fnv1a_u32(h, t.to_market);
+        fnv1a_f32(h, t.points);
     }
 
     // Battles in progress (BL-467). A battle is created, stepped and ended BY a

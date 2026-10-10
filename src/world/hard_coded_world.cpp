@@ -3595,7 +3595,7 @@ void run_tail(generation_cursor& c)
     // body-level pool, or in a capital market the carve no longer routes the HQ
     // to. Move each into the corp's home market pool (PRODUCTION.md § Stockpile
     // and output flow).
-    rehome_opening_pools(w);
+    place_opening_stock(w);
 }
 
 } // namespace

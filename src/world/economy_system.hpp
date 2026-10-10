@@ -16,6 +16,7 @@
 #include <array>
 #include <chrono> // economy_step_phase_clock (BL-1117)
 #include <map>
+#include <set>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -245,28 +246,14 @@ struct shelf_phase_audit
 /// Result of one economy step: the per-building reports plus the auto-bought
 /// input shortfalls per (corp, body), which become market demand and corporate
 /// expenditure downstream (market_clearing.hpp / budget_system.hpp).
-/// BL-1217 (AI_OPPONENT.md § 11, the dial reads posted demand plus pool-fed
-/// running processor draws, Ben 2026-10-09 as narrowed): one processor's dial
-/// record for a tick. `room[r]` is set where the want is posted
-/// (run_processing): the full-run need less what it posts as DEMAND, i.e. what
-/// its pool covered then (the whole need where the ceiling silenced the want,
-/// since a silenced want is not demand). Every pool draw, either turn, fills
-/// `drawn` only up to the room left — a top-up draw off a pool a sibling
-/// refilled is a unit this processor already put in demand, and counts once.
-struct proc_dial_draw
-{
-    std::array<float, resource_count> room  = {};
-    std::array<float, resource_count> drawn = {};
-    void take(std::size_t r, float from_pool)
-    {
-        const float c = std::min(from_pool, std::max(0.0f, room[r]));
-        if (c > 0.0f) { drawn[r] += c; room[r] -= c; }
-    }
-};
-
 struct economy_report
 {
     std::vector<building_report> buildings;
+
+    /// BL-1266 (TRADE.md § The Planetary Marketplace): every building whose goods
+    /// UPKEEP went unmet this tick (`run_building_upkeep`). A trade building in
+    /// it makes no trade points this tick (`building_trade_points`).
+    std::set<entity_id> upkeep_unmet;
 
     /// Building id → index into `buildings`, filled once by run_economy_step after
     /// the production pass (BL-360). estimate_building_profit resolves its row here
@@ -365,18 +352,6 @@ struct economy_report
     /// (`dispatch_absorbable`) reads. Same std::map, same sorted accumulation.
     std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> hauler_wants;
 
-    /// BL-1217 (AI_OPPONENT.md § 11, the dial's buyer signal): per processor on
-    /// a market, its pool-fed draws this tick that it did NOT also post as
-    /// demand (`proc_dial_draw`), across both turns. Transient: read once, right
-    /// after the production pass, by `collect_dial_pool_draws`.
-    std::map<entity_id, proc_dial_draw> dial_pool_draws;
-
-    /// BL-1217: this tick's dial record per (market, good) — every input key a
-    /// processor that posted its want touched, the running ones' not-posted pool
-    /// draws summed (0 where none). clear_markets writes it to
-    /// `market_component::dial_pool_draw` (its only writer), beside this tick's
-    /// demand. Sorted std::map: fixed float order.
-    std::map<std::pair<entity_id, std::size_t>, float> dial_pool_sums;
 
     /// BL-1209: every draw off a CONTENDED shelf this tick, rationed pro-rata
     /// (`plan_short_shelves`), and each phase's own invariant audit
