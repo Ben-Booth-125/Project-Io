@@ -95,8 +95,9 @@ struct bake_params
     /// The base hillshade's sign. +1 is the shading as baked, which lights the
     /// SE-facing slopes — the opposite of the landform pass and the tree and
     /// structure shadows (NR-1006 (e)); -1 lights the NW-facing slopes, as the
-    /// NW light every other pass uses. Flipping moves every golden: Ben's call.
-    float hillshade_sign  = 1.0f;
+    /// NW light every other pass uses. Flipped by Ben, 2026-10-10: one light for
+    /// the ground, landforms, trees and structures.
+    float hillshade_sign  = -1.0f;
     float altitude_gain   = 0.30f;  ///< Luminance lift with normalised height.
     float landform_accent = 2.2f;   ///< Detail amplitude multiplier from |relief bias|.
     float detail_amp      = 0.30f;  ///< Fractal height-detail base amplitude.
