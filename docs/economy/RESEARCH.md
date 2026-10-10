@@ -119,7 +119,7 @@ otherwise locked. A deed is visible before it is met.
 
 ### Placeholders
 
-**A placeholder cluster holds the place of a system not yet built (Ben, 2026-10-10).** It has a
+**A placeholder cluster reserves room for a system the tree is designed to grow into (Ben, 2026-10-10).** It has a
 cluster's shape — two minors and a major — no effect, and it names the system that will fill it
 (espionage, politics). It may be researched and does nothing until that system exists. A mastery
 whose branch carries a placeholder needs only the branch's real rim major until the system lands.

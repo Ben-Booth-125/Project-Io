@@ -6772,31 +6772,31 @@
    "difficulty": 2,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1271 - sprint 52 (Ben, 2026-10-10)",
    "batch": "sprint-52",
-   "resolved": null,
-   "resolution": null,
+   "resolved": "2026-10-10",
+   "resolution": "Delivered with sprint 52.",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: node tools/session/tech_tree_store.js --check"
      ],
      "requirement": "The store holds 160 nodes - 70 travel (7 joints, 9 masteries), 51 minor, 30 major, 9 quest - and passes every grammar rule: requirement groups resolve, pairs are symmetric, one quest and one mastery per branch, every node reachable from a first travel node.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "tech_tree_store.js digitisation --check OK - 160 nodes (70 travel incl. 7 joints and 9 masteries, 51 minor, 30 major, 9 quest)."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: tech_tree_store.js --check; header_graph.js --dangling (compare counts)"
      ],
      "requirement": "The doc carries the store's tables current, and no authority doc cites a heading that does not exist in RESEARCH.md, DIGITISATION_TREE.md or TREES.md.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "tables current; header_graph dangling counts unchanged by the new docs (compared, the tool FAILs repo-wide)."
     }
    ]
   },
@@ -6807,8 +6807,8 @@
    "importance": "A",
    "evaluated_difficulty": null,
    "status": "in-flight",
-   "promoted_from": "backlog.json BL-1272 - sprint 52 (Ben, 2026-10-10)",
-   "batch": "sprint-52",
+   "promoted_from": "backlog.json BL-1272 - sprint 52 (Ben, 2026-10-10); carried to sprint 53 at sprint 52 close (2026-10-10)",
+   "batch": "sprint-53",
    "resolved": null,
    "resolution": null,
    "rows": [
@@ -6850,61 +6850,61 @@
    "difficulty": 5,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1273 - sprint 52 (Ben, 2026-10-10)",
    "batch": "sprint-52",
-   "resolved": null,
-   "resolution": null,
+   "resolved": "2026-10-10",
+   "resolution": "Merged 14e8cace; verified on the merged tree.",
    "rows": [
     {
      "id": "R0",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: nation_tech_harness --seeds 16 (new); world_determinism x2"
      ],
      "requirement": "ITEM-SPANNING: on a 16-seed campaign run every nation opens holding no node on the industrial band, accrues research, and completes nodes through its queue; the run is identical twice.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "nation_tech_harness 16 seeds x2: every nation opens holding nothing on the industrial band, pools empty at the seat, the scripted queue completes, byte-identical twice; pacing at 200 RP a unit: 751/751 reach DG-PR-EX-A in 32 quarters, p10/p50/p90 10/21/30. The live game queues nothing until BL-1275 (nation research AI)."
     },
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: nation_tech_harness accrual rows"
      ],
      "requirement": "Research points accrue to each nation each quarter from its academic-research budget line and its staffed Universities and research institutes, deterministically.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "accrual rows PASS (base + sqrt(line spend) + Universities + institutes); the line pays only what the queue owes."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: nation_tech_harness queue rows"
      ],
      "requirement": "The queue: queuing a node queues its unheld requirement groups ahead of it (cheapest member of a choice); RP flow to the head and overflow on; a quest with an unmet deed is passed over and completes when its deed is met; a queue holding one side of a pair refuses the other.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "queue rows PASS: prerequisite expansion, AND groups, pair refusal, overflow, quest passed over. Quest COMPLETION awaits deed_met (BL-1278)."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: save_roundtrip"
      ],
      "requirement": "Nation tech state - held set, pool, queue, the in-progress remainder - survives save and load at a bumped world_save_version.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "save_roundtrip OK at v47, incl. refusal of an out-of-range or contradictory queue."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: build + world_determinism; code read by the cold review"
      ],
      "requirement": "The per-corporation earned_techs gates and scripts/tech_tree.lua are retired; every former consumer (placement, construction, recipe switch, corp_ai, selection panel, condition research) reads the nation's tree; the build is green.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "old gates and the Lua tree retired; the build links; every consumer reads the nation hooks, which return open/identity until BL-1274 - structural only."
     }
    ]
   },
@@ -6915,8 +6915,8 @@
    "importance": "A",
    "evaluated_difficulty": null,
    "status": "in-flight",
-   "promoted_from": "backlog.json BL-1274 - sprint 52 (Ben, 2026-10-10)",
-   "batch": "sprint-52",
+   "promoted_from": "backlog.json BL-1274 - sprint 52 (Ben, 2026-10-10); carried to sprint 53 at sprint 52 close (2026-10-10)",
+   "batch": "sprint-53",
    "resolved": null,
    "resolution": null,
    "rows": [
@@ -6949,8 +6949,8 @@
    "importance": "A",
    "evaluated_difficulty": null,
    "status": "in-flight",
-   "promoted_from": "backlog.json BL-1275 - sprint 52 (Ben, 2026-10-10)",
-   "batch": "sprint-52",
+   "promoted_from": "backlog.json BL-1275 - sprint 52 (Ben, 2026-10-10); carried to sprint 53 at sprint 52 close (2026-10-10)",
+   "batch": "sprint-53",
    "resolved": null,
    "resolution": null,
    "rows": [
@@ -6983,8 +6983,8 @@
    "importance": "A",
    "evaluated_difficulty": null,
    "status": "in-flight",
-   "promoted_from": "backlog.json BL-1276 - sprint 52 (Ben, 2026-10-10)",
-   "batch": "sprint-52",
+   "promoted_from": "backlog.json BL-1276 - sprint 52 (Ben, 2026-10-10); carried to sprint 53 at sprint 52 close (2026-10-10)",
+   "batch": "sprint-53",
    "resolved": null,
    "resolution": null,
    "rows": [
@@ -7027,8 +7027,8 @@
    "importance": "A",
    "evaluated_difficulty": null,
    "status": "in-flight",
-   "promoted_from": "backlog.json BL-1277 - sprint 52 (Ben, 2026-10-10)",
-   "batch": "sprint-52",
+   "promoted_from": "backlog.json BL-1277 - sprint 52 (Ben, 2026-10-10); carried to sprint 53 at sprint 52 close (2026-10-10)",
+   "batch": "sprint-53",
    "resolved": null,
    "resolution": null,
    "rows": [
@@ -7051,8 +7051,8 @@
    "importance": "A",
    "evaluated_difficulty": null,
    "status": "in-flight",
-   "promoted_from": "backlog.json BL-1278 - sprint 52 (Ben, 2026-10-10)",
-   "batch": "sprint-52",
+   "promoted_from": "backlog.json BL-1278 - sprint 52 (Ben, 2026-10-10); carried to sprint 53 at sprint 52 close (2026-10-10)",
+   "batch": "sprint-53",
    "resolved": null,
    "resolution": null,
    "rows": [

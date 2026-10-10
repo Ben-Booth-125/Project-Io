@@ -1,6 +1,10 @@
 # REFINED — active worklist
 
-## Sprint 52 — the Digitisation tech tree (opened 2026-10-10)
+## Sprint 52 — the Digitisation tech tree (opened 2026-10-10, CLOSED 2026-10-10)
+
+**Closed (Ben: "cut this sprint as a success on building the tech tree").** Wave 0 and lane C
+(BL-1273) landed. Every unticked task below CARRIES to sprint 53 on its branch; the checkpoints
+and resume steps are in `HANDOFF_TECH_TREE.md`.
 
 **Goal.** Every nation researches the Digitisation tree from an equal start — a research pool, a
 queue it can plan, 160 nodes — and the history no longer researches at all. The sprint row in

@@ -1,5 +1,8 @@
 # Sprint 50 running handoff — logistics and trade flow (updated 2026-10-08)
 
+> **Sprint 52 (the Digitisation tech tree) closed 2026-10-10; its tail carries to sprint 53 — read
+> `docs/development/HANDOFF_TECH_TREE.md` for that work.**
+
 Read this first after a compaction or in a new session. Then `REFINED.md` § Sprint 50 and the
 sprint 50 row in `sprints.json`. Mode for this work: **Delivery — Full**.
 

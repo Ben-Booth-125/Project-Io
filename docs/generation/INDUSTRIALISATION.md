@@ -70,7 +70,7 @@ that belonged to one (the ruptures, the Charter Act, the 1951 common tongue), an
 whatever the epoch: Ben, 2026-09-08 and 2026-09-18, NR-869; `GENERATION_STRATEGY.md` § Pass 2).
 
 **Every nation opens on the industrial recipe band, and at the same tech level (Ben, 2026-10-10,
-overturning NR-929's band per nation).** The band is fixed, not read off the history: a realm's
+overturning NR-929).** The band is fixed, not read off the history: a realm's
 crossing of the Industrial rung (§ Beat 1; `../lore/HISTORY.md` § Stage 4) dates its industrial
 moment and shapes its works, but never closes a roster to its nation's firms
 (`../economy/ERAS.md` § Where the ladder starts). The history hands the campaign no technology —

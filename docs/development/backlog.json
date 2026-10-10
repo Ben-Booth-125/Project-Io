@@ -1059,7 +1059,7 @@
    "design": "DESIGNED: TRADE.md § The capacity table (Ben, 2026-10-10). Propose per-resource capacity, Marketplace and Port trade point rates, and trade-building upkeep; read the 16-seed market-viability gate with absolute counts; put the table to Ben. Not final until he approves. Handoff: docs/development/HANDOFF_SHELF_TRADE.md."
   },
   {
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "sprint": 52,
    "written": "2026-10-10",
@@ -1081,12 +1081,12 @@
     "docs/generation/trees/TREES.md"
    ],
    "title": "The Digitisation tree is written down: its authority doc, its 160-node store, and a check that holds the store to the grammar",
-   "design": "DESIGNED: RESEARCH.md (the grammar, the queue, the nation holder) and DIGITISATION_TREE.md (the nodes). The doc-and-tool half of sprint 52: the store is canonical, the doc carries its rendered tables, tech_tree_store.js --check fails on a broken rule or a stale table. Every number in the store is a placeholder (Ben, 2026-10-10)."
+   "design": "DESIGNED: RESEARCH.md (the grammar, the queue, the nation holder) and DIGITISATION_TREE.md (the nodes). The doc-and-tool half of sprint 52: the store is canonical, the doc carries its rendered tables, tech_tree_store.js --check fails on a broken rule or a stale table. Every number in the store is a placeholder (Ben, 2026-10-10). DELIVERED 2026-10-10 (c05844d9, 4eb8c32a, 97ba4873): RESEARCH.md, DIGITISATION_TREE.md, the 160-node store, tech_tree_store.js --check."
   },
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": 52,
+   "sprint": 53,
    "written": "2026-10-10",
    "parked": false,
    "blocked_on": null,
@@ -1117,10 +1117,10 @@
     "tools/verify/world_cursor_equivalence.cpp"
    ],
    "title": "The pre-game history runs no technology trees: no polity holds, earns or invests in a node, and what the trees gated is gated by measured dates",
-   "design": "DESIGNED: TREES.md (retired; the table of what each gate became). Remove the three invested trees from the Invest verb and every reader; sea legs (Ben: by date), the third road rung and coastal naval points gated by dates MEASURED as the median polity's acquisition year in the last-blessed history; tree modifiers and the industry-tree industry-points credit go. A world-mover: report digest movement, never re-bless (BL-1277 owns the one re-bless)."
+   "design": "DESIGNED: TREES.md (retired; the table of what each gate became). Remove the three invested trees from the Invest verb and every reader; sea legs (Ben: by date), the third road rung and coastal naval points gated by dates MEASURED as the median polity's acquisition year in the last-blessed history; tree modifiers and the industry-tree industry-points credit go. A world-mover: report digest movement, never re-bless (BL-1277 owns the one re-bless). CARRIED to sprint 53 (2026-10-10). Branch worktree-agent-ab01dac630e84f644: dc74f929 (trees removed), a777f4c7 (sea legs need naval capacity; coastal naval ramp re-weighted to 353 - naval points at 1200 match baseline), 6071ed66 WIP (Ben: arrival across water needs a fleet afloat - threshold param mid-edit, unmeasured). Open: Industrialisation subjections 21 -> 440 before the fleet rule. Cold review of dc74f929 done; the fix rounds are unreviewed."
   },
   {
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "sprint": 52,
    "written": "2026-10-10",
@@ -1155,12 +1155,12 @@
     "tools/verify/nation_tech_harness.cpp"
    ],
    "title": "Every nation holds a Digitisation tree state, a research-point pool and a research queue, starts holding nothing, and researches by the queue",
-   "design": "DESIGNED: RESEARCH.md § Who holds technology, § Research points, § The research queue. Nation tech state (held set over 160 nodes, pool, queue) saved; RP from the academic-research budget line plus staffed Universities and research institutes; queue resolution with AND requirement groups, pick-one guard, deed-waiting quests, overflow; every nation starts holding nothing and on the industrial band (ERAS.md, Ben 2026-10-10). The old per-corp earned_techs gates and scripts/tech_tree.lua retire (NR-1022)."
+   "design": "DESIGNED: RESEARCH.md § Who holds technology, § Research points, § The research queue. Nation tech state (held set over 160 nodes, pool, queue) saved; RP from the academic-research budget line plus staffed Universities and research institutes; queue resolution with AND requirement groups, pick-one guard, deed-waiting quests, overflow; every nation starts holding nothing and on the industrial band (ERAS.md, Ben 2026-10-10). The old per-corp earned_techs gates and scripts/tech_tree.lua retire (NR-1022). DELIVERED 2026-10-10 (merged 14e8cace; lane d5265abb/6022d828/0ef9cde7): nation_tech state, pool, queue, save v47, pacing base 120 + 20 x sqrt(line spend) at 200 RP a unit (Ben). nation_tech_harness 16 seeds x2 PASS incl. pacing; save_roundtrip; world_determinism x2 same digests. R4 holds structurally only until BL-1274 wires the gates."
   },
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": 52,
+   "sprint": 53,
    "written": "2026-10-10",
    "parked": false,
    "blocked_on": null,
@@ -1184,12 +1184,12 @@
     "tools/verify/nation_tech_harness.cpp"
    ],
    "title": "Every Digitisation node moves the lever it names, or is declared unread and listed by a harness",
-   "design": "DESIGNED: RESEARCH.md § Effects no system reads yet. Give each node a machine effect (recipe unlock, structure unlock, modifier subject x scope x value, mechanic key, or declared unread). Wire the levers the game carries now (extraction_rate, processing_yield, logistics_cost, wage_floor, unit_upkeep, the named recipe unlocks); declare the rest unread with the system each waits on. Never a silent node."
+   "design": "DESIGNED: RESEARCH.md § Effects no system reads yet. Give each node a machine effect (recipe unlock, structure unlock, modifier subject x scope x value, mechanic key, or declared unread). Wire the levers the game carries now (extraction_rate, processing_yield, logistics_cost, wage_floor, unit_upkeep, the named recipe unlocks); declare the rest unread with the system each waits on. Never a silent node. CARRIED to sprint 53 (2026-10-10). Branch worktree-agent-a4b4b115f9c2b3fe1: b6a612a5 (61 wired / 127 unread / 3 deferred; harness PASS), 69507722 WIP fix round (Ben: Rocketry gates launch, propellant open as a +20% yield bonus, institutes staffed at construction; review fixes: end-to-end lever rows, prose-direction audit, farm scope, fuel scope, logistics fold excludes handling, store_run_limit) - unbuilt."
   },
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": 52,
+   "sprint": 53,
    "written": "2026-10-10",
    "parked": false,
    "blocked_on": null,
@@ -1210,12 +1210,12 @@
     "tools/verify/nation_tech_harness.cpp"
    ],
    "title": "An AI nation fills its research queue one frontier node at a time, by its scorer",
-   "design": "DESIGNED: AI_OPPONENT.md § 11 (an AI nation may fill its own research queue, Ben 2026-10-10) and RESEARCH.md § The research queue. One verb, queue a frontier node; score = relief to the nation's binding terms less cost; the player's nation never queued for; pure, seeded, replayable."
+   "design": "DESIGNED: AI_OPPONENT.md § 11 (an AI nation may fill its own research queue, Ben 2026-10-10) and RESEARCH.md § The research queue. One verb, queue a frontier node; score = relief to the nation's binding terms less cost; the player's nation never queued for; pure, seeded, replayable. CARRIED to sprint 53 (2026-10-10). Not started; waits on BL-1274."
   },
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": 52,
+   "sprint": 53,
    "written": "2026-10-10",
    "parked": false,
    "blocked_on": null,
@@ -1240,12 +1240,12 @@
     "docs/ui/ui_elements.json"
    ],
    "title": "The research panel draws the Digitisation tree as a ring of three trees, shows every node's exact advantage, and lets me queue a path and see when it arrives",
-   "design": "DESIGNED: RESEARCH.md § The shape of an age's tree and § The research queue; the render approved in the design session (inspect + plan modes). Replaces the F9 constellation of scripts/tech_tree.lua. Tiers distinguishable at a glance; AND links marked; hover/press shows advantage, cost, requirements, deed; plan mode queues a node with its prerequisites and shows arrival quarters. Needs Ben's live click."
+   "design": "DESIGNED: RESEARCH.md § The shape of an age's tree and § The research queue; the render approved in the design session (inspect + plan modes). Replaces the F9 constellation of scripts/tech_tree.lua. Tiers distinguishable at a glance; AND links marked; hover/press shows advantage, cost, requirements, deed; plan mode queues a node with its prerequisites and shows arrival quarters. Needs Ben's live click. CARRIED to sprint 53 (2026-10-10). Branch worktree-agent-aa32f1452e155d7d3: 215177de (panel, 10/10 visual expects, cold review clean on the seam), 693a676c WIP (Ben live click: shift+left click queues, the Plan strip goes, a queued node toggles off; review fixes: far-node R2 assertions, sentinel clamp, projection cache, MCP order text) - unbuilt. R2 live click owed after it builds."
   },
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": 52,
+   "sprint": 53,
    "written": "2026-10-10",
    "parked": false,
    "blocked_on": null,
@@ -1265,12 +1265,12 @@
     "docs/generation/seed_library.json"
    ],
    "title": "Sprint 52's one re-bless: the world without generation research, on the industrial band, described by shape and authorised by Ben",
-   "design": "DESIGNED: DELIVERY.md § The digest re-bless is one act per wave. Before/after per cause (BL-1272 tree removal; BL-1273 band fixed industrial; BL-1274 effects if any move the opening), described in world shape; Ben authorises against the description."
+   "design": "DESIGNED: DELIVERY.md § The digest re-bless is one act per wave. Before/after per cause (BL-1272 tree removal; BL-1273 band fixed industrial; BL-1274 effects if any move the opening), described in world shape; Ben authorises against the description. CARRIED to sprint 53 (2026-10-10). The wave re-bless; waits on BL-1272 (and BL-1274 if its gates move the opening)."
   },
   {
    "status": "designed",
    "glyph": "✓",
-   "sprint": 52,
+   "sprint": 53,
    "written": "2026-10-10",
    "parked": false,
    "blocked_on": null,
@@ -1294,7 +1294,7 @@
     "tools/verify/nation_tech_harness.cpp"
    ],
    "title": "A nation keeps the deed history its quests read, so a quest completes when its deed is met",
-   "design": "DESIGNED: RESEARCH.md § Quests key the next age (a deed is read from state the game carries). Add the per-nation deed state the nine deeds need where the game already carries the quantity: streak counters over quarters, first-time latches, the national stock-and-demand cover, trade partners by nation; saved. Wire deed_met for every deed whose quantity exists; the rest (Alarm, unrest, war outcomes) stay declared unread with the system they wait on. Never a counter kept only to unlock a node: each reads an in-world quantity."
+   "design": "DESIGNED: RESEARCH.md § Quests key the next age (a deed is read from state the game carries). Add the per-nation deed state the nine deeds need where the game already carries the quantity: streak counters over quarters, first-time latches, the national stock-and-demand cover, trade partners by nation; saved. Wire deed_met for every deed whose quantity exists; the rest (Alarm, unrest, war outcomes) stay declared unread with the system they wait on. Never a counter kept only to unlock a node: each reads an in-world quantity. CARRIED to sprint 53 (2026-10-10). Not started; waits on BL-1274."
   }
  ]
 }
