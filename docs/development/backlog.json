@@ -1686,6 +1686,31 @@
     "src/ui/ground_bake.cpp"
    ],
    "design": "SETTLED: RENDERING.md § Tiles hold their own ground (the crisper-texture bullet). WORK: sharpen the relief shading (and decide the hillshade sign, NR-1006 (e), with Ben if it moves the look), strengthen the fine grain, and add light contact ink on relief creases and on the family patterns; nominal-keyed so the far levels do not alias; byte-stable windows (P24). Before/after captures at the close rungs; measure bake cost."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 52,
+   "written": "2026-10-10",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "Logistics",
+   "priority": "A",
+   "difficulty": 4,
+   "id": "BL-1255",
+   "short_name": "RAIL_RUNG",
+   "author": "Ben (2026-10-10: \"I don't see any rails at all\" — backlog for sprint 52, option A)",
+   "title": "The world lays rail: the road ladder's next rung, on corridors from the city, with cheaper long hauls on land",
+   "authority_doc": "docs/generation/INDUSTRIALISATION.md",
+   "files": [
+    "src/world/components.hpp",
+    "src/world/road_generation.cpp",
+    "src/world/logistics.cpp",
+    "src/world/construction.cpp",
+    "src/world/history_sim.cpp"
+   ],
+   "design": "DESIGNED in INDUSTRIALISATION.md (Ben, 2026-09-15, the three sinks: Rail = the road ladder's next rung, on corridors from the city, feeding property 7 - cheaper long hauls on land; also § the corridor throughput and rail rung row, and road tiers with the rail rung stamped from corridors) and ROADMAP.md (Logistics modes: rail as its own mode). NOT BUILT: road_level stops at Highway (3); the industry tree unlocks Rail Head (IN-MV-1a) but nothing lays track. WORK (design owed where the docs are silent - LOGISTICS.md § 1 traversal cost and § 4 roads must say how rail prices a haul, whether it is a road_level value or its own field, how a player builds it, and how the Industrialisation span stamps it): a world-mover - measure before/after on market_viability and the haulage readings, report digest movement, re-bless only with authorisation. RENDERING: the rail surface (ballast, sleepers, twin rails) is already painted by the route pass (BL-1253, roads painted) for a tier nothing sets yet - wire it to the rung."
   }
  ]
 }
