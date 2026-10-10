@@ -104,7 +104,7 @@ Serial, not parallel (Ben, 2026-10-07, after a collision check): the lens and st
 **Planned.**
 - WAVE 0 - THE DOCS. BL-1271 (Digitisation tree store): RESEARCH.md, DIGITISATION_TREE.md, the store and its check; TREES.md retired; the sibling sweep.
 - WAVE 1 - TWO LANES. BL-1272 (generation without research), a world-mover reporting movement; BL-1273 (nation tech state), the campaign core.
-- WAVE 2 - ON THE CORE. BL-1274 (tech effects wired), BL-1275 (nation research AI), BL-1276 (tech tree panel, Ben's live click).
+- WAVE 2 - ON THE CORE. BL-1274 (tech effects wired), BL-1275 (nation research AI), BL-1276 (tech tree panel, Ben's live click), BL-1278 (quest deed state).
 - CLOSE - BL-1277 (tech wave re-bless), described by shape, authorised by Ben.
 
 **Done when.** Every nation opens holding nothing and researches through its queue on a 16-seed run; the history carries no tree; Ben has queued a path in the live panel; one re-bless authorised.
