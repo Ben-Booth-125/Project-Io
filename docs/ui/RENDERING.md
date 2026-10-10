@@ -108,10 +108,13 @@ ground retires only as coverage arrives.
   wrap period.
 - **Resident set — two tiers of memory:**
   - **System RAM** holds each baked body's master and its mip chain, chunk by
-    chunk (~6.7 GB for the 261×121 home body at 128 px per hex), plus its far page. A **RAM
-    budget of 8 GB across bodies** drops the least-recently-visited body's
-    master and chain — never the body on screen, never the pre-bake target —
-    and keeps its far page. A background bake starts only where its whole
+    chunk (~6.7 GB for the 261×121 home body at 128 px per hex), plus its far page. **The home body's master is pinned in RAM** and never dropped (Ben, 2026-10-10: at
+    128 px a single visit elsewhere had evicted it, and coming home re-baked for ~71 s).
+    Other bodies share the rest of a **RAM budget of 8 GB**: when a body's master must
+    leave RAM it **spills to a disk cache** — its finished chunks written to local disk —
+    and streams back from there on the next visit, in seconds from an SSD instead of a
+    re-bake; only chunks whose content hash moved meanwhile re-bake. The far page stays
+    resident. The disk cache is a cache: deleting it costs a re-bake, never correctness. A background bake starts only where its whole
     master fits the budget without dropping anything.
   - **The GPU** holds only the drawn level's chunks in view, a one-chunk ring
     around them, and the same view at the two adjacent levels — an LRU of at

@@ -1786,6 +1786,51 @@
     "tools/verify/ground_bake_check.cpp"
    ],
    "design": "SETTLED: RENDERING.md § Art direction and palette (towns bullet). WORK: procedural settlement forms in structure_stamps scaled up in footprint, height and block count by scale step, with lit roofs, shaded sides, stacks and a street grid that the route plan (tile_road_plan) keeps as streets; read as a town at rung 2. Window invariance and the bounds mode keep passing. Authored town stamps are a later item."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 51,
+   "written": "2026-10-10",
+   "requires": [
+    "BL-1246"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 3,
+   "id": "BL-1259",
+   "short_name": "GROUND_DISK_CACHE",
+   "author": "Ben (2026-10-10, the ground cost form)",
+   "title": "The home master is pinned in RAM; other bodies spill their masters to a disk cache and stream back in seconds",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "files": [
+    "src/core/ground_layer.hpp",
+    "src/core/ground_layer.cpp"
+   ],
+   "design": "SETTLED: RENDERING.md § Chunks, cache and invalidation (the resident-set bullet: home pinned, disk cache for the rest) and TECH_FOUNDATIONS.md § Target hardware (return to a visited body within a few seconds). WORK: pin the home body; when the 8 GB budget forces a master out, write its finished chunks (with their content hashes) to a local disk cache keyed by world seed + body + master geometry; on revisit stream them back on the pool, view-first, re-baking only chunks whose hash moved; the cache is safe to delete. Measure: return-to-body time from the cache vs a re-bake; disk size per body; no hitch while spilling."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 51,
+   "written": "2026-10-10",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 3,
+   "id": "BL-1260",
+   "short_name": "CANVAS_WIDE_RUNG_BUILD",
+   "author": "Ben (2026-10-10, the ground cost form)",
+   "title": "The Planetary canvas builds its vector layer within budget at the two widest rungs (60 fps)",
+   "authority_doc": "docs/ui/PLANETARY.md",
+   "files": [
+    "src/ui/body_surface_canvas.cpp"
+   ],
+   "design": "SETTLED: TECH_FOUNDATIONS.md § Target hardware (60 fps at every zoom); PLANETARY.md § Draw-loop cost model. WORK: rungs 0-1 read 21-25 ms median, the vector layer CPU build at 15-22 ms (not the ground). Profile per pass (IO_CANVAS_PASS_LOG) and cut the build under budget at rungs 0-1 without dropping any analytic layer silently (cache per-frame-invariant geometry across frames, e.g. border and road networks built once per world change instead of every frame; cheaper LOD where invisible); measure on an idle machine."
   }
  ]
 }

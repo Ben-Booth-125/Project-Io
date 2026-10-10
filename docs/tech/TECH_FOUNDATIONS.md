@@ -187,7 +187,12 @@ hope:
 
 - Zoom and pan on the home body show **no visible stand-in**: the ground under the view is
   final at every rung.
-- The ground pre-bake **adds at most 15 s** to world generation (STARTUP.md § Handoff).
+- The ground pre-bake **adds at most 15 s** to world generation (STARTUP.md § Handoff) **for a
+  player who reads the wizard's rounds** (Ben, 2026-10-10: measured 6.4 s with a realistic
+  dwell). A player who clicks straight through the rounds is **tracked separately** with no
+  budget yet (~54 s measured at 128 px per hex) — reported by the benchmark, not a failure.
+- A **return to a body visited before** shows its ground within a few seconds, from the disk
+  cache (RENDERING.md § Chunks, cache and invalidation).
 - A **first visit to another body** is sharp under the view **within 2 s**.
 - The Planetary canvas holds **60 fps at every zoom**.
 - A **building placed** has its ground re-baked **within 1 s**.
