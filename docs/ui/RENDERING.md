@@ -78,7 +78,8 @@ untouched by construction):
 | **Water & rivers** | water substrates, `river_edges` + flow | Sea, lakes, and carved, curved river courses that widen downstream, with bank treatment (§ Mountains, rivers and terrain variety) |
 | **Roads and sea lanes** | `road_level`, `lane_level`, the installations' road plan | The road lattice and the stamped lanes, smooth curves along their own tiles at the named tier widths, a surface per tier — painted in the installation pass's slot, after its ground parts and before its shadows and standing structures (§ Roads and sea lanes) |
 | **Installations** | buildings (type, active recipe, stack membership), settlements (scale, razed) | Structure stamps — § Installations below |
-| **Near-future grade** | — (a colour pass) | Desaturation, cool cast, distance haze — **a separable final pass**, tunable without re-authoring any brush |
+| **Cast shadows** | `height`, the relief fields, the landform forms | The low NW sun's shadow over everything the ground carries, behind ridges and hills (§ Art direction and palette) |
+| **Near-future grade** | — (a colour pass) | Desaturation, an S-curve on luminance, a split tone (cool shadows, warm lights), haze — **a separable final pass**, tunable without re-authoring any brush |
 
 **Brush placement is hashed from tile grid coordinates**, never screen position — the
 established rule (wrap copies of one tile must agree; no crawl under pan).
@@ -615,15 +616,33 @@ against `docs/ui/design/renders/map/`). What it asks of the bake, procedurally, 
 - **Palette and value.** Base hues move from mint and teal toward **khaki and olive-grey**;
   the value range widens — **lit slopes near a warm off-white, shadows near black** — where
   the build sat in a narrow mid-dark band; the broad dark mottle that belonged to no
-  landform is cut. The grade's S-curve strengthens to hold the range.
+  landform is cut. The grade's S-curve strengthens to hold the range. Sampled from the
+  reference (sRGB): lit slopes ~(168, 153, 127), at their brightest ~(180, 163, 135);
+  flat lit ground ~(75, 70, 60); the median ground ~(55, 56, 51); shadow ~(11-25, 12-27,
+  12-25); stands of forest ~(30-36, 35-38, 34); water ~(50, 56, 56), deep ~(30, 35, 35).
+  The value targets the bake is held to are the reference's luminance percentiles — p10
+  ~26, p50 ~55, p90 ~106, p99 ~155. The baked ground has its own palette for this
+  (`palette::ground_tile_colour`); the identity fill the vector fallback, minimap and
+  generation preview draw keeps its own hues.
 - **Relief everywhere.** Every hex carries terrain shape: **plains roll** as low hills with
   folds ~0.3-0.5 hex apart (they were held calm), ranges rise above them. The landform
-  forms keep their drama on top.
+  forms keep their drama on top. The folds are a field of two sheared octaves 0.46 and
+  0.29 canonical units across (a hex is 1.73 wide), turned ridged so they crease along
+  meandering crests, swelling and easing over ~2.4 units so some country lies nearly flat;
+  under them, broad smooth hills (~1.15 units) give the long lit and shaded faces.
+  Relief is terrain shape: its amplitude follows the wide interpolation, never a tile's
+  edge band, so no relief stops at a hex.
 - **Cast shadows.** A **low-sun shadow pass** on the height field throws shadow across the
   ground behind ridges and hills, from the same NW light, so relief reads as mass, not only
-  as slope shading.
+  as slope shading. The sun stands 33° high; a point looks at most **1.5 canonical units**
+  upsun for a caster, so a pixel reads tiles at most ~5.3 units away — inside the chunk
+  hash's margin (6 units), and the shadow is a pure function of position: any window
+  bakes it identically.
 - **Water.** Rivers and sea move from saturated royal blue to **grey-blue**, with specular
-  glints, white **rapids** where a river falls, and **rocky banks**.
+  glints, white **rapids** where a river falls, and **rocky banks**. Sea ~(36-54, 47-68,
+  55-75) before the grade; a river shelves from ~(74, 84, 88) at the bank to ~(34, 44, 52)
+  mid-channel. Rapids show where a reach drops more than ~0.02 of the height range to its
+  downstream neighbour, full white water by ~0.06.
 - **Towns.** Settlements are **denser and larger**: compact blocks of multi-storey buildings
   with lit roofs, shaded sides, stacks and a street grid, reading as a town from the mid rungs.
 - **Forests** keep their current procedural form for now (Ben did not take the conifer change).

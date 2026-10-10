@@ -747,7 +747,9 @@ bake_source prepare_source(const world& w, entity_id body, bool reveal_all,
             s.road[i] = static_cast<std::uint8_t>(std::min<int>(t.road_level, k_route_highway));
         if (water && t.lane_level > 0)
             s.lane[i] = t.lane_level;
-        s.colour[i] = palette::tile_colour(t.substrate, t.cover, t.cover_density);
+        // BL-1256: the baked ground's own khaki / olive-grey palette (the
+        // identity fill, palette::tile_colour, stays the vector fallback's).
+        s.colour[i] = palette::ground_tile_colour(t.substrate, t.cover, t.cover_density);
         s.height[i] = t.height;
         s.relief_bias[i] = palette::relief_amount(t.landform);
         s.jitter[i] = hash01(t.grid_x, t.grid_y, 0xB732u) * 2.0f - 1.0f;
@@ -958,9 +960,10 @@ void stamp_trees(const bake_source& src, const geometry& g, const bake_params& p
                 // Canopy ink: the tile's own colour pushed toward deep leaf,
                 // varied per tree so a wood is a crowd, not a pattern.
                 const float vr = 0.86f + 0.28f * hash01(cw, r, 0x7F00u + static_cast<std::uint32_t>(k));
-                const float cr_ = (palette::col_r(tc) * 0.45f + 20.0f * 0.55f) * vr * (1.0f + 0.10f * v_warm);
-                const float cg_ = (palette::col_g(tc) * 0.45f + 62.0f * 0.55f) * vr * (1.0f + 0.01f * v_warm);
-                const float cb_ = (palette::col_b(tc) * 0.45f + 26.0f * 0.55f) * vr * (1.0f - 0.08f * v_warm);
+                // (BL-1256: the leaf a dark olive, as the C-F reference's stands.)
+                const float cr_ = (palette::col_r(tc) * 0.45f + 24.0f * 0.55f) * vr * (1.0f + 0.10f * v_warm);
+                const float cg_ = (palette::col_g(tc) * 0.45f + 46.0f * 0.55f) * vr * (1.0f + 0.01f * v_warm);
+                const float cb_ = (palette::col_b(tc) * 0.45f + 28.0f * 0.55f) * vr * (1.0f - 0.08f * v_warm);
                 if (g.lift > 0.0)
                 {
                     // OBLIQUE: the tree STANDS. Its ground point rides the
@@ -1004,6 +1007,143 @@ struct feature_px
     std::int32_t owner = -1; ///< -1: no ground here (margin, lock fill).
     float lift = 0.0f;       ///< BL-1253: the oblique displacement the ground here was resolved at (the route pass rides it).
 };
+
+// ---------------------------------------------------------------------------
+// BL-1256 (ground look C-F) — shared pieces of the relief, water and shadow
+// passes. RENDERING.md § Art direction and palette.
+// ---------------------------------------------------------------------------
+
+inline float sst01(float e0, float e1, float v)
+{
+    const float t = std::clamp((v - e0) / (e1 - e0), 0.0f, 1.0f);
+    return t * t * (3.0f - 2.0f * t);
+}
+
+/// The fold field's amplitude (relief everywhere): roll_floor on every land
+/// pixel, more with the landform bias and the altitude. One formula for the
+/// base hillshade and the cast-shadow height field, so the two agree.
+inline float relief_amp(const bake_params& p, float detail_mul, float shape_bias, float h, float swell)
+{
+    return p.detail_amp * detail_mul
+         * (p.roll_floor * swell + p.landform_accent * std::fabs(shape_bias) + 0.35f * h);
+}
+
+/// The roll's own swell: a low-frequency field (~2.4 canonical, a hex and a
+/// half) that lifts some country into hills and lets other country lie
+/// nearly flat, so the folds are not one even ripple from coast to coast.
+/// Continuous across tiles; sampled at the ground point.
+inline float roll_swell(double x, double y, double cell, int cells)
+{
+    const float n = value_noise(x, y, cell, cells, 0xD381u);
+    return 0.30f + 1.40f * n * n * (3.0f - 2.0f * n);
+}
+
+/// How far the fold field turns ridged (a range's creases) for a shape bias.
+inline float ridge_weight0(const bake_params& p, float shape_bias)
+{
+    return std::min(1.0f, std::fabs(shape_bias) * p.landform_accent) * p.ridge_strength;
+}
+
+/// The fold field's ridged mix: the landform's own (ridge_weight0), then
+/// every ground toward roll_ridge — eroded folds with creases, not blobs —
+/// or BL-1254's light master fold where that is more.
+inline float fold_ridge(const bake_params& p, float rw0, float ck)
+{
+    return rw0 + (1.0f - rw0) * std::max(0.15f * ck, p.roll_ridge);
+}
+
+/// The fold field's noise (BL-1256): two sheared octaves, so the folds of
+/// a rolling plain meander in every direction rather than lining up with
+/// the lattice (one axis-aligned octave read as rows of bars). Shear keeps
+/// it periodic in x (only u's offset moves). In [0, 1], centred on 0.5.
+inline float fold_noise(double x, double y, double ca, int na, double cb, int nb)
+{
+    return 0.62f * value_noise_aniso(x - 0.42 * y, y, ca, na, ca, 0xD371u)
+         + 0.38f * value_noise_aniso(x + 0.58 * y, y, cb, nb, cb, 0xD373u);
+}
+
+/// value_noise_aniso with its analytic gradient (d/du, d/dv) — the same
+/// lattice, fade and wrap, so the value is byte-identical to the plain call.
+inline float value_noise_aniso_d(double u, double v, double cu, int period_cells, double cv,
+                                 std::uint32_t salt, float& du, float& dv)
+{
+    const double fu = u / cu, fv = v / cv;
+    const int iu = ifloor(fu);
+    const int iv = ifloor(fv);
+    const float ru = static_cast<float>(fu - iu);
+    const float rv = static_cast<float>(fv - iv);
+    const float tu = ru * ru * (3.0f - 2.0f * ru);
+    const float tv = rv * rv * (3.0f - 2.0f * rv);
+    int u0w = iu % period_cells;
+    if (u0w < 0)
+        u0w += period_cells;
+    const int u1w = u0w + 1 == period_cells ? 0 : u0w + 1;
+    const float v00 = hash01(u0w, iv,     salt);
+    const float v10 = hash01(u1w, iv,     salt);
+    const float v01 = hash01(u0w, iv + 1, salt);
+    const float v11 = hash01(u1w, iv + 1, salt);
+    const float a = v00 + (v10 - v00) * tu;
+    const float b = v01 + (v11 - v01) * tu;
+    du = ((v10 - v00) * (1.0f - tv) + (v11 - v01) * tv) * 6.0f * ru * (1.0f - ru) / static_cast<float>(cu);
+    dv = (b - a) * 6.0f * rv * (1.0f - rv) / static_cast<float>(cv);
+    return a + (b - a) * tv;
+}
+
+/// The hills under the folds (BL-1256): a broad, smooth field (~1.15 and
+/// ~0.75 canonical, sheared both ways) whose long lit and shaded faces give the
+/// country its mass — the folds ripple across it. In [0, 1], centred on 0.5.
+/// @p gx, @p gy receive its gradient (analytic: the field is smooth, so the
+/// exact slope is what a finite difference would approach, at a quarter of
+/// the cost).
+inline float hill_noise(double x, double y, double ca, int na, double cb, int nb, float& gx, float& gy)
+{
+    float ua, va, ub, vb;
+    const float a = value_noise_aniso_d(x - 0.30 * y, y, ca, na, ca, 0xD391u, ua, va);
+    const float b = value_noise_aniso_d(x + 0.70 * y, y, cb, nb, cb, 0xD393u, ub, vb);
+    gx = 0.62f * ua + 0.38f * ub;
+    gy = 0.62f * (va - 0.30f * ua) + 0.38f * (vb + 0.70f * ub);
+    return 0.62f * a + 0.38f * b;
+}
+
+/// Periodic lattices of the water's glints (every cell divides the wrap).
+struct glint_fields
+{
+    double sheen_u = 1.0, sheen_v = 1.0, spark = 1.0, swell = 1.0;
+    int    sheen_n = 1, spark_n = 1, swell_n = 1;
+};
+
+glint_fields make_glint_fields(double period)
+{
+    glint_fields f;
+    const auto cell = [&](double target, int& n) { n = std::max(1, static_cast<int>(std::lround(period / target))); return period / n; };
+    f.sheen_u = cell(0.55, f.sheen_n);
+    f.sheen_v = 0.045;
+    f.spark   = cell(0.030, f.spark_n);
+    f.swell   = cell(0.70, f.swell_n);
+    return f;
+}
+
+/// Specular glints on water at canonical point (x, y): a wind-combed sheen
+/// (long streaks, the low sun skimming the swell) and, at the close tiers,
+/// sparse sparkles where the swell field turns toward the light. Wrap-exact:
+/// every lattice is periodic in x, the streaks' shear moves only u.
+void water_glint(double x, double y, const glint_fields& f, float k, bool fine,
+                 float& r, float& g, float& b)
+{
+    const float sw = value_noise(x, y, f.swell, f.swell_n, 0x61A0u);
+    const float sh = value_noise_aniso(x - 0.18 * y, y, f.sheen_u, f.sheen_n, f.sheen_v, 0x61A1u);
+    const float sheen = (sh - 0.5f) * 2.0f * (0.35f + 0.65f * sw);
+    const float m = 1.0f + 0.10f * k * sheen;
+    r *= m; g *= m; b *= m;
+    if (fine)
+    {
+        const float n = value_noise(x, y, f.spark, f.spark_n, 0x61A2u);
+        const float s = sst01(0.88f, 0.94f, n) * sst01(0.62f, 0.90f, sw) * 0.45f * k;
+        r += (206.0f - r) * s;
+        g += (202.0f - g) * s;
+        b += (188.0f - b) * s;
+    }
+}
 
 /// The per-pixel base bake for one window: interpolated colour, hillshade,
 /// grain, mottle — UNGRADED, stamps and post passes are the orchestrator's
@@ -1054,6 +1194,12 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
     const double warp_cell2   = periodic_cell(p.warp_cell * 0.29, warp_cells2);
     const double detail_cell  = periodic_cell(p.detail_cell, detail_cells);
     const double detail_cell2 = periodic_cell(p.detail_cell * 0.41, detail_cells2);
+    int detail_cells_b, swell_cells;
+    const double detail_cell_b = periodic_cell(p.detail_cell * 0.62, detail_cells_b); // BL-1256: the fold's second octave
+    const double swell_cell    = periodic_cell(2.4, swell_cells);                     // BL-1256: the roll's swell
+    int hill_cells_a, hill_cells_b;
+    const double hill_cell_a   = periodic_cell(1.15, hill_cells_a);                   // BL-1256: the hills
+    const double hill_cell_b   = periodic_cell(0.75, hill_cells_b);
     // Close-tier grain: at high bake resolutions (>= 40 px/r: the master) the
     // standard octaves span many texels and the ground reads under-detailed up
     // close — one finer octave keys in on resolution alone.
@@ -1138,6 +1284,7 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
     const double streak_short  = periodic_cell(0.12, streak_cells_s);
     const double crack_cell    = periodic_cell(0.30, crack_cells);
     const double stip_cell     = periodic_cell(0.10, stip_cells); // finer reads as a value-noise checker
+    const glint_fields glint_f = make_glint_fields(period);       // BL-1256: water glints
     constexpr double kStreakK  = 0.57735026918962576; // tan 30 degrees: the two oblique streak directions
     constexpr double kInR      = 0.86602540378443865; // hex inradius: centre to edge midpoint
 
@@ -1839,6 +1986,11 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
             const float gyy  = static_cast<float>(gy * inv);
             float bias = static_cast<float>(rb * inv);
             float jtt  = static_cast<float>(jt * inv);
+            // BL-1256: the landform bias as terrain SHAPE — the wide smooth
+            // interpolation, never the material's edge band — drives the
+            // relief's amplitude and folding, so relief is continuous across
+            // tiles (no hex-shaped relief) and matches the cast-shadow field.
+            const float shape_bias = bias;
 
             const bool land = owner_cls == static_cast<std::uint8_t>(bake_source::tile_class::land);
 
@@ -2057,9 +2209,13 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                 // finite-difference gradient of the detail field), which is
                 // what gives the ground painterly terrain texture at sub-tile
                 // scale instead of a per-hex mosaic.
-                const float amp = p.detail_amp * detail_mul
-                                * (0.25f + p.landform_accent * std::fabs(bias) + 0.35f * h)
-                                * (vland ? vv[vp_detail] : 1.0f);
+                // BL-1256 (relief everywhere): the amplitude's floor is
+                // roll_floor, so a plain rolls; it reads the SHAPE bias, and a
+                // variant's roughness moves it only a third as far as it did,
+                // so no tile's relief stops at its hex.
+                const float amp = relief_amp(p, detail_mul, shape_bias, h,
+                                             roll_swell(x0_, uy + hlift, swell_cell, swell_cells))
+                                * (vland ? 1.0f + (vv[vp_detail] - 1.0f) * 0.35f : 1.0f);
                 // The GRADIENT reads the low octave only, central-differenced
                 // at half a cell: a fine octave in the slope is per-pixel
                 // speckle, not terrain. The fine octave still contributes to
@@ -2071,12 +2227,11 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                 // crease at every crest — a range then shades as ridge lines
                 // instead of soft blobs. The finite differences pick the
                 // crease up for free.
-                const float ridge_w0 = std::min(1.0f, std::fabs(bias) * p.landform_accent)
-                                     * p.ridge_strength;
+                const float ridge_w0 = ridge_weight0(p, shape_bias);
                 // BL-1254: every ground folds a little at the master (a plain
                 // gently, a range as before), so the relief has creases to
                 // shade and ink rather than soft swells only.
-                const float ridge_w = ridge_w0 + (1.0f - ridge_w0) * 0.15f * ck;
+                const float ridge_w = fold_ridge(p, ridge_w0, ck); // BL-1256: plains fold too
                 const auto fold = [&](float n) -> float
                 {
                     const float smooth = n - 0.5f;
@@ -2085,19 +2240,23 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                 };
                 const auto detail_lo = [&](double sx, double sy) -> float
                 {
-                    return fold(value_noise(sx, sy, detail_cell, detail_cells, 0xD371u));
+                    return fold(fold_noise(sx, sy, detail_cell, detail_cells, detail_cell_b, detail_cells_b));
                 };
+                // BL-1256: the relief is sampled at the GROUND point (the
+                // oblique lift included), so a fold rides its hill and the
+                // cast-shadow pass reads the same field.
+                const double gry = uy + hlift;
                 // BL-1254: the gradient's span narrows at the master (half a
                 // cell -> a fifth), so a fold resolves as a crease a few
                 // pixels wide instead of a swell twenty wide.
                 const double eps = detail_cell * (0.5 - 0.3 * ck);
-                const float ddx = (detail_lo(x0_ + eps, uy) - detail_lo(x0_ - eps, uy))
+                const float ddx = (detail_lo(x0_ + eps, gry) - detail_lo(x0_ - eps, gry))
                                   / static_cast<float>(2.0 * eps);
-                const float ddy = (detail_lo(x0_, uy + eps) - detail_lo(x0_, uy - eps))
+                const float ddy = (detail_lo(x0_, gry + eps) - detail_lo(x0_, gry - eps))
                                   / static_cast<float>(2.0 * eps);
-                const float n_c = value_noise(x0_, uy, detail_cell, detail_cells, 0xD371u);
+                const float n_c = fold_noise(x0_, gry, detail_cell, detail_cells, detail_cell_b, detail_cells_b);
                 const float d0 = fold(n_c) * 0.7f
-                    + (value_noise(x0_, uy, detail_cell2, detail_cells2, 0xD372u) - 0.5f) * 0.3f;
+                    + (value_noise(x0_, gry, detail_cell2, detail_cells2, 0xD372u) - 0.5f) * 0.3f;
 
                 // Two shade terms with their own scales: tile slopes are tiny
                 // (heights are 0-1 across a whole continent) and take the big
@@ -2116,10 +2275,24 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                 // from the creases, grain and patterns instead; a range keeps
                 // its full shading (the narrower gradient span already
                 // steepens its folds).
-                const float soft_ease = 1.0f - 0.40f * ck * (1.0f - ridge_w0);
+                // (BL-1256: plain_ease, 0 by default — plains roll.)
+                const float soft_ease = 1.0f - p.plain_ease * ck * (1.0f - ridge_w0);
                 const float dshade = (ddx * Lx + ddy * Ly) * amp * 0.75f * soft_ease;
-                const float shade = p.hillshade_sign * ((gxx * Lx + gyy * Ly) * p.relief_gain + dshade);
-                lum += std::clamp(shade, -(0.60f + 0.15f * res_t), 0.60f + 0.15f * res_t);
+                // BL-1256: the hills' long faces, under the folds.
+                float hshade = 0.0f;
+                if (p.hill_amp > 0.0f)
+                {
+                    float hx, hy;
+                    hill_noise(x0_, gry, hill_cell_a, hill_cells_a, hill_cell_b, hill_cells_b, hx, hy);
+                    hshade = (hx * Lx + hy * Ly) * p.hill_amp;
+                }
+                const float shade = p.hillshade_sign * ((gxx * Lx + gyy * Ly) * p.relief_gain + dshade + hshade);
+                // BL-1256: a wide value range — lit slopes toward a warm
+                // off-white, slopes turned from the light toward black (the
+                // grade's S-curve then holds it). The clamp still widens with
+                // resolution, as before.
+                const float rk = 0.8f + 0.2f * res_t;
+                lum += std::clamp(shade, -p.shade_lo * rk, p.shade_hi * rk);
                 if (ck > 0.0f)
                 {
                     // BL-1254: contact ink on the relief's creases — the fold
@@ -2129,7 +2302,7 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                     const float crease = 1.0f - std::fabs(2.0f * n_c - 1.0f);
                     const float line   = sstf(0.93f, 0.985f, crease);
                     if (line > 0.0f)
-                        lum -= ck * line * (0.035f + 0.16f * ridge_w0)
+                        lum -= ck * line * (0.012f + 0.16f * ridge_w0) // BL-1256: a plain's crest is a fold, not a contour line
                              * (p.hillshade_sign * dshade < 0.0f ? 1.0f : 0.45f);
                 }
 
@@ -2148,7 +2321,10 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                 }
                 // Altitude lift, the landform's own signed bias, and the detail
                 // field's own value (a crag's top is lit even side-on).
-                lum += (h - 0.45f) * p.altitude_gain + bias * 0.30f + d0 * amp * 0.8f * soft_ease;
+                // (BL-1256: the detail's own value is a range's — on a rolling
+                // plain it read as blotches, so it scales with the landform.)
+                lum += (h - 0.45f) * p.altitude_gain + bias * 0.30f
+                     + d0 * amp * 0.8f * soft_ease * (0.35f + 0.65f * std::min(1.0f, std::fabs(shape_bias) * p.landform_accent));
                 // Painterly patchiness: a WHISPER of per-tile jitter (this is
                 // the hex-mosaic dial — the detail field carries the texture
                 // now), then fine grain.
@@ -2193,7 +2369,7 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                     // blur's), the same range.
                     if (ck > 0.0f)
                         vpatch += (1.1f * firm(vpatch / 1.1f) - vpatch) * 0.5f * ck;
-                    lum += vv[vp_patch] * vpatch;
+                    lum += vv[vp_patch] * vpatch * p.mottle; // BL-1256: the broad patches cut
                     // Streaks: a soft band plus a darker crease along each
                     // band's centre line — strata, gullies, ripples, combing.
                     const auto streak = [](float n) -> float
@@ -2240,6 +2416,10 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                 lum += (h - 0.45f) * 0.06f;
             }
             r_ *= lum; g_ *= lum; b_ *= lum;
+            // BL-1256: specular glints on open water — wind-combed sheen and
+            // sparse sparkles where the low sun catches the swell.
+            if (!land && p.glint_strength > 0.0f && streak_gate > 0.0f)
+                water_glint(x0_, uy, glint_f, p.glint_strength * streak_gate, fine_on, r_, g_, b_);
 
             if (land)
             {
@@ -2248,7 +2428,7 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                 // reads as mist over the smooth colour field, most of all at
                 // the close tiers (hence the res_t growth).
                 const float mot = (value_noise(x0_, uy, noise_cell_a, noise_cells_a, 0xC01Au)
-                                   - 0.5f) * (0.6f + 0.9f * res_t);
+                                   - 0.5f) * (0.6f + 0.9f * res_t) * p.mottle; // BL-1256: cut
                 r_ *= 1.0f + mot * 0.14f;
                 g_ *= 1.0f + mot * 0.04f;
                 b_ *= 1.0f - mot * 0.10f;
@@ -2336,9 +2516,9 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                         // A pale wet margin, darkening to a wet line at the water.
                         const float t = static_cast<float>(1.0 - e / 0.10);
                         const float a = 0.40f * t * t * bs;
-                        r_ += (196.0f - r_) * a;
-                        g_ += (184.0f - g_) * a;
-                        b_ += (152.0f - b_) * a;
+                        r_ += (150.0f - r_) * a; // BL-1256: a khaki-grey wet margin
+                        g_ += (142.0f - g_) * a;
+                        b_ += (120.0f - b_) * a;
                         if (e < 0.022)
                         {
                             const float wl = 1.0f - 0.20f * static_cast<float>(1.0 - e / 0.022) * bs;
@@ -2350,15 +2530,15 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                         // The shallows, paling toward the shore, a thin foam line.
                         const float t = static_cast<float>(1.0 - e / 0.32);
                         const float a = 0.60f * t * t * bs;
-                        r_ += (104.0f - r_) * a;
-                        g_ += (166.0f - g_) * a;
-                        b_ += (184.0f - b_) * a;
+                        r_ += (82.0f - r_) * a;  // BL-1256: grey-blue shallows
+                        g_ += (96.0f - g_) * a;
+                        b_ += (100.0f - b_) * a;
                         if (e < 0.02)
                         {
                             const float f = 0.35f * static_cast<float>(1.0 - e / 0.02) * bs;
-                            r_ += (214.0f - r_) * f;
-                            g_ += (226.0f - g_) * f;
-                            b_ += (228.0f - b_) * f;
+                            r_ += (186.0f - r_) * f;
+                            g_ += (190.0f - g_) * f;
+                            b_ += (184.0f - b_) * f;
                         }
                     }
                 }
@@ -2794,9 +2974,9 @@ void bake_landforms(const bake_source& src, const geometry& g, const bake_params
         float b_ = static_cast<float>(palette::col_b(dst));
         // Mountain rock toward the crest, then the crest catches light.
         const float rock = static_cast<float>(std::min(1.0, m.tm * 1.3) * 0.62) * k * m_cover;
-        r_ += (142.0f + 11.0f * m_tint - r_) * rock; // the variant's rock: greyer (-) or warmer (+)
-        g_ += (133.0f +  2.0f * m_tint - g_) * rock;
-        b_ += (120.0f - 10.0f * m_tint - b_) * rock;
+        r_ += (116.0f + 11.0f * m_tint - r_) * rock; // the variant's rock: greyer (-) or warmer (+)
+        g_ += (109.0f +  2.0f * m_tint - g_) * rock; // (BL-1256: darker — the light makes the crags bright)
+        b_ += ( 97.0f - 10.0f * m_tint - b_) * rock;
         float lum = 1.0f + shade * k + static_cast<float>(0.05 * m.tm * m.tm) * k;
         // Canyon floor: deep, warm shadow. Crater bowl: shade. Ejecta: pale.
         lum *= 1.0f - static_cast<float>(0.30 * c_floor * m.cut + 0.16 * k_bowl * m.bowl
@@ -2810,9 +2990,9 @@ void bake_landforms(const bake_source& src, const geometry& g, const bake_params
         // A canyon's exposed rock runs warm: the floor and walls redden.
         {
             const float warm = static_cast<float>(0.45 * c_warm * m.cut) * k;
-            r_ += (152.0f - r_) * warm;
-            g_ += (100.0f - g_) * warm;
-            b_ += (74.0f - b_) * warm;
+            r_ += (134.0f - r_) * warm; // BL-1256: an ochre, not a red
+            g_ += (104.0f - g_) * warm;
+            b_ += (80.0f - b_) * warm;
         }
         lum *= 1.0f + static_cast<float>(0.10 * k_ejecta * m.ejecta) * k;
         r_ *= lum;
@@ -2858,8 +3038,30 @@ void bake_rivers(const bake_source& src, const geometry& g, const bake_params& p
     const float  k   = p.river_strength;
     const auto   water = static_cast<std::uint8_t>(bake_source::tile_class::water);
     constexpr int kSeg = 10; // polyline steps per quadratic
+    // BL-1256: water glints, white rapids where the river falls, rocky banks.
+    const glint_fields glint_f = make_glint_fields(period);
+    const bool   fine  = nominal_s(g) >= 40.0;
+    const float  sgate = static_cast<float>(std::clamp((nominal_s(g) - 12.0) / 12.0, 0.0, 1.0));
+    const int    foam_n  = std::max(1, static_cast<int>(std::lround(period / 0.020)));
+    const int    foam_n2 = std::max(1, static_cast<int>(std::lround(period / 0.046)));
+    const int    rock_n  = std::max(1, static_cast<int>(std::lround(period / 0.028)));
+    const double foam_c = period / foam_n, foam_c2 = period / foam_n2, rock_c = period / rock_n;
+    const float  Lx = -0.554700196f, Ly = -0.832050323f; // toward the NW light
+    // A tile's fall: the height it drops to its downstream neighbour (0 at a
+    // mouth or a sink). Heights are hashed (terrain_hash), so rapids move the
+    // chunk hash with the terrain that makes them.
+    const auto fall_out = [&](int t) -> float
+    {
+        for (int s = 0; s < 6; ++s)
+            if (src.river_out[t] & (1u << s))
+            {
+                const int j = nb_index(src, t, s);
+                return j >= 0 ? std::max(0.0f, src.height[t] - src.height[j]) : 0.0f;
+            }
+        return 0.0f;
+    };
 
-    struct curve { double p0x, p0y, p1x, p1y, p2x, p2y, hw0, hw1; };
+    struct curve { double p0x, p0y, p1x, p1y, p2x, p2y, hw0, hw1; float f0, f1; };
 
     const std::size_t n = static_cast<std::size_t>(pw) * ph;
     for (std::size_t i = 0; i < n; ++i)
@@ -2901,27 +3103,30 @@ void bake_rivers(const bake_source& src, const geometry& g, const bake_params& p
                 const int u = nb_index(src, t, s);
                 const double hw_u = u >= 0 ? river_hw(src.river_flow[u]) : hw_t;
                 const double mx = ox + 0.5 * kNbDx[s], my = oy + 0.5 * kNbDy[s];
+                const float fin = u >= 0 ? std::max(0.0f, src.height[u] - src.height[t]) : 0.0f;
                 if (wet)
                 {
                     // Estuary: on into the sea, widening.
                     const double ex = ox + 0.2 * kNbDx[s], ey = oy + 0.2 * kNbDy[s];
-                    cv[ncv++] = { mx, my, (mx + ex) * 0.5, (my + ey) * 0.5, ex, ey, hw_u, hw_u * 1.8 };
+                    cv[ncv++] = { mx, my, (mx + ex) * 0.5, (my + ey) * 0.5, ex, ey, hw_u, hw_u * 1.8, 0.0f, 0.0f };
                 }
                 else if (out_side >= 0)
                 {
                     cv[ncv++] = { mx, my, ox, oy,
-                                  ox + 0.5 * kNbDx[out_side], oy + 0.5 * kNbDy[out_side], hw_u, hw_t };
+                                  ox + 0.5 * kNbDx[out_side], oy + 0.5 * kNbDy[out_side], hw_u, hw_t,
+                                  fin, fall_out(t) };
                 }
                 else
                 {
-                    cv[ncv++] = { mx, my, (mx + ox) * 0.5, (my + oy) * 0.5, ox, oy, hw_u, hw_u };
+                    cv[ncv++] = { mx, my, (mx + ox) * 0.5, (my + oy) * 0.5, ox, oy, hw_u, hw_u, fin, fin };
                 }
             }
             if (!any_in && out_side >= 0 && !wet)
             {
                 // Source: a spoke from the centre, tapering to its spring.
                 const double ex = ox + 0.5 * kNbDx[out_side], ey = oy + 0.5 * kNbDy[out_side];
-                cv[ncv++] = { ox, oy, (ox + ex) * 0.5, (oy + ey) * 0.5, ex, ey, hw_t * 0.35, hw_t };
+                const float fo = fall_out(t);
+                cv[ncv++] = { ox, oy, (ox + ex) * 0.5, (oy + ey) * 0.5, ex, ey, hw_t * 0.35, hw_t, fo, fo };
             }
         }
         if (ncv == 0)
@@ -2929,6 +3134,7 @@ void bake_rivers(const bake_source& src, const geometry& g, const bake_params& p
 
         // Nearest point over every curve: signed distance to the bank e.
         double best_e = 1e9, best_hw = 0.0;
+        float  best_fall = 0.0f;
         for (int c = 0; c < ncv; ++c)
         {
             const curve& q = cv[c];
@@ -2957,8 +3163,9 @@ void bake_rivers(const bake_source& src, const geometry& g, const bake_params& p
                 const double e  = d - hw;
                 if (e < best_e)
                 {
-                    best_e  = e;
-                    best_hw = hw;
+                    best_e    = e;
+                    best_hw   = hw;
+                    best_fall = q.f0 + (q.f1 - q.f0) * static_cast<float>(tc);
                 }
                 prx = nx;
                 pry = ny;
@@ -2977,20 +3184,423 @@ void bake_rivers(const bake_source& src, const geometry& g, const bake_params& p
         r_ *= 1.0f - 0.34f * mg;
         g_ *= 1.0f - 0.26f * mg;
         b_ *= 1.0f - 0.30f * mg;
-        // The water: shelving from shallow at the bank to deep mid-channel.
+        // BL-1256: rapids where the river falls (the reach's height drop to
+        // its downstream neighbour: p50 0.015, p90 0.04 on the home body).
+        const float rs = sst01(0.020f, 0.060f, best_fall) * p.rapids_strength;
+        // BL-1256: rocky banks - broken stones along the bank, lit from the
+        // NW, more of them where the water runs fast.
+        if (fine && p.bank_rocks > 0.0f && best_e > 0.0)
+        {
+            const double bt = 1.0 - best_e / bank;
+            const float nr = value_noise(abx, aby, rock_c, rock_n, 0x21F5u);
+            const float cr = sst01(0.64f - 0.08f * rs, 0.72f - 0.08f * rs, nr)
+                           * static_cast<float>(smooth01(0.0, 0.45, bt)) * (0.55f + 0.45f * rs) * p.bank_rocks * k;
+            if (cr > 0.0f)
+            {
+                const float nl  = value_noise(abx + Lx * 0.008, aby + Ly * 0.008, rock_c, rock_n, 0x21F5u);
+                const float lit = 1.0f + std::clamp((nr - nl) * 20.0f, -0.35f, 0.35f);
+                r_ += (96.0f * lit - r_) * cr;
+                g_ += (92.0f * lit - g_) * cr;
+                b_ += (84.0f * lit - b_) * cr;
+            }
+        }
+        // The water: shelving from shallow at the bank to deep mid-channel -
+        // grey-blue (BL-1256), glinting, white where it falls.
         const float a = static_cast<float>(std::clamp(0.5 - best_e / pxc, 0.0, 1.0)) * k;
         if (a > 0.0f)
         {
             const float depth = static_cast<float>(std::clamp(-best_e / best_hw, 0.0, 1.0));
             const float dd = std::sqrt(depth);
-            const float wr = 84.0f + (34.0f - 84.0f) * dd;
-            const float wg = 150.0f + (92.0f - 150.0f) * dd;
-            const float wb = 205.0f + (182.0f - 205.0f) * dd;
+            float wr = 74.0f + (34.0f - 74.0f) * dd;
+            float wg = 84.0f + (44.0f - 84.0f) * dd;
+            float wb = 88.0f + (52.0f - 88.0f) * dd;
+            if (p.glint_strength > 0.0f && sgate > 0.0f)
+                water_glint(abx, aby, glint_f, p.glint_strength * sgate, fine, wr, wg, wb);
+            if (rs > 0.0f)
+            {
+                const float n1 = value_noise(abx, aby, foam_c,  foam_n,  0x21F3u);
+                const float n2 = value_noise(abx, aby, foam_c2, foam_n2, 0x21F4u);
+                const float nf = 0.6f * n1 + 0.4f * n2;
+                const float foam = rs * (0.20f + 0.70f * sst01(0.40f, 0.62f, nf));
+                wr += (204.0f - wr) * foam;
+                wg += (206.0f - wg) * foam;
+                wb += (200.0f - wb) * foam;
+            }
             r_ += (wr - r_) * a;
             g_ += (wg - g_) * a;
             b_ += (wb - b_) * a;
         }
         blend_px(dst, r_, g_, b_);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BL-1256 — CAST SHADOWS (RENDERING.md § Art direction and palette: "a
+// low-sun shadow pass on the height field throws shadow across the ground
+// behind ridges and hills, from the same NW light"). The hillshade lights a
+// slope by its own facing; this pass asks whether anything UPSUN stands
+// above the sun's ray, so relief reads as mass.
+//
+// The height field is the one the shading already reads, in its own units
+// (shade = -(grad H . L), so a slope of 1 is a full stop of light): the tile
+// height field times relief_gain, the fold field times 0.75 amp, and the
+// dramatic landforms' forms times 0.5 — the same factors the base hillshade
+// and the landform pass shade with, so a shadow falls behind exactly the
+// slopes that read as lit.
+//
+// Window invariance and the wrap: H and the shadow are evaluated on a lattice
+// fixed in canonical space (cells dividing the wrap period exactly, the
+// column index wrapped before it becomes a coordinate), every lattice value a
+// pure function of its index. A window builds the lattice over its own
+// ground plus the reach upsun, and a pixel reads its shadow by bilinear
+// interpolation at its ground point — so any window bakes the same pixel
+// byte-identical, and a wrap copy reads the same lattice values.
+//
+// Reach: a point looks at most shadow_reach canonical units upsun (1.5 by
+// default: a mountain's shadow at a 27 degree sun). What it reads: H at
+// points within reach of the pixel's ground point, each from tiles within the
+// domain warp (0.65) and the blend radius (1.45) of it, and a landform form
+// from the owner's neighbours (<= 2.73) — inside terrain_hash's margin (6.0).
+// Masked and void ground stands at height 0 (no shape leaks through the
+// survey mask); the lock fill is never shadowed (the tag).
+// ---------------------------------------------------------------------------
+
+/// The constants of the shadow height field for one geometry.
+struct shadow_field
+{
+    const bake_source& src;
+    const geometry&    g;
+    const bake_params& p;
+    double period = 0.0;
+    double R = 1.45, R2 = 2.1;
+    int    wpow = 2;
+    float  detail_mul = 1.0f, ck = 0.0f;
+    double warp_c = 1.0, warp_c2 = 1.0, detail_c = 1.0, detail_cb = 1.0, swell_c = 1.0, hill_ca = 1.0, hill_cb = 1.0;
+    int    warp_n = 1, warp_n2 = 1, detail_n = 1, detail_nb = 1, swell_n = 1, hill_na = 1, hill_nb = 1;
+    double crest_c = 1.0, spur_c = 1.0, jag_c = 1.0, fine_c = 1.0;
+    int    crest_n = 1, spur_n = 1, jag_n = 1, fine_n = 1;
+    double pxn = 0.0;
+
+    shadow_field(const bake_source& s, const geometry& gg, const bake_params& pp)
+        : src(s), g(gg), p(pp)
+    {
+        period = g.gw * kSqrt3;
+        const double ns = nominal_s(g);
+        const float res_t = static_cast<float>(std::clamp((ns - 24.0) / 48.0, 0.0, 1.0));
+        R  = p.blend_radius * (1.0 - 0.22 * res_t);
+        R2 = R * R;
+        wpow = 2 + static_cast<int>(std::lround(5.0f * res_t));
+        detail_mul = 1.0f + 1.1f * res_t;
+        ck = p.crisp * static_cast<float>(std::clamp((ns - 40.0) / 40.0, 0.0, 1.0));
+        const auto cell = [&](double target, int& n) { n = std::max(1, static_cast<int>(std::lround(period / target))); return period / n; };
+        warp_c   = cell(p.warp_cell, warp_n);
+        warp_c2  = cell(p.warp_cell * 0.29, warp_n2);
+        detail_c = cell(p.detail_cell, detail_n);
+        detail_cb = cell(p.detail_cell * 0.62, detail_nb);
+        swell_c   = cell(2.4, swell_n);
+        hill_ca   = cell(1.15, hill_na);
+        hill_cb   = cell(0.75, hill_nb);
+        crest_c  = cell(0.50, crest_n);
+        spur_c   = cell(0.21, spur_n);
+        jag_c    = cell(0.55, jag_n);
+        fine_c   = cell(0.17, fine_n);
+        pxn      = 1.0 / ns;
+    }
+
+    /// The same-class Wendland gather the base bake runs, at (x, y): the
+    /// interpolated height and landform bias of the owner's class, and the
+    /// owner (-1: no ground; a masked owner reads as height 0, no bias).
+    void gather(double x, double y, double& h, double& bias, int& owner) const
+    {
+        h = 0.0; bias = 0.0; owner = -1;
+        struct c_ { std::size_t i; double w; };
+        c_ cs[24];
+        int nc = 0;
+        double best = 1e30;
+        const int r_lo = std::max(0, iceil((y - R) / 1.5));
+        const int r_hi = std::min(src.gh - 1, ifloor((y + R) / 1.5));
+        for (int r = r_lo; r <= r_hi; ++r)
+        {
+            const double dy = y - 1.5 * r;
+            const double odd = (r & 1) ? 0.5 : 0.0;
+            const int c0 = ifloor(x / kSqrt3 - odd);
+            for (int dc = -1; dc <= 2; ++dc)
+            {
+                const int c = c0 + dc;
+                double dx = x - kSqrt3 * (c + odd);
+                if (src.gw < 5)
+                    dx -= period * std::round(dx / period);
+                const double d2 = dx * dx + dy * dy;
+                if (d2 >= R2)
+                    continue;
+                const std::size_t i = static_cast<std::size_t>(r) * src.gw + ((c % src.gw) + src.gw) % src.gw;
+                if (src.cls[i] == static_cast<std::uint8_t>(bake_source::tile_class::void_))
+                    continue;
+                const double t = R2 - d2;
+                double w = t * t;
+                for (int e = 2; e < wpow; ++e)
+                    w *= t;
+                if (nc < 24)
+                    cs[nc++] = { i, w };
+                if (d2 < best) { best = d2; owner = static_cast<int>(i); }
+            }
+        }
+        if (owner < 0)
+            return;
+        const std::uint8_t oc = src.cls[static_cast<std::size_t>(owner)];
+        if (oc == static_cast<std::uint8_t>(bake_source::tile_class::masked))
+            return;
+        double ws = 0.0, hs = 0.0, bs = 0.0;
+        for (int k = 0; k < nc; ++k)
+            if (src.cls[cs[k].i] == oc)
+            {
+                ws += cs[k].w;
+                hs += cs[k].w * src.height[cs[k].i];
+                bs += cs[k].w * src.relief_bias[cs[k].i];
+            }
+        if (ws > 0.0)
+        {
+            h = hs / ws;
+            bias = bs / ws;
+        }
+    }
+
+    /// The dramatic landforms' height at absolute (wx, wy), whose owner is
+    /// @p o — the landform pass's field at its neutral variant (mountain
+    /// massif and crest, canyon cut and rim, crater rim and bowl; a rift's
+    /// lips are too low to cast).
+    double landform_h(int o, double wx, double wy) const
+    {
+        const auto land = static_cast<std::uint8_t>(bake_source::tile_class::land);
+        double ocx, ocy;
+        tile_centre(src, o, ocx, ocy);
+        double qx = wx - ocx;
+        qx -= period * std::round(qx / period);
+        const double qy = wy - ocy;
+        const double jx = (value_noise(wx, wy, jag_c, jag_n, 0x1A61u) - 0.5) * 2.0;
+        const double jy = (value_noise(wx, wy, jag_c, jag_n, 0x1A62u) - 0.5) * 2.0;
+        const double fx = (value_noise(wx, wy, fine_c, fine_n, 0x1A63u) - 0.5) * 2.0;
+        const double fy = (value_noise(wx, wy, fine_c, fine_n, 0x1A64u) - 0.5) * 2.0;
+        double dm = 1e9, dc = 1e9, tt;
+        double h = 0.0;
+        const auto L_mountain = static_cast<std::uint8_t>(terrain_landform::mountain);
+        const auto L_canyon   = static_cast<std::uint8_t>(terrain_landform::canyon);
+        const auto L_crater   = static_cast<std::uint8_t>(terrain_landform::crater);
+        for (int kk = -1; kk < 6; ++kk)
+        {
+            const int t = kk < 0 ? o : nb_index(src, o, kk);
+            if (t < 0 || src.cls[t] != land || !dramatic(src.landform[t]))
+                continue;
+            const double ox = kk < 0 ? 0.0 : kNbDx[kk];
+            const double oy = kk < 0 ? 0.0 : kNbDy[kk];
+            const std::uint8_t lf = src.landform[t];
+            const int tr = t / src.gw, tc = t % src.gw;
+            if (lf == L_crater)
+            {
+                const double rc = 0.44 + 0.14 * hash01(tc, tr, 0xC4A7u);
+                const double d  = std::sqrt(sq(qx + 0.03 * jx - ox) + sq(qy + 0.03 * jy - oy));
+                h += 0.5 * std::exp(-sq((d - rc) / 0.09)) - 0.55 * std::max(0.0, 1.0 - sq(d / rc));
+                continue;
+            }
+            if (lf != L_mountain && lf != L_canyon)
+                continue;
+            const double mx = qx + (lf == L_mountain ? 0.14 * jx + 0.03 * fx : 0.09 * jx + 0.025 * fx);
+            const double my = qy + (lf == L_mountain ? 0.14 * jy + 0.03 * fy : 0.09 * jy + 0.025 * fy);
+            const std::uint8_t links = src.lf_links[t];
+            const auto take = [&](double ax, double ay, double bx, double by)
+            {
+                const double d = seg_dist(mx, my, ax, ay, bx, by, tt);
+                if (lf == L_mountain) dm = std::min(dm, d); else dc = std::min(dc, d);
+            };
+            if (links)
+            {
+                for (int s = 0; s < 6; ++s)
+                    if (links & (1u << s))
+                        take(ox, oy, ox + 0.5 * kNbDx[s], oy + 0.5 * kNbDy[s]);
+            }
+            else if (lf == L_mountain)
+                take(ox, oy, ox, oy);
+            else
+            {
+                const int ax_side = static_cast<int>(hash01(tc, tr, 0xA715u) * 3.0f) % 3;
+                const double ux = kNbDx[ax_side] / kSqrt3, uy = kNbDy[ax_side] / kSqrt3;
+                take(ox - 0.55 * ux, oy - 0.55 * uy, ox + 0.55 * ux, oy + 0.55 * uy);
+            }
+        }
+        if (dm < 1.0)
+        {
+            const double t_ = 1.0 - dm;
+            const double crest = value_noise(wx, wy, crest_c, crest_n, 0x1A65u);
+            const double spur  = 1.0 - std::fabs(2.0 * value_noise(wx, wy, spur_c, spur_n, 0x1A66u) - 1.0);
+            h += std::pow(t_, 1.5) * (0.6 + 0.8 * crest) + 0.11 * t_ * (spur - 0.5);
+        }
+        if (dc < 1e8)
+        {
+            const double fw = std::max(0.10, 0.9 * pxn), ww = 0.20 + pxn;
+            h += -0.25 * (1.0 - smooth01(fw, fw + ww, dc)) + 0.04 * std::exp(-sq((dc - (fw + ww + 0.05)) / 0.07));
+        }
+        return h;
+    }
+
+    /// H at the GROUND point (gx, gy), canonical: the shading's height field.
+    double height(double gx, double gy) const
+    {
+        // The base bake warps at the PIXEL (the ground point less its oblique
+        // lift), so the lift is estimated first from the unwarped gather.
+        double h0, b0;
+        int o0;
+        gather(gx, gy, h0, b0, o0);
+        const double uy = gy - g.y_min - h0 * g.lift;
+        float nfx, nfy, nwx, nwy;
+        value_noise2(gx, uy, warp_c2, warp_n2, 0xA21Cu, 0xB32Du, nfx, nfy);
+        value_noise2(gx, uy, warp_c,  warp_n,  0xA11Cu, 0xB22Du, nwx, nwy);
+        const double wax = (nwx - 0.5) * 2.0 + (nfx - 0.5) * 2.0 * 0.45;
+        const double way = (nwy - 0.5) * 2.0 + (nfy - 0.5) * 2.0 * 0.45;
+        const double wx = gx + wax * p.warp_amp, wy = gy + way * p.warp_amp;
+        double h, bias;
+        int o;
+        gather(wx, wy, h, bias, o);
+        if (o < 0 || src.cls[static_cast<std::size_t>(o)] != static_cast<std::uint8_t>(bake_source::tile_class::land))
+            return p.shadow_tile * p.relief_gain * h; // water, the mask, the margin: no relief of their own
+        const float amp = relief_amp(p, detail_mul, static_cast<float>(bias), static_cast<float>(h),
+                                     roll_swell(gx, gy - g.y_min, swell_c, swell_n));
+        const float rw0 = ridge_weight0(p, static_cast<float>(bias));
+        const float rw  = fold_ridge(p, rw0, ck);
+        const float n   = fold_noise(gx, gy - g.y_min, detail_c, detail_n, detail_cb, detail_nb);
+        const float fold = (n - 0.5f) + (((0.25f - std::fabs(n - 0.5f)) * 2.0f) - (n - 0.5f)) * rw;
+        double H = p.shadow_tile * p.relief_gain * h + p.shadow_fold * 0.75 * amp * fold;
+        if (p.hill_amp > 0.0f)
+        {
+            float hgx, hgy;
+            H += p.hill_amp * (hill_noise(gx, gy - g.y_min, hill_ca, hill_na, hill_cb, hill_nb, hgx, hgy) - 0.5f);
+        }
+        if (p.landform_strength > 0.0f && (src.near_feature[static_cast<std::size_t>(o)] & k_near_landform))
+            H += 0.5 * p.landform_strength * landform_h(o, wx, wy);
+        return H;
+    }
+};
+
+void bake_cast_shadows(const bake_source& src, const geometry& g, const bake_params& p,
+                       int px0, int py0, int pw, int ph, std::uint32_t* out,
+                       const std::uint8_t* tag, const feature_px* fpx)
+{
+    const shadow_field F(src, g, p);
+    const double ns = nominal_s(g);
+    // The lattice: ~4 px at the master, never finer than a pixel and a half
+    // of the nominal tier (so the far page pays little). The penumbra is
+    // wider than a cell, so the lattice never shows.
+    const double target = std::max(0.045, 1.5 / ns);
+    const int    nx = std::max(1, static_cast<int>(std::lround(F.period / target)));
+    const double cx = F.period / nx, cy = target;
+    const double Lx = -0.554700196, Ly = -0.832050323; // toward the NW light
+    const double tanE  = std::tan(std::clamp(static_cast<double>(p.sun_elevation), 5.0, 85.0) * 3.14159265358979 / 180.0);
+    const double reach = std::max(0.0, static_cast<double>(p.shadow_reach));
+    const double step  = std::min(cx, cy);
+    const int    K     = static_cast<int>(std::ceil(reach / step));
+
+    // The window's ground: its pixels' x, their y plus the oblique lift.
+    const double gx0 = px0 / g.s, gx1 = (px0 + pw) / g.s;
+    const double gy0 = py0 / g.s + g.y_min, gy1 = (py0 + ph) / g.s + g.y_min + 1.5 * g.lift;
+    const int si0 = ifloor(gx0 / cx) - 1, si1 = ifloor(gx1 / cx) + 2;
+    const int sj0 = ifloor(gy0 / cy) - 1, sj1 = ifloor(gy1 / cy) + 2;
+    const int hi0 = si0 - static_cast<int>(std::ceil(reach * -Lx / cx)) - 2, hi1 = si1 + 1;
+    const int hj0 = sj0 - static_cast<int>(std::ceil(reach * -Ly / cy)) - 2, hj1 = sj1 + 1;
+    const int hw = hi1 - hi0 + 1, hh = hj1 - hj0 + 1;
+    const int sw = si1 - si0 + 1, sh = sj1 - sj0 + 1;
+
+    // Skip the window when no pixel can take a shadow.
+    bool any = false;
+    for (std::size_t i = 0, n = static_cast<std::size_t>(pw) * ph; i < n && !any; ++i)
+        any = tag[i] && fpx[i].owner >= 0;
+    if (!any)
+        return;
+
+    // H on the lattice. Each value from its WRAPPED column index.
+    const auto Hat = [&](int i, int j) -> double
+    {
+        int iw = i % nx;
+        if (iw < 0)
+            iw += nx;
+        return F.height(iw * cx, j * cy);
+    };
+    std::vector<float> H(static_cast<std::size_t>(hw) * hh);
+    for (int j = 0; j < hh; ++j)
+        for (int i = 0; i < hw; ++i)
+            H[static_cast<std::size_t>(j) * hw + i] = static_cast<float>(Hat(hi0 + i, hj0 + j));
+    const auto Hget = [&](int i, int j) -> double
+    {
+        const int a = i - hi0, b = j - hj0;
+        if (a >= 0 && a < hw && b >= 0 && b < hh)
+            return H[static_cast<std::size_t>(b) * hw + a];
+        return static_cast<float>(Hat(i, j)); // never inside the ranges above; kept exact anyway
+    };
+
+    // The march's per-step offsets in lattice units: the integer part and the
+    // fraction from the OFFSET alone, so every lattice point (and its wrap
+    // copy) reads the same samples.
+    struct stp { int fi, fj; float ti, tj; float d; };
+    std::vector<stp> steps(static_cast<std::size_t>(K));
+    for (int k = 0; k < K; ++k)
+    {
+        const double d  = (k + 1) * step;
+        const double di = d * Lx / cx, dj = d * Ly / cy;
+        const int fi = ifloor(di), fj = ifloor(dj);
+        steps[static_cast<std::size_t>(k)] = { fi, fj, static_cast<float>(di - fi), static_cast<float>(dj - fj),
+                                               static_cast<float>(d) };
+    }
+    // The shadow on the lattice: how far the highest point upsun stands
+    // above the sun's ray, over a penumbra that widens with distance.
+    std::vector<float> S(static_cast<std::size_t>(sw) * sh);
+    for (int j = 0; j < sh; ++j)
+        for (int i = 0; i < sw; ++i)
+        {
+            const int li = si0 + i, lj = sj0 + j;
+            const double h0 = Hget(li, lj);
+            double m = 0.0;
+            for (const stp& st : steps)
+            {
+                const int a = li + st.fi, b = lj + st.fj;
+                const double h00 = Hget(a, b), h10 = Hget(a + 1, b), h01 = Hget(a, b + 1), h11 = Hget(a + 1, b + 1);
+                const double hq = (h00 + (h10 - h00) * st.ti) + ((h01 + (h11 - h01) * st.ti) - (h00 + (h10 - h00) * st.ti)) * st.tj;
+                const double over = (hq - h0 - st.d * tanE) / (0.03 + 0.16 * st.d);
+                if (over > m)
+                {
+                    m = over;
+                    if (m >= 1.0)
+                        break;
+                }
+            }
+            const double t = std::min(1.0, m);
+            S[static_cast<std::size_t>(j) * sw + i] = static_cast<float>(t * t * (3.0 - 2.0 * t));
+        }
+
+    const float k = p.shadow_strength;
+    for (int py = 0; py < ph; ++py)
+    {
+        const double y0_ = (py0 + py + 0.5) / g.s + g.y_min;
+        for (int px = 0; px < pw; ++px)
+        {
+            const std::size_t idx = static_cast<std::size_t>(py) * pw + px;
+            if (!tag[idx] || fpx[idx].owner < 0)
+                continue;
+            const double fx = ((px0 + px + 0.5) / g.s) / cx;
+            const double fy = (y0_ + fpx[idx].lift) / cy;
+            const int i = ifloor(fx), j = ifloor(fy);
+            const float ti = static_cast<float>(fx - i), tj = static_cast<float>(fy - j);
+            const int a = std::clamp(i - si0, 0, sw - 2), b = std::clamp(j - sj0, 0, sh - 2);
+            const float* s0 = &S[static_cast<std::size_t>(b) * sw + a];
+            const float* s1 = s0 + sw;
+            const float top = s0[0] + (s0[1] - s0[0]) * ti;
+            const float bot = s1[0] + (s1[1] - s1[0]) * ti;
+            const float sv  = top + (bot - top) * tj;
+            if (sv <= 0.0f)
+                continue;
+            const float m = 1.0f - k * sv;
+            std::uint32_t& dst = out[idx];
+            dst = palette::col32(static_cast<int>(palette::col_r(dst) * m + 0.5f),
+                                 static_cast<int>(palette::col_g(dst) * m + 0.5f),
+                                 static_cast<int>(palette::col_b(dst) * m + 0.5f), 255);
+        }
     }
 }
 
@@ -3082,6 +3692,12 @@ void bake_region_at(const bake_source& src, const geometry& g, const bake_params
     else
         route_call::run(&rc);
 
+    // BL-1256: cast shadows from the low NW sun, over everything the ground
+    // carries (a tree or a works in a ridge's shadow is in it too), before
+    // the grade so the S-curve takes them toward black.
+    if (p.shadow_strength > 0.0f)
+        bake_cast_shadows(src, g, p, px0 - A, py0 - A, apw, aph, abuf.data(), atag.data(), afpx.data());
+
     // The separable near-future grade. Its haze lift falls and its contrast
     // rises with resolution (BL-736): haze is blur-adjacent, and the close
     // tiers need their local contrast more than their atmosphere.
@@ -3089,8 +3705,22 @@ void bake_region_at(const bake_source& src, const geometry& g, const bake_params
     {
         const float res_t = static_cast<float>(std::clamp((ns - 24.0) / 48.0, 0.0, 1.0));
         const float lift     = p.grade_lift * (1.0f - 0.5f * res_t);
-        const float contrast = p.grade_contrast + 0.045f * res_t;
         const float haze_r = 15.0f, haze_g = 15.0f, haze_b = 20.0f;
+        // BL-1256: the S-curve on luminance — two power halves meeting at the
+        // pivot, so the shadows crush toward black and the lit slopes roll
+        // into a shoulder rather than clip; tabulated once per bake (1024
+        // steps, linear between), applied as a ratio so hue is kept. Then a
+        // split tone: shadows cool, lit ground warm.
+        const float c_  = std::max(0.2f, p.grade_contrast + 0.10f * res_t);
+        const float pv  = std::clamp(p.grade_pivot, 0.05f, 0.95f);
+        float curve[1025];
+        for (int k = 0; k <= 1024; ++k)
+        {
+            const float t = k / 1024.0f;
+            curve[k] = t < pv ? pv * std::pow(t / pv, c_)
+                              : 1.0f - (1.0f - pv) * std::pow((1.0f - t) / (1.0f - pv), c_);
+        }
+        const float tone_split = p.grade_split;
         for (std::size_t i = 0; i < an; ++i)
         {
             if (!atag[i])
@@ -3106,9 +3736,19 @@ void bake_region_at(const bake_source& src, const geometry& g, const bake_params
             r_ = r_ + (haze_r - r_) * lift;
             g_ = g_ + (haze_g - g_) * lift;
             b_ = b_ + (haze_b - b_) * lift;
-            r_ = (r_ - 128.0f) * contrast + 128.0f;
-            g_ = (g_ - 128.0f) * contrast + 128.0f;
-            b_ = (b_ - 128.0f) * contrast + 128.0f;
+            const float l2 = std::clamp((0.2126f * r_ + 0.7152f * g_ + 0.0722f * b_) / 255.0f, 0.0f, 1.0f);
+            const float fk = l2 * 1024.0f;
+            const int   k0 = std::min(1023, static_cast<int>(fk));
+            const float y  = curve[k0] + (curve[k0 + 1] - curve[k0]) * (fk - k0);
+            const float sc = l2 > 1e-4f ? y / l2 : 0.0f;
+            r_ *= sc; g_ *= sc; b_ *= sc;
+            if (tone_split > 0.0f)
+            {
+                const float sh = (1.0f - y) * (1.0f - y) * tone_split, hi = y * y * tone_split;
+                r_ *= 1.0f - 0.05f * sh + 0.035f * hi;
+                g_ *= 1.0f + 0.00f * sh + 0.010f * hi;
+                b_ *= 1.0f + 0.03f * sh - 0.050f * hi;
+            }
             abuf[i] = palette::col32(
                 std::clamp(static_cast<int>(r_ + 0.5f), 0, 255),
                 std::clamp(static_cast<int>(g_ + 0.5f), 0, 255),
@@ -3334,7 +3974,12 @@ std::uint64_t terrain_hash(const bake_source& src, const geometry& g,
     // beyond their owner tile — a river's neighbour-of-neighbour flow (BL-1242)
     // and a port's water-facing neighbours across the structure reach (BL-1241);
     // it also covers the variant falloff plus domain warp (~2.15, BL-1243).
-    const double margin = 4.5;
+    // 6.0 since BL-1256: the cast-shadow pass reads the height field up to
+    // shadow_reach (1.5) upsun of a pixel's ground, each sample from tiles
+    // within the warp and blend radius (~2.1) or a landform owner's
+    // neighbours (<= 2.73) of it — 4.2 at most, with the lift and a tile's
+    // rounding to spare.
+    const double margin = 6.0;
     const double x0 = px0 / g.s - margin,            x1 = (px0 + pw) / g.s + margin;
     const double y0 = py0 / g.s + g.y_min - margin,  y1 = (py0 + ph) / g.s + g.y_min + margin;
     const int r_lo = std::max(0, static_cast<int>(std::floor(y0 / 1.5)));
