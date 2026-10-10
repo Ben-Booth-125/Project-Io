@@ -101,6 +101,73 @@ bool trade_is_valid(const world& w, const recipe_registry& reg, const standing_t
     return std::isfinite(t.points) && t.points > 0.0f;
 }
 
+float trade_haul_per_unit(world& w, const recipe_registry& reg, const logistics_nodes& nodes,
+                          trade_haul_memo& memo, entity_id corp, entity_id a, entity_id b,
+                          std::size_t ri)
+{
+    const market_component& ma = w.markets.at(a);
+    const market_component& mb = w.markets.at(b);
+    if (ma.body == mb.body)
+    {
+        const auto key = std::make_pair(a, b);
+        auto it = memo.intra.find(key);
+        if (it == memo.intra.end())
+        {
+            const convoy_leg leg = price_market_leg(w, reg, nodes, a, b, 1.0f);
+            it = memo.intra.emplace(key, leg.viable ? leg.cost : std::nanf("")).first;
+        }
+        return it->second;
+    }
+    const convoy_leg leg = price_trade_leg(w, reg, nodes, corp, a, b, ri, 1.0f);
+    return leg.viable ? leg.cost : std::nanf("");
+}
+
+void rank_trade_routes(world& w, const recipe_registry& reg, const logistics_nodes& nodes,
+                       trade_haul_memo& memo, entity_id corp,
+                       const std::vector<entity_id>& reach, std::vector<trade_route_offer>& out)
+{
+    out.clear();
+    const trade_params& tp = reg.trade();
+    const float res_mult = reg.price_band().reservation_mult;
+    const float margin   = reg.dispatch_margin();
+    for (const entity_id a : reach)
+    {
+        const market_component& ma = w.markets.at(a);
+        for (std::size_t ri = 0; ri < resource_count; ++ri)
+        {
+            if (!(tp.capacity[ri] > 0.0f) || reg.grid_goods().grid(ri))
+                continue;
+            if (!(ma.inventory[ri] > 0.0f) || !shelf_admits(ma, ri, res_mult, /*off_buys=*/true))
+                continue;
+            const float price_a = posted_price(ma, ri);
+            if (!(price_a > 0.0f))
+                continue;
+            for (const entity_id b : reach)
+            {
+                if (b == a)
+                    continue;
+                const float price_b = dispatch_market_price(w.markets.at(b), ri);
+                // A gross price that cannot clear the margin cannot clear it net.
+                if (!(price_b - price_a > margin * price_a))
+                    continue;
+                const float haul = trade_haul_per_unit(w, reg, nodes, memo, corp, a, b, ri);
+                if (!std::isfinite(haul))
+                    continue;
+                const float m = price_b - price_a - haul;
+                if (!(m > margin * price_a))
+                    continue;
+                out.push_back({m * tp.capacity[ri], a, b, ri, price_a + haul, m});
+            }
+        }
+    }
+    std::sort(out.begin(), out.end(), [](const trade_route_offer& x, const trade_route_offer& y) {
+        if (x.score != y.score) return x.score > y.score;
+        if (x.a != y.a)         return x.a < y.a;
+        if (x.b != y.b)         return x.b < y.b;
+        return x.r < y.r;
+    });
+}
+
 trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& report,
                       lp_pool_map* shared_lp_pools)
 {
@@ -140,30 +207,10 @@ trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& repo
         lp_pool_map local_pools;
         lp_pool_map* lp = (shared_lp_pools != nullptr) ? shared_lp_pools : &local_pools;
         const logistics_nodes nodes = collect_logistics_nodes(w);
-        const float res_mult = reg.price_band().reservation_mult;
-        const float margin   = reg.dispatch_margin();
 
-        // Same-body haul per unit, per (source, destination) market, priced once
-        // per pass on a one-unit leg (cost is linear in quantity): corporation-
-        // and good-independent (`price_market_leg`). NaN = no route.
-        std::map<std::pair<entity_id, entity_id>, float> intra_haul;
-        auto haul_per_unit = [&](entity_id corp, entity_id a, entity_id b, std::size_t ri) {
-            const market_component& ma = w.markets.at(a);
-            const market_component& mb = w.markets.at(b);
-            if (ma.body == mb.body)
-            {
-                const auto key = std::make_pair(a, b);
-                auto it = intra_haul.find(key);
-                if (it == intra_haul.end())
-                {
-                    const convoy_leg leg = price_market_leg(w, reg, nodes, a, b, 1.0f);
-                    it = intra_haul.emplace(key, leg.viable ? leg.cost : std::nanf("")).first;
-                }
-                return it->second;
-            }
-            const convoy_leg leg = price_trade_leg(w, reg, nodes, corp, a, b, ri, 1.0f);
-            return leg.viable ? leg.cost : std::nanf("");
-        };
+        // Same-body haul per unit, memoised per (source, destination) market for
+        // the pass (`trade_haul_memo`).
+        trade_haul_memo haul_memo;
 
         // Ship up to `units` of good `ri` from `a` to `b` for `corp`. Returns
         // the units actually sent.
@@ -197,15 +244,7 @@ trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& repo
             return sent;
         };
 
-        struct candidate
-        {
-            float       score;  // margin per point
-            entity_id   a;
-            entity_id   b;
-            std::size_t r;
-            float       landed; // source price + haul per unit
-        };
-        std::vector<candidate> cands;
+        std::vector<trade_route_offer> cands;
 
         for (const auto& [corp, made] : points)
         {
@@ -235,44 +274,8 @@ trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& repo
             const std::vector<entity_id> reach = corp_trade_markets(w, corp);
             if (reach.size() < 2)
                 continue;
-            cands.clear();
-            for (const entity_id a : reach)
-            {
-                const market_component& ma = w.markets.at(a);
-                for (std::size_t ri = 0; ri < resource_count; ++ri)
-                {
-                    if (!(tp.capacity[ri] > 0.0f) || reg.grid_goods().grid(ri))
-                        continue;
-                    if (!(ma.inventory[ri] > 0.0f) || !shelf_admits(ma, ri, res_mult, /*off_buys=*/true))
-                        continue;
-                    const float price_a = posted_price(ma, ri);
-                    if (!(price_a > 0.0f))
-                        continue;
-                    for (const entity_id b : reach)
-                    {
-                        if (b == a)
-                            continue;
-                        const float price_b = dispatch_market_price(w.markets.at(b), ri);
-                        // A gross price that cannot clear the margin cannot clear it net.
-                        if (!(price_b - price_a > margin * price_a))
-                            continue;
-                        const float haul = haul_per_unit(corp, a, b, ri);
-                        if (!std::isfinite(haul))
-                            continue;
-                        const float m = price_b - price_a - haul;
-                        if (!(m > margin * price_a))
-                            continue;
-                        cands.push_back({m * tp.capacity[ri], a, b, ri, price_a + haul});
-                    }
-                }
-            }
-            std::sort(cands.begin(), cands.end(), [](const candidate& x, const candidate& y) {
-                if (x.score != y.score) return x.score > y.score;
-                if (x.a != y.a)         return x.a < y.a;
-                if (x.b != y.b)         return x.b < y.b;
-                return x.r < y.r;
-            });
-            for (const candidate& c : cands)
+            rank_trade_routes(w, reg, nodes, haul_memo, corp, reach, cands);
+            for (const trade_route_offer& c : cands)
             {
                 if (!(auto_pts > 1e-6f))
                     break;

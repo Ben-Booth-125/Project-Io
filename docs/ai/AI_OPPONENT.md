@@ -432,7 +432,7 @@ candidate set is this subset of it:
 | `idle(building)` / `resume` | `decommissioned` flag | Tier-0 loss-streak rule, reversible |
 | `survey(body)` | survey_system | The AI pays for discovery like the player |
 | `hire_unit(tile, unit_type)` | `hire_unit` at the corp's own completed `military_base` | Availability gated on stockpile/market access, never on cash; spend subject to the solvency gate |
-| `set_trade(resource, from, to, points)` / `clear_trade` / `set_trade_reserve` | `world::trades` (`../economy/TRADE.md`) | § 2C; the § 11 trade grant |
+| `set_trade(from, to, good, points)` / `clear_trade(id)` / `set_trade_reserve(points)` | the trade pass (`../economy/TRADE.md`) | § 2C; the corporation's own manual trades on its own trade points |
 
 **A plant the dial idled is not losing (Ben, 2026-10-08; BL-1235, dial hold outlasts reflex).**
 When the workforce dial sets a plant to zero, the maintenance it pays while idle is the cost the
@@ -761,30 +761,51 @@ regression-checked against `corp_ai_harness.cpp`.
 
 Ben, 2026-08-07, resolving NR-083: *"Order book needs to be a background process, the AI must be
 able to trade as a player does."* A player-only fence over the trade verbs was proposed and
-explicitly rejected, and that principle stands: the scorer reaches trade exactly as it reaches build
-and survey, through `corp_verb`s on the same seam, and rival corps are the corps that drive it.
+explicitly rejected, so the scorer reaches trade exactly as it reaches build and survey — through
+the player's own verbs on the corp-command seam. The order book and its sell orders retired with
+corporation pools (`../economy/MARKETS.md` § The shelf economy); what a corporation trades now is
+the **manual trade** (`../economy/TRADE.md` § A trade), under the § 11 grant *a rival may set its
+own trades* (Ben, 2026-10-10).
 
-**What a rival trades through is the trade, not an order (Ben, 2026-10-10).** A corporation holds no
-stock and sells everything it makes to the market on landing (`../economy/MARKETS.md` § The shelf
-economy), so there is no sell-side decision left to score: no listing, no floor, no hold. What moves
-goods between markets is a **trade** (`../economy/TRADE.md`), and a rival trades as the player does:
+**Auto trade is not a decision.** A corporation's unreserved trade points are spent by the trade
+pass on the best-margin routes every tick, for every owner alike (`TRADE.md` § Auto and reserved
+trade). The scorer decides only which routes to **pin** as manual trades, which to **clear**, and
+how many points to **reserve** for them.
 
-- **Auto trade** runs on the rival's unreserved trade points every tick. It is a system rule, the
-  same for every owner, not an AI decision, and needs no grant.
-- **Manual trades and the reserve** are the scorer's, under the § 11 trade grant (*a rival may set
-  its own trades*): `set_trade` / `clear_trade` over its own points, and `set_trade_reserve` for
-  how many of them auto may not spend. A candidate is a route — a resource, a source market and a
-  destination market among those the corporation's trade buildings reach — scored by its margin per
-  point: destination price less source price less the network's haul per unit, times the
-  resource's trade capacity, on public prices only. BL-1267 (AI_TRADES) owns the candidate's
-  bucket, budget and anti-thrash rule.
+**One estimate, one code path.** The scorer ranks routes with the trade pass's own ranking
+(`rank_trade_routes`): every route among the markets the corporation's own Marketplaces and Ports
+reach whose margin per unit — destination price less source price less the network's haul per
+unit — beats `dispatch_margin` of the source price, ordered by **margin per point** (margin per
+unit × the good's trade capacity), ties by source, destination and good. It reads public prices
+and the network's haul only — never another corporation's trades, points or plans.
 
-**This is a grant of reach, not of skill, and the distinction is the design.** "Can trade" is not
-"trades well": a manual trade that loses money runs until its owner changes it (`TRADE.md` § A
-trade), so a scorer that sets routes on a stale gap is genuinely worse than one that leaves its
-points to auto. The first cut is the narrowest thing that is still trading; a real strategy (price
-trend, targeting a rival's shortage) is later work.
+- **Eligible**: a corporation whose trade buildings made trade points on the last trade pass.
+  Never the player's corporation — not even under spectate, where every other family scores the
+  seat (§ 11 names "nothing for the player's corp", and that is not widened here).
+- **Pin** (`set_trade`): the best-ranked route the corporation does not already hold as a manual
+  trade, sized to what the destination can absorb above the landed cost (`trade_room`) and the
+  source shelf holds, and capped so its manual trades together hold at most `trade_pin_share`
+  (0.5) of the points it makes — the rest stays with auto. **Score**: the expected cash per tick,
+  margin per unit × the units its points move, × the personality jitter. **Spend**: one tick's
+  outlay at the landed cost, under the solvency gate. Bucket Nice-to-Have: a route lays cash out
+  at the source before its landing pays it back.
+- **Unpin** (`clear_trade`): a manual trade of its own whose route now loses — margin per unit
+  at or below zero at current prices and haul — or can no longer run. **Score**: the loss
+  avoided per tick, −margin × the units its points move (zero for a route that cannot run: it
+  ships nothing and costs nothing, and is cleared only to free its points). Bucket Must-Have, as
+  an idle is: a losing trade runs until its owner changes it, so it is a standing bleed. The gap
+  between the pin's margin floor and the unpin's zero is the hysteresis.
+- **Reserve** (`set_trade_reserve`): after any pin or unpin, the reserve is set to the sum of the
+  corporation's manual trades' points in the same evaluation, so a new pin is supplied on the very
+  next trade pass. Bookkeeping: no spend, outside the trade budget.
+- **Budget**: at most `max_trades` (1) pin or unpin per evaluation. A trade command's subject is a
+  market or a trade, never a building, so it takes no dial slot and records no building cooldown.
 
+`trade_pin_share` and `max_trades` are `corp_ai_params` fields. The rule is a grant of reach, not
+of skill: no price trend, no timing, no reading of a rival's shortage. Verified by
+`tools/verify/ai_trade_harness.cpp`: a rival pins the ranking's best route within its share,
+keeps its reserve equal to its manual points, unpins a route turned losing, never acts for the
+player's corporation, and two runs from one start issue the identical commands.
 There is no directed dispatch: a rival does not name a one-off convoy. Every shipment is a trade's
 (`../economy/SUPPLY.md` § A shipment).
 
@@ -813,7 +834,8 @@ There is no directed dispatch: a rival does not name a one-off convoy. Every shi
   scored for cutting its target and a loss-maker for raising it; a sign taken from the building's
   current variable margin would only ever find one direction.
 - **Budget**: per evaluation, at most `max_builds` (1) construction + `max_dials` (3) dial
-  changes + `max_trades` (1) trade command + one hire per corp; total committed spend capped
+  changes + `max_trades` (1) trade pin or unpin + one hire per corp (the trade reserve's
+  correction is outside it); total committed spend capped
   by the solvency gate, each accepted candidate reserving its spend against the later ones in the
   same evaluation.
 - **Determinism**: stable iteration (sorted `corp_ids`, stored asset order, tile-index order);
@@ -837,7 +859,7 @@ every decision a corp took.
 **Scored within one budget family, never across.** The candidate families — build, dial, survey,
 hire, trade — are the action budgets above, and each is scored by **one formula in
 one unit**: a build by `net / capex`, a dial by the estimator's modelled per-tick gain, a trade
-by its route's margin per point (`../economy/TRADE.md` § Auto and reserved trade). Those scales are unrelated, so a
+by the cash per tick a route pin earns or an unpin saves. Those scales are unrelated, so a
 comparison across families states nothing, and an evaluation-wide maximum makes
 `runner_up ≥ winning_score` the ordinary case — which is a decision surface that reports the same
 thing about every decision. The runner-up is therefore **the best option foregone in the winner's
