@@ -1980,26 +1980,36 @@ void route_row(world& w, entity_id home, const bake_source& src0, const bake_par
     }
 
     // A 16-aligned window around a tile, at the master geometry.
-    const auto window = [&](int c, int r, int& x0, int& y0, int side) {
-        const double x = kS3 * (c + ((r & 1) ? 0.5 : 0.0)) * m.s;
-        const double y = (1.5 * r - m.y_min) * m.s;
+    // (ox, oy): a canonical offset from the tile centre, for a surface that
+    // does not sit at it.
+    const auto window = [&](int c, int r, int& x0, int& y0, int side, double ox = 0.0, double oy = 0.0) {
+        const double x = (kS3 * (c + ((r & 1) ? 0.5 : 0.0)) + ox) * m.s;
+        const double y = (1.5 * r + oy - m.y_min) * m.s;
         x0 = (static_cast<int>(x) - side / 2) / 16 * 16;
         y0 = std::clamp((static_cast<int>(y) - side / 2) / 16 * 16, 0, m.H - side);
     };
     bake_params off = p;  off.route_strength = 0.0f;
     bake_params off1 = p1; off1.route_strength = 0.0f;
-    struct aimc { const char* name; int c, r; };
+    // The forecourt row aims at the plan's apron, not the tile centre: the
+    // route pass's only piece on the mine's tile is the arriving spoke, from
+    // the apron (about a third of a radius off centre, toward the road) out to
+    // the link midpoint (0.87 radii). A tile-centred 160 px window spans
+    // +-0.83 radii at 96 px/r but only +-0.63 at the 128 px master (BL-1246),
+    // which cut the spoke in half (277 -> 155 px moved). The apron itself is
+    // the installation pass's, the same with the route pass on or off.
+    const road_plan fcp = tile_road_plan(s, mine_i);
+    struct aimc { const char* name; int c, r; double ox, oy; };
     const aimc aims[] = {
-        { "highway", ac - 2, ar }, { "road", ac - 1, ar + 2 }, { "track", ac + 3, ar + 1 },
-        { "rail", ac - 1, ar + 4 }, { "lane", wc + 3, wr }, { "town", ac + 1, ar },
-        { "works", ac, ar + 2 }, { "forecourt", ac + 3, ar + 5 },
+        { "highway", ac - 2, ar, 0, 0 }, { "road", ac - 1, ar + 2, 0, 0 }, { "track", ac + 3, ar + 1, 0, 0 },
+        { "rail", ac - 1, ar + 4, 0, 0 }, { "lane", wc + 3, wr, 0, 0 }, { "town", ac + 1, ar, 0, 0 },
+        { "works", ac, ar + 2, 0, 0 }, { "forecourt", ac + 3, ar + 5, fcp.apx, fcp.apy },
     };
     const int side = 160;
     bool pure = true, wrap = true, seam = true;
     for (const aimc& a : aims)
     {
         int x0, y0;
-        window(a.c, a.r, x0, y0, side);
+        window(a.c, a.r, x0, y0, side, a.ox, a.oy);
         const bake_params* qs[] = { &p1, &p };
         for (const bake_params* q : qs)
         {
