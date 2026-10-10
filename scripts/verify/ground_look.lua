@@ -1,21 +1,23 @@
 -- BL-1256 (ground look C-F) — RENDERING.md § Art direction and palette: the
 -- it3 C-F reference (docs/ui/design/renders/map/it3, bottom-right panel) is the
--- target — dark, cold, hostile. A top-down bake cannot have the reference's
--- low camera (silhouettes, foreshortening, haze); what it owes is the rest:
+-- target for DETAIL and value, it1's top-down panel for COLOUR. A top-down bake
+-- cannot have the reference's low camera (silhouettes, foreshortening, haze);
+-- what it owes is the rest:
 --
---   palette and value  khaki and olive-grey; lit slopes near a warm off-white,
+--   palette and value  it1's khaki, olive and green, white peaks; lit slopes near a warm off-white,
 --                      shadows near black; no broad dark mottle of its own
 --   relief everywhere  plains roll in folds a third to a half of a hex apart,
 --                      ranges above them, continuous across tiles
 --   cast shadows       the low NW sun throws shadow behind ridges and hills
---   water              grey-blue, glinting; white where a river falls; rocky banks
+--   water              blue-green, glinting; white where a river falls; rocky banks
 --   forests            as before (their form is unchanged)
 --
 -- Subjects are ground_bake_check `--look`'s aims on the home body (that reading
 -- prints them, with the luminance percentiles the palette is tuned against): a
 -- plain, rolling hills, the best-linked mountain run, the river reach with the
--- steepest fall, a forest edge, the busiest town and a coast. Rungs 2, 3 and 4
--- of the stepped ladder. Judge side by side with the reference.
+-- steepest fall, a forest edge, the busiest town and a coast. Rungs 0 to 4 of
+-- the stepped ladder: rungs 0-2 are judged for COLOUR against it1's top-down
+-- panel (docs/ui/design/renders/map/it1), rungs 3-4 for detail against it3 C-F.
 --
 -- Run: ProjectIo --verify scripts/verify/ground_look.lua (Release).
 
@@ -47,7 +49,7 @@ for _, b in ipairs(verify.buildings()) do
 end
 
 for _, a in ipairs(aims) do
-    for k = 2, 4 do
+    for k = 0, 4 do
         verify.center_tile(a[2], a[3], kMinZoom * (2 ^ k))
         verify.frames(3)
         verify.capture(string.format("ground_look_%s_rung%d", a[1], k))

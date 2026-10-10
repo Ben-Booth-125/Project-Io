@@ -88,7 +88,8 @@
 //       deterministic, wrap-exact and window-invariant at the master (1x and
 //       2x), draws and darkens, and reads nothing past terrain_hash's margin.
 //       `--shadow` runs it alone. `--look` (a reading) bakes the C-F subjects
-//       and prints their luminance percentiles; `name=value` dials override.
+//       and prints their luminance percentiles and their colour (mean chroma,
+//       saturation, hue, per hue class); `name=value` dials override.
 //   P28-P30 Roads and sea lanes painted (BL-1253, RENDERING.md § Roads and
 //       sea lanes): the route pass pure, wrap-exact and seamless on every
 //       surface; the road / structure agreement; a route change re-baking
@@ -1654,6 +1655,22 @@ void look_row(const bake_source& src, const bake_params& p0, const char* suffix)
                 if (links > links_best) { links_best = links; m = i; }
             }
         subs.push_back({ "mountain", m });
+        // The mountain ground's tile heights: what the snow line reads.
+        std::vector<float> mh, lh;
+        for (int i = 0; i < static_cast<int>(src.cls.size()); ++i)
+            if (src.cls[i] == land)
+            {
+                lh.push_back(src.height[i]);
+                if (src.landform[i] == static_cast<std::uint8_t>(terrain_landform::mountain))
+                    mh.push_back(src.height[i]);
+            }
+        std::sort(mh.begin(), mh.end());
+        std::sort(lh.begin(), lh.end());
+        if (!mh.empty() && !lh.empty())
+            std::printf("LOOK  heights: land p50 %.3f p90 %.3f p99 %.3f | mountain (%zu) p10 %.3f p50 %.3f p90 %.3f max %.3f"
+                        " (the snow line: %.2f)\n",
+                        lh[lh.size() / 2], lh[lh.size() * 9 / 10], lh[lh.size() * 99 / 100], mh.size(),
+                        mh[mh.size() / 10], mh[mh.size() / 2], mh[mh.size() * 9 / 10], mh.back(), p.snow_line);
     }
     {
         // A river where it falls: the land river tile with the steepest drop
@@ -1768,6 +1785,52 @@ void look_row(const bake_source& src, const bake_params& p0, const char* suffix)
         const auto q = [&](double f) { return lum.empty() ? 0.0 : lum[static_cast<std::size_t>(f * (lum.size() - 1))]; };
         std::printf("LOOK  %-12s [%3d,%3d]  lum p5 %5.1f p10 %5.1f p25 %5.1f p50 %5.1f p75 %5.1f p90 %5.1f p99 %5.1f  (%.0f ms)\n",
                     s.name, tc, tr, q(0.05), q(0.10), q(0.25), q(0.50), q(0.75), q(0.90), q(0.99), ms);
+        // The colour reading (BL-1256, colour from it1): mean chroma (max - min
+        // channel, sRGB 0-255), mean HSV saturation, and the chroma-weighted
+        // mean hue — overall and per hue class (warm: soil and field; green:
+        // grass and forest; blue: water; grey: chroma under 14), the same
+        // classes the it1 sample in RENDERING.md § Art direction is read by.
+        {
+            struct acc { double n = 0, ch = 0, sat = 0, hx = 0, hy = 0, r = 0, g = 0, b = 0; };
+            acc all, cls[4];
+            const char* cls_name[4] = { "warm", "green", "blue", "grey" };
+            for (const std::uint32_t c : a)
+            {
+                if (ui::palette::col_a(c) != 255)
+                    continue;
+                const int r = ui::palette::col_r(c), g = ui::palette::col_g(c), b = ui::palette::col_b(c);
+                const int mx = std::max({ r, g, b }), mn = std::min({ r, g, b });
+                const double chroma = mx - mn;
+                double hue = 0.0;
+                if (mx > mn)
+                {
+                    if (mx == r)      hue = 60.0 * std::fmod((g - b) / chroma + 6.0, 6.0);
+                    else if (mx == g) hue = 60.0 * ((b - r) / chroma + 2.0);
+                    else              hue = 60.0 * ((r - g) / chroma + 4.0);
+                }
+                const int k = chroma < 14.0 ? 3 : (b > r + 8 && b >= g - 6) ? 2 : (g >= r && g > b) ? 1 : 0;
+                for (acc* t : { &all, &cls[k] })
+                {
+                    t->n += 1; t->ch += chroma; t->sat += mx > 0 ? chroma / mx : 0.0;
+                    t->hx += chroma * std::cos(hue * 3.14159265358979 / 180.0);
+                    t->hy += chroma * std::sin(hue * 3.14159265358979 / 180.0);
+                    t->r += r; t->g += g; t->b += b;
+                }
+            }
+            const auto hue_of = [](const acc& t)
+            {
+                double h = std::atan2(t.hy, t.hx) * 180.0 / 3.14159265358979;
+                return h < 0.0 ? h + 360.0 : h;
+            };
+            if (all.n > 0)
+                std::printf("LOOK  %-12s colour  chroma %5.1f  sat %.3f  hue %5.1f", s.name, all.ch / all.n,
+                            all.sat / all.n, hue_of(all));
+            for (int k = 0; k < 4; ++k)
+                if (cls[k].n > 0)
+                    std::printf("  | %s %4.1f%% (%3.0f,%3.0f,%3.0f) ch %4.1f", cls_name[k], 100.0 * cls[k].n / all.n,
+                                cls[k].r / cls[k].n, cls[k].g / cls[k].n, cls[k].b / cls[k].n, cls[k].ch / cls[k].n);
+            std::printf("\n");
+        }
         char path[160];
         std::snprintf(path, sizeof path, "look_%s%s.png", s.name, suffix);
         write_png_rgba(path, W, H, reinterpret_cast<const unsigned char*>(a.data()), W * 4);
@@ -2544,6 +2607,7 @@ int main(int argc, char** argv)
             { "grade_split", &q.grade_split }, { "relief_gain", &q.relief_gain },
             { "detail_amp", &q.detail_amp }, { "landform_accent", &q.landform_accent },
             { "altitude_gain", &q.altitude_gain }, { "noise_strength", &q.noise_strength },
+            { "snow_caps", &q.snow_caps }, { "snow_line", &q.snow_line },
         };
         for (int a = 3; a < argc; ++a)
         {

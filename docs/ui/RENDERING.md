@@ -639,7 +639,17 @@ Judged against `docs/ui/design/renders/map/`. What it asks of the bake, procedur
   flat lit ground ~(75, 70, 60); the median ground ~(55, 56, 51); shadow ~(11-25, 12-27,
   12-25); stands of forest ~(30-36, 35-38, 34); water ~(50, 56, 56), deep ~(30, 35, 35).
   The value targets the bake is held to are the reference's luminance percentiles — p10
-  ~26, p50 ~55, p90 ~106, p99 ~155. The baked ground has its own palette for this
+  ~26, p50 ~55, p90 ~106, p99 ~155. **The hues are it1's**, sampled from its top-down panel
+  (sRGB): fields khaki-ochre ~(100, 83, 53), the warm ground as a whole ~(79, 70, 47);
+  olive grassland ~(61, 67, 54); forest a deep olive-green ~(41-51, 43-54, 27-35); bare rock
+  a warm grey ~(62, 61, 56); snow ~(179, 175, 161); deep sea a teal ~(21, 42, 50), shallows
+  ~(64, 83, 81). The chroma target (mean max-minus-min channel, sRGB) is it1's **~22** over
+  the ground, ~32 on the warm ground, ~19 on vegetation, ~24 on water. Each baked base entry
+  keeps the luminance the C-F pass tuned and takes it1's hue and chroma, and the grade's
+  desaturation eases (0.15 toward luma) so the chroma survives it. **Snowy peaks:** white
+  caps on the mountain form's high ground, where the form rises past a snow line that falls
+  as the massif's tile height (a weighted mean, continuous across tiles) stands higher —
+  broken by the form's jag so snow runs down gullies. The baked ground has its own palette for this
   (`palette::ground_tile_colour`); the identity fill the vector fallback, minimap and
   generation preview draw keeps its own hues.
 - **Relief everywhere.** Every hex carries terrain shape: **plains roll** as low hills with
@@ -656,10 +666,10 @@ Judged against `docs/ui/design/renders/map/`. What it asks of the bake, procedur
   upsun for a caster, so a pixel reads tiles at most ~5.3 units away — inside the chunk
   hash's margin (6 units), and the shadow is a pure function of position: any window
   bakes it identically.
-- **Water.** Rivers and sea move from saturated royal blue to **grey-blue**, with specular
-  glints, white **rapids** where a river falls, and **rocky banks**. Sea ~(36-54, 47-68,
-  55-75) before the grade; a river shelves from ~(74, 84, 88) at the bank to ~(34, 44, 52)
-  mid-channel. Rapids show where a reach drops more than ~0.02 of the height range to its
+- **Water.** Rivers and sea take it1's **blue-green** — a teal, neither royal blue nor
+  grey — with specular glints, white **rapids** where a river falls, and **rocky banks**.
+  Sea ~(22-36, 50-66, 58-70) before the grade, shallows paling toward ~(62, 98, 94); a river
+  shelves from ~(58, 86, 86) at the bank to ~(22, 46, 54) mid-channel. Rapids show where a reach drops more than ~0.02 of the height range to its
   downstream neighbour, full white water by ~0.06.
 - **Towns.** Settlements are **denser and larger**: compact blocks of multi-storey buildings
   with lit roofs, shaded sides, stacks and a street grid, reading as a town from the mid rungs.

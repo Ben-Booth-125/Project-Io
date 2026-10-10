@@ -960,10 +960,10 @@ void stamp_trees(const bake_source& src, const geometry& g, const bake_params& p
                 // Canopy ink: the tile's own colour pushed toward deep leaf,
                 // varied per tree so a wood is a crowd, not a pattern.
                 const float vr = 0.86f + 0.28f * hash01(cw, r, 0x7F00u + static_cast<std::uint32_t>(k));
-                // (BL-1256: the leaf a dark olive, as the C-F reference's stands.)
+                // (BL-1256: the leaf a rich green, as it1's stands.)
                 const float cr_ = (palette::col_r(tc) * 0.45f + 24.0f * 0.55f) * vr * (1.0f + 0.10f * v_warm);
-                const float cg_ = (palette::col_g(tc) * 0.45f + 46.0f * 0.55f) * vr * (1.0f + 0.01f * v_warm);
-                const float cb_ = (palette::col_b(tc) * 0.45f + 28.0f * 0.55f) * vr * (1.0f - 0.08f * v_warm);
+                const float cg_ = (palette::col_g(tc) * 0.45f + 52.0f * 0.55f) * vr * (1.0f + 0.01f * v_warm);
+                const float cb_ = (palette::col_b(tc) * 0.45f + 18.0f * 0.55f) * vr * (1.0f - 0.08f * v_warm);
                 if (g.lift > 0.0)
                 {
                     // OBLIQUE: the tree STANDS. Its ground point rides the
@@ -2516,9 +2516,9 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                         // A pale wet margin, darkening to a wet line at the water.
                         const float t = static_cast<float>(1.0 - e / 0.10);
                         const float a = 0.40f * t * t * bs;
-                        r_ += (150.0f - r_) * a; // BL-1256: a khaki-grey wet margin
-                        g_ += (142.0f - g_) * a;
-                        b_ += (120.0f - b_) * a;
+                        r_ += (150.0f - r_) * a; // BL-1256: a khaki wet margin
+                        g_ += (140.0f - g_) * a;
+                        b_ += (108.0f - b_) * a;
                         if (e < 0.022)
                         {
                             const float wl = 1.0f - 0.20f * static_cast<float>(1.0 - e / 0.022) * bs;
@@ -2530,9 +2530,9 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                         // The shallows, paling toward the shore, a thin foam line.
                         const float t = static_cast<float>(1.0 - e / 0.32);
                         const float a = 0.60f * t * t * bs;
-                        r_ += (82.0f - r_) * a;  // BL-1256: grey-blue shallows
-                        g_ += (96.0f - g_) * a;
-                        b_ += (100.0f - b_) * a;
+                        r_ += (62.0f - r_) * a;  // BL-1256: blue-green shallows (it1)
+                        g_ += (98.0f - g_) * a;
+                        b_ += (94.0f - b_) * a;
                         if (e < 0.02)
                         {
                             const float f = 0.35f * static_cast<float>(1.0 - e / 0.02) * bs;
@@ -2762,6 +2762,11 @@ void bake_landforms(const bake_source& src, const geometry& g, const bake_params
         lf_var lv[7];
         int    nlv = 0;
         double gmin[4] = { 1e30, 1e30, 1e30, 1e30 };
+        // BL-1256 (snowy peaks): the mountain ground's height at the pixel, a
+        // weighted mean over the mountain tiles within one unit of it (each
+        // weight falls to 0 at 1.0, the massif's own support). Every such tile
+        // is in the owner's ring, so the mean is continuous across owners.
+        double hm_acc = 0.0, hm_w = 0.0;
         for (int kk = -1; kk < 6; ++kk)
         {
             const int t = kk < 0 ? o : nb_index(src, o, kk);
@@ -2770,6 +2775,12 @@ void bake_landforms(const bake_source& src, const geometry& g, const bake_params
             const double ox = kk < 0 ? 0.0 : kNbDx[kk];
             const double oy = kk < 0 ? 0.0 : kNbDy[kk];
             const std::uint8_t lf = src.landform[t];
+            if (lf == L_mountain)
+            {
+                const double w = sq(std::max(0.0, 1.0 - std::sqrt(sq(f.rx - ox) + sq(f.ry - oy))));
+                hm_acc += w * src.height[t];
+                hm_w   += w;
+            }
             if (vs > 0.0f)
             {
                 const double vd2 = sq(f.rx - ox) + sq(f.ry - oy);
@@ -2960,7 +2971,7 @@ void bake_landforms(const bake_source& src, const geometry& g, const bake_params
         };
 
         mat m;
-        field(f.rx, f.ry, &m);
+        const double hf = field(f.rx, f.ry, &m);
         if (!m.any)
             continue;
         const double hx = (field(f.rx + eps, f.ry, nullptr) - field(f.rx - eps, f.ry, nullptr)) / (2.0 * eps);
@@ -2977,6 +2988,19 @@ void bake_landforms(const bake_source& src, const geometry& g, const bake_params
         r_ += (116.0f + 11.0f * m_tint - r_) * rock; // the variant's rock: greyer (-) or warmer (+)
         g_ += (109.0f +  2.0f * m_tint - g_) * rock; // (BL-1256: darker — the light makes the crags bright)
         b_ += ( 97.0f - 10.0f * m_tint - b_) * rock;
+        // BL-1256 (colour from it1): white caps on the high mountain ground.
+        // The snow line sits on the form's height and falls as the massif's
+        // tile height rises past snow_line, broken by the form's own jag so
+        // the snow runs down gullies rather than stopping at a contour.
+        if (p.snow_caps > 0.0f && hm_w > 0.0 && m.tm > 0.0)
+        {
+            const double line = 0.95 - 1.6 * (hm_acc / hm_w - static_cast<double>(p.snow_line));
+            const float  snow = static_cast<float>(smooth01(line, line + 0.18, hf + 0.30 * fx + 0.10 * jx))
+                              * p.snow_caps * k;
+            r_ += (202.0f - r_) * snow;
+            g_ += (204.0f - g_) * snow;
+            b_ += (202.0f - b_) * snow;
+        }
         float lum = 1.0f + shade * k + static_cast<float>(0.05 * m.tm * m.tm) * k;
         // Canyon floor: deep, warm shadow. Crater bowl: shade. Ejecta: pale.
         lum *= 1.0f - static_cast<float>(0.30 * c_floor * m.cut + 0.16 * k_bowl * m.bowl
@@ -3211,9 +3235,9 @@ void bake_rivers(const bake_source& src, const geometry& g, const bake_params& p
         {
             const float depth = static_cast<float>(std::clamp(-best_e / best_hw, 0.0, 1.0));
             const float dd = std::sqrt(depth);
-            float wr = 74.0f + (34.0f - 74.0f) * dd;
-            float wg = 84.0f + (44.0f - 84.0f) * dd;
-            float wb = 88.0f + (52.0f - 88.0f) * dd;
+            float wr = 58.0f + (22.0f - 58.0f) * dd; // (BL-1256: it1's blue-green, not grey)
+            float wg = 86.0f + (46.0f - 86.0f) * dd;
+            float wb = 86.0f + (54.0f - 86.0f) * dd;
             if (p.glint_strength > 0.0f && sgate > 0.0f)
                 water_glint(abx, aby, glint_f, p.glint_strength * sgate, fine, wr, wg, wb);
             if (rs > 0.0f)
