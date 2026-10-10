@@ -59,7 +59,6 @@
 #include "world/spawn_seat.hpp"
 #include "world/standing.hpp"
 #include "world/supply_system.hpp"
-#include "world/tech_gate.hpp"
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -104,7 +103,6 @@ economy_report probe_tick(world& w, const recipe_registry& reg, int econ_step, b
     apply_budget(w, reg, flows, report.workforce_contention, &report.budgets,
                  &report.buildings, &report.building_labour);
     run_nation_step(w, reg, report, w.current_econ_tick);
-    advance_tech_gates(w);
     (void)compute_corp_standings(w, flows);
     run_firm_exits(w, reg.firm_exit(), &report.firm_exits);
     return report;

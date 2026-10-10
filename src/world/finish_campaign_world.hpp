@@ -56,19 +56,17 @@ struct world;
 struct world_gen_config;
 struct world_params;
 
-/// THE CAMPAIGN'S RECIPE BAND for a built world: the world's own
-/// (`world::campaign_band`, BL-1101, Ben 2026-09-24), derived once at the
-/// Industrialisation fold from the history's industry state -- `industrial`
-/// iff a living polity's materials capacity sits at the Industrial rung at the
-/// 1960 close, `ancient` otherwise -- never from the epoch year, which names the
-/// calendar alone. A world whose fold never ran (a harness fixture without the
-/// prehistory) carries `any` and bands here as the shipped default,
-/// `industrial`, so no fixture admits both rosters at once.
+/// THE CAMPAIGN'S RECIPE BAND for a built world: `industrial`, always (BL-1273;
+/// ERAS.md § Where the ladder starts, RESEARCH.md § Who holds technology, Ben
+/// 2026-10-10 — every nation opens at the same tech level, on the industrial
+/// band). It used to be the world's own band (`world::campaign_band`, BL-1101),
+/// derived from the history's industry state, which could open a seed on the
+/// ancient roster; the field is still written and saved, and no longer read here.
 ///
 /// ONE FUNCTION, ON PURPOSE: the round-6 worker bands its registry copy here,
 /// the app's `load_economy` and `load_game_from` band here, and the harness
-/// mirror bands its registry here -- so a save opens on the band its world
-/// earned and a harness never bands differently from the app.
+/// mirror bands its registry here -- so a save, a new game and a harness can
+/// never band differently.
 era_band campaign_band_from_world(const world& w);
 
 /// BL-1136 (Ben, 2026-09-26): the threads a round's proposals are scored on.

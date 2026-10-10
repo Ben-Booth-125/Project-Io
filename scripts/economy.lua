@@ -274,8 +274,8 @@ economy = {
         },
         -- BL-332: Research Institute — the dedicated tech-progress building.
         -- Same passive shape as military_base (base_rate 0, staffs at zero);
-        -- its output is a flat per-tick credit to the owning corp's
-        -- military.science accumulator (economy.military below), not a
+        -- its output is research points, each quarter, into the owning corp's
+        -- home nation's pool (economy.research below, BL-1273), not a
         -- resource_type good. Priced like military_base — a garrison-grade
         -- installation, not a waypoint.
         research_institute = {
@@ -322,10 +322,8 @@ economy = {
         },
     },
 
-    -- BL-332: research accumulation rate. Flat per-tick credit to the owning
-    -- corp's corporation_component.science for every COMPLETED
-    -- research_institute it owns — passive, no workforce dependency (the
-    -- building staffs at zero). First-cut authored constant; retune by playtest.
+    -- (BL-332's per-corp research accumulation rate lived here; BL-1273 moved
+    -- research to the nation — see economy.research.)
     --
     -- BL-641: BUILDING UPKEEP IN GOODS — the Industry demand channel.
     --
@@ -639,12 +637,11 @@ economy = {
 
     -- BL-455 (2026-08-17) removed `military_points_per_base_tick` from here with
     -- the field it fed: it credited an accumulator that nothing in src/ ever
-    -- read. `science` kept its rate because it now HAS a reader —
-    -- condition_subject::science, so a tech gate or a law can require a research
-    -- level (reached, not spent; see condition_set.hpp).
+    -- read. `science_per_research_institute_tick` followed it with BL-1273
+    -- (NR-1023, 2026-10-10): a research institute now adds research points to
+    -- its owner's nation's pool (nation_tech.hpp, research_params), not to a
+    -- per-corp accumulator.
     military = {
-        science_per_research_institute_tick = 1.0,
-
         -- BL-394: hire_unit's credit cost, debited from the corp's balance by
         -- apply_corp_command: cost = hire_base_cost + hire_cost_per_power *
         -- the roster row's power_mod. The base is a FLOOR — the cheapest
@@ -982,6 +979,22 @@ economy = {
         timber_highway = 0.20,  -- ...per Highway tile
         stone_hub      = 5.0,   -- stone per active port / inland hub per quarter
         timber_hub     = 2.5,   -- timber per active port / inland hub per quarter
+    },
+
+    -- BL-1273: the research dials (RESEARCH.md § What is open; the conversion is
+    -- documented on research_params in src/world/nation_tech.hpp). A nation's RP
+    -- per quarter = base + credit x spend + credit_sqrt x sqrt(spend) + per
+    -- University + per institute, and the research line spends only what its
+    -- queue still owes. The SHAPE is these dials: base + sqrt (Ben, 2026-10-10).
+    -- 200 RP a cost unit: an age is ~80 years (Ben, 2026-10-10); harness R0 measures it. The
+    -- loader rejects a negative or non-finite value by key.
+    research = {
+        base_rp_per_nation          = 120.0,
+        rp_per_research_credit      = 0.0,
+        rp_per_research_credit_sqrt = 20.0,
+        rp_per_university           = 100.0, -- unmeasured: no University stands on any curated seed
+        rp_per_institute            = 50.0,  -- unmeasured: likewise
+        rp_per_cost_unit            = 200.0,
     },
 
     -- BL-545/BL-546: the relational substrate's DECAY (sentiment.hpp). Each

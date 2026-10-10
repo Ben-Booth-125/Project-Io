@@ -17,8 +17,10 @@ class recipe_registry;
 // and spent nothing, which is the `military_points` defect with a new name. This
 // is the caller. It runs AFTER `apply_budget` — the treasury holds this tick's
 // levy (BL-480) and tariff (D4) only then; running it inside `run_economy_step`
-// would spend last quarter's revenue — and BEFORE `advance_tech_gates`, whose
-// `surplus` gate reads the corp balance the subsidy just moved.
+// would spend last quarter's revenue. (It used to run BEFORE `advance_tech_gates`, whose
+// `surplus` gate read the corp balance the subsidy had just moved; those
+// per-corp gates retired with BL-1273, and research now runs as this step's
+// last move — see `advance_research`, nation_tech.hpp.)
 //
 // FOUR MOVES, IN ORDER, AND EACH IS SOMEBODY ELSE'S MACHINERY:
 //
@@ -83,7 +85,8 @@ struct earmark_result
 
 /// Run the nation step for one economy tick. Mutates nation treasuries, corp
 /// balances, the survey store (via `dispatch_survey`), supplier (corp, body)
-/// pools (the space programme's consumption, BL-644) and `w.nation_budgets`;
+/// pools (the space programme's consumption, BL-644), `w.nation_budgets` and
+/// `w.nation_tech` (the research pass, BL-1273);
 /// nothing else. Appends to `report.national_budget`, `report.nation_scores`,
 /// `report.earmarks`, `report.space_purchases`, `report.budget_claims` (the
 /// state's own space-programme claims) and `report.budgets[corp].subsidies`.

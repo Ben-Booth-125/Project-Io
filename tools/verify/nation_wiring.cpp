@@ -34,7 +34,6 @@
 #include "world/nation_step.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/survey_system.hpp"
-#include "world/tech_gate.hpp"
 #include "world/world.hpp"
 
 #include <cmath>
@@ -102,7 +101,6 @@ economy_report run_tick(world& w, const recipe_registry& reg, int tick)
     auto flows = clear_markets(w, reg, rep);
     apply_budget(w, reg, flows, rep.workforce_contention, &rep.budgets, &rep.buildings);
     run_nation_step(w, reg, rep, tick);
-    advance_tech_gates(w);
     return rep;
 }
 
@@ -174,7 +172,7 @@ int main()
             probe = run_economy_step(w, reg, false);
             auto flows = clear_markets(w, reg, probe);
             apply_budget(w, reg, flows, probe.workforce_contention, &probe.budgets, &probe.buildings);
-            if (t < use_tick) { run_nation_step(w, reg, probe, t); advance_tech_gates(w); }
+            if (t < use_tick) { run_nation_step(w, reg, probe, t); }
         }
 
         int funded = 0;
@@ -301,7 +299,6 @@ int main()
             economy_report r2 = run_economy_step(without, reg, false);
             auto flows = clear_markets(without, reg, r2);
             apply_budget(without, reg, flows, r2.workforce_contention, &r2.budgets, &r2.buildings);
-            advance_tech_gates(without);
         }
         bool balances_equal = true;
         for (const auto& [cid, cc] : with.corporations)

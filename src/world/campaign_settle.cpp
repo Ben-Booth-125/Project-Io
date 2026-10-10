@@ -7,10 +7,10 @@
 #include "world/logistics.hpp"         // lp_pool_map
 #include "world/market_clearing.hpp"   // clear_markets
 #include "world/nation_step.hpp"       // run_nation_step
+#include "world/nation_tech.hpp"       // clear_research_at_handover (BL-1273)
 #include "world/recipe_registry.hpp"   // logistics_cost, firm_exit
 #include "world/standing.hpp"          // compute_corp_standings
 #include "world/supply_system.hpp"     // advance / credit / dispatch convoys
-#include "world/tech_gate.hpp"         // advance_tech_gates
 
 #include <atomic>
 
@@ -77,17 +77,17 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int eco
                  &out.report.buildings,        // BL-343: law enforcement seam
                  &out.report.building_labour); // BL-614: wages on the per-building grant
     // Sprint N3: the nation step -- score the due nations' weights, spend the
-    // treasury against this tick's claims, dispatch the earmarked surveys.
-    // After apply_budget so the treasury holds this quarter's levy and tariff;
-    // before the tech gates so a `surplus` gate reads the moved balance.
+    // treasury against this tick's claims, dispatch the earmarked surveys, and
+    // (BL-1273) run the quarter's research: RP into each nation's pool and down
+    // its queue. After apply_budget so the treasury holds this quarter's levy
+    // and tariff.
     run_nation_step(w, reg, out.report, w.current_econ_tick);
     lap_done(3); // budget + nation step
 
-    // BL-344: the tech gates once per tick, after the money loop has moved
-    // balances. Monotonic and deterministic; a no-op once everything earnable
-    // is earned.
-    advance_tech_gates(w);
-    lap_done(4); // tech gates
+    // Lap 4 was BL-344's per-corp tech gates, retired with BL-1273 (NR-1022);
+    // research now runs inside the nation step above. The lap stays, empty, so
+    // every probe's lap indices keep their meaning.
+    lap_done(4); // (retired: tech gates)
 
     // BL-262: this tick's standing profile, for the Corporations panel (a
     // transient cache the app keeps; a harness discards it). Then BL-743: the
@@ -144,5 +144,12 @@ void run_settle(world& w, const recipe_registry& reg, int ticks,
         tap.step = econ_step;
         (void)run_settle_tick(w, reg, econ_step, /*day_tick=*/0, /*spectating=*/true, use);
     }
+    // THE HANDOVER (BL-1273; RESEARCH.md: no nation opens ahead in technology).
+    // The settle ran the nation step like any tick, so the base and any
+    // University or institute accrued RP into pools; none of it carries into
+    // play. Nothing queues during the settle (no caller of enqueue_node yet,
+    // BL-1275's scorer included, and an empty queue spends no treasury), so the
+    // clear drops only RP that cost the treasury nothing.
+    clear_research_at_handover(w);
     if (progress != nullptr) progress->report_sub(0, 0);
 }

@@ -48,7 +48,7 @@ struct world; // forward-declared: evaluation reads the world, the type does not
 enum class condition_subject : uint8_t
 {
     // --- the six promoted labels ------------------------------------------
-    research,  ///< Qualified by `key` (a tech id). 1 if the subject corp has earned it, else 0.
+    research,  ///< Qualified by `key` (a Digitisation node id). 1 if the subject corp's home nation holds it, else 0 (BL-1273).
     structure, ///< Qualified by `structure`. Count of that building type the subject corp owns.
     stockpile, ///< Qualified by `resource`. Units of it across all of the subject corp's pools.
     market,    ///< Qualified by `resource`. Mean resolved price across every market in the world.
@@ -59,22 +59,13 @@ enum class condition_subject : uint8_t
     military_units,    ///< Total unit count the subject corp fields.
     military_strength, ///< Summed combat strength of the units the subject corp fields.
 
-    // --- research (BL-455, 2026-08-17) --------------------------------------
-    // corporation_component::science accumulates per tick from every completed
-    // research_institute (BL-332) and, until this value existed, was read by
-    // NOTHING — no gate, no surface, no scorer, not the blackboard. Three sites
-    // in all of src/: the declaration, the Lua param load, and the write.
-    //
-    // Appended last: condition_subject is a uint8_t inside a SERIALISED
-    // condition_set, so a value may be appended but never inserted.
-    //
-    // REACHED, NOT SPENT — and this matches BL-344 rather than inventing a
-    // second model. A tech_gate is a PREDICATE over corp state: it asks whether
-    // a condition holds, and holds again next tick. Nothing in the gate system
-    // debits anything. So science is a threshold a corp passes ("at_least N"),
-    // not a currency it pays down. Making it spendable would need an entirely
-    // different mechanism and would be a design change, not a wiring job.
-    science,           ///< The subject corp's accumulated research points.
+    // --- `science` (BL-455) was REMOVED here by BL-1273 (NR-1023) -----------
+    // It measured corporation_component::science, the per-corp research
+    // accumulator, which retired when the nation came to hold technology. No
+    // authored condition used it. Removing it renumbers `province_held` below
+    // (9 -> 8); a law's condition_set crosses the save seam, and the
+    // world_save_version bump to 47 that carries the nation tech state is what
+    // refuses an older stream rather than misreading the byte.
 
     // --- province_held (BL-570, 2026-08-23) ---------------------------------
     // CONTRACTS.md's spine — "a contract is a condition_set the client will pay
@@ -85,7 +76,7 @@ enum class condition_subject : uint8_t
     // `province_holder_for` — a military fact ("who currently holds it"), never
     // a political one (`tile_to_nation`, the territorial map, does not move).
     //
-    // Appended LAST, exactly as `science` was: `condition_subject` is a uint8_t
+    // Appended LAST: `condition_subject` is a uint8_t
     // inside a SERIALISED `condition` record (a law's condition_set crosses the
     // save seam — see world_save.cpp's `max_cond_subj`), so a value may be
     // appended but never inserted or reordered.
@@ -122,7 +113,7 @@ struct condition
     /// Qualifier — read only by the subject that names it (see the enum above).
     resource_type resource  = resource_type::iron_ore; ///< `stockpile`, `market`.
     building_type structure = building_type::none;     ///< `structure`.
-    std::string   key;                                 ///< `research` (a tech id).
+    std::string   key;                                 ///< `research` (a Digitisation node id, e.g. "DG-PR-EX-A").
 
     /// `province_held` (BL-570). The province id `measure_condition` asks
     /// `province_holder_for` about. Defaults to `no_province` — the SAME
