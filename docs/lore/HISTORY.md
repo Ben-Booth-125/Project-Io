@@ -345,7 +345,9 @@ grievance.
 
 **The ruptures are the sim's own breaks.** Secession (`../generation/CIVILISATION.md` § How an
 empire actually falls) and schism (`CREEDS.md` § The schism verb) are what break a polity; no
-pass pre-resolves a collapse, war or revolution over a finished map.
+pass pre-resolves a collapse, war or revolution over a finished map. The targeted history patterns
+(`../generation/GENERATION_STRATEGY.md` § History patterns) do not either: they lean the sim and
+reconcile inside it, by its own verbs.
 
 **Calibration is the sweep's, not the harness's.** A green harness means the pass is
 self-consistent, deterministic and wired into the political map — *not* that its dates or

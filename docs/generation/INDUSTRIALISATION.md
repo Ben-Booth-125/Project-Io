@@ -844,7 +844,24 @@ subject — or wanting it freed — fights over it.
 were spent or remitted elsewhere for generations. That makes it the natural ground for property
 3's proxy wars — the beat and the property share a cause.
 
-#### A world war is permitted, never forced
+#### A world war in every world
+
+**OVERTURNED (Ben, 2026-10-10; `GENERATION_STRATEGY.md` § History patterns): a world war is a target,
+always hit.** Every world fights one in this span. It destroys four things: **population** (conscripts,
+famine, flight), **industry** (works and capital razed in the regions fought over), **infrastructure**
+(roads and ports), and **treasuries** (war debt). The world then redevelops before 1960, so the
+campaign opens on a recovery. It is still not the rupture: the Era 1 catastrophe stays averted, not
+past (`../lore/HISTORY.md`). The ruling below stands for how a world war forms; its "never forced"
+and the acceptance row "never all, never none" are overturned.
+
+#### Revolution
+
+**A LEAN (Ben, 2026-10-10; `GENERATION_STRATEGY.md` § History patterns).** The disparity between a
+nation's cities is read after Exploration; where it is wide, a splinter can rise in this span and take
+the whole nation. It overturns, for this span, the Empires rule that no regime resets while the map
+stands still (`CIVILISATION.md`). A revolution is a lean and promises nothing.
+
+#### A world war is permitted, never forced (the 2026-09-15 ruling, superseded in part above)
 
 **SETTLED (Ben, 2026-09-15, elicitation and notes), closing the call deferred on 2026-09-11:**
 *"we don't force it, but it is not unlikely. So I am happy with seeds that reach either target."*
@@ -989,7 +1006,7 @@ Readings taken at **1960 CE** over a **seed spread**, never per world — the di
 | **Works notes** | Works-chartered notes per region track the 1960 firm count per seed, which is what pins *f* |
 | **Migration** | Urban share rising across the span; at least one cross-border stream in most worlds |
 | **Decolonisation** | Fewer subjects at 1960 than at 1660, not zero, and at least one lost without a war |
-| **World war** | Present in some worlds and absent in others — never all, never none |
+| **World war** | Present in every world (Ben, 2026-10-10), with population, industry, infrastructure and treasuries lost and rebuilt by 1960 |
 | **War dead** | Every war lowers population somewhere; no region emptied by one |
 | **Catastrophe lean** | Worlds that fought a world war open with higher aggregate Alarm against Ceiling than worlds that did not |
 | **A rival far away** (Ben, 2026-10-03) | The strongest industrial nation has a rival on another landmass, or a quarter of the world away, holding at least a quarter of its industry points — so the player is never handed a favourite free of competition |

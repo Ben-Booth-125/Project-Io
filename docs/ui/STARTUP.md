@@ -726,7 +726,7 @@ six humans, each taking one major, and seats one (Ben, 2026-10-10, NR-1025)**: m
 outside the prototype scope (`../tech/TECH_FOUNDATIONS.md`), so the prototype seats a single human
 and nothing in the screen's design assumes there is only one.
 
-**The nation card (Ben, 2026-10-10).** *Its question: which nation am I?* The card carries six
+**The nation card (Ben, 2026-10-10).** *Its question: which nation am I?* The card carries seven
 things, and the screen gives the nation more room than the firm card did:
 
 - its **territory, highlighted on the map** when its row is hovered;
@@ -734,7 +734,10 @@ things, and the screen gives the nation more room than the firm card did:
 - its **treasury, debt and budget weights**;
 - its **champion** — the firm card below, unchanged in content;
 - its **resource profile and deposits**;
-- its **neighbours, with stances and grudges**.
+- its **neighbours, with stances and grudges**;
+- its **history** (Ben, 2026-10-10): the pattern tags its polities carried (rose and fell, colonised,
+  revolution, survived civil war, world war), a short timeline of its key events, and a link into
+  the History ledger filtered to it (`../generation/GENERATION_STRATEGY.md` § History patterns).
 
 The briefing's origin sentence is read at the nation's grain where it names the realm, and at the
 champion's where it names the charter. The pick stays a game act and stays reproducible from

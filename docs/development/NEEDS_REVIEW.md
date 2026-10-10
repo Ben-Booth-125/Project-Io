@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*23 entries — 23 open, 0 resolved.*
+*24 entries — 24 open, 0 resolved.*
 
 ---
 
@@ -205,6 +205,17 @@ To verify the air gate and the sea-route lane headlessly, the verify API gained 
 *novel-work · raised 2026-10-09 · from Ben, sprint 50 close, the market stock form*
 
 Ben (2026-10-10): remove corporation stockpiles - all of them, production lands on the shelf - and push initial goods to markets (the same total, redistributed to the markets the corporations sit in), to simplify the model and fix construction at game start; build now in sprint 50. Flagged as large scope growth mid-close: pools carry production, own-input draws, sell orders, corporation convoys, the launch fuel reservation, procurement, upkeep and the space programme, and several of this sprint’s rulings read pools (opening stock held, the dial’s stock-fed draws, R2’s spare charge). Paused for Ben’s design calls (who owns shelf goods; what replaces corporation hauling; extend 50 or own sprint) before any build. Owning docs to rewrite: MARKETS, PRODUCTION, SUPPLY, FINANCE, CORPORATION_GENERATION, AI_OPPONENT.
+
+### NR-1034 — DECISION TAKEN: the rise-and-fall realm stays under the non-hegemony cap; the late culture is the world's most isolated
+*decision · raised 2026-10-10 · from Ben, 2026-10-10 history-patterns form*
+
+Two readings taken on your behalf. (a) 'Grows relatively large' is read as the largest share of its world by a clear margin, still under BL-224's non-hegemony cap - the cap is not overturned, so a pass-1 hegemon still fails the handoff. (b) The late culture is the culture most remote by reach when the Culture round closes, one per world; others may also be colonised naturally. Written: GENERATION_STRATEGY § History patterns, CIVILISATION, EXPLORATION.
+
+**Why it matters.** (a) decides whether the rise-and-fall target fights the non-hegemony invariant; (b) decides whether the late culture is chosen by a reading or emerges.
+
+> **Recommendation:** Confirm, or say how large the rise may go.
+
+*Files: `docs/generation/GENERATION_STRATEGY.md`, `docs/generation/CIVILISATION.md`, `docs/generation/EXPLORATION.md`, `docs/lore/HISTORY.md`*
 
 ---
 

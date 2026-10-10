@@ -258,13 +258,39 @@ the fixture-fitting this section exists to prevent.
 ---
 
 
-**The one sanctioned exception: the two nation counts (Ben, 2026-10-10).** The player sets how many
+**The first sanctioned exception: the two nation counts (Ben, 2026-10-10).** The player sets how many
 nations a world ends with and how many of them are majors, and both are always hit
 (`NATION_GENERATION.md` § The nation count is a target). The exception is narrow by design. It names
 two counts, not a shape: which nations they are, where they lie, how rich, how armed and how unequal
 stays the world's. And a count is hit by events the history already knows — conquest, release, a
 national champion's charter, a cross-border buy-out — never by deleting or relabelling a nation, so
 even the exception tunes forces and records a cause.
+
+### History patterns — three targets, two leans (Ben, 2026-10-10)
+
+**The second sanctioned exception.** Five patterns are written into the history on purpose, because a
+history worth reading has them. Real history is the mechanism reference and never the name source:
+the patterns are named for what they do.
+
+| Pattern | Round | Strength | What it is |
+|---|---|---|---|
+| **The rise and fall** | Empires | **always** | Early in Empires one realm grows to the largest share of its world through successive victories, then breaks down within a set window — through breakdown and secession, never by fiat (`CIVILISATION.md` § How an empire actually falls) |
+| **The late culture** | Culture → Exploration | **always** | One distant culture develops slower, held back by its isolation, and is colonised in Exploration (`EXPLORATION.md` § A colony is a subject) |
+| **The world war** | Industrialisation | **always** | A war that costs population, industry, roads and ports, and treasuries, so the world redevelops before 1960 (`INDUSTRIALISATION.md` § A world war in every world) |
+| **Civil war** | Empires | lean | A realm splits and its halves fight; soldiers die, and a famine and displacement mechanism of its own takes civilians (`MILITARY_HISTORY.md` § Armies are distinct from population) |
+| **Revolution** | Industrialisation | lean | Disparity read after Exploration; a splinter takes a whole nation (`INDUSTRIALISATION.md` § Revolution) |
+
+**They are fixed by design, not player-set (Ben, 2026-10-10).** Every world carries the three targets
+and the two leans; the setup round carries only the nation counts. A target is hit as the counts
+are: a lean conditions the passes, then reconciliation closes any gap with the history's own verbs,
+each recorded with a cause. A lean makes a pattern likely and promises nothing.
+
+**Every pattern is tracked (Ben, 2026-10-10).** Each pattern has a **detector** — a predicate over the
+history record that proves the target was hit and names the polities it touched. The detector is
+both the gate and the record: the polities it names carry a **pattern tag** into the nation they
+fold into, and the nation selection card shows those tags, a short timeline of the nation's key
+events, and a link into the History ledger filtered to that nation (`../ui/STARTUP.md` § The seat).
+A world's history is told, as the Empires round's causes already are; it is never narrated over.
 ## The world descriptor — seed + generation parameters
 
 Generation is driven by a small **world descriptor** (BL-114, world descriptor) — a master

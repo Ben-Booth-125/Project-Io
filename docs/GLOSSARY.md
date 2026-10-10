@@ -58,6 +58,9 @@ Every nation that is not a **Major nation** (Ben, 2026-10-10): it holds no champ
 **Champion**
 A major nation's one seat-eligible corporation — the **specialist** its ground generated (Ben, 2026-10-10). The player operates its nation's champion directly, exactly as a corporation always has, while also governing the nation; a rival major's champion runs under `corp_ai`. A champion is an ordinary corporation in every rule it operates under; its home nation favours it only through the budget and law it sets in the open. `docs/generation/CORPORATION_GENERATION.md` § Player corporation.
 
+**History pattern**
+One of five shapes written into every generated history on purpose (Ben, 2026-10-10): **the rise and fall**, **the late culture** and **the world war** are targets, always hit; **civil war** and **revolution** are leans. Each has a **detector** over the history record, and the polities it names carry a **pattern tag** into their nation, shown on the nation selection card. Fixed by design, not player-set. `docs/generation/GENERATION_STRATEGY.md` § History patterns.
+
 **Metropole / colony**
 In the exploration age (`docs/generation/EXPLORATION.md` § Two ways to claim ground across water), the **metropole** is the polity that claimed a province across water and the **colony** is the province claimed — by **purchase** (bought for trade, its culture shares kept) or by **conquest** (taken, its people digested). Both are polity verbs of the generation sim, never campaign-era actions. The colony grows the endemic good; the metropole wants it. What the pair leaves on the campaign map is a **sea lane** and, at setup, a taste, a treasury and a tariff — never a preferred-seller relationship in the order book (superseded, Ben, 2026-09-09).
 

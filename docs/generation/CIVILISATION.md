@@ -765,6 +765,15 @@ real ground, carrying the culture and the grudges it already had. That is precis
 dark age must leave asks the phase to hand forward: *nations of unequal strength*, some large
 enough to colonise and some only to be colonised.
 
+**THE RISE AND FALL IS TARGETED (Ben, 2026-10-10; `GENERATION_STRATEGY.md` § History patterns).**
+Every world has one realm that, early in Empires, grows to the largest share of its world through
+successive victories and then breaks down within a set window. This overturns the rule below for that
+one realm and that one fact — the window. The fall still happens only by the mechanism of this section:
+supply fails, regions secede, and the reasons stay readable off the map. Everything else collapses as
+before. **Civil war is a lean (same ruling):** a realm splits and its halves fight, rather than ground
+only walking away; the deaths are soldiers', plus the famine and displacement mechanism
+`MILITARY_HISTORY.md` owns.
+
 **MECHANICAL, NEVER SCHEDULED.** No collapse fires on a date or a counter. A realm fragments
 because a specific region's supply fell under a floor, for reasons a player could read off the map
 — distance, terrain, a road that was never built, a war that emptied the ground between.

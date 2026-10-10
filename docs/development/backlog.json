@@ -719,7 +719,7 @@
     "docs/ui/question_log.json"
    ],
    "title": "The seat becomes a nation selection screen: majors only, a six-part nation card, take_seat names a major",
-   "design": "DESIGNED (Ben, 2026-10-10): STARTUP.md § The seat. Rows are the majors (count = major target). Card: territory highlighted on the map, population and GDP, treasury/debt/budget weights, the champion (today's firm card), resource profile and deposits, neighbours with stances and grudges. take_seat names a major and seats its champion; its ACTIONS.json entry and the question_log surface question ('which nation am I?') change with it. Shaped for up to six humans, one major each; the prototype seats one (NR-1025). Needs a live click."
+   "design": "DESIGNED (Ben, 2026-10-10): STARTUP.md § The seat. Rows are the majors (count = major target). Card (seven parts; the seventh, history, is BL-1295): territory highlighted on the map, population and GDP, treasury/debt/budget weights, the champion (today's firm card), resource profile and deposits, neighbours with stances and grudges. take_seat names a major and seats its champion; its ACTIONS.json entry and the question_log surface question ('which nation am I?') change with it. Shaped for up to six humans, one major each; the prototype seats one (NR-1025). Needs a live click."
   },
   {
    "status": "designed",
@@ -791,6 +791,167 @@
    ],
    "title": "The player governs its nation: budget, tariff and law verbs, the nation step skips it, and the nation musters",
    "design": "DESIGNED IN PART (Ben, 2026-10-10): NATIONS.md § What a nation does each tick (the player's nation is never scored; moves 2-4 run on the player's weights); MILITARY.md § The muster interface (the nation raises units and buys their equipment as a real buyer on the order book, NR-1028); CONCEPT.md § Territorial existence (eliminated at no territory). OPEN: the verb set and its seam validation (untrusted-input rule), who builds and owns a military base, the elimination check. Every new control gets an ACTIONS.json entry."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 53,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the history-patterns form); filed by Claude",
+   "id": "BL-1286",
+   "short_name": "HISTORY_PATTERN_DETECTORS",
+   "category": "Generation",
+   "priority": "S",
+   "difficulty": 4,
+   "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+   "requires": [],
+   "files": [
+    "src/world/era_timelapse.hpp",
+    "src/world/history_sim.cpp"
+   ],
+   "title": "Detectors for the five history patterns, measured across the 16 library seeds before any target is built",
+   "design": "DESIGNED (Ben, 2026-10-10): GENERATION_STRATEGY.md § History patterns. One predicate per pattern over the history record (lapse_event + span records), naming the polities it touched; emits pattern tags carried polity -> nation (NATION_GENERATION's fold). FIRST: measure how often each pattern already happens across the 16 library seeds, unforced - it sets each lean's size and whether reconciliation has much to do. The detectors are also the gates of BL-1287, BL-1288, BL-1289."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 53,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the history-patterns form); filed by Claude",
+   "id": "BL-1287",
+   "short_name": "RISE_AND_FALL_TARGET",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 5,
+   "authority_doc": "docs/generation/CIVILISATION.md",
+   "requires": [
+    "BL-1286"
+   ],
+   "files": [
+    "src/world/history_sim.cpp"
+   ],
+   "title": "The rise and fall: one realm grows largest through successive victories early in Empires and breaks down within a window, every world",
+   "design": "DIRECTION RULED (Ben, 2026-10-10): CIVILISATION.md § How an empire actually falls (THE RISE AND FALL IS TARGETED). Overturns 'never scheduled' for one realm's window only; the fall is still breakdown + secession. OPEN: the window's span and how 'early' is read; lean then reconciliation verbs; the non-hegemony cap (NR-1034)."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 53,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the history-patterns form); filed by Claude",
+   "id": "BL-1288",
+   "short_name": "LATE_CULTURE_TARGET",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 5,
+   "authority_doc": "docs/generation/EXPLORATION.md",
+   "requires": [
+    "BL-1286"
+   ],
+   "files": [
+    "src/world/history_sim.cpp"
+   ],
+   "title": "The late culture: one distant culture develops slower from its isolation and is colonised in Exploration, every world",
+   "design": "DIRECTION RULED (Ben, 2026-10-10): EXPLORATION.md § A colony is a subject (THE LATE CULTURE IS TARGETED). A development lag read from remoteness, carried from the Culture round; bound by the ordinary subjection verbs. OPEN: the lag mechanism (no development-lag mechanism exists today), which culture is chosen (NR-1034), reconciliation if the lean misses."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 53,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the history-patterns form); filed by Claude",
+   "id": "BL-1289",
+   "short_name": "WORLD_WAR_TARGET",
+   "category": "Generation",
+   "priority": "S",
+   "difficulty": 5,
+   "authority_doc": "docs/generation/INDUSTRIALISATION.md",
+   "requires": [
+    "BL-1286"
+   ],
+   "files": [
+    "src/world/history_sim.cpp"
+   ],
+   "title": "A world war in every world: population, industry, roads and ports, and treasuries lost, and the world redevelops before 1960",
+   "design": "DIRECTION RULED (Ben, 2026-10-10): INDUSTRIALISATION.md § A world war in every world. Overturns 'permitted, never forced'. Builds on the PROPOSED mutual-defence spread (the clause exists in code; no world-war, conscript or refugee code exists). OPEN: razing industry and capital is not designed; war debt; redevelopment pace so 1960 opens on a recovery; Alarm interplay. Moves the 1960 economy: re-bless with Ben's go."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 53,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the history-patterns form); filed by Claude",
+   "id": "BL-1290",
+   "short_name": "CIVIL_WAR_LEAN",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 4,
+   "authority_doc": "docs/generation/MILITARY_HISTORY.md",
+   "requires": [
+    "BL-1286"
+   ],
+   "files": [
+    "src/world/history_sim.cpp"
+   ],
+   "title": "Civil war as a lean: a splitting realm's halves fight; soldiers die, and a famine and displacement mechanism takes civilians",
+   "design": "DIRECTION RULED (Ben, 2026-10-10): CIVILISATION.md and MILITARY_HISTORY.md § Armies are distinct from population. Secession gains a fighting step; civilian deaths only via a separately authored famine/displacement mechanism (the door the 2026-09-09 ruling left open). OPEN: the mechanism itself; guard against the empty-region failure."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 53,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the history-patterns form); filed by Claude",
+   "id": "BL-1294",
+   "short_name": "REVOLUTION_LEAN",
+   "category": "Generation",
+   "priority": "B",
+   "difficulty": 4,
+   "authority_doc": "docs/generation/INDUSTRIALISATION.md",
+   "requires": [
+    "BL-1286"
+   ],
+   "files": [
+    "src/world/history_sim.cpp"
+   ],
+   "title": "Revolution as a lean in Industrialisation: post-Exploration disparity between a nation's cities breeds a splinter that can take the whole nation",
+   "design": "DIRECTION RULED (Ben, 2026-10-10): INDUSTRIALISATION.md § Revolution. Off the post-Exploration city disparity (inequality stays between nations and cities, never households). Overturns 'no regime reset' for this span. OPEN: the splinter verb, what a takeover changes (regime field, name, polity id), its tag."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 53,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the history-patterns form); filed by Claude",
+   "id": "BL-1295",
+   "short_name": "NATION_CARD_HISTORY",
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/ui/STARTUP.md",
+   "requires": [
+    "BL-1281",
+    "BL-1286"
+   ],
+   "files": [
+    "docs/ui/question_log.json"
+   ],
+   "title": "The nation card's history: pattern tags, a short key-event timeline, and a link to the History ledger filtered to the nation",
+   "design": "DESIGNED (Ben, 2026-10-10): STARTUP.md § The seat, the card's seventh item. Reads BL-1286's tags and the lapse events of the polities that folded into the nation. Needs a live click."
   }
  ]
 }

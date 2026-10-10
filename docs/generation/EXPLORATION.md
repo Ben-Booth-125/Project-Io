@@ -254,6 +254,13 @@ determinism rule intact and keeps the phase free of a bargaining layer it cannot
 
 ## A colony is a subject, and it wants things of its own
 
+**THE LATE CULTURE IS TARGETED (Ben, 2026-10-10; `GENERATION_STRATEGY.md` § History patterns).**
+Every world has one distant culture that develops slower, held back by its isolation, and is
+colonised in this phase. Its lag is a development lag read from its remoteness, carried from the
+Culture round, never a flag that says "colonise me"; and it is bound by the ordinary subjection verbs
+below. Other cultures may be colonised too; this one always is.
+
+
 **A crowded sea power reaches overseas (Ben, 2026-10-04).** The Exploration age is where a crowded
 heartland first sails: its push — land crowding (people per unit of farmland) times navy, in this age — sends voyages, plants settler colonies
 beside natives, launches expeditions past the neighbour horizon and binds far peoples with the
