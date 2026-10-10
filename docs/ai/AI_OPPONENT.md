@@ -454,7 +454,7 @@ shelf with no bidder before any clear is an unknown, not a glut; after a clear i
 market. Otherwise the dial reads its buyer signal as usual (§ 11, the dial reads stock-fed
 consumers).
 
-**The reflex rescue reads an unpriced output as floored (Ben, 2026-10-09; BL-1217).** Tier 0's
+**The reflex rescue reads an unpriced output as floored (Ben, 2026-10-09; BL-1217, inputs reach processors).** Tier 0's
 recipe rescue switches a floored processor to the recipe whose outputs sell best against their
 base price. An output with no base price is no evidence of health. It reads as floored, so the
 rescue never switches a plant into a recipe it cannot price. Measured before the ruling:
@@ -1959,14 +1959,14 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
 
 
   **The workforce dial may read the build veto's composite bid (Ben, 2026-10-09; BL-1217, G1
-  plants running — the dial's buyer signal).** Until now the dial (`solve_workforce_target`)
-  forecast a plant's output from its own market's posted demand alone. At the settle's start that
+  plants running — the dial's buyer signal).** Without it, the dial (`solve_workforce_target`)
+  forecasts a plant's output from its own market's posted demand alone. At the settle's start that
   register is empty for goods whose consumers draw on their opening stock first: 244 steel
   consumers were running and bidding nothing, so the dial zeroed the steel plants that fed them,
   and the hold outlasted the demand's arrival two ticks later. The grant as given read the **same
   composite bid** the build veto reads (§ 2B, "What counts as a bid").
 
-  **Narrowed the same day (Ben, 2026-10-09, the dial form).** Built, the composite bid would not
+  **Narrowed the same day (Ben, 2026-10-09, the dial form).** Read by the dial, the composite bid would not
   read as a per-tick rate: procurement and the space programme note a whole lump, a pool-fed draw
   can also sit in posted demand, and later writers overwrite earlier ones. The grant is therefore:
   the dial's buyer signal for an output is **posted demand plus what running processors drew from

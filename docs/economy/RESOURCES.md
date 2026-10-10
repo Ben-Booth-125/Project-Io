@@ -450,7 +450,7 @@ tradeable, and `resolve_price` / the clearing pass ignore everything else
 - **Power** 2.6 and **construction capacity** 6.6 — the grid good and the
   construction sector's product (`docs/economy/PRODUCTION.md`).
 
-**Propellant has a base price (Ben, 2026-10-08; BL-1217).** It is made in a Chemical Plant and
+**Propellant has a base price (Ben, 2026-10-08; BL-1217, inputs reach processors).** It is made in a Chemical Plant and
 burned by a Launchpad from its corporation's own pool; the nation's space programme buys it — so
 it trades, and a plant that makes it can be judged by what it earns. Unpriced, every propellant
 plant forecast zero revenue and was idled the moment it stood (102 of them across the 16 curated

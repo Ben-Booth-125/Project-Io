@@ -160,7 +160,9 @@ supply is the grid's. A province with no road is dark, and a cut that splits the
 grid (§ 7). **A market's shelf is on its centre's grid (Ben, 2026-10-07):** power listed into a
 market feeds the grid that market's centre stands on, and a building bids at its own market — so
 "on the grid" is read through the market centre, which keeps power on the ordinary per-market shelf
-(measured: buildings on a grid other than their market centre's hold 1.3–2.1% of power need). A
+(measured: buildings on a grid other than their market centre's hold 1.3–2.1% of power need).
+Pooled over a grid, the shelf's share in the price law (`MARKETS.md` § Price resolution, at most
+k ticks of demand) is capped once, at the grid, not once per market on it. A
 wired grid with no generation on it runs short and decays like any short draw; the answer is
 generation on that grid, not a softer rule. Found by the BL-1228 (mine upkeep supply) diagnosis: power held on one market's shelf
 never reached a mine in the next market's catchment, and that alone held most mines at the
@@ -180,8 +182,10 @@ and rasterisation along each edge's A\* path taking the **max** `road_level` on 
 **A road is not built where a road already serves (Ben, 2026-09-25, walking round 6: "it should
 be heavily discouraged to build a lattice of roads").** The tree comes first. A further link
 between two centres is laid only when the network's own route between them costs more than
-**twice** the direct route — the detour test, one number. A second road beside a serviceable one
-is never built, and a loop exists only where the tree forces a long way round. This replaces
+**twice** the direct route — the detour test, one number. A second link between two centres a
+serviceable route already joins is never built, and a loop exists only where the tree forces a
+long way round. The test reads links, not tiles: two links can still lay side-by-side runs on
+the raster, which the snap (below) makes rare, not absent. This replaces
 the relative-neighbour redundancy edges, which laid the lattice.
 
 The test is read on the **town graph**, not the raster: the network's route is the cheapest chain
@@ -224,7 +228,8 @@ destination's cost flood was first built on (Ben, 2026-10-09):** the floods are 
 rebuilt after every stamp, which is what keeps the road passes inside their time budget —
 rebuilding after every stamp measured 2.5–4× slower on the sixteen curated seeds. So a link reuses
 the roads that stood when its destination's flood was built, and one laid later can run beside
-it. **What is laid is the priced route, reshaped by the snap** (BL-1252, no parallel roads).
+it. **What is laid is the priced route, reshaped by the snap** (BL-1252, no parallel roads —
+the item's handle; the snap makes long parallels rare, below).
 Before a national route (tree, loop, spur, border link) or an ancient corridor is stamped, every
 stretch of it that would lay two or more consecutive new land tiles, each within one cell (Chebyshev) of a road the route does
 not hold, is re-walked over the stretch and the road cells beside it. The re-walk minimises new

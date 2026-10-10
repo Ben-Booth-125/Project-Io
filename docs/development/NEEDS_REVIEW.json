@@ -1940,6 +1940,15 @@
    "status": "open",
    "source": "the sprint 50 scripted visual checks lane",
    "what": "To verify the air gate and the sea-route lane headlessly, the verify API gained accessors that build world state no game path would: sea_route_fixture lays two Ports to make a sea pair with real land legs, and air_gate inserts an electrolysis works on an airless body the player cannot reach. Verify-only (bound behind --verify), deterministic, nothing in play changes. No doc owns the rule for when a verify fixture may fabricate state rather than find it; flagged so the precedent is chosen, not accreted. Also new: verify corp_command reads recipe_name/target_name/quantity, validated."
+  },
+  {
+   "id": "NR-991",
+   "title": "Question: the held AI power-plant gate is written as design but is not on the sprint branch and no open item owns it (BL-1232, power plants per grid)",
+   "raised": "2026-10-10",
+   "kind": "question",
+   "status": "open",
+   "source": "sprint 50 close: the doc check",
+   "what": "AI_OPPONENT.md § Candidate enumeration ('A power-plant candidate is priced against its grid's shortfall', Ben 2026-10-07) and PRODUCTION.md § Power ('The scorer's power-plant estimate reads the same per-grid gap, and counts plants already under construction') state the scorer's power gate as the design. The code does not do it: corp_ai.cpp scores power recipes like any other processor group (~1586-1796); the gate exists only on branch bl1232-gate-remeasure (14969c85), unmerged, HELD by Ben. BL-1232 (power plants per grid) is complete, so no open item owns the held part. CALL: (a) file a backlog item that re-measures and merges the gate, docs unchanged; or (b) withdraw the rule from both docs until it is re-ruled."
   }
  ]
 }

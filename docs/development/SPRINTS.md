@@ -62,7 +62,7 @@ and/or a version goal (v0.1.1 etc.).
 ### Sprint 50 — logistics and trade flow
 *Open · opened 2026-10-07 · Ben (2026-10-07, the sprint 50 cut form: all nine items, measure-led, G1 stays 70%, diagnostic lens, extend rather than cut); Claude (the proposal in NEXT_SESSION.md)*
 
-**Goal.** Goods that exist reach the markets and processors that want them: a built processor gets its inputs (BL-1217, G1 >= 70% at handoff, pooled 16 seeds), surplus reaches shortage, and the flows and refusals are visible on one diagnostic lens.
+**Goal.** Goods that exist reach the markets and processors that want them: a built processor gets its inputs (BL-1217, inputs reach processors: G1 >= 85% running and G1b <= 5% input-starved at handoff, pooled 16 seeds; raised from 70% by Ben, 2026-10-08), surplus reaches shortage, and the flows and refusals are visible on one diagnostic lens.
 
 **Planned.**
 - WAVE 0 - THE INSTRUMENT. BL-1223 (gate logistics row): the market-viability skill gains a logistics row - units moved surplus -> shortage, dry markets, refusals by class for every good with processor inputs singled out. BL-1222 (trade-flow lens): diagnostic only (player polish is sprint 51). Read the baseline on main.
