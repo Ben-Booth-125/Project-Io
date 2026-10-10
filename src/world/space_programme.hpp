@@ -112,11 +112,18 @@ struct space_purchase
 ///                derived claims are appended in walk order.
 /// @return        The intents, in emission order — settle these after the
 ///                budget pass has decided which were paid.
+/// @param wants  BL-1227 (AI_OPPONENT.md § 2B, Ben 2026-10-08): when non-null,
+///               receives one row per good the line WANTED this tick, filled or
+///               not — at the market it would draw from (the supplier pool's or
+///               the fallback shelf's), or a null market when no pool and no
+///               shelf holds it anywhere (the caller records that at the
+///               nation's capital market). A want exists before its supply does.
 std::vector<space_purchase> derive_space_programme_claims(const world& w,
                                                           const std::map<entity_id, nation_budget>& budgets,
                                                           const space_programme_params& p,
                                                           float reservation_mult,
-                                                          std::vector<budget_claim>& claims);
+                                                          std::vector<budget_claim>& claims,
+                                                          std::vector<market_want>* wants = nullptr);
 
 /// Settle the derived intents against what `run_national_budget` actually
 /// paid. A paid transfer on the `space_programme` line funds the first

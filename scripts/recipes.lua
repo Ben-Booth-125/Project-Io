@@ -116,6 +116,7 @@ recipes = {
         group   = "Chemical Works", -- BL-434
         inputs  = { refined_fuel = 2.0 },
         outputs = { propellant = 1.0 },
+        air     = "atmosphere", -- runs only under air (Ben, 2026-10-09; PRODUCTION.md § Chemical Plant)
     },
 
     -- id 6 — Chemical Plant, AIRLESS route (BL-308, Era 1). No atmosphere to
@@ -136,6 +137,7 @@ recipes = {
         group   = "Chemical Works", -- BL-434
         inputs  = { water = 3.0, refined_fuel = 1.0 },
         outputs = { propellant = 1.0 },
+        air     = "airless",    -- runs only on an airless body (Ben, 2026-10-09)
     },
 
     -- BL-340 (2026-08-11) — the processing-chain roster. Every value here

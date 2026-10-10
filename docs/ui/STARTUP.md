@@ -68,7 +68,16 @@ settings hub (no Load/Save on the menu; `--load` is a command-line path). Conten
 - **Bodies** — a disabled slider, fixed at 5; the count knob is phased to a
   later update. No nation knob: nation count is a consequence of landmass, not
   a target (NATION_GENERATION.md).
-- **New Game** → `open_new_world_wizard()` (commits nothing); **Quit**.
+- **New Game** → `open_new_world_wizard()` (commits nothing); **Quick Start**; **Quit**.
+- **Quick Start (Ben, 2026-10-08)** — generates the world straight through on the menu's seed and
+  resources, with no wizard rounds drawn: the cold build behind one loading bar, then the **seat
+  screen**, so the player still chooses the corporation. It is the same world the wizard builds
+  on the same settings (§ Handoff: a cold build and an adopted world open on one state hash), so
+  it is a way past the rounds, not a different game.
+
+**Every loading bar sits in a top band (Ben, 2026-10-08):** about 15% of the window's height from
+the top, horizontally centred — the cold build, the wait on a round, the settle — never at the
+window's vertical centre, so the bar stays where the eye starts and the screen below it is free.
 
 Every widget edits `m_pending_world_params` (`world_params`), which the wizard
 continues to edit and `start_new_game()` finally consumes. The Planetology

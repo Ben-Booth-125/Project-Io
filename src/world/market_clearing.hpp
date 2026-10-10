@@ -8,6 +8,8 @@
 #include "world.hpp"
 
 #include <array>
+#include <cstdint>
+#include <map>
 #include <unordered_map>
 #include <vector>
 
@@ -75,6 +77,17 @@ float population_met_ratio(const world& w, const recipe_registry& reg, entity_id
 /// before the price update. Ascending market id, ascending resource; pure
 /// per-market arithmetic. Deterministic.
 void draw_household_basket(world& w);
+
+/// BL-1217 lever D (switch `economy.background_demand.consumes`: authored TRUE
+/// in scripts/economy.lua; the C++ struct default is false, so a hand-built
+/// registry does not draw). When on, every market's background basket TAKES its
+/// bid (`background_bid`, written by inject_background_demand) off the shelf
+/// after the households' draw, leaving one tick of the market's processor want
+/// (`processor_want`, BL-1217 G1b R3: posted plus ceiling-silenced) on the shelf:
+/// `background_fill[r] = min(bid, max(0, inventory[r] - processor_want[r]))`. No
+/// money moves; no ceiling. When off, the shelf is untouched and
+/// `background_fill` reads zero. Ascending market id and resource.
+void draw_background_basket(world& w, const recipe_registry& reg);
 
 /// BL-1179 (shelf spoilage; MARKETS.md § The shelf spoils). Every good on every
 /// market's SHELF loses its authored share of itself:
@@ -363,6 +376,45 @@ inline float pricing_supply(const market_component& m, std::size_t r, float shel
     return listed + std::min(shelf, sells);
 }
 
+/// BL-1230 (power crosses markets; LOGISTICS.md § 3a): a grid good that crosses
+/// markets (`grid_good_crosses_markets`) prices against its GRID's pooled
+/// registers, not one market's. `grid_good_figures` is one grid's three pooled
+/// registers (listings, shelf, demand + silenced want) and its pooled demand;
+/// `grid_good_pool` maps every market whose centre is wired to its grid and
+/// every grid to its figures. Built by `pool_grid_good_figures` — THE ONE
+/// pooling, read by clear_markets' price resolution and by the workforce
+/// solver's price forecast (BL-1232) alike. Sums run over ascending market id.
+struct grid_good_figures
+{
+    std::array<float, resource_count> listed{}, shelf{}, wants{}, demand{};
+};
+struct grid_good_pool
+{
+    std::map<entity_id, std::uint32_t>          market_grid;
+    std::map<std::uint32_t, grid_good_figures> grid_sd;
+};
+grid_good_pool pool_grid_good_figures(world& w, const recipe_registry& reg);
+
+/// BL-1232 review: the grid a building on @p tile FEEDS. A producer lists into
+/// its tile's market (`market_for_tile`), and a market's shelf is on the grid of
+/// its CENTRE tile's province (LOGISTICS.md § 3a; the grid clear's
+/// `shelves_on`) — so a generator serves the grid of its market's centre, which
+/// need not be its own tile's grid. 0 when the tile has no market or the
+/// centre's province is dark. (Its DRAW side is its own tile's grid,
+/// `tile_power_grid`.)
+std::uint32_t tile_feed_power_grid(world& w, entity_id tile);
+
+/// The pooled pricing supply: listed + min(shelf, k x wants) over the GRID —
+/// the shelf cap taken once, at the grid (review round 2 of BL-1230). At one
+/// market on a grid this is exactly `pricing_supply`.
+inline float grid_good_pricing_supply(const grid_good_figures& sd, std::size_t r,
+                                      float shelf_supply_ticks)
+{
+    return sd.listed[r] + ((shelf_supply_ticks > 0.0f)
+                               ? std::min(sd.shelf[r], shelf_supply_ticks * sd.wants[r])
+                               : 0.0f);
+}
+
 /// Input reservation a corporation needs to keep in ONE goods pool to feed a
 /// full run of the processors that draw that pool next tick — so it sells only
 /// the genuine surplus. BL-1003: a processor draws the pool of its own tile
@@ -371,6 +423,19 @@ inline float pricing_supply(const market_component& m, std::size_t r, float shel
 /// `dispatch_convoys`, so what a seller may haul is exactly what it would list.
 /// @pre `corp` is a key of `w.corporations`.
 std::array<float, resource_count> processor_reservation(
+    const world& w, const recipe_registry& reg, entity_id corp, entity_id pool_key);
+
+/// What AUTO-SURPLUS holds back in one pool: `processor_reservation`, plus — where
+/// the corp holds a Launchpad that burns from this pool (`launch_burns_from_pool`,
+/// the launch gate's own test) — the WHOLE stock of every launch-drawn good
+/// (`launch_draw_per_convoy`: propellant). "A pad's pool keeps its propellant"
+/// (MARKETS.md step 4, Ben 2026-10-09): auto-surplus lists none of it, so a pad
+/// stays fuelled. A pool with no pad reserves exactly `processor_reservation`.
+/// Shared by clearing's auto-surplus and `dispatch_convoys` (BL-995: what a
+/// seller may haul is exactly what it would list). A STANDING SELL ORDER reads
+/// `processor_reservation` instead, so the corp can still sell its propellant.
+/// @pre `corp` is a key of `w.corporations`.
+std::array<float, resource_count> auto_surplus_reservation(
     const world& w, const recipe_registry& reg, entity_id corp, entity_id pool_key);
 
 /// Resolve which market a tile clears against (its market catchment). Among the

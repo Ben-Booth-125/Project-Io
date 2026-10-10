@@ -246,6 +246,18 @@ void recipe_registry::load_from_lua(lua_state& lua)
         r.qualified_workforce =
             read_unit_rate(*entry, "qualified_workforce", 0.0f, "recipe '" + r.name + "'");
 
+        // Propellant routes follow the body's air (Ben, 2026-10-09). Absent =
+        // any; an unknown string is authored nonsense and rejected at load.
+        {
+            const std::string air = entry->get_or<std::string>("air", "any");
+            if (air == "any")             r.air = recipe_air::any;
+            else if (air == "atmosphere") r.air = recipe_air::atmosphere;
+            else if (air == "airless")    r.air = recipe_air::airless;
+            else
+                throw std::runtime_error("recipe_registry: recipe '" + r.name + "' has unknown air '"
+                                         + air + "' (any | atmosphere | airless)");
+        }
+
         m_recipes.push_back(std::move(r));
     }
 
@@ -347,6 +359,17 @@ void recipe_registry::load_from_lua(lua_state& lua)
         bd.elasticity_min    = bg_demand->get_or("elasticity_min",    bd.elasticity_min);
         bd.elasticity_max    = bg_demand->get_or("elasticity_max",    bd.elasticity_max);
         bd.demand_scale      = bg_demand->get_or("demand_scale",      bd.demand_scale);
+        // BL-1217 lever D: absent -> false -> the basket bids only (today).
+        {
+            const sol::object c = (*bg_demand)["consumes"];
+            if (c.valid() && c.get_type() != sol::type::lua_nil)
+            {
+                if (c.get_type() != sol::type::boolean)
+                    throw std::runtime_error("economy.background_demand.consumes: "
+                                             "must be a boolean");
+                bd.consumes = c.as<bool>();
+            }
+        }
         read_era_baskets(*bg_demand, bd.baskets, "economy.background_demand"); // BL-640
         set_background_demand(bd);
     }

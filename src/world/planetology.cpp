@@ -881,6 +881,9 @@ planetology_state run_planetology(const body_inputs& in,
     const float t_eq   = 278.6f * std::sqrt(std::sqrt(st.instellation))
                                 * std::sqrt(std::sqrt(1.0f - albedo));
 
+    // `airless` is set exactly when the class assigned is `none` or `thin` — the
+    // rule `atmosphere_is_airless` (components.hpp) states for the world, which
+    // the propellant routes read. Change one, change both.
     bool airless = false;
     if (st.shore < 0.05f)
     {

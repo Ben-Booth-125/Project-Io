@@ -76,6 +76,11 @@ branch point is `is_player_owned(world, building)` (with `owner_corp_of` behind 
   (subject to the *geographic* fog: a rival marker shows only on surveyed regions).
 - **Rival internals are private** — production rates and stockpile quantities never appear. A rival
   hover card shows **type and owner only**.
+- **That a plant is running, and what it consumes, is observable (Ben, 2026-10-08: "smoke from the
+  chimney").** A working plant is visible as working, and which goods it takes in follows from it;
+  how much it makes, what it holds and what it earns stay private. The rival scorer reads it as
+  evidence of a buyer in that market (`../ai/AI_OPPONENT.md` § 2B, what counts as a bid); the
+  player sees the same fact, not more.
 - **Construction state is public** (ruled 2026-08-09, NR-090): a rival's under-construction
   buildings render with the same construction dimming as the player's own. Scaffolding is
   externally observable, so a rival's expansion frontier is readable at a glance — deliberate

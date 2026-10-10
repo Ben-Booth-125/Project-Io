@@ -8,12 +8,15 @@
 #include <cstddef>
 #include <cstdint>
 #include <iosfwd>
+#include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 struct world;
 class recipe_registry;
 struct economy_report;
+struct building_report;
 
 // ---------------------------------------------------------------------------
 // Corp AI stage A — the scored utility layer (BL-202, AI_OPPONENT.md § 5)
@@ -365,15 +368,45 @@ const char* corp_decision_reason_label(corp_decision_reason r);
 float corp_should_have_buffer(const world& w, const recipe_registry& reg,
                               const economy_report& report, entity_id corp);
 
+/// BL-1227 (Ben, 2026-10-07/08: "a buyer that takes goods without posting a bid
+/// is still a buyer"): what RUNNING processors drew of each good in each market
+/// this tick's production pass, keyed (market, good) — derived from the
+/// economy report's per-building rows. run_economy_step records it as an
+/// unposted bid (market_component::unposted_bid) right after the production
+/// pass (a running plant and what it consumes are observable, DISCOVERY.md).
+using market_good_draw = std::map<std::pair<entity_id, std::size_t>, float>;
+
+/// Build `market_good_draw` from @p report: every processor row that produced
+/// (active, output > 0) on a building still standing, not decommissioned and
+/// complete, contributes its recipe's inputs x the runs it made, at its tile's
+/// market. An idled or decommissioned processor draws nothing and is no buyer.
+market_good_draw running_consumer_draws(const world& w, const recipe_registry& reg,
+                                        const economy_report& report);
+
+/// The one RUNNING-CONSUMER filter `running_consumer_draws` applies, per report
+/// row: the processor's tile market if @p br is a processor that produced on a
+/// standing, complete, not-decommissioned building with a priced-quantity
+/// recipe (and its runs in @p runs_out), else null_entity. Shared with the
+/// dial's pool-draw register (BL-1217, `collect_dial_pool_draws`) so a draw by a
+/// processor this skips is never credited to its market.
+entity_id running_consumer_market(const world& w, const recipe_registry& reg,
+                                  const building_report& br, float* runs_out = nullptr);
+
 /// Predictive-spending score multiplier for a candidate build of `type`
 /// producing `target` at `tile`, given its expected per-tick output
 /// `added_rate_per_tick` once live. Forecasts the added supply over
-/// `horizon_ticks` against the LOCAL MARKET'S PUBLIC supply/demand
-/// aggregates only (visibility-honest — the same facts export_corp_blackboard
-/// would show a rival, per BL-068/DISCOVERY.md) and returns 1.0 (no penalty)
-/// when the forecast supply/demand ratio stays at or below `p.glut_taper_ratio`,
-/// tapering linearly to 0.0 (veto) at `p.glut_veto_ratio`. Exposed for the
-/// harness; also used internally by the build-candidate scorer.
+/// `horizon_ticks` against the LOCAL MARKET'S supply/demand aggregates and
+/// returns 1.0 (no penalty) when the forecast supply/demand ratio stays at or
+/// below `p.glut_taper_ratio`, tapering linearly to 0.0 (veto) at
+/// `p.glut_veto_ratio`. With NO posted demand (BL-1227, AI_OPPONENT.md § 2B) the
+/// market is read by what it lists and what else bids: the silenced want
+/// (`hauler_want`) or an unposted bid held for the cadence
+/// (`unposted_bid`: off-book want, launch fuel, own-pool upkeep, a running
+/// processor's consumption — observable facts, DISCOVERY.md) is a bid, no
+/// penalty; otherwise listed supply vetoes, and so does a market that has
+/// cleared with nothing listed (a dead market). Only a market that has never
+/// cleared returns 1.0 for "no bid, nothing listed" (no signal). Exposed for
+/// the harness; also used internally by the build-candidate scorer.
 float forecast_glut_multiplier(const world& w, entity_id tile, resource_type target,
                                float added_rate_per_tick, int horizon_ticks,
                                const corp_ai_params& p = {});
@@ -381,6 +414,33 @@ float forecast_glut_multiplier(const world& w, entity_id tile, resource_type tar
 /// The corp's solvency reserve floor under `p` (exposed for the harness).
 float corp_reserve_floor(const world& w, const recipe_registry& reg,
                          entity_id corp, const corp_ai_params& p = {});
+
+/// BL-1227 (diagnosis) — one extraction build candidate's fate in the scorer,
+/// for a verify probe. WRITE-ONLY observability, the
+/// `economy_step_phase_clock_sink` shape: null by default (nothing is written,
+/// nothing reads it back), armed by a harness around its own run.
+enum class extraction_trace_outcome : uint8_t
+{
+    placement = 0, ///< can_place_in_world refused the tile
+    net_le0,       ///< the estimate's net <= 0
+    materials,     ///< construction materials not obtainable
+    veto_listed,   ///< glut veto: no bid against listed supply (BL-1227)
+    veto_dead,     ///< glut veto: a cleared market with no bid, nothing listed (BL-1227)
+    veto_ratio,    ///< glut veto: (supply + added) / demand >= glut_veto_ratio
+    emitted,       ///< a candidate went to the greedy selection
+    count
+};
+struct extraction_trace_row
+{
+    int           tick   = 0;
+    entity_id     corp   = null_entity;
+    entity_id     tile   = null_entity;
+    resource_type target = resource_type::iron_ore;
+    extraction_trace_outcome outcome = extraction_trace_outcome::placement;
+    float         net    = 0.0f;
+    float         score  = 0.0f;
+};
+std::vector<extraction_trace_row>*& corp_extraction_trace_sink();
 
 /// Fixed personality jitter for a corp in [0.9, 1.1] — a pure hash of
 /// (personality_seed, corp id); constant for the whole campaign.

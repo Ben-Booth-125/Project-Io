@@ -263,3 +263,14 @@ std::string gating_tech_for_recipe(const recipe_registry& reg, uint16_t recipe_i
             return g.id;
     return {};
 }
+
+// Declared beside `recipe_runs_on_body` in recipe_registry.hpp; defined here, in
+// a Lua-free TU, so the light (SDL/Lua-free) harness build links it.
+bool recipe_runs_at_tile(const world& w, const recipe& rc, entity_id tile)
+{
+    const auto tit = w.tiles.find(tile);
+    if (tit == w.tiles.end())
+        return true;
+    const auto bit = w.bodies.find(tit->second.body);
+    return bit == w.bodies.end() || recipe_runs_on_body(rc, bit->second);
+}

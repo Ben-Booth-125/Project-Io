@@ -8,8 +8,8 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <map>
 #include <numbers>
-#include <set>
 #include <string>
 #include <tuple>
 #include <unordered_map>
@@ -21,6 +21,9 @@ void advance_convoys(world& w)
 {
     for (auto& convoy : w.convoys)
     {
+        // BL-1195: where this tick's travel starts — interdiction sweeps from here
+        // to the new head. A held convoy does not move, so its sweep is its head.
+        convoy.progress_before = convoy.progress;
         // BL-452: a HELD convoy stops advancing and waits on its lane. It is
         // skipped rather than slowed — hold is a stop, not a throttle — and it
         // costs nothing further, since the haul was paid once at dispatch.
@@ -38,6 +41,21 @@ void advance_convoys(world& w)
 std::vector<interception_record> intercept_convoys(world& w, int tick)
 {
     std::vector<interception_record> cuts;
+    // BL-1195: this tick's sweep starts are spent on EVERY return, early or not —
+    // a later read in the same tick (or a tick that does not advance) checks the
+    // head alone (the components.hpp invariant on progress_before). A scope guard,
+    // so no early return below can skip it; it runs after the cut convoys are
+    // erased, which is harmless (the reset touches only survivors).
+    struct sweep_reset
+    {
+        world& w;
+        ~sweep_reset()
+        {
+            for (convoy_component& cv : w.convoys)
+                cv.progress_before = -1.0f;
+        }
+    } const reset_on_exit{w};
+
     if (w.convoys.empty() || w.units.empty() || w.corp_hostile_pairs.empty())
         return cuts; // nothing declared, nothing standing, or nothing in flight
 
@@ -69,16 +87,29 @@ std::vector<interception_record> intercept_convoys(world& w, int tick)
     std::vector<std::uint32_t> cut_ids;
     for (const convoy_component& cv : w.convoys)
     {
-        const entity_id tile = convoy_tile_at(w, cv);
-        if (tile == null_entity)
+        // BL-1195: THE SWEEP. A tick is 90 days and most hauls take one to three,
+        // so the cargo crosses most of its lane between two reads. Every tile it
+        // crossed this tick — from where it stood before advance_convoys to where
+        // it stands now, in lane order, both ends included — is checked, and the
+        // first holding a hostile unit is where it is cut. Position is read off the
+        // lane's clock (convoy_lane_index), each leg at its own speed.
+        const convoy_route lane = convoy_route_tiles(w, cv);
+        const int head = convoy_lane_index(lane.at, cv.progress);
+        if (head < 0)
             continue; // inter-body leg in transit, or an unresolvable lane
+        const int from = (cv.progress_before >= 0.0f)
+                             ? std::min(convoy_lane_index(lane.at, cv.progress_before), head)
+                             : head;
 
+        entity_id tile             = null_entity;
+        entity_id interceptor_unit = null_entity;
+        entity_id interceptor_corp = null_entity;
+        for (int li = from; li <= head && interceptor_unit == null_entity; ++li)
+        {
+        tile = lane.tiles[static_cast<std::size_t>(li)];
         const auto occ = units_on_tile.find(tile);
         if (occ == units_on_tile.end())
             continue;
-
-        entity_id interceptor_unit = null_entity;
-        entity_id interceptor_corp = null_entity;
         for (const entity_id uid : occ->second)
         {
             const unit_component& uc = w.units.at(uid);
@@ -98,6 +129,7 @@ std::vector<interception_record> intercept_convoys(world& w, int tick)
             interceptor_unit = uid;
             interceptor_corp = uc.owner;
             break; // sorted order: first hit is the lowest-id hostile unit
+        }
         }
         if (interceptor_unit == null_entity)
             continue;
@@ -367,6 +399,15 @@ float launch_draw_available(const world& w, entity_id corp, entity_id src_key,
 
 } // namespace
 
+bool launch_burns_from_pool(const world& w, entity_id corp, entity_id pool_key)
+{
+    const auto cit = w.corporations.find(corp);
+    if (cit == w.corporations.end())
+        return false;
+    const entity_id body = pool_key_body(w, pool_key);
+    return body != null_entity && corp_has_launchpad_on(w, cit->second, body);
+}
+
 entity_id corp_representative_tile(const world& w, const corporation_component& corp, entity_id body)
 {
     entity_id best_building = null_entity;
@@ -451,6 +492,8 @@ struct intra_route
     std::array<route_leg, 3> legs{};
     int         n_legs       = 0;
     int         ports        = 0; ///< ports the cargo passes through; handling is per port
+    entity_id   port_a       = null_entity; ///< BL-1195: the loading Port of a sea route
+    entity_id   port_b       = null_entity; ///< BL-1195: the unloading Port of a sea route
     int         travel_ticks = 1;
     convoy_mode mode         = convoy_mode::land; ///< the convoy's mode: sea when any leg is
 };
@@ -616,6 +659,8 @@ bool route_intra_body(world& w, const recipe_registry& reg, const logistics_node
                 route.legs[1] = sea;
                 route.legs[2] = on.leg;
                 route.ports   = 2;
+                route.port_a  = ports[i];
+                route.port_b  = ports[j];
                 route.mode    = convoy_mode::sea;
                 // Each leg at its own speed (SUPPLY.md): caravan overland, coastal by sea;
                 // summed, then quantised once.
@@ -658,6 +703,8 @@ convoy_leg finish_route(const intra_route& route, float qty, float handling)
     leg.mode         = route.mode;
     leg.cost         = cost;
     leg.travel_ticks = route.travel_ticks < 1 ? 1 : route.travel_ticks;
+    leg.port_a       = route.n_legs == 3 ? route.port_a : null_entity;
+    leg.port_b       = route.n_legs == 3 ? route.port_b : null_entity;
     return leg;
 }
 
@@ -784,7 +831,9 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
         intra_route route;
         if (!route_intra_body(w, reg, nodes, src_body, origin, dest_centre, route))
             return leg;
-        return finish_route(route, qty, reg.port_handling());
+        leg = finish_route(route, qty, reg.port_handling());
+        leg.origin_tile = origin; // BL-1195: the lane starts where the haul was priced from
+        return leg;
     }
 
     convoy_mode mode;
@@ -844,7 +893,9 @@ convoy_leg price_market_export_leg(world& w, const recipe_registry& reg,
     if (!route_intra_body(w, reg, nodes, body, sit->second.centre_tile,
                           dit->second.centre_tile, route))
         return convoy_leg{};
-    return finish_route(route, qty, reg.port_handling());
+    convoy_leg leg = finish_route(route, qty, reg.port_handling());
+    leg.origin_tile = sit->second.centre_tile; // BL-1195: the lane starts at the centre
+    return leg;
 }
 
 namespace {
@@ -977,9 +1028,16 @@ bool commit_convoy(world& w, const recipe_registry& reg, entity_id corp_id, enti
     {
         auto&       quantities  = w.pool_at(corp_id, src_key).quantities;
         const auto& launch_draw = launch_draw_per_convoy();
+        // BL-1227 (AI_OPPONENT.md § 2B, Ben 2026-10-08): launch fuel taken from
+        // the corporation's pool is a buyer that posts no bid.
+        const auto fuel_mit = w.markets.find(src_key);
         for (std::size_t dr = 0; dr < resource_count; ++dr)
             if (launch_draw[dr] > 0.0f)
+            {
                 quantities[dr] -= launch_draw[dr];
+                if (fuel_mit != w.markets.end())
+                    note_unposted_bid(fuel_mit->second, dr, launch_draw[dr], w.current_econ_tick);
+            }
     }
 
     convoy_component c;
@@ -1003,6 +1061,9 @@ bool commit_convoy(world& w, const recipe_registry& reg, entity_id corp_id, enti
     c.arrived        = false;
     c.held           = false;
     c.cost_paid      = cost;
+    c.origin_tile    = leg.origin_tile; // BL-1195: the lane follows the priced legs
+    c.port_a         = leg.port_a;
+    c.port_b         = leg.port_b;
     w.convoys.push_back(c);
     if (out_sent)
         *out_sent = send;
@@ -1024,6 +1085,29 @@ float dispatch_home_price(const world& w, entity_id src_key, std::size_t r)
 {
     const auto it = w.markets.find(src_key);
     return (it != w.markets.end()) ? dispatch_market_price(it->second, r) : 0.0f;
+}
+
+order_floor_map collect_order_floors(const world& w)
+{
+    // Several orders on one triple: the HIGHEST floor binds — a haul never
+    // sells below a price any of the corp's orders on the good named.
+    order_floor_map floors;
+    for (const sell_order& o : w.sell_orders)
+    {
+        float& f = floors[{o.corp, o.body, static_cast<std::size_t>(o.resource)}];
+        f = std::max(f, o.floor_price);
+    }
+    return floors;
+}
+
+float dispatch_source_price(const world& w, const order_floor_map& floors, entity_id corp,
+                            entity_id src_key, std::size_t r)
+{
+    const float home = dispatch_home_price(w, src_key, r);
+    if (floors.empty())
+        return home;
+    const auto it = floors.find({corp, pool_key_body(w, src_key), r});
+    return (it != floors.end()) ? std::max(home, it->second) : home;
 }
 
 float dispatch_absorbable(const world& w, const recipe_registry& reg, entity_id dest,
@@ -1163,7 +1247,7 @@ float dispatch_pending(const world& w, const recipe_registry& reg, entity_id des
         auto mit = memo.find({corp, dest});
         if (mit == memo.end())
             mit = memo.emplace(std::make_pair(corp, dest),
-                               processor_reservation(w, reg, corp, dest)).first;
+                               auto_surplus_reservation(w, reg, corp, dest)).first;
         const float excess = p->quantities[r] - mit->second[r];
         if (excess > 0.0f)
             pending += excess;
@@ -1366,6 +1450,9 @@ void export_market_shelves(world& w, const recipe_registry& reg, const logistics
                 cv.arrived        = false;
                 cv.held           = false;
                 cv.cost_paid      = (send < qty) ? leg.cost * (send / qty) : leg.cost;
+                cv.origin_tile    = leg.origin_tile; // BL-1195: the lane follows the legs
+                cv.port_a         = leg.port_a;
+                cv.port_b         = leg.port_b;
                 w.convoys.push_back(cv);
                 ++out.market_exports;
                 break; // one destination per (market, good) per pass
@@ -1444,16 +1531,33 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
     // touches a building), so each (corp, market) is computed once.
     reservation_memo memo;
 
-    // BL-995 CALL: a good under a standing SELL ORDER (corp, body, resource) is
-    // under manual control and is not auto-hauled — the same yield clearing's
-    // auto-surplus makes (market_clearing.cpp, `order_controls`). The corp chose
-    // to sell it at home at a floor; shipping it away would empty the order.
-    // A std::set over a totally ordered tuple, read only by lookup.
-    std::set<std::tuple<entity_id, entity_id, std::size_t>> order_controlled;
-    // BL-1201: quantity 0 is an UNCAPPED order now, not an inert one — every
-    // order controls its triple, exactly as `order_controls` reads it.
-    for (const sell_order& o : w.sell_orders)
-        order_controlled.insert({o.corp, o.body, static_cast<std::size_t>(o.resource)});
+    // BL-1229 (steel stays home) — AN ORDER IS A FLOOR, NOT A HOLD (Ben,
+    // 2026-10-07; MARKETS.md step 4). A good under a standing SELL ORDER still
+    // travels: the dispatcher hauls an ordered (corp, body, good) pool by the
+    // same net-price rule and the same room as unordered surplus, with the
+    // order's floor standing in for the home price wherever the floor is the
+    // higher — the seller's alternative to the haul is a sale the order would
+    // accept, and the order refuses any below its floor. So a haul must net the
+    // seller more than the floor (by the margin, as it must beat home), and is
+    // sized so the destination's price lands no lower than floor + haul. Before
+    // this rule an order held its pool out of every convoy (the BL-995 CALL) and
+    // stranded ~30% of all steel surplus while processors elsewhere starved.
+    //
+    // Several orders on one triple: the HIGHEST floor binds (collect_order_floors;
+    // dispatch_source_price is the one rule this pass and the rival scorer's
+    // directed dispatch share). A capped order's `quantity` caps what is LISTED
+    // at home per tick, not what may be hauled: the haul draws on the same
+    // surplus above the processor reservation as an unordered pool. One rule for
+    // the player's orders and a rival's.
+    //
+    // A HAULED POOL KEEPS ITS ORDER (BL-1229 review). Dispatch runs before the
+    // clear, so a pool hauled empty would read as "nothing to sell" to the
+    // order's auto-close, and once closed the haul would price at the home price
+    // and could ship below the floor. Every ordered triple this pass hauls from
+    // is recorded in `w.hauled_ordered_this_tick`, which the clear reads as
+    // "not empty" and then clears (world.hpp).
+    const order_floor_map order_floor = collect_order_floors(w);
+    w.hauled_ordered_this_tick.clear();
 
     struct candidate
     {
@@ -1461,11 +1565,36 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
         entity_id dest;
         float     haul;
         bool      space;
+        float     price_d; // BL-1222: recorded for the lens only; no rule reads it
     };
     std::vector<candidate> cands;
 
+    // BL-1222 (trade-flow lens) — the PLAYER corporation's record of this pass.
+    // WRITE-ONLY: every line that touches `tf` below records a value the pass has
+    // already computed for its own decision (or, for the classes of candidates the
+    // one-destination rule never reached, one extra `dispatch_room` read — a pure
+    // query); no branch the dispatcher takes reads it. Rolled into the world's
+    // trailing window at the end of the pass.
+    trade_flow_pass tf;
+    tf.corp = w.player_entity;
+    const auto tf_note = [&tf](entity_id dest, std::size_t ri, trade_refusal cls) {
+        const auto key = std::make_pair(dest, static_cast<std::uint16_t>(ri));
+        const auto it  = tf.best.find(key);
+        if (it == tf.best.end())
+            tf.best.emplace(key, cls);
+        else if (static_cast<int>(cls) > static_cast<int>(it->second))
+            it->second = cls;
+    };
+    // A market is SHORT of a good when last clear's demand outran its supply —
+    // the Scarcity lens's public signal (LENSES.md § Scarcity lens).
+    const auto tf_short = [&w](entity_id dest, std::size_t ri) {
+        const market_component& m = w.markets.at(dest);
+        return m.demand[ri] > m.supply[ri];
+    };
+
     for (const entity_id corp_id : corp_ids)
     {
+        const bool tf_player = (corp_id == w.player_entity);
         // This corp's pool keys, ascending (a std::map slice). Collected first
         // so nothing committed below can disturb the walk.
         std::vector<entity_id> src_keys;
@@ -1497,12 +1626,16 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                 return &origin_tile;
             };
 
-            // The same reservation auto-surplus holds back: what a seller may
-            // haul is exactly what it would otherwise list at home.
+            // The same processor reservation auto-surplus holds back. NOT the
+            // held opening stock (BL-1217 D5, `world::opening_stock_held`):
+            // auto-surplus keeps that off the HOME shelf until the home market
+            // bids, but a haul goes only where someone wants the good, so held
+            // stock may be hauled. What a seller may haul is therefore what it
+            // would list at home PLUS any opening stock held there.
             auto rit = memo.find({corp_id, src_key});
             if (rit == memo.end())
                 rit = memo.emplace(std::make_pair(corp_id, src_key),
-                                   processor_reservation(w, reg, corp_id, src_key)).first;
+                                   auto_surplus_reservation(w, reg, corp_id, src_key)).first;
             const std::array<float, resource_count> reserve = rit->second;
 
             for (std::size_t ri = 0; ri < resource_count; ++ri)
@@ -1510,8 +1643,6 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                 // BL-708: a grid good is never cargo (price_convoy_leg refuses
                 // it too; skipped here before any leg is priced).
                 if (grid_rules.grid(ri))
-                    continue;
-                if (order_controlled.count({corp_id, src_body, ri}) != 0)
                     continue;
 
                 // Live pool read: an earlier commit in this pass (a launch's
@@ -1529,7 +1660,12 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                 // sold at home at all — a market-less body's body-level pool,
                 // or a home market that does not price the good (auto-surplus
                 // lists neither). Any positive net price then beats home.
-                const float price_src = dispatch_home_price(w, src_key, ri);
+                //
+                // BL-1229: under a standing sell order the home price the rule
+                // weighs is max(home, floor) — the order accepts no sale below
+                // its floor, so a haul must beat the floor as it beats home, and
+                // `landed` below (the room's aim) is floor + haul.
+                const float price_src = dispatch_source_price(w, order_floor, corp_id, src_key, ri);
                 const float gate      = price_src + margin * price_src;
 
                 // Every destination that clears the margin, with its net price.
@@ -1545,24 +1681,38 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                         continue;
                     const market_component& dm = w.markets.at(dest_id);
                     const float price_d = dispatch_market_price(dm, ri);
+                    const bool  tf_rec  = tf_player && tf_short(dest_id, ri);
                     // net(d) <= price_d (a haul is never negative), so a
                     // destination whose GROSS price cannot clear the gate cannot
                     // clear it net: skip it before routing a leg.
                     if (!(price_d > gate))
+                    {
+                        if (tf_rec)
+                            tf_note(dest_id, ri, trade_refusal::gate);
                         continue;
+                    }
                     const convoy_leg leg = price_convoy_leg(
                         w, reg, nodes, corp_id, src_key, dest_id, ri, probe_qty,
                         logistics_cost_space,
                         dm.body == src_body ? pool_origin() : nullptr);
                     if (!leg.viable)
+                    {
+                        if (tf_rec)
+                            tf_note(dest_id, ri, dm.body == src_body ? trade_refusal::no_route
+                                                                     : trade_refusal::no_lane);
                         continue; // unroutable / unpadded / unfuelled / same market
+                    }
                     const float haul = leg.cost / probe_qty;
                     const float net  = price_d - haul;
                     // The margin gate: net(d) - price_src > margin x price_src.
                     // With no home price this reduces to net(d) > 0.
                     if (!(net - price_src > margin * price_src))
+                    {
+                        if (tf_rec)
+                            tf_note(dest_id, ri, trade_refusal::costly);
                         continue;
-                    cands.push_back({net, dest_id, haul, leg.mode == convoy_mode::space});
+                    }
+                    cands.push_back({net, dest_id, haul, leg.mode == convoy_mode::space, price_d});
                 }
                 if (cands.empty())
                     continue;
@@ -1577,8 +1727,11 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                 // take the cargo at a price above its landed cost, so the next-
                 // best destination that still beats home by the margin takes it,
                 // rather than the cargo defaulting to a home sale.
+                std::size_t tf_tried = 0; // BL-1222: candidates the loop below reached
                 for (const candidate& c : cands)
                 {
+                    ++tf_tried;
+                    const bool  tf_rec = tf_player && tf_short(c.dest, ri);
                     const float landed = price_src + c.haul;
                     const float room =
                         dispatch_room(w, reg, c.dest, ri, landed, corp_ids, memo);
@@ -1588,14 +1741,31 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                     if (c.space && launch_draw[ri] > 0.0f)
                         qty = std::min(qty, pool_qty - launch_draw[ri]);
                     if (!(qty > 0.0f) || !std::isfinite(qty))
+                    {
+                        // BL-1222: the propellant clamp is the source's own limit
+                        // and ranks below the destination's room, so it is named
+                        // whenever it zeroes the send, room or none.
+                        if (tf_rec)
+                            tf_note(c.dest, ri,
+                                    (c.space && launch_draw[ri] > 0.0f
+                                     && !(pool_qty - launch_draw[ri] > 0.0f))
+                                        ? trade_refusal::no_propellant
+                                        : trade_refusal::no_room);
                         continue;
+                    }
 
                     // Re-price the committed leg at its real quantity.
                     const convoy_leg leg = price_convoy_leg(
                         w, reg, nodes, corp_id, src_key, c.dest, ri, qty,
                         logistics_cost_space, c.space ? nullptr : pool_origin());
                     if (!leg.viable)
+                    {
+                        if (tf_rec)
+                            tf_note(c.dest, ri, w.markets.at(c.dest).body == src_body
+                                                    ? trade_refusal::no_route
+                                                    : trade_refusal::no_lane);
                         continue;
+                    }
 
                     // Commit through the shared path: the solvency gate, the
                     // passive-LP gate (BL-597), the pool debit, the propellant
@@ -1614,11 +1784,56 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
                         ++out.dispatched;
                         if (sent < qty)
                             ++out.trimmed_by_lp;
+                        // BL-1229 review: a hauled pool keeps its order.
+                        if (order_floor.count({corp_id, src_body, ri}) != 0)
+                            w.hauled_ordered_this_tick.insert({corp_id, src_body, ri});
+                        if (tf_player)
+                        {
+                            tf.shipments.push_back({src_key, c.dest,
+                                                    static_cast<std::uint16_t>(ri), sent,
+                                                    c.price_d});
+                            if (tf_rec)
+                                tf_note(c.dest, ri, trade_refusal::sent);
+                        }
                     }
-                    else if (refused_no_lp)
-                        ++out.refused_no_lp;
+                    else
+                    {
+                        if (refused_no_lp)
+                            ++out.refused_no_lp;
+                        // Refused at commit: the LP cap (`room`, held back), or
+                        // otherwise solvency — with a viable leg and a known
+                        // corp, commit_convoy's only other refusal.
+                        if (tf_rec)
+                            tf_note(c.dest, ri, refused_no_lp ? trade_refusal::room
+                                                              : trade_refusal::no_funds);
+                    }
                     break; // one destination per (pool, good) per pass
                 }
+
+                // BL-1222: the candidates the one-destination rule never reached.
+                // They cleared the margin; whether they had room is one extra
+                // `dispatch_room` read each — a pure query (its memo is a cache
+                // of values this pass never changes), paid for the player only,
+                // and only for a short destination. The propellant clamp is read
+                // as the loop above reads it; solvency is not knowable without
+                // committing, so an unreached candidate is never `no funds`.
+                if (tf_player)
+                    for (std::size_t k = tf_tried; k < cands.size(); ++k)
+                    {
+                        const candidate& c = cands[k];
+                        if (!tf_short(c.dest, ri))
+                            continue;
+                        if (c.space && launch_draw[ri] > 0.0f
+                            && !(pool_qty - launch_draw[ri] > 0.0f))
+                        {
+                            tf_note(c.dest, ri, trade_refusal::no_propellant);
+                            continue;
+                        }
+                        const float room = dispatch_room(w, reg, c.dest, ri, price_src + c.haul,
+                                                         corp_ids, memo);
+                        tf_note(c.dest, ri,
+                                room > 0.0f ? trade_refusal::room : trade_refusal::no_room);
+                    }
             }
         }
     }
@@ -1626,6 +1841,11 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
     // BL-1071 — A MARKET EXPORTS ITS OWN SHELF, after every corporation has
     // claimed the room it wanted (SUPPLY.md § Dispatch trigger).
     export_market_shelves(w, reg, nodes, corp_ids, market_ids, memo, &pools_by_body, out);
+
+    // BL-1222: roll the player's record into the lens's trailing window.
+    w.player_trade_flow.push_back(std::move(tf));
+    while (w.player_trade_flow.size() > world::trade_flow_window)
+        w.player_trade_flow.erase(w.player_trade_flow.begin());
 
     (void)logistics_cost_land; // intra-body reads reg.logistics_cost(land/sea) directly; this
                                // param is retained for caller/signature stability.

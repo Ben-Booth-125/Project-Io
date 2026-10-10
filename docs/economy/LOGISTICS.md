@@ -150,6 +150,24 @@ about its *connectedness* rather than about its ground. That is a supply asymmet
 player can read and change, which is what `docs/generation/GENERATION_STRATEGY.md` § Asymmetry is the
 deliverable asks generation to produce.
 
+**The province is the grid's cell (Ben, 2026-10-07; BL-1230, power crosses markets).** A province
+with a road in it is **wired**, and every building in a wired province is on the power grid there —
+the province, not the building's own tile, is what the road has to reach. Wired provinces whose
+roads join form **one grid**: a building in any of them draws from any generator on that grid,
+across market boundaries, on the one-tick latency above. A building pays **its own market's power
+price**, cleared against the generation on its grid, so power keeps a market price while its
+supply is the grid's. A province with no road is dark, and a cut that splits the roads splits the
+grid (§ 7). **A market's shelf is on its centre's grid (Ben, 2026-10-07):** power listed into a
+market feeds the grid that market's centre stands on, and a building bids at its own market — so
+"on the grid" is read through the market centre, which keeps power on the ordinary per-market shelf
+(measured: buildings on a grid other than their market centre's hold 1.3–2.1% of power need).
+Pooled over a grid, the shelf's share in the price law (`MARKETS.md` § Price resolution, at most
+k ticks of demand) is capped once, at the grid, not once per market on it. A
+wired grid with no generation on it runs short and decays like any short draw; the answer is
+generation on that grid, not a softer rule. Found by the BL-1228 (mine upkeep supply) diagnosis: power held on one market's shelf
+never reached a mine in the next market's catchment, and that alone held most mines at the
+shortfall floor.
+
 `docs/economy/PRODUCTION.md` § Power owns the generation buildings, the upkeep draw and the
 shortfall rule; this section owns only the transmission.
 
@@ -164,8 +182,10 @@ and rasterisation along each edge's A\* path taking the **max** `road_level` on 
 **A road is not built where a road already serves (Ben, 2026-09-25, walking round 6: "it should
 be heavily discouraged to build a lattice of roads").** The tree comes first. A further link
 between two centres is laid only when the network's own route between them costs more than
-**twice** the direct route — the detour test, one number. A second road beside a serviceable one
-is never built, and a loop exists only where the tree forces a long way round. This replaces
+**twice** the direct route — the detour test, one number. A second link between two centres a
+serviceable route already joins is never built, and a loop exists only where the tree forces a
+long way round. The test reads links, not tiles: two links can still lay side-by-side runs on
+the raster, which the snap (below) makes rare, not absent. This replaces
 the relative-neighbour redundancy edges, which laid the lattice.
 
 The test is read on the **town graph**, not the raster: the network's route is the cheapest chain
@@ -199,10 +219,38 @@ joins its own nation's backbone**: the network it must reach is its nation's own
 nation's towns, never another nation's (a border link is a Track between two networks, not part of
 either backbone), and the join runs over the nation's own land. A market whose nation holds no
 town has no backbone and stays off it, counted.
-**One cost model** (§ 1): every route is priced with `tile_traversal_cost` on the field as it
-stands. The **direct route** walks any land and any strait of up to two shore-water cells, never
-open ocean; every link is laid along it, so it reuses the roads that already shorten it. Catchments
-are grid-nearest, so these roads move no catchment and no fold.
+**One cost model** (§ 1): every route is priced with `tile_traversal_cost`. The **direct route**
+walks any land and any strait of up to two shore-water cells, never open ocean; every link is
+priced along it, so it reuses the roads that already shorten it, and laid along it as the snap
+(below) reshapes it. Catchments are grid-nearest, so these
+roads move no catchment and no fold. **Within a pass, a route is priced on the field its
+destination's cost flood was first built on (Ben, 2026-10-09):** the floods are reused, not
+rebuilt after every stamp, which is what keeps the road passes inside their time budget —
+rebuilding after every stamp measured 2.5–4× slower on the sixteen curated seeds. So a link reuses
+the roads that stood when its destination's flood was built, and one laid later can run beside
+it. **What is laid is the priced route, reshaped by the snap** (BL-1252, no parallel roads —
+the item's handle; the snap makes long parallels rare, below).
+Before a national route (tree, loop, spur, border link) or an ancient corridor is stamped, every
+stretch of it that would lay two or more consecutive new land tiles, each within one cell (Chebyshev) of a road the route does
+not hold, is re-walked over the stretch and the road cells beside it. The re-walk minimises new
+ground, not cost: a road cell counts 1 and a new tile 4. It replaces the stretch only when it
+lays fewer new tiles, keeps the route simple (no cell visited twice), and costs no more than
+**1.75×** the stretch it replaces. Both are priced on the one cost model, on the field as the
+stamp leaves it. So a laid link may cost up to that factor more than its priced route over a
+snapped stretch. No flood is rebuilt for it. The snap also catches a route that a current flood
+priced one cell off a road it nearly tied with.
+
+The snap answers the **adjacent-run** measure: two roads in side-by-side cells (d = 1). It
+leaves, by construction:
+- a parallel two cells apart;
+- a run of one new tile;
+- a stretch whose re-walk would fold the route or pass the cost bound;
+- contact by diagonal only;
+- the market joins, pulls and trunk, which are not snapped.
+
+Long side-by-side runs are therefore rare, not absent. On the sixteen curated seeds, pairs of
+routes running side by side for eight or more tiles fall from 235 to 59. A current flood on
+every route reads 103.
 
 Three readings, accepted by Ben (2026-10-03) and kept as readings: a trunk link's tier is the gate at the
 **lower** of its two nations' percentiles; **the network route** is the same walk over

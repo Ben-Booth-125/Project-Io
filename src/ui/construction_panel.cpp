@@ -498,6 +498,8 @@ void draw_construction_panel(world& w,
     ui.construction_ui.member_x = ui.construction_ui.member_y = -1.0f;
     ui.construction_ui.member   = null_entity;
     ui.construction_ui.levers_for = null_entity;
+    ui.construction_ui.door_tile  = null_entity;
+    ui.construction_ui.door_recipes.clear();
 
     if (p_open && !*p_open)
         return;

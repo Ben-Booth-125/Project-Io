@@ -53,7 +53,9 @@
 //
 // THE ANCHOR ROUTE AND THE ALTERNATES (NR-780). A good with several in-band
 // routes is priced off its CHEAPEST route — lowest marginal cost per unit of
-// primary output — and that route must clear k. Every other route must clear
+// primary output — and that route must clear k. The cheapest route a body WITH
+// AIR may run: a recipe authored `air = "airless"` is never the anchor, because
+// the table prices the home-body markets (propellant, Ben 2026-10-09). Every other route must clear
 // k_alt = economy.recipe_margin_anchor.alternate_profit_over_marginal (0.0:
 // profitable at base, no more) and M2 regardless. Demanding k of every route at
 // one price would force every route to the same input cost, which erases the
@@ -67,8 +69,10 @@
 // bands are checked below against the same table.
 //
 // WHAT IS EXEMPT, AND SAYS SO. A recipe whose every output carries base_price 0
-// (propellant: "consumed by the Launchpad, never sold", RESOURCES.md) has no
-// market margin to anchor and is listed as UNPRICED rather than failed. A recipe
+// has no market margin to anchor and is listed as UNPRICED rather than failed.
+// No recipe in the roster qualifies: propellant, the one good that once did,
+// carries a base price (RESOURCES.md, Ben 2026-10-08), so both Chemical Plant
+// routes are anchored like every other row. A recipe
 // with an UNPRICED INPUT is a defect, not an exemption — the input cannot be
 // bought at any price — and R5 fails on it.
 //
@@ -291,6 +295,12 @@ int main()
             const resource_type po = primary_output_resource(rc);
             const std::size_t   pi = static_cast<std::size_t>(po);
             if (rc.outputs[pi] <= 0.0f || price[pi] <= 0.0f)
+                continue;
+            // The table prices the HOME-BODY markets, and the home body has air.
+            // A route that runs only on an airless body (propellant_electrolysis;
+            // routes follow the body's air, Ben 2026-10-09) is never the anchor
+            // it could undercut — it is an alternate, cleared at k_alt.
+            if (rc.air == recipe_air::airless)
                 continue;
             double inp = 0.0;
             for (std::size_t r = 0; r < resource_count; ++r)

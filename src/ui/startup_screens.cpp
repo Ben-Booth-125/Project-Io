@@ -177,6 +177,26 @@ void app::open_new_world_wizard()
     m_pending_world_params.prehistory_years = 400;
 }
 
+void app::quick_start()
+{
+    // QUICK START (STARTUP.md § Main menu; Ben, 2026-10-08): the menu's seed
+    // and resources, straight through with no wizard round drawn. It is NOT a
+    // second generation path: it is Begin with no wizard behind it, so
+    // begin_new_game takes its cold case (launch_cold_build --
+    // make_hard_coded_world, then finish_campaign_world, the call round 6
+    // makes), behind the one loading bar, and poll_worldgen lands on the seat
+    // canvas exactly as the wizard's Begin does. Same settings, same world
+    // (§ Handoff: a cold build and an adopted world open on one state hash).
+    //
+    // The wizard's one write on the way in is made here too, so the
+    // parameters Begin consumes are the ones the wizard would have handed it.
+    m_pending_world_params.prehistory_years = 400;
+    std::printf("[quick start] seed %08X: building cold, no wizard rounds\n",
+                m_pending_world_params.seed);
+    std::fflush(stdout);
+    begin_new_game();
+}
+
 void app::refresh_wizard_preview()
 {
     // Preferences are not parameters, so they are resolved against the seed FIRST.
@@ -1555,6 +1575,12 @@ void app::draw_main_menu()
         if (ImGui::Button("New Game", btn))
             open_new_world_wizard();
         ImGui::Dummy({0.0f, 6.0f});
+        if (ImGui::Button("Quick Start", btn))
+            quick_start();
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Build this seed's world straight through, past the rounds,\n"
+                              "and choose your corporation.");
+        ImGui::Dummy({0.0f, 6.0f});
         if (ImGui::Button("Quit", btn))
             m_quit_requested = true;
     }
@@ -2171,9 +2197,12 @@ void app::draw_generation_screen()
                     };
                     const char* const label = k_loading[lapse_index];
                     const float w  = ImGui::GetContentRegionAvail().x;
-                    const float h2 = ImGui::GetContentRegionAvail().y;
                     const ImVec2 sz = ImGui::CalcTextSize(label);
-                    ImGui::Dummy({w, std::max(0.0f, h2 * 0.40f)});
+                    // THE TOP BAND (Ben, 2026-10-08): the bar sits on
+                    // ui::loading_bar_y(), so the label is padded to one line
+                    // plus the wait's 10 px gap above it -- not 40% down.
+                    ui::pad_to_loading_band(ImGui::GetTextLineHeightWithSpacing() + 10.0f
+                                            + ImGui::GetStyle().ItemSpacing.y);
                     if (w > sz.x)
                         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (w - sz.x) * 0.5f);
                     ImGui::TextUnformatted(label);

@@ -1,6 +1,9 @@
 #pragma once
+#include "components.hpp" // market_want (BL-1227)
 #include "entity.hpp"
 #include "nation_ai.hpp"
+
+#include <vector>
 
 struct world;
 struct economy_report;
@@ -87,6 +90,13 @@ struct earmark_result
 ///
 void run_nation_step(world& w, const recipe_registry& reg, economy_report& report,
                      int econ_tick);
+
+/// BL-1227 (AI_OPPONENT.md § 2B, Ben 2026-10-08): record each off-book WANT the
+/// state purchase derivations returned as an unposted bid
+/// (`note_unposted_bid`) at its market, at `w.current_econ_tick`. A row with no
+/// market — wanted, and held nowhere — is recorded at the nation's capital
+/// market; a row whose market is a market-less pool key resolves the same way.
+void record_market_wants(world& w, const std::vector<market_want>& wants);
 
 // ---------------------------------------------------------------------------
 // BL-571 — garrison upkeep, the `military_research` line's first consumer

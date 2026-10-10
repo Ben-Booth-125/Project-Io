@@ -221,6 +221,28 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
 /// disagree.
 void draw_production_method_section(world& w, const recipe_registry& reg, entity_id id);
 
+/// The method grid's OFFER for building @p b: the browse indices (recipe_at) of
+/// the rows the grid lists — same group as the active recipe, and runnable on
+/// the building's body's air (the active recipe always listed). The one list
+/// `draw_production_method_section` draws from; exposed so a verify check reads
+/// what the grid offers rather than re-deriving it.
+std::vector<int> method_grid_candidates(const world& w, const recipe_registry& reg,
+                                        const building_component& b);
+
+/// The method grid's Switch press onto ABSOLUTE recipe id @p recipe for building
+/// @p id: `try_switch_recipe` for the player, and the refusal recorded for the
+/// status line under the grid. The one body the grid's own button runs.
+recipe_switch_result method_grid_press(world& w, const recipe_registry& reg, entity_id id,
+                                       std::uint16_t recipe);
+
+/// The status line the grid draws under building @p id's rows after a refused
+/// press, or "" when there is none.
+const char* method_grid_status(entity_id id);
+
+/// The building whose grid actually DREW that status line on the grid's last
+/// drawn frame, `null_entity` when it drew none. Read by the air_gate check.
+entity_id method_grid_status_drawn_for();
+
 /// The **Workforce** lever — the placeholder trend graph plus the 0-100 slider that
 /// writes `workforce_target` and clears `workforce_auto` (a manual edit pins the
 /// target). Relocated off the Selection card by the same 2026-08-29 ruling as

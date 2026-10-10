@@ -454,6 +454,11 @@ enum class charter_unspent_reason : std::uint8_t
                            ///< the body (no Well or ice route, for water) and no recipe for
                            ///< it from producible inputs — so it is out of G by rule. The
                            ///< want is real and no firm on this body could ever serve it.
+    no_short_grid_ground = 13, ///< BL-1232 (power plants per grid): a POWER firm's windows held
+                               ///< anchorable ground (under the province cap), but none of it
+                               ///< feeds a short grid it may serve — its tile's market centre is
+                               ///< on no such grid (`tile_feed_power_grid`; unpowered short
+                               ///< grids first, Ben 2026-10-08).
 };
 
 inline const char* charter_unspent_reason_name(charter_unspent_reason r)
@@ -473,11 +478,12 @@ inline const char* charter_unspent_reason_name(charter_unspent_reason r)
     case charter_unspent_reason::no_specialist:    return "no_specialist";
     case charter_unspent_reason::chain_infeasible: return "chain_infeasible";
     case charter_unspent_reason::unproducible:     return "unproducible";
+    case charter_unspent_reason::no_short_grid_ground: return "no_short_grid_ground";
     }
     return "?";
 }
 
-constexpr int charter_unspent_reason_count = 13;
+constexpr int charter_unspent_reason_count = 14;
 
 /// Which anchor rung a charter landed on. There is no third rung: a charter that
 /// finds no ground in either is UNSPENT, never scattered nation-wide.

@@ -225,7 +225,7 @@ inline shipped_landscape apply_shipped_landscape(
 
     // load_economy's pass. Idempotent, so a caller that already ran it pays one
     // map walk and nothing else.
-    assign_default_recipes(w, reg);
+    assign_default_recipes(w, reg, "finish: before the search");
 
     std::vector<entity_id> before;
     before.reserve(w.corporations.size());
@@ -282,7 +282,7 @@ inline shipped_landscape apply_shipped_landscape(
 
     // app.cpp's second pass, and not belt-and-braces: without it every processor
     // a background firm authored keeps `no_recipe` for the whole campaign.
-    assign_default_recipes(w, reg);
+    assign_default_recipes(w, reg, "finish: after the winner");
 
     std::vector<entity_id> after;
     after.reserve(w.corporations.size());
@@ -476,7 +476,7 @@ inline void build_app_base_world(lua_state& lua, const world_params& params,
     // app.cpp:1176 ensure_works_loaded: already loaded above. app.cpp:1180-1181
     // (tech_tree.lua) and 1220-1228 (persona bench) write no world state, and
     // app.cpp:1209-1221 only reads it.
-    assign_default_recipes(out.w, out.reg);    // app.cpp:1193
+    assign_default_recipes(out.w, out.reg, "load_economy"); // app.cpp:1193
 }
 
 /// The second half of `build_app_start_world`: the landscape phase, on the world

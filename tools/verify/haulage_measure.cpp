@@ -13,16 +13,19 @@
 // clothes. This harness measures the number, so the multiplier in
 // scripts/economy.lua can be re-derived rather than trusted.
 //
-// WHAT IT MEASURES. Exactly the cost `dispatch_convoys` charges
-// (supply_system.cpp): for an intra-body leg,
+// WHAT IT MEASURES. Exactly the cost a market's own export leg is charged:
+// `price_market_export_leg` (supply_system.cpp) at one unit, the router the
+// dispatcher and placement both ask (BL-1186). Per leg,
 //
-//     haulage_per_unit = logistics_cost(mode) * path.cost * (1 - node_discount)
+//     logistics_cost(mode) * leg path cost * (1 - node_discount)
 //
-// where path.cost is the terrain-weighted A* cost (logistics.hpp) between the
-// two markets' centre tiles, mode is sea when the path crosses ocean, and the
-// node discount is the BL-148/149 city/hub discount along that same path. It
-// walks every market and finds its NEAREST market neighbour by that cost — the
-// "nearby market" of the requirement — and reports the distribution.
+// summed over one land leg, or land -> port -> sea -> port -> land through two
+// active Ports, plus the port handling at each Port; the node discount is the
+// BL-148/149 city/hub discount on each land leg. It walks every market and
+// finds its NEAREST market neighbour by that cost — the "nearby market" of the
+// requirement — and reports the distribution. A pair the router refuses is no
+// neighbour. (BL-1165 re-pointed this at the router; it had carried its own
+// copy of the pre-BL-1186 per-leg pricing.)
 //
 // THE DERIVATION IT FEEDS. A seller in market A can serve a scarce market B only
 // if the scarcity price clears the base price plus the haul:
@@ -40,7 +43,8 @@
 // authored data and the assertions on it live in price_band_harness.cpp. Its one
 // assertion is a vacuity guard: that it measured a world with markets in it.
 //
-// Run: .\build\haulage_measure.exe [seeds] [ticks] [--per-tick]
+// Run: .\build\haulage_measure.exe [seeds] [ticks] [--per-tick] [--no-snap]
+// (--no-snap, either mode: roads laid with BL-1252's snap off, an isolated reading)
 //
 // --per-tick (BL-978) prints the dispatch count of EVERY tick, pooled over the
 // seeds, after the totals. It is the instrument that sized the winner's
@@ -115,6 +119,7 @@
 #include "world/market_clearing.hpp"
 #include "world/nation_step.hpp"
 #include "world/resource_names.hpp"
+#include "world/road_generation.hpp" // g_road_probe_no_snap (--no-snap, BL-1119 R6)
 #include "world/supply_system.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/tech_gate.hpp"
@@ -898,6 +903,20 @@ int run_far_trade(int argc, char** argv)
 
 int main(int argc, char** argv)
 {
+    // --no-snap (BL-1119 R6, a measurement switch): lay roads with BL-1252's snap
+    // off (g_road_probe_no_snap, road_generation.hpp), so a reading can isolate
+    // the snap. Verify-only; stripped here so both modes accept it anywhere.
+    {
+        int out = 1;
+        for (int i = 1; i < argc; ++i)
+        {
+            if (std::strcmp(argv[i], "--no-snap") == 0) { g_road_probe_no_snap = true; continue; }
+            argv[out++] = argv[i];
+        }
+        argc = out;
+        if (g_road_probe_no_snap)
+            std::printf("[haulage_measure] --no-snap: BL-1252's road snap is OFF (measurement)\n");
+    }
     for (int i = 1; i < argc; ++i)
         if (std::strcmp(argv[i], "--far-trade") == 0)
             return run_far_trade(argc, argv);
@@ -959,6 +978,8 @@ int main(int argc, char** argv)
         // The landscape-search WINNER, as the app applies it — not the seed
         // candidate (BL-979; apply_shipped_landscape in harness_params.hpp).
         print_shipped_landscape(apply_shipped_landscape(w, reg, static_cast<uint32_t>(s)));
+        // The node set the router discounts against, as the dispatcher collects it.
+        const logistics_nodes nodes = collect_logistics_nodes(w);
 
         // Sorted id walk (standing.hpp convention) — markets is an unordered_map.
         std::vector<entity_id> mids;
@@ -1021,27 +1042,21 @@ int main(int argc, char** argv)
                     const entity_id tb = w.markets.at(b).centre_tile;
                     if (tb == null_entity)
                         continue;
-                    // Read cost/mode out of the cache reference immediately —
-                    // it is only valid until an invalidation.
-                    double cost;
-                    bool   sea;
-                    {
-                        const logistics_path& path = intra_body_path(w, body, ta, tb);
-                        if (!path.reachable)
-                            continue;
-                        cost = static_cast<double>(path.cost);
-                        sea  = path.crosses_ocean;
-                    }
-                    const double unit = static_cast<double>(
-                        reg.logistics_cost(sea ? convoy_mode::sea : convoy_mode::land));
-                    // The node discount needs the path tiles; recompute against the
-                    // same cached path. Deliberately NOT applied here: the discount
-                    // is a corp-built optimisation (cities/hubs on the route) and the
-                    // day-1 case the requirement names has neither. Measuring the
-                    // UNDISCOUNTED haul is the conservative side — it is the cost a
-                    // day-1 trader actually pays, and the discount only makes the
-                    // derived ceiling more than sufficient.
-                    const double haul = unit * cost;
+                    // THE ROUTER'S OWN PRICE (BL-1165, after BL-1186): one unit
+                    // priced by price_market_export_leg — the call the dispatcher
+                    // and BL-1185's placement both ask — never a local copy of the
+                    // per-leg arithmetic. It routes land, or land -> port -> sea ->
+                    // port -> land through two active Ports, applies the node
+                    // discount on each land leg and the handling at each port. A
+                    // pair it refuses (no overland path and no port pair) is a pair
+                    // no convoy can run, so it is no neighbour here either. The
+                    // retired copy priced the whole unconfined A* path at the sea
+                    // rate whenever it touched water, undiscounted and unhandled.
+                    const convoy_leg leg = price_market_export_leg(w, reg, nodes, a, b, 1.0f);
+                    if (!leg.viable)
+                        continue;
+                    const bool   sea  = leg.mode == convoy_mode::sea;
+                    const double haul = static_cast<double>(leg.cost);
                     all_pair_haul.push_back(haul);
                     if (haul < best)
                     {

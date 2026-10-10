@@ -28,7 +28,9 @@
 #include <cstdio>
 #include <iterator>
 #include <limits>
+#include <map>
 #include <string>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -1345,18 +1347,92 @@ void draw_supply_routes_key(const world& w, const std::vector<supply_edge>& edge
                          "Supply routes", rows, "no lanes from this body", nullptr, state);
 }
 
-/// BL-362: bumps whenever the logistics caches were cleared since the last look.
-/// invalidate_logistics_caches fires on every build/demolish/completion/road event,
-/// so a shrink of world.astar_cost_cache is the one cheap signal that covers them
-/// all; growth (ordinary path queries filling the cache) never bumps.
-std::uint32_t logistics_generation(const world& w)
+/// --- Trade-flow lens (BL-1222; LENSES.md § Trade-flow lens) -------------------
+/// The refusal classes' on-screen names, indexed by `trade_refusal` up to `room`:
+/// the CORPORATION dispatcher's rules, worst first (LENSES.md § Trade-flow lens).
+/// The market-viability skill's logistics row classifies MARKET SHELF exports, a
+/// different dispatcher with its own order and its own labels; these are not those.
+constexpr int k_trade_refusal_count = 8;
+constexpr const char* k_trade_refusal_name[k_trade_refusal_count] = {
+    "no lane", "price gate", "no route", "costly",
+    "no propellant", "no room", "no funds", "room",
+};
+static_assert(static_cast<int>(trade_refusal::room) + 1 == k_trade_refusal_count,
+              "one name per refusal class");
+static_assert(std::size(palette::trade_refusal_colour) == k_trade_refusal_count,
+              "one colour per refusal class");
+
+/// Arrow stroke width for a flow of @p rate units/tick against the body's
+/// heaviest flow @p max_rate: 1.5 px for a trickle, 7 px at the heaviest.
+float trade_flow_width(float rate, float max_rate)
 {
-    static std::size_t   last_size = 0;
-    static std::uint32_t gen       = 0;
-    const std::size_t size = w.astar_cost_cache.size();
-    if (size < last_size) ++gen;
-    last_size = size;
-    return gen;
+    const float t = (max_rate > 0.0f) ? std::clamp(rate / max_rate, 0.0f, 1.0f) : 0.0f;
+    return 1.5f + 5.5f * t;
+}
+
+/// The Trade-flow lens key: the class ramp (colour -> class, worst first) and the
+/// flow-width scale in units per tick. A fixed-height key, so it takes the
+/// begin_lens_key chrome and draws open.
+void draw_trade_flow_key(ImDrawList* dl, const ui_state& state, float max_rate, int flows,
+                         int markers)
+{
+    const float pad    = 8.0f;
+    const float line_h = ImGui::GetTextLineHeight();
+    const float row_h  = line_h + 2.0f;
+    const float sw     = 10.0f;
+
+    const float body_h = pad + line_h + 4.0f + line_h + 2.0f
+                       + static_cast<float>(k_trade_refusal_count) * row_h + 6.0f
+                       + line_h + 2.0f + 3.0f * row_h + pad;
+    float x, y, inner_w;
+    begin_lens_key(dl, state, body_h, pad, x, y, inner_w);
+    (void)inner_w;
+
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Trade flow (your surplus)"); // fit-exempt: legend box sized to its measured entries (container 2)
+    y += line_h + 4.0f;
+
+    char buf[96];
+    std::snprintf(buf, sizeof buf, "Not sent, best reason (%d)", markers);
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), buf); // fit-exempt: legend box sized to its measured entries (container 2)
+    y += line_h + 2.0f;
+    for (int i = 0; i < k_trade_refusal_count; ++i)
+    {
+        const ImVec2 c{ x + sw * 0.5f + 1.0f, y + line_h * 0.5f };
+        dl->AddCircleFilled(c, sw * 0.5f + 1.5f, IM_COL32(10, 12, 18, 230), 12);
+        dl->AddCircleFilled(c, sw * 0.5f, palette::trade_refusal_colour[i], 12);
+        dl->AddText({x + sw + 8.0f, y}, IM_COL32(220, 220, 228, 255), k_trade_refusal_name[i]); // fit-exempt: legend box sized to its measured entries (container 2)
+        y += row_h;
+    }
+    y += 6.0f;
+
+    std::snprintf(buf, sizeof buf, "Shipped, units/tick (%d)", flows);
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), buf); // fit-exempt: legend box sized to its measured entries (container 2)
+    y += line_h + 2.0f;
+    const float fracs[3] = { 1.0f, 0.5f, 0.1f };
+    for (const float f : fracs)
+    {
+        const float wpx = trade_flow_width(f * max_rate, max_rate);
+        const float ly  = y + line_h * 0.5f;
+        dl->AddLine({x, ly}, {x + 36.0f, ly}, palette::trade_flow_arrow, wpx);
+        if (max_rate > 0.0f)
+            std::snprintf(buf, sizeof buf, "%.3g", f * max_rate); // 3 significant: a trickle reads, not 0.0
+        else
+            std::snprintf(buf, sizeof buf, "%s", "no shipments");
+        dl->AddText({x + 44.0f, y}, IM_COL32(220, 220, 228, 255), buf); // fit-exempt: legend box sized to its measured entries (container 2)
+        y += row_h;
+        if (!(max_rate > 0.0f))
+            break;
+    }
+}
+
+/// BL-362: changes whenever the logistics caches were cleared since the last look.
+/// BL-1195: read off world::logistics_cache_generation, which
+/// invalidate_logistics_caches and a load bump — exact, where the old proxy (a
+/// shrink of world.astar_cost_cache between two looks) missed a clear that was
+/// refilled before the next frame.
+std::uint64_t logistics_generation(const world& w)
+{
+    return w.logistics_cache_generation;
 }
 
 /// BL-362 rebuild stamp for the per-frame derived views (vision model, marker
@@ -1369,7 +1445,7 @@ struct body_frame_stamp
     std::size_t   buildings = 0;
     std::size_t   convoys   = 0;
     std::size_t   units     = 0; // BL-575: invalidates the unit-marker groups on hire/disband; a march ORDER doesn't move a unit until a tick advances, which day_tick already catches.
-    std::uint32_t logi_gen  = ~0u; // default never matches a live stamp
+    std::uint64_t logi_gen  = ~0ull; // default never matches a live stamp
     bool operator==(const body_frame_stamp&) const = default;
 };
 
@@ -1794,6 +1870,24 @@ void update_body_vision(world& w, ui_state& state, double now_days)
     // Layer 3 (moving): the tile path + progress/speed of each live player intra-body
     // convoy, oriented src→dst. The renderer interpolates a head along it and trails a
     // dimming tail one econ tick's travel behind.
+    //
+    // BL-1195: a lane and its clock are a function of the convoy's endpoints and Ports
+    // and of the network, and the network changes only when the logistics caches are
+    // dropped. So each convoy's route is CACHED here, keyed on its id and the world's
+    // logistics_cache_generation (bumped by invalidate_logistics_caches and on load),
+    // with the route-defining fields kept beside it as a guard. A re-route — a road
+    // laid, a Port idled — bumps the generation and the next read rebuilds. View
+    // state only: nothing here is saved, hashed or read by the sim.
+    struct cached_lane
+    {
+        std::uint64_t gen = 0;
+        entity_id     src = null_entity, dst = null_entity, origin = null_entity;
+        entity_id     port_a = null_entity, port_b = null_entity;
+        convoy_mode   mode = convoy_mode::land;
+        convoy_route  route;
+    };
+    static std::map<std::uint32_t, cached_lane> s_lanes;
+    std::map<std::uint32_t, cached_lane> live;
     for (const auto& cv : w.convoys)
     {
         if (cv.corp != w.player_entity) continue;
@@ -1802,11 +1896,33 @@ void update_body_vision(world& w, ui_state& state, double now_days)
         // (world/logistics.hpp), because interdiction has to ask the SAME question
         // ("which tile is this convoy on?") and a second private copy of the
         // orientation rule would be a silent, unrenderable divergence.
-        convoy_route route = convoy_route_tiles(w, cv);
-        if (route.body != body || route.tiles.empty()) continue;
-        state.convoy_beams.push_back(
-            { std::move(route.tiles), std::clamp(cv.progress, 0.0f, 1.0f), std::max(cv.speed, 0.0f) });
+        cached_lane entry;
+        const auto hit = s_lanes.find(cv.id);
+        if (hit != s_lanes.end() && hit->second.gen == w.logistics_cache_generation
+            && hit->second.src == cv.source_market && hit->second.dst == cv.dest_market
+            && hit->second.origin == cv.origin_tile && hit->second.port_a == cv.port_a
+            && hit->second.port_b == cv.port_b && hit->second.mode == cv.mode)
+        {
+            entry = std::move(hit->second);
+        }
+        else
+        {
+            entry.gen    = w.logistics_cache_generation;
+            entry.src    = cv.source_market;
+            entry.dst    = cv.dest_market;
+            entry.origin = cv.origin_tile;
+            entry.port_a = cv.port_a;
+            entry.port_b = cv.port_b;
+            entry.mode   = cv.mode;
+            entry.route  = convoy_route_tiles(w, cv);
+        }
+        if (entry.route.body == body && !entry.route.tiles.empty())
+            state.convoy_beams.push_back(
+                { entry.route.tiles, std::clamp(cv.progress, 0.0f, 1.0f),
+                  std::max(cv.speed, 0.0f), entry.route.at });
+        live[cv.id] = std::move(entry);
     }
+    s_lanes.swap(live); // convoys that arrived or were cut drop out of the cache
 }
 
 void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_registry& reg,
@@ -2422,10 +2538,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             const int n = static_cast<int>(cb.path.size());
             if (n == 0) continue;
             // Head glides: last econ-step progress + this tick's fraction of a step.
+            // BL-1195: read off the lane's clock (convoy_lane_index), so the head
+            // stands where the sim says the cargo is — land legs slower than sea.
             const float p    = std::clamp(cb.progress + cb.speed * frac, 0.0f, 1.0f);
-            const int   head = std::clamp(static_cast<int>(std::lround(p * (n - 1))), 0, n - 1);
+            const int   head = std::clamp(convoy_lane_index(cb.at, p), 0, n - 1);
             // Tail = one econ tick's travel in tiles (>=1), dimming to 0 at its far end.
-            const int   tail = std::max(1, static_cast<int>(std::lround(cb.speed * (n - 1))));
+            const int   tail = std::max(1, head - std::max(0, convoy_lane_index(cb.at, p - cb.speed)));
             for (int i = head; i >= 0 && i >= head - tail; --i)
             {
                 const float inten = 1.0f - static_cast<float>(head - i) / static_cast<float>(tail);
@@ -4683,6 +4801,203 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
+    // Trade-flow lens (BL-1222; LENSES.md § Trade-flow lens). Reads only the
+    // player's own dispatcher record (`w.player_trade_flow`, written by
+    // dispatch_convoys for the player corporation alone), so no rival shipment,
+    // shelf export or refusal can appear (DISCOVERY.md § Competitor visibility).
+    //
+    // FLOWS: one arrow per (source market, destination market, good) the player
+    // shipped within the trailing window, both ends on this body; width from the
+    // window's mean units per tick. REFUSALS: a marker beside each market of this
+    // body short of a good the player held in surplus and did not ship there,
+    // coloured by the best class over its goods (the closest any good came).
+    // The hover reads are resolved here and drawn after the input early-out.
+    struct tf_arrow
+    {
+        entity_id     src, dest;
+        std::uint16_t good;
+        float         rate;   // mean units per tick over the window
+        float         price;  // newest pass's destination price
+    };
+    struct tf_marker
+    {
+        entity_id market;
+        std::vector<std::pair<std::uint16_t, trade_refusal>> goods; // best class per good
+    };
+    std::vector<tf_arrow>  tf_arrows;
+    std::vector<tf_marker> tf_markers;
+    float                  tf_max_rate = 0.0f;
+    int                    tf_hover_arrow  = -1;
+    int                    tf_hover_marker = -1;
+    // THE HELD CORPORATION'S PASSES ONLY. Each pass is tagged with the corp it was
+    // taken for; after a seat change the window still holds the corporation left
+    // behind (now a rival), and drawing it would show that rival's flows as the
+    // player's. So the lens reads nothing until the held corp's first pass.
+    std::vector<const trade_flow_pass*> tf_passes;
+    if (state.overlay == overlay_mode::trade_flow)
+        for (const trade_flow_pass& p : w.player_trade_flow)
+            if (p.corp == w.player_entity && p.corp != null_entity)
+                tf_passes.push_back(&p);
+    if (state.overlay == overlay_mode::trade_flow && !tf_passes.empty())
+    {
+        const auto on_body = [&](entity_id m) {
+            const auto it = w.markets.find(m);
+            return it != w.markets.end() && it->second.body == state.active_body
+                   && it->second.centre_tile != null_entity
+                   && w.tiles.find(it->second.centre_tile) != w.tiles.end();
+        };
+        const auto centre_of = [&](entity_id m) {
+            const tile_component& t = w.tiles.at(w.markets.at(m).centre_tile);
+            return to_screen(hex_local_centre(t.grid_x, t.grid_y, hex_size));
+        };
+
+        // Aggregate the window, in a std::map so the draw order is fixed.
+        const float passes = static_cast<float>(tf_passes.size());
+        std::map<std::tuple<entity_id, entity_id, std::uint16_t>, std::pair<float, float>> agg;
+        for (const trade_flow_pass* p : tf_passes)
+            for (const trade_flow_shipment& s : p->shipments)
+            {
+                if (!on_body(s.source) || !on_body(s.dest))
+                    continue;
+                auto& e = agg[{s.source, s.dest, s.good}];
+                e.first += s.units;
+                e.second = s.price_d; // later passes overwrite: the newest price
+            }
+        for (const auto& [key, v] : agg)
+        {
+            const float rate = v.first / passes;
+            tf_arrows.push_back({std::get<0>(key), std::get<1>(key), std::get<2>(key), rate,
+                                 v.second});
+            tf_max_rate = std::max(tf_max_rate, rate);
+        }
+
+        // Refusals from the NEWEST matching pass: "why not this pass", not a blend.
+        {
+            std::map<entity_id, tf_marker> by_market;
+            for (const auto& [key, cls] : tf_passes.back()->best)
+            {
+                if (!on_body(key.first))
+                    continue;
+                tf_marker& m = by_market[key.first];
+                m.market = key.first;
+                m.goods.push_back({key.second, cls});
+            }
+            for (auto& [mid, m] : by_market)
+            {
+                // A market only carries a marker if some good there was NOT sent.
+                const bool refused = std::any_of(m.goods.begin(), m.goods.end(), [](const auto& g) {
+                    return g.second != trade_refusal::sent;
+                });
+                if (!refused)
+                    continue;
+                std::stable_sort(m.goods.begin(), m.goods.end(), [](const auto& a, const auto& b) {
+                    return static_cast<int>(a.second) > static_cast<int>(b.second);
+                });
+                tf_markers.push_back(std::move(m));
+            }
+        }
+
+        const float mkt_r   = std::max(3.0f, draw_r * 0.28f);
+        const float inset   = mkt_r * 1.8f;
+        const auto  seg_d2  = [](ImVec2 p, ImVec2 a, ImVec2 b) {
+            const float vx = b.x - a.x, vy = b.y - a.y;
+            const float l2 = vx * vx + vy * vy;
+            float t = (l2 > 0.0f) ? ((p.x - a.x) * vx + (p.y - a.y) * vy) / l2 : 0.0f;
+            t = std::clamp(t, 0.0f, 1.0f);
+            const float dx = p.x - (a.x + t * vx), dy = p.y - (a.y + t * vy);
+            return dx * dx + dy * dy;
+        };
+        float best_arrow_d2 = std::numeric_limits<float>::max();
+
+        // Arrows. The destination is taken at the SHORTEST wrap displacement, and
+        // the shaft sits a few px right of the centre line so A->B and B->A read
+        // as two arrows rather than one double-headed line.
+        for (std::size_t i = 0; i < tf_arrows.size(); ++i)
+        {
+            const tf_arrow& f = tf_arrows[i];
+            if (f.src == f.dest)
+                continue;
+            const ImVec2 a0 = centre_of(f.src);
+            ImVec2       b0 = centre_of(f.dest);
+            if (period_px > 0.0f)
+            {
+                float dx = b0.x - a0.x;
+                dx -= period_px * std::round(dx / period_px);
+                b0.x = a0.x + dx;
+            }
+            const float vx = b0.x - a0.x, vy = b0.y - a0.y;
+            const float len = std::sqrt(vx * vx + vy * vy);
+            if (len <= 2.0f * inset)
+                continue;
+            const float ux = vx / len, uy = vy / len;
+            const float nx = -uy, ny = ux;
+            const float wpx  = trade_flow_width(f.rate, tf_max_rate);
+            const float side = 2.0f + wpx * 0.5f;
+            const float head = 5.0f + wpx;
+
+            const float lo = std::min(a0.x, b0.x), hi = std::max(a0.x, b0.x);
+            const int k_min = (period_px > 0.0f)
+                ? static_cast<int>(std::ceil((visible_left  - hi) / period_px)) : 0;
+            const int k_max = (period_px > 0.0f)
+                ? static_cast<int>(std::floor((visible_right - lo) / period_px)) : 0;
+            for (int k = k_min; k <= k_max; ++k)
+            {
+                const float  off = static_cast<float>(k) * period_px;
+                const ImVec2 a{ a0.x + off + ux * inset + nx * side, a0.y + uy * inset + ny * side };
+                const ImVec2 b{ b0.x + off - ux * inset + nx * side, b0.y - uy * inset + ny * side };
+                const ImVec2 shaft_end{ b.x - ux * head, b.y - uy * head };
+                dl->AddLine(a, shaft_end, IM_COL32(10, 12, 18, 170), wpx + 2.0f);
+                dl->AddLine(a, shaft_end, palette::trade_flow_arrow, wpx);
+                const float hw = head * 0.6f;
+                dl->AddTriangleFilled(b,
+                                      { shaft_end.x + nx * hw, shaft_end.y + ny * hw },
+                                      { shaft_end.x - nx * hw, shaft_end.y - ny * hw },
+                                      palette::trade_flow_arrow);
+                const float d2 = seg_d2(mouse_g, a, b);
+                const float hit = std::max(5.0f, wpx * 0.5f + 3.0f);
+                if (d2 <= hit * hit && d2 < best_arrow_d2)
+                {
+                    best_arrow_d2  = d2;
+                    tf_hover_arrow = static_cast<int>(i);
+                }
+            }
+        }
+
+        // Refusal markers, up-right of the market glyph so the glyph stays legible.
+        const float mr = std::max(4.0f, mkt_r * 0.9f);
+        for (std::size_t i = 0; i < tf_markers.size(); ++i)
+        {
+            const tf_marker& m = tf_markers[i];
+            int best = -1;
+            for (const auto& g : m.goods)
+                if (g.second != trade_refusal::sent)
+                    best = std::max(best, static_cast<int>(g.second));
+            if (best < 0 || best >= k_trade_refusal_count)
+                continue;
+            const ImVec2 c0 = centre_of(m.market);
+            const ImVec2 at0{ c0.x + mkt_r * 1.7f, c0.y - mkt_r * 1.7f };
+            const int k_min = (period_px > 0.0f)
+                ? static_cast<int>(std::ceil((visible_left  - at0.x) / period_px)) : 0;
+            const int k_max = (period_px > 0.0f)
+                ? static_cast<int>(std::floor((visible_right - at0.x) / period_px)) : 0;
+            for (int k = k_min; k <= k_max; ++k)
+            {
+                const ImVec2 at{ at0.x + static_cast<float>(k) * period_px, at0.y };
+                dl->AddCircleFilled(at, mr + 1.5f, IM_COL32(10, 12, 18, 235), 14);
+                dl->AddCircleFilled(at, mr, palette::trade_refusal_colour[best], 14);
+                const float dx = mouse_g.x - at.x, dy = mouse_g.y - at.y;
+                if (dx * dx + dy * dy <= (mr + 3.0f) * (mr + 3.0f))
+                    tf_hover_marker = static_cast<int>(i);
+            }
+        }
+        // A marker is the smaller target, so it wins a tie with an arrow under it.
+        if (tf_hover_marker >= 0)
+            tf_hover_arrow = -1;
+    }
+    state.trade_flow_arrows  = static_cast<int>(tf_arrows.size());
+    state.trade_flow_markers = static_cast<int>(tf_markers.size());
+    state.trade_flow_passes  = static_cast<int>(tf_passes.size());
+
     // Building-placement ghost preview. When construction mode is active and a tile
     // is hovered, draw a translucent-intent marker of the chosen building type at the
     // hovered copy's centre, tinted green when the placement-rules seam accepts the
@@ -4769,9 +5084,54 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         draw_reach_key(w, reach_links, state);
     else if (state.overlay == overlay_mode::supply_routes)
         draw_supply_routes_key(w, supply_edges, state);
+    else if (state.overlay == overlay_mode::trade_flow)
+        draw_trade_flow_key(dl, state, tf_max_rate, static_cast<int>(tf_arrows.size()),
+                            static_cast<int>(tf_markers.size()));
 
     if (!input_enabled)
         return;
+
+    // Trade-flow lens hover (BL-1222). An immediate read at the cursor, like the
+    // border band's below: an arrow or a marker is not an entity, so the
+    // entity-keyed glance card has nothing to hold; under this lens the ground
+    // carries no structure, so that card never competes for the slot.
+    if (tf_hover_arrow >= 0 || tf_hover_marker >= 0)
+    {
+        std::string text;
+        char line[160];
+        if (tf_hover_arrow >= 0)
+        {
+            const tf_arrow& f = tf_arrows[static_cast<std::size_t>(tf_hover_arrow)];
+            const char* good = presentation_of(static_cast<resource_type>(f.good)).name;
+            std::snprintf(line, sizeof line, "%s  %.3g units/tick\nlanded price %.2f\n%s -> %s",
+                          good, f.rate, f.price, market_city_name(w, f.src).c_str(),
+                          market_city_name(w, f.dest).c_str());
+            text = line;
+        }
+        else
+        {
+            const tf_marker& m = tf_markers[static_cast<std::size_t>(tf_hover_marker)];
+            text = market_city_name(w, m.market) + " - short; your surplus:";
+            for (const auto& [good, cls] : m.goods)
+            {
+                const char* gname = presentation_of(static_cast<resource_type>(good)).name;
+                const char* cname = (cls == trade_refusal::sent)
+                                        ? "sent"
+                                        : k_trade_refusal_name[static_cast<int>(cls)];
+                std::snprintf(line, sizeof line, "\n%s: %s", gname, cname);
+                text += line;
+            }
+        }
+        ImDrawList* fdl = ImGui::GetForegroundDrawList();
+        const ImVec2 ts  = ImGui::CalcTextSize(text.c_str());
+        const float  pad = 5.0f;
+        const ImVec2 tl { mouse_g.x + 14.0f, mouse_g.y + 14.0f };
+        const ImVec2 br { tl.x + ts.x + pad * 2.0f, tl.y + ts.y + pad * 2.0f };
+        const ImU32  edge = (tf_hover_marker >= 0) ? palette::neutral : palette::trade_flow_arrow;
+        fdl->AddRectFilled(tl, br, IM_COL32(18, 18, 24, 235), 3.0f);
+        fdl->AddRect(tl, br, edge, 3.0f, 0, 1.5f);
+        fdl->AddText({ tl.x + pad, tl.y + pad }, IM_COL32(230, 230, 235, 255), text.c_str()); // fit-exempt: the card is sized to its measured text
+    }
 
     // The border band's hover read (BL-601). Ben's ruling asked for a read that
     // NAMES the nation before the click commits - a corridor the player cannot

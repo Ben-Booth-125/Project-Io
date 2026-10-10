@@ -320,10 +320,9 @@ shadow take_shadow(const world& w, const recipe_registry& reg,
         market_ids.push_back(mid);
     std::sort(market_ids.begin(), market_ids.end());
 
-    std::set<std::tuple<entity_id, entity_id, std::size_t>> order_controlled;
-    for (const sell_order& o : w.sell_orders)
-        if (o.quantity > 0.0f)
-            order_controlled.insert({o.corp, o.body, static_cast<std::size_t>(o.resource)});
+    // BL-1229 (an order is a floor, not a hold): dispatch hauls an ordered pool
+    // too, at max(home, floor) — the shadow walks the same triples and gates.
+    const order_floor_map order_floors = collect_order_floors(w);
 
     const grid_goods_params& grid_rules = reg.grid_goods();
     const float              margin     = reg.dispatch_margin();
@@ -347,14 +346,12 @@ shadow take_shadow(const world& w, const recipe_registry& reg,
         {
             if (grid_rules.grid(ri))
                 continue;
-            if (order_controlled.count({corp_id, src_body, ri}) != 0)
-                continue;
             const float surplus = pool.quantities[ri] - reserve[ri]
                                 - dispatch_arrived(w, corp_id, src_key, ri);
             if (!(surplus > 0.0f))
                 continue;
             ++sh.triples[oc];
-            const float price_src = dispatch_home_price(w, src_key, ri);
+            const float price_src = dispatch_source_price(w, order_floors, corp_id, src_key, ri);
             const float gate      = price_src + margin * price_src;
             for (const entity_id dest_id : market_ids)
             {

@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <unordered_map>
 #include <vector>
 
@@ -166,6 +167,36 @@ const std::vector<float>& body_reach_field(world& w, entity_id body);
 /// UI surfaces hold a `const world&` and must not trigger the Dijkstra.
 float tile_reach_cost(const world& w, entity_id tile);
 
+/// BL-1230 (power crosses markets) — LOGISTICS.md § 3a, "The province is the
+/// grid's cell". A province with a road tile in it is WIRED; wired provinces
+/// whose roads join form ONE grid. Roads join where two roaded land tiles are
+/// 4-cardinal neighbours (east-west wrapped — the road raster's own adjacency),
+/// or across a strait: a run of at most kMaxCrossingTiles non-ocean water tiles
+/// between them, the same crossing the road-only walk admits. The province is
+/// the cell, so two road pieces in one province are one grid even where their
+/// tiles do not touch.
+///
+/// Returns wired province id -> grid id, the grid id being the LOWEST wired
+/// province id in it, so the answer is independent of every visit order.
+/// Built lazily and cached on `world.power_grid_of_province`; cleared by
+/// invalidate_logistics_caches. Deterministic.
+const std::map<std::uint32_t, std::uint32_t>& province_power_grid(world& w);
+
+/// The grid @p tile's province is on, or 0 when the province is dark (no road)
+/// or the tile is unpartitioned. Builds the cache on first use.
+std::uint32_t tile_power_grid(world& w, entity_id tile);
+
+/// BL-1230: the grid goods whose supply is the GRID's rather than the market's —
+/// wired by the province, filled from any shelf on the grid, priced against the
+/// grid. POWER ONLY: the ruling (LOGISTICS.md § 3a, Ben 2026-10-07) names power,
+/// and construction capacity, the other grid good, keeps its tile-reach wire,
+/// local shelf and local price (BL-708/BL-709) until a ruling says otherwise.
+/// The one place the roster is named; every reader asks this.
+inline bool grid_good_crosses_markets(std::size_t r)
+{
+    return r == static_cast<std::size_t>(resource_type::power);
+}
+
 /// Clear the path-cost and reach-field caches together. Call after any event
 /// that can change traversal cost or the anchor set. The caches rebuild lazily
 /// on next read, so an over-clear costs one Dijkstra, never a wrong answer; a
@@ -192,6 +223,9 @@ inline void invalidate_logistics_caches(world& w)
     w.body_reach_cost.clear();
     w.lp_anchor_fields.clear();       // BL-1117: road-weighted and anchor-keyed, so it stales
                                       // on exactly the events the three above do
+    w.power_grid_of_province.clear(); // BL-1230: the power grid is a function of road_level
+    w.power_grid_built = false;
+    bump_logistics_cache_generation(w); // BL-1195: the UI's lane cache re-reads on this
 }
 
 /// True when a state change on this building TYPE can alter a cached logistics
@@ -394,6 +428,10 @@ struct convoy_route
 {
     entity_id              body = null_entity;
     std::vector<entity_id> tiles;
+    /// BL-1195: the lane's clock — `at[i]` is the fraction of the journey's TIME
+    /// spent on reaching `tiles[i]` (0 at the origin, 1 at the destination), each
+    /// leg at its own speed. Same size as `tiles`. Read through convoy_lane_index.
+    std::vector<float>     at;
 };
 
 /// Derive @p cv's lane, oriented source->destination. Non-const `w` because
@@ -402,11 +440,14 @@ struct convoy_route
 /// `const world&`; that is not achievable without a second, uncached A*.)
 convoy_route convoy_route_tiles(world& w, const convoy_component& cv);
 
-/// Index of the head along a lane of @p tile_count tiles at @p progress (0..1).
-/// Factored out so the renderer's glide — which offsets progress by the
-/// fraction through the current econ tick — and the sim's discrete read share
-/// ONE rounding rule. Returns -1 for an empty lane.
-int convoy_head_index(std::size_t tile_count, float progress);
+/// BL-1195: the index along a lane of the tile the cargo is on at @p progress (the
+/// fraction of its travel time elapsed), read off the lane's clock
+/// (`convoy_route::at`): nearest clock reading, a tie to the later tile, and p >= 1
+/// always the destination (the last index). A land leg
+/// is slower than a sea leg, so this is NOT an even spacing over tiles. The one
+/// rule the sim's position, interdiction's sweep and the renderer's head share.
+/// Returns -1 for an empty lane.
+int convoy_lane_index(const std::vector<float>& at, float progress);
 
 /// The tile @p cv's head occupies right now, or `null_entity` when it has none:
 /// an inter-body leg in transit, an unresolved endpoint, or an unreachable

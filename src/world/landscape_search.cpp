@@ -191,7 +191,9 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
     // The same two calls, in the same order, that the slice-1/2 harness measured
     // discrimination on — so the search walks the fixture the objective was shown
     // to be able to see, not a second one invented here.
-    assign_default_recipes(w, reg);
+    // BL-1217 D6: a recipe-less processor whose default output is unwanted is
+    // unplaced here (before the roster's chain enforcement, which re-seats).
+    assign_default_recipes(w, reg, "landscape apply (legacy)");
 
     if (regenerate_specialists)
     {
@@ -317,7 +319,8 @@ void apply_landscape_candidate(world& w, const recipe_registry& reg,
     if (moved)
         invalidate_logistics_caches(w);
 
-    assign_default_recipes(w, reg);
+    // BL-1217 D6: an unwanted default unplaces (the roster goes next anyway).
+    assign_default_recipes(w, reg, "landscape apply (budget)");
 
     // THE BUDGET CHARTERS THE WHOLE WEB (INDUSTRIALISATION.md § 1, Ben 2026-09-17):
     // world-gen's specialist roster goes, and every specialist and background

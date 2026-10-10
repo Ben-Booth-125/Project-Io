@@ -30,6 +30,7 @@ constexpr auto max_substrate  = terrain_substrate::coast;
 constexpr auto max_cover      = terrain_cover::urban;
 constexpr auto max_landform   = terrain_landform::rift;
 constexpr auto max_body_type  = body_type::star;
+constexpr auto max_atmosphere = atmosphere_class::thick;
 constexpr auto max_building   = building_type::university; // BL-615: appended schooling/university.
                                                            // A WIDENED range gate, not a format
                                                            // change: no serialised array is sized
@@ -109,6 +110,7 @@ void w_body(std::ostream& o, const body_component& b)
     w_int(o, b.grid_width);
     w_int(o, b.grid_height);
     w_f32(o, b.mass_earths);
+    w_enum(o, b.atmosphere); // world_save_version 41 (propellant routes follow the air)
     w_enum(o, b.survey.phase);
     w_int(o, b.survey.regions_total);
     w_int(o, b.survey.regions_done);
@@ -122,6 +124,7 @@ bool r_body(std::istream& i, body_component& b)
         && r_f32(i, b.orbital_angular_velocity_rad_per_day)
         && r_f32(i, b.orbital_epoch_angle_rad) && r_int(i, b.grid_width)
         && r_int(i, b.grid_height) && r_f32(i, b.mass_earths)
+        && r_enum(i, b.atmosphere, max_atmosphere) // world_save_version 41
         && r_enum(i, b.survey.phase, max_survey) && r_int(i, b.survey.regions_total)
         && r_int(i, b.survey.regions_done) && r_int(i, b.survey.ticks_remaining);
 }
@@ -193,6 +196,19 @@ void w_market(std::ostream& o, const market_component& m)
     w_f32_array(o, m.household_fill); // BL-1196: world_save_version 35 (first claimed as 32)
     w_f32_array(o, m.household_weight); // BL-1203: world_save_version 36
     w_f32_array(o, m.hauler_want);      // BL-1203: world_save_version 36
+    w_f32_array(o, m.unposted_bid);     // BL-1227: world_save_version 38
+    for (const int32_t t : m.unposted_bid_tick) w_i32(o, t); // BL-1227: world_save_version 38
+    w_f32_array(o, m.dial_pool_draw);   // BL-1217: world_save_version 40
+    for (const int32_t t : m.dial_pool_draw_tick) w_i32(o, t); // BL-1217: world_save_version 40
+    w_f32_array(o, m.background_fill); // BL-1217 G1b R2: world_save_version 43
+}
+
+bool r_i32_array(std::istream& i, std::array<int32_t, resource_count>& a)
+{
+    for (int32_t& v : a)
+        if (!r_i32(i, v))
+            return false;
+    return true;
 }
 
 bool r_market(std::istream& i, market_component& m)
@@ -201,7 +217,10 @@ bool r_market(std::istream& i, market_component& m)
         && r_f32_array(i, m.demand) && r_f32_array(i, m.price)
         && r_f32_array(i, m.base_price) && r_f32_array(i, m.inventory)
         && r_f32_array(i, m.household_bid) && r_f32_array(i, m.household_fill)
-        && r_f32_array(i, m.household_weight) && r_f32_array(i, m.hauler_want);
+        && r_f32_array(i, m.household_weight) && r_f32_array(i, m.hauler_want)
+        && r_f32_array(i, m.unposted_bid) && r_i32_array(i, m.unposted_bid_tick)
+        && r_f32_array(i, m.dial_pool_draw) && r_i32_array(i, m.dial_pool_draw_tick) // BL-1217: v40
+        && r_f32_array(i, m.background_fill); // BL-1217 G1b R2: v45
 }
 
 void w_unit(std::ostream& o, const unit_component& u)
@@ -423,6 +442,9 @@ void w_convoy(std::ostream& o, const convoy_component& c)
     w_u32(o, c.id);
     w_bool(o, c.held);
     w_f32(o, c.cost_paid);
+    w_id(o, c.origin_tile); // BL-1195: world_save_version 42 (the lane follows the legs)
+    w_id(o, c.port_a);      // BL-1195: world_save_version 42
+    w_id(o, c.port_b);      // BL-1195: world_save_version 42
 }
 
 bool r_convoy(std::istream& i, convoy_component& c)
@@ -430,7 +452,8 @@ bool r_convoy(std::istream& i, convoy_component& c)
     return r_id(i, c.source_market) && r_id(i, c.dest_market) && r_enum(i, c.mode, max_convoy)
         && r_enum(i, c.cargo_resource, max_resource) && r_f32(i, c.cargo_qty)
         && r_f32(i, c.progress) && r_f32(i, c.speed) && r_id(i, c.corp) && r_bool(i, c.arrived)
-        && r_u32(i, c.id) && r_bool(i, c.held) && r_f32(i, c.cost_paid);
+        && r_u32(i, c.id) && r_bool(i, c.held) && r_f32(i, c.cost_paid)
+        && r_id(i, c.origin_tile) && r_id(i, c.port_a) && r_id(i, c.port_b); // BL-1195: v42
 }
 
 void w_route(std::ostream& o, const trade_route& t)
@@ -809,6 +832,9 @@ void clear_derived_state(world& w)
     w.body_port_tiles.clear();
     w.body_reach_cost.clear();
     w.lp_anchor_fields.clear(); // BL-1117: the nearest-anchor field, same footing
+    w.power_grid_of_province.clear(); // BL-1230: the power grid, same footing
+    w.power_grid_built = false;
+    bump_logistics_cache_generation(w); // BL-1195: view-only stamp, never serialised
 
     // The market index carries its own staleness stamps; zeroing them is what
     // makes the next `market_for_tile` rebuild rather than trust an empty index.
@@ -982,6 +1008,12 @@ void write_world_snapshot(const world& w, std::ostream& out)
               w_id(s, f.centre_tile);
               w_id(s, f.into);
           });
+
+    // BL-1217 D5 (world_save_version 39): the held opening stock -- live state
+    // the clear reads every tick, not derivable from the pools. A `std::map`,
+    // written ascending as held.
+    w_map(out, w.opening_stock_held, w_id_pair,
+          [](std::ostream& s, const std::array<float, resource_count>& a) { w_f32_array(s, a); });
 }
 
 bool read_world_snapshot(world& w, std::istream& in)
@@ -1199,6 +1231,19 @@ bool read_world_snapshot(world& w, std::istream& in)
         if (into == s.markets.end() || into->second.body != fm.body) return false;
         const auto tile = s.tiles.find(fm.centre_tile);
         if (tile == s.tiles.end() || tile->second.body != fm.body) return false;
+    }
+
+    // BL-1217 D5 (v39): the held opening stock. A record must name a pool that
+    // exists and hold finite, non-negative amounts -- the writer can produce
+    // nothing else (the clear drops a record whose pool is gone).
+    if (!r_map(in, s.opening_stock_held, r_id_pair,
+               [](std::istream& st, std::array<float, resource_count>& a) { return r_f32_array(st, a); }))
+        return false;
+    for (const auto& [key, held] : s.opening_stock_held)
+    {
+        if (s.corp_market_pools.count(key) == 0) return false;
+        for (const float h : held)
+            if (!std::isfinite(h) || h < 0.0f) return false;
     }
 
     clear_derived_state(s);

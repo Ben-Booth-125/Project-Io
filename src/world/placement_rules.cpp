@@ -693,4 +693,10 @@ int stack_rank(const world& w, entity_id building_id)
     return 0;
 }
 
+int prospective_stack_rank(const world& w, entity_id tile_id,
+                           building_type type, resource_type target)
+{
+    return static_cast<int>(stack_members(w, tile_id, type, target).size()) + 1;
+}
+
 } // namespace placement_rules

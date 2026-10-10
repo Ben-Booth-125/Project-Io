@@ -265,6 +265,57 @@ void continent(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Fill colour of the body and wheels; hubs take the dark outline.
 void throughput(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw the **Company** lens glyph (BL-1225) — a **briefcase**: a filled case,
+/// wider than tall, with a stroked carry handle above and a dark clasp band across
+/// it. The lens reads background firms, the Corporation lens's mirror, and the two
+/// sit side by side on the Planetary strip — so the mark must not be a variant of
+/// the corporation seal (a square with a dot). A case with a handle is a THING,
+/// read without decoding at ~21 px, and its landscape proportion and handle keep
+/// it apart from every square on the strip.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Fill colour of the case and stroke of the handle.
+void company(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
+/// Draw the **Reach** lens glyph (BL-1225) — a **broadcast mark**: a source dot in
+/// the lower-left corner with two concentric arcs spreading toward the upper
+/// right. The lens answers "which bodies do my trade routes reach", i.e. how far
+/// the player's commerce carries from home; the widening arcs are the plainest
+/// drawing of "carries this far". Distinct from `convoy` (a chevron, which it
+/// borrowed) and from the Supply-routes node graph beside it on the Solar strip.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Fill of the source dot and stroke of the arcs.
+void reach(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
+/// Draw the **Supply-routes** lens glyph (BL-1225) — a **lane graph**: three
+/// outlined nodes joined by three edges of different stroke weights. The lens is
+/// the standing lane graph with log-scaled thickness, so the unequal edges are the
+/// lens's own encoding in miniature. Distinct from `supply` (two plain parallels,
+/// which it borrowed and which is its Solar-strip neighbour) and from `reach`.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Stroke of the edges and fill of the nodes.
+void supply_routes(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
+/// Draw the **Trade flow** lens glyph (BL-1225) — an **exchange mark** (⇄): an
+/// upper arrow pointing right and a lower arrow pointing left, each with a solid
+/// head. The lens draws market-to-market arrows of the player's shipments, so the
+/// mark is the lens's own drawing. The solid heads are what keep it apart from
+/// `supply` (two bare parallels, which it borrowed) and from `convoy`.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Stroke of the shafts and fill of the heads.
+void trade_flow(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 /// Draw a **landform** marker for @p lf — the terrain-shape glyph family (BL-231).
 /// Stroke-only, in @p colour, so it reads as *engraved terrain* rather than as one
 /// more entity marker sitting on the tile; the caller picks a colour that contrasts

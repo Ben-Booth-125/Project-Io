@@ -134,6 +134,30 @@ NR-738). All four drive REAL PRESSES rather than only capturing frames, for the 
   bless only after eyeballing `texture_lens_country` and `texture_lod_*`, which are the two
   frames carrying decisions taken on Ben's behalf.
 
+Sprint 50 additions, scripted in place of two owed live clicks (Ben, 2026-10-10). Both assert on
+what the SURFACE listed or drew — the surface publishing its own list — never on a re-derivation:
+
+- **`air_gate.lua`** — the body's air at both doors (PRODUCTION.md § Chemical Plant, "And it runs
+  only there"). The Build door's processing rows are read from the door's own list
+  (`verify.build_door`: the recipe ids behind the folded rows, published as
+  `construction_controls::door_recipes`); the method grid's offer from `verify.method_grid`
+  (`ui::method_grid_candidates`, the list the grid draws). On the home planet (air): no
+  `propellant_electrolysis` at either door, `propellant_atmospheric` listed as the control. On every
+  airless body: the reverse. The wrong-air switch is pressed both through the `set_recipe` verb
+  (`rejected_wrong_air`) and through the grid's own Switch body (`verify.method_grid_press`,
+  `wrong_air`), and `status_drawn` asserts the status line was DRAWN, not merely recorded.
+  Fixture: `verify.seed_processing(recipe[, direct])` — the real `construct_building`, minus the
+  construction wait; `direct` inserts on a body the player cannot reach, still refusing wrong air.
+- **`sea_lane.lua`** — a sea-route convoy drawn along its legs (SUPPLY.md, "The lane is the legs").
+  `verify.sea_route_fixture(res, qty, min_land)` finds (or, by laying two Ports, makes) a market pair
+  on the home planet whose cheapest haul is land -> port -> sea -> port -> land with `min_land` land
+  hops each end, priced by the dispatch's own `price_convoy_leg`; the script dispatches through the
+  real `dispatch_convoy` verb (`corp_command` now takes `target_name` / `quantity` /
+  `recipe_name`). `verify.convoy_lane(id)` reads the beam the CANVAS built (its lane, clock and
+  head) and returns positions and aggregates only — no tile data. `verify.set_convoy_progress`
+  parks the head to sample the clock across the lane, since the dispatch's travel time is a couple
+  of econ ticks.
+
 ## Text-overflow floor check (BL-215)
 
 **`text_overflow_floor.lua`** — the render-precision audit's saved check. Every measured text

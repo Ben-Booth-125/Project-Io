@@ -8,6 +8,7 @@
 #include <array>
 #include <cstdint>
 #include <map>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -184,7 +185,7 @@ convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
 // scorer's directed dispatch (corp_ai.cpp), so both size a haul identically.
 // ---------------------------------------------------------------------------
 
-/// Per-pass memo of `processor_reservation` keyed (corp, pool key).
+/// Per-pass memo of `auto_surplus_reservation` keyed (corp, pool key).
 using reservation_memo = std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>>;
 
 /// Last resolved price of good `r` in `mc`, base price as the fallback; 0 when
@@ -194,6 +195,21 @@ float dispatch_market_price(const market_component& mc, std::size_t r);
 /// The HOME price of a pool: its market's last resolved price, or 0 for a
 /// body-level pool (no market to sell into) or a good its market does not price.
 float dispatch_home_price(const world& w, entity_id src_key, std::size_t r);
+
+/// BL-1229 (an order is a floor, not a hold; MARKETS.md step 4): the highest
+/// `floor_price` among the standing sell orders on each (corp, body, good).
+/// Built once per pass from `w.sell_orders`; a std::map, read only by lookup.
+using order_floor_map = std::map<std::tuple<entity_id, entity_id, std::size_t>, float>;
+order_floor_map collect_order_floors(const world& w);
+
+/// The SOURCE price a haul out of pool `src_key` must beat — the one rule the
+/// auto-dispatcher and the rival scorer's directed dispatch share. The pool's
+/// home price, or, where the corp holds a standing sell order on the good on
+/// the pool's body, max(home price, the highest floor): the order accepts no
+/// sale below its floor, at home or by haul, so a haul must beat it as it beats
+/// home, and is sized so the destination lands no lower than floor + haul.
+float dispatch_source_price(const world& w, const order_floor_map& floors, entity_id corp,
+                            entity_id src_key, std::size_t r);
 
 /// Supply `dest` can absorb before its UNSMOOTHED target price (`price_target`)
 /// falls to `landed_cost`: S* - S with S* = D x (base / landed)^2, clamped by the
@@ -274,7 +290,12 @@ struct convoy_leg
     convoy_mode mode         = convoy_mode::land;
     float       cost         = 0.0f; ///< Total credits the haul costs (already node-discounted).
     int         travel_ticks = 1;    ///< Econ ticks the leg takes; convoy speed is 1/this.
-
+    /// BL-1195: the route's waypoints, copied onto the convoy at commit so its lane
+    /// follows the legs priced here (convoy_component::origin_tile / port_a / port_b).
+    /// All null on a space lane; the ports null on a single overland leg.
+    entity_id   origin_tile  = null_entity;
+    entity_id   port_a       = null_entity;
+    entity_id   port_b       = null_entity;
 };
 
 /// Price one leg. A pure read of the world apart from the A* path cache, which
@@ -322,6 +343,15 @@ convoy_leg price_market_export_leg(world& w, const recipe_registry& reg,
 /// Tile of the corp's lowest-id building on `body` (BL-077's production anchor).
 /// `null_entity` if the corp holds nothing on the body.
 entity_id corp_representative_tile(const world& w, const corporation_component& corp, entity_id body);
+
+/// Does the launch draw burn from pool (`corp`, `pool_key`)? True exactly when
+/// the corp holds a Launchpad on the pool's body (`pool_key_body`) — the SAME
+/// test `price_convoy_leg`'s space-lane gate applies before it reads this pool's
+/// launch draw, so a pool this answers true for is a pool a launch can burn
+/// from, and no other. "A pad's pool keeps its propellant" (MARKETS.md step 4,
+/// Ben 2026-10-09) reserves against exactly these pools. False for an unknown
+/// corp or a key with no body.
+bool launch_burns_from_pool(const world& w, entity_id corp, entity_id pool_key);
 
 /// BL-1003 — where a haul out of the source pool `src_key` starts: for a market
 /// pool, the corp's lowest-id building in that market's catchment, else the

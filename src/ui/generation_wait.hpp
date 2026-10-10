@@ -19,6 +19,22 @@ struct generation_progress;
 
 namespace ui {
 
+/// THE TOP BAND (STARTUP.md § Main menu; Ben, 2026-10-08): every loading bar
+/// -- the cold build, the wait on a wizard round, the settle -- sits about 15%
+/// of the window's height from the top, horizontally centred, never at the
+/// window's vertical centre. The one position every wait surface reads; no
+/// screen carries its own literal.
+inline constexpr float k_loading_band_frac = 0.15f;
+
+/// Screen-space y the outer loading bar's top edge sits on.
+float loading_bar_y();
+
+/// Pad the current window down (a Dummy, never a cursor jump) so the next
+/// item lands @p lead_px above the loading band. A caller draws its title in
+/// that lead; `draw_generation_wait` then pads the last stretch to the bar.
+/// Does nothing when the cursor is already at or below that line.
+void pad_to_loading_band(float lead_px);
+
 /// Draw the wait's bars, caption and elapsed count, centred in @p pane_w.
 ///
 /// @param prog          The run's sink. Read with atomic loads, except

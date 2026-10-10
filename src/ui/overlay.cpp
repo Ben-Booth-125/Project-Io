@@ -26,24 +26,13 @@ void draw_lens_icon(ImDrawList* dl, overlay_mode m, ImVec2 rect_min, ImVec2 rect
         case overlay_mode::scarcity:    icons::scarcity   (dl, centre, r, colour); break;
         case overlay_mode::industry:    icons::industry   (dl, centre, r, colour); break;
         case overlay_mode::continent:   icons::continent  (dl, centre, r, colour); break;
-        // Reach/Supply-routes (BL-011/BL-014) reuse the existing convoy/supply
-        // glyphs rather than adding new ones — dedicated glyphs are an open TODO
-        // in ui::icons (src/ui/icons.{hpp,cpp}, out of this lens work's file
-        // scope) for whenever these lenses join the on-screen strip.
-        case overlay_mode::reach:         icons::convoy(dl, centre, r, colour); break;
-        case overlay_mode::supply_routes: icons::supply(dl, centre, r, colour); break;
-        // Throughput has its OWN glyph (BL-605). It borrowed Reach's convoy
-        // chevron while it was keyboard-only, on the grounds that the cycle names
-        // off-strip lenses apart; joining the strip ends that, because an
-        // on-screen lens carries one distinct glyph (LENSES.md) and two strip
-        // neighbours sharing a mark is exactly what that rule forbids.
+        // Every lens carries its OWN glyph (Ben, 2026-10-07; LENSES.md § The strip
+        // rotates with the rung): none borrows another lens's mark.
+        case overlay_mode::reach:         icons::reach(dl, centre, r, colour); break;
+        case overlay_mode::supply_routes: icons::supply_routes(dl, centre, r, colour); break;
         case overlay_mode::throughput:    icons::throughput(dl, centre, r, colour); break;
-        // Company (BL: corporation/company split, Ben 2026-08-28) borrows the
-        // corporation glyph while it is KEYBOARD-ONLY, on the same precedent
-        // Reach and Supply-routes set above. It must earn a distinct mark before
-        // it joins the strip — two strip neighbours sharing a glyph is exactly
-        // what LENSES.md forbids, and Corp would be its neighbour.
-        case overlay_mode::company:       icons::corporation(dl, centre, r, colour); break;
+        case overlay_mode::company:       icons::company(dl, centre, r, colour); break;
+        case overlay_mode::trade_flow:    icons::trade_flow(dl, centre, r, colour); break;
         default: break;
     }
 }
@@ -66,6 +55,7 @@ const char* overlay_mode_name(overlay_mode m)
         case overlay_mode::supply_routes: return "Supply-routes graph";
         case overlay_mode::throughput:    return "Throughput (active Logistic Points)";
         case overlay_mode::company:       return "Company holdings (background firms)";
+        case overlay_mode::trade_flow:    return "Trade flow (your shipments and refusals)";
         default:                        return "None";
     }
 }
@@ -86,6 +76,7 @@ const char* overlay_mode_short_name(overlay_mode m)
         case overlay_mode::supply_routes: return "Supply routes";
         case overlay_mode::throughput:    return "Throughput";
         case overlay_mode::company:       return "Company";
+        case overlay_mode::trade_flow:    return "Trade flow";
         default:                        return "None";
     }
 }
@@ -123,7 +114,7 @@ void draw_overlay_controls(ui_state& ui, float x, float top_y, float w)
         overlay_mode::resource,    overlay_mode::market,
         overlay_mode::scarcity,    overlay_mode::industry,
         overlay_mode::population,  overlay_mode::continent,
-        overlay_mode::throughput };
+        overlay_mode::throughput,  overlay_mode::trade_flow };
 
     static constexpr overlay_mode circumplanetary_modes[] = {
         overlay_mode::market, overlay_mode::scarcity, overlay_mode::supply };

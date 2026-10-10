@@ -110,6 +110,35 @@ inline constexpr long long kVillageSpurFloorHeads = 40000;
 /// BL-516), which let a bridge span three open tiles of channel.
 inline constexpr int kMaxCrossingTiles = 2;
 
+/// BL-1119 STALE-FLOOD MEASUREMENT PROBE — verify-only, never set by shipped code.
+/// Within a pass the flood fields and the pair cache are reused and never refreshed
+/// after a stamp, so a route is priced on the road field as it stood when its
+/// destination's flood was first built. When this is true, `stamp_edge` (the one
+/// stamper `generate_roads` and `stamp_history_roads` share) clears every logistics
+/// cache after any stamp that raised a tile, so each later route is priced on the field
+/// as it stands (LOGISTICS.md § 4). OFF (the default) the passes are byte-identical to
+/// the shipped ones: the flag is read in two places, and only to clear caches and to
+/// copy the laid path into the write-only traces. road_stale_flood_probe measures it;
+/// road_generation_harness --fresh-floods runs its rows on it.
+extern bool g_road_probe_fresh_floods;
+
+/// BL-1252 (no parallel roads) MEASUREMENT SWITCH -- verify-only, never set by shipped
+/// code. THE SNAP (road_generation.cpp § road_snapper; LOGISTICS.md § 4): the floods stay
+/// reused, and before a route is stamped every stretch that would lay two or more
+/// consecutive NEW land tiles beside a road already on the field (Chebyshev 1, columns
+/// wrapping) is re-walked over that road, kept only when it lays fewer new tiles, does
+/// not fold the route, and costs no more than kSnapCostBound x the stretch it replaces. When
+/// this is true the snap is off and every route is laid as priced, exactly as the passes
+/// did before it (road_stale_flood_probe --compare unsnapped reads its effect in one run,
+/// on one machine). The BL-1119 fresh-flood probe also runs without the snap, so its
+/// reading stays the reference it was measured as.
+extern bool g_road_probe_no_snap;
+/// BL-1252 measurement overrides -- verify-only, never set by shipped code. Unset (0)
+/// the snap reads its own constants, kSnapRun and kSnapCostBound (road_generation.cpp);
+/// a harness sets them to measure a ladder without a recompile.
+extern int   g_road_probe_snap_run;
+extern float g_road_probe_snap_bound;
+
 /// The longest contiguous run of WATER tiles (any kind) along @p path, in tiles.
 /// The one measure the cap is read against; exposed so a harness asks it of every
 /// laid route from outside.
@@ -177,6 +206,10 @@ struct road_generation_stats
     long long floods_backbone_lay = 0; ///< stamping the chosen tree links and loops
     long long floods_spurs        = 0; ///< the village spurs (every candidate tried)
     long long floods_border       = 0; ///< the border probes and links
+    /// BL-1252 (no parallel roads): route stretches the snap re-walked onto the road
+    /// they ran beside.
+    long long snaps               = 0;
+    long long snaps_refused_cost  = 0; ///< re-walks the snap's cost bound refused
 };
 
 /// What one `stamp_history_roads` call did (BL-1119 round 4). WRITE-ONLY.
@@ -190,6 +223,9 @@ struct history_road_stats
     /// than kMaxCrossingTiles (the bridge cap) -- the rest crossed open ocean or were
     /// unreachable.
     int       refused_long_crossing = 0;
+    /// BL-1252: corridor stretches the snap re-walked onto the road they ran beside.
+    long long snaps                 = 0;
+    long long snaps_refused_cost    = 0; ///< re-walks the snap's cost bound refused
 };
 
 /// Every corridor one `stamp_history_roads` call LAID, whole (the bridge-cap row reads

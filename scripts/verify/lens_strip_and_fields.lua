@@ -109,9 +109,9 @@ verify.capture("hover_single_no_lens")
 -- ---------------------------------------------------------------------------
 -- 4. The strip rotates with the rung.
 --
--- Nine lenses at Planetary (every sub-body read), three at each of the other two.
+-- Ten lenses at Planetary (every sub-body read), three at each of the other two.
 -- Captured per rung because the claim is about what is ON the bar, and the bar is
--- 240 px — whether nine glyphs FIT is exactly the question the old hand-kept
+-- 336 px — whether ten glyphs FIT is exactly the question the old hand-kept
 -- array of six was answering by omission.
 -- ---------------------------------------------------------------------------
 verify.set_overlay("none")

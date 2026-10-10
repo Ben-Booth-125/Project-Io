@@ -2,6 +2,7 @@
 
 #include "entity.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -824,6 +825,26 @@ struct survey_state
 /// (see advance_orbits in orbital_system.hpp); the authored value is the phase
 /// at world construction, frozen into `orbital_epoch_angle_rad` so the econ tick
 /// can reconstruct positions purely from the day tick (orbital_angle_at_tick).
+/// Atmospheric density class. `none` or `thin` gates out organic compositions
+/// (grassland, forest, wetland) and routes a body to the airless tables.
+/// Derived per body by the Planetology pass (`body_profile::atmosphere`,
+/// tile_generation.hpp) and copied onto `body_component::atmosphere` at world
+/// setup. Lives here, not in tile_generation.hpp, so the world record can hold it.
+enum class atmosphere_class : uint8_t { none, thin, moderate, thick };
+
+/// Is a body of this atmosphere class AIRLESS? `none` or `thin` — the
+/// codebase's one definition, and it must not drift from planetology: the
+/// Planetology pass (planetology.cpp, the `airless` flag beside each
+/// `st.profile.atmosphere` assignment) sets `airless = true` exactly when it
+/// assigns `none` or `thin` (surface pressure 0), and the enum's doc above
+/// routes those two to the airless tables. Read by the propellant routes
+/// (PRODUCTION.md § Chemical Plant, "And it runs only there", Ben 2026-10-09)
+/// and by hard_coded_world's "held an atmosphere" stage line.
+inline bool atmosphere_is_airless(atmosphere_class a)
+{
+    return a == atmosphere_class::none || a == atmosphere_class::thin;
+}
+
 struct body_component
 {
     std::string name;
@@ -846,6 +867,14 @@ struct body_component
     /// Defaults to Earth mass so a body built without one still has a sane
     /// scale rather than a zero that would read as "instant travel".
     float       mass_earths = 1.0f;
+
+    /// The body's atmosphere class, copied from its generated
+    /// `body_profile::atmosphere` when the Planetology pass's profile is applied
+    /// (`generate_body_tiles`). Saved (world_save_version 41). A body built with
+    /// no generated profile — a hand-built harness world — reads `moderate`, the
+    /// `body_profile` default: it has air, so it keeps the atmosphere route.
+    /// Airless is `atmosphere_is_airless(atmosphere)`.
+    atmosphere_class atmosphere = atmosphere_class::moderate;
 
     /// Survey progress (BL-067). `home_body` is seeded `surveyed`; all others open
     /// `hidden` until the player dispatches a survey. Advanced by advance_surveys
@@ -1077,6 +1106,58 @@ struct market_component
     /// reads `demand`), so they are SERIALISED (world_save_version 36).
     std::array<float, resource_count> household_weight = {};
     std::array<float, resource_count> hauler_want      = {};
+
+    /// BL-1227 (AI_OPPONENT.md § 2B, Ben 2026-10-07/08: what counts as a bid for
+    /// the dead-market veto). The UNPOSTED bid — a buyer of this market that
+    /// takes or wants goods without posting a bid: the space programme, network
+    /// upkeep and procurement (what they WANTED here, filled or not), space-lane
+    /// launch fuel taken from a corporation's pool, building upkeep met from a
+    /// corporation's own pool, and what a RUNNING processor here consumed.
+    /// `unposted_bid[r]` is the latest tick's total, `unposted_bid_tick[r]` the
+    /// econ tick it was recorded on; a later tick's first record overwrites it.
+    /// The scorer reads it as a bid while it is no older than its evaluation
+    /// cadence, so every corporation evaluating between two records sees it
+    /// (HELD FOR THE CADENCE). SERIALISED (world_save_version 38). Written only
+    /// through `note_unposted_bid`.
+    std::array<float, resource_count>   unposted_bid      = {};
+    std::array<int32_t, resource_count> unposted_bid_tick = {};
+    /// BL-1217 (AI_OPPONENT.md § 11, the dial's buyer signal, Ben 2026-10-09 as
+    /// narrowed): what RUNNING processors on this market drew from their
+    /// owners' POOLS on the tick `dial_pool_draw_tick[r]`, EXCLUDING any unit
+    /// the same processor also posted as demand (economy_system.cpp,
+    /// `proc_dial_draw`). The workforce dial reads posted `demand` plus this,
+    /// held for the scorer's cadence, and nothing else. ONE WRITER: the clear
+    /// (clear_markets, from `economy_report::dial_pool_sums`), in the same pass
+    /// that writes `demand`, so the two always describe the same tick — a
+    /// consumer that moves between its pool and the shelf is counted once
+    /// either way. Every key a processor's posted want touched is stamped (0
+    /// included); a key nobody touched keeps its last record and ages out of
+    /// the hold. SERIALISED (world_save_version 40).
+    std::array<float, resource_count>   dial_pool_draw      = {};
+    std::array<int32_t, resource_count> dial_pool_draw_tick = {};
+
+    /// BL-1217 lever D (behind `economy.background_demand.consumes`, authored
+    /// true in economy.lua): the BACKGROUND channel's bid at the last clear
+    /// (`inject_background_demand`) and what it DREW off `inventory`
+    /// (`draw_background_basket`, zero while the switch is off).
+    /// `background_bid` is TRANSIENT (rewritten inside the clear before anything
+    /// reads it; verify harnesses only). `background_fill` is SERIALISED (BL-1217
+    /// G1b R2, world_save_version 43): the supply clause reads it as the
+    /// background's draw at the last clear (input_reach.hpp § EVERY BUYER),
+    /// between clears, so a load must restore it.
+    std::array<float, resource_count> background_bid  = {};
+    std::array<float, resource_count> background_fill = {};
+
+    /// BL-1217 G1b R3 (MARKETS.md step 3, "the pull draws after the
+    /// processors", Ben 2026-10-09): one tick of this market's PROCESSOR want —
+    /// the want its processors POSTED here this tick plus the want the
+    /// fair-price ceiling SILENCED (`economy_report::processor_wants`; wanted,
+    /// not drawn; no construction, upkeep, household, background or nation
+    /// part; Ben 2026-10-09). draw_background_basket leaves this much on the shelf and draws
+    /// only what stands above it. TRANSIENT and NOT serialised: clear_markets
+    /// rewrites it on every market before the draw reads it, inside the same
+    /// clear, so a load that leaves it zero changes nothing the sim computes.
+    std::array<float, resource_count> processor_want = {};
 };
 
 /// BL-1172 — THE POSTED PRICE of good `r` on market `m`: the price that stands
@@ -1090,6 +1171,114 @@ struct market_component
 /// Lives beside `market_component` because every buyer reads it: the economy
 /// step's draws, `clear_markets`, the nations' purchases and the scorer's
 /// input check (corp_ai.cpp) — one rule, one definition.
+/// BL-1227: record @p quantity of good @p r as an unposted bid on @p m at econ
+/// tick @p tick (see market_component::unposted_bid). Same-tick records add; the
+/// first record of a later tick overwrites. Non-positive quantities are ignored.
+inline void note_unposted_bid(market_component& m, std::size_t r, float quantity, int tick)
+{
+    if (!(quantity > 0.0f))
+        return;
+    if (m.unposted_bid_tick[r] == tick && m.unposted_bid[r] > 0.0f)
+        m.unposted_bid[r] += quantity;
+    else
+    {
+        m.unposted_bid[r]      = quantity;
+        m.unposted_bid_tick[r] = tick;
+    }
+}
+
+/// BL-1227: is an unposted bid on good @p r held at econ tick @p tick — recorded
+/// no more than @p hold_ticks ago (the scorer passes its cadence)?
+inline bool unposted_bid_held(const market_component& m, std::size_t r, int tick, int hold_ticks)
+{
+    // Never read AHEAD: a record dated after `tick` (a settle replayed from
+    // econ tick 1, the --serve path) is not held — it would otherwise count
+    // for its whole lead over the current tick plus the cadence.
+    return m.unposted_bid[r] > 0.0f && tick >= m.unposted_bid_tick[r]
+        && tick - m.unposted_bid_tick[r] <= hold_ticks;
+}
+
+/// THE COMPOSITE BID for good @p r on market @p m at econ tick @p tick — what
+/// counts as a bid for the BUILD VETO (AI_OPPONENT.md § 2B, Ben 2026-10-07/08):
+/// the posted `demand`, PLUS the want the fair-price ceiling silenced
+/// (`hauler_want`), PLUS the unposted bid held for @p hold_ticks (off-book
+/// want, pool-fed launch fuel and upkeep, what running processors consume).
+/// The veto reads it for PRESENCE only (corp_ai.cpp, `zero_bid_veto`).
+inline float composite_bid(const market_component& m, std::size_t r, int tick, int hold_ticks)
+{
+    float bid = std::max(0.0f, m.demand[r]) + std::max(0.0f, m.hauler_want[r]);
+    if (unposted_bid_held(m, r, tick, hold_ticks))
+        bid += m.unposted_bid[r];
+    return bid;
+}
+
+/// THE DIAL'S BID for good @p r on market @p m at econ tick @p tick
+/// (AI_OPPONENT.md § 11, Ben 2026-10-09 as narrowed; BL-1217): posted
+/// `demand` PLUS what running processors drew from their owners' pools and
+/// did not also post as demand (`dial_pool_draw`), held for @p hold_ticks —
+/// and nothing else: no procurement, space programme, launch fuel, upkeep,
+/// nation want or silenced want. The plant's own market only. Read by the
+/// background workforce dial (`solve_workforce_target`) as its buyer signal,
+/// weighed against supply exactly as demand is.
+inline float dial_bid(const market_component& m, std::size_t r, int tick, int hold_ticks)
+{
+    float bid = std::max(0.0f, m.demand[r]);
+    // Never read AHEAD (as unposted_bid_held): a record dated after `tick`.
+    if (m.dial_pool_draw[r] > 0.0f && tick >= m.dial_pool_draw_tick[r]
+        && tick - m.dial_pool_draw_tick[r] <= hold_ticks)
+        bid += m.dial_pool_draw[r];
+    return bid;
+}
+
+/// BL-1227 / BL-1217 (D3 fix): has market @p m EVER CLEARED, read from existing
+/// state at econ tick @p tick? clear_markets runs once per econ step, after the
+/// economy step the scorer runs in, so at econ step k > 0 every market standing
+/// at step k-1 has cleared — and a market that has cleared bids or lists
+/// SOMETHING (households bid every tick wherever people live). One whose every
+/// supply / demand / silenced-want slot is still zero is read as not yet
+/// cleared. Shared by the build veto's "no clear yet: no signal"
+/// (`zero_bid_veto`) and the dial's "forecast at base where no fact exists
+/// yet" (`solve_workforce_target`).
+///
+/// ONLY REGISTERS A CLEAR WRITES (BL-1217, review of the D3 rework): supply,
+/// demand (with every demand injector) and hauler_want are written inside
+/// clear_markets and nowhere else. `unposted_bid` is NOT a clear fact — the
+/// economy step writes it mid-tick — so a market carved by emergence at a
+/// building's completion (economy step, before the clear) could carry one from
+/// the same step's production pass and read as cleared before its first clear.
+inline bool market_has_cleared(const market_component& m, int tick)
+{
+    if (tick <= 0)
+        return false; // no clear has run yet
+    for (std::size_t g = 0; g < resource_count; ++g)
+        if (m.supply[g] > 0.0f || m.demand[g] > 0.0f || m.hauler_want[g] > 0.0f)
+            return true;
+    return false;
+}
+
+/// BL-1217 (AI_OPPONENT.md, "The dial forecasts at base where no fact exists
+/// yet", Ben 2026-10-09): does the background dial forecast good @p r at its
+/// BASE price? Only where the market lists none of it, the dial's bid
+/// (`dial_bid`) is zero, AND the market has never cleared — the build veto's
+/// own "no clear yet: no signal". One definition for the solver and its probe.
+inline bool dial_forecasts_at_base(const market_component& m, std::size_t r, int tick, int hold_ticks)
+{
+    return !(m.supply[r] > 0.0f) && !(dial_bid(m, r, tick, hold_ticks) > 0.0f)
+        && !market_has_cleared(m, tick);
+}
+
+/// BL-1227: one off-book WANT a state purchase derivation recorded — what a
+/// nation's space programme or network upkeep wanted of @p resource this tick,
+/// filled or not, at @p market (null: no supplier anywhere, so the caller
+/// records it at the nation's capital market).
+struct market_want
+{
+    entity_id     nation   = null_entity;
+    entity_id     market   = null_entity;
+    resource_type resource = resource_type::iron_ore;
+    float         quantity = 0.0f;
+};
+
 inline float posted_price(const market_component& m, std::size_t r)
 {
     return (m.price[r] > 0.0f) ? m.price[r] : m.base_price[r];
@@ -1463,6 +1652,30 @@ struct convoy_component
     /// Convoys tab can report what the cargo in flight has already cost, which
     /// is otherwise unrecoverable once the balance has moved on.
     float       cost_paid      = 0.0f;
+
+    // --- BL-1195: the lane follows the legs the cargo travels (SUPPLY.md) ---
+
+    /// The intra-body route's waypoints, recorded at dispatch so every reader
+    /// (`convoy_route_tiles`: the drawn head, the vision beam, interdiction and
+    /// capture) walks the route the haul was priced on rather than the direct
+    /// centre-to-centre path. `origin_tile` is the tile the cargo left from (the
+    /// dispatch's `convoy_origin_tile`, or a market export's centre); `port_a` /
+    /// `port_b` are the loading and unloading Ports of a land -> sea -> land
+    /// route, both `null_entity` for a single overland leg. All three are
+    /// `null_entity` on a space lane and on a convoy built outside the dispatch
+    /// seam, which then falls back to the source market's centre and the
+    /// overland-or-direct path.
+    entity_id   origin_tile    = null_entity;
+    entity_id   port_a         = null_entity;
+    entity_id   port_b         = null_entity;
+
+    /// BL-1195: TRANSIENT, never serialised. The progress the convoy stood at before
+    /// this tick's `advance_convoys`, so interdiction sweeps every tile the cargo
+    /// crossed this tick rather than only the tile it stops on. Set by
+    /// `advance_convoys`, consumed and reset to -1 by `intercept_convoys` in the same
+    /// tick; -1 means "did not move this tick: check the head only" (a loaded save,
+    /// a hand-built convoy).
+    float       progress_before = -1.0f;
 };
 
 // ---------------------------------------------------------------------------
