@@ -10,7 +10,11 @@ shelf), and trade becomes the only way goods move between markets (Planetary Mar
 trade points; per-resource capacity; auto and reserved trades; AI manual trades; trade through all three
 generation rounds). Design: docs/economy/TRADE.md, MARKETS.md § The shelf economy. Work: BL-1265..BL-1270.
 **Another session builds it** — its handoff is docs/development/HANDOFF_SHELF_TRADE.md. Sprint 50 stays
-open; ONE re-bless after it lands. Still in this session: BL-1165 (untraced re-bless movements).
+open; ONE re-bless after it lands. BL-1165 (untraced re-bless movements) is complete (097dc8d0; Ben ruled
+all five traced movements as they stand, ce4e982c). Nothing else is in flight in the sprint 50 session.
+Owed at the close, after the redesign: the 16-seed gate, the visual checks (sea_lane's convoy now comes
+from a trade), `ruling-check`, the ONE re-bless with Ben's go, retro, version cut, integration onto main.
+Cleanup for Ben: `.claude/worktrees/bl1165-x\` (~30 exported commit trees; rm -rf is denied here).
 
 ## Where the work lives
 
