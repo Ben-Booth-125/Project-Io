@@ -94,6 +94,11 @@
 //       sea lanes): the route pass pure, wrap-exact and seamless on every
 //       surface; the road / structure agreement; a route change re-baking
 //       only its window. `--routes` runs them alone with routes_*.png previews.
+//   P32-P34 Roads as tile sets (BL-1261, RENDERING.md § Roads and sea lanes):
+//       crossing points agree from both tiles and across the seam and pieces
+//       meet there heading on; no road crosses a structure footprint; every
+//       terrain treatment is window-invariant and wrap-exact. `--roadsets`
+//       runs them alone with roadsets_*.png previews at rungs 4, 3 and 2.
 //
 //   --towns (BL-1258, a reading, not a check): the settlement ladder, a
 //       highway town, a crossed city, a metropolis on a road and a town
@@ -2038,6 +2043,18 @@ void route_row(world& w, entity_id home, const bake_source& src0, const bake_par
             }
             std::printf("ROUTE-PROF  rederive_routes on %d road tiles (%zu pieces): %.2f ms; prepare_source (this world): %.2f ms\n",
                         nr, dense.route_pieces.size(), best, ps);
+            // BL-1261: this world's own network (its campaign roads and lanes).
+            bake_source own = src0;
+            double bo = 1e30;
+            for (int rep_ = 0; rep_ < 7; ++rep_)
+            {
+                const auto t0 = std::chrono::steady_clock::now();
+                rederive_routes(own);
+                bo = std::min(bo, std::chrono::duration<double, std::milli>(
+                                      std::chrono::steady_clock::now() - t0).count());
+            }
+            std::printf("ROUTE-PROF  rederive_routes on this world's own network (%zu pieces): %.2f ms\n",
+                        own.route_pieces.size(), bo);
         }
         return;
     }
@@ -2176,7 +2193,19 @@ void route_row(world& w, entity_id home, const bake_source& src0, const bake_par
         check(clear, "P29", "every through-road on a roaded tile clears the cluster disc by its half-width");
         check(ends, "P29", "a road arriving at a roaded tile ends at its forecourt");
         check(!tile_road_plan(s, town_i).roaded, "P29", "a town's tile is not re-planned: its road is a street");
-        const double hx = kS3 * (ac - 2 + ((ar & 1) ? 0.5 : 0.0)), hy = 1.5 * ar;
+        // BL-1261: a road no longer passes through its tile's centre (it
+        // finds its way between its crossing points), so the probe stands on
+        // the highway tile's own curve, at its middle sample.
+        double hx = kS3 * (ac - 2 + ((ar & 1) ? 0.5 : 0.0)), hy = 1.5 * ar;
+        {
+            const std::size_t hi = idx(ac - 2, ar);
+            if (s.route_count[hi] > 0)
+            {
+                const route_piece& hp = s.route_pieces[static_cast<std::size_t>(s.route_first[hi])];
+                hx += hp.x[route_piece::k_pts / 2];
+                hy += hp.y[route_piece::k_pts / 2];
+            }
+        }
         check(route_clearance(s, hx, hy) < 0.0 && route_clearance(s, hx, hy + 0.6) > 0.0,
               "P29", "route_clearance is negative on a road and positive off it");
         // The mask: a road on a masked tile never reaches the source.
@@ -2271,6 +2300,435 @@ void route_row(world& w, entity_id home, const bake_source& src0, const bake_par
         check(hash_ok, "P30", "a route change moves region_hash and leaves terrain_hash (a partial, not a whole, re-bake)");
         check(rule_ok, "P30", "the windows around a route change, re-baked and blitted, give the new chunk byte for byte");
         check(small, "P30", "a one-tile route change's windows stay under 40% of the chunk");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BL-1261 (roads as tile sets), RENDERING.md § Roads and sea lanes: a road
+// crosses each edge at its own hashed point and finds its way inside the tile,
+// around higher ground and the road plan's cluster, in its terrain's treatment.
+//   P32 Crossing points agree: every edge's point is the same absolute point
+//       from both of its tiles, across the cylinder seam too, within the inner
+//       70% of the edge; a rail point stands apart from the road's; and every
+//       piece that ends on an edge meets its neighbour's piece there, at the
+//       same point and heading (staged networks and the world's own roads).
+//   P33 A road never crosses a structure footprint: on every roaded works
+//       tile (staged junctions and ends on hills and plain, and the world's
+//       own), no road piece's centreline comes within the cluster's disc plus
+//       the road's half-width.
+//   P34 Routes are window-invariant on every terrain treatment: a staged
+//       network on hills, through a forest, across a marsh, through a town and
+//       as rail bakes byte-identical in unaligned sub-windows to the same
+//       pixels of the whole window, at the master 1x and 2x, and wrap-exact.
+// `--roadsets` runs P32-P34 and writes roadsets_*.png previews: each subject
+// at the master (rung 4) and its 64 / 32 px levels (rungs 3 and 2), the
+// camera squash applied, and the same with the route pass off.
+// ---------------------------------------------------------------------------
+namespace {
+
+struct roadset_aim { const char* name; int c, r; };
+
+/// A land tile at the heart of the steepest run of five land tiles along a
+/// row (no forest, temperate rows): where a road must find its way.
+int hill_aim(const bake_source& src)
+{
+    const auto land = static_cast<std::uint8_t>(bake_source::tile_class::land);
+    int best = -1;
+    double best_s = 0.0;
+    for (int r = src.gh / 5 + 3; r < src.gh * 4 / 5 - 3; ++r)
+        for (int c = 0; c < src.gw; ++c)
+        {
+            double sum = 0.0;
+            bool ok = true;
+            for (int dr = -1; dr <= 1 && ok; ++dr)
+                for (int dc = -2; dc <= 2 && ok; ++dc)
+                {
+                    const std::size_t j = static_cast<std::size_t>(r + dr) * src.gw
+                                        + ((c + dc) % src.gw + src.gw) % src.gw;
+                    ok = src.cls[j] == land && src.cover[j] != static_cast<std::uint8_t>(terrain_cover::forest);
+                    sum += std::hypot(src.grad_x[j], src.grad_y[j]);
+                }
+            if (ok && sum > best_s)
+            {
+                best_s = sum;
+                best = r * src.gw + c;
+            }
+        }
+    return best;
+}
+
+/// Stage the road sets on @p s (roads cleared first): a road and a highway
+/// over the steepest hills with works at a junction and an end on them, a
+/// track through the deepest forest, a road across a marsh, a highway through
+/// a town, a rail over the hills and a road across the cylinder seam.
+std::vector<roadset_aim> stage_roadsets(bake_source& s, const bake_source& src0)
+{
+    const auto land = static_cast<std::uint8_t>(bake_source::tile_class::land);
+    const auto idx = [&](int c, int r) {
+        return static_cast<std::size_t>(r) * s.gw + ((c % s.gw) + s.gw) % s.gw;
+    };
+    s.road.assign(s.cls.size(), 0);
+    s.lane.assign(s.cls.size(), 0);
+    const auto lay = [&](int c, int r, std::uint8_t tier) {
+        if (r >= 0 && r < s.gh && s.cls[idx(c, r)] == land)
+            s.road[idx(c, r)] = tier;
+    };
+    const auto stand = [&](int c, int r, const tile_installation& ti) {
+        const std::size_t i = idx(c, r);
+        if (s.cls[i] != land)
+            return;
+        if (s.inst.of_tile[i] < 0)
+        {
+            s.inst.of_tile[i] = static_cast<std::int32_t>(s.inst.list.size());
+            s.inst.list.push_back(ti);
+        }
+        else
+            s.inst.list[static_cast<std::size_t>(s.inst.of_tile[i])] = ti;
+    };
+    tile_installation works;
+    works.stacks[0].subject = stamp_subject::building;
+    works.stacks[0].type    = static_cast<std::uint8_t>(building_type::processing_facility);
+    works.stacks[0].family  = static_cast<std::uint8_t>(processing_family::metal_foundry);
+    works.n_stacks = 1;
+    tile_installation mine = works;
+    mine.stacks[0].type   = static_cast<std::uint8_t>(building_type::extraction_site);
+    mine.stacks[0].family = static_cast<std::uint8_t>(extraction_family::mine);
+    tile_installation town;
+    town.settlement.subject = stamp_subject::settlement;
+    town.settlement.scale = 3;
+
+    std::vector<roadset_aim> aims;
+    const int hi = hill_aim(src0);
+    if (hi >= 0)
+    {
+        const int hr = hi / s.gw, hc = hi % s.gw;
+        for (int c = hc - 3; c <= hc + 3; ++c) lay(c, hr, k_route_road);          // a road along the hills
+        for (int r = hr - 2; r <= hr + 2; ++r) lay(hc, r, k_route_highway);       // a highway across it
+        lay(hc + 2, hr + 1, k_route_track);                                        // a track to a mine
+        lay(hc + 2, hr + 2, k_route_track);
+        stand(hc - 2, hr, works);                                                  // works on the through-road
+        stand(hc + 2, hr + 2, mine);                                               // a mine at the track's end
+        stand(hc, hr, works);                                                      // works at the crossroads
+        for (int c = hc - 3; c <= hc + 3; ++c) lay(c, hr + 4, k_route_rail);      // the staged rail rung
+        aims.push_back({ "hills", hc - 1, hr });
+        aims.push_back({ "highway_hills", hc, hr - 1 });
+        aims.push_back({ "junction_works", hc, hr });
+        aims.push_back({ "rail", hc, hr + 4 });
+    }
+    if (const int fa = homogeneous_aim(src0, terrain_cover::forest); fa >= 0)
+    {
+        const int fr = fa / s.gw, fc = fa % s.gw;
+        for (int c = fc - 3; c <= fc + 3; ++c) lay(c, fr, k_route_track);
+        for (int r = fr - 2; r <= fr + 2; ++r) lay(fc + 2, r, k_route_road);
+        aims.push_back({ "forest", fc, fr });
+    }
+    if (const int ma = homogeneous_aim(src0, terrain_cover::marsh); ma >= 0)
+    {
+        const int mr = ma / s.gw, mc = ma % s.gw;
+        for (int c = mc - 3; c <= mc + 3; ++c) lay(c, mr, k_route_road);
+        aims.push_back({ "marsh", mc, mr });
+    }
+    if (const int ga = homogeneous_aim(src0, terrain_cover::grass); ga >= 0)
+    {
+        const int gr = ga / s.gw, gc = ga % s.gw;
+        for (int c = gc - 3; c <= gc + 3; ++c) lay(c, gr, k_route_highway);
+        for (int r = gr - 2; r <= gr + 2; ++r) lay(gc + 1, r, k_route_track);
+        stand(gc, gr, town);
+        aims.push_back({ "town", gc, gr });
+        aims.push_back({ "highway", gc - 2, gr });
+    }
+    // A road across the cylinder seam, on whatever land row crosses it.
+    for (int r = s.gh / 3; r < s.gh * 2 / 3; ++r)
+    {
+        bool ok = true;
+        for (int c = s.gw - 3; c <= s.gw + 2 && ok; ++c)
+            ok = s.cls[idx(c, r)] == land && !s.road[idx(c, r)];
+        if (!ok)
+            continue;
+        for (int c = s.gw - 3; c <= s.gw + 2; ++c) lay(c, r, k_route_road);
+        aims.push_back({ "seam", s.gw - 1, r });
+        break;
+    }
+    rederive_routes(s);
+    return aims;
+}
+
+/// The absolute end points of a piece, and its heading at each end (start:
+/// the way it leaves; end: the way it arrives), for P32.
+void piece_ends(const route_piece& pc, double cx, double cy, double e[2][4])
+{
+    constexpr int K = route_piece::k_pts;
+    const double l0 = std::max(1e-12, static_cast<double>(std::hypot(pc.x[1] - pc.x[0], pc.y[1] - pc.y[0])));
+    const double l1 = std::max(1e-12, static_cast<double>(std::hypot(pc.x[K - 1] - pc.x[K - 2], pc.y[K - 1] - pc.y[K - 2])));
+    e[0][0] = cx + pc.x[0];     e[0][1] = cy + pc.y[0];
+    e[0][2] = (pc.x[1] - pc.x[0]) / l0; e[0][3] = (pc.y[1] - pc.y[0]) / l0;
+    e[1][0] = cx + pc.x[K - 1]; e[1][1] = cy + pc.y[K - 1];
+    e[1][2] = (pc.x[K - 1] - pc.x[K - 2]) / l1; e[1][3] = (pc.y[K - 1] - pc.y[K - 2]) / l1;
+}
+
+} // namespace
+
+void roadsets_row(const bake_source& src0, const bake_params& p, bool previews)
+{
+    constexpr double kS3 = 1.7320508075688772;
+    const geometry m = make_master_geometry(src0.gw, src0.gh);
+    bake_params p1 = p;
+    p1.supersample = 1;
+    bake_source s = src0;
+    const std::vector<roadset_aim> aims = stage_roadsets(s, src0);
+    std::printf("P32-34: staged %zu subjects, %zu pieces\n", aims.size(), s.route_pieces.size());
+    check(aims.size() >= 5, "P32", "the road sets are staged (hills, junction works, rail, forest, town, the seam)");
+
+    // --- P32: crossing points agree ---------------------------------------
+    {
+        // Every edge, both sides, every network (road, rail, lane).
+        bool same = true, band = true, apart = true;
+        double worst = 0.0;
+        for (int r = 0; r < s.gh; ++r)
+            for (int c = 0; c < s.gw; ++c)
+                for (int n = 0; n < 4; n += 2) // E and S; their far tiles' W and N
+                {
+                    const int fc = n == 0 ? c + 1 : c, fr = n == 0 ? r : r + 1;
+                    if (fr >= s.gh)
+                        continue;
+                    // The far tile beside the near one (one period east at the
+                    // seam), computing in its own wrapped column.
+                    const double ax = kS3 * (c + ((r & 1) ? 0.5 : 0.0)), ay = 1.5 * r;
+                    const double bx = kS3 * (fc + ((fr & 1) ? 0.5 : 0.0)), by = 1.5 * fr;
+                    const int fcw = fc % s.gw;
+                    double rp[2] = {};
+                    for (int net = 0; net < 3; ++net)
+                    {
+                        double x0, y0, nx0, ny0, x1, y1, nx1, ny1;
+                        route_crossing(s.gw, c, r, n, net, x0, y0, nx0, ny0);
+                        route_crossing(s.gw, fcw, fr, n + 1, net, x1, y1, nx1, ny1);
+                        const double dx = (ax + x0) - (bx + x1), dy = (ay + y0) - (by + y1);
+                        worst = std::max(worst, std::hypot(dx, dy));
+                        same = same && std::hypot(dx, dy) < 1e-9 && std::fabs(nx0 + nx1) < 1e-12
+                                    && std::fabs(ny0 + ny1) < 1e-12;
+                        // Within the inner 70%: the offset from the midpoint.
+                        const double mx = (bx - ax) * 0.5, my = (by - ay) * 0.5;
+                        band = band && std::hypot(x0 - mx, y0 - my) <= k_cross_band + 1e-9;
+                        if (net < 2)
+                            rp[net] = (x0 - mx) * -ny0 + (y0 - my) * nx0; // signed, along the edge
+                    }
+                    apart = apart && std::fabs(rp[0] - rp[1]) >= 0.5 * k_cross_band - 1e-9;
+                }
+        std::printf("P32: worst crossing disagreement %.3g canonical over every edge, three networks\n", worst);
+        check(same, "P32", "every edge's crossing point is one absolute point from both tiles, across the seam too");
+        check(band, "P32", "every crossing point lies within the inner 70% of its edge");
+        check(apart, "P32", "a rail crossing stands at least half the band from the road's on the same edge");
+
+        // Pieces meet: every curve/spoke end on an edge has a neighbour end at
+        // the same absolute point, heading on (staged sets and the world's).
+        double worst_turn = 0.0;
+        const auto meet = [&](const bake_source& src, int& ends, int& met) {
+            ends = met = 0;
+            const auto pidx = [&](int c, int r) {
+                return static_cast<std::size_t>(r) * src.gw + ((c % src.gw) + src.gw) % src.gw;
+            };
+            for (int r = 0; r < src.gh; ++r)
+                for (int c = 0; c < src.gw; ++c)
+                {
+                    const std::size_t i = pidx(c, r);
+                    const double cx = kS3 * (c + ((r & 1) ? 0.5 : 0.0)), cy = 1.5 * r;
+                    for (int j = 0; j < src.route_count[i]; ++j)
+                    {
+                        const route_piece& pc = src.route_pieces[static_cast<std::size_t>(src.route_first[i] + j)];
+                        if (pc.kind != route_piece::curve && pc.kind != route_piece::spoke)
+                            continue;
+                        double e[2][4];
+                        piece_ends(pc, cx, cy, e);
+                        for (int end = pc.kind == route_piece::curve ? 0 : 1; end < 2; ++end)
+                        {
+                            ++ends;
+                            bool found = false;
+                            for (int n = 0; n < 4 && !found; ++n)
+                            {
+                                static constexpr int kc[4][2] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+                                const int nc = c + kc[n][0], nr = r + kc[n][1];
+                                if (nr < 0 || nr >= src.gh)
+                                    continue;
+                                const std::size_t t = pidx(nc, nr);
+                                const double ncx = kS3 * (nc + ((nr & 1) ? 0.5 : 0.0)), ncy = 1.5 * nr;
+                                for (int q = 0; q < src.route_count[t] && !found; ++q)
+                                {
+                                    const route_piece& o = src.route_pieces[static_cast<std::size_t>(src.route_first[t] + q)];
+                                    if (((o.tier & 0x80u) != 0) != ((pc.tier & 0x80u) != 0))
+                                        continue;
+                                    if (o.kind != route_piece::curve && o.kind != route_piece::spoke)
+                                        continue;
+                                    double f[2][4];
+                                    piece_ends(o, ncx, ncy, f);
+                                    for (int fe = o.kind == route_piece::curve ? 0 : 1; fe < 2 && !found; ++fe)
+                                    {
+                                        const double d = std::hypot(e[end][0] - f[fe][0], e[end][1] - f[fe][1]);
+                                        // Heading on: one end's outward heading is
+                                        // the other's outward heading reversed.
+                                        const double ox = end ? e[end][2] : -e[end][2], oy = end ? e[end][3] : -e[end][3];
+                                        const double px = fe ? f[fe][2] : -f[fe][2], py = fe ? f[fe][3] : -f[fe][3];
+                                        // The end segments sample the tangent a
+                                        // half-step in, so a bend turns them a
+                                        // little from the shared heading: within
+                                        // 20 degrees, and the worst is printed.
+                                        const double dot = ox * px + oy * py;
+                                        if (d < 2e-5 && dot < -0.94)
+                                        {
+                                            found = true;
+                                            worst_turn = std::max(worst_turn, std::acos(std::clamp(-dot, -1.0, 1.0)) * 57.29578);
+                                        }
+                                    }
+                                }
+                            }
+                            met += found;
+                        }
+                    }
+                }
+        };
+        int e1, m1, e2, m2;
+        meet(s, e1, m1);
+        meet(src0, e2, m2);
+        std::printf("P32: staged sets %d/%d piece ends meet their neighbour; the world's roads and lanes %d/%d"
+                    " (end segments within %.1f degrees)\n", m1, e1, m2, e2, worst_turn);
+        check(e1 > 0 && m1 == e1, "P32", "every staged piece end on an edge meets its neighbour's at one point, heading on");
+        check(m2 == e2, "P32", "every world road and lane piece end on an edge meets its neighbour's, heading on");
+    }
+
+    // --- P33: no road crosses a structure footprint ----------------------
+    {
+        const auto clear_of = [&](const bake_source& src, int& roaded, double& worst) {
+            roaded = 0;
+            worst = 1e9;
+            bool ok = true;
+            for (std::size_t i = 0; i < src.cls.size(); ++i)
+            {
+                const road_plan pl = tile_road_plan(src, i);
+                if (!pl.roaded)
+                    continue;
+                ++roaded;
+                for (int j = 0; j < src.route_count[i]; ++j)
+                {
+                    const route_piece& pc = src.route_pieces[static_cast<std::size_t>(src.route_first[i] + j)];
+                    if (pc.tier & 0x80u)
+                        continue;
+                    const double hw = 0.5 * k_route_width[pc.tier];
+                    for (int k = 1; k < route_piece::k_pts; ++k)
+                    {
+                        // The segment's distance to the cluster centre.
+                        const double ax = pc.x[k - 1] - pl.kx, ay = pc.y[k - 1] - pl.ky;
+                        const double vx = pc.x[k] - pc.x[k - 1], vy = pc.y[k] - pc.y[k - 1];
+                        const double l2 = vx * vx + vy * vy;
+                        const double u = l2 > 0.0 ? std::clamp(-(ax * vx + ay * vy) / l2, 0.0, 1.0) : 0.0;
+                        const double d = std::hypot(ax + vx * u, ay + vy * u) - pl.radius - hw;
+                        worst = std::min(worst, d);
+                        ok = ok && d >= -1e-6;
+                    }
+                }
+            }
+            return ok;
+        };
+        int r1, r2;
+        double w1, w2;
+        const bool ok1 = clear_of(s, r1, w1);
+        const bool ok2 = clear_of(src0, r2, w2);
+        std::printf("P33: %d staged roaded tiles (closest %.3f past the disc and half-width), %d in the world (%.3f)\n",
+                    r1, w1 < 1e8 ? w1 : 0.0, r2, w2 < 1e8 ? w2 : 0.0);
+        check(r1 >= 3 && ok1, "P33", "no staged road comes within a roaded cluster's disc plus its half-width");
+        check(ok2, "P33", "no road in the world comes within a roaded cluster's disc plus its half-width");
+    }
+
+    // --- P34: window invariance on every treatment -----------------------
+    {
+        bool inv = true, wrap = true, draws = true;
+        const int side = 192;
+        for (const roadset_aim& a : aims)
+        {
+            const double x = kS3 * (a.c + ((a.r & 1) ? 0.5 : 0.0)) * m.s;
+            const double y = (1.5 * a.r - m.y_min) * m.s;
+            const int x0 = static_cast<int>(x) - side / 2;
+            const int y0 = std::clamp(static_cast<int>(y) - side / 2, 0, m.H - side);
+            const bake_params* qs[2] = { &p1, &p };
+            for (const bake_params* q : qs)
+            {
+                std::vector<std::uint32_t> whole(static_cast<std::size_t>(side) * side), wb(whole.size());
+                bake_region(s, m, *q, x0, y0, side, side, whole.data());
+                bake_region(s, m, *q, x0 + m.W, y0, side, side, wb.data());
+                wrap = wrap && whole == wb;
+                // Unaligned sub-windows: odd sizes and offsets.
+                static constexpr int subs[4][4] = { { 0, 0, 77, 101 }, { 77, 0, 115, 61 },
+                                                    { 33, 61, 97, 131 }, { 130, 101, 62, 91 } };
+                for (const auto& sb : subs)
+                {
+                    std::vector<std::uint32_t> part(static_cast<std::size_t>(sb[2]) * sb[3]);
+                    bake_region(s, m, *q, x0 + sb[0], y0 + sb[1], sb[2], sb[3], part.data());
+                    for (int yy = 0; yy < sb[3] && inv; ++yy)
+                        inv = std::memcmp(part.data() + static_cast<std::size_t>(yy) * sb[2],
+                                          whole.data() + static_cast<std::size_t>(sb[1] + yy) * side + sb[0],
+                                          static_cast<std::size_t>(sb[2]) * 4u) == 0;
+                }
+                if (q == &p1)
+                {
+                    bake_params off = p1;
+                    off.route_strength = 0.0f;
+                    std::vector<std::uint32_t> wo(whole.size());
+                    bake_region(s, m, off, x0, y0, side, side, wo.data());
+                    int moved = 0;
+                    for (std::size_t k = 0; k < whole.size(); ++k)
+                        moved += whole[k] != wo[k];
+                    draws = draws && moved > 150;
+                    std::printf("P34: %-15s [%d,%d] %d px moved by the pass\n", a.name, a.c, a.r, moved);
+                }
+            }
+        }
+        check(inv, "P34", "every road set bakes byte-identical in unaligned sub-windows (1x and 2x)");
+        check(wrap, "P34", "every road set is wrap-exact one period east (1x and 2x)");
+        check(draws, "P34", "every road set draws (the pass moves its window)");
+    }
+
+    if (!previews)
+        return;
+    // Previews: each subject at the master (rung 4), and its 64 / 32 px levels
+    // (rungs 3 and 2), the camera squash applied; the same with the pass off.
+    const auto squash = [](const std::vector<std::uint32_t>& buf, int PW, int PH, double sy, int U, const char* path) {
+        const int OH = static_cast<int>(PH * sy);
+        std::vector<std::uint32_t> up(static_cast<std::size_t>(PW) * U * OH * U);
+        for (int y = 0; y < OH * U; ++y)
+        {
+            const int syr = std::min(PH - 1, static_cast<int>((y / U) / sy));
+            for (int x = 0; x < PW * U; ++x)
+                up[static_cast<std::size_t>(y) * PW * U + x] = buf[static_cast<std::size_t>(syr) * PW + x / U];
+        }
+        write_png_rgba(path, PW * U, OH * U, reinterpret_cast<const unsigned char*>(up.data()), PW * U * 4);
+    };
+    for (const roadset_aim& a : aims)
+    {
+        const int PW = 640, PH = 512;
+        const double x = kS3 * (a.c + ((a.r & 1) ? 0.5 : 0.0)) * m.s;
+        const double y = (1.5 * a.r - m.y_min) * m.s;
+        const int x0 = (static_cast<int>(x) - PW / 2) / 16 * 16;
+        const int y0 = std::clamp((static_cast<int>(y) - PH / 2) / 16 * 16, 0, m.H - PH);
+        for (int on = 1; on >= 0; --on)
+        {
+            bake_params q = p1;
+            if (!on)
+                q.route_strength = 0.0f;
+            std::vector<std::uint32_t> buf(static_cast<std::size_t>(PW) * PH);
+            bake_region(s, m, q, x0, y0, PW, PH, buf.data());
+            char path[128];
+            std::snprintf(path, sizeof path, "roadsets_%s%s_r4.png", a.name, on ? "" : "_off");
+            squash(buf, PW, PH, m.tilt_sy, 1, path);
+            int w = PW, h = PH;
+            std::vector<std::uint32_t> cur = buf, nxt;
+            for (int l = 0; l < 2; ++l)
+            {
+                nxt.assign(static_cast<std::size_t>(w / 2) * (h / 2), 0u);
+                downsample_half(cur.data(), w, h, nxt.data());
+                w /= 2; h /= 2;
+                cur.swap(nxt);
+                std::snprintf(path, sizeof path, "roadsets_%s%s_r%d.png", a.name, on ? "" : "_off", 3 - l);
+                squash(cur, w, h, m.tilt_sy, l == 0 ? 2 : 4, path);
+            }
+        }
     }
 }
 
@@ -2649,6 +3107,15 @@ int main(int argc, char** argv)
     if (argc > 1 && std::strcmp(argv[1], "--routes") == 0)
     {
         route_row(w, home, src, p, /*previews=*/true);
+        roadsets_row(src, p, /*previews=*/false); // BL-1261: P32-P34
+        std::printf("%s (%d failures)\n", g_failures ? "FAIL" : "PASS", g_failures);
+        return g_failures ? 1 : 0;
+    }
+
+    // --roadsets: the BL-1261 rows (P32-P34) alone, with roadsets_*.png previews.
+    if (argc > 1 && std::strcmp(argv[1], "--roadsets") == 0)
+    {
+        roadsets_row(src, p, /*previews=*/true);
         std::printf("%s (%d failures)\n", g_failures ? "FAIL" : "PASS", g_failures);
         return g_failures ? 1 : 0;
     }
@@ -4083,6 +4550,7 @@ int main(int argc, char** argv)
     // P26 / P27 - tiles hold their own ground (BL-1251).
     border_row(src, hb, p, /*previews=*/false);
     route_row(w, home, src, p, /*previews=*/false);
+    roadsets_row(src, p, /*previews=*/false); // BL-1261
     // P31 - cast shadows (BL-1256).
     shadow_row(src, p);
 
