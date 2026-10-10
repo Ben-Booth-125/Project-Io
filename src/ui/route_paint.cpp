@@ -286,13 +286,17 @@ const curve_weights& cw()
 /// its six neighbours', with their heights) interpolated as the hillshade's
 /// slope is, plus the hills field — each in the hillshade's own units
 /// (relief_gain x height, hill_amp x hills), so "lower" is what the light
-/// shows. A masked or water neighbour contributes nothing.
+/// shows. A masked or water neighbour contributes nothing. Flat land renders
+/// flat (Ben, 2026-10-10): the hills weigh by the interpolated roll weight,
+/// as the hillshade's do, so a road on a plain is not steered round hills
+/// the ground no longer shows.
 struct tile_ground
 {
     double cx = 0.0, cy = 0.0; ///< Absolute centre (wrapped column).
     int    n = 0;
-    double ox[7] = {}, oy[7] = {}, h[7] = {};
+    double ox[7] = {}, oy[7] = {}, h[7] = {}, roll[7] = {};
     double gain = 9.0, hill = 0.7;
+    bool   rolls = false; ///< Any tile of the ring rolls (else the hills field is skipped).
 };
 
 tile_ground make_ground(const bake_source& s, std::size_t i)
@@ -313,6 +317,8 @@ tile_ground make_ground(const bake_source& s, std::size_t i)
         tg.ox[tg.n] = k < 0 ? 0.0 : kNbDx[k];
         tg.oy[tg.n] = k < 0 ? 0.0 : kNbDy[k];
         tg.h[tg.n]  = s.height[static_cast<std::size_t>(t)];
+        tg.roll[tg.n] = s.roll[static_cast<std::size_t>(t)];
+        tg.rolls = tg.rolls || tg.roll[tg.n] > 0.0;
         ++tg.n;
     }
     return tg;
@@ -320,18 +326,24 @@ tile_ground make_ground(const bake_source& s, std::size_t i)
 
 double ground_v(const bake_source& s, const tile_ground& tg, double x, double y)
 {
-    double hs = 0.0, ws = 0.0;
+    double hs = 0.0, ws = 0.0, rs = 0.0;
     for (int k = 0; k < tg.n; ++k)
     {
         const double dx = x - tg.ox[k], dy = y - tg.oy[k];
         double w = std::max(0.0, 2.1 - (dx * dx + dy * dy));
         w *= w;
         hs += w * tg.h[k];
+        rs += w * tg.roll[k];
         ws += w;
     }
-    float gx, gy;
-    const double hv = hill_field(s, tg.cx + x, tg.cy + y, gx, gy);
-    return tg.gain * (ws > 0.0 ? hs / ws : 0.0) + tg.hill * hv;
+    const double roll = ws > 0.0 ? rs / ws : 0.0;
+    double hv = 0.0;
+    if (tg.rolls && roll > 0.0)
+    {
+        float gx, gy;
+        hv = hill_field(s, tg.cx + x, tg.cy + y, gx, gy);
+    }
+    return tg.gain * (ws > 0.0 ? hs / ws : 0.0) + tg.hill * roll * hv;
 }
 
 /// Hex distance: the largest projection on the six edge normals (inside the
@@ -1064,7 +1076,7 @@ void paint_routes(const bake_source& s, const geometry& g, const bake_params& p,
             // slope.
             double L = 1.0, Gx = 0.0, Gy = 0.0;
             {
-                double gx = 0.0, gy = 0.0, ws = 0.0, hs = 0.0, bs = 0.0;
+                double gx = 0.0, gy = 0.0, ws = 0.0, hs = 0.0, bs = 0.0, rs = 0.0;
                 int cc = 0, rr0 = 0;
                 const int tn = nearest_tile(s, qx, qy, cc, rr0);
                 if (tn >= 0)
@@ -1081,19 +1093,26 @@ void paint_routes(const bake_source& s, const geometry& g, const bake_params& p,
                         gx += w * w * s.grad_x[static_cast<std::size_t>(t)];
                         gy += w * w * s.grad_y[static_cast<std::size_t>(t)];
                         hs += w * w * s.height[static_cast<std::size_t>(t)];
-                        bs += w * w * s.relief_bias[static_cast<std::size_t>(t)];
+                        // Flat land renders flat: the rolling tiles' bias and
+                        // the roll weight, as the base hillshade reads them.
+                        const double rl = s.roll[static_cast<std::size_t>(t)];
+                        bs += w * w * rl * s.relief_bias[static_cast<std::size_t>(t)];
+                        rs += w * w * rl;
                         ws += w * w;
                     }
                     if (ws > 0.0)
                     {
-                        Gx = gx / ws * p.relief_gain;
-                        Gy = gy / ws * p.relief_gain;
+                        const double tilt = tilt_weight(p, static_cast<float>(rs / ws));
+                        Gx = gx / ws * p.relief_gain * tilt;
+                        Gy = gy / ws * p.relief_gain * tilt;
                     }
                 }
-                // The folds and the hills: the sub-tile relief the eye reads.
+                // The folds and the hills: the sub-tile relief the eye reads
+                // (none on flat ground: no hillside cut on a plain).
                 float hx = 0.0f, hy = 0.0f;
                 relief_slope(s, g, p, abx, aby, ws > 0.0 ? static_cast<float>(bs / ws) : 0.0f,
-                             ws > 0.0 ? static_cast<float>(hs / ws) : 0.0f, hx, hy);
+                             ws > 0.0 ? static_cast<float>(hs / ws) : 0.0f,
+                             ws > 0.0 ? static_cast<float>(rs / ws) : 0.0f, hx, hy);
                 Gx += hx;
                 Gy += hy;
                 // The ground's own shade (bake_window's hillshade term and

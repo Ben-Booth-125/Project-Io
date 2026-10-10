@@ -696,7 +696,13 @@ Judged against `docs/ui/design/renders/map/`. What it asks of the bake, procedur
   move their light), **highland rolls**, and the dramatic forms — mountain, canyon, crater, rift —
   keep their drama; the rolling fold field below applies to highland only, and cast shadows fall
   only where there is relief to cast them. The transition from rolling to flat ground is smooth
-  across tiles, never hex-shaped. The 2026-10-10 rule it revises:
+  across tiles, never hex-shaped. The weight is a per-tile **roll** — 0 on plains and valleys, 1
+  on highland and the dramatic forms — interpolated as the relief bias is (the wide
+  interpolation, never the edge band). It scales the fold field's floor and altitude share, the
+  hills, and the tile height field's slope shading (flat ground keeps none of it); the landform
+  accent reads only rolling tiles' bias, so a valley adds none. The cast-shadow height field, the
+  crease ink and a road's hillside cut read the same weight, so flat ground casts, inks and cuts
+  nothing. The 2026-10-10 rule it revises:
 - **Relief everywhere.** Every hex carries terrain shape: **plains roll** as low hills with
   folds ~0.3-0.5 hex apart (they were held calm), ranges rise above them. The landform
   forms keep their drama on top. The folds are a field of two sheared octaves 0.46 and

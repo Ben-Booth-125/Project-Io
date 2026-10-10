@@ -1762,6 +1762,37 @@ void look_row(const bake_source& src, const bake_params& p0, const char* suffix)
         }
         subs.push_back({ "coast", t });
     }
+    // Flat land renders flat (Ben, 2026-10-10): a valley, a plain meeting a
+    // mountain run (the rolling-to-flat transition), and a road on a plain.
+    {
+        const auto lf_is = [&](int i, terrain_landform l) { return src.landform[i] == static_cast<std::uint8_t>(l); };
+        int tv = -1, bv = -1, tm = -1, bm = -1, tr_ = -1, br = -1;
+        for (int i = 0; i < static_cast<int>(src.cls.size()); ++i)
+        {
+            if (src.cls[i] != land)
+                continue;
+            int nv = 0, nm = 0, np = 0, nr = 0;
+            for (int s = 0; s < 6; ++s)
+            {
+                const int j = nbi(i, s);
+                if (j < 0 || src.cls[j] != land)
+                    continue;
+                nv += lf_is(j, terrain_landform::valley);
+                nm += lf_is(j, terrain_landform::mountain);
+                np += lf_is(j, terrain_landform::plains);
+                nr += src.road[j] > 0;
+            }
+            if (lf_is(i, terrain_landform::valley) && nv > bv) { bv = nv; tv = i; } // valleys are rare: any latitude
+            if (!temperate(i))
+                continue;
+            if (lf_is(i, terrain_landform::plains) && nm >= 1 && nm <= 3 && np * 4 + nm > bm) { bm = np * 4 + nm; tm = i; }
+            if (lf_is(i, terrain_landform::plains) && src.road[i] > 0 && src.inst.of_tile[static_cast<std::size_t>(i)] < 0
+                && np * 2 + nr > br) { br = np * 2 + nr; tr_ = i; }
+        }
+        subs.push_back({ "valley", tv });
+        subs.push_back({ "plain_mountain", tm });
+        subs.push_back({ "road_plain", tr_ });
+    }
 
     constexpr int W = 1024, H = 640;
     std::vector<std::uint32_t> a(static_cast<std::size_t>(W) * H);
@@ -1847,6 +1878,11 @@ void look_row(const bake_source& src, const bake_params& p0, const char* suffix)
         write_png_rgba(path, W / 2, H / 2, reinterpret_cast<const unsigned char*>(h1.data()), (W / 2) * 4);
         std::snprintf(path, sizeof path, "look_%s%s_quarter.png", s.name, suffix);
         write_png_rgba(path, W / 4, H / 4, reinterpret_cast<const unsigned char*>(h2.data()), (W / 4) * 4);
+        // The rung-1 read: the master an eighth.
+        std::vector<std::uint32_t> h3(static_cast<std::size_t>(W / 8) * (H / 8));
+        downsample_half(h2.data(), W / 4, H / 4, h3.data());
+        std::snprintf(path, sizeof path, "look_%s%s_eighth.png", s.name, suffix);
+        write_png_rgba(path, W / 8, H / 8, reinterpret_cast<const unsigned char*>(h3.data()), (W / 8) * 4);
     }
 }
 
@@ -3054,7 +3090,7 @@ int main(int argc, char** argv)
         bake_params q = p;
         struct dial { const char* name; float* v; };
         const dial dials[] = {
-            { "roll_floor", &q.roll_floor }, { "roll_ridge", &q.roll_ridge }, { "plain_ease", &q.plain_ease },
+            { "roll_floor", &q.roll_floor }, { "roll_ridge", &q.roll_ridge }, { "plain_ease", &q.plain_ease }, { "flat_tilt", &q.flat_tilt },
             { "hill_amp", &q.hill_amp },
             { "shade_lo", &q.shade_lo }, { "shade_hi", &q.shade_hi }, { "mottle", &q.mottle },
             { "shadow_strength", &q.shadow_strength }, { "sun_elevation", &q.sun_elevation },
