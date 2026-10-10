@@ -49,6 +49,7 @@
 #include "world/placement_rules.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/supply_system.hpp"
+#include "world/trade.hpp"
 #include "world/world.hpp"
 
 #include <cstdio>
@@ -262,9 +263,8 @@ int main(int argc, char** argv)
         {
             advance_convoys(w);
             credit_arrived_convoys(w, t); // app order: arrivals before the economy
-            const economy_report report = run_economy_step(w, reg);
-            dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land), // BL-995: before the clear
-                             reg.logistics_cost(convoy_mode::space));
+            economy_report report = run_economy_step(w, reg);
+            run_trades(w, reg, report); // BL-1266: the trade pass (was dispatch_convoys), before the clear
             const auto flows = clear_markets(w, reg, report);
             apply_budget(w, reg, flows, report.workforce_contention, nullptr);
 

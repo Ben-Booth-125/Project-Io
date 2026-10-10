@@ -12,12 +12,10 @@
 // Reading the code answers half of it. Neither dispatch path can commit a
 // zero-quantity convoy:
 //
-//   - the auto path (`dispatch_convoys`, supply_system.cpp) skips a source
-//     whose `surplus <= 0.0f` and skips a destination whose `shortfall <= 0`,
-//     then takes `qty = min(surplus, shortfall)` — strictly positive by
-//     construction;
-//   - the directed verb (`corp_verb::dispatch_convoy`, corp_command.cpp)
-//     rejects the whole command on `!(cmd.quantity > 0.0f)`, finiteness first.
+//   - (BL-1266) the dispatcher and the directed `dispatch_convoy` verb have
+//     retired: every convoy is now a TRADE's shipment (`run_trades` ->
+//     `commit_trade_shipment`). The invariant below is unchanged and is
+//     asserted over the trade pass instead.
 //
 // So `cargo_qty == 0` should be unreachable. What the code does NOT settle is
 // what the ledger was actually looking at, because `cargo_qty` is a FLOAT and
@@ -46,6 +44,7 @@
 #include "world/economy_system.hpp"
 #include "world/market_clearing.hpp"
 #include "world/supply_system.hpp"
+#include "world/trade.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
 #include "world/world_gen_config.hpp"
@@ -123,15 +122,17 @@ int main(int argc, char** argv)
         // candidate (BL-979; apply_shipped_landscape in harness_params.hpp).
         print_shipped_landscape(apply_shipped_landscape(w, reg, static_cast<uint32_t>(s)));
 
-        std::size_t seen = 0;
         for (int t = 1; t <= n_ticks; ++t)
         {
-            dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
-                             reg.logistics_cost(convoy_mode::space));
-            // Only convoys appended THIS tick — w.convoys is append-only within
-            // a tick and compacted by advance/credit, so walking from the
-            // previous size is the honest dispatch count (haulage_measure.cpp
-            // uses the same walk).
+            // BL-1266: the dispatcher retired; a convoy is now a TRADE's
+            // shipment, committed inside run_trades. The tick runs in the app's
+            // order (advance -> arrivals -> economy -> trade -> clear -> budget)
+            // and the census reads only what run_trades appended.
+            advance_convoys(w);
+            credit_arrived_convoys(w, t);
+            economy_report report = run_economy_step(w, reg);
+            const std::size_t seen = w.convoys.size();
+            run_trades(w, reg, report);
             for (std::size_t i = seen; i < w.convoys.size(); ++i)
             {
                 const convoy_component& c = w.convoys[i];
@@ -146,12 +147,8 @@ int main(int argc, char** argv)
                     if (q < 1.0) ++n_sub_one;
                 }
             }
-            advance_convoys(w);
-            const economy_report report = run_economy_step(w, reg);
             const auto flows = clear_markets(w, reg, report);
             apply_budget(w, reg, flows, report.workforce_contention, nullptr);
-            credit_arrived_convoys(w, t);
-            seen = w.convoys.size();
         }
     }
 

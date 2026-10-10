@@ -14,9 +14,12 @@
 #include "world/market_clearing.hpp"
 #include "world/orbital_system.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/economy_system.hpp" // economy_report (the trade pass's registers)
 #include "world/supply_system.hpp"
+#include "world/trade.hpp"
 #include "world/world.hpp"
 
+#include <map>
 #include <vector>
 
 #include <cmath>
@@ -93,16 +96,19 @@ static void test_logistics_constants()
 }
 
 // ---------------------------------------------------------------------------
-// R5: dispatch_convoys debits corp balance by logistics_cost × distance × qty
-// R6: space-mode requires launchpad on source body (gate check)
+// R5: a trade shipment debits the trader's balance by logistics_cost × distance
+//     × qty (BL-1266: the dispatcher retired; every convoy is a trade's
+//     shipment — `price_trade_leg` + `commit_trade_shipment`)
+// R6: space-mode requires a launchpad on the source body AND the launch's
+//     propellant on the source shelf (gate check)
 // ---------------------------------------------------------------------------
 static void test_dispatch_and_gate()
 {
-    std::printf("--- R5 + R6: dispatch_convoys ---\n");
+    std::printf("--- R5 + R6: a trade shipment between bodies ---\n");
     world w;
     recipe_registry reg;
 
-    // Two bodies: src (has launchpad + iron surplus) and dest (iron shortfall in market).
+    // Two bodies: src (iron on its market's shelf) and dest (iron shortfall).
     entity_id src_body  = w.create_entity();
     entity_id dest_body = w.create_entity();
     entity_id corp_id   = w.create_entity();
@@ -138,36 +144,51 @@ static void test_dispatch_and_gate()
         mc.body = dest_body;
         mc.supply[ri(resource_type::iron_ore)] = 0.0f;
         mc.demand[ri(resource_type::iron_ore)] = 50.0f;
-        // BL-995: dispatch is the seller chasing a net price, so the
-        // destination must PRICE iron (5, against a 1/unit space haul and no
-        // home price) for anything to move; with zero supply there, the
-        // quantity is its unmet demand of 50.
         mc.base_price[ri(resource_type::iron_ore)] = 5.0f;
         mc.price = mc.base_price;
         w.markets[dest_mkt] = mc;
     }
 
-    // Source pool with iron surplus.
-    w.pool_at(corp_id, pool_key_for_body(w, src_body)).quantities[ri(resource_type::iron_ore)] = 100.0f;
-
-    // --- Test gate: NO launchpad on source body → no convoy dispatched ---
-    dispatch_convoys(w, reg,
-                     reg.logistics_cost(convoy_mode::land),
-                     reg.logistics_cost(convoy_mode::space));
-    check(w.convoys.empty(), "R6: no convoy without launchpad");
-    const float balance_before_gate = w.corporations.at(corp_id).balance;
-    check(near(balance_before_gate, 500.0f), "R6: balance unchanged without launchpad",
-          balance_before_gate, 500.0f);
-
-    // --- Add launchpad building on source body ---
-    entity_id tile_id   = w.create_entity();
-    entity_id asset_id  = w.create_entity();
+    // Source market with 100 iron on its SHELF (BL-1265: no pools), priced at 1.
+    entity_id tile_id = w.create_entity();
     {
         tile_component tc{};
         tc.body = src_body;
         tc.grid_x = 0; tc.grid_y = 0;
         w.tiles[tile_id] = tc;
     }
+    entity_id src_mkt = w.create_entity();
+    {
+        market_component mc{};
+        mc.body = src_body;
+        mc.centre_tile = tile_id;
+        mc.base_price[ri(resource_type::iron_ore)]   = 1.0f;
+        mc.base_price[ri(resource_type::propellant)] = 1.0f;
+        mc.price = mc.base_price;
+        mc.inventory[ri(resource_type::iron_ore)] = 100.0f;
+        w.markets[src_mkt] = mc;
+    }
+
+    // One 50-unit shipment src -> dest, priced and committed as a trade ships.
+    auto ship50 = [&]() {
+        economy_report rep;
+        const logistics_nodes nodes = collect_logistics_nodes(w);
+        const convoy_leg leg = price_trade_leg(w, reg, nodes, corp_id, src_mkt, dest_mkt,
+                                               ri(resource_type::iron_ore), 50.0f);
+        return leg.viable
+            && commit_trade_shipment(w, reg, rep, corp_id, src_mkt, dest_mkt,
+                                     ri(resource_type::iron_ore), 50.0f, leg);
+    };
+
+    // --- Test gate: NO launchpad on source body → no convoy ---
+    check(!ship50(), "R6: the space lane is refused without a launchpad");
+    check(w.convoys.empty(), "R6: no convoy without launchpad");
+    const float balance_before_gate = w.corporations.at(corp_id).balance;
+    check(near(balance_before_gate, 500.0f), "R6: balance unchanged without launchpad",
+          balance_before_gate, 500.0f);
+
+    // --- Add launchpad building on source body ---
+    entity_id asset_id = w.create_entity();
     {
         building_component bc{};
         bc.tile = tile_id;
@@ -177,67 +198,53 @@ static void test_dispatch_and_gate()
     w.corporations[corp_id].assets.push_back(asset_id);
 
     // --- BL-308 gate: a pad with NO propellant is as shut as no pad at all ---
-    dispatch_convoys(w, reg,
-                     reg.logistics_cost(convoy_mode::land),
-                     reg.logistics_cost(convoy_mode::space));
-    check(w.convoys.empty(), "R6: no convoy from an UNFUELLED launchpad (BL-308)");
+    check(!ship50(), "R6: no convoy from an UNFUELLED launchpad (BL-308)");
+    check(w.convoys.empty(), "R6: ... and no convoy appended");
     check(near(w.corporations.at(corp_id).balance, 500.0f),
           "R6: balance unchanged without propellant",
           w.corporations.at(corp_id).balance, 500.0f);
 
-    // Fuel the pad. 3 units of propellant on the source body; a launch burns 1.
-    w.pool_at(corp_id, pool_key_for_body(w, src_body)).quantities[ri(resource_type::propellant)] = 3.0f;
+    // Fuel the pad: 3 units of propellant on the source SHELF; a launch burns 1,
+    // which the trader buys there (BL-1265).
+    w.markets.at(src_mkt).inventory[ri(resource_type::propellant)] = 3.0f;
 
-    // Also add a source market (needed by credit_arrived_convoys).
-    entity_id src_mkt = w.create_entity();
-    {
-        market_component mc{};
-        mc.body = src_body;
-        w.markets[src_mkt] = mc;
-    }
-    // BL-1003: a market arriving on a market-less body takes its body-level
-    // pool whole — what maybe_spawn_market does; this fixture inserts by hand.
-    absorb_body_pool_into_market(w, src_body, src_mkt);
-
-    dispatch_convoys(w, reg,
-                     reg.logistics_cost(convoy_mode::land),
-                     reg.logistics_cost(convoy_mode::space));
-
+    check(ship50(), "R5: the shipment commits with a fuelled launchpad");
     check(!w.convoys.empty(), "R5: convoy dispatched with launchpad");
 
     if (!w.convoys.empty())
     {
         const convoy_component& conv = w.convoys[0];
         check(conv.cargo_resource == resource_type::iron_ore, "cargo resource = iron_ore");
-        check(near(conv.cargo_qty, 50.0f), "cargo qty = shortfall (50)",
+        check(near(conv.cargo_qty, 50.0f), "cargo qty = the shipment (50)",
               conv.cargo_qty, 50.0f);
         check(conv.mode == convoy_mode::space, "mode = space");
 
-        // cost = space_rate × distance × qty = 1.0 × 1.0 × 50 = 50
+        // cost = space_rate × distance × qty = 1.0 × 1.0 × 50 = 50. The haul is
+        // paid now; the purchase is billed at the clear (not run here).
         const float expected_cost = 1.0f * 1.0f * 50.0f;
         const float balance_after = w.corporations.at(corp_id).balance;
         check(near(balance_after, 500.0f - expected_cost),
               "R5: corp balance debited by logistics cost",
               balance_after, 500.0f - expected_cost);
 
-        // Source pool debited.
-        const float src_qty = w.pool_at(corp_id, pool_key_for_body(w, src_body)).quantities[ri(resource_type::iron_ore)];
-        check(near(src_qty, 100.0f - 50.0f), "R5: source pool debited",
+        // Source shelf debited.
+        const float src_qty = w.markets.at(src_mkt).inventory[ri(resource_type::iron_ore)];
+        check(near(src_qty, 100.0f - 50.0f), "R5: source shelf debited",
               src_qty, 100.0f - 50.0f);
 
         // BL-308: the launch burned exactly one unit of propellant — per LAUNCH,
         // not per unit of cargo and not per AU.
-        const float prop_left = w.pool_at(corp_id, pool_key_for_body(w, src_body)).quantities[ri(resource_type::propellant)];
+        const float prop_left = w.markets.at(src_mkt).inventory[ri(resource_type::propellant)];
         check(near(prop_left, 3.0f - 1.0f), "R6: one launch burns one propellant (BL-308)",
               prop_left, 2.0f);
     }
 }
 
 // ---------------------------------------------------------------------------
-// R7 + R8: credit_arrived_convoys credits the pool and leaves market supply
-// alone (BL-382 — a direct supply write was zeroed by the next clear_markets
-// before pricing read it, while the pre-clear AI scorer did read it; the cargo
-// reaches supply via the auto-surplus path off the pool instead)
+// R7 + R8: credit_arrived_convoys LANDS the cargo for its owner on the
+// destination market and leaves market supply alone (BL-382 — a direct supply
+// write was zeroed by the next clear_markets before pricing read it; BL-1265:
+// the landing is listed and sold at that clear instead of an auto-surplus pass)
 // ---------------------------------------------------------------------------
 static void test_credit_arrived()
 {
@@ -259,8 +266,8 @@ static void test_credit_arrived()
     mc.supply[ri(resource_type::iron_ore)] = 10.0f;
     w.markets[dest_mkt] = mc;
 
-    // Pre-seed the dest pool.
-    w.pool_at(corp_id, pool_key_for_body(w, dest_body)).quantities[ri(resource_type::iron_ore)] = 5.0f;
+    // Pre-seed a landing this tick (production, say).
+    w.land_goods(corp_id, dest_mkt, ri(resource_type::iron_ore), 5.0f);
 
     // Arrived convoy carrying 30 iron.
     convoy_component cv{};
@@ -276,22 +283,21 @@ static void test_credit_arrived()
 
     check(w.convoys.empty(), "convoy retired after credit");
 
-    const float pool_qty = w.pool_at(corp_id, pool_key_for_body(w, dest_body)).quantities[ri(resource_type::iron_ore)];
-    check(near(pool_qty, 5.0f + 30.0f), "R7: pool credited",
-          pool_qty, 5.0f + 30.0f);
+    const float landed = w.landed(corp_id, dest_mkt, ri(resource_type::iron_ore));
+    check(near(landed, 5.0f + 30.0f), "R7: the cargo lands for its owner on the destination",
+          landed, 5.0f + 30.0f);
 
     const float mkt_supply = w.markets.at(dest_mkt).supply[ri(resource_type::iron_ore)];
     check(near(mkt_supply, 10.0f), "R8: market supply untouched (BL-382)",
           mkt_supply, 10.0f);
 }
-
 // ---------------------------------------------------------------------------
 // R8: two-body price convergence via repeated convoy deliveries
 //
-// Body A: abundant iron supply (large corp pool) → low market price.
+// Body A: abundant iron supply (a large shelf) → low market price.
 // Body B: iron demand only (no supply, no pool) → price at ceiling.
 // Each delivery tick: seed an arrived convoy, credit it, clear markets.
-// After 8 deliveries the body B pool accumulates → price falls.
+// After 8 deliveries body B's landings list as supply → price falls.
 // ---------------------------------------------------------------------------
 static void test_price_convergence()
 {
@@ -327,7 +333,7 @@ static void test_price_convergence()
         mc.price[ri(resource_type::iron_ore)]      = 1.0f;
         w.markets[mkt_a] = mc;
     }
-    w.pool_at(corp, pool_key_for_body(w, body_a)).quantities[ri(resource_type::iron_ore)] = 500.0f;
+    w.markets.at(mkt_a).inventory[ri(resource_type::iron_ore)] = 500.0f; // BL-1265: on A's shelf
 
     entity_id mkt_b = w.create_entity();
     {
@@ -353,8 +359,8 @@ static void test_price_convergence()
     economy_report report;
     std::array<float, resource_count> shortfall{};
     shortfall[ri(resource_type::iron_ore)] = 50.0f;
-    report.wants[{corp, pool_key_for_body(w, body_b)}]     = shortfall; // BL-1003: keyed (corp, market)
-    report.purchases[{corp, pool_key_for_body(w, body_b)}] = shortfall;
+    report.wants[{corp, mkt_b}]     = shortfall; // keyed (corp, market)
+    report.purchases[{corp, mkt_b}] = shortfall;
 
     // --- Phase 1: diverge without convoys (3 ticks to settle EMA) ---
     for (int i = 0; i < 3; ++i)
@@ -390,22 +396,26 @@ static void test_price_convergence()
 }
 
 // ---------------------------------------------------------------------------
-// BL-354: econ-tick orbital purity — dispatch is a pure function of tick.
+// BL-354: econ-tick orbital purity — the trade pass is a pure function of tick.
 //
 // Two candidate source bodies on moving orbits compete to fill a shortfall on a
 // third. Run the same authored world twice over three econ ticks; in run B,
-// scribble garbage into every body's live orbital_angle_rad before each dispatch
-// (simulating arbitrary frame-rate drift). Source choice, dispatch cost, convoy
-// speed and arrival step count must be identical — dispatch may read only the
-// tick-pure orbital_angle_at_tick.
+// scribble garbage into every body's live orbital_angle_rad before each trade
+// pass (simulating arbitrary frame-rate drift). Source choice, haul cost,
+// convoy speed and arrival step count must be identical — the trade pass may
+// read only the tick-pure orbital_angle_at_tick.
+//
+// BL-1266: the dispatcher retired; the competition is AUTO TRADE (run_trades),
+// on a corporation holding a Port (a trade building: flat trade points) on
+// every body, so all three markets are in its trade's reach.
 // ---------------------------------------------------------------------------
 
 struct purity_trace
 {
-    std::vector<float>     costs;         ///< Balance debited per dispatch.
+    std::vector<float>     costs;         ///< Balance debited per pass (the haul).
     std::vector<float>     speeds;        ///< Convoy speed (1 / distance AU).
-    std::vector<float>     qtys;          ///< Cargo quantity per dispatch.
-    std::vector<entity_id> sources;       ///< Chosen source market per dispatch.
+    std::vector<float>     qtys;          ///< Cargo quantity per pass.
+    std::vector<entity_id> sources;       ///< Chosen source market per pass.
     std::vector<int>       arrival_steps; ///< advance_convoys calls until arrival.
 };
 
@@ -413,6 +423,14 @@ static purity_trace run_purity_world(bool perturb_angles)
 {
     world w;
     recipe_registry reg;
+    {
+        trade_params tp;
+        // Three Ports make three points; one tick's whole capacity is ~50 units,
+        // which the best route takes, so exactly one convoy leaves per tick.
+        tp.capacity[ri(resource_type::iron_ore)] = 50.0f / 3.0f;
+        tp.port_points = 1.0f;
+        reg.set_trade(tp);
+    }
 
     entity_id corp_id = w.create_entity();
     entity_id src_a   = w.create_entity();
@@ -439,29 +457,14 @@ static purity_trace run_purity_world(bool perturb_angles)
     corp.balance = 100000.0f;
     w.corporations[corp_id] = corp;
 
-    // A market on every body (sources need one so the convoy records its origin).
+    // A tile, a market and a Port on every body; a launchpad on each source.
+    // Every market prices iron (a source must price what it sells), the
+    // destination well above any space haul in this fixture, so every tick has
+    // one margin to chase; the better route spends the corporation's one trade
+    // point (50 units), so exactly one convoy leaves per tick.
     entity_id dest_mkt = null_entity;
+    std::map<entity_id, entity_id> mkt_of;
     for (entity_id body : { src_a, src_b, dest })
-    {
-        entity_id mkt = w.create_entity();
-        market_component mc{};
-        mc.body = body;
-        // BL-995: only the destination prices iron (well above any space haul
-        // in this fixture), so every tick has one net-price gain to chase; the
-        // lower-id source pool fills the unmet demand and the other sees it in
-        // transit, so exactly one convoy leaves per tick.
-        if (body == dest)
-        {
-            mc.base_price[ri(resource_type::iron_ore)] = 50.0f;
-            mc.price = mc.base_price;
-        }
-        w.markets[mkt] = mc;
-        if (body == dest)
-            dest_mkt = mkt;
-    }
-
-    // Fuelled launchpad on both source bodies.
-    for (entity_id body : { src_a, src_b })
     {
         entity_id tile = w.create_entity();
         {
@@ -469,44 +472,63 @@ static purity_trace run_purity_world(bool perturb_angles)
             tc.body = body;
             w.tiles[tile] = tc;
         }
-        entity_id pad = w.create_entity();
+        entity_id mkt = w.create_entity();
+        market_component mc{};
+        mc.body = body;
+        mc.centre_tile = tile;
+        mc.base_price[ri(resource_type::iron_ore)]   = (body == dest) ? 50.0f : 1.0f;
+        mc.base_price[ri(resource_type::propellant)] = 1.0f;
+        mc.price = mc.base_price;
+        w.markets[mkt] = mc;
+        mkt_of[body] = mkt;
+        if (body == dest)
+            dest_mkt = mkt;
+        entity_id port = w.create_entity();
         {
+            building_component bc{};
+            bc.tile = tile;
+            bc.type = building_type::port;
+            w.buildings[port] = bc;
+        }
+        w.corporations[corp_id].assets.push_back(port);
+        if (body != dest)
+        {
+            entity_id pad = w.create_entity();
             building_component bc{};
             bc.tile = tile;
             bc.type = building_type::launchpad;
             w.buildings[pad] = bc;
+            w.corporations[corp_id].assets.push_back(pad);
         }
-        w.corporations[corp_id].assets.push_back(pad);
     }
 
     purity_trace trace;
     for (const int tick : { 90, 180, 270 })
     {
-        // Fresh shortfall + surpluses each econ tick.
+        // Fresh shortfall + source shelves each econ tick.
         w.markets.at(dest_mkt).demand[ri(resource_type::iron_ore)] = 50.0f;
-        // BL-995: last tick's delivery would have sold at the destination's
-        // clear (this loop runs no clear), so it is not still pending there.
-        w.pool_at(corp_id, dest_mkt).quantities[ri(resource_type::iron_ore)] = 0.0f;
+        // Last tick's delivery would have sold at the destination's clear (this
+        // loop runs no clear), so it is not still pending there.
+        w.landed_this_tick.clear();
         w.markets.at(dest_mkt).supply[ri(resource_type::iron_ore)] = 0.0f;
         for (entity_id body : { src_a, src_b })
         {
-            w.pool_at(corp_id, pool_key_for_body(w, body)).quantities[ri(resource_type::iron_ore)]   = 100.0f;
-            w.pool_at(corp_id, pool_key_for_body(w, body)).quantities[ri(resource_type::propellant)] = 5.0f;
+            w.markets.at(mkt_of[body]).inventory[ri(resource_type::iron_ore)]   = 100.0f;
+            w.markets.at(mkt_of[body]).inventory[ri(resource_type::propellant)] = 5.0f;
         }
 
         w.current_day_tick  = tick;
         w.current_econ_tick = tick;
 
-        // Run B: the live angles carry arbitrary frame-drift garbage. Dispatch
-        // must not notice.
+        // Run B: the live angles carry arbitrary frame-drift garbage. The trade
+        // pass must not notice.
         if (perturb_angles)
             for (auto& [id, body] : w.bodies)
                 body.orbital_angle_rad = 5.777f + 0.13f * static_cast<float>(id + tick);
 
         const float balance_before = w.corporations.at(corp_id).balance;
-        dispatch_convoys(w, reg,
-                         reg.logistics_cost(convoy_mode::land),
-                         reg.logistics_cost(convoy_mode::space));
+        economy_report rep;
+        run_trades(w, reg, rep);
 
         trace.costs.push_back(balance_before - w.corporations.at(corp_id).balance);
         if (w.convoys.size() == 1)
@@ -533,7 +555,6 @@ static purity_trace run_purity_world(bool perturb_angles)
     }
     return trace;
 }
-
 static void test_orbital_purity()
 {
     std::printf("--- BL-354: econ-tick orbital purity ---\n");
@@ -565,7 +586,7 @@ static void test_orbital_purity()
     for (const float s : clean.speeds)
         if (s <= 0.0f)
             convoys_each_tick = false;
-    check(convoys_each_tick, "one convoy dispatched every econ tick");
+    check(convoys_each_tick, "one convoy shipped by the trade pass every econ tick");
 
     for (std::size_t i = 0; i < clean.costs.size(); ++i)
     {

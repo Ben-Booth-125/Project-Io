@@ -10,7 +10,8 @@
 //   R3 — the state export (corp_blackboard) is visibility-honest against
 //        ground truth: own facts full; rival internals absent; unsurveyed tile
 //        facts absent; deterministic ordering.
-//   R4 — the hire gate + debit (BL-324/BL-352) read the LIVE (corp, body)
+//   R4 — the hire gate + debit (BL-324/BL-352) read the LIVE shelves the corp
+//        sits in (BL-1265: they were its (corp, body)
 //        pools: goods in pools unlock a gated row and are drained by exactly
 //        the hire cost (ascending body id); a corp without them is refused;
 //        an ungated row hires with no resource debit.
@@ -517,29 +518,43 @@ int main()
             s.w.corporations[s.ai_corp].assets.push_back(b);
         };
 
-        // Goods in the live pools unlock the gated row, and the hire drains
-        // them across pools in ascending POOL-KEY order (BL-1003: a market id,
-        // or a body id on a market-less body — corp_command.cpp's
-        // debit_from_corp) by exactly the flat axis cost (5, hire_axis_cost).
+        // BL-1265: corporations hold no pools — goods on the SHELVES of the
+        // markets the corp sits in unlock the gated row, and the hire BUYS them
+        // across those shelves in ascending MARKET-ID order
+        // (`buy_from_corp_shelves`) by exactly the flat axis cost (5,
+        // hire_axis_cost). The corp sits in a second market here: one on the
+        // hidden body, through an extraction site there.
         {
             scene s = make_scene(1000.0f);
             add_muster_base(s);
-            const entity_id k_home   = pool_key_for_body(s.w, s.body);
-            const entity_id k_hidden = pool_key_for_body(s.w, s.hidden);
-            s.w.pool_at(s.ai_corp, k_home).quantities[ri(resource_type::steel)]   = 3.0f;
-            s.w.pool_at(s.ai_corp, k_hidden).quantities[ri(resource_type::steel)] = 4.0f;
+            const entity_id k_home   = s.market;
+            const entity_id k_hidden = s.w.create_entity();
+            {
+                market_component mc{};
+                mc.body        = s.hidden;
+                mc.centre_tile = s.t_hidden;
+                s.w.markets[k_hidden] = mc;
+                const entity_id hb = s.w.create_entity();
+                building_component b{};
+                b.tile = s.t_hidden;
+                b.type = building_type::extraction_site;
+                s.w.buildings[hb] = b;
+                s.w.corporations.at(s.ai_corp).assets.push_back(hb);
+            }
+            s.w.markets.at(k_home).inventory[ri(resource_type::steel)]   = 3.0f;
+            s.w.markets.at(k_hidden).inventory[ri(resource_type::steel)] = 4.0f;
             const auto r = hire(s, iron_foot);
             check(r == corp_command_result::applied && s.w.units.size() == 1,
-                  "BL-352 R4: pooled goods make the gated row hireable through the seam");
-            // The lower key drains first: 3 from home then 2 of hidden's 4, or
+                  "BL-352 R4: goods on the corp's shelves make the gated row hireable through the seam");
+            // The lower id drains first: 3 from home then 2 of hidden's 4, or
             // all 4 of hidden then 1 of home's 3.
-            const float home_left   = s.w.pool_at(s.ai_corp, k_home).quantities[ri(resource_type::steel)];
-            const float hidden_left = s.w.pool_at(s.ai_corp, k_hidden).quantities[ri(resource_type::steel)];
+            const float home_left   = s.w.markets.at(k_home).inventory[ri(resource_type::steel)];
+            const float hidden_left = s.w.markets.at(k_hidden).inventory[ri(resource_type::steel)];
             const bool ordered = (k_home < k_hidden)
                 ? (home_left == 0.0f && hidden_left == 2.0f)
                 : (hidden_left == 0.0f && home_left == 2.0f);
             check(ordered,
-                  "BL-352 R4: the debit drains pools in ascending pool-key order by exactly the cost");
+                  "BL-352 R4: the hire buys across shelves in ascending market-id order by exactly the cost");
         }
 
         // No goods anywhere: the gate refuses the row (availability re-check),
@@ -556,10 +571,10 @@ int main()
         {
             scene s = make_scene(1000.0f);
             add_muster_base(s);
-            s.w.pool_at(s.ai_corp, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::steel)] = 3.0f;
+            s.w.markets.at(s.market).inventory[ri(resource_type::steel)] = 3.0f;
             const auto r = hire(s, iron_foot);
             check(r == corp_command_result::rejected_funds && s.w.units.empty() &&
-                  s.w.pool_at(s.ai_corp, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::steel)] == 3.0f,
+                  s.w.markets.at(s.market).inventory[ri(resource_type::steel)] == 3.0f,
                   "BL-352 R4: an unaffordable hire is refused whole — no partial debit");
         }
 
@@ -567,10 +582,10 @@ int main()
         {
             scene s = make_scene(1000.0f);
             add_muster_base(s);
-            s.w.pool_at(s.ai_corp, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::steel)] = 7.0f;
+            s.w.markets.at(s.market).inventory[ri(resource_type::steel)] = 7.0f;
             const auto r = hire(s, levy);
             check(r == corp_command_result::applied && s.w.units.size() == 1 &&
-                  s.w.pool_at(s.ai_corp, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::steel)] == 7.0f,
+                  s.w.markets.at(s.market).inventory[ri(resource_type::steel)] == 7.0f,
                   "BL-352 R4: an ungated row hires without touching the pools");
         }
     }
@@ -634,7 +649,7 @@ int main()
         // nothing else, so it cannot acquire a candidate the debit lacks.
         {
             scene s = make_scene(1000.0f);
-            s.w.pool_at(s.ai_corp, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::machinery)] = 1000.0f;
+            s.w.markets.at(s.market).inventory[ri(resource_type::machinery)] = 1000.0f;
             const campaign_roster_gate_input g = campaign_gate_input(s.w, s.ai_corp);
             check(g.ore_q == 0 && g.farm_q == 0 && g.energy_q == 0,
                   "BL-498 R5: a resource absent from the table opens no axis");
@@ -652,7 +667,7 @@ int main()
                 scene s = make_scene(1000.0f);
                 for (std::size_t a = 0; a < hire_axis_count; ++a)
                     for (const resource_type r : hire_axis_resources(static_cast<hire_axis>(a)))
-                        s.w.pool_at(s.ai_corp, pool_key_for_body(s.w, s.body)).quantities[ri(r)] = 1000.0f;
+                        s.w.markets.at(s.market).inventory[ri(r)] = 1000.0f;
                 add_bldg(s, building_type::port);
                 const auto  rows  = available_rows(s.w, s.ai_corp, band);
                 const auto& table = unit_roster_table();
@@ -684,16 +699,16 @@ int main()
                     if (a == ax) continue;
                     const resource_type other =
                         hire_axis_resources(static_cast<hire_axis>(a)).candidates[0];
-                    s.w.pool_at(s.ai_corp, pool_key_for_body(s.w, s.body)).quantities[ri(other)] = 1000.0f;
+                    s.w.markets.at(s.market).inventory[ri(other)] = 1000.0f;
                 }
-                s.w.pool_at(s.ai_corp, pool_key_for_body(s.w, s.body)).quantities[ri(cand)] = hire_axis_cost;
+                s.w.markets.at(s.market).inventory[ri(cand)] = hire_axis_cost;
 
                 corp_command cmd{};
                 cmd.tick = 1; cmd.corp = s.ai_corp; cmd.verb = corp_verb::hire_unit;
                 cmd.tile = s.t_rich; cmd.unit_type = static_cast<uint16_t>(probe_row);
                 const auto r = apply_corp_command(s.w, reg, cmd);
 
-                const float left = s.w.pool_at(s.ai_corp, pool_key_for_body(s.w, s.body)).quantities[ri(cand)];
+                const float left = s.w.markets.at(s.market).inventory[ri(cand)];
                 const std::string label =
                     "BL-498 R5: axis " + std::to_string(ax) + " candidate " +
                     std::to_string(static_cast<int>(cand)) +
@@ -816,7 +831,8 @@ int main()
             s.w.corporations.at(s.ai_corp).science = 8.0f;
             stockpile_component pool;
             pool.quantities[ri(resource_type::iron_ore)] = 30.0f;
-            s.w.corp_market_pools[{s.ai_corp, pool_key_for_body(s.w, s.body)}] = pool;
+            for (std::size_t r_ = 0; r_ < resource_count; ++r_) // BL-1265: on the shelf, not a pool
+                s.w.markets.at(s.market).inventory[r_] += pool.quantities[r_];
             const entity_id u = s.w.create_entity();
             unit_component uc{};
             uc.position               = s.t_rich;
@@ -833,10 +849,12 @@ int main()
             const standing_index si = corp_standing_index(s.w, reg, s.ai_corp);
 
             // Economic = balance (1000) + book value (one extraction site at
-            // build_cost 100) + stock (30 iron ore at the market's price 4).
+            // build_cost 100). BL-1265: corporations hold no stock, so the
+            // held-stock term retired — the 30 iron the fixture puts on the
+            // market's shelf is the market's, and must NOT be counted.
             const float economic = si.component[static_cast<std::size_t>(standing_component::economic)];
-            check(std::fabs(economic - (1000.0f + 100.0f + 120.0f)) < 0.01f,
-                  "BL-700 R7: the economic component is cash + book value + stock at market");
+            check(std::fabs(economic - (1000.0f + 100.0f)) < 0.01f,
+                  "BL-700 R7: the economic component is cash + book value (no held-stock term since BL-1265)");
 
             const float research = si.component[static_cast<std::size_t>(standing_component::research)];
             check(std::fabs(research - 8.0f) < 1e-4f,
@@ -1038,7 +1056,8 @@ int main()
 
             stockpile_component pool;
             pool.quantities[ri(resource_type::iron_ore)] = 10000.0f;
-            s.w.corp_market_pools[{s.ai_corp, pool_key_for_body(s.w, s.body)}] = pool;
+            for (std::size_t r_ = 0; r_ < resource_count; ++r_) // BL-1265: on the shelf, not a pool
+                s.w.markets.at(s.market).inventory[r_] += pool.quantities[r_];
             return std::make_pair(std::move(s), f);
         };
 
@@ -1141,7 +1160,8 @@ int main()
             pool.quantities[ri(resource_type::iron_ore)] = 10000.0f;
             if (src == coal_source::pool)
                 pool.quantities[ri(resource_type::coal)] = 10000.0f;
-            s.w.corp_market_pools[{s.ai_corp, pool_key_for_body(s.w, s.body)}] = pool;
+            for (std::size_t r_ = 0; r_ < resource_count; ++r_) // BL-1265: on the shelf, not a pool
+                s.w.markets.at(s.market).inventory[r_] += pool.quantities[r_];
 
             if (src == coal_source::producer)
             {

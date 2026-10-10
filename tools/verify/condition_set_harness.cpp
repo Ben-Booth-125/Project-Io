@@ -89,12 +89,14 @@ fixture make_fixture()
     add_building(f.w, f.corp, f.body, building_type::extraction_site);
     add_building(f.w, f.corp, f.body, building_type::processing_facility);
 
-    f.w.pool_at(f.corp, pool_key_for_body(f.w, f.body)).quantities[static_cast<std::size_t>(resource_type::iron_ore)] = 120.0f;
+    // BL-1265: corporations hold no pools; the 120 iron ore is on the shelf of
+    // the one market the corp sits in (what `stockpile` now reads).
 
     f.market = f.w.create_entity();
     market_component mc{};
     mc.body = f.body;
     mc.price[static_cast<std::size_t>(resource_type::iron_ore)] = 40.0f;
+    mc.inventory[static_cast<std::size_t>(resource_type::iron_ore)] = 120.0f;
     f.w.markets[f.market] = mc;
 
     const entity_id u = f.w.create_entity();
@@ -154,7 +156,7 @@ int main()
     {
         condition c = make(condition_subject::stockpile, condition_comparator::at_least, 0.0f);
         c.resource = resource_type::iron_ore;
-        check(measure_condition(c, w, f.corp) == 120.0f, "C2d stockpile reads the pooled iron ore");
+        check(measure_condition(c, w, f.corp) == 120.0f, "C2d stockpile reads the iron ore on the corp's market shelf");
         c.resource = resource_type::copper_ore;
         check(measure_condition(c, w, f.corp) == 0.0f, "C2e stockpile reads 0 for an unstocked good");
     }

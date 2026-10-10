@@ -77,7 +77,7 @@
 //                    shortfall            (priced resources only)
 //   world.csv        tick,valued_production,exchange_revenue,convoys,
 //                    buildings_active,buildings_idle,corps,corps_in_debt,
-//                    hostile_pairs,friend_pairs,sell_orders,treasury_sum,
+//                    hostile_pairs,friend_pairs,trades,treasury_sum,
 //                    state_purchase_qty
 //
 // Exits 0 on success (campaign mode: CSVs written; --t0: all rows PASS).
@@ -96,6 +96,7 @@
 #include "world/resource_names.hpp"
 #include "world/standing.hpp"
 #include "world/supply_system.hpp"
+#include "world/trade.hpp"
 #include "world/tech_gate.hpp"
 #include "world/world.hpp"
 #include "world/world_gen_config.hpp"
@@ -166,7 +167,7 @@ struct lapse_params
 /// by construction (each is a difference of two snapshots).
 struct phase_deltas
 {
-    double convoys  = 0.0; ///< dispatch_convoys: leg costs debited at departure.
+    double convoys  = 0.0; ///< advance + credit_arrived_convoys (BL-1266: legs are paid inside the trade pass, in agency).
     double agency   = 0.0; ///< run_economy_step: the corp AI batch — build, hire, buyout, switch. CAPITAL.
     double budget   = 0.0; ///< clear_markets + apply_budget: the seven filed flows.
     double nation   = 0.0; ///< run_nation_step + tech gates: state purchases, subsidies, levies settled there.
@@ -213,8 +214,7 @@ tick(world& w, const recipe_registry& reg, int t, economy_report& rep_out,
     credit_arrived_convoys(w, t); // app order: arrivals before the economy
     attribute(&phase_deltas::convoys);
     economy_report rep = run_economy_step(w, reg, /*spectating=*/true, &lp);
-    dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land), // BL-995: before the clear
-                     reg.logistics_cost(convoy_mode::space), &lp);
+    run_trades(w, reg, rep, &lp); // BL-1266: the trade pass (was dispatch_convoys), before the clear
     attribute(&phase_deltas::agency);
     auto flows = clear_markets(w, reg, rep);
     apply_budget(w, reg, flows, rep.workforce_contention, &rep.budgets, &rep.buildings,
@@ -462,7 +462,7 @@ rollout_result run_rollout(const lapse_params& lp, recipe_registry& reg,
     out.markets_csv = "tick,market,body,resource,price,base_price,supply,demand,shortfall\n";
     out.world_csv = "tick,valued_production,exchange_revenue,convoys,buildings_active,"
                     "buildings_idle,corps,corps_in_debt,hostile_pairs,friend_pairs,"
-                    "sell_orders,treasury_sum,state_purchase_qty,firm_exits\n";
+                    "trades,treasury_sum,state_purchase_qty,firm_exits\n";
 
     const int total_ticks = lp.settle_ticks + lp.ticks;
     for (int t = 1; t <= total_ticks; ++t)
@@ -675,7 +675,7 @@ rollout_result run_rollout(const lapse_params& lp, recipe_registry& reg,
                 static_cast<int>(w.corporations.size()), in_debt,
                 static_cast<int>(w.corp_hostile_pairs.size()),
                 static_cast<int>(w.corp_friend_pairs.size()),
-                static_cast<int>(w.sell_orders.size()), treasury_sum, state_qty,
+                static_cast<int>(w.trades.size()), treasury_sum, state_qty,
                 static_cast<int>(rep.firm_exits.size()));
 
         if (t == total_ticks)

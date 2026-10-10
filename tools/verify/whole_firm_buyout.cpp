@@ -21,10 +21,11 @@
 //       BYTE-COMPARING a full world snapshot taken before and after the command —
 //       not by spot-checking the two or three fields the reader thought of.
 //
-//   R3  THE TRANSFER. Holdings, (corp, body) pools, balance and filed returns
-//       move; hq_building / influence_range recompute over the merged set; units
-//       re-point THROUGH their muster_base; open sell orders are CANCELLED, not
-//       reassigned. Each one is a separate assertion, because "the buyout worked"
+//   R3  THE TRANSFER. Holdings, standing trades (BL-1266; corporations hold no
+//       pools since BL-1265), balance and filed returns move; hq_building /
+//       influence_range recompute over the merged set; units re-point THROUGH
+//       their muster_base. (The sell-order cancellation and pool-merge rows
+//       retired with the order book and the pools.) Each one is a separate assertion, because "the buyout worked"
 //       is not a check.
 //
 //   R4  NOTHING DANGLES. The requirement this verb exists to be dangerous about:
@@ -78,6 +79,7 @@
 #include "world/recipe_registry.hpp"
 #include "world/sentiment.hpp"
 #include "world/supply_system.hpp"
+#include "world/trade.hpp"
 #include "world/world.hpp"
 #include "world/world_save.hpp"
 #include "harness_params.hpp"
@@ -167,10 +169,10 @@ std::vector<std::string> dangling_refs(const world& w, entity_id gone)
     }
     for (const auto& kv : w.units)
         if (kv.second.owner == gone)                           note("world::units[*].owner");
-    for (const sell_order& o : w.sell_orders)
-        if (o.corp == gone)                                    note("world::sell_orders[*].corp");
-    for (const buy_order& o : w.buy_orders)
-        if (o.corp == gone)                                    note("world::buy_orders[*].corp");
+    for (const standing_trade& t : w.trades)                   // BL-1266
+        if (t.owner == gone)                                   note("world::trades[*].owner");
+    for (const auto& kv : w.landed_this_tick)                  // BL-1265
+        if (kv.first.first == gone)                            note("world::landed_this_tick key");
     for (const convoy_component& c : w.convoys)
         if (c.corp == gone)                                    note("world::convoys[*].corp");
     for (const trade_route& r : w.trade_routes)
@@ -179,12 +181,10 @@ std::vector<std::string> dangling_refs(const world& w, entity_id gone)
         if (q.buyer == gone || q.supplier == gone)             note("world::procurement_quotes[*]");
     for (const procurement_contract& c : w.procurement_contracts)
         if (c.buyer == gone || c.supplier == gone)             note("world::procurement_contracts[*]");
-    for (const mercenary_contract& c : w.mercenary_contracts)
-        if (c.contractor == gone)                              note("world::mercenary_contracts[*].contractor");
+
     for (const active_battle& b : w.battles)
         if (b.attacker == gone || b.defender == gone)          note("world::battles[*]");
-    for (const auto& kv : w.corp_market_pools)
-        if (kv.first.first == gone)                            note("world::corp_market_pools key");
+
     for (const auto& kv : w.workforce_supply_overrides)
         if (kv.first.first == gone)                            note("world::workforce_supply_overrides key");
     for (const auto& kv : w.sentiment.pairs)
@@ -230,6 +230,8 @@ struct fixture
     entity_id body     = null_entity;
     entity_id body_far = null_entity;
     entity_id market   = null_entity;
+    entity_id market_far = null_entity;  ///< BL-1266: a trade's destination, on body_far
+    uint32_t  target_trade = 0;          ///< BL-1266: the target's standing trade
     entity_id buyer    = null_entity;
     entity_id target   = null_entity;
     entity_id bystander = null_entity;
@@ -347,10 +349,28 @@ fixture build_fixture()
     o.returns.push_back(filed(10.0f, 9000.0f, 1, 100.0f));
 
     // --- references of every kind, so R4 has something to find --------------
-    // (corp, body) pools on two bodies, one of which the buyer also holds.
-    w.pool_at(f.target, pool_key_for_body(w, f.body)).quantities[ri(resource_type::iron_ore)]     = 40.0f;
-    w.pool_at(f.target, pool_key_for_body(w, f.body_far)).quantities[ri(resource_type::iron_ore)] = 7.0f;
-    w.pool_at(f.buyer, pool_key_for_body(w, f.body)).quantities[ri(resource_type::iron_ore)]     = 3.0f;
+    // BL-1265/1266: corporations hold no pools (their goods are the market's);
+    // what a corp owns in trade is its STANDING TRADES — one each for the
+    // target and the buyer, from the home market to one on body_far.
+    f.market_far = w.create_entity();
+    {
+        market_component mc;
+        mc.body = f.body_far;
+        mc.base_price[ri(resource_type::iron_ore)] = 3.0f;
+        mc.price = mc.base_price;
+        w.markets[f.market_far] = mc;
+    }
+    {
+        standing_trade tt{};
+        tt.id = w.allocate_trade_id(); tt.owner = f.target; tt.resource = resource_type::iron_ore;
+        tt.from_market = f.market; tt.to_market = f.market_far; tt.points = 2.0f;
+        w.trades.push_back(tt);
+        f.target_trade = tt.id;
+        standing_trade bt{};
+        bt.id = w.allocate_trade_id(); bt.owner = f.buyer; bt.resource = resource_type::iron_ore;
+        bt.from_market = f.market; bt.to_market = f.market_far; bt.points = 1.0f;
+        w.trades.push_back(bt);
+    }
 
     w.workforce_supply_overrides[{f.target, f.body_far}] = 6.0f;
     w.workforce_supply_overrides[{f.buyer,  f.body}]     = 4.0f;
@@ -364,23 +384,7 @@ fixture build_fixture()
     w.units[f.target_unit].count       = 500;
     w.units[f.target_unit].muster_base = f.target_base;
 
-    // Standing sell orders on both sides of the transaction.
-    {
-        sell_order o;
-        o.id = w.allocate_order_id(); o.corp = f.target; o.body = f.body;
-        o.resource = resource_type::iron_ore; o.quantity = 5.0f;
-        w.sell_orders.push_back(o);
-        sell_order k;
-        k.id = w.allocate_order_id(); k.corp = f.buyer; k.body = f.body;
-        k.resource = resource_type::iron_ore; k.quantity = 2.0f;
-        w.sell_orders.push_back(k);
-    }
-    {
-        buy_order b;
-        b.id = w.allocate_order_id(); b.corp = f.target; b.body = f.body;
-        b.resource = resource_type::iron_ore; b.quantity = 1.0f; b.max_price = 9.0f;
-        w.buy_orders.push_back(b);
-    }
+    // (BL-1265: the standing sell/buy orders retired with the order book.)
 
     // A convoy in flight, a trade route, a live quote, an accepted contract, a
     // mercenary contract, stance rows, sentiment rows, an embargo, a tech, a
@@ -413,12 +417,7 @@ fixture build_fixture()
         s.unit_price = 3.0f; s.lead_time_ticks = 2; s.deposit_paid = 3.0f;
         w.procurement_contracts.push_back(s);
     }
-    {
-        mercenary_contract m{};
-        m.id = w.allocate_contract_id(); m.contractor = f.target;
-        m.client = null_entity; m.fee = 100.0f; m.units[0] = f.target_unit;
-        w.mercenary_contracts.push_back(m);
-    }
+    // (The mercenary contract retired with the mercenary model, NR-885.)
     w.corp_hostile_pairs.insert({f.target, f.bystander});
     w.corp_friend_pairs.insert({std::min(f.target, f.buyer), std::max(f.target, f.buyer)});
     w.corp_friend_offers.insert({f.bystander, f.target});
@@ -669,11 +668,7 @@ void run_transfer_rows(const recipe_registry& reg)
     const corporation_component before_b = w.corporations.at(f.buyer);
     const float price = corp_acquisition_price(before_t, reg.acquisition().multiple);
 
-    // Pooled stock on the shared body, before.
-    const float buyer_pool_before =
-        w.corp_market_pools.at({f.buyer, pool_key_for_body(w, f.body)}).quantities[ri(resource_type::iron_ore)];
-    const float target_pool_before =
-        w.corp_market_pools.at({f.target, pool_key_for_body(w, f.body)}).quantities[ri(resource_type::iron_ore)];
+    const std::size_t trades_before = w.trades.size();
 
     // --- R5's solvency half, FIRST: one credit short is refused ------------
     {
@@ -684,7 +679,6 @@ void run_transfer_rows(const recipe_registry& reg)
                              "an acquirer one credit short is refused, and nothing moves");
     }
 
-    const std::size_t orders_before = w.sell_orders.size();
     const corp_command_result r = apply_corp_command(w, reg, buy_cmd(f.buyer, f.target));
     check(r == corp_command_result::applied, "R3", "a solvent buyer, a public target: applied");
 
@@ -705,16 +699,21 @@ void run_transfer_rows(const recipe_registry& reg)
                    && std::find(acq.assets.begin(), acq.assets.end(), a) != acq.assets.end();
     check(holdings_ok, "R3", "every holding transferred to the acquirer");
 
-    check(w.corp_market_pools.count({f.target, pool_key_for_body(w, f.body)}) == 0
-              && w.corp_market_pools.count({f.target, pool_key_for_body(w, f.body_far)}) == 0,
-          "R3", "the target's (corp, body) pools are gone");
-    check(w.corp_market_pools.at({f.buyer, pool_key_for_body(w, f.body)}).quantities[ri(resource_type::iron_ore)]
-              == buyer_pool_before + target_pool_before,
-          "R3", "colliding pools MERGED (stock summed, not replaced)");
-    check(w.corp_market_pools.count({f.buyer, pool_key_for_body(w, f.body_far)}) == 1
-              && w.corp_market_pools.at({f.buyer, pool_key_for_body(w, f.body_far)})
-                         .quantities[ri(resource_type::iron_ore)] == 7.0f,
-          "R3", "a pool on a body the buyer did not hold came across whole");
+    // BL-1265/1266: the pool rows (pools gone, colliding pools merged, a far
+    // pool came across) retired with pools; what transfers in trade is the
+    // target's STANDING TRADES, each keeping its id and its spending-order place.
+    {
+        bool moved = false, kept_place = true;
+        for (std::size_t i = 0; i < w.trades.size(); ++i)
+            if (w.trades[i].id == f.target_trade)
+            {
+                moved      = w.trades[i].owner == f.buyer;
+                kept_place = i == 0; // it was placed first
+            }
+        check(w.trades.size() == trades_before && moved && kept_place, "R3",
+              "the target's standing trade TRANSFERRED to the acquirer, keeping its id and its "
+              "place in the spending order");
+    }
 
     check(acq.returns.size()
               == std::max(before_t.returns.size(), before_b.returns.size()),
@@ -743,13 +742,7 @@ void run_transfer_rows(const recipe_registry& reg)
     check(owner_corp_of(w, w.units.at(f.target_unit).muster_base) == f.buyer, "R3",
           "and that muster base is now the acquirer's holding");
 
-    check(w.sell_orders.size() == orders_before - 1, "R3",
-          "the target's open sell order was CANCELLED, not reassigned");
-    bool no_reassigned = true;
-    for (const sell_order& o : w.sell_orders)
-        no_reassigned = no_reassigned && o.quantity != 5.0f; // the target's order's size
-    check(no_reassigned, "R3", "and it did not reappear under the acquirer's name");
-    check(w.buy_orders.empty(), "R3", "the buy side is cancelled on the same rule");
+    // (BL-1265: the sell/buy order cancellation rows retired with the order book.)
 
     check(w.convoys.size() == 1 && w.convoys.front().corp == f.buyer, "R3",
           "a convoy in flight TRANSFERS (its cargo left the pool; a cancel would mint goods)");
@@ -761,9 +754,7 @@ void run_transfer_rows(const recipe_registry& reg)
     check(w.procurement_contracts.size() == 1
               && w.procurement_contracts.front().supplier == f.buyer,
           "R3", "an ACCEPTED procurement contract transfers; the self-dealing one is dropped");
-    check(!w.mercenary_contracts.empty()
-              && w.mercenary_contracts.front().contractor == f.buyer,
-          "R3", "the mercenary contract's contractor follows its committed force");
+
     check(w.battles.empty(), "R3", "a live battle naming the target is CANCELLED");
 
     // --- R4: nothing dangles -----------------------------------------------
@@ -807,14 +798,15 @@ constexpr int k_warm_ticks = 40;
 
 void tick(world& w, const recipe_registry& reg, int t)
 {
+    // The app's order (BL-1266): advance -> arrivals -> economy -> trade ->
+    // clear -> budget.
     w.current_econ_tick = t;
-    dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
-                     reg.logistics_cost(convoy_mode::space));
     advance_convoys(w);
-    const economy_report report = run_economy_step(w, reg);
+    credit_arrived_convoys(w, t);
+    economy_report report = run_economy_step(w, reg);
+    run_trades(w, reg, report);
     const auto flows = clear_markets(w, reg, report);
     apply_budget(w, reg, flows, report.workforce_contention);
-    credit_arrived_convoys(w, t);
 }
 
 void run_warm_start_rows(const recipe_registry& reg)

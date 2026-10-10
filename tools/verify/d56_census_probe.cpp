@@ -21,6 +21,7 @@
 #include "world/campaign_settle.hpp"
 #include "world/components.hpp"
 #include "world/economy_system.hpp"
+#include "world/market_clearing.hpp" // market_for_tile
 #include "world/resource_names.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/spawn_seat.hpp"
@@ -72,8 +73,8 @@ void read(world& w, const recipe_registry& reg, const economy_report* rep, readi
             ++R.pads;
             const auto oit = owner.find(bid);
             if (oit != owner.end())
-                if (const stockpile_component* p = w.find_pool(oit->second, pool_key_for_tile(w, b.tile)))
-                    if (p->quantities[prop] >= 1.0f) ++R.pads_fuelled;
+                if (const auto mit = w.markets.find(market_for_tile(w, b.tile)); mit != w.markets.end()) // BL-1265: the pad's shelf
+                    if (mit->second.inventory[prop] >= 1.0f) ++R.pads_fuelled;
         }
         if (b.type != building_type::processing_facility || b.decommissioned) continue;
         const recipe* rc = reg.get_recipe(b.recipe);

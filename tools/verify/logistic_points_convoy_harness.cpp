@@ -12,6 +12,12 @@
 // `commit_convoy`/`dispatch_convoys`, both now take an optional
 // `lp_pool_map*`).
 //
+// BL-1265/1266 (MARKETS.md § The shelf economy; TRADE.md): the dispatcher,
+// `commit_convoy` and corporation pools retired. Every shipment is a TRADE
+// committed through `commit_trade_shipment` (which always trims to the anchor,
+// BL-1186 E1) and the auto-scan is `run_trades`; stock sits on the source
+// market's SHELF. The rows below keep their claims on that funnel.
+//
 // This file does NOT re-assert BL-596's own anchor-pool-determinism claims
 // (logistic_points_harness.cpp owns those). It asserts only what BL-597 adds:
 //
@@ -46,11 +52,13 @@
 #include "world/logistics.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/supply_system.hpp"
+#include "world/trade.hpp"
 #include "world/world.hpp"
 
 #include <cmath>
 #include <cstdio>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace {
@@ -157,7 +165,8 @@ scenario make_scenario(float stock = 100.0f, float balance = 1000.0f, bool with_
     dm.price         = dm.base_price;
     s.w.markets[s.dst_market] = dm;
 
-    s.w.pool_at(s.corp, s.src_market).quantities[r_iron] = stock; // BL-1003: the source market's pool
+    // BL-1265: the stock is on the SOURCE MARKET's shelf (no corporation pools).
+    s.w.markets.at(s.src_market).inventory[r_iron] = stock;
     return s;
 }
 
@@ -175,19 +184,48 @@ recipe_registry make_registry(float lp_per_anchor)
     return reg;
 }
 
+/// BL-1266: the dispatcher's auto-scan retired; AUTO TRADE is what ships now.
+/// Give the scenario's corp a staffed Planetary Marketplace (a trade building
+/// that is NOT a supply anchor, so the LP topology the rows pin is unchanged)
+/// and author iron's trade capacity, so `run_trades` has points to spend.
+void enable_auto_trade(scenario& s, recipe_registry& reg)
+{
+    trade_params tp;
+    tp.capacity[r_iron]   = 1000.0f; // one point moves more than any row needs
+    tp.marketplace_points = 1.0f;
+    reg.set_trade(tp);
+    const entity_id mp = s.w.create_entity();
+    building_component b{};
+    b.tile               = tile_at(s.w, s.body, 20, 2); // far off every route
+    b.type               = building_type::planetary_marketplace;
+    b.workforce_assigned = 1.0f;
+    s.w.buildings[mp] = b;
+    s.w.corporations.at(s.corp).assets.push_back(mp);
+}
+
+/// The source SHELF's iron (BL-1265: was the corporation's pool).
 float pool_iron(const scenario& s)
 {
-    const auto it = s.w.corp_market_pools.find({s.corp, s.src_market});
-    return it != s.w.corp_market_pools.end() ? it->second.quantities[r_iron] : 0.0f;
+    return s.w.markets.at(s.src_market).inventory[r_iron];
 }
 
 logistics_nodes nodes_of(world& w) { return collect_logistics_nodes(w); }
+
+/// One trade shipment of @p qty iron, source -> destination (BL-1266:
+/// `commit_trade_shipment` is THE funnel every shipment goes through).
+bool ship(scenario& s, const recipe_registry& reg, const convoy_leg& leg, float qty,
+          lp_pool_map* pools, bool* refused, float* sent = nullptr)
+{
+    economy_report rep; // the purchase is billed at a clear this harness never runs
+    return commit_trade_shipment(s.w, reg, rep, s.corp, s.src_market, s.dst_market, r_iron, qty,
+                                 leg, pools, refused, sent);
+}
 
 } // namespace
 
 // ---------------------------------------------------------------------------
 // P1 — a leg within the pool commits normally, drawing down exactly the CARGO
-// QUANTITY (Ben, 2026-08-25, NR-620: not distance — see commit_convoy).
+// QUANTITY (Ben, 2026-08-25, NR-620: not distance — see commit_trade_shipment).
 // ---------------------------------------------------------------------------
 
 void p1_granted_draw()
@@ -198,25 +236,25 @@ void p1_granted_draw()
     recipe_registry reg = make_registry(/*lp_per_anchor*/ 50.0f);
     const logistics_nodes nodes = nodes_of(s.w);
 
-    const convoy_leg leg = price_convoy_leg(s.w, reg, nodes, s.corp, s.src_market, s.dst_market,
-                                            r_iron, 25.0f, reg.logistics_cost(convoy_mode::space));
+    const convoy_leg leg = price_trade_leg(s.w, reg, nodes, s.corp, s.src_market, s.dst_market,
+                                           r_iron, 25.0f);
     check(leg.viable, "the leg prices viable (a plains column, no water)");
     check(leg.mode == convoy_mode::land, "an all-plains intra-body lane is land mode");
 
     lp_pool_map pools;
     const float balance_before = s.w.corporations.at(s.corp).balance;
     bool refused = false;
-    const bool ok = commit_convoy(s.w, reg, s.corp, s.body, s.src_market, s.dst_market,
-                                  r_iron, 25.0f, leg, &pools, &refused);
+    const bool ok = ship(s, reg, leg, 25.0f, &pools, &refused);
 
     check(ok, "the leg commits");
     check(!refused, "no refusal reported");
     check(s.w.convoys.size() == 1, "exactly one convoy is created");
-    check(approx(pool_iron(s), 75.0f), "the source pool is debited by exactly the quantity");
+    check(approx(pool_iron(s), 75.0f), "the source shelf is debited by exactly the quantity");
     check(approx(s.w.corporations.at(s.corp).balance, balance_before - leg.cost),
-          "the balance is debited by leg.cost ONLY — no second LP-specific credit charge");
+          "the balance is debited by leg.cost ONLY — no second LP-specific credit charge "
+          "(the purchase is billed at the clear)");
 
-    // The anchor nearest the dispatch tile — one column over — should show the
+    // The anchor nearest the source centre — one column over — should show the
     // rate minus the CARGO QUANTITY (25), and nothing to do with the route's
     // length. This row is the load-bearing one for NR-620: it fails if the draw
     // ever goes back to being distance-proportional, since a few plains hops
@@ -230,20 +268,20 @@ void p1_granted_draw()
 }
 
 // ---------------------------------------------------------------------------
-// P2 — a leg exceeding the pool is refused outright, mutating nothing
+// P2 — a leg the pool cannot admit even one unit of is refused, mutating nothing
 // ---------------------------------------------------------------------------
 
 void p2_refused_mutates_nothing()
 {
-    std::printf("\n-- P2  a leg exceeding the pool is refused outright --\n");
+    std::printf("\n-- P2  a leg the pool cannot admit is refused outright --\n");
 
     scenario s = make_scenario(100.0f, 1000.0f);
-    // A rate so small the leg's own CARGO (25 units) exceeds it.
+    // A rate so small it is under the one-unit floor (BL-1186 E1).
     recipe_registry reg = make_registry(/*lp_per_anchor*/ 0.5f);
     const logistics_nodes nodes = nodes_of(s.w);
 
-    const convoy_leg leg = price_convoy_leg(s.w, reg, nodes, s.corp, s.src_market, s.dst_market,
-                                            r_iron, 25.0f, reg.logistics_cost(convoy_mode::space));
+    const convoy_leg leg = price_trade_leg(s.w, reg, nodes, s.corp, s.src_market, s.dst_market,
+                                           r_iron, 25.0f);
     check(leg.viable, "fixture: the leg prices viable, and its 25 units exceed the tiny pool");
 
     lp_pool_map pools;
@@ -252,13 +290,12 @@ void p2_refused_mutates_nothing()
     const std::size_t convoys_before = s.w.convoys.size();
 
     bool refused = false;
-    const bool ok = commit_convoy(s.w, reg, s.corp, s.body, s.src_market, s.dst_market,
-                                  r_iron, 25.0f, leg, &pools, &refused);
+    const bool ok = ship(s, reg, leg, 25.0f, &pools, &refused);
 
     check(!ok, "the leg is refused");
     check(refused, "the refusal is attributed to want of passive LP specifically");
     check(approx(s.w.corporations.at(s.corp).balance, balance_before), "balance is untouched");
-    check(approx(pool_iron(s), pool_before), "the source pool is untouched");
+    check(approx(pool_iron(s), pool_before), "the source shelf is untouched");
     check(s.w.convoys.size() == convoys_before, "no convoy was created");
 }
 
@@ -274,14 +311,13 @@ void p3_no_anchor_no_dispatch()
     recipe_registry reg = make_registry(/*lp_per_anchor*/ 1.0e6f); // generous — doesn't matter
     const logistics_nodes nodes = nodes_of(s.w);
 
-    const convoy_leg leg = price_convoy_leg(s.w, reg, nodes, s.corp, s.src_market, s.dst_market,
-                                            r_iron, 25.0f, reg.logistics_cost(convoy_mode::space));
+    const convoy_leg leg = price_trade_leg(s.w, reg, nodes, s.corp, s.src_market, s.dst_market,
+                                           r_iron, 25.0f);
     check(leg.viable, "fixture: the leg still prices (LP is a separate gate from routability)");
 
     lp_pool_map pools;
     bool refused = false;
-    const bool ok = commit_convoy(s.w, reg, s.corp, s.body, s.src_market, s.dst_market,
-                                  r_iron, 25.0f, leg, &pools, &refused);
+    const bool ok = ship(s, reg, leg, 25.0f, &pools, &refused);
 
     check(!ok && refused, "refused — no anchor exists on this body at all");
     check(s.w.convoys.empty(), "no convoy was created");
@@ -320,20 +356,20 @@ void p4_space_leg_exempt()
     entity_id dst_mkt = w.create_entity();
     market_component dm{}; dm.body = dest_body; w.markets[dst_mkt] = dm;
 
-    // BL-1003: the stock sits in the source MARKET's pool.
-    w.pool_at(corp, src_mkt).quantities[r_iron] = 50.0f;
-    w.pool_at(corp, src_mkt).quantities[static_cast<std::size_t>(resource_type::propellant)] = 5.0f;
+    // BL-1265: the stock and the launch's propellant sit on the source SHELF.
+    w.markets.at(src_mkt).inventory[r_iron] = 50.0f;
+    w.markets.at(src_mkt).inventory[static_cast<std::size_t>(resource_type::propellant)] = 5.0f;
 
     recipe_registry reg = make_registry(/*lp_per_anchor*/ 0.0f); // no LP anywhere
     const logistics_nodes nodes = collect_logistics_nodes(w);
-    const convoy_leg leg = price_convoy_leg(w, reg, nodes, corp, src_mkt, dst_mkt,
-                                            r_iron, 10.0f, reg.logistics_cost(convoy_mode::space));
+    const convoy_leg leg = price_trade_leg(w, reg, nodes, corp, src_mkt, dst_mkt, r_iron, 10.0f);
     check(leg.viable && leg.mode == convoy_mode::space, "fixture: an inter-body leg prices as space mode");
 
     lp_pool_map pools;
     bool refused = false;
-    const bool ok = commit_convoy(w, reg, corp, src_body, src_mkt, dst_mkt,
-                                  r_iron, 10.0f, leg, &pools, &refused);
+    economy_report rep;
+    const bool ok = commit_trade_shipment(w, reg, rep, corp, src_mkt, dst_mkt, r_iron, 10.0f, leg,
+                                          &pools, &refused);
 
     check(ok, "a space leg commits despite zero LP anywhere — LOGISTICS.md's design is tile-grounded");
     check(!refused, "no LP refusal is ever attributed to a space leg");
@@ -341,64 +377,57 @@ void p4_space_leg_exempt()
 }
 
 // ---------------------------------------------------------------------------
-// P5 — dispatch_convoys' own counters agree with what happened
+// P5 — the trade pass's own counters agree with what happened
 // ---------------------------------------------------------------------------
 
 void p5_dispatch_counters()
 {
-    std::printf("\n-- P5  dispatch_convoys' dispatched/refused_no_lp counters are honest --\n");
+    std::printf("\n-- P5  run_trades' shipment/refused_no_lp counters are honest --\n");
 
     scenario s = make_scenario(100.0f, 1000.0f);
     // A pool that comfortably covers ONE shortfall haul but not a second.
     recipe_registry reg = make_registry(/*lp_per_anchor*/ 10.0f);
+    enable_auto_trade(s, reg);
 
-    // BL-995: auto-dispatch chases a net price, so the destination must
-    // price iron above home (10 vs 5) for the haul to happen at all.
+    // Auto trade chases a margin, so the destination must price iron above
+    // home (10 vs 5) for the haul to happen at all.
     s.w.markets.at(s.dst_market).price[r_iron]  = 10.0f;
     s.w.markets.at(s.dst_market).demand[r_iron] = 30.0f;
     s.w.markets.at(s.dst_market).supply[r_iron] = 0.0f;
 
-    const convoy_dispatch_tick t1 = dispatch_convoys(s.w, reg, reg.logistics_cost(convoy_mode::land),
-                                                      reg.logistics_cost(convoy_mode::space));
-    check(t1.dispatched == static_cast<int>(s.w.convoys.size()),
-          "dispatched counts exactly the convoys this pass created");
+    economy_report rep1;
+    const trade_tick t1 = run_trades(s.w, reg, rep1);
+    check(t1.auto_shipments == static_cast<int>(s.w.convoys.size()) && t1.auto_shipments >= 1,
+          "auto_shipments counts exactly the convoys this pass created (and it shipped)");
 
     // Drive the SAME shortfall again with a pool too small this time.
     recipe_registry tiny_reg = make_registry(/*lp_per_anchor*/ 0.01f);
     scenario s2 = make_scenario(100.0f, 1000.0f);
-    // BL-995: auto-dispatch chases a net price, so the destination must
-    // price iron above home (10 vs 5) for the haul to happen at all.
+    enable_auto_trade(s2, tiny_reg);
     s2.w.markets.at(s2.dst_market).price[r_iron]  = 10.0f;
     s2.w.markets.at(s2.dst_market).demand[r_iron] = 30.0f;
     s2.w.markets.at(s2.dst_market).supply[r_iron] = 0.0f;
-    const convoy_dispatch_tick t2 = dispatch_convoys(s2.w, tiny_reg,
-                                                      tiny_reg.logistics_cost(convoy_mode::land),
-                                                      tiny_reg.logistics_cost(convoy_mode::space));
-    check(t2.dispatched == 0 && s2.w.convoys.empty(),
-          "a starved pool dispatches nothing");
+    economy_report rep2;
+    const trade_tick t2 = run_trades(s2.w, tiny_reg, rep2);
+    check(t2.auto_shipments == 0 && s2.w.convoys.empty(),
+          "a starved pool ships nothing");
     check(t2.refused_no_lp >= 1, "the refusal is counted on the tick summary");
 }
 
 // ---------------------------------------------------------------------------
-// P6 — CONTENTION: a mobilised march and a convoy dispatch share one pool
+// P6 — CONTENTION: a mobilised march and the trade pass share one pool
 // ---------------------------------------------------------------------------
 
 void p6_shared_pool_contention()
 {
-    std::printf("\n-- P6  war flips the queue: a march and a convoy dispatch genuinely contend --\n");
+    std::printf("\n-- P6  war flips the queue: a march and the trade pass genuinely contend --\n");
 
-    for (int run = 0; run < 2; ++run)
-    {
+    // A mobilised rival unit sits on the anchor tile, ready to march away. The
+    // real tick order runs the march (inside run_economy_step) BEFORE the trade
+    // pass, so armies claim the anchor first; the shipment then takes what the
+    // march left (BL-1186 E1: trimmed, not refused).
+    auto run_scenario = [&](float lp) -> std::tuple<bool, bool, float, bool> {
         scenario s = make_scenario(100.0f, 1000.0f);
-
-        // A rival corp, hostile toward s.corp (mobilises the march pass's
-        // priority partition), with a unit sitting right at the anchor tile
-        // ready to march away — it draws BEFORE any convoy dispatch this
-        // tick if the caller runs run_unit_march first, same as commit_convoy
-        // if dispatch runs first: this test checks the OUTCOME is
-        // deterministic and capped (BL-1186 E1: no longer mutually exclusive —
-        // the convoy takes what the march left), not which side wins (that is
-        // the real driver's call order, reported separately).
         const entity_id rival = s.w.create_entity();
         corporation_component rc; rc.balance = 1000.0f;
         s.w.corporations[rival] = rc;
@@ -418,127 +447,52 @@ void p6_shared_pool_contention()
         uc.order = mo;
         s.w.units[unit] = uc;
 
-        // A pool that covers roughly ONE of the two draws (march ~1pt, convoy
-        // leg's dist ~3.16 down the column) but not both comfortably.
-        recipe_registry reg = make_registry(/*lp_per_anchor*/ 3.0f);
+        recipe_registry reg = make_registry(lp);
         military_capability_params mp = reg.military();
         mp.march_points_per_class[static_cast<std::size_t>(unit_class::infantry)] = 2.0f;
         reg.set_military(mp);
+        enable_auto_trade(s, reg);
 
         lp_pool_map shared_pool;
-
-        // Active first (matches main.cpp/app.cpp's real tick order since
-        // BL-1066/BL-995 — run_economy_step's march pass runs BEFORE
-        // dispatch_convoys, so armies claim the anchor first).
-        // BL-995: auto-dispatch chases a net price, so the destination must
-        // price iron above home (10 vs 5) for the haul to happen at all.
         s.w.markets.at(s.dst_market).price[r_iron]  = 10.0f;
-        s.w.markets.at(s.dst_market).demand[r_iron] = 30.0f;
+        s.w.markets.at(s.dst_market).demand[r_iron] = 1000.0f; // deep: the room never binds, the LP does
         s.w.markets.at(s.dst_market).supply[r_iron] = 0.0f;
         const unit_march_tick mt = run_unit_march(s.w, reg, &shared_pool);
-        const convoy_dispatch_tick ct = dispatch_convoys(s.w, reg, reg.logistics_cost(convoy_mode::land),
-                                                          reg.logistics_cost(convoy_mode::space),
-                                                          &shared_pool);
+        economy_report rep;
+        const trade_tick tt = run_trades(s.w, reg, rep, &shared_pool);
 
-        const std::string tag = " (run " + std::to_string(run) + ")";
-        // Exactly one of the two draws should have been admitted from the
-        // shared pool of 3.0 (convoy leg ~3.16 alone already exceeds it, so
-        // AT MOST the march can also be granted only if the convoy was
-        // refused first — never both when the convoy runs first and already
-        // exhausts the pool). The row that matters is that the SAME outcome
-        // reproduces across two runs, proving determinism, not first-come by
-        // iteration order.
-        // BL-1186 E1: the auto-dispatch now SENDS what the anchor still admits
-        // rather than refusing a cargo above it whole, so "at most one side is
-        // granted" is no longer the rule. The rule the cap keeps is that the two
-        // draws together never exceed the pool: no anchor goes negative.
         bool cap_held = true;
         for (const auto& [body, pools] : shared_pool)
             for (const auto& [anchor, left] : pools)
                 if (left < -1e-4f)
                     cap_held = false;
-        (void)mt;
-        check(cap_held && ct.dispatched <= 1,
-              ("the convoy and the march together never draw past the pool (cap held)" + tag)
-                  .c_str());
-
-        if (run == 0)
-        {
-            static bool first_convoy_won = false;
-            first_convoy_won = (ct.dispatched == 1);
-            check(true, ("fixture: recorded run 0's outcome" + tag).c_str());
-            // Re-run for determinism comparison below via a second pass.
-            (void)first_convoy_won;
-        }
-    }
-
-    // Determinism proper: two independent, identically-built worlds run the
-    // exact same contested scenario and land on the identical outcome.
-    auto run_scenario = [&]() -> std::pair<bool, bool> {
-        scenario s = make_scenario(100.0f, 1000.0f);
-        const entity_id rival = s.w.create_entity();
-        corporation_component rc; rc.balance = 1000.0f;
-        s.w.corporations[rival] = rc;
-        s.w.corp_hostile_pairs.insert({ std::min(s.corp, rival), std::max(s.corp, rival) });
-
-        const entity_id anchor_tile = tile_at(s.w, s.body, 1, 0);
-        const entity_id unit = s.w.create_entity();
-        unit_component uc{};
-        uc.owner    = rival;
-        uc.position = anchor_tile;
-        uc.count    = 50;
-        uc.type     = 0;
-        movement_order mo;
-        mo.dest       = tile_at(s.w, s.body, 5, 0);
-        mo.next_index = 1;
-        for (int c = 0; c <= 5; ++c) mo.path.push_back(tile_at(s.w, s.body, c, 0));
-        uc.order = mo;
-        s.w.units[unit] = uc;
-
-        // The pool is sized to the CONVOY'S CARGO (the dest market is short 30
-        // units, below): the convoy alone would exactly exhaust it. The
-        // mobilised unit's 2.0-point march draws FIRST (the real tick order),
-        // leaving 28 — too little for the 30-unit convoy.
-        recipe_registry reg = make_registry(30.0f);
-        military_capability_params mp = reg.military();
-        mp.march_points_per_class[static_cast<std::size_t>(unit_class::infantry)] = 2.0f;
-        reg.set_military(mp);
-
-        lp_pool_map shared_pool;
-        // BL-995: auto-dispatch chases a net price, so the destination must
-        // price iron above home (10 vs 5) for the haul to happen at all.
-        s.w.markets.at(s.dst_market).price[r_iron]  = 10.0f;
-        s.w.markets.at(s.dst_market).demand[r_iron] = 30.0f;
-        s.w.markets.at(s.dst_market).supply[r_iron] = 0.0f;
-        const unit_march_tick mt = run_unit_march(s.w, reg, &shared_pool);
-        const convoy_dispatch_tick ct = dispatch_convoys(s.w, reg, reg.logistics_cost(convoy_mode::land),
-                                                          reg.logistics_cost(convoy_mode::space),
-                                                          &shared_pool);
-        // { march granted, convoy TRIMMED to what the march left (BL-1186 E1) }
         float cargo = 0.0f;
         for (const convoy_component& c : s.w.convoys)
             cargo += c.cargo_qty;
         return { mt.marching == 1 && mt.refused_no_lp == 0,
-                 ct.dispatched == 1 && ct.trimmed_by_lp == 1 && ct.refused_no_lp == 0
-                     && std::fabs(cargo - 28.0f) < 1e-3f };
+                 tt.auto_shipments == 1 && tt.refused_no_lp == 0, cargo, cap_held };
     };
 
-    const auto a = run_scenario();
-    const auto b = run_scenario();
-    check(a.first == b.first && a.second == b.second,
-          "the contested outcome (which side is granted) is IDENTICAL across two independent runs");
-    // Concrete numbers, pinned rather than trusted from prose. The real driver
-    // now runs run_unit_march BEFORE dispatch_convoys (BL-1066/BL-995: advance
-    // -> arrivals -> economy (march inside) -> dispatch -> clear), so the
-    // mobilised unit's 2.0-point march draws the anchor FIRST and is GRANTED,
-    // leaving 28 of the 30.0 pool; the dest market is short 30 and the source
-    // holds 100, so the convoy's cargo is sized 30 — more than is left. Armies
-    // still claim the anchor before goods (the goods-vs-force priority
-    // LOGISTICS.md says must be chosen); BL-1186 E1: the auto-dispatch then
-    // sends the 28 the march left, rather than refusing the cargo whole.
-    check(a.first == true, "the march (drawn first, the real tick order) is granted");
-    check(a.second == true,
-          "...leaving 28 of 30 LP, so the 30-unit convoy is TRIMMED to 28 (BL-1186 E1), not refused");
+    // A pool of 3.0: the march's 2 points first, then the shipment the 1 left.
+    for (int run = 0; run < 2; ++run)
+    {
+        const auto [march_ok, ship_ok, cargo, cap_held] = run_scenario(3.0f);
+        (void)march_ok; (void)ship_ok;
+        const std::string tag = " (run " + std::to_string(run) + ")";
+        check(cap_held && cargo <= 1.0f + 1e-3f,
+              ("the shipment and the march together never draw past the pool (cap held)" + tag)
+                  .c_str());
+    }
+
+    // Determinism proper, with numbers pinned: the pool is sized to the
+    // SHIPMENT'S WANT (deep demand, 100 on the shelf): the 2.0-point march draws
+    // FIRST and is granted, leaving 28; the 30-unit shipment is TRIMMED to 28.
+    const auto a = run_scenario(30.0f);
+    const auto b = run_scenario(30.0f);
+    check(a == b, "the contested outcome is IDENTICAL across two independent runs");
+    check(std::get<0>(a), "the march (drawn first, the real tick order) is granted");
+    check(std::get<1>(a) && std::fabs(std::get<2>(a) - 28.0f) < 1e-3f,
+          "...leaving 28 of 30 LP, so the 30-unit shipment is TRIMMED to 28 (BL-1186 E1), not refused");
 }
 
 // ---------------------------------------------------------------------------
@@ -553,61 +507,58 @@ void p7_default_is_private_and_fresh()
     recipe_registry reg = make_registry(/*lp_per_anchor*/ 5.0f);
     const logistics_nodes nodes = nodes_of(s.w);
 
-    // Two legs, each individually within the pool (dist ~1.0 each), committed
+    // Two legs, each individually within the pool (5 units each), committed
     // with NO shared pool passed — if any hidden state persisted between the
-    // two calls, the second would see the first's draw and could refuse.
-    const convoy_leg leg1 = price_convoy_leg(s.w, reg, nodes, s.corp, s.src_market, s.dst_market,
-                                             r_iron, 5.0f, reg.logistics_cost(convoy_mode::space));
+    // two calls, the second would see the first's draw and be trimmed or refused.
+    const convoy_leg leg1 = price_trade_leg(s.w, reg, nodes, s.corp, s.src_market, s.dst_market,
+                                            r_iron, 5.0f);
     bool refused1 = false;
-    const bool ok1 = commit_convoy(s.w, reg, s.corp, s.body, s.src_market, s.dst_market,
-                                   r_iron, 5.0f, leg1, nullptr, &refused1);
-    check(ok1 && !refused1, "first call (no shared pool) commits");
+    float sent1 = 0.0f;
+    const bool ok1 = ship(s, reg, leg1, 5.0f, nullptr, &refused1, &sent1);
+    check(ok1 && !refused1 && approx(sent1, 5.0f), "first call (no shared pool) commits whole");
 
-    const convoy_leg leg2 = price_convoy_leg(s.w, reg, nodes, s.corp, s.src_market, s.dst_market,
-                                             r_iron, 5.0f, reg.logistics_cost(convoy_mode::space));
+    const convoy_leg leg2 = price_trade_leg(s.w, reg, nodes, s.corp, s.src_market, s.dst_market,
+                                            r_iron, 5.0f);
     bool refused2 = false;
-    const bool ok2 = commit_convoy(s.w, reg, s.corp, s.body, s.src_market, s.dst_market,
-                                   r_iron, 5.0f, leg2, nullptr, &refused2);
-    check(ok2 && !refused2,
-          "second call ALSO commits — a private local pool means no draw carries over "
+    float sent2 = 0.0f;
+    const bool ok2 = ship(s, reg, leg2, 5.0f, nullptr, &refused2, &sent2);
+    check(ok2 && !refused2 && approx(sent2, 5.0f),
+          "second call ALSO commits whole — a private local pool means no draw carries over "
           "from the first call (each call rebuilds the full rate fresh)");
 }
 
 // ---------------------------------------------------------------------------
-// P8 — BL-1186 E1: the auto-dispatch sends what the anchor admits.
+// P8 — BL-1186 E1: a shipment sends what the anchor admits.
 // ---------------------------------------------------------------------------
 
 void p8_partial_lp_sends()
 {
-    std::printf("\n-- P8  BL-1186 E1: a cargo over the pool is trimmed, not refused (auto-dispatch) --\n");
+    std::printf("\n-- P8  BL-1186 E1: a cargo over the pool is trimmed, not refused --\n");
 
-    // P8.1 A MARKET'S OWN SHELF EXPORT is trimmed to the anchor's pool. No corp
-    // stock, so only the shelf ships: 100 on the source shelf, the destination
-    // short 30 at twice the price, the anchor (the city at (1,0)) holds 20.
+    // P8.1 AN AUTO TRADE is trimmed to the anchor's pool: 100 on the source
+    // shelf, the destination short 30 at twice the price, the anchor (the city
+    // at (1,0)) holds 20. (BL-1266: this row was a market's own shelf export,
+    // which retired; a trade is now what ships a shelf, by the same rule.)
     {
-        scenario s = make_scenario(/*stock=*/0.0f, 1000.0f);
+        scenario s = make_scenario(/*stock=*/100.0f, 1000.0f);
         recipe_registry reg = make_registry(20.0f);
-        s.w.markets.at(s.src_market).inventory[r_iron] = 100.0f;
+        enable_auto_trade(s, reg);
         s.w.markets.at(s.dst_market).price[r_iron]     = 10.0f;
         s.w.markets.at(s.dst_market).demand[r_iron]    = 30.0f;
         s.w.markets.at(s.dst_market).supply[r_iron]    = 0.0f;
-        const convoy_dispatch_tick ct = dispatch_convoys(
-            s.w, reg, reg.logistics_cost(convoy_mode::land), reg.logistics_cost(convoy_mode::space));
+        economy_report rep;
+        const trade_tick ct = run_trades(s.w, reg, rep);
         float cargo = 0.0f;
-        bool  owned_by_market = !s.w.convoys.empty();
         for (const convoy_component& c : s.w.convoys)
-        {
             cargo += c.cargo_qty;
-            owned_by_market = owned_by_market && c.corp == null_entity;
-        }
-        check(ct.market_exports == 1 && ct.trimmed_by_lp == 1 && ct.refused_no_lp == 0
-                  && owned_by_market && approx(cargo, 20.0f)
+        check(ct.auto_shipments == 1 && ct.refused_no_lp == 0 && approx(cargo, 20.0f)
                   && approx(s.w.markets.at(s.src_market).inventory[r_iron], 80.0f),
-              "P8.1 a market's own shelf export sized 30 leaves at the anchor's 20, shelf 100 -> 80");
+              "P8.1 an auto trade sized 30 leaves at the anchor's 20, shelf 100 -> 80");
     }
 
-    // The direct commit_convoy rows: one leg of `qty` priced, committed with
-    // allow_partial_lp, no shared pool (each call a fresh pool at the rate).
+    // The direct commit rows: one leg of `qty` priced, committed with no shared
+    // pool (each call a fresh pool at the rate). @p src_price is the source
+    // shelf's posted price — the purchase the solvency gate also weighs.
     struct outcome
     {
         bool  ok;
@@ -616,18 +567,18 @@ void p8_partial_lp_sends()
         float spent;
         std::size_t convoys;
     };
-    const auto commit = [](float lp, float qty, float balance, bool partial) -> outcome {
+    const auto commit = [](float lp, float qty, float balance, float src_price = 5.0f) -> outcome {
         scenario s = make_scenario(100.0f, balance);
+        s.w.markets.at(s.src_market).base_price[r_iron] = src_price;
+        s.w.markets.at(s.src_market).price[r_iron]      = src_price;
         recipe_registry reg = make_registry(lp);
         const logistics_nodes nodes = nodes_of(s.w);
-        const convoy_leg leg = price_convoy_leg(s.w, reg, nodes, s.corp, s.src_market,
-                                                s.dst_market, r_iron, qty,
-                                                reg.logistics_cost(convoy_mode::space));
+        const convoy_leg leg = price_trade_leg(s.w, reg, nodes, s.corp, s.src_market,
+                                               s.dst_market, r_iron, qty);
         bool  refused = false;
         float sent    = 0.0f;
         const float before = s.w.corporations.at(s.corp).balance;
-        const bool ok = commit_convoy(s.w, reg, s.corp, s.body, s.src_market, s.dst_market,
-                                      r_iron, qty, leg, nullptr, &refused, partial, &sent);
+        const bool ok = ship(s, reg, leg, qty, nullptr, &refused, &sent);
         return {ok, refused, sent, before - s.w.corporations.at(s.corp).balance,
                 s.w.convoys.size()};
     };
@@ -635,7 +586,7 @@ void p8_partial_lp_sends()
     // P8.2 THE ONE-UNIT FLOOR: an anchor holding 0.5 does not make a convoy of a
     // 30-unit cargo — refused for want of LP, nothing mutated.
     {
-        const outcome o = commit(0.5f, 30.0f, 1000.0f, true);
+        const outcome o = commit(0.5f, 30.0f, 1000.0f);
         check(!o.ok && o.refused_lp && o.convoys == 0 && o.spent == 0.0f,
               "P8.2 pool 0.5, cargo 30: under the one-unit floor -> refused for LP, nothing spent");
     }
@@ -643,25 +594,30 @@ void p8_partial_lp_sends()
     // P8.3 A CARGO UNDER ONE UNIT: the floor is min(cargo, 1), so a 0.8 cargo needs
     // the whole 0.8 — a 0.5 pool refuses it, a 0.9 pool sends it whole.
     {
-        const outcome short_pool = commit(0.5f, 0.8f, 1000.0f, true);
+        const outcome short_pool = commit(0.5f, 0.8f, 1000.0f);
         check(!short_pool.ok && short_pool.refused_lp && short_pool.convoys == 0,
               "P8.3a cargo 0.8, pool 0.5: refused (a sub-unit cargo is not trimmed further)");
-        const outcome enough = commit(0.9f, 0.8f, 1000.0f, true);
+        const outcome enough = commit(0.9f, 0.8f, 1000.0f);
         check(enough.ok && approx(enough.sent, 0.8f),
               "P8.3b cargo 0.8, pool 0.9: sent whole");
     }
 
     // P8.4 THE SOLVENCY GATE WEIGHS THE TRIMMED COST. Cargo 30 down the 3-edge
-    // plains column costs 0.02 x 3 x 30 = 1.8; the pool admits 10, a third, 0.6.
-    // A balance of 1.0 affords the trimmed convoy but not the whole one: the
-    // partial commit sends 10 for 0.6; the whole commit is refused as insolvent.
+    // plains column hauls for 0.02 x 3 x 30 = 1.8; the pool admits 10, a third:
+    // 0.6. The source prices iron at 0.01, so the purchase the gate also weighs
+    // (BL-1266: the trader pays haul + purchase) is 0.1 trimmed, 0.3 whole. A
+    // balance of 1.0 affords the trimmed shipment (0.7) but not the whole one
+    // (2.1): it sends 10, paying the 0.6 haul now.
+    // RETIRED: P8.4b (the same cargo committed WHOLE — a commanded leg — is
+    // refused): the commanded `dispatch_convoy` verb retired with BL-1266, and
+    // every shipment now trims.
     {
-        const outcome partial = commit(10.0f, 30.0f, 1.0f, true);
+        const outcome partial = commit(10.0f, 30.0f, 1.0f, /*src_price=*/0.01f);
         check(partial.ok && approx(partial.sent, 10.0f) && approx(partial.spent, 0.6f),
-              "P8.4a balance 1.0 between trimmed (0.6) and full (1.8) cost: sends 10 for 0.6");
-        const outcome whole = commit(10.0f, 30.0f, 1.0f, false);
-        check(!whole.ok && whole.convoys == 0 && whole.spent == 0.0f,
-              "P8.4b the same cargo committed WHOLE (a commanded leg) is refused, nothing spent");
+              "P8.4 balance 1.0 between trimmed (0.7) and full (2.1) cost: sends 10, paying 0.6 haul");
+        const outcome broke = commit(10.0f, 30.0f, 0.5f, /*src_price=*/0.01f);
+        check(!broke.ok && broke.convoys == 0 && broke.spent == 0.0f,
+              "P8.4 a balance under even the trimmed cost (0.5 < 0.7) is refused, nothing spent");
     }
 }
 

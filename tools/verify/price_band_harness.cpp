@@ -269,7 +269,8 @@ float settle_at_floor(recipe_registry& reg, float base_price, int ticks)
 // down its `supply <= 0` branch — `target = base * ceil_mult` — and walks the
 // price up to the ceiling.
 //
-// The demand is a STANDING BUY ORDER, re-posted each tick, rather than a
+// The demand is a POSTED WANT, re-posted each tick (BL-1265: it was a standing
+// buy order until the order book retired), rather than a
 // processor's input shortfall. A processor was tried first and generated exactly
 // zero demand: `mc.demand` accrues from what a corp actually BOUGHT
 // (market_clearing.cpp's auto-buy pass), and with no supply and no market
@@ -288,19 +289,11 @@ float settle_at_ceiling(recipe_registry& reg, float base_price, int ticks)
 
     for (int i = 0; i < ticks; ++i)
     {
-        // Re-post each tick: matching drains the book, and this fixture wants a
-        // standing appetite, not a one-off bid.
-        buy_order bo{};
-        bo.id        = static_cast<uint32_t>(i + 1);
-        bo.corp      = f.corp;
-        bo.body      = f.body;
-        bo.resource  = resource_type::iron_ore;
-        bo.quantity  = 500.0f;
-        bo.max_price = 999.0f;
-        f.w.buy_orders.clear();
-        f.w.buy_orders.push_back(bo);
-
+        // BL-1265: the order book retired. The standing appetite is now a
+        // posted WANT of 500 each tick — what every buyer posts — which the
+        // clear counts into demand with nothing to fill it.
         economy_report rep = run_economy_step(f.w, reg);
+        rep.wants[std::make_pair(f.corp, f.market)][ri(resource_type::iron_ore)] += 500.0f;
         clear_markets(f.w, reg, rep);
     }
     return f.w.markets.at(f.market).price[ri(resource_type::iron_ore)];

@@ -1,39 +1,35 @@
-// Headless pools-per-market harness (BL-1003; no SDL / Lua / ImGui).
+// Headless pools-per-market harness (BL-1003 -> BL-1265; no SDL / Lua / ImGui).
 //
-// PRODUCTION.md § Stockpile and output flow: the goods pool is keyed
-// (corporation, market), not (corporation, body). A building's output enters
-// the pool of the market whose catchment holds its tile; its inputs draw that
-// pool and that market's inventory; its want and fill book in that market. A
-// body with no market keeps ONE body-level pool, which the first market to
-// spawn there absorbs whole.
+// BL-1265 (MARKETS.md § The shelf economy, Ben 2026-10-10): corporations hold
+// no pools — the market owns its shelf. What BL-1003 established and still
+// stands is the ROUTING: a building's output LANDS on the shelf of the market
+// whose catchment holds its tile; its inputs and a construction site's
+// materials are bought off that same shelf; its want and fill book in that
+// market. A same-body trade lands and sells at its destination. Every row uses
+// ONE body with TWO markets and a corp whose lowest-id building (and HQ) sits
+// in market A's catchment, so a regression to a representative-market routing
+// books at A where the row expects B.
 //
-// The defect this item fixes, measured on the shipped home body (255 markets):
-// a build drew from its tile's market while its want, fills, pools and
-// auto-surplus booked at the corp's representative market (lowest-id
-// building's tile), and a same-body convoy landed back in the seller's own
-// pool. Every row below uses ONE body with TWO markets and a corp whose
-// lowest-id building sits in market A's catchment, so a regression to the
-// representative-market routing books at A where the row expects B.
-//
-//   (a) OUTPUT: a processor in B's catchment credits (corp, B), not (corp, A);
-//       its fill books under (corp, B).
+//   (a) OUTPUT: a processor in B's catchment lands its output on B, not A; its
+//       fill books under (corp, B).
 //   (b) WANT: a construction site in B's catchment registers its want under
 //       (corp, B), and clearing puts that demand on market B, none on A.
-//   (b') DRAW: the site draws B's SHELF only — never its owner's pool (the
-//       pool is what the corp's processors hold back; cold review 2026-09-23);
-//       want and fill are the whole need, at B; stock in A is not reachable.
-//   (c) CONVOY: a haul from (corp, A) to market B debits A's pool, credits
-//       B's pool on arrival, and the cargo sells AT B, at B's price.
-//   (d) SPAWN: a body with no market keeps one body-level pool; the market
-//       that spawns there absorbs it whole.
-//   (e) SAVE: a flat-binary round trip preserves every (corp, market) and
-//       body-level pool key and quantity, and the state hash.
-//   (f) REHOME: world build's opening stock — a body-level pool, or a pool in
-//       a market that no longer serves the HQ tile — moves to the corp's home
-//       (HQ tile) market pool.
-//   (g) SELL ORDER: a standing sell order on a body lists from each of the
-//       corp's market pools there, ascending market id, each into its own
-//       market, capped at the order's quantity.
+//   (b') DRAW: the site draws B's SHELF; want and fill are the whole need, at
+//       B; stock on A's shelf is not reachable.
+//   (c) TRADE: a shipment A -> B debits A's shelf, lands at B on arrival, and
+//       the cargo sells AT B, at B's price.
+//   (f) OPENING STOCK: `place_opening_stock` puts a corporation's seeded stock
+//       on the shelves of the markets it sits in, split by how many of its
+//       buildings each catchment holds, and is idempotent.
+//   (h) PROCUREMENT: a completing contract's supplier buys off its HOME
+//       market's shelf on the body (and builds the rest to order); the buyer's
+//       delivery LANDS on its home market; the supplier's stock elsewhere on the
+//       body is not touched (goods do not teleport within a body).
+//
+// RETIRED with pools (BL-1265): (d) a spawned market absorbs a body-level pool;
+// (e) the save round trip of pool keys; the old (f) rehoming of opening pools;
+// (g) a standing sell order listing from each market pool (the order book
+// retired too). The save round trip of shelves and trades is save_roundtrip's.
 //
 // The process exits non-zero if any assertion FAILs.
 
@@ -45,11 +41,10 @@
 #include "world/recipe_registry.hpp"
 #include "world/supply_system.hpp"
 #include "world/world.hpp"
-#include "world/world_save.hpp"
 
+#include <array>
 #include <cmath>
 #include <cstdio>
-#include <sstream>
 
 namespace {
 
@@ -62,22 +57,15 @@ void check(bool ok, const char* what)
 }
 
 bool near(float a, float b, float eps = 1e-3f) { return std::fabs(a - b) < eps; }
-std::size_t ri(resource_type r) { return static_cast<std::size_t>(r); }
 
 constexpr std::size_t r_iron  = static_cast<std::size_t>(resource_type::iron_ore);
 constexpr std::size_t r_steel = static_cast<std::size_t>(resource_type::steel);
 
-float pool_q(const world& w, entity_id corp, entity_id key, std::size_t r)
-{
-    const stockpile_component* p = w.find_pool(corp, key);
-    return p ? p->quantities[r] : 0.0f;
-}
-
 // ---------------------------------------------------------------------------
 // Fixture: one body, a 32x4 plains grid (convoy_command.cpp's idiom), market A
 // centred at (0,0) and market B centred at (0,3). The corp's FIRST building —
-// its lowest id, the retired representative-market anchor — sits at (0,0), in
-// A's catchment. Everything a row adds in B's catchment goes at (0,3).
+// its lowest id and HQ — sits at (0,0), in A's catchment. Everything a row adds
+// in B's catchment goes at (0,3).
 // ---------------------------------------------------------------------------
 struct scenario
 {
@@ -141,8 +129,9 @@ scenario make_scenario()
     s.w.corporations[s.corp] = cc;
     s.w.player_entity = s.corp;
 
-    // A supply anchor off the haul's column, so a convoy clears the passive-LP
-    // gate without earning a node discount (convoy_command.cpp's reasoning).
+    // A supply anchor off the haul's column, so a shipment clears the
+    // passive-LP gate without earning a node discount (convoy_command.cpp's
+    // reasoning).
     s.w.population_centre_tile[s.w.create_entity()] = tile_at(s.w, s.body, 1, 0);
 
     s.market_a = s.w.create_entity();
@@ -180,26 +169,49 @@ recipe_registry processing_registry(uint16_t& steel_id)
     return reg;
 }
 
+entity_id add_site(scenario& s, entity_id tile)
+{
+    const entity_id site = s.w.create_entity();
+    building_component b{};
+    b.tile = tile;
+    b.type = building_type::processing_facility;
+    b.ticks_remaining = 1;
+    s.w.buildings[site] = b;
+    s.w.corporations.at(s.corp).assets.push_back(site);
+    return site;
+}
+
+recipe_registry site_registry()
+{
+    recipe_registry reg;
+    building_economics pr;
+    pr.build_cost = 0.0f;
+    pr.build_duration_ticks = 1.0f;
+    pr.resource_build_cost[r_steel] = 10.0f;
+    reg.set_economics(building_type::processing_facility, pr);
+    return reg;
+}
+
 } // namespace
 
 int main()
 {
-    std::printf("=== pools_per_market (BL-1003: goods pools key (corp, market)) ===\n");
+    std::printf("=== pools_per_market (BL-1003 -> BL-1265: goods route by market, on shelves) ===\n");
 
     // -----------------------------------------------------------------------
     // Key resolution — the fixture is what every row leans on.
     // -----------------------------------------------------------------------
     {
         scenario s = make_scenario();
-        check(pool_key_for_tile(s.w, s.tile_a) == s.market_a &&
-              pool_key_for_tile(s.w, s.tile_b) == s.market_b,
+        check(market_for_tile(s.w, s.tile_a) == s.market_a &&
+              market_for_tile(s.w, s.tile_b) == s.market_b,
               "K.1 fixture: (0,0) resolves to market A and (0,3) to market B");
-        check(pool_key_body(s.w, s.market_b) == s.body && pool_key_body(s.w, s.body) == s.body,
-              "K.2 a market key and a body key both resolve to their body");
+        check(market_body(s.w, s.market_b) == s.body && corp_hq_market(s.w, s.corp) == s.market_a,
+              "K.2 a market resolves to its body; the corp's HQ market is A");
     }
 
     // -----------------------------------------------------------------------
-    // (a) a building's output lands in its TILE market's pool
+    // (a) a building's output lands on its TILE market
     // -----------------------------------------------------------------------
     {
         scenario s = make_scenario();
@@ -227,10 +239,10 @@ int main()
                 out = br.output_quantity;
 
         check(out > 0.0f, "(a).1 fixture: the processor in B's catchment ran");
-        check(near(pool_q(s.w, s.corp, s.market_b, r_steel), out),
-              "(a).2 its whole output entered the (corp, market B) pool");
-        check(pool_q(s.w, s.corp, s.market_a, r_steel) == 0.0f,
-              "(a).3 nothing entered (corp, market A) — the representative market");
+        check(near(s.w.landed(s.corp, s.market_b, r_steel), out),
+              "(a).2 its whole output LANDED on market B");
+        check(s.w.landed(s.corp, s.market_a, r_steel) == 0.0f,
+              "(a).3 nothing landed on market A — the corp's HQ (representative) market");
         const auto pit = rep.purchases.find({s.corp, s.market_b});
         check(pit != rep.purchases.end() && pit->second[r_iron] > 0.0f &&
               rep.purchases.find({s.corp, s.market_a}) == rep.purchases.end() &&
@@ -243,20 +255,8 @@ int main()
     // -----------------------------------------------------------------------
     {
         scenario s = make_scenario();
-        recipe_registry reg;
-        building_economics pr;
-        pr.build_cost = 0.0f;
-        pr.build_duration_ticks = 1.0f;
-        pr.resource_build_cost[r_steel] = 10.0f;
-        reg.set_economics(building_type::processing_facility, pr);
-
-        const entity_id site = s.w.create_entity();
-        building_component b{};
-        b.tile = s.tile_b;
-        b.type = building_type::processing_facility;
-        b.ticks_remaining = 1;
-        s.w.buildings[site] = b;
-        s.w.corporations.at(s.corp).assets.push_back(site);
+        const recipe_registry reg = site_registry();
+        add_site(s, s.tile_b);
 
         const economy_report rep = run_economy_step(s.w, reg);
         const auto wit = rep.wants.find({s.corp, s.market_b});
@@ -273,48 +273,32 @@ int main()
               "(b).4 market A — the corp's representative market — sees none of it");
     }
 
-    // (b') the site draws its market's SHELF only; its owner's pool is not
-    // touched, and the whole need is bid for and billed.
+    // (b') the site draws its market's SHELF; stock on another market's shelf
+    // is not reachable, and the whole need is bid for and billed at B.
     {
         scenario s = make_scenario();
-        recipe_registry reg;
-        building_economics pr;
-        pr.build_cost = 0.0f;
-        pr.build_duration_ticks = 1.0f;
-        pr.resource_build_cost[r_steel] = 10.0f;
-        reg.set_economics(building_type::processing_facility, pr);
-
-        s.w.pool_at(s.corp, s.market_b).quantities[r_steel] = 6.0f;  // own stock at B
-        s.w.pool_at(s.corp, s.market_a).quantities[r_steel] = 50.0f; // elsewhere: not reachable
+        const recipe_registry reg = site_registry();
+        s.w.markets.at(s.market_a).inventory[r_steel] = 50.0f; // elsewhere: not reachable
         s.w.markets.at(s.market_b).inventory[r_steel] = 10.0f;
-
-        const entity_id site = s.w.create_entity();
-        building_component b{};
-        b.tile = s.tile_b;
-        b.type = building_type::processing_facility;
-        b.ticks_remaining = 1;
-        s.w.buildings[site] = b;
-        s.w.corporations.at(s.corp).assets.push_back(site);
+        const entity_id site = add_site(s, s.tile_b);
 
         const economy_report rep = run_economy_step(s.w, reg);
         const auto wit = rep.wants.find({s.corp, s.market_b});
         const auto pit = rep.purchases.find({s.corp, s.market_b});
         check(s.w.buildings.at(site).ticks_remaining == 0,
               "(b').1 the shelf's 10 covers the need of 10: the build completes at full rate");
-        check(near(pool_q(s.w, s.corp, s.market_b, r_steel), 6.0f) &&
-              near(s.w.markets.at(s.market_b).inventory[r_steel], 0.0f),
-              "(b').2 it drew all 10 off B's shelf and left the (corp, B) pool's 6 alone");
+        check(near(s.w.markets.at(s.market_b).inventory[r_steel], 0.0f),
+              "(b').2 it drew all 10 off B's shelf");
         check(wit != rep.wants.end() && near(wit->second[r_steel], 10.0f) &&
               pit != rep.purchases.end() && near(pit->second[r_steel], 10.0f),
               "(b').3 want and fill are the whole need of 10, booked at market B");
-        check(near(pool_q(s.w, s.corp, s.market_a, r_steel), 50.0f),
-              "(b').4 the corp's stock in market A is untouched: goods do not teleport within a body");
+        check(near(s.w.markets.at(s.market_a).inventory[r_steel], 50.0f),
+              "(b').4 market A's shelf is untouched: goods do not teleport within a body");
     }
 
     // -----------------------------------------------------------------------
-    // (c) a convoy A -> B credits B's pool, and the goods sell at B's price
+    // (c) a trade A -> B lands at B, and the goods sell at B's price
     // -----------------------------------------------------------------------
-    world after_convoy; // kept for (e)
     {
         scenario s = make_scenario();
         recipe_registry reg;
@@ -322,32 +306,30 @@ int main()
         mp.active_lp_per_anchor_tick = 1.0e6f;
         reg.set_military(mp);
 
-        s.w.pool_at(s.corp, s.market_a).quantities[r_iron] = 100.0f;
+        s.w.markets.at(s.market_a).inventory[r_iron] = 100.0f;
 
-        corp_command cmd;
-        cmd.corp         = s.corp;
-        cmd.verb         = corp_verb::dispatch_convoy;
-        cmd.subject      = s.market_a;
-        cmd.counterparty = s.market_b;
-        cmd.target       = resource_type::iron_ore;
-        cmd.quantity     = 30.0f;
-        check(apply_corp_command(s.w, reg, cmd) == corp_command_result::applied,
-              "(c).1 fixture: the corp dispatches 30 iron from market A to market B");
-        check(near(pool_q(s.w, s.corp, s.market_a, r_iron), 70.0f),
-              "(c).2 dispatch debits the SOURCE market's pool (100 -> 70)");
+        economy_report ship_rep;
+        const logistics_nodes nodes = collect_logistics_nodes(s.w);
+        const convoy_leg leg = price_trade_leg(s.w, reg, nodes, s.corp, s.market_a, s.market_b,
+                                               r_iron, 30.0f);
+        check(leg.viable && commit_trade_shipment(s.w, reg, ship_rep, s.corp, s.market_a,
+                                                  s.market_b, r_iron, 30.0f, leg),
+              "(c).1 fixture: the corp ships 30 iron from market A to market B");
+        check(near(s.w.markets.at(s.market_a).inventory[r_iron], 70.0f),
+              "(c).2 the shipment buys off the SOURCE market's shelf (100 -> 70)");
 
         for (int i = 0; i < 50 && !s.w.convoys.empty(); ++i)
         {
             advance_convoys(s.w);
             credit_arrived_convoys(s.w, i);
+            if (s.w.convoys.empty())
+                break;
         }
         check(s.w.convoys.empty(), "(c).3 the convoy arrives and is retired");
-        check(near(pool_q(s.w, s.corp, s.market_b, r_iron), 30.0f) &&
-              near(pool_q(s.w, s.corp, s.market_a, r_iron), 70.0f),
-              "(c).4 arrival credits the DESTINATION market's pool (A 70, B 30) — a same-body "
-              "haul no longer lands back in the pool it left");
-
-        after_convoy = s.w; // (e) snapshots the two-pool state before anything sells
+        check(near(s.w.landed(s.corp, s.market_b, r_iron), 30.0f) &&
+              s.w.landed(s.corp, s.market_a, r_iron) == 0.0f,
+              "(c).4 arrival LANDS the cargo on the DESTINATION market — a same-body trade "
+              "never lands back where it left");
 
         const float inv_b_before = s.w.markets.at(s.market_b).inventory[r_iron];
         clear_markets(s.w, reg, economy_report{});
@@ -364,154 +346,44 @@ int main()
                                 s.w.markets.at(s.market_a).price[r_iron],
               "(c).6 ...at B's resolved price, which is above A's");
         check(near(s.w.markets.at(s.market_b).inventory[r_iron] - inv_b_before, 30.0f) &&
-              pool_q(s.w, s.corp, s.market_b, r_iron) == 0.0f,
-              "(c).7 B's inventory gains exactly the cargo and B's pool empties");
+              s.w.landed_this_tick.empty(),
+              "(c).7 B's shelf gains exactly the cargo and the landing is spent");
     }
 
     // -----------------------------------------------------------------------
-    // (d) a body with no market keeps one pool; a spawned market absorbs it
+    // (f) the opening stock goes on the shelves the corporation sits in
     // -----------------------------------------------------------------------
     {
         scenario s = make_scenario();
-        recipe_registry reg;
-
-        const entity_id outpost = s.w.create_entity();
-        body_component ob{};
-        ob.name = "Cinder";
-        ob.type = body_type::planet;
-        ob.orbital_radius_au = 2.0f;
-        ob.grid_width = 4;
-        ob.grid_height = 1;
-        s.w.bodies[outpost] = ob;
-        entity_id first_tile = null_entity;
-        for (int c = 0; c < 4; ++c)
+        // Two more works in B's catchment: weights A 1, B 2.
+        for (int k = 0; k < 2; ++k)
         {
-            const entity_id t = s.w.create_entity();
-            tile_component tc{};
-            tc.body = outpost;
-            tc.grid_x = c;
-            tc.grid_y = 0;
-            s.w.tiles[t] = tc;
-            if (c == 0)
-                first_tile = t;
+            const entity_id b2 = s.w.create_entity();
+            building_component b{};
+            b.tile = tile_at(s.w, s.body, 1 + k, 3);
+            b.type = building_type::extraction_site;
+            s.w.buildings[b2] = b;
+            s.w.corporations.at(s.corp).assets.push_back(b2);
         }
-        const entity_id rival = s.w.create_entity();
-        s.w.corporations[rival] = corporation_component{};
-
-        const entity_id key = pool_key_for_tile(s.w, first_tile);
-        check(key == outpost, "(d).1 on a market-less body the pool key is the BODY");
-        s.w.pool_at(s.corp, key).quantities[r_iron] = 40.0f;
-        s.w.pool_at(rival, key).quantities[r_steel] = 7.0f;
-
-        const entity_id mid = maybe_spawn_market(s.w, reg, outpost, first_tile);
-        check(mid != null_entity, "(d).2 fixture: a market spawns on the outpost");
-        check(s.w.find_pool(s.corp, outpost) == nullptr && s.w.find_pool(rival, outpost) == nullptr,
-              "(d).3 no body-level pool survives the spawn");
-        check(near(pool_q(s.w, s.corp, mid, r_iron), 40.0f) &&
-              near(pool_q(s.w, rival, mid, r_steel), 7.0f),
-              "(d).4 the new market's pool absorbed every corp's body-level pool whole");
-        check(pool_key_for_tile(s.w, first_tile) == mid,
-              "(d).5 the tile now resolves to the new market");
+        std::array<float, resource_count> stock{};
+        stock[r_iron] = 30.0f;
+        seed_opening_stock(s.w, s.corp, stock);
+        check(s.w.markets.at(s.market_a).inventory[r_iron] == 0.0f,
+              "(f).0 seeding holds the stock off the shelves until it is placed");
+        place_opening_stock(s.w);
+        check(near(s.w.markets.at(s.market_a).inventory[r_iron], 10.0f) &&
+              near(s.w.markets.at(s.market_b).inventory[r_iron], 20.0f),
+              "(f).1 placed by building count: A (1 work) 10, B (2 works) 20 — the whole 30");
+        check(s.w.gen_opening_stock.empty(), "(f).2 the held stock is emptied once placed");
+        place_opening_stock(s.w);
+        check(near(s.w.markets.at(s.market_a).inventory[r_iron], 10.0f) &&
+              near(s.w.markets.at(s.market_b).inventory[r_iron], 20.0f),
+              "(f).3 placing again is a no-op (idempotent)");
     }
 
     // -----------------------------------------------------------------------
-    // (e) save round-trip preserves the pools
-    // -----------------------------------------------------------------------
-    {
-        world& w = after_convoy;
-        // Add a body-level pool on a market-less body so both key kinds travel.
-        const entity_id bare = w.create_entity();
-        body_component bb{};
-        bb.name = "Bare";
-        bb.type = body_type::planet;
-        w.bodies[bare] = bb;
-        w.pool_at(w.player_entity, bare).quantities[r_steel] = 3.5f;
-
-        std::stringstream buf(std::ios::in | std::ios::out | std::ios::binary);
-        write_world_snapshot(w, buf);
-        world loaded;
-        const bool ok = read_world_snapshot(loaded, buf);
-        check(ok, "(e).1 the snapshot reads back whole");
-
-        bool same = ok && loaded.corp_market_pools.size() == w.corp_market_pools.size();
-        if (same)
-            for (const auto& [k, p] : w.corp_market_pools)
-            {
-                const auto it = loaded.corp_market_pools.find(k);
-                if (it == loaded.corp_market_pools.end() || it->second.quantities != p.quantities)
-                {
-                    same = false;
-                    break;
-                }
-            }
-        check(same, "(e).2 every (corp, key) pool and every quantity survives the round trip");
-        check(ok && loaded.find_pool(loaded.player_entity, bare) != nullptr &&
-              w.markets.find(bare) == w.markets.end(),
-              "(e).3 the body-level key survives as a body-level key");
-        check(ok && loaded.state_hash(0) == w.state_hash(0),
-              "(e).4 the state hash (which folds the pools) is identical after load");
-    }
-
-    // -----------------------------------------------------------------------
-    // (f) rehome: a stray body-level pool on a body with markets moves home
-    // -----------------------------------------------------------------------
-    {
-        scenario s = make_scenario();
-        // Move the corp's HQ into B's catchment; its lowest-id building stays in A.
-        const entity_id hq = s.w.create_entity();
-        building_component b{};
-        b.tile = s.tile_b;
-        b.type = building_type::extraction_site;
-        s.w.buildings[hq] = b;
-        s.w.corporations.at(s.corp).assets.push_back(hq);
-        s.w.corporations.at(s.corp).hq_building = hq;
-
-        s.w.pool_at(s.corp, s.body).quantities[r_iron] = 25.0f;     // seeded before the carve
-        s.w.pool_at(s.corp, s.market_a).quantities[r_iron] = 5.0f;  // seeded into a stale home
-        rehome_opening_pools(s.w);
-        check(s.w.find_pool(s.corp, s.body) == nullptr,
-              "(f).1 no body-level pool is left on a body that has markets");
-        check(near(pool_q(s.w, s.corp, s.market_b, r_iron), 30.0f) &&
-              pool_q(s.w, s.corp, s.market_a, r_iron) == 0.0f,
-              "(f).2 both moved to the HQ tile's market (B): 25 body-level + 5 from market A");
-    }
-
-    // -----------------------------------------------------------------------
-    // (g) a standing sell order on a body lists from each market pool there
-    // -----------------------------------------------------------------------
-    {
-        scenario s = make_scenario();
-        recipe_registry reg;
-        s.w.pool_at(s.corp, s.market_a).quantities[r_steel] = 10.0f;
-        s.w.pool_at(s.corp, s.market_b).quantities[r_steel] = 20.0f;
-        sell_order o;
-        o.id          = s.w.allocate_order_id();
-        o.corp        = s.corp;
-        o.body        = s.body;
-        o.resource    = resource_type::steel;
-        o.quantity    = 25.0f;
-        o.floor_price = 0.0f;
-        s.w.sell_orders.push_back(o);
-
-        clear_markets(s.w, reg, economy_report{});
-        float sold_a = 0.0f, sold_b = 0.0f;
-        for (const exchange_record& e : s.w.exchanges.entries)
-            if (e.seller == s.corp && e.resource == resource_type::steel)
-            {
-                if (e.market == s.market_a) sold_a += e.quantity;
-                if (e.market == s.market_b) sold_b += e.quantity;
-            }
-        check(near(sold_a, 10.0f) && near(sold_b, 15.0f),
-              "(g).1 the 25-unit order sold A's 10 at A and 15 of B's 20 at B (ascending market id)");
-        check(near(pool_q(s.w, s.corp, s.market_a, r_steel), 0.0f) &&
-              near(pool_q(s.w, s.corp, s.market_b, r_steel), 5.0f),
-              "(g).2 each pool was debited only what sold from it (A 0, B 5)");
-    }
-
-    // -----------------------------------------------------------------------
-    // (h) a completing contract draws the supplier's stock across its pools on
-    //     the body — home first — before building anything to order
-    //     (cold review 2026-09-23: drawing the home pool alone minted goods)
+    // (h) a completing contract: the supplier buys off its HOME shelf on the
+    //     body and builds the rest to order; the buyer's delivery LANDS
     // -----------------------------------------------------------------------
     {
         scenario s = make_scenario();
@@ -519,8 +391,8 @@ int main()
         const entity_id buyer = s.w.create_entity();
         s.w.corporations[buyer] = corporation_component{};
         s.w.corporations.at(buyer).balance = 1.0e6f;
-        s.w.pool_at(s.corp, s.market_a).quantities[r_iron] = 10.0f; // home (anchor in A)
-        s.w.pool_at(s.corp, s.market_b).quantities[r_iron] = 50.0f; // held in B
+        s.w.markets.at(s.market_a).inventory[r_iron] = 10.0f; // the supplier's home shelf (HQ in A)
+        s.w.markets.at(s.market_b).inventory[r_iron] = 50.0f; // another shelf on the body
 
         procurement_contract c;
         c.id              = 1;
@@ -534,11 +406,11 @@ int main()
 
         run_economy_step(s.w, reg);
         check(s.w.procurement_contracts.empty(), "(h).1 the contract completed");
-        check(near(pool_q(s.w, s.corp, s.market_a, r_iron), 0.0f) &&
-              near(pool_q(s.w, s.corp, s.market_b, r_iron), 20.0f),
-              "(h).2 the supplier gave its home 10 then 30 of B's 50 (A 0, B 20)");
-        check(near(body_pool_total(s.w, buyer, s.body).quantities[r_iron], 40.0f),
-              "(h).3 the buyer received 40 — every unit drawn, none minted");
+        check(near(s.w.markets.at(s.market_a).inventory[r_iron], 0.0f) &&
+              near(s.w.markets.at(s.market_b).inventory[r_iron], 50.0f),
+              "(h).2 the supplier bought its HOME shelf's 10 (A 0) and touched no other shelf (B 50)");
+        check(near(s.w.landed(buyer, corp_home_market(s.w, buyer, s.body), r_iron), 40.0f),
+              "(h).3 the buyer's whole 40 LANDS on its home market (the rest built to order)");
     }
 
     std::printf("\n%s  (%d passed, %d failed)\n", g_fail == 0 ? "ALL PASS" : "FAILURES",

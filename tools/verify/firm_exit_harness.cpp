@@ -2,9 +2,10 @@
 //
 // What run_firm_exits promises (corp_command.hpp § BL-743):
 //   F1  the trigger: a corp whose last N FILED returns all closed below the
-//       floor is erased; its buildings demolish, its pools dump to the local
-//       market's REAL inventory (conservation: inventory gains what pools
-//       lose), its units disband.
+//       floor is erased; its buildings demolish, its units disband, and its
+//       standing trades drop (BL-1266: a promise its owner can no longer keep).
+//       (BL-1265: it holds no pools — the pool-dump row retired; its goods are
+//       already on the market's shelf.)
 //   F2  the player is exempt ABSOLUTELY — same returns, is_player, survives.
 //   F3  an (N-1)-quarter streak survives; one solvent quarter inside the
 //       window resets the sentence.
@@ -48,6 +49,7 @@ struct fixture
     world     w;
     entity_id body   = null_entity;
     entity_id market = null_entity;
+    entity_id market2 = null_entity; ///< BL-1266: a standing trade destination
     entity_id doomed = null_entity;   ///< the insolvent corp
     entity_id healthy = null_entity;  ///< a solvent bystander
     entity_id tile_a = null_entity;
@@ -55,8 +57,8 @@ struct fixture
     entity_id doomed_unit     = null_entity;
 };
 
-/// One body, one market, one doomed corp (a building, a pool of 40 stone, a
-/// unit, a sell order, a hostile pair with the bystander, a sentiment row),
+/// One body, two markets, one doomed corp (a building, a unit, a standing
+/// trade, a hostile pair with the bystander, a sentiment row),
 /// one healthy bystander. The doomed corp files `quarters` returns at
 /// `filed_balance`.
 fixture make_fixture(int quarters, float filed_balance)
@@ -100,22 +102,32 @@ fixture make_fixture(int quarters, float filed_balance)
         f.w.buildings[f.doomed_building] = bc;
         f.w.corporations.at(f.doomed).assets.push_back(f.doomed_building);
     }
-    f.w.corp_market_pools[std::make_pair(f.doomed, pool_key_for_body(f.w, f.body))].quantities[k_stone] = 40.0f;
+    // BL-1265/1266: no pool and no sell order to hold any more; its standing
+    // trade (stone, market -> market2) is the estate the wind-up must drop.
+    f.market2 = f.w.create_entity();
+    {
+        market_component mc{};
+        mc.body = f.body;
+        mc.base_price[k_stone] = 1.0f;
+        f.w.markets[f.market2] = mc;
+    }
+    {
+        standing_trade t{};
+        t.id          = f.w.allocate_trade_id();
+        t.owner       = f.doomed;
+        t.resource    = resource_type::stone;
+        t.from_market = f.market;
+        t.to_market   = f.market2;
+        t.points      = 1.0f;
+        f.w.trades.push_back(t);
+    }
     {
         f.doomed_unit = f.w.create_entity();
         unit_component uc{};
         uc.owner = f.doomed;
         f.w.units[f.doomed_unit] = uc;
     }
-    {
-        sell_order o{};
-        o.id       = 7;
-        o.corp     = f.doomed;
-        o.body     = f.body;
-        o.resource = resource_type::stone;
-        o.quantity = 5.0f;
-        f.w.sell_orders.push_back(o);
-    }
+
     f.w.corp_hostile_pairs.insert(std::minmax(f.doomed, f.healthy));
     f.w.sentiment.pairs[{f.doomed, f.healthy}] = sentiment_value{};
 
@@ -143,7 +155,9 @@ bool world_holds(const world& w, entity_id id)
     if (w.corporations.count(id)) return true;
     for (const auto& kv : w.buildings)
         (void)kv; // buildings carry no corp field; ownership is the asset list
-    for (const auto& kv : w.corp_market_pools)
+    for (const auto& t : w.trades) // BL-1266
+        if (t.owner == id) return true;
+    for (const auto& kv : w.landed_this_tick) // BL-1265
         if (kv.first.first == id) return true;
     for (const auto& kv : w.units)
         if (kv.second.owner == id) return true;
@@ -151,10 +165,7 @@ bool world_holds(const world& w, entity_id id)
         if (c.corp == id) return true;
     for (const auto& r : w.trade_routes)
         if (r.corp == id) return true;
-    for (const auto& o : w.sell_orders)
-        if (o.corp == id) return true;
-    for (const auto& o : w.buy_orders)
-        if (o.corp == id) return true;
+
     for (const auto& q : w.procurement_quotes)
         if (q.buyer == id || q.supplier == id) return true;
     for (const auto& c : w.procurement_contracts)
@@ -200,10 +211,9 @@ int main()
               f.w.units.count(f.doomed_unit) == 0,
               "F1", "four filed quarters below the floor: the firm is erased, "
                     "its building demolished, its unit disbanded");
-        check(f.w.markets.at(f.market).inventory[k_stone] == 40.0f &&
-              f.w.corp_market_pools.count(std::make_pair(f.doomed, pool_key_for_body(f.w, f.body))) == 0,
-              "F1b", "...and its pool lands WHOLE in the local market's real "
-                     "inventory - the conservation law, not a vanishing");
+        check(f.w.trades.empty(),
+              "F1b", "...and its standing trade drops with it (BL-1266) - no promise "
+                     "outlives the firm that made it");
     }
 
     // F2: the player is exempt absolutely.
@@ -250,8 +260,7 @@ int main()
         std::vector<firm_exit_record> out;
         run_firm_exits(f.w, firm_exit_params{}, &out);
         check(out.empty() && f.w.corporations.count(f.doomed) == 1 &&
-              f.w.corp_market_pools.count(std::make_pair(f.doomed, pool_key_for_body(f.w, f.body))) == 1 &&
-              f.w.markets.at(f.market).inventory[k_stone] == 0.0f,
+              f.w.trades.size() == 1 && f.w.trades.front().owner == f.doomed,
               "F5", "inert params (the unloaded-registry defaults) touch "
                     "nothing - the standing inertness discipline");
     }
@@ -266,8 +275,7 @@ int main()
         check(oa.size() == ob.size() && oa.size() == 1 &&
               oa[0].corp == ob[0].corp && oa[0].holdings == ob[0].holdings &&
               oa[0].units == ob[0].units && oa[0].balance == ob[0].balance &&
-              a.w.markets.at(a.market).inventory[k_stone]
-                  == b.w.markets.at(b.market).inventory[k_stone],
+              a.w.trades.size() == b.w.trades.size(),
               "F6", "two runs of one fixture exit identically, records included");
     }
 

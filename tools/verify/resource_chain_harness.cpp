@@ -116,7 +116,8 @@ int main()
       cc.is_player = true; w.corporations[chain_corp] = cc; }
     // Seed steel directly — steel's own iron_ore/coal chain is pre-existing,
     // tested elsewhere (econ_harness); this harness scopes to the NEW chain.
-    w.pool_at(chain_corp, pool_key_for_body(w, body)).quantities[ri(resource_type::steel)] = 1.0e5f;
+    // BL-1265: on the market shelf (corporations hold no pools).
+    w.markets.at(market).inventory[ri(resource_type::steel)] = 1.0e5f;
 
     auto make_processor = [&](uint16_t recipe_id) {
         const entity_id bld = w.create_entity();
@@ -132,6 +133,13 @@ int main()
     make_processor(id_alloys);
     make_processor(id_electronics);
     make_processor(id_spacecraft);
+    // Seven processors at workforce 1.0 each want 7 labour against the default
+    // (corp, body) supply of 3.0, and BL-614 staffs the first three by id IN
+    // FULL and the rest NOT AT ALL — so machinery, alloys, electronics and
+    // spacecraft never ran (a fixture gap independent of BL-1265, found in the
+    // shelf sweep). This harness is about the chain shape, not labour: supply
+    // the labour every stage needs.
+    w.workforce_supply_overrides[{chain_corp, body}] = 7.0f;
 
     const resource_type new_goods[] = {
         resource_type::silicon, resource_type::refined_copper, resource_type::ree_alloy,

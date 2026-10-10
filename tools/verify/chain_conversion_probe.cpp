@@ -37,6 +37,7 @@
 #include "world/survey_system.hpp"
 #include "world/resource_names.hpp"
 #include "world/supply_system.hpp"
+#include "world/trade.hpp"
 #include "world/tech_gate.hpp"
 #include "world/world.hpp"
 #include "world/world_gen_config.hpp"
@@ -179,8 +180,7 @@ int main(int argc, char** argv)
         advance_convoys(w);
         credit_arrived_convoys(w, t); // app order: arrivals before the economy
         economy_report rep = run_economy_step(w, reg, /*spectating=*/false, &lp);
-        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land), // BL-995: before the clear
-                         reg.logistics_cost(convoy_mode::space), &lp);
+        run_trades(w, reg, rep, &lp); // BL-1266: the trade pass (was dispatch_convoys), before the clear
         auto flows = clear_markets(w, reg, rep);
         apply_budget(w, reg, flows, rep.workforce_contention, &rep.budgets, &rep.buildings,
                      &rep.building_labour);
