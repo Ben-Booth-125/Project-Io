@@ -1831,6 +1831,54 @@
     "src/ui/body_surface_canvas.cpp"
    ],
    "design": "SETTLED: TECH_FOUNDATIONS.md § Target hardware (60 fps at every zoom); PLANETARY.md § Draw-loop cost model. WORK: rungs 0-1 read 21-25 ms median, the vector layer CPU build at 15-22 ms (not the ground). Profile per pass (IO_CANVAS_PASS_LOG) and cut the build under budget at rungs 0-1 without dropping any analytic layer silently (cache per-frame-invariant geometry across frames, e.g. border and road networks built once per world change instead of every frame; cheaper LOD where invisible); measure on an idle machine."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 51,
+   "written": "2026-10-10",
+   "requires": [
+    "BL-1253"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 4,
+   "id": "BL-1261",
+   "short_name": "ROADS_AS_TILE_SETS",
+   "author": "Ben (2026-10-10, walking the it1-colour build)",
+   "title": "Roads are part of the ground's tile sets: varied edge crossings, routing around hills and buildings, per-terrain treatments, rail-ready",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "files": [
+    "src/ui/route_paint.hpp",
+    "src/ui/route_paint.cpp",
+    "src/ui/structure_stamps.cpp",
+    "src/ui/ground_bake.cpp",
+    "tools/verify/ground_bake_check.cpp"
+   ],
+   "design": "SETTLED: RENDERING.md § Roads and sea lanes (the 2026-10-10 \"roads are part of the ground's tile sets\" bullets). WORK: hashed per-edge crossing points (inner 70%, identical from both tiles); in-tile paths that bend around higher ground and around the road plan's structures; per-terrain-family road treatments (hillside cut with a shaded uphill bank, low embankment on wet/low ground, cleared forest corridor, worn verge, town street); rail with gentler curvature and deeper cuttings/embankments (for the rail rung, BL-1255). Window invariance (P24/P30) and wrap/seam rows must hold; measure bake cost."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 51,
+   "written": "2026-10-10",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1262",
+   "short_name": "BORDERS_HARD_EDGES",
+   "author": "Ben (2026-10-10, walking the it1-colour build)",
+   "title": "National borders are hard edges only (no inward wash); no drawn road network on the plain canvas at any rung",
+   "authority_doc": "docs/ui/PLANETARY.md",
+   "files": [
+    "src/ui/body_surface_canvas.cpp"
+   ],
+   "design": "SETTLED: PLANETARY.md § The national border band (hard edges only, 2026-10-10) and RENDERING.md § Roads and sea lanes (no drawn road network on the plain canvas at any rung; the Throughput lens keeps it). WORK: remove the border band wash (the per-tile falloff, incl. in the BL-1260 static stroke cache), keep the inset boundary stroke and its click corridor; remove the plain-canvas drawn road/lane network at the wide rungs; keep the Throughput lens network. Captures of a many-nation frontier at rungs 0-2; frame time."
   }
  ]
 }
