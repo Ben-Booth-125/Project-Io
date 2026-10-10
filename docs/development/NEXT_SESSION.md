@@ -371,6 +371,10 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   needs a finished building; no sea convoy on screen. **Ben: build the scripted visual check
   instead** — lane running (two scripts/verify checks: air gate on door data + method grid +
   set_recipe refusal; sea-route convoy lane + leg-time head; each shown able to fail).
+  **BL-1252 MERGED** (tidy 10e17321): snap bounded at 1.75x (1.25 gave 190 pairs); parallels 59;
+  road tiles 75,952; 1.06x; gate G1 96.7 / G1b 1.7 / t50 87.3 / G2 95.6 / income 34,896. App
+  BUILD_OK, road_generation_harness 0 failures. LEFT: visual-check lane; BL-1119 R4 quiet timing
+  (now on the snapped roads) + R6 haulage; close.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
