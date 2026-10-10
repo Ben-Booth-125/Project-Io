@@ -282,3 +282,14 @@ numbers, and its within-tier reading (`ceil > 6`) is the binding one.
 5. **The garrison rule against the new province grain** (units). One garrison per bordering
    province at 20-200 men, on a sixth as many provinces. Re-read the rule's scale, or rule the
    167 k forces intended.
+
+## Ben's rulings on the traced movements (2026-10-10)
+
+All five follow-ups were ruled as they stand — none filed:
+
+- **Population 12.19B -> 6.27B (BL-1132 settle spacing): intended.**
+- **Specialists stop carrying trade (BL-1154 armed rivals, BL-1168 seat re-anchor): intended.**
+  The shelf economy and trade redesign (BL-1265..BL-1270) changes how goods move in any case.
+- **Road-tier search axis deciding on noise: leave it.**
+- **Garrisons 414k -> 167k (rule unchanged over the new province grain): intended.**
+- **Fingerprint treasury median (fragile across a split distribution): leave it.**
