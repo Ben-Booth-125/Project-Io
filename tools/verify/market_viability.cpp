@@ -483,6 +483,7 @@ struct seed_reading
     double t_points = 0.0, t_spent = 0.0, t_units = 0.0;
     long long t_ship_manual = 0, t_ship_auto = 0, t_refused_lp = 0;
     int t_ticks = 0, t_corps_max = 0, t_marketplaces_t50 = 0, t_ports_t50 = 0;
+    int t_marketplaces_handoff = 0; ///< Marketplaces standing (built or building) at the handoff
     // Why a trade building is silent at t50 (first reason that applies):
     // decommissioned, no workforce target, no effective staffing, upkeep unmet,
     // else making points.
@@ -1086,6 +1087,9 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
 
     // --- G1 at the handoff (the settle's last report, the world after the seat) ---
     r.g1_handoff = tally_processors(w, last_settle, reg, last_row);
+    for (const auto& [bid, b] : w.buildings)
+        if (b.type == building_type::planetary_marketplace && !b.decommissioned)
+            ++r.t_marketplaces_handoff;
     if (r.g1_handoff.total() == 0) r.fail = "zero processors at the handoff";
     if (r.inc_close <= 0.0 && r.fail.empty()) r.fail = "zero field income at the settle close";
     if (r.seat == null_entity && r.fail.empty()) r.fail = "no corporation seated";
@@ -1392,9 +1396,9 @@ int main(int argc, char** argv)
                         k_g1_g2_play_tick, r.t_marketplaces_t50, r.t_ports_t50);
         if (r.t_ticks > 0)
             std::printf("   Marketplaces at t%d: decommissioned %d, no workforce target %d, unstaffed %d,"
-                        " upkeep unmet %d, making points %d\n",
+                        " upkeep unmet %d, making points %d; at the handoff %d\n",
                         k_g1_g2_play_tick, r.t_mp_decom, r.t_mp_notarget, r.t_mp_unstaffed,
-                        r.t_mp_unmet, r.t_mp_making);
+                        r.t_mp_unmet, r.t_mp_making, r.t_marketplaces_handoff);
         for (std::size_t g = 0; g < resource_count; ++g)
             if (r.t_short_empty[g] + r.t_short_ceiling[g] > 0)
                 std::printf("     upkeep short: good #%zu empty %d over-ceiling %d\n",

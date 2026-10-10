@@ -238,10 +238,10 @@ trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& repo
     trade_flow_pass tf;
     tf.corp = w.player_entity;
 
+    lp_pool_map local_pools;
+    lp_pool_map* lp = (shared_lp_pools != nullptr) ? shared_lp_pools : &local_pools;
     if (!points.empty())
     {
-        lp_pool_map local_pools;
-        lp_pool_map* lp = (shared_lp_pools != nullptr) ? shared_lp_pools : &local_pools;
         const logistics_nodes nodes = collect_logistics_nodes(w);
 
         // Same-body haul per unit, memoised per (source, destination) market for
@@ -352,6 +352,13 @@ trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& repo
             }
         }
     }
+
+    // What each market's anchor still admits once the pass is done — the
+    // Logistic Points a further shipment leaving there could have used. Each
+    // market writes only its own field, so the (unordered) walk's order is
+    // immaterial; building a body's pool on first touch is deterministic.
+    for (auto& [mid, mc] : w.markets)
+        mc.trade_lp_spare = market_lp_left(w, reg, mid, *lp);
 
     // BL-1222: roll the player's record into the lens's trailing window.
     w.player_trade_flow.push_back(std::move(tf));

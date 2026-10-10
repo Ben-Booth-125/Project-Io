@@ -2050,10 +2050,15 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   **A rival may build a Planetary Marketplace (Ben, 2026-10-10; `../economy/TRADE.md`).**
   Without it a rival's trade capacity would be fixed at what generation retrofits and the Ports it
   holds. The grant: the scorer may propose building a Marketplace in a market where the
-  corporation already holds ground and no trade building, when the trade pass's own route ranking
-  (public prices, the network's haul) finds a route with margin leaving that market. It is scored
-  with a **modest flat score** — the bootstrap port's shape — so it never out-bids a genuine
-  economic build, and only one trade building is under construction at a time.
+  corporation already holds ground and no trade building. **It is scored as every build is
+  (Ben, 2026-10-10, superseding the flat score given the same day):** its net is the profit of
+  the trades its points would carry — the trade pass's own route ranking (public prices, the
+  network's haul), best first — less its maintenance, wage and upkeep goods, over its build
+  cost. The estimate reads what the last tick actually left over, never the standing shelf: a
+  good's spare on a market is what landed there less what its buyers wanted; a route on the body
+  is filled no further than the Logistic Points the market's anchor had left after the last
+  trade pass; and a market whose spare cannot carry the Marketplace's own upkeep is no site. Only
+  one trade building is under construction at a time.
 
   **What it admits.** One build candidate through the ordinary build verb, sited at the free tile
   of that market's catchment nearest its centre, under the usual placement, reach and materials

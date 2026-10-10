@@ -1148,6 +1148,14 @@ struct market_component
     /// rewrites it on every market before the draw reads it, inside the same
     /// clear, so a load that leaves it zero changes nothing the sim computes.
     std::array<float, resource_count> processor_want = {};
+    /// The Logistic Points left at the anchor nearest this market's centre at
+    /// the end of the last trade pass (`run_trades`) — units of cargo a further
+    /// overland shipment leaving here could still have passed that tick; 0 when
+    /// no anchor reaches the centre. Read by the rival Marketplace build's
+    /// estimate (corp_ai.cpp; AI_OPPONENT.md § 11), which must not count on
+    /// shipments the Logistic Point cap would refuse. SERIALISED
+    /// (world_save_version 46).
+    float trade_lp_spare = 0.0f;
 };
 
 /// BL-1172 — THE POSTED PRICE of good `r` on market `m`: the price that stands

@@ -885,6 +885,16 @@ float passive_lp_grant(float pool, float qty, bool allow_partial)
 
 } // namespace
 
+float market_lp_left(world& w, const recipe_registry& reg, entity_id market_id,
+                     lp_pool_map& pools)
+{
+    const auto mit = w.markets.find(market_id);
+    if (mit == w.markets.end() || mit->second.centre_tile == null_entity)
+        return 0.0f;
+    const float* slot = passive_lp_slot(w, reg, mit->second.body, mit->second.centre_tile, pools);
+    return (slot != nullptr && std::isfinite(*slot)) ? std::max(0.0f, *slot) : 0.0f;
+}
+
 bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report& report,
                            entity_id corp_id, entity_id src_market, entity_id dest_market_id,
                            std::size_t ri, float qty, const convoy_leg& leg,

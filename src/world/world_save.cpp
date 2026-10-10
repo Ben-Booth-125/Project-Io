@@ -200,6 +200,7 @@ void w_market(std::ostream& o, const market_component& m)
     for (const int32_t t : m.unposted_bid_tick) w_i32(o, t); // BL-1227: world_save_version 38
     // BL-1265 (v46): the dial's pool-draw register (v40) retired with the pool.
     w_f32_array(o, m.background_fill); // BL-1217 G1b R2: world_save_version 43
+    w_f32(o, m.trade_lp_spare);        // world_save_version 46
 }
 
 bool r_i32_array(std::istream& i, std::array<int32_t, resource_count>& a)
@@ -218,7 +219,9 @@ bool r_market(std::istream& i, market_component& m)
         && r_f32_array(i, m.household_bid) && r_f32_array(i, m.household_fill)
         && r_f32_array(i, m.household_weight) && r_f32_array(i, m.hauler_want)
         && r_f32_array(i, m.unposted_bid) && r_i32_array(i, m.unposted_bid_tick)
-        && r_f32_array(i, m.background_fill); // BL-1217 G1b R2: v45
+        && r_f32_array(i, m.background_fill) // BL-1217 G1b R2: v45
+        && r_f32(i, m.trade_lp_spare)         // v46: finite, never negative
+        && std::isfinite(m.trade_lp_spare) && m.trade_lp_spare >= 0.0f;
 }
 
 void w_unit(std::ostream& o, const unit_component& u)

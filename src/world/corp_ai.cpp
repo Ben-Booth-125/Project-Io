@@ -2452,14 +2452,24 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // ---- Planetary Marketplace build candidate (Ben, 2026-10-10, NR-1013;
         // AI_OPPONENT.md § 11, "a rival may build a Planetary Marketplace") ---
         // A Marketplace makes trade points for the market it stands in
-        // (TRADE.md; NR-1018), so a rival builds one where it already holds
-        // ground, has no trade building yet, and the trade pass's own ranking
-        // (`rank_trade_routes`, public prices and the network's haul) finds a
-        // route leaving that market with margin. One flat, modest score — the
-        // muster base's shape: the building sells no good, so there is no
-        // net/capex curve to price it on, and it must never out-bid a genuine
-        // economic build. One at a time: none while another of its trade
-        // buildings is still under construction. Never the player's corp.
+        // (TRADE.md; NR-1018), so a rival weighs one in each market where it
+        // holds ground and has no trade building yet. It is scored as every
+        // build is (Ben, 2026-10-10): its NET is the profit of the trades its
+        // points would carry — the trade pass's own ranking
+        // (`rank_trade_routes`, public prices and the network's haul) walked
+        // best first, each route filled only as far as the source shelf and
+        // the destination's room allow — less its maintenance, its wage and
+        // its upkeep goods at the shelf price; the score is `net / capex`.
+        // The estimate reads what the LAST tick actually left over, never the
+        // standing shelf: a good's SPARE on a market is what landed there less
+        // everything its buyers wanted (`supply - demand - hauler_want`), and
+        // a route on the body is filled no further than the Logistic Points the
+        // market's anchor still had after the last trade pass
+        // (`market_component::trade_lp_spare`). A market whose spare cannot
+        // carry the Marketplace's own upkeep is no site: a Marketplace makes no
+        // points on a tick its upkeep goes unmet.
+        // One at a time: none while another of its trade buildings is still
+        // under construction. Never the player's corp.
         if (!(cc.is_player || corp == w.player_entity))
         {
             bool building_one = false;
@@ -2480,16 +2490,69 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 const logistics_nodes        mp_nodes = collect_logistics_nodes(w);
                 trade_haul_memo              mp_memo;
                 std::vector<trade_route_offer> routes;
+                const trade_params&       tp  = reg.trade();
+                const building_economics& mex = reg.economics(building_type::planetary_marketplace);
+                const float mp_wf  = 0.5f; // construct_building staffs at 0.5
+                const float mp_pts = tp.marketplace_points * mp_wf;
+                const std::array<float, resource_count> mp_upkeep = building_upkeep_goods(
+                    reg.building_upkeep(), building_type::planetary_marketplace, reg.era());
                 entity_id best_market = null_entity;
-                float     best_route  = 0.0f;
+                float     best_net    = 0.0f; // never toward a loss
+                // Last tick's spare of good r on market m: landed less wanted.
+                auto spare_of = [](const market_component& m, std::size_t r) {
+                    const float s = m.supply[r] - std::max(0.0f, m.demand[r])
+                                  - std::max(0.0f, m.hauler_want[r]);
+                    return (std::isfinite(s) && s > 0.0f) ? s : 0.0f;
+                };
                 for (const entity_id mid : corp_markets(w, corp)) // ascending
                 {
                     if (std::binary_search(trading.begin(), trading.end(), mid))
                         continue; // already trades from here
-                    rank_trade_routes(w, reg, mp_nodes, mp_memo, corp, std::vector<entity_id>{mid}, routes);
-                    if (!routes.empty() && routes.front().score > best_route)
+                    const market_component& um = w.markets.at(mid);
+                    std::array<float, resource_count> spare{};
+                    for (std::size_t r = 0; r < resource_count; ++r)
+                        spare[r] = spare_of(um, r);
+                    float upkeep_cost     = 0.0f;
+                    bool  upkeep_on_shelf = true;
+                    for (std::size_t ur = 0; ur < resource_count && upkeep_on_shelf; ++ur)
                     {
-                        best_route  = routes.front().score;
+                        if (!(mp_upkeep[ur] > 0.0f))
+                            continue;
+                        if (!(spare[ur] >= mp_upkeep[ur]))
+                            upkeep_on_shelf = false;
+                        spare[ur]   -= mp_upkeep[ur]; // its own upkeep comes first
+                        upkeep_cost += mp_upkeep[ur] * dispatch_market_price(um, ur);
+                    }
+                    if (!upkeep_on_shelf)
+                        continue;
+                    float lp_left = um.trade_lp_spare;
+                    rank_trade_routes(w, reg, mp_nodes, mp_memo, corp, std::vector<entity_id>{mid}, routes);
+                    float pts_left = mp_pts;
+                    float earn     = 0.0f;
+                    for (const trade_route_offer& o : routes)
+                    {
+                        if (!(pts_left > 1e-6f))
+                            break;
+                        const float cap  = tp.capacity[o.r];
+                        const float room = trade_room(w, reg, o.b, o.r, o.landed);
+                        // Overland (same body) passes the anchor's Logistic
+                        // Points; a space lane is out of the cap's scope.
+                        const bool overland = w.markets.at(o.b).body == um.body;
+                        float units = std::min({pts_left * cap, spare[o.r], room});
+                        if (overland)
+                            units = std::min(units, lp_left);
+                        if (!(units > 1e-4f) || !(cap > 0.0f))
+                            continue;
+                        earn       += o.margin_per_unit * units;
+                        spare[o.r] -= units;
+                        if (overland)
+                            lp_left -= units;
+                        pts_left   -= units / cap;
+                    }
+                    const float net = earn - mex.maintenance - mex.base_wage * mp_wf - upkeep_cost;
+                    if (std::isfinite(net) && net > best_net)
+                    {
+                        best_net    = net;
                         best_market = mid;
                     }
                 }
@@ -2529,15 +2592,16 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     best_tile = null_entity;
                 if (best_tile != null_entity)
                 {
+                    const float capex = std::max(1.0f, construction_capex(
+                        w, reg, best_tile, building_type::planetary_marketplace, resource_type::iron_ore));
                     candidate c;
                     c.cmd.tick = tick;
                     c.cmd.corp = corp;
                     c.cmd.verb = corp_verb::build;
                     c.cmd.tile = best_tile;
                     c.cmd.type = building_type::planetary_marketplace;
-                    c.score  = 0.4f * jitter; // the bootstrap port's flat, modest score
-                    c.spend  = std::max(1.0f, construction_capex(
-                        w, reg, best_tile, building_type::planetary_marketplace, resource_type::iron_ore));
+                    c.score  = (best_net / capex) * focus_weight(cc.focus, corp_verb::build) * jitter;
+                    c.spend  = capex;
                     c.reason = corp_decision_reason::best_build;
                     c.bucket = bucket_for_reason(c.reason);
                     cands.push_back(c);

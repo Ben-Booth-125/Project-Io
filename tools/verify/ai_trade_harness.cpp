@@ -472,29 +472,70 @@ void run_marketplace_build(world& w, const recipe_registry& reg)
 
     corp_ai_params p;
     p.cadence_k = 1;
-    // The Marketplace's flat score (0.4) is modest BY DESIGN — it must never
-    // out-bid a genuine economic build — so under the default one build per
-    // evaluation a better build hides it. The budget is widened here so the
-    // row observes the candidate itself, not the contest (the contest is the
-    // design, not the subject).
+    // A Marketplace scores as any build (net / capex), so under the default
+    // one build per evaluation a better build can hide it. The budget is
+    // widened so each row observes the candidate itself, not the contest.
     p.max_builds = 64;
-    economy_report report;
-    const std::size_t before = w.ai_decisions.total;
-    run_corp_strategic_step(w, reg, report, 100, p);
-    bool built = false;
-    for (const corp_decision& d : decisions_since(w.ai_decisions, before))
-    {
-        if (d.corp != rival) continue;
-        if (d.command.verb == corp_verb::build && d.command.type == building_type::planetary_marketplace
-            && market_for_tile(w, d.command.tile) == rr.a)
+
+    // The estimate reads what the last tick LEFT OVER (AI_OPPONENT.md § 11):
+    // the source market's spare of the traded good and of the Marketplace's
+    // upkeep goods (supply less demand less hauler want), and the Logistic
+    // Points its anchor had left after the last trade pass. Rig all three.
+    const std::array<float, resource_count> upkeep = building_upkeep_goods(
+        reg.building_upkeep(), building_type::planetary_marketplace, reg.era());
+    auto rig_spare = [&](world& x, bool upkeep_goods, float lp) {
+        market_component& ma = x.markets.at(rr.a);
+        ma.supply[rr.r] = std::max(0.0f, ma.demand[rr.r]) + std::max(0.0f, ma.hauler_want[rr.r]) + 1000.0f;
+        for (std::size_t u = 0; u < resource_count; ++u)
+            if (upkeep[u] > 0.0f && u != rr.r)
+                ma.supply[u] = upkeep_goods
+                    ? std::max(0.0f, ma.demand[u]) + std::max(0.0f, ma.hauler_want[u]) + 100.0f
+                    : 0.0f;
+        ma.trade_lp_spare = lp;
+    };
+    auto proposes = [&](world& x, bool print) {
+        economy_report report;
+        const std::size_t before = x.ai_decisions.total;
+        run_corp_strategic_step(x, reg, report, 100, p);
+        bool built = false;
+        for (const corp_decision& d : decisions_since(x.ai_decisions, before))
         {
-            built = true;
-            std::printf("    Marketplace build at tile %llu, score %.4f\n",
-                        static_cast<unsigned long long>(d.command.tile), d.winning_score);
+            if (d.corp != rival) continue;
+            if (d.command.verb == corp_verb::build && d.command.type == building_type::planetary_marketplace
+                && market_for_tile(x, d.command.tile) == rr.a)
+            {
+                built = true;
+                if (print)
+                    std::printf("    Marketplace build at tile %llu, score %.4f\n",
+                                static_cast<unsigned long long>(d.command.tile), d.winning_score);
+            }
         }
+        return built;
+    };
+
+    // Refusals first, each on its own copy of the world: same rival, same route.
+    {
+        world x = w;
+        rig_spare(x, true, 0.0f);
+        // The rigged route is overland (same body), so no Logistic Points left
+        // means the estimate can carry nothing on it.
+        check(!proposes(x, false),
+              "no Marketplace when the source market's anchor had no Logistic Points left");
     }
-    check(built, "a rival with no trade building in a market and a margin route out of it "
-                 "builds a Planetary Marketplace in that market's catchment");
+    {
+        bool any_upkeep = false;
+        for (std::size_t u = 0; u < resource_count; ++u)
+            if (upkeep[u] > 0.0f && u != rr.r) any_upkeep = true;
+        world x = w;
+        rig_spare(x, false, 1.0e6f);
+        check(any_upkeep && !proposes(x, false),
+              "no Marketplace where the market's spare cannot carry its own upkeep");
+    }
+
+    rig_spare(w, true, 1.0e6f);
+    check(proposes(w, true), "a rival with no trade building in a market and a margin route out of it, "
+                             "with spare goods, spare upkeep and Logistic Points left, "
+                             "builds a Planetary Marketplace in that market's catchment");
 }
 
 } // namespace

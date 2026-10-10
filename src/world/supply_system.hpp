@@ -269,6 +269,12 @@ struct economy_report; // economy_system.hpp: the tick's want and fill registers
 ///                         shipment's purchase to it — so a trader shipping
 ///                         many routes in one pass cannot overdraw (cold
 ///                         review). Null: the balance alone.
+/// The passive Logistic Points still left this tick at the anchor nearest
+/// market @p market_id's centre, in @p pools (built on first touch, nothing
+/// else mutated); 0 when no anchor reaches the centre or the market is unknown.
+float market_lp_left(world& w, const recipe_registry& reg, entity_id market_id,
+                     lp_pool_map& pools);
+
 bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report& report,
                            entity_id corp_id, entity_id src_market, entity_id dest_market_id,
                            std::size_t ri, float qty, const convoy_leg& leg,
