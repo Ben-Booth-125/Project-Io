@@ -676,9 +676,10 @@ void r7_the_reservation_ceiling()
         check(t.unmet == 1,      "R7e and the draw goes unmet, as it always did");
     }
 
-    // --- R7f: reservation_mult 0 is the pre-BL-654 behaviour exactly ---------
-    // The DEFAULT. Every harness that hand-builds a registry and never authors a
-    // band must see a pool-only draw, or this item is not inert where it claims.
+    // --- R7f: reservation_mult 0 is the ceiling OFF: the draw buys freely -----
+    // The DEFAULT. BL-1265: with no corporation pools, "off" can no longer mean
+    // the pre-BL-654 pool-only draw (it would leave upkeep no source at all);
+    // it means what it means for every other shelf draw — no ceiling.
     {
         fixture f;
         f.build(1, building_type::extraction_site);
@@ -692,10 +693,11 @@ void r7_the_reservation_ceiling()
         economy_report rep;
         const building_upkeep_tick t = run_building_upkeep(f.w, reg, rep);
 
-        check(rep.wants.empty(), "R7f at the default the draw never bids");
-        check_near(f.w.markets.begin()->second.inventory[ri(good)], 10.0f,
-                   "R7f at the default the market is untouched");
-        check(t.unmet == 1, "R7f at the default the draw simply goes short (BL-1265: there is no pool to fall back on)");
+        check(!rep.wants.empty(), "R7f at the default the draw bids on the shelf");
+        check(f.w.markets.begin()->second.inventory[ri(good)] < 10.0f,
+              "R7f at the default the draw buys off the shelf (no ceiling)");
+        check(t.unmet == (need > 10.0f ? 1 : 0),
+              "R7f at the default the draw is met when the shelf holds the need");
     }
 }
 

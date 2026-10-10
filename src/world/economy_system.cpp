@@ -3446,7 +3446,10 @@ bool draw_goods_or_bid(world& w, const recipe_registry& reg, economy_report& rep
         // it — "unpriced == unbuyable" falls out of the arithmetic rather than
         // needing a rule of its own. `res_mult <= 0` is the authored OFF switch.
         // BL-1172: the one rule every goods draw shares (`shelf_admits`).
-        if (m != nullptr && shelf_admits(*m, r, res_mult, /*off_buys=*/false))
+        // BL-1265: with the ceiling OFF (res_mult <= 0) the draw BUYS freely,
+        // as every other shelf draw does. Before, off meant the pre-BL-654
+        // pool-only draw; with no pools that would leave upkeep no source at all.
+        if (m != nullptr && shelf_admits(*m, r, res_mult, /*off_buys=*/true))
         {
             if (want == nullptr)
             {
