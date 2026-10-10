@@ -47,7 +47,7 @@ dramatic landforms and rivers leave the canvas's vector layer for the bake too; 
 is **never magnified** at any rung (§ Level of detail).
 
 Ruled by Ben, 2026-10-09, after walking the sprint 51 build: the ground is viewed at **one
-angle** (22.5°) at every rung, and **zooming does not add detail** — one 96 px/hex master
+angle** (22.5°) at every rung, and **zooming does not add detail** — one 128 px/hex master
 per body, pre-baked during generation and held in RAM, with every other zoom a downsample
 of it (§ Level of detail; § One angle). This supersedes the never-magnify tier ladder and
 the stepped tilt.
@@ -85,7 +85,7 @@ established rule (wrap copies of one tile must agree; no crawl under pan).
 
 **The master carries feature stamps and sharpened relief** (Ben, 2026-09-01: *"we
 should be able to render individual trees, and sharper hills"*). At bake resolutions
-≥ 40 px per hex (the 96 px master — and so, downsampled, every level): forest and scrub tiles scatter **individual tree
+≥ 40 px per hex (the 128 px master — and so, downsampled, every level): forest and scrub tiles scatter **individual tree
 canopies** — hash-positioned, density-counted, NW-lit with an SE drop shadow, drawn
 before the grade so they take it exactly as the ground does, and never painted over
 the survey lock fill; mountain-biased detail noise folds toward a **ridged** variant
@@ -108,8 +108,8 @@ ground retires only as coverage arrives.
   wrap period.
 - **Resident set — two tiers of memory:**
   - **System RAM** holds each baked body's master and its mip chain, chunk by
-    chunk (~3.8 GB for the 261×121 home body), plus its far page. A **RAM
-    budget of 6 GB across bodies** drops the least-recently-visited body's
+    chunk (~6.7 GB for the 261×121 home body at 128 px per hex), plus its far page. A **RAM
+    budget of 8 GB across bodies** drops the least-recently-visited body's
     master and chain — never the body on screen, never the pre-bake target —
     and keeps its far page. A background bake starts only where its whole
     master fits the budget without dropping anything.
@@ -501,7 +501,8 @@ biggest fix even if we keep a high resolution"*). This supersedes the per-rung b
 tiers of 2026-09-01 and the never-magnify tier chooser of 2026-10-08: a zoom step had
 been a fresh, expensive bake, and that bake was the lag.
 
-- **One master per body.** The ground is baked ONCE per body, at **96 px per hex**, at
+- **One master per body.** The ground is baked ONCE per body, at **128 px per hex** (Ben,
+  2026-10-10: "simply up the resolution in each tile"; it was 96), at
   the one camera angle (§ One angle), whole-body, in 512 px chunks. Everything the
   player sees at any rung is this image: the close-tier features (trees, crags, strata,
   structures) are always in it and simply grow small with distance.
@@ -511,7 +512,7 @@ been a fresh, expensive bake, and that bake was the lag.
   shimmers (`SDL_Renderer` has no mipmaps; the chain is ours). Detail never changes
   with zoom; only scale does.
 - **The master is held in RAM; the GPU holds what is on screen.** The master and its
-  chain live in system memory (about 4 GB for an Earth-sized body); each frame uploads
+  chain live in system memory (about 6.7 GB for an Earth-sized body); each frame uploads
   the visible chunks of the level in use, within a per-frame upload budget so a pan
   never hitches, and keeps an LRU of uploaded textures.
 - **Pre-baked during generation.** The home body's master bakes while the player watches
@@ -534,19 +535,20 @@ been a fresh, expensive bake, and that bake was the lag.
   — the one rung that reads the master near 1:1 — would gain from a 2× bake, at four
   times the bake cost. A 2× master is taken only if the pool's measured pre-bake still
   fits the target in TECH_FOUNDATIONS.md § Target hardware.
-- **The top rung reads the master slightly magnified** at the reference window (~110 px
-  drawn from 96: ~1.15×), and more on a 4K-height window (~2.3×). Accepted for the
-  prototype's windows (Ben, 2026-10-09: 96 over 48, and over a separate 192 tier).
+- **No rung magnifies at the reference window**: the top rung draws ~110 px from the
+  128 px master (minified ~1.16:1). A 4K-height window magnifies the top rung ~1.7×,
+  accepted for the prototype (Ben, 2026-10-10: 128 over 96, and over 192, which would
+  break the 16 GB minimum).
 
 At the reference 1720×1080 window:
 
 | Zoom rung (drawn hex radius) | Level drawn (px per hex) |
 |---|---|
-| ~7 px (whole grid) | 12, minified (~1.7:1) |
-| ~14 px | 24, minified |
-| ~28 px | 48, minified |
-| ~55 px | 96 — the master, minified |
-| ~110 px | 96 — the master, ~1.15× magnified |
+| ~7 px (whole grid) | 8, minified (~1.14:1) |
+| ~14 px | 16, minified |
+| ~28 px | 32, minified |
+| ~55 px | 64, minified |
+| ~110 px | 128 — the master, minified (~1.16:1) |
 
 The vector fill remains only as the fallback before a body's far page exists. What the
 canvas strokes OVER the ground — washes, roads, lanes, the border rule — has its own

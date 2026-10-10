@@ -622,11 +622,13 @@ presentation half:
 **The ground pre-bakes behind the wizard** (Ben, 2026-10-09; started at the Life round on
 Ben's ruling the same day, after the first build measured 36-55 s when the bake began at
 round 6). The homeworld's **ground master** ([RENDERING.md](RENDERING.md) § Level of detail) —
-the one 96 px/hex image every zoom of the Planetary canvas is drawn from — starts baking on the
+the one 128 px/hex image every zoom of the Planetary canvas is drawn from — starts baking on the
 worker pool as soon as **the Life round has built the homeworld's terrain**, and runs behind the
 rest of the wizard, which the player spends minutes watching. Each later round changes the
 world on its own worker, so the ground layer takes a **fresh source snapshot only at a round
-boundary**, never from a world a round worker is still mutating; whatever a round changed —
+boundary** — and one more **inside round 6, right after the campaign road network is laid**
+(Ben, 2026-10-10), so the roads bake while the settle runs instead of landing with its
+buildings at the end — never from a world a round worker is still mutating; whatever a round changed —
 history's urban growth, settlements, roads, the settle's buildings — moves only the content
 hashes of its own chunks, and only those chunks re-bake. Play does not open on a half-painted
 ground: if the master is still unfinished when the player confirms a seat, entering play waits

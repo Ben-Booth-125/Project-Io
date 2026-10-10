@@ -193,7 +193,7 @@ hope:
 - A **building placed** has its ground re-baked **within 1 s**.
 
 What these budgets cost, and why they fit: the ground is painted on the CPU by a worker pool
-and held in system RAM (about 4 GB per Earth-sized body, with a RAM budget across bodies); the
+and held in system RAM (about 6.7 GB per Earth-sized body at 128 px per hex, with an 8 GB budget across bodies); the
 GPU holds only the textures on screen and draws them as quads, so GPU time is not the
 constraint (RENDERING.md § Level of detail). A check that misses a budget on the reference PC
 is a defect; one that only the minimum PC would miss is measured on it before release.
