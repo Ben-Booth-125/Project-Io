@@ -1392,6 +1392,30 @@ void route_row(world& w, entity_id home, const bake_source& src0, const bake_par
                             ss, cfgs[k].name, wall[k], cyc[k] < 1e29 ? cyc[k] : -1.0,
                             100.0 * (wall[k] / wall[1] - 1.0));
         }
+        // The window rule's own cost at a boundary that lays the whole network
+        // at once (the settle lands the campaign roads): the chunk's rects
+        // from "no road" to "the network", best of 5.
+        {
+            bake_source bare = s;
+            std::fill(bare.road.begin(), bare.road.end(), 0);
+            std::fill(bare.lane.begin(), bare.lane.end(), 0);
+            rederive_routes(bare);
+            bake_params q1 = p; q1.supersample = 1;
+            double best = 1e30;
+            std::vector<pixel_rect> rr;
+            bool ok = false;
+            for (int rep_ = 0; rep_ < 5; ++rep_)
+            {
+                const auto t0 = std::chrono::steady_clock::now();
+                ok = installation_patch_rects(bare, s, gm, q1, x0, y0, 512, 512, rr);
+                best = std::min(best, std::chrono::duration<double, std::milli>(
+                                          std::chrono::steady_clock::now() - t0).count());
+            }
+            long long area = 0;
+            for (const pixel_rect& r : rr) area += static_cast<long long>(r.w) * r.h;
+            std::printf("ROUTE-PROF  window rule, network laid at once: %.2f ms, %s, %zu windows, %.1f%% of the chunk\n",
+                        best, ok ? "patched" : "whole", rr.size(), 100.0 * area / (512.0 * 512.0));
+        }
         return;
     }
 
@@ -1554,13 +1578,28 @@ void route_row(world& w, entity_id home, const bake_source& src0, const bake_par
             rederive_routes(t);
             return t;
         };
-        struct change { const char* name; bake_source after; int c, r; };
+        struct change { const char* name; bake_source after; int c, r; bool one_tile = true; };
         std::vector<change> changes;
         if (s.cls[idx(ac - 4, ar)] == land)
             changes.push_back({ "a road built (highway extended)", with(s, idx(ac - 4, ar), k_route_highway, false), ac - 4, ar });
         changes.push_back({ "a road upgraded (track -> road)", with(s, idx(ac + 3, ar + 1), k_route_road, false), ac + 3, ar + 1 });
         changes.push_back({ "a road removed (a link into the works)", with(s, idx(ac - 1, ar + 2), 0, false), ac - 1, ar + 2 });
         changes.push_back({ "a lane stamped", with(s, idx(wc + 8, wr), 1, true), wc + 8, wr });
+        // A track cut through the deepest forest: the trees it clears and the
+        // canopies that now stand over it.
+        {
+            const int fa = homogeneous_aim(src0, terrain_cover::forest);
+            if (fa >= 0)
+            {
+                const int fr = fa / s.gw, fc = fa % s.gw;
+                bake_source cut = s;
+                for (int c = fc - 1; c <= fc + 1; ++c)
+                    if (cut.cls[idx(c, fr)] == land)
+                        cut.road[idx(c, fr)] = k_route_track;
+                rederive_routes(cut);
+                changes.push_back({ "a track cut through a forest", std::move(cut), fc, fr, false }); // three tiles: past 40% is the rule working
+            }
+        }
         bool hash_ok = true, rule_ok = true, small = true;
         for (const change& ch : changes)
         {
@@ -1594,11 +1633,11 @@ void route_row(world& w, entity_id home, const bake_source& src0, const bake_par
                         ch.name, x0, y0, rects.size(), rects.size() == 1 ? "" : "s", 100.0 * frac, miss,
                         ok ? "" : "  [rule refused]");
             rule_ok = rule_ok && ok && miss == 0 && !rects.empty();
-            small = small && frac < 0.40;
+            small = small && (!ch.one_tile || frac < 0.40);
         }
         check(hash_ok, "P30", "a route change moves region_hash and leaves terrain_hash (a partial, not a whole, re-bake)");
         check(rule_ok, "P30", "the windows around a route change, re-baked and blitted, give the new chunk byte for byte");
-        check(small, "P30", "a route change's windows stay under 40% of the chunk");
+        check(small, "P30", "a one-tile route change's windows stay under 40% of the chunk");
     }
 }
 

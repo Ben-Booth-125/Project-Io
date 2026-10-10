@@ -894,12 +894,18 @@ std::uint64_t route_hash(const bake_source& s, const geometry& g, int px0, int p
     if (!has_routes(s) || s.route_pieces.empty())
         return 0; // no route anywhere: nothing to fold
     std::uint64_t h = 0x52A7E5D1C0FFEE11ull;
+    bool any = false;
     auto mix = [&h](std::uint64_t v) { h ^= v + 0x9E3779B97F4A7C15ull + (h << 6) + (h >> 2); };
     walk_tiles(s, g, px0, py0, pw, ph, k_route_margin, [&](int, int, std::size_t i) {
         if (s.road[i] | s.lane[i])
+        {
+            any = true;
             mix((static_cast<std::uint64_t>(i) << 16) | (static_cast<std::uint64_t>(s.road[i]) << 8) | s.lane[i]);
+        }
     });
-    return h;
+    // No route in reach: nothing to fold, so a window far from every road keeps
+    // its hash when roads are laid elsewhere (no needless sweep job).
+    return any ? h : 0;
 }
 
 int route_patch_boxes(const bake_source& a, const bake_source& b, const geometry& g,
@@ -929,7 +935,7 @@ int route_patch_boxes(const bake_source& a, const bake_source& b, const geometry
     // after it (ground_bake.cpp stamp_trees): its root lies within ~0.55 north
     // or 0.15 south of the reach, its canopy reaches 0.24 sideways and down
     // from the root, and stands up to 0.55 plus the oblique lift above it.
-    const double t_side = 0.50, t_down = 0.60 + 0.24 + 0.05, t_up = 0.15 + 0.55 + 0.30 + g.lift;
+    const double t_side = 0.50, t_down = 0.60 + 0.24 + 0.05, t_up = 0.15 + 0.55 + 0.30;
     walk_tiles(b, g, px0, py0, pw, ph, 4.0, [&](int c, int r, std::size_t i) {
         const road_plan pa = has_routes(a) ? tile_road_plan(a, i) : road_plan{};
         const road_plan pb = has_routes(b) ? tile_road_plan(b, i) : road_plan{};
@@ -938,8 +944,42 @@ int route_patch_boxes(const bake_source& a, const bake_source& b, const geometry
         if (!pieces_moved && !plan_moved)
             return;
         const double cx = kSqrt3 * (c + ((r & 1) ? 0.5 : 0.0)), cy = 1.5 * r;
+        // Trees stand only on forest and scrub; a tree a piece can touch roots
+        // on the piece's own tile or a neighbour (within ~1.5 of its centre).
+        const auto wooded_at = [&](int t) {
+            if (t < 0 || b.cls[static_cast<std::size_t>(t)] != land)
+                return false;
+            const auto cv = static_cast<terrain_cover>(b.cover[static_cast<std::size_t>(t)]);
+            return cv == terrain_cover::forest || cv == terrain_cover::scrub;
+        };
+        bool wooded = false;
+        for (int kk = -1; kk < 6 && trees && !wooded; ++kk)
+            wooded = wooded_at(kk < 0 ? static_cast<int>(i) : nb_index(b, static_cast<int>(i), kk));
+        const auto settled_at = [&](const bake_source& src, int t) {
+            if (src.inst.of_tile.size() != src.cls.size() || src.inst.of_tile[static_cast<std::size_t>(t)] < 0)
+                return false;
+            return src.inst.list[static_cast<std::size_t>(src.inst.of_tile[static_cast<std::size_t>(t)])]
+                       .settlement.subject == stamp_subject::settlement;
+        };
         if (pieces_moved)
         {
+            // The oblique lift a pixel here can be drawn at: the ground's
+            // height there is a blend of centres within two rings of the tile.
+            double hmax = b.height[i];
+            for (int k1 = 0; k1 < 6; ++k1)
+            {
+                const int t1 = nb_index(b, static_cast<int>(i), k1);
+                if (t1 < 0)
+                    continue;
+                hmax = std::max(hmax, static_cast<double>(b.height[static_cast<std::size_t>(t1)]));
+                for (int k2 = 0; k2 < 6; ++k2)
+                {
+                    const int t2 = nb_index(b, t1, k2);
+                    if (t2 >= 0)
+                        hmax = std::max(hmax, static_cast<double>(b.height[static_cast<std::size_t>(t2)]));
+                }
+            }
+            const double hl = std::clamp(hmax, 0.0, 1.0) * g.lift;
             for (const bake_source* src : { &a, &b })
             {
                 if (!has_routes(*src))
@@ -949,18 +989,33 @@ int route_patch_boxes(const bake_source& a, const bake_source& b, const geometry
                 {
                     const route_piece& pc = src->route_pieces[static_cast<std::size_t>(src->route_first[i] + j)];
                     const double reach = tier_hw(pc.tier) * 1.5 + tier_out(pc.tier);
-                    // Only a road clears trees (a lane lies on open water).
-                    const bool road = (pc.tier & 0x80u) == 0;
-                    box(cx, cy, pc.bx0 - reach - (road ? t_side : 0.0), pc.by0 - reach - g.lift - (road ? t_up : 0.0),
-                        pc.bx1 + reach + (road ? t_side : 0.0), pc.by1 + reach + (road ? t_down : 0.0));
+                    // Only a road clears trees (a lane lies on open water),
+                    // and only where trees grow.
+                    const bool road = (pc.tier & 0x80u) == 0 && wooded;
+                    // One box per half (a bend's two halves box far tighter
+                    // than the whole curve), grown by the reach, the lift and
+                    // the trees.
+                    constexpr int mid = route_piece::k_pts / 2;
+                    for (int half = 0; half < 2; ++half)
+                    {
+                        const int k0 = half ? mid : 0, k1 = half ? route_piece::k_pts - 1 : mid;
+                        double x0 = pc.x[k0], x1 = pc.x[k0], y0 = pc.y[k0], y1 = pc.y[k0];
+                        for (int k = k0 + 1; k <= k1; ++k)
+                        {
+                            x0 = std::min(x0, static_cast<double>(pc.x[k])); x1 = std::max(x1, static_cast<double>(pc.x[k]));
+                            y0 = std::min(y0, static_cast<double>(pc.y[k])); y1 = std::max(y1, static_cast<double>(pc.y[k]));
+                        }
+                        box(cx, cy, x0 - reach - (road ? t_side : 0.0), y0 - reach - hl - (road ? t_up : 0.0),
+                            x1 + reach + (road ? t_side : 0.0), y1 + reach + (road ? t_down : 0.0));
+                    }
                 }
             }
-            // A town's blocks keep off the road: every settled tile the
-            // pieces pass near re-lays its blocks.
+            // A town's blocks keep off the road: every town tile the pieces
+            // pass near re-lays its blocks.
             for (int kk = -1; kk < 6; ++kk)
             {
                 const int t = kk < 0 ? static_cast<int>(i) : nb_index(b, static_cast<int>(i), kk);
-                if (t < 0)
+                if (t < 0 || !(settled_at(a, t) || settled_at(b, t)))
                     continue;
                 // The neighbour's row and UNWRAPPED column: its centre beside ours.
                 const int    tr  = r + (kk < 0 ? 0 : static_cast<int>(std::lround(kNbDy[kk] / 1.5)));
@@ -985,9 +1040,9 @@ int route_patch_boxes(const bake_source& a, const bake_source& b, const geometry
                     ++n;
                 }
         }
-        // The tile's own trees (a roaded cluster's disc clears them).
-        const auto cov = static_cast<terrain_cover>(b.cover[i]);
-        if (trees && b.cls[i] == land && (cov == terrain_cover::forest || cov == terrain_cover::scrub))
+        // The tile's own trees, when its cluster moved (a roaded cluster's
+        // disc clears them).
+        if (plan_moved && trees && wooded_at(static_cast<int>(i)))
         {
             const double side = 0.9 + 0.16 * 1.5;
             const double up   = 0.9 + g.lift + 2.85 * 0.16 / g.tilt_sy;

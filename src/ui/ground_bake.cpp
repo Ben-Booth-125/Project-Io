@@ -3317,7 +3317,11 @@ bool installation_patch_rects(const bake_source& old_src, const bake_source& new
         keep(x0, y0, x1, y1); // nothing either side draws: an empty box, dropped
     }
     // Merge overlapping or touching rectangles into their bounding box until
-    // none touch (a handful per chunk: quadratic is fine).
+    // none touch (a handful per chunk: quadratic is fine) — but only where the
+    // box costs no more pixels than the two apart (BL-1253: a road crossing a
+    // chunk diagonally is a chain of windows, and its bounding box was the
+    // whole chunk). Two windows left overlapping bake the same pixels twice,
+    // byte-identical (window invariance), so the blit order cannot matter.
     for (bool merged = true; merged;)
     {
         merged = false;
@@ -3330,6 +3334,9 @@ bool installation_patch_rects(const bake_source& old_src, const bake_source& new
                     continue;
                 const int x0 = std::min(a.x0, b.x0), y0 = std::min(a.y0, b.y0);
                 const int x1 = std::max(a.x0 + a.w, b.x0 + b.w), y1 = std::max(a.y0 + a.h, b.y0 + b.h);
+                if (static_cast<long long>(x1 - x0) * (y1 - y0)
+                    > static_cast<long long>(a.w) * a.h + static_cast<long long>(b.w) * b.h)
+                    continue; // the box would bake more than the pair: keep both
                 out[i] = { x0, y0, x1 - x0, y1 - y0 };
                 out.erase(out.begin() + static_cast<std::ptrdiff_t>(j));
                 merged = true;

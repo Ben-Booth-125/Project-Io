@@ -187,7 +187,10 @@ ground retires only as coverage arrives.
   - It is **aligned outward to 16 px**, so every mip level's piece of it is whole pixels
     and derives from the window alone, and clipped to the chunk. A structure that
     straddles chunks, or the wrap seam, is a window in each chunk it reaches.
-  - Overlapping or touching windows **merge** into their bounding box.
+  - Overlapping or touching windows **merge** into their bounding box where that box
+    costs no more pixels than the two apart; otherwise both stand, and their overlap
+    bakes twice, identically (a road crossing a chunk is a chain of windows, never the
+    chunk's whole bounding box).
   - Past **40 % of the chunk**, or on **any terrain change**, the chunk re-bakes whole.
   This rests on the bake being **window-invariant**: any window bakes byte-identical to
   the same pixels of a larger bake, structures, trees, post passes and all
