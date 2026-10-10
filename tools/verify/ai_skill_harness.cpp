@@ -55,7 +55,6 @@
 #include "world/market_clearing.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/survey_system.hpp" // init_survey_states - the app runs it, this harness did not
-#include "world/tech_gate.hpp" // BL-325 S2: advance_tech_gates must run for military_base to ever unlock
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -206,7 +205,6 @@ void run_tick(world& w, const recipe_registry& reg, int tick, int* out_idled_eve
     }
     const auto flows = clear_markets(w, reg, rep);
     apply_budget(w, reg, flows, rep.workforce_contention, nullptr);
-    advance_tech_gates(w);
 }
 
 // ---------------------------------------------------------------------------

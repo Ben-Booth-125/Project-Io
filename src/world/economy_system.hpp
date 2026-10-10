@@ -893,7 +893,8 @@ recipe_switch_result try_switch_recipe(world& w, const recipe_registry& reg,
 /// Exported for the estimator; the taper and the stack decay are NOT in it.
 ///
 /// BL-479: the owning corp's earned `extraction_rate` modifiers are folded in
-/// HERE (`world::modified_scalar`), inside the single definition, so the taper
+/// HERE (`nation_scalar` on the corp's home nation since BL-1273; identity until
+/// BL-1274 wires node effects), inside the single definition, so the taper
 /// sizing and the draw cannot disagree about a modified corp's rate. `corp` is
 /// defaulted to `null_entity` = "apply no corp's modifiers" — the pre-BL-479
 /// figure, byte for byte — which is what the estimator call sites (the Build

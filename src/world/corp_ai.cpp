@@ -14,7 +14,7 @@
 #include "recipe_registry.hpp"
 #include "supply_system.hpp"   // price_convoy_leg / commit_convoy (BL-600, the shared dispatch seam)
 #include "survey_system.hpp"
-#include "tech_gate.hpp"       // recipe_unlocked (BL-588)
+#include "nation_tech.hpp"     // recipe_unlocked, nation_scalar (BL-1273; BL-588 before it)
 #include "unit_roster.hpp"
 #include "world.hpp"
 
@@ -625,9 +625,12 @@ standing_index corp_standing_index(const world& w, const recipe_registry& reg,
     // else in this function — see `standing_component`'s append-only note.
     out.component[static_cast<std::size_t>(standing_component::economic)] =
         standing_economic(w, reg, corp, cc);
-    // RESEARCH: the BL-332 accumulator. Stockpiled, market-invisible, never
-    // decaying — reached, not spent, so this is a level and not a balance.
-    out.component[static_cast<std::size_t>(standing_component::research)] = cc.science;
+    // RESEARCH: zero. The per-corp BL-332 accumulator it read retired with
+    // BL-1273 (NR-1023): the NATION holds technology, so a firm holds no
+    // research level of its own. The slot stays (append-only enum, and a
+    // corporation's research stake is RESEARCH.md's open question); it read
+    // 0.0 on every measured corp-row before the retirement too (BL-697).
+    out.component[static_cast<std::size_t>(standing_component::research)] = 0.0f;
     out.component[static_cast<std::size_t>(standing_component::military)] =
         standing_military(w, corp);
 

@@ -493,7 +493,7 @@ target_compile_features(commercial_fog_harness PRIVATE cxx_std_20)
 # The harnesses above keep their hand-tuned minimal link sets. This block then
 # (a) builds every REMAINING tools/verify/*.cpp not already declared — linking
 # the SDL/Lua/ImGui-free world superset (every src/world/*.cpp EXCEPT
-# recipe_registry.cpp, tech_tree.cpp, and world_gen_config.cpp, the TUs that pull
+# recipe_registry.cpp, works_registry.cpp and world_gen_config.cpp, the TUs that pull
 # sol2/Lua), mirroring the CI headless
 # loop in .github/workflows/build.yml so CMake and CI stay in lockstep and a new
 # harness is picked up automatically — and (b) registers ALL harnesses
@@ -503,7 +503,7 @@ target_compile_features(commercial_fog_harness PRIVATE cxx_std_20)
 enable_testing()
 
 file(GLOB IO_WORLD_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/world/*.cpp")
-list(FILTER IO_WORLD_SOURCES EXCLUDE REGEX "(recipe_registry|works_registry|tech_tree|world_gen_config)\\.cpp$")
+list(FILTER IO_WORLD_SOURCES EXCLUDE REGEX "(recipe_registry|works_registry|world_gen_config)\\.cpp$")
 
 # ---------------------------------------------------------------------------
 # The world layer, compiled ONCE (BL-287)
@@ -804,6 +804,26 @@ target_include_directories(market_census PRIVATE
 target_link_libraries(market_census PRIVATE io_world_obj lua54)
 target_compile_features(market_census PRIVATE cxx_std_20)
 target_compile_options(market_census PRIVATE ${IO_WARNING_FLAGS})
+
+# nation_tech_harness (BL-1273; sprint 52) — live-Lua for market_census's
+# reason: its R0 campaign run builds the shipped world in app order through
+# harness_params.hpp. Under ctest it runs its fixture rows only
+# (IO_TEST_ARGS_nation_tech_harness, `--seeds 0`); the 16-seed run is manual.
+add_executable(nation_tech_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/nation_tech_harness.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/works_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(nation_tech_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(nation_tech_harness PRIVATE io_world_obj lua54)
+target_compile_features(nation_tech_harness PRIVATE cxx_std_20)
+target_compile_options(nation_tech_harness PRIVATE ${IO_WARNING_FLAGS})
 
 # centre_census (BL-1130; sprint 48) — live-Lua for market_census's reason: it
 # builds the shipped world in app order (harness_params.hpp's
@@ -1201,6 +1221,7 @@ set(IO_TEST_TIMEOUT_LONG 240)
 # Per-harness ctest arguments (BL-1159): IO_TEST_ARGS_<name> is appended to the test
 # command. Unset for every harness but those named here.
 set(IO_TEST_ARGS_road_generation_harness --seeds 0,28)
+set(IO_TEST_ARGS_nation_tech_harness --seeds 0) # BL-1273: fixture rows; the 16-seed R0 run is manual
 
 # RE-TIERED AGAIN 2026-08-13. Wiring the Era -1 year-tick sim into generation
 # added ~23 s to every generated world. Harnesses that do not test the era now

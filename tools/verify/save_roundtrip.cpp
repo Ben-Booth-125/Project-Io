@@ -8,8 +8,8 @@
 //   P3  R2  A bad magic / bad version / truncated stream is REJECTED, and the
 //           destination world is left untouched.
 //   P4  R3  Derived caches are cleared on load and rebuild identically.
-//   P5  R3  corp_modifiers survives with its ORDER intact -- the case a re-fold
-//           from earned_techs would get wrong (NR-510).
+//   P5  R3  The nation tech state (BL-1273, v47) -- held set, pool, queue --
+//           survives exactly; a queue entry outside the tree is refused.
 //   P6  R4  A battle round-trips mid-fight and continues on the same RNG stream.
 //   P7  R1  Container coverage: every container the canonical world populates is
 //           non-empty on the far side, so an omitted section cannot pass vacuously.
@@ -35,12 +35,13 @@
 #include "world/history_log.hpp"
 #include "world/logistics.hpp"
 #include "world/market_clearing.hpp"   // BL-1125: market_for_tile across the round trip
-#include "world/modifier_set.hpp"
+#include "world/nation_tech.hpp"     // BL-1273: P5, the nation tech state
 #include "world/nation_budget.hpp"
 #include "world/world.hpp"
 #include "world/world_save.hpp"
 #include "harness_params.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <sstream>
@@ -721,57 +722,62 @@ int main()
     }
 
     // -----------------------------------------------------------------------
-    // P5 (R3) -- corp_modifiers keeps its ORDER, which a re-fold cannot
+    // P5 (R3) -- the nation tech state round-trips (BL-1273, format v47)
     // -----------------------------------------------------------------------
-    // The canonical world earns no modify_scalar tech, so this is built rather
-    // than found: the property under test is about ORDER, and it is only visible
-    // when a non-commuting pair is stored in a deliberate sequence.
+    // Replaces the BL-536 corp_modifiers ORDER row: corp_modifiers and the
+    // per-corp earned set retired with the four tech gates (NR-1022). Built
+    // rather than found: a freshly generated world has researched nothing.
+    // Two nations, each with a held set, a pool (the head's in-progress
+    // remainder) and a queue filled through `enqueue_node` itself; a third
+    // nation left absent must stay absent.
     {
         world m = w;
-        const entity_id corp = m.player_entity;
+        std::vector<entity_id> nids;
+        for (const auto& kv : m.nations)
+            nids.push_back(kv.first);
+        std::sort(nids.begin(), nids.end());
+        check(nids.size() >= 2, "P5 the canonical world has two nations to carry tech state");
+        if (nids.size() >= 2)
+        {
+            const entity_id a = nids[0];
+            const entity_id b = nids[1];
+            nation_tech_state& sa = m.nation_tech[a];
+            sa.held.set(static_cast<std::size_t>(io::dg::find_node("DG-PR-EX-T1")));
+            sa.held.set(static_cast<std::size_t>(io::dg::find_node("DG-PR-EX-T2")));
+            sa.pool = 137.25f;
+            enqueue_node(m, a, io::dg::find_node("DG-PR-EX-A"));
+            enqueue_node(m, b, io::dg::find_node("DG-ST-AC-C"));
+            m.nation_tech[b].pool = 1.0f / 3.0f; // non-dyadic: bits, not a rounded print
 
-        // add-then-multiply. Reversed, the same two modifiers give a different
-        // answer, which is exactly why the stored order is state and not a cache.
-        m.corp_modifiers[corp] = {
-            scalar_modifier{ modifier_subject::extraction_rate, modifier_op::add, 2.0f },
-            scalar_modifier{ modifier_subject::extraction_rate, modifier_op::multiply, 3.0f },
-        };
-        // A second corp holding the reverse order, so the check cannot pass by
-        // accident on a symmetric fold.
-        entity_id other = null_entity;
-        for (const auto& kv : m.corporations)
-            if (kv.first != corp)
-            {
-                other = kv.first;
-                break;
-            }
-        if (other != null_entity)
-            m.corp_modifiers[other] = {
-                scalar_modifier{ modifier_subject::extraction_rate, modifier_op::multiply, 3.0f },
-                scalar_modifier{ modifier_subject::extraction_rate, modifier_op::add, 2.0f },
-            };
+            world back;
+            const bool ok = from_bytes(to_bytes(m), back);
+            check(ok, "P5 a world carrying nation tech state round-trips");
+            bool same = ok && back.nation_tech.size() == m.nation_tech.size();
+            if (same)
+                for (const auto& [nid, st] : m.nation_tech)
+                {
+                    const auto it = back.nation_tech.find(nid);
+                    same = same && it != back.nation_tech.end() && it->second.held == st.held
+                        && it->second.pool == st.pool && it->second.queue == st.queue;
+                }
+            check(same, "P5 held set, pool and queue survive the load exactly, per nation");
+            check(ok && !back.nation_tech.at(b).queue.empty()
+                      && back.nation_tech.at(a).queue.size() == 3,
+                  "P5 the queues are not vacuous (A1, A2, then the major; B's path)");
+            std::printf("     nation %u: held %zu, pool %.2f, queue %zu | nation %u: queue %zu\n",
+                        (unsigned)a, m.nation_tech.at(a).held.count(), m.nation_tech.at(a).pool,
+                        m.nation_tech.at(a).queue.size(), (unsigned)b,
+                        m.nation_tech.at(b).queue.size());
 
-        const float base   = 10.0f;
-        const float want_a = m.modified_scalar(corp, modifier_subject::extraction_rate, base);
-        const float want_b = (other == null_entity)
-                                 ? 0.0f
-                                 : m.modified_scalar(other, modifier_subject::extraction_rate, base);
-
-        check(other == null_entity || want_a != want_b,
-              "P5 the two orders really do give different answers (the test is not vacuous)");
-
-        world back;
-        const bool ok = from_bytes(to_bytes(m), back);
-        check(ok, "P5 a world carrying scalar modifiers round-trips");
-
-        const float got_a = ok ? back.modified_scalar(corp, modifier_subject::extraction_rate, base)
-                               : -1.0f;
-        const float got_b = (ok && other != null_entity)
-                                ? back.modified_scalar(other, modifier_subject::extraction_rate, base)
-                                : 0.0f;
-        check(ok && got_a == want_a && got_b == want_b,
-              "P5 modified_scalar returns the same value after a load, order intact");
-        std::printf("     add-then-multiply=%.1f  multiply-then-add=%.1f\n", got_a, got_b);
+            // A corrupt queue entry (an index past the tree) refuses the stream
+            // whole and leaves the destination untouched.
+            world bad = m;
+            bad.nation_tech[a].queue.push_back(static_cast<uint16_t>(io::dg::node_count));
+            world dest = w;
+            const uint64_t before = dest.state_hash(0);
+            check(!from_bytes(to_bytes(bad), dest) && dest.state_hash(0) == before,
+                  "P5 a queue entry outside the tree refuses the stream, destination untouched");
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -897,9 +903,8 @@ int main()
             { "corp_hostile_pairs", w.corp_hostile_pairs.size(), loaded.corp_hostile_pairs.size() },
             { "corp_friend_pairs", w.corp_friend_pairs.size(), loaded.corp_friend_pairs.size() },
             { "corp_friend_offers", w.corp_friend_offers.size(), loaded.corp_friend_offers.size() },
-            { "earned_techs", w.earned_techs.size(), loaded.earned_techs.size() },
+            { "nation_tech", w.nation_tech.size(), loaded.nation_tech.size() }, // BL-1273
             { "laws", w.laws.size(), loaded.laws.size() },
-            { "corp_modifiers", w.corp_modifiers.size(), loaded.corp_modifiers.size() },
             { "battles", w.battles.size(), loaded.battles.size() },
             { "history_log", w.history_log.size(), loaded.history_log.size() },
             { "provinces", w.provinces.provinces.size(), loaded.provinces.provinces.size() },
@@ -1111,7 +1116,7 @@ int main()
                                             20.0f, 7.5f, 8, 3, 25.0f, 6.25f });
 
         condition_set embargo;
-        embargo.all.push_back({ condition_subject::science, condition_comparator::greater_than,
+        embargo.all.push_back({ condition_subject::military_strength, condition_comparator::greater_than,
                                 42.5f, resource_type::coffee, building_type::launchpad,
                                 "embargo-key" }); // province defaults to no_province — untouched
         // BL-570: the 7th positional field (province) round-trips too — a
@@ -1126,14 +1131,6 @@ int main()
         f.corp_hostile_pairs.insert({ c3, c1 });
         f.corp_friend_pairs.insert({ c1, c3 });
         f.corp_friend_offers.insert({ c2, c3 });
-
-        f.earned_techs[c1] = { "rocketry", "metallurgy" };
-        f.earned_techs[c2] = { "optics" };
-
-        f.corp_modifiers[c1] = {
-            { modifier_subject::logistics_cost, modifier_op::subtract, 0.125f },
-            { modifier_subject::wage_floor, modifier_op::multiply, 1.75f },
-        };
 
         law l;
         l.id = "levy-test"; l.name = "Test Levy"; l.conditions = embargo;
@@ -1175,14 +1172,11 @@ int main()
                   "P8 a procurement contract keeps delivery body and elapsed ticks");
             const auto& e = back.corp_embargo_conditions.at(c3);
             check(e.all.size() == 2 && e.all[0].key == "embargo-key"
-                      && e.all[0].subject == condition_subject::science
+                      && e.all[0].subject == condition_subject::military_strength
                       && e.all[1].structure == building_type::military_base,
                   "P8 a condition_set nested in a map survives, strings included");
             check(e.all[0].province == no_province && e.all[1].province == 4242u,
                   "P8 BL-570: condition::province round-trips (default AND a real id)");
-            check(back.earned_techs.at(c1) == std::set<std::string>{ "metallurgy", "rocketry" }
-                      && back.earned_techs.at(c2).count("optics") == 1,
-                  "P8 the per-corp earned-tech string sets survive");
             check(back.corp_hostile_pairs.size() == 2 && back.corp_friend_pairs.size() == 1
                       && back.corp_friend_offers.count({ c2, c3 }) == 1
                       && back.corp_hostile_pairs.count({ c1, c2 }) == 1,

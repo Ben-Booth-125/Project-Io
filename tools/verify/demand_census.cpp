@@ -128,7 +128,6 @@
 #include "world/space_programme.hpp" // BL-644: the State channel's derivation, re-run for the census
 #include "world/supply_system.hpp"
 #include "world/survey_system.hpp" // init_survey_states - the app runs it, this census did not
-#include "world/tech_gate.hpp"
 #include "world/unit_roster.hpp"
 #include "world/world.hpp"
 #include "world/world_gen_config.hpp"
@@ -438,7 +437,6 @@ void finish_tick(world& w, const recipe_registry& reg, int t, economy_report& re
     apply_budget(w, reg, flows, rep.workforce_contention, &rep.budgets, &rep.buildings,
                  &rep.building_labour);
     run_nation_step(w, reg, rep, t);
-    advance_tech_gates(w);
 }
 
 // ---------------------------------------------------------------------------

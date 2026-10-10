@@ -361,6 +361,32 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_f32(h, nb.reserve_fraction);
             }
         }
+        // BL-1273: each nation's tech state — held set, pool (the head's
+        // progress) and queue. Live state the quarterly research pass writes.
+        // Folded only when the map is non-empty, on the budgets' precedent, so a
+        // world in which no nation has researched hashes as before. A std::map:
+        // ascending with no sort; the held set folds as 32-bit words.
+        if (!nation_tech.empty())
+        {
+            fnv1a_u32(h, 0x7EC4u); // tag: cannot alias the budget run above
+            fnv1a_u32(h, static_cast<uint32_t>(nation_tech.size()));
+            for (const auto& [nid, st] : nation_tech)
+            {
+                fnv1a_u32(h, nid);
+                fnv1a_f32(h, st.pool);
+                for (int i = 0; i < io::dg::node_count; i += 32)
+                {
+                    uint32_t word = 0;
+                    for (int b = 0; b < 32 && i + b < io::dg::node_count; ++b)
+                        if (st.held.test(static_cast<std::size_t>(i + b)))
+                            word |= (1u << b);
+                    fnv1a_u32(h, word);
+                }
+                fnv1a_u32(h, static_cast<uint32_t>(st.queue.size()));
+                for (const uint16_t n : st.queue)
+                    fnv1a_u32(h, n);
+            }
+        }
     }
 
     // Province holder (BL-569). UNLIKE `provinces` itself (generation output,

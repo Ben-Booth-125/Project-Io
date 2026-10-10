@@ -83,10 +83,9 @@ the tile assembly block in `tile_generation.cpp`.
 
 Use that route for anything linking the world superset — `world_audit`, `ai_skill_harness`,
 `history_ladder_harness`, **`settlement_harness`**, `data_creep_harness`, `corp_terrain_matrix`,
-`trade_routes_harness`, `tech_effect_union_harness` (BL-479: the tech effect union — a fixture
-modify_scalar tech moves the named scalar for the earning corp only, the stack-taper pre-pass
-prices the modified rate, and the no-effect real world's `state_hash` marks stay bit-identical
-to the pre-change build), `trade_routes_harness`, **`province_partition_harness`** (BL-466 — the
+`trade_routes_harness`, **`nation_tech_harness`** (BL-1273: every nation's Digitisation tree
+state — accrual, the queue, the save seam, a 16-seed campaign run; it replaced
+`tech_gate_harness`, `tech_effect_union_harness` and `military_capability_harness`), **`province_partition_harness`** (BL-466 — the
 province partition's invariants plus the three serialisation-seam properties over the HISTORY-LOG
 stream: the pre-BL-466 stream is a byte-exact prefix, an older stream still loads, and the round
 trip is bit-identical) — and for `font_glyph_harness`, which links ImGui and is hand-declared in
@@ -146,15 +145,9 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\resource_chain_harness.cpp ^
    /Fo:build_gen\verify\resource_chain_harness\ /Fe:build_gen\verify\resource_chain_harness.exe
 .\build_gen\verify\resource_chain_harness.exe
 
-:: Military capability points (BL-332) — a completed military_base credits its
-:: owning corp's military_points and a completed research_institute credits
-:: science, symmetric across player and non-player corps; neither accumulates
-:: while under construction or decommissioned.
-cl /nologo /std:c++20 /EHsc /I src tools\verify\military_capability_harness.cpp ^
-   src\world\world.cpp src\world\economy_system.cpp ^
-   src\world\market_clearing.cpp src\world\budget_system.cpp ^
-   /Fo:build_gen\verify\military_capability_harness\ /Fe:build_gen\verify\military_capability_harness.exe
-.\build_gen\verify\military_capability_harness.exe
+:: (military_capability_harness retired with BL-1273: the per-corp `science`
+:: accumulator it tested is gone; research institutes feed the nation's pool,
+:: covered by nation_tech_harness — `node tools/verify/build_harness.js nation_tech_harness`.)
 
 :: Laws MVP (BL-343, reshaped by BL-480) — the law record, per-tick resolution
 :: (evaluate_laws) and the enforcement seam in apply_budget: a repealed law is

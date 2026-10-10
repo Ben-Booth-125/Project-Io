@@ -140,7 +140,7 @@ inline bool recipe_runs_on_body(const recipe& rc, const body_component& b)
 /// body (no air to read, nothing to refuse on — the callers' own existence
 /// checks refuse those).
 struct world;
-bool recipe_runs_at_tile(const world& w, const recipe& rc, entity_id tile); // defined in tech_gate.cpp (a Lua-free TU)
+bool recipe_runs_at_tile(const world& w, const recipe& rc, entity_id tile); // defined in construction.cpp (a Lua-free TU)
 
 /// The primary output resource of a recipe — the argmax of its outputs. Used
 /// to key a processing method's resource pip (construction_panel.cpp) and,
@@ -778,17 +778,14 @@ struct logistics_node_params
     float discount_cap            = 0.50f; ///< ceiling on the summed node discount (fraction of the haul cost).
 };
 
-/// BL-332 research accumulation rate, authored in scripts/economy.lua under the
-/// top-level `military` table. A flat per-tick credit to the owning corp's
-/// corporation_component.science for every COMPLETED research_institute it owns —
-/// see economy_system.cpp's research-points pass.
-///
-/// `military_points_per_base_tick` was removed 2026-08-17 (BL-455) with the field
-/// it fed. The struct keeps its name because BL-394's hire costs live in it too.
+/// The `military` table of scripts/economy.lua. Its two research-flavoured rates
+/// are gone: `military_points_per_base_tick` with its field (BL-455, 2026-08-17)
+/// and `science_per_research_institute_tick` with `corporation_component::science`
+/// (BL-1273, NR-1023 — institutes feed the nation's research pool now, at
+/// `research_params::rp_per_institute`). The struct keeps its name because
+/// BL-394's hire costs live in it.
 struct military_capability_params
 {
-    float science_per_research_institute_tick = 1.0f;
-
     /// BL-394: hire_unit's credit cost, debited from the corp's balance at
     /// apply time — cost = hire_base_cost + hire_cost_per_power × the roster
     /// row's power_mod. The base is a FLOOR: row 0's gate is all-zero, so the

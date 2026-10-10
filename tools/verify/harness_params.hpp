@@ -368,7 +368,6 @@ inline void print_shipped_landscape(const shipped_landscape& s)
 #include "world/standing.hpp"          // compute_corp_standings (phase 5, as app.cpp:1308)
 #include "world/supply_system.hpp"     // dispatch/advance/credit convoys
 #include "world/survey_system.hpp"     // init_survey_states
-#include "world/tech_gate.hpp"         // advance_tech_gates
 #include "world/works_roster.hpp"      // works_registry
 
 #include <chrono>                      // app_tick_timing (diagnostic wall time only)

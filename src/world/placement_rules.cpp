@@ -3,7 +3,7 @@
 #include "world/hex_neighbors.hpp"
 #include "world/logistics.hpp"
 #include "world/province.hpp"  // BL-513: the province building ceiling
-#include "world/tech_gate.hpp" // BL-344: structure_unlocked
+#include "world/nation_tech.hpp" // structure_unlocked (BL-1273; BL-344 before it)
 #include "world/world.hpp"
 
 #include <algorithm>

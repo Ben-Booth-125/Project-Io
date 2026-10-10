@@ -57,7 +57,6 @@
 #include "harness_params.hpp"
 #include "world/market_clearing.hpp"
 #include "world/recipe_registry.hpp"
-#include "world/tech_gate.hpp"
 #include "world/world.hpp"
 
 #include <cstdio>
@@ -213,7 +212,6 @@ void run_tick(world& w, const recipe_registry& reg, int tick)
     const economy_report rep = run_economy_step(w, reg, /*spectating=*/false);
     const auto flows = clear_markets(w, reg, rep);
     apply_budget(w, reg, flows, rep.workforce_contention, nullptr);
-    advance_tech_gates(w);
 }
 
 struct rollout

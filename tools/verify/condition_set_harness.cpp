@@ -170,13 +170,20 @@ int main()
                             w, f.corp) == 0.0f,
           "C2h era reads 0 with no launchpad");
     {
+        // BL-1273: research reads the subject corp's HOME NATION's held set.
         condition c = make(condition_subject::research, condition_comparator::at_least, 1.0f);
-        c.key = "E1-PL-09";
-        check(measure_condition(c, w, f.corp) == 0.0f, "C2i research reads 0 for an unearned tech");
+        c.key = "DG-PR-EX-T1";
+        check(measure_condition(c, w, f.corp) == 0.0f, "C2i research reads 0 for an unheld node");
         fixture g = make_fixture();
-        g.w.earned_techs[g.corp].insert("E1-PL-09");
-        check(measure_condition(c, g.w, g.corp) == 1.0f, "C2j research reads 1 once earned");
-        check(measure_condition(c, g.w, 99999) == 0.0f, "C2k research is PER-CORP, not global");
+        const entity_id nation = g.w.create_entity();
+        g.w.nations[nation] = nation_component{};
+        g.w.corporations.at(g.corp).home_nation = nation;
+        g.w.nation_tech[nation].held.set(static_cast<std::size_t>(io::dg::find_node("DG-PR-EX-T1")));
+        check(measure_condition(c, g.w, g.corp) == 1.0f, "C2j research reads 1 once the corp's nation holds it");
+        check(measure_condition(c, g.w, 99999) == 0.0f, "C2k research reads 0 for a corp with no such nation");
+        condition bad = c;
+        bad.key = "E1-PL-09"; // a retired Lua-tree id: not a Digitisation node
+        check(measure_condition(bad, g.w, g.corp) == 0.0f, "C2l an unknown node key reads 0");
     }
     {
         // Era rises when the corp owns a launchpad — the honest measure, matching

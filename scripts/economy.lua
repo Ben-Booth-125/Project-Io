@@ -639,12 +639,11 @@ economy = {
 
     -- BL-455 (2026-08-17) removed `military_points_per_base_tick` from here with
     -- the field it fed: it credited an accumulator that nothing in src/ ever
-    -- read. `science` kept its rate because it now HAS a reader —
-    -- condition_subject::science, so a tech gate or a law can require a research
-    -- level (reached, not spent; see condition_set.hpp).
+    -- read. `science_per_research_institute_tick` followed it with BL-1273
+    -- (NR-1023, 2026-10-10): a research institute now adds research points to
+    -- its owner's nation's pool (nation_tech.hpp, research_params), not to a
+    -- per-corp accumulator.
     military = {
-        science_per_research_institute_tick = 1.0,
-
         -- BL-394: hire_unit's credit cost, debited from the corp's balance by
         -- apply_corp_command: cost = hire_base_cost + hire_cost_per_power *
         -- the roster row's power_mod. The base is a FLOOR — the cheapest

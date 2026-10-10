@@ -4,7 +4,9 @@
 
 #include "market_clearing.hpp" // market_for_tile
 #include "placement_rules.hpp"
-#include "tech_gate.hpp"       // BL-588: recipe_unlocked
+#include "nation_tech.hpp"     // recipe_unlocked (BL-1273: the nation's tree; BL-588 before it)
+#include "recipe_registry.hpp" // recipe_runs_at_tile (defined at the foot of this file)
+#include "world.hpp"
 
 #include <algorithm> // std::find (asset-list removal in demolish_building), std::max, std::clamp
 #include <cmath>     // std::lround (BL-323 S3 site-time multiplier)
@@ -342,4 +344,16 @@ construction_result place_road(world& w, const recipe_registry& reg,
     invalidate_logistics_caches(w);
 
     return construction_result::placed;
+}
+
+// Declared beside `recipe_runs_on_body` in recipe_registry.hpp; defined here, in
+// a Lua-free TU, so the light (SDL/Lua-free) harness build links it. (It lived in
+// tech_gate.cpp until BL-1273 retired that file.)
+bool recipe_runs_at_tile(const world& w, const recipe& rc, entity_id tile)
+{
+    const auto tit = w.tiles.find(tile);
+    if (tit == w.tiles.end())
+        return true;
+    const auto bit = w.bodies.find(tit->second.body);
+    return bit == w.bodies.end() || recipe_runs_on_body(rc, bit->second);
 }

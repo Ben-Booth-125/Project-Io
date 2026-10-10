@@ -174,12 +174,18 @@ in `tools/verify/README.md`.
   ree_alloy, machinery, alloys, electronics, spacecraft_components) is produced
   at least once and never sits pegged at the `[0.25×, 4×]` band ceiling for the
   whole run. Links the same TUs as `econ_harness`.
-- **`military_capability_harness`** — capability points (BL-332): a completed
-  `military_base` credits its owning corp's `military_points` and a completed
-  `research_institute` credits `science`, at the authored per-tick rate,
-  symmetric across player and non-player corps; a building still under
-  construction (`ticks_remaining > 0`) or decommissioned accumulates nothing.
-  Links the same TUs as `econ_harness`.
+- **`nation_tech_harness`** — the nation's tech state (BL-1273, RESEARCH.md):
+  R1 accrual (the academic-research line's share, staffed Universities and
+  research institutes into the nation's pool, deterministically; under
+  construction or decommissioned counts nothing), R2 the queue (requirements
+  queued ahead, cheapest member of a choice, AND groups, pair refusal mutating
+  nothing, overflow, a deed-unmet quest passed over), R3 the save seam, and R0
+  a campaign run over the curated seeds (`--seeds N`, default 16; every nation
+  opens holding nothing on the industrial band, accrues, completes nodes, run
+  twice identical) with the pacing measurement. Build:
+  `node tools/verify/build_harness.js nation_tech_harness`. It replaced
+  `tech_gate_harness`, `tech_effect_union_harness` and
+  `military_capability_harness`, whose per-corp gates and `science` retired.
 - **`procurement_harness`** — the procurement/contract seam (BL-350): one contract
   quoted, accepted, paced and delivered end to end with the treasury debited in
   the split shape (a deposit at `accept_quote`, the remainder paced across

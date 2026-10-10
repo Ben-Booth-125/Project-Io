@@ -141,7 +141,9 @@ building ceiling (`../generation/PROVINCES.md` § The building ceiling).
 - **Anything may be queued**, however far out. Queuing a node queues its unheld requirements ahead
   of it — every group, the cheapest member where a group offers a choice.
 - **RP flow to the head of the queue**; a node completes when its cost is met, and the remainder
-  flows on to the next entry. With nothing queued the pool accrues and waits.
+  flows on to the next entry. With nothing queued the pool accrues and waits. The pool *is* the
+  head's progress — RP the head has not consumed stay in the pool — so reordering the queue never
+  strands research.
 - **A quest whose deed is unmet is passed over, not blocking**: RP flow past it to the next entry,
   and it completes when its deed is met and its cost is paid.
 - **Pick-one pairs are guarded**: a queue holding one side refuses the other.

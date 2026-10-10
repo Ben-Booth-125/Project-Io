@@ -563,7 +563,6 @@ void run_seed(lua_state& lua, const options& o, std::uint32_t seed)
         lap[4] = ms(t0, t1);
 
         t0 = clk::now();
-        advance_tech_gates(w);
         t1 = clk::now();
         lap[5] = ms(t0, t1);
 

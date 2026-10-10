@@ -31,7 +31,7 @@
 #include "world/settlement.hpp"      // BL-785: region_domain_of - the three-domain word for a water tile
 #include "world/recipe_registry.hpp" // recipe/economics lookups for the building element
 #include "world/survey_system.hpp"
-#include "world/tech_gate.hpp"       // BL-593: recipe_unlocked — the door filters what the gate would refuse
+#include "world/nation_tech.hpp"     // BL-593: recipe_unlocked — the door filters what the gate would refuse
 #include "world/unit_roster.hpp" // campaign hire gate + roster table (BL-324); also the Soldier card's Roster page name lookup
 
 #include <map> // BL-434: group -> representative-candidate lookup in draw_construction_ledger_body
