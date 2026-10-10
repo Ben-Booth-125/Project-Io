@@ -126,14 +126,18 @@ extern bool g_road_probe_fresh_floods;
 /// code. THE SNAP (road_generation.cpp § road_snapper; LOGISTICS.md § 4): the floods stay
 /// reused, and before a route is stamped every stretch that would lay two or more
 /// consecutive NEW land tiles beside a road already on the field (Chebyshev 1, columns
-/// wrapping) is re-walked over that road, kept only when it lays fewer new tiles. When
+/// wrapping) is re-walked over that road, kept only when it lays fewer new tiles, does
+/// not fold the route, and costs no more than kSnapCostBound x the stretch it replaces. When
 /// this is true the snap is off and every route is laid as priced, exactly as the passes
 /// did before it (road_stale_flood_probe --compare unsnapped reads its effect in one run,
 /// on one machine). The BL-1119 fresh-flood probe also runs without the snap, so its
 /// reading stays the reference it was measured as.
 extern bool g_road_probe_no_snap;
-/// BL-1252 measurement knob -- verify-only: the snap's run (kSnapRun, 2, in shipped code).
-extern int  g_road_probe_snap_run;
+/// BL-1252 measurement overrides -- verify-only, never set by shipped code. Unset (0)
+/// the snap reads its own constants, kSnapRun and kSnapCostBound (road_generation.cpp);
+/// a harness sets them to measure a ladder without a recompile.
+extern int   g_road_probe_snap_run;
+extern float g_road_probe_snap_bound;
 
 /// The longest contiguous run of WATER tiles (any kind) along @p path, in tiles.
 /// The one measure the cap is read against; exposed so a harness asks it of every
@@ -205,6 +209,7 @@ struct road_generation_stats
     /// BL-1252 (no parallel roads): route stretches the snap re-walked onto the road
     /// they ran beside.
     long long snaps               = 0;
+    long long snaps_refused_cost  = 0; ///< re-walks the snap's cost bound refused
 };
 
 /// What one `stamp_history_roads` call did (BL-1119 round 4). WRITE-ONLY.
@@ -220,6 +225,7 @@ struct history_road_stats
     int       refused_long_crossing = 0;
     /// BL-1252: corridor stretches the snap re-walked onto the road they ran beside.
     long long snaps                 = 0;
+    long long snaps_refused_cost    = 0; ///< re-walks the snap's cost bound refused
 };
 
 /// Every corridor one `stamp_history_roads` call LAID, whole (the bridge-cap row reads

@@ -179,7 +179,7 @@
 #include "world/market_clearing.hpp"
 #include "world/resource_names.hpp"
 #include "world/recipe_registry.hpp"
-#include "world/road_generation.hpp" // BL-1252: --no-snap / --snap-run (measurement)
+#include "world/road_generation.hpp" // BL-1252: --no-snap / --snap-run / --snap-bound (measurement)
 #include "world/spawn_seat.hpp"
 #include "world/world.hpp"
 
@@ -1294,7 +1294,8 @@ int main(int argc, char** argv)
         else if (!std::strcmp(argv[i], "--no-logistics")) g_logistics = false;
         else if (!std::strcmp(argv[i], "--no-snap")) g_road_probe_no_snap = true; // BL-1252 measurement
         else if (!std::strcmp(argv[i], "--snap-run") && i + 1 < argc) g_road_probe_snap_run = std::atoi(argv[++i]); // BL-1252
-        else { std::fprintf(stderr, "usage: market_viability [--seeds a,b] [--ticks N] [--k X] [--no-spoil] [--no-logistics]\n"); return 2; }
+        else if (!std::strcmp(argv[i], "--snap-bound") && i + 1 < argc) g_road_probe_snap_bound = static_cast<float>(std::atof(argv[++i])); // BL-1252
+        else { std::fprintf(stderr, "usage: market_viability [--seeds a,b] [--ticks N] [--k X] [--no-spoil] [--no-logistics] [--no-snap] [--snap-run N] [--snap-bound X]\n"); return 2; }
     }
     // L (BL-1223): several play ticks, never one -- 10, 25, 50 and the last.
     for (const int t : {10, 25, k_g1_g2_play_tick, ticks})

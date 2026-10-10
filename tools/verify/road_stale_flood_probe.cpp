@@ -42,7 +42,7 @@
 // must reproduce the built world's road field tile for tile, or the replay is not
 // the pass the build ran.
 //
-// Usage:  road_stale_flood_probe.exe [--examples DIR] [--compare fresh|unsnapped] [seed ...]
+// Usage:  road_stale_flood_probe.exe [--examples DIR] [--compare fresh|unsnapped] [--snap-run N] [--snap-bound X] [seed ...]
 //         (default: the 16 curated seeds; run from the repo root). DIR receives one
 //         tile list per variant: the longest d=1 parallel run found (each tile tagged
 //         with the laid routes holding it, by lay order).
@@ -399,6 +399,7 @@ struct pooled
     double gen_s = 0, hist_s = 0;
     long long floods_gen = 0, floods_hist = 0;
     long long snaps_gen = 0, snaps_hist = 0; // BL-1252: stretches the snap re-walked
+    long long refused_gen = 0, refused_hist = 0; // ... and re-walks its cost bound refused
 };
 
 } // namespace
@@ -412,6 +413,7 @@ int main(int argc, char** argv)
         const std::string a = argv[i];
         if (a == "--examples" && i + 1 < argc) { ex_dir = argv[++i]; continue; }
         if (a == "--snap-run" && i + 1 < argc) { g_road_probe_snap_run = std::atoi(argv[++i]); continue; }
+        if (a == "--snap-bound" && i + 1 < argc) { g_road_probe_snap_bound = static_cast<float>(std::atof(argv[++i])); continue; }
         if (a == "--compare" && i + 1 < argc)
         {
             const std::string m = argv[++i];
@@ -536,9 +538,12 @@ int main(int argc, char** argv)
                 p.par[pi].pairs_nh += pr.by[pi].pairs_nh;
                 p.par[pi].pairs_hh += pr.by[pi].pairs_hh;
             }
-            std::printf("seed %u %s SNAPS gen %lld history %lld\n", seed, vname(v), X.st.snaps, X.hs.snaps);
+            std::printf("seed %u %s SNAPS gen %lld history %lld | refused by the cost bound gen %lld history %lld\n", seed, vname(v),
+                        X.st.snaps, X.hs.snaps, X.st.snaps_refused_cost, X.hs.snaps_refused_cost);
             p.snaps_gen  += X.st.snaps;
             p.snaps_hist += X.hs.snaps;
+            p.refused_gen  += X.st.snaps_refused_cost;
+            p.refused_hist += X.hs.snaps_refused_cost;
             std::printf("seed %u %s GAP (laid on final field - cheapest on it): backbone %.1f spur %.1f"
                         " border %.1f history %.1f\n",
                         seed, vname(v), gap[0], gap[1], gap[2], gap[3]);
@@ -654,7 +659,8 @@ int main(int argc, char** argv)
                     "(%lld floods) history %.1f s (%lld floods)\n",
                     vname(v), p.tiles[0], p.tiles[1], p.tiles[2], p.tiles[3], p.field,
                     p.gen_s, p.floods_gen, p.hist_s, p.floods_hist);
-        std::printf("%s SNAPS gen %lld history %lld\n", vname(v), p.snaps_gen, p.snaps_hist);
+        std::printf("%s SNAPS gen %lld history %lld | refused by the cost bound gen %lld history %lld\n", vname(v),
+                    p.snaps_gen, p.snaps_hist, p.refused_gen, p.refused_hist);
         for (int pi = 0; pi < kParN; ++pi)
             std::printf("%s PARALLEL d%d K%d runs/tiles: backbone %lld/%lld spur %lld/%lld border %lld/%lld"
                         " history %lld/%lld | pairs nat-nat %lld nat-hist %lld hist-hist %lld\n",

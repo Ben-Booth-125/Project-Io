@@ -5,6 +5,7 @@
 #include "logistics.hpp"
 #include "market_clearing.hpp" // BL-1138: market_for_tile, a town's market
 #include "ocean_currents.hpp" // BL-1098: the current field a lane's walk is priced with
+#include "river_generation.hpp" // BL-1252: the snap prices its re-walk as the flood does
 
 #include <algorithm>
 #include <array>
@@ -21,13 +22,14 @@
 
 bool g_road_probe_fresh_floods = false; // BL-1119 measurement probe (road_generation.hpp)
 bool g_road_probe_no_snap     = false; // BL-1252 measurement switch (road_generation.hpp)
-int  g_road_probe_snap_run     = 2;     // BL-1252 measurement knob: the snap's run (road_generation.hpp)
+int   g_road_probe_snap_run   = 0;     // BL-1252 measurement override: the snap's run (0: unset, kSnapRun)
+float g_road_probe_snap_bound = 0.0f;  // BL-1252 measurement override: the cost bound (0: unset, kSnapCostBound)
 
 namespace {
 
 /// The route stamp_edge last laid -- after the BL-1252 snap, and copied before the BL-1119
 /// probe clears the caches -- so the write-only traces record the route actually laid.
-std::vector<entity_id> g_last_laid;
+thread_local std::vector<entity_id> g_last_laid;
 
 // Road tiers (BL-172 three-tier ladder; BL-146 shipped local/trunk). road_traversal_multiplier
 // = 1/(1+0.5*tier): Track(1) x0.67, Road(2) x0.50, Highway(3) x0.40. Generation assigns a tier
@@ -172,40 +174,54 @@ bool crossings_are_straits(const world& w, const logistics_path& p)
 // and the floods are reused for speed. A road laid after that flood was built is
 // invisible to the route, so the route can run beside it rather than ride it. And a
 // route priced on a current flood can still pick a line one cell off a road when the two
-// nearly tie. Either way the map gains a second road beside a serviceable one, which
-// § 4 forbids.
+// nearly tie. Either way the map gains a second road beside a serviceable one.
 //
-// The snap leaves the pricing alone and corrects what is LAID. Before a route is
+// The snap leaves the pricing alone and reshapes what is LAID. Before a route is
 // stamped, every stretch of it that would lay at least kSnapRun consecutive NEW land
-// tiles beside a road already on the field is re-walked: a local search from the route
-// tile before the stretch to the one after it, over the stretch's own tiles and the road
-// cells beside them (Chebyshev kSnapDist, columns wrapping, never a cell the route
-// already holds elsewhere). A road cell costs 1 to enter and a new tile kSnapNewCost. The
-// stretch is replaced only when the re-walk lays FEWER new tiles. The re-walk is
-// 4-connected, like every route, so connectivity holds. The route then rides the road it
-// ran beside and lays new ground only to reach it. No flood is built and no cache is
-// touched, so the pass keeps its time.
+// tiles each within one cell (Chebyshev kSnapDist, columns wrapping) of a road the route
+// does not hold is re-walked: a local search from the route tile before the stretch to
+// the one after it, over the stretch's own tiles and the road cells beside them. The
+// search minimises new ground: a road cell costs 1 to enter, a new tile kSnapNewCost.
+// The re-walk replaces the stretch only when
+//   - it lays FEWER new tiles,
+//   - it does not fold the route back onto a cell the route (as rebuilt so far) holds
+//     outside the stretch, so the laid path stays simple, and
+//   - it costs no more than kSnapCostBound x the stretch it replaces, both priced on the
+//     ONE cost model (`tile_traversal_cost` per hop, the flood's own edge: mean of the two
+//     cells x the river discount of the side left) on the field as the stamp leaves it,
+//     each tile at max(its road, the link's tier). This bound keeps the snap from
+//     snaking a route through street cells at several times its priced cost.
+// The re-walk is 4-connected, like every route, so connectivity holds. No flood is built
+// and no cache is touched, so the pass keeps its time.
 //
-// The measure is road_stale_flood_probe's d/K parallel run (LOGISTICS.md § 4). kSnapRun is
-// 2, not the probe's K: a parallel is often laid piecewise, in short stretches by
-// several routes into one hub, each too short to read as a run on its own. Measured on
-// the sixteen curated seeds (BL-1252): d1 K8 pairs 235 unsnapped, 47 at run 2, 17 at run
-// 1; the history routes' cost gap is 1.87% unsnapped, 2.27% at run 2 and 3.17% at run 1.
-// Run 2 keeps the gap closer to the cheapest route.
+// WHAT IT LEAVES. The snap reads the adjacent-run measure (road_stale_flood_probe's d1):
+// it does not touch a parallel two cells off, a run of one new tile, a stretch whose
+// re-walk would fold or cost past the bound, contact by diagonal only, or the market
+// roads (`lay_market_roads`, its own walk on the field as it stands).
+//
+// THE NUMBERS, measured on the sixteen curated seeds (BL-1252; d1 K8 pairs against
+// FRESH's 103): 235 unsnapped; unbounded at run 2 47, at run 1 17, at run 3 153.
+// kSnapRun is 2, not the probe's K, because a parallel is often laid piecewise, in short
+// stretches by several routes into one hub, each too short to read as a run alone.
+// The bound at run 2: 1.0 -> 203, 1.25 -> 190, 1.5 -> 120, 1.6 -> 108, 1.75 -> 59,
+// 2.0 -> 56, 3.0 -> 47 (no re-walk costs 3x its stretch). A stretch is short, so stepping
+// across to the road beside it is a large share of its cost; 1.75 is the tightest factor
+// measured that holds the pairs under 103 with margin.
 //
 // Deterministic: a pure function of the path and the road field. The search orders its
 // frontier on (cost, raster index), and stretches are walked in path order.
-constexpr int kSnapDist    = 1;
-constexpr int kSnapRun     = 2;
-static_assert(kSnapRun == 2, "g_road_probe_snap_run defaults to kSnapRun");
-constexpr int kSnapNewCost = 4;
+constexpr int   kSnapDist      = 1;
+constexpr int   kSnapRun       = 2;
+constexpr int   kSnapNewCost   = 4;
+constexpr float kSnapCostBound = 1.75f;
 
 struct road_snapper
 {
     world&    w;
     int       gw = 0, gh = 0;
     const std::vector<entity_id>* grid = nullptr;
-    long long snaps = 0; ///< stretches re-walked onto a road (write-only stats)
+    long long snaps = 0;        ///< stretches re-walked onto a road (write-only stats)
+    long long refused_cost = 0; ///< re-walks refused by kSnapCostBound (write-only stats)
 
     road_snapper(world& w_, entity_id body) : w(w_)
     {
@@ -219,13 +235,19 @@ struct road_snapper
     }
     bool usable() const { return grid != nullptr; }
 
+    const tile_component* tile_at(int r) const
+    {
+        const entity_id t = (*grid)[static_cast<std::size_t>(r)];
+        if (t == null_entity) return nullptr;
+        const auto it = w.tiles.find(t);
+        return it != w.tiles.end() ? &it->second : nullptr;
+    }
+
     /// A land cell carrying a road.
     bool road_cell(int r) const
     {
-        const entity_id t = (*grid)[static_cast<std::size_t>(r)];
-        if (t == null_entity) return false;
-        const auto it = w.tiles.find(t);
-        return it != w.tiles.end() && !is_water(it->second.substrate) && it->second.road_level > 0;
+        const tile_component* tc = tile_at(r);
+        return tc != nullptr && !is_water(tc->substrate) && tc->road_level > 0;
     }
 
     template <class Fn>
@@ -244,11 +266,42 @@ struct road_snapper
         }
     }
 
-    /// Re-walk every stretch of @p path that would lay new road beside a road (above).
-    void snap(std::vector<entity_id>& path)
+    /// A cell's traversal cost once the stamp at @p level has passed over it.
+    float cell_cost(int r, std::uint8_t level) const
+    {
+        tile_component tc = *tile_at(r);
+        if (!is_water(tc.substrate)) tc.road_level = std::max(tc.road_level, level);
+        return tile_traversal_cost(tc);
+    }
+
+    /// A raster walk priced as the flood prices it (logistics.cpp § flood_edge_cost):
+    /// hop a -> b = mean of the two cells' costs x a's river discount on the side left.
+    float walk_cost(const std::vector<int>& cells, std::uint8_t level) const
+    {
+        float c = 0.0f;
+        for (std::size_t k = 0; k + 1 < cells.size(); ++k)
+        {
+            const int a = cells[k], b = cells[k + 1];
+            int dc = b % gw - a % gw;
+            if (dc > 1) dc -= gw;
+            if (dc < -1) dc += gw;
+            const int dr = b / gw - a / gw;
+            const tile_component& ta = *tile_at(a);
+            const int side = hex_side_for_offset(dc, dr, ((a / gw) & 1) != 0);
+            const float rm = side >= 0 ? river_edge_discount(ta, side) : 1.0f;
+            c += 0.5f * (cell_cost(a, level) + cell_cost(b, level)) * rm;
+        }
+        return c;
+    }
+
+    /// Re-walk every stretch of @p path that would lay new road beside a road (above),
+    /// for a link stamped at @p level.
+    void snap(std::vector<entity_id>& path, std::uint8_t level)
     {
         const std::size_t n = path.size();
         if (n < 3) return;
+        const int   run_min = g_road_probe_snap_run > 0 ? g_road_probe_snap_run : kSnapRun;
+        const float bound   = g_road_probe_snap_bound > 0.0f ? g_road_probe_snap_bound : kSnapCostBound;
         std::vector<int>  ras(n, -1);
         std::vector<char> land(n, 0), road(n, 0);
         for (std::size_t i = 0; i < n; ++i)
@@ -259,21 +312,20 @@ struct road_snapper
             land[i] = is_water(it->second.substrate) ? 0 : 1;
             road[i] = land[i] && it->second.road_level > 0;
         }
-        std::vector<int> on_sorted;
-        for (const int r : ras) if (r >= 0) on_sorted.push_back(r);
-        std::sort(on_sorted.begin(), on_sorted.end());
-        const auto on_route = [&](int r) {
-            return std::binary_search(on_sorted.begin(), on_sorted.end(), r);
-        };
-        // A NEW land tile of the route with a road beside it that the route does not hold.
-        std::vector<char> beside(n, 0);
-        for (std::size_t i = 0; i < n; ++i)
-        {
-            if (!land[i] || road[i] || ras[i] < 0) continue;
+        // The cells the route holds AS REBUILT: the original path, less each replaced
+        // stretch's interior, plus each re-walk's interior. Counted, so a cell the route
+        // visits twice is read correctly.
+        std::map<int, int> held;
+        for (const int r : ras) if (r >= 0) ++held[r];
+        const auto on_route = [&](int r) { const auto it = held.find(r); return it != held.end() && it->second > 0; };
+        // A NEW land tile of the route with a road beside it that the route does not hold
+        // (read against the route as rebuilt so far, as the walk reaches it).
+        const auto beside = [&](std::size_t i) {
+            if (!land[i] || road[i] || ras[i] < 0) return false;
             bool b = false;
             for_near(ras[i], [&](int u) { if (!b && road_cell(u) && !on_route(u)) b = true; });
-            beside[i] = b ? 1 : 0;
-        }
+            return b;
+        };
         std::vector<entity_id> out;
         out.reserve(n);
         std::size_t c = 0; // path[c..] not yet copied to `out`
@@ -281,23 +333,23 @@ struct road_snapper
         std::size_t i = 0;
         while (i < n)
         {
-            if (!beside[i]) { ++i; continue; }
+            if (!beside(i)) { ++i; continue; }
             const std::size_t run0 = i;
             std::size_t j = i;
-            while (j + 1 < n && beside[j + 1]) ++j;
+            while (j + 1 < n && beside(j + 1)) ++j;
             i = j + 1;
             // The stretch [s, e]: the run with the route tile either side of it (a run at a
             // route end keeps that end, the centre the route serves).
             const std::size_t s = run0 > 0 ? run0 - 1 : run0;
             const std::size_t e = j + 1 < n ? j + 1 : j;
-            if (static_cast<int>(j - run0 + 1) < g_road_probe_snap_run || s < c || s == e) continue;
+            if (static_cast<int>(j - run0 + 1) < run_min || s < c || s == e) continue;
             const int from = ras[s], to = ras[e];
             if (from < 0 || to < 0) continue;
             std::map<int, int> cell; // raster -> cost to enter
             for (std::size_t k = s; k <= e; ++k)
                 if (ras[k] >= 0) cell[ras[k]] = road[k] ? 1 : kSnapNewCost;
-            for (std::size_t k = s; k <= e; ++k)
-                if (ras[k] >= 0 && beside[k])
+            for (std::size_t k = run0; k <= j; ++k)
+                if (ras[k] >= 0)
                     for_near(ras[k], [&](int u) { if (!cell.count(u) && road_cell(u)) cell[u] = 1; });
             // Dijkstra over those cells, 4-cardinal, columns wrapping.
             std::map<int, int> dist, par;
@@ -333,18 +385,28 @@ struct road_snapper
             std::reverse(seg.begin(), seg.end());
             int new_before = 0, new_after = 0;
             for (std::size_t k = s + 1; k < e; ++k) new_before += (land[k] && !road[k]) ? 1 : 0;
-            bool folds = false; // a cell the route holds OUTSIDE the stretch would fold it back
+            // The stretch's own cells, counted: what the rebuilt route holds INSIDE it.
+            std::map<int, int> inside;
+            for (std::size_t q = s; q <= e; ++q) if (ras[q] >= 0) ++inside[ras[q]];
+            bool folds = false; // a cell the rebuilt route holds OUTSIDE the stretch
             for (std::size_t k = 1; k + 1 < seg.size(); ++k)
             {
                 new_after += road_cell(seg[k]) ? 0 : 1;
-                if (on_route(seg[k]))
-                {
-                    bool inside = false;
-                    for (std::size_t q = s; q <= e && !inside; ++q) inside = ras[q] == seg[k];
-                    folds = folds || !inside;
-                }
+                const auto hit = held.find(seg[k]);
+                const int  h   = hit != held.end() ? hit->second : 0;
+                const auto iit = inside.find(seg[k]);
+                folds = folds || h > (iit != inside.end() ? iit->second : 0);
             }
             if (folds || new_after >= new_before) continue;
+            std::vector<int> old(ras.begin() + static_cast<long>(s), ras.begin() + static_cast<long>(e) + 1);
+            if (std::find(old.begin(), old.end(), -1) != old.end()) continue;
+            if (walk_cost(seg, level) > bound * walk_cost(old, level))
+            {
+                ++refused_cost;
+                continue;
+            }
+            for (std::size_t k = s + 1; k < e; ++k) --held[ras[k]];
+            for (std::size_t k = 1; k + 1 < seg.size(); ++k) ++held[seg[k]];
             out.insert(out.end(), path.begin() + static_cast<long>(c), path.begin() + static_cast<long>(s));
             for (std::size_t k = 0; k + 1 < seg.size(); ++k)
                 out.push_back((*grid)[static_cast<std::size_t>(seg[k])]);
@@ -385,7 +447,7 @@ bool stamp_edge(world& w, entity_id body, entity_id ta, entity_id tb, std::uint8
     // The snap is the shipped pass's. The BL-1119 fresh-flood probe stays the reference
     // it was measured as (no snap), and the BL-1252 switch turns it off to read its effect.
     if (snapper != nullptr && snapper->usable() && !g_road_probe_fresh_floods && !g_road_probe_no_snap)
-        snapper->snap(g_last_laid);
+        snapper->snap(g_last_laid, level);
     bool raised = false; // probe-only reading
     for (const entity_id t : g_last_laid)
     {
@@ -1104,6 +1166,7 @@ void generate_roads(world& w, entity_id body, generation_progress* progress,
     st.floods_border = floods_now() - st.flood_fields_before_border;
     st.flood_fields = static_cast<long long>(w.logistics_flood_fields.size());
     st.snaps        = snapper.snaps;
+    st.snaps_refused_cost = snapper.refused_cost;
     if (trace != nullptr)
         for (std::size_t i = 0; i < nodes.size(); ++i)
             if (on_network[i])
@@ -1180,9 +1243,10 @@ void stamp_history_roads(world& w, entity_id body,
         ++corridor_degree[tb];
     }
 
-    // `corridors` arrives sorted by (a, b) and stamping takes the max per tile,
-    // so this walk is order-independent: a tile shared by two corridors ends at
-    // the higher of the two tiers whichever is stamped first.
+    // `corridors` arrives sorted by (a, b) and is walked in that order. The ORDER
+    // MATTERS: a later corridor's route can reuse an earlier one's road (its flood may
+    // have seen it), and the BL-1252 snap re-walks a later corridor onto the roads
+    // already laid. Stamping still takes the max per tile, so no tier is lowered.
     // BL-1072: one unit per corridor on the loading bar. Write-only.
     const int corridor_total = static_cast<int>(std::min<std::size_t>(corridors.size(), 1000000));
     int       corridor_done  = 0;
@@ -1229,6 +1293,7 @@ void stamp_history_roads(world& w, entity_id body,
     hs.destinations = static_cast<int>(destinations.size());
     hs.floods = static_cast<long long>(w.logistics_flood_fields.size()) - floods_at_entry;
     hs.snaps  = snapper.snaps;
+    hs.snaps_refused_cost = snapper.refused_cost;
     if (stats != nullptr)
         *stats = hs; // BL-1119 round 4: write-only
 
