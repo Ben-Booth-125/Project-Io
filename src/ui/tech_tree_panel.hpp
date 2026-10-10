@@ -11,12 +11,14 @@ namespace ui {
 //
 // Two halves, one flag (`ui_state::show_tech_tree`, nav slot 4 and F9):
 //
-//   * the COLUMN (`draw_tech_tree_menu`) — the Inspect / Plan strip, the seat's
-//     nation and its research rate, and the queue with each entry's arrival
-//     quarter, Remove last and Clear;
+//   * the COLUMN (`draw_tech_tree_menu`) — the seat's nation and its research
+//     rate, and the queue with each entry's arrival quarter, Remove last and
+//     Clear, always shown while the nation exists;
 //   * the CANVAS (`draw_tech_tree_panel`) — the Digitisation tree as three trees
-//     in a ring, every node and link, the shared hover card on a node, and in
-//     Plan mode a press that queues the node for the seat's nation.
+//     in a ring, every node and link, the shared hover card on a node. SHIFT +
+//     left click queues a node for the seat's nation; on a queued node it takes
+//     the node off with the entries that need it (Ben, 2026-10-10; NR-1027). A
+//     plain click only inspects.
 //
 // The panel reads the world and never writes it: a press is a `corp_command`
 // (`queue_research` / `unqueue_research` / `clear_research`) pushed onto

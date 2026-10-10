@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bitset>
 #include <cfloat>
 #include <cmath>
 #include <cstdio>
@@ -49,6 +50,8 @@ constexpr float kBranchStep    = 38.0f;
 constexpr float kRimRadius     = 318.0f; ///< The mastery ring, the outermost node.
 constexpr float kLabelRadius   = 346.0f; ///< Branch labels.
 constexpr float kFitRadius     = 372.0f; ///< What the default zoom fits inside the canvas.
+constexpr float kHubRadius     = 40.0f;  ///< The empty hub the tree names sit in (radius 0 maps here).
+constexpr float kNameRadius    = 42.0f;  ///< A tree name's centre, raw base units, on its tree's axis.
 
 /// The radii between the four cost rings (RESEARCH.md: rings run inside out
 /// and stand for cost), drawn as faint guides.
@@ -482,8 +485,7 @@ void outward_text(ImDrawList* dl, ImFont* font, float size, ImVec2 at, float ang
 }
 
 /// The hover card's body for node @p i.
-void hover_body(const world& w, const research_params& p, const nation_view& v, int i,
-                bool plan_mode)
+void hover_body(const world& w, const research_params& p, const nation_view& v, int i)
 {
     const dg::node& n = node_at(i);
     ImGui::TextUnformatted(n.name);
@@ -524,10 +526,20 @@ void hover_body(const world& w, const research_params& p, const nation_view& v, 
     ImGui::Separator();
     const node_state st = v.state(i);
     if (st == node_state::queued)
+    {
         ImGui::Text("Queued, position %d", v.queue_pos[static_cast<std::size_t>(i)]);
+        const std::size_t off = queued_dependents(w, v.nation, i).size();
+        ImGui::PushStyleColor(ImGuiCol_Text, palette::text_secondary);
+        if (off > 1)
+            ImGui::TextWrapped("Shift-click to unqueue it and the %d queued entries that need it.",
+                               static_cast<int>(off) - 1);
+        else
+            ImGui::TextWrapped("Shift-click to unqueue it.");
+        ImGui::PopStyleColor();
+    }
     else
         ImGui::TextWrapped("%s", state_label(st));
-    if (plan_mode && st != node_state::held && st != node_state::queued)
+    if (st != node_state::held && st != node_state::queued)
     {
         std::vector<std::uint16_t> plan;
         const std::string why = refusal_reason(w, v.nation, i, &plan);
@@ -543,7 +555,7 @@ void hover_body(const world& w, const research_params& p, const nation_view& v, 
             for (const std::uint16_t q : plan)
                 milli += node_cost_milli(q, p);
             ImGui::PushStyleColor(ImGuiCol_Text, palette::positive);
-            ImGui::TextWrapped("Press to queue: %d node%s, %lld RP.",
+            ImGui::TextWrapped("Shift-click a node to queue it: %d node%s, %lld RP.",
                                static_cast<int>(plan.size()), plan.size() == 1 ? "" : "s",
                                static_cast<long long>(milli / k_milli_per_rp));
             ImGui::PopStyleColor();
@@ -551,9 +563,26 @@ void hover_body(const world& w, const research_params& p, const nation_view& v, 
     }
 }
 
-/// A Plan press on node @p i: previewed, then queued through the seam.
+/// A shift-click on node @p i: a queued node toggles off with the entries that
+/// need it (NR-1027); any other is previewed, then queued through the seam.
 void press_node(const world& w, ui_state& s, entity_id nation, int i)
 {
+    const std::vector<std::uint16_t> off = queued_dependents(w, nation, i);
+    if (!off.empty())
+    {
+        corp_command cmd;
+        cmd.corp  = w.player_entity;
+        cmd.verb  = corp_verb::unqueue_research;
+        cmd.order = static_cast<std::uint32_t>(i);
+        s.pending_research_commands.push_back(cmd);
+        const int after = static_cast<int>(off.size()) - 1;
+        s.research_message = std::string("Unqueued ") + node_at(i).name
+                             + (after > 0 ? " and " + std::to_string(after)
+                                                + (after == 1 ? " entry" : " entries")
+                                                + " that needed it."
+                                          : ".");
+        return;
+    }
     std::vector<std::uint16_t> plan;
     const std::string why = refusal_reason(w, nation, i, &plan);
     if (!why.empty())
@@ -572,6 +601,48 @@ void press_node(const world& w, ui_state& s, entity_id nation, int i)
                                             + (ahead == 1 ? " requirement" : " requirements")
                                             + " ahead of it."
                                       : ".");
+}
+
+/// The column's two projections — RP a quarter and each queue entry's arrival
+/// — recomputed only when what they read changes: the day, the nation, its
+/// treasury, pool, held set or queue (cold review of BL-1276: they ran every
+/// frame). View state only; nothing here reaches the sim.
+struct research_projection
+{
+    bool                            valid    = false;
+    int                             day      = -1;
+    entity_id                       nation   = null_entity;
+    float                           treasury = 0.0f;
+    std::int64_t                    pool     = 0;
+    std::bitset<dg::node_count>     held;
+    std::vector<std::uint16_t>      queue;
+    std::int64_t                    rate_milli = 0;
+    std::vector<int>                arrival;
+};
+
+const research_projection& projection(const world& w, entity_id nation, const research_params& p)
+{
+    static research_projection c;
+    const auto sit = w.nation_tech.find(nation);
+    const nation_tech_state* st = sit != w.nation_tech.end() ? &sit->second : nullptr;
+    const float treasury = w.nations.at(nation).treasury;
+    const std::int64_t pool = st != nullptr ? st->pool_milli : 0;
+    static const std::vector<std::uint16_t> none;
+    const std::vector<std::uint16_t>& queue = st != nullptr ? st->queue : none;
+    const std::bitset<dg::node_count> held = st != nullptr ? st->held : std::bitset<dg::node_count>{};
+    if (c.valid && c.day == w.current_day_tick && c.nation == nation && c.treasury == treasury
+        && c.pool == pool && c.held == held && c.queue == queue)
+        return c;
+    c.valid      = true;
+    c.day        = w.current_day_tick;
+    c.nation     = nation;
+    c.treasury   = treasury;
+    c.pool       = pool;
+    c.held       = held;
+    c.queue      = queue;
+    c.rate_milli = estimate_rp_per_quarter_milli(w, nation, p);
+    c.arrival    = project_queue_arrivals(w, nation, p);
+    return c;
 }
 
 /// "Q3 1963" for the quarter @p quarters_ahead after the current one.
@@ -651,41 +722,23 @@ entity_id research_player_nation(const world& w)
 }
 
 // ---------------------------------------------------------------------------
-// The column: mode strip, nation, queue
+// The column: nation, queue (no mode strip: shift-click queues, Ben 2026-10-10)
 // ---------------------------------------------------------------------------
 
 void draw_tech_tree_menu(const world& w, const research_params& p, ui_state& s)
 {
     if (!s.show_tech_tree)
         return;
-    if (s.tech_tree_view != 0 && s.tech_tree_view != 1)
-        s.tech_tree_view = 0; // a retired era index from the mock viewer reads as Inspect
 
     const entity_id nation = research_player_nation(w);
-    if (nation == null_entity && s.tech_tree_view == 1)
-        s.tech_tree_view = 0;
 
     if (ui::foldout_begin("Research"))
     {
-        // --- the mode strip (the toggle rule: the active tab closes the panel)
-        ui::nav_button("Inspect", 0, s.tech_tree_view, &s.show_tech_tree);
-        ImGui::SameLine();
-        if (nation == null_entity)
-            ImGui::BeginDisabled();
-        ui::nav_button("Plan", 1, s.tech_tree_view, &s.show_tech_tree);
-        if (nation == null_entity)
-        {
-            ImGui::EndDisabled();
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-                ImGui::SetTooltip("No corporation is seated, so there is no nation to plan for.");
-        }
-        ImGui::Separator();
-
         if (nation == null_entity)
         {
             ImGui::PushStyleColor(ImGuiCol_Text, palette::text_secondary);
             ImGui::TextWrapped("No corporation is seated, so there is no nation to plan for. "
-                               "Inspect reads the tree.");
+                               "Hover a node on the ring to read it.");
             ImGui::PopStyleColor();
             ui::foldout_end();
             return;
@@ -694,7 +747,8 @@ void draw_tech_tree_menu(const world& w, const research_params& p, ui_state& s)
         const nation_component& nc = w.nations.at(nation);
         const auto sit = w.nation_tech.find(nation);
         const nation_tech_state* st = sit != w.nation_tech.end() ? &sit->second : nullptr;
-        const std::int64_t rate = estimate_rp_per_quarter_milli(w, nation, p);
+        const research_projection& proj = projection(w, nation, p);
+        const std::int64_t rate = proj.rate_milli;
 
         ImGui::Text("Nation: %s", nc.name.c_str());
         ImGui::PushStyleColor(ImGuiCol_Text, palette::text_secondary);
@@ -705,13 +759,12 @@ void draw_tech_tree_menu(const world& w, const research_params& p, ui_state& s)
         ImGui::PopStyleColor();
         ImGui::Separator();
 
-        const bool plan_mode = s.tech_tree_view == 1;
-        ImGui::TextUnformatted(plan_mode ? "Plan: press a node on the ring to queue it."
-                                         : "Inspect: hover a node to read it.");
+        ImGui::TextWrapped("Shift-click a node to queue it; shift-click a queued node to "
+                           "take it off. Hover reads it.");
         ImGui::Spacing();
 
         // --- the queue
-        const std::vector<int> arrival = project_queue_arrivals(w, nation, p);
+        const std::vector<int>& arrival = proj.arrival;
         const bool empty = st == nullptr || st->queue.empty();
         ImGui::Text("Queue (%d)", empty ? 0 : static_cast<int>(st->queue.size()));
         if (empty)
@@ -766,16 +819,16 @@ void draw_tech_tree_menu(const world& w, const research_params& p, ui_state& s)
             ImGui::EndTable();
         }
 
-        // --- the plan controls (Plan mode only: Inspect reads, it never edits)
-        if (plan_mode)
+        // --- the queue controls, always present while there is a nation
         {
             if (empty)
                 ImGui::BeginDisabled();
             if (ImGui::Button("Remove last"))
             {
                 corp_command cmd;
-                cmd.corp = w.player_entity;
-                cmd.verb = corp_verb::unqueue_research;
+                cmd.corp  = w.player_entity;
+                cmd.verb  = corp_verb::unqueue_research;
+                cmd.order = unqueue_last;
                 s.pending_research_commands.push_back(cmd);
                 s.research_message = std::string("Removed ") + node_at(st->queue.back()).name + ".";
             }
@@ -850,24 +903,35 @@ void draw_tech_tree_panel(const world& w, const research_params& p, ui_state& s)
     }
     const float k = fit * s.tech_tree_zoom;               // base unit -> px
     const ImVec2 centre{mid.x + s.tech_tree_pan_x, mid.y + s.tech_tree_pan_y};
-    const auto at = [&](float ang, float r) {
+    // A raw polar point (base units), and the RING's point: the layout's radii
+    // pushed out by a hub so each tree's name fits inside its own sector,
+    // between its root travel nodes, without the three meeting at the centre
+    // (Ben, 2026-10-10). The rim stays where it was; the inner rings compress.
+    const auto raw = [&](float ang, float r) {
         return ImVec2{centre.x + std::cos(ang * kDeg) * r * k, centre.y + std::sin(ang * kDeg) * r * k};
+    };
+    const auto at = [&](float ang, float r) {
+        return raw(ang, kHubRadius + r * (kRimRadius - kHubRadius) / kRimRadius);
     };
 
     const nation_view v = view_of(w);
-    const bool plan_mode = s.tech_tree_view == 1 && v.nation != null_entity;
+    const bool can_plan = v.nation != null_entity;
+    const bool shift = io.KeyShift;
     const auto& L = layout();
 
     dl->PushClipRect({canvas.x, canvas.y}, {canvas.x + canvas.w, canvas.y + canvas.h}, true);
 
     // --- ring guides: the three edges between the four cost rings
     for (const float e : kRingEdge)
-        dashed_circle(dl, centre, e * k, IM_COL32(120, 126, 138, 60), 1.0f, 72);
+    {
+        const ImVec2 edge = at(0.0f, e);
+        dashed_circle(dl, centre, edge.x - centre.x, IM_COL32(120, 126, 138, 60), 1.0f, 72);
+    }
     // Sector dividers between the three trees.
     for (int t = 0; t < 3; ++t)
     {
         const float ang = kTreeCentre[t] + 60.0f;
-        dashed_line(dl, at(ang, 40.0f), at(ang, kLabelRadius), IM_COL32(120, 126, 138, 70), 1.0f, 6.0f);
+        dashed_line(dl, at(ang, 20.0f), at(ang, kLabelRadius), IM_COL32(120, 126, 138, 70), 1.0f, 6.0f);
     }
 
     std::array<ImVec2, dg::node_count> scr{};
@@ -922,10 +986,15 @@ void draw_tech_tree_panel(const world& w, const research_params& p, ui_state& s)
         }
     }
 
-    // A Plan-mode hover previews what the press would queue.
+    // Holding Shift over a node previews what a shift-click would queue (or,
+    // on a queued node, what it would take off).
     std::vector<std::uint16_t> preview;
-    if (plan_mode && hovered >= 0)
-        refusal_reason(w, v.nation, hovered, &preview);
+    if (can_plan && shift && hovered >= 0)
+    {
+        preview = queued_dependents(w, v.nation, hovered);
+        if (preview.empty())
+            refusal_reason(w, v.nation, hovered, &preview);
+    }
 
     // --- nodes
     ImFont* font = ImGui::GetFont();
@@ -972,22 +1041,16 @@ void draw_tech_tree_panel(const world& w, const research_params& p, ui_state& s)
         outward_text(dl, font, ImGui::GetFontSize(), at(a, kLabelRadius), a, palette::research_accent,
                      dg::branches[static_cast<std::size_t>(b)].name);
     }
-    // Tree names inside, at the hub: Production centred above the centre,
-    // Network and State either side below it, each running away from the
-    // other so the three never meet however small the ring is drawn.
+    // Tree names inside their own sectors (Ben, 2026-10-10): each on its
+    // tree's axis in the hub, inside the ring of its three root travel nodes,
+    // so the three never run together at the centre.
     for (int t = 0; t < 3; ++t)
     {
         const char* tn = dg::branches[static_cast<std::size_t>(t * 3)].tree_name;
-        const float fs = small;
-        const ImVec2 ts = font->CalcTextSizeA(fs, FLT_MAX, 0.0f, tn);
-        ImVec2 tp;
-        if (t == 0)
-            tp = {centre.x - ts.x * 0.5f, centre.y - ts.y - 3.0f};
-        else if (t == 1)
-            tp = {centre.x + 3.0f, centre.y + 3.0f};
-        else
-            tp = {centre.x - ts.x - 3.0f, centre.y + 3.0f};
-        dl->AddText(font, fs, tp, palette::research_accent, tn); // fit-exempt: free-standing ring label
+        const ImVec2 ts = font->CalcTextSizeA(small, FLT_MAX, 0.0f, tn);
+        const ImVec2 c  = raw(kTreeCentre[t], kNameRadius);
+        dl->AddText(font, small, {c.x - ts.x * 0.5f, c.y - ts.y * 0.5f}, palette::research_accent,
+                    tn); // fit-exempt: free-standing ring label
     }
     // Ring numerals on the one boundary no joint sits on.
     {
@@ -1008,21 +1071,22 @@ void draw_tech_tree_panel(const world& w, const research_params& p, ui_state& s)
 
     // --- the mode line and the legend, in the canvas corners
     {
-        const char* line = plan_mode
-                               ? "Plan: press a node to queue it, with its requirements ahead of it."
-                               : (v.nation == null_entity
-                                      ? "Inspect: hover a node to read it. No seat, so no plan."
-                                      : "Inspect: hover a node to read it. Plan mode queues.");
+        const char* line = can_plan
+                               ? "Hover a node to read it. Shift-click a node to queue it, with its "
+                                 "requirements ahead of it; shift-click a queued node to take it off."
+                               : "Hover a node to read it. No corporation is seated, so there is no "
+                                 "nation to plan for.";
         dl->AddText({canvas.x + 12.0f, canvas.y + 10.0f}, palette::text_secondary, line); // fit-exempt: canvas caption
-        if (!s.research_message.empty() && plan_mode)
+        if (!s.research_message.empty() && can_plan)
             dl->AddText({canvas.x + 12.0f, canvas.y + 10.0f + ImGui::GetTextLineHeightWithSpacing()},
                         palette::research_warning, s.research_message.c_str()); // fit-exempt: canvas caption
         const float lh = ImGui::GetFontSize() * 0.9f + 6.0f;
         legend(dl, {canvas.x + 12.0f, canvas.y + canvas.h - 10.0f * lh - 12.0f}, k);
     }
 
-    // --- the press (Plan mode): queue the node through the seam
-    if (plan_mode && hovered >= 0 && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+    // --- the press: SHIFT + left click queues (or toggles a queued node off)
+    // through the seam (Ben, 2026-10-10). A plain click only inspects.
+    if (can_plan && shift && hovered >= 0 && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
         press_node(w, s, v.nation, hovered);
 
     // --- publish node positions for the verify API
@@ -1075,7 +1139,7 @@ void draw_tech_tree_panel(const world& w, const research_params& p, ui_state& s)
                                   : io.MousePos;
         const int node = s.tech_tree_hover_node;
         ImVec2 mn, mx;
-        draw_hover_card(anchor, [&] { hover_body(w, p, v, node, plan_mode); }, &mn, &mx);
+        draw_hover_card(anchor, [&] { hover_body(w, p, v, node); }, &mn, &mx);
         s.tech_tree_card_min_x = mn.x;
         s.tech_tree_card_min_y = mn.y;
         s.tech_tree_card_max_x = mx.x;

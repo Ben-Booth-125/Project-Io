@@ -420,8 +420,12 @@ research_accrual compute_accrual(const world& w, entity_id nid, const research_b
     }
     if (row.line_share > 0.0f && line_need > 0 && mult > 0.0)
     {
-        const double bill = line_credits_for(static_cast<std::int64_t>(
-                                                 std::ceil(static_cast<double>(line_need) / mult)), p);
+        // Clamped before the int64 cast: a small multiplier can lift the
+        // quotient past int64's range (the panel's estimate passes a bill no
+        // quarter can meet). Inert for every real queue — 2^62 milli-RP.
+        const double need_milli = std::min(std::ceil(static_cast<double>(line_need) / mult),
+                                           4.0e18);
+        const double bill = line_credits_for(static_cast<std::int64_t>(need_milli), p);
         row.line_spend = static_cast<float>(std::min(static_cast<double>(row.line_share), bill));
     }
 
@@ -521,7 +525,7 @@ std::int64_t estimate_rp_per_quarter_milli(const world& w, entity_id nation,
     // rate a nation researches at while its queue owes more than a quarter.
     nation_tech_state owing;
     owing.queue.assign(1, 0);
-    owing.pool_milli = -(std::numeric_limits<std::int64_t>::max() / 4);
+    owing.pool_milli = -1'000'000'000'000'000LL; // a trillion RP owed: no quarter meets it
     return compute_accrual(w, nation, count_research_buildings(w), &owing,
                            nit->second.treasury, p).rp_milli;
 }
@@ -573,6 +577,65 @@ bool remove_last_queued(world& w, entity_id nation)
         return false;
     it->second.queue.pop_back();
     return true;
+}
+
+std::vector<std::uint16_t> queued_dependents(const world& w, entity_id nation, int node)
+{
+    std::vector<std::uint16_t> removed;
+    const nation_tech_state* st = state_of(w, nation);
+    if (st == nullptr || !valid_node(node))
+        return removed;
+    const auto at = std::find(st->queue.begin(), st->queue.end(), static_cast<std::uint16_t>(node));
+    if (at == st->queue.end())
+        return removed;
+
+    // Kept so far: the held set plus every surviving entry ahead in the queue.
+    std::bitset<io::dg::node_count> kept = st->held;
+    for (auto it = st->queue.begin(); it != at; ++it)
+        kept.set(*it);
+    std::bitset<io::dg::node_count> gone;
+    gone.set(static_cast<std::size_t>(node));
+    removed.push_back(static_cast<std::uint16_t>(node));
+
+    for (auto it = at + 1; it != st->queue.end(); ++it)
+    {
+        const io::dg::node& n = node_at(*it);
+        bool needs = false;
+        for (int g = 0; g < n.group_count && !needs; ++g)
+        {
+            bool touches_gone = false, still_met = false;
+            for (const std::int16_t m : n.groups[static_cast<std::size_t>(g)])
+            {
+                if (m < 0)
+                    continue;
+                if (gone.test(static_cast<std::size_t>(m)))
+                    touches_gone = true;
+                if (kept.test(static_cast<std::size_t>(m)))
+                    still_met = true;
+            }
+            needs = touches_gone && !still_met;
+        }
+        if (needs)
+        {
+            gone.set(*it);
+            removed.push_back(*it);
+        }
+        else
+            kept.set(*it);
+    }
+    return removed;
+}
+
+int unqueue_with_dependents(world& w, entity_id nation, int node)
+{
+    const std::vector<std::uint16_t> removed = queued_dependents(w, nation, node);
+    if (removed.empty())
+        return 0;
+    std::vector<std::uint16_t>& q = w.nation_tech.at(nation).queue;
+    q.erase(std::remove_if(q.begin(), q.end(),
+                           [&](std::uint16_t n) { return in_list(removed, n); }),
+            q.end());
+    return static_cast<int>(removed.size());
 }
 
 bool clear_research_queue(world& w, entity_id nation)

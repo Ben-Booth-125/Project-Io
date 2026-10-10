@@ -116,10 +116,9 @@ ledger("construction", "ledger_03_construction")
 -- ===========================================================================
 -- Slot 4 — Research panel (UI-108, BL-1276)
 -- ===========================================================================
--- Two modes: 0 = Inspect, 1 = Plan. tech_tree_panel.lua drives the presses.
-for v = 0, 1 do
-    ledger("tech_tree", string.format("ledger_04_research_mode_%d", v), "tech_tree", v)
-end
+-- One view (no modes: shift-click queues, Ben 2026-10-10). tech_tree_panel.lua
+-- drives the presses.
+ledger("tech_tree", "ledger_04_research")
 
 -- ===========================================================================
 -- Slot 5 — Acquisitions ledger

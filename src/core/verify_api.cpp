@@ -670,6 +670,7 @@ void app::reset_verify_transients()
     m_pointer_y = 0.0f;
     m_inject_button = -1;
     m_inject_down = false;
+    m_inject_shift = -1;
 }
 
 // --- Synthetic pointer input (BL-521) ---------------------------------------
@@ -707,6 +708,13 @@ void app::pump_injected_input()
     {
         io.AddMouseButtonEvent(m_inject_button, m_inject_down);
         m_inject_button = -1;
+    }
+    // BL-1276: the research panel's shift-click. A modifier, posted as its key
+    // event so io.KeyShift reads it exactly as a held Shift would.
+    if (m_inject_shift >= 0)
+    {
+        io.AddKeyEvent(ImGuiMod_Shift, m_inject_shift == 1);
+        m_inject_shift = -1;
     }
 }
 
@@ -2501,6 +2509,30 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return out;
     });
     v.set_function("research_message", [this]() -> std::string { return m_ui.research_message; });
+
+    // `tech_tree_arrivals()`: the seat's nation's queue arrivals, one per entry
+    // head first, in quarters from now (-1 = not within the horizon) — the same
+    // project_queue_arrivals the column reads. Read-only, verify-only.
+    v.set_function("tech_tree_arrivals", [this](sol::this_state ts) -> sol::table {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        const entity_id nation = ui::research_player_nation(m_world);
+        int k = 1;
+        for (const int a : project_queue_arrivals(m_world, nation, m_registry.research()))
+            out[k++] = a;
+        return out;
+    });
+
+    // `shift_click(x, y)`: a left press with Shift held, through the real input
+    // path (BL-1276: shift-click queues on the research ring). Shift goes down
+    // on the settle frame before the press and comes up on the frame after the
+    // release, so the whole gesture reads io.KeyShift.
+    v.set_function("shift_click", [this](float x, float y) {
+        m_inject_shift = 1;
+        inject_pointer(x, y, mouse_button_from_name("left"), 1);
+        m_inject_shift = 0;
+        render();
+    });
 
     // Park a COLLAPSING SECTION open or closed.
     //

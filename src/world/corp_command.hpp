@@ -152,7 +152,7 @@ enum class corp_verb : uint8_t
     // into `io::dg::nodes`, range-checked before any use. DELIBERATELY NOT in
     // corp_ai.cpp's candidate list.
     queue_research,    ///< The seat's nation queues node `order` with its unheld requirements ahead of it (`enqueue_node`). rejected_state when already held/queued or a pick-one pair refuses it; rejected_invalid for an unknown node.
-    unqueue_research,  ///< The seat's nation drops the LAST entry of its research queue. rejected_state when the queue is empty.
+    unqueue_research,  ///< The seat's nation takes queued node `order` off its research queue with every later entry that needs it (the toggle, NR-1027); `order == unqueue_last` drops the LAST entry instead. rejected_state when the node is not queued / the queue is empty; rejected_invalid for any other out-of-tree `order`.
     clear_research,    ///< The seat's nation empties its research queue (the pool stays). rejected_state when the queue is empty.
 };
 
@@ -164,6 +164,10 @@ enum class corp_verb : uint8_t
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
     static_cast<uint8_t>(corp_verb::clear_research) + 1;
+
+/// `unqueue_research`'s "the last entry" sentinel for `corp_command::order`
+/// (the MCP boundary's -1). UINT32_MAX, never a node index.
+inline constexpr uint32_t unqueue_last = 0xFFFFFFFFu;
 
 /// Ceiling on one corporation's outstanding sell orders. The book is now
 /// reachable by command, so it is reachable by a scorer with a bug in it — this

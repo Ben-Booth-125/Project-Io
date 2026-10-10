@@ -1007,10 +1007,10 @@ struct ui_state
     int  ages_year    = 0;
     bool ages_playing = false;
 
-    /// Research panel mode (BL-1276): 0 = Inspect (read the ring), 1 = Plan (a
-    /// press on a node queues it for the seat's nation). Anything else reads as
-    /// Inspect — the retired mock viewer used 0..3 for eras, and a verify hook
-    /// carrying an old index must land on something.
+    /// UNREAD. The research panel has no views: hover reads a node and SHIFT +
+    /// left click queues it (Ben, 2026-10-10, retiring BL-1276's Inspect/Plan
+    /// strip). Kept so `verify.panel_view("tech_tree", n)` in older scripts
+    /// stays a harmless write.
     int  tech_tree_view = 0;
 
     /// The ring's camera: pan offset of the ring's centre from the canvas

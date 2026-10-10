@@ -232,6 +232,19 @@ std::vector<int> project_queue_arrivals(const world& w, entity_id nation,
 /// queue is empty. The pool is untouched: it is the head's progress.
 bool remove_last_queued(world& w, entity_id nation);
 
+/// What `unqueue_with_dependents` would take off @p nation's queue for @p node,
+/// in queue order: the node, then every LATER entry that needs it — an entry
+/// with a requirement group whose members include a removed entry and none of
+/// which is held or still queued ahead of it. Empty when @p node is not queued.
+/// Pure: reads the queue, mutates nothing.
+std::vector<std::uint16_t> queued_dependents(const world& w, entity_id nation, int node);
+
+/// Take @p node off @p nation's queue together with every later entry that
+/// needs it (`queued_dependents`) — the toggle a press on a queued node makes
+/// (NR-1027). The rest of the queue keeps its order; the pool stays. Returns how
+/// many entries were removed (0 = nothing touched: the node was not queued).
+int unqueue_with_dependents(world& w, entity_id nation, int node);
+
 /// Empty @p nation's queue. False (nothing touched) when it is already empty.
 /// The pool stays, so nothing researched is stranded (RESEARCH.md § The research
 /// queue: the pool IS the head's progress).

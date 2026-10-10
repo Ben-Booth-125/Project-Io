@@ -73,7 +73,7 @@ and so is the safety net.
 | `UI-098` Lens system (overlay_mode family) > Throughput lens | sub-element | `throughput_lens`, `lens_strip_and_fields` | 5 | 0 | 0 |
 | `UI-100` Corporation ledger | ledger | `corp_dashboard` | 10 | 1 | 0 |
 | `UI-105` Generation Ledger | ledger | `save_load`, `generation_ledger` | 6 | 1 | 5 |
-| `UI-108` Research panel | ledger | `tech_tree_panel` | 6 | 0 | 4 |
+| `UI-108` Research panel | ledger | `tech_tree_panel` | 15 | 0 | 2 |
 | `UI-111` Spectator god view | element | `spectator_god_view` | 1 | 0 | 0 |
 | `UI-112` Market Ledger > Nation presence row | sub-element | `goods_table` | 8 | 1 | 0 |
 | `UI-113` Convoys Ledger | ledger | `convoys_ledger`, `ledger_pass` | 7 | 2 | 4 |

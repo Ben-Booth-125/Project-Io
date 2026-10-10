@@ -2017,8 +2017,19 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 return corp_command_result::rejected_invalid;
             }
             if (cmd.verb == corp_verb::unqueue_research)
-                return remove_last_queued(w, nation) ? corp_command_result::applied
-                                                     : corp_command_result::rejected_state;
+            {
+                // `order` = the queued node to take off with every later entry
+                // that needs it (the toggle, NR-1027), or `unqueue_last` for the
+                // last entry. Anything else outside the tree is rejected whole.
+                if (cmd.order == unqueue_last)
+                    return remove_last_queued(w, nation) ? corp_command_result::applied
+                                                         : corp_command_result::rejected_state;
+                if (cmd.order >= static_cast<uint32_t>(io::dg::node_count))
+                    return corp_command_result::rejected_invalid;
+                return unqueue_with_dependents(w, nation, static_cast<int>(cmd.order)) > 0
+                           ? corp_command_result::applied
+                           : corp_command_result::rejected_state;
+            }
             return clear_research_queue(w, nation) ? corp_command_result::applied
                                                    : corp_command_result::rejected_state;
         }

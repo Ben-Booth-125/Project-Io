@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*163 entries — 31 gameplay · 25 canvas · 17 lens · 55 ledger · 35 chrome.*
+*162 entries — 31 gameplay · 25 canvas · 17 lens · 54 ledger · 35 chrome.*
 
 ---
 
@@ -565,40 +565,44 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Choose the opening position rather than be dealt one: the card shows what the firm makes and what its home market pays for it, what it holds and owes, and whose law it trades under - so a planner can prefer depth (a processor near population), a debt-free book, or a friendly nation, or knowingly take a marked firm as a harder game.
 
-### `gameplay.queue_research` — The research panel in Plan mode: a press on a node of the ring. A corp_verb (30, `queue_research`), so an agent issues it through the same seam.
+### `gameplay.queue_research` — The research panel's ring: SHIFT + left click on a node (Ben, 2026-10-10; there is no Plan mode - a plain click or a hover only inspects). A corp_verb (30, `queue_research`), so an agent issues it through the same seam.
 
-**Press.** In Plan mode, click a node on the ring. Hovering first shows what the press would queue (rings on each node it would add, and the count and RP on the card) or why it is refused.
+**Press.** Hold Shift and left-click a node on the ring. Holding Shift over a node first rings what the click would queue; the hover card says the count and RP, or why it is refused.
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `order` | `uint32` | The node: its index in io::dg::nodes (the Digitisation tree store, DIGITISATION_TREE.md). Range-checked against the node count before any use; out of range is rejected_invalid. |
+| `order` | `uint32` | The node: its INDEX in io::dg::nodes - store order of docs/economy/tech/digitisation_tree.json, generated into src/world/digitisation_tree_data.hpp, where each row carries its index. 0..159. The MCP server refuses anything else before the wire; the seam range-checks it again (rejected_invalid). |
 
 **Valid when:**
 - `corp` is the SEAT (world::player_entity): the player reaches its nation's queue as the nation's operating champion. Any other corporation is refused (rejected_state) - a rival does not plan its nation's research.
 - The seat has a home nation (rejected_state otherwise).
-- The node is not already held or already queued (rejected_state).
+- The node is not already held (rejected_state) and not already queued (a shift-click on a queued node is the unqueue toggle, gameplay.unqueue_research, not this verb).
 - Neither the node nor every route to it crosses a pick-one pair whose other side is held or queued (rejected_state; the panel says which pair). A refusal queues nothing.
 
 **Expected output.** The nation's queue gains the node with its unheld requirements AHEAD of it - every requirement group, the cheapest member where a group offers a choice (RESEARCH.md § The research queue). RP flow to the head each quarter; a quest whose deed is unmet is passed over, not blocking. The panel lists each entry's arrival quarter at the nation's current RP rate.
 
 **Reason to select.** Plan a route to a technology far out: one press queues the whole path, and the arrival column says when each step lands.
 
-### `gameplay.unqueue_research` — The research panel's column in Plan mode: the 'Remove last' button under the queue. A corp_verb (31, `unqueue_research`).
+### `gameplay.unqueue_research` — The research panel: SHIFT + left click on a QUEUED node (the toggle rule, NR-1027), or the 'Remove last' button under the queue. A corp_verb (31, `unqueue_research`).
 
-**Press.** In Plan mode, click 'Remove last'.
+**Press.** Hold Shift and left-click a queued node on the ring (it carries a white ring and its queue position); or click 'Remove last' under the queue.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `order` | `uint32` | The queued node to take off: its INDEX in io::dg::nodes (0..159, as queue_research). The sentinel 4294967295 (`unqueue_last`; -1 at the MCP server, which is also its default) means the LAST entry instead - what 'Remove last' sends. Any other value outside the tree is rejected_invalid. |
 
 **Valid when:**
 - `corp` is the SEAT (world::player_entity): the player reaches its nation's queue as the nation's operating champion. Any other corporation is refused (rejected_state) - a rival does not plan its nation's research.
 - The seat has a home nation (rejected_state otherwise).
-- The queue is not empty (rejected_state; the button is disabled).
+- The named node is queued, or (for the last-entry sentinel) the queue is not empty (rejected_state otherwise; nothing touched).
 
-**Expected output.** The LAST entry of the nation's research queue is dropped. RP in hand stay: the pool is the head's progress, so nothing researched is stranded.
+**Expected output.** The node comes off the nation's research queue together with every LATER entry that needs it - an entry with a requirement group that loses its only queued-or-held member (so a press on Field Practice II also takes off Seismic Survey behind it, and keeps Field Practice I ahead of it). The rest of the queue keeps its order. RP in hand stay: the pool is the head's progress, so nothing researched is stranded. With the last-entry sentinel, only the last entry comes off.
 
-**Reason to select.** Undo the most recent addition to the plan.
+**Reason to select.** Undo part of the plan: the toggle on the node you queued takes its dependents with it, so the queue never holds an entry that can no longer open.
 
-### `gameplay.clear_research` — The research panel's column in Plan mode: the 'Clear' button under the queue. A corp_verb (32, `clear_research`).
+### `gameplay.clear_research` — The research panel's column: the 'Clear' button under the queue (always shown while the seat's nation exists). A corp_verb (32, `clear_research`).
 
-**Press.** In Plan mode, click 'Clear'.
+**Press.** Click 'Clear' under the queue.
 
 **Valid when:**
 - `corp` is the SEAT (world::player_entity): the player reaches its nation's queue as the nation's operating champion. Any other corporation is refused (rejected_state) - a rival does not plan its nation's research.
@@ -883,9 +887,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 **Valid when:**
 - The app is in-game and no ImGui text field has keyboard focus.
 
-**Expected output.** Toggles the research panel (the same flag as nav rail slot 4). The research panel: the Digitisation tree drawn as three trees in a ring (Production, Network, State; three branches each; four cost rings inside out; no centre node) on the canvas, and in the fold-out column the Inspect / Plan strip, the seat's nation with its RP a quarter, RP in hand and held count, and its research queue with each entry's arrival quarter. Every node, every requirement link (an AND link - a node with two or more requirement groups - in the accent), pick-one pairs outlined in red with a dashed tie, quests as amber diamonds, placeholders dashed and muted; held nodes green, queued nodes ringed with their queue position. Hovering a node opens the shared hover card: name, tier, ring, RP cost, exact advantage, "Requires: A + B" (groups joined by +, members by or), a quest's deed and the next-age branch it keys, a pair's sibling, and the node's state. Opening it closes any other ledger; pressing F9 again closes it (toggle rule). Sim, view, and selection untouched.
+**Expected output.** Toggles the research panel (the same flag as nav rail slot 4). The research panel: the Digitisation tree drawn as three trees in a ring (Production, Network, State; three branches each; four cost rings inside out; no centre node) on the canvas, and in the fold-out column the seat's nation with its RP a quarter, RP in hand and held count, and its research queue with each entry's arrival quarter, Remove last and Clear - always shown while the seat's nation exists. Shift + left click on a node queues it; shift-click on a queued node takes it off with the entries that need it. Every node, every requirement link (an AND link - a node with two or more requirement groups - in the accent), pick-one pairs outlined in red with a dashed tie, quests as amber diamonds, placeholders dashed and muted; held nodes green, queued nodes ringed with their queue position. Hovering a node opens the shared hover card: name, tier, ring, RP cost, exact advantage, "Requires: A + B" (groups joined by +, members by or), a quest's deed and the next-age branch it keys, a pair's sibling, and the node's state. Opening it closes any other ledger; pressing F9 again closes it (toggle rule). Sim, view, and selection untouched.
 
-**Reason to select.** Read which technologies the nation can reach and what each gives, and (in Plan mode) plan its research queue.
+**Reason to select.** Read which technologies the nation can reach and what each gives, and shift-click nodes to plan its research queue.
 
 ### `canvas.zoom_keys` — Keyboard.
 
@@ -1568,7 +1572,7 @@ TRADES shows FOUR headed sections, each bounded and scrolling inside itself so a
 **Valid when:**
 - In-game
 
-**Expected output.** Toggles the research panel open; re-click closes; opening closes any other ledger. The research panel: the Digitisation tree drawn as three trees in a ring (Production, Network, State; three branches each; four cost rings inside out; no centre node) on the canvas, and in the fold-out column the Inspect / Plan strip, the seat's nation with its RP a quarter, RP in hand and held count, and its research queue with each entry's arrival quarter. Every node, every requirement link (an AND link - a node with two or more requirement groups - in the accent), pick-one pairs outlined in red with a dashed tie, quests as amber diamonds, placeholders dashed and muted; held nodes green, queued nodes ringed with their queue position. Hovering a node opens the shared hover card: name, tier, ring, RP cost, exact advantage, "Requires: A + B" (groups joined by +, members by or), a quest's deed and the next-age branch it keys, a pair's sibling, and the node's state.
+**Expected output.** Toggles the research panel open; re-click closes; opening closes any other ledger. The research panel: the Digitisation tree drawn as three trees in a ring (Production, Network, State; three branches each; four cost rings inside out; no centre node) on the canvas, and in the fold-out column the seat's nation with its RP a quarter, RP in hand and held count, and its research queue with each entry's arrival quarter, Remove last and Clear - always shown while the seat's nation exists. Shift + left click on a node queues it; shift-click on a queued node takes it off with the entries that need it. Every node, every requirement link (an AND link - a node with two or more requirement groups - in the accent), pick-one pairs outlined in red with a dashed tie, quests as amber diamonds, placeholders dashed and muted; held nodes green, queued nodes ringed with their queue position. Hovering a node opens the shared hover card: name, tier, ring, RP cost, exact advantage, "Requires: A + B" (groups joined by +, members by or), a quest's deed and the next-age branch it keys, a pair's sibling, and the node's state.
 
 **Reason to select.** Answers "which technologies can my nation reach, what does each give, and when will my plan arrive?"
 
@@ -1777,22 +1781,6 @@ TRADES shows FOUR headed sections, each bounded and scrolling inside itself so a
 **Expected output.** The pressed section expands in place and any other closes. Deposits and Population read the PROVINCE of the selected tile, so the province's content is reachable without a province selection existing. The tile's available-buildings tab is unchanged; the province's own buildings roll-up and member-tile list are gone.
 
 **Reason to select.** The pager hid the LIST of questions the surface can answer behind a press, so a player had to already know a reading existed to go and find it. An accordion shows all five and opens the one you ask for. The order is the other half (Ben, 2026-08-24): it runs from what the player can act on to what the ground merely is, where the pager ran the other way and put the least actionable reading in the default slot.
-
-### `ledger.research_mode_tab` — Research panel (nav slot 4 / F9), fold-out column, the Inspect / Plan strip
-
-**Press.** Click the 'Inspect' or 'Plan' button at the top of the Research column.
-
-| Arg | Type | Meaning |
-|---|---|---|
-| `mode` | `enum` | 'Inspect' (the default: the ring is read-only; hovering a node reads it) / 'Plan' (a press on a node queues it for the seat's nation; Remove last and Clear appear under the queue) |
-
-**Valid when:**
-- The research panel is open (nav slot 4 or F9).
-- Plan is disabled, with the reason on hover, when no corporation is seated or the seat has no home nation: there is no nation to plan for.
-
-**Expected output.** Switches the panel between reading the ring and planning the queue. Re-clicking the currently-active button closes the panel (toggle rule); switching is an ordinary view change. Neither mode touches the sim.
-
-**Reason to select.** Plan to queue research for the nation; Inspect to read the tree without risk of a stray press queuing anything.
 
 ### `ledger.decision_feed_open` — Navigation rail slot 11, "AI decisions"
 
@@ -2003,7 +1991,7 @@ TRADES shows FOUR headed sections, each bounded and scrolling inside itself so a
 - App is in game.
 - Not while an ImGui widget owns the keyboard.
 
-**Expected output.** Toggles the research panel (nav slot 4) and its fold-out column. The research panel: the Digitisation tree drawn as three trees in a ring (Production, Network, State; three branches each; four cost rings inside out; no centre node) on the canvas, and in the fold-out column the Inspect / Plan strip, the seat's nation with its RP a quarter, RP in hand and held count, and its research queue with each entry's arrival quarter. Every node, every requirement link (an AND link - a node with two or more requirement groups - in the accent), pick-one pairs outlined in red with a dashed tie, quests as amber diamonds, placeholders dashed and muted; held nodes green, queued nodes ringed with their queue position. Hovering a node opens the shared hover card: name, tier, ring, RP cost, exact advantage, "Requires: A + B" (groups joined by +, members by or), a quest's deed and the next-age branch it keys, a pair's sibling, and the node's state. Opening it closes any other ledger; F9 again closes it.
+**Expected output.** Toggles the research panel (nav slot 4) and its fold-out column. The research panel: the Digitisation tree drawn as three trees in a ring (Production, Network, State; three branches each; four cost rings inside out; no centre node) on the canvas, and in the fold-out column the seat's nation with its RP a quarter, RP in hand and held count, and its research queue with each entry's arrival quarter, Remove last and Clear - always shown while the seat's nation exists. Shift + left click on a node queues it; shift-click on a queued node takes it off with the entries that need it. Every node, every requirement link (an AND link - a node with two or more requirement groups - in the accent), pick-one pairs outlined in red with a dashed tie, quests as amber diamonds, placeholders dashed and muted; held nodes green, queued nodes ringed with their queue position. Hovering a node opens the shared hover card: name, tier, ring, RP cost, exact advantage, "Requires: A + B" (groups joined by +, members by or), a quest's deed and the next-age branch it keys, a pair's sibling, and the node's state. Opening it closes any other ledger; F9 again closes it.
 
 **Reason to select.** Answers "which technologies can my nation reach, what does each give, and when will my plan arrive?" - the route to the queue_research press.
 

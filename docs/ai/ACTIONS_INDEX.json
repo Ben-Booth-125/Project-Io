@@ -506,10 +506,6 @@
    "System menu popup, spectate-only checkbox"
   ],
   [
-   "ledger.research_mode_tab",
-   "Research panel (nav slot 4 / F9), fold-out column, the Inspect / Plan strip"
-  ],
-  [
    "chrome.wizard_back",
    "New World wizard, footer button row"
   ],
@@ -599,15 +595,15 @@
   ],
   [
    "gameplay.queue_research",
-   "The research panel in Plan mode: a press on a node of the ring. A corp_verb (30, `queue_research`), so an agent issues it through the same seam."
+   "The research panel's ring: SHIFT + left click on a node (Ben, 2026-10-10; there is no Plan mode - a plain click or a hover only inspects). A corp_verb (30, `queue_research`), so an agent issues it through the same seam."
   ],
   [
    "gameplay.unqueue_research",
-   "The research panel's column in Plan mode: the 'Remove last' button under the queue. A corp_verb (31, `unqueue_research`)."
+   "The research panel: SHIFT + left click on a QUEUED node (the toggle rule, NR-1027), or the 'Remove last' button under the queue. A corp_verb (31, `unqueue_research`)."
   ],
   [
    "gameplay.clear_research",
-   "The research panel's column in Plan mode: the 'Clear' button under the queue. A corp_verb (32, `clear_research`)."
+   "The research panel's column: the 'Clear' button under the queue (always shown while the seat's nation exists). A corp_verb (32, `clear_research`)."
   ],
   [
    "chrome.quick_save_key",
