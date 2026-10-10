@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*95 entries — 15 open, 80 resolved.*
+*95 entries — 14 open, 81 resolved.*
 
 ---
 
@@ -160,11 +160,6 @@ The always-on player-identity wash (about 30% on the player's tiles on the plain
 *decision taken on your behalf · raised 2026-10-09 · from the BL-1250 (lens washes ground) and BL-1246 partial re-bake lanes, sprint 51*
 
 (a) Wash strengths taken: categorical lenses 0.46, sequential 0.54 (LENSES.md). (b) Resource lens: ground with no deposit keeps the WHITE wash Ben ruled 2026-10-04 (0.50) rather than "no wash" - LENSES.md says an unanswered tile takes no wash, so one of the two needs your word. (c) CALL: at the close rungs the Company lens draws the unpicked owners' dark rim on nearly every tile (firms hold most ground), which reads as a heavy hex grid. Options: thin/fade the rim at close zoom; drop the rim where the close-zoom seam already marks edges; accept. (d) NOVEL, fixed: a lit structure's hover wash drew at the inset radius and left a 1 px grid of unlit gaps over the bake; now drawn at full radius. (e) NOVEL, scope grew: the partial re-bake needed a bounds mode in the structure pass (rasterise a tile's parts writing nothing) and a shared build_tile, because a conservative reach only saved ~50%; plus a 1/256 px rounding fix in four structure forms caught by the new window-invariance row. (f) Rung 0 frame time read ~20 ms in the lens lane under heavy machine load (11.5 ms clean in the 60 fps lane); a clean re-measure is owed.
-
-### NR-1011 — With the border wash gone, neighbouring nations' muted stroke colours read as one similar dark blue
-*question · raised 2026-10-10 · from the BL-1262 (borders hard edges) lane, sprint 51*
-
-The hard-edge stroke is drawn in a muted version of the nation's identity colour. With the wash retired the stroke is the only national read, and across a many-nation frontier the muted strokes look alike (dark blue). Options: draw the stroke in the nation's full identity colour; widen the stroke slightly; accept (borders are context, the Selection element names the nation).
 
 ---
 
@@ -1485,4 +1480,9 @@ BL-1197 round 2 (no fallback for water-gap firms) cost seeds 0 and 43 their allo
 *question · raised 2026-10-10 · from the BL-1256 (ground look C-F) lane, sprint 51*
 
 (a) CALL: outside the player corporation's vision the canvas washes the ground ~50% toward near-black (the activity fog, DISCOVERY.md). Over the new darker C-F palette the fogged ground sits at median luminance ~33 against ~58 baked, so most of the map in play reads very dark. Options: lighten the fog (e.g. 25-30%), make it a desaturation rather than a darkening, or keep. (b) TAKEN, novel: the bake has its own palette (palette::ground_tile_colour); the vector fallback, minimap and generation preview keep the old colours. (c) Mountain forms still read faceted (the landform pass was not retuned). (d) Rapids read as a white chain along the bank; sea glints as fine specks - art iteration if wanted. (e) The bake costs ~25-31% more per chunk (whole revealed home master 41 -> 52 s at 1x); the wait budget assumes the rounds are read (TECH_FOUNDATIONS). RULED (Ben, 2026-10-10): (a) lighten the fog to 20% (DISCOVERY.md, k_fog_strength). Ben walked the build: the look reads well, lenses look good, the painting wait felt quick (his session measured 53.3 s with a fast click-through - the separately tracked case). (b)-(e) stand as recorded.
+
+### NR-1011 — With the border wash gone, neighbouring nations' muted stroke colours read as one similar dark blue
+*question · raised 2026-10-10 · from the BL-1262 (borders hard edges) lane, sprint 51*
+
+The hard-edge stroke is drawn in a muted version of the nation's identity colour. With the wash retired the stroke is the only national read, and across a many-nation frontier the muted strokes look alike (dark blue). Options: draw the stroke in the nation's full identity colour; widen the stroke slightly; accept (borders are context, the Selection element names the nation). RULED (Ben, 2026-10-10): "Borders also [great]" - keep the stroke as built.
 

@@ -1952,9 +1952,10 @@
    "title": "With the border wash gone, neighbouring nations' muted stroke colours read as one similar dark blue",
    "raised": "2026-10-10",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "the BL-1262 (borders hard edges) lane, sprint 51",
-   "what": "The hard-edge stroke is drawn in a muted version of the nation's identity colour. With the wash retired the stroke is the only national read, and across a many-nation frontier the muted strokes look alike (dark blue). Options: draw the stroke in the nation's full identity colour; widen the stroke slightly; accept (borders are context, the Selection element names the nation)."
+   "what": "The hard-edge stroke is drawn in a muted version of the nation's identity colour. With the wash retired the stroke is the only national read, and across a many-nation frontier the muted strokes look alike (dark blue). Options: draw the stroke in the nation's full identity colour; widen the stroke slightly; accept (borders are context, the Selection element names the nation). RULED (Ben, 2026-10-10): \"Borders also [great]\" - keep the stroke as built.",
+   "resolved": "2026-10-10"
   }
  ]
 }
