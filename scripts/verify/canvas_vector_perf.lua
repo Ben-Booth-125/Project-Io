@@ -14,6 +14,10 @@
 -- Run (Release, from the build directory), with the pass meter on so the per-pass
 -- vertex/CPU table prints to stdout:
 --   IO_CANVAS_PASS_LOG=1 ProjectIo --verify scripts/verify/canvas_vector_perf.lua
+-- FRAME TOTALS NEED THE PLAY PATH (BL-1260): plain --verify re-snapshots the world
+-- into the ground's bake source every frame (~15 ms of build_ms that play never
+-- pays), so read the CSVs from a run with IO_GROUND_BENCH=1 as well. The pass
+-- meter's canvas split is the same either way (PLANETARY.md § Draw-loop cost model).
 -- CSVs: canvas_still_ and canvas_pan_<lens>_rung<k>.csv; captures: screenshots/canvas_<lens>_rung<k>.png
 
 local kMinZoom = 1.2531328  -- body_surface_canvas.cpp kMinZoom (~1.253)
