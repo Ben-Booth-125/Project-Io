@@ -175,12 +175,65 @@ struct bake_params
     // Nominal-keyed: full at the 96 px master, nothing at the far page. The
     // per-tile tone (the honeycomb) is untouched. 0 = the pre-BL-1254 look.
     float crisp             = 1.0f;
+    // Ground look C-F (BL-1256, RENDERING.md § Art direction and palette: the
+    // it3 C-F target — dark, cold, hostile). Tuned against the reference's
+    // luminance percentiles with ground_bake_check --look; the pre-BL-1256
+    // value is noted where a dial replaced one.
+    /// Relief everywhere: the floor of the fold field's amplitude on every
+    /// land pixel (the 0.25 it was let plains sit nearly flat). Folds are
+    /// detail_cell apart (0.46 canonical, ~0.3-0.5 of a hex's 1.73 width).
+    float roll_floor      = 0.50f;
+    /// How far every ground's folds turn ridged (creases along meandering
+    /// crests, the eroded read of the reference) rather than soft blobs.
+    float roll_ridge      = 0.55f;
+    /// The hills under the folds: a broad smooth field (~1.15 canonical) whose
+    /// long faces the light and the cast shadows read as mass. Shading units
+    /// (a slope of 1 is a full stop of light); 0 = none.
+    float hill_amp        = 0.70f;
+    /// How far a plain's soft swells ease at the master (BL-1254 eased them
+    /// by 0.40; 0 = plains roll at full shading).
+    float plain_ease      = 0.0f;
+    /// Value range: the hillshade's clamp below and above flat ground, before
+    /// the grade (pre-BL-1256 +-0.75 at the master).
+    float shade_lo        = 0.65f;
+    float shade_hi        = 1.00f;
+    /// The broad low-frequency mottle that belongs to no landform (the colour
+    /// mottle and the variants' broad patches): a multiplier on both (1 = as
+    /// before).
+    float mottle          = 0.35f;
+    /// Cast shadows: a low sun on the height field from the NW light every
+    /// pass uses. Strength 0 = off. The sun's elevation is in degrees; reach
+    /// is how far upsun a point looks for a caster, canonical units — the pass
+    /// reads nothing past it (bake_cast_shadows; terrain_hash's margin covers
+    /// it with room).
+    float shadow_strength = 0.50f;
+    float sun_elevation   = 33.0f;
+    float shadow_reach    = 1.5f;
+    /// How much of the tile height field (the continental swell, relief_gain
+    /// x height) casts: the plateaus it interpolates between threw whole-tile
+    /// shadows the slope shading never shows, so it casts only in part.
+    float shadow_tile     = 0.35f;
+    /// How much of the fold field casts: a fold's crest throwing a hard
+    /// shadow read as a spot, so the folds cast softly and the ranges carry
+    /// the long shadows.
+    float shadow_fold     = 0.6f;
+    /// Water: specular glints on sea and river, white rapids where a river
+    /// falls, rocky banks. 0 = off, each.
+    float glint_strength  = 1.0f;
+    float rapids_strength = 1.0f;
+    float bank_rocks      = 1.0f;
     // Near-future grade (the separable pass).
     bool  grade_enabled   = true;
-    float grade_desat     = 0.34f;  ///< Toward luma.
-    float grade_cool[3]   = { 0.93f, 0.97f, 1.05f }; ///< Channel multipliers (r,g,b).
-    float grade_lift      = 0.05f;  ///< Haze floor: lift toward the cool haze colour.
-    float grade_contrast  = 1.06f;  ///< Mild S-curve about mid-grey.
+    float grade_desat     = 0.42f;  ///< Toward luma.
+    float grade_cool[3]   = { 0.99f, 1.00f, 1.00f }; ///< Channel multipliers (r,g,b).
+    float grade_lift      = 0.02f;  ///< Haze floor: lift toward the cool haze colour.
+    /// The S-curve on luminance (BL-1256): exponent of the two power halves
+    /// meeting at grade_pivot (1 = no curve) — crushes the shadows toward
+    /// black and rolls the lit slopes into a warm off-white shoulder.
+    float grade_contrast  = 1.30f;
+    float grade_pivot     = 0.30f;  ///< Luminance (0-1) the curve pivots on.
+    /// Split tone: shadows cool (toward blue-green), lit ground warm.
+    float grade_split     = 1.0f;
     // Installations (BL-1241, structures baked): the structure pass and the
     // stamp seam it asks. A null sheet = every key draws its procedural form.
     bool  installations   = true;
@@ -204,7 +257,7 @@ struct bake_source
     int gw = 0, gh = 0;
     enum class tile_class : std::uint8_t { void_ = 0, land, water, masked };
     std::vector<std::uint8_t> cls;      ///< tile_class per tile.
-    std::vector<std::uint32_t> colour;  ///< palette::tile_colour, ABGR.
+    std::vector<std::uint32_t> colour;  ///< palette::ground_tile_colour (BL-1256), ABGR.
     std::vector<float> height;          ///< BL-517 normalised height.
     std::vector<float> grad_x, grad_y;  ///< Height gradient (neighbour differences).
     std::vector<float> relief_bias;     ///< palette::relief_amount, landform accent input.

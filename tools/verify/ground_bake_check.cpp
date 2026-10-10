@@ -84,6 +84,11 @@
 //       (e)); crisp_<subject>[_flip].png. `--crisp --decomp` repeats it with
 //       crisp 0 (the pre-BL-1254 look, byte for byte), no variants, no
 //       detail and no grain. `--prof` carries a pre-BL-1254 configuration.
+//   P31 Cast shadows (BL-1256, ground look C-F): the low-sun shadow pass is
+//       deterministic, wrap-exact and window-invariant at the master (1x and
+//       2x), draws and darkens, and reads nothing past terrain_hash's margin.
+//       `--shadow` runs it alone. `--look` (a reading) bakes the C-F subjects
+//       and prints their luminance percentiles; `name=value` dials override.
 //   P28-P30 Roads and sea lanes painted (BL-1253, RENDERING.md § Roads and
 //       sea lanes): the route pass pure, wrap-exact and seamless on every
 //       surface; the road / structure agreement; a route change re-baking
@@ -1434,6 +1439,315 @@ void crisp_row(const bake_source& src, const bake_params& p, const char* suffix)
 }
 
 // ---------------------------------------------------------------------------
+// P31 - cast shadows (BL-1256, RENDERING.md § Art direction and palette and
+// § Chunks, cache and invalidation). At the master geometry, 1x and 2x, on the
+// best-linked mountain run (the longest shadows on the body):
+//   - deterministic (byte-identical twice), wrap-exact (one period east),
+//   - window-invariant: sub-windows of a chunk (aligned and not) bake
+//     byte-identical to the same pixels of the whole chunk,
+//   - it draws (shadow_strength 0 differs, and darkens),
+//   - its reach is inside terrain_hash's margin: every tile farther than the
+//     margin from the window has its height raised, and the window bakes
+//     byte-identical — nothing the pass reads lies outside what the hash
+//     covers.
+// `--shadow` runs it alone.
+// ---------------------------------------------------------------------------
+void shadow_row(const bake_source& src, const bake_params& p)
+{
+    const auto land = static_cast<std::uint8_t>(bake_source::tile_class::land);
+    int m = -1, links_best = -1;
+    for (int i = 0; i < static_cast<int>(src.cls.size()); ++i)
+        if (src.cls[i] == land && src.landform[i] == static_cast<std::uint8_t>(terrain_landform::mountain))
+        {
+            int links = 0;
+            for (int s = 0; s < 6; ++s)
+                links += (src.lf_links[i] >> s) & 1;
+            if (links > links_best) { links_best = links; m = i; }
+        }
+    check(m >= 0, "P31", "found a mountain run to cast from");
+    if (m < 0)
+        return;
+    const geometry gm = make_master_geometry(src.gw, src.gh);
+    const int r = m / src.gw, c = m % src.gw;
+    const double cx = 1.7320508075688772 * (c + ((r & 1) ? 0.5 : 0.0));
+    // A chunk-aligned 512 px window with the run's SE side (where its shadow
+    // falls) inside it.
+    const int x0 = std::max(0, static_cast<int>((cx + 0.4) * gm.s) - 256) / 16 * 16;
+    const int y0 = std::clamp((static_cast<int>((1.5 * r + 0.4 - gm.y_min) * gm.s) - 256) / 16 * 16, 0, gm.H - 512);
+    const int W = 512;
+    bool det = true, wrap = true, inv = true, draws = true, darker = true, far_ok = true;
+    long shaded = 0;
+    for (const int ss : { 1, 2 })
+    {
+        bake_params q = p;
+        q.supersample = ss;
+        std::vector<std::uint32_t> a(static_cast<std::size_t>(W) * W), b(a.size()), e(a.size()), o(a.size());
+        bake_region(src, gm, q, x0, y0, W, W, a.data());
+        bake_region(src, gm, q, x0, y0, W, W, b.data());
+        det = det && a == b;
+        bake_region(src, gm, q, x0 + gm.W, y0, W, W, e.data());
+        wrap = wrap && a == e;
+        // Sub-windows: aligned, unaligned, and one straddling the window's
+        // shaded middle.
+        struct sw_ { int x, y, w, h; };
+        for (const sw_ s : { sw_{ 128, 96, 128, 160 }, sw_{ 37, 211, 77, 53 }, sw_{ 250, 250, 200, 140 } })
+        {
+            std::vector<std::uint32_t> part(static_cast<std::size_t>(s.w) * s.h);
+            bake_region(src, gm, q, x0 + s.x, y0 + s.y, s.w, s.h, part.data());
+            for (int y = 0; y < s.h && inv; ++y)
+                for (int x = 0; x < s.w; ++x)
+                    if (part[static_cast<std::size_t>(y) * s.w + x]
+                        != a[static_cast<std::size_t>(y + s.y) * W + (x + s.x)])
+                    {
+                        inv = false;
+                        std::printf("P31: %dx sub-window (%d,%d %dx%d) differs at (%d,%d)\n", ss, s.x, s.y, s.w, s.h, x, y);
+                        break;
+                    }
+        }
+        bake_params off = q;
+        off.shadow_strength = 0.0f;
+        bake_region(src, gm, off, x0, y0, W, W, o.data());
+        draws = draws && a != o;
+        long n_dark = 0, n_light = 0;
+        for (std::size_t i = 0; i < a.size(); ++i)
+        {
+            if (a[i] == o[i])
+                continue;
+            const int la = ui::palette::col_r(a[i]) + ui::palette::col_g(a[i]) + ui::palette::col_b(a[i]);
+            const int lo = ui::palette::col_r(o[i]) + ui::palette::col_g(o[i]) + ui::palette::col_b(o[i]);
+            (la <= lo ? n_dark : n_light)++;
+        }
+        // (the unsharp mask lifts a rim beside a shadow's edge, so a few
+        // pixels brighten; the pass as a whole darkens)
+        darker = darker && n_dark > 2000 && n_dark > 4 * n_light;
+        if (ss == 1)
+            shaded = n_dark;
+        std::printf("P31: %dx  %ld px darkened by the pass, %ld lifted (the unsharp rim)\n", ss, n_dark, n_light);
+
+        // Far tiles raised: nothing past the hash margin is read.
+        {
+            constexpr double kMargin = 6.0; // terrain_hash's margin (ground_bake.cpp)
+            const double wx0 = x0 / gm.s, wx1 = (x0 + W) / gm.s;
+            const double wy0 = y0 / gm.s + gm.y_min, wy1 = (y0 + W) / gm.s + gm.y_min;
+            bake_source far = src;
+            const double period = src.gw * 1.7320508075688772;
+            int raised = 0;
+            for (int i = 0; i < static_cast<int>(far.cls.size()); ++i)
+            {
+                const int rr = i / src.gw, cc = i % src.gw;
+                const double tx = 1.7320508075688772 * (cc + ((rr & 1) ? 0.5 : 0.0)), ty = 1.5 * rr;
+                double dx = std::max({ wx0 - tx, 0.0, tx - wx1 });
+                // the nearest wrap copy
+                for (const double k : { -period, period })
+                    dx = std::min(dx, std::max({ wx0 - (tx + k), 0.0, (tx + k) - wx1 }));
+                const double dy = std::max({ wy0 - ty, 0.0, ty - wy1 });
+                if (std::sqrt(dx * dx + dy * dy) <= kMargin)
+                    continue;
+                far.height[static_cast<std::size_t>(i)] = 1.0f;
+                ++raised;
+            }
+            std::vector<std::uint32_t> f(a.size());
+            bake_region(far, gm, q, x0, y0, W, W, f.data());
+            far_ok = far_ok && raised > 1000 && f == a;
+        }
+    }
+    std::printf("P31: mountain run [%d,%d], master window (%d,%d) 512 px, %ld px in shadow at 1x\n",
+                c, r, x0, y0, shaded);
+    check(det,    "P31", "the cast-shadow bake is deterministic (1x and 2x)");
+    check(wrap,   "P31", "the cast-shadow bake is wrap-exact one period east (1x and 2x)");
+    check(inv,    "P31", "sub-windows bake byte-identical to the same pixels of the whole window (window-invariant)");
+    check(draws && darker, "P31", "the pass draws, and it darkens");
+    check(far_ok, "P31", "no tile past terrain_hash's margin moves the bake (the reach is inside the hash)");
+}
+
+// ---------------------------------------------------------------------------
+// --look (BL-1256, ground look C-F; a reading, not a check): the subjects the
+// it3 C-F reference is judged on — a plain, rolling hills, a mountain run, a
+// river where it falls, a forest edge, a town, a coast — baked as master
+// windows (the app's 1x) and written as look_<subject>.png with the rung-3
+// and rung-2 reads (the master halved, quartered: the mip chain) beside them.
+// Prints each aim (col, row: scripts/verify/ground_look.lua frames them) and
+// the luminance percentiles of its ground, the numbers the palette and value
+// are tuned against (the reference's: RENDERING.md § Art direction).
+// ---------------------------------------------------------------------------
+void look_row(const bake_source& src, const bake_params& p0, const char* suffix)
+{
+    bake_params p = p0;
+    p.supersample = 1; // the app's master (ground_layer k_master_ss)
+    const geometry gm = make_master_geometry(src.gw, src.gh);
+    const auto land = static_cast<std::uint8_t>(bake_source::tile_class::land);
+    const auto water = static_cast<std::uint8_t>(bake_source::tile_class::water);
+    const auto nbi = [&](int i, int s) -> int
+    {
+        const hex_neighbors::coord nb = hex_neighbors::neighbour(i % src.gw, i / src.gw, s);
+        if (nb.gy < 0 || nb.gy >= src.gh)
+            return -1;
+        return nb.gy * src.gw + ((nb.gx % src.gw) + src.gw) % src.gw;
+    };
+    const auto temperate = [&](int i) { const int r = i / src.gw; return r > src.gh / 5 && r < src.gh * 4 / 5; };
+    struct subj { const char* name; int tile; };
+    std::vector<subj> subs;
+    subs.push_back({ "plain", homogeneous_aim(src, terrain_cover::grass) });
+    {
+        // Hills: the highland tile with the most highland neighbours.
+        int t = -1, best = -1;
+        for (int i = 0; i < static_cast<int>(src.cls.size()); ++i)
+        {
+            if (src.cls[i] != land || !temperate(i)
+                || src.landform[i] != static_cast<std::uint8_t>(terrain_landform::highland))
+                continue;
+            int n = 0;
+            for (int s = 0; s < 6; ++s)
+            {
+                const int j = nbi(i, s);
+                n += j >= 0 && src.cls[j] == land
+                  && src.landform[j] == static_cast<std::uint8_t>(terrain_landform::highland);
+            }
+            n = n * 4 - (src.near_feature[i] ? 1 : 0);
+            if (n > best) { best = n; t = i; }
+        }
+        subs.push_back({ "hills", t });
+    }
+    {
+        int m = -1, links_best = -1;
+        for (int i = 0; i < static_cast<int>(src.cls.size()); ++i)
+            if (src.cls[i] == land && src.landform[i] == static_cast<std::uint8_t>(terrain_landform::mountain))
+            {
+                int links = 0;
+                for (int s = 0; s < 6; ++s)
+                    links += (src.lf_links[i] >> s) & 1;
+                if (links > links_best) { links_best = links; m = i; }
+            }
+        subs.push_back({ "mountain", m });
+    }
+    {
+        // A river where it falls: the land river tile with the steepest drop
+        // to its downstream neighbour. Also the drop distribution.
+        int t = -1;
+        float best = -1.0f;
+        std::vector<float> drops;
+        for (int i = 0; i < static_cast<int>(src.cls.size()); ++i)
+        {
+            if (src.cls[i] != land || !src.river_out[i])
+                continue;
+            for (int s = 0; s < 6; ++s)
+                if (src.river_out[i] & (1u << s))
+                {
+                    const int j = nbi(i, s);
+                    if (j < 0)
+                        continue;
+                    const float d = src.height[i] - src.height[j];
+                    drops.push_back(d);
+                    if (d > best && temperate(i)) { best = d; t = i; }
+                }
+        }
+        std::sort(drops.begin(), drops.end());
+        if (!drops.empty())
+            std::printf("LOOK  river drops (%zu reaches): p10 %.4f p50 %.4f p90 %.4f p99 %.4f max %.4f\n",
+                        drops.size(), drops[drops.size() / 10], drops[drops.size() / 2],
+                        drops[drops.size() * 9 / 10], drops[drops.size() * 99 / 100], drops.back());
+        subs.push_back({ "river_fall", t });
+    }
+    {
+        // A forest edge: a forest tile with the most non-forest land neighbours.
+        int t = -1, best = 0;
+        for (int i = 0; i < static_cast<int>(src.cls.size()); ++i)
+        {
+            if (src.cls[i] != land || !temperate(i) || src.near_feature[i]
+                || src.cover[i] != static_cast<std::uint8_t>(terrain_cover::forest))
+                continue;
+            int n = 0, f = 0;
+            for (int s = 0; s < 6; ++s)
+            {
+                const int j = nbi(i, s);
+                if (j < 0 || src.cls[j] != land)
+                    continue;
+                (src.cover[j] == static_cast<std::uint8_t>(terrain_cover::forest) ? f : n)++;
+            }
+            const int score = std::min(n, f) * 10 + n + f;
+            if (score > best) { best = score; t = i; }
+        }
+        subs.push_back({ "forest_edge", t });
+    }
+    {
+        int t = -1, best = -1;
+        for (int r = src.gh / 5; r < src.gh * 4 / 5; ++r)
+            for (int c = 0; c < src.gw; ++c)
+            {
+                const int i = r * src.gw + c;
+                if (src.inst.of_tile[static_cast<std::size_t>(i)] < 0 || src.cls[i] != land)
+                    continue;
+                int n = 0;
+                for (int s = 0; s < 6; ++s)
+                {
+                    const int j = nbi(i, s);
+                    n += j >= 0 && src.inst.of_tile[static_cast<std::size_t>(j)] >= 0;
+                }
+                if (n > best) { best = n; t = i; }
+            }
+        subs.push_back({ "town", t });
+    }
+    {
+        // A coast: a temperate land tile with three water neighbours and land behind.
+        int t = -1;
+        for (int i = 0; i < static_cast<int>(src.cls.size()) && t < 0; ++i)
+        {
+            if (src.cls[i] != land || !temperate(i))
+                continue;
+            int wn = 0;
+            for (int s = 0; s < 6; ++s)
+            {
+                const int j = nbi(i, s);
+                wn += j >= 0 && src.cls[j] == water;
+            }
+            if (wn == 3)
+                t = i;
+        }
+        subs.push_back({ "coast", t });
+    }
+
+    constexpr int W = 1024, H = 640;
+    std::vector<std::uint32_t> a(static_cast<std::size_t>(W) * H);
+    for (const subj& s : subs)
+    {
+        if (s.tile < 0)
+        {
+            std::printf("LOOK  %-12s none\n", s.name);
+            continue;
+        }
+        const int tr = s.tile / src.gw, tc = s.tile % src.gw;
+        const double cx = 1.7320508075688772 * (tc + ((tr & 1) ? 0.5 : 0.0));
+        const int qx0 = (static_cast<int>(cx * gm.s) - W / 2) / 16 * 16;
+        const int qy0 = std::clamp((static_cast<int>((1.5 * tr - gm.y_min - 0.3) * gm.s) - H / 2) / 16 * 16,
+                                   0, gm.H - H);
+        const auto t0 = std::chrono::steady_clock::now();
+        bake_region(src, gm, p, qx0, qy0, W, H, a.data());
+        const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+        std::vector<double> lum;
+        lum.reserve(a.size());
+        for (const std::uint32_t c : a)
+            if (ui::palette::col_a(c) == 255)
+                lum.push_back(0.2126 * ui::palette::col_r(c) + 0.7152 * ui::palette::col_g(c)
+                              + 0.0722 * ui::palette::col_b(c));
+        std::sort(lum.begin(), lum.end());
+        const auto q = [&](double f) { return lum.empty() ? 0.0 : lum[static_cast<std::size_t>(f * (lum.size() - 1))]; };
+        std::printf("LOOK  %-12s [%3d,%3d]  lum p5 %5.1f p10 %5.1f p25 %5.1f p50 %5.1f p75 %5.1f p90 %5.1f p99 %5.1f  (%.0f ms)\n",
+                    s.name, tc, tr, q(0.05), q(0.10), q(0.25), q(0.50), q(0.75), q(0.90), q(0.99), ms);
+        char path[160];
+        std::snprintf(path, sizeof path, "look_%s%s.png", s.name, suffix);
+        write_png_rgba(path, W, H, reinterpret_cast<const unsigned char*>(a.data()), W * 4);
+        // The rung-3 and rung-2 reads: the master halved and quartered.
+        std::vector<std::uint32_t> h1(static_cast<std::size_t>(W / 2) * (H / 2)), h2(static_cast<std::size_t>(W / 4) * (H / 4));
+        downsample_half(a.data(), W, H, h1.data());
+        downsample_half(h1.data(), W / 2, H / 2, h2.data());
+        std::snprintf(path, sizeof path, "look_%s%s_half.png", s.name, suffix);
+        write_png_rgba(path, W / 2, H / 2, reinterpret_cast<const unsigned char*>(h1.data()), (W / 2) * 4);
+        std::snprintf(path, sizeof path, "look_%s%s_quarter.png", s.name, suffix);
+        write_png_rgba(path, W / 4, H / 4, reinterpret_cast<const unsigned char*>(h2.data()), (W / 4) * 4);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // BL-1253 (roads painted), RENDERING.md § Roads and sea lanes.
 //   P28 The route pass on a staged network (a Highway, a Road, a Track, the
 //       Rail rung no world lays yet, a sea lane with its parallel run): pure,
@@ -1939,6 +2253,8 @@ int main(int argc, char** argv)
         struct cfg { const char* name; bake_params q; };
         std::vector<cfg> cfgs;
         cfgs.push_back({ "now", base });
+        { bake_params q = base; q.shadow_strength = 0.0f; cfgs.push_back({ "no shadows", q }); }   // BL-1256
+        { bake_params q = base; q.hill_amp = 0.0f; cfgs.push_back({ "no hills", q }); }            // BL-1256
         { bake_params q = base; q.crisp = 0.0f; cfgs.push_back({ "pre-BL-1254", q }); }
         { bake_params q = base; q.pattern_strength = 0.0f; cfgs.push_back({ "no patterns", q }); }
         { bake_params q = base; q.border_strength = 0.0f;  cfgs.push_back({ "no borders", q }); }
@@ -2000,6 +2316,40 @@ int main(int argc, char** argv)
         return 0;
     }
 
+    // --look: the BL-1256 subjects (a reading), as baked; `--look <suffix>`
+    // names the files.
+    if (argc > 1 && std::strcmp(argv[1], "--look") == 0)
+    {
+        // Tuning overrides, `name=value` after the suffix (the BL-1256 dials).
+        bake_params q = p;
+        struct dial { const char* name; float* v; };
+        const dial dials[] = {
+            { "roll_floor", &q.roll_floor }, { "roll_ridge", &q.roll_ridge }, { "plain_ease", &q.plain_ease },
+            { "hill_amp", &q.hill_amp },
+            { "shade_lo", &q.shade_lo }, { "shade_hi", &q.shade_hi }, { "mottle", &q.mottle },
+            { "shadow_strength", &q.shadow_strength }, { "sun_elevation", &q.sun_elevation },
+            { "shadow_reach", &q.shadow_reach }, { "shadow_tile", &q.shadow_tile }, { "shadow_fold", &q.shadow_fold }, { "glint_strength", &q.glint_strength },
+            { "rapids_strength", &q.rapids_strength }, { "bank_rocks", &q.bank_rocks },
+            { "grade_desat", &q.grade_desat }, { "grade_lift", &q.grade_lift },
+            { "grade_contrast", &q.grade_contrast }, { "grade_pivot", &q.grade_pivot },
+            { "grade_split", &q.grade_split }, { "relief_gain", &q.relief_gain },
+            { "detail_amp", &q.detail_amp }, { "landform_accent", &q.landform_accent },
+            { "altitude_gain", &q.altitude_gain }, { "noise_strength", &q.noise_strength },
+        };
+        for (int a = 3; a < argc; ++a)
+        {
+            const char* eq = std::strchr(argv[a], '=');
+            if (!eq)
+                continue;
+            for (const dial& d : dials)
+                if (std::strncmp(argv[a], d.name, static_cast<std::size_t>(eq - argv[a])) == 0
+                    && std::strlen(d.name) == static_cast<std::size_t>(eq - argv[a]))
+                    *d.v = static_cast<float>(std::atof(eq + 1));
+        }
+        look_row(src, q, argc > 2 ? argv[2] : "");
+        return 0;
+    }
+
     // --border: the BL-1251 rows (P26, P27) alone, with previews.
     if (argc > 1 && std::strcmp(argv[1], "--border") == 0)
     {
@@ -2019,6 +2369,14 @@ int main(int argc, char** argv)
     if (argc > 1 && std::strcmp(argv[1], "--routes") == 0)
     {
         route_row(w, home, src, p, /*previews=*/true);
+        std::printf("%s (%d failures)\n", g_failures ? "FAIL" : "PASS", g_failures);
+        return g_failures ? 1 : 0;
+    }
+
+    // --shadow: the cast-shadow row (P31) alone.
+    if (argc > 1 && std::strcmp(argv[1], "--shadow") == 0)
+    {
+        shadow_row(src, p);
         std::printf("%s (%d failures)\n", g_failures ? "FAIL" : "PASS", g_failures);
         return g_failures ? 1 : 0;
     }
@@ -3441,6 +3799,8 @@ int main(int argc, char** argv)
     // P26 / P27 - tiles hold their own ground (BL-1251).
     border_row(src, hb, p, /*previews=*/false);
     route_row(w, home, src, p, /*previews=*/false);
+    // P31 - cast shadows (BL-1256).
+    shadow_row(src, p);
 
     std::printf("\n%s (%d failure%s)\n", g_failures ? "FAILED" : "ALL PASS",
                 g_failures, g_failures == 1 ? "" : "s");

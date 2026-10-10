@@ -59,6 +59,16 @@ colour32 cover_endpoint(terrain_cover c);
 /// ui::terrain_colour delegates here.
 colour32 tile_colour(terrain_substrate sub, terrain_cover cov, std::uint8_t density);
 
+/// The BAKED ground's base hues (BL-1256, RENDERING.md § Art direction and
+/// palette: the it3 C-F target) — khaki and olive-grey, darker and far less
+/// saturated than the identity fill above, which the vector fallback, the
+/// minimap and the generation preview keep. The same substrate -> cover
+/// blend by density; only the endpoints differ. The bake's relief, shadow
+/// and grade passes carry the value range on top of these.
+colour32 ground_substrate_colour(terrain_substrate sub);
+colour32 ground_cover_endpoint(terrain_cover c);
+colour32 ground_tile_colour(terrain_substrate sub, terrain_cover cov, std::uint8_t density);
+
 /// Signed relief ordinal, plains = 0 (mountain highest, canyon lowest).
 float relief_amount(terrain_landform lf);
 
