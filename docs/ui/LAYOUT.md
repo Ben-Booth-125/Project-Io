@@ -299,8 +299,8 @@ Fold-out ledgers with more than one question split their content across a **butt
 (`ui::nav_button`, `foldout_column.hpp` — a manual `Selectable`/`Button` strip, since
 `ImGui::BeginTabBar` does not render in this build), each view drawing exclusively. The splits:
 the **Construction** panel — **Construction / Buildings** (defaults to Buildings; the build
-front door is the tile Selection element's and sell orders are the Market Ledger's); the
-**Market Ledger** — **Prices / Sell Orders**; the **History** ledger — Story / Chain /
+front door is the tile Selection element's and trades are the Market Ledger's); the
+**Market Ledger** — **Goods / Trades**; the **History** ledger — Story / Chain /
 Ages. The **Balance** and **Corporation** ledgers are single-question — no split. The principle
 is *one question per view, a menu to move between views* — not a mandate to split every panel.
 

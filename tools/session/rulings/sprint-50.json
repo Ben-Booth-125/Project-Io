@@ -308,6 +308,79 @@
    "doc": "docs/ui/LENSES.md",
    "anchor": "The player sees unmet\\s+want",
    "owner": "BL-1222 (trade-flow lens)"
+  },
+  {
+   "ruling": "Corporations hold no stockpiles; every good is on a market's shelf (shelf economy)",
+   "doc": "docs/economy/MARKETS.md",
+   "anchor": "Corporations hold no stockpiles; every good is on a market's shelf",
+   "stale": [
+    "units across all the corp's pools",
+    "Prices / Sell Orders"
+   ],
+   "owner": "BL-1265 (shelf economy)"
+  },
+  {
+   "ruling": "Trade is the only way goods move between markets",
+   "doc": "docs/economy/TRADE.md",
+   "anchor": "Trade is the only way goods move between markets",
+   "stale": [
+    "corp_verb::dispatch_convoy\\) rejects"
+   ],
+   "owner": "BL-1266 (trade core)"
+  },
+  {
+   "ruling": "Ports make trade points too",
+   "doc": "docs/economy/TRADE.md",
+   "anchor": "Ports make trade points too",
+   "owner": "BL-1266 (trade core)"
+  },
+  {
+   "ruling": "Trade points belong to the market the building stands in (NR-1018)",
+   "doc": "docs/economy/TRADE.md",
+   "anchor": "Points belong to the market the building stands in",
+   "stale": [
+    "Marketplaces reach"
+   ],
+   "owner": "BL-1266 (trade core)"
+  },
+  {
+   "ruling": "Reach runs from market centre to market centre; one reserve (NR-1018)",
+   "doc": "docs/economy/TRADE.md",
+   "anchor": "Reach runs from market centre to market centre",
+   "stale": [
+    "per Marketplace or for all of them"
+   ],
+   "owner": "BL-1266 (trade core)"
+  },
+  {
+   "ruling": "A rival may build a Planetary Marketplace, scored as every build is (NR-1013, superseded flat score)",
+   "doc": "docs/ai/AI_OPPONENT.md",
+   "anchor": "It is scored as every build is",
+   "stale": [
+    "modest flat score"
+   ],
+   "owner": "BL-1267 (AI trades)"
+  },
+  {
+   "ruling": "Generation's trade record retrofits Marketplaces (NR-1019)",
+   "doc": "docs/economy/TRADE.md",
+   "anchor": "How the record is read",
+   "owner": "BL-1268 (trade in generation)"
+  },
+  {
+   "ruling": "Exchange rows fold per market, good, side and tick (NR-1021)",
+   "doc": "docs/economy/MARKETS.md",
+   "anchor": "One row per market, good, side and tick",
+   "owner": "built"
+  },
+  {
+   "ruling": "Converter Practice reads produced machinery; the produced subject (NR-1015)",
+   "doc": "docs/META_LAYER.md",
+   "anchor": "has the corp ever made this good",
+   "stale": [
+    "holds machinery"
+   ],
+   "owner": "built"
   }
  ]
 }
