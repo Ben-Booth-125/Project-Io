@@ -7,9 +7,9 @@
 --
 -- WHAT THIS PHOTOGRAPHS. On seed 0 (the harness's own world) at the reference
 -- 1720x1080 window, the whole home master baked first, three framings at the
--- rungs the painted roads carry -- rung 2 (~27 px, the first rung with no drawn
--- network), rung 3 (~55 px) and rung 4 (~110 px, the master near 1:1) -- plus
--- rung 1 (~14 px), the widest rung that still draws the thin network:
+-- rungs the painted roads carry -- rung 2 (~27 px), rung 3 (~55 px) and rung 4
+-- (~110 px, the master near 1:1) -- plus rung 1 (~14 px), where a painted road
+-- is near a pixel (the plain canvas draws no network at any rung, BL-1262):
 --
 --   city_roads  a city carrying all three tiers (Highway, Road, Track) and
 --               roads meeting its works (the roaded variant, the forecourt);
@@ -17,8 +17,8 @@
 --   coast_lane  a coastal run of a lane (the wake along the shore).
 --
 -- Each framing is taken twice: on the plain canvas, where a road is a thin pale
--- thread painted into the ground (0.015-0.03 of a hex) and the drawn network
--- stays only at rung 1; and under the THROUGHPUT lens (BL-1257, LENSES.md
+-- thread painted into the ground (0.015-0.03 of a hex) and no network is drawn
+-- (Ben, 2026-10-10); and under the THROUGHPUT lens (BL-1257, LENSES.md
 -- § Throughput lens), which draws the whole road and lane network at full
 -- weight (1 : 1.5 : 2, lanes in their blue) over its reach-cost field at
 -- every rung -- roads_painted_<framing>_throughput_rung<k>.

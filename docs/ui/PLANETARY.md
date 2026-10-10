@@ -138,7 +138,7 @@ surfaces cannot drift. Verified by `scripts/verify/landform_relief.lua`.
 | Background | Dark: `(18, 18, 24)` |
 | Tile | Filled hexagon. Colour from `ui::terrain_colour` (substrate + cover hue), composited with the landform relief tint (§ Terrain types above). A 1 px gap between hexes lets the background show through as a border — achieved by drawing each hex at `circumradius - 1 px` rather than adding explicit borders. |
 | Buildings | **No marker.** A building is a structure baked into the ground art (RENDERING.md § Installations) — a cluster of up to three on a stacked tile. Type, count, owner and running state are read from the hover card, the Selection element and the ownership lenses: [§ Building markers](#building-markers) below. |
-| Road network | **Always-on** (like terrain, not a lens): the generated road lattice plus player-placed roads render as **continuous, symmetric spans**. Each roaded tile draws its **own half** of every shared road edge — from its centre to the midpoint of the centre-to-neighbour line — toward each roaded, survey-revealed cardinal neighbour; the two tiles' halves meet at the edge midpoint, so a road spans the pair identically whichever tile is "from" (no from/to asymmetry), and a small centre cap rounds junctions and keeps a lone / just-placed road visible. Cylinder-seam edges shift one period to stay short; drawn only toward survey-revealed neighbours, so roads don't leak past the survey fog. Styled by the drawing tile's **tier** — **Track** (`road_level` 1) thin/dim, **Road** (2) medium, **Highway** (3) thick/bright — so a tier change reads as a taper at the midpoint. Spans **dim with the commercial-reach fog**, through the same wash the lens fill takes; a road edge is fogged by the **max** of its two tiles' vision (see [DISCOVERY.md](DISCOVERY.md)). The tier ladder has **no on-canvas key** — it is named contextually in the Selection panel instead (below). Below a 20 px drawn radius each curve is one stroke with no apex joint (RENDERING.md § Roads and sea lanes — the 60 fps budget). **Painted from the third rung up:** at a drawn radius of 20 px and more, a road or lane over baked ground is painted into the ground with a surface per tier (RENDERING.md § Roads and sea lanes) and this drawn network does not draw; it stays, thin, at the two widest rungs, and at every rung on a tile still showing the vector fallback. |
+| Road network | **Always-on** (like terrain, not a lens): the generated road lattice plus player-placed roads render as **continuous, symmetric spans**. Each roaded tile draws its **own half** of every shared road edge — from its centre to the midpoint of the centre-to-neighbour line — toward each roaded, survey-revealed cardinal neighbour; the two tiles' halves meet at the edge midpoint, so a road spans the pair identically whichever tile is "from" (no from/to asymmetry), and a small centre cap rounds junctions and keeps a lone / just-placed road visible. Cylinder-seam edges shift one period to stay short; drawn only toward survey-revealed neighbours, so roads don't leak past the survey fog. Styled by the drawing tile's **tier** — **Track** (`road_level` 1) thin/dim, **Road** (2) medium, **Highway** (3) thick/bright — so a tier change reads as a taper at the midpoint. Spans **dim with the commercial-reach fog**, through the same wash the lens fill takes; a road edge is fogged by the **max** of its two tiles' vision (see [DISCOVERY.md](DISCOVERY.md)). The tier ladder has **no on-canvas key** — it is named contextually in the Selection panel instead (below). Below a 20 px drawn radius each curve is one stroke with no apex joint (RENDERING.md § Roads and sea lanes — the 60 fps budget). **Painted, not drawn, on the plain canvas at every rung** (Ben, 2026-10-10: the drawn web drew too much attention zoomed out): over baked ground a road or lane is painted into the ground with a surface per tier (RENDERING.md § Roads and sea lanes) and this drawn network does not draw at any rung; it draws only under the **Throughput lens** (LENSES.md § Throughput lens), and on a tile still showing the vector fallback, where no painted road exists yet. |
 | Road-tier legend | **Contextual, not chrome** (Ben's call, 2026-08-09). The three tiers render by line weight and brightness alone, and roads are always-on terrain rather than a lens, so the per-lens legend drawer cannot carry them. Instead, selecting a roaded tile names its tier beside the coordinates in the Selection panel header — `Tile [x, y] · Highway` — with a hover tooltip giving the thin→thick ladder. A roadless tile shows nothing; no persistent chip is added anywhere. |
 | Selection / hover indicator | Hex outline drawn through the shared highlight convention (`src/ui/highlight.hpp`): white for the selected tile, light blue for the hovered tile (per wrap copy), amber for pinned. Precedence is selected > pinned > hovered. |
 | Hover card | The shared glance-then-stick hover card ([TOOLTIP.md](TOOLTIP.md)), content **lens-keyed** (`src/ui/hover_content.cpp`). A tile's default variant: `substrate · landform` header (plains unnamed), habitability, and the landform's movement-cost multiplier when not plains. Under the Resource lens: the selected resource's deposit richness; under Population: habitability + workforce cap. Buildings carry their own variant (rival buildings show type + owner only — the competitor-visibility rule, [DISCOVERY.md](DISCOVERY.md)). A market centre has no hover target of its own on this canvas: its tile hovers as any tile does. |
@@ -147,7 +147,7 @@ surfaces cannot drift. Verified by `scripts/verify/landform_relief.lua`.
 | Settlements | Always-on, not lens-gated: **every** generated population centre is a **settlement structure** baked into the ground (RENDERING.md § Installations) whose footprint and height grow with its scale, and a **razed** centre (BL-624) bakes as a ruin — a ruin is a tile-scale fact. The skyline and ruin glyphs retire from this canvas (Ben, 2026-10-08). Far-zoom legibility is the art's job: a settled region must read as settled at the far page without a glyph. Only **City+** centres (scale ≥ 4) carry a name label. Ownership is never carried by a settlement's colour — tier is carried by the structure. On the plain canvas ownership is read from the national border band; under a lens the band is suppressed, so ownership is not on the canvas at all and is read from the Selection panel. |
 | Home-cluster ring | Always-on player-presence chrome: the player's holdings read as "my region" by a ring in the player-identity colour traced round **each tile the player holds** (under every lens; the selection accent under the Corporation lens, where the fill is already the player colour), over a light player-identity wash on the plain canvas. Rival tiles carry no ring. It is drawn per tile, not as one circle round the cluster — the fixed-radius cluster circle retired with BL-329 (corp-reach circle). **No HQ star** — the `ui::icons::hq` origin mark is not drawn on this canvas, for the player or any corporation, plain or under a lens (Ben, 2026-10-10: "We should remove the HQ glyph and market center glyphs"). |
 | Market centres | **No marker and no hit zone** (Ben, 2026-10-10: "We should remove the HQ glyph and market center glyphs"). A market is selected from the map through the **Market lens** — a press on its catchment selects it ([SELECTION.md](SELECTION.md) § A lens collapses selection to ONE TIER) — or from the Market ledger. With no lens, a press on a market's centre tile resolves as any other tile or building press. |
-| National border band | **Plain-canvas** political chrome, **suppressed while any lens is up** (Ben, 2026-08-28, reaffirmed 2026-09-07): a nation's identity colour sits at its frontier and falls off inwards over three tiles, and clicking the band selects the nation. Unlike roads, it is not always-on — a lens asks one question, and a national wash competes with the answer. See § The national border band below. |
+| National border band | **Plain-canvas** political chrome, **suppressed while any lens is up** (Ben, 2026-08-28, reaffirmed 2026-09-07): a nation's border is a **hard edge only** — an inset stroke in its muted identity colour on each edge facing another owner, with no wash inside the territory (Ben, 2026-10-10) — and clicking the stroke's corridor selects the nation. Unlike roads, it is not always-on — a lens asks one question, and a national wash competes with the answer. See § The national border band below. |
 | Rivers | **Baked into the ground** as carved, curved water courses that widen downstream (RENDERING.md § Mountains, rivers and terrain variety). No canvas stroke and no chevron: the width gradient carries the flow direction. Terrain, not a lens; always on. |
 
 ---
@@ -266,7 +266,7 @@ with a reason, or lenses that paint no fill. That is deliberate: the province is
 grain under every lens, but it is the *render* grain only where the field is continuous.
 
 **Country has no row because it is not a lens.** The national read is the border band below, which draws on the plain canvas only —
-always-on chrome, composited per tile *after* the blend has run. That siting is what retires the
+an inset stroke drawn *after* the blend has run, with no fill at all. That siting is what retires the
 question the row used to answer: a nation's colour never enters the blended fill, so the mean of two
 nation colours — a third nation's colour — cannot be reached.
 
@@ -295,20 +295,22 @@ the card's contents — are in [SELECTION.md](SELECTION.md) § The province elem
 **Hard edges only — no wash inside the border** (Ben, 2026-10-10, walking the build: *"there's a
 lot of visual clutter when many nations border each other. One fix would be removing shading inside
 national borders, and just go with the hard edges"*). A nation's border is the **inset boundary
-stroke** alone, in its identity colour; the inward falloff wash below is **retired** — no tile is
-tinted by its nation. What follows about the wash is kept as the record of why the stroke is inset
-and never shared; read it as describing the stroke only.
+stroke** alone, in its identity colour, with its click corridor. **No tile is tinted by its
+nation** — the inward falloff wash the band once carried is retired, so the ground inside a
+territory, at its frontier included, is the ground.
 
 **A nation reads as a bordered region, not as a tinted field.** Its identity colour
-(`palette::nation_colour`) lives at the boundary and falls off inwards; the middle of a territory
-stays plain. That is what makes the read affordable at all — a full-territory tint would own the
-ground the terrain and the texture need, and a band does not.
+(`palette::nation_colour`) lives on the boundary only; the territory itself stays plain. That is what
+makes the read affordable at all — a territory tint would own the ground the terrain and the
+texture need, and where many small nations meet, even a one-tile frontier wash became a field of
+overlapping colour (the 2026-10-10 clutter). The name *band* is kept: it is the political chrome
+as a whole — the stroke and its corridor.
 
 **The band draws on the plain canvas only, and is suppressed while any lens is up** (Ben,
-2026-08-28, reaffirmed 2026-09-07). Affordability is why the band is a band; it is not a licence to
-draw it under a lens. A lens asks one question, and nation ownership is a second political answer
-competing with it — so nation context is absent from a lens *by construction*, not merely absent
-from its fill. Roads are therefore **not** the precedent: a road is terrain a lens reads over.
+2026-08-28, reaffirmed 2026-09-07). A lens asks one question, and nation ownership is a second
+political answer competing with it — so nation context is absent from a lens *by construction*, not
+merely absent from its fill. Roads are therefore **not** the precedent: a road is terrain a lens
+reads over.
 
 A consequence worth stating, because it removes a question rather than answering it: the band's
 click corridor cannot contend with a lens's own structure for a press, because the two are never on
@@ -316,58 +318,39 @@ screen together. Under a lens, a click that misses every marker falls through to
 always did.
 
 Ben, 2026-08-24: *"National borders should not diffuse together, instead they should borders
-extending their colour inwards. With this, we can drop the nation lens."*
+extending their colour inwards. With this, we can drop the nation lens."* The colour-inwards half
+of that ruling is what 2026-10-10 retired; the not-diffusing half is the constraint below.
 
 ### Two neighbours must never blend into a third colour
 
-This is the binding constraint, not a nicety, and it decides both halves of the pass:
+This is the binding constraint, not a nicety:
 
-- **The wash is composited per tile, after the land blend.** A tile takes only *its own*
-  nation's colour, at an alpha keyed to its depth from the frontier. No arithmetic in the pass ever
-  sees two nations, so no averaged hue can be produced.
 - **The boundary stroke is inset, not laid on the shared edge.** A shared edge can carry one colour
   only; two neighbours would fight for it and the later draw would win. Pulled back toward the
-  drawing tile's own centre by `k_border_stroke_inset`, each nation paints a rule just *inside* its
-  own side, so a frontier reads as two parallel coloured lines with the seam between them.
+  drawing tile's own centre by `k_border_stroke_inset` (0.18 of the hex radius), each nation paints
+  a rule just *inside* its own side, so a frontier reads as two parallel coloured lines with the
+  seam between them. No pass ever averages two nations' hues.
 
-### The falloff
+### Which edges draw, and at what weight
 
-Depth is the tile's distance, in tiles, from its nation's frontier — depth 0 being a tile that
-touches a foreign owner. **Unclaimed ground is its own owner**, so a coastline is a border: a
-nation's shore carries the band too. Unclaimed tiles draw no band; they have no colour to extend.
+A tile draws a rule on each edge whose neighbour has a different owner. **Unclaimed ground is its
+own owner**, so a coastline is a border: a nation's shore carries the stroke too. Unclaimed tiles
+draw nothing; they have no colour.
 
 **But a shore is not the same claim as a neighbour, and it is not drawn at the same weight.** An
-edge facing unclaimed ground takes `k_border_unclaimed_scale` — wash *and* stroke, colour and
-thickness — where an edge facing another nation takes full strength. Ben, 2026-08-24: *"reduce the
-border band on edges facing unclaimed ground."*
+edge facing unclaimed ground takes `k_border_unclaimed_scale` (0.40) — colour alpha and thickness —
+where an edge facing another nation takes full strength (`k_border_stroke_px`, 2.2 px). Ben,
+2026-08-24: *"reduce the border band on edges facing unclaimed ground."* The stroke resolves this
+**per edge**: a headland facing water on three sides and a neighbour on the fourth draws three light
+rules and one full one. A country of small islands is nearly all frontier, so at one uniform weight
+an edge treatment becomes a tint on precisely the nations least able to spare the ground.
 
-The reason is a shape problem rather than a taste one. A country of small islands is nearly *all*
-frontier, so at one uniform weight the treatment meant to be an edge effect became a tint again —
-and it did so on precisely the nations least able to spare the ground. Two rules keep the reduction
-honest:
-
-- **Political wins where both meet.** A tile touching a foreign nation *and* open ground counts as
-  political, so a coastal frontier between two countries does not quietly fade into its own sea.
-- **The stroke resolves per edge, the wash per tile.** The stroke already knows what lies across
-  each individual edge, so a headland facing water on three sides and a neighbour on the fourth
-  draws three light rules and one full one. The wash cannot: a depth-1 tile is not on the frontier
-  and has no neighbour to ask, so it *inherits* its kind from the frontier tile that seeded it.
-
-| Depth | Wash opacity | Reads as |
-|---|---|---|
-| 0 (on the frontier) | 0.35 | The single frontier ring, under the coloured rule |
-| 1+ | none | Terrain, texture and the active lens, untouched |
-
-`k_border_band_tiles` = 1, and the band colour is **muted** — the nation identity colour
-pulled toward its own luma by `k_border_mute` (0.55) and sat down slightly, wash and stroke
-alike (the border-corridor hover label keeps the full identity colour: a label must be read,
-not weighed). Ben, 2026-09-01, judging the first baked painterly ground: the three-ring
-falloff and full-strength colour were tuned against flat saturated hexes, and over the muted
-C-F bake the band inverted its contrast relationship with the ground — it became the loudest
-mark on the map. *"Nation borders are way too strong. We should use a muted colour palette,
-and we should also make it a 1 tile glow."* The inward-falloff mechanism above remains the
-design (the depth relaxation still runs, and widening the ring is one constant) — what the
-ruling sets is its extent and its volume.
+The stroke colour is **muted** — the nation identity colour pulled toward its own luma by
+`k_border_mute` (0.55) and sat down slightly (the border-corridor hover label keeps the full
+identity colour: a label must be read, not weighed). Ben, 2026-09-01, judging the first baked
+painterly ground: full-strength colour was tuned against flat saturated hexes, and over the muted
+C-F bake it became the loudest mark on the map — *"Nation borders are way too strong. We should use
+a muted colour palette."*
 
 The band is gated on `revealed`, like the survey mask itself: a border drawn through the survey
 mask would leak the political shape of ground the player has not paid to survey
@@ -409,8 +392,8 @@ Beyond the base grid and the chrome in the table above, the draw pass
 - **Lens tints** — the lenses keyed on `ui_state::overlay`
   ([LENSES.md](LENSES.md)); relief composites *after* the lens tint so landform
   survives a saturated overlay.
-- **Built-tile chrome** — road spans (at the two widest rungs; painted into the ground
-  above them), the home-cluster ring. Buildings and
+- **Built-tile chrome** — the home-cluster ring. Roads are painted into the ground at every
+  rung; the drawn road span is the Throughput lens's. Buildings and
   settlements are **not** a layer here: they are baked into the ground
   ([§ Building markers](#building-markers); RENDERING.md § Installations).
 - **No HQ or market-centre markers** — both retired from this canvas (Ben, 2026-10-10: "We should remove the HQ glyph and market center glyphs").
@@ -484,21 +467,24 @@ first, converted for their own four vertices. Draw order is unchanged.
   neighbours along a row into one rect: ~500 vertices for the whole body where there
   were ~175k. A road or rule now sits over its neighbour's wash rather than under it;
   the difference is the width of a fringe.
-- **Roads and lanes below 20 px take the wide-rung curve LOD** — one stroke per curve,
-  two segments a half, no apex joint (RENDERING.md § Roads and sea lanes).
-- **Only frontier tiles draw the border rule** — the depth pass already ran the same
-  neighbour test, so every interior tile skips six reads. Nothing that drew stops drawing.
+- **The drawn roads and lanes below 20 px take the wide-rung curve LOD** — one stroke per
+  curve, two segments a half, no apex joint (RENDERING.md § Roads and sea lanes). The drawn
+  network is the Throughput lens's; the plain canvas draws none at any rung.
+- **No frontier pass.** The border band is the rule alone (hard edges only, 2026-10-10), so
+  the per-tile depth relaxation that fed the inward wash is gone with the wash. The rule's
+  own neighbour test finds the frontier, and on the baked ground it runs only when a static
+  bucket rebuilds.
 
 **The static strokes are cached, not rebuilt (Ben, 2026-10-10: 60 fps at every zoom).**
-The border band's wash, the drawn road and lane network, the border rule and the
-Throughput anchor rings do not move while the player pans, so they are not re-tessellated
+The border rule and the Throughput lens's drawn road and lane network and anchor rings
+do not move while the player pans, so they are not re-tessellated
 every frame. They are built per **bucket** — sixteen columns of one row — at the view
 origin, stored as finished vertices, and re-emitted each frame with the pan added, for
 each wrap copy and only for the bucket's tiles whose centres are on screen. A bucket is
 **content-addressed**: its key folds in every input its strokes read (each tile's road and
 lane levels, survey bit, vision and nation over the bucket widened by two columns and two
-rows — the lane rung test reads two steps out — and each own tile's band depth, frontier
-kind and anchor share), so it rebuilds exactly when something it draws from moves, and
+rows — the lane rung test reads two steps out — and each own tile's anchor share), so it
+rebuilds exactly when something it draws from moves, and
 never on a pan. Whatever moves the world — a tick, a road laid while paused, a scripted
 survey, a different world — the hash sees it on the next frame; nothing is trusted to a
 change counter. A zoom step, a lens switch or a change of draw flags starts the cache over.
@@ -535,17 +521,28 @@ Vertex counts are unchanged at every rung, and every rung holds the 16.7 ms fram
 heavy load (a game and a parallel compile on the same machine) rung 0 is the one still at
 the edge: 13.3 ms of work plain against 16.4 before, 12.9 under Throughput against 15.9.
 
+**Hard edges only took vertices off the plain canvas, not time it was short of** (2026-10-10,
+the same bench; base → after, after the better of two runs). Retiring the band wash and the
+plain canvas's drawn road and lane network halves the plain canvas's vertices at the wide
+rungs — rung 0 ~108k → ~47k per frame, rung 1 ~87k → ~44k; rung 2 ~20k → ~16k — and drops
+two per-frame passes (the frontier depth relaxation and the wash). Frame work, pan: rung 0
+9.1 → 7.4 ms, rung 1 4.4 → 3.6, rungs 2-4 unchanged within the bench's noise (1.7 → 1.9,
+1.3 → 1.4, 0.9 → 1.1; the unchanged Throughput lens moved as much between runs). Throughput
+is untouched: its vertex counts are identical.
+
 **Frame timings need the live ground path.** Under `--verify` the ground layer re-snapshots
 the world into its bake source every frame (`ground_layer::tick`, the `--verify` path, so a
 capture sees that frame's world) — ~15 ms of every `build_ms` sample that play never pays.
 Read frame totals with `IO_GROUND_BENCH=1`, which runs `--verify` on the play path; the pass
 meter's canvas split is unaffected either way.
 
-**No layer is dropped at any rung.** Terrain, relief, survey mask, fog, roads, lanes,
-the border band and rule, markers and labels all draw at every rung they drew at
-before (roads and lanes are drawn at the two widest rungs and painted into the ground
-from the third up — one layer, two media); the captures at rungs 0 and 1 differ from the old ones in under 2.5% of pixels
-by more than 8/255, and in under 0.1% by more than 32/255.
+**No layer is dropped for cost at any rung.** Terrain, relief, survey mask, fog, roads,
+lanes, the border rule, markers and labels all draw at every rung; the captures at rungs 0
+and 1 differ from the uncached ones in under 2.5% of pixels by more than 8/255, and in under
+0.1% by more than 32/255. Two layers were retired by ruling, not for cost (Ben, 2026-10-10):
+the border band's inward wash (hard edges only) and the plain canvas's drawn road and lane
+network (roads are the painted ground at every rung; the drawn network is the Throughput
+lens's).
 
 `IO_CANVAS_PASS_LOG=1` prints, every 120 frames, each map pass's vertices and CPU time
 per frame (`CANVAS_PASS ...`); the meter costs ~0.4 ms per pass at rung 0, so read it for
