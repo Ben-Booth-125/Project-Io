@@ -1796,6 +1796,7 @@ void run_exploration(generation_cursor& c)
 
         kepler_corridors  = kepler_exploration.surviving_corridors;
         c.kepler_sea_legs = kepler_exploration.sea_legs; // BL-1098: the lane stamp's record
+        c.kepler_trade_record = kepler_exploration.trade_record; // BL-1268: the record Marketplaces are retrofitted from
         kepler_grudges    = kepler_exploration.grudges;
         kepler_grudge_cap = static_cast<int32_t>(ep.grudge_cap);
 
@@ -2067,6 +2068,7 @@ void run_industrialisation(generation_cursor& c)
         //     chest and one conquered after 1660 is credited none.
         kepler_corridors         = kepler_industrialisation.surviving_corridors;
         c.kepler_sea_legs        = kepler_industrialisation.sea_legs; // BL-1098: 1960's lanes
+        merge_trade_record(c.kepler_trade_record, kepler_industrialisation.trade_record); // BL-1268
         kepler_grudges           = kepler_industrialisation.grudges;
         kepler_grudge_cap        = static_cast<int32_t>(dp.grudge_cap);
         kepler_polity_treasuries = polity_treasuries_at_close(kepler_industrialisation.regions);
@@ -3589,6 +3591,13 @@ void run_tail(generation_cursor& c)
     // `generate_corporations` reads — are intact. Set whether or not a report
     // was requested, so the harness tier and the app hand the search one thing.
     w.gen_settlement = std::make_shared<const settlement_state>(kepler_settlement);
+
+    // BL-1268 (TRADE.md § Trade in generation): the history's trade record,
+    // converted to trade points at the campaign's authored rates
+    // (`world_gen.trade_retrofit`), for the retrofit the finish spends it on
+    // (`retrofit_marketplaces`). On `gen_settlement`'s footing: generation-time,
+    // never saved or hashed. Region indices are this same settlement's.
+    w.gen_trade_record = gen_trade_record_from_history(c.kepler_trade_record, gen_cfg.trade_retrofit);
 
     // BL-1003: corporations are generated (and their opening stock seeded)
     // before the home body's markets are carved, so that stock sits in a

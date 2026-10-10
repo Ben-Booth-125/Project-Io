@@ -213,6 +213,31 @@ enum class carve_drop_reason : uint8_t
     no_tile        = 1, ///< the chosen raster index resolved to no tile (defensive; unreached)
 };
 
+/// BL-1268 (TRADE.md § Trade in generation) — ONE CELL OF THE HISTORY'S TRADE
+/// RECORD, converted to trade points: what history polity `polity` earned at
+/// settlement region `region` (an index into `world::gen_settlement`'s regions)
+/// across the Exploration and Industrialisation spans. Generation-time only.
+struct gen_trade_cell
+{
+    std::int32_t polity = -1;
+    std::int32_t region = -1;
+    std::int64_t points = 0;
+    /// The history's own readings the points were converted from, kept so a
+    /// reader can say WHY a Marketplace stands where it does (the ledger's
+    /// question) and a measurement can re-rate without regenerating.
+    std::int64_t flow_volume    = 0;
+    std::int64_t relation_years = 0;
+};
+
+/// The record the retrofit spends, and the two rates it spends it at
+/// (`world_gen.trade_retrofit`). Cells sorted ascending by (polity, region).
+struct gen_trade_record
+{
+    std::vector<gen_trade_cell> cells;
+    std::int64_t points_per_marketplace = 0;
+    int          max_per_market         = 0;
+};
+
 /// A carved centre that was never founded, with the reason.
 struct carve_dropped_slot
 {
@@ -450,6 +475,13 @@ struct world
     /// centres. Same footing as `gen_carve_centres`: generation-time, NOT
     /// SERIALISED, empty after a load.
     std::vector<carve_dropped_slot> gen_carve_dropped;
+
+    /// BL-1268 (TRADE.md § Trade in generation) — THE HISTORY'S TRADE RECORD in
+    /// trade points, built at the end of `make_hard_coded_world` and SPENT by
+    /// `retrofit_marketplaces` once the corporations are chartered. Same footing
+    /// as `gen_carve_centres`: generation-time, NOT SERIALISED (no save field, no
+    /// `state_hash` fold), empty after a load.
+    ::gen_trade_record gen_trade_record;
 
     /// BL-1265 (the shelf economy; MARKETS.md § The shelf economy, Ben 2026-10-10):
     /// CORPORATIONS HOLD NO STOCKPILES. Every good is on a market's shelf

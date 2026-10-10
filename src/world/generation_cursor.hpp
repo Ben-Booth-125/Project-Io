@@ -134,6 +134,12 @@ struct generation_cursor
     /// else Exploration's 1660 one; empty when neither ran.
     std::vector<sea_leg> kepler_sea_legs;
 
+    /// BL-1268 — THE TRADE RECORD (`trade_record_cell`), carried to the tail
+    /// where `w.gen_trade_record` is built from it: Exploration's whole span,
+    /// plus Industrialisation's when it ran (`merge_trade_record`). Empty when
+    /// neither ran.
+    std::vector<trade_record_cell> kepler_trade_record;
+
     /// BL-898 — THE GRUDGE RECORD, carried for the same reason and on the same
     /// terms as the corridors: its consumer (`seed_grudge_sentiment`) runs
     /// after the political map exists. WHY IT IS CARRIED AT ALL: before BL-898
