@@ -192,51 +192,13 @@ std::vector<network_purchase> derive_network_upkeep_claims(const world& w,
                 continue;
             const std::size_t ri = static_cast<std::size_t>(good);
 
-            // The supplier: the (corp, market) pool holding the MOST unreserved
-            // stock — strict >, so ties keep the lowest key the std::map walk
-            // reached first. The player's corp is never eligible (see the
-            // header: a forced sale is an unsanctioned auto-action). Unlike
-            // the space programme there is no whole-lump gate: upkeep is
-            // continuous, so a pool short of the bill still supplies what it
-            // holds and the bill is CAPPED to it. BL-1003: each pool is its
-            // own candidate, priced at its own market.
-            entity_id best_corp  = null_entity;
-            entity_id best_key   = null_entity;
-            entity_id best_body  = null_entity;
-            float     best_avail = 0.0f;
-            for (const auto& [key, pool] : w.corp_market_pools) // ascending (corp, pool key)
+            // BL-1265 (MARKETS.md § The shelf economy): the state BUYS ITS
+            // REPAIR MATERIALS OFF A SHELF. Corporations hold no stockpiles,
+            // so the supplier is always a market. Unlike the space programme
+            // there is no whole-lump gate: upkeep is continuous, so a shelf
+            // short of the bill supplies what it holds and the bill is capped.
             {
-                const entity_id corp = key.first;
-                const entity_id body = pool_key_body(w, key.second);
-                if (corp == w.player_entity)
-                    continue;
-                if (w.corporations.find(corp) == w.corporations.end())
-                    continue;
-                if (body == null_entity)
-                    continue;
-                // BL-1172: a pool priced over the fair-price ceiling at its
-                // market is not a candidate (every draw, pool and shelf alike).
-                if (!pool_price_admitted(w, key.second, ri, reservation_mult))
-                    continue;
-                float avail = pool.quantities[ri];
-                const auto rit = reserved.find(std::make_tuple(corp, key.second, ri));
-                if (rit != reserved.end())
-                    avail -= rit->second;
-                if (avail > best_avail)
-                {
-                    best_corp  = corp;
-                    best_key   = key.second;
-                    best_body  = body;
-                    best_avail = avail;
-                }
-            }
-            if (best_corp == null_entity)
-           
-            {
-                // BL-742: NO pool holds the good — the measured industrial-band
-                // case, where auto-surplus sweeps every pool into market
-                // inventory each tick and the pool-buying template starved
-                // beside a stocked market. Fall back to the market with the
+                // The market with the
                 // most unreserved REAL inventory (strict >, ties keep the
                 // lowest id the sorted walk reached first), at that market's
                 // own resolved price. No budget claim rides the machinery —
@@ -315,42 +277,7 @@ std::vector<network_purchase> derive_network_upkeep_claims(const world& w,
                 np.quantity = quantity;
                 np.credits  = amount;
                 out.push_back(np);
-                continue;
             }
-
-            want(nid, best_key, good, need); // BL-1227: the whole bill, at the supplier pool's market
-
-            const float unit = unit_price_at(w, best_key, ri);
-            if (!std::isfinite(unit) || !(unit > 0.0f))
-                continue; // no price basis, no purchase
-
-            const float quantity = std::min(need, best_avail);
-            const float amount   = quantity * unit;
-            if (!std::isfinite(amount) || !(amount > 0.0f))
-                continue;
-
-            reserved[std::make_tuple(best_corp, best_key, ri)] += quantity;
-            line_claimed += amount;
-
-            budget_claim c;
-            c.nation = nid;
-            c.corp   = best_corp;
-            c.line   = budget_priority::logistics_maintenance;
-            c.amount = amount;
-            // No subject: this line takes none (`line_takes_subject`), and the
-            // gather nulls the field on such a line anyway — the pro-rata fill
-            // is the point (see the header).
-            claims.push_back(c);
-
-            network_purchase np;
-            np.nation   = nid;
-            np.supplier = best_corp;
-            np.body     = best_body;
-            np.pool     = best_key;
-            np.resource = good;
-            np.quantity = quantity;
-            np.credits  = amount;
-            out.push_back(np);
         }
     }
     return out;
@@ -458,28 +385,11 @@ void settle_network_purchases(world& w,
                            ? std::min(t.fill_fraction, 1.0f) : 0.0f;
         const float drawn = np.quantity * fill;
 
-        const std::size_t ri  = static_cast<std::size_t>(np.resource);
-        const auto        pit = w.corp_market_pools.find(std::make_pair(np.supplier, np.pool));
-        if (fill > 0.0f && pit != w.corp_market_pools.end()
-            && pit->second.quantities[ri] >= drawn)
+        // BL-1265: a corporation-supplied bill no longer exists (no pools), so
+        // a transfer matched to one cannot be settled in goods. Reverse it in
+        // the same two places the pass wrote it, as space_programme.cpp does.
+        (void)drawn;
         {
-            // The terminal sink: the materials leave the supplier's pool and
-            // land nowhere — the repairs went into the roadbed. The credit
-            // half stays on the supplier's balance (it is a sale) and
-            // run_nation_step folds it onto `subsidies` so `net()` explains
-            // the delta.
-            pit->second.quantities[ri] -= drawn;
-            np.paid      = t.credits;
-            np.drawn     = drawn;
-            np.completed = true;
-        }
-        else
-        {
-            // The derivation's reservation makes this unreachable within one
-            // tick; defend it anyway, exactly as space_programme.cpp does:
-            // reverse the transfer in the same two places the pass wrote it,
-            // so the tick's books still balance and the nation did not pay
-            // for a repair that never happened.
             const auto cit = w.corporations.find(t.corp);
             const auto nit = w.nations.find(t.nation);
             if (cit != w.corporations.end()) cit->second.balance -= t.credits;

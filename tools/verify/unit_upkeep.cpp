@@ -12,7 +12,7 @@
 //
 //   U1  The credit charge is exactly N x the type's rate, and NOTHING else in
 //       the budget moves. The goods debit is exactly N x each authored good.
-//   U2  An EMPTY pool produces decay at the authored scalar, and stock never
+//   U2  An EMPTY shelf (BL-1265: was pool) produces decay at the authored scalar, and stock never
 //       goes negative.
 //   U3  Demolishing the muster base leaves no orphan unit.
 //   U4  Two runs of one seed produce identical balances, pools and strengths.
@@ -39,6 +39,7 @@
 #include "world/world.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <map>
@@ -49,11 +50,10 @@ namespace {
 
 // BL-654: both upkeep passes now take an `economy_report&` — the shortfall bid
 // they place on the market lands in its `wants` / `purchases` / `upkeep_wants`
-// registers. Nothing in THIS harness reads those registers, and nothing here can
-// write to them either: `price_band_params::reservation_mult` defaults to 0 and
-// these fixtures hand-build their registry, so the bid path is off and the draw
-// is pool-only exactly as it was before BL-654. One shared scratch report keeps
-// that visible rather than scattering a fresh local at every call site.
+// registers. BL-1265: with no pools the shelf is the ONLY source, so
+// `registry_with_upkeep` authors the shipped ceiling and every draw is a shelf
+// purchase. Rows that do not read the registers share one scratch report; the
+// rows that assert on them (U5, U8, U10+) declare their own.
 economy_report g_upkeep_report;
 
 int g_pass = 0, g_fail = 0;
@@ -121,6 +121,28 @@ fixture make_fixture()
     return f;
 }
 
+/// BL-1265 (MARKETS.md § The shelf economy): corporations hold no pools — a
+/// unit's goods draw is BOUGHT off the shelf of the market its tile routes to.
+/// The fixture's one market on the body, centred on the base tile, made on
+/// first use with every good priced at 1 (inside any fair-price ceiling); a
+/// row that never stocks it has no market, so its draws go unmet exactly as an
+/// empty pool's did. A row that adds its own market first gets that one.
+std::array<float, resource_count>& body_shelf(fixture& f)
+{
+    entity_id mid = market_on_body(f.w, f.body);
+    if (mid == null_entity)
+    {
+        mid = f.w.create_entity();
+        market_component mc{};
+        mc.body        = f.body;
+        mc.centre_tile = f.tile;
+        for (std::size_t r = 0; r < resource_count; ++r) mc.base_price[r] = 1.0f;
+        mc.price = mc.base_price;
+        f.w.markets[mid] = mc;
+    }
+    return f.w.markets.at(mid).inventory;
+}
+
 entity_id add_unit(fixture& f, uint16_t type, int count, entity_id muster, int supply = 1000)
 {
     const entity_id u = f.w.create_entity();
@@ -151,6 +173,13 @@ recipe_registry registry_with_upkeep(float credits_per_head,
     mp.upkeep.supply_decay_permille      = decay_permille;
     mp.upkeep.supply_recovery_permille   = recovery_permille;
     reg.set_military(mp);
+    // BL-1265: the shelf is the ONLY source of an upkeep good now, and with the
+    // fair-price ceiling OFF (reservation_mult 0, the hand-built default) the
+    // goods draw buys nothing. Authored at the shipped 2.0 (k_shipped_reservation
+    // below); rows that test the ceiling author their own band over it.
+    price_band_params pb = reg.price_band();
+    pb.reservation_mult = 2.0f;
+    reg.set_price_band(pb);
     return reg;
 }
 
@@ -210,8 +239,8 @@ void u1_exact_charge()
 
     // 2 credits/head, 0.5 ordnance/head. No decay: the pool is stocked.
     recipe_registry reg = registry_with_upkeep(2.0f, 0.5f, 100);
-    f.w.pool_at(f.corp, pool_key_for_body(f.w, f.body)).quantities[ORD] = 1000.0f;
-    f.w.pool_at(f.corp, pool_key_for_body(f.w, f.body)).quantities[IRO] = 77.0f; // an untouched neighbour
+    body_shelf(f)[ORD] = 1000.0f;
+    body_shelf(f)[IRO] = 77.0f; // an untouched neighbour
 
     const float balance_before = f.w.corporations.at(f.corp).balance;
 
@@ -220,12 +249,12 @@ void u1_exact_charge()
           "U1a the pass saw three units, disbanded none, met every draw");
 
     // The goods half: 50 heads x 0.5 = 25 ordnance, and NOTHING else drawn.
-    const stockpile_component& pool = f.w.pool_at(f.corp, pool_key_for_body(f.w, f.body));
-    check(near(pool.quantities[ORD], 975.0f),
-          "U1b ordnance debited by exactly N x the authored rate (1000 - 50*0.5)");
-    check(near(pool.quantities[IRO], 77.0f),
-          "U1c a neighbouring resource in the same pool is untouched");
-    check(near(pool.quantities[RAT], 0.0f),
+    const std::array<float, resource_count>& pool = body_shelf(f);
+    check(near(pool[ORD], 975.0f),
+          "U1b ordnance debited off the shelf by exactly N x the authored rate (1000 - 50*0.5)");
+    check(near(pool[IRO], 77.0f),
+          "U1c a neighbouring good on the same shelf is untouched");
+    check(near(pool[RAT], 0.0f),
           "U1d an unauthored good is not drawn");
 
     // The credit half, through apply_budget's own term.
@@ -271,11 +300,11 @@ void u2_shortfall_decay()
 
     // 1 ordnance/head = 20 needed per tick; the pool holds 5.
     recipe_registry reg = registry_with_upkeep(0.0f, 1.0f, 150);
-    f.w.pool_at(f.corp, pool_key_for_body(f.w, f.body)).quantities[ORD] = 5.0f;
+    body_shelf(f)[ORD] = 5.0f;
 
     unit_upkeep_tick t = run_unit_upkeep(f.w, reg, g_upkeep_report);
     check(t.unmet == 1, "U2a a short draw is reported unmet");
-    check(f.w.pool_at(f.corp, pool_key_for_body(f.w, f.body)).quantities[ORD] == 0.0f,
+    check(body_shelf(f)[ORD] == 0.0f,
           "U2b the pool took what was there and floored at zero (never negative)");
     check(f.w.units.at(u).supply_factor_permille == 850,
           "U2c supply fell by exactly the authored decay scalar (1000 - 150)");
@@ -285,7 +314,7 @@ void u2_shortfall_decay()
         run_unit_upkeep(f.w, reg, g_upkeep_report);
     check(f.w.units.at(u).supply_factor_permille == 400,
           "U2d four ticks of unmet draw = four subtractions (1000 - 4*150)");
-    check(f.w.pool_at(f.corp, pool_key_for_body(f.w, f.body)).quantities[ORD] == 0.0f,
+    check(body_shelf(f)[ORD] == 0.0f,
           "U2e stock is still exactly zero, never negative");
 
     // It floors at zero rather than running negative.
@@ -298,11 +327,11 @@ void u2_shortfall_decay()
 
     // Restock and the SAME rule recovers it — one rule, symmetric.
     recipe_registry rec = registry_with_upkeep(0.0f, 1.0f, 150, 200);
-    f.w.pool_at(f.corp, pool_key_for_body(f.w, f.body)).quantities[ORD] = 1000.0f;
+    body_shelf(f)[ORD] = 1000.0f;
     run_unit_upkeep(f.w, rec, g_upkeep_report);
     check(f.w.units.at(u).supply_factor_permille == 200,
           "U2h a met draw recovers at the authored rate");
-    check(near(f.w.pool_at(f.corp, pool_key_for_body(f.w, f.body)).quantities[ORD], 980.0f),
+    check(near(body_shelf(f)[ORD], 980.0f),
           "U2i and the met draw debited the full 20 heads x 1.0");
 }
 
@@ -379,7 +408,7 @@ rollout run_rollout(int ticks)
     add_unit(f, ROW_LEVY,   7, f.base);
 
     recipe_registry reg = registry_with_upkeep(1.5f, 0.4f, 90, 30, 0.002f);
-    f.w.pool_at(f.corp, pool_key_for_body(f.w, f.body)).quantities[ORD] = 100.0f;
+    body_shelf(f)[ORD] = 100.0f;
 
     std::unordered_map<entity_id, corp_cash_flow>    flows;
     std::map<std::pair<entity_id, entity_id>, float> contention;
@@ -390,7 +419,7 @@ rollout run_rollout(int ticks)
         run_unit_upkeep(f.w, reg, g_upkeep_report);
         apply_budget(f.w, reg, flows, contention);
         r.balances.push_back(f.w.corporations.at(f.corp).balance);
-        r.pool_ordnance.push_back(f.w.pool_at(f.corp, pool_key_for_body(f.w, f.body)).quantities[ORD]);
+        r.pool_ordnance.push_back(body_shelf(f)[ORD]);
     }
 
     // Strengths and stack entries, in ascending unit id so the digest itself is
@@ -443,15 +472,18 @@ void u5_inert_at_zero()
     const entity_id u2 = add_unit(f, ROW_RIFLE, 25, f.base);
 
     const float balance_before = f.w.corporations.at(f.corp).balance;
-    const std::size_t pools_before = f.w.corp_market_pools.size();
 
     std::unordered_map<entity_id, corp_cash_flow>    flows;
     std::map<std::pair<entity_id, entity_id>, float> contention;
     std::map<entity_id, corp_budget>                 breakdown;
 
+    bool posted_nothing = true;
     for (int i = 0; i < 25; ++i)
     {
-        run_unit_upkeep(f.w, reg, g_upkeep_report);
+        economy_report rep;
+        run_unit_upkeep(f.w, reg, rep);
+        posted_nothing = posted_nothing && rep.wants.empty() && rep.purchases.empty()
+                      && rep.upkeep_wants.empty();
         apply_budget(f.w, reg, flows, contention, &breakdown);
     }
 
@@ -459,8 +491,9 @@ void u5_inert_at_zero()
           "U5b the balance is bit-identical after 25 ticks");
     check(breakdown.at(f.corp).upkeep == 0.0f, "U5c the upkeep term is exactly zero");
     check(breakdown.at(f.corp).net() == 0.0f,  "U5d net() is exactly zero");
-    check(f.w.corp_market_pools.size() == pools_before,
-          "U5e no pool was even CREATED (an all-zero goods table touches nothing)");
+    check(posted_nothing && f.w.markets.empty(),
+          "U5e no want, no purchase, no market touched (an all-zero goods table touches nothing; "
+          "BL-1265: was 'no pool created')");
     check(f.w.units.at(u1).supply_factor_permille == 1000
               && f.w.units.at(u2).supply_factor_permille == 1000,
           "U5f no supply factor moved — neither trigger can fire at zero rates");
@@ -614,10 +647,10 @@ void u8_the_reservation_ceiling()
         economy_report rep;
         const unit_upkeep_tick t = run_unit_upkeep(f.w, reg, rep);
 
-        const auto wit = rep.wants.find(std::make_pair(f.corp, pool_key_for_body(f.w, f.body)));
+        const auto wit = rep.wants.find(std::make_pair(f.corp, mid));
         check(wit != rep.wants.end() && near(wit->second[ORD], need),
               "U8 under the ceiling the unit's shortfall reaches the want register");
-        const auto pit = rep.purchases.find(std::make_pair(f.corp, pool_key_for_body(f.w, f.body)));
+        const auto pit = rep.purchases.find(std::make_pair(f.corp, mid));
         check(pit != rep.purchases.end() && near(pit->second[ORD], need),
               "U8 and the fill is what the shelf supplied");
         check(near(f.w.markets.at(mid).inventory[ORD], 100.0f - need),
@@ -650,8 +683,8 @@ void u8_the_reservation_ceiling()
 // FINANCE.md § Standing-force upkeep: "the subtraction stops at the unit's
 // supply share ... A unit fed half its draw therefore settles at half strength
 // rather than starving to nothing, and climbs back toward its share from
-// below." The pool is refilled to half the need every tick; no market, so the
-// share is exactly 500 per-mille.
+// below." BL-1265: the SHELF is refilled to half the need every tick (no pool),
+// so the share is exactly 500 per-mille.
 
 void u9_half_fed_settles_at_half()
 {
@@ -668,7 +701,7 @@ void u9_half_fed_settles_at_half()
         bool overshot = false;
         for (int t = 0; t < 30; ++t)
         {
-            f.w.pool_at(f.corp, pool_key_for_body(f.w, f.body)).quantities[ORD] = need * 0.5f;
+            body_shelf(f)[ORD] = need * 0.5f;
             economy_report rep;
             run_unit_upkeep(f.w, reg, rep);
             const int sf = f.w.units.at(u).supply_factor_permille;
@@ -698,6 +731,8 @@ void u9_half_fed_settles_at_half()
 // ... a unit beside a full shelf is never refused by a price its own want drove
 // up."
 //
+// BL-1265: corporations hold no pools, so the unit's WHOLE need is bought off
+// the shelf (the rows used to take half from the corporation's pool first).
 // The shelf posts 1.5x base (under the 2x ceiling). (a) SHELF ONLY, no listing,
 // at the HISTORICAL k = 0: the unit buys at 1.5x and is billed 1.5x — even
 // though its own want, against zero listed supply, resolves this tick's price
@@ -753,24 +788,23 @@ void u10_a_shelf_draw_pays_the_posted_price()
         fixture f = make_fixture();
         const entity_id u   = add_unit(f, ROW_LEVY, heads, f.base, 600);
         const entity_id mid = setup(f);
-        f.w.pool_at(f.corp, mid).quantities[ORD] = need * 0.5f; // half from the pool
         recipe_registry reg = reg_for(k_historical_shelf_ticks);
 
         economy_report rep;
         const unit_upkeep_tick t = run_unit_upkeep(f.w, reg, rep);
-        check(t.unmet == 0, "U10a the shelf covered the rest: the draw is met, and the tally says so");
+        check(t.unmet == 0, "U10a the shelf covered the need: the draw is met, and the tally says so");
         const auto flows = clear_markets(f.w, reg, rep);
         const float resolved = f.w.markets.at(mid).price[ORD];
         check(resolved > base * k_shipped_reservation,
               "U10a HISTORICAL k = 0: its own want resolves the price OVER the ceiling (5.75x; U13 is the cost)");
         const auto fit = flows.find(f.corp);
         const float spent = (fit == flows.end()) ? 0.0f : fit->second.expenditure;
-        check(near(spent, need * 0.5f * posted),
+        check(near(spent, need * posted),
               "U10a ... and it is billed at the POSTED 1.5x, not the resolved price");
         float q, lo, hi;
-        check(buyer_rows(f, q, lo, hi) == 1 && near(q, need * 0.5f) && near(lo, posted) && near(hi, posted),
+        check(buyer_rows(f, q, lo, hi) == 1 && near(q, need) && near(lo, posted) && near(hi, posted),
               "U10a one exchange row, the shelf fill, at the posted price");
-        check(near(f.w.markets.at(mid).inventory[ORD], shelf - need * 0.5f),
+        check(near(f.w.markets.at(mid).inventory[ORD], shelf - need),
               "U10a the shelf gave up exactly the fill");
         check(f.w.units.at(u).supply_factor_permille == 700,
               "U10a fully fed this tick, the unit steps toward 1000 (600 -> 700)");
@@ -781,7 +815,6 @@ void u10_a_shelf_draw_pays_the_posted_price()
         fixture f = make_fixture();
         add_unit(f, ROW_LEVY, heads, f.base, 600);
         const entity_id mid = setup(f);
-        f.w.pool_at(f.corp, mid).quantities[ORD] = need * 0.5f;
         recipe_registry reg = reg_for(k_shipped_shelf_ticks);
 
         economy_report rep;
@@ -791,7 +824,7 @@ void u10_a_shelf_draw_pays_the_posted_price()
         check(resolved <= base * k_shipped_reservation && !near(resolved, posted),
               "U10d SHIPPED k = 1: the shelf's share is supply, so its own want leaves the price at or under the ceiling");
         const auto fit = flows.find(f.corp);
-        check(near(fit == flows.end() ? 0.0f : fit->second.expenditure, need * 0.5f * posted),
+        check(near(fit == flows.end() ? 0.0f : fit->second.expenditure, need * posted),
               "U10d SHIPPED k = 1: ... billed at the posted 1.5x");
     }
 
@@ -800,7 +833,6 @@ void u10_a_shelf_draw_pays_the_posted_price()
         fixture f = make_fixture();
         add_unit(f, ROW_LEVY, heads, f.base, 600);
         const entity_id mid = setup(f);
-        f.w.pool_at(f.corp, mid).quantities[ORD] = need * 0.5f;
         recipe_registry reg = reg_for(k_dormant_shelf_ticks);
 
         economy_report rep;
@@ -810,7 +842,7 @@ void u10_a_shelf_draw_pays_the_posted_price()
         check(resolved <= base * k_shipped_reservation && !near(resolved, posted),
               "U10c k = 4 (not shipped): the shelf's share is supply, so its own want leaves the price at or under the ceiling");
         const auto fit = flows.find(f.corp);
-        check(near(fit == flows.end() ? 0.0f : fit->second.expenditure, need * 0.5f * posted),
+        check(near(fit == flows.end() ? 0.0f : fit->second.expenditure, need * posted),
               "U10c k = 4 (not shipped): ... billed at the posted 1.5x all the same");
     }
 
@@ -823,7 +855,7 @@ void u10_a_shelf_draw_pays_the_posted_price()
         corporation_component sc{};
         sc.name = "Seller";
         f.w.corporations[seller] = sc;
-        f.w.pool_at(seller, mid).quantities[ORD] = 40.0f;
+        f.w.land_goods(seller, mid, ORD, 40.0f); // BL-1265: a landing the clear lists
         recipe_registry reg = reg_for(k_shipped_shelf_ticks);
 
         economy_report rep;

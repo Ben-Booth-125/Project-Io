@@ -51,6 +51,7 @@
 #include "world/orbital_system.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/supply_system.hpp"
+#include "world/trade.hpp"
 #include "world/survey_system.hpp"
 #include "world/world.hpp"
 
@@ -349,7 +350,7 @@ enum counter : int
     c_corporations,
     c_corp_assets_total,   ///< Sum over corporations of assets.size().
     c_nation_tiles_total,  ///< Sum over nations of tiles.size().
-    c_corp_market_pools,
+    c_trades,              ///< BL-1266: world.trades (the pools counter retired with BL-1265).
     c_convoys,
     c_trade_routes,
     c_glimpse_stamps,
@@ -386,7 +387,7 @@ const char* const k_counter_names[c_count] = {
     "world.corporations",
     "corporation.assets (sum)",
     "nation.tiles (sum)",
-    "world.corp_market_pools",
+    "world.trades",
     "world.convoys",
     "world.trade_routes",
     "world.body_last_glimpse_tick",
@@ -468,7 +469,7 @@ sample take_sample(int tick, const world& w, const economy_report& rep,
         nation_tiles += static_cast<long long>(nat.tiles.size());
     s.v[c_nation_tiles_total] = nation_tiles;
 
-    s.v[c_corp_market_pools]  = static_cast<long long>(w.corp_market_pools.size());
+    s.v[c_trades]           = static_cast<long long>(w.trades.size());
     s.v[c_convoys]          = static_cast<long long>(w.convoys.size());
     s.v[c_trade_routes]     = static_cast<long long>(w.trade_routes.size());
     s.v[c_glimpse_stamps]   = static_cast<long long>(w.body_last_glimpse_tick.size());
@@ -651,8 +652,7 @@ int main(int argc, char* argv[])
         advance_convoys(w);
         credit_arrived_convoys(w, t); // app order: arrivals before the economy
         economy_report rep = run_economy_step(w, reg);
-        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land), // BL-995: before the clear
-                         reg.logistics_cost(convoy_mode::space));
+        run_trades(w, reg, rep); // BL-1266: the trade pass (was dispatch_convoys), before the clear
         auto flows = clear_markets(w, reg, rep);
         apply_budget(w, reg, flows, rep.workforce_contention, &rep.budgets);
         advance_surveys(w, 1);

@@ -468,11 +468,9 @@ The bodies are generated against the full model by the six-pass pipeline in
 **All three axes render.** Substrate supplies the base hex colour (`terrain_colour`), cover
 supplies the overlay texture scaled by density (BL-520, tile texturing), and landform is a third,
 independent channel: a subtle **relief tint** (`landform_relief`, `src/ui/hex_render.hpp`) for
-the common ground and a **glyph** for the dramatic landforms. Mountains read as raised ground
-from the relief fill rather than from a glyph (BL-565, mountains read as elevation — relief
-+0.45 for mountain, +0.25 for highland); canyon, crater and rift — which sink or pit, and which
-relief serves far less well — keep their glyphs. The split is authored in `docs/ui/PLANETARY.md`
-§ Terrain channels; the glyph shapes are catalogued in `docs/ui/ICONS.md` § Landform glyphs.
+the common ground and a **baked relief form** for each dramatic landform — massif and ridge,
+canyon cut, crater bowl, rift fissure. The split is authored in `docs/ui/PLANETARY.md`
+§ Terrain channels; the forms in `docs/ui/RENDERING.md` § Mountains, rivers and terrain variety.
 
 **Runs are bridged, not repeated** (BL-232, landform spans). A contiguous run of the same linear
 landform draws as **one** spanning marker rather than the same glyph stamped on each tile — rift

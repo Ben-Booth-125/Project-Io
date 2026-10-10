@@ -77,8 +77,8 @@ The campaign premise makes three big historical claims:
    `terrain_resistance`, `src/world/terrain_combat.cpp`).
 3. **Corporations as first-class actors.** An immortal legal fiction can own, trade, and expand
    across borders — and nations tolerate it. The *mechanism* — the enforceable promise, the
-   charter — is settled. The *player* is a corporation that holds a seat (`docs/CONCEPT.md`, Ben
-   2026-09-17, NR-885), and the rupture is **averted, not past** (Ben, 2026-07-30, BL-223).
+   charter — is settled. The *player* is a major nation operating its champion corporation
+   (`docs/CONCEPT.md`, Ben 2026-10-10), and the rupture is **averted, not past** (Ben, 2026-07-30, BL-223).
 
 None of these are natural defaults. Each is the residue of specific historical stages. This
 document names those stages, states the causal lesson each one carries, and marks the hooks
@@ -345,7 +345,9 @@ grievance.
 
 **The ruptures are the sim's own breaks.** Secession (`../generation/CIVILISATION.md` § How an
 empire actually falls) and schism (`CREEDS.md` § The schism verb) are what break a polity; no
-pass pre-resolves a collapse, war or revolution over a finished map.
+pass pre-resolves a collapse, war or revolution over a finished map. The targeted history patterns
+(`../generation/GENERATION_STRATEGY.md` § History patterns) do not either: they lean the sim and
+reconcile inside it, by its own verbs.
 
 **Calibration is the sweep's, not the harness's.** A green harness means the pass is
 self-consistent, deterministic and wired into the political map — *not* that its dates or

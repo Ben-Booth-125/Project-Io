@@ -12,6 +12,7 @@
 #include "nav_pane.hpp"
 #include "presentation.hpp"
 #include "shell_metrics.hpp"     // right chrome column + minimap rect (BL-533 legend home)
+#include "ground_bake.hpp"      // k_tilt_sy: the one camera angle (BL-1246)
 #include "world/battle_system.hpp" // first_battle_in (BL-469 battle rung)
 #include "world/hex_neighbors.hpp"   // canonical odd-r neighbour offsets (BL-363)
 #include "world/logistics.hpp"       // intra_body_path (convoy vision beam, BL-152)
@@ -23,9 +24,11 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <iterator>
 #include <limits>
 #include <map>
@@ -35,9 +38,111 @@
 #include <unordered_set>
 #include <vector>
 
+#include <SDL3/SDL_stdinc.h> // SDL_getenv: the pass meter's off-by-default flag
+#include <imgui_internal.h> // ImDrawListSharedData: the static stroke cache re-emits ImGui-tessellated strokes (BL-1260)
+
 namespace ui {
 
 namespace {
+
+// ---------------------------------------------------------------------------
+// The vector-layer pass meter (off by default; PLANETARY.md § Draw-loop cost
+// model). IO_CANVAS_PASS_LOG=1 charges every map pass its emitted vertices and
+// its CPU time, and prints the per-frame mean every 120 frames:
+//   CANVAS_PASS draw_r 6.3 lens 0 frames 120 vtx 12345 | fill 1.20ms 4000v | ...
+// A running cursor, not nested scopes: `mark(p)` charges everything since the
+// previous mark to pass p, so instrumenting a section is one line at its end.
+// ---------------------------------------------------------------------------
+struct canvas_pass_meter
+{
+    enum pass : int { setup, ground, shade, tile_misc, fill,
+                      lens_marks, roads, lanes, border_rule, player_ring, markers,
+                      outline, post, stat, count };
+    static constexpr const char* k_names[count] = {
+        "setup", "ground", "shade", "tile", "fill", "lensmk",
+        "roads", "lanes", "brule", "pring", "markers", "outline", "post", "static" };
+
+    bool        on = false;
+    double      ms[count]  = {};
+    long long   vtx[count] = {};
+    long long   vtx_total  = 0;
+    long long   static_builds = 0; ///< static stroke buckets (re)built this tally (BL-1260)
+    int         frames     = 0;
+    float       last_r     = -1.0f;
+    int         last_lens  = -1;
+    std::chrono::steady_clock::time_point t;
+    int         v = 0;
+
+    /// The top of the canvas draw: everything up to the first mark is `setup`.
+    void start(ImDrawList* dl)
+    {
+        if (!on) return;
+        t = std::chrono::steady_clock::now();
+        v = dl->VtxBuffer.Size;
+    }
+    /// Once the zoom and lens are known: a new (radius, lens) starts a new tally.
+    void begin(float draw_r, int lens)
+    {
+        if (!on) return;
+        if (std::fabs(draw_r - last_r) > 0.25f || lens != last_lens)
+        {
+            const auto keep_t = t;
+            const int  keep_v = v;
+            flush();
+            t = keep_t;
+            v = keep_v;
+            last_r = draw_r;
+            last_lens = lens;
+        }
+    }
+    void mark(int p, ImDrawList* dl)
+    {
+        if (!on) return;
+        const auto now = std::chrono::steady_clock::now();
+        ms[p]  += std::chrono::duration<double, std::milli>(now - t).count();
+        vtx[p] += dl->VtxBuffer.Size - v;
+        t = now;
+        v = dl->VtxBuffer.Size;
+    }
+    void end(ImDrawList* dl, int v_start)
+    {
+        if (!on) return;
+        vtx_total += dl->VtxBuffer.Size - v_start;
+        if (++frames >= 120)
+            flush();
+    }
+    void flush()
+    {
+        if (frames > 0)
+        {
+            const double f = static_cast<double>(frames);
+            double tot = 0.0;
+            for (double x : ms) tot += x;
+            std::printf("CANVAS_PASS draw_r %.1f lens %d frames %d vtx %lld cpu %.2fms",
+                        last_r, last_lens, frames,
+                        static_cast<long long>(static_cast<double>(vtx_total) / f), tot / f);
+            for (int p = 0; p < count; ++p)
+                if (ms[p] / f >= 0.005 || vtx[p] > 0)
+                    std::printf(" | %s %.2fms %lldv", k_names[p], ms[p] / f,
+                                static_cast<long long>(static_cast<double>(vtx[p]) / f));
+            std::printf(" | static builds %lld\n", static_builds);
+            std::fflush(stdout);
+        }
+        *this = canvas_pass_meter{ on };
+        last_r = -1.0f;
+    }
+};
+
+canvas_pass_meter& pass_meter()
+{
+    static canvas_pass_meter m = [] {
+        canvas_pass_meter pm;
+        const char* e = SDL_getenv("IO_CANVAS_PASS_LOG");
+        pm.on = e && *e && e[0] != '0';
+        return pm;
+    }();
+    return m;
+}
 
 /// The construction-suitability wash's terrain test: tile-level `can_place`,
 /// plus the world-level terrain gate of the two deposit-agnostic extraction
@@ -152,46 +257,27 @@ constexpr int k_side_verts[6][2] = { {5,0}, {4,5}, {3,4}, {2,3}, {1,2}, {0,1} };
 constexpr float k_land_blend_strength = 0.35f;
 
 // ---------------------------------------------------------------------------
-// BL-601 — the national border band (always-on chrome, no longer a lens)
+// BL-601 — the national border band (plain-canvas chrome, no longer a lens)
 // ---------------------------------------------------------------------------
-// Ben, 2026-08-24: "National borders should not diffuse together, instead they
-// should borders extending their colour inwards. With this, we can drop the
-// nation lens."
+// HARD EDGES ONLY (BL-1292; Ben, 2026-10-10: "a lot of visual clutter when many
+// nations border each other. One fix would be removing shading inside national
+// borders, and just go with the hard edges"). A nation reads as a BORDERED
+// REGION: its identity colour is the inset boundary stroke and nothing else —
+// no tile is tinted by its nation (the inward falloff wash of 2026-08-24 is
+// retired). PLANETARY.md § The national border band.
 //
-// A nation reads as a BORDERED REGION, not a tinted field. Its identity colour
-// lives at the boundary and falls off inwards over a few tiles, which is what
-// makes an always-on read affordable at all: the middle of a territory stays
-// free for terrain, texture and whatever lens is active, which a full-territory
-// tint cannot do. Roads set the precedent — drawn always, not behind a lens.
-//
-// TWO NEIGHBOURS MEETING MUST NEVER BLEND INTO A THIRD COLOUR. That is exactly
-// the objection PLANETARY.md's categorical refusal raised against blending the
-// old Country lens (overruled by BL-532, and reinstated here in a shape that
-// does not need the refusal): the band is composited PER TILE, after the
-// province blend has already run, and each tile takes only its OWN nation's
-// colour. Nothing in this pass ever averages two nations' hues.
+// TWO NEIGHBOURS MEETING MUST NEVER BLEND INTO A THIRD COLOUR: the stroke is
+// inset into each nation's own side (k_border_stroke_inset), so a frontier is
+// two parallel rules and no pass ever averages two nations' hues.
 
-/// Depth of the inward band, in tiles. Depth 0 is a tile touching a foreign
-/// owner — another nation, or unclaimed ground, so a coastline is a border too.
-///
-/// ONE TILE (Ben, 2026-09-01, judging the baked ground): the three-ring falloff
-/// was tuned against flat saturated hexes; over the muted painterly bake the
-/// band inverted its contrast relationship with the ground and became the
-/// loudest mark on the map. "A 1 tile glow, rather than the current 2/3 tile
-/// glow" — the frontier ring alone, in a muted colour (below).
-constexpr int k_border_band_tiles = 1;
-
-/// Wash opacity by depth — the single frontier ring.
-constexpr float k_border_band_alpha[k_border_band_tiles] = { 0.35f };
-
-/// How far the band's colour is pulled toward its own luma before drawing —
-/// the "muted colour palette" half of the same 2026-09-01 ruling. Applied to
-/// the wash AND the stroke; the border-corridor hover label keeps the full
-/// identity colour, because a label must be read, not weighed.
+/// How far the stroke's colour is pulled toward its own luma before drawing —
+/// the "muted colour palette" ruling (Ben, 2026-09-01). The border-corridor
+/// hover label keeps the full identity colour, because a label must be read,
+/// not weighed.
 constexpr float k_border_mute = 0.55f;
 
-/// Mute a nation identity colour for the band: desaturate toward its own luma
-/// by k_border_mute and sit it down slightly, so the ring reads as a claim on
+/// Mute a nation identity colour for the stroke: desaturate toward its own luma
+/// by k_border_mute and sit it down slightly, so the rule reads as a claim on
 /// the ground rather than as chrome over it.
 inline ImU32 muted_nation_colour(ImU32 nc)
 {
@@ -229,20 +315,53 @@ inline ImU32 washed_resource_ground(ImU32 c, bool water)
     return IM_COL32(ch(r, wr), ch(g, wg), ch(b, wb), 255);
 }
 
-/// Scale applied to the whole treatment — wash AND stroke — where the frontier
+// --- A lens washes the rendered ground (BL-1250; LENSES.md § A lens washes the
+// rendered ground) ---------------------------------------------------------------
+// Under a lens the baked ground stays; each lens's per-tile answer is a translucent
+// wash over it in the tile's own geometry. ONE strength per lens family, set by eye
+// against the lens_modes / owner_multi_select captures:
+//
+//   CATEGORICAL (Corporation, Company, Market, Continent, Resource deposits) — a
+//   hue says WHICH, and a hue reads at a lower alpha than a value does, because the
+//   eye separates hues even over textured ground; the structures, forms and rivers
+//   beneath must still read through, so the wash stays under half.
+//   SEQUENTIAL (Population, Throughput, Scarcity, Industry) — a ramp says HOW MUCH,
+//   and a value read needs more of the ramp colour over the ground's own light and
+//   dark: a little stronger. Where a sequential lens's old blend already scaled with
+//   its value (Scarcity, Industry), the value scales this alpha the same way.
+constexpr float k_lens_wash_categorical = 0.46f;
+constexpr float k_lens_wash_sequential  = 0.54f;
+/// The Resource lens's no-deposit ground: its ruled white wash (Ben, 2026-10-04,
+/// "the white wash should still exist") over the bake, paler than the fill path's
+/// 72% so the ground's forms survive under it while the deposits stay the only
+/// saturated thing.
+constexpr float k_resource_ground_wash_alpha = 0.50f;
+
+/// @p c's RGB at alpha @p a (0..1).
+inline ImU32 with_alpha(ImU32 c, float a)
+{
+    const int ai = static_cast<int>(std::lround(std::clamp(a, 0.0f, 1.0f) * 255.0f));
+    return (c & ~IM_COL32_A_MASK) | (static_cast<ImU32>(ai) << IM_COL32_A_SHIFT);
+}
+
+// --- The close-zoom seam (BL-1251 part 5; RENDERING.md § The grid rule) ---------
+// At the two closest rungs only, a faint line between neighbouring tiles: a
+// low-alpha BLACK stroke, so it is the ground under it darkened, never a colour of
+// its own. Keyed on the drawn radius: 40 px sits between rung 2 (~27 px) and rung 3
+// (~55 px) at the reference 1720x1080 window.
+constexpr float k_seam_min_drawn_r = 40.0f;
+constexpr float k_seam_alpha       = 0.16f;
+
+/// Scale applied to the stroke — its alpha AND its thickness — where an edge
 /// faces UNCLAIMED ground rather than another nation (Ben, 2026-08-24: "reduce
 /// the border band on edges facing unclaimed ground").
 ///
 /// Both kinds of edge are still borders — a coastline is where a nation stops —
 /// but they are not the same claim, and drawing them at the same weight made the
-/// band read as heavy on exactly the nations that have the most of it. A country
-/// of small islands is nearly all frontier, so at full strength almost none of
-/// its land showed plain terrain: the treatment that was meant to be an edge
-/// effect became a tint again for the shapes least able to afford it.
-///
-/// A tile touching BOTH a foreign nation and unclaimed ground counts as
-/// political — the stronger claim wins, so a coastal frontier between two
-/// countries does not quietly fade.
+/// band read as heavy on exactly the nations that have the most of it: a country
+/// of small islands is nearly all frontier. Resolved PER EDGE — a headland facing
+/// the sea on three sides and a neighbour on the fourth draws three light rules
+/// and one full one.
 constexpr float k_border_unclaimed_scale = 0.40f;
 
 /// The boundary stroke is INSET toward the drawing tile's own centre by this
@@ -268,6 +387,27 @@ constexpr float k_border_stroke_px    = 2.2f;
 constexpr float k_border_hit_px   = 7.0f;
 constexpr float k_border_hit_frac = 0.18f;
 
+/// `hex_vertices` (hex_render.cpp) off a table: the same six angles through the
+/// same float cos/sin, computed once rather than twelve trig calls per hex per
+/// wrap copy (the 60 fps budget, PLANETARY.md § Draw-loop cost model). The
+/// output is bit-identical — the table holds exactly the values the loop would
+/// have computed, and the multiply-add is the same expression.
+void hex_verts_fast(ImVec2 out[6], float cx, float cy, float r)
+{
+    static const std::array<ImVec2, 6> unit = [] {
+        std::array<ImVec2, 6> u{};
+        for (int i = 0; i < 6; ++i)
+        {
+            const float angle = kPi / 6.0f + kPi / 3.0f * static_cast<float>(i);
+            u[static_cast<std::size_t>(i)] = { std::cos(angle), std::sin(angle) };
+        }
+        return u;
+    }();
+    for (int i = 0; i < 6; ++i)
+        out[i] = { cx + r * unit[static_cast<std::size_t>(i)].x,
+                   cy + r * unit[static_cast<std::size_t>(i)].y };
+}
+
 /// Per-tile shade, computed one pass ahead of the draw loop so a tile's
 /// neighbours' colours are in hand when its corners are blended.
 struct tile_shade
@@ -275,6 +415,7 @@ struct tile_shade
     ImU32    fill     = 0;      ///< The tile's final composited colour.
     uint32_t province = 0;      ///< Owning province id; 0 = ocean / unpartitioned.
     bool     blend    = false;  ///< Whether this tile joins its province's blend.
+    bool     province_known = false; ///< `province` was looked up (the bake skips it).
 };
 
 /// Per-channel mean of @p n opaque colours. The blend's only arithmetic: a
@@ -377,17 +518,25 @@ void prim_blended_hex(ImDrawList* dl, const ImVec2 verts[6], ImVec2 centre,
 /// road span reads). Every layer the fog covers goes through this one function — the
 /// lens fill and, since BL-185, the road spans — so the fog reads as a single wash
 /// rather than a dark ground with brightly-lit roads laid over it.
+/// The activity fog's strength: how far unseen ground is washed toward near-black.
+/// 0.5 until 2026-10-10; Ben, walking the it3 C-F palette: "lighten the fog to 20%,
+/// it's too dark" (DISCOVERY.md § The two fogs).
+constexpr float k_fog_strength = 0.2f;
+
 ImU32 fog_dim(ImU32 c, float vision)
 {
     if (vision >= 1.0f)
         return c;
     const ImU32 alpha = (c >> IM_COL32_A_SHIFT) & 0xFFu;
-    const ImU32 dim   = lerp_colour(c, IM_COL32(8, 10, 16, 255), 0.5f * (1.0f - vision));
+    const ImU32 dim   = lerp_colour(c, IM_COL32(8, 10, 16, 255), k_fog_strength * (1.0f - vision));
     return (dim & ~(0xFFu << IM_COL32_A_SHIFT)) | (alpha << IM_COL32_A_SHIFT);
 }
 
 /// ROUTE STROKE WIDTHS, one named constant per tier (RENDERING.md § Roads and sea
-/// lanes; Ben, 2026-10-03: "make them thinner"). Each is the stroke width as a fraction
+/// lanes; Ben, 2026-10-03: "make them thinner"). These are the DRAWN network's weights —
+/// the Throughput lens's full-weight network at every rung (BL-1257) and the vector
+/// fallback's — not the painted roads, which are thin threads in the bake
+/// (route_paint.hpp k_route_width). Each is the stroke width as a fraction
 /// of the drawn hex circumradius, which is floored at 10 px before it is applied so
 /// the tiers stay apart on the whole-grid view. Half the widths the straight-segment
 /// roads used (0.12 / 0.18 / 0.24); the 1 : 1.5 : 2 ladder between the tiers is kept,
@@ -398,9 +547,19 @@ constexpr float k_road_width_highway = 0.12f;
 /// A sea lane's one rung (LOGISTICS.md § 4b): a soft band a little under a Highway,
 /// told apart from the road ladder by its sea blue rather than by weight.
 constexpr float k_lane_width         = 0.10f;
+/// Below this DRAWN hex radius a road or lane curve takes the wide-rung LOD: one
+/// stroke per curve, two segments a half (chords at the coarse fill), no apex
+/// joint (RENDERING.md § Roads and sea lanes; the 60 fps budget, Ben 2026-10-09).
+/// 20 px sits between the second rung (~13 px) and the third (~27 px). The drawn
+/// network itself is the Throughput lens's (and the vector fallback's): on the plain
+/// canvas a road or lane over baked ground is painted into the bake at every rung,
+/// never drawn (BL-1292; Ben, 2026-10-10).
+constexpr float k_route_lod_radius_px = 20.0f;
 
-/// Building silhouette radius as a fraction of the hex circumradius. The silhouette
-/// scales to the hex rather than being a small pin on it; the value leaves the
+/// Building silhouette radius as a fraction of the hex circumradius — since BL-1241
+/// (structures baked) used ONLY by the construction ghost, the one place a building
+/// glyph still draws on this canvas (an armed placement is chrome, not ground).
+/// The silhouette scales to the hex rather than being a small pin on it; the value leaves the
 /// lower-right corner free for the owner emblem tag and keeps the widest glyph (the
 /// square) inside the hexagon's inradius. Shared with the construction ghost so the
 /// armed preview matches what actually lands.
@@ -410,30 +569,6 @@ constexpr float k_lane_width         = 0.10f;
 /// ground, so its legibility rests on its own dark outline against a live background,
 /// which is what the icon vocabulary is for (ICONS.md § Shared conventions).
 constexpr float kBuiltSilhouetteScale = 0.48f;
-
-/// Level-of-detail floor for the stacked-tile ring (BL-596), in drawn hex
-/// circumradius. Its OWN bound, and a stricter one than the coarse-fill threshold
-/// below, exactly as the terrain texture carries its own stricter bound — because
-/// the two passes fail differently. Coarse fill asks "is the corner cut still
-/// drawable"; the ring asks "is one SEGMENT still a segment", and a segment that has
-/// shrunk to the length of its own gap reads as a dotted circle, not as a count.
-///
-/// **Derived, not chosen.** A segment's drawn arc is
-/// `2 pi * 0.76 * draw_r / kinds * (1 - 0.20)`. At the practical worst case — the
-/// full building_type roster, six placeable kinds on one tile — that is `0.637 *
-/// draw_r`, and a stroke needs about 6 px of run before it reads as an arc rather
-/// than a blob: `0.637 * draw_r >= 6` gives `draw_r >= 9.4`. Rounded up to 10.
-///
-/// Because 10 > k_lod_radius_px (7), the ring is already gone by the time the fill
-/// goes coarse, which is the degrade BL-596's ruling requires: below the threshold
-/// there is no rim left to segment, so the tile falls back to the dominant kind's
-/// glyph alone — never to an empty hex, and never to a ring whose arcs have merged.
-constexpr float kStackRingLodRadiusPx = 10.0f;
-
-/// Upper bound on the kinds one tile's ring can name — the whole `building_type`
-/// roster minus `none`. Sized as a fixed array so the marker pass allocates nothing
-/// per tile per frame.
-constexpr int kStackRingMaxKinds = 7;
 
 /// Shared red→yellow→green ramp for every "red to green" lens (Opportunity,
 /// Population/workforce, Production). `t` in [0, 1]: 0 = red (low), 0.5 = yellow
@@ -939,6 +1074,137 @@ void draw_resource_key(const world& w, ui_state& state)
 
     dl->AddText({x, note_y}, IM_COL32(170, 175, 185, 255), // fit-exempt: legend box sized to its measured entries (container 2)
                 full ? "Full: six at most" : "Split tile = several here");
+}
+
+/// Key for the Corporation and Company lenses (BL-1240, owner multi-select;
+/// LENSES.md § Corporation lens). The Resource lens's checklist shape: a header
+/// with the picked count, a search box, and one row per owner of the lens's kind
+/// holding ground on the active body — identity swatch filled when picked, empty
+/// when not. A checkbox press toggles the owner in or out of the lens's own set
+/// (`ui_state::lens_corps` / `lens_companies`). An owner with nothing on this body
+/// earns no row; its pick, if any, stands and is counted in the header.
+void draw_owner_key(const world& w, ui_state& state,
+                    const std::unordered_map<entity_id, entity_id>& tile_to_corp)
+{
+    const bool background = (state.overlay == overlay_mode::company);
+
+    // Owners of the admitted kind with ground here, with their tile count.
+    // tile_to_corp is already scoped to the active body.
+    std::unordered_map<entity_id, int> held;
+    for (const auto& [tile, corp] : tile_to_corp)
+    {
+        const auto cit = w.corporations.find(corp);
+        if (cit != w.corporations.end() && cit->second.is_background == background)
+            ++held[corp];
+    }
+    std::vector<entity_id> present;
+    present.reserve(held.size());
+    for (const auto& [corp, n] : held)
+        present.push_back(corp);
+    // The player first, then by name, then by id — never the map's walk order.
+    std::sort(present.begin(), present.end(), [&](entity_id a, entity_id b) {
+        const bool pa = (a == w.player_entity), pb = (b == w.player_entity);
+        if (pa != pb)
+            return pa;
+        const std::string& na = w.corporations.at(a).name;
+        const std::string& nb = w.corporations.at(b).name;
+        return na != nb ? na < nb : a < b;
+    });
+
+    const auto matches = [&](entity_id corp) {
+        const char* q = state.lens_owner_filter(background);
+        if (q[0] == '\0')
+            return true;
+        std::string name   = w.corporations.at(corp).name;
+        std::string needle = q;
+        for (char& ch : name)   ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+        for (char& ch : needle) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+        return name.find(needle) != std::string::npos;
+    };
+    std::vector<entity_id> rows;
+    for (const entity_id corp : present)
+        if (matches(corp))
+            rows.push_back(corp);
+
+    const float pad    = 8.0f;
+    const float line_h = ImGui::GetTextLineHeight();
+    const float row_h  = ImGui::GetFrameHeightWithSpacing();
+    const float head_h = line_h + 4.0f;
+    const float note_h = line_h + 2.0f;
+    const float want_h = pad + head_h + kLensComboH + 4.0f
+                       + static_cast<float>(std::max<std::size_t>(rows.size(), 1)) * row_h
+                       + note_h + pad;
+
+    ImDrawList* dl = ImGui::GetBackgroundDrawList();
+    const ui::shell_rect r = open_lens_chrome(dl, state, want_h, "##lens_key_blocker");
+    const float x  = r.x + pad;
+    const float bw = r.w - 2.0f * pad;
+    float       y  = r.y + pad * 0.5f;
+
+    char head[64];
+    std::snprintf(head, sizeof head, "%s  (%d picked)",
+                  background ? "Companies" : "Corporations",
+                  static_cast<int>(state.lens_owner_set(background).size()));
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), head); // fit-exempt: legend box sized to its measured entries (container 2)
+    y += head_h;
+
+    const float note_y = r.y + r.h - pad * 0.5f - note_h;
+    const float list_h = std::max(0.0f, note_y - y);
+
+    ImGui::SetNextWindowPos({x, y}, ImGuiCond_Always);
+    ImGui::SetNextWindowSize({bw, list_h}, ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.0f);
+    constexpr ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoNav    | ImGuiWindowFlags_NoScrollbar |
+        ImGuiWindowFlags_NoSavedSettings;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0.0f, 0.0f});
+    ImGui::Begin("##lens_key_owner_list", nullptr, flags);
+    ImGui::SetNextItemWidth(bw);
+    ImGui::InputTextWithHint(background ? "##lens_company_search" : "##lens_corp_search",
+                             background ? "Search companies" : "Search corporations",
+                             state.lens_owner_filter(background),
+                             sizeof state.lens_corps_filter); // both filters are char[32]
+    ImGui::Dummy({bw, 2.0f});
+    ImGui::BeginChild("##rows", {bw, std::max(0.0f, list_h - kLensComboH - 4.0f)}, false,
+                      ImGuiWindowFlags_NoBackground);
+    if (rows.empty())
+        ImGui::TextDisabled("%s", present.empty()
+                                      ? (background ? "No companies on this body"
+                                                    : "No corporations on this body")
+                                      : "No match");
+    for (const entity_id corp : rows)
+    {
+        const bool on = state.lens_owner_picked(corp, background);
+        ImGui::PushID(static_cast<int>(corp));
+        bool v = on;
+        if (ImGui::Checkbox("##on", &v))
+            state.toggle_lens_owner(corp, background);
+        ImGui::SameLine();
+        const ImVec2 c   = ImGui::GetCursorScreenPos();
+        ImDrawList*  wdl = ImGui::GetWindowDrawList();
+        const float  sy  = c.y + (ImGui::GetFrameHeight() - 10.0f) * 0.5f;
+        const ImU32  col = palette::corp_identity_colour(corp, w.player_entity);
+        if (on)
+            wdl->AddRectFilled({c.x, sy}, {c.x + 10.0f, sy + 10.0f}, col);
+        else
+            wdl->AddRect({c.x, sy}, {c.x + 10.0f, sy + 10.0f}, col);
+        ImGui::Dummy({14.0f, ImGui::GetFrameHeight()});
+        ImGui::SameLine();
+        ImGui::AlignTextToFramePadding();
+        const std::string& name = w.corporations.at(corp).name;
+        if (on)
+            ImGui::TextUnformatted(name.c_str());
+        else
+            ImGui::TextDisabled("%s", name.c_str());
+        ImGui::PopID();
+    }
+    ImGui::EndChild();
+    ImGui::End();
+    ImGui::PopStyleVar();
+
+    dl->AddText({x, note_y}, IM_COL32(170, 175, 185, 255), // fit-exempt: legend box sized to its measured entries (container 2)
+                "Grey = unpicked owner. Shift-click to pick");
 }
 
 /// On-canvas legend for the Market lens: a diverging cheap↔dear gradient bar plus
@@ -1456,8 +1722,9 @@ body_frame_stamp make_body_frame_stamp(const world& w, entity_id body)
 }
 
 /// Nearest-wins marker hit resolution shared by hover and click (BL-031/BL-059):
-/// unit outranks building outranks market_centre within the glyph radii; the
-/// tile fallback stays with the callers. Unit was added above building by
+/// unit outranks building within the glyph radii; the tile fallback stays with
+/// the callers. (The market-centre marker kind retired with its glyph — Ben,
+/// 2026-10-10; a market is reached through the Market lens or its ledger.) Unit was added above building by
 /// BL-575, matching the repeat-click cycle's own order (Battle -> Soldier ->
 /// Building -> Province — SELECTION.md § Tile repeat-click selection cycle):
 /// a unit standing on a built tile must be reachable on the FIRST click, not
@@ -1467,10 +1734,8 @@ entity_id resolve_marker_hit(const std::vector<marker_hit_zone>& zones, float mx
 {
     float     best_unit_d2 = std::numeric_limits<float>::max();
     float     best_bld_d2  = std::numeric_limits<float>::max();
-    float     best_mkt_d2  = std::numeric_limits<float>::max();
     entity_id unit = null_entity;
     entity_id bld  = null_entity;
-    entity_id mkt  = null_entity;
     for (const marker_hit_zone& hz : zones)
     {
         const float dx = mx - hz.centre.x;
@@ -1488,13 +1753,8 @@ entity_id resolve_marker_hit(const std::vector<marker_hit_zone>& zones, float mx
             best_bld_d2 = d2;
             bld         = hz.id;
         }
-        else if (hz.kind == marker_hit_zone::kind::market_centre && d2 < best_mkt_d2)
-        {
-            best_mkt_d2 = d2;
-            mkt         = hz.id;
-        }
     }
-    return unit != null_entity ? unit : (bld != null_entity ? bld : mkt);
+    return unit != null_entity ? unit : bld;
 }
 
 /// Nearest-wins STRUCTURE hit resolution (BL-601) — resolve_marker_hit's
@@ -1931,6 +2191,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                               bool input_enabled)
 {
     ImDrawList* dl = ImGui::GetBackgroundDrawList();
+    pass_meter().start(dl);
 
     dl->AddRectFilled(origin, origin + size, IM_COL32(18, 18, 24, 255));
 
@@ -2088,12 +2349,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // the signal that a marker click should land on the TILE (grouped stack
     // list) rather than assuming the whole hex is one installation.
     static std::unordered_map<entity_id, int>            tile_bld_count;
-    // BL-596: the DISTINCT building kinds standing on the tile, ascending by
-    // building_type — the segmented ring's contents. Kept separate from
-    // tile_bld_count on purpose, because the two answer different questions: the
-    // count says HOW MANY buildings ("+3"), the kind set says WHICH KINDS. Ben chose
-    // the ring over primary-plus-count precisely because a count "never says which".
-    static std::unordered_map<entity_id, std::vector<building_type>> tile_bld_kinds;
     // Unit groups per province (BL-575) — see the pre-pass below. Keyed on the
     // SAME stamp as the maps above, since a hire/disband changes w.units.size()
     // and a march order's actual tile move only happens on a tick (already
@@ -2115,23 +2370,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         tile_to_bld.clear();
         tile_to_corp.clear();
         tile_bld_count.clear();
-        tile_bld_kinds.clear();
         for (const auto& [bld_id, bld] : w.buildings)
         {
             auto tile_it = w.tiles.find(bld.tile);
             if (tile_it != w.tiles.end() && tile_it->second.body == state.active_body)
             {
                 ++tile_bld_count[bld.tile];
-                // Distinct kinds, inserted in sorted position. w.buildings is an
-                // unordered_map, so accumulate-then-sort would still be
-                // deterministic, but an ordered insert keeps the vector correct at
-                // every step and the sets are at most a handful long.
-                {
-                    std::vector<building_type>& kinds = tile_bld_kinds[bld.tile];
-                    const auto pos = std::lower_bound(kinds.begin(), kinds.end(), bld.type);
-                    if (pos == kinds.end() || *pos != bld.type)
-                        kinds.insert(pos, bld.type);
-                }
                 // Lowest building id wins the tile. w.buildings is an unordered_map, so a
                 // plain last-writer-wins assignment would let its iteration order pick the
                 // representative — fine while a tile holds one building, not once they
@@ -2556,33 +2800,109 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // the corp-centre->market corridors), else the moving beam's intensity. Hoisted out
     // of the tile loop's fill block for BL-185, because the road pass now needs the same
     // number for a *neighbour* tile — the fog must size identically wherever it is read.
-    auto tile_vision = [&](entity_id tid) -> float {
-        // The Resource lens reads SURVEY knowledge, not activity: a deposit is known
-        // wherever the ground is surveyed, so the activity fog is lifted under it and
-        // the washed-clear map reads clear (Ben, 2026-10-04). The survey mask still
-        // owns unsurveyed tiles.
+    //
+    // Held as a dense raster, built from the two sparse layers ONCE a frame, for
+    // the passes that read it per tile and per neighbour (the 60 fps budget,
+    // PLANETARY.md § Draw-loop cost model): ~30k tiles x two set lookups became
+    // one array read. 1 inside permanent vision, else the beam.
+    //
+    // The Resource lens reads SURVEY knowledge, not activity: a deposit is known
+    // wherever the ground is surveyed, so the activity fog is lifted under it and
+    // the washed-clear map reads clear (Ben, 2026-10-04). The survey mask still
+    // owns unsurveyed tiles.
+    //
+    // The building and ownership indices get the same treatment as a bit mask:
+    // both maps are small, so a miss on every other tile was the whole cost.
+    static std::vector<float>   vision_raster;
+    static std::vector<uint8_t> tile_flags; // bit 0 built, bit 1 owned
+    vision_raster.assign(raster_ok ? raster.size() : 0u, 0.0f);
+    tile_flags.assign(raster_ok ? raster.size() : 0u, 0u);
+    const auto raster_index_of = [&](entity_id tid) -> int {
+        const auto it = w.tiles.find(tid);
+        if (it == w.tiles.end() || it->second.body != state.active_body)
+            return -1;
+        const int x = it->second.grid_x, y = it->second.grid_y;
+        return (x >= 0 && x < gw && y >= 0 && y < gh) ? y * gw + x : -1;
+    };
+    if (raster_ok)
+    {
+        for (const entity_id tid : state.permanent_vision)
+            if (const int ri = raster_index_of(tid); ri >= 0)
+                vision_raster[static_cast<std::size_t>(ri)] = 1.0f;
+        for (const auto& [tid, inten] : beam_intensity)
+            if (const int ri = raster_index_of(tid); ri >= 0)
+            {
+                float& v = vision_raster[static_cast<std::size_t>(ri)];
+                v = std::max(v, inten);
+            }
+        for (const auto& [tid, bt] : built_tiles)
+            if (const int ri = raster_index_of(tid); ri >= 0)
+                tile_flags[static_cast<std::size_t>(ri)] |= 1u;
+        for (const auto& [tid, corp] : tile_to_corp)
+            if (const int ri = raster_index_of(tid); ri >= 0)
+                tile_flags[static_cast<std::size_t>(ri)] |= 2u;
+        // Bits 2-4 gate the per-tile marker lookups (the 60 fps budget): a unit
+        // group draws on this tile, a province's battle glyph would, an LP anchor
+        // stands here. Each is a superset test only — the marker passes still ask
+        // their own maps — so a tile with the bit clear skips a hash lookup or a
+        // binary search that could only have missed.
+        for (const auto& [tid, groups] : tile_units)
+            if (const int ri = raster_index_of(tid); ri >= 0)
+                tile_flags[static_cast<std::size_t>(ri)] |= 4u;
+        if (!w.battles.empty())
+            for (const auto& [pid, tid] : province_mark_tile)
+                if (const int ri = raster_index_of(tid); ri >= 0)
+                    tile_flags[static_cast<std::size_t>(ri)] |= 8u;
+        if (state.overlay == overlay_mode::throughput)
+            for (const ui_state::lp_anchor& a : state.lp_anchors)
+                if (const int ri = raster_index_of(a.tile); ri >= 0)
+                    tile_flags[static_cast<std::size_t>(ri)] |= 16u;
+    }
+    // The Throughput field's reach cost, read off the active body's raster once a
+    // frame instead of three hash lookups a tile (`tile_reach_cost`'s own path:
+    // tile -> body -> grid index). Same three-way contract: -1 not computed, inf
+    // unreachable, else the cost. A tile here is always the active body's, at its
+    // raster position, so the index is the one tile_reach_cost derives.
+    const std::vector<float>* reach_cost_raster = nullptr;
+    if (state.overlay == overlay_mode::throughput)
+    {
+        const auto rit = w.body_reach_cost.find(state.active_body);
+        if (rit != w.body_reach_cost.end() && !rit->second.empty())
+            reach_cost_raster = &rit->second;
+    }
+    // By raster position, so the lens wash on the bake never touches the tile
+    // record (a cache miss a tile at the widest rung).
+    const auto reach_cost_rc = [&](int col, int row) -> float {
+        if (!reach_cost_raster || col < 0 || row < 0)
+            return -1.0f;
+        const std::size_t idx = static_cast<std::size_t>(row) * static_cast<std::size_t>(gw)
+                              + static_cast<std::size_t>(col);
+        return idx < reach_cost_raster->size() ? (*reach_cost_raster)[idx] : -1.0f;
+    };
+    const auto reach_cost_of = [&](const tile_component& t) -> float {
+        return reach_cost_rc(t.grid_x, t.grid_y);
+    };
+    const auto vision_rc = [&](int col, int row) -> float {
         if (state.overlay == overlay_mode::resource)
             return 1.0f;
-        if (state.permanent_vision.find(tid) != state.permanent_vision.end())
-            return 1.0f;
-        const auto bi = beam_intensity.find(tid);
-        return (bi != beam_intensity.end()) ? bi->second : 0.0f;
+        if (!raster_ok || col < 0 || col >= gw || row < 0 || row >= gh)
+            return 0.0f;
+        return vision_raster[static_cast<std::size_t>(row) * gw + col];
     };
 
     const ImVec2 mouse = state.mouse.active
                          ? ImVec2{state.mouse.x, state.mouse.y}
                          : ImVec2{-1.0f, -1.0f}; // off-screen sentinel suppresses hover
 
-    // --- BL-737: the stepped tilt camera -----------------------------------
-    // The top zoom rungs view the land obliquely (22.5°/45°). The canvas keeps
-    // drawing entirely in FLAT ground space; one vertex-range squash at the
-    // end of the map passes is the camera, and this inverse maps the real
-    // cursor into that flat space so every existing hit test works unchanged.
-    // Tilt is a pure function of zoom (verify's free-form zooms included) and
-    // applies on the plain canvas only — a lens is an analytic read and stays
-    // flat, which also keeps its legend chrome out of the squash.
-    const float  tilt_sy    = state.overlay == overlay_mode::none
-                                  ? planetary_tilt_sy(zoom) : 1.0f;
+    // --- The camera: ONE angle (RENDERING.md § One angle; BL-1246) ----------
+    // The land is viewed at 22.5° at every rung and under every lens (Ben,
+    // 2026-10-09 — one angle is what makes one master possible, and toggling
+    // a lens never moves the map). The canvas keeps drawing entirely in FLAT
+    // ground space; one vertex-range squash over the map passes is the camera
+    // (the lens legend's vertices are excluded from it), and this inverse
+    // maps the real cursor into that flat space so every hit test works
+    // unchanged.
+    const float  tilt_sy    = planetary_tilt_sy(zoom);
     const float  tilt_pivot = canvas_centre.y;
     const ImVec2 mouse_g    = { mouse.x,
                                 tilt_pivot + (mouse.y - tilt_pivot) / tilt_sy };
@@ -2713,8 +3033,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // and the fallback-by-coverage rule, in one flag. Canonical space is the
     // hex grid at circumradius 1, so canonical -> local is a scale by hex_size.
     const ground_view& gview = state.ground;
-    const bool ground_on = state.overlay == overlay_mode::none
-                        && gview.body == state.active_body
+    // Under EVERY lens too (BL-1250, LENSES.md § A lens washes the rendered
+    // ground): the lens is a wash over the bake, not a fill that replaces it.
+    const bool ground_on = gview.body == state.active_body
                         && gview.far_ready;
     const auto canon_to_screen = [&](float gx_, float gy_) -> ImVec2 {
         return to_screen({ gx_ * hex_size, gy_ * hex_size });
@@ -2730,43 +3051,202 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         state.ground_req.x1     = x1c;
         state.ground_req.y0     = 1.5f * static_cast<float>(row_lo) - 1.0f;
         state.ground_req.y1     = 1.5f * static_cast<float>(row_hi) + 1.0f;
-        state.ground_req.draw_r = draw_r; ///< Picks the bake tier (stepped ladder).
-        state.ground_req.sy     = tilt_sy; ///< The tilted rungs want oblique tiers (BL-737).
+        // The DRAWN ground radius, hex_size * zoom — not draw_r, which is a
+        // 1 px border-inset for the polygon fills. Passing draw_r let a drawn
+        // radius in (T, T+1] pick tier T and draw it magnified (BL-1244).
+        state.ground_req.draw_r = hit_r; ///< Picks the master's level (RENDERING.md § Level of detail).
         state.ground_req.valid  = raster_ok;
     }
     // BL-737: everything from here to the camera squash at the end of the map
     // passes draws in FLAT ground space; the squash over this vertex range IS
     // the tilt. (The background rect, title and chrome above this line stay
-    // screen-space.)
+    // screen-space; so does the lens legend, whose vertex range is cut out.)
     const int v_map_start = dl->VtxBuffer.Size;
-
+    canvas_pass_meter& pm = pass_meter();
+    pm.begin(draw_r, static_cast<int>(state.overlay));
+    pm.mark(canvas_pass_meter::setup, dl);
+    int v_key_start = -1, v_key_end = -1;
+    // The camera over [from, to) of this list's vertices.
+    const auto squash = [&](int from, int to) {
+        if (tilt_sy >= 1.0f || from < 0)
+            return;
+        ImDrawVert* vtx = dl->VtxBuffer.Data;
+        for (int vi = from; vi < to; ++vi)
+            vtx[vi].pos.y = tilt_pivot + (vtx[vi].pos.y - tilt_pivot) * tilt_sy;
+    };
+    // THE GROUND IS EMITTED LAST AND DRAWN FIRST (sprint 51, the 60 fps budget;
+    // PLANETARY.md § Draw-loop cost model). The SDL renderer backend converts a
+    // draw command's vertex colours from that command's VtxOffset to the END of
+    // the list, once per command — and every ground chunk is its own texture,
+    // so its own command. Emitted first, ~50 chunk images each re-converted the
+    // whole vector layer behind them (~300k vertices): measured, that was most
+    // of the canvas's submit time, not the vectors themselves. So the images go
+    // into channel 0 of a three-channel split (0 ground, 1 washes, 2 strokes),
+    // written AFTER the vector passes on a vertex offset of their own: the draw
+    // order is unchanged, the per-command conversion is ~4 vertices.
+    //
+    // Draw one image quad per wrap copy that intersects the canvas. The
+    // image spans exactly one wrap period, so copies abut seamlessly.
+    const auto draw_ground_rect = [&](const ground_chunk_view& cv)
+    {
+        if (!cv.tex)
+            return;
+        const ImVec2 p0 = canon_to_screen(cv.x0, cv.y0);
+        const ImVec2 p1 = canon_to_screen(cv.x1, cv.y1);
+        const int k_lo = (period_px > 0.0f)
+            ? static_cast<int>(std::floor((visible_left  - p1.x) / period_px)) : 0;
+        const int k_hi = (period_px > 0.0f)
+            ? static_cast<int>(std::ceil ((visible_right - p0.x) / period_px)) : 0;
+        for (int k = k_lo; k <= k_hi; ++k)
+        {
+            const float off = static_cast<float>(k) * period_px;
+            if (p1.x + off < visible_left || p0.x + off > visible_right)
+                continue;
+            dl->AddImage((ImTextureID)(intptr_t)cv.tex,
+                         { p0.x + off, p0.y }, { p1.x + off, p1.y });
+        }
+    };
     if (ground_on)
     {
-        // Draw one image quad per wrap copy that intersects the canvas. The
-        // image spans exactly one wrap period, so copies abut seamlessly.
-        const auto draw_ground_rect = [&](const ground_chunk_view& cv)
-        {
-            if (!cv.tex)
-                return;
-            const ImVec2 p0 = canon_to_screen(cv.x0, cv.y0);
-            const ImVec2 p1 = canon_to_screen(cv.x1, cv.y1);
-            const int k_lo = (period_px > 0.0f)
-                ? static_cast<int>(std::floor((visible_left  - p1.x) / period_px)) : 0;
-            const int k_hi = (period_px > 0.0f)
-                ? static_cast<int>(std::ceil ((visible_right - p0.x) / period_px)) : 0;
-            for (int k = k_lo; k <= k_hi; ++k)
+        dl->ChannelsSplit(3);
+        dl->ChannelsSetCurrent(2);
+    }
+    // The washes over the bake (player identity, construction suitability, the
+    // vision fog) are collected as the tile loop meets them and emitted into
+    // channel 1 — over the ground, under every stroke — so a run of equal washes
+    // along a row can be ONE quad (see the tile loop's on_bake branch).
+    struct ground_wash { ImVec2 c; float r; ImVec2 p0, p1; ImU32 col; bool hex; };
+    static std::vector<ground_wash> washes;
+    washes.clear();
+    // The lens's own washes (BL-1250) are a list of their own, emitted BEFORE the
+    // player/suitability/fog washes so the fog dims the lens answer exactly as it
+    // dimmed the lens fill — and so each list's equal-colour run joining sees its
+    // own previous rect. Tiles never overlap, so splitting the lists moves nothing.
+    static std::vector<ground_wash> lens_washes;
+    lens_washes.clear();
+    int lens_run[4] = { -1, -1, -1, -1 }; // last coarse rect per wrap copy (k & 3)
+    // A Resource-lens split tile's wedges over the bake, at the wash strength.
+    struct ground_wedges { ImVec2 c; float r; ImU32 cols[ui_state::k_lens_resource_cap]; int n; };
+    static std::vector<ground_wedges> lens_wedges;
+    lens_wedges.clear();
+    // The close-zoom seam (BL-1251 part 5): one segment per shared tile edge.
+    static std::vector<ImVec2> seam_segs;
+    seam_segs.clear();
+    const bool seam_on = hit_r >= k_seam_min_drawn_r;
+    const auto emit_ground = [&] {
+        if (!ground_on)
+            return;
+        dl->ChannelsSetCurrent(1);
+        // The seam first: over the ground, under every wash and stroke. Thin
+        // anti-aliased lines — the texture-AA path, a few vertices a segment.
+        for (std::size_t si = 0; si + 1 < seam_segs.size(); si += 2)
+            dl->AddLine(seam_segs[si], seam_segs[si + 1],
+                        IM_COL32(0, 0, 0, static_cast<int>(k_seam_alpha * 255.0f)), 1.0f);
+        // NOT anti-aliased: a wash tiles the plane with its neighbours, and an AA
+        // fringe both doubles the vertices and leaves a faint seam where two
+        // translucent fringes overlap.
+        const ImDrawListFlags saved = dl->Flags;
+        dl->Flags &= ~ImDrawListFlags_AntiAliasedFill;
+        // Batched (the 60 fps budget): one PrimReserve per run of up to 8k
+        // washes rather than one per wash. The vertices and indices written are
+        // exactly AddRectFilled's (PrimRect) and the non-AA AddConvexPolyFilled
+        // fan, in list order; only the reservations are merged.
+        const auto emit_list = [&](const std::vector<ground_wash>& list) {
+            constexpr std::size_t k_batch = 8192; // x6 vertices stays under 64k
+            const ImVec2 uv = dl->_Data->TexUvWhitePixel;
+            std::size_t i = 0;
+            while (i < list.size())
             {
-                const float off = static_cast<float>(k) * period_px;
-                if (p1.x + off < visible_left || p0.x + off > visible_right)
-                    continue;
-                dl->AddImage((ImTextureID)(intptr_t)cv.tex,
-                             { p0.x + off, p0.y }, { p1.x + off, p1.y });
+                const bool hex = list[i].hex;
+                std::size_t j = i, n = 0;
+                while (j < list.size() && list[j].hex == hex && n < k_batch)
+                {
+                    if ((list[j].col & IM_COL32_A_MASK) != 0u) // as Add*Filled: skip invisible
+                        ++n;
+                    ++j;
+                }
+                if (n > 0)
+                {
+                    if (hex)
+                        dl->PrimReserve(static_cast<int>(n) * 12, static_cast<int>(n) * 6);
+                    else
+                        dl->PrimReserve(static_cast<int>(n) * 6, static_cast<int>(n) * 4);
+                    for (std::size_t q = i; q < j; ++q)
+                    {
+                        const ground_wash& gw_ = list[q];
+                        if ((gw_.col & IM_COL32_A_MASK) == 0u)
+                            continue;
+                        if (!hex)
+                        {
+                            dl->PrimRect(gw_.p0, gw_.p1, gw_.col);
+                            continue;
+                        }
+                        ImVec2 hv[6];
+                        hex_verts_fast(hv, gw_.c.x, gw_.c.y, gw_.r);
+                        const unsigned int base = dl->_VtxCurrentIdx;
+                        for (int v = 0; v < 6; ++v)
+                        {
+                            dl->_VtxWritePtr[v].pos = hv[v];
+                            dl->_VtxWritePtr[v].uv  = uv;
+                            dl->_VtxWritePtr[v].col = gw_.col;
+                        }
+                        dl->_VtxWritePtr += 6;
+                        for (int v = 2; v < 6; ++v)
+                        {
+                            dl->_IdxWritePtr[0] = static_cast<ImDrawIdx>(base);
+                            dl->_IdxWritePtr[1] = static_cast<ImDrawIdx>(base + v - 1);
+                            dl->_IdxWritePtr[2] = static_cast<ImDrawIdx>(base + v);
+                            dl->_IdxWritePtr += 3;
+                        }
+                        dl->_VtxCurrentIdx += 6;
+                    }
+                }
+                i = j;
             }
         };
+        emit_list(lens_washes);
+        for (const ground_wedges& wg : lens_wedges)
+            draw_lens_wedges(dl, wg.c, wg.r, wg.cols, wg.n);
+        emit_list(washes);
+        dl->Flags = saved;
+        pm.mark(canvas_pass_meter::fill, dl);
+        dl->ChannelsSetCurrent(0);
+        // And start the images on a FRESH vertex offset: below 64k vertices the
+        // whole list is one offset block, so being emitted last is not enough —
+        // each image command would still re-convert every vertex from 0.
+        if (dl->Flags & ImDrawListFlags_AllowVtxOffset)
+        {
+            dl->_CmdHeader.VtxOffset = static_cast<unsigned int>(dl->VtxBuffer.Size);
+            dl->_OnChangedVtxOffset();
+        }
+        // The far page carries only a body whose master has not yet covered
+        // the view (BL-1246): every other frame the level's chunks cover it.
         draw_ground_rect(gview.far);
         for (const ground_chunk_view& cv : gview.chunks)
             draw_ground_rect(cv);
+        dl->ChannelsMerge();
+    };
+    // Every map vertex emitted so far, minus the legend's: called once, at
+    // whichever exit the frame takes (the input early-out included — a
+    // cursor over a panel must not un-tilt the map).
+    // The ground's deferred images are emitted here, so they ride the squash.
+    const auto apply_camera = [&] {
+        pm.mark(canvas_pass_meter::post, dl);
+        emit_ground();
+        pm.mark(canvas_pass_meter::ground, dl);
+        pm.end(dl, v_map_start);
+        const int n = dl->VtxBuffer.Size;
+        if (v_key_start < 0)
+            squash(v_map_start, n);
+        else
+        {
+            squash(v_map_start, v_key_start);
+            squash(v_key_end, n);
+        }
+    };
 
+    if (ground_on)
+    {
         // BL-736: the ground-detail metric — the texel renderer's answer to a
         // polygon count. Rides the existing frame-HUD toggle; texel:pixel is
         // the number that says whether "blurry" is a resolution problem (it
@@ -2774,15 +3254,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         if (state.show_frame_hud)
         {
             char gbuf[96];
-            if (gview.tier_ppr > 0.0)
+            if (gview.level_ppr > 0.0)
                 std::snprintf(gbuf, sizeof gbuf,
-                              "ground: tier %.0f px/r  ·  %.2f texel/px  ·  %d chunks",
-                              gview.tier_ppr, gview.tier_ppr / draw_r,
+                              "ground: level %.0f px/r  ·  %.2f texel/px  ·  %d chunks",
+                              gview.level_ppr, gview.level_ppr / hit_r, // texels per DRAWN px
                               static_cast<int>(gview.chunks.size()));
             else
                 std::snprintf(gbuf, sizeof gbuf,
                               "ground: far page 6 px/r  ·  %.2f texel/px",
-                              6.0f / draw_r);
+                              6.0f / hit_r);
             // Foreground list: HUD text must not ride the tilt camera's squash.
             ImGui::GetForegroundDrawList()->AddText(
                 { grid_area_origin.x + 8.0f,
@@ -2790,6 +3270,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 IM_COL32(200, 210, 220, 200), gbuf); // fit-exempt: debug HUD line
         }
     }
+    pm.mark(canvas_pass_meter::setup, dl);
 
     // --- BL-511: the province fill cache ------------------------------------
     // The province, not the hex, is the unit this canvas renders and the player
@@ -2812,9 +3293,44 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         return it != w.corporations.end() && it->second.is_background;
     };
 
+    // BL-1240: the Corporation lens's picked set defaults to the player, applied
+    // once per session (ui_state cannot know the player id when it is built).
+    state.seed_lens_corps(w.player_entity);
+    // A dissolved owner drops out of both sets rather than lingering in the count.
+    state.prune_lens_owners([&w](entity_id id) { return w.corporations.count(id) > 0; });
+
+    // A tile's catchment market, memoised per frame on the raster: the Market and
+    // Scarcity fills key on it, and the hovered-catchment wash asks again for the
+    // same tile (the 60 fps budget — it is several lookups a call).
+    static std::vector<entity_id> market_memo;
+    static std::vector<uint8_t>   market_memo_set;
+    const bool memo_markets = state.overlay == overlay_mode::market
+                           || state.overlay == overlay_mode::scarcity;
+    if (memo_markets)
+    {
+        market_memo.assign(raster_ok ? raster.size() : 0u, null_entity);
+        market_memo_set.assign(raster_ok ? raster.size() : 0u, 0u);
+    }
+    const auto market_of = [&](entity_id id, const tile_component& tile) -> entity_id {
+        const int x = tile.grid_x, y = tile.grid_y;
+        if (!memo_markets || !raster_ok || x < 0 || x >= gw || y < 0 || y >= gh)
+            return market_for_tile(w, id);
+        const std::size_t ri = static_cast<std::size_t>(y) * gw + x;
+        if (!market_memo_set[ri])
+        {
+            market_memo[ri]     = market_for_tile(w, id);
+            market_memo_set[ri] = 1u;
+        }
+        return market_memo[ri];
+    };
+
     auto compute_tile_fill = [&](entity_id id, const tile_component& tile) -> ImU32
     {
-        const auto   corp_it    = tile_to_corp.find(id);
+        // The ownership bit first: the index is small, so a lookup on every
+        // unowned tile was all miss.
+        const bool   maybe_owned = !raster_ok
+            || (tile_flags[static_cast<std::size_t>(tile.grid_y) * gw + tile.grid_x] & 2u) != 0;
+        const auto   corp_it    = maybe_owned ? tile_to_corp.find(id) : tile_to_corp.end();
         const bool   has_owner  = corp_it != tile_to_corp.end();
         const ImU32  owner_col  = has_owner ? corp_identity(corp_it->second)
                                             : IM_COL32(255, 255, 255, 255);
@@ -2842,18 +3358,24 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // (GLOSSARY.md), and a lens that mixed them answered neither question —
         // "who are my rivals here" drowned in the background firms that outnumber
         // them. Those get their own lens immediately below, drawn identically.
+        //
+        // OWNER MULTI-SELECT (BL-1240): only a PICKED owner takes its colour; an
+        // unpicked owner of the admitted kind takes the one owned-grey, so "someone
+        // holds this" survives without every rival shouting at once.
         if (state.overlay == overlay_mode::corporation)
         {
             if (has_owner && !is_background_firm(corp_it->second))
-                fill = owner_col;
+                fill = state.lens_owner_picked(corp_it->second, false) ? owner_col
+                                                                       : palette::owned_grey;
         }
         // Company lens: the exact mirror — background firms only, same per-corp
-        // identity tint, so the two lenses are read the same way and differ only
-        // in which population of firms they admit.
+        // identity tint and owned-grey, so the two lenses are read the same way and
+        // differ only in which population of firms they admit (and in the default).
         else if (state.overlay == overlay_mode::company)
         {
             if (has_owner && is_background_firm(corp_it->second))
-                fill = owner_col;
+                fill = state.lens_owner_picked(corp_it->second, true) ? owner_col
+                                                                      : palette::owned_grey;
         }
         // Resource lens (BL-1182): a toggled set of goods. A tile carrying one takes
         // its identity colour SOLID; every other tile takes a white wash that keeps a
@@ -2874,7 +3396,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // logic as the Corporation lens. Price readout is in the Market Ledger.
         else if (state.overlay == overlay_mode::market)
         {
-            const entity_id mid = market_for_tile(w, id);
+            const entity_id mid = market_of(id, tile);
             const auto col_it   = market_catchment_colour.find(mid);
             if (col_it != market_catchment_colour.end())
                 fill = lerp_colour(fill, col_it->second, 0.55f);
@@ -2906,7 +3428,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // normalised across the body's markets. Hot where scarce; no tint where met.
         else if (state.overlay == overlay_mode::scarcity)
         {
-            const auto sf_it = scar_shortfall.find(market_for_tile(w, id));
+            const auto sf_it = scar_shortfall.find(market_of(id, tile));
             if (sf_it != scar_shortfall.end() && scar_max_shortfall > 0.0f)
             {
                 const float scar = std::clamp(sf_it->second / scar_max_shortfall, 0.0f, 1.0f);
@@ -2963,7 +3485,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // Nothing here can trigger the Dijkstra.
         else if (state.overlay == overlay_mode::throughput && state.lp_reach_max > 0.0f)
         {
-            const float rc = tile_reach_cost(w, id);
+            const float rc = reach_cost_of(tile);
             if (rc >= 0.0f)
             {
                 // NORMALISED AGAINST THE 90th PERCENTILE, then square-root
@@ -3112,10 +3634,114 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // along the player's corridors, with a convoy's beam gliding and trailing over
         // them. Survey mask owns unrevealed tiles, so this skips them. The road pass
         // below reads the same scalar (BL-185) — hence the hoist out of the branch.
-        const float vision = tile_vision(id);
+        const float vision = vision_rc(tile.grid_x, tile.grid_y);
         if (surveyed) // the survey mask (or its god-view tell) owns unsurveyed tiles
             fill = fog_dim(fill, vision);
         return fill;
+    };
+
+    // The lens's answer for one tile ON THE BAKED GROUND (BL-1250; LENSES.md § A
+    // lens washes the rendered ground): the colour compute_tile_fill blends in for
+    // the active lens, as a translucent wash at its family's strength. Zero = the
+    // lens has no answer here; the plain ground shows. The lens SEMANTICS are
+    // compute_tile_fill's, line for line — which tiles answer, which colour; only
+    // the composite changed (alpha over the bake, not a lerp over a terrain hue).
+    // Relief, the survey mask and the fog are not here: the bake carries relief,
+    // on_bake is surveyed by definition, and the fog is the wash list after this.
+    // The Throughput wash from a reach cost (lens_wash_of's Throughput case; the
+    // tile loop calls it by raster position, without the tile record).
+    const auto throughput_wash_of = [&](float rc) -> ImU32 {
+        if (rc < 0.0f)
+            return 0u;
+        const float denom = (state.lp_reach_p90 > 0.0f) ? state.lp_reach_p90
+                                                        : state.lp_reach_max;
+        const float t = std::isinf(rc)
+            ? 0.0f
+            : 1.0f - std::sqrt(std::clamp(rc / denom, 0.0f, 1.0f));
+        return with_alpha(throughput_field_colour(t), k_lens_wash_sequential);
+    };
+    const auto lens_wash_of = [&](entity_id id, const tile_component& tile) -> ImU32
+    {
+        const overlay_mode ov = state.overlay;
+        if (ov == overlay_mode::corporation || ov == overlay_mode::company)
+        {
+            const bool maybe_owned = !raster_ok
+                || (tile_flags[static_cast<std::size_t>(tile.grid_y) * gw + tile.grid_x] & 2u) != 0;
+            const auto corp_it = maybe_owned ? tile_to_corp.find(id) : tile_to_corp.end();
+            if (corp_it == tile_to_corp.end())
+                return 0u;
+            const bool want_bg = (ov == overlay_mode::company);
+            if (is_background_firm(corp_it->second) != want_bg)
+                return 0u;
+            const ImU32 c = state.lens_owner_picked(corp_it->second, want_bg)
+                                ? corp_identity(corp_it->second)
+                                : palette::owned_grey;
+            return with_alpha(c, k_lens_wash_categorical);
+        }
+        if (ov == overlay_mode::resource)
+        {
+            resource_type on_tile[ui_state::k_lens_resource_cap];
+            if (lens_resources_on_tile(state, tile, on_tile) > 0)
+                return with_alpha(presentation_of(on_tile[0]).colour, k_lens_wash_categorical);
+            const ImU32 pale = placement_rules::is_water_tile(tile.substrate)
+                                   ? IM_COL32(206, 216, 230, 255) : IM_COL32(244, 242, 236, 255);
+            return with_alpha(pale, k_resource_ground_wash_alpha);
+        }
+        if (ov == overlay_mode::market)
+        {
+            const auto col_it = market_catchment_colour.find(market_of(id, tile));
+            return col_it != market_catchment_colour.end()
+                       ? with_alpha(col_it->second, k_lens_wash_categorical) : 0u;
+        }
+        if (ov == overlay_mode::population)
+        {
+            if (placement_rules::is_water_tile(tile.substrate))
+                return 0u;
+            const float eff = workforce_efficiency(std::clamp(tile.habitability, 0.0f, 1.0f));
+            return with_alpha(ryg_colour(eff), k_lens_wash_sequential);
+        }
+        if (ov == overlay_mode::scarcity)
+        {
+            const auto sf_it = scar_shortfall.find(market_of(id, tile));
+            if (sf_it == scar_shortfall.end() || scar_max_shortfall <= 0.0f)
+                return 0u;
+            const float scar = std::clamp(sf_it->second / scar_max_shortfall, 0.0f, 1.0f);
+            return scar > 0.0f
+                ? with_alpha(IM_COL32(220, 70, 55, 255), k_lens_wash_sequential * scar) : 0u;
+        }
+        if (ov == overlay_mode::industry)
+        {
+            const auto it = industry_field.find(id);
+            if (it == industry_field.end() || industry_max <= 0.0f)
+                return 0u;
+            const float t = std::clamp(it->second / industry_max, 0.0f, 1.0f);
+            // The fill path's 0.15 + 0.6t ramp, rescaled so its top is the family strength.
+            return with_alpha(IM_COL32(210, 150, 70, 255),
+                              k_lens_wash_sequential * (0.15f + 0.6f * t) / 0.75f);
+        }
+        if (ov == overlay_mode::throughput && state.lp_reach_max > 0.0f)
+            return throughput_wash_of(reach_cost_of(tile));
+        if (ov == overlay_mode::continent && plates)
+        {
+            const int idx = tile.grid_x + tile.grid_y * gw;
+            const int me  = plates->plate_id[static_cast<std::size_t>(idx)];
+            bool boundary = false;
+            const int cols[2] = { (tile.grid_x + 1) % gw, (tile.grid_x + gw - 1) % gw };
+            for (const int c : cols)
+                if (plates->plate_id[static_cast<std::size_t>(c + tile.grid_y * gw)] != me) boundary = true;
+            for (const int dy : { -1, 1 })
+            {
+                const int ry = tile.grid_y + dy;
+                if (ry < 0 || ry >= gh) continue;
+                if (plates->plate_id[static_cast<std::size_t>(tile.grid_x + ry * gw)] != me) boundary = true;
+            }
+            // The boundary lift keeps its own channel: toward white, on the plate hue.
+            ImU32 c = plate_colour(me);
+            if (boundary)
+                c = lerp_colour(c, IM_COL32(255, 255, 245, 255), 0.45f);
+            return with_alpha(c, k_lens_wash_categorical);
+        }
+        return 0u;
     };
 
     // One-pass-ahead shade cache over the visible band (+1 row each way, so a
@@ -3126,18 +3752,109 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     shade_cache.assign(static_cast<std::size_t>(gw) * gh, tile_shade{});
     const int row_cache_lo = std::max(0,      row_lo - 1);
     const int row_cache_hi = std::min(gh - 1, row_hi + 1);
+
+    // COLUMN CULL for the band passes (the 60 fps budget, PLANETARY.md
+    // § Draw-loop cost model). The tile loop has always skipped a column with no
+    // visible wrap copy, but the passes that run one ahead of it — this shade
+    // cache — walked every column of the band, and even at the widest rung the
+    // body is wider than the canvas. A column is live when either row parity of
+    // it has a copy on screen; the mask is then widened by the one-tile
+    // neighbourhood the passes read (the blend corners, the border rule's
+    // neighbour test). An unmasked column falls back to the lookup.
+    // THE STATIC STROKE CACHE (BL-1260; PLANETARY.md § Draw-loop cost model).
+    // The border rule, the Throughput lens's road and lane network and its
+    // anchors do not move while the player pans: they are rebuilt
+    // only when what they draw from moves. Ground on, no god view (whose lifted
+    // fills draw over strokes in the loop), a full raster.
+    constexpr int k_static_block = 16; // columns per cached bucket
+    const bool static_cache_on = ground_on && !god_view_lift && raster_ok;
+    static std::vector<uint8_t> col_live;
+    col_live.assign(static_cast<std::size_t>(std::max(gw, 0)), 0u);
+    {
+        static std::vector<uint8_t> col_seen;
+        col_seen.assign(col_live.size(), 0u);
+        for (int cc = 0; cc < gw; ++cc)
+            for (int parity = 0; parity < 2; ++parity)
+            {
+                const float sx = to_screen(hex_local_centre(cc, parity, hex_size)).x;
+                const int k_lo = (period_px > 0.0f)
+                    ? static_cast<int>(std::ceil((visible_left  - sx) / period_px)) : 0;
+                const int k_hi = (period_px > 0.0f)
+                    ? static_cast<int>(std::floor((visible_right - sx) / period_px)) : 0;
+                if (k_lo <= k_hi)
+                    col_seen[static_cast<std::size_t>(cc)] = 1u;
+            }
+        // The static stroke cache (below) builds and hashes whole column blocks,
+        // so a block with any column on screen is live in full.
+        if (static_cache_on)
+            for (int b0 = 0; b0 < gw; b0 += k_static_block)
+            {
+                const int b1 = std::min(gw, b0 + k_static_block);
+                bool any = false;
+                for (int cc = b0; cc < b1 && !any; ++cc)
+                    any = col_seen[static_cast<std::size_t>(cc)] != 0u;
+                if (any)
+                    for (int cc = b0; cc < b1; ++cc)
+                        col_seen[static_cast<std::size_t>(cc)] = 1u;
+            }
+        const int margin = 1;
+        for (int cc = 0; cc < gw; ++cc)
+        {
+            if (!col_seen[static_cast<std::size_t>(cc)])
+                continue;
+            for (int d = -margin; d <= margin; ++d)
+                col_live[static_cast<std::size_t>(((cc + d) % gw + gw) % gw)] = 1u;
+        }
+    }
     const bool lens_blends = lens_blend_mode(state.overlay);
+    // The same band's tile records and nation owners, looked up ONCE a frame:
+    // the passes below read a tile's neighbours again and again (the border
+    // rule, the road and lane chains), and at the widest rung
+    // that was ~30k tiles x six hash lookups per pass (the 60 fps budget,
+    // PLANETARY.md § Draw-loop cost model). Rows outside the band fall back to
+    // the lookup (tile_rc / nation_rc below).
+    static std::vector<const tile_component*> tile_cache;
+    tile_cache.assign(static_cast<std::size_t>(gw) * gh, nullptr);
+    static std::vector<entity_id> nation_cache;
+    const bool cache_nations = state.overlay == overlay_mode::none
+                            && !state.dbg_hide_border_band;
+    if (cache_nations)
+        nation_cache.assign(static_cast<std::size_t>(gw) * gh, null_entity);
+    static std::vector<std::uint16_t> route_levels; // road | lane << 8, the band only
+    route_levels.resize(static_cast<std::size_t>(gw) * gh);
     for (int cr = row_cache_lo; cr <= row_cache_hi; ++cr)
     for (int cc = 0; cc < gw; ++cc)
     {
+        if (!col_live[static_cast<std::size_t>(cc)])
+            continue;
         const std::size_t ci = static_cast<std::size_t>(cr) * gw + cc;
         const entity_id cid  = raster_ok ? raster[ci] : null_entity;
         if (cid == null_entity)
             continue;
         const tile_component& ct = w.tiles.at(cid);
+        tile_cache[ci] = &ct;
+        // The two route levels the static stroke cache hashes, read while the
+        // record is in cache (BL-1260): a later read of a tile record is a miss.
+        route_levels[ci] = static_cast<std::uint16_t>(
+            ct.road_level | (static_cast<unsigned>(ct.lane_level) << 8));
+        if (cache_nations)
+            nation_cache[ci] = nation_of(cid);
         tile_shade& sh = shade_cache[ci];
+        // On the baked ground a surveyed tile's fill is never drawn (the loop's
+        // on_bake branch) — skip the derivation, the costliest per-tile work at
+        // the wide rungs, and leave the province to be looked up where a pass
+        // asks for it. The god view keeps both: there a lifted tile beside a
+        // surveyed one blends with its fill. (The raster IS the grid, so the
+        // survey test reads (cc, cr), not the record.)
+        if (ground_on && !god_view_lift
+            && survey_tile_visible(body.survey, gw, gh, cc, cr))
+        {
+            sh.blend = false;
+            continue;
+        }
+        sh.province       = w.provinces.province_of(cid);
+        sh.province_known = true;
         sh.fill        = compute_tile_fill(cid, ct);
-        sh.province    = w.provinces.province_of(cid);
         // A tile joins the blend only when it is ordinary ground under a lens
         // whose field is continuous. A survey-masked tile is excluded: the lock
         // fill is a statement about knowledge, not terrain, and smearing it would
@@ -3165,136 +3882,808 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         sh.blend = lens_blends && ct_seen && sh.province != 0
                    && !is_water(ct.substrate);
     }
+    pm.mark(canvas_pass_meter::shade, dl);
 
-    // --- BL-601: the national border band's inward falloff ------------------
-    // Per-tile depth from the nation's frontier: 0 = touching a foreign owner
-    // (another nation, or unclaimed ground — a coastline is a border too), 1 and
-    // 2 = one and two tiles in, 0xFF = beyond the band or claimed by nobody.
-    // This is the "colour extending inwards" of Ben's ruling, made a scalar: the
-    // wash below reads it straight out of k_border_band_alpha.
+    // The band caches with their fallback (a row outside the band, or a lens up).
+    const auto in_cache = [&](int row) { return row >= row_cache_lo && row <= row_cache_hi; };
+    const auto tile_rc = [&](int col, int row) -> const tile_component* {
+        if (!raster_ok || col < 0 || col >= gw || row < 0 || row >= gh)
+            return nullptr;
+        const std::size_t ci = static_cast<std::size_t>(row) * gw + col;
+        if (in_cache(row) && tile_cache[ci])
+            return tile_cache[ci];
+        const auto it = w.tiles.find(raster[ci]);
+        return it != w.tiles.end() ? &it->second : nullptr;
+    };
+    const auto nation_rc = [&](int col, int row) -> entity_id {
+        if (!raster_ok || col < 0 || col >= gw || row < 0 || row >= gh)
+            return null_entity;
+        const std::size_t ci = static_cast<std::size_t>(row) * gw + col;
+        return (cache_nations && in_cache(row) && col_live[static_cast<std::size_t>(col)])
+            ? nation_cache[ci] : nation_of(raster[ci]);
+    };
+
+    // --- BL-601: the national border band ------------------------------------
+    // SUPPRESSED UNDER EVERY LENS (Ben, 2026-08-28). The band is chrome on the
+    // plain canvas — that is what BL-601 made it, and it is why the default view
+    // IS the country view. But a lens is a question about one subject, and a
+    // national border over a corporate or resource read competes with the
+    // answer. Ben, on the Corporation lens: "we will not display country borders
+    // when displaying that lens. This will bring focus on to corporations" —
+    // extended to all lenses on the same instruction.
     //
-    // Computed over the visible band PLUS the band depth in rows each way, so a
-    // visible tile's chain back to its own frontier is complete. Depth 0 is
-    // marked from `nation_of` directly (a raster index, not the cache), so the
-    // top and bottom rows of the computed range are still correct; only the
-    // relaxation is short there, and those rows are already off screen.
-    //
-    // COARSE ZOOM TAKES DEPTH 0 ONLY. At the whole-grid view every one of the
-    // ~15k hexes is in range and a three-ring relaxation over all of them is the
-    // one place this pass could cost real time. A single ring still draws the
-    // political outline, which is the whole read at that zoom.
-    static std::vector<uint8_t> border_depth;
-    border_depth.assign(static_cast<std::size_t>(gw) * gh, 0xFFu);
-    // Which KIND of frontier a banded tile belongs to: 1 where the nation faces
-    // another nation, 0 where it faces only unclaimed ground (Ben, 2026-08-24).
-    // Carried beside the depth rather than recomputed at the wash, because a
-    // depth-1 or depth-2 tile is not on the frontier at all and cannot answer the
-    // question by looking at its own neighbours — it inherits the answer from the
-    // frontier tile that seeded it.
-    static std::vector<uint8_t> border_political;
-    border_political.assign(static_cast<std::size_t>(gw) * gh, 0u);
-    const int band_depth = coarse_fill ? 1 : k_border_band_tiles;
-    const int band_lo    = std::max(0,      row_lo - band_depth);
-    const int band_hi    = std::min(gh - 1, row_hi + band_depth);
-    // SUPPRESSED UNDER EVERY LENS (Ben, 2026-08-28). The band is always-on chrome
-    // on the plain canvas — that is what BL-601 made it, and it is why the default
-    // view IS the country view. But a lens is a question about one subject, and a
-    // national wash over a corporate or resource read competes with the answer.
-    // Ben, on the Corporation lens: "we will not display country borders when
-    // displaying that lens. This will bring focus on to corporations" — extended
-    // to all lenses on the same instruction.
-    //
-    // Gated on the COMPUTATION, not just the wash below, so the three-ring
-    // relaxation over the visible band costs nothing while a lens is up. Every
-    // depth stays 0xFF, and the wash's `depth < band_depth` test then fails on
-    // its own without needing a second guard.
+    // The band is the inset rule alone (BL-1292, hard edges only): the per-tile
+    // frontier depth and its inward wash are retired, so there is no pass here —
+    // the rule's own neighbour test (emit_routes) is the frontier test.
     const bool draw_border_band = (state.overlay == overlay_mode::none)
                                && !state.dbg_hide_border_band;
-    if (draw_border_band && raster_ok && !w.tile_to_nation.empty())
+    // ---- The static stroke layer of one tile copy ---------------------------
+    // Two pieces, each drawn into @p out at the tile centre (cx, cy): the drawn
+    // road/lane network (the Throughput lens's) with the border rule, and the
+    // Throughput anchor ring. The tile loop calls them in place when the
+    // static cache is off; the cache calls them once per bucket build, at the
+    // view origin (0, 0) and copy 0, and re-emits the result with the pan.
+    // `vo` is the view origin the neighbour centres are placed against, `k` the
+    // wrap copy — so the same code serves both.
+    const auto to_scr = [&](ImVec2 vo, ImVec2 lp) -> ImVec2 {
+        return { vo.x + (lp.x - grid_cx) * zoom, vo.y + (lp.y - grid_cy) * zoom };
+    };
+    // The road and lane network and the border rule of one tile copy.
+    const auto emit_routes = [&](ImDrawList* out, int t_col, int t_row, const tile_component& tile,
+                                 float cx, float cy, ImVec2 vo, int k, bool on_bake, float vision,
+                                 std::vector<structure_hit_zone>& zones)
     {
-        for (int cr = band_lo; cr <= band_hi; ++cr)
-        for (int cc = 0; cc < gw; ++cc)
+        const bool metered = (out == dl);
+        // ROADS AND SEA LANES AS SMOOTH CURVES (Ben, 2026-10-03: "render [roads] as
+        // curves rather than lines, and make them thinner"; "sea lanes should always go
+        // over ocean, never over ground"; RENDERING.md § Roads and sea lanes). Both are
+        // tile fields on the cardinal grid the traversal walk uses, so both draw the same
+        // way: a tile joined to exactly TWO network neighbours draws ONE quadratic from
+        // the midpoint of the first shared edge, through its own centre as the control
+        // point, to the midpoint of the second. Consecutive tiles' curves meet at those
+        // midpoints along the centre-to-centre line, so the run is tangent-continuous —
+        // the quadratic B-spline of the tile-centre chain — and each curve stays inside
+        // the triangle (midpoint, centre, midpoint), so a lane never leaves the sea tiles
+        // it was stamped on. A junction pairs its neighbours into through-curves (most
+        // opposite first); an end, or a three-way junction's odd branch, is a straight
+        // spoke, so a fork still reads as a fork. The half-edge symmetry of
+        // BL-172 is unchanged: the halves still meet at the shared midpoint, and each
+        // half takes its own edge's fog (BL-185, max of the pair).
+        //
+        // At the coarse LOD (draw_r <= 7 px) the curve is invisible at a few pixels a
+        // tile, so the quadratic is drawn as its two straight chords.
+        // Is (col, row) on the network? Raw field, columns wrapping, rows not — the
+        // rung test below reads it, and must read the same from either end.
+        const auto on_network = [&](auto level_of, int col, int row) -> bool
         {
-            const std::size_t ci = static_cast<std::size_t>(cr) * gw + cc;
-            const entity_id cid  = raster[ci];
-            if (cid == null_entity)
-                continue;
-            const entity_id nat = nation_of(cid);
-            if (nat == null_entity)
-                continue; // Unclaimed ground has no colour to extend inwards.
-            const int (*off)[2] = hex_neighbors::offsets(cr);
-            for (int n = 0; n < 6; ++n)
+            if (row < 0 || row >= gh)
+                return false;
+            col %= gw;
+            if (col < 0)
+                col += gw;
+            const tile_component* at = tile_rc(col, row);
+            return at && level_of(*at) != 0;
+        };
+        // @p skip_rungs: a link between two tiles that BOTH run straight through
+        // along the other axis is a RUNG between two parallel runs, not a route —
+        // two lanes laid on adjacent rows touch tile to tile, and drawing every
+        // touch hatched the sea between them. Symmetric (the same test from either
+        // end), so the half-edges still meet. A crossing is kept: the cross run's
+        // tile does not run straight through along the other axis. Lanes only; a
+        // road lattice's rungs are real roads.
+        const auto draw_network = [&](auto level_of, ImU32 col, float thick, bool skip_rungs)
+        {
+            static const int card_off[4][2] = {{+1, 0}, {-1, 0}, {0, +1}, {0, -1}};
+            const auto through = [&](int c, int r, bool horizontal) {
+                return horizontal
+                    ? (on_network(level_of, c + 1, r) && on_network(level_of, c - 1, r))
+                    : (on_network(level_of, c, r + 1) && on_network(level_of, c, r - 1));
+            };
+            ImVec2 mids[4];
+            float  vis[4];
+            int    deg = 0;
+            for (int n = 0; n < 4; ++n)
             {
-                const int nrow = cr + off[n][1];
+                const int nrow = t_row + card_off[n][1];
                 if (nrow < 0 || nrow >= gh)
-                    continue; // Off the pole: no neighbour, so not a frontier.
-                int ncol = (cc + off[n][0]) % gw;
+                    continue;
+                const int raw_col = t_col + card_off[n][0];
+                int ncol = raw_col % gw;
                 if (ncol < 0)
                     ncol += gw;
-                const entity_id nb_nat = nation_of(tile_at_rc(ncol, nrow));
-                if (nb_nat != nat)
+
+                const entity_id nb_id = tile_at_rc(ncol, nrow);
+                if (nb_id == null_entity)
+                    continue;
+                const tile_component* nb_tile = tile_rc(ncol, nrow);
+                if (!nb_tile || level_of(*nb_tile) == 0)
+                    continue;
+                if (!(survey_tile_visible(body.survey, gw, gh, ncol, nrow) || god_view_lift))
+                    continue; // BL-408: god view draws into the masked region too
+                if (skip_rungs)
                 {
-                    border_depth[ci] = 0u;
-                    // Do NOT break on the first foreign edge: a tile can face
-                    // both a neighbour nation and open ground, and the political
-                    // claim is the stronger one. Keep looking until a political
-                    // edge is found, so a coastal frontier between two countries
-                    // is not quietly faded by the sea on its other side.
-                    if (nb_nat != null_entity)
+                    const bool other_axis_horizontal = (n >= 2); // a row step's rung runs E-W
+                    if (through(t_col, t_row, other_axis_horizontal)
+                        && through(ncol, nrow, other_axis_horizontal))
+                        continue;
+                }
+
+                ImVec2 nb_sc = to_scr(vo, hex_local_centre(ncol, nrow, hex_size));
+                nb_sc.x += static_cast<float>(k) * period_px;
+                if (raw_col >= gw)      nb_sc.x += period_px; // east across the cylinder seam
+                else if (raw_col < 0)   nb_sc.x -= period_px; // west across the seam
+
+                mids[deg] = {(cx + nb_sc.x) * 0.5f, (cy + nb_sc.y) * 0.5f};
+                vis[deg]  = std::max(vision, vision_rc(ncol, nrow));
+                ++deg;
+            }
+
+            // The junction cap takes the brightest edge meeting at this centre, so it
+            // never reads as a dark blot on the end of a lit span.
+            float cap_vision = vision;
+            for (int i = 0; i < deg; ++i)
+                cap_vision = std::max(cap_vision, vis[i]);
+
+            // One quadratic mids[a] -> (centre) -> mids[b], split at its apex so each
+            // half carries its own edge's fog. Apex = (ma + 2c + mb) / 4; each half's
+            // control is the midpoint of its end and the centre.
+            const auto curve = [&](int a, int b) -> ImVec2
+            {
+                const ImVec2 apex = {(mids[a].x + 2.0f * cx + mids[b].x) * 0.25f,
+                                     (mids[a].y + 2.0f * cy + mids[b].y) * 0.25f};
+                // THE WIDE-RUNG LOD (drawn radius under k_route_lod_radius_px;
+                // RENDERING.md § Roads and sea lanes). The whole curve is ONE
+                // stroke when both halves fog alike (nearly always), so it
+                // needs no round joint at the apex; each half is tessellated
+                // at two segments, and at the coarse fill (<= 7 px) at one —
+                // its two chords. At these radii the curve spans a dozen
+                // pixels: six segments a half and a joint fan were most of
+                // the road layer's vertices for a shape no one could see.
+                if (draw_r < k_route_lod_radius_px)
+                {
+                    const ImU32 ea = fog_dim(col, vis[a]);
+                    const ImU32 eb = fog_dim(col, vis[b]);
+                    const ImVec2 ctl_a = {(mids[a].x + cx) * 0.5f, (mids[a].y + cy) * 0.5f};
+                    const ImVec2 ctl_b = {(mids[b].x + cx) * 0.5f, (mids[b].y + cy) * 0.5f};
+                    const int segs = coarse_fill ? 1 : 2;
+                    // Continue the open path along one half, to @p to.
+                    const auto half = [&](ImVec2 ctl, ImVec2 to) {
+                        if (segs == 1)
+                            out->PathLineTo(to);
+                        else
+                            out->PathBezierQuadraticCurveTo(ctl, to, segs);
+                    };
+                    if (ea == eb)
                     {
-                        border_political[ci] = 1u;
-                        break;
+                        out->PathLineTo(mids[a]);
+                        half(ctl_a, apex);
+                        half(ctl_b, mids[b]); // the b half, walked apex-outward
+                        out->PathStroke(ea, ImDrawFlags_None, thick);
+                    }
+                    else
+                    {
+                        out->PathLineTo(mids[a]);
+                        half(ctl_a, apex);
+                        out->PathStroke(ea, ImDrawFlags_None, thick);
+                        out->PathLineTo(apex);
+                        half(ctl_b, mids[b]);
+                        out->PathStroke(eb, ImDrawFlags_None, thick);
+                    }
+                    return apex;
+                }
+                for (const int i : {a, b})
+                {
+                    const ImU32 ec = fog_dim(col, vis[i]);
+                    const ImVec2 ctl = {(mids[i].x + cx) * 0.5f, (mids[i].y + cy) * 0.5f};
+                    out->AddBezierQuadratic(mids[i], ctl, apex, ec, thick, 6);
+                }
+                // A round joint at the apex hides the seam between the two halves.
+                out->AddCircleFilled(apex, thick * 0.5f, fog_dim(col, std::max(vis[a], vis[b])));
+                return apex;
+            };
+
+            // THROUGH-ROUTES. The neighbours pair off, most-opposite first (the pair
+            // whose directions from the centre have the most negative dot product),
+            // and each pair is one curve — so a junction reads as two crossing runs,
+            // not a star of spokes, and a dense city lattice curves as a run does.
+            // Deterministic: ties keep the first pair in the fixed E, W, S, N order.
+            bool   used[4] = {false, false, false, false};
+            ImVec2 hub     = {cx, cy}; // where an odd branch joins: the last curve's apex
+            for (int left = deg; left >= 2; left -= 2)
+            {
+                int   pa = -1, pb = -1;
+                float best = 2.0f;
+                for (int i = 0; i < deg; ++i)
+                {
+                    if (used[i]) continue;
+                    for (int j = i + 1; j < deg; ++j)
+                    {
+                        if (used[j]) continue;
+                        const float ax = mids[i].x - cx, ay = mids[i].y - cy;
+                        const float bx = mids[j].x - cx, by = mids[j].y - cy;
+                        const float la = std::sqrt(ax * ax + ay * ay), lb = std::sqrt(bx * bx + by * by);
+                        const float d  = (la > 0.0f && lb > 0.0f) ? (ax * bx + ay * by) / (la * lb) : 1.0f;
+                        if (d < best) { best = d; pa = i; pb = j; }
                     }
                 }
+                if (pa < 0) break;
+                used[pa] = used[pb] = true;
+                hub = curve(pa, pb);
             }
-        }
-        for (uint8_t d = 1; d < static_cast<uint8_t>(band_depth); ++d)
+
+            // An end (one neighbour, or none: a lone / just-placed tile), or a
+            // three-way junction's odd branch: a straight spoke from the hub — the
+            // centre, or the through-curve's apex so the branch meets the curve —
+            // to its shared-edge midpoint, with a cap that rounds the join and keeps
+            // a lone tile visible. Four neighbours pair off whole and need neither.
+            if (deg == 2 || deg == 4)
+                return;
+            for (int i = 0; i < deg; ++i)
+                if (!used[i])
+                    out->AddLine(hub, mids[i], fog_dim(col, vis[i]), thick);
+            out->AddCircleFilled(hub, std::max(1.0f, thick * 0.75f),
+                                 fog_dim(col, cap_vision));
+        };
+
+        // Road network (BL-146/BL-172 generated + BL-147/BL-172 player-placed). Always-on
+        // under every lens (roads are terrain, not an overlay), drawn only toward roaded,
+        // survey-revealed cardinal neighbours (the 4 directions the intra-body A* actually
+        // traverses; ocean is never roaded, so "land" is implicit). Styled by THIS tile's
+        // tier — Track(1) thin/dim, Road(2) medium, Highway(3) thick/bright — so a tier
+        // change reads as a taper at the midpoint. The width is ONE named constant per
+        // tier (k_road_width_*: the stroke as a fraction of the drawn hex radius, which is
+        // floored at 10 px so the tiers stay apart on the whole-grid view).
+        //
+        // BL-185: roads dim with the intra-body reach fog, through the same fog_dim wash
+        // the lens fill takes, so an unreached road recedes with the ground under it rather
+        // than reading as brightly as one on your own corridor. A road edge spans two tiles,
+        // so the pair's vision is combined with MAX — a road is lit if EITHER end is reached.
+        // Max is the choice for two reasons: it is SYMMETRIC, so both tiles' halves fog to the
+        // same value and the span stays one continuous weight (the BL-172 no-from/to-asymmetry
+        // property the geometry already guarantees); and reach is a flood outward from where
+        // the player operates, so an edge touching a reached tile is inside that reach — a
+        // corridor's roads should not darken one hop early at its rim. Survey (BL-067) still
+        // owns genuinely unrevealed tiles; this is only the commercial-reach fog.
+        //
+        // PAINTED, NOT DRAWN, ON THE PLAIN CANVAS AT EVERY RUNG (BL-1253, BL-1292;
+        // RENDERING.md § Roads and sea lanes). Roads and lanes are painted into the baked
+        // ground (ui/route_paint.cpp), with a surface per tier, and the plain canvas draws
+        // no network over them at any rung (Ben, 2026-10-10: the drawn web drew too much
+        // attention zoomed out). A tile whose ground is not yet baked (the vector fallback)
+        // has no painted road, so it keeps the drawn network.
+        //
+        // THE THROUGHPUT LENS DRAWS THE NETWORK AT EVERY RUNG (BL-1257; Ben, 2026-10-10;
+        // LENSES.md § Throughput lens). On the ground a road is a thin pale thread of the
+        // land (0.015-0.03 of a hex, route_paint.hpp k_route_width); the network AS
+        // LOGISTICS — every road by tier at the 1 : 1.5 : 2 weights below, every lane in its
+        // blue — is read through this lens, over the reach-cost field it produces.
+        const bool route_lens  = state.overlay == overlay_mode::throughput;
+        const bool route_drawn = !on_bake || route_lens;
+        const float route_r = std::max(10.0f, draw_r) * state.dbg_route_width_scale;
+        if (route_drawn && tile.road_level > 0)
         {
-            for (int cr = band_lo; cr <= band_hi; ++cr)
-            for (int cc = 0; cc < gw; ++cc)
+            ImU32 col; float thick;
+            switch (tile.road_level)
             {
-                const std::size_t ci = static_cast<std::size_t>(cr) * gw + cc;
-                if (border_depth[ci] != 0xFFu)
-                    continue;
-                const entity_id cid = raster[ci];
-                if (cid == null_entity)
-                    continue;
-                const entity_id nat = nation_of(cid);
-                if (nat == null_entity)
-                    continue;
-                const int (*off)[2] = hex_neighbors::offsets(cr);
+                case 1:  col = IM_COL32(175, 158, 120, 205); thick = route_r * k_road_width_track;   break;
+                case 2:  col = IM_COL32(205, 188, 140, 225); thick = route_r * k_road_width_road;    break;
+                default: col = IM_COL32(225, 205, 150, 238); thick = route_r * k_road_width_highway; break;
+            }
+            draw_network([](const tile_component& t) { return t.road_level; }, col, thick, false);
+        }
+
+        if (metered)
+            pm.mark(canvas_pass_meter::roads, dl);
+        // Sea lanes (BL-1098, LOGISTICS.md § 4b): the stamped `lane_level` field, drawn
+        // along the lane's own water tiles — never between its ends — as the same smooth
+        // curve, in the soft sea blue the wizard's lapse draws a lane in. Always-on like
+        // roads: a lane is part of the network a convoy rides, not an overlay.
+        if (route_drawn && tile.lane_level > 0)
+            draw_network([](const tile_component& t) { return t.lane_level; },
+                         IM_COL32(140, 200, 245, 190), route_r * k_lane_width, true);
+
+        if (metered)
+            pm.mark(canvas_pass_meter::lanes, dl);
+        // Rivers draw nothing here: they bake into the ground as carved courses along
+        // river_edges, widening downstream (ground_bake.cpp bake_rivers; RENDERING.md
+        // § Mountains, rivers and terrain variety). The width gradient says which way
+        // the water flows, so the stroke and its chevrons are retired.
+
+        // National borders - the coloured rule (BL-601), the whole of the
+        // band since BL-1292 (hard edges only: no inward wash). It says WHICH
+        // frontier and whose, and it is what carries the hit corridor.
+        //
+        // ON THE PLAIN CANVAS ONLY (Ben, 2026-08-28). It was "always on,
+        // under every lens" from BL-601 until now - the national read became
+        // chrome on the same footing as roads and rivers. Ben, reviewing the
+        // lens sweep: "All: We can still see nation borders."
+        //
+        // The hit corridor goes with it, deliberately: it is built inside this
+        // same loop, and a border that is invisible but still clickable is a
+        // worse outcome than either state. Under a lens the lens's own subject
+        // is what hover and selection pivot to (BL-603).
+        //
+        // THE STROKE IS INSET, not laid along the shared edge, and that is
+        // the whole answer to "borders should not diffuse together". A
+        // shared edge can only carry one colour, so two neighbours would
+        // fight for it and whichever drew last would win - or, worse, be
+        // averaged into a third nation's hue. Inset toward the drawing
+        // tile's own centre, each nation paints a rule just inside its own
+        // side: the pair reads as two parallel coloured lines with the
+        // frontier between them, and no pixel ever belongs to a colour that
+        // is neither neighbour's.
+        // Each edge whose neighbour has a different owner draws a rule; an
+        // interior tile draws none. On the baked ground this runs only when a
+        // static bucket rebuilds, not per frame.
+        if (draw_border_band)
+        {
+            const entity_id own_nation = nation_rc(t_col, t_row);
+            if (own_nation != null_entity)
+            {
+                // Muted (2026-09-01): the identity colour desaturated, so
+                // the claim reads without shouting over the painterly ground.
+                const ImU32 border_col = muted_nation_colour(palette::nation_colour(own_nation));
+
+                // Standard odd-r neighbour offsets (col, row deltas; canonical table, BL-363).
+                const int (*off)[2] = hex_neighbors::offsets(t_row);
+
                 for (int n = 0; n < 6; ++n)
                 {
-                    const int nrow = cr + off[n][1];
-                    if (nrow < band_lo || nrow > band_hi)
-                        continue;
-                    int ncol = (cc + off[n][0]) % gw;
+                    const int nrow = t_row + off[n][1];
+                    if (nrow < 0 || nrow >= gh)
+                        continue; // Off the top/bottom edge: no neighbour tile.
+
+                    // Columns wrap on the horizontal cylinder.
+                    int ncol = (t_col + off[n][0]) % gw;
                     if (ncol < 0)
                         ncol += gw;
-                    const std::size_t ni = static_cast<std::size_t>(nrow) * gw + ncol;
-                    // Same nation only: depth propagates INSIDE a territory. A
-                    // neighbour across the frontier is a different nation's
-                    // band and must never seed this one's.
-                    if (border_depth[ni] == d - 1u && nation_of(raster[ni]) == nat)
+
+                    const entity_id nb_id = tile_at_rc(ncol, nrow);
+                    if (nb_id == null_entity)
+                        continue;
+                    const entity_id nb_nation = nation_rc(ncol, nrow);
+                    if (nb_nation == own_nation)
+                        continue; // Same owner: interior edge, no border.
+
+                    // An edge facing UNCLAIMED ground is drawn lighter and
+                    // thinner than one facing another nation (Ben,
+                    // 2026-08-24), per EDGE — so a headland that faces the
+                    // sea on three sides and a neighbour on the fourth draws
+                    // three light rules and one full one.
+                    const bool  political  = (nb_nation != null_entity);
+                    const float edge_scale = political ? 1.0f : k_border_unclaimed_scale;
+
+                    // The shared edge via the midpoint-perpendicular method:
+                    // place the segment at the midpoint of the centre-to-centre
+                    // line, perpendicular to it, with length equal to one hex side
+                    // (== circumradius draw_r for a regular hexagon). This avoids
+                    // mapping neighbour directions to per-vertex pairs, which the
+                    // offset-row vertex ordering makes error-prone. The neighbour's
+                    // screen centre is taken at the SAME wrap offset k as this tile.
+                    const ImVec2 nb_lc = hex_local_centre(ncol, nrow, hex_size);
+                    ImVec2 nb_sc = to_scr(vo, nb_lc);
+                    nb_sc.x += static_cast<float>(k) * period_px;
+
+                    float dirx = nb_sc.x - cx;
+                    float diry = nb_sc.y - cy;
+                    const float len = std::sqrt(dirx * dirx + diry * diry);
+                    if (len <= 0.0f)
+                        continue;
+                    dirx /= len;
+                    diry /= len;
+
+                    // Pulled back along the centre line by the inset, so the
+                    // rule sits inside this tile rather than on the seam.
+                    const float inset = draw_r * k_border_stroke_inset;
+                    const float mx = (cx + nb_sc.x) * 0.5f - dirx * inset;
+                    const float my = (cy + nb_sc.y) * 0.5f - diry * inset;
+                    const float px = -diry; // perpendicular to the centre line
+                    const float py =  dirx;
+                    const float half = draw_r * 0.5f;
+
+                    const ImVec2 e0 { mx - px * half, my - py * half };
+                    const ImVec2 e1 { mx + px * half, my + py * half };
+                    const ImU32 edge_col =
+                        political ? border_col
+                                  : IM_COL32((border_col >> IM_COL32_R_SHIFT) & 0xFFu,
+                                             (border_col >> IM_COL32_G_SHIFT) & 0xFFu,
+                                             (border_col >> IM_COL32_B_SHIFT) & 0xFFu,
+                                             static_cast<int>(255.0f * k_border_unclaimed_scale));
+                    out->AddLine(e0, e1, edge_col,
+                                 std::max(1.0f, k_border_stroke_px * edge_scale));
+
+                    // The hit corridor (BL-601, and the general structure-grain
+                    // case BL-603 builds on). Registered per DRAWN segment, so
+                    // it follows the wrap copies and the survey mask for free -
+                    // a border the player cannot see is a border they cannot
+                    // click. Coarse zoom registers nothing: at draw_r <= 7 px
+                    // a tile is barely wider than the corridor, and the whole
+                    // canvas would resolve to a nation.
+                    //
+                    // Zones live in GROUND space (pre-squash), and the click
+                    // asks with the ground-space cursor, as hover does. A
+                    // single-building tile's hex OUTRANKS this corridor with no
+                    // lens (SELECTION.md § Multi-building tiles; BL-1241): the
+                    // press resolves its building before the band is asked, so
+                    // the band is reached from the unbuilt or stacked side of a
+                    // border there — and from either side under a lens.
+                    if (!coarse_fill)
                     {
-                        border_depth[ci]     = d;
-                        border_political[ci] = border_political[ni];
-                        break;
+                        structure_hit_zone sz;
+                        sz.id         = own_nation;
+                        sz.kind       = structure_kind::nation;
+                        sz.a          = e0;
+                        sz.b          = e1;
+                        sz.half_width = std::min(k_border_hit_px,
+                                                 draw_r * k_border_hit_frac);
+                        zones.push_back(sz);
                     }
                 }
             }
         }
+        if (metered)
+            pm.mark(canvas_pass_meter::border_rule, dl);
+    };
+
+    // Throughput lens (BL-606): the MAGNITUDE half. LP is generated at
+    // anchors — cities, built-and-active ports and inland hubs — and
+    // nowhere else, so the quantity is drawn where it exists rather than
+    // smeared over the tiles it might serve. Shading every tile by "the
+    // throughput serving it" would need a per-tile nearest-anchor
+    // attribution the engine does not have; deriving one would be the
+    // second distance model BL-325 ruling 3 forbids outright.
+    //
+    // Radius and hue both carry the anchor's share of the body's largest
+    // pool, so a thin anchor reads small AND dim.
+    //
+    // NOT vision-fogged, which is the value-mark / building-glyph
+    // convention rather than the road-span one: the survey mask already
+    // owns this mark (the `!revealed` gate is upstream of it), and an
+    // anchor is a city or a completed port — as public as the building
+    // glyph beside it. It was fogged in the first cut and the mark vanished
+    // into the wash, which is how the convention was settled here rather
+    // than guessed. Returns the anchor's share, or -1 where none stands.
+    const auto anchor_share = [&](entity_id id) -> float {
+        if (state.overlay != overlay_mode::throughput || state.lp_anchors.empty())
+            return -1.0f;
+        const auto ait = std::lower_bound(
+            state.lp_anchors.begin(), state.lp_anchors.end(), id,
+            [](const ui_state::lp_anchor& a, entity_id t) { return a.tile < t; });
+        if (ait == state.lp_anchors.end() || ait->tile != id || state.lp_anchor_max <= 0.0f)
+            return -1.0f;
+        // A uniform authored rate makes every share 1.0, and that is
+        // the honest reading: every anchor generates the same, full
+        // amount. The ramp is here for the moment the rate stops being
+        // uniform, not to manufacture variation that is not there.
+        return std::clamp(ait->lp / state.lp_anchor_max, 0.0f, 1.0f);
+    };
+    const auto emit_anchor = [&](ImDrawList* out, float t, float cx, float cy)
+    {
+        // A RING, not a disc. Every anchor is a city, a port or a hub,
+        // so the anchor tile ALREADY carries a settlement or building
+        // marker. A filled disc is simply hidden by it (measured: the
+        // first cut drew correctly at every one of the 57 anchors and was
+        // invisible at all of them). A ring sits outside the marker and
+        // reads as a capacity halo around the generator.
+        const float ar = std::max(3.0f, draw_r * 0.66f);
+        const float th = std::max(1.5f, draw_r * (0.10f + 0.13f * t));
+        out->AddCircle({cx, cy}, ar, IM_COL32(10, 18, 30, 220), 18, th + 2.0f);
+        out->AddCircle({cx, cy}, ar, throughput_anchor_colour(t), 18, th);
+    };
+
+    // ---- The static stroke cache (BL-1260) ----------------------------------
+    // Content-addressed, per bucket of k_static_block columns of one row. A
+    // bucket's hash folds in every input its strokes read — each tile's road
+    // and lane levels, survey bit, vision and nation over the bucket widened by
+    // two columns and two rows (the lane rung test reads two steps out), and
+    // each own tile's anchor share — so a bucket
+    // rebuilds exactly when something it draws from moved, and never on a pan.
+    // The geometry is stored at the view origin and copy 0 and re-emitted per
+    // visible copy with the pan added: the vertices are the same, only their
+    // tessellation is saved. The record is kept per frame on a memo, so the
+    // hash costs array reads (the tile records and nations are the band
+    // caches above). Draw ORDER: the cached strokes emit before the tile loop's
+    // per-tile marks (player ring, rims, markers, highlights), so a neighbour's
+    // road or rule sits under a tile's ring rather than over it.
+    if (static_cache_on)
+    {
+        struct static_bucket
+        {
+            std::uint64_t hash = 0;
+            bool          built = false;
+            bool          direct = false; ///< too large to re-base: drawn in place
+            std::uint32_t v0 = 0, vn = 0, i0 = 0, in = 0, z0 = 0, zn = 0;
+            std::uint32_t t0 = 0; ///< first of (columns + 1) per-tile offsets in s_tofs
+        };
+        // Where each tile's strokes start inside its bucket, so a copy emits
+        // only the tiles on screen (a bucket straddling the canvas edge would
+        // otherwise submit its off-screen half).
+        struct tile_ofs { std::uint32_t v = 0, i = 0; };
+        struct static_key
+        {
+            const world* wp = nullptr;
+            entity_id    body = null_entity;
+            int          gw_ = 0, gh_ = 0, overlay = -1;
+            float        zoom_ = 0.0f, hex = 0.0f, route_scale = 0.0f, fringe = 0.0f;
+            float        uv_x = 0.0f, uv_y = 0.0f;
+            const void*  uv_lines = nullptr;
+            int          flags = 0;
+            bool         band = false;
+            bool operator==(const static_key&) const = default;
+        };
+        static static_key                       s_key;
+        static std::vector<static_bucket>       s_buckets;
+        static std::vector<ImDrawVert>          s_vtx;
+        static std::vector<ImDrawIdx>           s_idx;
+        static std::vector<structure_hit_zone>  s_zones;
+        static std::vector<tile_ofs>            s_tofs;
+        static std::vector<std::uint64_t>       s_nsig;
+        static std::vector<uint8_t>             s_sig_col;
+        static ImDrawList*                      s_scratch = nullptr;
+        if (!s_scratch)
+            s_scratch = IM_NEW(ImDrawList)(ImGui::GetDrawListSharedData());
+        s_scratch->_Data = ImGui::GetDrawListSharedData(); // this context's, every frame
+
+        const int n_blocks = (gw + k_static_block - 1) / k_static_block;
+        const static_key key{ &w, state.active_body, gw, gh, static_cast<int>(state.overlay),
+                              zoom, hex_size, state.dbg_route_width_scale, dl->_FringeScale,
+                              dl->_Data->TexUvWhitePixel.x, dl->_Data->TexUvWhitePixel.y,
+                              static_cast<const void*>(dl->_Data->TexUvLines),
+                              static_cast<int>(dl->Flags), draw_border_band };
+        // A changed key, or pools grown well past a whole body's worth of
+        // rebuilt buckets (a whole body is a few hundred thousand vertices; a
+        // rebuilt bucket appends and leaves its old run behind), start over.
+        if (!(key == s_key) || s_vtx.size() > (std::size_t{1} << 20))
+        {
+            s_key = key;
+            s_buckets.assign(static_cast<std::size_t>(gh) * n_blocks, static_bucket{});
+            s_vtx.clear();
+            s_idx.clear();
+            s_zones.clear();
+            s_tofs.clear();
+        }
+        // Each step is a bijection of the running hash (xor, odd multiply,
+        // xorshift), so any one changed input always changes the result.
+        const auto mix = [](std::uint64_t h, std::uint64_t v) -> std::uint64_t {
+            h = (h ^ v) * 0x9E3779B97F4A7C15ull;
+            return h ^ (h >> 31);
+        };
+        const auto fbits = [](float f) -> std::uint64_t {
+            std::uint32_t u;
+            std::memcpy(&u, &f, sizeof u);
+            return u;
+        };
+        // What a NEIGHBOUR contributes to a tile's strokes, laid out once a
+        // frame over the rows and columns the bucket hashes read: the visible
+        // band plus two rows, the live columns (the visible blocks plus one)
+        // plus one more.
+        const int hr_lo = std::max(0, row_lo - 2);
+        const int hr_hi = std::min(gh - 1, row_hi + 2);
+        s_sig_col.assign(static_cast<std::size_t>(gw), 0u);
+        for (int cc = 0; cc < gw; ++cc)
+            if (col_live[static_cast<std::size_t>(cc)])
+                for (int d = -1; d <= 1; ++d)
+                    s_sig_col[static_cast<std::size_t>(((cc + d) % gw + gw) % gw)] = 1u;
+        s_nsig.resize(static_cast<std::size_t>(std::max(0, hr_hi - hr_lo + 1)) * gw);
+        for (int rr = hr_lo; rr <= hr_hi; ++rr)
+        for (int cc = 0; cc < gw; ++cc)
+        {
+            if (!s_sig_col[static_cast<std::size_t>(cc)])
+                continue;
+            const std::size_t ci = static_cast<std::size_t>(rr) * gw + cc;
+            std::uint64_t v = 0x51u;
+            if (raster[ci] != null_entity)
+            {
+                if (in_cache(rr) && tile_cache[ci])
+                    v = route_levels[ci]; // laid by the shade pass
+                else
+                {
+                    const tile_component* t = tile_rc(cc, rr);
+                    v = t ? (std::uint64_t{ t->road_level } | (std::uint64_t{ t->lane_level } << 8))
+                          : 0xFFFFu;
+                }
+                v |= std::uint64_t{ survey_tile_visible(body.survey, gw, gh, cc, rr) } << 16;
+                v ^= fbits(vision_rc(cc, rr)) << 24;
+                if (draw_border_band)
+                    v = mix(v, nation_rc(cc, rr));
+            }
+            s_nsig[static_cast<std::size_t>(rr - hr_lo) * gw + cc] = v;
+        }
+        const auto wrap_col = [gw](int c) {
+            return c < 0 ? ((c % gw) + gw) % gw : (c >= gw ? c % gw : c);
+        };
+        // One hash per (row, block) over the block widened by two columns:
+        // each feeds the five buckets above and below it, so the window is
+        // read once rather than five times.
+        static std::vector<std::uint64_t> s_seg;
+        s_seg.resize(static_cast<std::size_t>(std::max(0, hr_hi - hr_lo + 1)) * n_blocks);
+        for (int rr = hr_lo; rr <= hr_hi; ++rr)
+        for (int b = 0; b < n_blocks; ++b)
+        {
+            const int c0 = b * k_static_block;
+            if (!col_live[static_cast<std::size_t>(c0)])
+                continue; // not on screen (a block on screen is live whole)
+            const int c1 = std::min(gw, c0 + k_static_block);
+            const std::uint64_t* row_sig = s_nsig.data() + static_cast<std::size_t>(rr - hr_lo) * gw;
+            std::uint64_t h = 0x5E6ull;
+            for (int cc = c0 - 2; cc < c1 + 2; ++cc)
+                h = mix(h, row_sig[(cc >= 0 && cc < gw) ? cc : wrap_col(cc)]);
+            s_seg[static_cast<std::size_t>(rr - hr_lo) * n_blocks + b] = h;
+        }
+
+        static std::vector<structure_hit_zone> build_zones;
+        ImDrawList& sc = *s_scratch;
+        for (int r = row_lo; r <= row_hi; ++r)
+        for (int b = 0; b < n_blocks; ++b)
+        {
+            const int c0 = b * k_static_block;
+            const int c1 = std::min(gw, c0 + k_static_block); // exclusive
+            // The copies on screen: the same centre test the tile loop culls by,
+            // over the block's extreme centres.
+            const float x_min = to_screen(hex_local_centre(c0, r, hex_size)).x;
+            const float x_max = to_screen(hex_local_centre(c1 - 1, r, hex_size)).x;
+            const int kb_lo = (period_px > 0.0f)
+                ? static_cast<int>(std::ceil((visible_left  - x_max) / period_px)) : 0;
+            const int kb_hi = (period_px > 0.0f)
+                ? static_cast<int>(std::floor((visible_right - x_min) / period_px)) : 0;
+            if (kb_lo > kb_hi)
+                continue;
+
+            // The bucket's content hash.
+            std::uint64_t h = 0xC0FFEEull;
+            for (int rr = r - 2; rr <= r + 2; ++rr)
+                h = mix(h, (rr < 0 || rr >= gh)
+                               ? 0xEDull
+                               : s_seg[static_cast<std::size_t>(rr - hr_lo) * n_blocks + b]);
+            for (int cc = c0; cc < c1; ++cc)
+            {
+                const std::size_t ci = static_cast<std::size_t>(r) * gw + cc;
+                std::uint64_t own = 0x0Bull;
+                if (tile_flags[ci] & 16u)
+                    own ^= fbits(anchor_share(raster[ci])) << 16;
+                h = mix(h, own);
+            }
+
+            // This block's strokes, drawn into @p out with view origin @p vo at
+            // copy @p k: the build (scratch list, origin 0, copy 0), and the
+            // direct path for a bucket too large to re-base.
+            const auto draw_block = [&](ImDrawList* out, ImVec2 vo, int k,
+                                        std::vector<structure_hit_zone>& zones,
+                                        std::vector<tile_ofs>* ofs) {
+                for (int cc = c0; cc <= c1; ++cc)
+                {
+                    if (ofs)
+                        ofs->push_back({ static_cast<std::uint32_t>(out->VtxBuffer.Size),
+                                         static_cast<std::uint32_t>(out->IdxBuffer.Size) });
+                    if (cc == c1)
+                        break;
+                    const std::size_t ci = static_cast<std::size_t>(r) * gw + cc;
+                    if (raster[ci] == null_entity
+                        || !survey_tile_visible(body.survey, gw, gh, cc, r))
+                        continue; // the mask owns it: no route or rule
+                    const tile_component* t = tile_rc(cc, r);
+                    if (!t)
+                        continue;
+                    ImVec2 tc = to_scr(vo, hex_local_centre(cc, r, hex_size));
+                    tc.x += static_cast<float>(k) * period_px;
+                    emit_routes(out, cc, r, *t, tc.x, tc.y, vo, k,
+                                /*on_bake=*/true, vision_rc(cc, r), zones);
+                    if (tile_flags[ci] & 16u)
+                        if (const float as = anchor_share(raster[ci]); as >= 0.0f)
+                            emit_anchor(out, as, tc.x, tc.y);
+                }
+            };
+
+            static_bucket& bk = s_buckets[static_cast<std::size_t>(r) * n_blocks + b];
+            if (!bk.built || bk.hash != h)
+            {
+                // Build: this block's strokes at the view origin, copy 0.
+                sc._ResetForNewFrame();
+                sc.Flags        = dl->Flags;
+                sc._FringeScale = dl->_FringeScale;
+                sc.PushClipRectFullScreen();
+                sc.PushTextureID(dl->_CmdHeader.TextureId);
+                build_zones.clear();
+                bk.t0 = static_cast<std::uint32_t>(s_tofs.size());
+                draw_block(&sc, { 0.0f, 0.0f }, 0, build_zones, &s_tofs);
+                // Re-basing needs one draw command whose indices start at 0 —
+                // under 64k vertices with 16-bit indices. A 16-column bucket is
+                // a few thousand at most; were one ever larger it is drawn
+                // directly each frame instead (bk.direct), never dropped.
+                bk.direct = sc.VtxBuffer.Size >= 65536 || sc.CmdBuffer.Size > 1;
+                bk.v0 = static_cast<std::uint32_t>(s_vtx.size());
+                bk.i0 = static_cast<std::uint32_t>(s_idx.size());
+                bk.z0 = static_cast<std::uint32_t>(s_zones.size());
+                bk.vn = bk.direct ? 0u : static_cast<std::uint32_t>(sc.VtxBuffer.Size);
+                bk.in = bk.direct ? 0u : static_cast<std::uint32_t>(sc.IdxBuffer.Size);
+                bk.zn = bk.direct ? 0u : static_cast<std::uint32_t>(build_zones.size());
+                if (!bk.direct)
+                {
+                    s_vtx.insert(s_vtx.end(), sc.VtxBuffer.Data, sc.VtxBuffer.Data + sc.VtxBuffer.Size);
+                    s_idx.insert(s_idx.end(), sc.IdxBuffer.Data, sc.IdxBuffer.Data + sc.IdxBuffer.Size);
+                    s_zones.insert(s_zones.end(), build_zones.begin(), build_zones.end());
+                }
+                if (pm.on)
+                    ++pm.static_builds;
+                bk.hash  = h;
+                bk.built = true;
+            }
+
+            // Re-emit at each visible copy, with the pan.
+            for (int k = kb_lo; k <= kb_hi; ++k)
+            {
+                if (bk.direct)
+                {
+                    draw_block(dl, view_origin, k, state.structure_hit_zones, nullptr);
+                    continue;
+                }
+                const ImVec2 off = { view_origin.x + static_cast<float>(k) * period_px,
+                                     view_origin.y };
+                // The tiles of this copy whose centres are on screen — the
+                // tile loop's own cull, solved for the column range.
+                const float sx0  = to_screen(hex_local_centre(0, r, hex_size)).x
+                                 + static_cast<float>(k) * period_px;
+                const float step = col_step * zoom;
+                const int   ca   = std::max(c0, static_cast<int>(std::ceil((visible_left  - sx0) / step)));
+                const int   cb   = std::min(c1 - 1, static_cast<int>(std::floor((visible_right - sx0) / step)));
+                const tile_ofs* to = s_tofs.data() + bk.t0;
+                const std::uint32_t va = (ca <= cb) ? to[ca - c0].v     : 0u;
+                const std::uint32_t vb = (ca <= cb) ? to[cb - c0 + 1].v : 0u;
+                const std::uint32_t ia = (ca <= cb) ? to[ca - c0].i     : 0u;
+                const std::uint32_t ib = (ca <= cb) ? to[cb - c0 + 1].i : 0u;
+                if (vb > va && ib > ia)
+                {
+                    const int nv = static_cast<int>(vb - va), ni = static_cast<int>(ib - ia);
+                    dl->PrimReserve(ni, nv);
+                    const unsigned int base = dl->_VtxCurrentIdx; // after a possible new VtxOffset
+                    ImDrawVert*       vw = dl->_VtxWritePtr;
+                    const ImDrawVert* vs = s_vtx.data() + bk.v0 + va;
+                    for (int i = 0; i < nv; ++i)
+                    {
+                        vw[i]        = vs[i];
+                        vw[i].pos.x += off.x;
+                        vw[i].pos.y += off.y;
+                    }
+                    // A tile's indices name only its own vertices, so a run of
+                    // whole tiles re-bases by its first vertex.
+                    ImDrawIdx*       iw = dl->_IdxWritePtr;
+                    const ImDrawIdx* is = s_idx.data() + bk.i0 + ia;
+                    for (int i = 0; i < ni; ++i)
+                        iw[i] = static_cast<ImDrawIdx>(base + (is[i] - va));
+                    dl->_VtxWritePtr   += nv;
+                    dl->_IdxWritePtr   += ni;
+                    dl->_VtxCurrentIdx += static_cast<unsigned int>(nv);
+                }
+                for (std::uint32_t z = 0; z < bk.zn; ++z)
+                {
+                    structure_hit_zone sz = s_zones[bk.z0 + z];
+                    sz.a.x += off.x; sz.a.y += off.y;
+                    sz.b.x += off.x; sz.b.y += off.y;
+                    state.structure_hit_zones.push_back(sz);
+                }
+            }
+        }
+        pm.mark(canvas_pass_meter::stat, dl);
     }
 
+    // The two provinces the outline can light (BL-511): selected and hovered.
+    const province* sel_prov = state.selected_province != 0
+                             ? w.provinces.find(state.selected_province) : nullptr;
+    const province* hov_prov = state.hovered_province != 0
+                             ? w.provinces.find(state.hovered_province) : nullptr;
     for (int t_row = row_lo; t_row <= row_hi; ++t_row)
     for (int t_col = 0; t_col < gw; ++t_col)
     {
+        // col_live is every column with a copy on screen, widened: a column
+        // outside it cannot pass the wrap-window cull below, so skip it first.
+        if (!col_live[static_cast<std::size_t>(t_col)])
+            continue;
         const entity_id id = raster[static_cast<std::size_t>(t_row) * gw + t_col];
         if (id == null_entity)
             continue;
-        const tile_component& tile = w.tiles.at(id);
-
-        const ImVec2 lc   = hex_local_centre(tile.grid_x, tile.grid_y, hex_size);
+        // The raster is row-major on the grid, so (t_col, t_row) IS the tile's
+        // grid position: the cull below needs no tile record.
+        const ImVec2 lc   = hex_local_centre(t_col, t_row, hex_size);
         const ImVec2 sc   = to_screen(lc);
 
         // Column cull: the horizontal wrap-window (computed once here, reused by
@@ -3306,37 +4695,25 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             ? static_cast<int>(std::floor((visible_right - sc.x) / period_px)) : 0;
         if (k_min > k_max)
             continue;
+        // The tile record, fetched only when a pass on this tile asks for it: on
+        // the baked ground under no lens nothing in the loop does (the static
+        // strokes are cached), and the lookup was the loop's largest cost.
+        const tile_component* tile_p = nullptr;
+        const auto tile_of = [&]() -> const tile_component& {
+            if (!tile_p)
+                tile_p = tile_rc(t_col, t_row);
+            return *tile_p;
+        };
 
         // Does this tile carry a building, and who owns it? Resolved once here so the
         // marker pass below reuses the one lookup. It no longer feeds the FILL — since
         // BL-596 a built tile fills as terrain like any other.
-        const auto   built_it   = built_tiles.find(id);
-        const bool   built      = built_it != built_tiles.end();
-        const building_type built_type = built ? built_it->second : building_type::none;
-        const auto   corp_it    = tile_to_corp.find(id);
+        const uint8_t tflags    = tile_flags[static_cast<std::size_t>(t_row) * gw + t_col];
+        const bool   built      = (tflags & 1u) != 0;
+        const auto   corp_it    = (tflags & 2u) ? tile_to_corp.find(id) : tile_to_corp.end();
         const bool   has_owner  = corp_it != tile_to_corp.end();
-        const ImU32  owner_col  = has_owner ? corp_identity(corp_it->second)
-                                            : IM_COL32(255, 255, 255, 255);
-
-        // BL-429: the representative building's extraction target / processing
-        // primary output, so the on-canvas marker draws the same named-building
-        // glyph as the Build door and the Buildings tab. Reuses tile_to_bld's
-        // lowest-id-wins representative (BL-367) — resolved once per tile, ahead
-        // of the k-loop below, so every wrap copy shares one identity.
-        resource_type marker_identity = resource_type::iron_ore;
-        if (built)
-        {
-            if (const auto ctb_it = tile_to_bld.find(id); ctb_it != tile_to_bld.end())
-                if (const auto cbld_it = w.buildings.find(ctb_it->second); cbld_it != w.buildings.end())
-                {
-                    const building_component& rep = cbld_it->second;
-                    marker_identity =
-                        (rep.type == building_type::processing_facility
-                         && reg.get_recipe(rep.recipe) != nullptr)
-                            ? primary_output_resource(*reg.get_recipe(rep.recipe))
-                            : rep.target_resource;
-                }
-        }
+        // (BL-1241: the marker's owner colour and type identity retired with the
+        // marker — the structure is baked into the ground, keyed by the bake.)
 
         // Fill starts as the tile's terrain colour, on EVERY tile (BL-596 retired the
         // built tile's owner plate). Lens tints then composite over it — a lens is a
@@ -3353,14 +4730,24 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // they are map lookups, not the colour derivation.
         const bool is_player_tile = has_owner && corp_it->second == w.player_entity;
         const bool selected       = (id == state.selected_entity);
-        const bool surveyed = survey_tile_visible(body.survey, gw, gh, tile.grid_x, tile.grid_y);
+        const bool surveyed = survey_tile_visible(body.survey, gw, gh, t_col, t_row);
         const bool revealed = surveyed || god_view_lift;
-        const float vision  = tile_vision(id);
+        const float vision  = vision_rc(t_col, t_row);
 
         const std::size_t shade_idx = static_cast<std::size_t>(t_row) * gw + t_col;
         const tile_shade& shade     = shade_cache[shade_idx];
         const ImU32       fill      = shade.fill;
-        const uint32_t    prov_id   = shade.province;
+        // The province, looked up only when a pass asks (the bake skips it).
+        uint32_t prov_id_v     = shade.province;
+        bool     prov_id_known = shade.province_known;
+        const auto prov_id_of  = [&]() -> uint32_t {
+            if (!prov_id_known)
+            {
+                prov_id_v     = w.provinces.province_of(id);
+                prov_id_known = true;
+            }
+            return prov_id_v;
+        };
 
         // BL-732: this tile's ground is carried by the baked texture drawn
         // before the loop — skip the per-tile fill and texture emit (the
@@ -3380,7 +4767,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // field is categorical or sparse — see PLANETARY.md's reduction table)
         // renders exactly as it did before this item.
         ImU32 corner_col[6] = { fill, fill, fill, fill, fill, fill };
-        if (shade.blend)
+        if (shade.blend && !on_bake) // on the bake the fill is not drawn at all
         {
             for (int v = 0; v < 6; ++v)
             {
@@ -3404,7 +4791,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     // ocean never sets it (it needs province != 0) and built
                     // tiles never set it, so installations and coastline stay
                     // crisp exactly as before.
-                    if (!ns.blend || prov_id == 0)
+                    if (!ns.blend || prov_id_of() == 0)
                         continue;
                     acc[n++] = ns.fill;
                 }
@@ -3420,6 +4807,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
 
 
+        pm.mark(canvas_pass_meter::tile_misc, dl);
+        // The lens wash (BL-1250), derived once per tile, not once per wrap copy.
+        ImU32 lens_wc      = 0u;
+        bool  lens_wc_done = false;
         // Wrap copies inside the canvas: k_min/k_max were computed at the top of
         // the loop body (BL-268), where they double as the column cull.
         for (int k = k_min; k <= k_max; ++k)
@@ -3431,7 +4822,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // hex, and those read as hexes at any zoom. Computing them is arithmetic;
             // it is EMITTING them as a filled 6-gon that costs.
             ImVec2 verts[6];
-            hex_vertices(verts, cx, cy, draw_r);
+            hex_verts_fast(verts, cx, cy, draw_r);
 
             // A BLENDING tile is drawn at the FULL circumradius, not at draw_r.
             // draw_r is `hex_size * zoom - 1`, and that 1 px is the whole reason a
@@ -3443,7 +4834,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // installation and a categorical lens block stay crisp.
             ImVec2 blend_verts[6];
             if (shade.blend)
-                hex_vertices(blend_verts, cx, cy, draw_r + 1.0f);
+                hex_verts_fast(blend_verts, cx, cy, draw_r + 1.0f);
 
             // Coarse fill below the LOD threshold (BL-269): a rect instead of a
             // 6-gon, ~4 vertices against ~10 and no AA fringe.
@@ -3463,39 +4854,126 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 // The baked ground already carries terrain, relief and grain.
                 // What the fill path also carried — the player-identity wash,
                 // the construction-suitability washes, the vision fog — draws
-                // here as translucent full-radius hexes over the bake, at the
+                // as translucent full-radius washes over the bake, at the
                 // same strengths compute_tile_fill blends them in at.
-                ImVec2 wash_verts[6];
-                hex_vertices(wash_verts, cx, cy, draw_r + 1.0f);
+                //
+                // Collected, not drawn here: they emit into the wash channel
+                // once the loop is done (emit_ground). At the coarse fill they
+                // are the grid-step rect (the fill LOD), and the FOG — the one
+                // wash on nearly every tile — joins equal neighbours in a row
+                // into one rect: a few hundred quads for the whole body where
+                // it was 15k anti-aliased hexes (PLANETARY.md § Draw-loop cost
+                // model, the 60 fps budget).
+                const float step = draw_r + 1.0f; // hex_size * zoom
+                const float whw  = kSqrt3 * step * 0.5f;
+                const float whh  = 0.75f  * step;
+                const auto wash = [&](ImU32 c) {
+                    if (coarse_fill)
+                        washes.push_back({ {}, 0.0f, { cx - whw, cy - whh },
+                                           { cx + whw, cy + whh }, c, false });
+                    else
+                        washes.push_back({ { cx, cy }, step, {}, {}, c, true });
+                };
+                // The lens's answer (BL-1250): a wash of its own list, joined
+                // along a row at the coarse fill exactly as the fog is (a
+                // catchment or a plate is long runs of one colour).
+                if (state.overlay != overlay_mode::none)
+                {
+                    resource_type on_tile[ui_state::k_lens_resource_cap];
+                    const int n_res = (state.overlay == overlay_mode::resource && !coarse_fill)
+                        ? lens_resources_on_tile(state, tile_of(), on_tile) : 0;
+                    if (n_res >= 2)
+                    {
+                        // A split tile: equal wedges, each at the wash strength.
+                        ground_wedges wg{ { cx, cy }, step, {}, n_res };
+                        for (int q = 0; q < n_res; ++q)
+                            wg.cols[q] = with_alpha(presentation_of(on_tile[q]).colour,
+                                                    k_lens_wash_categorical);
+                        lens_wedges.push_back(wg);
+                    }
+                    else if (const ImU32 lc = lens_wc_done
+                                 ? lens_wc
+                                 : (lens_wc_done = true,
+                                    lens_wc = state.overlay == overlay_mode::throughput
+                                        ? (state.lp_reach_max > 0.0f
+                                               ? throughput_wash_of(reach_cost_rc(t_col, t_row)) : 0u)
+                                        : lens_wash_of(id, tile_of()));
+                             (lc & IM_COL32_A_MASK) != 0u)
+                    {
+                        // The run is per wrap COPY: with two copies on screen the
+                        // list's back is the other copy's rect, never a neighbour.
+                        int& run = lens_run[static_cast<unsigned>(k) & 3u];
+                        ground_wash* last = (run >= 0 && run < static_cast<int>(lens_washes.size()))
+                                                ? &lens_washes[static_cast<std::size_t>(run)] : nullptr;
+                        if (coarse_fill && last && !last->hex && last->col == lc
+                            && last->p0.y == cy - whh
+                            && std::fabs(last->p1.x - (cx - whw)) < 0.01f)
+                            last->p1.x = cx + whw;
+                        else if (coarse_fill)
+                        {
+                            run = static_cast<int>(lens_washes.size());
+                            lens_washes.push_back({ {}, 0.0f, { cx - whw, cy - whh },
+                                                    { cx + whw, cy + whh }, lc, false });
+                        }
+                        else
+                            lens_washes.push_back({ { cx, cy }, step, {}, {}, lc, true });
+                    }
+                }
+                // The close-zoom seam: sides 0-2 (E, NE, NW) of every tile on
+                // the bake — each shared edge is exactly one tile's side in that
+                // set and the other's side + 3, so every edge draws once.
+                if (seam_on)
+                {
+                    ImVec2 sv[6];
+                    hex_verts_fast(sv, cx, cy, step);
+                    for (int side = 0; side < 3; ++side)
+                    {
+                        const auto nc = hex_neighbors::neighbour(t_col, t_row, side);
+                        if (nc.gy < 0 || nc.gy >= gh)
+                            continue; // off the pole: no neighbour, no seam
+                        seam_segs.push_back(sv[k_side_verts[side][0]]);
+                        seam_segs.push_back(sv[k_side_verts[side][1]]);
+                    }
+                }
                 if (is_player_tile)
                 {
                     const ImU32 pid = corp_identity(w.player_entity);
-                    dl->AddConvexPolyFilled(wash_verts, 6,
-                        (pid & ~IM_COL32_A_MASK) | (ImU32(77) << IM_COL32_A_SHIFT)); // 0.30
+                    wash((pid & ~IM_COL32_A_MASK) | (ImU32(77) << IM_COL32_A_SHIFT)); // 0.30
                 }
                 if (suitability_active && !selected)
                 {
                     const bool placeable = suitability_placeable(
-                        w, id, tile, suitability_btype, suitability_target);
+                        w, id, tile_of(), suitability_btype, suitability_target);
                     if (!placeable)
-                        dl->AddConvexPolyFilled(wash_verts, 6, IM_COL32(0, 0, 0, 90)); // 0.35
+                        wash(IM_COL32(0, 0, 0, 90)); // 0.35
                     else if (suitability_affine_kind)
                     {
                         bool any_dep = false;
                         const resource_type best =
-                            placement_rules::richest_extractable(tile, any_dep);
+                            placement_rules::richest_extractable(tile_of(), any_dep);
                         if (any_dep && best == suitability_target)
-                            dl->AddConvexPolyFilled(wash_verts, 6,
-                                                    IM_COL32(100, 200, 100, 61)); // 0.24
+                            wash(IM_COL32(100, 200, 100, 61)); // 0.24
                     }
                 }
                 if (vision < 1.0f)
                 {
-                    // fog_dim's wash (lerp toward (8,10,16) by 0.5*(1-vision)),
+                    // fog_dim's wash (lerp toward (8,10,16) by k_fog_strength*(1-vision)),
                     // as an alpha overlay over the baked ground.
-                    const int fa = static_cast<int>(std::lround(127.5f * (1.0f - vision)));
+                    const int fa = static_cast<int>(std::lround(255.0f * k_fog_strength * (1.0f - vision)));
                     if (fa > 0)
-                        dl->AddConvexPolyFilled(wash_verts, 6, IM_COL32(8, 10, 16, fa));
+                    {
+                        const ImU32 fc = IM_COL32(8, 10, 16, fa);
+                        // Join the previous rect when it is this row's left
+                        // neighbour in the same copy, in the same colour, and
+                        // nothing was washed between them (so order holds).
+                        ground_wash* last = washes.empty() ? nullptr : &washes.back();
+                        if (coarse_fill && last && !last->hex && last->col == fc
+                            && last->p0.y == cy - whh
+                            && std::fabs(last->p1.x - (cx - whw)) < 0.01f)
+                            last->p1.x = cx + whw;
+                        else
+                            wash(fc);
+                    }
                 }
             }
             else if (coarse_fill)
@@ -3514,10 +4992,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // more toggled resources is cut into equal pie wedges from the centre,
             // one per resource in toggle order. Below the coarse LOD the hex is a
             // few pixels across and the rect keeps the first resource's colour.
-            if (state.overlay == overlay_mode::resource && surveyed && !coarse_fill)
+            // (On the bake the wedges are washes, collected above.)
+            if (state.overlay == overlay_mode::resource && surveyed && !coarse_fill && !on_bake)
             {
                 resource_type on_tile[ui_state::k_lens_resource_cap];
-                const int n = lens_resources_on_tile(state, tile, on_tile);
+                const int n = lens_resources_on_tile(state, tile_of(), on_tile);
                 if (n >= 2)
                 {
                     ImU32 cols[ui_state::k_lens_resource_cap];
@@ -3541,10 +5020,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // Never drawn under `coarse_fill`, which is implied: coarse_fill needs
             // draw_r <= 7 and texture_strength is 0 below draw_r 14.
             if (revealed && texture_strength > 0.0f && !on_bake)
-                draw_tile_texture(dl, { cx, cy }, draw_r, tile.grid_x, tile.grid_y,
-                                  tile.substrate, tile.cover, tile.cover_density,
+                draw_tile_texture(dl, { cx, cy }, draw_r, t_col, t_row,
+                                  tile_of().substrate, tile_of().cover, tile_of().cover_density,
                                   fill, texture_strength);
 
+            pm.mark(canvas_pass_meter::fill, dl);
             // Province edge: NOT DRAWN. BL-511 stroked every side facing a
             // different province at alpha 105, and NR-417 called that alpha the
             // one dial to move. Ben moved it to zero (BL-514, 2026-08-22):
@@ -3564,46 +5044,27 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (!revealed)
                 continue;
 
-            // National border band — the inward falloff (BL-601). Always-on
-            // chrome, drawn under every lens exactly as roads are: the national
-            // read is terrain-grade context now, not a mode the player enters.
-            //
-            // Each tile takes ITS OWN nation's colour at an alpha keyed to its
-            // depth from the frontier, composited over the finished fill. That
-            // per-tile compositing is the guarantee Ben's ruling asks for: two
-            // neighbours meeting draw two different colours side by side and
-            // never average into a third nation's hue, because no arithmetic in
-            // this pass sees more than one nation.
-            //
-            // Gated on `revealed` for the same reason the province edge was: a
-            // border drawn through the survey mask would leak the political
-            // shape of ground the player has not paid to survey.
-            if (const uint8_t depth = border_depth[shade_idx]; depth < band_depth)
+            // Owner multi-select rim (BL-1240): ground held by an UNPICKED owner of
+            // the lens's kind takes owned_grey AND a dark inset rim. The grey alone
+            // is a value, and some terrain sits at that value (urban, regolith,
+            // metallic); the rim is the colour-independent channel that says "held,
+            // not picked" whatever the ground beside it. Skipped under coarse_fill,
+            // where a hex is a few pixels and a rim would be the whole tile.
+            if (!coarse_fill && has_owner
+                && (state.overlay == overlay_mode::corporation
+                    || state.overlay == overlay_mode::company))
             {
-                const entity_id nat = nation_of(id);
-                if (nat != null_entity)
+                const bool want_bg = (state.overlay == overlay_mode::company);
+                const auto oit     = w.corporations.find(corp_it->second);
+                if (oit != w.corporations.end()
+                    && oit->second.is_background == want_bg
+                    && !state.lens_owner_picked(corp_it->second, want_bg))
                 {
-                    // Muted (2026-09-01): the identity colour desaturated for
-                    // the band, so the claim reads without shouting over the
-                    // painterly ground.
-                    const ImU32 nc = muted_nation_colour(palette::nation_colour(nat));
-                    const float scale = border_political[shade_idx]
-                                        ? 1.0f : k_border_unclaimed_scale;
-                    const int   a  = static_cast<int>(k_border_band_alpha[depth] * scale * 255.0f);
-                    const ImU32 wash = IM_COL32((nc >> IM_COL32_R_SHIFT) & 0xFFu,
-                                                (nc >> IM_COL32_G_SHIFT) & 0xFFu,
-                                                (nc >> IM_COL32_B_SHIFT) & 0xFFu, a);
-                    if (coarse_fill)
-                    {
-                        const float step = draw_r + 1.0f;
-                        const float hw   = kSqrt3 * step * 0.5f - 0.5f;
-                        const float hh   = 1.5f   * step * 0.5f - 0.5f;
-                        dl->AddRectFilled({ cx - hw, cy - hh }, { cx + hw, cy + hh }, wash);
-                    }
-                    else
-                    {
-                        dl->AddConvexPolyFilled(verts, 6, wash);
-                    }
+                    const float lw = std::max(1.0f, draw_r * 0.10f);
+                    ImVec2 rim[6];
+                    hex_verts_fast(rim, cx, cy, std::max(1.0f, draw_r - lw * 0.5f));
+                    dl->AddPolyline(rim, 6, IM_COL32(18, 20, 26, 200),
+                                    ImDrawFlags_Closed, lw);
                 }
             }
 
@@ -3615,7 +5076,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (state.overlay == overlay_mode::resource && surveyed && !coarse_fill && raster_ok)
             {
                 resource_type tmp[ui_state::k_lens_resource_cap];
-                if (lens_resources_on_tile(state, tile, tmp) > 0)
+                if (lens_resources_on_tile(state, tile_of(), tmp) > 0)
                 {
                     const ImVec2* ev = shade.blend ? blend_verts : verts;
                     const float   lw = std::max(1.5f, draw_r * 0.16f);
@@ -3655,10 +5116,18 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // statement, not an edge one.
             if (state.hovered_structure != null_entity)
             {
-                entity_id            tile_struct = null_entity;
-                const structure_kind sk = lens_structure_of_tile(w, state, id,
-                                                                 tile_to_corp, &tile_struct,
-                                                                 plates, gw);
+                entity_id      tile_struct = null_entity;
+                structure_kind sk          = structure_kind::none;
+                if (memo_markets)
+                {
+                    // lens_structure_of_tile's Market/Scarcity case, on the memo.
+                    tile_struct = market_of(id, tile_of());
+                    sk = (tile_struct != null_entity) ? structure_kind::market
+                                                      : structure_kind::none;
+                }
+                else
+                    sk = lens_structure_of_tile(w, state, id, tile_to_corp, &tile_struct,
+                                                plates, gw);
                 // A deposit lights by MEMBERSHIP: a split tile resolves to one wedge,
                 // but it belongs to every toggled deposit it carries.
                 const bool member =
@@ -3666,15 +5135,29 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         ? [&] {
                               const std::size_t ri =
                                   static_cast<std::size_t>(state.hovered_structure - 1u);
-                              return ri < std::size(tile.resource_deposit)
-                                  && tile.resource_deposit[ri] > 0.0f;
+                              return ri < std::size(tile_of().resource_deposit)
+                                  && tile_of().resource_deposit[ri] > 0.0f;
                           }()
                         : (sk == state.hovered_structure_kind
                            && tile_struct == state.hovered_structure);
                 if (member)
                 {
                     constexpr ImU32 lit = IM_COL32(255, 255, 255, 34);
-                    if (coarse_fill)
+                    if (on_bake)
+                    {
+                        // Over the bake it is a wash like the lens's own (BL-1250):
+                        // full radius, in the wash channel, so a lit catchment does
+                        // not draw a 1 px grid of unlit gaps across the ground.
+                        const float step = draw_r + 1.0f;
+                        if (coarse_fill)
+                            washes.push_back({ {}, 0.0f,
+                                               { cx - kSqrt3 * step * 0.5f, cy - 0.75f * step },
+                                               { cx + kSqrt3 * step * 0.5f, cy + 0.75f * step },
+                                               lit, false });
+                        else
+                            washes.push_back({ { cx, cy }, step, {}, {}, lit, true });
+                    }
+                    else if (coarse_fill)
                     {
                         const float step = draw_r + 1.0f;
                         const float hw   = kSqrt3 * step * 0.5f - 0.5f;
@@ -3688,408 +5171,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 }
             }
 
-            // ROADS AND SEA LANES AS SMOOTH CURVES (Ben, 2026-10-03: "render [roads] as
-            // curves rather than lines, and make them thinner"; "sea lanes should always go
-            // over ocean, never over ground"; RENDERING.md § Roads and sea lanes). Both are
-            // tile fields on the cardinal grid the traversal walk uses, so both draw the same
-            // way: a tile joined to exactly TWO network neighbours draws ONE quadratic from
-            // the midpoint of the first shared edge, through its own centre as the control
-            // point, to the midpoint of the second. Consecutive tiles' curves meet at those
-            // midpoints along the centre-to-centre line, so the run is tangent-continuous —
-            // the quadratic B-spline of the tile-centre chain — and each curve stays inside
-            // the triangle (midpoint, centre, midpoint), so a lane never leaves the sea tiles
-            // it was stamped on. A junction pairs its neighbours into through-curves (most
-            // opposite first); an end, or a three-way junction's odd branch, is a straight
-            // spoke, so a fork still reads as a fork. The half-edge symmetry of
-            // BL-172 is unchanged: the halves still meet at the shared midpoint, and each
-            // half takes its own edge's fog (BL-185, max of the pair).
-            //
-            // At the coarse LOD (draw_r <= 7 px) the curve is invisible at a few pixels a
-            // tile, so the quadratic is drawn as its two straight chords.
-            // Is (col, row) on the network? Raw field, columns wrapping, rows not — the
-            // rung test below reads it, and must read the same from either end.
-            const auto on_network = [&](auto level_of, int col, int row) -> bool
-            {
-                if (row < 0 || row >= gh)
-                    return false;
-                col %= gw;
-                if (col < 0)
-                    col += gw;
-                const entity_id id_at = tile_at_rc(col, row);
-                if (id_at == null_entity)
-                    return false;
-                const auto it = w.tiles.find(id_at);
-                return it != w.tiles.end() && level_of(it->second) != 0;
-            };
-            // @p skip_rungs: a link between two tiles that BOTH run straight through
-            // along the other axis is a RUNG between two parallel runs, not a route —
-            // two lanes laid on adjacent rows touch tile to tile, and drawing every
-            // touch hatched the sea between them. Symmetric (the same test from either
-            // end), so the half-edges still meet. A crossing is kept: the cross run's
-            // tile does not run straight through along the other axis. Lanes only; a
-            // road lattice's rungs are real roads.
-            const auto draw_network = [&](auto level_of, ImU32 col, float thick, bool skip_rungs)
-            {
-                static const int card_off[4][2] = {{+1, 0}, {-1, 0}, {0, +1}, {0, -1}};
-                const auto through = [&](int c, int r, bool horizontal) {
-                    return horizontal
-                        ? (on_network(level_of, c + 1, r) && on_network(level_of, c - 1, r))
-                        : (on_network(level_of, c, r + 1) && on_network(level_of, c, r - 1));
-                };
-                ImVec2 mids[4];
-                float  vis[4];
-                int    deg = 0;
-                for (int n = 0; n < 4; ++n)
-                {
-                    const int nrow = tile.grid_y + card_off[n][1];
-                    if (nrow < 0 || nrow >= gh)
-                        continue;
-                    const int raw_col = tile.grid_x + card_off[n][0];
-                    int ncol = raw_col % gw;
-                    if (ncol < 0)
-                        ncol += gw;
-
-                    const entity_id nb_id = tile_at_rc(ncol, nrow);
-                    if (nb_id == null_entity)
-                        continue;
-                    const auto nb_tile_it = w.tiles.find(nb_id);
-                    if (nb_tile_it == w.tiles.end() || level_of(nb_tile_it->second) == 0)
-                        continue;
-                    if (!(survey_tile_visible(body.survey, gw, gh, ncol, nrow) || god_view_lift))
-                        continue; // BL-408: god view draws into the masked region too
-                    if (skip_rungs)
-                    {
-                        const bool other_axis_horizontal = (n >= 2); // a row step's rung runs E-W
-                        if (through(tile.grid_x, tile.grid_y, other_axis_horizontal)
-                            && through(ncol, nrow, other_axis_horizontal))
-                            continue;
-                    }
-
-                    ImVec2 nb_sc = to_screen(hex_local_centre(ncol, nrow, hex_size));
-                    nb_sc.x += static_cast<float>(k) * period_px;
-                    if (raw_col >= gw)      nb_sc.x += period_px; // east across the cylinder seam
-                    else if (raw_col < 0)   nb_sc.x -= period_px; // west across the seam
-
-                    mids[deg] = {(cx + nb_sc.x) * 0.5f, (cy + nb_sc.y) * 0.5f};
-                    vis[deg]  = std::max(vision, tile_vision(nb_id));
-                    ++deg;
-                }
-
-                // The junction cap takes the brightest edge meeting at this centre, so it
-                // never reads as a dark blot on the end of a lit span.
-                float cap_vision = vision;
-                for (int i = 0; i < deg; ++i)
-                    cap_vision = std::max(cap_vision, vis[i]);
-
-                // One quadratic mids[a] -> (centre) -> mids[b], split at its apex so each
-                // half carries its own edge's fog. Apex = (ma + 2c + mb) / 4; each half's
-                // control is the midpoint of its end and the centre.
-                const auto curve = [&](int a, int b) -> ImVec2
-                {
-                    const ImVec2 apex = {(mids[a].x + 2.0f * cx + mids[b].x) * 0.25f,
-                                         (mids[a].y + 2.0f * cy + mids[b].y) * 0.25f};
-                    for (const int i : {a, b})
-                    {
-                        const ImU32 ec = fog_dim(col, vis[i]);
-                        if (coarse_fill)
-                        {
-                            dl->AddLine(mids[i], apex, ec, thick);
-                            continue;
-                        }
-                        const ImVec2 ctl = {(mids[i].x + cx) * 0.5f, (mids[i].y + cy) * 0.5f};
-                        dl->AddBezierQuadratic(mids[i], ctl, apex, ec, thick, 6);
-                    }
-                    // A round joint at the apex hides the seam between the two halves.
-                    dl->AddCircleFilled(apex, thick * 0.5f, fog_dim(col, std::max(vis[a], vis[b])));
-                    return apex;
-                };
-
-                // THROUGH-ROUTES. The neighbours pair off, most-opposite first (the pair
-                // whose directions from the centre have the most negative dot product),
-                // and each pair is one curve — so a junction reads as two crossing runs,
-                // not a star of spokes, and a dense city lattice curves as a run does.
-                // Deterministic: ties keep the first pair in the fixed E, W, S, N order.
-                bool   used[4] = {false, false, false, false};
-                ImVec2 hub     = {cx, cy}; // where an odd branch joins: the last curve's apex
-                for (int left = deg; left >= 2; left -= 2)
-                {
-                    int   pa = -1, pb = -1;
-                    float best = 2.0f;
-                    for (int i = 0; i < deg; ++i)
-                    {
-                        if (used[i]) continue;
-                        for (int j = i + 1; j < deg; ++j)
-                        {
-                            if (used[j]) continue;
-                            const float ax = mids[i].x - cx, ay = mids[i].y - cy;
-                            const float bx = mids[j].x - cx, by = mids[j].y - cy;
-                            const float la = std::sqrt(ax * ax + ay * ay), lb = std::sqrt(bx * bx + by * by);
-                            const float d  = (la > 0.0f && lb > 0.0f) ? (ax * bx + ay * by) / (la * lb) : 1.0f;
-                            if (d < best) { best = d; pa = i; pb = j; }
-                        }
-                    }
-                    if (pa < 0) break;
-                    used[pa] = used[pb] = true;
-                    hub = curve(pa, pb);
-                }
-
-                // An end (one neighbour, or none: a lone / just-placed tile), or a
-                // three-way junction's odd branch: a straight spoke from the hub — the
-                // centre, or the through-curve's apex so the branch meets the curve —
-                // to its shared-edge midpoint, with a cap that rounds the join and keeps
-                // a lone tile visible. Four neighbours pair off whole and need neither.
-                if (deg == 2 || deg == 4)
-                    return;
-                for (int i = 0; i < deg; ++i)
-                    if (!used[i])
-                        dl->AddLine(hub, mids[i], fog_dim(col, vis[i]), thick);
-                dl->AddCircleFilled(hub, std::max(1.0f, thick * 0.75f),
-                                    fog_dim(col, cap_vision));
-            };
-
-            // Road network (BL-146/BL-172 generated + BL-147/BL-172 player-placed). Always-on
-            // under every lens (roads are terrain, not an overlay), drawn only toward roaded,
-            // survey-revealed cardinal neighbours (the 4 directions the intra-body A* actually
-            // traverses; ocean is never roaded, so "land" is implicit). Styled by THIS tile's
-            // tier — Track(1) thin/dim, Road(2) medium, Highway(3) thick/bright — so a tier
-            // change reads as a taper at the midpoint. The width is ONE named constant per
-            // tier (k_road_width_*: the stroke as a fraction of the drawn hex radius, which is
-            // floored at 10 px so the tiers stay apart on the whole-grid view).
-            //
-            // BL-185: roads dim with the intra-body reach fog, through the same fog_dim wash
-            // the lens fill takes, so an unreached road recedes with the ground under it rather
-            // than reading as brightly as one on your own corridor. A road edge spans two tiles,
-            // so the pair's vision is combined with MAX — a road is lit if EITHER end is reached.
-            // Max is the choice for two reasons: it is SYMMETRIC, so both tiles' halves fog to the
-            // same value and the span stays one continuous weight (the BL-172 no-from/to-asymmetry
-            // property the geometry already guarantees); and reach is a flood outward from where
-            // the player operates, so an edge touching a reached tile is inside that reach — a
-            // corridor's roads should not darken one hop early at its rim. Survey (BL-067) still
-            // owns genuinely unrevealed tiles; this is only the commercial-reach fog.
-            const float route_r = std::max(10.0f, draw_r) * state.dbg_route_width_scale;
-            if (tile.road_level > 0)
-            {
-                ImU32 col; float thick;
-                switch (tile.road_level)
-                {
-                    case 1:  col = IM_COL32(175, 158, 120, 205); thick = route_r * k_road_width_track;   break;
-                    case 2:  col = IM_COL32(205, 188, 140, 225); thick = route_r * k_road_width_road;    break;
-                    default: col = IM_COL32(225, 205, 150, 238); thick = route_r * k_road_width_highway; break;
-                }
-                draw_network([](const tile_component& t) { return t.road_level; }, col, thick, false);
-            }
-
-            // Sea lanes (BL-1098, LOGISTICS.md § 4b): the stamped `lane_level` field, drawn
-            // along the lane's own water tiles — never between its ends — as the same smooth
-            // curve, in the soft sea blue the wizard's lapse draws a lane in. Always-on like
-            // roads: a lane is part of the network a convoy rides, not an overlay.
-            if (tile.lane_level > 0)
-                draw_network([](const tile_component& t) { return t.lane_level; },
-                             IM_COL32(140, 200, 245, 190), route_r * k_lane_width, true);
-
-            // Rivers (BL-170 data; this render is new, 2026-08-02). Always-on terrain like
-            // roads. Drawn ONCE per edge from the UPSTREAM tile only — river_downstream bit
-            // set on a side means that side is this tile's outflow direction, so checking
-            // both river_edges and river_downstream picks exactly one of the two tiles
-            // sharing the edge as its drawer, and the line direction (this tile -> neighbour)
-            // is always the true flow direction with no separate lookup needed.
-            if (tile.river_edges != 0)
-            {
-                const int (*r_off)[2] = hex_neighbors::offsets(tile.grid_y);
-
-                const ImU32 river_col    = IM_COL32(90, 160, 235, 235);
-                const ImU32 chevron_col  = IM_COL32(220, 235, 255, 245);
-                const float river_thick  = std::max(1.5f, draw_r * 0.16f);
-
-                for (int side = 0; side < 6; ++side)
-                {
-                    const auto bit = static_cast<std::uint8_t>(1u << side);
-                    if (!(tile.river_edges & bit) || !(tile.river_downstream & bit))
-                        continue; // no river here, or this tile is the downstream half (already drawn from upstream)
-
-                    const int nrow = tile.grid_y + r_off[side][1];
-                    if (nrow < 0 || nrow >= gh)
-                        continue;
-                    const int raw_col = tile.grid_x + r_off[side][0];
-                    int ncol = raw_col % gw;
-                    if (ncol < 0)
-                        ncol += gw;
-
-                    if (tile_at_rc(ncol, nrow) == null_entity)
-                        continue;
-                    if (!(survey_tile_visible(body.survey, gw, gh, ncol, nrow) || god_view_lift))
-                        continue; // BL-408: god view draws into the masked region too
-
-                    ImVec2 nb_sc = to_screen(hex_local_centre(ncol, nrow, hex_size));
-                    nb_sc.x += static_cast<float>(k) * period_px;
-                    if (raw_col >= gw)      nb_sc.x += period_px;
-                    else if (raw_col < 0)   nb_sc.x -= period_px;
-
-                    float dirx = nb_sc.x - cx;
-                    float diry = nb_sc.y - cy;
-                    const float len = std::sqrt(dirx * dirx + diry * diry);
-                    if (len <= 0.0f)
-                        continue;
-                    dirx /= len;
-                    diry /= len;
-                    const float px = -diry;
-                    const float py =  dirx;
-
-                    dl->AddLine({cx, cy}, nb_sc, river_col, river_thick);
-
-                    // Chevron cadence ("every 2 tiles"): no per-edge distance-from-source is
-                    // stored (generate_rivers traces tile-by-tile with no persisted path
-                    // index), so this approximates the cadence with the upstream tile's grid
-                    // parity — cheap, deterministic, and roughly-alternating rather than an
-                    // exact along-river count.
-                    if (((tile.grid_x + tile.grid_y) & 1) == 0)
-                    {
-                        const float mx   = (cx + nb_sc.x) * 0.5f;
-                        const float my   = (cy + nb_sc.y) * 0.5f;
-                        const float chev = std::max(2.5f, draw_r * 0.3f);
-                        const ImVec2 tip   = {mx + dirx * chev * 0.5f, my + diry * chev * 0.5f};
-                        const ImVec2 wing1 = {mx - dirx * chev * 0.3f + px * chev * 0.55f,
-                                              my - diry * chev * 0.3f + py * chev * 0.55f};
-                        const ImVec2 wing2 = {mx - dirx * chev * 0.3f - px * chev * 0.55f,
-                                              my - diry * chev * 0.3f - py * chev * 0.55f};
-                        dl->AddLine(wing1, tip, chevron_col, river_thick * 0.9f);
-                        dl->AddLine(wing2, tip, chevron_col, river_thick * 0.9f);
-                    }
-                }
-            }
-
-            // National borders - the coloured rule (BL-601). The band's wash
-            // above says "this ground is near a frontier"; this pass says WHICH
-            // frontier and whose, and it is what carries the hit corridor.
-            //
-            // ON THE PLAIN CANVAS ONLY (Ben, 2026-08-28). It was "always on,
-            // under every lens" from BL-601 until now - the national read became
-            // chrome on the same footing as roads and rivers. Ben, reviewing the
-            // lens sweep: "All: We can still see nation borders."
-            //
-            // THIS IS THE SECOND OF TWO NATION-BORDER PASSES and the reason the
-            // first suppression looked ineffective: the inward WASH (gated at
-            // `draw_border_band` above) says "this ground is near a frontier",
-            // while this pass draws the coloured rule that says WHICH frontier and
-            // whose. Suppressing only the wash left the rule drawing, so the
-            // borders were still plainly there. Both now answer to one flag.
-            //
-            // The hit corridor goes with it, deliberately: it is built inside this
-            // same loop, and a border that is invisible but still clickable is a
-            // worse outcome than either state. Under a lens the lens's own subject
-            // is what hover and selection pivot to (BL-603).
-            //
-            // THE STROKE IS INSET, not laid along the shared edge, and that is
-            // the whole answer to "borders should not diffuse together". A
-            // shared edge can only carry one colour, so two neighbours would
-            // fight for it and whichever drew last would win - or, worse, be
-            // averaged into a third nation's hue. Inset toward the drawing
-            // tile's own centre, each nation paints a rule just inside its own
-            // side: the pair reads as two parallel coloured lines with the
-            // frontier between them, and no pixel ever belongs to a colour that
-            // is neither neighbour's.
-            if (draw_border_band)
-            {
-                const entity_id own_nation = nation_of(id);
-                if (own_nation != null_entity)
-                {
-                    // Muted like the wash (2026-09-01) — the pair must read as
-                    // one treatment.
-                    const ImU32 border_col = muted_nation_colour(palette::nation_colour(own_nation));
-
-                    // Standard odd-r neighbour offsets (col, row deltas; canonical table, BL-363).
-                    const int (*off)[2] = hex_neighbors::offsets(tile.grid_y);
-
-                    for (int n = 0; n < 6; ++n)
-                    {
-                        const int nrow = tile.grid_y + off[n][1];
-                        if (nrow < 0 || nrow >= gh)
-                            continue; // Off the top/bottom edge: no neighbour tile.
-
-                        // Columns wrap on the horizontal cylinder.
-                        int ncol = (tile.grid_x + off[n][0]) % gw;
-                        if (ncol < 0)
-                            ncol += gw;
-
-                        const entity_id nb_id = tile_at_rc(ncol, nrow);
-                        if (nb_id == null_entity)
-                            continue;
-                        const entity_id nb_nation = nation_of(nb_id);
-                        if (nb_nation == own_nation)
-                            continue; // Same owner: interior edge, no border.
-
-                        // An edge facing UNCLAIMED ground is drawn lighter and
-                        // thinner than one facing another nation (Ben,
-                        // 2026-08-24). The wash carries this per TILE, inherited
-                        // inward from the frontier; the stroke can do better,
-                        // because it already knows what is on the other side of
-                        // each individual edge — so a headland that faces the sea
-                        // on three sides and a neighbour on the fourth draws three
-                        // light rules and one full one, rather than four of a
-                        // single averaged weight.
-                        const bool  political  = (nb_nation != null_entity);
-                        const float edge_scale = political ? 1.0f : k_border_unclaimed_scale;
-
-                        // The shared edge via the midpoint-perpendicular method:
-                        // place the segment at the midpoint of the centre-to-centre
-                        // line, perpendicular to it, with length equal to one hex side
-                        // (== circumradius draw_r for a regular hexagon). This avoids
-                        // mapping neighbour directions to per-vertex pairs, which the
-                        // offset-row vertex ordering makes error-prone. The neighbour's
-                        // screen centre is taken at the SAME wrap offset k as this tile.
-                        const ImVec2 nb_lc = hex_local_centre(ncol, nrow, hex_size);
-                        ImVec2 nb_sc = to_screen(nb_lc);
-                        nb_sc.x += static_cast<float>(k) * period_px;
-
-                        float dirx = nb_sc.x - cx;
-                        float diry = nb_sc.y - cy;
-                        const float len = std::sqrt(dirx * dirx + diry * diry);
-                        if (len <= 0.0f)
-                            continue;
-                        dirx /= len;
-                        diry /= len;
-
-                        // Pulled back along the centre line by the inset, so the
-                        // rule sits inside this tile rather than on the seam.
-                        const float inset = draw_r * k_border_stroke_inset;
-                        const float mx = (cx + nb_sc.x) * 0.5f - dirx * inset;
-                        const float my = (cy + nb_sc.y) * 0.5f - diry * inset;
-                        const float px = -diry; // perpendicular to the centre line
-                        const float py =  dirx;
-                        const float half = draw_r * 0.5f;
-
-                        const ImVec2 e0 { mx - px * half, my - py * half };
-                        const ImVec2 e1 { mx + px * half, my + py * half };
-                        const ImU32 edge_col =
-                            political ? border_col
-                                      : IM_COL32((border_col >> IM_COL32_R_SHIFT) & 0xFFu,
-                                                 (border_col >> IM_COL32_G_SHIFT) & 0xFFu,
-                                                 (border_col >> IM_COL32_B_SHIFT) & 0xFFu,
-                                                 static_cast<int>(255.0f * k_border_unclaimed_scale));
-                        dl->AddLine(e0, e1, edge_col,
-                                    std::max(1.0f, k_border_stroke_px * edge_scale));
-
-                        // The hit corridor (BL-601, and the general structure-grain
-                        // case BL-603 builds on). Registered per DRAWN segment, so
-                        // it follows the wrap copies and the survey mask for free -
-                        // a border the player cannot see is a border they cannot
-                        // click. Coarse zoom registers nothing: at draw_r <= 7 px
-                        // a tile is barely wider than the corridor, and the whole
-                        // canvas would resolve to a nation.
-                        if (!coarse_fill)
-                        {
-                            structure_hit_zone sz;
-                            sz.id         = own_nation;
-                            sz.kind       = structure_kind::nation;
-                            sz.a          = e0;
-                            sz.b          = e1;
-                            sz.half_width = std::min(k_border_hit_px,
-                                                     draw_r * k_border_hit_frac);
-                            state.structure_hit_zones.push_back(sz);
-                        }
-                    }
-                }
-            }
+            pm.mark(canvas_pass_meter::lens_marks, dl);
+            // The road and lane network and the border rule (emit_routes above).
+            // From the static cache when it is on, drawn before this loop.
+            if (!static_cache_on)
+                emit_routes(dl, t_col, t_row, tile_of(), cx, cy, view_origin, k, on_bake, vision,
+                            state.structure_hit_zones);
 
             // Persistent player footprint: outline the player's own tiles under
             // EVERY lens (and the plain default), so "these are mine" never
@@ -4104,100 +5191,22 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 dl->AddPolyline(verts, 6, ring, ImDrawFlags_Closed, 2.0f);
             }
 
+            pm.mark(canvas_pass_meter::player_ring, dl);
             if (built)
             {
-                // `mr` is the legacy marker radius, kept solely as the hit-zone scale
-                // below so click routing is unchanged by the silhouette resize.
-                const float mr    = std::max(2.0f, draw_r * 0.22f);
-                // The silhouette is the tile's content now, so it scales to the hex.
-                const float sil_r = std::max(3.0f, draw_r * kBuiltSilhouetteScale);
-
-                // The structure reads PALE and carries the filled family's dark
-                // outline, so the pair is self-balancing over the live ground BL-596
-                // put back underneath it: over near-white ice the dark outline holds
-                // the shape, over dark forest the pale fill does. Lightening toward
-                // white keeps the owner hue, so identity survives; an unowned tile's
-                // owner_col is already white, so it stays white through the same blend.
-                const ImU32 marker_col =
-                    lerp_colour(owner_col, IM_COL32(255, 255, 255, 255), 0.5f);
-
-                // BL-327 (replacing BL-323 S4's dimming, same-day: Ben found the
-                // desaturated silhouette read as "faded", not "being built"): a
-                // site with ticks_remaining > 0 draws the dedicated crane glyph
-                // IN PLACE OF its type silhouette, at full owner-tinted colour —
-                // identity still reads, the type does not, which is honest: the
-                // installation is not that type yet. ticks_remaining is the single
-                // source of truth economy_system counts down; no separate flag.
-                bool under_construction = false;
-                if (k == 0)
-                {
-                    const auto ctb_it = tile_to_bld.find(id);
-                    if (ctb_it != tile_to_bld.end())
-                    {
-                        const auto cbld_it = w.buildings.find(ctb_it->second);
-                        if (cbld_it != w.buildings.end() && cbld_it->second.ticks_remaining > 0)
-                            under_construction = true;
-                    }
-                }
-
-                {
-                    // Stacked-tile ring (BL-596). Drawn BEFORE the centre glyph so
-                    // the silhouette stays the loudest thing on the tile, and before
-                    // the emblem tag and the "+N" badge so those read as pinned onto
-                    // the ring rather than sliced by it.
-                    //
-                    // The ring names WHICH KINDS stand here; the centre glyph names
-                    // which of them leads (the lowest-id representative, the same one
-                    // tile_to_bld picks); the "+N" badge still names how many
-                    // buildings in total. Three different questions, three marks.
-                    if (draw_r > kStackRingLodRadiusPx)
-                    {
-                        const auto kinds_it = tile_bld_kinds.find(id);
-                        if (kinds_it != tile_bld_kinds.end() && kinds_it->second.size() >= 2)
-                        {
-                            ImU32 seg[kStackRingMaxKinds];
-                            int   n = 0;
-                            // DOMINANT FIRST — it takes the 12 o'clock segment, which
-                            // is the only thing tying an arc to the glyph in the
-                            // middle. The rest follow in the cache's ascending
-                            // building_type order, so the ring is stable frame to
-                            // frame and identical across runs.
-                            seg[n++] = palette::building_kind_colour(built_type);
-                            for (const building_type bt : kinds_it->second)
-                            {
-                                if (bt == built_type || n >= kStackRingMaxKinds)
-                                    continue;
-                                seg[n++] = palette::building_kind_colour(bt);
-                            }
-                            icons::stack_ring(dl, {cx, cy}, draw_r, seg, n);
-                        }
-                    }
-
-                    if (under_construction)
-                        icons::under_construction(dl, {cx, cy}, sil_r, marker_col);
-                    else
-                        icons::building(dl, {cx, cy}, sil_r, built_type, marker_identity, marker_col);
-                }
-
-                // Owner-identity tag (BL-090): a small corp emblem tucked into the
-                // hex's lower-right corner, for BOTH player and rival buildings —
-                // the owning corp is public under the BL-068 visibility model, so this
-                // adds no leak. Shape + colour route through the shared palette source
-                // of truth, so the tag matches the identity card and the Selection
-                // header. Parked past the enlarged silhouette (offsets are fractions of
-                // the hex circumradius, chosen to sit inside the lower-right edges) and
-                // backed by a dark disc so it never gets lost against terrain, lens fill,
-                // the stack ring, or the glyph. Does not affect hit-testing.
-                if (has_owner)
-                {
-                    const entity_id owner = corp_it->second;
-                    const float     er    = std::max(1.5f, draw_r * 0.15f);
-                    const ImVec2    ec    { cx + draw_r * 0.56f, cy + draw_r * 0.40f };
-                    dl->AddCircleFilled(ec, er * 1.40f, IM_COL32(18, 20, 26, 225), 16);
-                    icons::corp_emblem(dl, ec, er,
-                                       palette::corp_emblem_shape(owner),
-                                       palette::corp_identity_colour(owner, w.player_entity));
-                }
+                // BL-1241 (structures baked): NO building mark draws here. What
+                // stands on the tile is a structure baked into the ground art —
+                // a cluster of up to three, one per stack (RENDERING.md
+                // § Installations; ui/structure_stamps.cpp). The silhouette
+                // glyph, the crane, the stacked-tile ring, the corp emblem tag and
+                // the "+N" badge all retired from this canvas with it; the count
+                // and each stack's state are the Selection element's, ownership
+                // the hover card's and the owner lenses'.
+                //
+                // The HIT ZONE stays exactly as it was: the hex, not the stamp,
+                // is what a press lands on (SELECTION.md § Multi-building tiles).
+                // `mr` is the legacy marker radius, kept solely as its scale.
+                const float mr = std::max(2.0f, draw_r * 0.22f);
 
                 // Register hit zone (BL-059). Only the k==0 copy per tile so
                 // wrap copies don't produce duplicate zones; the single zone
@@ -4207,12 +5216,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     const auto bld_it = tile_to_bld.find(id);
                     if (bld_it != tile_to_bld.end())
                     {
-                        // BL-367: one marker still stands for the whole tile (the
-                        // "+N" badge below counts them, and since BL-596 the stack
-                        // ring above names their kinds), so a tile with more than one building no
-                        // longer assumes the whole hex is a single installation —
-                        // the click lands on the TILE (grouped stack list) instead
-                        // of jumping into whichever building sorts lowest-id.
+                        // BL-367: a tile with more than one building does not
+                        // assume the whole hex is one installation — the click
+                        // lands on the TILE (grouped stack list) instead of
+                        // jumping into whichever building sorts lowest-id.
                         const int count = tile_bld_count.count(id) ? tile_bld_count.at(id) : 1;
                         marker_hit_zone hz;
                         hz.id     = (count > 1) ? id : bld_it->second;
@@ -4220,99 +5227,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         hz.centre = {cx, cy};
                         hz.radius = mr * 2.0f;
                         state.marker_hit_zones.push_back(hz);
-
-                        if (count > 1)
-                        {
-                            // "+N" badge, lower-right — staggered past the corp-identity
-                            // tag (also lower-right) per ICONS.md's multi-badge offset
-                            // convention, same k/N text idiom the survey badge uses.
-                            // It survives BL-596's ring rather than being replaced by
-                            // it: the ring says which KINDS, the badge says how MANY,
-                            // and a tile holding three extraction sites is one kind
-                            // standing three times.
-                            char nbuf[8];
-                            std::snprintf(nbuf, sizeof nbuf, "+%d", count - 1);
-                            const ImVec2 bpos{ cx + draw_r * 0.56f, cy + draw_r * 0.68f };
-                            const ImU32  bcol = IM_COL32(230, 230, 235, 235);
-                            dl->AddCircleFilled(bpos, 8.0f, IM_COL32(18, 20, 26, 225), 12);
-                            dl->AddText({bpos.x - 7.0f, bpos.y - 6.0f}, bcol, nbuf); // fit-exempt: on-canvas marker badge, no containing box
-                        }
                     }
                 }
             }
 
-            // Landform glyph (BL-231): the categorical half of the landform channel.
-            // Only the four DRAMATIC landforms draw — mountain, canyon, crater, rift —
-            // measured at ≤1.5 % of land tiles each (world_audit § S3) and each carrying
-            // a movement cost of ×1.3 or worse, so this is the set where an invisible
-            // surprise is expensive. Plains, highland and valley draw nothing; between
-            // them plains and valley are ~95 % of land, and an icon on nearly every tile
-            // would be far denser than any other glyph family.
-            //
-            // Unbuilt tiles only: a built hex already carries an enlarged silhouette plus
-            // a corp emblem tag, and its cost is spent. Suppressed under the two value
-            // lenses, which claim the hex centre for their own mark below (BL-135). Ink
-            // contrasts against the finished fill, so the glyph reads over any terrain
-            // hue and any lens tint composited on top of it.
-            //
-            // BRIDGING (BL-232): a run of three mountains should read as ONE range, not
-            // three identical icons, so a tile with a same-landform cardinal neighbour
-            // draws SPANS instead of its centred glyph — this tile's half of each shared
-            // edge, exactly as BL-172's roads do, so the neighbour's half meets it at the
-            // midpoint with no cross-tile state and the survey fog clips it cleanly.
-            // Measured (world_audit § S4): 71 % of mountain and 81 % of rift tiles have
-            // such a neighbour, and modal run length is 2-3. Crater never spans — a basin
-            // is a blob, not a line. The all-four-neighbours "filled interior" case that
-            // was designed alongside this was CANCELLED on the same measurement: not one
-            // tile in the system has four, so it would have been dead code on every seed.
-            if (!built)
-            {
-                const ImU32 ink = contrast_ink(fill);
-                bool        spanned = false;
-
-                if (icons::landform_spans(tile.landform))
-                {
-                    const float amp   = std::max(1.5f, draw_r * 0.20f);
-                    const float thick = std::max(1.0f, draw_r * 0.13f);
-
-                    static const int card_off[4][2] = {{+1, 0}, {-1, 0}, {0, +1}, {0, -1}};
-                    for (int n = 0; n < 4; ++n)
-                    {
-                        const int nrow = tile.grid_y + card_off[n][1];
-                        if (nrow < 0 || nrow >= gh)
-                            continue;
-                        const int raw_col = tile.grid_x + card_off[n][0];
-                        int ncol = raw_col % gw;
-                        if (ncol < 0)
-                            ncol += gw;
-
-                        const entity_id nb_id = tile_at_rc(ncol, nrow);
-                        if (nb_id == null_entity)
-                            continue;
-                        const auto nb_tile_it = w.tiles.find(nb_id);
-                        if (nb_tile_it == w.tiles.end()
-                            || nb_tile_it->second.landform != tile.landform)
-                            continue;
-                        if (!(survey_tile_visible(body.survey, gw, gh, ncol, nrow) || god_view_lift))
-                            continue; // BL-408: god view draws into the masked region too
-
-                        ImVec2 nb_sc = to_screen(hex_local_centre(ncol, nrow, hex_size));
-                        nb_sc.x += static_cast<float>(k) * period_px;
-                        if (raw_col >= gw)    nb_sc.x += period_px; // east across the seam
-                        else if (raw_col < 0) nb_sc.x -= period_px; // west across the seam
-
-                        const ImVec2 mid = {(cx + nb_sc.x) * 0.5f, (cy + nb_sc.y) * 0.5f};
-                        icons::landform_span(dl, {cx, cy}, mid, amp, thick, tile.landform, ink);
-                        spanned = true;
-                    }
-                }
-
-                // The lone tile keeps its centred glyph — the same role the road's centre
-                // cap plays, and needed by 29 % of mountain and 50 % of canyon tiles.
-                if (!spanned)
-                    icons::landform(dl, {cx, cy}, std::max(3.0f, draw_r * 0.44f),
-                                    tile.landform, ink);
-            }
+            // Landforms draw nothing here: the dramatic set (mountain, canyon, crater,
+            // rift) bakes its own relief form into the ground, a bridged run as one
+            // form (ground_bake.cpp bake_landforms; RENDERING.md § Mountains, rivers and
+            // terrain variety). The hover card still names the landform and its cost.
 
             // The Workforce (Population) lens's per-tile DOT used to be drawn here
             // (BL-135's value mark). It is gone: the lens tints the tile itself now
@@ -4321,50 +5243,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // suppressions it needed — the stack ring and the landform glyph both
             // draw under this lens exactly as they do under every other one.
 
-            // Throughput lens (BL-606): the MAGNITUDE half. LP is generated at
-            // anchors — cities, built-and-active ports and inland hubs — and
-            // nowhere else, so the quantity is drawn where it exists rather than
-            // smeared over the tiles it might serve. Shading every tile by "the
-            // throughput serving it" would need a per-tile nearest-anchor
-            // attribution the engine does not have; deriving one would be the
-            // second distance model BL-325 ruling 3 forbids outright.
-            //
-            // Radius and hue both carry the anchor's share of the body's largest
-            // pool, so a thin anchor reads small AND dim.
-            //
-            // NOT vision-fogged, which is the value-mark / building-glyph
-            // convention rather than the road-span one: the survey mask already
-            // owns this mark (the `!revealed` continue above is upstream of it),
-            // and an anchor is a city or a completed port — as public as the
-            // building glyph beside it. It was fogged in the first cut and the
-            // mark vanished into the wash, which is how the convention was
-            // settled here rather than guessed.
-            if (state.overlay == overlay_mode::throughput && !state.lp_anchors.empty())
-            {
-                const auto ait = std::lower_bound(
-                    state.lp_anchors.begin(), state.lp_anchors.end(), id,
-                    [](const ui_state::lp_anchor& a, entity_id t) { return a.tile < t; });
-                if (ait != state.lp_anchors.end() && ait->tile == id && state.lp_anchor_max > 0.0f)
-                {
-                    // A uniform authored rate makes every share 1.0, and that is
-                    // the honest reading: every anchor generates the same, full
-                    // amount. The ramp is here for the moment the rate stops being
-                    // uniform, not to manufacture variation that is not there.
-                    const float t = std::clamp(ait->lp / state.lp_anchor_max, 0.0f, 1.0f);
-
-                    // A RING, not a disc. Every anchor is a city, a port or a hub,
-                    // so the anchor tile ALREADY carries a settlement or building
-                    // marker — and those are drawn after this pass, on the same
-                    // draw list. A filled disc is simply hidden by them (measured:
-                    // the first cut drew correctly at every one of the 57 anchors
-                    // and was invisible at all of them). A ring sits outside the
-                    // marker and reads as a capacity halo around the generator.
-                    const float ar = std::max(3.0f, draw_r * 0.66f);
-                    const float th = std::max(1.5f, draw_r * (0.10f + 0.13f * t));
-                    dl->AddCircle({cx, cy}, ar, IM_COL32(10, 18, 30, 220), 18, th + 2.0f);
-                    dl->AddCircle({cx, cy}, ar, throughput_anchor_colour(t), 18, th);
-                }
-            }
+            // Throughput lens (BL-606): the anchor ring (anchor_share / emit_anchor
+            // above). From the static cache when it is on, drawn before this loop.
+            if (!static_cache_on && (tflags & 16u))
+                if (const float as = anchor_share(id); as >= 0.0f)
+                    emit_anchor(dl, as, cx, cy);
 
             // Supply lens: draw a convoy glyph on every tile when the active body
             // has a player convoy passing through it. supply_active is false when
@@ -4389,7 +5272,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // fighting is happening is public, the way a rival's buildings are —
             // and the card withholds the internals. Tinted by whether it is yours,
             // so the two read apart at a glance.
-            if (!w.battles.empty() && draw_r >= 6.0f)
+            if ((tflags & 8u) && !w.battles.empty() && draw_r >= 6.0f)
             {
                 const uint32_t pid = w.provinces.province_of(id);
                 if (pid != 0)
@@ -4424,7 +5307,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // tile can lie far from every unit in it, leaving an army on screen
             // with no marker. Groups whose sample units share a tile spread
             // side by side, as before.
-            if (draw_r >= 6.0f && prov_id != 0)
+            if ((tflags & 4u) && draw_r >= 6.0f && !tile_units.empty() && prov_id_of() != 0)
             {
                 {
                     const auto pu_it = tile_units.find(id);
@@ -4469,6 +5352,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 }
             }
 
+            pm.mark(canvas_pass_meter::markers, dl);
             // Selection outline is drawn on every visible copy of the selected
             // tile; hover is deferred to a single nearest copy, resolved below.
             draw_hex_highlight(dl, verts,
@@ -4485,8 +5369,17 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // the outline now reads as "the ground your Deposits / Buildings /
             // Population sections are about", drawn around the selected tile's
             // own cell. `selected_province` is the derived mirror that says which.
-            if (revealed && prov_id != 0)
+            // (A province lights only when one is selected or hovered, so the
+            // test is membership of THOSE two — a binary search of their sorted
+            // tile lists, not a province lookup on every tile.)
+            const bool in_sel_prov = sel_prov
+                && std::binary_search(sel_prov->tiles.begin(), sel_prov->tiles.end(), id);
+            const bool in_hov_prov = !in_sel_prov && hov_prov
+                && std::binary_search(hov_prov->tiles.begin(), hov_prov->tiles.end(), id);
+            if (revealed && (in_sel_prov || in_hov_prov))
             {
+                const uint32_t prov_id = in_sel_prov ? state.selected_province
+                                                     : state.hovered_province;
                 const bool prov_selected = (prov_id == state.selected_province);
                 // Hover only with NO lens, for the reason recorded at the tile
                 // ring below (Ben's "stop dual hover", 2026-08-28): under a lens
@@ -4546,6 +5439,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     std::copy(std::begin(verts), std::end(verts), std::begin(hover_verts));
                 }
             }
+            pm.mark(canvas_pass_meter::outline, dl);
         }
     }
 
@@ -4584,78 +5478,35 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         state.hovered_structure_kind = sk;
     }
 
-    // Market-centre markers (BL-059). Draw a circle+cross glyph at each market's
-    // centre tile position and register a hit zone for click-selection (BL-031).
-    // Drawn after the tile loop so markers sit above all tile chrome. Only markets
-    // anchored to the active body (and with a valid centre_tile) are shown.
-    {
-        constexpr ImU32 mkt_col = IM_COL32(255, 220, 80, 220);
-        const float mkt_r = std::max(3.0f, draw_r * 0.28f);
+    // No market-centre marker (Ben, 2026-10-10: "We should remove the HQ glyph
+    // and market center glyphs"). A market is selected through the MARKET LENS —
+    // a press on its catchment, SELECTION.md § A lens collapses selection to ONE
+    // TIER — or from the Market ledger; with no lens a press on a centre tile
+    // resolves as any other tile or building press.
 
-        for (const auto& [mid, mk] : w.markets)
-        {
-            if (mk.body != state.active_body)
-                continue;
-            if (mk.centre_tile == null_entity)
-                continue;
-            const auto ctc_it = w.tiles.find(mk.centre_tile);
-            if (ctc_it == w.tiles.end())
-                continue;
-            const tile_component& ctc = ctc_it->second;
-            const ImVec2 lc = hex_local_centre(ctc.grid_x, ctc.grid_y, hex_size);
-            const ImVec2 sc = to_screen(lc);
-
-            // Draw on every visible wrap copy.
-            const int k_min = (period_px > 0.0f)
-                ? static_cast<int>(std::ceil((visible_left  - sc.x) / period_px)) : 0;
-            const int k_max = (period_px > 0.0f)
-                ? static_cast<int>(std::floor((visible_right - sc.x) / period_px)) : 0;
-            for (int k = k_min; k <= k_max; ++k)
-            {
-                const ImVec2 mc = {sc.x + static_cast<float>(k) * period_px, sc.y};
-                icons::market_centre(dl, mc, mkt_r, mkt_col);
-            }
-
-            // Hit zone on the canonical copy (k==0).
-            marker_hit_zone hz;
-            hz.id     = mid;
-            hz.kind   = marker_hit_zone::kind::market_centre;
-            hz.centre = sc;
-            hz.radius = mkt_r * 2.0f;
-            state.marker_hit_zones.push_back(hz);
-        }
-    }
-
-    // Population-centre markers (BL-083; LOD ladder, BL-625). Every generated
-    // settlement is drawn — the world genuinely carries one per province
-    // (BL-623: 1,823 on the canonical homeworld) — and the FORM follows the
-    // zoom, on the canvas's two existing detail pivots (k_lod_radius_px = 7,
-    // the coarse-fill LOD; 14, where terrain texture fades in). Far zoom keeps
-    // the long tail of villages as a density field of dots rather than glyph
-    // soup; close zoom shows every centre as its tier skyline, razed centres
-    // included. This replaces the conurbation clustering (Chebyshev <= 3,
-    // transitive), authored for a 20-40-centre world — at the post-BL-623
-    // density it collapsed the map to 49 marks (the measured diagnosis on
-    // BL-625) and hid the settled world it was meant to organise.
+    // Population centres (BL-083; BL-1241, structures baked). Every generated
+    // settlement is a STRUCTURE baked into the ground art — footprint and height
+    // stepping with its scale, a razed centre as a ruin (RENDERING.md
+    // § Installations; ui/structure_stamps.cpp) — so the skyline glyph, the ruin
+    // glyph and the far-zoom density dot all retired from this canvas. Far-zoom
+    // legibility is the art's job now: a scale >= 3 centre bakes as a pale paved
+    // patch with a dark core at the far page.
+    //
+    // What remains here is the NAME: only City+ centres (scale >= 4, not razed)
+    // carry a label, placed where the old skyline's edge stood.
     if (!w.population_centres.empty())
     {
-        // Ladder rungs. close: every centre is a skyline and ruins surface.
-        // mid: towns (scale 2) join the skylines. far: only scale >= 3 carries
-        // a glyph; smaller centres are the density field.
-        const bool close_zoom = draw_r >= 14.0f;
-        const bool mid_zoom   = draw_r > k_lod_radius_px;
-        const int  skyline_min_scale = close_zoom ? 1 : (mid_zoom ? 2 : 3);
-
         const float visible_top    = grid_area_origin.y - hit_r;
         const float visible_bottom = grid_area_origin.y + grid_area_size.y + hit_r;
 
-        // Sorted gather: the store is an unordered_map, and overlapping marks
+        // Sorted gather: the store is an unordered_map, and overlapping labels
         // must overdraw in one deterministic order for the capture harness.
-        struct pop_centre { int col; int row; int scale; bool razed; entity_id centre; };
+        struct pop_centre { int col; int row; int scale; entity_id centre; };
         std::vector<pop_centre> pcs;
-        pcs.reserve(w.population_centres.size());
         for (const auto& [pid, pc] : w.population_centres)
         {
+            if (pc.scale < 4 || pc.razed)
+                continue;
             const auto tit = w.population_centre_tile.find(pid);
             if (tit == w.population_centre_tile.end())
                 continue;
@@ -4663,40 +5514,30 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (til == w.tiles.end() || til->second.body != state.active_body)
                 continue;
             pcs.push_back({ til->second.grid_x, til->second.grid_y,
-                            std::clamp(pc.scale, 1, 5), pc.razed, pid });
+                            std::clamp(pc.scale, 1, 5), pid });
         }
         std::sort(pcs.begin(), pcs.end(),
                   [](const pop_centre& a, const pop_centre& b) { return a.centre < b.centre; });
 
         for (const pop_centre& a : pcs)
         {
-            // A ruin is a tile-scale fact, not a region-scale one (BL-624):
-            // razed centres surface only at close zoom, as the razed mark.
-            if (a.razed && !close_zoom)
-                continue;
-
             const ImVec2 lc = hex_local_centre(a.col, a.row, hex_size);
             const ImVec2 sc = to_screen(lc);
             if (sc.y < visible_top || sc.y > visible_bottom)
-                continue; // vertical cull — at 1,800+ centres dead marks are real vertices
+                continue;
 
-            // Civic-neutral under every lens (BL-601): tier is carried by the
-            // glyph, ownership by the national border band, never by colour.
-            const ImU32 col = palette::settlement;
-            const float sr  = std::max(3.0f, draw_r * (0.30f + 0.11f * static_cast<float>(a.scale)));
+            // The label's offset from the centre: the old skyline radius, so
+            // names sit where players learned to look for them.
+            const float sr = std::max(3.0f, draw_r * (0.30f + 0.11f * static_cast<float>(a.scale)));
 
-            // A City+ centre is labelled with its PERSISTED name — generated by
-            // the seeded tongue system (generate_city_name, BL-290) and re-named
-            // to the settling culture's speech in name_population_centres, so the
-            // label is deterministic per campaign and speaks the world's own
-            // language. (The old static Earth-flavoured bank was removed, BL-363.)
-            const char* name = nullptr;
-            if (a.scale >= 4 && !a.razed)
-            {
-                const auto name_it = w.population_centre_name.find(a.centre);
-                if (name_it != w.population_centre_name.end() && !name_it->second.empty())
-                    name = name_it->second.c_str();
-            }
+            // The PERSISTED name — generated by the seeded tongue system
+            // (generate_city_name, BL-290) and re-named to the settling culture's
+            // speech in name_population_centres, so the label is deterministic
+            // per campaign and speaks the world's own language.
+            const auto name_it = w.population_centre_name.find(a.centre);
+            if (name_it == w.population_centre_name.end() || name_it->second.empty())
+                continue;
+            const char* name = name_it->second.c_str();
 
             const int k_min = (period_px > 0.0f)
                 ? static_cast<int>(std::ceil((visible_left  - sc.x) / period_px)) : 0;
@@ -4705,101 +5546,17 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             for (int k = k_min; k <= k_max; ++k)
             {
                 const ImVec2 mc = { sc.x + static_cast<float>(k) * period_px, sc.y };
-                if (a.razed)
-                    icons::settlement_razed(dl, mc, sr, col);
-                else if (a.scale >= skyline_min_scale)
-                    icons::settlement(dl, mc, sr, a.scale, col);
-                else
-                {
-                    // The density field: below its skyline rung a centre is a
-                    // small civic dot — the "many population centres" read at
-                    // region scale, without 1,700 skylines of glyph soup.
-                    const float dot_r = std::max(1.2f, draw_r * 0.16f);
-                    dl->AddCircleFilled(mc, dot_r, (col & 0x00FFFFFFu) | 0xA5000000u);
-                }
-
-                // Label City+ centres (tier >= 4) only, to keep the map legible.
-                if (name)
-                {
-                    const ImVec2 tp{ mc.x + sr + 3.0f, mc.y - sr };
-                    dl->AddText({ tp.x + 1.0f, tp.y + 1.0f }, IM_COL32(20, 22, 28, 200), name); // shadow // fit-exempt: legend box sized to its measured entries (container 2)
-                    dl->AddText(tp, IM_COL32(236, 230, 214, 255), name); // fit-exempt: legend box sized to its measured entries (container 2)
-                }
+                const ImVec2 tp{ mc.x + sr + 3.0f, mc.y - sr };
+                dl->AddText({ tp.x + 1.0f, tp.y + 1.0f }, IM_COL32(20, 22, 28, 200), name); // shadow // fit-exempt: legend box sized to its measured entries (container 2)
+                dl->AddText(tp, IM_COL32(236, 230, 214, 255), name); // fit-exempt: legend box sized to its measured entries (container 2)
             }
         }
     }
 
-    // Corporate HQ marker (BL-182 foundation; the border RING retired BL-329,
-    // 2026-08-08 — Ben's live critique: "retire the circle around corp
-    // buildings. It doesn't show anything informative." The reach fog/lens
-    // already shows supply reach properly; this fixed-radius, non-growing ring
-    // duplicated that less accurately and added noise). What remains is just
-    // the seat marker itself, from the PERSISTED hq_building (designated
-    // deterministically at generation) — drawn on the corp's HOME body only
-    // (the single-home model; branch offices are deferred with the full
-    // BL-182 mechanic).
-    auto draw_corp_hq = [&](entity_id corp_id, const corporation_component& cc)
-    {
-        if (cc.hq_building == null_entity)
-            return;
-        const auto b = w.buildings.find(cc.hq_building);
-        if (b == w.buildings.end())
-            return;
-        const auto t = w.tiles.find(b->second.tile);
-        if (t == w.tiles.end() || t->second.body != state.active_body)
-            return;
-
-        const ImU32  accent = corp_identity(corp_id);
-        const ImVec2 hq_lc  = hex_local_centre(t->second.grid_x, t->second.grid_y, hex_size);
-        const ImVec2 hq_s   = to_screen(hq_lc);
-        const float  hq_r   = std::max(4.0f, draw_r * 0.5f);
-
-        const int k_min = (period_px > 0.0f)
-            ? static_cast<int>(std::ceil((visible_left  - hq_s.x - hq_r) / period_px)) : 0;
-        const int k_max = (period_px > 0.0f)
-            ? static_cast<int>(std::floor((visible_right - hq_s.x + hq_r) / period_px)) : 0;
-        for (int k = k_min; k <= k_max; ++k)
-        {
-            const float off = static_cast<float>(k) * period_px;
-            icons::hq(dl, { hq_s.x + off, hq_s.y }, hq_r, accent);
-        }
-    };
-
-    // The player's HQ marker is always-on identity chrome (BL-085 lineage), drawn on
-    // the player's home body regardless of the active lens.
-    if (state.active_body == w.home_body && w.player_entity != null_entity)
-    {
-        const auto pc = w.corporations.find(w.player_entity);
-        if (pc != w.corporations.end())
-            draw_corp_hq(w.player_entity, pc->second);
-    }
-
-    // Rival HQ markers (BL-183 lineage): under the Corporation lens, every rival
-    // corp's seat reads from the same persisted hq_building via the shared lambda
-    // above. The player's own marker is the always-on chrome above (excluded here,
-    // no double-draw). Each rival's marker is drawn on its OWN home body
-    // (draw_corp_hq gates on the seat's body), so a rival only shows one when its
-    // home body is the one on screen.
-    //
-    // SPLIT WITH THE TINT (Ben, 2026-08-28): the Corporation lens shows rival
-    // corporations' seats, the Company lens shows background firms' seats, and
-    // neither shows the other's. Before the split this loop drew every non-player
-    // corp — background firms included, and they outnumber the rivals — so the
-    // marker layer answered "where is everyone" when the lens was asking "where
-    // are my rivals". Same population rule as compute_tile_fill, so a seat and
-    // its tiles never appear under different lenses.
-    if (state.overlay == overlay_mode::corporation || state.overlay == overlay_mode::company)
-    {
-        const bool want_background = (state.overlay == overlay_mode::company);
-        for (const auto& [corp_id, cc] : w.corporations)
-        {
-            if (corp_id == w.player_entity)
-                continue;
-            if (cc.is_background != want_background)
-                continue;
-            draw_corp_hq(corp_id, cc);
-        }
-    }
+    // No HQ star, the player's or anyone's, plain or under a lens (Ben,
+    // 2026-10-10: "We should remove the HQ glyph"). The Corporation and Company
+    // lenses carry an owner by its tile tint alone; the picked set (BL-1240)
+    // drives the tint and nothing else on this canvas.
 
     // Trade-flow lens (BL-1222; LENSES.md § Trade-flow lens). Reads only the
     // player's own dispatcher record (`w.player_trade_flow`, written by
@@ -5061,8 +5818,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     //
     // The Country row is absent rather than pending: BL-601 retired that lens in the
     // same sprint, and its key with it.
+    //
+    // The key is screen chrome on the canvas's own draw list: its vertices
+    // are cut out of the camera squash (BL-1246 — lenses ride the one angle
+    // now, their legends do not).
+    v_key_start = dl->VtxBuffer.Size;
     if (state.overlay == overlay_mode::resource)
         draw_resource_key(w, state);
+    else if (state.overlay == overlay_mode::corporation || state.overlay == overlay_mode::company)
+        draw_owner_key(w, state, tile_to_corp);
     else if (state.overlay == overlay_mode::market)
         draw_market_key(w, state, market_catchment_colour);
     else if (state.overlay == overlay_mode::population)
@@ -5087,9 +5851,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     else if (state.overlay == overlay_mode::trade_flow)
         draw_trade_flow_key(dl, state, tf_max_rate, static_cast<int>(tf_arrows.size()),
                             static_cast<int>(tf_markers.size()));
+    v_key_end = dl->VtxBuffer.Size;
 
     if (!input_enabled)
+    {
+        apply_camera();
         return;
+    }
 
     // Trade-flow lens hover (BL-1222). An immediate read at the cursor, like the
     // border band's below: an arrow or a marker is not an entity, so the
@@ -5176,7 +5944,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     }
 
     // Hover-card (BL-060, BL-020). Resolve the hovered entity in marker-priority
-    // order (building > market_centre > tile — mirroring click priority). Track
+    // order (unit > building > tile — mirroring click priority). Track
     // stable hover ticks and show the lens-contextual "why not what" card after
     // kHoverAppearDelaySec of rest on the same entity.
     {
@@ -5318,7 +6086,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         {
             const entity_id card_eid = state.hover_card_entity;
             draw_hover_card(state.hover_card_anchor, [&]() {
-                draw_hover_content(w, state, card_eid);
+                draw_hover_content(w, state, card_eid, &reg, &report);
             }, &state.hover_card_min, &state.hover_card_max);
         }
     }
@@ -5331,7 +6099,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // construction gesture, not a selection one, so it must not retarget the
     // Selection info element.
     // BL-031: marker hit zones take priority over tile selection (unit >
-    // building > market_centre; closest-wins tie-break within a kind).
+    // building; closest-wins tie-break within a kind).
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
     {
         // March-picking mode (BL-575) outranks everything below, exactly as
@@ -5345,12 +6113,44 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // province (open ocean, off-body) is simply ignored: the mode stays
         // armed for the next try rather than silently cancelling on a stray
         // miss.
+        //
+        // OWNER MULTI-SELECT (BL-1240): under the Corporation or Company lens, a
+        // SHIFT-click on ground an owner of the lens's kind holds toggles that owner
+        // in or out of the picked set — the map itself is a picker — and touches no
+        // selection. A plain click, or a shift-click on ground no admitted owner
+        // holds, takes the ordinary resolution below, unchanged.
+        entity_id    shift_pick_owner = null_entity;
+        const bool   owner_lens = (state.overlay == overlay_mode::corporation
+                                   || state.overlay == overlay_mode::company);
+        if (owner_lens && ImGui::GetIO().KeyShift)
+        {
+            entity_id owner = null_entity;
+            const structure_kind k =
+                lens_structure_of_tile(w, state, hovered_tile, tile_to_corp, &owner);
+            // The border band outranks the ground under every lens (BL-601): a
+            // shift-click ON a border still selects the nation. The zones are
+            // registered in ground space, so ask with the ground-space cursor,
+            // as the hover label does.
+            structure_kind band_kind = structure_kind::nation;
+            const bool on_band =
+                resolve_structure_hit(state.structure_hit_zones, mouse_g.x, mouse_g.y,
+                                      &band_kind) != null_entity;
+            if (!on_band
+                && (k == structure_kind::corporation || k == structure_kind::company))
+                shift_pick_owner = owner;
+        }
+
         if (state.pending_march_unit != null_entity)
         {
             const uint32_t march_prov = (hovered_tile != null_entity)
                                         ? w.provinces.province_of(hovered_tile) : 0u;
             if (march_prov != 0)
                 state.pending_march_dest_province = march_prov;
+        }
+        else if (shift_pick_owner != null_entity && !state.construction.active)
+        {
+            state.toggle_lens_owner(shift_pick_owner,
+                                    state.overlay == overlay_mode::company);
         }
         else if (!state.construction.active)
         {
@@ -5376,12 +6176,37 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // be over (the BL-603 ordering, unchanged).
             const bool lensed = (state.overlay != overlay_mode::none);
 
-            // Resolve marker hit zones in priority order (BL-031): building
-            // outranks market-centre; both outrank tile. Shared with hover.
+            // Resolve marker hit zones in priority order (BL-031): unit
+            // outranks building; both outrank tile. Shared with hover.
             // Suppressed entirely under a lens by the rule above.
-            const entity_id marker_hit =
+            //
+            // GROUND-SPACE CURSOR (BL-1241 fix round): the zones are registered
+            // in flat ground space and the camera squash maps them onto the
+            // screen, so the press asks with `mouse_g` exactly as hover does.
+            // Asking with the screen `mouse` missed off-centre presses on every
+            // tilted rung — the hover named one thing and the press took another.
+            entity_id marker_hit =
                 lensed ? null_entity
-                       : resolve_marker_hit(state.marker_hit_zones, mouse.x, mouse.y);
+                       : resolve_marker_hit(state.marker_hit_zones, mouse_g.x, mouse_g.y);
+
+            // A SINGLE BUILDING OWNS ITS WHOLE HEX (SELECTION.md § Multi-building
+            // tiles; BL-1241). With the structures baked there is no glyph to aim
+            // at — the hex is the press area — so on a tile carrying exactly one
+            // building the building is resolved HERE, before the border band's
+            // corridor gets a say: a press anywhere on that hex, edge included,
+            // lands on the installation. A unit marker still outranks it (a unit
+            // standing on a built tile must stay reachable on the first press).
+            // A stacked tile is unchanged — it falls through to the tile view —
+            // and so is every lensed press (the lens branch never reaches here).
+            if (!lensed && hovered_tile != null_entity
+                && (marker_hit == null_entity || !w.units.count(marker_hit)))
+            {
+                const auto cnt_it = tile_bld_count.find(hovered_tile);
+                const auto tb     = tile_to_bld.find(hovered_tile);
+                if (cnt_it != tile_bld_count.end() && cnt_it->second == 1
+                    && tb != tile_to_bld.end())
+                    marker_hit = tb->second;
+            }
 
             // STRUCTURE-GRAIN selection (BL-601), between the markers and the
             // tile/province fallback. With no lens a marker is a specific thing
@@ -5402,8 +6227,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             structure_kind struct_kind = structure_kind::nation;
             entity_id structure_hit =
                 (marker_hit == null_entity)
-                    ? resolve_structure_hit(state.structure_hit_zones, mouse.x, mouse.y,
-                                            &struct_kind)
+                    ? resolve_structure_hit(state.structure_hit_zones, mouse_g.x, mouse_g.y,
+                                            &struct_kind) // ground space, as hover asks
                     : null_entity;
 
             // Set when the click resolved to a NON-ENTITY structure (a deposit or
@@ -5822,15 +6647,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
     // BL-737: the camera. One squash over every map-space vertex emitted since
     // v_map_start — fills, strokes, ground images, glyphs and labels alike —
-    // about the canvas centre. Chrome drawn before the marker, ImGui windows
-    // (hover card, ledgers) and the foreground list are untouched.
-    if (tilt_sy < 1.0f)
-    {
-        ImDrawVert* vtx = dl->VtxBuffer.Data;
-        const int   n   = dl->VtxBuffer.Size;
-        for (int vi = v_map_start; vi < n; ++vi)
-            vtx[vi].pos.y = tilt_pivot + (vtx[vi].pos.y - tilt_pivot) * tilt_sy;
-    }
+    // about the canvas centre. Chrome drawn before the marker, the lens key,
+    // ImGui windows (hover card, ledgers) and the foreground list are untouched.
+    apply_camera();
 
     // Pan and zoom. Middle mouse button pans; scroll wheel zooms, anchored at
     // the cursor so the point under the mouse stays fixed.
@@ -5864,11 +6683,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             state.planetary_wheel_accum = 0.0f;
             const float new_zoom = planetary_zoom_stepped(zoom, dir);
             // World point under the cursor, kept fixed across the zoom change —
-            // read through the OLD tilt's inverse, re-projected through the NEW
-            // tilt's (a step can cross a tilt threshold; the point under the
-            // cursor must land back under the cursor either side — BL-737).
-            const float new_sy = state.overlay == overlay_mode::none
-                                     ? planetary_tilt_sy(new_zoom) : 1.0f;
+            // read through the tilt's inverse, re-projected through it (one
+            // angle now, so both are the same squash — BL-737, BL-1246).
+            const float new_sy = planetary_tilt_sy(new_zoom);
             const ImVec2 wp = { (mouse.x - view_origin.x) / zoom + grid_cx,
                                 (mouse_g.y - view_origin.y) / zoom + grid_cy };
             const float target_gy = tilt_pivot + (mouse.y - tilt_pivot) / new_sy;
@@ -5895,13 +6712,10 @@ float planetary_zoom_stepped(float current, int direction)
 
 float planetary_tilt_sy(float zoom)
 {
-    // Thresholds at the geometric midpoints between rungs 2/3 and 3/4, so a
-    // free-form zoom lands on the tilt of its nearest rung.
-    if (zoom >= kMinZoom * 11.31f)
-        return 0.70710678f; // 45°
-    if (zoom >= kMinZoom * 5.657f)
-        return 0.92387953f; // 22.5°
-    return 1.0f;
+    // ONE angle at every rung (RENDERING.md § One angle, Ben 2026-10-09; the
+    // stepped 22.5°/45° tilt of 2026-09-02 is retired): cos(22.5°).
+    (void)zoom;
+    return static_cast<float>(ground::k_tilt_sy);
 }
 
 } // namespace ui

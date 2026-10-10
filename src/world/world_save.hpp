@@ -390,16 +390,22 @@ inline constexpr uint32_t world_save_magic =
 /// refused whole on the strict-equality contract, no migration. Claimed
 /// through `tools/session/next_save_version.js --kind world --claim` (renumbered 45 -> 43 at the
 /// sprint 50 integration, stacked on BL-1195's 42).
+/// Bumped to 46 by BL-1265 (the shelf economy) and BL-1266 (trade core),
+/// Ben 2026-10-10 (MARKETS.md § The shelf economy; TRADE.md): the
+/// corporation pools, the held opening stock (v39), the market's dial
+/// pool-draw register (v40) and the order book (sell and buy orders) are
+/// gone; the order book's id slot carries `next_trade_id`, its vector slot the
+/// manual trades (`standing_trade`), and the corporation record gains
+/// `trade_reserve` and `trade_points` at its tail, the market record
+/// `trade_lp_spare`, and the exchange row `side` and `parties`.
 /// Bumped to 47 by BL-1273 (every nation holds a Digitisation tree state, a
 /// research pool and a queue; RESEARCH.md, NR-1022/NR-1023): the per-corp
 /// `earned_techs` set and `corp_modifiers` list are gone from the stream and
 /// `world::nation_tech` takes their place beside the laws; the corporation
-/// record loses its `science` float; and `condition_subject::science` is removed,
-/// so `province_held` reads as 8, not 9. An older stream is refused whole on the
-/// strict-equality contract, no migration — a new campaign opens with every
-/// nation holding nothing. Claimed through
-/// `tools/session/next_save_version.js --kind world --claim` (44-46 are carried
-/// by in-flight branches).
+/// record loses its `science` float; and `condition_subject::science` is removed.
+/// v47 carries both changes: the two branches claimed 46 and 47 in parallel and
+/// met at the 2026-10-10 merge onto main. Every change is refused whole on the
+/// strict-equality contract, no migration.
 inline constexpr uint32_t world_save_version = 47;
 
 /// Write @p w as a complete world snapshot.

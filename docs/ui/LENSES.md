@@ -37,8 +37,8 @@ by the cycle without a literal being kept in step by hand.
 
 | `overlay_mode` | Surface (one line) |
 |---|---|
-| `corporation` | Planetary tile tint per owning corp, player/rival HQ markers |
-| `company` | Planetary tile tint per owning background firm + its HQ marker — the Corporation lens's mirror |
+| `corporation` | Planetary tile tint per **picked** corporation, the rest greyed; owner checklist key |
+| `company` | The Corporation lens's mirror over background firms — picked firms tinted, the rest greyed |
 | `resource` | Planetary contiguous-deposit flat fill; good selector in the legend |
 | `market` | Planetary **catchment tint** — one colour per market + city-name key; Circumplanetary price strip |
 | `population` | Per-tile red→green **value mark** (workforce efficiency) + gradient key |
@@ -94,7 +94,7 @@ ladder while the rest do not, and a copy drifts from the original silently.
 | Lens | Solar | Circumplanetary | Planetary |
 |---|---|---|---|
 | Supply *(keyboard-cycle only)* | per-convoy route lines | per-body convoy-count badge | per-tile convoy glyph |
-| **Corporation** | — | — | tile tint + player/rival HQ markers |
+| **Corporation** | — | — | picked owners' tint, the rest grey + checklist key |
 | **Resource** | — | — | contiguous-deposit flat fill + key |
 | **Market** | — | per-body price strip | catchment tint + city-name key |
 | **Population** | — | — | per-tile workforce-efficiency **heatmap** |
@@ -129,6 +129,42 @@ prototype, single-select (one `overlay_mode` at a time). The mode bar lives on t
 Solar/Circumplanetary representations, where specified, are additive render
 passes guarded behind the same `overlay_mode` — they do not change the Planetary
 behaviour.
+
+### A lens washes the rendered ground (Ben, 2026-10-09, NR-1003)
+
+**Under a lens the Planetary canvas still draws the baked ground** — the same master image,
+at the same 22.5° camera, with its structures, settlements, landform forms and rivers
+([RENDERING.md](RENDERING.md) § Level of detail, § Installations). The lens is a
+**translucent wash over it**, per tile, in the identical geometry, never an opaque fill that
+replaces it. The wash was ruled once the ground became one image per body: before that, a lens
+drew over a vector fill, and with the canvas glyphs retired every building, river and mountain
+vanished the moment any lens was up — which made the owner lenses ask the player to pick owners
+whose buildings they could not see.
+
+- **One wash rule for the roster.** A lens colours a tile by blending its colour over the
+  ground at a wash strength strong enough to read as the lens's answer and weak enough that
+  the structure, form and river beneath still read through it; the strength is one tuned value
+  per lens family (categorical, sequential), set by eye against captures. A tile the
+  lens has no answer for takes **no wash** — the plain ground shows.
+- **The strengths (set against `lens_modes.lua`'s `lens_wash_*` captures, 2026-10-09).**
+  **Categorical** — Corporation, Company, Market, Continent, the Resource lens's deposits —
+  washes at **0.46**: a hue says *which*, and hues separate at under half alpha even over
+  textured ground, so the structures and forms keep reading through. **Sequential** —
+  Population, Throughput, Scarcity, Industry — washes at **0.54**: a ramp says *how much*,
+  and a value read has to beat the ground's own light and dark, so it takes a little more.
+  Where a sequential lens's value already set its strength (Scarcity's shortfall, Industry's
+  density), the value scales the family strength the same way. The Resource lens's
+  no-deposit ground keeps its white wash (§ Resource lens) at **0.50** over the bake, paler
+  than the fill path's 72% so the forms survive it. The owner lenses' picked identity and
+  unpicked owned-grey washes are categorical; the unpicked owner's dark rim stays a stroke.
+  The Continent boundary keeps its lift toward white inside the plate wash. A lit
+  structure's hover wash is a wash too, at full tile radius, so it never draws a grid.
+- **The lens's own marks stay vector chrome** above the wash: keys, the owner
+  rim, value marks, arrows, labels.
+- **Hit-testing is unchanged** — a lens still resolves a press to its own structure grain
+  (SELECTION.md § A lens collapses selection to ONE TIER).
+- **Before a body's ground exists** (the far page not yet baked) a lens falls back to the
+  vector fill, as the plain canvas does.
 
 ### Legend placement — one chrome home
 
@@ -171,7 +207,8 @@ The good selector shared by the Market and Scarcity lenses is one combo bound to
 `ui_state.lens_resource` (`draw_lens_resource_combo`), sitting directly above the
 active key in the same region — never on the minimap bar, which carries glyphs only
 (BL-134, lens selector in legend). The Resource lens has its own search-and-checklist
-key instead (§ Resource lens).
+key instead (§ Resource lens), and the Corporation and Company lenses share that key's
+shape for their owner set (§ Corporation lens, owner multi-select).
 
 ---
 
@@ -182,12 +219,12 @@ who owns what, and how the player's footprint sits against rivals. National
 territory is the border band's job — and **the band is suppressed while any lens
 is up** (Ben, 2026-08-28), so nation context is absent from this lens by
 construction rather than merely absent from its fill. A lens asks one question;
-a national wash over a corporate read competes with the answer.
+a national border over a corporate read competes with the answer.
 
 **Population (settled 2026-08-28).** This lens admits **corporations only** — the
 player and its rivals — and never a background firm. Ben: *"The corporation lens
 narrows to player and rival, the company lens shows only background firms."*
-Before the narrowing, both the tile tint and the rival HQ-marker layer drew every
+Before the narrowing, the tile tint (and the rival HQ-marker layer, since retired) drew every
 non-player corp, and background firms outnumber the rivals — so a lens asked
 "where are my rivals" and was answered "here is everyone". Background firms have
 their own lens, drawn identically: see **Company lens** below. The two
@@ -207,15 +244,24 @@ pass is guarded entirely behind `overlay_mode::corporation` in
 nothing on the other two canvases.
 
 **Colour.**
-- **Owned tiles** are tinted their owning corporation's identity colour — a direct
-  replacement of the terrain hue, not a blend.
+- **Tiles of a picked owner** are washed in that corporation's identity colour over the
+  rendered ground (§ A lens washes the rendered ground), so the owner's buildings show
+  through their own colour.
+- **Tiles of an unpicked owner** are **greyed** — a wash of one neutral, desaturated owned-grey,
+  the same for every unpicked owner, distinct from unowned ground (which keeps its plain
+  terrain). Grey still says *someone holds this*; colour says *one of the owners you
+  asked about holds this*. The grey is a **mid value** (`palette::owned_grey`), clear of
+  both the pale terrain (ice, snow, salt) and the dark (forest, ash); because some ground
+  sits at mid value too, every unpicked owner's tile also carries a **dark inset rim** —
+  the colour-independent channel. Below the coarse level of detail the rim is dropped
+  and the grey carries the read alone.
 - The **player corporation** (`w.player_entity`) uses
   `presentation::faction_colour(0)` for its tile fill and additionally gets a thin
   border in `palette::selection` (white) so the player's holdings contrast against
   any rival fill colour at a glance.
-- **Rival corporations** use the per-corp hashed slot already used for the
-  building markers (a multiplicative hash kept off slot 0 so a rival never
-  collides with the player's colour).
+- **Rival corporations** use their per-corp hashed identity slot
+  (`palette::corp_identity_colour`; a multiplicative hash kept off slot 0 so a rival
+  never collides with the player's colour).
 - **Unowned tiles** render in their plain terrain colour with **no tint** — there
   is no nation underlay in this lens.
 
@@ -224,10 +270,33 @@ nothing on the other two canvases.
 extraction-site filled diamond, the processing-facility plain filled square, and
 the port/unit filled triangle.
 
+**Owner multi-select** (Ben, 2026-10-08, the sprint 51 visibility pass; owner BL-1240,
+owner multi-select). Buildings no longer carry an owner colour on the canvas (RENDERING.md
+§ Installations), so this lens is where ownership is read at a glance — and with every
+corporation tinted at once it answered "who owns what" with a map of every colour at
+once. The lens draws a **picked set** of owners instead:
+
+- **Default: the player only.** Opening the lens shows the player's holdings in colour and
+  every rival's in grey — "where am I, against everyone" — and the player adds the rivals
+  they want to compare.
+- **The key is a checklist** in the lens chrome region, the Resource lens's shape: a header
+  with the picked count ("Corporations (n picked)"), a search box, and a checklist of the
+  corporations holding ground on the active body, each row with its identity swatch
+  (filled when picked, empty when not). A corporation with nothing on the body earns no row.
+  No cap: identity colours are per corp, not per slot.
+- **Shift-click on an owned tile toggles its owner** in or out of the set, so the map itself
+  is a picker. A plain click is unchanged — it selects the tile or building and its
+  dossier, as under every lens (SELECTION.md § Lens-driven hover & selection resolution).
+- **Hover ignores the set.** Hovering an owned tile still lights that owner's whole group,
+  picked or not — that is how a player finds whom to pick.
+- **The set drives the tint and nothing else.** No HQ star draws for a picked owner, nor for
+  the player — the HQ glyph retired from the Planetary canvas (Ben, 2026-10-10: "We should remove the HQ glyph and market center glyphs").
+- **The set is UI state** (`ui_state::lens_corps`), per session, not saved, and survives a
+  body switch — a picked corporation absent from the new body simply has no row there.
+
 **Legend.** The active lens is named by the strip glyph highlight and its hover
-tooltip (`overlay_mode_name` → "Corporation ownership"). A per-corp colour key is the
-lens's legend, sharing the `draw_scroll_list_key` chrome with the other
-count-driven keys (§ Legend placement).
+tooltip (`overlay_mode_name` → "Corporation ownership"); the owner checklist above is its
+key.
 
 **Player identity chrome.** The player's white outline above is drawn as part of the
 Corporation lens's own fill/border pass, but the *general* player-identity accent — a subtle wash
@@ -235,23 +304,19 @@ on the player's tiles at the plain default, plus an outline drawn under **every*
 separate, always-on chrome (`is_player_tile`, `corp_identity(w.player_entity)` in
 `body_surface_canvas.cpp`) drawn once regardless of which lens (if any) is active. The
 Corporation lens does not add a second player outline — it *extends the same identity language
-to rivals*, giving every corporation (not just the player) a readable tile tint. The home ring /
-HQ star, drawn only on the player's home body, is a further, distinct layer of the same identity
-chrome.
+to rivals*, giving every corporation (not just the player) a readable tile tint. There is no HQ star on
+this canvas, the player's or anyone's (Ben, 2026-10-10: "We should remove the HQ glyph and market center glyphs").
 
-**Corporate HQ marker** (BL-182, corporate reach). Beyond tinting *held tiles*, the lens draws
-each **rival** corporation's `hq` star, in the corp's identity colour, reading the corp's
-**persisted** seat (`corporation_component::hq_building`, designated at generation —
-CORPORATION_GENERATION.md § Pass 3b). There is **no reach ring** around that seat: a fixed-radius
-ring never grows as a corp builds outward and, with the reach fog showing supply reach, "doesn't
-show anything informative" (Ben's live critique). `influence_range` is computed and stored — a
-future operate-gate may want it — but not drawn. The player's marker and every rival's are drawn
-through **one shared `draw_corp_hq` path**, each on that corp's **home body** (the single-home
-model; branch offices on other bodies are out of scope). The player's own marker stays always-on;
-the rival layer shows under this lens (no double-draw of the player). This layer is
-**render-only chrome** — it gates nothing. The *gameplay* mechanic (range that gates operations,
-the national origin gate, multi-HQ building via advancement, the tall/wide axis, law/tech
-levers) is BL-182's (corporate borders). See `scripts/verify/corporate_reach.lua`.
+**No corporate HQ marker** (Ben, 2026-10-10: "We should remove the HQ glyph and market center glyphs"). The lens reads an owner by its tiles alone: no
+`hq` star marks any corporation's seat (`corporation_component::hq_building`, designated at
+generation — CORPORATION_GENERATION.md § Pass 3b), the player's included, and no reach ring
+surrounds one — the ring went first, as a fixed-radius circle that never grows as a corp builds
+outward and "doesn't show anything informative" (Ben's live critique, BL-329). `influence_range`
+is computed and stored — a future operate-gate may want it — but not drawn. A corporation is
+reached from the map by a press on ground it holds (SELECTION.md § A lens collapses selection to
+ONE TIER). The *gameplay* mechanic (range that gates operations, the national origin gate,
+multi-HQ building via advancement, the tall/wide axis, law/tech levers) is BL-182's (corporate
+borders). See `scripts/verify/corporate_reach.lua`.
 
 ---
 
@@ -263,11 +328,19 @@ the BL-365 `generate_background_firms` pass). Ben, 2026-08-28, splitting the
 words: a *corporation* is the player and its rivals, a *company* is a background
 firm (`docs/GLOSSARY.md` § Company).
 
-**Drawn identically to the Corporation lens, deliberately.** Same per-corp
-identity tint on any tile carrying that firm's building, same HQ-marker layer for
-its seat. The two lenses differ in exactly one thing — which population they
-admit — so a player who has learned to read one has learned to read the other,
-and the pair can be flipped between to compare.
+**Drawn identically to the Corporation lens, deliberately.** Same identity tint for a
+picked firm and owned-grey for an unpicked one, same checklist key and shift-click
+picking, and no HQ marker for a firm's seat either. The two lenses differ in what
+they admit and in one default:
+
+- **Default: no firm picked.** The player owns no company, so the Corporation lens's
+  "the player only" has no counterpart here; the lens opens with every firm's ground in
+  owned-grey, which already answers "where do background firms operate", and the player
+  picks the firms they want named. The set is its own (`ui_state::lens_companies`), so
+  flipping between the two lenses keeps each one's picks.
+
+A player who has learned to read one lens has learned to read the other, and the pair
+can be flipped between to compare.
 
 **Glyph / access.** On the Planetary strip beside Corporation, with its own glyph
 distinct from the corporation mark (§ The strip rotates with the rung).
@@ -290,13 +363,13 @@ should borders extending their colour inwards. With this, we can drop the nation
 lens."*
 
 **The lens dissolved rather than being deleted: its content became chrome.** A
-nation's identity colour sits at its frontier and falls off inwards over three
-tiles, drawn **on the plain canvas and suppressed while any lens is up** (Ben,
-2026-08-28, reaffirmed 2026-09-07). Roads are *not* the precedent here, and the
+nation's border is an inset stroke in its identity colour — **hard edges only**,
+no wash inside the territory (Ben, 2026-10-10) — drawn **on the plain canvas and
+suppressed while any lens is up** (Ben, 2026-08-28, reaffirmed 2026-09-07). Roads are *not* the precedent here, and the
 difference is the point: a road is terrain a lens reads over, while a national
-wash is a second political answer competing with the one the lens was opened to
-ask. The full render spec, the falloff table, and the
-never-average-two-nations constraint that decides both halves of the pass are in
+border is a second political answer competing with the one the lens was opened to
+ask. The full render spec, the edge weights, and the
+never-average-two-nations constraint that decides the stroke's inset are in
 [PLANETARY.md](PLANETARY.md) § The national border band.
 
 **The identity colour is the realm's, pinned per world (Ben, 2026-09-24).** A
@@ -591,8 +664,8 @@ It was a per-tile red→green **dot** drawn in place of the building glyph, and 
 reason to change it: this was the only lens in the roster that answered by **adding a mark** rather
 than by colouring the ground, so it read one tile at a time and never as a field — which is the
 whole reason to have a lens. The dot also had to suppress the stack ring and the landform glyph to
-avoid competing with them; a tint competes with nothing, so both are back and the tile reads
-normally under this lens.
+avoid competing with them; a tint competes with nothing, so the tile reads normally under this
+lens (both marks have since left the canvas for the ground bake — RENDERING.md § Installations).
 
 **Water is left alone** rather than tinted at the ramp's floor. Workforce efficiency is *undefined*
 on ocean, not zero, and painting it red would assert "bad ground" about ground that is not ground —
@@ -893,6 +966,11 @@ and how far is this ground from the capacity that would move it? Owned by BL-606
 **throughput is Reach with a magnitude** — an extension of an existing surface
 rather than a new one. Its companion duty is the same section's *"surfacing is
 non-optional"*: a cap nobody can see is silent interdiction again.
+
+**The road network is drawn at full weight under this lens** (Ben, 2026-10-10). On the
+ground roads are thin pale threads of the land (RENDERING.md § Roads and sea lanes), so the
+network as logistics — every road and lane by tier, at the 1 : 1.5 : 2 weights — is read
+here, over the reach-cost field the network itself produces.
 
 **Data definition.** Two reads, both of things that already exist.
 

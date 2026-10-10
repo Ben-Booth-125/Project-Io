@@ -100,35 +100,9 @@ int main()
               "R2 market inventory drained by exactly the drawn quantity (20 iron)");
     }
 
-    // --- R3: pool PARTIALLY covers, market inventory covers the rest -> full
-    // batch, pool exhausted, market inventory drained only by the remainder. ---
-    {
-        world w;
-        const entity_id body = w.create_entity(); w.bodies[body] = body_component{};
-        const entity_id tile = w.create_entity();
-        { tile_component tc{}; tc.body = body; tc.substrate = terrain_substrate::sedimentary; tc.cover = terrain_cover::grass; tc.cover_density = 150; w.tiles[tile] = tc; }
-        const entity_id market = w.create_entity();
-        { market_component mc; mc.body = body; mc.base_price[ri(resource_type::iron_ore)] = 2.5f;
-          mc.base_price[ri(resource_type::steel)] = 8.0f; mc.price = mc.base_price;
-          mc.inventory[ri(resource_type::iron_ore)] = 100.0f;
-          w.markets[market] = mc; }
-        const entity_id bld = w.create_entity();
-        { building_component b{}; b.tile = tile; b.type = building_type::processing_facility;
-          b.workforce_assigned = 0.5f; b.recipe = steel_id; w.buildings[bld] = b; }
-        const entity_id corp = w.create_entity();
-        { corporation_component cc; cc.balance = 10000.0f; cc.is_player = true;
-          cc.assets.push_back(bld); w.corporations[corp] = cc; }
-        w.pool_at(corp, pool_key_for_body(w, body)).quantities[ri(resource_type::iron_ore)] = 12.0f; // covers 12 of the 20 needed
-
-        const economy_report rep = run_economy_step(w, reg);
-        float out = 0.0f;
-        for (const auto& br : rep.buildings) if (br.building == bld) out = br.output_quantity;
-        check(near(out, 10.0f), "R3 pool + market inventory together still yield a full batch");
-        check(near(w.pool_at(corp, pool_key_for_body(w, body)).quantities[ri(resource_type::iron_ore)], 0.0f),
-              "R3 pool drawn down to zero (pool-first)");
-        check(near(w.markets.at(market).inventory[ri(resource_type::iron_ore)], 100.0f - 8.0f),
-              "R3 market inventory drained only by the remainder (20 - 12 = 8)");
-    }
+    // --- R3 (pool partially covers, the shelf the rest) RETIRED with
+    // corporation pools (BL-1265, MARKETS.md § The shelf economy): there is no
+    // pool to draw first. R2 is the whole-need-from-the-shelf case. ---
 
     // --- R4: coverage BETWEEN t_idle and t_full -> the two-threshold model now
     // applies uniformly, even on a market body (BL-130 retires the old
@@ -161,8 +135,9 @@ int main()
     }
 
     // --- R5: inventory fills from REAL corp sales, not from the abstract
-    // substrate. A corp with surplus above its processor reservation sells it;
-    // the sold quantity lands in inventory. ---
+    // substrate. BL-1265: a corp's goods LAND on the shelf and are sold at the
+    // clear (landing is selling); the landed quantity lands in inventory and
+    // the corp is paid for it. ---
     {
         world w;
         const entity_id body = w.create_entity(); w.bodies[body] = body_component{};
@@ -173,15 +148,15 @@ int main()
           mc.price = mc.base_price; w.markets[market] = mc; }
         const entity_id corp = w.create_entity();
         { corporation_component cc; cc.balance = 1000.0f; cc.is_player = true; w.corporations[corp] = cc; }
-        w.pool_at(corp, pool_key_for_body(w, body)).quantities[ri(resource_type::steel)] = 50.0f; // pure surplus, no processors reserving it.
+        w.land_goods(corp, market, ri(resource_type::steel), 50.0f); // 50 steel landed this tick
 
         const economy_report rep = run_economy_step(w, reg);
         auto flows = clear_markets(w, reg, rep);
-        (void)flows;
         check(near(w.markets.at(market).inventory[ri(resource_type::steel)], 50.0f),
-              "R5 a corp's real surplus sale lands in market inventory");
-        check(near(w.pool_at(corp, pool_key_for_body(w, body)).quantities[ri(resource_type::steel)], 0.0f),
-              "R5 the corp's pool is debited by the sold quantity");
+              "R5 a corp's landed goods are sold onto market inventory at the clear");
+        check(w.landed_this_tick.empty(), "R5 the clear empties the tick's landings");
+        check(flows.count(corp) != 0 && flows.at(corp).income > 0.0f,
+              "R5 the corp is paid for the landing (the market is the counterparty)");
     }
 
     // --- R6: construction draws real inventory too, and drains it —
@@ -267,9 +242,9 @@ int main()
               "R7 nobody is charged: no flow, and the corp's balance is untouched");
     }
 
-    // --- R8 (BL-1179): only the SHELF spoils — a corp's pool on the same body
-    // keeps every unit; and a registry that authors no rates leaves the shelf
-    // bit-identical (the inert default every hand-built harness relies on). ---
+    // --- R8 (BL-1179): a registry that authors no rates leaves the shelf
+    // bit-identical (the inert default every hand-built harness relies on).
+    // The "a corp's pool does not spoil" row retired with pools (BL-1265). ---
     {
         recipe_registry reg4;
         std::array<float, resource_count> rates = {};
@@ -283,12 +258,10 @@ int main()
           mc.inventory[ri(resource_type::food_rations)] = 100.0f; w.markets[market] = mc; }
         const entity_id corp = w.create_entity();
         { corporation_component cc; cc.balance = 100.0f; w.corporations[corp] = cc; }
-        w.pool_at(corp, pool_key_for_body(w, body)).quantities[ri(resource_type::food_rations)] = 40.0f;
+        (void)corp;
         spoil_market_shelves(w, reg4);
         check(near(w.markets.at(market).inventory[ri(resource_type::food_rations)], 75.0f),
               "R8 the shelf loses its rate (100 -> 75)");
-        check(near(w.pool_at(corp, pool_key_for_body(w, body)).quantities[ri(resource_type::food_rations)], 40.0f),
-              "R8 the corp pool on the same body does not spoil (40 stays 40)");
         spoil_market_shelves(w, reg); // the R1-R6 registry: no rates authored
         check(w.markets.at(market).inventory[ri(resource_type::food_rations)] == 75.0f,
               "R8 a registry with no rates leaves the shelf bit-identical");

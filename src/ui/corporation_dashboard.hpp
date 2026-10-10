@@ -52,6 +52,12 @@ struct corp_rollups
     float       balance = 0.0f;
     corp_budget budget{};   ///< Empty under the headless harnesses.
 
+    /// BL-1215 (refunds flow shown): the `refunds` the corp's latest quarterly
+    /// return booked (BL-1206 — the seat's cancelled construction, credited back).
+    /// Not a `corp_budget` flow, so `budget.net()` excludes it; read from
+    /// `corporation_component::returns.back()`, filed by the same tick.
+    float refunds = 0.0f;
+
     /// True when the last economy report carried no budget breakdown — the card
     /// says so rather than charting zeroes as though they were measured.
     bool budget_measured = false;
@@ -70,8 +76,9 @@ struct corp_rollups
 /// changes across the solvency boundary).
 struct balance_columns
 {
-    /// Income, plus national subsidies when a nation paid any this quarter.
-    charts::stack_segment earnings[2]{};
+    /// Income, plus national subsidies when a nation paid any this quarter, plus
+    /// refunds when the quarter's return booked any (BL-1215).
+    charts::stack_segment earnings[3]{};
     std::size_t           earning_count = 0;
 
     /// Every outflow `corp_budget::net()` subtracts, each its own segment.
@@ -88,8 +95,10 @@ struct balance_columns
     }
 };
 
-/// Build the Balance card's columns from a measured quarter. Pure.
-balance_columns build_balance_columns(const corp_budget& b);
+/// Build the Balance card's columns from a measured quarter. Pure. @p refunds is
+/// the quarter's return's `refunds` (BL-1215), drawn as its own earnings segment
+/// when positive and absent otherwise.
+balance_columns build_balance_columns(const corp_budget& b, float refunds = 0.0f);
 
 /// How many cards the ledger draws. One; exposed so a check can assert that
 /// rather than trusting a comment.

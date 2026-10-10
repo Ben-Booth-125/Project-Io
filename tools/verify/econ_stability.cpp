@@ -312,11 +312,11 @@ int main()
             if (!finite_ok(corp.balance)) all_finite = false;
             if (std::fabs(corp.balance) > k_balance_bound) balance_bound = false;
         }
-        // Pool quantities finite.
-        for (const auto& [key, pool] : w.corp_market_pools)
+        // Shelf quantities finite (BL-1265: the shelves hold every good now).
+        for (const auto& [mid, mc] : w.markets)
         {
             for (std::size_t r = 0; r < resource_count; ++r)
-                if (!finite_ok(pool.quantities[r])) all_finite = false;
+                if (!finite_ok(mc.inventory[r])) all_finite = false;
         }
     }
 
@@ -326,7 +326,7 @@ int main()
                 w.corporations[corp_e].balance, w.corporations[corp_p].balance);
 
     check(price_in_band, "R2 all market prices stay within [0.25x, 4x] base_price over the run");
-    check(all_finite,    "R3 no NaN/Inf in any price, pool quantity, or balance");
+    check(all_finite,    "R3 no NaN/Inf in any price, shelf quantity, or balance");
     check(reserve_mono,  "R4 deposit reserve decreases monotonically (never refills)");
     check(final_reserve < 600.0f,
           "R4 reserve depletes substantially toward exhaustion over the run");

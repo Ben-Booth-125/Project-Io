@@ -151,15 +151,10 @@ bool corp_owns_port(const world& w, entity_id corp)
 
 float corp_stockpile_total(const world& w, entity_id corp, resource_type res)
 {
-    // Reads the live (corp, market) pool store (BL-1003) — the per-building
-    // stockpile_component is authored empty and never credited in L3
-    // (world.hpp § corp_market_pools). The map is keyed (corp, key), so the
-    // corp's pools sit in one contiguous ascending-key run: a corp-wide sum.
-    float total = 0.0f;
-    for (auto it = w.corp_market_pools.lower_bound({corp, entity_id{0}});
-         it != w.corp_market_pools.end() && it->first.first == corp; ++it)
-        total += it->second.quantities[static_cast<std::size_t>(res)];
-    return total;
+    // BL-1265 (MARKETS.md § The shelf economy): corporations hold no stockpiles,
+    // so the gate reads the stock on the shelves of the markets the corp sits
+    // in — what a hire there could buy (`corp_shelf_stock`).
+    return corp_shelf_stock(w, corp, static_cast<std::size_t>(res));
 }
 
 campaign_roster_gate_input campaign_gate_input(const world& w, entity_id corp)

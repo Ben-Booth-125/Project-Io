@@ -342,6 +342,9 @@ int app::run(autostart_mode autostart)
     // corporation they are; the windowed autostart walks the wizard for
     // nobody, so its tail draws (and says so).
     m_player_picks_seat = !windowed_autostart;
+    // BL-1246: the live frame loop pumps the ground pool every frame, so the
+    // home master can pre-bake behind the seat canvas and play can wait on it.
+    m_ground_prebake_on = true;
     // Apply the player's persisted display settings before anything renders, so
     // the window opens at their last size/mode. Interactive-only: run_verify()
     // never touches settings, keeping golden captures at the fixed default size.
@@ -820,6 +823,7 @@ void app::poll_worldgen()
 
     // --- The finished world: adopted from the wizard, or the cold worker's ---
     std::shared_ptr<wizard_world_cache> built;
+    const bool adopted = m_worldgen_adopted;
     if (m_worldgen_adopted)
     {
         m_worldgen_adopted = false;
@@ -887,7 +891,19 @@ void app::poll_worldgen()
     m_generation_report      = std::move(built->report);
     m_registry               = std::move(built->registry);
     m_landscape_winner_score = built->finish.search.winner_score;
+    // BL-1246 (STARTUP.md § Handoff): the world is finished. On the wizard's
+    // path the home master has been baking since the Life round, re-taking
+    // its source at every round boundary; adoption is the last boundary (the
+    // world is the main thread's now, survey state and all), so only what the
+    // tail and the settle changed re-bakes. On the cold path it starts now.
+    // Either way the rest bakes behind the seat canvas.
     built.reset();
+    const bool prebaked = adopted && m_ground_prebake_wizard
+                       && m_ground.resnapshot(m_world, /*assume_surveyed=*/false);
+    m_ground_prebake_wizard = false;
+    if (!prebaked)
+        start_ground_prebake(m_world, /*wizard=*/false);
+    m_ground_world_live = true;
     pin_nation_colours_from_report(); // BL-1089: the realms' colours, before the first frame
     start_new_game_prelude();
     // BL-568: the cadence key continues from the settle's twelve steps, which
@@ -1023,6 +1039,139 @@ void app::draw_building_screen()
         draw_building_carve();
     }
     ImGui::End();
+}
+
+/// BL-1246 (STARTUP.md § Handoff): start the home body's ground master on the
+/// pool, from @p w — the wizard's Life-round gate world the moment it is held
+/// (@p wizard: every later round boundary re-snapshots it, and Begin's
+/// adoption keeps it), or the cold path's built world. The live app only.
+///
+/// THE RACE AUDIT (the pre-bake runs for minutes beside the round workers):
+///  - A source snapshot (`prepare_source`) is taken ONLY on the main thread,
+///    and only from a world no worker writes: a round's landed slot
+///    (m_wiz_slot[k], which every later worker COPIES from and never writes),
+///    round 6's landed cache (its future consumed), or m_world after adoption.
+///  - The cadence snapshot cannot fire before play: m_ground_world_live is
+///    false from here until adoption, so pump() is handed no world.
+///  - The bake workers read only the immutable, shared-const snapshot; they
+///    never see a world.
+void app::start_ground_prebake(const world& w, bool wizard)
+{
+    if (!m_ground_prebake_on || m_ground_bake_all)
+        return;
+    m_ground.forget_world();
+    m_ground.registry = &m_registry;
+    // The wizard's worlds carry no survey state until the finish runs
+    // init_survey_states; the home body is always surveyed in play, so its
+    // master is baked unmasked -- what play will show, hash for hash.
+    m_ground.prebake(w, w.home_body, /*assume_surveyed=*/wizard);
+    m_ground_prebake_wizard = wizard;
+    if (wizard)
+        m_ground_world_live = false; // the app's m_world is not this world yet
+    std::printf("[ground] pre-bake of the home master started (%s)\n",
+                wizard ? "the Life round's gate world" : "the built world");
+    std::fflush(stdout);
+}
+
+void app::ground_round_boundary(const world& w, const char* what)
+{
+    if (!m_ground_prebake_on || m_ground_bake_all)
+        return;
+    if (!m_ground_prebake_wizard)
+    {
+        start_ground_prebake(w, /*wizard=*/true);
+        return;
+    }
+    std::printf("[ground] round boundary: %s\n", what);
+    std::fflush(stdout);
+    if (!m_ground.resnapshot(w, /*assume_surveyed=*/true))
+    {
+        std::printf("[ground] the homeworld changed identity: the master starts again\n");
+        std::fflush(stdout);
+        start_ground_prebake(w, /*wizard=*/true);
+    }
+}
+
+void app::ground_take_roads_snapshot(wizard_world_cache& c)
+{
+    std::shared_ptr<const ui::ground::bake_source> src;
+    entity_id body = null_entity;
+    {
+        std::lock_guard lk(c.ground_mx);
+        if (!c.ground_roads)
+            return;
+        src  = std::move(c.ground_roads);
+        body = c.ground_roads_body;
+    }
+    if (!m_ground_prebake_on || m_ground_bake_all || !m_ground_prebake_wizard)
+        return; // no wizard pre-bake to move: round 6's landing starts one
+    std::printf("[ground] in-round boundary: round 6's roads are laid (the search and settle run on)\n");
+    std::fflush(stdout);
+    if (!m_ground.resnapshot(body, std::move(src), /*assume_surveyed=*/true))
+    {
+        // Not the pre-bake's homeworld: round 6's landing boundary decides
+        // (it restarts the master if the identity really moved).
+        std::printf("[ground] the in-round snapshot is not the pre-bake's homeworld: skipped\n");
+        std::fflush(stdout);
+    }
+}
+
+void app::drop_wizard_ground(const char* why)
+{
+    if (!m_ground_prebake_wizard)
+        return;
+    m_ground.forget_world();
+    m_ground_prebake_wizard = false;
+    std::printf("[ground] the wizard's pre-bake is dropped: %s\n", why);
+    std::fflush(stdout);
+}
+
+/// BL-1246 (STARTUP.md § Handoff): the last loading step — the home body's
+/// ground master finishing on the pool after the seat is taken. The same one
+/// wait surface as every other step, captioned "Painting the ground", its bar
+/// the master's chunks landed over its total. When the master is whole, play
+/// opens through finish_new_game exactly as it would have without the wait.
+void app::draw_painting_screen()
+{
+    int ready = 0, total = 0;
+    m_ground.master_progress(m_world.home_body, ready, total);
+    m_paint_wait.weight_total.store(std::max(total, 1), std::memory_order_relaxed);
+    m_paint_wait.weight_done.store(ready, std::memory_order_relaxed);
+
+    const ImVec2 disp = ImGui::GetIO().DisplaySize;
+    ImGui::SetNextWindowPos({disp.x * 0.5f, disp.y * 0.5f}, ImGuiCond_Always, {0.5f, 0.5f});
+    constexpr ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_AlwaysAutoResize |
+        ImGuiWindowFlags_NoBackground;
+    if (ImGui::Begin("##painting", nullptr, flags))
+    {
+        const char* title = "BUILDING THE WORLD";
+        const float tw = ImGui::CalcTextSize(title).x;
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (420.0f - tw) * 0.5f);
+        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(225, 230, 240, 255));
+        ImGui::TextUnformatted(title);
+        ImGui::PopStyleColor();
+        ImGui::Dummy({420.0f, 10.0f});
+        ui::draw_generation_wait(m_paint_wait, 420.0f, "Painting the ground",
+                                 m_golden_dir.empty());
+        ImGui::Dummy({420.0f, 8.0f});
+        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 142, 255));
+        ImGui::TextUnformatted("The home world's ground is baked once, for every zoom.");
+        ImGui::PopStyleColor();
+    }
+    ImGui::End();
+
+    if (total == 0 || m_ground.master_current(m_world.home_body))
+    {
+        std::printf("[begin] the ground is painted (%d chunks) after a %.1f s wait: play opens\n",
+                    total,
+                    std::chrono::duration<double>(std::chrono::steady_clock::now()
+                                                  - m_paint_wait.wait_began).count());
+        std::fflush(stdout);
+        finish_new_game(); // passes the gate now, rebases the clock, opens play
+    }
 }
 
 /// The live carve (BL-305): the world's politics being DECIDED rather than
@@ -1461,6 +1610,51 @@ void app::start_new_game_prelude()
 
 void app::finish_new_game()
 {
+    // BL-1246 (STARTUP.md § Handoff — the ground pre-bakes behind the
+    // handoff): play does not open on a half-painted ground. If the home
+    // body's master is still baking, wait for it on the loading screen
+    // ("Painting the ground"); that screen calls back here when it lands.
+    // Before the clock rebase below, so the wait never lands as game days.
+    int paint_ready = 0, paint_total = 0;
+    m_ground.master_progress(m_world.home_body, paint_ready, paint_total);
+    // Current, not merely complete: the adoption's snapshot may still be
+    // sweeping, and a chunk it moves is not painted until it re-bakes.
+    if (m_ground_prebake_on && !m_ground_bake_all && paint_total > 0
+        && !m_ground.master_current(m_world.home_body))
+    {
+        if (m_screen != app_screen::painting_ground)
+        {
+            m_paint_wait.begin_wait();
+            m_paint_wait.stage_count.store(1, std::memory_order_relaxed);
+            m_paint_t0 = std::chrono::steady_clock::now();
+            m_screen = app_screen::painting_ground;
+            std::printf("[begin] painting the ground: waiting on the home master (%d of %d chunks landed)\n",
+                        paint_ready, paint_total);
+            std::fflush(stdout);
+        }
+        return;
+    }
+    if (m_ground_prebake_on && !m_ground_bake_all && paint_total > 0)
+    {
+        // The pre-bake's whole cost, said once as play opens: master chunk
+        // bakes, and how many of them were re-bakes a round boundary forced.
+        const ground_layer::bake_stats& bs = m_ground.bake_counters();
+        char waited[64] = "no wait at the seat";
+        if (m_screen == app_screen::painting_ground)
+            std::snprintf(waited, sizeof waited, "after a %.1f s wait",
+                          std::chrono::duration<double>(std::chrono::steady_clock::now()
+                                                        - m_paint_t0).count());
+        std::printf("[begin] the ground is painted: %s; %llu master chunk bakes for %d chunks "
+                    "(%llu re-bakes, %llu of them as %llu windows: %.1f Mpx re-baked whole + "
+                    "%.1f Mpx in windows)\n",
+                    waited,
+                    static_cast<unsigned long long>(bs.chunk_bakes), paint_total,
+                    static_cast<unsigned long long>(bs.chunk_rebakes),
+                    static_cast<unsigned long long>(bs.chunk_patches),
+                    static_cast<unsigned long long>(bs.patch_windows), bs.rebake_px / 1e6,
+                    bs.patch_px / 1e6);
+        std::fflush(stdout);
+    }
     // THE BALANCE SERIES FROM THE RETURNS THE SETTLE FILED (STARTUP.md
     // § Handoff, item 2; BL-1085). The twelve pre-game ticks ran inside the
     // worker with no presentation half of their own -- no agency comms, no
@@ -1822,6 +2016,8 @@ void app::setup_presentation(const world_params& params)
     // from the strip. (Reverses BL-013's Corporation-default.) Single-select with a
     // null state — re-clicking the active lens clears back here. See LENSES.md.
     m_ui.overlay = overlay_mode::none;
+    // Owner-lens picks are keyed by corp id, and ids restart in a new world.
+    m_ui.reset_lens_owners();
 
     // The survey day counter restarts with the view (the survey STATES are
     // world state: `init_survey_states`, run once by whoever built the world).
@@ -2086,6 +2282,9 @@ bool app::load_game_from(const std::string& path)
         return false;
     }
 
+    m_ground.forget_world(); // BL-1246: another world's masters are not this one's
+    m_ground_prebake_wizard = false;
+    m_ground_world_live    = true;
     m_world               = std::move(w);
     m_generation_report   = std::move(env.report);
     m_active_world_params = env.params;
@@ -2133,6 +2332,9 @@ bool app::load_game_from(const std::string& path)
     m_ui.planetary_zoom    = env.planetary_zoom;
     m_ui.planetary_pan_x   = env.planetary_pan_x;
     m_ui.planetary_pan_y   = env.planetary_pan_y;
+    // Owner-lens picks are per session and keyed by corp id: a loaded world
+    // reuses ids, so a carried pick would name a different corporation.
+    m_ui.reset_lens_owners();
 
     // App-side transients that describe the world just replaced. Left alone
     // they would keep drawing the PREVIOUS campaign's numbers until the next
@@ -2171,6 +2373,12 @@ void app::render()
     pump_injected_input();
     ImGui::NewFrame();
 
+    // BL-1246: the ground pool's per-frame pump, on EVERY screen — the home
+    // body's master pre-bakes behind the seat canvas (STARTUP.md § Handoff).
+    m_ground.registry = &m_registry;
+    m_ground.pump(m_ground_world_live || m_screen == app_screen::in_game ? &m_world : nullptr,
+                  m_ground_bake_all);
+
     // Main menu and the staged generation screen — drawn instead of the canvases
     // when play has not started. Both share the Render/clear/capture tail below, so
     // either is capturable like any frame.
@@ -2178,6 +2386,8 @@ void app::render()
     {
         if (m_screen == app_screen::building)
             draw_building_screen();
+        else if (m_screen == app_screen::painting_ground)
+            draw_painting_screen(); // BL-1246: entering play waits for the home master
         else if (m_screen == app_screen::choosing_seat)
             draw_seat_screen(); // BL-1076: the corporation selection canvas
         else if (m_screen == app_screen::generating)
@@ -2321,6 +2531,7 @@ void app::render()
                 // ground_request, then publishes ui_state::ground for the canvas
                 // draw below. Texture work on the render thread, before the
                 // draw data is submitted.
+                m_ground.registry = &m_registry; // BL-1241: processing stamps key on the recipe family
                 m_ground.tick(m_renderer, m_world, m_ui, m_ground_bake_all);
                 // No lens-key anchor argument (Sprint 17b, one chrome home):
                 // every legend now asks ui::lens_chrome_rect for the one region —
@@ -2454,8 +2665,8 @@ void app::render()
     // one of the mutually-exclusive column occupants (ledgers + Selection).
     ui::draw_construction_panel(m_world, m_registry, m_last_econ_report, m_ui, &m_ui.show_construction_panel);
     // Market ledger — Goods and Trades. It takes a NON-CONST world and the recipe
-    // registry because the Trades tab's potential-trade read prices real convoy
-    // legs through `price_convoy_leg` (which warms the A* cache and mutates no
+    // registry because the Trades tab's potential-trade read prices real trade
+    // routes through `rank_trade_routes`, the trade pass's own ranking (which warms the A* cache and mutates no
     // game state), rather than inventing a second haulage model that could
     // disagree with the one that actually bills the player.
     ui::draw_market_ledger(m_world, m_registry, m_ui, m_market_history, m_ui.show_market_ledger);
@@ -2554,6 +2765,10 @@ void app::render()
         switch (r)
         {
             case construction_result::placed:
+                // BL-1246: the ground under it re-bakes now, not at the
+                // source cadence (TECH_FOUNDATIONS.md § Target hardware: a
+                // building placed is re-baked within 1 s).
+                m_ground.touch();
                 // BL-095: placement now only *starts* a durative, material-gated build
                 // (ticks_remaining > 0), so the toast reflects that rather than claiming
                 // it is done — the Selection card carries the live rate / ETA / paused
@@ -2679,45 +2894,6 @@ void app::render()
         m_ui.construction.pending_hire_tile = null_entity; // consume the request
     }
 
-    // Execute a convoy-dispatch request queued this frame by the market
-    // Selection card's dispatch form (BL-607). Routes through the same
-    // `dispatch_convoy` corp_verb the AI's own directed dispatch and the wire
-    // seam use (SUPPLY.md § Dispatch trigger: "the auto-dispatch body above
-    // with the shortfall scan removed") — the player's convoy costs, travels
-    // and picks a mode exactly like a rival's. Unlike the order-book presses
-    // above, the result IS surfaced: a dispatch can fail for reasons the form
-    // cannot fully pre-check (no viable route, insufficient funds at commit
-    // time), and a rejection mutates nothing, so the player needs to be told why.
-    if (m_ui.construction.pending_dispatch_source != null_entity)
-    {
-        corp_command cmd;
-        cmd.tick         = static_cast<int>(m_sim_loop.day_tick());
-        cmd.corp         = m_world.player_entity;
-        cmd.verb         = corp_verb::dispatch_convoy;
-        cmd.subject      = m_ui.construction.pending_dispatch_source;
-        cmd.counterparty = m_ui.construction.pending_dispatch_dest;
-        cmd.target       = m_ui.construction.pending_dispatch_good;
-        cmd.quantity     = m_ui.construction.pending_dispatch_qty;
-        const corp_command_result r = apply_corp_command(m_world, m_registry, cmd);
-        switch (r)
-        {
-            case corp_command_result::applied:
-                m_ui.construction.last_message = "Convoy dispatched."; break;
-            case corp_command_result::rejected_state:
-                m_ui.construction.last_message = "Not enough stock on hand to dispatch that much."; break;
-            case corp_command_result::rejected_placement:
-                m_ui.construction.last_message = "No viable route to that market."; break;
-            case corp_command_result::rejected_funds:
-                m_ui.construction.last_message = "Can't afford the haul."; break;
-            case corp_command_result::rejected_no_lp:
-                m_ui.construction.last_message =
-                    "No Logistic Points left at the source anchor this tick."; break;
-            default:
-                m_ui.construction.last_message = "Dispatch failed."; break;
-        }
-        m_ui.construction.pending_dispatch_source = null_entity; // consume the request
-    }
-
     // Execute a demolition queued this frame by the building Selection element. The
     // selection is cleared on success: the entity it pointed at no longer exists, and
     // leaving it dangling would leave the panel resolving a dead id.
@@ -2822,16 +2998,47 @@ void app::render()
         m_ui.pending_disband_unit = null_entity; // consume the request
     }
 
-    // Order-book presses (BL-293) — same seam-consuming shape as the survey
-    // dispatch above, applied through apply_corp_command so the player's press
-    // and a rival corp's command share one implementation. A rejection is not
-    // reported to the surface: the ledger's own form already enforces the same
-    // preconditions, so a rejection here means a race (the body's market gone,
-    // the order already removed) and the correct response is to do nothing.
+    // Ledger presses (BL-293; the trade presses since BL-1269) — same
+    // seam-consuming shape as the survey dispatch above, applied through
+    // apply_corp_command so the player's press and a rival corp's command share
+    // one implementation. A TRADE press's result is surfaced on the Trades tab
+    // (`ui_state::trade_message`), and a refusal mutates nothing, so the player
+    // is told why. What `set_trade` refuses is exactly `trade_is_valid` plus two
+    // bounds (corp_command.cpp): rejected_invalid for a source market where the
+    // corporation holds no trade building (Ben, 2026-10-10), points that are not
+    // finite, not > 0 or above max_trade_points, the same market at both ends, a
+    // market that no longer exists, a good trade does not carry (capacity 0, or
+    // a grid good), or no acting corporation; rejected_placement when no leg
+    // reaches the destination from the source market's centre; rejected_state when the
+    // corporation already holds max_trades_per_corp trades. The form pre-checks
+    // most of these, so a refusal here is mostly a race or an edge the form let
+    // through; the message names the whole set rather than guessing one. Other presses' rejections mean a race (the target
+    // already gone) and the correct response is to do nothing.
     for (corp_command& cmd : m_ui.pending_order_commands)
     {
         cmd.tick = static_cast<int>(m_sim_loop.day_tick());
-        apply_corp_command(m_world, m_registry, cmd);
+        const corp_command_result r = apply_corp_command(m_world, m_registry, cmd);
+        const bool applied = (r == corp_command_result::applied);
+        switch (cmd.verb)
+        {
+            case corp_verb::set_trade:
+                m_ui.trade_message = applied ? "Trade set."
+                    : (r == corp_command_result::rejected_state)
+                        ? "You hold as many trades as a corporation may."
+                    : (r == corp_command_result::rejected_placement)
+                        ? "Refused: no route reaches that market from here."
+                        : "Refused: it must leave a market where you hold a Marketplace or Port, "
+                          "go to a different market, carry a good trade carries, and have points above 0.";
+                break;
+            case corp_verb::clear_trade:
+                m_ui.trade_message = applied ? "Trade removed." : "That trade is already gone.";
+                break;
+            case corp_verb::set_trade_reserve:
+                m_ui.trade_message = applied ? "Reserve set." : "That reserve is out of range.";
+                break;
+            default:
+                break;
+        }
     }
     m_ui.pending_order_commands.clear(); // consume the requests
 

@@ -79,6 +79,21 @@ void world_gen_config::load_from_lua(lua_state& lua)
         }
     }
 
+    // BL-1268: the retrofit's rates (TRADE.md § Trade in generation).
+    if (sol::optional<sol::table> tr = (*wg)["trade_retrofit"])
+    {
+        trade_retrofit.flow_points_per_1000 =
+            tr->get_or("flow_points_per_1000", trade_retrofit.flow_points_per_1000);
+        trade_retrofit.relation_points_per_year =
+            tr->get_or("relation_points_per_year", trade_retrofit.relation_points_per_year);
+        trade_retrofit.points_per_marketplace =
+            tr->get_or("points_per_marketplace", trade_retrofit.points_per_marketplace);
+        trade_retrofit.max_per_market = tr->get_or("max_per_market", trade_retrofit.max_per_market);
+        if (trade_retrofit.flow_points_per_1000 < 0 || trade_retrofit.relation_points_per_year < 0
+            || trade_retrofit.max_per_market < 0)
+            throw std::runtime_error("world_gen.trade_retrofit rates must be >= 0");
+    }
+
     if (sol::optional<sol::table> corp = (*wg)["corporations"])
         corporation_count = corp->get_or("count", corporation_count);
 }

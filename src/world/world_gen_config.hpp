@@ -76,6 +76,26 @@ struct endemic_pricing_params
     float distance_gain = 7.0f; ///< multiplier applied across the globe (half-diagonal = 1.0 norm).
 };
 
+/// BL-1268 — THE RETROFIT'S RATES (TRADE.md § Trade in generation: "how many
+/// points a nation earns per unit of history trade or relation, and how the
+/// record converts into Marketplaces ... are proposed by measurement and
+/// approved by Ben"). Authored in scripts/world_gen.lua under
+/// `world_gen.trade_retrofit`; these defaults equal the authored values, so a
+/// Lua-free harness retrofits the world the app does. NOT FINAL until Ben has
+/// approved them. The measured reading (16 curated seeds) is in the Lua block.
+struct trade_retrofit_params
+{
+    /// Trade points per 1000 units of history flow volume x years (both ends
+    /// of a flow each earn it, at their own capital).
+    std::int64_t flow_points_per_1000 = 40;
+    /// Trade points per partner-year of a standing mutual treaty.
+    std::int64_t relation_points_per_year = 1;
+    /// Points one retrofitted Marketplace costs. <= 0 places none.
+    std::int64_t points_per_marketplace = 40000;
+    /// The most Marketplaces one market's record may buy.
+    int          max_per_market = 3;
+};
+
 /// World-generation balance values, authored in scripts/world_gen.lua. Pure data
 /// once built; constructed either from Lua (load_from_lua) in the real build or
 /// left at these defaults in a headless test harness — the defaults reproduce
@@ -213,6 +233,7 @@ struct world_gen_config
 
     market_carving_params  market_carving{};
     endemic_pricing_params endemic{};
+    trade_retrofit_params  trade_retrofit{}; ///< BL-1268, `world_gen.trade_retrofit`.
 
     /// Non-player corporations generated alongside the player's own, authored
     /// under `world_gen.corporations.count`.

@@ -78,7 +78,7 @@ call), run on the winner
 inside the Industrialisation round's worker as generation's last act — the round hands Begin a
 world already proved, and a cold Begin with no wizard makes the same call in the same order (Ben,
 2026-09-24) — under spectate with nobody seated, with the persona counsel and battle dispatches
-suppressed. The balances, pools, filed returns and prices those ticks leave
+suppressed. The balances, shelves, filed returns and prices those ticks leave
 *are* the opening position; the seat card shows the returns they file. Twelve is **measured,
 not round**, and the instrument is `haulage_measure --per-tick` (the only harness that sees
 trade): pooled over five seeds, the per-tick convoy dispatch count climbs from zero — tick 1
@@ -280,14 +280,14 @@ This is the **keystone quest** that unlocks space access (BL-087). All three con
 
 1. **Rocketry research purchased.** Rocketry is the only technology required for space access; the full quest tree is BL-087's (era tech/quest system). Whether it stands alone or is the Digitisation tree's Reach quest is open (`../generation/trees/TREES.md` § Open questions).
 2. **Launchpad constructed and staffed.** A Launchpad building exists on the home body with `workforce_assigned > 0`.
-3. **Propellant reserve met.** The home body's stockpile contains at least the minimum propellant quantity required for an initial launch. This threshold is a Lua balance value. Propellant is the product of the propellant loop (`docs/research/ERA1_TECH_LANDSCAPE.md`), not a roster resource of the ancient arc.
+3. **Propellant on the shelf.** A market on the home body holds at least the minimum propellant quantity required for an initial launch on its shelf — where every launch buys its propellant (`PRODUCTION.md` § Launchpad). This threshold is a Lua balance value. Propellant is the product of the propellant loop (`docs/research/ERA1_TECH_LANDSCAPE.md`), not a roster resource of the ancient arc.
 
 **The gate says what leaving costs.** What supplies the urgency is the Era's own catastrophe:
 reaching orbit requires the lift stack that frightens everyone, so the space programme is *itself*
 the largest single contributor to Alarm (§ The point of an Era). The player cannot dodge the
 dangerous technology — the skill is buying the reassurance that lets them hold it.
 
-When all three conditions hold, space bodies become accessible to convoy dispatch, and the Ice Extractor and Assembly Plant become available for construction. The operative half of the gate in the convoy layer is launchpad presence — an inter-body convoy dispatches iff the corp holds a launchpad on the source body (`corp_has_launchpad_on`, `src/world/supply_system.cpp`; SUPPLY.md § Infrastructure gates).
+When all three conditions hold, space bodies become accessible to trade, and the Ice Extractor and Assembly Plant become available for construction. The operative half of the gate in the shipment layer is launchpad presence and propellant — a trade between bodies ships iff the trader holds a launchpad on the source body (`corp_has_launchpad_on`, `src/world/supply_system.cpp`; SUPPLY.md § Infrastructure gates) and the source shelf holds the launch's propellant at a price the ceiling admits (`TRADE.md` § A trade).
 
 ---
 
@@ -338,5 +338,5 @@ Era 3 likely involves multi-system expansion where the home solar system becomes
 Bodies are **not** fully visible from day one (BL-067, survey fog). Every body except the home
 body starts `survey_phase::hidden`: the player sees its type, orbit, and grid size on the Solar
 canvas, but its tile map and deposits are revealed only by a paid survey (`docs/ui/DISCOVERY.md`).
-Accessibility (whether a convoy can be dispatched) is a separate axis from visibility; the Era
+Accessibility (whether a trade can ship there) is a separate axis from visibility; the Era
 gate controls the former.

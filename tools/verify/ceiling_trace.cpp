@@ -219,16 +219,7 @@ void run_seed(std::uint32_t seed, int ticks, int max_traces, pool_tally& T)
         for (const auto& [key, a] : res.report.purchases)
             for (std::size_t g = 0; g < resource_count; ++g)
                 if (a[g] > 0.0f) { auto it = t.find({key.second, g}); if (it != t.end()) it->second.fill += a[g]; }
-        std::map<std::pair<entity_id, std::size_t>, float> bo;
-        std::map<std::pair<entity_id, std::size_t>, int> so;
-        for (const buy_order& o : w.buy_orders) bo[{o.body, static_cast<std::size_t>(o.resource)}] += o.quantity;
-        for (const sell_order& o : w.sell_orders) so[{o.body, static_cast<std::size_t>(o.resource)}] += 1;
-        for (auto& [key, r] : t)
-        {
-            const entity_id body = w.markets.at(key.first).body;
-            if (auto i = bo.find({body, key.second}); i != bo.end()) r.buy_orders = i->second;
-            if (auto i = so.find({body, key.second}); i != so.end()) r.sell_orders = i->second;
-        }
+        // BL-1265: the order book retired — the buy/sell order columns read 0.
 
         if (std::find(std::begin(k_sel_ticks), std::end(k_sel_ticks), k) == std::end(k_sel_ticks)) continue;
         for (const building_report& br : res.report.buildings)

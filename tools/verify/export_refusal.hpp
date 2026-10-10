@@ -80,7 +80,7 @@ struct context
     logistics_nodes              nodes;
     std::vector<entity_id>       corp_ids; ///< ascending (the dispatcher's order)
     std::vector<entity_id>       mids;     ///< every market, ascending
-    reservation_memo             memo;
+
     std::map<std::pair<entity_id, entity_id>, convoy_leg> legs;    ///< (s, d) at qty 1
     std::map<std::pair<entity_id, entity_id>, int>        nr_why;  ///< (s, d) noroute sub-reason
 
@@ -98,7 +98,7 @@ struct context
         const auto key = std::make_pair(s, d);
         auto it = legs.find(key);
         if (it == legs.end())
-            it = legs.emplace(key, price_market_export_leg(w, reg, nodes, s, d, 1.0f)).first;
+            it = legs.emplace(key, price_market_leg(w, reg, nodes, s, d, 1.0f)).first;
         return it->second;
     }
 
@@ -167,7 +167,10 @@ inline good_markets scan_good(const context& x, std::size_t G,
             ++out.consuming;
             if (mc.inventory[G] < 1.0f) out.dry.push_back(m);
         }
-        const float s = market_shelf_surplus(x.w, m, G);
+        // BL-1265/1266: the market export retired; "surplus" is still read the
+        // way it was (BL-1071) — the shelf less last clear's demand there —
+        // so the probe keeps asking why shelf goods do not reach short markets.
+        const float s = std::max(0.0f, mc.inventory[G] - std::max(0.0f, mc.demand[G]));
         const bool is_src = rule == surplus_rule::one_unit ? (s >= 1.0f) : (s > 0.0f);
         if (is_src && mc.centre_tile != null_entity)
         {
@@ -216,8 +219,7 @@ inline pair_result classify_pair(context& x, entity_id s, entity_id d, std::size
     r.landed = p_s + haul;
     if (!(p_d - haul - p_s > margin * p_s)) { r.c = c_costly; return r; }
     const float absorb = dispatch_absorbable(x.w, x.reg, d, G, r.landed);
-    const float pend = dispatch_pending(x.w, x.reg, d, G, x.corp_ids, x.memo)
-                     + std::max(0.0f, dm.inventory[G]);
+    const float pend = trade_pending(x.w, d, G) + std::max(0.0f, dm.inventory[G]);
     r.absorb = absorb;
     r.room = absorb - pend;
     r.c = !(absorb - pend > 0.0f) ? c_noroom : c_room;

@@ -218,6 +218,11 @@ population, it does so through a **famine or displacement mechanism of its own**
 and visible as such — never as a coefficient hidden inside a battle. A battle that quietly killed
 farmers is exactly the accounting this section replaced.
 
+**Civil war takes that exception too (Ben, 2026-10-10; `GENERATION_STRATEGY.md` § History patterns).**
+A civil war in Empires kills soldiers in its battles as any war does, and kills civilians only through
+a **famine and displacement mechanism** authored for it and visible as such — never a coefficient in
+a battle. The empty-region accounting this section replaced stays replaced.
+
 **Industrialisation takes that exception, and only by that route (Ben, 2026-09-15):** *"we really need
 to ensure that people die when wars happen."* Industrial war kills through named, visible
 mechanisms — conscript dead drawn back from the regions that raised them, displacement toward safe

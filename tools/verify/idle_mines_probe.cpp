@@ -307,10 +307,9 @@ void classify_uc(const world& w, const recipe_registry& reg, const building_comp
     const entity_id body = m.body;
     for (const auto& [xid, xm] : w.markets)
         if (xid != mid && xm.body == body && xm.inventory[r] >= need[r]) { s.cls = u_shelf_body; return; }
-    float pools = 0.0f;
-    for (const auto& [k, pool] : w.corp_market_pools)
-        if (pool_key_body(w, k.second) == body) pools += std::max(0.0f, pool.quantities[r]);
-    s.cls = pools >= need[r] ? u_pools_body : u_none_body;
+    // BL-1265: corporations hold no pools, so `u_pools_body` can no longer
+    // occur; a site no shelf on the body covers is `u_none_body`.
+    s.cls = u_none_body;
 }
 
 /// Discover / refresh the focus sites present now.

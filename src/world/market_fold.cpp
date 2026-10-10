@@ -38,25 +38,12 @@ double body_inventory_total(const world& w, entity_id body)
     return sum;
 }
 
-/// Every corporation's goods in pools keyed by a market on @p body, standing or
-/// folded (a pool left on a folded key would be stock the fold lost track of;
-/// counting it keeps such a leak visible as a before/after match that hides
-/// nothing). std::map order: ascending (corp, key).
-double body_market_pool_total(const world& w, entity_id body)
+/// BL-1265: corporations hold no pools — every good is on a shelf, which the
+/// inventory total above counts — so the pool half of the fold's conservation
+/// check is always zero.
+double body_market_pool_total(const world&, entity_id)
 {
-    double sum = 0.0;
-    for (const auto& [key, pool] : w.corp_market_pools)
-    {
-        const auto mit = w.markets.find(key.second);
-        const auto fit = w.folded_markets.find(key.second);
-        const bool on_body = (mit != w.markets.end() && mit->second.body == body)
-                          || (fit != w.folded_markets.end() && fit->second.body == body);
-        if (!on_body)
-            continue;
-        for (std::size_t r = 0; r < resource_count; ++r)
-            sum += static_cast<double>(pool.quantities[r]);
-    }
-    return sum;
+    return 0.0;
 }
 
 /// Population (thousands) of the body's centres, each routed with
@@ -161,8 +148,8 @@ void fold_market_into(world& w, entity_id folded, entity_id into)
     for (std::size_t r = 0; r < resource_count; ++r)
         iit->second.inventory[r] += fit->second.inventory[r];
 
-    // The pools: (corp, folded) adds into (corp, into), ascending corp order.
-    absorb_body_pool_into_market(w, folded, into);
+    // BL-1265: no corporation pools to move — every good was on the folded
+    // market's shelf, and the shelf has moved whole above.
 
     // The catchment: the routing record, and every record that named the
     // folded market as its absorber now names the market that absorbed it.

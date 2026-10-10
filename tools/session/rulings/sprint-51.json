@@ -1,0 +1,29 @@
+{
+ "_note": "Sprint 51 rulings for tools/session/ruling_check.js --register. anchor = a regex the owning doc must carry; stale = OLD wording that must not survive in docs/ outside docs/development. Code match is a reading, not checked here.",
+ "rulings": [
+  {"ruling": "Sprint cut: a visibility pass on the ground and the opening market", "doc": "docs/development/sprints.json", "anchor": "visibility", "owner": "sprint row 51"},
+  {"ruling": "Production section of the tile Selection element", "doc": "docs/ui/SELECTION.md", "anchor": "Production", "owner": "BL-1239 (tile production section)"},
+  {"ruling": "Owner lenses multi-select: picked tinted, the rest grey, checklist key", "doc": "docs/ui/LENSES.md", "anchor": "picked owners' tint, the rest grey", "owner": "built (owner multi-select)"},
+  {"ruling": "No building marker on the Planetary canvas; structures baked into the ground", "doc": "docs/ui/PLANETARY.md", "anchor": "No building marker draws on the Planetary canvas", "owner": "built (structure stamps)"},
+  {"ruling": "Procedural now, raster later, one stamp seam; a stacked tile stands a cluster", "doc": "docs/ui/RENDERING.md", "anchor": "Procedural now, raster later, one seam", "owner": "built"},
+  {"ruling": "One angle (22.5 degrees) at every rung, under lenses too", "doc": "docs/ui/RENDERING.md", "anchor": "angle\\*\\* \\(22\\.5°\\) at every rung", "stale": ["never-magnify tier ladder (is|remains) (the|in force)"], "owner": "built"},
+  {"ruling": "Zooming does not add detail: one master per body", "doc": "docs/ui/RENDERING.md", "anchor": "Zooming does not add detail", "owner": "built"},
+  {"ruling": "Master at 128 px/hex over 96 and 192", "doc": "docs/ui/RENDERING.md", "anchor": "128 over 96, and over 192", "stale": ["96 px/hex master"], "owner": "built"},
+  {"ruling": "Home master pinned; other bodies spill to a session disk cache", "doc": "docs/ui/RENDERING.md", "anchor": "The home body's master is pinned in RAM", "owner": "built (ground disk cache)"},
+  {"ruling": "RAM budget scales with installed RAM: 45%", "doc": "docs/ui/RENDERING.md", "anchor": "45% of installed RAM", "owner": "built"},
+  {"ruling": "Target hardware: 8C/16T, 16 GB, 8 GB GPU minimum", "doc": "docs/tech/TECH_FOUNDATIONS.md", "anchor": "## Target hardware", "owner": "BL-1247 (ground benchmark) for the measured half"},
+  {"ruling": "The ground pre-bakes behind the wizard, from the Life round", "doc": "docs/ui/STARTUP.md", "anchor": "The ground pre-bakes behind the wizard", "owner": "built"},
+  {"ruling": "Snapshot after the roads are laid in round 6", "doc": "docs/ui/STARTUP.md", "anchor": "so the roads bake while the landscape search and the settle run", "owner": "built"},
+  {"ruling": "No hex grid on the ground; faint seam at close zooms only", "doc": "docs/ui/RENDERING.md", "anchor": "No hex grid renders on the ground", "owner": "built"},
+  {"ruling": "Per-tile tone stays", "doc": "docs/ui/RENDERING.md", "anchor": "Per-tile tone stays", "stale": ["(drop|retire)[sd]? (the )?per-tile tone"], "owner": "built"},
+  {"ruling": "Crisper texture inside a tile", "doc": "docs/ui/RENDERING.md", "anchor": "Crisper texture inside a tile", "owner": "built"},
+  {"ruling": "Two references, two jobs: it3 C-F for detail, it1 for colour", "doc": "docs/ui/RENDERING.md", "anchor": "Two references, two jobs", "owner": "built"},
+  {"ruling": "Flat land renders flat", "doc": "docs/ui/RENDERING.md", "anchor": "Flat land renders flat", "owner": "built"},
+  {"ruling": "Roads are tile sets: own edge crossings, routed around hills and buildings, per-terrain treatment", "doc": "docs/ui/RENDERING.md", "anchor": "Roads are part of the ground's tile sets, not threads laid on it", "owner": "built; rail treatment BL-1255 (rail rung)"},
+  {"ruling": "No drawn road network at any rung; the network reads on the Throughput lens", "doc": "docs/ui/RENDERING.md", "anchor": "No drawn road network on the plain canvas at any rung", "stale": ["thin network at wide rungs"], "owner": "built"},
+  {"ruling": "National borders: hard edges only, no wash", "doc": "docs/ui/PLANETARY.md", "anchor": "Hard edges only — no wash inside the border", "owner": "built (border hard edges)"},
+  {"ruling": "No HQ or market-centre markers; markets selected through the Market lens", "doc": "docs/ui/PLANETARY.md", "anchor": "No HQ or market-centre markers", "owner": "built"},
+  {"ruling": "Static strokes cached for 60 fps", "doc": "docs/ui/PLANETARY.md", "anchor": "The static strokes are cached, not rebuilt", "owner": "built (BL-1260, stroke cache)"},
+  {"ruling": "Fog at 20%", "doc": "docs/ui/DISCOVERY.md", "anchor": "Its strength is 20%", "owner": "built"}
+ ]
+}

@@ -697,10 +697,10 @@ identity.
   the `(substrate, cover, density)` triple: a substrate base blended toward a cover
   endpoint by density, calibrated so the four canonical covers render at their
   canonical RGB. Landform *is* rendered — a subtle relief tint (`landform_relief`,
-  `src/ui/hex_render.cpp`) over the terrain colour, plus always-on glyphs for the
-  four dramatic landforms (mountain, canyon, crater, rift — `ui::icons::landform`,
-  `src/ui/icons.cpp`), with contiguous same-landform runs bridged into spanning
-  markers (`landform_span`, BL-232 landform spans).
+  `src/ui/hex_render.cpp`) over the terrain colour, plus a baked relief form for each of
+  the four dramatic landforms (mountain, canyon, crater, rift), with contiguous same-landform
+  runs baked as one continuous form (`docs/ui/RENDERING.md` § Mountains, rivers and terrain
+  variety).
 - **`first_land_tiles()`** — lives in `tile_generation.cpp`; checks against
   water (`is_water`) to pick building attachment tiles.
 - **Hazard / habitability** — not specified by the design tables but carried on

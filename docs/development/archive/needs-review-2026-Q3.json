@@ -6129,6 +6129,50 @@
       ],
       "resolution": "RULED (Ben, 2026-09-18, wave 1 form): (1) REVERT to the 400 +/-40% draw — the unspent-points rule is removed (BL-1039 round 2); (2) the ceiling fills goods in turn; (3) B net of specialist prices, B_ref = 8 x goods x firm price; (4) furnace_lit reads Coke Smelting held; (5) forest scored as fuel is — the best held forest share against the world mean; (6) Default A kept; (7) Default B kept; (8) the bar ends full at (12/12). DIGITISATION.md § 1 and § Beat 1, CORPORATION_GENERATION.md Pass 4 and Pass 6, INDUSTRY_TREE.md § The scorer carry it; BL-1039 round 2 and BL-1041 build it."
     },
+    "NR-896": {
+      "id": "NR-896",
+      "title": "CALL: forest and coal both read the BEST held region, which grows with realm size — and Charcoal now outnumbers Coke",
+      "raised": "2026-09-18",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1041 (industry points) build lane and cold review, after the wave 1 ruling \"score forest like fuel\" (NR-895). Figures are the lane's 16-seed run; the main session re-runs them before quoting them as evidence.",
+      "what": "With forest scored like fuel (the best held region against the world mean, capped 1000) the Fuel Doctrine split moved from 391 coke / 132 charcoal / 333 neither to 200 / 319 / 337. 261 of the 319 Charcoal polities had passed the seam gate — Coke was open and they took Charcoal. Mean held forest score by side: coke 739, charcoal 859, neither 306. TREES.md § The scorer: 'Never a rank, never a term inside the scorer that grows with the polity's own size.' A best-of-held maximum can only rise as a realm grows (to its 1000 cap), so both ground_fuel (already a best seam) and ground_forest now breach the letter of that rule, weakly; INDUSTRY_TREE.md rules exactly this shape. The docs disagree, and wide realms read near the cap on both terms.",
+      "why_it_matters": "The Fuel Doctrine is the tree's central fork: coke to scale and the Blast Works, charcoal to quality and a ceiling. If breadth, not ground, decides it, the 1960 spread it manufactures is about realm size.",
+      "options": [
+        "Both terms read the SHARE of held regions whose score clears the world mean — size-neutral, like with like; the fuel GATE still passes on any held seam.",
+        "Keep best-of-held for both, and write it into TREES.md as a stated exception to the size rule.",
+        "Both terms read the held MEAN of the scores — size-neutral, but a large realm with one coalfield reads low."
+      ],
+      "recommendation": "The share of held regions over the world mean, for both terms. It keeps \"any seam opens the gate\" and stops breadth from deciding the pull.",
+      "files": [
+        "src/world/history_sim.cpp",
+        "docs/generation/trees/INDUSTRY_TREE.md",
+        "docs/generation/trees/TREES.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-19): option A. Both ground_forest and ground_fuel read the share of held regions whose score clears the world mean; the fuel gate still passes on any held seam. Written into INDUSTRY_TREE.md § The scorer; the work is BL-1056 (points size-neutral)."
+    },
+    "NR-897": {
+      "id": "NR-897",
+      "title": "DECISIONS TAKEN (and a call): the treasury-to-points constants, and treasury points landing only on the capital",
+      "raised": "2026-09-18",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "BL-1041 (industry points) build lane and cold review. Figures are the lane's 16-seed run, to be re-run by the main session.",
+      "what": "The lane chose, on your behalf: 1000 industry points per million urban heads per year (defines the point); a fuel factor of 250 + 750 x reading/1000 (floor 250, so fuel is at most a x4 lever); a treasury share of 250 per mille of the round's surplus, where surplus is the treasury's net rise across the round's earn and army/navy bills, floored at 0 and DEBITED (a conversion, not a copy), and tribute is not counted; and an exchange rate of 1000 points per treasury unit. At 1:1 the treasury could not move any region's rank; at 1000:1 the treasury supplies a median 69% of all points (0.16-0.82 by seed), and because treasury points land on the capital's own region (PROPOSED 2026-09-18, not overturned), one region holds up to 65% of a world's points (median top-region share 0.28). The charter budget follows the points, so charters would concentrate at capitals.",
+      "why_it_matters": "\"Density follows cities\" becomes \"density follows capitals\" if the treasury term dominates and lands in one place; the real-stockpile sweep (BL-1043) and the re-bless read this.",
+      "options": [
+        "Spread treasury points over the polity's centres by their urban scale, not the capital alone; keep the constants.",
+        "Keep the capital landing; lower the exchange rate so treasury is a minority input (e.g. a third of points).",
+        "Accept as built and judge on the real-stockpile sweep."
+      ],
+      "recommendation": "Spread treasury points by scale over the polity's centres. A treasury builds its realm's works where its people are, and the capital still leads because it is usually the largest centre.",
+      "files": [
+        "src/world/history_sim.cpp",
+        "src/world/history_sim.hpp",
+        "docs/generation/DIGITISATION.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-19): option A. Treasury points spread over the polity's centres by urban scale; the lane's constants are kept. Written into DIGITISATION.md § Beat 1; the work is BL-1056 (points size-neutral)."
+    },
     "NR-898": {
       "id": "NR-898",
       "title": "TWELVE CALLS shaping sprint 46: bring the generation work into the wizard, hand off cleanly to the game, retire the previous method",
@@ -6146,6 +6190,1349 @@
         "docs/ui/STARTUP.md"
       ],
       "resolution": "RULED (Ben, 2026-09-18, sprint 46 form): (1) the EPOCH FLIP lands IN SPRINT 46, once the superseded arc is retired and the epoch gates decoupled — re-ruling NR-869's 'waits for Beats 2 and 3' (their items were archived unbuilt); (2) RETIRE the superseded 1560->1960 arc OUTRIGHT (no legacy field); (3) RETIRE the three narrative passes that ran only on it (ruptures, the Charter Act and border accord, the 1951 common tongue); (4) INDUSTRIALISATION reads Beat 1's industry points (national ideology, qualification, focus, the corporation focus pivot), not the calendar-anchored Stage 4 lag; (5) HAND THE BUILT WORLD to Begin (the game starts on the world the wizard built; re-files BL-1025); (6) wizard ROUND 6 PLAYS THE SPAN (re-files BL-997); (7) CARRY ALL EIGHT play-list rows offered: price field and household demand weights, tariff posture, culture lens, GDP/treasury/grudges on the nation summary, the search seed from network strength (BL-879's unmet clause), sea lanes, the depletion retrofit, campaign tech state; (8) STRIKE the preferred-seller rows (the 2026-09-09 supersession stands); (9) the post-1200 verb set: MEASURE each Empires force in the spans, then decide; (10) TWO re-blesses: sprint 45's (BL-1044), then sprint 46's; (11) the continuity-pass items stay AFTER Digitisation; (12) the SELECT-CORPORATION screen comes at the END of sprint 46 (BL-880 was its cancelled first design). Carried by the sprint 46 row in sprints.json (proposed; items filed at the cut) and BL-1047 (amended)."
+    },
+    "NR-899": {
+      "id": "NR-899",
+      "title": "CALL: under the ruled share, Charcoal leads Coke 373 to 142 — and span-founded ground is left out of both Fuel Doctrine pulls",
+      "raised": "2026-09-19",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1056 (points size-neutral) build, cold review and fix round; figures from the main session's chain 9 on 2867cdaa (digitisation_sim_harness --through 1960, 16 library seeds).",
+      "what": "NR-896 ruled both pulls read the share of held regions scoring over the world mean, to stop breadth deciding the fork. It did that: Charcoal polities are now the wooded ones (mean forest share 666 against Coke's 271; Charcoal wooder than Coke on 14 of 16 seeds). But the split moved further toward Charcoal, not back: coke 142 / charcoal 373 / neither 341 (best-of-held was 200 / 319 / 337; before forest was scored, 391 / 132 / 333). Coal scores sit on few regions, so few realms have a large SHARE of held ground over the mean on fuel, while forest is widespread. Also taken on your behalf: regions the span founds inherit fuel at x0.7 (Default A) but no forest reading, so to keep one region set both pulls exclude them (they are 0.3% of points).",
+      "why_it_matters": "The Fuel Doctrine is the tree's central fork: coke to scale and the Blast Works, charcoal to quality and a ceiling. BL-1042 and BL-1043 measure the 1960 world it manufactures; a world where Charcoal outnumbers Coke 2.6 to 1 builds fewer Blast Works.",
+      "options": [
+        "Accept: ground decides the fork now, and a coal-poor world industrialising on charcoal is a legitimate outcome; judge on BL-1043's sweep.",
+        "Keep the share for forest, but let the fuel pull read the share of held ground within reach of a seam (a coalfield serves more than its own region), so coal's pull is not starved by its rarity.",
+        "Compare each pull against its own spread, not the mean: a region counts when it is in the top third of the world for that resource, so fuel and forest clear at the same rate world-wide."
+      ],
+      "recommendation": "The third option. It keeps the share and its size-neutrality, and makes 'like with like' literal: each pull counts regions in the same top fraction of the world for its own resource, so coal's rarity stops being a handicap. If you prefer to see the world before touching it, the first.",
+      "files": [
+        "src/world/history_sim.cpp",
+        "docs/generation/trees/INDUSTRY_TREE.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-19): option C, and founded ground stays excluded from both pulls. Each pull counts held regions in the top third of the world for its own resource, a bar fixed at the span open. Written into INDUSTRY_TREE.md § The scorer; the work is BL-1059 (top-third bar)."
+    },
+    "NR-900": {
+      "id": "NR-900",
+      "title": "CALL: the top-third bar — rank every region or only those carrying the resource; and a cliff at the survey's 1000 cap",
+      "raised": "2026-09-19",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1059 (top-third bar) lane (commit 15713143) and its cold review, 2026-09-19. Raised first as a decision taken with a recommendation to keep it; the review showed it departs from the ruled wording, so it is re-raised as a call. Per-seed carrier counts owed from the next main-session run.",
+      "what": "NR-899 ruled 'the top third of every region's score ... fuel and forest clear at the same rate world-wide'. The lane ranked only NONZERO scores (k = floor(m/3) of m carriers; a tie band straddling the cut falls out whole). Two problems. (1) RARITY TILT RETURNS, milder: with fuel in 150 of 300 regions and forest in 285, nonzero-only clears 50 fuel regions (17% of the world) against 95 forest (32%); ranking every region clears about 100 of each, which is the ruling's 'same rate world-wide'. The built split is coke 239 / charcoal 277 / neither 340 (from 142 / 373 / 341). (2) A CLIFF AT THE CAP: survey scores clamp at 1000 (twice the world mean, settlement.cpp:377); if more than a third of carriers sit at 1000 the tie rule pushes them all out, the bar becomes 1001 and fuel clears NOWHERE on that world (30 capped: 30 clear; 31: none). The 16 library seeds avoid it (each bar clears 31.8-33.3% of carriers), but nothing fails if a seed hits it.",
+      "why_it_matters": "It decides which ground counts as a coalfield or a forest, so the 1960 Fuel Doctrine split BL-1043 measures and BL-1044 re-blesses.",
+      "options": [
+        "Rank every region's score (the ruling's words), and rank the unclamped survey share so a pile at the cap cannot empty the bar.",
+        "Keep nonzero-only (clears a third of CARRIERS, not of the world), and rank the unclamped share.",
+        "Keep as built, and make the harness fail when a bar reaches 1001 with three or more carriers."
+      ],
+      "recommendation": "The first: it is what NR-899 says, it makes fuel and forest clear at one rate world-wide, and ranking the unclamped share removes the cliff rather than alarming on it. The per-seed carrier counts (fuel vs forest nonzero) will show how far apart the options really are; they come from the next main-session run.",
+      "files": [
+        "src/world/history_sim.cpp",
+        "src/world/settlement.cpp",
+        "tools/verify/digitisation_sim_harness.cpp",
+        "docs/generation/trees/INDUSTRY_TREE.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-19): option A. The top third is taken over every region, ranking the unclamped survey share; a region with none never clears. Written into INDUSTRY_TREE.md § The scorer; BL-1059 (top-third bar) takes a fix round before it closes."
+    },
+    "NR-901": {
+      "id": "NR-901",
+      "title": "CALL: industry points on ground with no town reach no campaign centre — on seed 0, 44% of the stock",
+      "raised": "2026-09-19",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1042 (stockpile to budget) lane and its cold review, 2026-09-19 (static). The lane's figures: seed 0 stock 56.2M, 24.97M of it 'no_carved_centre' in 13 regions; seeds 28 and 46 lose 2.2M each.",
+      "what": "The carve makes campaign centres only on regions with people AND centres (population_generation.cpp:174), so points sitting on a region with no centres at 1960 reach nobody; BL-1042 counts them unspent. The review traced two ways points land there, and ruled out a sim/carve mismatch. (a) A region earned points, then lost its towns: scale points need centres only at the moment of credit (history_sim.cpp:8666), and a sack can round centres to 0 while people remain (settlement.cpp:2460-2465). (b) The treasury fallback: when a polity holds no region with centres, BL-1056 lands the whole round's treasury credit on its capital (history_sim.cpp:1069) — which, by the same condition, has no towns. The treasury is really debited (:1083) and the handoff then discards the points. Concentration in 13 regions points to (b); the per-region treasury tally will separate them on the next run.",
+      "why_it_matters": "BL-1044 sets the charter prices against this budget; on seed 0 it is missing nearly half its stock, and (b) debits a treasury for works that never exist.",
+      "options": [
+        "(b) converts nothing when the polity holds no town — the treasury keeps its money, since there is nowhere to build; (a) stays unspent under a 'razed' reason, because war destroyed those works.",
+        "Both reach the nearest carved centre of the same nation at the handoff.",
+        "Keep as built: both unspent under one reason; judge on BL-1043."
+      ],
+      "recommendation": "The first. It stops a treasury paying for works with nowhere to stand (the NR-897 principle: a treasury builds where its people are), and it gives the razed case a visible in-world cause rather than a silent loss.",
+      "files": [
+        "src/world/history_sim.cpp",
+        "src/world/stockpile_budget.cpp",
+        "src/world/stockpile_budget.hpp",
+        "docs/generation/DIGITISATION.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-19): option A. A polity holding no town converts no treasury to points (the treasury keeps it); points on a region whose towns were razed are counted unspent as razed. Written into DIGITISATION.md § Beat 1; built in BL-1042 (stockpile to budget)'s fix round."
+    },
+    "NR-902": {
+      "id": "NR-902",
+      "title": "CALL: the density ceiling — 120 or 160 firms per body — read off BL-1039's 21 timed rows",
+      "raised": "2026-09-19",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1039 (charter spend rules) R6. player_seed_sweep --charter-cost on seeds 0, 28, 46 at 1x/2x/4x under the square-root rule (c = 8, B on firms, goods in turn), ceilings 120 and 160; quiet machine, main at ab9c38f8, Release /O2 MSVC 14.44.35207, serial, 7126 s; folded into charter_cost_sweep.json as runs.bl1039_sqrt. Every row: spend rules PASS at land, points balance PASS, nothing threw; the none rows match the pins. The reference budget's definition was already ruled (NR-895: B_ref = 8 x goods x firm price).",
+      "what": "At 1x and 2x the two ceilings give identical worlds: neither binds. At 4x: ceiling 120 lays 120 firms on every seed (12 per good, trimmed evenly, 167-190 points unspent to the ceiling); ceiling 160 lays 141/141/151 firms — it never binds, because every good reaches its own square-root cap of 15 first, so 160 is in effect no ceiling up to 4x. Live economy tick (median ms, a lower bound) at 4x, 120 vs 160: seed 0 11,582 vs 12,934 (+12%); seed 28 26,634 vs 34,614 (+30%); seed 46 13,756 vs 18,004 (+31%). The seated corporation is solvent on every row; budget specialists solvent 10 or 11 of 11 at 4x either way. These are SYNTHETIC budgets (seeded weights, not population); BL-1043's real-stockpile sweep re-reads the ceiling on real budgets. BL-1042 built with a provisional ceiling of 150; this call replaces it.",
+      "why_it_matters": "The ceiling is the only brake on firm density when budgets run large; it sets the per-tick cost of a dense 1960 world and how many firms each good carries.",
+      "options": [
+        "120: it binds at 4x and trims every good evenly to 12 firms; the tick is 12-31% cheaper there than at 160.",
+        "160: effectively no ceiling up to 4x — each good's own cap decides; more firms, a dearer tick.",
+        "Defer: keep BL-1042's provisional 150 and decide on BL-1043's real-stockpile rows."
+      ],
+      "recommendation": "120. A ceiling that never binds is not a brake; at 120 every good still holds firms and the dense rows cost less. BL-1043 confirms it on real budgets.",
+      "files": [
+        "src/world/stockpile_budget.hpp",
+        "src/world/charter_budget.hpp",
+        "charter_cost_sweep.json"
+      ],
+      "resolution": "RULED (Ben, 2026-09-19): 120 firms per body. Written into DIGITISATION.md (the square-root cap paragraph); BL-1060 (charter spend hardening) replaces BL-1042's provisional 150 with it. BL-1043's real-stockpile sweep reads it on real budgets."
+    },
+    "NR-903": {
+      "id": "NR-903",
+      "title": "CALL: under the goods-in-turn fill, one good that cannot be placed forfeits the centre's whole remainder",
+      "raised": "2026-09-19",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1039 round 2 cold review (static), 2026-09-19.",
+      "what": "The turn's cursor moves only on a charter, and a failed placement ends the centre (corporation_generation.cpp:3287-3289, 3343-3351, 3396-3397). A raw good with no recipe gets an EXTRACTION firm, which needs an unoccupied non-urban deposit tile in the window (placement_rules.cpp:112-122); a processing firm does not. So a city centre whose radius-4 window has land but no free deposit tile stops at agricultural_produce (a low index, reached every pass) and books the rest window_exhausted, though processing goods later in the turn would have placed; the next centre on the body starts on the same good. Legacy has the same break, but the turn brings every extraction good up every pass. On seeds 0/28/46 at 4x it costs 15-17 points (legacy 12). It follows the ruling's letter; 'forfeit vs skip' was settled in a code comment, not asked.",
+      "why_it_matters": "Once the span defaults on (BL-1044) the app runs this turn on real stockpile budgets, where dense city windows are the common case; R9's 'every good with demand holds firms' can fail there.",
+      "options": [
+        "Skip: a good that cannot be placed in this centre's window is passed over for this centre and the turn moves on; the centre ends only when no good in the turn can place.",
+        "Forfeit (as built): the centre ends at the first failed placement."
+      ],
+      "recommendation": "Skip. A dense city with no free deposit tile should still charter the mills and works it has room for; forfeiting them books a city's budget as unspent for want of a quarry.",
+      "files": [
+        "src/world/corporation_generation.cpp"
+      ],
+      "resolution": "RULED (Ben, 2026-09-19): option A, skip. A good with no free site in a centre's window is passed over for that centre; the centre stops only when no good in the turn can place. Written into DIGITISATION.md; built with BL-1060 (charter spend hardening)."
+    },
+    "NR-904": {
+      "id": "NR-904",
+      "title": "CALL: a tie band at the top-third cut clears whole or falls out whole",
+      "raised": "2026-09-19",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Cold check of BL-1059 (top-third bar) fix round 4a7bb291, 2026-09-19.",
+      "what": "The forest share is a proportion of tiles, capped at 1000 per mille by definition (settlement.cpp:396). The built tie rule pushes a band straddling the cut out whole (at most a third clears), so if more than a third of regions are fully wooded the forest bar becomes 1001 and forest clears nowhere: the NR-900 cliff surviving for forest. No library seed hit it; the harness gate would catch it, the shipped sim would not.",
+      "why_it_matters": "Which ground counts as forest for the Fuel Doctrine on a heavily wooded world.",
+      "options": [
+        "The tie clears whole: a bar can never empty; more than a third may clear on a wooded world.",
+        "The tie falls out whole, as built: never more than a third; a bar can empty."
+      ],
+      "recommendation": "The first.",
+      "files": [
+        "src/world/history_sim.cpp",
+        "docs/generation/trees/INDUSTRY_TREE.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-19): option A. Regions tied at the cut all clear. Written into INDUSTRY_TREE.md § The scorer; BL-1059 (top-third bar) carries it."
+    },
+    "NR-905": {
+      "id": "NR-905",
+      "title": "CALL: skip (NR-903) plus a binding ceiling (NR-902) can leave a good with no firms",
+      "raised": "2026-09-19",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1060 (charter spend hardening) cold review, 2026-09-19 (static).",
+      "what": "If the first centre walked has no free deposit tile and its budget alone reaches the 120 ceiling, it spends everything on processing goods; later centres with quarries stop at density_ceiling on their first firm, and every extraction good ends at 0 firms — against DIGITISATION.md's 'the ceiling trims every good evenly' and NR-903's own reason.",
+      "why_it_matters": "Whether every good with demand holds firms on a dense body once BL-1044 turns the spend on.",
+      "options": [
+        "When the ceiling binds each good holds at most its even share of it; a share no centre can place is unspent under its own reason.",
+        "The next centre serves a skipped good first (still starves if the first centre fills the ceiling).",
+        "Accept as built; judge on BL-1043."
+      ],
+      "recommendation": "The first.",
+      "files": [
+        "src/world/corporation_generation.cpp",
+        "src/world/charter_budget.hpp",
+        "docs/generation/DIGITISATION.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-19): option A. Written into DIGITISATION.md (the goods-in-turn paragraph); built in BL-1060 round 2."
+    },
+    "NR-906": {
+      "id": "NR-906",
+      "title": "DECISION TAKEN: an even share of the ceiling is a reservation, not a cap; the yards come off the ceiling first",
+      "raised": "2026-09-19",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Cold check of BL-1060 round 2 (2886d20f), 2026-09-19.",
+      "what": "NR-905 was written into DIGITISATION.md as 'a good may take AT MOST its equal part' and built that way. The check found the cap holds room back: if one good stops being short at 6 firms, 9x12 + 6 + 1 = 115, the other nine stall at 12 while still short, the ceiling never fills and later centres book their points no_gap (a false label); near the threshold a single unplaceable good drops a body that would never have hit the ceiling from 118 to 109 firms. And the yard takes a place under the ceiling but outside the shares, so its place comes out of the skipped goods. Taken on your behalf, reading your option 'each good keeps an even share': the share is a RESERVATION — a good may go beyond its share while the room left still covers every other short good's unfilled share — and each yard's place comes off the ceiling before it is shared. Also: a ceiling smaller than the turn is refused rather than silently switching the shares off.",
+      "why_it_matters": "Whether a binding ceiling still fills, and whether the unspent reasons BL-1043 reads are true.",
+      "options": [],
+      "recommendation": "Keep it: it is what 'keeps an even share' means, and it makes the ceiling fill.",
+      "files": [
+        "src/world/corporation_generation.cpp",
+        "src/world/charter_budget.hpp",
+        "docs/generation/DIGITISATION.md"
+      ],
+      "resolution": "CONFIRMED (Ben, 2026-09-19): the reservation reading is right, keep it."
+    },
+    "NR-907": {
+      "id": "NR-907",
+      "title": "CALL: one specialist price cannot hold the seat menu, because the library's stockpiles vary five-fold and seats track them",
+      "raised": "2026-09-21",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1043 (real-stockpile charter sweep) stage 1: 16 library seeds x firm price 10000/20000/40000 x specialist 4 firm charters, three parallel shards, folded into charter_cost_sweep.json as runs.real_stockpile_bl1043_a/_b/_c (main session, 2026-09-20/21).",
+      "what": "The seat-menu anchor (NR-886 and the sprint 45 elicitation) is that the MEDIAN library world offers about as many seats as a world with no budget. Measured over all 16 seeds, the legacy anchor is a median of 9 specialists (range 6-17) and does NOT track the stockpile: seed 31 holds 95.3M points and offers 6, seed 9 holds 27.5M and offers 16. The budget's seats DO track it almost proportionally. Medians: firm price 10000 -> 107.5 seats (range 20-412, 0 of 16 seeds at or under the anchor), 20000 -> 50.5 (8-167, 1 of 16), 40000 -> 23.5 (1-91, 7 of 16). Stockpiles run 24.7M (seed 28) to 133.6M (seed 11), and at 40000 the poorest world offers 1 seat while the richest offers 91. Pricing for the median (about 100000, extrapolating the halving per doubling) starves the poorer half below the legacy roster; pricing for the poorest floods the richest. The firm count is at the 120 ceiling on 16 of 16 seeds at 10000 and 11 of 16 at 40000, so the ceiling binds throughout. NO seed produced a no-specialist world at any tested price.",
+      "why_it_matters": "BL-1044 pins these prices at the re-bless; the seat menu is what the player chooses from on the select-corporation screen (sprint 46).",
+      "options": [
+        "Price a specialist as a SHARE of the world's own stockpile, so the menu is about the same size library-wide (a build, not a constant: the price stops being a fixed number and becomes a derived one, deterministic and seeded).",
+        "Keep a fixed price and accept the spread: a world that industrialised harder offers more seats, which is the world talking rather than a knob. Then the price is chosen against the RICHEST world's menu being usable, and the anchor's 'median' wording is what changes.",
+        "Keep a fixed low price and cap the MENU instead: the shortlist shows at most N seats however many the budget opens."
+      ],
+      "recommendation": "The first if the menu's size is a UI contract; the second if the menu is meant to read the world. I lean to the first, because the anchor was written to keep the menu comparable across worlds, and a derived price keeps that without a clamp — but it changes what 'the specialist price' means, so it is yours. Either way stage 2's prices depend on it, so stage 2 is held.",
+      "files": [
+        "src/world/stockpile_budget.hpp",
+        "tools/verify/player_seed_sweep.cpp",
+        "docs/generation/DIGITISATION.md",
+        "docs/generation/CORPORATION_GENERATION.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-21): option A — a charter's price is a SHARE of the world's own industry stockpile, fixed once when the budget is built, so the seat menu is about the same size on every world. Written into DIGITISATION.md; built by BL-1064 (derived charter price), whose sweep reads the constant. Ben also picked 80k/160k/320k for stage 2, but that answer was the FIXED-price fallback; under option A stage 2 sweeps the divisor instead."
+    },
+    "NR-908": {
+      "id": "NR-908",
+      "title": "CALL: under a derived price, which knob answers the seat menu — the divisor or the specialist price in firm charters?",
+      "raised": "2026-09-21",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1064 (derived charter price), reading the generation docs before stage 2 (main session, 2026-09-21). Stage 1's table (runs.real_stockpile_bl1043_a/_b/_c).",
+      "what": "NR-907 made a firm charter's price the world's stock over a divisor d, with a specialist still costing m firm charters. A centre then affords a specialist when its points cover m/d of the world's stock, so the seat menu turns on d/m ALONE: stage 1 gives seats ~ 0.056 x d / m on the median world (the median of seats x firm price / stock over 48 rows is 0.01395 at m = 4), so the anchor's 9 seats is d/m ~ 160. Firm density — how many charters a world's stock buys — turns on d alone. BL-1064 as filed pinned d to the seat menu with m frozen at 4, which leaves density with no knob; DIGITISATION.md § 1 and its hard-list item 7 set the FIRM price against live-play cost and the 2026-09-18 ruling anchors the SPECIALIST price (in firm charters) to the seat menu. The handoff's 'divisor near 150' was d/m, and its seat direction was inverted (a larger d/m is a cheaper seat and MORE seats).",
+      "why_it_matters": "It decides what stage 2 of BL-1043 measures and what BL-1044 pins: one knob or two.",
+      "options": [
+        "A: the divisor answers live-play cost and m answers the seat menu (the doc's split); stage 2 holds d/m near 160 while d moves.",
+        "B: the divisor answers the seat menu with m frozen at 4 (BL-1064 as filed); density is whatever that divisor gives."
+      ],
+      "recommendation": "A: it is what the doc already rules, and it gives each knob one job.",
+      "files": [
+        "docs/generation/DIGITISATION.md",
+        "src/world/stockpile_budget.hpp",
+        "tools/verify/player_seed_sweep.cpp"
+      ],
+      "resolution": "RULED (Ben, 2026-09-21, elicitation): A — the divisor answers live-play cost, m answers the seat menu. Written into DIGITISATION.md § 1. Stage 2 is FIVE rows per seed (plus the legacy row): (divisor, m) = (450, 4), (650, 4), (900, 4) for the seat menu along d/m = 112 / 162 / 225, and (325, 2), (1300, 8) for density at the ratio 162. The sweep takes them as --price-pairs."
+    },
+    "NR-909": {
+      "id": "NR-909",
+      "title": "CALL: once the span is on by default, what do --verify, --serve and the headless run build?",
+      "raised": "2026-09-21",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Planning BL-1044 (Beat 1 ships), main session, 2026-09-21, reading the three search-less start paths.",
+      "what": "Three start paths never search: app::run_verify (verify_api.cpp:529), run_serve (main.cpp:148) and the headless run (main.cpp:258). Each calls generate_background_firms directly and only WARNS when the stockpile budget is non-empty; today that never fires, because they build from default world_params with the Digitisation span off. BL-1044 flips the span on by default, so from then every --verify capture, every MCP/--serve session and every headless run builds a span world and lays the legacy web over it, ignoring its budget — a world the app never builds. None of these paths searches today either (they lay the legacy web with a fixed seed, not the search winner), so none of them was ever the exact shipped world.",
+      "why_it_matters": "--verify is how a UI change is checked and --serve is the AI seam; both would silently show a hybrid world, and their guards would print on every run.",
+      "options": [
+        "A: spend the budget on the SEED CANDIDATE (the harness's unsearched apply, apply_shipped_landscape with search = false): a non-empty budget charters as the app does, minus the search; an empty budget keeps today's call byte for byte.",
+        "B: pin the span OFF on the three paths: they keep today's world exactly, and check a world the player no longer gets.",
+        "C: run the full search there too: the exact shipped world, at 20-60 s more per verify run."
+      ],
+      "recommendation": "A. It shows the budget world at no search cost, matches how these paths already skip the search, and leaves a span-off world untouched. B keeps verify on a world nobody plays; C taxes every UI check for the search's choice of roster, which verify has never checked.",
+      "files": [
+        "src/core/verify_api.cpp",
+        "src/main.cpp",
+        "tools/verify/harness_params.hpp"
+      ],
+      "resolution": "RULED (Ben, 2026-09-21, the charter pin form): A — where the world carries a charter budget, --verify, --serve and the headless run spend it on the search's seed candidate (the harness's unsearched apply); an empty budget lays exactly today's web. Written into DEVELOPMENT_PRACTICES.md § A harness must build the world the application builds; built by BL-1044 (T5)."
+    },
+    "NR-910": {
+      "id": "NR-910",
+      "title": "CALLS: the charter pins for BL-1044 — the price pair, the seat spread, the no-specialist world, the province cap, the sqrt base",
+      "raised": "2026-09-21",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1043 stage 2 (runs.real_stockpile_bl1043_stage2, 16 seeds x NR-908's five pairs, serial) and the seat curve (stockpile_budget_check --seat-curve, 16 seeds, d/m 162-1300), main session, 2026-09-21.",
+      "what": "Seats turn on d/m alone and follow the curve median 3 / 4 / 13.5 / 28 / 54 at d/m 162 / 225 / 325 / 450 / 650, so the anchor's 9 sits near d/m 290. Live tick against the legacy world: x0.43 / x0.91 / x1.70 at 325:2 / 650:4 / 1300:8, so the divisor near 650 runs the legacy cost. Whole charters are too coarse: at d = 650, m = 3 opens ~4 and m = 2 ~13.5. The spread at the anchor is wide (3-98 at d/m 325) because worlds with many near-equal cities cross the price together — the derived price removes the stock's size, not the world's shape. No-specialist worlds occur below d/m ~325 (seeds 46, 37, 25) and none above. The province cap binds on 7 of 16 worlds at 650:4, up to 24.6% of one budget.",
+      "why_it_matters": "BL-1044 pins these and re-blesses the shipped world on them.",
+      "options": [
+        "Price pair: A m 2 with the divisor tuned near 580 so the median lands at 9 / B 650:2 (median 13.5) / C m 3 near 870.",
+        "Seat spread: accept (the anchor is a median) / cap the menu at N.",
+        "No-specialist world: fall back to the no-budget world / unseatable, re-roll / seat on a background firm.",
+        "Province cap: keep 2 / raise to 3 / lift. Sqrt base: pin 8 / measure another."
+      ],
+      "recommendation": "A; accept; fall back; keep 2; pin 8.",
+      "files": [
+        "docs/generation/DIGITISATION.md",
+        "docs/generation/CORPORATION_GENERATION.md",
+        "src/world/stockpile_budget.hpp"
+      ],
+      "resolution": "RULED (Ben, 2026-09-21, the charter pin form), all as recommended: a specialist costs TWO firm charters and the divisor is the one at which the median library world opens nine seats at two (near 580, read off the seat curve); the seat spread is accepted — the anchor is a median; a world whose budget opens no specialist falls back to the no-budget world, as a refused spend does; the per-province cap stays at 2; the sqrt base is 8. Written into DIGITISATION.md § 1 and CORPORATION_GENERATION.md § Pass 1; BL-1044 pins them. PINNED (seat curve at m = 2, 16 seeds, 2026-09-21): divisor 580 — median 6.5 / 7 / 8 / 9.5 / 12.5 seats at d = 520 / 540 / 560 / 580 / 600, and 580 is the smallest divisor measured at which no library world falls back (seed 37: 0 at 560, 2 at 580); spread 2 to 73 at 580:2."
+    },
+    "NR-911": {
+      "id": "NR-911",
+      "title": "CALL: the no-specialist residual — a budget that affords a specialist but places none leaves no player",
+      "raised": "2026-09-22",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Building BL-1044 (Beat 1 ships), T4, main session, 2026-09-22, reading charter_web_from_budget against NR-910's fallback.",
+      "what": "NR-910 rules the no-specialist world falls back to the no-budget world, 'decided from the budget before anything is chartered'. BL-1044 builds exactly that: the search and the apply ask charter_budget_affords_specialist (a centre on a nation's tile whose points cover the specialist) and lay the no-budget world when none does. But affording is not placing. A centre that affords a specialist and finds no ground in either window charters none (corporation_generation.cpp, the walk's 'no ground in either window' branch). If every affording centre does so, the walk ends with no specialist, nobody is picked, spawn_seat finds nobody (spawn_seat.cpp:118), and the world has no player. That cannot be decided before the walk: a poorer centre's specialist competes for ground with richer centres' firms. It is not hypothetical in kind: the seat curve (centres affording, off the budget) matched the charted seats on 74 of 80 stage 2 rows, so on 6 rows placement differed from affording. Whether it ever reaches zero on the library at 580:2 (minimum 2 affording) is what BL-1044's measurement counts.",
+      "why_it_matters": "The app would start a campaign with no player corporation. BL-1044 states the invariant where it binds (world.hpp), prints the count on the app's seat line and fails a player_seed_sweep row (and guard S7) that seats other than one, so the case is loud, never silent. What the world should do then is a design call.",
+      "options": [
+        "A: extend the fallback past the walk — lay the budget world on a copy, and if it charters no specialist lay the no-budget world instead. Exact, but it is decided AFTER chartering, which the ruling's wording excludes, and costs a world copy per apply.",
+        "B: seat the richest affording centre's specialist on a relaxed rung (a third anchor rung, nation-wide) when the walk would otherwise end with none. Keeps the budget world; adds the nation-wide scatter § 1 forbids for every other charter.",
+        "C: leave it reported and counted, and act only if BL-1044's measurement (or any later library run) ever shows it: the invariant is loud today."
+      ],
+      "recommendation": "C now, with A as the fix if it is ever measured. A is the only option that keeps both the ruling's outcome (the no-budget world) and § 1's placement rule; its cost matters only if the case occurs.",
+      "files": [
+        "src/world/corporation_generation.cpp",
+        "src/world/landscape_search.cpp",
+        "src/world/world.hpp",
+        "docs/generation/DIGITISATION.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-22, the Gate 2 form): C — reported and counted, fixed only if measured. No library world hit it in BL-1044 Step 2 (16 of 16 seat one player). Written into DIGITISATION.md § 1 and CORPORATION_GENERATION.md § Pass 1."
+    },
+    "NR-912": {
+      "id": "NR-912",
+      "title": "CALL: the treasury credit rate on the 1960 close — the median nation opens near zero, and Pass 7's two scales are stale",
+      "raised": "2026-09-22",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1044 Step 2 (era_world_harness R7 on seed 0; digitisation_sim_harness's setup-diff line on 16 library seeds), main session, 2026-09-22 — the reading BL-1053 (1) left owed.",
+      "what": "With the span on, a nation's opening treasury is its folded polities' chest at the 1960 close x 0.01 per mille (NATION_GENERATION.md § Pass 7). The 1960 chests total 0.62-0.91x the 1660 ones across the library (median ~0.84; seed 0: 2.74B against 3.27B material), as BL-1053 forecast. But the rate's own justification no longer holds on the reference seed, and did not hold at 1660 either: § Pass 7 says 0.01 per mille opens the median nation on ~100 credits (thirteen quarters of levy) and sums the 38 treasuries to ~15,300 with the richest on ~3,800. Measured on seed 0 today: the 38 sum to 31,691 credits, the richest opens on 5,420, and the MEDIAN nation opens on 0.41 — 22 of 38 nations hold under one credit, 14 hold 100 or more. The '~100 for the median' figure read the median POLITY chest (~10M), not the median nation's folded chest (~41k material).",
+      "why_it_matters": "The rate is a stated conversion chosen against two scales; the scales are the reason for the number. As measured, most nations open broke and a handful hold a corporate field's cash between them, which is the opposite of 'a reserve, not a hoard' for the median realm. It is also a doc claim that is false today.",
+      "options": [
+        "A: keep 0.01 per mille and restate § Pass 7's scales from the shipped world (the sum, the top realm, the median near zero): the skew is history's, and a broke majority is a legible opening.",
+        "B: keep the rate and give every folded nation a floor (e.g. one quarter's levy), so the median nation is not broke; the top is unchanged.",
+        "C: re-derive the rate against the median NATION on the shipped world (a larger rate lifts the median and multiplies the top with it)."
+      ],
+      "recommendation": "A, with the restated numbers written into § Pass 7 by BL-1044 — the skew is the world talking, as the seat spread was (NR-910). B is the lever if a broke majority reads badly in play; C scales the hoard with the median and breaks the second scale.",
+      "files": [
+        "docs/generation/NATION_GENERATION.md",
+        "src/world/nation_generation.hpp",
+        "tools/verify/era_world_harness.cpp"
+      ],
+      "resolution": "RULED (Ben, 2026-09-22, the Gate 2 form): A — keep 0.01 per mille and restate Pass 7's scales from the shipped world. Written into NATION_GENERATION.md § Pass 7 (median nation 0.41 credits, 22 of 38 under one, 14 at 100+, sum 31,691, richest 5,420 on the reference seed)."
+    },
+    "NR-913": {
+      "id": "NR-913",
+      "title": "CALL: density does not follow cities on the shipped world — at 580:2 most centres cannot buy one firm, and ~79% of every stock goes unspent",
+      "raised": "2026-09-22",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1044 Step 2 (digitisation_sim_harness --through 1960, reading 1, 16 library seeds; player_seed_sweep --digest on the shipped arc, the charter accounts), main session, 2026-09-22 — BL-1044's done-when reading.",
+      "what": "BL-1044's done-when reading is 'density follows cities': firm count per market against the catchment's urban population, above its good count (BL-1029's baseline on the legacy web: rho 0.431 against 0.460). On the shipped world at the pins it does not: rho(firms, urban) median 0.138 (p25 0.095, p75 0.177), rho(firms, goods) median 0.167; urban beats goods on 5 of 16 worlds. The cause is in the charter accounts. A firm costs 1/580 of the WHOLE stock, but the stock is split over 5,579 to 15,240 carved centres, so most centres hold less than one firm's price: the median world spends 16.6% of its stock and leaves 78.8% unspent as `remainder` (seed 46: 97.4%, seed 25: 94.7%, seed 32: 56.4%). The web is bought by the few dozen richest centres — 7 to 92 firms a world, median 65, against the legacy web's 81 on every seed — so it cannot track cities across 148 to 538 markets. The cost mode's per-centre reading says the same (seed 46: rho -0.005 over 15,240 centres).",
+      "why_it_matters": "It is the phase's own claim (DIGITISATION.md § 1: the budget is the stockpile, not headcount, so density following cities is MEANINGFUL) and BL-1044's done-when. The re-bless would pin a world whose charter web sits in its great cities and nowhere else. Tick cost and the seat menu are separate knobs (NR-908); this is where the points go.",
+      "options": [
+        "A: accept — capital concentrates, and firms stand where it did; restate the done-when as 'density follows the richest cities' and re-bless.",
+        "B: pool what a centre cannot spend: a centre's remainder rolls up (to its region, or its nation's capital) and buys firms there, so the stock is spent rather than stranded; the seat menu is untouched (it reads a centre's own points).",
+        "C: price a firm off the centres, not the whole stock (e.g. the median centre's budget over a divisor), so a typical city can buy one; the specialist stays m x the whole-stock price. Density rises, and so does the tick — measured against NR-908's live-play band.",
+        "D: hold the re-bless and re-measure the done-when on a small sweep of B or C first."
+      ],
+      "recommendation": "D, measuring B first: it spends the stranded points without touching the price rulings (NR-907, NR-908, NR-910) or the seat menu, and its cost is one reading. A is legitimate if Ben reads 'cities' as 'the capitals', but it is a different phase claim than § 1 makes.",
+      "files": [
+        "docs/generation/DIGITISATION.md",
+        "src/world/corporation_generation.cpp",
+        "src/world/stockpile_budget.hpp",
+        "tools/verify/digitisation_sim_harness.cpp"
+      ],
+      "resolution": "INTERIM RULING (Ben, 2026-09-22, the Gate 2 form): D — hold the re-bless and measure pooling (option B) first. The adoption call follows the reading. MEASURED (2026-09-22, digitisation_sim_harness --through 1960 at 650:2, 16 library seeds, pooling off by default): rho(firms, urban) / rho(firms, goods) medians, and worlds where urban beats goods — none 0.139 / 0.167, 5 of 16 (65.5 firms a world, 15.2% of the stock spent); region 0.186 / 0.195, 10 of 16 (109 firms, 19.8%); market 0.211 / 0.204, 7 of 16 (120 firms on every seed, 21.1%); nation 0.156 / 0.213, 3 of 16 (120 firms, 21.1%). The density ceiling (120 a body) binds under every pool, so ~79% of each stock stays unspent — now under the ceiling, not the price. None approaches BL-1029's legacy web (0.431 / 0.460): at most 120 firms over 148-538 markets leaves most markets empty. AND the seat menu is NOT untouched: affording is, but pooled firms at a group's richest centre take ground before poorer centres place their specialists (seed 41: 65 seated unpooled, 44 region, 29 market). The adoption call is Ben's. RULED (Ben, 2026-09-22, the pooling form): A — ship unpooled, restate BL-1044's done-when (the reading taken and reported, not gated), file density as its own sprint 46 design item (drafts/sprint-46-items.json DENSITY_FOLLOWS_CITIES), re-bless now; the pool switch stays, off by default, as a measurement."
+    },
+    "NR-914": {
+      "id": "NR-914",
+      "title": "CALL: the pinned divisor opens a median 6.5 seats on the shipped world, not the anchor's 9 — the seat curve moved when the tier turned on",
+      "raised": "2026-09-22",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1044 Step 2 (player_seed_sweep --digest on the shipped arc; stockpile_budget_check --seat-curve on the shipped world, 16 library seeds), main session, 2026-09-22.",
+      "what": "NR-910 ruled the RULE — the divisor at which the median library world opens the anchor's nine seats at two firm charters — and read 580 off a seat curve taken with BL-1037's corridor tier OFF. BL-1044 turns the tier on, and the tier moves every stockpile (it changes Exploration's resume, and so the 1660 handoff the span opens on). On the shipped world at 580:2 the median library world affords 6.5 specialists and seats 6.5 (min 3, max 48; no world falls back, every world seats one player). The shipped curve at m = 2 (median centres affording): 450 4.0 | 500 5.0 | 540 5.5 | 580 6.5 | 620 8.0 | 660 13.5 | 700 14.5 | 800 17.5, none ever zero. So the anchor now sits between 620 and 660; a finer curve (600-660 by 10) is queued to name the number. The step is steep because worlds with many near-equal cities cross together (seed 12: 4 -> 52 between 620 and 660; seed 41: 7 -> 73 between 580 and 620). SEPARATELY, affording is not seating on the rich-city worlds: seeds 31, 40, 32, 38 and 9 afford 37 / 50 / 66 / 61 / 19 and seat 26 / 37 / 48 / 41 / 15 — a poorer centre's specialist finds its window taken by richer centres' firms (window_exhausted, up to 79 centres a world). The seat curve counts affording, so it overstates the menu where it is widest.",
+      "why_it_matters": "The re-bless pins the shipped world's digests on whatever divisor ships. Re-pinning after would cost a second re-bless.",
+      "options": [
+        "A: apply the ruled rule to the shipped world — re-pin the divisor to the value the fine curve gives for a median of nine at m = 2 (~630-650), measure its tick, then re-bless.",
+        "B: keep 580 — the seat menu is a median, 6.5 is near the anchor, and the tick is lower.",
+        "C: re-pin on SEATED rather than affording specialists (the digest run's count), which reads slightly higher divisors on the rich-city worlds."
+      ],
+      "recommendation": "A: the ruling is the anchor, and 580 was its reading on a world that no longer ships. The tick at ~640 sits between stage 2's x0.43 (325) and x0.91 (650), inside the band. Take the number off the fine curve (affording, as NR-910 did), and note the placement loss beside it rather than chasing it with the divisor.",
+      "files": [
+        "src/world/stockpile_budget.hpp",
+        "docs/generation/DIGITISATION.md",
+        "tools/verify/stockpile_budget_check.cpp"
+      ],
+      "resolution": "RULED (Ben, 2026-09-22, the Gate 2 form): A — apply the ruled rule to the shipped world: re-pin the divisor to the value the fine seat curve (affording, m = 2, 16 library seeds) gives for a median of nine. The number is pinned by BL-1044 and written into DIGITISATION.md § 1. PINNED 650 (2026-09-22): the fine shipped seat curve at m = 2 reads median 7.5 / 7.5 / 8 / 8.5 / 8.5 / 9 / 13.5 at d = 600-660 by 10; 650 is the first divisor at nine, none opens zero, spread 4 to 98; its tick near x0.91 legacy (stage 2)."
+    },
+    "NR-915": {
+      "id": "NR-915",
+      "title": "CALL: the live tick at the pinned 650:2 is fine at the median and heavy in the tail — three of sixteen worlds run 2.5-6x their legacy selves",
+      "raised": "2026-09-22",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1044 re-bless (player_seed_sweep --charter-cost --budget stockpile --price-pairs 650:2, 16 library seeds, Release, serial, quiet machine, 7669 s), main session, 2026-09-22.",
+      "what": "NR-908 gave the divisor to live-play cost, and the pin was set on the median: at 650:2 the shipped world's live tick is a median x0.78 of the same seed's legacy world (4.5 s against 5.4 s), inside the band stage 2 read (x0.43 / x0.91 / x1.70 at 325 / 650 / 1300 with the tier off). The TAIL is not: seed 41 ticks 30.9 s against its legacy 5.3 s (x5.79), seed 31 25.5 s against 6.2 s (x4.12), seed 28 12.8 s against 4.1 s (x3.13); the other thirteen run x0.36 to x1.51. It is not a small-denominator artefact — those are absolute seconds per live tick, and 31 s a tick is heavy for play. The heavy worlds are the ones the seat menu opens widest (seed 41 seats 65 specialists, seed 31 seats 31, against a library median of 8.5), so the cost follows the specialists the budget charters rather than the background firms (seed 41 holds 56 firms, fewer than the median world's 65). Generation cost moved too: the budget row's generation is a median 53.3 s against the legacy row's 42.5 s (max 93 s), about 26% dearer.",
+      "why_it_matters": "The divisor is pinned and the world is re-blessed on it. If a 31-second tick is not playable, the knob that fixes it is the same divisor (or a seat cap), and moving it costs another re-bless.",
+      "options": [
+        "A: pure speed-ups with identical results, no re-bless — cache the province ceiling within a tick (PROVINCES.md owns the rule; the cache must invalidate when centres/roads change), and resolve each pool's origin tile once per dispatch pass plus make markets_by_body stop rescanning (SUPPLY.md owns dispatch). Estimated: ~90% of the econ step, ~70% of dispatch.",
+        "B: A, then change the base scan's behaviour — stop at the first placeable tile, cache a corp's best base tile, or back off after the candidate loses; this also ends the offered-forever pattern but changes which bases are built (re-bless; AI_OPPONENT.md § 11 read first).",
+        "C: NR-915's original seat cap — misses seed 28 and moves the pinned seat menu; not recommended."
+      ],
+      "recommendation": "A now (identical results, verified by world_determinism and a before/after digest on the live tick), then re-measure; B only if the base-scan pattern still matters after A.",
+      "files": [
+        "src/world/stockpile_budget.hpp",
+        "docs/generation/INDUSTRIALISATION.md",
+        "tools/verify/player_seed_sweep.cpp"
+      ],
+      "resolution": "RULED (Ben, 2026-09-24): option A — pure speed-ups with identical results (province ceiling cached within a tick; each pool's origin tile resolved once per dispatch pass). The work is BL-1079 (live tick speedups); re-measure the tail after it.",
+      "investigation": "RE-TAKEN 2026-09-24 on the current tree (after BL-1003, BL-995, the tick reorder; tools/verify/live_tick_cost_probe, merged 158f1201). The tail is real but narrower — 650:2 vs legacy: seed 41 x3.04 (26.8 s vs 8.8 s), seed 31 x1.93, seed 28 x1.28; median seeds ~x0.8-1.0 — partly because the legacy worlds got slower too. NR-915's diagnosis does NOT hold: the cost does not follow specialists as such. (1) ~80% of a heavy tick is ONE corp_ai loop: the military_base candidate (corp_ai.cpp ~1730) — a base-less corp scans every tile of its home nation with can_place_in_world, and nearly every call reaches province_building_ceiling -> measure_province_sustain, which rebuilds a map over every population centre in the world (6-14k) per call (~0.8-2 ms). Almost every tile passes, so the candidate is offered every evaluation and the corp still has no base next time. Cost ~ base-less corps due x home-nation tiles x centres: seed 41 has 91 base-less corps (48 of its 65 specialists are new and base-less); seed 28's tail comes from charters in huge nations (2,600-3,100 tiles each), not seat count. (2) BL-995 dispatch is 5-45% of the tick: ~150-190k legs priced per tick on 255-423 markets, 72% of it re-resolving the SAME source pool's origin tile per destination (convoy_origin_tile -> pool_key_for_tile -> markets_by_body/nearest_market; ~509M market visits a tick on seed 31)."
+    },
+    "NR-916": {
+      "id": "NR-916",
+      "title": "CALL: the size of the capital market premium — 1.25x the carve's price is a placeholder, not a derivation",
+      "raised": "2026-09-23",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1066 (the player cannot build), main session 2026-09-23, on Ben's ruling that capital markets are priced at a premium.",
+      "what": "The BL-910 capital markets (nine on the shipped verify world) now take the carve template's base price for every good they lacked, and every good, endemic included, is multiplied by kCapitalMarketPricePremium (hard_coded_world.cpp, PROVISIONAL). It ships at 1.25. Nothing derives that number: it was chosen to be clearly above 1 and far inside the 10x price band, so a carve market's haul can still undercut a capital.",
+      "why_it_matters": "The premium sets how hard a capital pulls goods: convoys chase shortfall, and a dearer capital is where sellers list first. Too low and a capital is just another market; too high and every good the realm makes drains to its capital before anywhere else.",
+      "options": [
+        "A: keep 1.25 as authored flavour (a capital is modestly dearer).",
+        "B: derive it — e.g. from the capital's population share or its polity's treasury at the 1200 close, so a great capital is dearer than a minor one.",
+        "C: a different flat figure."
+      ],
+      "recommendation": "A for now; B is the deeper answer and belongs with the Exploration-age capital-as-treasury design (EXPLORATION.md), not this item.",
+      "files": [
+        "src/world/hard_coded_world.cpp",
+        "docs/economy/MARKETS.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-24): 1.25 is fine; tune later if needed. The constant is marked authored, not provisional (hard_coded_world.cpp)."
+    },
+    "NR-917": {
+      "id": "NR-917",
+      "title": "CALL: the convoy reorder hands armies first claim on Logistic Points — a goods-vs-force priority nobody has chosen",
+      "raised": "2026-09-23",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1066, main session 2026-09-23, on Ben's ruling to reorder the tick (advance -> arrivals -> economy -> clearing -> dispatch).",
+      "what": "Dispatch and the march share one Logistic Point pool per tick (BL-597). Dispatch used to run first, so convoys claimed LP before armies; it now runs last, so the march in run_economy_step claims first and convoys take what is left. LOGISTICS.md § The finding worth keeping says goods-vs-force priority 'is otherwise decided invisibly, by tick phase order' and should be an explicit rule, not an inherited default. The reorder flipped it, and nothing chose either order.",
+      "why_it_matters": "In a war, which starves first — the front or the trade — is a design statement. Today it is a side effect of where a function call sits.",
+      "options": [
+        "A: accept armies-first as the rule and write it into LOGISTICS.md.",
+        "B: restore convoys-first by reserving the passive share before the march runs.",
+        "C: an explicit split (a fixed or doctrine-driven share per side), order-independent."
+      ],
+      "recommendation": "A: an army's supply is the more urgent draw and the more legible one to starve on purpose. C is the complete answer and can follow when LP contention is actually measured in a war.",
+      "files": [
+        "src/core/app.cpp",
+        "src/main.cpp",
+        "tools/verify/harness_params.hpp",
+        "docs/economy/LOGISTICS.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-24): accepted — armies claim Logistic Points first. Written into LOGISTICS.md § Refusal, surface and determinism as a chosen priority."
+    },
+    "NR-918": {
+      "id": "NR-918",
+      "title": "DECISION TAKEN: the reroll path once the world moves forward — hold the predecessor by a faithful copy, replay from the Life gate as the fallback",
+      "raised": "2026-09-24",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md",
+      "what": "Ben ruled the whole half-built world crosses each seam and rerolls are per stage, and asked to be told if there is a stronger reason to recalculate. There is one: a world moved into round N's worker and mutated is consumed, so a reroll of N needs round N-1's closing world back. Taken: hold the predecessor's closed world by a faithful copy at landing (BL-1034 proved a copy ticks as its original; world_copy_determinism), move a copy into the worker, re-copy on reroll; when the predecessor is not held, replay from the Life gate with the fixed per-span seeds — bit-identical by determinism, about 0.5 s + 1.6 s + 1.5 s in Release. A serialised snapshot was rejected (a save round trip reorders the unordered stores). Copy cost is measured first; if it exceeds the replay it saves, pure replay ships.",
+      "why_it_matters": "Nothing displayed is ever inaccurate either way — with per-span seeds a replay IS the same calculation — so the question is only memory against a few seconds on the reroll path. The forward path (Next, Back) never recomputes.",
+      "options": [
+        "A: the hybrid (copy held, replay fallback) — taken",
+        "B: pure replay (no held copies; every reroll costs up to ~3.6 s)",
+        "C: hold every closed world (25-40 MB each, inferred; simplest invalidation)"
+      ],
+      "recommendation": "A, measured; B if the copy costs more than it saves.",
+      "files": [
+        "src/core/app.hpp",
+        "src/ui/startup_screens.cpp",
+        "src/world/hard_coded_world.cpp"
+      ],
+      "resolution": "CONFIRMED (Ben, the delegated-decision form, 2026-09-25): A, the hybrid -- hold the predecessor by a faithful copy, replay from the Life gate as the fallback. Applies with BL-1084 in sprint 48."
+    },
+    "NR-919": {
+      "id": "NR-919",
+      "title": "DECISION TAKEN: the scope reading — a ruling Ben made by name wins over the general \"no sim beats\" answer",
+      "raised": "2026-09-24",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md",
+      "what": "On the form Ben answered Scope with \"presentation plus record-only kinds and fields plus per-span seeds, no sim beats, no people\", and on the same form chose by name: the purchase verb and sea-lane tier (\"a sim beat with a re-bless\"), the band from the history's industry state, the tariff posture derived by the span, mid-span works-chartered events, and the Industrialisation round absorbing Begin's work. His closing note says his notes \"should apply some slightly different readings of some of the options\". Taken: the specific rulings are in the sprint as exceptions to the general scope; the sprint takes ONE re-bless after its world-movers land (already authorised in principle, 2026-09-24).",
+      "why_it_matters": "Fixes the digest and re-bless budget for the whole sprint; if Ben meant the general answer to exclude any of the five, that item comes out before it is built.",
+      "options": [],
+      "recommendation": "Confirm, or name the exception to withdraw.",
+      "files": [],
+      "resolution": "RULED (Ben, the delegated-decision form, 2026-09-25): the named rulings win, AND the blanket \"no sim beats\" scope answer is OVERRULED -- sim beats are in scope, taken one re-bless at a time. The same form overturned three delegated readings into sim beats (NR-925 B, NR-926, NR-929 B)."
+    },
+    "NR-920": {
+      "id": "NR-920",
+      "title": "CALL: what --epoch 0 means once the recipe band is derived from the history, and whether the ancient-roster sandbox keeps an explicit --band override",
+      "raised": "2026-09-24",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md",
+      "what": "Ben ruled the band comes from the history's industry state (BL-1101). The epoch then names the calendar only. Today --epoch 0 also selected the ancient roster through industrial_band_from_year; era_roster.cpp and INDUSTRIALISATION.md § The boundary (the epoch and the band) (ruled 2026-09-24) describe that sandbox.",
+      "why_it_matters": "Every harness and the seed library run with an epoch; a derived band can also come out ancient on a seed whose history never crossed the rung, which is a different thing from asking for the ancient roster.",
+      "options": [
+        "A: calendar only — same world, same derived band, dated 0 CE",
+        "B: calendar plus an explicit --band ancient|industrial override kept for the sandbox",
+        "C: retire epoch 0"
+      ],
+      "recommendation": "B, if the sandbox is still wanted; A otherwise. Either way INDUSTRIALISATION.md § The boundary (the epoch and the band) is rewritten.",
+      "files": [
+        "src/world/era_band.hpp",
+        "src/core/app.hpp",
+        "docs/generation/INDUSTRIALISATION.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-25, the sprint-47 close form): C, epoch 0 is retired -- no band override, no ancient-roster sandbox; an ancient opening exists only where a history never crossed the rung. Written into INDUSTRIALISATION.md (the epoch and the band), ERAS.md and the epoch action entry; the work is BL-1114 (epoch 0 retired)."
+    },
+    "NR-921": {
+      "id": "NR-921",
+      "title": "CALL: switch sea legs on for the Exploration and Industrialisation spans — today they run with sea_legs_ration_q = 0, so wet campaigns starve and the port bonus is dead code in the spans EXPLORATION.md owns",
+      "raised": "2026-09-24",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md",
+      "what": "While reading the sea-lane tier (BL-1097): exploration_sim_params leaves sea_legs_ration_q at 0 and amphibious_weight_crossing false (era_minus_one.cpp:328-375; asserted by industrialisation_sim_harness.cpp:1271-1274, BL-1053's EMPIRES_ONLY), so the only code applying the port/navy crossing bonus (history_sim.cpp:4419-4451) never runs in these spans and EXPLORATION.md:383-395 (\"the port is why the skirmish is cheap\") describes a force that is off. A lane tier earned by traffic from wet campaigns alone would stamp almost nothing; the tribute-round metropole→subject leg is what carries the record.",
+      "why_it_matters": "Turning sea legs on is a sim beat that moves displacement (the phase's one structural reading) and every pin; it is not folded into BL-1097.",
+      "options": [
+        "A: leave them off; the tribute-round leg carries the lane record",
+        "B: turn them on for the later spans as its own item with a re-bless, and re-read displacement",
+        "C: amend EXPLORATION.md:383-395 to say the port bonus applies only where sea legs run"
+      ],
+      "recommendation": "A now with C's clarification; B as a filed item once BL-1096/1097 have been read on the 16 seeds.",
+      "files": [
+        "src/world/era_minus_one.cpp",
+        "src/world/history_sim.cpp",
+        "docs/generation/EXPLORATION.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-25, the sprint-47 close form): B, sea legs switch on for the Exploration and Industrialisation spans as their own item with a re-bless, and displacement is re-read on the 16 seeds. Written into EXPLORATION.md (the port is why the skirmish is cheap); the work is BL-1115 (sea legs in the later spans)."
+    },
+    "NR-922": {
+      "id": "NR-922",
+      "title": "NOVEL WORK: seven new record kinds, two series fields and a name table widen the lapse record's scope",
+      "raised": "2026-09-24",
+      "kind": "novel-work",
+      "status": "resolved",
+      "source": "Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md",
+      "what": "The sprint adds lapse_event_kind entries cradle, inherited, works_chartered, province_bought, sea_lane_opened, sea_leg_campaign and the rung crossing (or a reuse of furnace_lit), navy_stock and port_stock_q on polity_sample, and a polity_name (and civilisation/creed name) table on era_timelapse — all in one save_game_version bump. Each is record-only (write-only from the sim; read by the UI), so digests do not move, but the record stops being \"what the span computes about borders\" and becomes the wizard's narrative store.",
+      "why_it_matters": "The standing rules ask that novelty be chosen, not accreted; this is the one place the sprint grows a data structure's purpose.",
+      "options": [],
+      "recommendation": "Accept as the sprint's one widening; the kinds are append-only and each is documented on the enum.",
+      "files": [
+        "src/world/era_timelapse.hpp",
+        "src/core/save_game.cpp"
+      ],
+      "resolution": "ACCEPTED (Ben, the delegated-decision form, 2026-09-25): the seven record kinds, the navy/port series and the name table are the sprint's one widening of the lapse record."
+    },
+    "NR-923": {
+      "id": "NR-923",
+      "title": "DECISION TAKEN: Selene and Pallas stay in Finishing; the Life-gate world is Helios + Cinder + Kepler",
+      "raised": "2026-09-24",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md",
+      "what": "Ben ruled \"move the whole half-built world\". Selene (moon) and Pallas (asteroid) are authored in Finishing after corporations (hard_coded_world.cpp:2532-2600); moving them to the gate shifts every later entity id (create_entity is monotonic) — a full re-bless for two bodies no wizard round shows. Taken: they stay in Finishing; STARTUP.md § The world cache says so.",
+      "why_it_matters": "If Ben wants the gate to be literally the whole system, it rides the sprint's re-bless at no other cost.",
+      "options": [
+        "A: stay in Finishing (taken)",
+        "B: move to the gate in the same re-bless"
+      ],
+      "recommendation": "A.",
+      "files": [
+        "src/world/hard_coded_world.cpp"
+      ],
+      "resolution": "CONFIRMED (Ben, the delegated-decision form, 2026-09-25): A, Selene and Pallas stay in Finishing."
+    },
+    "NR-924": {
+      "id": "NR-924",
+      "title": "DECISION TAKEN: folding the landscape search INTO generation at the companies stage is a stretch item (BL-1086), not part of the first wave",
+      "raised": "2026-09-24",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md",
+      "what": "Ben: \"completely obsolete that block of code\". Taken: BL-1085 moves Begin's work into one world/* function called by the round-6 worker and the cold path (hash gate intact, goldens untouched); folding the search into make_hard_coded_world so the market carve reads the searched roster and no world-gen roster is laid then removed (the literal \"work twice\") is a world-mover that changes what the carve reads — filed as BL-1086 to ride the sprint's re-bless if BL-1085 lands with time.",
+      "why_it_matters": "Two possible readings of \"obsolete that block\": retire Begin's code (BL-1085) or also retire the double roster (BL-1086). Both are in the sprint; only the order is delegated.",
+      "options": [],
+      "recommendation": "Confirm the order.",
+      "files": [
+        "src/world/hard_coded_world.cpp",
+        "src/world/landscape_search.cpp"
+      ],
+      "resolution": "CONFIRMED (Ben, the delegated-decision form, 2026-09-25): the order stands -- Begin's work moved first (BL-1085), the search folds into generation later (BL-1086, sprint 48)."
+    },
+    "NR-925": {
+      "id": "NR-925",
+      "title": "DECISION TAKEN: works-chartered events are record-only in-span at a fraction of the RUNNING price, no points debited, and the close flashes the real charters",
+      "raised": "2026-09-24",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md",
+      "what": "Ben chose \"invent mid-span works-chartered events at a fixed fraction of a price\". The ruled firm price is the 1960 stock over 650, unknown in 1720, so \"a price\" inside the span is the running price (stock so far / 650); a fixed points constant was rejected for the close by NR-907. Taken (shape C): the event is emitted from the accrual, record-only, capped per region per round, with the fraction f read off the harness before it is pinned; points are not debited (a Works sink is Beat 1's own force with its own re-bless); once the search runs inside the round (BL-1085) the close flashes the real charters dated by pairing a region's k-th firm with its k-th crossing. Real in-span chartering (firms materialised mid-span) is a sim beat that reopens DENSITY_FOLLOWS_CITIES and every 650:2 pin — not taken.",
+      "why_it_matters": "A flash that shows ten to forty times more works than the roster is worse than no flash; the fraction is measured, not guessed.",
+      "options": [
+        "A: shape C (taken)",
+        "B: real in-span chartering — a sim beat, sequenced after BL-1085 with its own re-bless"
+      ],
+      "recommendation": "A.",
+      "files": [
+        "src/world/history_sim.cpp",
+        "src/ui/history_lapse.cpp"
+      ],
+      "resolution": "OVERTURNED (Ben, the delegated-decision form, 2026-09-25): B, real in-span chartering -- a firm is chartered when its region's stock crosses the running price and the points are debited; a sim beat with its own re-bless. Written into INDUSTRIALISATION.md (Firms are chartered in the span) and STARTUP.md (Company creation flashes); the work is BL-1122 (in-span chartering)."
+    },
+    "NR-926": {
+      "id": "NR-926",
+      "title": "DECISION TAKEN: the culture ground profile is filed record-only with no consumer (BL-1107, stretch)",
+      "raised": "2026-09-24",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md",
+      "what": "Ben's note: materials shaped culture; primitive cultures gain a preference toward amenities. Taken: a per-culture ground profile coined at the cradle (deposits summed, an amenity class of cover) and inherited by daughters, record-only; its consumer (derive_culture_preference, the want table) is a sim beat for a later sprint. Note that \"amenity\" has no field today — a classifier comes first.",
+      "why_it_matters": "Giving it a consumer moves every digest; the profile alone moves none.",
+      "options": [],
+      "recommendation": "Confirm record-only for now.",
+      "files": [
+        "src/world/settlement.cpp",
+        "src/world/creeds.hpp"
+      ],
+      "resolution": "OVERTURNED (Ben, the delegated-decision form, 2026-09-25): give the ground profile its reader -- derive_culture_preference reads it (an amenity classifier first). COLONISATION.md already names the reader; the marker now records the ruling. The work widens BL-1107 (culture ground profile, sprint 48) into a sim beat."
+    },
+    "NR-927": {
+      "id": "NR-927",
+      "title": "DECISION TAKEN: the presentation half of the twelve pre-game settle ticks is dropped when the settle runs inside round 6's worker",
+      "raised": "2026-09-24",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md",
+      "what": "The settle's world half is pure and moves into the worker (BL-1085). Its presentation half — agency comms stamped day 0, record_histories samples, the strategy readout, the last econ report and corp standings — cannot run there. Taken: drop it for the twelve ticks; the balance series is already rebuilt from filed returns at the seat; counsel and battles were already suppressed; ledgers open on the first live tick. Stated in STARTUP.md.",
+      "why_it_matters": "The first in-game frame opens with fewer history samples and no \"last report\"; if that matters, the per-tick flows would have to be kept and replayed on the main thread.",
+      "options": [
+        "A: drop (taken)",
+        "B: keep the flows and replay the presentation half after adopt"
+      ],
+      "recommendation": "A.",
+      "files": [
+        "src/core/app.cpp"
+      ],
+      "resolution": "CONFIRMED (Ben, the delegated-decision form, 2026-09-25): A, the settle's presentation half stays dropped."
+    },
+    "NR-928": {
+      "id": "NR-928",
+      "title": "DECISION TAKEN: sea lanes split into the RECORD (BL-1097, this sprint) and the STAMP (BL-1098, stretch), and the stamp does not wait for a play-handoff contract",
+      "raised": "2026-09-24",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md",
+      "what": "Ben: build the purchase verb and sea-lane tier this sprint. Taken: the leg record, the tier event and round 5's lane line are one item; the water stamp (a new lane_level tile field, a water-only walker, a traversal multiplier, a digest fold) is a second item of its own weight. The sprint-46 draft row PLAY_HANDOFF_CONTRACT (one struct for every row of What crosses into play) stays unfiled; the stamp lands through the existing stamp_history_roads seam rather than waiting for it.",
+      "why_it_matters": "The reader that scoped it said the stamp \"should wait for the contract or land with it\"; landing it without the contract adds one more loose handoff local of the kind that row exists to end.",
+      "options": [
+        "A: stamp through the existing seam (taken)",
+        "B: file PLAY_HANDOFF_CONTRACT first and land the stamp behind it"
+      ],
+      "recommendation": "A this sprint.",
+      "files": [
+        "src/world/road_generation.cpp",
+        "src/world/hard_coded_world.cpp"
+      ],
+      "resolution": "CONFIRMED (Ben, the delegated-decision form, 2026-09-25): A, the lane stamp (BL-1098) lands through the existing seam."
+    },
+    "NR-929": {
+      "id": "NR-929",
+      "title": "DECISION TAKEN: the recipe band is per WORLD, named by the materials rung; per-nation grain comes through campaign tech, not a second band",
+      "raised": "2026-09-24",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md",
+      "what": "Ben: the band should come from the history's industry state. Taken: industrial iff any living polity's materials capacity reaches the industrial rung at the 1960 fold (the derivation industrial_year already uses); persisted on the world; the epoch reader retired. Per-nation banding would put a second gating system over tech (the BL-692 ruling) and every band consumer takes no actor; the per-corporation earned_techs route (BL-1109, ruled 2026-09-18) is the per-nation grain. The Industry spire ring and raw industry points were the other candidates.",
+      "why_it_matters": "A seed whose history never crossed the rung derives ancient and opens without the industrial roster — measured across the 16 seeds before the threshold is fixed, never forced.",
+      "options": [
+        "A: per world by the materials rung (taken)",
+        "B: per nation on nation_component with an actor-aware registry",
+        "C: per world by the Industry spire ring"
+      ],
+      "recommendation": "A.",
+      "files": [
+        "src/world/era_band.hpp",
+        "src/world/hard_coded_world.cpp"
+      ],
+      "resolution": "OVERTURNED (Ben, the delegated-decision form, 2026-09-25): B, the recipe band is PER NATION with an actor-aware registry -- a corporation's roster is masked on its own nation's band. Written into ERAS.md (Where the ladder starts, the owner), INDUSTRIALISATION.md, PRODUCTION.md, GENERATION_STRATEGY.md and the epoch action entry; the work is BL-1123 (band per nation). Supersedes the per-world premise of NR-934's reading."
+    },
+    "NR-930": {
+      "id": "NR-930",
+      "title": "DECISION TAKEN: the purchase is a fork inside the subjection block and a trade province stays a label; the sim_verb contest and the minted foothold are filed",
+      "raised": "2026-09-24",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Sprint 47 design pass (Ben's form, 2026-09-24); docs/development/drafts/sprint-47-rulings.md",
+      "what": "Ben: build the purchase verb this sprint. Taken: buy when the native seat is coastal and the price is affordable, take otherwise, inside the existing round-level block (bounded, one function, deterministic); price = max(floor, native seat treasury × rate) paid buyer → native seat; subject_kind is the verb taken. The fuller shapes — a sim_verb::purchase candidate scored against campaign (\"one contest with two costs\", EXPLORATION.md:314-320) and a minted foothold region beside the native's capital (:279-283) — are filed as continuity-pass items. The seller stays a non-decision (no new actor).",
+      "why_it_matters": "The bounded fork is what fits the sprint; the doc keeps the fuller design as design.",
+      "options": [
+        "A: the fork (taken)",
+        "B: the scored verb now"
+      ],
+      "recommendation": "A.",
+      "files": [
+        "src/world/history_sim.cpp",
+        "docs/generation/EXPLORATION.md"
+      ],
+      "resolution": "CONFIRMED (Ben, the delegated-decision form, 2026-09-25): A, the purchase stays a fork inside the subjection block."
+    },
+    "NR-931": {
+      "id": "NR-931",
+      "title": "CALL: what does the Culture round's reroll re-roll, when the migration walk is seed-free by design?",
+      "raised": "2026-09-24",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1083 lane G (span seeds), its harness span_seed_isolation row S0 and the cold review, 2026-09-24",
+      "what": "span_seed[0] is folded into run_settlement's seed as ruled, but the migration record is byte-identical under any value of it (span_seed_isolation: migration digest A00A5876639F4D94 with slot 0 at 0 and at 1) while the Empires, Exploration and Industrialisation records all change. The reason is design, not a defect: the colonisation walk consumes no randomness — where people go is a deterministic consequence of the ground (COLONISATION.md § No actor, and no infrastructure; memory: consequences, not simulation). What the seed reaches is derive_daughter_culture (tongue drift, coined names, aggression_q) and the furnace lag. So a round-3 reroll re-coins the peoples and forks every later age while the ownership map stays identical. STARTUP.md § Each pass round is rerollable now says so and names this call.",
+      "why_it_matters": "The item's headline half — \"the Culture round can reroll at all\" — is not delivered as written, and Ben ruled rerolls are per stage. Either the round's reroll means labels only, or the walk takes dice (against Ben's own principle), or the Culture round carries no reroll and rejecting a migration is the Life round's reroll (the world's).",
+      "options": [
+        "A: accept — a Culture reroll re-coins the peoples (names, tongues, temper) and forks later ages; the doc says so (already written)",
+        "B: give the walk a seeded roll (a design change to COLONISATION.md and a re-bless; contradicts \"consequences not simulation\")",
+        "C: remove the Culture round's Reroll; the migration is the world's consequence and the Life round's reroll is how a player rejects it; span_seed[0] stays folded (zero-neutral) or is dropped"
+      ],
+      "recommendation": "C. A reroll button that moves labels and nothing on the map is a button that lies; the honest control is the Life round's. If Ben wants A, the doc already reads that way.",
+      "files": [
+        "src/ui/startup_screens.cpp",
+        "docs/ui/STARTUP.md",
+        "docs/generation/COLONISATION.md",
+        "tools/verify/span_seed_isolation.cpp"
+      ],
+      "resolution": "RULED (Ben, 2026-09-25, the sprint-47 close form): C, the Culture round carries no Reroll; the migration is the world's consequence and the Life round's reroll rejects it; span_seed[0] stays folded and zero-neutral. Written into STARTUP.md (each pass round is rerollable); the work is a sprint-47 task under BL-1083 (span seeds per round) in REFINED.md, which also re-reads its failed R3."
+    },
+    "NR-932": {
+      "id": "NR-932",
+      "title": "OBSERVATION → CALL: one settle tick is pathological — tick 1 runs 44-62 s of a 69-114 s settle on seed 0",
+      "raised": "2026-09-24",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1085 lane C (Begin retired into round six), gen_step_costs --finish 0 28 in Release, 2026-09-24",
+      "what": "Inside the twelve-tick settle that now runs in round 6's worker, tick 1 costs 44-62 s while the other eleven cost ~1.5 s each (seed 0: settle 113,922 ms, slowest tick 1 56,881 ms; seed 28: 68,832 ms). It was hidden inside the old on-thread validation run. The wait's bar holds still through it because a tick has no progress tap; the round-6 wait grew by ~100 s in total with the search and the settle inside it, as Ben accepted, but most of that is one tick.",
+      "why_it_matters": "The longest still in the wizard is now this tick (LONGEST STILL 90.91 s on seed 0), which is the \"a wait never looks stopped\" rule (BL-1072) failing by construction; and a first tick 30-40x the others is a cost shape NR-915 (the tick tail) may already own.",
+      "options": [
+        "A: instrument tick 1 (which phase — the first clearing over cold pools? the first dispatch?) and file the finding under NR-915 / BL-1066's economy work",
+        "B: give the settle a per-tick progress tap so the bar moves and accept the cost",
+        "C: both"
+      ],
+      "recommendation": "C: the tap is cheap and honest; the cause is economy work for the economy lane, not this sprint.",
+      "files": [
+        "src/world/campaign_settle.cpp",
+        "src/world/finish_campaign_world.cpp"
+      ],
+      "resolution": "RULED (Ben, 2026-09-25, the sprint-47 close form): C, both -- a per-tick progress tap on the settle now (a sprint-47 task under BL-1085, Begin retired into round six), and tick 1 instrumented for the economy lane as BL-1117 (settle tick one cost)."
+    },
+    "NR-933": {
+      "id": "NR-933",
+      "title": "DECISION TAKEN: the purchase constants — rate 2000 per mille of the seller's chest, floor as measured — pinned at the first grid point where the purse, not the coast alone, decides",
+      "raised": "2026-09-24",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "BL-1096 lane W1 (purchase verb), exploration_sweep over the 16 curated seeds at rates 1000 / 2000 / 4000 per mille, 2026-09-24",
+      "what": "Measured bought/taken splits (bought/taken over the library): 1000‰ → 62/48, 2000‰ → the pinned point, 4000‰ → 36/74. At 1000 the coast alone decides (nearly everything coastal is bought); at 4000 few can afford it. 2000 was taken as the first point where the treasury discriminates. Digests moved on 2 of 16 library seeds (25, 38); exploration_sim_harness's R3b regression pin moved by exactly one purchase (+400 tribute) and is left failing for the sprint's single re-bless. A purchase recoups itself through tribute in ~7 rounds at 2000 (read, not hidden).",
+      "why_it_matters": "The number shapes how many colonies arrive at 1660 \"bought\" rather than \"taken\", which is what the round-5 map and the culture shares read.",
+      "options": [
+        "A: keep 2000‰ (taken)",
+        "B: 1000‰ (more purchases; the coast decides)",
+        "C: 4000‰ (purchases rare)"
+      ],
+      "recommendation": "A; re-measure with --set subjection_purchase_rate_q if Ben wants a different feel (~2.5 min a run).",
+      "files": [
+        "src/world/history_sim.hpp",
+        "tools/verify/exploration_sweep.cpp"
+      ],
+      "resolution": "CONFIRMED (Ben, the delegated-decision form, 2026-09-25): A, the purchase rate stays 2000 per mille."
+    },
+    "NR-934": {
+      "id": "NR-934",
+      "title": "OBSERVATION → CALL: the ruled band threshold discriminates nothing on the library — every curated seed reaches materials capacity 6 by 1200 CE, so all 16 derive industrial",
+      "raised": "2026-09-24",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1101 lane W2 (band from history), history_sweep over the 16 curated seeds, 2026-09-24",
+      "what": "The band derives per world as ruled (industrial iff a living polity's materials capacity reaches the industrial rung at the 1960 fold). On all 16 seeds the verdict is industrial, and the rung is already reached by 1200 CE on every one. The ancient-band campaign is reachable by the rule but not observed on the library; nothing was reshaped. Side finding: on seeds 0, 12 and 37 one living polity sits at the rung at the fold without a recorded industrial_year (at-rung exceeds ever-crossed by one) — the band is unaffected; the cause was not chased.",
+      "why_it_matters": "Ben asked for the reading before any threshold is fixed. A rule that always says industrial is honest but says nothing; whether that is fine, or the rung should be later (the Industry spire ring, or capacity at 1960 rather than \"ever\"), is his.",
+      "options": [
+        "A: fine — the band is the history's and the library is industrial; keep the rung",
+        "B: name a later rung (e.g. the Industry spire's second ring) so a quiet world can open ancient",
+        "C: keep the rung and add the per-nation grain through campaign tech (BL-1109) as planned"
+      ],
+      "recommendation": "A now, C as planned; B only if Ben wants ancient openings to exist on the shipped library.",
+      "files": [
+        "src/world/hard_coded_world.cpp",
+        "tools/verify/history_sweep.cpp"
+      ],
+      "resolution": "RULED (Ben, 2026-09-25, the sprint-47 close form): A, keep the rung -- the band is the history's and the library is industrial; per-nation grain comes through campaign tech as planned (BL-1109). No doc change: INDUSTRIALISATION.md already reads this way."
+    },
+    "NR-935": {
+      "id": "NR-935",
+      "title": "CALL: the tariff bands (300 / 500 / 700) were authored for the retired furnace scalar; under the derived posture the floor cuts the field near its median",
+      "raised": "2026-09-24",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1102 lane W3 (tariff posture derived), industrialisation_sim_harness over the 16 curated seeds, 2026-09-24",
+      "what": "With protection_q derived from scarcity, flows and preference at the close, the per-seed median posture sits 285-376 against law.hpp's tariff_bands 300/500/700: 61% of nations enact a tariff, 80% of the laws are the 5% band, the 20% band is reached on 3 of 16 worlds. The bands were deliberately not moved (the lane was told to measure, not tune). Every curated seed now writes laws, so all 16 --digest-check pins move at the re-bless. The derivation also runs at the Exploration close (gated on exploration_upkeep_enabled), so a world run with the Industrialisation span switched off would enact the 1660 posture — harmless on the shipped path.",
+      "why_it_matters": "Whether \"most nations tariff, almost all at 5%\" is the intended feel of the 1960 map is a design reading, not a constant.",
+      "options": [
+        "A: keep the bands; the reading is the map",
+        "B: re-author the bands against the new posture distribution (e.g. terciles of the library's postures)",
+        "C: keep the bands, raise the floor so only the protective third tariffs"
+      ],
+      "recommendation": "B, measured from the library's distribution, in the same re-bless.",
+      "files": [
+        "src/world/law.hpp",
+        "src/world/history_sim.cpp"
+      ],
+      "resolution": "RULED (Ben, 2026-09-25, the sprint-47 close form): A, keep the tariff bands 300 / 500 / 700 -- the reading is the map. No change; no second re-bless."
+    },
+    "NR-936": {
+      "id": "NR-936",
+      "title": "OBSERVATION: the wizard's Next press does not wait for the running round, so a fast player can have rounds 3-6 building at once",
+      "raised": "2026-09-24",
+      "kind": "observation",
+      "status": "resolved",
+      "source": "BL-1085 lane C and its cold review, 2026-09-24 (the autostart walk was made player-shaped in the fix round; the press itself was not gated)",
+      "what": "Next on a lapse round launches the next round's worker whether or not the current one has landed; four concurrent world builds plus the surface build is the peak memory now, the memory-pressure shape BL-1078 was filed on. Begin never starts a second build, so the adopt path is safe; the concern is the peak. BL-1084 (the world built once and moved) changes what each worker holds and is the natural place to decide whether Next waits.",
+      "why_it_matters": "A note for BL-1084's design, not a defect to fix in isolation.",
+      "options": [],
+      "recommendation": "Fold into BL-1084: with one world moved forward, round N+1 cannot start before round N lands anyway.",
+      "files": [
+        "src/ui/startup_screens.cpp"
+      ],
+      "resolution": "FOLDED (Ben, 2026-09-25, the sprint-47 close form): BL-1084 (world built once and moved) is carried to sprint 48 and this note rides with it -- with one world moved forward, round N+1 cannot start before round N lands. Recorded in BL-1084's design."
+    },
+    "NR-937": {
+      "id": "NR-937",
+      "title": "CALL: does a hard realm's COAST draw heavy too, and is 10% of people (off at 6%) the right pin for a hard border?",
+      "raised": "2026-09-25",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1090 lane I2 (hard borders by people share) and its cold review, 2026-09-25",
+      "what": "The pin was measured over the 16 curated seeds at every recorded Empires step (87,900 polity-steps): top people shares peak 8-17%; 20%+ bolds nothing anywhere, 15% one realm on one world, 10% bolds one to six realms on six of sixteen worlds at 1000 CE (46:1, 28:6, 40:2, 25:1, 38:3, 0:1) and none on the city-state worlds; hysteresis on at 10% / off at 6% (no observed single-step dip deeper than 3.9 points). The doc's \"any edge either side of which is hard\" is read literally, so a hard realm's coastline draws the 2 px dark + own-colour inner stroke as well as its land frontiers.",
+      "why_it_matters": "Both are what the player sees on round 4: how many realms read as great powers (a third of worlds show any; the median world shows none at 1000 CE), and whether a coastal empire's outline is heavy at sea.",
+      "options": [
+        "A: keep 10/6 and the heavy coast (built)",
+        "B: keep 10/6, heavy inter-realm edges only (one-line condition in each frontier pass)",
+        "C: a rarer pin (15%: one realm on one world) or a commoner one (7%) — the sweep column reports any candidate"
+      ],
+      "recommendation": "B: the coast is not a frontier, and the pin as measured is honest. Take at the live click with the crop.",
+      "files": [
+        "src/ui/history_lapse.hpp",
+        "src/ui/history_lapse.cpp",
+        "tools/verify/history_sweep.cpp"
+      ],
+      "resolution": "RULED (Ben, 2026-09-25, the sprint-47 close form): B, keep 10% on / 6% off and draw heavy on edges between two different realms only -- a coast is not a frontier. Written into STARTUP.md (a hard border is people share); the work is a sprint-47 task under BL-1090 (hard borders by people share)."
+    },
+    "NR-938": {
+      "id": "NR-938",
+      "title": "DECISION TAKEN: the pinned-slot clash rule is pinned-vs-pinned (the 2026-09-24 ruling said pinned-vs-fresh, a case the walk never produces)",
+      "raised": "2026-09-25",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "BL-1087 lane I1 fix round and its cold review, 2026-09-25",
+      "what": "The ruling (R7) said a pinned/fresh adjacency clash re-slots the smaller people-share realm. In the built walk a FRESH realm is coloured greedily AROUND the pins, so it cannot clash with one; the only clash the seam makes is two PINNED realms that never touched before and now neighbour — that is the case the code resolves (the smaller people share re-slots at the round's opening step; on the verify world 1 re-slot at each of the 1200 and 1660 seams). STARTUP.md § Identity across the rounds was reworded to say so with a dated note; the sentence is qualified: a fresh realm cannot clash except on a spill (the palette exhausted), where it shares a neighbour's slot and no re-slot happens.",
+      "why_it_matters": "An authority-doc sentence was changed by a lane on its own reading; Ben should know the rule he ruled is not the rule the walk needs, and confirm the pinned/pinned form.",
+      "options": [
+        "A: confirm pinned/pinned (as built and now written)",
+        "B: keep the ruling's wording and add a fresh-realm re-slot the walk does not need"
+      ],
+      "recommendation": "A.",
+      "files": [
+        "docs/ui/STARTUP.md",
+        "src/ui/history_lapse.cpp"
+      ],
+      "resolution": "CONFIRMED (Ben, the delegated-decision form, 2026-09-25): A, the clash rule is pinned-vs-pinned, as built and written."
+    },
+    "NR-939": {
+      "id": "NR-939",
+      "title": "CALL: the origin sentence's 'since <year>' reads the one record that spans the founding year, so a realm that held the region across the whole span reads 'since 1660 CE'",
+      "raised": "2026-09-25",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1099 lane F3 (the seat briefing's origin sentence, R22) and its review, 2026-09-25",
+      "what": "seat_origin_sentence reads the holder of the firm's origin region at its founding year off the record whose span holds that year (Industrialisation first, then Exploration, then Empires) and takes 'since' as the year of that record's last owner change of the region at or before the founding year. A region held from before the span opens has its first change AT the span's open, so the sentence reads 'the realm of X since 1660 CE' for most firms (the capture: 'Chartered from Guagua's industry, in Gesher Nehua, under Tuarthuage Thuathe, the realm of Gesher Nehua since 1660 CE'). The three records are separate resumes, but a polity id is ONE TABLE across them -- a resumed span inherits its realms by id and restates their seats as `inherited` rather than coining (CIVILISATION.md sec A realm's name; `hard_walk_record` and the slot inheritance rely on the same fact) -- so a walk back into the earlier records is well-defined; it is simply not what the sentence reads today. The realm is named by the record's coined `polity_name`, as the board and the ticker name it.",
+      "why_it_matters": "The sentence is 'the whole of the history the seat carries' (STARTUP.md § The seat); 'since 1660 CE' is the record's opening, not the realm's tenure, and a player who watched round 5 may know the realm took that ground earlier.",
+      "options": [
+        "A: accept as built -- 'since' is the year the record the sentence reads from first shows the holder (honest about the record, silent about earlier ones)",
+        "B: walk back into the earlier records while the same polity id holds the region at their close -- well-defined, since ids carry across the spans; two more slices per briefing, and 'since' then reads as tenure rather than as the record's opening",
+        "C: drop the year when it equals the record's opening: '...the realm of X' with no 'since'"
+      ],
+      "recommendation": "C at low cost, or A: both are honest about the record the sentence reads. B is the one that makes 'since' mean tenure; whether the sentence should claim tenure is the call.",
+      "files": [
+        "src/ui/seat_screen.cpp"
+      ],
+      "resolution": "RULED (Ben, 2026-09-25, the sprint-47 close form): B, walk back for true tenure -- while the same polity id holds the region at an earlier span's close, the origin sentence reads that record too, so \"since\" is the realm's tenure. Written into STARTUP.md (the seat); the work is a sprint-47 task under BL-1099 (works chartered events)."
+    },
+    "NR-940": {
+      "id": "NR-940",
+      "title": "CALL: the works-chartered notes cluster in the span's first century because the RUNNING price is tiny at the open -- is that the moment the round should show?",
+      "raised": "2026-09-25",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1099 lane F3, the 16-seed reading that pinned f = 2 (industrialisation_sim_harness --through 1960 --works-fractions ..., 2026-09-25)",
+      "what": "A note fires when a region's industry points cross the next multiple of f x the running price, the world's stock so far over the charter divisor (R15, self-consistent with the close's price per NR-907). At the span's open the world's stock is near zero, so the price is near zero and a region with any points crosses its four multiples in the first decades: on most seeds the notes run 1660 -> ~1760 (seed 28: 1660 -> 1760 at f = 1; the verify world: 27 of 40 charters dated 1660 -> 1716), and the seat briefing's origin year lands early in the span for nearly every firm. At the pinned f = 2 the library notes 3233 works and dates 894 of 1297 charters; the four-per-region cap is what binds thereafter, not the price.",
+      "why_it_matters": "The round is meant to show WHEN the capital that charters a firm was built; a close of works flashing in the 1660s reads as the age's dawn rather than its industrial century, and the briefing's 'since 1660 CE' / early founding years follow from it.",
+      "options": [
+        "A: accept -- the early crossings are the honest reading of a price that grows with the stock (built)",
+        "B: floor the running price at a fraction of the CLOSE's price (needs the 1960 stock, which NR-907 ruled out applying backwards) -- not available without a second pass",
+        "C: read the region's points against ITS OWN running share (the region's k-th multiple of f x the world's mean stock per region so far), which spreads the crossings across the span; a different rule, Ben's to choose",
+        "D: keep the rule and space the notes: at most one note per region per N years (a rate on top of the cap), so the k-th note lands later without changing what it measures"
+      ],
+      "recommendation": "A for this sprint; D is the smallest change if the dawn-cluster reads wrong at the live click.",
+      "files": [
+        "src/world/history_sim.hpp",
+        "src/world/history_sim.cpp",
+        "tools/verify/industrialisation_sim_harness.cpp"
+      ],
+      "resolution": "RULED (Ben, 2026-09-25, the sprint-47 close form): A, accept -- the early crossings are the honest reading of a running price that grows with the stock. No change."
+    },
+    "NR-941": {
+      "id": "NR-941",
+      "title": "CALL: the origin sentence doubles its name once the nation carries its realm's -- 'under Guashe These, the realm of Guashe These since 1660 CE'",
+      "raised": "2026-09-25",
+      "kind": "question",
+      "status": "resolved",
+      "source": "main session, the F3 merge (BL-1099 origin sentence composed with BL-1088/BL-1089 name inheritance), seat_pick.lua seat_02_briefing.png on the verify world",
+      "what": "R22's form is 'under <nation>, the realm of <X> since <year>', where X is the realm the Empires/Exploration/Industrialisation record shows holding the firm's region in its founding year (owner_slice_at). Since BL-1089 every nation with a founding realm carries that realm's coined name verbatim (38 of 38 on seed 0), and a firm is nearly always chartered on ground its own nation's realm held in 1660, so the two names coincide: the capture reads 'under Guashe These, the realm of Guashe These since 1660 CE'. The clause only earns its place when the holder in the founding year is NOT the realm the nation grew from (ground absorbed since; a purchase; a colony's overlord), which is the minority case.",
+      "why_it_matters": "The sentence is the one origin line the briefing carries (R22) and Ben's live click on BL-1099 R5 will read it; the doubled form reads as a bug rather than a fact. The information is still right -- the realm the nation is and the realm that held the ground agree -- it is the wording that has no branch for agreement.",
+      "options": [
+        "A: collapse on agreement -- when the founding realm's name equals the nation's, write 'under Guashe These, its own realm since 1660 CE'; keep the full form when they differ (one branch in seat_screen.cpp's origin sentence, STARTUP.md's quoted form gains the second reading)",
+        "B: keep R22's form verbatim -- the repetition is the fact stated twice and the live click decides",
+        "C: drop the nation clause when the names agree -- 'in Gesher Nehua, the realm of Guashe These since 1660 CE' (shorter, but loses the word 'under' that says whose law you trade beneath, which the line above already states)"
+      ],
+      "recommendation": "A -- the honest sentence in both cases, one branch, no field. Not applied without the call because the form is Ben's ruling (R22, STARTUP.md § The seat).",
+      "files": [
+        "src/ui/seat_screen.cpp",
+        "docs/ui/STARTUP.md",
+        "docs/development/drafts/sprint-47-rulings.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-25, the sprint-47 close form): A, collapse on agreement -- \"under <nation>, its own realm since <year>\" when the holder is the realm the nation grew from; the full form otherwise. Written into STARTUP.md (the seat); the work is a sprint-47 task under BL-1099 (works chartered events), before the live click on its R5."
+    },
+    "NR-942": {
+      "id": "NR-942",
+      "title": "CALL: the kin arrow's dash threshold -- two interior water tiles, any graze, or the corridor majority rule",
+      "raised": "2026-09-25",
+      "kind": "question",
+      "status": "resolved",
+      "source": "lane F1 fix round (BL-1092 routes and splits on the map), cold review [low] on history_lapse.hpp's lapse_kin_seg comment: the header cited lapse_corridor_over_water for the dash while the kin bake (finish_history_lapse's crosses_water lambda) dashes from two interior water tiles by its own per-tile sampler; the constant is now named k_kin_dash_water_tiles",
+      "what": "COLONISATION.md sec The route record says a kin arrow is 'dashed where the line between the two anchors crosses water'. Three readings of 'crosses' were measured on the same tree, 2026-09-25, on library seed 13 (249 arrows) and seed 0: the road bake's majority rule (lapse_corridor_over_water, eight samples, more than half water) dashes 0 of 249; any single sampled water tile dashes 193 of 249; two interior water tiles (the rule shipped, k_kin_dash_water_tiles = 2) dashes 58 of 249. Seed 0 reads 0 dashed under every rule. The shipped rule was picked in-lane because a crude hop is a bounded crossing of up to three tiles (colonisation_max_hop_tiles) while a coast-hugging people's consecutive foundings graze a bay by one tile almost every time, so any-graze drowned the hops and the majority rule found none; it is a constant nobody ruled on.",
+      "why_it_matters": "The dash is the one mark the round-3 map makes of a sea hop, and the threshold decides whether the migration's water-crossings read as 58 arrows, 193, or none. The doc's wording is honest about grain under any of the three; which one it MEANS is a design call, and the constant is named so the call is a one-line change.",
+      "options": [
+        "A: keep two interior tiles (k_kin_dash_water_tiles = 2) -- 58 of 249 on seed 13; a graze is not a crossing, a strait is",
+        "B: any interior water tile -- 193 of 249 on seed 13; every wet founding dashed, the hops indistinguishable from the bay-grazes",
+        "C: the corridor's majority rule (lapse_corridor_over_water) -- 0 of 249 on seed 13; one sampler for roads and kin, and no hop ever dashes at region grain",
+        "D: tie the threshold to colonisation_max_hop_tiles rather than a bare 2 -- the hop's own bound as the dash's, so the two move together"
+      ],
+      "recommendation": "A, as shipped -- the only reading of the three under which the hops are visible and the grazes are not; D is the principled form of A if the hop bound ever moves. Not applied beyond naming the constant: the threshold is the design's word 'crosses', which is Ben's.",
+      "files": [
+        "src/ui/history_lapse.cpp",
+        "src/ui/history_lapse.hpp",
+        "docs/generation/COLONISATION.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-25, the sprint-47 close form): A, keep two interior water tiles (k_kin_dash_water_tiles = 2) -- a strait is a crossing, a graze is not. Written into COLONISATION.md (the route record). No code change."
+    },
+    "NR-943": {
+      "id": "NR-943",
+      "title": "CALL: should the shipped-path validators range-check every civilisation and creed index at the 1200 and 1660 crossings, now that BL-1049 closed the gap?",
+      "raised": "2026-09-25",
+      "kind": "question",
+      "status": "resolved",
+      "source": "lane BL-1049's report and its cold review (2026-09-25): pass_one_output_valid does not range-check the two new tables, and the 1200 path calls make_exploration_output without a `from`, so the prefix check that guards the 1660 crossing never runs at 1200; the fidelity harness is the only check on the 1200 crossing",
+      "what": "The harness gate (industrialisation_sim_harness --fidelity, the BL-1049 section) now fails on any index past the table, any pair recorded twice, or a carried prefix short of the 1200 table, on 16/16 library seeds. The shipped path itself would still accept a regressed resume silently: a region::civilisation or universal_creed index at or past its table resolves to nothing and nothing crashes. Adding the >= size checks to pass_one_output_valid (1200) and exploration_output_valid (1660), as record_handoff_violation, is one loop each -- but exploration_sim_harness builds hand-made exploration_output values whose tables may be empty, so those fixtures would need their tables filled or the check made conditional on a non-empty table.",
+      "why_it_matters": "A validator on the shipped path catches the regression on every run of the app; the harness catches it only when someone runs --fidelity. BL-1036 chose harness-only parity at 1660; BL-1049 kept that parity rather than widen.",
+      "options": [
+        "A: keep harness-only parity (as shipped)",
+        "B: add the range checks to both validators, conditional on a non-empty table, and fill the exploration_sim_harness fixtures' tables (one small item)",
+        "C: add the checks unconditionally and rewrite the fixtures"
+      ],
+      "recommendation": "B, as a small Light item when convenient; not urgent while --fidelity is in the merge gates.",
+      "files": [
+        "src/world/history_sim.cpp",
+        "tools/verify/exploration_sim_harness.cpp"
+      ],
+      "resolution": "RULED (Ben, 2026-09-25, the sprint-47 close form): B, range-check the civilisation and creed indices in both validators, conditional on a non-empty table, and fill the exploration_sim_harness fixtures' tables. The work is BL-1116 (handoff validators range-check), Light."
+    },
+    "NR-944": {
+      "id": "NR-944",
+      "title": "CALL: a nation with no town and no spurring village now gets no border link at all - off the continental network. Accept, fall back, or read after centres consolidate?",
+      "raised": "2026-09-25",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1119 (roads tree and detour) round 2, 2026-09-25, following Ben's density-form ruling that a border link ends only on a town or a spurring village",
+      "what": "The ruling removed every border link that ended on a bare village street (seed 46: 106 -> 0; seed 28: 26 -> 0). But a nation pair where one side has NO centre on its network now lays no link at all: 49 of 174 pairs on seed 46, 13 of 48 on seed 28, 30 of 94 on seed 0. Such a nation is off the continental network entirely; earlier road work (every centre gets a street, the border link) existed to keep every nation connected. Border links fell 151 -> 118 (seed 46), 46 -> 33 (seed 28), 91 -> 62 (seed 0). UPDATED 2026-09-25 after round 3 (on the network now means a road that reaches a town; 25-40% of villages the pass had called on-network never did): pairs with no network endpoint seed 0 30 -> 37 of 94, seed 28 13 of 48, seed 46 49 -> 83 of 174; border links laid seed 0 62 -> 55, seed 46 118 -> 83. A nation with no town now has no road network at all, so no border link.",
+      "why_it_matters": "A nation with no link cannot be reached by road across the border: its trade and any march into or out of it price as off-road. BL-1130 (centres consolidate) merges villages into towns this sprint, which should give many of these nations a town and so a network endpoint.",
+      "options": [
+        "A: accept - a nation with nothing on its network lays no border road",
+        "B: fall back - such a nation links from its largest centre even if it is a bare street, so every nation stays connected",
+        "C: read after BL-1130 lands, then choose between A and B on the consolidated worlds"
+      ],
+      "recommendation": "C, leaning B: the ruling was about links that join nothing, and a nation left wholly off the network is the opposite case.",
+      "files": [
+        "src/world/road_generation.cpp",
+        "docs/economy/LOGISTICS.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-25, the open-calls form): C, read after BL-1130 (centres consolidate) and its follow-ons land, leaning B (a nation with nothing on its network links from its largest centre). The reading and the fallback are BL-1119 (roads tree and detour) follow-up work."
+    },
+    "NR-945": {
+      "id": "NR-945",
+      "title": "DECISION TAKEN: only a road that can be laid enters the roads tree and the detour test, so a nation the sea divides builds one tree per landmass",
+      "raised": "2026-09-25",
+      "kind": "decision",
+      "status": "resolved",
+      "source": "BL-1119 (roads tree and detour) cold review, 2026-09-25, finding 1",
+      "what": "The tree and the detour test took every town pair the path flood could reach, and that flood crosses water at the sea-leg cost. Road rasterisation then refuses any open-ocean route. So a tree link across a bay was never laid (stranding a town from its nation's road), and an admitted sea loop sat in the test network refusing real land loops near it. Taken on your behalf: a route that crosses open sea (other than a strait) is not a road candidate at all -- it never enters the Kruskal tree or the detour test, so a nation the sea divides builds one tree per landmass. Also written down: the detour test reads the town graph (cheapest chain of accepted links, each at its own direct cost), not the raster. LOGISTICS.md § 4 states both.",
+      "why_it_matters": "It changes which links form a divided nation's tree, so it moves the road digests (inside the sprint's one re-bless). The alternative keeps sea pairs in the tree and accepts stranded towns.",
+      "options": [
+        "A: keep the reading (layable links only; one tree per landmass)",
+        "B: keep sea pairs as candidates but skip them in the detour test only",
+        "C: something else"
+      ],
+      "recommendation": "A: a road that cannot be built should not decide which roads are built.",
+      "files": [
+        "src/world/road_generation.cpp",
+        "docs/economy/LOGISTICS.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-25, the open-calls form): A, keep -- only a layable link enters the tree; a sea-divided nation builds one tree per landmass. LOGISTICS.md § 4 states it."
+    },
+    "NR-946": {
+      "id": "NR-946",
+      "title": "DECISION TAKEN: \"province anchors reuse a centre\" is read as a centre-less province joining its nearest neighbouring province of the same nation",
+      "raised": "2026-09-25",
+      "kind": "decision",
+      "status": "resolved",
+      "source": "Ben's open-calls form, 2026-09-25 (BL-1133, anchors reuse a centre)",
+      "what": "A centre already stands in exactly one province, so a province without one cannot \"take\" another's. Taken on your behalf: a centre-less land province JOINS the adjacent province of its own nation whose centre is nearest, and the merged province's centre anchors it; a scale-1 founding happens only where no such neighbour exists. POPULATION.md § Generation states it; PROVINCES.md § The partition owns the merge.",
+      "why_it_matters": "It lowers the province count as well as the centre count, so conquest units get larger in thinly settled country.",
+      "options": [
+        "A: keep the reading (join the nearest neighbouring province)",
+        "B: keep provinces, and anchor the empty one on the nearest centre across its border (a province anchored outside itself)",
+        "C: other"
+      ],
+      "recommendation": "A: a province is the ground a centre can hold; one with nothing to hold it is hinterland of its neighbour.",
+      "files": [
+        "src/world/population_generation.cpp",
+        "docs/economy/POPULATION.md",
+        "docs/generation/PROVINCES.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-25, the centres-and-routes form): A, keep -- a centre-less province joins its nearest neighbouring province of the same nation. BL-1133 builds it. SUPERSEDED (Ben, 2026-09-26, the province form): a province is its centre's ground -- the fill covers the land, so no centre-less province is left to join; the join branch (232cf4db) is not merged."
+    },
+    "NR-947": {
+      "id": "NR-947",
+      "title": "DECISION TAKEN + CALL: the threshold below which a shrinking centre is abandoned is a village's worth; and does play follow the history?",
+      "raised": "2026-09-25",
+      "kind": "decision",
+      "status": "resolved",
+      "source": "Ben, 2026-09-25: \"Let's supersede that POPULATION.md rule, we can destroy shrinking centres below a threshold\"",
+      "what": "Taken on your behalf: the threshold is the smallest rung, a village's worth -- the size hierarchy (BL-1130) already sizes a region's centres from its heads with the smallest a village's worth, so a centre whose share falls below it is abandoned, no new number. Written for the HISTORY (POPULATION.md § Generation). OPEN: play keeps \"passive failure never destroys a centre\" (§ Growth, decline and razing), because a centre is its province's capture anchor and razing is a tier, not an erasure; superseding it in play too would need an anchor hand-off.",
+      "why_it_matters": "The history rule is what thins the generated map (with BL-1137, industrial urbanisation). The play rule decides whether a campaign's villages can empty and vanish too.",
+      "options": [
+        "A: keep both readings (village threshold; history only, play unchanged)",
+        "B: village threshold, and play follows (with an anchor hand-off to the nearest centre)",
+        "C: a different threshold (say which)"
+      ],
+      "recommendation": "A for this sprint; B is its own item if wanted.",
+      "files": [
+        "docs/economy/POPULATION.md",
+        "src/world/history_sim.cpp"
+      ],
+      "resolution": "RULED (Ben, 2026-09-25, the centres-and-routes form): the threshold stays a village's worth, AND play follows too (he picked both \"history only\" and \"play follows too\"; read together: the village threshold, applied in play as well). The play half is BL-1139 (centres abandoned in play), with the anchor hand-off read as the razed tier (NR-948)."
+    },
+    "NR-948": {
+      "id": "NR-948",
+      "title": "DECISION TAKEN: in play an abandoned centre drops to the razed tier (a ruin that keeps its province anchor) rather than vanishing",
+      "raised": "2026-09-25",
+      "kind": "decision",
+      "status": "resolved",
+      "source": "Ben's centres-and-routes form, 2026-09-25",
+      "what": "Play follows the history's abandonment rule (NR-947). But a centre is its province's capture anchor, and razing is already a tier, not an erasure. Taken on your behalf: a centre whose population falls below a village's worth in play drops to the razed tier (population zero, no labour or demand, entity/name/tile/urban ground persist, cheap to re-settle), so no province loses its anchor. POPULATION.md § Growth, decline and razing states it.",
+      "why_it_matters": "The alternative -- deleting the centre and handing the province to a neighbour at runtime -- changes ownership and conquest mid-campaign.",
+      "options": [
+        "A: keep (abandoned = razed tier)",
+        "B: delete the centre and merge its province into its nearest neighbour at runtime",
+        "C: other"
+      ],
+      "recommendation": "A.",
+      "files": [
+        "docs/economy/POPULATION.md"
+      ],
+      "resolution": "OVERTURNED (Ben, 2026-09-26, the review form): B -- in play an abandoned centre is DELETED and its province merges into the adjacent province of its own nation whose centre is nearest (the NR-946 join, at runtime). A province with no such neighbour falls back to the razed tier so it keeps an anchor (NR-952, a delegated fallback). POPULATION.md § Growth, decline and razing states it; BL-1139 builds it."
+    },
+    "NR-949": {
+      "id": "NR-949",
+      "title": "DECISION TAKEN: ocean currents follow each latitude band's prevailing wind and turn along the coasts, so a basin circulates",
+      "raised": "2026-09-25",
+      "kind": "decision",
+      "status": "resolved",
+      "source": "Ben's centres-and-routes form, 2026-09-25",
+      "what": "Ben ruled currents are built this sprint and shape the lanes (BL-1120). The generation was open. Taken on your behalf: each ocean region's current follows its latitude band's prevailing wind (easterly in the tropics, westerly in the mid-latitudes, its sense set by the body's rotation) and is turned along the coasts the continents present; a leg with its current costs less, against it more, by one measured weight. Real ocean circulation is the mechanism reference, never a name source. EXPLORATION.md § Currents states it.",
+      "why_it_matters": "It decides where every lane bends and how far trade across water reaches.",
+      "options": [
+        "A: keep the wind-band-and-coast reading",
+        "B: a simpler field (one prevailing current per hemisphere)",
+        "C: other"
+      ],
+      "recommendation": "A: it gives basins that circulate, which is what makes a return route differ from the outbound.",
+      "files": [
+        "docs/generation/EXPLORATION.md",
+        "src/world/history_sim.cpp"
+      ],
+      "resolution": "RULED (Ben, 2026-09-26, the review form): A, keep the wind-band-and-coast field (built, BL-1120 stage 1, weight 500)."
+    },
+    "NR-950": {
+      "id": "NR-950",
+      "title": "DECISION TAKEN: the market trunk links each market centre to its nearest neighbouring market centres, at Road tier",
+      "raised": "2026-09-25",
+      "kind": "decision",
+      "status": "resolved",
+      "source": "Ben's centres-and-routes form, 2026-09-25",
+      "what": "Ben ruled roads pull toward market centres and bridge across markets (BL-1138). The trunk's shape was open. Taken on your behalf: each market centre is joined to its nearest neighbouring market centres by traversal cost (a Delaunay-like neighbour set, never all pairs), over a border where the neighbour lies across one, laid at Road tier; the detour test still refuses a trunk link a serviceable route already gives. LOGISTICS.md § 4 states it.",
+      "why_it_matters": "It decides how connected the world's markets are by road and so how far a large trade reaches.",
+      "options": [
+        "A: keep (nearest neighbours, Road tier)",
+        "B: a spanning tree over market centres only (fewer links)",
+        "C: Highway tier for the trunk"
+      ],
+      "recommendation": "A.",
+      "files": [
+        "docs/economy/LOGISTICS.md",
+        "src/world/road_generation.cpp"
+      ],
+      "resolution": "RULED (Ben, 2026-09-26, the review form): A, keep -- the market trunk links each market centre to its nearest neighbouring market centres at Road tier. BL-1138 builds it after the market folds."
+    },
+    "NR-951": {
+      "id": "NR-951",
+      "title": "DECISION TAKEN: a centre's urban footprint stops at its region's cell edge, and \"no land\" means no ground a centre can stand on",
+      "raised": "2026-09-26",
+      "kind": "decision",
+      "status": "resolved",
+      "source": "BL-1130 (centres consolidate) cold review, 2026-09-26",
+      "what": "Two readings taken on your behalf to make your rulings hold as written. (1) The sim sizes a region's centres by its own hierarchy, but the carve gives them body-wide rank-size scales and paves their footprints from those, so a large region could pave its neighbours' cells. Reading: a footprint is cut short at its own region's cell edge, exactly as it already is at a coast; scales unchanged. (2) A region whose cell has land but no tile a centre can stand on kept centres in the sim and earned industry points the carve could never spend. Reading: your water ruling (\"a cell that holds no land carries no centre\") counts ground a centre can stand on, so such a region carries none and earns nothing. POPULATION.md states both.",
+      "why_it_matters": "(1) keeps \"footprints fit inside the region's own cell\" true by construction; (2) stops industry points vanishing into regions with nowhere to stand a centre.",
+      "options": [
+        "A: keep both readings",
+        "B: for (1), size the carve's centres by each region's own hierarchy instead (overturns the body-wide rank-size)",
+        "C: other"
+      ],
+      "recommendation": "A: both are the smallest change that makes the ruled rules true.",
+      "files": [
+        "docs/economy/POPULATION.md",
+        "src/world/population_generation.cpp",
+        "src/world/settlement.cpp"
+      ],
+      "resolution": "RULED (Ben, 2026-09-26, the review form): A, keep both -- a footprint stops at its region's cell edge, and \"no land\" means no ground a centre can stand on."
+    },
+    "NR-952": {
+      "id": "NR-952",
+      "title": "DECISION TAKEN: a province whose abandoned centre has no same-nation neighbour to merge into keeps it as a ruin (the razed tier)",
+      "raised": "2026-09-26",
+      "kind": "decision",
+      "status": "resolved",
+      "source": "Ben's review form, 2026-09-26 (NR-948 overturned to delete-and-merge)",
+      "what": "Ben ruled that in play an abandoned centre is deleted and its province merges into its nearest neighbouring province of the same nation. A province with no such neighbour (an island province, or the last province of a nation) would then have no capture anchor, which breaks the conquest unit. Taken on your behalf: only in that case the centre stays as a ruin at the razed tier.",
+      "why_it_matters": "It keeps every province takeable; the alternatives are merging across a national border (an ownership change no one decided) or deleting a nation's last province.",
+      "options": [
+        "A: keep the ruin fallback",
+        "B: merge into the nearest province of any nation (ownership passes)",
+        "C: other"
+      ],
+      "recommendation": "A.",
+      "files": [
+        "docs/economy/POPULATION.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-27, the open calls form): OTHER: \"No ruins, record province ids using another method.\" No ruin fallback: a province with no same-nation neighbour loses its centre and stands without one, held by its recorded holder (province_holder, which battles already move) and taken by a battle decided on it. READING TAKEN (say if meant otherwise): 'another method' = a province's id is recorded for its life once generation ends, instead of derived from its lowest member tile, so the runtime merge and a lost centre renumber nothing a battle, march order or save holds (province.hpp ~388-392 assumes borders move in generation only). The razed tier (BL-624) stays for deliberate razing. Written into POPULATION.md and PROVINCES.md; BL-1139 (abandonment in play) carries the work.",
+      "resolved": "2026-09-27"
+    },
+    "NR-953": {
+      "id": "NR-953",
+      "title": "DECISION TAKEN: with the budget gone, a centre's scale weights its reach, so a metropolis still draws the larger province",
+      "raised": "2026-09-26",
+      "kind": "decision",
+      "status": "resolved",
+      "source": "Ben's province form, 2026-09-26 (A: a province is its centre's ground)",
+      "what": "The partition grew each centre by a budget of 7 tiles (village) to 12 (metropolis); ruling A removes the stop, so the budget can no longer carry \"a metropolis draws a larger province than a village does\" (PROVINCES.md ruling 1). Taken on your behalf: the centre's scale divides its step cost in the multi-source fill (a weighted fill), so bigger centres claim more ground before competition meets them.",
+      "why_it_matters": "Without a weight, every province would be a plain nearest-centre cell and a metropolis would hold no more ground than a village beside it.",
+      "options": [
+        "A: keep the scale weight on reach",
+        "B: an unweighted fill (plain nearest-centre cells)",
+        "C: other"
+      ],
+      "recommendation": "A.",
+      "files": [
+        "docs/generation/PROVINCES.md",
+        "src/world/province.cpp"
+      ],
+      "resolution": "RULED (Ben, 2026-09-27, the open calls form): A, keep: a centre's scale divides its step cost, so a metropolis draws the larger province.",
+      "resolved": "2026-09-27"
+    },
+    "NR-954": {
+      "id": "NR-954",
+      "title": "CALL: three consequences of \"a province is its centre's ground\" (hemmed villages absorbed; anchors kept by the settled-ground lock; giant provinces)",
+      "raised": "2026-09-26",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1133 as merged (5cab560b), 2026-09-26",
+      "what": "Merged: provinces 45,199 -> 30,894 pooled, anchor foundings 20,505 -> 6,856, every province invariant green. Three consequences. (1) 21,457 seed centres (47%) end on their own tile, hemmed by a larger neighbour's reach, and singleton absorption (the 2026-08-21 ruling) folds each into its cheapest neighbour, so provinces = centres holds with that counted exception. (2) 3,753 of the 6,856 remaining anchor villages exist only because the settlement lock (BL-849) stops the fill crossing from settled into never-settled ground. (3) Provinces now reach 1,315 tiles (a lone village over lightly settled land); p90 stays 7-13. COLD REVIEW CAUTION (2026-09-26): centre_census C8 buckets anchor-only provinces (the uncentred leftovers) as villages, so (3)'s 1,315-tile 'lone village' may be leftover ground, not a village's draw; read C7b's anchor-only maximum before ruling on option C (the fix is BL-1145). PROVINCES.md now says a world has at most as many provinces as centres, with the hemmed ones counted.",
+      "why_it_matters": "(2) is the remaining gap to a world without villages founded on empty ground; (3) decides whether a province can be a continent-sized conquest unit.",
+      "options": [
+        "A: keep all three as built",
+        "B: let the fill cross the settled line (relaxes BL-849; removes most of (2))",
+        "C: bound a province's size again on sparsely settled land (a cap that splits a giant into anchored pieces)",
+        "D: other"
+      ],
+      "recommendation": "A for (1); read (2) and (3) again after BL-1137 (industrial urbanisation) and BL-1132 (settle spacing) land, since both change what is settled and how many centres stand.",
+      "files": [
+        "src/world/province.cpp",
+        "docs/generation/PROVINCES.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-27, the density calls form): B -- a centre's fill crosses the settled line (the settlement lock, BL-849, retires on land), so never-settled ground joins the province of the centre that reaches it; measured before it is built. Written into PROVINCES.md; BL-1150 (province fill crosses the settled line) builds it. Parts (1) hemmed villages and (3) giant provinces were not asked: (1) stands as built, and (3) is read in BL-1150's report, since crossing the line grows provinces.",
+      "resolved": "2026-09-27"
+    },
+    "NR-955": {
+      "id": "NR-955",
+      "title": "DECISION TAKEN + CALL: how a sea lane is laid (ports, direction), and whether a lane should compete with land",
+      "raised": "2026-09-26",
+      "kind": "decision",
+      "status": "resolved",
+      "source": "BL-1098 (the sea-lane tier stamped), merged 7238f8ef, 2026-09-26",
+      "what": "Taken on your behalf by the lane: a seat's port is its nearest sea tile within nine tiles (the sim's neighbour radius); the walk runs toward the busier end (the lane record carries no direction), as the old-road stamp does; a laned sea tile costs x0.50. Two consequences: (1) 41 of 137 earned lanes (30%) are not laid because a seat has no sea within nine tiles; (2) a laned sea tile (2.5 -> 1.25) is still dearer than plains (1.0) or a road (0.5-0.67), so a lane carries traffic only between landmasses, never along a coast a road already serves. The market junction degree was not extended with lanes (it would add markets at lane ports). LOGISTICS.md § 4b states the rules. COLD REVIEW (2026-09-26): the walk was eight-way while every traversal reader is four-way, so a diagonal lane had no two laned tiles side by side and realised about x0.75 (a leg (10,10) -> (20,20): 37.5 against 50 unlaned), not x0.50. The walk is being made four-way in the sea lane, and LOGISTICS.md § 4b says so; after it, part (2)'s 1.25 a tile holds on every bearing. ALSO FOUND: a seat's port is picked north-then-west, never toward its partner, so a seat on an isthmus can send its lane through the wrong ocean (option E); B alone does not fix it.",
+      "why_it_matters": "Your vision is lanes as the routes of inter-continental trade; (1) drops a third of them and (2) decides whether the sea ever beats the road.",
+      "options": [
+        "A: keep all as built",
+        "B: a realm's port is its nearest coastal region's seat (lays the lost 30%)",
+        "C: B, and a deeper lane discount so a lane can beat a coastal road (sea was the faster medium: ~130 km/day against ~25)",
+        "E: a seat's port is its sea tile nearest its partner's (combines with B or C)",
+        "D: other"
+      ],
+      "recommendation": "B and E now; C read against the haulage baseline before it is set.",
+      "files": [
+        "src/world/road_generation.cpp",
+        "src/world/logistics.cpp",
+        "docs/economy/LOGISTICS.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-27, the open calls form): B: a realm's port is its nearest coastal region's seat, so a seat with no sea within nine tiles lays its lane from the nearest coastal seat of its realm. E (the port faces the partner) was not taken, so an isthmus seat may still face the far ocean; C (a deeper discount) not taken. Written into LOGISTICS.md § 4b; BL-1153 (lane port at a coastal seat) builds it.",
+      "resolved": "2026-09-27"
+    },
+    "NR-956": {
+      "id": "NR-956",
+      "title": "DECISION TAKEN: a scheduled founding keeps its ground, and every region counts for the spacing",
+      "raised": "2026-09-26",
+      "kind": "decision",
+      "status": "resolved",
+      "source": "BL-1132 (settle spacing) cold review, 2026-09-26; merged 89d3bb4b",
+      "what": "The review found the three-tile rule bound only Settle. A founding the migration stream schedules (pending, dated -400 to 0 CE) could arrive 0-1 tiles from a Settle daughter founded in the same years. Taken on your behalf: a pending founding keeps its ground, so Settle refuses any tile within three tiles of it (option a). The other option was to test the spacing when a scheduled founding arrives and drop or defer it (option b), which changes the migration playback. Also taken: the spacing counts every region, held or not, because each still anchors a cell (the doc said \"standing\"). CIVILISATION.md states both. The fix is in the spacing lane, with a census count of too-close pairs that must read 0.",
+      "why_it_matters": "Option a reserves ground for the migration stream over the realms; option b lets realms take it first and thins the stream.",
+      "options": [
+        "A: keep as taken (pending ground reserved; every region counts)",
+        "B: test at arrival and drop or defer a blocked scheduled founding",
+        "C: other"
+      ],
+      "recommendation": "A: it honours the rule without changing the migration playback.",
+      "files": [
+        "src/world/history_sim.cpp",
+        "docs/generation/CIVILISATION.md",
+        "tools/verify/centre_census.cpp"
+      ],
+      "resolution": "RULED (Ben, 2026-09-27, the open calls form): A, keep: a pending founding keeps its ground, and every region counts for the spacing.",
+      "resolved": "2026-09-27"
+    },
+    "NR-957": {
+      "id": "NR-957",
+      "title": "CALL: what the carve counts as a competitor on a budget world (planned firms, specialists, or both), and at what scale",
+      "raised": "2026-09-26",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1086 (the carve counts the budget's planned firms), merged 15da1bd2, 2026-09-26",
+      "what": "You ruled the carve reads the budget's planned firms (MARKETS.md). As built, it counts each centre's specialist as well as its whole firms, since both are corporations the budget buys, so the doc and code disagree. The scale changed too: the carve used to count at most 8 laid corporations a world; it now counts 147-313 planned charters (specialists alone would be 22-88), under the same gain (0.15). On the spaced world (after BL-1132) this moves markets 5,784 -> 5,800 (+0.3%, every seed within 3%); before the spacing, the same change swung seeds +62% (seed 28) to -35% (seed 40). The winner keeps its candidate on 13 of 16 seeds. COLD REVIEW (2026-09-26): the plan also counts firms above the walk's ceiling (120 a body, spent richest first), so on a world planning more than 120 on a body the carve counts firms never chartered, and inflates exactly the poorer nations the walk starves. The lane is making the plan honour the ceiling and will report planned against chartered per nation; read that before ruling. THE PLAN NOW HONOURS THE CEILING (fix round, merged b92165e4): all 16 seeds plan exactly 120 firms a body; chartered 806 specialists + 1,721 firms against planned 861 + 1,920 (shortfall is placements that find no ground; seed 28 places 59 of 84 planned specialists). Markets 5,800 -> 5,803. So option A (firms only) counts 120 a world, B (both) 142-208.",
+      "why_it_matters": "The market folds (BL-1125) are calibrated next on this carve; its input should be settled first. The small move now may be luck of the spaced world, given the swings before it.",
+      "options": [
+        "A: planned firms only, as the doc says; the gain unchanged",
+        "B: firms and specialists, as built; the doc widened to say so",
+        "C: specialists only (22-88 a world, nearest the old scale)",
+        "D: re-tune the gain for the new scale (measured, never to a count)"
+      ],
+      "recommendation": "A: the doc as ruled, gain unchanged until the folds are calibrated; D only if the folds' reading shows the count dominating.",
+      "files": [
+        "src/world/corporation_generation.cpp",
+        "src/world/hard_coded_world.cpp",
+        "docs/economy/MARKETS.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-27, the density calls form): B -- the carve counts the budget's planned firms AND specialists (142-208 a world), as built; MARKETS.md widened to say so. No code change; BL-1086 stands.",
+      "resolved": "2026-09-27"
+    },
+    "NR-958": {
+      "id": "NR-958",
+      "title": "DECISION TAKEN: a migrant carries its food with it, and a sack never lowers a region's ceiling (BL-1137 reverted and rebuilt)",
+      "raised": "2026-09-26",
+      "kind": "decision",
+      "status": "resolved",
+      "source": "BL-1137 (industrial urbanisation) cold review, 2026-09-26; merged b591d1e9, reverted 8cbdbc9d",
+      "what": "The first build of the urbanisation stream raised each destination's carrying capacity by every migrant it took while the source kept its own, so every move created capacity and the emptied countryside regrew by births: population 6.08B -> 10.92B pooled, urban share ~15% -> 70-72%, and centres fell only 3% (carved 7%). A sack then cut a city's industrial heads, the ceiling fell with them, and the next year deleted about 40% of the city with no record. Both break the docs: the displacement row (the count is conserved), Beat 2 (the countryside empties, far fewer centres) and BL-835 (war does not consume people). I reverted it on main and took two readings for the rebuild: (1) a migrant carries its food with it -- whatever ceiling a destination gains, its source loses, so a move conserves the world's carrying capacity and an emptied village cannot regrow; (2) a sack never lowers a ceiling -- a sacked city's people scatter into its countryside. Also: a razing is counted in heads lost, uncapped (a sacked 10M city recorded none).",
+      "why_it_matters": "The alternative reading is that industry raises what the land can feed (a real historical effect), which would be a new mechanism with no doc and a population near double; the conserving reading is what makes the stream thin the map to your ~500 aim.",
+      "options": [
+        "A: keep as taken (the move conserves capacity; a sack moves no one out)",
+        "B: industry raises carrying capacity, designed and bounded in INDUSTRIALISATION.md as its own mechanism",
+        "C: other"
+      ],
+      "recommendation": "A: it is the doc as written; B only as its own designed beat.",
+      "files": [
+        "src/world/settlement.cpp",
+        "src/world/history_sim.cpp",
+        "docs/generation/INDUSTRIALISATION.md",
+        "docs/economy/POPULATION.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-27, the density calls form): A, keep -- a migrant carries its food with it and a sack never lowers a ceiling. Written into INDUSTRIALISATION.md Beat 2 with the land-line reading of held corridors.",
+      "resolved": "2026-09-27"
+    },
+    "NR-959": {
+      "id": "NR-959",
+      "title": "CALL: far pairs across water bind almost wholesale (the sea far-penalty set to 0), and a leg against the current loses cargo at weight 500",
+      "raised": "2026-09-26",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1142 (far pairs bind across water; cargo against the current), branch 1a00072e, 2026-09-26; not merged until its cold review returns",
+      "what": "Found first: the far-pair force NR-888 ruled on was never built, so far realms across water never met (contact came only from campaigns within nine tiles) and none ever cleared the 700 far penalty. Built: realms on different landmasses meet when a trade across water is open between them (a good one holds and the other wants, a navy and two ports to carry it), and a far pair across water reads its own penalty. The penalty ladder: 0 far pairs bound at 700 and 500, 9 at 450, 166 at 400, then 489 / 484 / 479 at 350 / 300 / 0. The lane SET 0, the plateau: between 450 and 350 the dial would choose the count; below 350 the pair's own aggression, grudges and trade decide. Result at 1960, 16 seeds: cross-water pairs bound 53 -> 538 (485 far), trade-written lanes 27 -> 297, Industrialisation battles -4%; six seeds with no water between realms unchanged. Cargo loss: linear, no knee (0.9 / 1.5 / 2.9% of volume across water at 250 / 500 / 1000); SET 500, the current's own weight, so a leg against a full current loses half its cargo -- a choice, not a measurement. COLD REVIEW (2026-09-26): every ladder number above predates the four-way landmass change that decides which pairs count as across water, so the ladder is being re-run before you rule. It also found a pair bound across water breaks, and brands the lower side a treaty-breaker, when a fallen capital moves its seat onto the other landmass; the fix records a pair's across-water class at first contact, as near-home already is. And with the penalty at 0, 'far pairs bind across water' reads as 'far pairs bind only across water': a far land pair still faces 700. RE-RUN LADDER on the final tree (merged e5be22bf, 16 seeds, Industrialisation span, loss 500): far pairs bound at 1960 -- 0 / 0 / 10 / 191 / 530 / 526 / 518 at penalty 700 / 500 / 450 / 400 / 350 / 300 / 0; subjections 96 / 96 / 95 / 62 / 56 / 43 / 56; battles 9,266 -> 8,520. The plateau is still 350 to 0. Loss ladder: cargo lost 0 / 0.53% / 0.86% / 1.55% of trade across water at 0 / 250 / 500 / 1000; bound pairs and battles flat across it. The Exploration span loses no cargo at any rung: every cross-landmass trade there that runs against a current has a road at least as wide. The seat-move break is fixed (the class is recorded at first contact).",
+      "why_it_matters": "A far pair across water now binds more easily than a far pair on land (still 700). The sea was the faster medium, which supports it, but 0 removes distance from the sea treaty entirely.",
+      "options": [
+        "A: keep both as set (sea penalty 0 at the plateau; loss 500)",
+        "B: a sea penalty inside the plateau but above 0 (e.g. 300), so distance still reads across water",
+        "C: tie the sea penalty to the land one by the speed ratio of the media",
+        "D: other"
+      ],
+      "recommendation": "B at 300: inside the plateau (526 bound, against 518 at 0), so the dial does not choose the count, and distance still reads across water; the loss at 500 as set.",
+      "files": [
+        "src/world/history_sim.cpp",
+        "src/world/history_sim.hpp",
+        "docs/generation/INDUSTRIALISATION.md",
+        "docs/generation/EXPLORATION.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-27, the open calls form): B: the sea far-penalty is 300 (inside the plateau), the land far pair keeps 700, and the cargo loss stays 500. Written into INDUSTRIALISATION.md. The sea lane sets it first on its BL-1152 branch, so the fleet work measures on the ruled world.",
+      "resolved": "2026-09-27"
+    },
+    "NR-960": {
+      "id": "NR-960",
+      "title": "CALL: the two-firms-per-province cap on provinces that are now a centre's whole ground",
+      "raised": "2026-09-26",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1146 (the firm cap on grown provinces), re-read after BL-1141 (one centre a region), 2026-09-26",
+      "what": "You set two firms a province (NR-910) when provinces were at most ~20 tiles. A province is now its centre's ground (BL-1133) and a region stands one centre (BL-1141), so a city's province holds the whole city. Re-read on main: the cap refuses 5.2% of the pooled charter budget (1.0% before BL-1141, 4.7% before BL-1133), binds on 16 of 16 worlds, and takes 29.5% of seed 28's budget. The total barely moves: budget firms reach the 120-per-body ceiling on 15 of 16 worlds (1,909 of 1,920). So the cap decides WHERE firms stand -- away from the big cities, into smaller centres -- not how many. ALSO FOUND (the centres lane, stockpile_budget_check --seat-curve 650:2, 2026-09-26): main already opens a median of 81.5 seats (61-111 a seed; centres affording a specialist), not the nine the NR-910 divisor of 650 was pinned to give; the price rises with the stock, so the BL-1137 rebuild barely moves it (88). The cap and the divisor were both set on a world that no longer exists.",
+      "why_it_matters": "Industry that gathers where people gather (Beat 2) is pushed out of the cities by a cap sized for a different province.",
+      "options": [
+        "A: keep two a province",
+        "B: the cap scales with the province's centre (e.g. two per rung: a village 2, a city 6)",
+        "C: retire the province cap; the 120-per-body ceiling bounds the total",
+        "D: other"
+      ],
+      "recommendation": "B: it keeps the spread NR-910 wanted on small ground and lets a city's province hold a city's industry; read it on the census before it is set.",
+      "files": [
+        "src/world/corporation_generation.cpp",
+        "src/world/stockpile_budget.cpp",
+        "docs/generation/CORPORATION_GENERATION.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-27, the density calls form): B -- the cap scales with the province's centre, two firms per rung: village 2, town 4, city 6 (the form's reading), metropolis 8, megacity 10 (extended by the same rule; say if the top two should differ). Written into INDUSTRIALISATION.md § 1; BL-1146 builds it. The seat-menu finding (81.5 seats against the nine the price was anchored to) is filed as BL-1151 (seat menu re-anchored).",
+      "resolved": "2026-09-27"
+    },
+    "NR-961": {
+      "id": "NR-961",
+      "title": "CALL: should a fleet gate sea crossings (the doc says it does; the code never reads it), and at what rung does the naval carry-over open?",
+      "raised": "2026-09-26",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1147 (naval points carry over), merged 5f734c76 with the conversion at 0; its cold review, 2026-09-26",
+      "what": "Built as you ruled: an Empires polity earns naval points (coastal province-years, crossings, coastal sea techs; weighted about a third each) and opens the Exploration age with points x rate / 1000 hulls. Left at rate 0 (today's world, byte-identical). The ladder moves little: at 50 / 250 / 1000 the largest opening fleet is 10k / 52k / 207k hulls, Exploration purchases 30 / 21 / 38 (21 today), subjections 42 / 31 / 65 (32), purchase-written lanes 0-1 at every rung. WHY: a sea crossing never reads the fleet. The crossing gate (history_sim.cpp ~6736-6739) is the hub's army and can_field_naval (the military band at a port window); navy_stock is read only by upkeep, the sea trade line, meeting by sea, a sea-legs ration bonus (at most +400 per mille) and the Alarm a visible fleet raises. The first Exploration crossing is at 1200 on 13 of 16 seeds with no fleet. And the navy bill is under 0.1% of the treasuries at every rung, so upkeep does not bite. EXPLORATION.md's stocks table says a navy buys \"crossing capacity, and contest of a crossing\": the code disagrees. Also: 15,395 polities dead by 1200 held 16.7M points (more than the living's 14.1M) and carry nothing, as ruled. AFTER THE REVIEW FIXES (merged 572a0afb; a corridor walked across sea is no longer a road, and the coastal deed reads the terrain, not the inherited port window): weights re-derived to 1 / 280 / 9,600 (still a third each); 7,841 dead polities held 7.0M points; the ladder at 10 / 50 / 250 / 1000 gives a largest opening fleet of 1k / 5k / 25k / 101k hulls, Exploration purchases 35 / 23 / 26 / 17 (20 at 0), subjections 61 / 50 / 38 / 31 (46), purchase-written lanes 0 at every rung, the navy bill under 0.05% of the treasuries. The shape is unchanged: no rung decides who crosses. BEN'S STEER (2026-09-27, mid-session): \"Fleets should project power so allies with large fleets stop enemy fleets before they move.\" Written into EXPLORATION.md under the stocks table as SET; the mechanics (who defends, how power falls with distance, what a stopped crossing costs, whether a fleet also bounds its army, which spans) are put to Ben in a form.",
+      "why_it_matters": "Your aim for the carry-over (coastal empires open the age already at sea) can only happen if a fleet decides who crosses; as built it only prices trade and raises Alarm.",
+      "options": [
+        "A: make the doc true -- a wet campaign's size is bounded by the navy staged from its hub's port, so fleets gate crossings; then read the carry-over ladder again and pick a rung",
+        "B: correct the doc -- a navy prices trade and raises Alarm, crossings stay band-gated; pick a rung now from the ladder above",
+        "C: leave the carry-over at 0 until the fleet has a job",
+        "D: other"
+      ],
+      "recommendation": "A: it is what the stocks table says and what your ruling needs; the upkeep that does not bite today becomes a real cost once a fleet is used. A world-mover and its own build.",
+      "files": [
+        "src/world/history_sim.cpp",
+        "src/world/combat.cpp",
+        "docs/generation/EXPLORATION.md"
+      ],
+      "resolution": "RULED (Ben, 2026-09-27, the fleet projection form, after his steer \"fleets should project power so allies with large fleets stop enemy fleets before they move\"): A, make the doc true, in the Exploration and Industrialisation spans. A fleet bounds the army a sea campaign carries (staged from its hub's port); the defenders are the target and its mutual-defence partners; a fleet's power falls with sea distance from its own ports, priced by the currents; a crossing out-projected anywhere on its leg never sails, and the attacker keeps its army and fleet. Build this sprint, measured first: BL-1152 (fleets project power). The carry-over rung is NOT yet chosen: it is read again once fleets have this job, and put to Ben then.",
+      "resolved": "2026-09-27"
     }
   }
 }

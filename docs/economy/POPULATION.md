@@ -183,11 +183,11 @@ lens-gated — so the surface reads as inhabited rather than "resources with ind
   simulation entities are untouched.
 - **Anchor and tier** — each conurbation is anchored at its highest-scale member and takes
   that member's scale as its tier.
-- **Marker** — the tiered `icons::settlement` skyline glyph (tower count and height grow with
-  tier), in the civic-neutral `palette::settlement` colour under every lens; ownership is read
-  off the national border band (`docs/ui/PLANETARY.md` § The national border band), so the host
-  nation's tint has no live gate now that the Country lens is retired. Tier is carried by glyph
-  size, keeping colour out of the ownership vocabulary (see `docs/ui/ICONS.md`).
+- **Marker** — on the Planetary canvas, a settlement structure baked into the ground whose
+  footprint and height step with the tier (`docs/ui/RENDERING.md` § Installations); ownership is
+  read off the national border band (`docs/ui/PLANETARY.md` § The national border band), so the
+  host nation's tint has no live gate now that the Country lens is retired. Tier is carried by the
+  structure's size, keeping colour out of the ownership vocabulary.
 - **Labels** — only City-and-above conurbations (tier ≥ 4) are labelled, named
   deterministically from the anchor tile id against a fixed settlement name bank, so labels
   are stable per campaign. Names are sci-fi / fantasy, never Earth-drawn (standing rule).
@@ -257,7 +257,7 @@ the woods in the ancient. A centre's **met ratio** is the weight-averaged share 
 population bid that its market filled (`MARKETS.md` § Want and fill records the bid), each good
 capped at 1, read from the market's last clear. **Filled means received:** the households draw
 their bid off the market's shelf at the end of each clear, and the fill is what they took
-(`MARKETS.md` § The clearing tick, step 12). A shelf that stands full feeds them whether or not
+(`MARKETS.md` § The clearing tick, step 9). A shelf that stands full feeds them whether or not
 anything was listed that tick. Steel, ore, fuel and every other industrial want
 are out: they are firms' wants, and a city does not shrink because a mill is short. The grow
 threshold is unchanged at one half. A good the band does not make is never in the basket, because
@@ -500,7 +500,7 @@ when it is scarce, and what it is paid.
 ### The labour pool
 
 Workforce is a **pool**, not a per-building free parameter. The pool is held **per `(corp,
-body)`** — the same granularity as the stockpile pool — because labour does not cross
+body)`** because labour does not cross
 bodies without transport, and a corporation's contention is local to where its buildings
 sit. (A corporation-wide pool was considered and rejected: it would let a labour surplus on
 one body silently staff buildings on another, which the spatial economy must not allow.)

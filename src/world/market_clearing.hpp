@@ -13,9 +13,6 @@
 #include <unordered_map>
 #include <vector>
 
-// `sell_order` and `buy_order` (both sides of the order book) are defined in
-// components.hpp so both the UI state and this clearing system can name them
-// without an include cycle.
 
 /// Per-corporation cash-flow figures from one market clearing, valued at the
 /// price resolved this tick (base_price modulated by supply/demand). The balance
@@ -257,55 +254,28 @@ void inject_interbody_demand(world& w,
                              const recipe_registry& reg,
                              const market_supply_snapshot& prior_supply);
 
-/// Clear every body market for one economy tick using a per-(body, resource)
-/// matched order book. For each market and resource:
-///   - Sell side: each corp's pool surplus above its processors' next-run need,
-///     plus every standing sell order in `w.sell_orders` (floor-priced).
-///   - Buy side: processor input shortfalls from the economy report, plus every
-///     standing buy order in `w.buy_orders` (max-price limited).
-/// Orders are sorted by price priority (cheapest seller first, highest bidder
-/// first) with corp id as the deterministic tiebreaker. Matching proceeds buyer-
-/// first: each buyer draws from the cheapest compatible seller; a preferred_seller
-/// hint wins ties and is matched when up to 10% more expensive than the cheapest
-/// alternative. Clearing price per match = seller's floor price (ask). Volume-
-/// weighted average price of all matches drives the EMA price update. Unmatched
-/// surplus/shortfall still updates mc.supply/demand for the UI. Pools are debited
-/// only for matched sell quantities.
+/// Clear every market for one economy tick (BL-1265; MARKETS.md § The clearing
+/// tick and § The shelf economy). There is no order book: the market is the
+/// counterparty of every exchange.
+///   - SUPPLY is this tick's landings (`world::landed_this_tick`: production, a
+///     trade's arriving cargo, a capture), plus the shelf's share in the price
+///     law (`pricing_supply`).
+///   - DEMAND is the posted wants of the economy report and the demand
+///     channels injected here (households, background, endemic, inter-body).
+/// The reference price resolves from the two; every landing is then SOLD to
+/// the market at it (its owner paid, the goods onto the shelf) and every shelf
+/// draw this tick is billed at the POSTED price it was decided at. Households
+/// and the background draw next, the shelves spoil, and the reference price
+/// becomes the market price.
 ///
-/// THE BOOK IS READ FROM THE WORLD, NOT PASSED IN (BL-293, 2026-08-07). It used
-/// to arrive as two caller-supplied vectors owned by `ui_state`, which made
-/// clearing something the UI *drove* rather than something the simulation *does*
-/// — a headless tick sold nothing standing, and no corp_command could reach the
-/// book. Ben's ruling: "Order book needs to be a background process, the AI must
-/// be able to trade as a player does." An empty book is the prior pooled model
-/// exactly, so existing econ_harness expectations are unchanged.
-///
-/// @param w      World; markets and (corp, market) pools are mutated, and the
-///               standing order book (`sell_orders` / `buy_orders`) is read.
-/// @param reg    Loaded registry (for processor input reservations).
-/// @param report Economy step report (its purchases drive the buy side).
-/// @return       Per-corporation cash flow valued at matched prices.
+/// @param w      World; markets are mutated, `landed_this_tick` is emptied.
+/// @param reg    Loaded registry.
+/// @param report Economy step report (its wants price, its purchases bill).
+/// @return       Per-corporation cash flow.
 std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     world& w,
     const recipe_registry& reg,
     const economy_report& report);
-
-/// BL-1201 (orders are price floors, Ben 2026-10-05; MARKETS.md step 4): a
-/// standing sell order whose POOL has held no surplus — no stock above the
-/// processor reservation in any of its corp's market pools on its body, read
-/// before any order's claim — for this many consecutive clearing ticks is removed
-/// by `clear_markets`, and the good returns to auto-surplus. The same rule for
-/// the player and for rival corps.
-///
-/// WHY 4 (one year of quarterly ticks): a pool fed by convoys or by a processor
-/// whose input comes and goes can stand empty for a tick or two between
-/// deliveries while the order is still wanted, so 1-2 would close an order the
-/// next delivery needs and make its owner place it again. Much longer leaves a
-/// dead order governing a good for years. Four quarters rides out a delivery gap
-/// and returns an abandoned good to auto-surplus inside a year. It equals the
-/// rival scorer's evaluation cadence (corp_ai_params::cadence_k = 4), so a run
-/// of empty ticks spans one full look by every rival.
-inline constexpr uint8_t sell_order_empty_close_ticks = 4;
 
 /// The EMA factor `resolve_price` eases a market price toward its target by, each
 /// clear: next = prior + k_price_smoothing x (target - prior). Exported for
@@ -415,28 +385,7 @@ inline float grid_good_pricing_supply(const grid_good_figures& sd, std::size_t r
                                : 0.0f);
 }
 
-/// Input reservation a corporation needs to keep in ONE goods pool to feed a
-/// full run of the processors that draw that pool next tick — so it sells only
-/// the genuine surplus. BL-1003: a processor draws the pool of its own tile
-/// market (`pool_key_for_tile`), so only processors keyed to @p pool_key
-/// reserve against it. BL-995: shared by clearing's auto-surplus and by
-/// `dispatch_convoys`, so what a seller may haul is exactly what it would list.
-/// @pre `corp` is a key of `w.corporations`.
-std::array<float, resource_count> processor_reservation(
-    const world& w, const recipe_registry& reg, entity_id corp, entity_id pool_key);
 
-/// What AUTO-SURPLUS holds back in one pool: `processor_reservation`, plus — where
-/// the corp holds a Launchpad that burns from this pool (`launch_burns_from_pool`,
-/// the launch gate's own test) — the WHOLE stock of every launch-drawn good
-/// (`launch_draw_per_convoy`: propellant). "A pad's pool keeps its propellant"
-/// (MARKETS.md step 4, Ben 2026-10-09): auto-surplus lists none of it, so a pad
-/// stays fuelled. A pool with no pad reserves exactly `processor_reservation`.
-/// Shared by clearing's auto-surplus and `dispatch_convoys` (BL-995: what a
-/// seller may haul is exactly what it would list). A STANDING SELL ORDER reads
-/// `processor_reservation` instead, so the corp can still sell its propellant.
-/// @pre `corp` is a key of `w.corporations`.
-std::array<float, resource_count> auto_surplus_reservation(
-    const world& w, const recipe_registry& reg, entity_id corp, entity_id pool_key);
 
 /// Resolve which market a tile clears against (its market catchment). Among the
 /// markets on the tile's body: a body with a single market routes there

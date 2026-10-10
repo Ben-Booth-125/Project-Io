@@ -8,9 +8,10 @@
 
 ## Preface
 
-Project Io is a single-player grand strategy game about running a **corporation** in a
-procedurally generated world that opens in 1960. You are not a nation and you do not rule anyone.
-You find the ground worth industrialising, you build on it, and you fight for it when you must.
+Project Io is a single-player grand strategy game about running a **nation** and its **champion corporation** in a
+procedurally generated world that opens in 1960. You govern the state, and you run the firm that
+builds for it. You find the ground worth industrialising, you build on it, and you fight for it when
+you must.
 
 This manual is for two readers. If you are **playing**, sections 1 through 4 are yours — what the
 game is, how to start, and every control. If you are **building** it, section 4 maps each system to
@@ -38,16 +39,19 @@ your business.
 
 ### 1.2 The player
 
-You are a **corporation**, chosen from a shortlist of seats when the campaign begins. Three things
-follow from that, and they are the design's spine:
+You are a **major nation**, chosen from the majors when the campaign begins, and you run its
+**champion** — the one corporation its ground produced. Three things follow from that, and they are
+the design's spine:
 
-- **You do not legislate.** Law, tax and policy are conditions you operate inside, not levers you
-  pull. When a law makes your work harder, your options are to route around it, price it in, or
-  take work somewhere else.
-- **You do not manufacture your force.** Equipment is bought from private companies who are
-  counterparties, not subsidiaries. They quote a price and a lead time, and they can refuse.
-- **You build to industrialise.** Your holdings extract, refine and sell, and the machinery you
-  build is the road to space.
+- **At home you legislate.** Your budget, your tariffs and your law are levers you pull. Abroad they
+  are conditions your champion operates inside: route around them, price them in, or pay to have
+  them changed.
+- **You raise your force; you do not manufacture it.** You muster your own units, and their
+  equipment is bought from corporations who are counterparties, not subsidiaries.
+- **You build to industrialise.** Your champion's holdings extract, refine and sell, and the
+  machinery it builds is your nation's road to space.
+
+You answer to three parties: other nations, your population, and your corporations.
 
 ### 1.3 The loop
 
@@ -80,7 +84,8 @@ worse.
 
 Losing is progressive and it is a spiral rather than an event. Lose ground and your income falls.
 With less income you can afford less upkeep and less force, which loses you the next piece of
-ground. A corporation can die of this without ever losing a battle it could not have won.
+ground. A nation can bleed out this way without ever losing a battle it could not have won. It is
+gone only when it holds no territory at all.
 
 The escape is the same as the trap, run backwards: stop reaching for what you cannot hold, hold what
 you have, and rebuild. That is a real strategic choice with a real cost in time.
@@ -101,7 +106,9 @@ Pausing is a legitimate way to play; nothing is hidden behind reaction speed.
 ### 2.1 Starting a campaign
 
 From the main menu, **New Game** opens the New World wizard. You set *preferences*, not parameters:
-how abundant the world's resources are, and the lean of the generation. The world is then generated
+how abundant the world's resources are, and the lean of the generation. The one exception is the
+nation count: before the world is built you choose how many nations it ends with (up to 40) and how
+many are **majors** (up to 6), and the history will arrive at exactly those numbers. The world is then generated
 in visible stages — planetology, continents, tiles, rivers, population, history, nations, roads,
 corporations — each stage a deterministic consequence of the one above it.
 
@@ -209,9 +216,8 @@ cycling: **Scarcity, Industry, Reach, Supply-routes**.
 | Action | Control |
 |---|---|
 | Open the Market Ledger | The market glyph on the icon rail |
-| Switch view | The **Prices** / **Sell Orders** tabs |
-| Place a sell order | Sell Orders tab → pick a resource → set price and quantity |
-| Remove a sell order | **Remove** beside the listed order |
+| Switch view | The **Prices** / **Trades** tabs |
+| Set, change or clear a trade; reserve trade points from auto | The **Trades** tab (`docs/ai/ACTIONS.md` names each press) |
 
 ### 3.7 Ledgers
 
@@ -294,8 +300,8 @@ a supply anchor, and build time depends on where you build, not only what.
 **You may build any building and run any method your research permits.** Two locks govern the
 Build door, and both remove a row rather than showing it greyed — the door does not offer what it
 would refuse: an **era lock** (a building or recipe belongs to a later technological era and never
-appears in this campaign at all) and a **tech lock** (a specific research condition — holding a
-stockpile, running a processing facility, a cash surplus — that unlocks one recipe by name once
+appears in this campaign at all) and a **tech lock** (a specific research condition — a good
+standing on the shelves of your markets, running a processing facility, a cash surplus — that unlocks one recipe by name once
 met). Nothing is locked behind what you have produced before.
 
 So what stops you is not permission. A method you can place may still be a bad idea, or simply
@@ -311,10 +317,16 @@ straight upgrade, so the better choice depends on which market the output is goi
 ### 4.5 Markets and prices
 
 Each market is independent. Base prices come from global rarity; local prices respond to local
-supply and demand, smoothed rather than jumping. A matched price-time **order book** sits on top,
-so the player and the AI place standing orders through the same mechanism.
+supply and demand, smoothed rather than jumping. You hold no stock: everything you make lands on
+your market's shelf and is sold there at that quarter's price, and everything your buildings use
+they buy off a shelf at the posted price — your own output included.
 
-*Authority: `docs/economy/MARKETS.md`.*
+Goods move between markets only by **trade**. Your Planetary Marketplaces and Ports make **trade
+points**; a trade spends them to buy a good on one market, haul it, and sell it on landing at
+another, and you keep the margin less the haul. Points you do not reserve for your own routes are
+spent automatically on the best-paying routes; the AI trades the same way.
+
+*Authority: `docs/economy/MARKETS.md`, `docs/economy/TRADE.md`.*
 
 ### 4.6 Money
 
@@ -327,7 +339,7 @@ differently.
 ### 4.7 Logistics
 
 Roads come in three tiers and are generated as a per-nation lattice; cities are free logistics hubs.
-Convoys route goods between markets at a cost weighted by terrain, and distance costs both money
+A trade's convoys carry goods between markets at a cost weighted by terrain, and distance costs both money
 and **time**.
 
 A tile is about **128 km across** — derived from the planet's generated mass, not authored. A laden
@@ -344,7 +356,7 @@ Two independent fogs. The **geographic fog** hides the tile map and deposits unt
 survey. The **activity fog** is lit by your own trade routes and presence, tiering each body from
 Unknown through Known, Stale and Visible. A place can be Known but unsurveyed.
 
-Rival buildings are visible; their production and stockpiles are private. Markets are the public
+Rival buildings are visible; their production and finances are private. Markets are the public
 intelligence channel.
 
 *Authority: `docs/ui/DISCOVERY.md`.*
@@ -384,7 +396,7 @@ be legislated for.
 ### 4.12 The opponent
 
 Rival companies run a deterministic scored-utility layer over the same command seam you use: they
-build, demolish, survey, road, hire, trade and place sell orders. Nations act in the same shape,
+build, demolish, survey, road, hire and trade. Nations act in the same shape,
 allocating a budget over priority lines. There are no hidden AI exceptions — they play by your
 rules or a defined subset of them.
 

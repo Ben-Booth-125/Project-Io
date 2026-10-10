@@ -1,100 +1,99 @@
--- BL-231 (landform render) — the landform axis, which the renderer discarded until
--- now. `terrain_colour` keyed on composition alone, so mountain, highland, canyon,
--- valley, crater and rift all drew as flat hexes, even though landform drives build
--- cost (x1.0-x2.0), hazard, habitability and mineral richness.
+-- BL-231 (landform render), re-pointed by BL-1242 (landforms and rivers baked).
 --
--- Two channels, split by the measured mix (world_audit S3): a subtle relief tint for
--- the common ground (plains 77%, valley 18%, highland 3.5% system-wide) and a glyph
--- for the four dramatic landforms (mountain, canyon, crater, rift — each <=1.5%).
+-- The landform axis renders on two channels (PLANETARY.md § Terrain channels): a subtle
+-- relief tint for the common ground (plains, valley, highland) and, for the four DRAMATIC
+-- landforms (mountain, canyon, crater, rift — each <=1.5% of land, each x1.3 movement or
+-- worse), a relief FORM baked into the ground: mountain as massif and ridge, canyon as a cut
+-- between paired rims, crater as a raised-rim bowl, rift as a dark fissure. No glyph is drawn
+-- on the canvas. A contiguous run bakes as ONE form — a range, one cut, one fissure — each
+-- tile baking its half toward a same-landform neighbour (RENDERING.md § Mountains, rivers
+-- and terrain variety).
+--
+-- What to look for: the forms read at EVERY rung, the far page included (these are the
+-- expensive tiles, so an invisible one is a surprise), the run reads as one feature rather
+-- than a repeated stamp, and no glyph or span stroke appears anywhere.
 
--- R2: the dramatic landforms on a WET body. Kepler is 90% plains with 7.7% highland
--- and ~2.6% mountain/canyon/crater/rift, so this is the sparse-glyph case — the
--- glyphs should read as scattered accents, not as a rash over the map.
+-- The far page and the play rungs on the home body. The dramatic set is sparse here, so
+-- the forms should read as scattered accents, not a rash. The reference window
+-- (RENDERING.md § Level of detail), selection cleared so the Selection band does not
+-- cover the ground under study.
+verify.window(1720, 1080)
+verify.clear_selection()
 verify.goto_surface("home")
-verify.set_zoom(1)
 verify.set_overlay("none")
-verify.capture("landform_kepler_wide")
+verify.set_zoom(1.26)
+verify.frames(2)
+verify.capture("landform_home_far")
 
--- Zoomed in far enough to read an individual silhouette: twin peaks (mountain),
--- split rims (canyon), a flattened bowl (crater), a jagged fissure (rift). This is
--- the capture that shows they are distinguishable from EACH OTHER, not merely
--- present.
-verify.set_zoom(4)
-verify.capture("landform_kepler_zoom")
+verify.set_zoom(2.5)
+verify.frames(2)
+verify.capture("landform_home_wide")
 
--- R4: the relief tint alone. Kepler generates ZERO valley tiles (its ocean takes all
--- the low ground), so the wet-body relief read is entirely plains-vs-highland — the
--- subtlest case, and the one where the tint most risks being mistaken for a change
--- of composition rather than a change of elevation.
-verify.set_zoom(2)
-verify.capture("landform_kepler_relief")
+-- The relief tint alone (plains vs highland), at a mid rung.
+verify.set_zoom(5)
+verify.frames(2)
+verify.capture("landform_home_relief")
 
--- R4 again on a DRY body. Cinder is 24.7% valley and 71.5% plains, so the sunken
--- half of the relief scale actually appears here; on Kepler it never fires. Together
--- the two bodies exercise both directions of the lift/sink scale.
---
--- Cinder is NOT the home body, so it opens unsurveyed and the survey mask blanks
--- every tile — without this reveal the captures below show a dark grid and verify
--- nothing. Clamped to full.
+-- A DRY body: the sunken half of the relief scale (valley) actually appears here.
+-- Not the home body, so it opens unsurveyed; reveal it or the captures show the lock fill.
 verify.set_survey("inner", 99999)
 verify.goto_surface("inner")
-verify.set_zoom(1)
-verify.capture("landform_cinder_wide")
+verify.set_zoom(1.26)
+verify.frames(2)
+verify.capture("landform_inner_far")
 
-verify.set_zoom(4)
-verify.capture("landform_cinder_zoom")
+verify.set_zoom(5)
+verify.frames(2)
+verify.capture("landform_inner_zoom")
 
--- R3: the channel must SURVIVE A LENS. Composition owns hue and lens tints composite
--- over it at 0.6-0.80 alpha, so a landform signal carried in the fill would be buried
--- exactly when a lens is on. Relief is composited after the tint and the glyphs are
--- drawn over it; both should still read here. Continent is the most saturated lens
--- (0.80) and therefore the hardest case.
+-- Under a lens. Continent is the most saturated lens (0.80).
 verify.set_overlay("continent")
-verify.capture("landform_cinder_lens_continent")
+verify.capture("landform_inner_lens_continent")
 
-
--- BL-232: spanning markers, and the tooltip that makes the glyph vocabulary
--- learnable. A run of contiguous mountains draws ONE chain of peaks rather than a
--- repeated icon per tile; a lone tile keeps its centred glyph, the same role the
--- road's centre cap plays.
---
--- Coordinates come from world_audit § S4's exemplar readout, not from eyeballing a
--- screenshot — if a generation change moves these runs, the harness prints the new
--- ones instead of these captures quietly becoming pictures of empty ground.
+-- The baked forms, framed tight. Coordinates come from ground_bake_check's feature
+-- readout (the best-linked tile of each landform on the home body); if a generation change
+-- moves them, that harness prints the new ones instead of these captures quietly becoming
+-- pictures of empty ground.
 verify.goto_surface("home")
 verify.set_overlay("none")
 
--- Mountain run at [89,10] vs the lone mountain at [76,12]: the span-vs-cap contrast
--- is the whole point of the item, so both are framed tight enough to compare.
-verify.center_tile(89, 10, 6)
-verify.capture("landform_span_mountain_run")
+-- A range: the mountain with the most same-landform neighbours (5) — the run should bake
+-- as one massif with a ridge, not a cluster of cones. Then a lone peak for contrast.
+verify.center_tile(232, 85, 5)
+verify.frames(2)
+verify.capture("landform_range_mountain_run")
+verify.center_tile(232, 85, 10)
+verify.frames(2)
+verify.capture("landform_range_mountain_run_tilt")
 
-verify.center_tile(76, 12, 6)
-verify.capture("landform_span_mountain_lone")
+verify.center_tile(7, 22, 5)
+verify.frames(2)
+verify.capture("landform_range_mountain_lone")
 
--- Rift at [157,42] — the strongest contiguity of the three (81% connected) and the
--- one whose real-world referent most obviously IS a line.
-verify.center_tile(157, 42, 6)
-verify.capture("landform_span_rift_run")
+-- A rift — one continuous dark fissure along its run.
+verify.center_tile(235, 57, 5)
+verify.frames(2)
+verify.capture("landform_fissure_rift_run")
+verify.center_tile(235, 57, 20)
+verify.frames(2)
+verify.capture("landform_fissure_rift_close")
 
--- Canyon at [143,38] — the marginal case: 50% isolated, 24 tiles system-wide, so
--- half its glyphs stay caps and the spanning read is thin. Captured so that
--- thinness is on the record rather than assumed away.
-verify.center_tile(143, 38, 6)
-verify.capture("landform_span_canyon_run")
+-- A canyon — a cut between paired rims.
+verify.center_tile(230, 55, 10)
+verify.frames(2)
+verify.capture("landform_cut_canyon_run")
 
--- THE TOOLTIP (Ben, on delivery: "there is no easy way for a player to know what is
--- what"). Every tile hover named the composition and never the landform, so the
--- glyphs had no label anywhere short of clicking through to the Selection panel.
--- Hovering the mountain run should now name it AND give its real consequence.
--- capture() composits a single frame, and the hover card is gated on
--- kHoverAppearDelaySec = 30 frames (BL-230's glance-then-stick), so the cursor must sit
--- still for a while before the card exists. verify.frames (BL-228) is what makes that
--- reachable from a script; without it the capture shows only the hover ring.
-verify.hover_tile(89, 10)
+-- A crater — a raised-rim bowl; craters never span.
+verify.center_tile(162, 18, 10)
+verify.frames(2)
+verify.capture("landform_bowl_crater")
+
+-- THE TOOLTIP: the form carries no label, so the hover card names the landform and its
+-- consequence. The card is gated on the glance-then-stick delay, so the cursor sits still.
+verify.hover_tile(232, 85)
 verify.frames(40)
 verify.capture("landform_tooltip_mountain")
 
-verify.hover_tile(157, 42)
+verify.hover_tile(235, 57)
 verify.frames(40)
 verify.capture("landform_tooltip_rift")

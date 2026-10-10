@@ -16,6 +16,97 @@
 //   P6  Mask: a source built WITHOUT reveal_all on an unsurveyed body bakes
 //       the lock colour, and leaks no terrain hue.
 //   P7  region_hash moves when a tile field the bake reads moves.
+//   P8/P9 close-tier and oblique bakes stay pure and wrap-exact.
+//
+// Requirement group `ground-never-magnified` (BL-1244):
+//
+//   P10 (retired with the per-rung tiers, BL-1246; see P22) The tier chooser: smallest tier with ppr >= the DRAWN radius, far
+//       page at or below 1:1, no radius magnified up to the 192 px top tier,
+//       no chunked tier minified past 2:1, and the canvas's border-inset
+//       radius shown to be the wrong feed (F34).
+//   P11 The 2x supersampled bake is pure, wrap-exact, seamless across a chunk
+//       edge, and not a no-op.
+//   P12 (a reading) bake ms per 512 px chunk per tier, 1x vs 2x.
+//   P13 Installations (BL-1241, structures baked): the structure pass is
+//       deterministic and wrap-exact at the flat, oblique and far geometries,
+//       actually draws (on vs off differs), and leaves a masked window exact.
+//   P14 The chunk hash folds installations: a build, a stack, a recipe-family
+//       change, a scale step and a raze each move it; a tile outside the
+//       window's reach does not.
+// Also (not checks): bake ms per tier with the pass off vs on, and a gallery
+// of every procedural form at every tier (structures_gallery_*.png).
+//   P15 Landform relief (BL-1242): a bridged mountain run's window is moved
+//       by the pass, deterministic, wrap-exact flat and oblique; ground with
+//       no feature near it is untouched.
+//   P16 Rivers (BL-1242): a river mouth's window likewise.
+//   P17-P20 Terrain variant families (BL-1243): the colouring (no shared
+//       neighbour, mask-blind), purity/wrap/seam of the variant pass on a
+//       plain, a forest and a mountain run, the plain's tile-to-tile spread,
+//       and the hash folding family and variant. `--aim` prints the capture
+//       aims for scripts/verify/terrain_variants.lua and exits; `--variants`
+//       runs P17-P20 alone; `--timing` the variant cost reading alone;
+//       `--seam` triages the P11 seam window pass by pass.
+//   P21 The worker pool (Ben, 2026-10-09): a set of chunk windows across
+//       tiers (flat, 2x supersampled, oblique) baked CONCURRENTLY on the
+//       pool's thread count, sharing one source read-only, is byte-identical
+//       to the same set baked serially. `--pool` runs P21 alone.
+//   P22 The one master (BL-1246, RENDERING.md § Level of detail): the master
+//       geometry is aligned (W, H multiples of 16, every level whole pixels
+//       and wrap-exact), a master chunk equals its quadrant of a wider window,
+//       the chain built chunk by chunk equals the whole image's chain, and the
+//       level chooser reads the coarsest level at or above the drawn radius.
+//       `--master` runs P22 plus the whole-body master bake reading (1x, 2x).
+//   P23 The lock fast path (BL-1246): a window wholly inside survey-masked
+//       ground fills with the lock colour directly, byte-identical to the
+//       full per-pixel bake (masked chunks and a mask-edge chunk).
+//   P24 The partial re-bake (BL-1246): windows the rule draws around
+//       installations, re-baked and blitted over a master chunk, are
+//       window-invariant (the whole bake is unchanged) and turn the chunk
+//       baked before an installation change into the chunk baked after, byte
+//       for byte — real installations, a structure straddling a chunk corner,
+//       one on the wrap seam; a terrain change or a dense change re-bakes
+//       whole. P25 the windows' own mip pieces equal the whole chain.
+//       `--patch` runs P24/P25 alone.
+//   P26 Tiles hold their own ground (BL-1251, RENDERING.md § Tiles hold their
+//       own ground): a tile's centre region bakes byte-identical whatever its
+//       neighbours' ground (colour, family, variant, border sets) is — and the
+//       pre-BL-1251 wide blend fails the same comparison.
+//   P27 Every border set on the home body, and the shore shelf, is pure,
+//       wrap-exact, seamless across a chunk edge at the master geometry, and
+//       draws. `--border` runs P26/P27 alone and writes bl1251_*.png previews
+//       (legacy look vs now) of each edge and of the wide plain, forest,
+//       scrub and bare ground.
+//
+//   --crisp (BL-1254, a reading, not a check): how crisp the ground reads
+//       against what stands on it — fine-band and mid-band energy and local
+//       contrast of the ground alone vs the structure and tree pixels, per
+//       subject, as baked and with the base hillshade's sign flipped (NR-1006
+//       (e)); crisp_<subject>[_flip].png. `--crisp --decomp` repeats it with
+//       crisp 0 (the pre-BL-1254 look, byte for byte), no variants, no
+//       detail and no grain. `--prof` carries a pre-BL-1254 configuration.
+//   P31 Cast shadows (BL-1256, ground look C-F): the low-sun shadow pass is
+//       deterministic, wrap-exact and window-invariant at the master (1x and
+//       2x), draws and darkens, and reads nothing past terrain_hash's margin.
+//       `--shadow` runs it alone. `--look` (a reading) bakes the C-F subjects
+//       and prints their luminance percentiles and their colour (mean chroma,
+//       saturation, hue, per hue class); `name=value` dials override.
+//   P28-P30 Roads and sea lanes painted (BL-1253, RENDERING.md § Roads and
+//       sea lanes): the route pass pure, wrap-exact and seamless on every
+//       surface; the road / structure agreement; a route change re-baking
+//       only its window. `--routes` runs them alone with routes_*.png previews.
+//   P32-P34 Roads as tile sets (BL-1291, RENDERING.md § Roads and sea lanes):
+//       crossing points agree from both tiles and across the seam and pieces
+//       meet there heading on; no road crosses a structure footprint; every
+//       terrain treatment is window-invariant and wrap-exact. `--roadsets`
+//       runs them alone with roadsets_*.png previews at rungs 4, 3 and 2.
+//
+//   --towns (BL-1258, a reading, not a check): the settlement ladder, a
+//       highway town, a crossed city, a metropolis on a road and a town
+//       beside works at the master and its 48/24/12 levels and the far page
+//       (towns_*.png), with each town chunk's bake cost and bounds box.
+//
+// Also prints bake time per tier (a measurement, not a check) and writes
+// feature_<form>_<tier>.png previews for the eye.
 //
 // Exits 0 on PASS, non-zero naming the failed phase.
 
@@ -24,19 +115,45 @@
 #include "core/png_writer.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/survey_system.hpp"
+#include "world/hex_neighbors.hpp"
 #include "world/world.hpp"
 #include "harness_params.hpp"
 
+#include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <atomic>
+#include <thread>
 #include <vector>
+
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#undef near // windef.h's 16-bit relics collide with locals
+#undef far
+#endif
 
 using namespace ui::ground;
 
 namespace {
 
 int g_failures = 0;
+
+/// This thread's CPU cycles in millions (QueryThreadCycleTime: high resolution,
+/// and blind to time the thread spent descheduled), or -1 where the platform
+/// does not say. A relative reading: compare configurations, not machines.
+double thread_cpu_ms()
+{
+#ifdef _WIN32
+    ULONG64 cyc = 0;
+    if (QueryThreadCycleTime(GetCurrentThread(), &cyc))
+        return static_cast<double>(cyc) / 1e6;
+#endif
+    return -1.0;
+}
 
 void check(bool ok, const char* phase, const char* what)
 {
@@ -68,9 +185,2754 @@ stats measure(const std::vector<std::uint32_t>& px)
     return s;
 }
 
+/// The tile at the heart of the widest run of one cover (BL-1243): the land tile
+/// whose radius-3 neighbourhood (37 tiles, columns wrapping) holds the most
+/// land tiles of @p cover on plain ground with no dramatic landform or river
+/// near — a "wide plain" or "deep forest" to aim a variant window at.
+/// Temperate rows only. Returns -1 when the body has none.
+int homogeneous_aim(const bake_source& src, terrain_cover cover, int* score_out = nullptr)
+{
+    const auto land = static_cast<std::uint8_t>(bake_source::tile_class::land);
+    const auto cv = static_cast<std::uint8_t>(cover);
+    int best = -1, best_score = 0;
+    for (int r = src.gh / 5 + 3; r < src.gh * 4 / 5 - 3; ++r)
+        for (int c = 0; c < src.gw; ++c)
+        {
+            const std::size_t i = static_cast<std::size_t>(r) * src.gw + c;
+            if (src.cls[i] != land || src.cover[i] != cv || src.near_feature[i])
+                continue;
+            int score = 0;
+            for (int dr = -3; dr <= 3; ++dr)
+                for (int dc = -3; dc <= 3; ++dc)
+                {
+                    if (std::abs(dr) + std::abs(dc) > 4)
+                        continue; // a rough hex disc
+                    const int rr = r + dr;
+                    const int cc = ((c + dc) % src.gw + src.gw) % src.gw;
+                    const std::size_t j = static_cast<std::size_t>(rr) * src.gw + cc;
+                    if (src.cls[j] == land && src.cover[j] == cv && !src.near_feature[j])
+                        ++score;
+                }
+            if (score > best_score)
+            {
+                best_score = score;
+                best = static_cast<int>(i);
+            }
+        }
+    if (score_out)
+        *score_out = best_score;
+    return best;
+}
+
+/// P21 - the worker pool's correctness row: chunk windows over several
+/// geometries, aimed at land, a forest, a landform/river and an installation,
+/// baked serially and then concurrently (threads pulling from a shared index,
+/// as the ground_layer pool does), compared byte for byte. Two concurrent
+/// rounds, in opposite job orders, so the interleaving differs.
+void pool_row(const bake_source& src, const body_component& hb, int land_i, const bake_params& p)
+{
+    std::vector<int> aims = { land_i };
+    if (const int f = homogeneous_aim(src, terrain_cover::forest); f >= 0)
+        aims.push_back(f);
+    for (std::size_t i = 0; i < src.near_feature.size(); ++i)
+        if (src.near_feature[i]) { aims.push_back(static_cast<int>(i)); break; }
+    for (std::size_t i = 0; i < src.inst.of_tile.size(); ++i)
+        if (src.inst.of_tile[i] >= 0) { aims.push_back(static_cast<int>(i)); break; }
+
+    struct win { geometry g; bake_params prm; int x0, y0, w, h; };
+    std::vector<win> jobs;
+    struct tier { double ppr; double sy; int ss; };
+    for (const tier t : { tier{ 24.0, 1.0, 2 }, tier{ 48.0, 1.0, 2 }, tier{ 48.0, k_tilt_sy, 2 },
+                          tier{ k_master_ppr, k_tilt_sy, 1 } })
+    {
+        const geometry g = make_geometry(hb.grid_width, hb.grid_height, t.ppr, t.sy);
+        bake_params prm = p;
+        prm.supersample = t.ss;
+        for (const int a : aims)
+        {
+            const int ar = a / src.gw, ac = a % src.gw;
+            const double ax = 1.7320508075688772 * (ac + ((ar & 1) ? 0.5 : 0.0));
+            const int side = 160;
+            // Two abutting windows per aim: the pool bakes neighbours at once.
+            for (int k = 0; k < 2; ++k)
+            {
+                const int h = std::min(side, g.H);
+                win wv{ g, prm, static_cast<int>(ax * g.s) - side + k * side,
+                        std::clamp(static_cast<int>((1.5 * ar - g.y_min) * g.s) - side / 2,
+                                   0, std::max(0, g.H - h)),
+                        side, h };
+                jobs.push_back(wv);
+            }
+        }
+    }
+
+    const auto bake = [&](const win& j, std::vector<std::uint32_t>& out) {
+        out.assign(static_cast<std::size_t>(j.w) * j.h, 0u);
+        bake_region(src, j.g, j.prm, j.x0, j.y0, j.w, j.h, out.data());
+    };
+    std::vector<std::vector<std::uint32_t>> serial(jobs.size());
+    for (std::size_t i = 0; i < jobs.size(); ++i)
+        bake(jobs[i], serial[i]);
+
+    const int hc = static_cast<int>(std::thread::hardware_concurrency());
+    const int n_threads = std::max(2, hc - 2); // the pool's count, at least two
+    bool identical = true;
+    for (int round = 0; round < 2; ++round)
+    {
+        std::vector<std::vector<std::uint32_t>> par(jobs.size());
+        std::atomic<std::size_t> next{ 0 };
+        std::vector<std::thread> pool;
+        for (int t = 0; t < n_threads; ++t)
+            pool.emplace_back([&] {
+                for (std::size_t k; (k = next.fetch_add(1)) < jobs.size();)
+                {
+                    const std::size_t i = round == 0 ? k : jobs.size() - 1 - k;
+                    bake(jobs[i], par[i]);
+                }
+            });
+        for (std::thread& t : pool)
+            t.join();
+        for (std::size_t i = 0; i < jobs.size(); ++i)
+            identical = identical && par[i] == serial[i];
+    }
+    std::printf("P21: %zu windows over %zu aims, %d threads\n", jobs.size(), aims.size(), n_threads);
+    check(identical, "P21", "concurrent bakes on the pool's thread count equal the serial bakes byte for byte");
+}
+
+/// The whole-body master bake on the pool's thread count (RENDERING.md
+/// § Level of detail): every 512 px chunk of the master at @p ss, then its
+/// mip pieces. Returns the bake wall ms; prints the reading. @p ppr other
+/// than the master's bakes a master-shaped image (aligned alike) at that
+/// resolution — the 96-vs-128 comparison reading (Ben, 2026-10-10).
+double master_bake(const bake_source& src, const bake_params& p, int ss, const char* tag,
+                   double ppr = k_master_ppr)
+{
+    geometry g = make_master_geometry(src.gw, src.gh);
+    if (ppr != k_master_ppr)
+    {
+        g = make_geometry(src.gw, src.gh, ppr, k_tilt_sy);
+        const double period = src.gw * 1.7320508075688772;
+        const int A = k_master_align;
+        g.W = std::max(A, static_cast<int>(std::lround(period * ppr / A)) * A);
+        g.s = g.W / period;
+        const double y_max = 1.5 * (src.gh - 1) + 1.0;
+        g.H = (std::max(1, static_cast<int>(std::ceil((y_max - g.y_min) * g.s))) + A - 1) / A * A;
+    }
+    bake_params prm = p;
+    prm.supersample = ss;
+    const int cw = (g.W + k_chunk_px - 1) / k_chunk_px;
+    const int ch = (g.H + k_chunk_px - 1) / k_chunk_px;
+    const int n  = cw * ch;
+    const int hc = static_cast<int>(std::thread::hardware_concurrency());
+    const int n_threads = std::max(1, hc - 2);
+    std::atomic<int> next{ 0 };
+    std::atomic<long long> chain_us{ 0 };
+    const auto t0 = std::chrono::steady_clock::now();
+    std::vector<std::thread> pool;
+    for (int t = 0; t < n_threads; ++t)
+        pool.emplace_back([&] {
+            std::vector<std::uint32_t> buf, half, cur;
+            for (int k; (k = next.fetch_add(1)) < n;)
+            {
+                const int ci = k % cw, cj = k / cw;
+                const int x0 = ci * k_chunk_px, y0 = cj * k_chunk_px;
+                const int w = std::min(k_chunk_px, g.W - x0), h = std::min(k_chunk_px, g.H - y0);
+                buf.assign(static_cast<std::size_t>(w) * h, 0u);
+                bake_region(src, g, prm, x0, y0, w, h, buf.data());
+                const auto c0 = std::chrono::steady_clock::now();
+                int lw = w, lh = h;
+                cur = buf;
+                for (int l = 1; l < k_level_count; ++l)
+                {
+                    half.assign(static_cast<std::size_t>(lw / 2) * (lh / 2), 0u);
+                    downsample_half(cur.data(), lw, lh, half.data());
+                    cur.swap(half);
+                    lw /= 2; lh /= 2;
+                }
+                chain_us += std::chrono::duration_cast<std::chrono::microseconds>(
+                    std::chrono::steady_clock::now() - c0).count();
+            }
+        });
+    for (std::thread& t : pool)
+        t.join();
+    const double ms = std::chrono::duration<double, std::milli>(
+        std::chrono::steady_clock::now() - t0).count();
+    double bytes = 0.0;
+    for (int l = 0; l < k_level_count; ++l)
+    {
+        const geometry gl = level_geometry(g, l);
+        bytes += static_cast<double>(gl.W) * gl.H * 4.0;
+    }
+    std::printf("MASTER  %-10s %dx%d grid  master %dx%d px (%d chunks)  %dx  %d threads  bake %.1f s"
+                "  (chain %.2f s of thread time)  RAM master+chain %.2f GB\n",
+                tag, src.gw, src.gh, g.W, g.H, n, ss, n_threads, ms / 1000.0,
+                chain_us.load() / 1e6, bytes / (1024.0 * 1024.0 * 1024.0));
+    std::fflush(stdout);
+    return ms;
+}
+
+/// P22 - the one master and its chain (RENDERING.md § Level of detail):
+/// the master geometry is aligned so every level is whole pixels and keeps
+/// the wrap; the chain built chunk by chunk equals the chain of the whole
+/// image; and the level chooser reads the coarsest level at or above the
+/// drawn radius (never past 2:1 minified; the master magnified past 128).
+void master_row(const bake_source& src, const body_component& hb, int land_i, const bake_params& p)
+{
+    const geometry m = make_master_geometry(hb.grid_width, hb.grid_height);
+    bool aligned = m.W % k_master_align == 0 && m.H % k_master_align == 0
+                && std::fabs(m.tilt_sy - k_tilt_sy) < 1e-9 && m.lift > 0.3 && m.lift < 0.45;
+    for (int l = 0; l < k_level_count; ++l)
+    {
+        const geometry gl = level_geometry(m, l);
+        aligned = aligned && gl.W * (1 << l) == m.W && gl.H * (1 << l) == m.H
+               && std::fabs(gl.s * (1 << l) - m.s) < 1e-9
+               && std::fabs(gl.W / gl.s - m.W / m.s) < 1e-6; // same wrap period
+    }
+    std::printf("P22: master %dx%d at %.3f px/hex, tilt sy %.4f, lift %.3f\n", m.W, m.H, m.s,
+                m.tilt_sy, m.lift);
+    check(aligned, "P22", "master W/H are multiples of 16; each level halves exactly and keeps the wrap period");
+
+    // Chunkwise vs whole: a 2x2-chunk master window (1024 px) aimed at land,
+    // on the chunk lattice.
+    const int lr = land_i / src.gw, lc = land_i % src.gw;
+    const double lx = 1.7320508075688772 * (lc + ((lr & 1) ? 0.5 : 0.0));
+    const int side = 2 * k_chunk_px;
+    const int x0 = (static_cast<int>(lx * m.s) / k_chunk_px) * k_chunk_px;
+    const int y0 = std::clamp((static_cast<int>((1.5 * lr - m.y_min) * m.s) / k_chunk_px) * k_chunk_px,
+                              0, std::max(0, (m.H - side) / k_chunk_px * k_chunk_px));
+    bake_params p1 = p;
+    p1.supersample = 1;
+    std::vector<std::uint32_t> whole(static_cast<std::size_t>(side) * side);
+    bake_region(src, m, p1, x0, y0, side, side, whole.data());
+    std::vector<std::uint32_t> wl = whole, tmp;
+    int ws = side;
+    for (int l = 1; l < k_level_count; ++l)
+    {
+        tmp.assign(static_cast<std::size_t>(ws / 2) * (ws / 2), 0u);
+        downsample_half(wl.data(), ws, ws, tmp.data());
+        wl.swap(tmp);
+        ws /= 2;
+    }
+    std::vector<std::uint32_t> placed(static_cast<std::size_t>(ws) * ws, 0u);
+    bool chunk_eq_bake = true;
+    for (int q = 0; q < 4; ++q)
+    {
+        const int qx = (q & 1) * k_chunk_px, qy = (q >> 1) * k_chunk_px;
+        std::vector<std::uint32_t> c(static_cast<std::size_t>(k_chunk_px) * k_chunk_px);
+        bake_region(src, m, p1, x0 + qx, y0 + qy, k_chunk_px, k_chunk_px, c.data());
+        for (int y = 0; y < k_chunk_px && chunk_eq_bake; ++y)
+            chunk_eq_bake = std::memcmp(c.data() + static_cast<std::size_t>(y) * k_chunk_px,
+                                        whole.data() + static_cast<std::size_t>(qy + y) * side + qx,
+                                        k_chunk_px * 4u) == 0;
+        int cs = k_chunk_px;
+        for (int l = 1; l < k_level_count; ++l)
+        {
+            tmp.assign(static_cast<std::size_t>(cs / 2) * (cs / 2), 0u);
+            downsample_half(c.data(), cs, cs, tmp.data());
+            c.swap(tmp);
+            cs /= 2;
+        }
+        for (int y = 0; y < cs; ++y)
+            std::memcpy(placed.data() + static_cast<std::size_t>(qy / 16 + y) * ws + qx / 16,
+                        c.data() + static_cast<std::size_t>(y) * cs, static_cast<std::size_t>(cs) * 4u);
+    }
+    check(chunk_eq_bake, "P22", "a master chunk bakes byte-identical to its quadrant of a 2x2-chunk window (no chunk seam)");
+    check(placed == wl, "P22", "the mip chain built chunk by chunk equals the whole image's chain to the 8 px level");
+    {
+        std::vector<std::uint32_t> flat(16, 0xFF204060u), half(4);
+        downsample_half(flat.data(), 4, 4, half.data());
+        check(half == std::vector<std::uint32_t>(4, 0xFF204060u), "P22",
+              "a flat run (lock fill, open sea) downsamples byte-exact");
+    }
+
+    // The chooser. Rung radii at 1720x1080 (drawn: 6.93 / 13.87 / 27.73 /
+    // 55.47 / 110.66) and 3840x2160 (14.0 ... 223.41). The 128 px ladder
+    // (Ben, 2026-10-10): 8 / 16 / 32 / 64 / 128, so the reference window's
+    // five rungs read levels 4 / 3 / 2 / 1 / 0, every one minified.
+    const struct { double r; int want; } rows[] = {
+        { 3.0, 4 }, { 6.93, 4 }, { 8.0, 4 }, { 8.01, 3 }, { 13.87, 3 }, { 16.0, 3 }, { 16.5, 2 },
+        { 27.73, 2 }, { 28.0, 2 }, { 32.0, 2 }, { 32.5, 1 }, { 55.47, 1 }, { 64.0, 1 },
+        { 64.5, 0 }, { 110.66, 0 }, { 128.0, 0 }, { 223.41, 0 },
+    };
+    bool all = true;
+    for (const auto& row : rows)
+        if (const int got = choose_level(row.r); got != row.want)
+        {
+            std::printf("      draw_r %.2f -> level %d, want %d\n", row.r, got, row.want);
+            all = false;
+        }
+    check(all, "P22", "chooser reads the coarsest level at or above the drawn radius");
+    bool never_mag = true, within_2 = true;
+    for (double r = k_level_ppr[k_level_count - 1] + 0.0625; r <= k_master_ppr; r += 0.0625)
+    {
+        const double ppr = k_level_ppr[choose_level(r)];
+        if (ppr / r < 1.0) never_mag = false;
+        if (ppr / r > 2.0) within_2 = false;
+    }
+    check(never_mag && within_2, "P22", "every radius from 8 to 128 px reads a level minified by 1:1 to 2:1");
+    // RENDERING.md § Level of detail: no rung magnifies at the reference window.
+    bool ref_min = true;
+    for (const double r : { 6.93, 13.87, 27.73, 55.47, 110.66 })
+        ref_min = ref_min && k_level_ppr[choose_level(r)] >= r;
+    check(ref_min, "P22", "no rung of the reference 1720x1080 window magnifies (its top rung reads the master minified)");
+}
+
+/// P23 - the lock fast path (BL-1246): a window wholly inside survey-masked
+/// ground is filled with the lock colour directly; it must be byte-identical
+/// to the full per-pixel bake. Checked on master chunks of an unsurveyed body
+/// and on the first masked master chunks of the home body under its mask
+/// (where the path engages), plus one chunk on a mask edge (where it must
+/// not change anything either).
+void lock_fast_row(world& w, entity_id home, const bake_params& p)
+{
+    bake_params fast = p, slow = p;
+    fast.supersample = slow.supersample = 1; // the master's
+    fast.fast_lock = true;
+    slow.fast_lock = false;
+    constexpr std::uint32_t lock = ui::palette::col32(12, 14, 20, 255);
+    int compared = 0, engaged = 0;
+    bool equal = true;
+    double ms_fast = 0.0, ms_slow = 0.0;
+    std::vector<std::uint32_t> a, b;
+    const auto compare = [&](const bake_source& s, const geometry& g, int ci, int cj) {
+        const int x0 = ci * k_chunk_px, y0 = cj * k_chunk_px;
+        const int cw = std::min(k_chunk_px, g.W - x0), chh = std::min(k_chunk_px, g.H - y0);
+        a.assign(static_cast<std::size_t>(cw) * chh, 0u);
+        b.assign(a.size(), 0u);
+        auto t0 = std::chrono::steady_clock::now();
+        bake_region(s, g, fast, x0, y0, cw, chh, a.data());
+        ms_fast += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+        t0 = std::chrono::steady_clock::now();
+        bake_region(s, g, slow, x0, y0, cw, chh, b.data());
+        ms_slow += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+        ++compared;
+        equal = equal && a == b;
+        return std::all_of(a.begin(), a.end(), [&](std::uint32_t c) { return c == lock; });
+    };
+    for (const auto& [id, bd] : w.bodies)
+        if (bd.grid_width > 0 && bd.survey.phase == survey_phase::hidden)
+        {
+            const bake_source hs = prepare_source(w, id);
+            const geometry g = make_master_geometry(bd.grid_width, bd.grid_height);
+            const int cw = (g.W + k_chunk_px - 1) / k_chunk_px, ch = (g.H + k_chunk_px - 1) / k_chunk_px;
+            engaged += compare(hs, g, cw / 2, ch / 2) ? 1 : 0;
+            break;
+        }
+    {
+        const body_component& hb = w.bodies.at(home);
+        const bake_source ms = prepare_source(w, home, /*reveal_all=*/false);
+        const geometry g = make_master_geometry(hb.grid_width, hb.grid_height);
+        const int cw = (g.W + k_chunk_px - 1) / k_chunk_px, ch = (g.H + k_chunk_px - 1) / k_chunk_px;
+        int found = 0, edge = 0;
+        std::vector<std::uint32_t> probe;
+        for (int cj = 1; cj + 1 < ch && (found < 3 || edge < 1); ++cj)
+            for (int ci = 0; ci < cw && (found < 3 || edge < 1); ci += 3)
+            {
+                // Cheap pre-probe: the fast output alone, to find candidates.
+                const int x0 = ci * k_chunk_px, y0 = cj * k_chunk_px;
+                probe.assign(static_cast<std::size_t>(std::min(k_chunk_px, g.W - x0))
+                             * std::min(k_chunk_px, g.H - y0), 0u);
+                bake_region(ms, g, fast, x0, y0, std::min(k_chunk_px, g.W - x0),
+                            std::min(k_chunk_px, g.H - y0), probe.data());
+                const std::size_t n_lock = static_cast<std::size_t>(
+                    std::count(probe.begin(), probe.end(), lock));
+                if (n_lock == probe.size() && found < 3)
+                {
+                    engaged += compare(ms, g, ci, cj) ? 1 : 0;
+                    ++found;
+                }
+                else if (n_lock > 0 && n_lock < probe.size() && edge < 1)
+                {
+                    compare(ms, g, ci, cj); // a mask edge: the path must not engage
+                    ++edge;
+                }
+            }
+    }
+    // A mask EDGE: a body this seed has partly surveyed — every master chunk
+    // in the rows that cross its mask boundary, so the path is exercised
+    // right up to the reach margin where it must stop engaging.
+    int edge_chunks = 0;
+    // No body is part-surveyed in this harness world, so make one: the home
+    // body mid-scan, half its survey regions revealed (restored after).
+    body_component& hbm = w.bodies.at(home);
+    const survey_state saved = hbm.survey;
+    hbm.survey.phase = survey_phase::scanning;
+    hbm.survey.regions_done = survey_region_count(hbm.grid_width, hbm.grid_height) / 2;
+    for (const auto& [id, bd] : w.bodies)
+    {
+        if (bd.grid_width <= 0 || edge_chunks > 0)
+            continue;
+        const bake_source s = prepare_source(w, id);
+        const std::size_t n_masked = static_cast<std::size_t>(std::count(
+            s.cls.begin(), s.cls.end(), static_cast<std::uint8_t>(bake_source::tile_class::masked)));
+        if (n_masked == 0 || n_masked == s.cls.size())
+            continue;
+        const geometry g = make_master_geometry(bd.grid_width, bd.grid_height);
+        const int cw = (g.W + k_chunk_px - 1) / k_chunk_px, ch = (g.H + k_chunk_px - 1) / k_chunk_px;
+        // Is any tile within `reach` canonical units of the chunk's window
+        // NOT masked? (The fast path's own test at reach 4.5.)
+        const auto unmasked_within = [&](int ci, int cj, double reach) {
+            const double x0 = ci * k_chunk_px / g.s, x1 = (ci + 1) * k_chunk_px / g.s;
+            const double y0 = cj * k_chunk_px / g.s + g.y_min, y1 = (cj + 1) * k_chunk_px / g.s + g.y_min;
+            const int r_lo = std::max(0, static_cast<int>(std::floor((y0 - reach) / 1.5)));
+            const int r_hi = std::min(s.gh - 1, static_cast<int>(std::ceil((y1 + reach) / 1.5)));
+            for (int r = r_lo; r <= r_hi; ++r)
+                for (int c = static_cast<int>(std::floor((x0 - reach) / 1.7320508075688772)) - 1;
+                     c <= static_cast<int>(std::ceil((x1 + reach) / 1.7320508075688772)) + 1; ++c)
+                    if (s.cls[static_cast<std::size_t>(r) * s.gw + ((c % s.gw) + s.gw) % s.gw]
+                        != static_cast<std::uint8_t>(bake_source::tile_class::masked))
+                        return true;
+            return false;
+        };
+        // The chunks the path engages on CLOSEST to the mask edge (visible
+        // ground just past the 4.5 reach, within 4.5 + one chunk), and the
+        // mixed chunks beside them: where a reach too short would show.
+        int near = 0, mixed = 0;
+        for (int cj = 1; cj + 1 < ch; ++cj)
+            for (int ci = 0; ci < cw; ++ci)
+            {
+                if (near < 6 && !unmasked_within(ci, cj, 4.5)
+                    && unmasked_within(ci, cj, 4.5 + k_chunk_px / g.s))
+                {
+                    engaged += compare(s, g, ci, cj) ? 1 : 0;
+                    ++near;
+                    ++edge_chunks;
+                    if (mixed < 3 && cj > 0)
+                    {
+                        compare(s, g, ci, cj - 1);
+                        compare(s, g, ci, cj + 1);
+                        ++mixed;
+                    }
+                }
+            }
+        std::printf("P23: partly surveyed body %u (%zu of %zu tiles masked)\n",
+                    static_cast<unsigned>(id), n_masked, s.cls.size());
+    }
+    hbm.survey = saved;
+    std::printf("P23: %d chunks compared, %d wholly lock; fast %.1f ms vs full %.1f ms\n",
+                compared, engaged, ms_fast, ms_slow);
+    check(compared >= 2 && engaged >= 1, "P23", "found masked master chunks to compare");
+    if (edge_chunks == 0)
+        std::printf("SKIP  P23 edge: no partly surveyed body on this seed\n");
+    check(equal, "P23", "the lock fast path is byte-identical to the full bake (masked and mask-edge chunks)");
+}
+
+/// P24 / P25 - the partial re-bake (BL-1246, RENDERING.md § Chunks, cache and
+/// invalidation: a building's change re-bakes a window around it, not its
+/// whole chunk). On master chunks, exactly as ground_layer bakes them:
+///   P24 window invariance — a chunk baked whole, then the windows the rule
+///       draws around its installations re-baked and blitted over it, is
+///       unchanged byte for byte; and the patch itself — a chunk baked
+///       against the source BEFORE an installation change, patched with the
+///       windows the rule draws from the before/after diff, equals the whole
+///       chunk baked AFTER, byte for byte: real installations, a staged
+///       structure straddling a chunk corner (every chunk it reaches), one on
+///       the wrap seam (both sides), a build, a removal, a family change, a
+///       raze. A terrain change and a dense change fall back to a whole bake.
+///   P25 the mip pieces derived from the windows alone, placed over the old
+///       chunk's chain, equal the new chunk's chain at every level.
+void patch_row(const bake_source& src, const bake_params& p)
+{
+    const geometry m = make_master_geometry(src.gw, src.gh);
+    bake_params p1 = p;
+    p1.supersample = 1; // the master's (ground_layer::k_master_ss)
+    const int cw = (m.W + k_chunk_px - 1) / k_chunk_px;
+    const int ch = (m.H + k_chunk_px - 1) / k_chunk_px;
+    constexpr double kS3 = 1.7320508075688772;
+
+    bake_source bare = src;
+    bare.inst.of_tile.assign(bare.cls.size(), -1);
+    bare.inst.list.clear();
+    const auto staged = [](const bake_source& base, std::size_t i, const tile_installation& ti) {
+        bake_source s = base;
+        if (s.inst.of_tile[i] < 0)
+        {
+            s.inst.of_tile[i] = static_cast<std::int32_t>(s.inst.list.size());
+            s.inst.list.push_back(ti);
+        }
+        else
+            s.inst.list[static_cast<std::size_t>(s.inst.of_tile[i])] = ti;
+        return s;
+    };
+    const auto cleared = [](const bake_source& base, std::size_t i) {
+        bake_source s = base;
+        s.inst.of_tile[i] = -1; // the list entry is left behind, unreferenced
+        return s;
+    };
+    const auto chunk_of = [&](std::size_t i, int& ci, int& cj) {
+        const int r = static_cast<int>(i / src.gw), c = static_cast<int>(i % src.gw);
+        const double x = kS3 * (c + ((r & 1) ? 0.5 : 0.0)) * m.s;
+        const double y = (1.5 * r - m.y_min) * m.s;
+        ci = std::clamp(static_cast<int>(x) / k_chunk_px, 0, cw - 1);
+        cj = std::clamp(static_cast<int>(y) / k_chunk_px, 0, ch - 1);
+    };
+
+    int cases = 0, windows = 0;
+    long long patch_px = 0, chunk_px = 0;
+    bool p24_ok = true, p25_ok = true, inv_ok = true;
+    std::vector<std::uint32_t> base, target, out;
+    std::vector<std::uint32_t> base_mip[k_level_count], target_mip[k_level_count], pm[k_level_count];
+    // One case: chunk (ci, cj) baked against @p base_src, the windows of the
+    // (rect_old -> rect_new) diff re-baked against rect_new and blitted,
+    // compared with the chunk baked whole against rect_new.
+    const auto run = [&](const char* name, const bake_source& base_src, const bake_source& rect_old,
+                         const bake_source& rect_new, int ci, int cj, bool invariance) {
+        const int x0 = ci * k_chunk_px, y0 = cj * k_chunk_px;
+        const int w = std::min(k_chunk_px, m.W - x0), h = std::min(k_chunk_px, m.H - y0);
+        std::vector<pixel_rect> rects;
+        const bool ok = installation_patch_rects(rect_old, rect_new, m, p1, x0, y0, w, h, rects, 1.0);
+        base.assign(static_cast<std::size_t>(w) * h, 0u);
+        target.assign(base.size(), 0u);
+        bake_region(base_src, m, p1, x0, y0, w, h, base.data());
+        bake_region(rect_new, m, p1, x0, y0, w, h, target.data());
+        derive_mip_pieces(base.data(), w, h, base_mip);
+        derive_mip_pieces(target.data(), w, h, target_mip);
+        long long area = 0;
+        for (const pixel_rect& r : rects)
+        {
+            out.assign(static_cast<std::size_t>(r.w) * r.h, 0u);
+            bake_region(rect_new, m, p1, r.x0, r.y0, r.w, r.h, out.data());
+            const int rx = r.x0 - x0, ry = r.y0 - y0;
+            for (int y = 0; y < r.h; ++y)
+                std::memcpy(base.data() + static_cast<std::size_t>(ry + y) * w + rx,
+                            out.data() + static_cast<std::size_t>(y) * r.w, static_cast<std::size_t>(r.w) * 4u);
+            derive_mip_pieces(out.data(), r.w, r.h, pm);
+            int lw = w;
+            for (int l = 1; l < k_level_count; ++l)
+            {
+                lw /= 2;
+                for (int y = 0; y < (r.h >> l); ++y)
+                    std::memcpy(base_mip[l].data() + static_cast<std::size_t>((ry >> l) + y) * lw + (rx >> l),
+                                pm[l].data() + static_cast<std::size_t>(y) * (r.w >> l),
+                                static_cast<std::size_t>(r.w >> l) * 4u);
+            }
+            area += static_cast<long long>(r.w) * r.h;
+        }
+        bool same = ok && base == target;
+        int first = -1;
+        if (!same && ok)
+            for (std::size_t q = 0; q < base.size() && first < 0; ++q)
+                if (base[q] != target[q])
+                    first = static_cast<int>(q);
+        bool chain = ok;
+        for (int l = 1; l < k_level_count && chain; ++l)
+            chain = base_mip[l] == target_mip[l];
+        std::printf("P24: %-34s chunk (%d,%d)  %zu window%s  %.1f%% of the chunk%s",
+                    name, ci, cj, rects.size(), rects.size() == 1 ? "" : "s",
+                    100.0 * area / (static_cast<double>(w) * h), ok ? "" : "  [rule refused]");
+        if (first >= 0)
+            std::printf("  FIRST MISMATCH at chunk px (%d,%d)", first % w, first / w);
+        std::printf("\n");
+        ++cases;
+        windows += static_cast<int>(rects.size());
+        patch_px += area;
+        chunk_px += static_cast<long long>(w) * h;
+        (invariance ? inv_ok : p24_ok) = (invariance ? inv_ok : p24_ok) && same;
+        p25_ok = p25_ok && chain;
+        return rects.size();
+    };
+
+    // --- Real installations: the chunk holding the most of them ---
+    std::vector<int> per_chunk(static_cast<std::size_t>(cw) * ch, 0);
+    std::vector<std::size_t> inst_tiles;
+    for (std::size_t i = 0; i < src.inst.of_tile.size(); ++i)
+        if (src.inst.of_tile[i] >= 0)
+        {
+            int ci = 0, cj = 0;
+            chunk_of(i, ci, cj);
+            ++per_chunk[static_cast<std::size_t>(cj) * cw + ci];
+            inst_tiles.push_back(i);
+        }
+    const auto busiest = std::max_element(per_chunk.begin(), per_chunk.end());
+    if (!inst_tiles.empty() && *busiest > 0)
+    {
+        const int k = static_cast<int>(busiest - per_chunk.begin());
+        const int ci = k % cw, cj = k / cw;
+        std::printf("P24: the real installations' busiest master chunk (%d,%d) holds %d\n", ci, cj, *busiest);
+        run("invariance (real, every structure)", src, bare, src, ci, cj, true);
+        run("real: every structure built", bare, bare, src, ci, cj, false);
+        // One structure in that chunk: built, demolished, re-familied, razed.
+        std::size_t one = inst_tiles.front();
+        for (const std::size_t i : inst_tiles)
+        {
+            int a = 0, b = 0;
+            chunk_of(i, a, b);
+            if (a == ci && b == cj) { one = i; break; }
+        }
+        const bake_source without = cleared(src, one);
+        run("real: one build", without, without, src, ci, cj, false);
+        run("real: one demolition", src, src, without, ci, cj, false);
+        tile_installation ti = src.inst.list[static_cast<std::size_t>(src.inst.of_tile[one])];
+        if (ti.n_stacks > 0)
+            ti.stacks[0].family ^= 1;
+        else
+            ti.settlement.subject = ti.settlement.subject == stamp_subject::ruin
+                                        ? stamp_subject::settlement : stamp_subject::ruin;
+        const bake_source changed = staged(src, one, ti);
+        run("real: one family change / raze", src, src, changed, ci, cj, false);
+    }
+    else
+        std::printf("SKIP  P24 real: this seed's home body stands no installation\n");
+
+    // The biggest staged tile: three stacks and a metropolis.
+    tile_installation big;
+    {
+        const auto bld = [](building_type t, int fam) {
+            stamp_key k; k.subject = stamp_subject::building;
+            k.type = static_cast<std::uint8_t>(t); k.family = static_cast<std::uint8_t>(fam);
+            return k;
+        };
+        big.stacks[0] = bld(building_type::processing_facility, static_cast<int>(processing_family::refinery));
+        big.stacks[1] = bld(building_type::extraction_site, static_cast<int>(extraction_family::mine));
+        big.stacks[2] = bld(building_type::port, 0);
+        big.n_stacks = 3;
+        big.settlement.subject = stamp_subject::settlement;
+        big.settlement.scale = 5;
+    }
+    const auto visible = [&](std::size_t i) {
+        return src.cls[i] == static_cast<std::uint8_t>(bake_source::tile_class::land)
+            || src.cls[i] == static_cast<std::uint8_t>(bake_source::tile_class::water);
+    };
+    // A staged tile built: the rule run on its own master chunk and all eight
+    // around it (columns wrapping) — a chunk the rule leaves unpatched must
+    // come out unchanged too. Returns the chunks given a window, and whether
+    // both sides of the wrap seam were.
+    const auto run_reached = [&](const char* name, std::size_t i, bool& both_seam_sides) {
+        const bake_source before = cleared(src, i);
+        const bake_source after  = staged(src, i, big);
+        int ci0 = 0, cj0 = 0;
+        chunk_of(i, ci0, cj0);
+        int n = 0;
+        bool east = false, west = false;
+        for (int dj = -1; dj <= 1; ++dj)
+            for (int di = -1; di <= 1; ++di)
+            {
+                const int cj = cj0 + dj;
+                const int ci = ((ci0 + di) % cw + cw) % cw;
+                if (cj < 0 || cj >= ch)
+                    continue;
+                if (run(name, before, before, after, ci, cj, false) > 0)
+                {
+                    ++n;
+                    east = east || ci == 0;
+                    west = west || ci == cw - 1;
+                }
+            }
+        both_seam_sides = east && west;
+        return n;
+    };
+
+    // --- A structure straddling a chunk CORNER: the tile whose centre is
+    // nearest a corner of the master chunk lattice, in temperate rows ---
+    {
+        std::size_t best = 0;
+        double best_d = 1e30;
+        for (int r = src.gh / 4; r < src.gh * 3 / 4; ++r)
+            for (int c = 1; c + 1 < src.gw; ++c)
+            {
+                const std::size_t i = static_cast<std::size_t>(r) * src.gw + c;
+                if (!visible(i))
+                    continue;
+                const double x = kS3 * (c + ((r & 1) ? 0.5 : 0.0)) * m.s;
+                const double y = (1.5 * r - m.y_min) * m.s - 40.0; // structures stand up: aim a little high
+                const double dx = std::fabs(x - std::round(x / k_chunk_px) * k_chunk_px);
+                const double dy = std::fabs(y - std::round(y / k_chunk_px) * k_chunk_px);
+                if (dx + dy < best_d) { best_d = dx + dy; best = i; }
+            }
+        bool seam_unused = false;
+        const int n = run_reached("staged: straddling a chunk corner", best, seam_unused);
+        std::printf("P24: the corner tile [%zu,%zu] reaches %d master chunks\n",
+                    best % src.gw, best / src.gw, n);
+        check(n >= 3, "P24", "the corner case reaches at least three chunks (it straddles)");
+
+        // EVERY FORM, one at a time, built on that tile: a window wide enough
+        // for any structure, baked before and after, patched by the rule —
+        // so no form draws a pixel its window misses.
+        const auto bld = [](building_type t, int fam, stamp_subject sj = stamp_subject::building) {
+            stamp_key k; k.subject = sj;
+            k.type = static_cast<std::uint8_t>(t); k.family = static_cast<std::uint8_t>(fam);
+            return k;
+        };
+        std::vector<tile_installation> forms;
+        const auto one = [&](stamp_key a) { tile_installation t; t.stacks[0] = a; t.n_stacks = 1; forms.push_back(t); };
+        for (int f = 0; f < static_cast<int>(extraction_family::count); ++f)
+            one(bld(building_type::extraction_site, f));
+        for (int f = 0; f < static_cast<int>(processing_family::count); ++f)
+            one(bld(building_type::processing_facility, f));
+        for (building_type t : { building_type::port, building_type::launchpad,
+                                 building_type::inland_logistics_hub, building_type::military_base,
+                                 building_type::research_institute, building_type::schooling,
+                                 building_type::university })
+            one(bld(t, 0));
+        one(bld(building_type::processing_facility, static_cast<int>(processing_family::metal_foundry),
+                stamp_subject::scaffold));
+        for (int sc = 1; sc <= 5; ++sc)
+        {
+            tile_installation t; t.settlement.subject = stamp_subject::settlement;
+            t.settlement.scale = static_cast<std::uint8_t>(sc);
+            forms.push_back(t);
+        }
+        {
+            tile_installation t; t.settlement.subject = stamp_subject::ruin; t.settlement.scale = 1;
+            forms.push_back(t);
+        }
+        {
+            // BL-1258: a city beside works — the blocks keep off the works'
+            // slots, the works stand at the edge; every lot, stack, roof unit
+            // and tower crown inside the window.
+            tile_installation t; t.settlement.subject = stamp_subject::settlement; t.settlement.scale = 4;
+            t.stacks[0] = bld(building_type::processing_facility, static_cast<int>(processing_family::metal_foundry));
+            t.stacks[1] = bld(building_type::extraction_site, static_cast<int>(extraction_family::mine));
+            t.n_stacks = 2;
+            forms.push_back(t);
+        }
+        forms.push_back(big);
+        const int br = static_cast<int>(best / src.gw), bc = static_cast<int>(best % src.gw);
+        const double bx = kS3 * (bc + ((br & 1) ? 0.5 : 0.0)), by = 1.5 * br;
+        const int fx0 = (static_cast<int>((bx - 3.5) * m.s) / k_patch_align) * k_patch_align;
+        const int fy0 = (static_cast<int>((by - 4.0 - m.y_min) * m.s) / k_patch_align) * k_patch_align;
+        const int fw = static_cast<int>(7.5 * m.s) / k_patch_align * k_patch_align;
+        const int fh = static_cast<int>(7.0 * m.s) / k_patch_align * k_patch_align;
+        const bake_source before = cleared(src, best);
+        std::vector<std::uint32_t> fb(static_cast<std::size_t>(fw) * fh), fa(fb.size()), fo;
+        bake_region(before, m, p1, fx0, fy0, fw, fh, fb.data());
+        int forms_ok = 0;
+        double max_frac = 0.0;
+        for (const tile_installation& ti : forms)
+        {
+            const bake_source after = staged(before, best, ti);
+            bake_region(after, m, p1, fx0, fy0, fw, fh, fa.data());
+            std::vector<pixel_rect> rr;
+            std::vector<std::uint32_t> patched = fb;
+            bool good = installation_patch_rects(before, after, m, p1, fx0, fy0, fw, fh, rr, 1.0);
+            long long area = 0;
+            for (const pixel_rect& r : rr)
+            {
+                fo.assign(static_cast<std::size_t>(r.w) * r.h, 0u);
+                bake_region(after, m, p1, r.x0, r.y0, r.w, r.h, fo.data());
+                for (int y = 0; y < r.h; ++y)
+                    std::memcpy(patched.data() + static_cast<std::size_t>(r.y0 - fy0 + y) * fw + (r.x0 - fx0),
+                                fo.data() + static_cast<std::size_t>(y) * r.w, static_cast<std::size_t>(r.w) * 4u);
+                area += static_cast<long long>(r.w) * r.h;
+            }
+            good = good && patched == fa && fa != fb;
+            // And the form's window-invariance at another window origin on the
+            // 16 px lattice: the overlap of a shifted window bakes the same.
+            {
+                const int sx = 48, sy = 32;
+                std::vector<std::uint32_t> sh(fa.size());
+                bake_region(after, m, p1, fx0 + sx, fy0 + sy, fw, fh, sh.data());
+                for (int y = 0; y + sy < fh && good; ++y)
+                    good = std::memcmp(sh.data() + static_cast<std::size_t>(y) * fw,
+                                       fa.data() + static_cast<std::size_t>(y + sy) * fw + sx,
+                                       static_cast<std::size_t>(fw - sx) * 4u) == 0;
+            }
+            max_frac = std::max(max_frac, area / (static_cast<double>(k_chunk_px) * k_chunk_px));
+            if (!good)
+            {
+                int dx0 = fw, dy0 = fh, dx1 = -1, dy1 = -1, miss = 0;
+                for (int y = 0; y < fh; ++y)
+                    for (int x = 0; x < fw; ++x)
+                    {
+                        const std::size_t q = static_cast<std::size_t>(y) * fw + x;
+                        if (fa[q] == fb[q])
+                            continue;
+                        dx0 = std::min(dx0, x); dx1 = std::max(dx1, x);
+                        dy0 = std::min(dy0, y); dy1 = std::max(dy1, y);
+                        miss += patched[q] != fa[q];
+                    }
+                std::printf("      form %s type %d family %d scale %d: the window misses %d pixels it "
+                            "draws (changed px x %d..%d y %d..%d of the %dx%d window",
+                            stamp_name(ti.n_stacks ? ti.stacks[0] : ti.settlement),
+                            ti.stacks[0].type, ti.stacks[0].family, ti.settlement.scale, miss,
+                            dx0, dx1, dy0, dy1, fw, fh);
+                for (const pixel_rect& r : rr)
+                    std::printf("; rect x %d..%d y %d..%d", r.x0 - fx0, r.x0 - fx0 + r.w - 1,
+                                r.y0 - fy0, r.y0 - fy0 + r.h - 1);
+                std::printf(")\n");
+                // Triage: which pass is window-dependent? The rect baked alone
+                // vs the same pixels of the wide window, each pass off in turn.
+                if (!rr.empty())
+                {
+                    const pixel_rect r = rr.front();
+                    struct off { const char* name; void (*set)(bake_params&); };
+                    const off offs[] = {
+                        { "all on",           [](bake_params&) {} },
+                        { "no-installations", [](bake_params& q) { q.installations = false; } },
+                        { "no-unsharp",       [](bake_params& q) { q.unsharp_amount = 0.0f; } },
+                        { "no-ink",           [](bake_params& q) { q.edge_ink = q.shore_ink = 0.0f; } },
+                        { "no-grade",         [](bake_params& q) { q.grade_enabled = false; } },
+                        { "no-trees",         [](bake_params& q) { q.tree_density = 0.0f; } },
+                        { "no-landforms",     [](bake_params& q) { q.landform_strength = 0.0f; } },
+                        { "no-rivers",        [](bake_params& q) { q.river_strength = 0.0f; } },
+                        { "no-variants",      [](bake_params& q) { q.variant_strength = 0.0f; } },
+                    };
+                    std::vector<std::uint32_t> wide(fa.size()), part;
+                    for (const off& o : offs)
+                    {
+                        bake_params q = p1;
+                        o.set(q);
+                        bake_region(after, m, q, fx0, fy0, fw, fh, wide.data());
+                        part.assign(static_cast<std::size_t>(r.w) * r.h, 0u);
+                        bake_region(after, m, q, r.x0, r.y0, r.w, r.h, part.data());
+                        int bad = 0, fx = -1, fy = -1;
+                        for (int y = 0; y < r.h; ++y)
+                            for (int x = 0; x < r.w; ++x)
+                                if (part[static_cast<std::size_t>(y) * r.w + x]
+                                    != wide[static_cast<std::size_t>(r.y0 - fy0 + y) * fw + (r.x0 - fx0 + x)])
+                                {
+                                    if (!bad) { fx = x; fy = y; }
+                                    ++bad;
+                                }
+                        std::printf("        triage %-16s %d px differ (first at rect px %d,%d)\n", o.name, bad, fx, fy);
+                    }
+                }
+            }
+            forms_ok += good ? 1 : 0;
+        }
+        std::printf("P24: %d of %zu forms patched exactly; the largest window is %.0f%% of a chunk\n",
+                    forms_ok, forms.size(), 100.0 * max_frac);
+        check(forms_ok == static_cast<int>(forms.size()), "P24",
+              "every procedural form's window holds every pixel it draws, and the form bakes alike at another window origin");
+    }
+    // --- A structure in a FOREST: the trees its cleared ground removes ---
+    {
+        const int f = homogeneous_aim(src, terrain_cover::forest);
+        if (f >= 0)
+        {
+            bool unused = false;
+            run_reached("staged: in a forest (trees cleared)", static_cast<std::size_t>(f), unused);
+        }
+        else
+            std::printf("SKIP  P24 forest: no forest on this seed's home body\n");
+    }
+    // --- A structure on the WRAP SEAM: column 0, mid-body ---
+    {
+        std::size_t seam = static_cast<std::size_t>(src.gh / 2) * src.gw;
+        for (int r = src.gh / 2; r < src.gh * 3 / 4; r += 2) // even rows: centre at x = 0 exactly
+        {
+            const std::size_t i = static_cast<std::size_t>(r) * src.gw;
+            if (visible(i)) { seam = i; break; }
+        }
+        bool both = false;
+        run_reached("staged: on the wrap seam", seam, both);
+        check(both, "P24", "the wrap-seam structure is patched on both sides of the seam");
+    }
+
+    // --- The fall-backs ---
+    {
+        const int ci = cw / 2, cj = ch / 2;
+        const int x0 = ci * k_chunk_px, y0 = cj * k_chunk_px;
+        const int w = std::min(k_chunk_px, m.W - x0), h = std::min(k_chunk_px, m.H - y0);
+        // A terrain change inside the chunk's reach: never a patch.
+        std::size_t t = 0;
+        for (std::size_t i = 0; i < src.cls.size(); ++i)
+        {
+            int a = 0, b = 0;
+            chunk_of(i, a, b);
+            if (a == ci && b == cj && visible(i)) { t = i; break; }
+        }
+        bake_source terr = staged(src, t, big);
+        terr.colour[t] ^= 0x00101010u;
+        std::vector<pixel_rect> rr;
+        check(!installation_patch_rects(cleared(src, t), terr, m, p1, x0, y0, w, h, rr),
+              "P24", "a terrain change in reach re-bakes the chunk whole");
+        // Every tile of the chunk building at once: past 40%, whole.
+        bake_source dense = bare;
+        for (std::size_t i = 0; i < src.cls.size(); ++i)
+        {
+            int a = 0, b = 0;
+            chunk_of(i, a, b);
+            if (a == ci && b == cj && visible(i))
+            {
+                dense.inst.of_tile[i] = static_cast<std::int32_t>(dense.inst.list.size());
+                dense.inst.list.push_back(big);
+            }
+        }
+        check(!installation_patch_rects(bare, dense, m, p1, x0, y0, w, h, rr),
+              "P24", "windows past 40% of the chunk re-bake it whole");
+        check(installation_patch_rects(src, src, m, p1, x0, y0, w, h, rr) && rr.empty(),
+              "P24", "no change, no window");
+    }
+
+    std::printf("P24: %d cases, %d windows, %.1f%% of their chunks' pixels re-baked\n", cases, windows,
+                chunk_px ? 100.0 * patch_px / chunk_px : 0.0);
+    check(inv_ok, "P24", "windows around installations re-baked and blitted leave a whole-chunk bake byte-identical");
+    check(p24_ok, "P24", "a chunk patched by the window rule equals the chunk baked whole after the change");
+    check(p25_ok, "P25", "the windows' own mip pieces, placed, equal the whole chunk's chain at 64/32/16/8");
+}
+
 } // namespace
 
-int main()
+/// P26 / P27 — tiles hold their own ground (BL-1251, RENDERING.md § Tiles hold
+/// their own ground).
+///   P26 The edge band holds: a tile's centre region bakes byte-identical
+///       whatever its neighbours' ground is (colour, family, variant — so
+///       their border sets too); the pre-BL-1251 wide blend (edge_band 0)
+///       fails the same comparison, so the row has teeth.
+///   P27 Every border set found on the home body, and the shore shelf, bakes
+///       deterministically, wrap-exact one period east, seamless across a
+///       chunk edge, at the real master geometry — and actually draws
+///       (border_strength 0 differs).
+/// @p previews also writes bl1251_<subject>_{legacy,now}.png master windows.
+void border_row(const bake_source& src, const body_component& hb, const bake_params& p, bool previews)
+{
+    const auto land = static_cast<std::uint8_t>(bake_source::tile_class::land);
+    const auto water = static_cast<std::uint8_t>(bake_source::tile_class::water);
+    const auto nb = [&](int i, int side) -> int
+    {
+        const hex_neighbors::coord c = hex_neighbors::neighbour(i % src.gw, i / src.gw, side);
+        if (c.gy < 0 || c.gy >= src.gh)
+            return -1;
+        return c.gy * src.gw + ((c.gx % src.gw) + src.gw) % src.gw;
+    };
+    const auto bare_tile = [&](int i) -> bool
+    {
+        return i >= 0 && src.cls[i] == land && !src.near_feature[i]
+            && (static_cast<std::size_t>(i) >= src.inst.of_tile.size() || src.inst.of_tile[i] < 0);
+    };
+    const auto temperate = [&](int i) { const int r = i / src.gw; return r > src.gh / 5 && r < src.gh * 4 / 5; };
+
+    // ---- P26: a tile whose whole ring is quiet land.
+    {
+        int t = -1;
+        for (int i = 0; i < static_cast<int>(src.cls.size()) && t < 0; ++i)
+        {
+            if (!temperate(i) || !bare_tile(i))
+                continue;
+            bool ok = true;
+            for (int s = 0; s < 6 && ok; ++s)
+                ok = bare_tile(nb(i, s));
+            if (ok)
+                t = i;
+        }
+        check(t >= 0, "P26", "found a land tile whose six neighbours are quiet land");
+        if (t >= 0)
+        {
+            // Every neighbour's ground changed: another family (and so another
+            // border set facing t), another colour, another variant.
+            bake_source alt = src;
+            for (int s = 0; s < 6; ++s)
+            {
+                const int j = nb(t, s);
+                alt.family[j]  = static_cast<std::uint8_t>(alt.family[t] == 0 ? 4 : 0); // grass <-> bare
+                alt.colour[j]  = ui::palette::col32(200, 40, 160, 255);
+                alt.variant[j] = static_cast<std::uint8_t>((alt.variant[j] + 1) % k_variant_count);
+                for (int k = 0; k < k_vparam_count; ++k)
+                    alt.vparam[static_cast<std::size_t>(j) * k_vparam_count + k] *= -1.5f;
+            }
+            rederive_border_sets(alt);
+            const geometry gf = make_geometry(hb.grid_width, hb.grid_height, 96.0); // flat: canonical = pixel
+            const int tr = t / src.gw, tc = t % src.gw;
+            const double cx = 1.7320508075688772 * (tc + ((tr & 1) ? 0.5 : 0.0)), cy = 1.5 * tr;
+            const int side = 256;
+            const int px0 = static_cast<int>(cx * gf.s) - side / 2;
+            const int py0 = static_cast<int>((cy - gf.y_min) * gf.s) - side / 2;
+            const auto centre_equal = [&](const bake_params& q, int& compared) -> bool
+            {
+                std::vector<std::uint32_t> a(static_cast<std::size_t>(side) * side), b(a.size());
+                bake_region(src, gf, q, px0, py0, side, side, a.data());
+                bake_region(alt, gf, q, px0, py0, side, side, b.data());
+                compared = 0;
+                bool eq = true;
+                for (int y = 0; y < side; ++y)
+                    for (int x = 0; x < side; ++x)
+                    {
+                        const double dx = (px0 + x + 0.5) / gf.s - cx;
+                        const double dy = (py0 + y + 0.5) / gf.s + gf.y_min - cy;
+                        if (dx * dx + dy * dy > 0.30 * 0.30)
+                            continue;
+                        ++compared;
+                        eq = eq && a[static_cast<std::size_t>(y) * side + x] == b[static_cast<std::size_t>(y) * side + x];
+                    }
+                return eq;
+            };
+            int n_now = 0, n_old = 0;
+            const bool now = centre_equal(p, n_now);
+            bake_params legacy = p;
+            legacy.edge_band = 0.0f;
+            legacy.border_strength = 0.0f;
+            legacy.pattern_strength = 0.0f;
+            const bool old = centre_equal(legacy, n_old);
+            std::printf("P26: tile [%d,%d], %d centre pixels (r 0.30 of the 0.866 inradius)\n", tc, tr, n_now);
+            check(now && n_now > 1000, "P26", "a tile's centre region is its own ground whatever its neighbours are");
+            check(!old, "P26", "the pre-BL-1251 wide blend fails the same comparison (the row has teeth)");
+        }
+    }
+
+    // ---- P27: each border set, and the shore shelf, at the master geometry.
+    const geometry gm = make_master_geometry(hb.grid_width, hb.grid_height);
+    struct subject { const char* name; int tile; int side; };
+    std::vector<subject> subs;
+    static const char* const set_names[bs_count] = { "none", "forest fringe", "scrub fringe", "scree lip",
+                                                     "field edge", "reed fringe", "drift lip", "snow drift" };
+    for (int set = 1; set < bs_count; ++set)
+    {
+        int found = -1, fside = -1;
+        for (int i = 0; i < static_cast<int>(src.cls.size()) && found < 0; ++i)
+        {
+            if (!temperate(i) && set != bs_snow)
+                continue;
+            if (!bare_tile(i))
+                continue;
+            for (int s = 0; s < 6; ++s)
+                if (src.bset[static_cast<std::size_t>(i) * 6 + s] == set && bare_tile(nb(i, s)))
+                {
+                    found = i;
+                    fside = s;
+                    break;
+                }
+        }
+        if (found >= 0)
+            subs.push_back({ set_names[set], found, fside });
+        else
+            std::printf("P27: no %s edge on this body\n", set_names[set]);
+    }
+    {
+        int found = -1, fside = -1;
+        for (int i = 0; i < static_cast<int>(src.cls.size()) && found < 0; ++i)
+        {
+            if (!temperate(i) || !bare_tile(i))
+                continue;
+            for (int s = 0; s < 6; ++s)
+            {
+                const int j = nb(i, s);
+                if (j >= 0 && src.cls[j] == water && !src.near_feature[j])
+                {
+                    found = i;
+                    fside = s;
+                    break;
+                }
+            }
+        }
+        if (found >= 0)
+            subs.push_back({ "shore shelf", found, fside });
+    }
+    const auto has = [&](const char* nm) {
+        for (const subject& s : subs) if (std::strcmp(s.name, nm) == 0) return true;
+        return false;
+    };
+    check(has("forest fringe") && has("scree lip") && has("field edge") && has("shore shelf"), "P27",
+          "found a forest fringe, a scree lip, a field edge and a shore on the home body");
+    static const double kDx[6] = { 1.7320508075688772, 0.8660254037844386, -0.8660254037844386,
+                                   -1.7320508075688772, -0.8660254037844386, 0.8660254037844386 };
+    static const double kDy[6] = { 0.0, -1.5, -1.5, 0.0, 1.5, 1.5 };
+    bake_params off = p;
+    off.border_strength = 0.0f;
+    bool all_det = true, all_wrap = true, all_seam = true, all_draw = true;
+    for (const subject& sj : subs)
+    {
+        const int tr = sj.tile / src.gw, tc = sj.tile % src.gw;
+        const double mx = 1.7320508075688772 * (tc + ((tr & 1) ? 0.5 : 0.0)) + 0.5 * kDx[sj.side];
+        const double my = 1.5 * tr + 0.5 * kDy[sj.side];
+        const int side = 128;
+        const int px0 = static_cast<int>(mx * gm.s) - side;
+        const int py0 = std::clamp(static_cast<int>((my - gm.y_min - 0.3) * gm.s) - side / 2, 0, gm.H - side);
+        const std::size_t n = static_cast<std::size_t>(side) * side * 2;
+        std::vector<std::uint32_t> a(n), b(n), e(n), o(n), l(n / 2), r(n / 2);
+        bake_region(src, gm, p, px0, py0, side * 2, side, a.data());
+        bake_region(src, gm, p, px0, py0, side * 2, side, b.data());
+        bake_region(src, gm, p, px0 + gm.W, py0, side * 2, side, e.data());
+        bake_region(src, gm, off, px0, py0, side * 2, side, o.data());
+        bake_region(src, gm, p, px0, py0, side, side, l.data());
+        bake_region(src, gm, p, px0 + side, py0, side, side, r.data());
+        bool seam = true;
+        for (int y = 0; y < side && seam; ++y)
+            for (int x = 0; x < side; ++x)
+                if (a[static_cast<std::size_t>(y) * side * 2 + x] != l[static_cast<std::size_t>(y) * side + x]
+                    || a[static_cast<std::size_t>(y) * side * 2 + side + x] != r[static_cast<std::size_t>(y) * side + x])
+                {
+                    seam = false;
+                    break;
+                }
+        int diff = 0;
+        for (std::size_t i = 0; i < n; ++i)
+            diff += a[i] != o[i];
+        std::printf("P27: %-13s tile [%d,%d] side %d: %s, %s, %s, %d px drawn\n", sj.name, tc, tr, sj.side,
+                    a == b ? "pure" : "IMPURE", a == e ? "wrap-exact" : "WRAP SEAM", seam ? "seamless" : "CHUNK SEAM", diff);
+        all_det  = all_det && a == b;
+        all_wrap = all_wrap && a == e;
+        all_seam = all_seam && seam;
+        all_draw = all_draw && diff > 200;
+        if (previews)
+        {
+            // A wider look for the eye: 512 x 320 master pixels, legacy vs now.
+            const int W = 512, H = 320;
+            const int qx0 = static_cast<int>(mx * gm.s) - W / 2;
+            const int qy0 = std::clamp(static_cast<int>((my - gm.y_min - 0.3) * gm.s) - H / 2, 0, gm.H - H);
+            bake_params legacy = p;
+            legacy.edge_band = 0.0f; legacy.border_strength = 0.0f; legacy.pattern_strength = 0.0f;
+            legacy.edge_ink = 0.30f;
+            std::vector<std::uint32_t> pb(static_cast<std::size_t>(W) * H);
+            for (int k = 0; k < 2; ++k)
+            {
+                bake_region(src, gm, k ? p : legacy, qx0, qy0, W, H, pb.data());
+                char path[160];
+                std::string nm = sj.name;
+                for (char& c : nm) if (c == ' ') c = '_';
+                std::snprintf(path, sizeof path, "bl1251_%s_%s.png", nm.c_str(), k ? "now" : "legacy");
+                write_png_rgba(path, W, H, reinterpret_cast<const unsigned char*>(pb.data()), W * 4);
+            }
+        }
+    }
+    check(!subs.empty() && all_det,  "P27", "every border set and the shore bake byte-identical twice");
+    check(!subs.empty() && all_wrap, "P27", "every border set and the shore wrap byte-identical one period east");
+    check(!subs.empty() && all_seam, "P27", "every border set and the shore are seamless across a chunk edge");
+    check(!subs.empty() && all_draw, "P27", "every border set and the shore actually draw (strength 0 differs)");
+    if (previews)
+    {
+        // The wide plain and a deep forest's interior, for the patterns.
+        for (const auto& [nm, cov] : { std::pair{ "plain", terrain_cover::grass },
+                                       std::pair{ "forest", terrain_cover::forest },
+                                       std::pair{ "scrub", terrain_cover::scrub },
+                                       std::pair{ "bare", terrain_cover::none } })
+        {
+            const int t = homogeneous_aim(src, cov);
+            if (t < 0)
+                continue;
+            const int tr = t / src.gw, tc = t % src.gw;
+            const double cx = 1.7320508075688772 * (tc + ((tr & 1) ? 0.5 : 0.0));
+            const int W = 640, H = 400;
+            const int qx0 = static_cast<int>(cx * gm.s) - W / 2;
+            const int qy0 = std::clamp(static_cast<int>((1.5 * tr - gm.y_min - 0.3) * gm.s) - H / 2, 0, gm.H - H);
+            bake_params legacy = p;
+            legacy.edge_band = 0.0f; legacy.border_strength = 0.0f; legacy.pattern_strength = 0.0f;
+            legacy.edge_ink = 0.30f;
+            std::vector<std::uint32_t> pb(static_cast<std::size_t>(W) * H);
+            for (int k = 0; k < 2; ++k)
+            {
+                bake_region(src, gm, k ? p : legacy, qx0, qy0, W, H, pb.data());
+                char path[160];
+                std::snprintf(path, sizeof path, "bl1251_%s_%s.png", nm, k ? "now" : "legacy");
+                write_png_rgba(path, W, H, reinterpret_cast<const unsigned char*>(pb.data()), W * 4);
+            }
+            std::printf("preview %s at [%d,%d]\n", nm, tc, tr);
+        }
+    }
+}
+
+/// --crisp (BL-1254, a reading): how crisp the ground reads against what
+/// stands on it. One 512 px master window per subject (plain, field, forest,
+/// scrub, bare, mountain, and the first installation); the ground alone
+/// (installations and trees off) and the full bake. On luminance: hf = mean
+/// |L - box3(L)| (the 1-2 px band — what reads as crisp), mid = mean |box3 -
+/// box11| (the 4-10 px band), lstd = mean 9x9 local standard deviation. The
+/// ground figures are the ground-only bake over every terrain pixel; the
+/// structure figures are the full bake over the pixels the structures and
+/// trees changed. Writes crisp_<subject><suffix>.png for the eye.
+void crisp_row(const bake_source& src, const bake_params& p, const char* suffix)
+{
+    const geometry gm = make_master_geometry(src.gw, src.gh);
+    const auto land = static_cast<std::uint8_t>(bake_source::tile_class::land);
+    struct subj { const char* name; int tile; };
+    std::vector<subj> subs;
+    subs.push_back({ "plain",  homogeneous_aim(src, terrain_cover::grass) });
+    {
+        // A cultivated field: a furrowed grass variant (0, 1) ringed by grass.
+        int f = -1;
+        for (int r = src.gh / 5 + 3; r < src.gh * 4 / 5 - 3 && f < 0; ++r)
+            for (int c = 0; c < src.gw && f < 0; ++c)
+            {
+                const int i = r * src.gw + c;
+                if (src.cls[i] != land || src.cover[i] != static_cast<std::uint8_t>(terrain_cover::grass)
+                    || src.variant[i] >= 2 || src.near_feature[i])
+                    continue;
+                bool ring = true;
+                for (int s = 0; s < 6 && ring; ++s)
+                {
+                    const hex_neighbors::coord nb = hex_neighbors::neighbour(c, r, s);
+                    const int j = nb.gy * src.gw + ((nb.gx % src.gw) + src.gw) % src.gw;
+                    ring = src.cls[j] == land && src.cover[j] == static_cast<std::uint8_t>(terrain_cover::grass);
+                }
+                if (ring)
+                    f = i;
+            }
+        subs.push_back({ "field", f });
+    }
+    subs.push_back({ "forest", homogeneous_aim(src, terrain_cover::forest) });
+    subs.push_back({ "scrub",  homogeneous_aim(src, terrain_cover::scrub) });
+    subs.push_back({ "bare",   homogeneous_aim(src, terrain_cover::none) });
+    {
+        int m = -1, links_best = -1;
+        for (int i = 0; i < static_cast<int>(src.cls.size()); ++i)
+            if (src.cls[i] == land && src.landform[i] == static_cast<std::uint8_t>(terrain_landform::mountain))
+            {
+                int links = 0;
+                for (int s = 0; s < 6; ++s)
+                    links += (src.lf_links[i] >> s) & 1;
+                if (links > links_best) { links_best = links; m = i; }
+            }
+        subs.push_back({ "mountain", m });
+    }
+    {
+        int t = -1;
+        // The installation with the most installations around it (a town),
+        // temperate rows only.
+        int best = -1;
+        for (int r = src.gh / 5; r < src.gh * 4 / 5; ++r)
+            for (int c = 0; c < src.gw; ++c)
+            {
+                const int i = r * src.gw + c;
+                if (src.inst.of_tile[static_cast<std::size_t>(i)] < 0 || src.cls[i] != land)
+                    continue;
+                int n = 0;
+                for (int s = 0; s < 6; ++s)
+                {
+                    const hex_neighbors::coord nb = hex_neighbors::neighbour(c, r, s);
+                    n += src.inst.of_tile[static_cast<std::size_t>(nb.gy * src.gw + ((nb.gx % src.gw) + src.gw) % src.gw)] >= 0;
+                }
+                if (n > best) { best = n; t = i; }
+            }
+        subs.push_back({ "structures", t });
+    }
+
+    constexpr int W = 512, H = 512;
+    const auto lum = [](std::uint32_t c) -> double
+    {
+        return 0.2126 * ui::palette::col_r(c) + 0.7152 * ui::palette::col_g(c) + 0.0722 * ui::palette::col_b(c);
+    };
+    // Box mean of L over a (2k+1)^2 window (clamped at the window edge).
+    const auto box = [&](const std::vector<double>& L, int k) -> std::vector<double>
+    {
+        std::vector<double> t(L.size()), o(L.size());
+        for (int y = 0; y < H; ++y)
+            for (int x = 0; x < W; ++x)
+            {
+                double s = 0.0;
+                for (int d = -k; d <= k; ++d)
+                    s += L[static_cast<std::size_t>(y) * W + std::clamp(x + d, 0, W - 1)];
+                t[static_cast<std::size_t>(y) * W + x] = s / (2 * k + 1);
+            }
+        for (int y = 0; y < H; ++y)
+            for (int x = 0; x < W; ++x)
+            {
+                double s = 0.0;
+                for (int d = -k; d <= k; ++d)
+                    s += t[static_cast<std::size_t>(std::clamp(y + d, 0, H - 1)) * W + x];
+                o[static_cast<std::size_t>(y) * W + x] = s / (2 * k + 1);
+            }
+        return o;
+    };
+    struct m3 { double hf = 0, mid = 0, lstd = 0; long n = 0; };
+    const auto metrics = [&](const std::vector<std::uint32_t>& px, const std::vector<std::uint8_t>& sel) -> m3
+    {
+        std::vector<double> L(px.size()), L2(px.size());
+        for (std::size_t i = 0; i < px.size(); ++i)
+        {
+            L[i] = lum(px[i]);
+            L2[i] = L[i] * L[i];
+        }
+        const auto b1 = box(L, 1), b5 = box(L, 5), b4 = box(L, 4), b4q = box(L2, 4);
+        m3 m;
+        for (int y = 6; y < H - 6; ++y)
+            for (int x = 6; x < W - 6; ++x)
+            {
+                const std::size_t i = static_cast<std::size_t>(y) * W + x;
+                if (!sel[i])
+                    continue;
+                m.hf   += std::fabs(L[i] - b1[i]);
+                m.mid  += std::fabs(b1[i] - b5[i]);
+                m.lstd += std::sqrt(std::max(0.0, b4q[i] - b4[i] * b4[i]));
+                ++m.n;
+            }
+        if (m.n)
+        {
+            m.hf /= m.n; m.mid /= m.n; m.lstd /= m.n;
+        }
+        return m;
+    };
+
+    bake_params ground = p;
+    ground.installations = false;
+    ground.tree_density  = 0.0f;
+    std::vector<std::uint32_t> a(static_cast<std::size_t>(W) * H), g(a.size());
+    for (const subj& s : subs)
+    {
+        if (s.tile < 0)
+        {
+            std::printf("CRISP %-10s none on this body\n", s.name);
+            continue;
+        }
+        const int tr = s.tile / src.gw, tc = s.tile % src.gw;
+        const double cx = 1.7320508075688772 * (tc + ((tr & 1) ? 0.5 : 0.0));
+        const int qx0 = static_cast<int>(cx * gm.s) - W / 2;
+        const int qy0 = std::clamp(static_cast<int>((1.5 * tr - gm.y_min - 0.3) * gm.s) - H / 2, 0, gm.H - H);
+        bake_region(src, gm, p, qx0, qy0, W, H, a.data());
+        bake_region(src, gm, ground, qx0, qy0, W, H, g.data());
+        std::vector<std::uint8_t> gsel(a.size()), ssel(a.size());
+        long nstruct = 0;
+        for (std::size_t i = 0; i < a.size(); ++i)
+        {
+            const bool terrain = ui::palette::col_a(g[i]) == 255;
+            gsel[i] = terrain;
+            ssel[i] = terrain && a[i] != g[i];
+            nstruct += ssel[i];
+        }
+        const m3 mg = metrics(g, gsel);
+        const m3 ms = metrics(a, ssel);
+        std::printf("CRISP %-10s [%d,%d]  ground hf %5.2f mid %5.2f lstd %5.2f   |  stands-on (%6ld px) hf %5.2f mid %5.2f lstd %5.2f   ground/stands hf %.2f\n",
+                    s.name, tc, tr, mg.hf, mg.mid, mg.lstd, nstruct, ms.hf, ms.mid, ms.lstd,
+                    ms.hf > 0.0 ? mg.hf / ms.hf : 0.0);
+        char path[160];
+        std::snprintf(path, sizeof path, "crisp_%s%s.png", s.name, suffix);
+        write_png_rgba(path, W, H, reinterpret_cast<const unsigned char*>(a.data()), W * 4);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// P31 - cast shadows (BL-1256, RENDERING.md § Art direction and palette and
+// § Chunks, cache and invalidation). At the master geometry, 1x and 2x, on the
+// best-linked mountain run (the longest shadows on the body):
+//   - deterministic (byte-identical twice), wrap-exact (one period east),
+//   - window-invariant: sub-windows of a chunk (aligned and not) bake
+//     byte-identical to the same pixels of the whole chunk,
+//   - it draws (shadow_strength 0 differs, and darkens),
+//   - its reach is inside terrain_hash's margin: every tile farther than the
+//     margin from the window has its height raised, and the window bakes
+//     byte-identical — nothing the pass reads lies outside what the hash
+//     covers.
+// `--shadow` runs it alone.
+// ---------------------------------------------------------------------------
+void shadow_row(const bake_source& src, const bake_params& p)
+{
+    const auto land = static_cast<std::uint8_t>(bake_source::tile_class::land);
+    int m = -1, links_best = -1;
+    for (int i = 0; i < static_cast<int>(src.cls.size()); ++i)
+        if (src.cls[i] == land && src.landform[i] == static_cast<std::uint8_t>(terrain_landform::mountain))
+        {
+            int links = 0;
+            for (int s = 0; s < 6; ++s)
+                links += (src.lf_links[i] >> s) & 1;
+            if (links > links_best) { links_best = links; m = i; }
+        }
+    check(m >= 0, "P31", "found a mountain run to cast from");
+    if (m < 0)
+        return;
+    const geometry gm = make_master_geometry(src.gw, src.gh);
+    const int r = m / src.gw, c = m % src.gw;
+    const double cx = 1.7320508075688772 * (c + ((r & 1) ? 0.5 : 0.0));
+    // A chunk-aligned 512 px window with the run's SE side (where its shadow
+    // falls) inside it.
+    const int x0 = std::max(0, static_cast<int>((cx + 0.4) * gm.s) - 256) / 16 * 16;
+    const int y0 = std::clamp((static_cast<int>((1.5 * r + 0.4 - gm.y_min) * gm.s) - 256) / 16 * 16, 0, gm.H - 512);
+    const int W = 512;
+    bool det = true, wrap = true, inv = true, draws = true, darker = true, far_ok = true;
+    long shaded = 0;
+    for (const int ss : { 1, 2 })
+    {
+        bake_params q = p;
+        q.supersample = ss;
+        std::vector<std::uint32_t> a(static_cast<std::size_t>(W) * W), b(a.size()), e(a.size()), o(a.size());
+        bake_region(src, gm, q, x0, y0, W, W, a.data());
+        bake_region(src, gm, q, x0, y0, W, W, b.data());
+        det = det && a == b;
+        bake_region(src, gm, q, x0 + gm.W, y0, W, W, e.data());
+        wrap = wrap && a == e;
+        // Sub-windows: aligned, unaligned, and one straddling the window's
+        // shaded middle.
+        struct sw_ { int x, y, w, h; };
+        for (const sw_ s : { sw_{ 128, 96, 128, 160 }, sw_{ 37, 211, 77, 53 }, sw_{ 250, 250, 200, 140 } })
+        {
+            std::vector<std::uint32_t> part(static_cast<std::size_t>(s.w) * s.h);
+            bake_region(src, gm, q, x0 + s.x, y0 + s.y, s.w, s.h, part.data());
+            for (int y = 0; y < s.h && inv; ++y)
+                for (int x = 0; x < s.w; ++x)
+                    if (part[static_cast<std::size_t>(y) * s.w + x]
+                        != a[static_cast<std::size_t>(y + s.y) * W + (x + s.x)])
+                    {
+                        inv = false;
+                        std::printf("P31: %dx sub-window (%d,%d %dx%d) differs at (%d,%d)\n", ss, s.x, s.y, s.w, s.h, x, y);
+                        break;
+                    }
+        }
+        bake_params off = q;
+        off.shadow_strength = 0.0f;
+        bake_region(src, gm, off, x0, y0, W, W, o.data());
+        draws = draws && a != o;
+        long n_dark = 0, n_light = 0;
+        for (std::size_t i = 0; i < a.size(); ++i)
+        {
+            if (a[i] == o[i])
+                continue;
+            const int la = ui::palette::col_r(a[i]) + ui::palette::col_g(a[i]) + ui::palette::col_b(a[i]);
+            const int lo = ui::palette::col_r(o[i]) + ui::palette::col_g(o[i]) + ui::palette::col_b(o[i]);
+            (la <= lo ? n_dark : n_light)++;
+        }
+        // (the unsharp mask lifts a rim beside a shadow's edge, so a few
+        // pixels brighten; the pass as a whole darkens)
+        darker = darker && n_dark > 2000 && n_dark > 4 * n_light;
+        if (ss == 1)
+            shaded = n_dark;
+        std::printf("P31: %dx  %ld px darkened by the pass, %ld lifted (the unsharp rim)\n", ss, n_dark, n_light);
+
+        // Far tiles raised: nothing past the hash margin is read.
+        {
+            constexpr double kMargin = 6.0; // terrain_hash's margin (ground_bake.cpp)
+            const double wx0 = x0 / gm.s, wx1 = (x0 + W) / gm.s;
+            const double wy0 = y0 / gm.s + gm.y_min, wy1 = (y0 + W) / gm.s + gm.y_min;
+            bake_source far = src;
+            const double period = src.gw * 1.7320508075688772;
+            int raised = 0;
+            for (int i = 0; i < static_cast<int>(far.cls.size()); ++i)
+            {
+                const int rr = i / src.gw, cc = i % src.gw;
+                const double tx = 1.7320508075688772 * (cc + ((rr & 1) ? 0.5 : 0.0)), ty = 1.5 * rr;
+                double dx = std::max({ wx0 - tx, 0.0, tx - wx1 });
+                // the nearest wrap copy
+                for (const double k : { -period, period })
+                    dx = std::min(dx, std::max({ wx0 - (tx + k), 0.0, (tx + k) - wx1 }));
+                const double dy = std::max({ wy0 - ty, 0.0, ty - wy1 });
+                if (std::sqrt(dx * dx + dy * dy) <= kMargin)
+                    continue;
+                far.height[static_cast<std::size_t>(i)] = 1.0f;
+                ++raised;
+            }
+            std::vector<std::uint32_t> f(a.size());
+            bake_region(far, gm, q, x0, y0, W, W, f.data());
+            far_ok = far_ok && raised > 1000 && f == a;
+        }
+    }
+    std::printf("P31: mountain run [%d,%d], master window (%d,%d) 512 px, %ld px in shadow at 1x\n",
+                c, r, x0, y0, shaded);
+    check(det,    "P31", "the cast-shadow bake is deterministic (1x and 2x)");
+    check(wrap,   "P31", "the cast-shadow bake is wrap-exact one period east (1x and 2x)");
+    check(inv,    "P31", "sub-windows bake byte-identical to the same pixels of the whole window (window-invariant)");
+    check(draws && darker, "P31", "the pass draws, and it darkens");
+    check(far_ok, "P31", "no tile past terrain_hash's margin moves the bake (the reach is inside the hash)");
+}
+
+// ---------------------------------------------------------------------------
+// --look (BL-1256, ground look C-F; a reading, not a check): the subjects the
+// it3 C-F reference is judged on — a plain, rolling hills, a mountain run, a
+// river where it falls, a forest edge, a town, a coast — baked as master
+// windows (the app's 1x) and written as look_<subject>.png with the rung-3
+// and rung-2 reads (the master halved, quartered: the mip chain) beside them.
+// Prints each aim (col, row: scripts/verify/ground_look.lua frames them) and
+// the luminance percentiles of its ground, the numbers the palette and value
+// are tuned against (the reference's: RENDERING.md § Art direction).
+// ---------------------------------------------------------------------------
+void look_row(const bake_source& src, const bake_params& p0, const char* suffix)
+{
+    bake_params p = p0;
+    p.supersample = 1; // the app's master (ground_layer k_master_ss)
+    const geometry gm = make_master_geometry(src.gw, src.gh);
+    const auto land = static_cast<std::uint8_t>(bake_source::tile_class::land);
+    const auto water = static_cast<std::uint8_t>(bake_source::tile_class::water);
+    const auto nbi = [&](int i, int s) -> int
+    {
+        const hex_neighbors::coord nb = hex_neighbors::neighbour(i % src.gw, i / src.gw, s);
+        if (nb.gy < 0 || nb.gy >= src.gh)
+            return -1;
+        return nb.gy * src.gw + ((nb.gx % src.gw) + src.gw) % src.gw;
+    };
+    const auto temperate = [&](int i) { const int r = i / src.gw; return r > src.gh / 5 && r < src.gh * 4 / 5; };
+    struct subj { const char* name; int tile; };
+    std::vector<subj> subs;
+    subs.push_back({ "plain", homogeneous_aim(src, terrain_cover::grass) });
+    {
+        // Hills: the highland tile with the most highland neighbours.
+        int t = -1, best = -1;
+        for (int i = 0; i < static_cast<int>(src.cls.size()); ++i)
+        {
+            if (src.cls[i] != land || !temperate(i)
+                || src.landform[i] != static_cast<std::uint8_t>(terrain_landform::highland))
+                continue;
+            int n = 0;
+            for (int s = 0; s < 6; ++s)
+            {
+                const int j = nbi(i, s);
+                n += j >= 0 && src.cls[j] == land
+                  && src.landform[j] == static_cast<std::uint8_t>(terrain_landform::highland);
+            }
+            n = n * 4 - (src.near_feature[i] ? 1 : 0);
+            if (n > best) { best = n; t = i; }
+        }
+        subs.push_back({ "hills", t });
+    }
+    {
+        int m = -1, links_best = -1;
+        for (int i = 0; i < static_cast<int>(src.cls.size()); ++i)
+            if (src.cls[i] == land && src.landform[i] == static_cast<std::uint8_t>(terrain_landform::mountain))
+            {
+                int links = 0;
+                for (int s = 0; s < 6; ++s)
+                    links += (src.lf_links[i] >> s) & 1;
+                if (links > links_best) { links_best = links; m = i; }
+            }
+        subs.push_back({ "mountain", m });
+        // The mountain ground's tile heights: what the snow line reads.
+        std::vector<float> mh, lh;
+        for (int i = 0; i < static_cast<int>(src.cls.size()); ++i)
+            if (src.cls[i] == land)
+            {
+                lh.push_back(src.height[i]);
+                if (src.landform[i] == static_cast<std::uint8_t>(terrain_landform::mountain))
+                    mh.push_back(src.height[i]);
+            }
+        std::sort(mh.begin(), mh.end());
+        std::sort(lh.begin(), lh.end());
+        if (!mh.empty() && !lh.empty())
+            std::printf("LOOK  heights: land p50 %.3f p90 %.3f p99 %.3f | mountain (%zu) p10 %.3f p50 %.3f p90 %.3f max %.3f"
+                        " (the snow line: %.2f)\n",
+                        lh[lh.size() / 2], lh[lh.size() * 9 / 10], lh[lh.size() * 99 / 100], mh.size(),
+                        mh[mh.size() / 10], mh[mh.size() / 2], mh[mh.size() * 9 / 10], mh.back(), p.snow_line);
+    }
+    {
+        // A river where it falls: the land river tile with the steepest drop
+        // to its downstream neighbour. Also the drop distribution.
+        int t = -1;
+        float best = -1.0f;
+        std::vector<float> drops;
+        for (int i = 0; i < static_cast<int>(src.cls.size()); ++i)
+        {
+            if (src.cls[i] != land || !src.river_out[i])
+                continue;
+            for (int s = 0; s < 6; ++s)
+                if (src.river_out[i] & (1u << s))
+                {
+                    const int j = nbi(i, s);
+                    if (j < 0)
+                        continue;
+                    const float d = src.height[i] - src.height[j];
+                    drops.push_back(d);
+                    if (d > best && temperate(i)) { best = d; t = i; }
+                }
+        }
+        std::sort(drops.begin(), drops.end());
+        if (!drops.empty())
+            std::printf("LOOK  river drops (%zu reaches): p10 %.4f p50 %.4f p90 %.4f p99 %.4f max %.4f\n",
+                        drops.size(), drops[drops.size() / 10], drops[drops.size() / 2],
+                        drops[drops.size() * 9 / 10], drops[drops.size() * 99 / 100], drops.back());
+        subs.push_back({ "river_fall", t });
+    }
+    {
+        // A forest edge: a forest tile with the most non-forest land neighbours.
+        int t = -1, best = 0;
+        for (int i = 0; i < static_cast<int>(src.cls.size()); ++i)
+        {
+            if (src.cls[i] != land || !temperate(i) || src.near_feature[i]
+                || src.cover[i] != static_cast<std::uint8_t>(terrain_cover::forest))
+                continue;
+            int n = 0, f = 0;
+            for (int s = 0; s < 6; ++s)
+            {
+                const int j = nbi(i, s);
+                if (j < 0 || src.cls[j] != land)
+                    continue;
+                (src.cover[j] == static_cast<std::uint8_t>(terrain_cover::forest) ? f : n)++;
+            }
+            const int score = std::min(n, f) * 10 + n + f;
+            if (score > best) { best = score; t = i; }
+        }
+        subs.push_back({ "forest_edge", t });
+    }
+    {
+        int t = -1, best = -1;
+        for (int r = src.gh / 5; r < src.gh * 4 / 5; ++r)
+            for (int c = 0; c < src.gw; ++c)
+            {
+                const int i = r * src.gw + c;
+                if (src.inst.of_tile[static_cast<std::size_t>(i)] < 0 || src.cls[i] != land)
+                    continue;
+                int n = 0;
+                for (int s = 0; s < 6; ++s)
+                {
+                    const int j = nbi(i, s);
+                    n += j >= 0 && src.inst.of_tile[static_cast<std::size_t>(j)] >= 0;
+                }
+                if (n > best) { best = n; t = i; }
+            }
+        subs.push_back({ "town", t });
+    }
+    {
+        // A coast: a temperate land tile with three water neighbours and land behind.
+        int t = -1;
+        for (int i = 0; i < static_cast<int>(src.cls.size()) && t < 0; ++i)
+        {
+            if (src.cls[i] != land || !temperate(i))
+                continue;
+            int wn = 0;
+            for (int s = 0; s < 6; ++s)
+            {
+                const int j = nbi(i, s);
+                wn += j >= 0 && src.cls[j] == water;
+            }
+            if (wn == 3)
+                t = i;
+        }
+        subs.push_back({ "coast", t });
+    }
+    // Flat land renders flat (Ben, 2026-10-10): a valley, a plain meeting a
+    // mountain run (the rolling-to-flat transition), and a road on a plain.
+    {
+        const auto lf_is = [&](int i, terrain_landform l) { return src.landform[i] == static_cast<std::uint8_t>(l); };
+        int tv = -1, bv = -1, tm = -1, bm = -1, tr_ = -1, br = -1;
+        for (int i = 0; i < static_cast<int>(src.cls.size()); ++i)
+        {
+            if (src.cls[i] != land)
+                continue;
+            int nv = 0, nm = 0, np = 0, nr = 0;
+            for (int s = 0; s < 6; ++s)
+            {
+                const int j = nbi(i, s);
+                if (j < 0 || src.cls[j] != land)
+                    continue;
+                nv += lf_is(j, terrain_landform::valley);
+                nm += lf_is(j, terrain_landform::mountain);
+                np += lf_is(j, terrain_landform::plains);
+                nr += src.road[j] > 0;
+            }
+            if (lf_is(i, terrain_landform::valley) && nv > bv) { bv = nv; tv = i; } // valleys are rare: any latitude
+            if (!temperate(i))
+                continue;
+            if (lf_is(i, terrain_landform::plains) && nm >= 1 && nm <= 3 && np * 4 + nm > bm) { bm = np * 4 + nm; tm = i; }
+            if (lf_is(i, terrain_landform::plains) && src.road[i] > 0 && src.inst.of_tile[static_cast<std::size_t>(i)] < 0
+                && np * 2 + nr > br) { br = np * 2 + nr; tr_ = i; }
+        }
+        subs.push_back({ "valley", tv });
+        subs.push_back({ "plain_mountain", tm });
+        subs.push_back({ "road_plain", tr_ });
+    }
+
+    constexpr int W = 1024, H = 640;
+    std::vector<std::uint32_t> a(static_cast<std::size_t>(W) * H);
+    for (const subj& s : subs)
+    {
+        if (s.tile < 0)
+        {
+            std::printf("LOOK  %-12s none\n", s.name);
+            continue;
+        }
+        const int tr = s.tile / src.gw, tc = s.tile % src.gw;
+        const double cx = 1.7320508075688772 * (tc + ((tr & 1) ? 0.5 : 0.0));
+        const int qx0 = (static_cast<int>(cx * gm.s) - W / 2) / 16 * 16;
+        const int qy0 = std::clamp((static_cast<int>((1.5 * tr - gm.y_min - 0.3) * gm.s) - H / 2) / 16 * 16,
+                                   0, gm.H - H);
+        const auto t0 = std::chrono::steady_clock::now();
+        bake_region(src, gm, p, qx0, qy0, W, H, a.data());
+        const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+        std::vector<double> lum;
+        lum.reserve(a.size());
+        for (const std::uint32_t c : a)
+            if (ui::palette::col_a(c) == 255)
+                lum.push_back(0.2126 * ui::palette::col_r(c) + 0.7152 * ui::palette::col_g(c)
+                              + 0.0722 * ui::palette::col_b(c));
+        std::sort(lum.begin(), lum.end());
+        const auto q = [&](double f) { return lum.empty() ? 0.0 : lum[static_cast<std::size_t>(f * (lum.size() - 1))]; };
+        std::printf("LOOK  %-12s [%3d,%3d]  lum p5 %5.1f p10 %5.1f p25 %5.1f p50 %5.1f p75 %5.1f p90 %5.1f p99 %5.1f  (%.0f ms)\n",
+                    s.name, tc, tr, q(0.05), q(0.10), q(0.25), q(0.50), q(0.75), q(0.90), q(0.99), ms);
+        // The colour reading (BL-1256, colour from it1): mean chroma (max - min
+        // channel, sRGB 0-255), mean HSV saturation, and the chroma-weighted
+        // mean hue — overall and per hue class (warm: soil and field; green:
+        // grass and forest; blue: water; grey: chroma under 14), the same
+        // classes the it1 sample in RENDERING.md § Art direction is read by.
+        {
+            struct acc { double n = 0, ch = 0, sat = 0, hx = 0, hy = 0, r = 0, g = 0, b = 0; };
+            acc all, cls[4];
+            const char* cls_name[4] = { "warm", "green", "blue", "grey" };
+            for (const std::uint32_t c : a)
+            {
+                if (ui::palette::col_a(c) != 255)
+                    continue;
+                const int r = ui::palette::col_r(c), g = ui::palette::col_g(c), b = ui::palette::col_b(c);
+                const int mx = std::max({ r, g, b }), mn = std::min({ r, g, b });
+                const double chroma = mx - mn;
+                double hue = 0.0;
+                if (mx > mn)
+                {
+                    if (mx == r)      hue = 60.0 * std::fmod((g - b) / chroma + 6.0, 6.0);
+                    else if (mx == g) hue = 60.0 * ((b - r) / chroma + 2.0);
+                    else              hue = 60.0 * ((r - g) / chroma + 4.0);
+                }
+                const int k = chroma < 14.0 ? 3 : (b > r + 8 && b >= g - 6) ? 2 : (g >= r && g > b) ? 1 : 0;
+                for (acc* t : { &all, &cls[k] })
+                {
+                    t->n += 1; t->ch += chroma; t->sat += mx > 0 ? chroma / mx : 0.0;
+                    t->hx += chroma * std::cos(hue * 3.14159265358979 / 180.0);
+                    t->hy += chroma * std::sin(hue * 3.14159265358979 / 180.0);
+                    t->r += r; t->g += g; t->b += b;
+                }
+            }
+            const auto hue_of = [](const acc& t)
+            {
+                double h = std::atan2(t.hy, t.hx) * 180.0 / 3.14159265358979;
+                return h < 0.0 ? h + 360.0 : h;
+            };
+            if (all.n > 0)
+                std::printf("LOOK  %-12s colour  chroma %5.1f  sat %.3f  hue %5.1f", s.name, all.ch / all.n,
+                            all.sat / all.n, hue_of(all));
+            for (int k = 0; k < 4; ++k)
+                if (cls[k].n > 0)
+                    std::printf("  | %s %4.1f%% (%3.0f,%3.0f,%3.0f) ch %4.1f", cls_name[k], 100.0 * cls[k].n / all.n,
+                                cls[k].r / cls[k].n, cls[k].g / cls[k].n, cls[k].b / cls[k].n, cls[k].ch / cls[k].n);
+            std::printf("\n");
+        }
+        char path[160];
+        std::snprintf(path, sizeof path, "look_%s%s.png", s.name, suffix);
+        write_png_rgba(path, W, H, reinterpret_cast<const unsigned char*>(a.data()), W * 4);
+        // The rung-3 and rung-2 reads: the master halved and quartered.
+        std::vector<std::uint32_t> h1(static_cast<std::size_t>(W / 2) * (H / 2)), h2(static_cast<std::size_t>(W / 4) * (H / 4));
+        downsample_half(a.data(), W, H, h1.data());
+        downsample_half(h1.data(), W / 2, H / 2, h2.data());
+        std::snprintf(path, sizeof path, "look_%s%s_half.png", s.name, suffix);
+        write_png_rgba(path, W / 2, H / 2, reinterpret_cast<const unsigned char*>(h1.data()), (W / 2) * 4);
+        std::snprintf(path, sizeof path, "look_%s%s_quarter.png", s.name, suffix);
+        write_png_rgba(path, W / 4, H / 4, reinterpret_cast<const unsigned char*>(h2.data()), (W / 4) * 4);
+        // The rung-1 read: the master an eighth.
+        std::vector<std::uint32_t> h3(static_cast<std::size_t>(W / 8) * (H / 8));
+        downsample_half(h2.data(), W / 4, H / 4, h3.data());
+        std::snprintf(path, sizeof path, "look_%s%s_eighth.png", s.name, suffix);
+        write_png_rgba(path, W / 8, H / 8, reinterpret_cast<const unsigned char*>(h3.data()), (W / 8) * 4);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BL-1253 (roads painted), RENDERING.md § Roads and sea lanes.
+//   P28 The route pass on a staged network (a Highway, a Road, a Track, the
+//       Rail rung no world lays yet, a sea lane with its parallel run): pure,
+//       wrap-exact, seamless across a chunk edge (both axes) at the master
+//       geometry 1x and 2x, each surface actually draws (strength 0 differs).
+//   P29 The road / structure agreement: on every roaded works tile a through
+//       curve clears the cluster's keep-out disc by its half-width, an
+//       arriving road ends at the plan's forecourt, and the cluster moved; a
+//       town is not re-planned; a masked tile's road_level never reaches the
+//       source.
+//   P30 A road change re-bakes only its window: region_hash moves while
+//       terrain_hash does not, and the windows the rule draws (a road built,
+//       upgraded, removed; a lane stamped) re-baked and blitted over the old
+//       master chunk give the new chunk byte for byte, under 40% of it.
+// `--routes` runs P28-P30 alone and writes routes_*.png previews.
+// ---------------------------------------------------------------------------
+void route_row(world& w, entity_id home, const bake_source& src0, const bake_params& p, bool previews,
+               bool prof = false)
+{
+    constexpr double kS3 = 1.7320508075688772;
+    const auto land  = static_cast<std::uint8_t>(bake_source::tile_class::land);
+    const auto water = static_cast<std::uint8_t>(bake_source::tile_class::water);
+    const geometry m = make_master_geometry(src0.gw, src0.gh);
+    bake_params p1 = p;
+    p1.supersample = 1;
+    const auto idx = [&](int c, int r) {
+        return static_cast<std::size_t>(r) * src0.gw + ((c % src0.gw) + src0.gw) % src0.gw;
+    };
+
+    // --- Stage a network on the widest plain --------------------------------
+    bake_source s = src0;
+    s.road.assign(s.cls.size(), 0);
+    s.lane.assign(s.cls.size(), 0);
+    const int aim = std::max(0, homogeneous_aim(src0, terrain_cover::grass));
+    const int ar = aim / s.gw, ac = aim % s.gw;
+    const auto lay = [&](int c, int r, std::uint8_t tier) {
+        if (r >= 0 && r < s.gh && s.cls[idx(c, r)] == land)
+            s.road[idx(c, r)] = tier;
+    };
+    for (int c = ac - 3; c <= ac + 3; ++c) lay(c, ar, k_route_highway);
+    for (int c = ac - 3; c <= ac + 3; ++c) lay(c, ar + 2, k_route_road);
+    for (int r = ar; r <= ar + 4; ++r)     lay(ac + 3, r, k_route_track);
+    for (int c = ac - 3; c <= ac + 2; ++c) lay(c, ar + 4, k_route_rail);
+    lay(ac - 3, ar + 3, k_route_track); // a track north from the rail to the road row
+    // Works on the road row (a through-road bends round it) and at a track's
+    // end (it ends at the forecourt); a town on the highway (its street).
+    const auto stand = [&](std::size_t i, tile_installation ti) {
+        if (s.inst.of_tile[i] < 0)
+        {
+            s.inst.of_tile[i] = static_cast<std::int32_t>(s.inst.list.size());
+            s.inst.list.push_back(ti);
+        }
+        else
+            s.inst.list[static_cast<std::size_t>(s.inst.of_tile[i])] = ti;
+    };
+    tile_installation works;
+    works.stacks[0].subject = stamp_subject::building;
+    works.stacks[0].type    = static_cast<std::uint8_t>(building_type::processing_facility);
+    works.stacks[0].family  = static_cast<std::uint8_t>(processing_family::metal_foundry);
+    works.n_stacks = 1;
+    tile_installation mine = works;
+    mine.stacks[0].type   = static_cast<std::uint8_t>(building_type::extraction_site);
+    mine.stacks[0].family = static_cast<std::uint8_t>(extraction_family::mine);
+    tile_installation town;
+    town.settlement.subject = stamp_subject::settlement;
+    town.settlement.scale = 3;
+    const std::size_t works_i = idx(ac, ar + 2), mine_i = idx(ac + 3, ar + 5), town_i = idx(ac + 1, ar);
+    stand(works_i, works);
+    lay(ac + 3, ar + 5, k_route_track);
+    stand(mine_i, mine);
+    stand(town_i, town);
+    // A sea lane: two parallel runs on adjacent rows (the rungs between them
+    // are skipped) on open water.
+    int wi = -1, wbest = 0;
+    for (int r = s.gh / 4; r < s.gh * 3 / 4 - 2; ++r)
+        for (int c = 0; c < s.gw; ++c)
+        {
+            int run = 0;
+            for (int k = 0; k < 8; ++k)
+                for (int dr = 0; dr < 2; ++dr)
+                    run += s.cls[idx(c + k, r + dr)] == water;
+            if (run > wbest) { wbest = run; wi = static_cast<int>(idx(c, r)); }
+        }
+    const int wr = wi / s.gw, wc = wi % s.gw;
+    for (int k = 0; k < 8; ++k)
+        for (int dr = 0; dr < 2; ++dr)
+            if (s.cls[idx(wc + k, wr + dr)] == water)
+                s.lane[idx(wc + k, wr + dr)] = 1;
+    rederive_routes(s);
+    std::printf("P28: staged network at [%d,%d] (%zu pieces), lane at [%d,%d]\n", ac, ar,
+                s.route_pieces.size(), wc, wr);
+    check(!s.route_pieces.empty(), "P28", "the staged network derives pieces");
+
+    // --route-prof: the route pass's cost on a master chunk (a reading, not a
+    // check) — the chunk holding the staged network, and the same chunk with
+    // no route at all, at the master's 1x and at 2x, pass on vs off,
+    // interleaved, best of 9, wall time and this thread's cycles.
+    if (prof)
+    {
+        const geometry gm = m;
+        const double cx = kS3 * (ac + ((ar & 1) ? 0.5 : 0.0)) * gm.s;
+        const double cy = (1.5 * (ar + 2) - gm.y_min) * gm.s;
+        const int x0 = static_cast<int>(cx - 256) / 16 * 16;
+        const int y0 = std::clamp(static_cast<int>(cy - 256) / 16 * 16, 0, gm.H - 512);
+        bake_source none = src0;
+        rederive_routes(none); // no route: the pass's cull alone
+        std::vector<std::uint32_t> tb(512u * 512u);
+        for (int ss : { 1, 2 })
+        {
+            bake_params on = p;  on.supersample = ss;
+            bake_params of = on; of.route_strength = 0.0f;
+            struct cfg { const char* name; const bake_source* src; const bake_params* q; };
+            const cfg cfgs[] = { { "network, pass on ", &s, &on }, { "network, pass off", &s, &of },
+                                 { "no route at all  ", &none, &on } };
+            double wall[3] = { 1e30, 1e30, 1e30 }, cyc[3] = { 1e30, 1e30, 1e30 };
+            for (int rep_ = 0; rep_ < 9; ++rep_)
+                for (int k = 0; k < 3; ++k)
+                {
+                    const double c0 = thread_cpu_ms();
+                    const auto t0 = std::chrono::steady_clock::now();
+                    bake_region(*cfgs[k].src, gm, *cfgs[k].q, x0, y0, 512, 512, tb.data());
+                    const double c1 = thread_cpu_ms();
+                    wall[k] = std::min(wall[k], std::chrono::duration<double, std::milli>(
+                                                    std::chrono::steady_clock::now() - t0).count());
+                    if (c1 >= 0.0)
+                        cyc[k] = std::min(cyc[k], c1 - c0);
+                }
+            for (int k = 0; k < 3; ++k)
+                std::printf("ROUTE-PROF  master chunk %dx  %s  %8.1f ms wall  %8.1f Mcycles  (%+.1f%% vs pass off)\n",
+                            ss, cfgs[k].name, wall[k], cyc[k] < 1e29 ? cyc[k] : -1.0,
+                            100.0 * (wall[k] / wall[1] - 1.0));
+        }
+        // The window rule's own cost at a boundary that lays the whole network
+        // at once (the settle lands the campaign roads): the chunk's rects
+        // from "no road" to "the network", best of 5.
+        {
+            bake_source bare = s;
+            std::fill(bare.road.begin(), bare.road.end(), 0);
+            std::fill(bare.lane.begin(), bare.lane.end(), 0);
+            rederive_routes(bare);
+            bake_params q1 = p; q1.supersample = 1;
+            double best = 1e30;
+            std::vector<pixel_rect> rr;
+            bool ok = false;
+            for (int rep_ = 0; rep_ < 5; ++rep_)
+            {
+                const auto t0 = std::chrono::steady_clock::now();
+                ok = installation_patch_rects(bare, s, gm, q1, x0, y0, 512, 512, rr);
+                best = std::min(best, std::chrono::duration<double, std::milli>(
+                                          std::chrono::steady_clock::now() - t0).count());
+            }
+            long long area = 0;
+            for (const pixel_rect& r : rr) area += static_cast<long long>(r.w) * r.h;
+            std::printf("ROUTE-PROF  window rule, network laid at once: %.2f ms, %s, %zu windows, %.1f%% of the chunk\n",
+                        best, ok ? "patched" : "whole", rr.size(), 100.0 * area / (512.0 * 512.0));
+        }
+        // The snapshot's own cost: the source is re-taken on the main thread
+        // (every 30 frames in play, every frame under --verify), so deriving
+        // the pieces must stay cheap. A lattice about the campaign's density
+        // (every third row and every fourth column of land roaded).
+        {
+            bake_source dense = src0;
+            dense.road.assign(dense.cls.size(), 0);
+            dense.lane.assign(dense.cls.size(), 0);
+            int nr = 0;
+            for (std::size_t i = 0; i < dense.cls.size(); ++i)
+            {
+                const int r = static_cast<int>(i) / dense.gw, c = static_cast<int>(i) % dense.gw;
+                if (dense.cls[i] == land && (r % 3 == 0 || c % 4 == 0))
+                {
+                    dense.road[i] = static_cast<std::uint8_t>(1 + (r + c) % 3);
+                    ++nr;
+                }
+            }
+            double best = 1e30;
+            for (int rep_ = 0; rep_ < 7; ++rep_)
+            {
+                const auto t0 = std::chrono::steady_clock::now();
+                rederive_routes(dense);
+                best = std::min(best, std::chrono::duration<double, std::milli>(
+                                          std::chrono::steady_clock::now() - t0).count());
+            }
+            double ps = 1e30;
+            for (int rep_ = 0; rep_ < 3; ++rep_)
+            {
+                const auto t0 = std::chrono::steady_clock::now();
+                const bake_source again = prepare_source(w, home, /*reveal_all=*/true);
+                ps = std::min(ps, std::chrono::duration<double, std::milli>(
+                                      std::chrono::steady_clock::now() - t0).count());
+            }
+            std::printf("ROUTE-PROF  rederive_routes on %d road tiles (%zu pieces): %.2f ms; prepare_source (this world): %.2f ms\n",
+                        nr, dense.route_pieces.size(), best, ps);
+            // BL-1291: this world's own network (its campaign roads and lanes).
+            bake_source own = src0;
+            double bo = 1e30;
+            for (int rep_ = 0; rep_ < 7; ++rep_)
+            {
+                const auto t0 = std::chrono::steady_clock::now();
+                rederive_routes(own);
+                bo = std::min(bo, std::chrono::duration<double, std::milli>(
+                                      std::chrono::steady_clock::now() - t0).count());
+            }
+            std::printf("ROUTE-PROF  rederive_routes on this world's own network (%zu pieces): %.2f ms\n",
+                        own.route_pieces.size(), bo);
+        }
+        return;
+    }
+
+    // A 16-aligned window around a tile, at the master geometry.
+    // (ox, oy): a canonical offset from the tile centre, for a surface that
+    // does not sit at it.
+    const auto window = [&](int c, int r, int& x0, int& y0, int side, double ox = 0.0, double oy = 0.0) {
+        const double x = (kS3 * (c + ((r & 1) ? 0.5 : 0.0)) + ox) * m.s;
+        const double y = (1.5 * r + oy - m.y_min) * m.s;
+        x0 = (static_cast<int>(x) - side / 2) / 16 * 16;
+        y0 = std::clamp((static_cast<int>(y) - side / 2) / 16 * 16, 0, m.H - side);
+    };
+    bake_params off = p;  off.route_strength = 0.0f;
+    bake_params off1 = p1; off1.route_strength = 0.0f;
+    // The forecourt row aims at the plan's apron, not the tile centre: the
+    // route pass's only piece on the mine's tile is the arriving spoke, from
+    // the apron (about a third of a radius off centre, toward the road) out to
+    // the link midpoint (0.87 radii). A tile-centred 160 px window spans
+    // +-0.83 radii at 96 px/r but only +-0.63 at the 128 px master (BL-1246),
+    // which cut the spoke in half (277 -> 155 px moved). The apron itself is
+    // the installation pass's, the same with the route pass on or off.
+    const road_plan fcp = tile_road_plan(s, mine_i);
+    struct aimc { const char* name; int c, r; double ox, oy; };
+    const aimc aims[] = {
+        { "highway", ac - 2, ar, 0, 0 }, { "road", ac - 1, ar + 2, 0, 0 }, { "track", ac + 3, ar + 1, 0, 0 },
+        { "rail", ac - 1, ar + 4, 0, 0 }, { "lane", wc + 3, wr, 0, 0 }, { "town", ac + 1, ar, 0, 0 },
+        { "works", ac, ar + 2, 0, 0 }, { "forecourt", ac + 3, ar + 5, fcp.apx, fcp.apy },
+    };
+    const int side = 160;
+    bool pure = true, wrap = true, seam = true;
+    for (const aimc& a : aims)
+    {
+        int x0, y0;
+        window(a.c, a.r, x0, y0, side, a.ox, a.oy);
+        const bake_params* qs[] = { &p1, &p };
+        for (const bake_params* q : qs)
+        {
+            std::vector<std::uint32_t> b1(side * side), b2(side * side), bw(side * side), bo(side * side);
+            bake_region(s, m, *q, x0, y0, side, side, b1.data());
+            bake_region(s, m, *q, x0, y0, side, side, b2.data());
+            bake_region(s, m, *q, x0 + m.W, y0, side, side, bw.data());
+            pure = pure && b1 == b2;
+            wrap = wrap && b1 == bw;
+            // Seams: the same pixels as two windows split mid-way, each axis.
+            std::vector<std::uint32_t> l(static_cast<std::size_t>(side / 2) * side), rr(l.size());
+            bake_region(s, m, *q, x0, y0, side / 2, side, l.data());
+            bake_region(s, m, *q, x0 + side / 2, y0, side / 2, side, rr.data());
+            for (int y = 0; y < side && seam; ++y)
+                seam = std::memcmp(l.data() + static_cast<std::size_t>(y) * (side / 2),
+                                   b1.data() + static_cast<std::size_t>(y) * side, (side / 2) * 4u) == 0
+                    && std::memcmp(rr.data() + static_cast<std::size_t>(y) * (side / 2),
+                                   b1.data() + static_cast<std::size_t>(y) * side + side / 2, (side / 2) * 4u) == 0;
+            std::vector<std::uint32_t> top(static_cast<std::size_t>(side) * (side / 2)), bot(top.size());
+            bake_region(s, m, *q, x0, y0, side, side / 2, top.data());
+            bake_region(s, m, *q, x0, y0 + side / 2, side, side / 2, bot.data());
+            seam = seam && std::memcmp(top.data(), b1.data(), top.size() * 4u) == 0
+                        && std::memcmp(bot.data(), b1.data() + top.size(), bot.size() * 4u) == 0;
+            if (q == &p)
+            {
+                // The draws check and the previews read the master's own 1x.
+                bake_region(s, m, p1, x0, y0, side, side, b1.data());
+                bake_region(s, m, off1, x0, y0, side, side, bo.data());
+                int moved = 0;
+                for (std::size_t k = 0; k < b1.size(); ++k)
+                    moved += b1[k] != bo[k];
+                char what[96];
+                std::snprintf(what, sizeof what, "the %s surface draws (%d px moved by the pass)", a.name, moved);
+                check(moved > 200, "P28", what);
+                if (previews)
+                {
+                    char path[96];
+                    std::snprintf(path, sizeof path, "routes_%s.png", a.name);
+                    write_png_rgba(path, side, side, reinterpret_cast<const unsigned char*>(b1.data()), side * 4);
+                    std::snprintf(path, sizeof path, "routes_%s_off.png", a.name);
+                    write_png_rgba(path, side, side, reinterpret_cast<const unsigned char*>(bo.data()), side * 4);
+                }
+            }
+        }
+    }
+    check(pure, "P28", "the route pass is deterministic (1x and 2x, every surface)");
+    check(wrap, "P28", "the route pass is wrap-exact one period east (1x and 2x)");
+    check(seam, "P28", "the route pass is seamless across a chunk edge, both axes (1x and 2x)");
+    if (previews)
+    {
+        // The whole staged network at a glance, at the master (2x).
+        int x0, y0;
+        const int wv = 768, hv = 640;
+        window(ac, ar + 2, x0, y0, 0);
+        x0 = (x0 - wv / 2) / 16 * 16;
+        y0 = std::clamp(y0 - hv / 2, 0, m.H - hv) / 16 * 16;
+        std::vector<std::uint32_t> big(static_cast<std::size_t>(wv) * hv);
+        bake_region(s, m, p1, x0, y0, wv, hv, big.data());
+        write_png_rgba("routes_network.png", wv, hv, reinterpret_cast<const unsigned char*>(big.data()), wv * 4);
+        bake_region(s, m, off1, x0, y0, wv, hv, big.data());
+        write_png_rgba("routes_network_off.png", wv, hv, reinterpret_cast<const unsigned char*>(big.data()), wv * 4);
+    }
+
+    // --- P29: the agreement -----------------------------------------------
+    {
+        int roaded = 0;
+        bool clear = true, ends = true;
+        for (std::size_t i = 0; i < s.cls.size(); ++i)
+        {
+            const road_plan pl = tile_road_plan(s, i);
+            if (!pl.roaded)
+                continue;
+            ++roaded;
+            const int n = s.route_count[i];
+            int curves = 0;
+            bool at_apron = false;
+            for (int j = 0; j < n; ++j)
+            {
+                const route_piece& pc = s.route_pieces[static_cast<std::size_t>(s.route_first[i] + j)];
+                if (pc.tier & 0x80u)
+                    continue;
+                const double hw = 0.5 * k_route_width[pc.tier];
+                if (pc.kind == route_piece::curve)
+                {
+                    ++curves;
+                    for (int k = 2; k <= route_piece::k_pts - 3; ++k)
+                        clear = clear && std::hypot(pc.x[k] - pl.kx, pc.y[k] - pl.ky) >= pl.radius + hw;
+                }
+                if ((pc.kind == route_piece::spoke || pc.kind == route_piece::spur)
+                    && std::hypot(pc.x[0] - pl.apx, pc.y[0] - pl.apy) < 1e-5)
+                    at_apron = true;
+            }
+            if (curves == 0 && !at_apron)
+                ends = false; // an arriving road that did not end at the forecourt
+        }
+        const road_plan wp = tile_road_plan(s, works_i), mp = tile_road_plan(s, mine_i);
+        std::printf("P29: %d roaded works tiles; works cluster at (%.2f, %.2f) x%.2f, mine at (%.2f, %.2f) x%.2f\n",
+                    roaded, wp.kx, wp.ky, wp.scale, mp.kx, mp.ky, mp.scale);
+        check(wp.roaded && mp.roaded && std::hypot(wp.kx, wp.ky) > 0.1 && wp.scale < 1.0,
+              "P29", "a works tile a road meets takes its roaded variant (the cluster steps aside and shrinks)");
+        check(clear, "P29", "every through-road on a roaded tile clears the cluster disc by its half-width");
+        check(ends, "P29", "a road arriving at a roaded tile ends at its forecourt");
+        check(!tile_road_plan(s, town_i).roaded, "P29", "a town's tile is not re-planned: its road is a street");
+        // BL-1291: a road no longer passes through its tile's centre (it
+        // finds its way between its crossing points), so the probe stands on
+        // the highway tile's own curve, at its middle sample.
+        double hx = kS3 * (ac - 2 + ((ar & 1) ? 0.5 : 0.0)), hy = 1.5 * ar;
+        {
+            const std::size_t hi = idx(ac - 2, ar);
+            if (s.route_count[hi] > 0)
+            {
+                const route_piece& hp = s.route_pieces[static_cast<std::size_t>(s.route_first[hi])];
+                hx += hp.x[route_piece::k_pts / 2];
+                hy += hp.y[route_piece::k_pts / 2];
+            }
+        }
+        check(route_clearance(s, hx, hy) < 0.0 && route_clearance(s, hx, hy + 0.6) > 0.0,
+              "P29", "route_clearance is negative on a road and positive off it");
+        // The mask: a road on a masked tile never reaches the source.
+        const bake_source masked = prepare_source(w, home, /*reveal_all=*/false);
+        const auto masked_cls = static_cast<std::uint8_t>(bake_source::tile_class::masked);
+        tile_component* mt = nullptr;
+        for (auto& [id, t] : w.tiles)
+            if (t.body == home && t.grid_x >= 0 && t.grid_y >= 0 && t.grid_x < masked.gw && t.grid_y < masked.gh
+                && masked.cls[static_cast<std::size_t>(t.grid_y) * masked.gw + t.grid_x] == masked_cls)
+            {
+                mt = &t;
+                break;
+            }
+        if (mt)
+        {
+            const std::uint8_t keep = mt->road_level;
+            mt->road_level = 3;
+            const bake_source ms = prepare_source(w, home, /*reveal_all=*/false);
+            mt->road_level = keep;
+            check(ms.road[static_cast<std::size_t>(mt->grid_y) * ms.gw + mt->grid_x] == 0,
+                  "P29", "a masked tile's road never reaches the source (the survey mask)");
+        }
+        else
+            std::printf("SKIP  P29 mask: the home body has no masked tile\n");
+    }
+
+    // --- P30: a road change re-bakes only its window -----------------------
+    {
+        const auto with = [&](const bake_source& base, std::size_t i, std::uint8_t tier, bool lane) {
+            bake_source t = base;
+            (lane ? t.lane : t.road)[i] = tier;
+            rederive_routes(t);
+            return t;
+        };
+        struct change { const char* name; bake_source after; int c, r; bool one_tile = true; };
+        std::vector<change> changes;
+        if (s.cls[idx(ac - 4, ar)] == land)
+            changes.push_back({ "a road built (highway extended)", with(s, idx(ac - 4, ar), k_route_highway, false), ac - 4, ar });
+        changes.push_back({ "a road upgraded (track -> road)", with(s, idx(ac + 3, ar + 1), k_route_road, false), ac + 3, ar + 1 });
+        changes.push_back({ "a road removed (a link into the works)", with(s, idx(ac - 1, ar + 2), 0, false), ac - 1, ar + 2 });
+        changes.push_back({ "a lane stamped", with(s, idx(wc + 8, wr), 1, true), wc + 8, wr });
+        // A track cut through the deepest forest: the trees it clears and the
+        // canopies that now stand over it.
+        {
+            const int fa = homogeneous_aim(src0, terrain_cover::forest);
+            if (fa >= 0)
+            {
+                const int fr = fa / s.gw, fc = fa % s.gw;
+                bake_source cut = s;
+                for (int c = fc - 1; c <= fc + 1; ++c)
+                    if (cut.cls[idx(c, fr)] == land)
+                        cut.road[idx(c, fr)] = k_route_track;
+                rederive_routes(cut);
+                changes.push_back({ "a track cut through a forest", std::move(cut), fc, fr, false }); // three tiles: past 40% is the rule working
+            }
+        }
+        bool hash_ok = true, rule_ok = true, small = true;
+        for (const change& ch : changes)
+        {
+            int x0, y0;
+            window(ch.c, ch.r, x0, y0, 0);
+            x0 = std::max(0, x0) / k_chunk_px * k_chunk_px;
+            y0 = std::max(0, y0) / k_chunk_px * k_chunk_px; // the master chunk lattice
+            const int cw_ = std::min(k_chunk_px, m.W - x0), ch_ = std::min(k_chunk_px, m.H - y0);
+            hash_ok = hash_ok && region_hash(s, m, x0, y0, cw_, ch_) != region_hash(ch.after, m, x0, y0, cw_, ch_)
+                              && terrain_hash(s, m, x0, y0, cw_, ch_) == terrain_hash(ch.after, m, x0, y0, cw_, ch_);
+            std::vector<pixel_rect> rects;
+            const bool ok = installation_patch_rects(s, ch.after, m, p1, x0, y0, cw_, ch_, rects, 1.0);
+            std::vector<std::uint32_t> base(static_cast<std::size_t>(cw_) * ch_), target(base.size()), o;
+            bake_region(s, m, p1, x0, y0, cw_, ch_, base.data());
+            bake_region(ch.after, m, p1, x0, y0, cw_, ch_, target.data());
+            long long area = 0;
+            for (const pixel_rect& r : rects)
+            {
+                o.assign(static_cast<std::size_t>(r.w) * r.h, 0u);
+                bake_region(ch.after, m, p1, r.x0, r.y0, r.w, r.h, o.data());
+                for (int y = 0; y < r.h; ++y)
+                    std::memcpy(base.data() + static_cast<std::size_t>(r.y0 - y0 + y) * cw_ + (r.x0 - x0),
+                                o.data() + static_cast<std::size_t>(y) * r.w, static_cast<std::size_t>(r.w) * 4u);
+                area += static_cast<long long>(r.w) * r.h;
+            }
+            const double frac = area / (static_cast<double>(cw_) * ch_);
+            int miss = 0;
+            for (std::size_t q = 0; q < base.size(); ++q)
+                miss += base[q] != target[q];
+            std::printf("P30: %-40s chunk at (%d,%d)  %zu window%s  %.1f%% of the chunk  %d px missed%s\n",
+                        ch.name, x0, y0, rects.size(), rects.size() == 1 ? "" : "s", 100.0 * frac, miss,
+                        ok ? "" : "  [rule refused]");
+            rule_ok = rule_ok && ok && miss == 0 && !rects.empty();
+            small = small && (!ch.one_tile || frac < 0.40);
+        }
+        check(hash_ok, "P30", "a route change moves region_hash and leaves terrain_hash (a partial, not a whole, re-bake)");
+        check(rule_ok, "P30", "the windows around a route change, re-baked and blitted, give the new chunk byte for byte");
+        check(small, "P30", "a one-tile route change's windows stay under 40% of the chunk");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BL-1291 (roads as tile sets), RENDERING.md § Roads and sea lanes: a road
+// crosses each edge at its own hashed point and finds its way inside the tile,
+// around higher ground and the road plan's cluster, in its terrain's treatment.
+//   P32 Crossing points agree: every edge's point is the same absolute point
+//       from both of its tiles, across the cylinder seam too, within the inner
+//       70% of the edge; a rail point stands apart from the road's; and every
+//       piece that ends on an edge meets its neighbour's piece there, at the
+//       same point and heading (staged networks and the world's own roads).
+//   P33 A road never crosses a structure footprint: on every roaded works
+//       tile (staged junctions and ends on hills and plain, and the world's
+//       own), no road piece's centreline comes within the cluster's disc plus
+//       the road's half-width.
+//   P34 Routes are window-invariant on every terrain treatment: a staged
+//       network on hills, through a forest, across a marsh, through a town and
+//       as rail bakes byte-identical in unaligned sub-windows to the same
+//       pixels of the whole window, at the master 1x and 2x, and wrap-exact.
+// `--roadsets` runs P32-P34 and writes roadsets_*.png previews: each subject
+// at the master (rung 4) and its 64 / 32 px levels (rungs 3 and 2), the
+// camera squash applied, and the same with the route pass off.
+// ---------------------------------------------------------------------------
+namespace {
+
+struct roadset_aim { const char* name; int c, r; };
+
+/// A land tile at the heart of the steepest run of five land tiles along a
+/// row (no forest, temperate rows): where a road must find its way.
+int hill_aim(const bake_source& src)
+{
+    const auto land = static_cast<std::uint8_t>(bake_source::tile_class::land);
+    int best = -1;
+    double best_s = 0.0;
+    for (int r = src.gh / 5 + 3; r < src.gh * 4 / 5 - 3; ++r)
+        for (int c = 0; c < src.gw; ++c)
+        {
+            double sum = 0.0;
+            bool ok = true;
+            for (int dr = -1; dr <= 1 && ok; ++dr)
+                for (int dc = -2; dc <= 2 && ok; ++dc)
+                {
+                    const std::size_t j = static_cast<std::size_t>(r + dr) * src.gw
+                                        + ((c + dc) % src.gw + src.gw) % src.gw;
+                    ok = src.cls[j] == land && src.cover[j] != static_cast<std::uint8_t>(terrain_cover::forest);
+                    sum += std::hypot(src.grad_x[j], src.grad_y[j]);
+                }
+            if (ok && sum > best_s)
+            {
+                best_s = sum;
+                best = r * src.gw + c;
+            }
+        }
+    return best;
+}
+
+/// Stage the road sets on @p s (roads cleared first): a road and a highway
+/// over the steepest hills with works at a junction and an end on them, a
+/// track through the deepest forest, a road across a marsh, a highway through
+/// a town, a rail over the hills and a road across the cylinder seam.
+std::vector<roadset_aim> stage_roadsets(bake_source& s, const bake_source& src0)
+{
+    const auto land = static_cast<std::uint8_t>(bake_source::tile_class::land);
+    const auto idx = [&](int c, int r) {
+        return static_cast<std::size_t>(r) * s.gw + ((c % s.gw) + s.gw) % s.gw;
+    };
+    s.road.assign(s.cls.size(), 0);
+    s.lane.assign(s.cls.size(), 0);
+    const auto lay = [&](int c, int r, std::uint8_t tier) {
+        if (r >= 0 && r < s.gh && s.cls[idx(c, r)] == land)
+            s.road[idx(c, r)] = tier;
+    };
+    const auto stand = [&](int c, int r, const tile_installation& ti) {
+        const std::size_t i = idx(c, r);
+        if (s.cls[i] != land)
+            return;
+        if (s.inst.of_tile[i] < 0)
+        {
+            s.inst.of_tile[i] = static_cast<std::int32_t>(s.inst.list.size());
+            s.inst.list.push_back(ti);
+        }
+        else
+            s.inst.list[static_cast<std::size_t>(s.inst.of_tile[i])] = ti;
+    };
+    tile_installation works;
+    works.stacks[0].subject = stamp_subject::building;
+    works.stacks[0].type    = static_cast<std::uint8_t>(building_type::processing_facility);
+    works.stacks[0].family  = static_cast<std::uint8_t>(processing_family::metal_foundry);
+    works.n_stacks = 1;
+    tile_installation mine = works;
+    mine.stacks[0].type   = static_cast<std::uint8_t>(building_type::extraction_site);
+    mine.stacks[0].family = static_cast<std::uint8_t>(extraction_family::mine);
+    tile_installation town;
+    town.settlement.subject = stamp_subject::settlement;
+    town.settlement.scale = 3;
+
+    std::vector<roadset_aim> aims;
+    const int hi = hill_aim(src0);
+    if (hi >= 0)
+    {
+        const int hr = hi / s.gw, hc = hi % s.gw;
+        for (int c = hc - 3; c <= hc + 3; ++c) lay(c, hr, k_route_road);          // a road along the hills
+        for (int r = hr - 2; r <= hr + 2; ++r) lay(hc, r, k_route_highway);       // a highway across it
+        lay(hc + 2, hr + 1, k_route_track);                                        // a track to a mine
+        lay(hc + 2, hr + 2, k_route_track);
+        stand(hc - 2, hr, works);                                                  // works on the through-road
+        stand(hc + 2, hr + 2, mine);                                               // a mine at the track's end
+        stand(hc, hr, works);                                                      // works at the crossroads
+        for (int c = hc - 3; c <= hc + 3; ++c) lay(c, hr + 4, k_route_rail);      // the staged rail rung
+        aims.push_back({ "hills", hc - 1, hr });
+        aims.push_back({ "highway_hills", hc, hr - 1 });
+        aims.push_back({ "junction_works", hc, hr });
+        aims.push_back({ "rail", hc, hr + 4 });
+    }
+    if (const int fa = homogeneous_aim(src0, terrain_cover::forest); fa >= 0)
+    {
+        const int fr = fa / s.gw, fc = fa % s.gw;
+        for (int c = fc - 3; c <= fc + 3; ++c) lay(c, fr, k_route_track);
+        for (int r = fr - 2; r <= fr + 2; ++r) lay(fc + 2, r, k_route_road);
+        aims.push_back({ "forest", fc, fr });
+    }
+    if (const int ma = homogeneous_aim(src0, terrain_cover::marsh); ma >= 0)
+    {
+        const int mr = ma / s.gw, mc = ma % s.gw;
+        for (int c = mc - 3; c <= mc + 3; ++c) lay(c, mr, k_route_road);
+        aims.push_back({ "marsh", mc, mr });
+    }
+    if (const int ga = homogeneous_aim(src0, terrain_cover::grass); ga >= 0)
+    {
+        const int gr = ga / s.gw, gc = ga % s.gw;
+        for (int c = gc - 3; c <= gc + 3; ++c) lay(c, gr, k_route_highway);
+        for (int r = gr - 2; r <= gr + 2; ++r) lay(gc + 1, r, k_route_track);
+        stand(gc, gr, town);
+        aims.push_back({ "town", gc, gr });
+        aims.push_back({ "highway", gc - 2, gr });
+    }
+    // A road across the cylinder seam, on whatever land row crosses it.
+    for (int r = s.gh / 3; r < s.gh * 2 / 3; ++r)
+    {
+        bool ok = true;
+        for (int c = s.gw - 3; c <= s.gw + 2 && ok; ++c)
+            ok = s.cls[idx(c, r)] == land && !s.road[idx(c, r)];
+        if (!ok)
+            continue;
+        for (int c = s.gw - 3; c <= s.gw + 2; ++c) lay(c, r, k_route_road);
+        aims.push_back({ "seam", s.gw - 1, r });
+        break;
+    }
+    rederive_routes(s);
+    return aims;
+}
+
+/// The absolute end points of a piece, and its heading at each end (start:
+/// the way it leaves; end: the way it arrives), for P32.
+void piece_ends(const route_piece& pc, double cx, double cy, double e[2][4])
+{
+    constexpr int K = route_piece::k_pts;
+    const double l0 = std::max(1e-12, static_cast<double>(std::hypot(pc.x[1] - pc.x[0], pc.y[1] - pc.y[0])));
+    const double l1 = std::max(1e-12, static_cast<double>(std::hypot(pc.x[K - 1] - pc.x[K - 2], pc.y[K - 1] - pc.y[K - 2])));
+    e[0][0] = cx + pc.x[0];     e[0][1] = cy + pc.y[0];
+    e[0][2] = (pc.x[1] - pc.x[0]) / l0; e[0][3] = (pc.y[1] - pc.y[0]) / l0;
+    e[1][0] = cx + pc.x[K - 1]; e[1][1] = cy + pc.y[K - 1];
+    e[1][2] = (pc.x[K - 1] - pc.x[K - 2]) / l1; e[1][3] = (pc.y[K - 1] - pc.y[K - 2]) / l1;
+}
+
+} // namespace
+
+void roadsets_row(const bake_source& src0, const bake_params& p, bool previews)
+{
+    constexpr double kS3 = 1.7320508075688772;
+    const geometry m = make_master_geometry(src0.gw, src0.gh);
+    bake_params p1 = p;
+    p1.supersample = 1;
+    bake_source s = src0;
+    const std::vector<roadset_aim> aims = stage_roadsets(s, src0);
+    std::printf("P32-34: staged %zu subjects, %zu pieces\n", aims.size(), s.route_pieces.size());
+    check(aims.size() >= 5, "P32", "the road sets are staged (hills, junction works, rail, forest, town, the seam)");
+
+    // --- P32: crossing points agree ---------------------------------------
+    {
+        // Every edge, both sides, every network (road, rail, lane).
+        bool same = true, band = true, apart = true;
+        double worst = 0.0;
+        for (int r = 0; r < s.gh; ++r)
+            for (int c = 0; c < s.gw; ++c)
+                for (int n = 0; n < 4; n += 2) // E and S; their far tiles' W and N
+                {
+                    const int fc = n == 0 ? c + 1 : c, fr = n == 0 ? r : r + 1;
+                    if (fr >= s.gh)
+                        continue;
+                    // The far tile beside the near one (one period east at the
+                    // seam), computing in its own wrapped column.
+                    const double ax = kS3 * (c + ((r & 1) ? 0.5 : 0.0)), ay = 1.5 * r;
+                    const double bx = kS3 * (fc + ((fr & 1) ? 0.5 : 0.0)), by = 1.5 * fr;
+                    const int fcw = fc % s.gw;
+                    double rp[2] = {};
+                    for (int net = 0; net < 3; ++net)
+                    {
+                        double x0, y0, nx0, ny0, x1, y1, nx1, ny1;
+                        route_crossing(s.gw, c, r, n, net, x0, y0, nx0, ny0);
+                        route_crossing(s.gw, fcw, fr, n + 1, net, x1, y1, nx1, ny1);
+                        const double dx = (ax + x0) - (bx + x1), dy = (ay + y0) - (by + y1);
+                        worst = std::max(worst, std::hypot(dx, dy));
+                        same = same && std::hypot(dx, dy) < 1e-9 && std::fabs(nx0 + nx1) < 1e-12
+                                    && std::fabs(ny0 + ny1) < 1e-12;
+                        // Within the inner 70%: the offset from the midpoint.
+                        const double mx = (bx - ax) * 0.5, my = (by - ay) * 0.5;
+                        band = band && std::hypot(x0 - mx, y0 - my) <= k_cross_band + 1e-9;
+                        if (net < 2)
+                            rp[net] = (x0 - mx) * -ny0 + (y0 - my) * nx0; // signed, along the edge
+                    }
+                    apart = apart && std::fabs(rp[0] - rp[1]) >= 0.5 * k_cross_band - 1e-9;
+                }
+        std::printf("P32: worst crossing disagreement %.3g canonical over every edge, three networks\n", worst);
+        check(same, "P32", "every edge's crossing point is one absolute point from both tiles, across the seam too");
+        check(band, "P32", "every crossing point lies within the inner 70% of its edge");
+        check(apart, "P32", "a rail crossing stands at least half the band from the road's on the same edge");
+
+        // Pieces meet: every curve/spoke end on an edge has a neighbour end at
+        // the same absolute point, heading on (staged sets and the world's).
+        double worst_turn = 0.0;
+        const auto meet = [&](const bake_source& src, int& ends, int& met) {
+            ends = met = 0;
+            const auto pidx = [&](int c, int r) {
+                return static_cast<std::size_t>(r) * src.gw + ((c % src.gw) + src.gw) % src.gw;
+            };
+            for (int r = 0; r < src.gh; ++r)
+                for (int c = 0; c < src.gw; ++c)
+                {
+                    const std::size_t i = pidx(c, r);
+                    const double cx = kS3 * (c + ((r & 1) ? 0.5 : 0.0)), cy = 1.5 * r;
+                    for (int j = 0; j < src.route_count[i]; ++j)
+                    {
+                        const route_piece& pc = src.route_pieces[static_cast<std::size_t>(src.route_first[i] + j)];
+                        if (pc.kind != route_piece::curve && pc.kind != route_piece::spoke)
+                            continue;
+                        double e[2][4];
+                        piece_ends(pc, cx, cy, e);
+                        for (int end = pc.kind == route_piece::curve ? 0 : 1; end < 2; ++end)
+                        {
+                            ++ends;
+                            bool found = false;
+                            for (int n = 0; n < 4 && !found; ++n)
+                            {
+                                static constexpr int kc[4][2] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
+                                const int nc = c + kc[n][0], nr = r + kc[n][1];
+                                if (nr < 0 || nr >= src.gh)
+                                    continue;
+                                const std::size_t t = pidx(nc, nr);
+                                const double ncx = kS3 * (nc + ((nr & 1) ? 0.5 : 0.0)), ncy = 1.5 * nr;
+                                for (int q = 0; q < src.route_count[t] && !found; ++q)
+                                {
+                                    const route_piece& o = src.route_pieces[static_cast<std::size_t>(src.route_first[t] + q)];
+                                    if (((o.tier & 0x80u) != 0) != ((pc.tier & 0x80u) != 0))
+                                        continue;
+                                    if (o.kind != route_piece::curve && o.kind != route_piece::spoke)
+                                        continue;
+                                    double f[2][4];
+                                    piece_ends(o, ncx, ncy, f);
+                                    for (int fe = o.kind == route_piece::curve ? 0 : 1; fe < 2 && !found; ++fe)
+                                    {
+                                        const double d = std::hypot(e[end][0] - f[fe][0], e[end][1] - f[fe][1]);
+                                        // Heading on: one end's outward heading is
+                                        // the other's outward heading reversed.
+                                        const double ox = end ? e[end][2] : -e[end][2], oy = end ? e[end][3] : -e[end][3];
+                                        const double px = fe ? f[fe][2] : -f[fe][2], py = fe ? f[fe][3] : -f[fe][3];
+                                        // The end segments sample the tangent a
+                                        // half-step in, so a bend turns them a
+                                        // little from the shared heading: within
+                                        // 20 degrees, and the worst is printed.
+                                        const double dot = ox * px + oy * py;
+                                        if (d < 2e-5 && dot < -0.94)
+                                        {
+                                            found = true;
+                                            worst_turn = std::max(worst_turn, std::acos(std::clamp(-dot, -1.0, 1.0)) * 57.29578);
+                                        }
+                                    }
+                                }
+                            }
+                            met += found;
+                        }
+                    }
+                }
+        };
+        int e1, m1, e2, m2;
+        meet(s, e1, m1);
+        meet(src0, e2, m2);
+        std::printf("P32: staged sets %d/%d piece ends meet their neighbour; the world's roads and lanes %d/%d"
+                    " (end segments within %.1f degrees)\n", m1, e1, m2, e2, worst_turn);
+        check(e1 > 0 && m1 == e1, "P32", "every staged piece end on an edge meets its neighbour's at one point, heading on");
+        check(m2 == e2, "P32", "every world road and lane piece end on an edge meets its neighbour's, heading on");
+    }
+
+    // --- P33: no road crosses a structure footprint ----------------------
+    {
+        const auto clear_of = [&](const bake_source& src, int& roaded, double& worst) {
+            roaded = 0;
+            worst = 1e9;
+            bool ok = true;
+            for (std::size_t i = 0; i < src.cls.size(); ++i)
+            {
+                const road_plan pl = tile_road_plan(src, i);
+                if (!pl.roaded)
+                    continue;
+                ++roaded;
+                for (int j = 0; j < src.route_count[i]; ++j)
+                {
+                    const route_piece& pc = src.route_pieces[static_cast<std::size_t>(src.route_first[i] + j)];
+                    if (pc.tier & 0x80u)
+                        continue;
+                    const double hw = 0.5 * k_route_width[pc.tier];
+                    for (int k = 1; k < route_piece::k_pts; ++k)
+                    {
+                        // The segment's distance to the cluster centre.
+                        const double ax = pc.x[k - 1] - pl.kx, ay = pc.y[k - 1] - pl.ky;
+                        const double vx = pc.x[k] - pc.x[k - 1], vy = pc.y[k] - pc.y[k - 1];
+                        const double l2 = vx * vx + vy * vy;
+                        const double u = l2 > 0.0 ? std::clamp(-(ax * vx + ay * vy) / l2, 0.0, 1.0) : 0.0;
+                        const double d = std::hypot(ax + vx * u, ay + vy * u) - pl.radius - hw;
+                        worst = std::min(worst, d);
+                        ok = ok && d >= -1e-6;
+                    }
+                }
+            }
+            return ok;
+        };
+        int r1, r2;
+        double w1, w2;
+        const bool ok1 = clear_of(s, r1, w1);
+        const bool ok2 = clear_of(src0, r2, w2);
+        std::printf("P33: %d staged roaded tiles (closest %.3f past the disc and half-width), %d in the world (%.3f)\n",
+                    r1, w1 < 1e8 ? w1 : 0.0, r2, w2 < 1e8 ? w2 : 0.0);
+        check(r1 >= 3 && ok1, "P33", "no staged road comes within a roaded cluster's disc plus its half-width");
+        check(ok2, "P33", "no road in the world comes within a roaded cluster's disc plus its half-width");
+    }
+
+    // --- P34: window invariance on every treatment -----------------------
+    {
+        bool inv = true, wrap = true, draws = true;
+        const int side = 192;
+        for (const roadset_aim& a : aims)
+        {
+            const double x = kS3 * (a.c + ((a.r & 1) ? 0.5 : 0.0)) * m.s;
+            const double y = (1.5 * a.r - m.y_min) * m.s;
+            const int x0 = static_cast<int>(x) - side / 2;
+            const int y0 = std::clamp(static_cast<int>(y) - side / 2, 0, m.H - side);
+            const bake_params* qs[2] = { &p1, &p };
+            for (const bake_params* q : qs)
+            {
+                std::vector<std::uint32_t> whole(static_cast<std::size_t>(side) * side), wb(whole.size());
+                bake_region(s, m, *q, x0, y0, side, side, whole.data());
+                bake_region(s, m, *q, x0 + m.W, y0, side, side, wb.data());
+                wrap = wrap && whole == wb;
+                // Unaligned sub-windows: odd sizes and offsets.
+                static constexpr int subs[4][4] = { { 0, 0, 77, 101 }, { 77, 0, 115, 61 },
+                                                    { 33, 61, 97, 131 }, { 130, 101, 62, 91 } };
+                for (const auto& sb : subs)
+                {
+                    std::vector<std::uint32_t> part(static_cast<std::size_t>(sb[2]) * sb[3]);
+                    bake_region(s, m, *q, x0 + sb[0], y0 + sb[1], sb[2], sb[3], part.data());
+                    for (int yy = 0; yy < sb[3] && inv; ++yy)
+                        inv = std::memcmp(part.data() + static_cast<std::size_t>(yy) * sb[2],
+                                          whole.data() + static_cast<std::size_t>(sb[1] + yy) * side + sb[0],
+                                          static_cast<std::size_t>(sb[2]) * 4u) == 0;
+                }
+                if (q == &p1)
+                {
+                    bake_params off = p1;
+                    off.route_strength = 0.0f;
+                    std::vector<std::uint32_t> wo(whole.size());
+                    bake_region(s, m, off, x0, y0, side, side, wo.data());
+                    int moved = 0;
+                    for (std::size_t k = 0; k < whole.size(); ++k)
+                        moved += whole[k] != wo[k];
+                    draws = draws && moved > 150;
+                    std::printf("P34: %-15s [%d,%d] %d px moved by the pass\n", a.name, a.c, a.r, moved);
+                }
+            }
+        }
+        check(inv, "P34", "every road set bakes byte-identical in unaligned sub-windows (1x and 2x)");
+        check(wrap, "P34", "every road set is wrap-exact one period east (1x and 2x)");
+        check(draws, "P34", "every road set draws (the pass moves its window)");
+    }
+
+    if (!previews)
+        return;
+    // Previews: each subject at the master (rung 4), and its 64 / 32 px levels
+    // (rungs 3 and 2), the camera squash applied; the same with the pass off.
+    const auto squash = [](const std::vector<std::uint32_t>& buf, int PW, int PH, double sy, int U, const char* path) {
+        const int OH = static_cast<int>(PH * sy);
+        std::vector<std::uint32_t> up(static_cast<std::size_t>(PW) * U * OH * U);
+        for (int y = 0; y < OH * U; ++y)
+        {
+            const int syr = std::min(PH - 1, static_cast<int>((y / U) / sy));
+            for (int x = 0; x < PW * U; ++x)
+                up[static_cast<std::size_t>(y) * PW * U + x] = buf[static_cast<std::size_t>(syr) * PW + x / U];
+        }
+        write_png_rgba(path, PW * U, OH * U, reinterpret_cast<const unsigned char*>(up.data()), PW * U * 4);
+    };
+    for (const roadset_aim& a : aims)
+    {
+        const int PW = 640, PH = 512;
+        const double x = kS3 * (a.c + ((a.r & 1) ? 0.5 : 0.0)) * m.s;
+        const double y = (1.5 * a.r - m.y_min) * m.s;
+        const int x0 = (static_cast<int>(x) - PW / 2) / 16 * 16;
+        const int y0 = std::clamp((static_cast<int>(y) - PH / 2) / 16 * 16, 0, m.H - PH);
+        for (int on = 1; on >= 0; --on)
+        {
+            bake_params q = p1;
+            if (!on)
+                q.route_strength = 0.0f;
+            std::vector<std::uint32_t> buf(static_cast<std::size_t>(PW) * PH);
+            bake_region(s, m, q, x0, y0, PW, PH, buf.data());
+            char path[128];
+            std::snprintf(path, sizeof path, "roadsets_%s%s_r4.png", a.name, on ? "" : "_off");
+            squash(buf, PW, PH, m.tilt_sy, 1, path);
+            int w = PW, h = PH;
+            std::vector<std::uint32_t> cur = buf, nxt;
+            for (int l = 0; l < 2; ++l)
+            {
+                nxt.assign(static_cast<std::size_t>(w / 2) * (h / 2), 0u);
+                downsample_half(cur.data(), w, h, nxt.data());
+                w /= 2; h /= 2;
+                cur.swap(nxt);
+                std::snprintf(path, sizeof path, "roadsets_%s%s_r%d.png", a.name, on ? "" : "_off", 3 - l);
+                squash(cur, w, h, m.tilt_sy, l == 0 ? 2 : 4, path);
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// --towns (BL-1258, towns denser; a reading + previews, no check): the
+// settlement ladder (Outpost -> Metropolis), a town a highway runs through
+// (its street), a city two roads cross, a metropolis a road runs through and
+// a town beside works, staged on the widest plain and baked at the MASTER
+// geometry. Previews: the master (towns_master.png), the 48 / 24 / 12 px
+// levels it mips to — the mid rungs read these (rung 2 draws ~28 px: the 48
+// level minified) — upscaled for the eye, and the far page (towns_far.png,
+// x8). The camera squash is applied. Then the bake cost of a 512 px master
+// chunk centred on each staged town, installations on vs off, best of 5, and
+// the bounds mode's cost and box for the town's tile.
+// ---------------------------------------------------------------------------
+void towns_row(const bake_source& src0, const bake_params& p)
+{
+    constexpr double kS3 = 1.7320508075688772;
+    const auto land = static_cast<std::uint8_t>(bake_source::tile_class::land);
+    const geometry m = make_master_geometry(src0.gw, src0.gh);
+    bake_params p1 = p;
+    p1.supersample = 1;
+    const auto idx = [&](int c, int r) {
+        return static_cast<std::size_t>(r) * src0.gw + ((c % src0.gw) + src0.gw) % src0.gw;
+    };
+    bake_source s = src0;
+    s.inst.of_tile.assign(s.cls.size(), -1);
+    s.inst.list.clear();
+    s.road.assign(s.cls.size(), 0);
+    s.lane.assign(s.cls.size(), 0);
+    const int aim = std::max(0, homogeneous_aim(src0, terrain_cover::grass));
+    const int ar = aim / s.gw, ac = aim % s.gw;
+    struct staged_town { const char* name; int c, r; };
+    std::vector<staged_town> towns;
+    const auto stand = [&](const char* name, int c, int r, int scale, int n_works) {
+        const std::size_t i = idx(c, r);
+        if (s.cls[i] != land)
+        {
+            std::printf("towns: [%d,%d] is not land; %s not staged\n", c, r, name);
+            return;
+        }
+        tile_installation ti;
+        ti.settlement.subject = stamp_subject::settlement;
+        ti.settlement.scale = static_cast<std::uint8_t>(scale);
+        if (n_works > 0)
+        {
+            ti.stacks[0].subject = stamp_subject::building;
+            ti.stacks[0].type = static_cast<std::uint8_t>(building_type::processing_facility);
+            ti.stacks[0].family = static_cast<std::uint8_t>(processing_family::metal_foundry);
+        }
+        if (n_works > 1)
+        {
+            ti.stacks[1].subject = stamp_subject::building;
+            ti.stacks[1].type = static_cast<std::uint8_t>(building_type::extraction_site);
+            ti.stacks[1].family = static_cast<std::uint8_t>(extraction_family::mine);
+        }
+        ti.n_stacks = static_cast<std::uint8_t>(n_works);
+        s.inst.of_tile[i] = static_cast<std::int32_t>(s.inst.list.size());
+        s.inst.list.push_back(ti);
+        towns.push_back({ name, c, r });
+    };
+    const auto lay = [&](int c, int r, std::uint8_t tier) {
+        if (r >= 0 && r < s.gh && s.cls[idx(c, r)] == land)
+            s.road[idx(c, r)] = tier;
+    };
+    // Row ar: the ladder, every other column (a clear hex between towns).
+    stand("outpost (1)",    ac - 4, ar, 1, 0);
+    stand("village (2)",    ac - 2, ar, 2, 0);
+    stand("town (3)",       ac,     ar, 3, 0);
+    stand("city (4)",       ac + 2, ar, 4, 0);
+    stand("metropolis (5)", ac + 4, ar, 5, 0);
+    // Row ar + 3: a highway town, a crossed city, a metropolis on a road, a
+    // town beside works.
+    const int rr = ar + 3;
+    for (int c = ac - 6; c <= ac - 2; ++c) lay(c, rr, k_route_highway);
+    stand("town on a highway (3)", ac - 4, rr, 3, 0);
+    for (int c = ac - 1; c <= ac + 4; ++c) lay(c, rr, k_route_road);
+    for (int r = rr - 2; r <= rr + 2; ++r) lay(ac + 1, r, k_route_track);
+    stand("city, two roads crossing (4)", ac + 1, rr, 4, 0);
+    stand("metropolis, road through (5)", ac + 3, rr, 5, 0);
+    stand("town beside works (3+2)", ac + 5, rr, 3, 2);
+    rederive_routes(s);
+    std::printf("towns: staged %zu at aim [%d,%d], %zu route pieces\n", towns.size(), ac, ar,
+                s.route_pieces.size());
+
+    const auto squash_up = [](const std::vector<std::uint32_t>& buf, int PW, int PH, double sy, int U,
+                              const char* path) {
+        const int OH = static_cast<int>(PH * sy);
+        std::vector<std::uint32_t> up(static_cast<std::size_t>(PW) * U * OH * U);
+        for (int y = 0; y < OH * U; ++y)
+        {
+            const int syr = std::min(PH - 1, static_cast<int>((y / U) / sy));
+            for (int x = 0; x < PW * U; ++x)
+                up[static_cast<std::size_t>(y) * PW * U + x] = buf[static_cast<std::size_t>(syr) * PW + x / U];
+        }
+        write_png_rgba(path, PW * U, OH * U, reinterpret_cast<const unsigned char*>(up.data()), PW * U * 4);
+        std::printf("preview: %s (%dx%d)\n", path, PW * U, OH * U);
+    };
+    {
+        const double x0 = kS3 * (ac - 6.2), x1 = kS3 * (ac + 6.4);
+        const double y0 = 1.5 * (ar - 1) - 0.8, y1 = 1.5 * (rr + 1) + 0.2;
+        int px0 = static_cast<int>(x0 * m.s) / 16 * 16;
+        int py0 = std::max(0, static_cast<int>((y0 - m.y_min) * m.s) / 16 * 16);
+        int PW = static_cast<int>((x1 - x0) * m.s) / 16 * 16;
+        int PH = std::min(m.H - py0, static_cast<int>((y1 - y0) * m.s)) / 16 * 16;
+        std::vector<std::uint32_t> buf(static_cast<std::size_t>(PW) * PH);
+        bake_region(s, m, p1, px0, py0, PW, PH, buf.data());
+        squash_up(buf, PW, PH, m.tilt_sy, 1, "towns_master.png");
+        int w = PW, h = PH;
+        std::vector<std::uint32_t> cur = buf, nxt;
+        const struct { const char* name; int up; } lv[3] = { { "towns_l48.png", 2 }, { "towns_l24.png", 4 },
+                                                             { "towns_l12.png", 8 } };
+        for (int l = 0; l < 3; ++l)
+        {
+            nxt.assign(static_cast<std::size_t>(w / 2) * (h / 2), 0u);
+            downsample_half(cur.data(), w, h, nxt.data());
+            w /= 2; h /= 2;
+            cur.swap(nxt);
+            squash_up(cur, w, h, m.tilt_sy, lv[l].up, lv[l].name);
+        }
+        // The far page: a direct bake at k_far_ppr, the same angle.
+        const geometry f = make_geometry(s.gw, s.gh, k_far_ppr, k_tilt_sy);
+        px0 = static_cast<int>(x0 * f.s);
+        py0 = std::max(0, static_cast<int>((y0 - f.y_min) * f.s));
+        PW = static_cast<int>((x1 - x0) * f.s);
+        PH = std::min(f.H - py0, static_cast<int>((y1 - y0) * f.s));
+        buf.assign(static_cast<std::size_t>(PW) * PH, 0u);
+        bake_region(s, f, p1, px0, py0, PW, PH, buf.data());
+        squash_up(buf, PW, PH, f.tilt_sy, 8, "towns_far.png");
+    }
+
+    // Cost: the 512 px master chunk centred on each town, best of 5, in
+    // this thread's Mcycles (thread_cpu_ms; ~ms at ~1 GHz-equivalent).
+    std::vector<std::uint32_t> tb(512u * 512u);
+    double sum_on = 0, sum_off = 0;
+    for (const staged_town& t : towns)
+    {
+        const double cx = kS3 * (t.c + ((t.r & 1) ? 0.5 : 0.0)) * m.s;
+        const double cy = (1.5 * t.r - m.y_min) * m.s;
+        const int x0 = static_cast<int>(cx - 256) / 16 * 16;
+        const int y0 = std::clamp(static_cast<int>(cy - 256) / 16 * 16, 0, m.H - 512);
+        double best[2] = { 1e30, 1e30 };
+        for (int rep = 0; rep < 5; ++rep)
+            for (int on = 0; on < 2; ++on)
+            {
+                bake_params q = p1;
+                q.installations = on == 1;
+                // This thread's cycles (millions): blind to time descheduled,
+                // so a busy machine does not drown the reading.
+                const double c0 = thread_cpu_ms();
+                bake_region(s, m, q, x0, y0, 512, 512, tb.data());
+                best[on] = std::min(best[on], thread_cpu_ms() - c0);
+            }
+        sum_off += best[0]; sum_on += best[1];
+        int bx0 = 0, by0 = 0, bx1 = 0, by1 = 0;
+        const auto b0 = std::chrono::steady_clock::now();
+        const bool any = installation_tile_bounds(s, m, p1, t.c, t.r, bx0, by0, bx1, by1);
+        const double bms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - b0).count();
+        std::printf("towns: %-30s chunk Mcyc  off %7.1f  on %7.1f  (+%5.1f)   bounds %s %dx%d px in %.1f ms\n",
+                    t.name, best[0], best[1], best[1] - best[0], any ? "box" : "none",
+                    bx1 - bx0, by1 - by0, bms);
+    }
+    if (!towns.empty())
+        std::printf("towns: mean chunk Mcyc  off %.1f  on %.1f  (+%.1f per town chunk)\n",
+                    sum_off / towns.size(), sum_on / towns.size(), (sum_on - sum_off) / towns.size());
+}
+
+int main(int argc, char** argv)
 {
     generation_report report;
     world w = make_hard_coded_world(no_prehistory(), &report);
@@ -116,6 +2978,671 @@ int main()
     check(land_i >= 0 && water_i >= 0, "setup", "found land and water tiles");
     if (g_failures)
         return 1;
+
+    // --aim: print the variant-capture aims (BL-1243) and stop — the tile
+    // coordinates scripts/verify/terrain_variants.lua frames, without the
+    // ten-minute Debug run of every phase.
+    if (argc > 1 && std::strcmp(argv[1], "--aim") == 0)
+    {
+        for (const auto& [name, cov] : { std::pair{ "plain (grass)", terrain_cover::grass },
+                                         std::pair{ "bare (none)",   terrain_cover::none },
+                                         std::pair{ "forest",        terrain_cover::forest },
+                                         std::pair{ "scrub",         terrain_cover::scrub } })
+        {
+            int score = 0;
+            const int t = homogeneous_aim(src, cov, &score);
+            if (t >= 0)
+                std::printf("AIM  %-14s [%d,%d]  %d/%d of its neighbourhood alike\n", name,
+                            t % src.gw, t / src.gw, score, 37);
+            else
+                std::printf("AIM  %-14s none\n", name);
+        }
+        return 0;
+    }
+
+    // --pool: the worker-pool row (P21) alone.
+    if (argc > 1 && std::strcmp(argv[1], "--pool") == 0)
+    {
+        pool_row(src, hb, land_i, p);
+        std::printf("%s (%d failures)\n", g_failures ? "FAIL" : "PASS", g_failures);
+        return g_failures ? 1 : 0;
+    }
+
+    // --prof: where a master chunk's time goes under the BL-1251 passes — one
+    // 512 px master chunk (the real geometry, 1x) on the wide plain and on the
+    // forest fringe, best of 3, with each pass off in turn. A reading.
+    if (argc > 1 && std::strcmp(argv[1], "--prof") == 0)
+    {
+        const geometry gm = make_master_geometry(hb.grid_width, hb.grid_height);
+        bake_params base = p;
+        base.supersample = 1;
+        struct cfg { const char* name; bake_params q; };
+        std::vector<cfg> cfgs;
+        cfgs.push_back({ "now", base });
+        { bake_params q = base; q.shadow_strength = 0.0f; cfgs.push_back({ "no shadows", q }); }   // BL-1256
+        { bake_params q = base; q.hill_amp = 0.0f; cfgs.push_back({ "no hills", q }); }            // BL-1256
+        { bake_params q = base; q.crisp = 0.0f; cfgs.push_back({ "pre-BL-1254", q }); }
+        { bake_params q = base; q.pattern_strength = 0.0f; cfgs.push_back({ "no patterns", q }); }
+        { bake_params q = base; q.border_strength = 0.0f;  cfgs.push_back({ "no borders", q }); }
+        { bake_params q = base; q.border_strength = 0.0f; q.pattern_strength = 0.0f; cfgs.push_back({ "band only", q }); }
+        { bake_params q = base; q.edge_band = 0.0f; q.border_strength = 0.0f; q.pattern_strength = 0.0f;
+          q.edge_ink = 0.30f; q.shore_ink = 0.42f; cfgs.push_back({ "pre-BL-1251", q }); }
+        std::vector<std::uint32_t> tb(512u * 512u);
+        for (const auto& [nm, cov] : { std::pair{ "plain", terrain_cover::grass },
+                                       std::pair{ "forest", terrain_cover::forest } })
+        {
+            const int aim = std::max(0, homogeneous_aim(src, cov));
+            const int ar = aim / src.gw, ac = aim % src.gw;
+            const double ax = 1.7320508075688772 * (ac + ((ar & 1) ? 0.5 : 0.0));
+            const int x0 = static_cast<int>(ax * gm.s) / 512 * 512;
+            const int y0 = std::clamp(static_cast<int>((1.5 * ar - gm.y_min) * gm.s) / 512 * 512, 0, gm.H - 512);
+            // Interleaved (every configuration once per round, nine rounds)
+            // and the minimum kept, of wall time and of this thread's cycles:
+            // a load spike then costs one sample of one configuration, not
+            // a whole configuration's reading.
+            std::vector<double> wall(cfgs.size(), 1e30), cyc(cfgs.size(), 1e30);
+            for (int rep = 0; rep < 9; ++rep)
+                for (std::size_t k = 0; k < cfgs.size(); ++k)
+                {
+                    const double c0 = thread_cpu_ms();
+                    const auto t0 = std::chrono::steady_clock::now();
+                    bake_region(src, gm, cfgs[k].q, x0, y0, 512, 512, tb.data());
+                    const double c1 = thread_cpu_ms();
+                    wall[k] = std::min(wall[k], std::chrono::duration<double, std::milli>(
+                                                    std::chrono::steady_clock::now() - t0).count());
+                    if (c1 >= 0.0)
+                        cyc[k] = std::min(cyc[k], c1 - c0);
+                }
+            for (std::size_t k = 0; k < cfgs.size(); ++k)
+                std::printf("PROF  %-7s master chunk  %-12s %8.1f ms wall  %8.1f Mcycles  (%+.0f%% vs pre-BL-1251)\n",
+                            nm, cfgs[k].name, wall[k], cyc[k] < 1e29 ? cyc[k] : -1.0,
+                            100.0 * (wall[k] / wall.back() - 1.0));
+        }
+        return 0;
+    }
+
+    // --crisp: the BL-1254 crispness reading, as baked and with the base
+    // hillshade's sign flipped (NR-1006 (e), Ben's call — an A/B, not a check).
+    if (argc > 1 && std::strcmp(argv[1], "--crisp") == 0)
+    {
+        if (argc > 2 && std::strcmp(argv[2], "--decomp") == 0)
+        {
+            bake_params d = p;
+            d.crisp = 0.0f;              crisp_row(src, d, "_c0");
+            d = p; d.variant_strength = 0.0f; crisp_row(src, d, "_novar");
+            d = p; d.detail_amp = 0.0f;  crisp_row(src, d, "_nodetail");
+            d = p; d.noise_strength = 0.0f; crisp_row(src, d, "_nonoise");
+            return 0;
+        }
+        crisp_row(src, p, "");
+        bake_params q = p;
+        q.hillshade_sign = -q.hillshade_sign;
+        std::printf("-- base hillshade sign flipped (%+.0f):\n", q.hillshade_sign);
+        crisp_row(src, q, "_flip");
+        return 0;
+    }
+
+    // --look: the BL-1256 subjects (a reading), as baked; `--look <suffix>`
+    // names the files.
+    if (argc > 1 && std::strcmp(argv[1], "--look") == 0)
+    {
+        // Tuning overrides, `name=value` after the suffix (the BL-1256 dials).
+        bake_params q = p;
+        struct dial { const char* name; float* v; };
+        const dial dials[] = {
+            { "roll_floor", &q.roll_floor }, { "roll_ridge", &q.roll_ridge }, { "plain_ease", &q.plain_ease }, { "flat_tilt", &q.flat_tilt },
+            { "hill_amp", &q.hill_amp },
+            { "shade_lo", &q.shade_lo }, { "shade_hi", &q.shade_hi }, { "mottle", &q.mottle },
+            { "shadow_strength", &q.shadow_strength }, { "sun_elevation", &q.sun_elevation },
+            { "shadow_reach", &q.shadow_reach }, { "shadow_tile", &q.shadow_tile }, { "shadow_fold", &q.shadow_fold }, { "glint_strength", &q.glint_strength },
+            { "rapids_strength", &q.rapids_strength }, { "bank_rocks", &q.bank_rocks },
+            { "grade_desat", &q.grade_desat }, { "grade_lift", &q.grade_lift },
+            { "grade_contrast", &q.grade_contrast }, { "grade_pivot", &q.grade_pivot },
+            { "grade_split", &q.grade_split }, { "relief_gain", &q.relief_gain },
+            { "detail_amp", &q.detail_amp }, { "landform_accent", &q.landform_accent },
+            { "altitude_gain", &q.altitude_gain }, { "noise_strength", &q.noise_strength },
+            { "snow_caps", &q.snow_caps }, { "snow_line", &q.snow_line },
+        };
+        for (int a = 3; a < argc; ++a)
+        {
+            const char* eq = std::strchr(argv[a], '=');
+            if (!eq)
+                continue;
+            for (const dial& d : dials)
+                if (std::strncmp(argv[a], d.name, static_cast<std::size_t>(eq - argv[a])) == 0
+                    && std::strlen(d.name) == static_cast<std::size_t>(eq - argv[a]))
+                    *d.v = static_cast<float>(std::atof(eq + 1));
+        }
+        look_row(src, q, argc > 2 ? argv[2] : "");
+        return 0;
+    }
+
+    // --border: the BL-1251 rows (P26, P27) alone, with previews.
+    if (argc > 1 && std::strcmp(argv[1], "--border") == 0)
+    {
+        border_row(src, hb, p, /*previews=*/true);
+        std::printf("%s (%d failures)\n", g_failures ? "FAIL" : "PASS", g_failures);
+        return g_failures ? 1 : 0;
+    }
+
+    // --route-prof: the route pass's per-chunk cost (BL-1253), a reading.
+    if (argc > 1 && std::strcmp(argv[1], "--route-prof") == 0)
+    {
+        route_row(w, home, src, p, /*previews=*/false, /*prof=*/true);
+        return 0;
+    }
+
+    // --towns: the BL-1258 settlement ladder previews and cost (a reading).
+    if (argc > 1 && std::strcmp(argv[1], "--towns") == 0)
+    {
+        towns_row(src, p);
+        return 0;
+    }
+
+    // --routes: the BL-1253 rows (P28-P30) alone, with previews.
+    if (argc > 1 && std::strcmp(argv[1], "--routes") == 0)
+    {
+        route_row(w, home, src, p, /*previews=*/true);
+        roadsets_row(src, p, /*previews=*/false); // BL-1291: P32-P34
+        std::printf("%s (%d failures)\n", g_failures ? "FAIL" : "PASS", g_failures);
+        return g_failures ? 1 : 0;
+    }
+
+    // --roadsets: the BL-1291 rows (P32-P34) alone, with roadsets_*.png previews.
+    if (argc > 1 && std::strcmp(argv[1], "--roadsets") == 0)
+    {
+        roadsets_row(src, p, /*previews=*/true);
+        std::printf("%s (%d failures)\n", g_failures ? "FAIL" : "PASS", g_failures);
+        return g_failures ? 1 : 0;
+    }
+
+    // --shadow: the cast-shadow row (P31) alone.
+    if (argc > 1 && std::strcmp(argv[1], "--shadow") == 0)
+    {
+        shadow_row(src, p);
+        std::printf("%s (%d failures)\n", g_failures ? "FAIL" : "PASS", g_failures);
+        return g_failures ? 1 : 0;
+    }
+
+    // --patch: the partial re-bake rows (P24, P25) alone.
+    if (argc > 1 && std::strcmp(argv[1], "--patch") == 0)
+    {
+        patch_row(src, p);
+        std::printf("%s (%d failures)\n", g_failures ? "FAIL" : "PASS", g_failures);
+        return g_failures ? 1 : 0;
+    }
+
+    // --master: the whole-body master bake reading (BL-1246; RENDERING.md
+    // § Level of detail; TECH_FOUNDATIONS.md § Target hardware — the pre-bake
+    // must add at most 15 s): the home body's master on the pool's thread
+    // count, 1x and 2x, under the survey mask as play opens and fully
+    // revealed (the worst case), plus P22. A reading; only P22 can fail.
+    if (argc > 1 && std::strcmp(argv[1], "--master") == 0)
+    {
+        master_row(src, hb, land_i, p);
+        lock_fast_row(w, home, p);
+        const bake_source masked = prepare_source(w, home, /*reveal_all=*/false);
+        master_bake(masked, p, 1, "masked");
+        master_bake(src, p, 1, "revealed");
+        // The 96 px master this replaced, same pool and alignment (a reading).
+        master_bake(masked, p, 1, "masked@96", 96.0);
+        master_bake(src, p, 1, "revealed@96", 96.0);
+        // An unsurveyed body: every tile the lock fill.
+        for (const auto& [id, bd] : w.bodies)
+            if (bd.grid_width > 0 && bd.survey.phase == survey_phase::hidden)
+            {
+                master_bake(prepare_source(w, id), p, 1, "unsurveyed");
+                break;
+            }
+        master_bake(masked, p, 2, "masked");
+        master_bake(src, p, 2, "revealed");
+        // Where the revealed master's time goes: the whole 1x bake with one
+        // pass switched off at a time (a reading for whoever optimises it).
+        {
+            struct off { const char* name; void (*set)(bake_params&); };
+            const off offs[] = {
+                { "no-installations", [](bake_params& q) { q.installations = false; } },
+                { "no-landforms",     [](bake_params& q) { q.landform_strength = 0.0f; } },
+                { "no-rivers",        [](bake_params& q) { q.river_strength = 0.0f; } },
+                { "no-variants",      [](bake_params& q) { q.variant_strength = 0.0f; } },
+                { "no-trees",         [](bake_params& q) { q.tree_density = 0.0f; } },
+                { "no-edges/unsharp", [](bake_params& q) { q.edge_ink = q.shore_ink = 0.0f; q.unsharp_amount = 0.0f; } },
+                { "no-patterns",      [](bake_params& q) { q.pattern_strength = 0.0f; } },
+                { "no-borders",       [](bake_params& q) { q.border_strength = 0.0f; } },
+                { "pre-BL-1251",      [](bake_params& q) { q.edge_band = 0.0f; q.border_strength = 0.0f;
+                                                           q.pattern_strength = 0.0f; q.edge_ink = 0.30f;
+                                                           q.shore_ink = 0.42f; } },
+            };
+            for (const off& o : offs)
+            {
+                bake_params q = p;
+                o.set(q);
+                master_bake(src, q, 1, o.name);
+            }
+        }
+        std::printf("%s (%d failures)\n", g_failures ? "FAIL" : "PASS", g_failures);
+        return g_failures ? 1 : 0;
+    }
+
+    // --variants: run only the BL-1243 rows (P17-P20) and their previews,
+    // without the timing readings — the fast loop for tuning the tables.
+    const bool variants_only = argc > 1 && std::strcmp(argv[1], "--variants") == 0;
+
+    // --timing: the BL-1243 cost reading alone — one 512 px chunk per tier on
+    // the wide plain, variants off vs on, interleaved, best of 7 each.
+    if (argc > 1 && std::strcmp(argv[1], "--timing") == 0)
+    {
+        const int aim = std::max(0, homogeneous_aim(src, terrain_cover::grass));
+        const int ar = aim / src.gw, ac = aim % src.gw;
+        const double ax = 1.7320508075688772 * (ac + ((ar & 1) ? 0.5 : 0.0));
+        bake_params v_off = p;
+        v_off.variant_strength = 0.0f;
+        std::vector<std::uint32_t> tb(512u * 512u);
+        for (double tp : { k_far_ppr, k_level_ppr[3], k_level_ppr[2], k_level_ppr[1], k_master_ppr })
+        {
+            const geometry gt = make_geometry(hb.grid_width, hb.grid_height, tp);
+            const int cw = std::min(512, gt.W), ch = std::min(512, gt.H);
+            const int x0 = static_cast<int>(ax * gt.s) - cw / 2;
+            const int y0 = std::clamp(static_cast<int>((1.5 * ar - gt.y_min) * gt.s) - ch / 2,
+                                      0, std::max(0, gt.H - ch));
+            double ms[2] = { 1e30, 1e30 };
+            for (int rep = 0; rep < 7; ++rep)
+                for (int k = 0; k < 2; ++k)
+                {
+                    const auto t0 = std::chrono::steady_clock::now();
+                    bake_region(src, gt, k ? p : v_off, x0, y0, cw, ch, tb.data());
+                    ms[k] = std::min(ms[k], std::chrono::duration<double, std::milli>(
+                                                std::chrono::steady_clock::now() - t0).count());
+                }
+            std::printf("TIME  variants  tier %3.0f px/r  chunk %dx%d (plain)  off %8.1f ms  on %8.1f ms  (%+.0f%%)\n",
+                        tp, cw, ch, ms[0], ms[1], 100.0 * (ms[1] / ms[0] - 1.0));
+        }
+        return 0;
+    }
+
+    // --seam: the P11 chunk-seam window alone, with each pass switched off in
+    // turn, naming the first mismatching pixel — the triage for a seam.
+    if (argc > 1 && std::strcmp(argv[1], "--seam") == 0)
+    {
+        const geometry g48 = make_geometry(hb.grid_width, hb.grid_height, 48.0);
+        const int lr = land_i / src.gw, lc = land_i % src.gw;
+        const double lx = 1.7320508075688772 * (lc + ((lr & 1) ? 0.5 : 0.0));
+        const int side = 96;
+        const int px0 = static_cast<int>(lx * g48.s) - side / 2;
+        const int py0 = std::clamp(static_cast<int>((1.5 * lr - g48.y_min) * g48.s) - side / 2,
+                                   0, std::max(0, g48.H - side));
+        std::printf("seam window px0 %d py0 %d (tile [%d,%d])\n", px0, py0, lc, lr);
+        struct variant_case { const char* name; bake_params bp; };
+        std::vector<variant_case> cases;
+        cases.push_back({ "default", p });
+        { bake_params q = p; q.variant_strength = 0.0f;  cases.push_back({ "variants off", q }); }
+        { bake_params q = p; q.tree_density = 0.0f;      cases.push_back({ "trees off", q }); }
+        { bake_params q = p; q.installations = false;    cases.push_back({ "installations off", q }); }
+        { bake_params q = p; q.landform_strength = 0.0f; q.river_strength = 0.0f; cases.push_back({ "features off", q }); }
+        // Ground nudges with the variants OFF: a seam that appears here is
+        // not the variants' — it is a pass whose rounding is window-relative
+        // and merely revealed by whatever ground lies under it.
+        for (float k : { 1.02f, 1.04f, 0.98f })
+        {
+            bake_params q = p; q.variant_strength = 0.0f; q.noise_strength *= k;
+            static char names[3][32];
+            static int ni = 0;
+            std::snprintf(names[ni % 3], sizeof names[0], "variants off, grain x%.2f", k);
+            cases.push_back({ names[ni++ % 3], q });
+        }
+        for (float k : { 1.02f, 1.04f, 0.98f })
+        {
+            bake_params q = p; q.variant_strength = 0.0f; q.noise_strength *= k; q.installations = false;
+            static char names2[3][40];
+            static int ni2 = 0;
+            std::snprintf(names2[ni2 % 3], sizeof names2[0], "  same, installations off x%.2f", k);
+            cases.push_back({ names2[ni2++ % 3], q });
+        }
+        for (const variant_case& vc : cases)
+        {
+            const std::size_t n = static_cast<std::size_t>(side) * side;
+            std::vector<std::uint32_t> whole(n * 2), l(n), r(n);
+            bake_region(src, g48, vc.bp, px0, py0, side * 2, side, whole.data());
+            bake_region(src, g48, vc.bp, px0, py0, side, side, l.data());
+            bake_region(src, g48, vc.bp, px0 + side, py0, side, side, r.data());
+            int bad = 0, fx = -1, fy = -1;
+            for (int y = 0; y < side; ++y)
+                for (int x = 0; x < side * 2; ++x)
+                {
+                    const std::uint32_t wv = whole[static_cast<std::size_t>(y) * side * 2 + x];
+                    const std::uint32_t hv = x < side ? l[static_cast<std::size_t>(y) * side + x]
+                                                      : r[static_cast<std::size_t>(y) * side + x - side];
+                    if (wv != hv) { if (!bad) { fx = x; fy = y; } ++bad; }
+                }
+            std::printf("  %-18s %d mismatching pixels (first at %d,%d)\n", vc.name, bad, fx, fy);
+        }
+        return 0;
+    }
+
+    // ------------------------------------------------------------------
+    // BL-1243 (terrain variant families), RENDERING.md § Mountains, rivers
+    // and terrain variety — "More tile sets".
+    //   P17 The variant colouring: no two neighbours share an index (bar the
+    //       wrap corner), and it is mask-blind (a pure function of the grid).
+    //   P18 A wide plain and a forest at 48/96: the variant pass is pure,
+    //       wrap-exact flat and oblique, chunk-seamless at 2x, and moves the
+    //       bake; tile-to-tile variation across the plain rises.
+    //   P19 A mountain run: the form's variants move it, purely, wrap-exact.
+    //   P20 region_hash folds the family and the variant index.
+    // Also (not checks): bake ms per tier with variants off vs on, and
+    // variants_<subject>_<tier>[_off].png previews.
+    // ------------------------------------------------------------------
+    const auto variant_rows = [&](bool timing)
+    {
+        const auto land = static_cast<std::uint8_t>(bake_source::tile_class::land);
+        // P17 — the colouring.
+        {
+            int conflicts = 0, corner = 0;
+            for (int i = 0; i < static_cast<int>(src.variant.size()); ++i)
+                for (int side = 0; side < 6; ++side)
+                {
+                    const hex_neighbors::coord nb = hex_neighbors::neighbour(i % src.gw, i / src.gw, side);
+                    if (nb.gy < 0 || nb.gy >= src.gh)
+                        continue;
+                    const int j = nb.gy * src.gw + ((nb.gx % src.gw) + src.gw) % src.gw;
+                    if (src.variant[i] == src.variant[j])
+                    {
+                        // The one place the raster colouring may fail: the
+                        // last column against column 0 across the wrap.
+                        const int ci = i % src.gw, cj = j % src.gw;
+                        const bool wrap_pair = (ci == src.gw - 1 && cj == 0) || (ci == 0 && cj == src.gw - 1);
+                        (wrap_pair ? corner : conflicts) += 1;
+                    }
+                }
+            int hist[k_variant_count] = {};
+            for (std::uint8_t v : src.variant)
+                ++hist[v];
+            std::printf("      variants: %d / %d / %d / %d tiles; %d neighbour pairs share one at the wrap seam\n",
+                        hist[0], hist[1], hist[2], hist[3], corner / 2);
+            check(conflicts == 0, "P17", "no two neighbours share a variant away from the wrap seam");
+            const bake_source masked = prepare_source(w, home, /*reveal_all=*/false);
+            check(masked.variant == src.variant, "P17",
+                  "the variant colouring is mask-blind (a pure function of the grid)");
+        }
+
+        const int plain_i  = homogeneous_aim(src, terrain_cover::grass);
+        const int forest_i = homogeneous_aim(src, terrain_cover::forest);
+        int mtn_i = -1, mtn_links = -1;
+        for (int i = 0; i < static_cast<int>(src.cls.size()); ++i)
+            if (src.cls[i] == land && src.landform[i] == static_cast<std::uint8_t>(terrain_landform::mountain))
+            {
+                int links = 0;
+                for (int s = 0; s < 6; ++s)
+                    links += (src.lf_links[i] >> s) & 1;
+                if (links > mtn_links) { mtn_links = links; mtn_i = i; }
+            }
+        check(plain_i >= 0 && forest_i >= 0 && mtn_i >= 0, "P18", "found a plain, a forest and a mountain run");
+
+        const auto vwin = [&](int tile_idx, const geometry& gg, const bake_params& bp, int side,
+                              int dpx, std::vector<std::uint32_t>& out, int wide = 1)
+        {
+            const int r = tile_idx / src.gw, c = tile_idx % src.gw;
+            const double cx = 1.7320508075688772 * (c + ((r & 1) ? 0.5 : 0.0));
+            const double cy = 1.5 * r - src.height[tile_idx] * gg.lift;
+            const int x0 = static_cast<int>(cx * gg.s) - side / 2 + dpx;
+            const int y0 = std::clamp(static_cast<int>((cy - gg.y_min) * gg.s) - side / 2,
+                                      0, std::max(0, gg.H - side));
+            out.assign(static_cast<std::size_t>(side) * side * wide, 0u);
+            bake_region(src, gg, bp, x0, y0, side * wide, side, out.data());
+        };
+        bake_params v_off = p;
+        v_off.variant_strength = 0.0f;
+        const geometry g48v = make_geometry(hb.grid_width, hb.grid_height, 48.0);
+        const geometry g96t = make_geometry(hb.grid_width, hb.grid_height, 96.0, k_tilt_sy);
+        std::vector<std::uint32_t> a1, a2, a3, a4;
+        struct subj { const char* name; int tile; const char* phase; };
+        for (const subj& sj : { subj{ "plain", plain_i, "P18" }, subj{ "forest", forest_i, "P18" },
+                                subj{ "mountain", mtn_i, "P19" } })
+        {
+            if (sj.tile < 0)
+                continue;
+            char what[160];
+            vwin(sj.tile, g48v, p, 160, 0, a1);
+            vwin(sj.tile, g48v, p, 160, 0, a2);
+            vwin(sj.tile, g48v, p, 160, g48v.W, a3);
+            vwin(sj.tile, g48v, v_off, 160, 0, a4);
+            std::snprintf(what, sizeof what, "%s @48: variants bake byte-identical twice", sj.name);
+            check(a1 == a2, sj.phase, what);
+            std::snprintf(what, sizeof what, "%s @48: variants wrap byte-identical one period east", sj.name);
+            check(a1 == a3, sj.phase, what);
+            std::snprintf(what, sizeof what, "%s @48: the variant pass moves the bake", sj.name);
+            check(a1 != a4, sj.phase, what);
+            vwin(sj.tile, g96t, p, 160, 0, a1);
+            vwin(sj.tile, g96t, p, 160, g96t.W, a3);
+            std::snprintf(what, sizeof what, "%s @96 oblique 45: variants wrap byte-identical", sj.name);
+            check(a1 == a3, sj.phase, what);
+            // Chunk seam at 2x: one window two chunks wide equals its halves.
+            {
+                std::vector<std::uint32_t> whole, l, r;
+                vwin(sj.tile, g48v, p, 128, 0, whole, 2);
+                vwin(sj.tile, g48v, p, 128, 0, l);
+                vwin(sj.tile, g48v, p, 128, 128, r);
+                bool seam_ok = true;
+                for (int y = 0; y < 128 && seam_ok; ++y)
+                    for (int x = 0; x < 128; ++x)
+                        if (whole[static_cast<std::size_t>(y) * 256 + x] != l[static_cast<std::size_t>(y) * 128 + x]
+                            || whole[static_cast<std::size_t>(y) * 256 + 128 + x] != r[static_cast<std::size_t>(y) * 128 + x])
+                        {
+                            std::printf("      first seam mismatch at (%d,%d): whole %08x/%08x, halves %08x/%08x\n",
+                                        x, y, whole[static_cast<std::size_t>(y) * 256 + x],
+                                        whole[static_cast<std::size_t>(y) * 256 + 128 + x],
+                                        l[static_cast<std::size_t>(y) * 128 + x], r[static_cast<std::size_t>(y) * 128 + x]);
+                            seam_ok = false;
+                            break;
+                        }
+                std::snprintf(what, sizeof what, "%s @48: two adjacent windows equal one spanning both (no chunk seam)", sj.name);
+                check(seam_ok, sj.phase, what);
+            }
+        }
+
+        // P18 — the anti-wallpaper reading. A wide plain reads as wallpaper
+        // when every tile has the same CHARACTER — the same hue and the same
+        // texture. Per interior plain tile (all six neighbours the same
+        // cover: an edge tile mixes the next cover in through the warp), a
+        // disc of radius 0.45 about the centre gives a character vector —
+        // mean warm (r - b), mean green (g - (r + b) / 2), local contrast
+        // (luminance SD) — off and on. Two things are read:
+        //   * the spread of that character across the plain, off -> on (a
+        //     reading: cover density already spreads hue tile to tile);
+        //   * the CHECK: the variants are distinct characters, not noise.
+        //     Grouping each tile's shift (on - off) by its variant index,
+        //     the spread BETWEEN the group means must exceed the spread
+        //     WITHIN a group — the variant index explains most of the shift.
+        //     The within-group spread is not all noise: each variant's broad
+        //     patches deliberately vary inside it, and the cross-fade carries
+        //     some of each neighbour into a tile's disc. (First drafted at
+        //     2x; measured 1.69x on the home body's plain — the bar was
+        //     re-stated, not the tables tuned to it: the tables are set by eye.)
+        // Read at the 24 px tier, where a 768 px window holds a plain's
+        // worth of interior tiles.
+        if (plain_i >= 0)
+        {
+            const geometry g24v = make_geometry(hb.grid_width, hb.grid_height, 24.0);
+            const int side = 768;
+            const int r0 = plain_i / src.gw, c0 = plain_i % src.gw;
+            const double cx0 = 1.7320508075688772 * (c0 + ((r0 & 1) ? 0.5 : 0.0));
+            const int x0 = static_cast<int>(cx0 * g24v.s) - side / 2;
+            const int y0 = std::clamp(static_cast<int>((1.5 * r0 - g24v.y_min) * g24v.s) - side / 2,
+                                      0, std::max(0, g24v.H - side));
+            std::vector<std::uint32_t> on(static_cast<std::size_t>(side) * side), off(on.size());
+            bake_region(src, g24v, p,     x0, y0, side, side, on.data());
+            bake_region(src, g24v, v_off, x0, y0, side, side, off.data());
+            struct tile_stat { double c[3]; int v; };
+            std::vector<tile_stat> st_on, st_off;
+            for (int r = 0; r < src.gh; ++r)
+                for (int c = 0; c < src.gw; ++c)
+                {
+                    const std::size_t ti = static_cast<std::size_t>(r) * src.gw + c;
+                    if (src.cls[ti] != land || src.cover[ti] != src.cover[plain_i])
+                        continue;
+                    bool interior = true;
+                    for (int side_ = 0; side_ < 6 && interior; ++side_)
+                    {
+                        const hex_neighbors::coord nb = hex_neighbors::neighbour(c, r, side_);
+                        if (nb.gy < 0 || nb.gy >= src.gh) { interior = false; break; }
+                        const std::size_t nj = static_cast<std::size_t>(nb.gy) * src.gw
+                                             + ((nb.gx % src.gw) + src.gw) % src.gw;
+                        interior = src.cls[nj] == land && src.cover[nj] == src.cover[plain_i];
+                    }
+                    if (!interior)
+                        continue;
+                    const double tx = 1.7320508075688772 * (c + ((r & 1) ? 0.5 : 0.0)) * g24v.s - x0;
+                    const double ty = (1.5 * r - g24v.y_min) * g24v.s - y0;
+                    const double rad = 0.45 * g24v.s;
+                    if (tx - rad < 0 || ty - rad < 0 || tx + rad >= side || ty + rad >= side)
+                        continue;
+                    for (int k = 0; k < 2; ++k)
+                    {
+                        const std::vector<std::uint32_t>& img = k ? on : off;
+                        double sw = 0, sg = 0, sl = 0, sll = 0;
+                        int np = 0;
+                        for (int y = static_cast<int>(ty - rad); y <= static_cast<int>(ty + rad); ++y)
+                            for (int x = static_cast<int>(tx - rad); x <= static_cast<int>(tx + rad); ++x)
+                            {
+                                if ((x - tx) * (x - tx) + (y - ty) * (y - ty) > rad * rad)
+                                    continue;
+                                const std::uint32_t cc = img[static_cast<std::size_t>(y) * side + x];
+                                const double R = ui::palette::col_r(cc), G = ui::palette::col_g(cc),
+                                             B = ui::palette::col_b(cc);
+                                const double L = 0.2126 * R + 0.7152 * G + 0.0722 * B;
+                                sw += R - B;
+                                sg += G - 0.5 * (R + B);
+                                sl += L; sll += L * L;
+                                ++np;
+                            }
+                        const double ml = sl / np;
+                        (k ? st_on : st_off).push_back(
+                            { { sw / np, sg / np, std::sqrt(std::max(0.0, sll / np - ml * ml)) },
+                              src.variant[ti] });
+                    }
+                }
+            const auto spread = [](const std::vector<tile_stat>& v, int which) {
+                double s = 0, ss = 0;
+                for (const tile_stat& t : v) { s += t.c[which]; ss += t.c[which] * t.c[which]; }
+                const double m = s / v.size();
+                return std::sqrt(std::max(0.0, ss / v.size() - m * m));
+            };
+            if (st_on.size() >= 8)
+            {
+                const double chroma_off = std::hypot(spread(st_off, 0), spread(st_off, 1));
+                const double chroma_on  = std::hypot(spread(st_on, 0),  spread(st_on, 1));
+                std::printf("      plain @24: %zu interior tiles; per-tile chroma spread %.2f -> %.2f, "
+                            "local-contrast spread %.2f -> %.2f (variants off -> on)\n",
+                            st_on.size(), chroma_off, chroma_on, spread(st_off, 2), spread(st_on, 2));
+                // Between- vs within-variant spread of the shift, over the
+                // three character axes together.
+                double gm[k_variant_count][3] = {};
+                int gn[k_variant_count] = {};
+                for (std::size_t t = 0; t < st_on.size(); ++t)
+                {
+                    ++gn[st_on[t].v];
+                    for (int a = 0; a < 3; ++a)
+                        gm[st_on[t].v][a] += st_on[t].c[a] - st_off[t].c[a];
+                }
+                double all[3] = {};
+                int groups = 0;
+                for (int v = 0; v < k_variant_count; ++v)
+                    if (gn[v])
+                    {
+                        ++groups;
+                        for (int a = 0; a < 3; ++a) { gm[v][a] /= gn[v]; all[a] += gm[v][a]; }
+                    }
+                for (int a = 0; a < 3; ++a) all[a] /= std::max(1, groups);
+                double between = 0, within = 0;
+                for (int v = 0; v < k_variant_count; ++v)
+                    if (gn[v])
+                        for (int a = 0; a < 3; ++a) between += (gm[v][a] - all[a]) * (gm[v][a] - all[a]);
+                between = std::sqrt(between / std::max(1, groups));
+                for (std::size_t t = 0; t < st_on.size(); ++t)
+                    for (int a = 0; a < 3; ++a)
+                    {
+                        const double d = st_on[t].c[a] - st_off[t].c[a] - gm[st_on[t].v][a];
+                        within += d * d;
+                    }
+                within = std::sqrt(within / st_on.size());
+                std::printf("      plain @24: variant shift spread between variants %.2f, within a variant %.2f "
+                            "(%d variants present)\n", between, within, groups);
+                check(groups >= 3 && between > within, "P18",
+                      "the plain's variants are distinct characters (between-variant spread > within)");
+            }
+            else
+                std::printf("SKIP  P18: fewer than 8 interior plain tiles in the window\n");
+        }
+
+        // P20 — the hash folds family and variant.
+        {
+            const int r0 = plain_i >= 0 ? plain_i / src.gw : 2, c0 = plain_i >= 0 ? plain_i % src.gw : 2;
+            const int x0 = static_cast<int>(1.7320508075688772 * c0 * g48v.s) - 256;
+            const int y0 = std::max(0, static_cast<int>((1.5 * r0 - g48v.y_min) * g48v.s) - 256);
+            const std::size_t ti = static_cast<std::size_t>(r0) * src.gw + c0;
+            const std::uint64_t h0 = region_hash(src, g48v, x0, y0, 512, 512);
+            bake_source m1 = src; m1.family[ti] ^= 1u;
+            bake_source m2 = src; m2.variant[ti] = static_cast<std::uint8_t>((m2.variant[ti] + 1) % k_variant_count);
+            check(region_hash(m1, g48v, x0, y0, 512, 512) != h0, "P20", "region_hash moves with a tile's variant family");
+            check(region_hash(m2, g48v, x0, y0, 512, 512) != h0, "P20", "region_hash moves with a tile's variant index");
+        }
+
+        // Previews and timing (readings).
+        {
+            struct shot { const char* name; int tile; };
+            std::vector<std::uint32_t> pb;
+            for (const shot& sh : { shot{ "plain", plain_i }, shot{ "forest", forest_i }, shot{ "mountain", mtn_i } })
+            {
+                if (sh.tile < 0)
+                    continue;
+                for (double tp : { 24.0, 48.0, 96.0 })
+                {
+                    const geometry gp = make_geometry(hb.grid_width, hb.grid_height, tp);
+                    vwin(sh.tile, gp, p, 512, 0, pb);
+                    char path[128];
+                    std::snprintf(path, sizeof path, "variants_%s_%d.png", sh.name, static_cast<int>(tp));
+                    write_png_rgba(path, 512, 512, reinterpret_cast<const unsigned char*>(pb.data()), 512 * 4);
+                    vwin(sh.tile, gp, v_off, 512, 0, pb);
+                    std::snprintf(path, sizeof path, "variants_%s_%d_off.png", sh.name, static_cast<int>(tp));
+                    write_png_rgba(path, 512, 512, reinterpret_cast<const unsigned char*>(pb.data()), 512 * 4);
+                }
+            }
+            std::vector<std::uint32_t> tb(512u * 512u);
+            const int aim = plain_i >= 0 ? plain_i : land_i;
+            const int ar = aim / src.gw, ac = aim % src.gw;
+            const double ax = 1.7320508075688772 * (ac + ((ar & 1) ? 0.5 : 0.0));
+            for (double tp : { k_far_ppr, k_level_ppr[3], k_level_ppr[2], k_level_ppr[1], k_master_ppr })
+            {
+                if (!timing)
+                    break;
+                const geometry gt = make_geometry(hb.grid_width, hb.grid_height, tp);
+                const int cw = std::min(512, gt.W), ch = std::min(512, gt.H);
+                const int x0 = static_cast<int>(ax * gt.s) - cw / 2;
+                const int y0 = std::clamp(static_cast<int>((1.5 * ar - gt.y_min) * gt.s) - ch / 2,
+                                          0, std::max(0, gt.H - ch));
+                double ms[2] = { 1e30, 1e30 };
+                for (int rep = 0; rep < 3; ++rep) // best of 3, off/on interleaved: load cancels
+                    for (int k = 0; k < 2; ++k)
+                    {
+                        const auto t0 = std::chrono::steady_clock::now();
+                        bake_region(src, gt, k ? p : v_off, x0, y0, cw, ch, tb.data());
+                        ms[k] = std::min(ms[k], std::chrono::duration<double, std::milli>(
+                                                    std::chrono::steady_clock::now() - t0).count());
+                    }
+                std::printf("TIME  variants  tier %3.0f px/r  chunk %dx%d (plain)  off %8.1f ms  on %8.1f ms  (%+.0f%%)\n",
+                            tp, cw, ch, ms[0], ms[1], 100.0 * (ms[1] / ms[0] - 1.0));
+            }
+        }
+    };
+
+    if (variants_only)
+    {
+        variant_rows(/*timing=*/false);
+        std::printf("\n%s (%d failure%s)\n", g_failures ? "FAILED" : "ALL PASS",
+                    g_failures, g_failures == 1 ? "" : "s");
+        return g_failures ? 1 : 0;
+    }
+
 
     auto window_at = [&](int tile_idx, const bake_params& bp,
                          std::vector<std::uint32_t>& out, int side = 96)
@@ -254,21 +3781,409 @@ int main()
         check(a48 == b48, "P8", "48 px tier bakes byte-identical twice (stamps + ridged active)");
         check(a48 == e48, "P8", "48 px tier wraps byte-identical one period east");
 
-        // P9 — the OBLIQUE bake (BL-737): at 45 degrees the same window bakes
+        // P9 — the OBLIQUE bake (BL-737; BL-1246: the one angle, 22.5
+        // degrees — the 45-degree tier is retired): the same window bakes
         // byte-identical twice and one wrap period east; and the projection
         // actually projects (the tilted window differs from the flat one).
-        const geometry g45 = make_geometry(hb.grid_width, hb.grid_height, 48.0, 0.70710678);
+        const geometry g45 = make_geometry(hb.grid_width, hb.grid_height, 48.0, k_tilt_sy);
         const int tpy0 = std::clamp(
             static_cast<int>((fy - g45.y_min) * g45.s) - side / 2, 0, std::max(0, g45.H - side));
         std::vector<std::uint32_t> t1(a48.size()), t2(a48.size()), t3(a48.size());
         bake_region(src, g45, p, px0, tpy0, side, side, t1.data());
         bake_region(src, g45, p, px0, tpy0, side, side, t2.data());
         bake_region(src, g45, p, px0 + g45.W, tpy0, side, side, t3.data());
-        check(t1 == t2, "P9", "45-degree oblique bake is byte-identical twice");
-        check(t1 == t3, "P9", "45-degree oblique bake wraps byte-identical one period east");
-        check(g45.lift > 0.8 && g45.lift < 1.0, "P9", "45-degree lift derives to ~0.9 canonical");
+        check(t1 == t2, "P9", "22.5-degree oblique bake is byte-identical twice");
+        check(t1 == t3, "P9", "22.5-degree oblique bake wraps byte-identical one period east");
+        check(g45.lift > 0.35 && g45.lift < 0.40, "P9", "22.5-degree lift derives to 0.9 tan(22.5) ~ 0.373 canonical");
         check(t1 != a48, "P9", "the oblique projection differs from the flat bake");
     }
+
+    // P10 retired with the per-rung tier ladder (BL-1246, one master): the
+    // never-magnify chooser it pinned is gone. The one-master chooser, the
+    // master's alignment and the chunkwise mip chain are P22.
+    master_row(src, hb, land_i, p);
+    lock_fast_row(w, home, p);
+
+    // P11 — supersampling (BL-1244): the 2x bake is pure (byte-identical
+    // twice), wrap-exact (one period east), seamless (two half windows equal
+    // the whole — the downsample and the nominal unsharp cannot seam a chunk
+    // edge), and actually different from the single-sample bake.
+    {
+        const geometry g48 = make_geometry(hb.grid_width, hb.grid_height, 48.0);
+        const int lr = land_i / src.gw, lc = land_i % src.gw;
+        const double lx = 1.7320508075688772 * (lc + ((lr & 1) ? 0.5 : 0.0));
+        const int side = 96;
+        const int px0 = static_cast<int>(lx * g48.s) - side / 2;
+        const int py0 = std::clamp(static_cast<int>((1.5 * lr - g48.y_min) * g48.s) - side / 2,
+                                   0, std::max(0, g48.H - side));
+        bake_params p2 = p;   p2.supersample = 2;
+        bake_params p1 = p;   p1.supersample = 1;
+        const std::size_t n = static_cast<std::size_t>(side) * side;
+        std::vector<std::uint32_t> a(n), b(n), e(n), s1(n), whole(n * 2), l(n), r(n);
+        bake_region(src, g48, p2, px0, py0, side, side, a.data());
+        bake_region(src, g48, p2, px0, py0, side, side, b.data());
+        bake_region(src, g48, p2, px0 + g48.W, py0, side, side, e.data());
+        bake_region(src, g48, p1, px0, py0, side, side, s1.data());
+        check(a == b, "P11", "2x supersampled bake is byte-identical twice");
+        check(a == e, "P11", "2x supersampled bake wraps byte-identical one period east");
+        check(a != s1, "P11", "supersampling changes the bake (it is not a no-op)");
+        // Seam: a 2*side-wide window vs its two halves baked separately.
+        bake_region(src, g48, p2, px0, py0, side * 2, side, whole.data());
+        bake_region(src, g48, p2, px0, py0, side, side, l.data());
+        bake_region(src, g48, p2, px0 + side, py0, side, side, r.data());
+        bool seam_ok = true;
+        for (int y = 0; y < side && seam_ok; ++y)
+            for (int x = 0; x < side; ++x)
+                if (whole[static_cast<std::size_t>(y) * side * 2 + x] != l[static_cast<std::size_t>(y) * side + x]
+                    || whole[static_cast<std::size_t>(y) * side * 2 + side + x] != r[static_cast<std::size_t>(y) * side + x])
+                {
+                    seam_ok = false;
+                    break;
+                }
+        check(seam_ok, "P11", "two adjacent 2x windows equal one window spanning both (no chunk seam)");
+    }
+
+    // P21 - the worker pool: concurrent bakes equal serial ones.
+    pool_row(src, hb, land_i, p);
+
+    // P12 — bake cost per tier (a reading, not a check): one 512 px chunk per
+    // tier at 1x and 2x, wall-clock ms, so R3's before/after has a number
+    // independent of the app's viewport. The window is centred on land.
+    {
+        const int lr = land_i / src.gw, lc = land_i % src.gw;
+        const double lx = 1.7320508075688772 * (lc + ((lr & 1) ? 0.5 : 0.0));
+        const double ladder[] = { k_far_ppr, k_level_ppr[4], k_level_ppr[3], k_level_ppr[2],
+                                  k_level_ppr[1], k_master_ppr };
+        std::vector<std::uint32_t> buf(512u * 512u);
+        for (const double ppr : ladder)
+        {
+            const geometry g = make_geometry(hb.grid_width, hb.grid_height, ppr);
+            const int cw = std::min(512, g.W), ch = std::min(512, g.H);
+            const int px0 = static_cast<int>(lx * g.s) - cw / 2;
+            const int py0 = std::clamp(static_cast<int>((1.5 * lr - g.y_min) * g.s) - ch / 2,
+                                       0, std::max(0, g.H - ch));
+            double ms[2] = {};
+            for (int k = 0; k < 2; ++k)
+            {
+                bake_params pk = p;
+                pk.supersample = k == 0 ? 1 : 2;
+                const auto t0 = std::chrono::steady_clock::now();
+                bake_region(src, g, pk, px0, py0, cw, ch, buf.data());
+                ms[k] = std::chrono::duration<double, std::milli>(
+                    std::chrono::steady_clock::now() - t0).count();
+            }
+            std::printf("TIMING  tier %3.0f px/r  chunk %dx%d  1x %8.1f ms  2x %8.1f ms  (x%.2f)\n",
+                        ppr, cw, ch, ms[0], ms[1], ms[0] > 0.0 ? ms[1] / ms[0] : 0.0);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // BL-1241 (structures baked): the installation pass.
+    // ------------------------------------------------------------------
+    {
+        std::printf("installations on the home body: %zu tiles carry one\n", src.inst.list.size());
+
+        // A GALLERY source: the home ground with every procedural form staged
+        // on a land block, so each form is exercised (and previewed) whatever
+        // the seed happened to build. Real snapshots carry no world state the
+        // pass could not also see here — the pass reads only `inst`.
+        const int BW = 16, BH = 10;
+        int best = -1, bc0 = 0, br0 = 0;
+        // Temperate rows, vegetated land preferred: the forms are judged on the
+        // ground most of the game is played on, not on polar ice.
+        for (int r0 = src.gh / 4; r0 + BH < src.gh * 3 / 4; ++r0)
+            for (int c0 = 0; c0 < src.gw; c0 += 2)
+            {
+                int land = 0;
+                for (int r = r0; r < r0 + BH; ++r)
+                    for (int c = c0; c < c0 + BW; ++c)
+                    {
+                        const std::size_t ti = static_cast<std::size_t>(r) * src.gw + (c % src.gw);
+                        if (src.cls[ti] != static_cast<std::uint8_t>(bake_source::tile_class::land))
+                            continue;
+                        const std::uint32_t col = src.colour[ti];
+                        land += 2 + (ui::palette::col_g(col) > ui::palette::col_b(col) + 10 ? 1 : 0);
+                    }
+                if (land > best) { best = land; bc0 = c0; br0 = r0; }
+            }
+        std::printf("gallery block at col %d row %d (%d/%d land)\n", bc0, br0, best, BW * BH);
+
+        struct staged { stamp_key k[3]; int n; stamp_key settle; };
+        std::vector<staged> roster;
+        const auto bld = [](building_type t, int fam) {
+            stamp_key k; k.subject = stamp_subject::building;
+            k.type = static_cast<std::uint8_t>(t); k.family = static_cast<std::uint8_t>(fam);
+            return k;
+        };
+        for (int f = 0; f < static_cast<int>(extraction_family::count); ++f)
+            roster.push_back({ { bld(building_type::extraction_site, f) }, 1, {} });
+        for (int f = 0; f < static_cast<int>(processing_family::count); ++f)
+            roster.push_back({ { bld(building_type::processing_facility, f) }, 1, {} });
+        for (building_type t : { building_type::port, building_type::launchpad,
+                                 building_type::inland_logistics_hub, building_type::military_base,
+                                 building_type::research_institute, building_type::schooling,
+                                 building_type::university })
+            roster.push_back({ { bld(t, 0) }, 1, {} });
+        {
+            stamp_key sc = bld(building_type::processing_facility,
+                               static_cast<int>(processing_family::metal_foundry));
+            sc.subject = stamp_subject::scaffold;
+            roster.push_back({ { sc }, 1, {} });
+        }
+        for (int sc = 1; sc <= 5; ++sc)
+        {
+            stamp_key k; k.subject = stamp_subject::settlement; k.scale = static_cast<std::uint8_t>(sc);
+            roster.push_back({ {}, 0, k });
+        }
+        {
+            stamp_key k; k.subject = stamp_subject::ruin; k.scale = 1;
+            roster.push_back({ {}, 0, k });
+        }
+        // The stacked tile: three stacks, dominant mine in front.
+        roster.push_back({ { bld(building_type::extraction_site, static_cast<int>(extraction_family::mine)),
+                             bld(building_type::processing_facility, static_cast<int>(processing_family::metal_foundry)),
+                             bld(building_type::inland_logistics_hub, 0) }, 3, {} });
+        roster.push_back({ { bld(building_type::extraction_site, static_cast<int>(extraction_family::farm)),
+                             bld(building_type::processing_facility, static_cast<int>(processing_family::food_processing)) }, 2, {} });
+        {
+            stamp_key k; k.subject = stamp_subject::settlement; k.scale = 3;
+            roster.push_back({ { bld(building_type::schooling, 0) }, 1, k });
+        }
+
+        bake_source gal = src;
+        gal.inst.of_tile.assign(gal.cls.size(), -1);
+        gal.inst.list.clear();
+        std::size_t next = 0;
+        std::vector<std::size_t> gal_tiles;
+        for (int r = br0; r < br0 + BH && next < roster.size(); r += 2)
+            for (int c = bc0; c < bc0 + BW && next < roster.size(); c += 2)
+            {
+                const std::size_t i = static_cast<std::size_t>(r) * gal.gw + (c % gal.gw);
+                if (gal.cls[i] != static_cast<std::uint8_t>(bake_source::tile_class::land))
+                    continue;
+                tile_installation ti;
+                const staged& st = roster[next++];
+                for (int j = 0; j < st.n; ++j) ti.stacks[j] = st.k[j];
+                ti.n_stacks = static_cast<std::uint8_t>(st.n);
+                ti.settlement = st.settle;
+                gal.inst.of_tile[i] = static_cast<std::int32_t>(gal.inst.list.size());
+                gal.inst.list.push_back(ti);
+                gal_tiles.push_back(i);
+            }
+        std::printf("gallery staged %zu of %zu forms\n", next, roster.size());
+
+        // P13 — determinism and wrap at flat, oblique and far geometry, aimed
+        // at the stacked tile (the busiest one).
+        // Aim at the three-stack tile (staged third from the end of the roster).
+        const std::size_t aim_i = gal_tiles[gal_tiles.size() >= 3 ? gal_tiles.size() - 3 : 0];
+        const int ar = static_cast<int>(aim_i / gal.gw), ac = static_cast<int>(aim_i % gal.gw);
+        const double axc = 1.7320508075688772 * (ac + ((ar & 1) ? 0.5 : 0.0));
+        const double ayc = 1.5 * ar;
+        struct gcase { const char* name; double ppr; double sy; };
+        for (const gcase& gc : { gcase{ "flat 48", 48.0, 1.0 }, gcase{ "oblique 45 @48", 48.0, 0.70710678 },
+                                 gcase{ "far page 6", 6.0, 1.0 }, gcase{ "flat 24", 24.0, 1.0 } })
+        {
+            const geometry gg = make_geometry(gal.gw, gal.gh, gc.ppr, gc.sy);
+            const int side = gc.ppr < 10 ? 64 : 160;
+            const int px0 = static_cast<int>(axc * gg.s) - side / 2;
+            const int py0 = std::clamp(static_cast<int>((ayc - gg.y_min) * gg.s) - side / 2,
+                                       0, std::max(0, gg.H - side));
+            std::vector<std::uint32_t> a1(static_cast<std::size_t>(side) * side), a2(a1.size()),
+                a3(a1.size()), off(a1.size());
+            bake_region(gal, gg, p, px0, py0, side, side, a1.data());
+            bake_region(gal, gg, p, px0, py0, side, side, a2.data());
+            bake_region(gal, gg, p, px0 + gg.W, py0, side, side, a3.data());
+            bake_params po = p; po.installations = false;
+            bake_region(gal, gg, po, px0, py0, side, side, off.data());
+            char what[128];
+            std::snprintf(what, sizeof what, "%s: structures bake byte-identical twice", gc.name);
+            check(a1 == a2, "P13", what);
+            std::snprintf(what, sizeof what, "%s: structures wrap byte-identical one period east", gc.name);
+            check(a1 == a3, "P13", what);
+            std::snprintf(what, sizeof what, "%s: the pass draws (on differs from off)", gc.name);
+            check(a1 != off, "P13", what);
+        }
+
+        // P13 — mask: a body whose survey hides its ground records no structure.
+        for (const auto& [id, bd] : w.bodies)
+            if (bd.grid_width > 0 && bd.survey.phase == survey_phase::hidden)
+            {
+                const bake_source hsv = prepare_source(w, id);
+                check(hsv.inst.list.empty(), "P13",
+                      "an unsurveyed body snapshots no installation (nothing leaks the mask)");
+                break;
+            }
+
+        // P14 — the hash folds installations, and only within reach.
+        {
+            const geometry gg = make_geometry(gal.gw, gal.gh, 48.0);
+            const int side = 512;
+            const int px0 = static_cast<int>(axc * gg.s) - side / 2;
+            const int py0 = std::clamp(static_cast<int>((ayc - gg.y_min) * gg.s) - side / 2,
+                                       0, std::max(0, gg.H - side));
+            const std::uint64_t h0 = region_hash(gal, gg, px0, py0, side, side);
+            const auto moved = [&](auto&& mutate) {
+                bake_source m = gal;
+                mutate(m);
+                return region_hash(m, gg, px0, py0, side, side) != h0;
+            };
+            tile_installation& base = gal.inst.list[static_cast<std::size_t>(gal.inst.of_tile[aim_i])];
+            (void)base;
+            check(moved([&](bake_source& m) {
+                      auto& t = m.inst.list[static_cast<std::size_t>(m.inst.of_tile[aim_i])];
+                      if (t.n_stacks < 3) { t.stacks[t.n_stacks] = bld(building_type::port, 0); ++t.n_stacks; }
+                      else t.n_stacks = 2; }),
+                  "P14", "adding / removing a stack moves the chunk hash");
+            check(moved([&](bake_source& m) {
+                      auto& t = m.inst.list[static_cast<std::size_t>(m.inst.of_tile[aim_i])];
+                      t.stacks[0].family ^= 1; }),
+                  "P14", "a family (recipe group / target) change moves the chunk hash");
+            check(moved([&](bake_source& m) {
+                      auto& t = m.inst.list[static_cast<std::size_t>(m.inst.of_tile[aim_i])];
+                      t.stacks[0].subject = stamp_subject::scaffold; }),
+                  "P14", "construction start / completion moves the chunk hash");
+            check(moved([&](bake_source& m) {
+                      auto& t = m.inst.list[static_cast<std::size_t>(m.inst.of_tile[aim_i])];
+                      t.settlement.subject = stamp_subject::settlement; t.settlement.scale = 4; }),
+                  "P14", "a settlement scale step moves the chunk hash");
+            check(moved([&](bake_source& m) {
+                      auto& t = m.inst.list[static_cast<std::size_t>(m.inst.of_tile[aim_i])];
+                      t.settlement.subject = stamp_subject::ruin; }),
+                  "P14", "a raze moves the chunk hash");
+            // A build half a body away: outside the window's reach.
+            const int far_r = std::clamp(ar + gal.gh / 2, 0, gal.gh - 1) == ar
+                                  ? std::max(0, ar - gal.gh / 2) : std::clamp(ar + gal.gh / 2, 0, gal.gh - 1);
+            const std::size_t far_i = static_cast<std::size_t>(far_r) * gal.gw
+                                    + static_cast<std::size_t>((ac + gal.gw / 2) % gal.gw);
+            check(!moved([&](bake_source& m) {
+                      if (m.inst.of_tile[far_i] < 0)
+                      {
+                          m.inst.of_tile[far_i] = static_cast<std::int32_t>(m.inst.list.size());
+                          m.inst.list.emplace_back();
+                      }
+                      auto& t = m.inst.list[static_cast<std::size_t>(m.inst.of_tile[far_i])];
+                      t.stacks[0] = bld(building_type::launchpad, 0); t.n_stacks = 1; }),
+                  "P14", "a build outside the window's reach leaves the chunk hash alone");
+        }
+
+        // Bake time per tier, the pass off vs on, over real content: up to six
+        // 512 px chunks spread over the body (the far page whole). Not a check
+        // — the before/after record the requirement asks for.
+        {
+            struct tier { const char* name; double ppr; double sy; };
+            for (const tier& t : { tier{ "far 6 (whole page)", 6.0, 1.0 }, tier{ "12", 12.0, 1.0 },
+                                   tier{ "24", 24.0, 1.0 }, tier{ "48", 48.0, 1.0 },
+                                   tier{ "96", 96.0, 1.0 }, tier{ "48 @22.5", 48.0, 0.92387953 },
+                                   tier{ "96 @45", 96.0, 0.70710678 } })
+            {
+                const geometry gg = make_geometry(src.gw, src.gh, t.ppr, t.sy);
+                double ms[2] = { 0, 0 };
+                int chunks = 0;
+                for (int pass = 0; pass < 2; ++pass)
+                {
+                    bake_params bp = p;
+                    bp.installations = pass == 1;
+                    chunks = 0;
+                    const auto t0 = std::chrono::steady_clock::now();
+                    if (t.ppr < 10)
+                    {
+                        std::vector<std::uint32_t> buf(static_cast<std::size_t>(gg.W) * gg.H);
+                        bake_region(src, gg, bp, 0, 0, gg.W, gg.H, buf.data());
+                        chunks = 1;
+                    }
+                    else
+                    {
+                        std::vector<std::uint32_t> buf(512u * 512u);
+                        const int nx = std::max(1, gg.W / 512), ny = std::max(1, gg.H / 512);
+                        for (int k = 0; k < 6; ++k)
+                        {
+                            const int ci = (k * 7 + 1) % nx, cj = std::min(ny - 1, (k * 3 + ny / 3) % ny);
+                            bake_region(src, gg, bp, ci * 512, cj * 512, 512, 512, buf.data());
+                            ++chunks;
+                        }
+                    }
+                    ms[pass] = std::chrono::duration<double, std::milli>(
+                                   std::chrono::steady_clock::now() - t0).count() / chunks;
+                }
+                std::printf("bake ms/chunk  tier %-18s  off %8.1f   on %8.1f   (+%.0f%%)\n",
+                            t.name, ms[0], ms[1], ms[0] > 0 ? 100.0 * (ms[1] - ms[0]) / ms[0] : 0.0);
+            }
+        }
+
+        // The dense case: one 512 px chunk over the staged gallery, every form
+        // in reach — the pass's worst case rather than the body's average.
+        for (const double ppr : { 24.0, 48.0, 96.0 })
+        {
+            const geometry gg = make_geometry(gal.gw, gal.gh, ppr);
+            const int px0 = static_cast<int>(1.7320508075688772 * (bc0 + 1) * gg.s);
+            const int py0 = std::max(0, static_cast<int>((1.5 * br0 - gg.y_min) * gg.s));
+            std::vector<std::uint32_t> buf(512u * 512u);
+            double ms[2];
+            for (int pass = 0; pass < 2; ++pass)
+            {
+                bake_params bp = p;
+                bp.installations = pass == 1;
+                const auto t0 = std::chrono::steady_clock::now();
+                bake_region(gal, gg, bp, px0, py0, 512, 512, buf.data());
+                ms[pass] = std::chrono::duration<double, std::milli>(
+                               std::chrono::steady_clock::now() - t0).count();
+            }
+            std::printf("bake ms/chunk  gallery (dense) %3.0f px  off %8.1f   on %8.1f\n", ppr, ms[0], ms[1]);
+        }
+
+        // Gallery previews at every tier: the whole staged block, flat tiers
+        // 6 (upscaled x4 for the eye), 12, 24, 48; the 96 and the oblique
+        // rungs on the block's first half, squashed by the camera factor.
+        {
+            const double gx0 = 1.7320508075688772 * (bc0 - 0.6);
+            const double gy0 = 1.5 * br0 - 1.4;
+            const double gx1 = 1.7320508075688772 * (bc0 + BW + 0.2);
+            const double gy1 = 1.5 * (br0 + BH) + 0.4;
+            struct shot { const char* name; double ppr; double sy; double frac; int up; double qx, qy; };
+            for (const shot& sh : { shot{ "far6", 6.0, 1.0, 1.0, 4, 0, 0 }, shot{ "t12", 12.0, 1.0, 1.0, 2, 0, 0 },
+                                    shot{ "t24", 24.0, 1.0, 1.0, 1, 0, 0 }, shot{ "t48", 48.0, 1.0, 1.0, 1, 0, 0 },
+                                    shot{ "t96", 96.0, 1.0, 0.5, 1, 0, 0 },
+                                    shot{ "t48_tilt22", 48.0, 0.92387953, 1.0, 1, 0, 0 },
+                                    shot{ "t96_tilt45", 96.0, 0.70710678, 0.5, 1, 0, 0 },
+                                    shot{ "t96_tilt45_q2", 96.0, 0.70710678, 0.5, 1, 0.5, 0 },
+                                    shot{ "t96_tilt45_q3", 96.0, 0.70710678, 0.5, 1, 0, 0.5 },
+                                    shot{ "t96_tilt45_q4", 96.0, 0.70710678, 0.5, 1, 0.5, 0.5 } })
+            {
+                const geometry gg = make_geometry(gal.gw, gal.gh, sh.ppr, sh.sy);
+                const double xs = gx0 + (gx1 - gx0) * sh.qx, xe = xs + (gx1 - gx0) * sh.frac;
+                const double ys = gy0 + (gy1 - gy0) * sh.qy - (sh.sy < 1.0 ? 1.2 : 0.0);
+                const double ye = gy0 + (gy1 - gy0) * (sh.qy + sh.frac);
+                const int px0 = static_cast<int>(xs * gg.s);
+                const int py0 = std::max(0, static_cast<int>((ys - gg.y_min) * gg.s));
+                const int PW = static_cast<int>((xe - xs) * gg.s);
+                const int PH = std::min(gg.H - py0, static_cast<int>((ye - ys) * gg.s));
+                std::vector<std::uint32_t> buf(static_cast<std::size_t>(PW) * PH);
+                bake_region(gal, gg, p, px0, py0, PW, PH, buf.data());
+                // Camera squash (nearest row) for the oblique rungs.
+                const int OH = static_cast<int>(PH * sh.sy);
+                std::vector<std::uint32_t> sq(static_cast<std::size_t>(PW) * OH);
+                for (int y = 0; y < OH; ++y)
+                {
+                    const int syr = std::min(PH - 1, static_cast<int>(y / sh.sy));
+                    std::memcpy(sq.data() + static_cast<std::size_t>(y) * PW,
+                                buf.data() + static_cast<std::size_t>(syr) * PW,
+                                static_cast<std::size_t>(PW) * 4u);
+                }
+                const int U = sh.up;
+                std::vector<std::uint32_t> up(static_cast<std::size_t>(PW) * U * OH * U);
+                for (int y = 0; y < OH * U; ++y)
+                    for (int x = 0; x < PW * U; ++x)
+                        up[static_cast<std::size_t>(y) * PW * U + x] =
+                            sq[static_cast<std::size_t>(y / U) * PW + x / U];
+                char path[128];
+                std::snprintf(path, sizeof path, "structures_gallery_%s.png", sh.name);
+                write_png_rgba(path, PW * U, OH * U,
+                               reinterpret_cast<const unsigned char*>(up.data()), PW * U * 4);
+                std::printf("preview: %s (%dx%d)\n", path, PW * U, OH * U);
+            }
+        }
+    }
+
 
     // ------------------------------------------------------------------
     // Look previews (not a check): bake one interesting window under several
@@ -389,6 +4304,291 @@ int main()
             std::printf("preview: ground_preview_v8_tilt45.png\n");
         }
     }
+
+    // ------------------------------------------------------------------
+    // P15 / P16 — the landform relief and river passes (BL-1242): each moves
+    // the bake where its feature stands, bakes byte-identical twice and one
+    // wrap period east (flat 48 px and the 45-degree oblique tier), and leaves
+    // ground with no feature near it untouched. Feature previews follow, at
+    // the far page, 24 px and 96 px, for the eye.
+    // ------------------------------------------------------------------
+    {
+        const auto land = static_cast<std::uint8_t>(bake_source::tile_class::land);
+        const auto water = static_cast<std::uint8_t>(bake_source::tile_class::water);
+        auto popcount6 = [](std::uint8_t v) { int c = 0; for (int b = 0; b < 6; ++b) c += (v >> b) & 1; return c; };
+        // Aims: the most-linked tile of each linear landform, a crater, and
+        // the highest-flow river mouth (a land tile flowing into water).
+        int aim_lf[7] = { -1, -1, -1, -1, -1, -1, -1 };
+        int best_links[7] = { -1, -1, -1, -1, -1, -1, -1 };
+        int mouth = -1;
+        float mouth_flow = 0.0f;
+        // A river MOUTH is at the sea, not a lake: read substrates off the world.
+        std::vector<std::uint8_t> is_sea(src.cls.size(), 0);
+        for (const auto& [tid, t] : w.tiles)
+            if (t.body == home && t.grid_x >= 0 && t.grid_x < src.gw && t.grid_y >= 0
+                && t.grid_y < src.gh)
+                is_sea[static_cast<std::size_t>(t.grid_y) * src.gw + t.grid_x] =
+                    (t.substrate == terrain_substrate::ocean || t.substrate == terrain_substrate::coast)
+                        ? 1 : 0;
+        for (int i = 0; i < static_cast<int>(src.cls.size()); ++i)
+        {
+            if (src.cls[i] != land)
+                continue;
+            const int lf = src.landform[i];
+            const int lk = popcount6(src.lf_links[i]);
+            if (lf >= 0 && lf < 7 && lk > best_links[lf])
+            {
+                best_links[lf] = lk;
+                aim_lf[lf] = i;
+            }
+            for (int s = 0; s < 6; ++s)
+            {
+                if (!(src.river_out[i] & (1u << s)))
+                    continue;
+                const hex_neighbors::coord nb = hex_neighbors::neighbour(i % src.gw, i / src.gw, s);
+                if (nb.gy < 0 || nb.gy >= src.gh)
+                    continue;
+                const int j = nb.gy * src.gw + ((nb.gx % src.gw) + src.gw) % src.gw;
+                if (src.cls[j] == water && is_sea[j] && src.river_flow[i] > mouth_flow)
+                {
+                    mouth_flow = src.river_flow[i];
+                    mouth = i;
+                }
+            }
+        }
+        const int mtn = aim_lf[static_cast<int>(terrain_landform::mountain)];
+        check(mtn >= 0 && best_links[static_cast<int>(terrain_landform::mountain)] >= 1,
+              "P15", "found a bridged mountain run");
+        check(mouth >= 0, "P16", "found a river mouth");
+        std::printf("      mountain run at [%d,%d] (%d links); rift [%d]; canyon [%d]; crater [%d]; "
+                    "mouth at [%d,%d] flow %.0f\n",
+                    mtn % src.gw, mtn / src.gw,
+                    best_links[static_cast<int>(terrain_landform::mountain)],
+                    aim_lf[static_cast<int>(terrain_landform::rift)],
+                    aim_lf[static_cast<int>(terrain_landform::canyon)],
+                    aim_lf[static_cast<int>(terrain_landform::crater)],
+                    mouth % src.gw, mouth / src.gw, mouth_flow);
+        // Walk the mouth's main stem upstream (largest inflow each step) to its
+        // source, so a capture script can frame the whole river.
+        if (mouth >= 0)
+        {
+            int cur = mouth, steps = 0;
+            for (;;)
+            {
+                int next = -1;
+                float bf = 0.0f;
+                for (int s = 0; s < 6; ++s)
+                {
+                    if (!(src.river_in[cur] & (1u << s)))
+                        continue;
+                    const hex_neighbors::coord nb = hex_neighbors::neighbour(cur % src.gw, cur / src.gw, s);
+                    if (nb.gy < 0 || nb.gy >= src.gh)
+                        continue;
+                    const int j = nb.gy * src.gw + ((nb.gx % src.gw) + src.gw) % src.gw;
+                    if (src.river_flow[j] > bf) { bf = src.river_flow[j]; next = j; }
+                }
+                if (next < 0 || ++steps > 4096)
+                    break;
+                cur = next;
+            }
+            std::printf("      main stem: source [%d,%d] -> mouth [%d,%d], %d tiles\n",
+                        cur % src.gw, cur / src.gw, mouth % src.gw, mouth / src.gw, steps + 1);
+        }
+        for (int i = 0; i < static_cast<int>(src.cls.size()); ++i)
+            if (src.cls[i] == land && src.landform[i] == static_cast<std::uint8_t>(terrain_landform::mountain)
+                && src.lf_links[i] == 0 && i / src.gw > 20 && i / src.gw < src.gh - 20)
+            {
+                std::printf("      lone mountain at [%d,%d]\n", i % src.gw, i / src.gw);
+                break;
+            }
+        for (int lf : { 2, 3, 5, 6 })
+            if (aim_lf[lf] >= 0)
+                std::printf("      landform %d best at [%d,%d] (%d links)\n", lf,
+                            aim_lf[lf] % src.gw, aim_lf[lf] / src.gw, best_links[lf]);
+
+        const auto window = [&](int tile_idx, const geometry& gg, const bake_params& bp,
+                                int side, int dpx, std::vector<std::uint32_t>& out)
+        {
+            const int r = tile_idx / src.gw, c = tile_idx % src.gw;
+            const double cx = 1.7320508075688772 * (c + ((r & 1) ? 0.5 : 0.0));
+            const double cy = 1.5 * r - src.height[tile_idx] * gg.lift;
+            const int x0 = static_cast<int>(cx * gg.s) - side / 2 + dpx;
+            const int y0 = std::clamp(static_cast<int>((cy - gg.y_min) * gg.s) - side / 2,
+                                      0, std::max(0, gg.H - side));
+            out.assign(static_cast<std::size_t>(side) * side, 0u);
+            bake_region(src, gg, bp, x0, y0, side, side, out.data());
+        };
+        const geometry g48f = make_geometry(hb.grid_width, hb.grid_height, 48.0);
+        const geometry g45f = make_geometry(hb.grid_width, hb.grid_height, 96.0, k_tilt_sy);
+        bake_params no_lf = p;  no_lf.landform_strength = 0.0f;
+        bake_params no_rv = p;  no_rv.river_strength = 0.0f;
+        std::vector<std::uint32_t> a1, a2, a3, a4;
+        if (mtn >= 0)
+        {
+            window(mtn, g48f, p, 160, 0, a1);
+            window(mtn, g48f, p, 160, 0, a2);
+            window(mtn, g48f, p, 160, g48f.W, a3);
+            window(mtn, g48f, no_lf, 160, 0, a4);
+            check(a1 == a2, "P15", "a mountain run bakes byte-identical twice");
+            check(a1 == a3, "P15", "a mountain run wraps byte-identical one period east");
+            check(a1 != a4, "P15", "the landform pass moves a mountain run");
+            window(mtn, g45f, p, 160, 0, a1);
+            window(mtn, g45f, p, 160, g45f.W, a3);
+            check(a1 == a3, "P15", "the oblique mountain run wraps byte-identical");
+        }
+        if (mouth >= 0)
+        {
+            window(mouth, g48f, p, 160, 0, a1);
+            window(mouth, g48f, p, 160, 0, a2);
+            window(mouth, g48f, p, 160, g48f.W, a3);
+            window(mouth, g48f, no_rv, 160, 0, a4);
+            check(a1 == a2, "P16", "a river mouth bakes byte-identical twice");
+            check(a1 == a3, "P16", "a river mouth wraps byte-identical one period east");
+            check(a1 != a4, "P16", "the river pass moves a river mouth");
+            window(mouth, g45f, p, 160, 0, a1);
+            window(mouth, g45f, p, 160, g45f.W, a3);
+            check(a1 == a3, "P16", "the oblique river mouth wraps byte-identical");
+        }
+        // Featureless ground stays byte-identical with both passes off.
+        {
+            int quiet = -1;
+            for (int i = 0; i < static_cast<int>(src.cls.size()) && quiet < 0; ++i)
+            {
+                if (src.cls[i] != land || src.near_feature[i])
+                    continue;
+                bool ok = true;
+                const int r = i / src.gw, c = i % src.gw;
+                for (int dr = -3; dr <= 3 && ok; ++dr)
+                    for (int dc = -3; dc <= 3 && ok; ++dc)
+                    {
+                        const int rr = r + dr;
+                        if (rr < 0 || rr >= src.gh) { ok = false; break; }
+                        const int cc = ((c + dc) % src.gw + src.gw) % src.gw;
+                        if (src.near_feature[static_cast<std::size_t>(rr) * src.gw + cc])
+                            ok = false;
+                    }
+                if (ok)
+                    quiet = i;
+            }
+            if (quiet >= 0)
+            {
+                bake_params off = p; off.landform_strength = 0.0f; off.river_strength = 0.0f;
+                window(quiet, g48f, p, 96, 0, a1);
+                window(quiet, g48f, off, 96, 0, a2);
+                check(a1 == a2, "P15", "ground with no feature near it is untouched by both passes");
+            }
+        }
+
+        // Previews.
+        struct shot { const char* name; int tile; };
+        const shot shots[] = {
+            { "mountain", mtn },
+            { "rift",   aim_lf[static_cast<int>(terrain_landform::rift)] },
+            { "canyon", aim_lf[static_cast<int>(terrain_landform::canyon)] },
+            { "crater", aim_lf[static_cast<int>(terrain_landform::crater)] },
+            { "mouth",  mouth },
+        };
+        const double tiers[] = { 6.0, 24.0, 96.0 };
+        std::vector<std::uint32_t> pb;
+        for (const shot& sh : shots)
+        {
+            if (sh.tile < 0)
+                continue;
+            for (double tp : tiers)
+            {
+                const geometry gp = make_geometry(hb.grid_width, hb.grid_height, tp);
+                const int side = tp < 10.0 ? 160 : 512;
+                window(sh.tile, gp, p, side, 0, pb);
+                char path[128];
+                std::snprintf(path, sizeof path, "feature_%s_%d.png", sh.name, static_cast<int>(tp));
+                write_png_rgba(path, side, side, reinterpret_cast<const unsigned char*>(pb.data()),
+                               side * 4);
+                // The same window with both passes off: the A/B the eye needs.
+                bake_params off = p; off.landform_strength = 0.0f; off.river_strength = 0.0f;
+                window(sh.tile, gp, off, side, 0, pb);
+                std::snprintf(path, sizeof path, "feature_%s_%d_off.png", sh.name, static_cast<int>(tp));
+                write_png_rgba(path, side, side, reinterpret_cast<const unsigned char*>(pb.data()),
+                               side * 4);
+            }
+        }
+    }
+
+    variant_rows(/*timing=*/true);
+
+    // ------------------------------------------------------------------
+    // Bake time per tier (BL-1242: recorded before and after the landform
+    // and river passes). Not a check — a measurement. One 512 px chunk per
+    // tier aimed at the body's strongest-relief tile, the two oblique tiers,
+    // and the far page whole. Debug builds time far slower than Release;
+    // compare like with like.
+    // ------------------------------------------------------------------
+    {
+        int aim = land_i;
+        float best = -1.0f;
+        for (int i = 0; i < static_cast<int>(src.relief_bias.size()); ++i)
+            if (src.cls[i] == static_cast<std::uint8_t>(bake_source::tile_class::land)
+                && src.relief_bias[i] > best)
+            {
+                best = src.relief_bias[i];
+                aim  = i;
+            }
+        const int ar = aim / src.gw, ac = aim % src.gw;
+        const double ax = 1.7320508075688772 * (ac + ((ar & 1) ? 0.5 : 0.0));
+        const double ay = 1.5 * ar;
+        struct tier { double px; double sy; const char* name; };
+        const tier tiers[] = { { 12.0, 1.0, "12" }, { 24.0, 1.0, "24" }, { 48.0, 1.0, "48" },
+                               { 96.0, k_tilt_sy, "96@22.5" } };
+        std::vector<std::uint32_t> tb(512u * 512u);
+        // Each row times the default bake AND the same window with the BL-1242
+        // passes off, in one process, so load on the machine cancels out of the
+        // comparison. Best of three each: Debug timing is noisy.
+        bake_params feat_off = p;
+        feat_off.landform_strength = 0.0f;
+        feat_off.river_strength    = 0.0f;
+        const auto best_of3 = [&](const geometry& gg, const bake_params& bp, int x0, int y0,
+                                  int w_, int h_, std::uint32_t* buf) -> double
+        {
+            double best = 1e30;
+            for (int rep = 0; rep < 3; ++rep)
+            {
+                const auto t0 = std::chrono::steady_clock::now();
+                bake_region(src, gg, bp, x0, y0, w_, h_, buf);
+                const auto t1 = std::chrono::steady_clock::now();
+                best = std::min(best, std::chrono::duration<double, std::milli>(t1 - t0).count());
+            }
+            return best;
+        };
+        for (const tier& t : tiers)
+        {
+            const geometry gt = make_geometry(hb.grid_width, hb.grid_height, t.px, t.sy);
+            const int side = 512;
+            const int tpx0 = static_cast<int>(ax * gt.s) - side / 2;
+            const int tpy0 = std::clamp(static_cast<int>((ay - gt.y_min) * gt.s) - side / 2,
+                                        0, std::max(0, gt.H - side));
+            const double on  = best_of3(gt, p, tpx0, tpy0, side, side, tb.data());
+            const double off = best_of3(gt, feat_off, tpx0, tpy0, side, side, tb.data());
+            std::printf("TIME  tier %-8s 512x512 chunk: %8.1f ms (features off %8.1f ms)\n",
+                        t.name, on, off);
+        }
+        {
+            const geometry g6 = make_geometry(hb.grid_width, hb.grid_height, 6.0);
+            std::vector<std::uint32_t> fb(static_cast<std::size_t>(g6.W) * g6.H);
+            const double on  = best_of3(g6, p, 0, 0, g6.W, g6.H, fb.data());
+            const double off = best_of3(g6, feat_off, 0, 0, g6.W, g6.H, fb.data());
+            std::printf("TIME  far page %dx%d: %8.1f ms (features off %8.1f ms)\n",
+                        g6.W, g6.H, on, off);
+        }
+    }
+
+    // P24 / P25 - the partial re-bake (BL-1246).
+    patch_row(src, p);
+
+    // P26 / P27 - tiles hold their own ground (BL-1251).
+    border_row(src, hb, p, /*previews=*/false);
+    route_row(w, home, src, p, /*previews=*/false);
+    roadsets_row(src, p, /*previews=*/false); // BL-1291
+    // P31 - cast shadows (BL-1256).
+    shadow_row(src, p);
 
     std::printf("\n%s (%d failure%s)\n", g_failures ? "FAILED" : "ALL PASS",
                 g_failures, g_failures == 1 ? "" : "s");

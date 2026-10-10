@@ -117,7 +117,12 @@ struct corp_ai_params
     int   cooldown_evals  = 4;     ///< Evals a touched building holds before re-dialling.
     int   max_builds      = 1;     ///< Constructions per corp per evaluation.
     int   max_dials       = 3;     ///< Dial changes (recipe/workforce/idle/resume) per evaluation.
-    int   max_trades      = 1;     ///< Order-book commands per corp per evaluation (BL-293).
+    int   max_trades      = 1;     ///< Manual-trade pins/unpins per corp per evaluation (BL-1267; was BL-293's order-book budget). The reserve correction is free of it.
+    /// BL-1267 (a rival sets its own trades, AI_OPPONENT.md § 11): the share of
+    /// the trade points a corporation MAKES that its manual trades may hold
+    /// together; the rest stays with auto. A pin is sized to what its
+    /// destination absorbs and capped by what this leaves. First cut, 0.5.
+    float trade_pin_share = 0.5f;
     int   max_dispatches  = 1;     ///< Directed convoy dispatches per corp per evaluation (BL-600).
 
     /// BL-409 — spectator mode: the session has no human seat.

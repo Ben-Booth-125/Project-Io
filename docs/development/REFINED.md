@@ -149,7 +149,7 @@ tools/session/rulings/sprint-50.json`; list every dated ruling: `--since 2026-10
 - [x] Lever D: background demand consumes; numbers at the split pull (MARKETS.md step 3, 12)
 - [x] Background pull split by catchment; electronics stays until the household rung (MARKETS.md)
 - [x] Power rides the province grid; market shelf on its centre's grid (LOGISTICS.md § 3a) — grid-level shelf cap added to LOGISTICS § 3a
-- [x] An order is a floor, not a hold (MARKETS.md step 4; ACTIONS place_sell_order; NR-982) — SUPPLY § Dispatch trigger now says it too
+- [x] An order is a floor, not a hold (MARKETS.md step 4; ACTIONS place_sell_order; NR-982) — SUPPLY § A shipment now says it too
 - [x] A mine candidate is priced at its stack rank (AI_OPPONENT.md)
 - [x] A processor needs spare reachable supply at t_idle (CORPORATION_GENERATION.md Pass 3)
 - [x] A refused processor's draw enters derived demand, tied to reach (CORPORATION_GENERATION.md)
@@ -180,6 +180,36 @@ tools/session/rulings/sprint-50.json`; list every dated ruling: `--since 2026-10
 - [x] ADDED: The seat's dial-idled plants return to auto at the handoff (AI_OPPONENT.md; NR-986)
 - [x] ADDED: A recipe-less processor with an unwanted default is not placed; the authored installation and a chartered firm's second works excepted (CORPORATION_GENERATION.md Pass 6)
 - [x] ADDED: Roads - a route is priced on the field its destination's flood was built on; the snap bounded at 1.75x (LOGISTICS.md § 4; BL-1252, no parallel roads) — detour-test sentence no longer claims no second road on the raster
+
+### Wave 3 — the shelf economy and trade (extended 2026-10-10; HANDOFF_SHELF_TRADE.md)
+
+Branch `claude/shelf-economy-trade-42f8f4`, cut from `worktree-sprint-50`; merges back there.
+Design: TRADE.md, MARKETS.md § The shelf economy. Save v46 (claimed). Calls taken on Ben's
+behalf: NR-1029, NR-1012..NR-1017 (NR-1013 is a question: may a rival build a Marketplace).
+Baseline on this tip (16 seeds, 50 ticks): G1 96.7, G1b 1.7, G1 t50 87.3, G2 95.6, G3 100;
+run/built at handoff 1739/1798.
+- [x] S1 BL-1265 (shelf economy) core, main session: pools, held stock, dial draw register, order
+  book, auto-surplus, processor and pad reservations retire; every landing (production, arrival,
+  capture, procurement) sells at the clear; every buyer buys off the shelf; opening stock placed
+  on the shelves; tariff charged at arrival (MARKETS § Tariffs); save v46. World + core compile.
+- [x] S2 BL-1266 (trade core), main session: Planetary Marketplace (type, economics, upkeep);
+  trade points (Marketplace staffed, Port flat; none on unmet upkeep); capacity table (first
+  proposal); manual trades + reserve + verbs; auto trade; `run_trades` in the tick; shipments
+  buy at the source, pay the haul, pass the LP cap, land and sell; space lane buys propellant.
+- [x] S3 Core harnesses: save_roundtrip (80 PASS), money_conservation (ALL PASS),
+  determinism_harness (PASS); world_audit / world_determinism / spectator / history_sim running.
+- [x] S4 Harness sweep lane (economy-dev): every other tools/verify harness adapted or retired.
+- [x] S5 BL-1269 (trade UI) lane (ui-dev): app compiles; trade surface; Marketplace in Build;
+  ACTIONS.json; question_log; scripts. Ben's live click.
+- [x] S6 BL-1268 (trade in generation) lane (generation-dev): the history's trade record and the
+  Marketplace retrofit at the charter walk; rates proposed by measurement; Part B (points replace
+  the Exploration flows) as a plan for Ben.
+- [x] S7 BL-1267 (AI trades) lane (economy-dev): pin / unpin / reserve under the § 11 grant.
+- [x] S8 Docs lane: sibling docs rewritten to the shelf model; ruling-check.
+- [x] S9 BL-1270 (trade capacity table): measured (NR-1030: G1b 5.3 FAIL, the rest pass); awaiting Ben. Put capacity, point rates and
+  upkeep to Ben.
+- [ ] S10 (all lanes merged and cold-reviewed with fix rounds; 16-seed gate run; air_gate, sea_lane, trades_tab pass; ruling register 0 MISS. OWED: Ben's live clicks, his calls on NR-1012..1019, NR-1021, NR-1029, NR-1030, the re-bless, the merge back.) Integrate every lane; cold code-reviewer round per lane; 16-seed gate; scripted visual
+  checks (air_gate, sea_lane); ruling-check; then the one re-bless with Ben's go.
 
 ## Sprint 48 — the world moves forward (opened 2026-09-25, CLOSED 2026-10-04)
 
@@ -1198,3 +1228,43 @@ the seat) lands in the same re-bless.
   - [ ] T3 directed verb parity; the scorer's home-price valuation (R5, R6).
   - [ ] T4 trade_reaches_for_price harness (R7); main session: determinism, far trade, the BL-1066 probe, cold review (R8-R10).
 - [ ] **BL-1066 (the player cannot build)** — after BL-1003: price the site multiplier at placement (gate, Build door preview, rival scorer); construction capacity where the player stands (measure first); the fixture places near home and waits out the tech gate.
+
+## Sprint 51 — visibility: initial market conditions and the ground (opened 2026-10-08, CLOSED 2026-10-10, v0.1.29)
+
+Ben's design form (2026-10-08); the design is in SELECTION.md, LENSES.md, RENDERING.md and
+PLANETARY.md. Base: `claude/parallel-sprints-collision-check-b5090c`, which carries sprint 50 through
+68c8d209. Requirement groups: `tile-production-section`, `owner-multi-select`,
+`ground-never-magnified`, `structures-baked`, `landforms-and-rivers-baked`, `wharf-placed-on-shore`,
+`refunds-flow-shown`. Every item is render-side except BL-1218, so world digests must not move.
+
+**Wave 1 — six lanes in parallel, each a ui-dev agent in its own worktree.** The main session merges
+in the order L6, L1, L2, L3, L4, L5 (the bake lanes last, L3 first among them), builds, verifies, and
+takes a cold review per item. **Wave 2:** BL-1243 (terrain variant families) after L5 merges.
+
+- [x] **L1 — BL-1239 (tile production section).** Files: `selection_panel.cpp`, `hover_content.cpp`, `ui_state.hpp`, `question_log.json`.
+  - [x] T1 extract the building running-state classification from `hover_building_detail` into one shared function. provides: `classify_building_state` (name the lane's choice).
+  - [x] T2 the Production section (stack rows, then the catchment market rows, the unbuilt and rival cases); the nav at six (R1-R4). consumes: T1.
+  - [x] T3 the Status page reads T1 (R5); question_log entry; a `scripts/verify/tile_production.lua` check (R6).
+- [x] **L2 — BL-1240 (owner multi-select).** Files: `body_surface_canvas.cpp` (fill, key, click), `ui_state.hpp`, `presentation.hpp`, `overlay.cpp`, `ACTIONS.json`, `question_log.json`.
+  - [x] T1 `ui_state::lens_corps` / `lens_companies` with their defaults; `palette::owned_grey`. provides: both sets, the grey.
+  - [x] T2 the fill, the HQ gate and the hover rule (R1, R3). consumes: T1.
+  - [x] T3 the checklist key and shift-click picking (R2); ACTIONS and question_log (R4); verify API hooks to pick an owner if needed.
+- [x] **L3 — BL-1244 (ground never magnified).** Files: `src/core/ground_layer.*`, the bake entry in `ground_bake.cpp`, the stand-in in `body_surface_canvas.cpp`.
+  - [x] T1 measure the HUD texel/px per rung and bake time per tier on the base (R1, R3 before).
+  - [-] T2 (cancelled: superseded by one master, BL-1246) the chooser rule and the 192 px tier (R2); the next-tier-down stand-in (R4).
+  - [-] T3 (cancelled: 2x rejected on cost) 2x supersample and box-downsample, unsharp re-tuned (R3); measure after (R1, R3).
+- [x] **L4 — BL-1241 (structures baked).** Files: `ground_bake.*`, `ground_layer.cpp` (hash), `body_surface_canvas.cpp` (glyph removal), `selection_panel.cpp` (neighbourhood view only), `scripts/verify/ground_bake.lua`.
+  - [x] T1 the stamp seam and the installation pass with one form per type, the cluster, settlements, ruins, scaffolding, oblique standing (R1, R2). provides: the stamp seam (`structure_stamp` or the lane's name).
+  - [x] T2 the chunk hash folds installations (R3).
+  - [x] T3 retire the canvas building, ring, badge, emblem, settlement, ruin and density-dot draws; the neighbourhood view reads the bake (R4); bake time before and after (R5).
+- [x] **L5 — BL-1242 (landforms and rivers baked).** Files: `ground_bake.cpp`, `body_surface_canvas.cpp` (strokes), `hex_render.cpp`, `scripts/verify/landform_relief.lua`.
+  - [x] T1 the landform relief pass and contiguous runs (R1).
+  - [x] T2 the river pass along `river_edges`, curved, widening (R2).
+  - [x] T3 retire the landform glyphs, spans, river strokes and chevrons (R3).
+- [x] **L6 — BL-1218 (wharf placed on shore) + BL-1215 (refunds flow shown).** Files: the construction offer path and `placement_rules` if the rule is wrong; the corporation dashboard and selection panel return lines.
+  - [x] T1 find which side disagrees (offer or rule) for the wharf and the well; fix it; world_determinism before and after (BL-1218 R1, R2).
+  - [x] T2 the refunds line (BL-1215 R1, R2).
+- [x] **Main session.** Merge, the review barrier (`verifier-review`), the integrating build, world_determinism, the visual checks, a cold review per item, Ben's live walk, one commit per item.
+- [x] **Wave 2 — L7, BL-1243 (terrain variant families)** — launched 2026-10-08 on top of 8bfad073 (all six wave-1 lanes merged). Group `terrain-variant-families`.
+
+**Closed 2026-10-10.** Every lane merged. Grown on Ben's walks: BL-1246 (ground one master), BL-1250 (lens washes ground), BL-1251 (tiles hold their own ground), BL-1253 (roads painted), BL-1254 (ground crisper), BL-1256 (ground look C-F), BL-1257 (roads thin lens), BL-1258 (towns denser), BL-1259 (ground disk cache), BL-1260 (canvas wide-rung build), BL-1291 (roads as tile sets), BL-1292 (borders hard edges). Carried to sprint 52: BL-1247 (ground benchmark), BL-1293 (anchor rings clip), BL-1255 (rail rung). Live clicks still owed are the pending rows in requirements.json.

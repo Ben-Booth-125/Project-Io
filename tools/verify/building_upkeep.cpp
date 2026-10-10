@@ -147,14 +147,50 @@ struct fixture
         w.corporations[corp] = cc;
     }
 
-    stockpile_component& pool() { return w.pool_at(corp, pool_key_for_body(w, body)); }
+    /// BL-1265 (MARKETS.md § The shelf economy): corporations hold no pools; a
+    /// building's upkeep is BOUGHT off the shelf of its tile's market. `pool()`
+    /// keeps every row's wording and now names that shelf — the one market on
+    /// @p on_body (made on first use: centred on the body's first tile, every
+    /// good priced at 1, so the fair-price ceiling admits it). A row that never
+    /// calls it has no market at all, so its draws go unmet exactly as an empty
+    /// pool's did.
+    struct shelf_ref { std::array<float, resource_count>& quantities; };
+    shelf_ref pool_on(entity_id on_body)
+    {
+        entity_id mid = market_on_body(w, on_body);
+        if (mid == null_entity)
+        {
+            mid = w.create_entity();
+            market_component mc{};
+            mc.body = on_body;
+            for (const auto& [tid, t] : w.tiles)
+                if (t.body == on_body && (mc.centre_tile == null_entity || tid < mc.centre_tile))
+                    mc.centre_tile = tid;
+            for (std::size_t r = 0; r < resource_count; ++r) mc.base_price[r] = 1.0f;
+            mc.price = mc.base_price;
+            w.markets[mid] = mc;
+        }
+        return shelf_ref{ w.markets.at(mid).inventory };
+    }
+    shelf_ref pool() { return pool_on(body); }
 };
 
 /// A registry authoring ONE resource on ONE building type in ONE band.
 recipe_registry make_registry(building_type bt, era_band band, resource_type good, float qty,
-                              int decay = 50, int recovery = 100, int floor = 0)
+                              int decay = 50, int recovery = 100, int floor = 0,
+                              bool ceiling_on = true)
 {
     recipe_registry reg;
+    // BL-1265: the shelf is the ONLY source of an upkeep good now, and with the
+    // fair-price ceiling OFF (reservation_mult 0, the hand-built default) the
+    // upkeep draw buys nothing at all. Every row that means "a stocked source
+    // meets the draw" runs at the shipped ceiling; R7f keeps the OFF default.
+    if (ceiling_on)
+    {
+        price_band_params pb = reg.price_band();
+        pb.reservation_mult = k_shipped_reservation;
+        reg.set_price_band(pb);
+    }
     building_upkeep_params up;
     up.supply_decay_permille    = decay;
     up.supply_recovery_permille = recovery;
@@ -230,17 +266,19 @@ void r3_rates_are_per_type_and_era_banded()
               "R3 a zero rate moves no supply factor (not even upward)");
     }
 
-    // An ALL-ZERO table never creates a pool — the property that keeps a zero-rate
-    // world byte-identical down to its pool SET, not merely its pool contents.
+    // An ALL-ZERO table posts nothing — the property that keeps a zero-rate
+    // world byte-identical. (BL-1265: it was "creates no pool"; with no pools
+    // the register a zero rate must not touch is the want/fill book.)
     {
         fixture f;
         f.build(1, building_type::processing_facility);
+        f.pool().quantities[ri(resource_type::tools)] = 10.0f;
         recipe_registry reg = make_registry(building_type::processing_facility,
                                             era_band::ancient, resource_type::tools, 0.0f);
-        const std::size_t pools_before = f.w.corp_market_pools.size();
-        run_building_upkeep(f.w, reg, g_upkeep_report);
-        check(f.w.corp_market_pools.size() == pools_before,
-              "R3 a zero-rate pass creates no pool that did not already exist");
+        economy_report rep;
+        run_building_upkeep(f.w, reg, rep);
+        check(rep.wants.empty() && rep.purchases.empty() && rep.upkeep_wants.empty(),
+              "R3 a zero-rate pass posts no want and buys nothing");
     }
 }
 
@@ -287,7 +325,7 @@ void r1_the_draw_and_its_order()
         f.w.corporations.at(f.corp).assets.push_back(b2);
 
         f.pool().quantities[ri(resource_type::tools)] = 10.0f;
-        f.w.pool_at(f.corp, pool_key_for_body(f.w, body2)).quantities[ri(resource_type::tools)] = 10.0f;
+        f.pool_on(body2).quantities[ri(resource_type::tools)] = 10.0f;
 
         recipe_registry reg = make_registry(building_type::extraction_site,
                                             era_band::ancient, resource_type::tools, 1.0f);
@@ -295,7 +333,7 @@ void r1_the_draw_and_its_order()
 
         check_near(f.pool().quantities[ri(resource_type::tools)], 9.0f,
                    "R1 the home-body building drew from the home-body pool");
-        check_near(f.w.pool_at(f.corp, pool_key_for_body(f.w, body2)).quantities[ri(resource_type::tools)], 9.0f,
+        check_near(f.pool_on(body2).quantities[ri(resource_type::tools)], 9.0f,
                    "R1 the other-body building drew from THAT body's pool, not the first");
     }
 
@@ -562,11 +600,11 @@ void r7_the_reservation_ceiling()
         const int before = f.w.buildings.at(f.buildings[0]).supply_factor_permille;
         const building_upkeep_tick t = run_building_upkeep(f.w, reg, rep);
 
-        check_near(want_of(rep, f.corp, pool_key_for_body(f.w, f.body), good), need,
+        check_near(want_of(rep, f.corp, market_on_body(f.w, f.body), good), need,
                    "R7a the WHOLE shortfall reaches the want register");
-        check_near(fill_of(rep, f.corp, pool_key_for_body(f.w, f.body), good), need,
+        check_near(fill_of(rep, f.corp, market_on_body(f.w, f.body), good), need,
                    "R7a the fill is what the shelf actually supplied");
-        check_near(upkeep_want_of(rep, f.corp, pool_key_for_body(f.w, f.body), good), need,
+        check_near(upkeep_want_of(rep, f.corp, market_on_body(f.w, f.body), good), need,
                    "R7a the attribution mirror carries the same bid");
         check_near(f.w.markets.begin()->second.inventory[ri(good)], 10.0f - need,
                    "R7a the market's real inventory is drained by the fill");
@@ -610,30 +648,17 @@ void r7_the_reservation_ceiling()
         economy_report rep;
         const building_upkeep_tick t = run_building_upkeep(f.w, reg, rep);
 
-        check_near(want_of(rep, f.corp, pool_key_for_body(f.w, f.body), good), need,
+        check_near(want_of(rep, f.corp, market_on_body(f.w, f.body), good), need,
                    "R7c the want is the full shortfall, UNREDUCED by what the shelf holds");
-        check_near(fill_of(rep, f.corp, pool_key_for_body(f.w, f.body), good), 0.2f,
+        check_near(fill_of(rep, f.corp, market_on_body(f.w, f.body), good), 0.2f,
                    "R7c the fill is only what was delivered");
         check_near(f.w.markets.begin()->second.inventory[ri(good)], 0.0f,
                    "R7c the shelf is emptied, never driven negative");
         check(t.unmet == 1, "R7c a partly-filled draw is still unmet");
     }
 
-    // --- R7d: the pool is drawn FIRST; only its shortfall is bid -------------
-    {
-        fixture f;
-        f.build(1, building_type::extraction_site);
-        add_market(f, good, base, base, /*inventory*/ 10.0f);
-        recipe_registry reg = registry_with_reservation(good, need, k_shipped_reservation);
-        f.pool().quantities[ri(good)] = need * 0.4f;
-
-        economy_report rep;
-        run_building_upkeep(f.w, reg, rep);
-
-        check_near(want_of(rep, f.corp, pool_key_for_body(f.w, f.body), good), need * 0.6f,
-                   "R7d only what the POOL could not cover is bid");
-        check_near(f.pool().quantities[ri(good)], 0.0f, "R7d the pool is spent first");
-    }
+    // --- R7d (the pool is drawn first; only its shortfall is bid) RETIRED with
+    // corporation pools (BL-1265): the whole need is the bid, as R7a asserts.
 
     // --- R7e: unpriced == unbuyable, and it needs no rule of its own ---------
     // A resource with base_price 0 has a reservation ceiling of 0, and no price
@@ -651,25 +676,28 @@ void r7_the_reservation_ceiling()
         check(t.unmet == 1,      "R7e and the draw goes unmet, as it always did");
     }
 
-    // --- R7f: reservation_mult 0 is the pre-BL-654 behaviour exactly ---------
-    // The DEFAULT. Every harness that hand-builds a registry and never authors a
-    // band must see a pool-only draw, or this item is not inert where it claims.
+    // --- R7f: reservation_mult 0 is the ceiling OFF: the draw buys freely -----
+    // The DEFAULT. BL-1265: with no corporation pools, "off" can no longer mean
+    // the pre-BL-654 pool-only draw (it would leave upkeep no source at all);
+    // it means what it means for every other shelf draw — no ceiling.
     {
         fixture f;
         f.build(1, building_type::extraction_site);
         add_market(f, good, base, base, /*inventory*/ 10.0f);
         recipe_registry reg = make_registry(building_type::extraction_site, era_band::any,
-                                            good, need); // no price band authored
+                                            good, need, 50, 100, 0,
+                                            /*ceiling_on=*/false); // no price band authored
         check_near(reg.price_band().reservation_mult, 0.0f,
                    "R7f reservation_mult defaults to 0 — the feature ships OFF");
 
         economy_report rep;
         const building_upkeep_tick t = run_building_upkeep(f.w, reg, rep);
 
-        check(rep.wants.empty(), "R7f at the default the draw never bids");
-        check_near(f.w.markets.begin()->second.inventory[ri(good)], 10.0f,
-                   "R7f at the default the market is untouched");
-        check(t.unmet == 1, "R7f at the default a short pool simply goes short");
+        check(!rep.wants.empty(), "R7f at the default the draw bids on the shelf");
+        check(f.w.markets.begin()->second.inventory[ri(good)] < 10.0f,
+              "R7f at the default the draw buys off the shelf (no ceiling)");
+        check(t.unmet == (need > 10.0f ? 1 : 0),
+              "R7f at the default the draw is met when the shelf holds the need");
     }
 }
 
@@ -911,7 +939,7 @@ void r10_a_shelf_draw_pays_the_posted_price()
         corporation_component sc;
         sc.name = "Seller";
         f.w.corporations[seller] = sc;
-        f.w.pool_at(seller, mid).quantities[ri(good)] = 20.0f;
+        f.w.land_goods(seller, mid, ri(good), 20.0f); // BL-1265: a landing the clear lists
         recipe_registry reg = registry_with_reservation(good, need, k_shipped_reservation);
 
         economy_report rep;
@@ -1127,7 +1155,7 @@ void r11_the_province_is_the_grid_cell()
             recipe_registry reg = power_registry(need);
             for (int i = 0; i < 60; ++i)
             {
-                f.w.pool_at(seller, f.m1).quantities[ri(good)] = 10.0f; // M1 lists 10
+                f.w.land_goods(seller, f.m1, ri(good), 10.0f); // M1 lists 10 (BL-1265: a landing)
                 economy_report rep;
                 rep.wants[{ f.corp, f.m2 }][ri(good)] = 10.0f;         // M2 wants 10
                 clear_markets(f.w, reg, rep);

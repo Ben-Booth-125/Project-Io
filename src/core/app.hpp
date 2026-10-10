@@ -33,6 +33,7 @@
 #include <deque>
 #include <future>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -442,6 +443,7 @@ private:
     void poll_worldgen();
     /// The loading screen: a progress bar over generation_progress.
     void draw_building_screen();
+    void draw_painting_screen(); ///< BL-1246: "Painting the ground", after the seat.
     /// The live nation carve + charter marks drawn inside it (BL-305).
     void draw_building_carve();
 
@@ -591,7 +593,9 @@ private:
     // over the settled world once the validation run is over, and only on the
     // interactive path — a path with no player to ask still draws the seat and
     // goes straight to `in_game`. Like every pre-play screen it does not tick.
-    enum class app_screen { menu, generating, building, choosing_seat, in_game };
+    /// painting_ground (BL-1246): after the seat, while the home body's ground
+    /// master finishes baking (STARTUP.md § Handoff).
+    enum class app_screen { menu, generating, building, choosing_seat, painting_ground, in_game };
     app_screen m_screen = app_screen::menu;
     /// Pending `--load` target, consumed by run() before the frame loop.
     std::string m_pending_load;
@@ -654,6 +658,12 @@ private:
     /// The planetology round the walk last rerolled (BL-1084: once per round,
     /// or the Life round's gate world never lands and Next never enables).
     int  m_autostart_rerolled_round = -1;
+    /// When the walk arrived on the round it is on (IO_AUTOSTART_DWELL_MS, a
+    /// measurement switch: the walk dwells at least that long on each round,
+    /// as a player watching it would; unset = Next the moment it enables).
+    std::chrono::steady_clock::time_point m_autostart_round_t0{};
+    /// When the walk first saw round 6's world landed (IO_AUTOSTART_BEGIN_DWELL_MS).
+    std::chrono::steady_clock::time_point m_autostart_landed_t0{};
     bool m_wiz_dirty = true; ///< A control moved (or the wizard just opened) — recompute the preview next frame.
     resolved_world m_wiz_resolved{};              ///< The pending preferences resolved against the seed — the params every preview chart is drawn from, plus the reroll cost (attempts / gave_up).
     body_naming m_wiz_names{};                    ///< The coined body catalogue for the pending seed (BL-257) — what the wizard's charts and orrery label bodies with.
@@ -870,6 +880,15 @@ private:
         recipe_registry        registry; ///< The worker's banded copy; play's registry after Begin.
         finish_campaign_result finish;   ///< The search's winner score (the seat reads it), the charter report.
         bool                   ready = false; ///< Set by the worker as its last write.
+        /// BL-1246 (STARTUP.md § Handoff, Ben 2026-10-10): the ground master's
+        /// IN-ROUND snapshot -- the home body's bake source, built by round 6's
+        /// worker from its OWN world right after the campaign road network is
+        /// laid (the generation tail; before the search and the settle), and
+        /// handed to the main thread here. Guarded by ground_mx; the main
+        /// thread takes it (moves it out) the frame it sees it.
+        std::mutex                                       ground_mx;
+        std::shared_ptr<const ui::ground::bake_source>   ground_roads;
+        entity_id                                        ground_roads_body = null_entity;
     };
     std::shared_ptr<wizard_world_cache> m_wiz_world_pending;
     std::shared_ptr<wizard_world_cache> m_wiz_world;
@@ -1086,6 +1105,39 @@ private:
     /// True while a --verify script drives frames: the ground cache bakes every
     /// chunk synchronously so a capture never races the per-frame bake budget.
     bool            m_ground_bake_all = false;
+    /// BL-1246: set by run() (the live frame loop) — the home master pre-bakes
+    /// when the world is finished, and entering play waits for it. Off on the
+    /// headless paths, which pump no frames.
+    bool            m_ground_prebake_on = false;
+    /// BL-1246: false while the ground pre-bakes from a world the app does not
+    /// hold yet (the wizard's rounds, from the Life round on) — the pump then
+    /// reads no world at all, so no cadence snapshot can race a round worker;
+    /// true once a world is adopted or loaded into m_world.
+    bool            m_ground_world_live = true;
+    /// BL-1246: the running pre-bake is the wizard's homeworld, started from
+    /// the Life round's gate world and re-snapshotted at every round boundary
+    /// (STARTUP.md § Handoff). Begin's adoption keeps it; a cold build, a new
+    /// gate world, or leaving the wizard drops it.
+    bool            m_ground_prebake_wizard = false;
+    /// Start the home master from @p w (forgets any other): @p wizard = the
+    /// wizard's Life-round gate world, else the cold path's built world.
+    void start_ground_prebake(const world& w, bool wizard);
+    /// A round boundary (main thread, @p w owned by no worker): re-take the
+    /// wizard pre-bake's source from @p w, or start it if none runs. @p what
+    /// names the boundary in the log.
+    void ground_round_boundary(const world& w, const char* what);
+    /// Round 6's in-round snapshot (the roads laid): when its worker has
+    /// handed one over in @p c, re-take the wizard pre-bake's source from it.
+    /// Main thread; once per run.
+    void ground_take_roads_snapshot(wizard_world_cache& c);
+    /// Leaving the wizard's homeworld (a new gate world is coming, or the
+    /// menu): stop the wizard pre-bake. No-op when none runs.
+    void drop_wizard_ground(const char* why);
+    /// BL-1246: the "Painting the ground" wait's sink (its bar is the master's
+    /// chunks landed over its total).
+    generation_progress m_paint_wait;
+    /// When the "Painting the ground" wait began (its length is said as play opens).
+    std::chrono::steady_clock::time_point m_paint_t0{};
     recipe_registry m_registry;          ///< Recipes + economy constants, loaded from Lua at startup.
     works_registry  m_works;             ///< BL-321 Era -1 works table, loaded from scripts/works.lua at startup.
     economy_report  m_last_econ_report;  ///< Most recent economy-step report; read by the ledgers.

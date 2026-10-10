@@ -12,6 +12,69 @@ release.
 
 ## [Unreleased]
 
+## [0.1.29] — 2026-10-10
+
+*The ground you can read. Sprint 51 was a visibility pass. It set out to show the opening market on a
+tile, pick out owners on the map and make the ground legible. It grew on Ben's walks of the live build
+into a rebuild of how the ground is rendered. The planet is now one baked painting per body, at one
+angle, pre-baked behind the wizard. Buildings, landforms, rivers and roads are painted into it, and
+the vector marks that sat on top are gone.*
+
+### Added
+
+- **The Production section** (BL-1239 (tile production section)): first in the tile nav. Each stack's
+  output and running state with its reason, then the catchment market's price and state per good. An
+  unbuilt tile lists its deposits at their market. The building card's Status page shares the same
+  running state.
+- **Owner multi-select** (BL-1240 (owner multi-select)): the Corporation and Company lenses tint a
+  picked set and grey the rest, with a checklist key and shift-click picking. Corporation defaults to
+  the player.
+- **Structures baked into the ground** (BL-1241 (structures baked), BL-1258 (towns denser)): buildings and
+  settlements stand as procedural structures behind a raster-ready stamp seam, up to three per tile.
+  Every building, settlement and emblem glyph has left the canvas.
+- **Landforms and rivers baked** (BL-1242 (landforms and rivers baked)): relief forms for mountains,
+  canyons, craters and rifts; rivers carved as curves widening downstream. Terrain carries several
+  hash-picked variants per family (BL-1243 (terrain variant families)).
+- **Roads as tile sets** (BL-1253 (roads painted), BL-1291 (roads as tile sets)): roads are painted
+  into the ground, crossing each tile edge at a hashed point. They curve around hills and buildings,
+  with a per-terrain treatment: cuttings, embankments, cleared corridors, streets. Buildings have
+  roaded variants. No road network is drawn at any rung; the Throughput lens shows the network.
+- **Lenses wash the ground** (BL-1250 (lens washes ground)): every lens tints the baked ground rather than
+  replacing it, so structures and relief read through.
+- **Target hardware** set: 8 cores / 16 threads, 16 GB RAM, an 8 GB GPU (TECH_FOUNDATIONS.md).
+
+### Changed
+
+- **One master per body** (BL-1246 (ground one master), superseding BL-1244 (ground never magnified)):
+  one 22.5° angle at every rung; zooming adds no detail. One 128 px/hex master per body with a mip
+  chain, baked on a worker pool from the Life round behind the wizard. A snapshot is taken after the
+  roads are laid. Changes re-bake only the windows around them.
+- **Memory** (BL-1259 (ground disk cache)): the home body's master is pinned in RAM. Other bodies spill to
+  a session-scoped disk cache. The ground may hold 45% of installed RAM.
+- **The look** (BL-1251 (tiles hold their own ground), BL-1254 (ground crisper), BL-1256 (ground look
+  C-F)): each tile holds its own ground, with a narrow edge band and natural border sets. A faint seam
+  appears at close zooms only. Detail follows the it3 C-F reference and colour follows it1, keeping
+  per-tile tone. The hillshade is flipped. **Flat land renders flat**: relief follows the landform.
+- **60 fps at every rung** (BL-1260 (canvas wide-rung build)): the static strokes are cached rather than
+  rebuilt each frame.
+- **Map chrome**: fog lightened to 20%. The HQ stars and market-centre glyphs are removed, and a market
+  is selected through the Market lens. National borders are hard edges only, with no inner wash
+  (BL-1292 (borders hard edges)).
+- **The Fishing Wharf is offered on shore**, where it can be placed (BL-1218 (wharf placed on shore)).
+  The quarterly refunds flow is shown on the dashboard and selection panel (BL-1215 (refunds flow shown)).
+
+### Known — recorded, not fixed
+
+- **Click-through painting wait**: a player who clicks straight through the wizard waits 46–68 s for
+  the 128 px master. A player who reads the rounds waits about 6 s. The measured benchmark is
+  BL-1247 (ground benchmark).
+- **Anchor rings clip** at some rungs; cause not yet found (BL-1293 (anchor rings clip), sprint 52).
+- **Rail** has a road treatment designed but the world lays no rail (BL-1255 (rail rung), sprint 52).
+- **Live clicks owed**: the Production good row, the owner checklist, wharf placement and stacked-tile
+  presses. These are pending rows in requirements.json.
+- Gated on the Release build, `ground_bake_check` (137 rows, all pass), `world_determinism` twice
+  (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8, identical to main), and `save_roundtrip`.
+
 ## [0.1.28] — 2026-10-07
 
 *Profit from day 1. Sprint 49 set out to make the market economy viable from the first tick, at its

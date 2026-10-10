@@ -487,7 +487,7 @@ float input_reach_haul(world& w, const recipe_registry& reg, input_reach& ir,
     const auto key = std::make_pair(src_market, dst_market);
     if (const auto it = ir.haul.find(key); it != ir.haul.end())
         return it->second;
-    const convoy_leg leg = price_market_export_leg(w, reg, ir.nodes, src_market, dst_market, 1.0f);
+    const convoy_leg leg = price_market_leg(w, reg, ir.nodes, src_market, dst_market, 1.0f);
     const float h = (leg.viable && std::isfinite(leg.cost) && leg.cost >= 0.0f) ? leg.cost : -1.0f;
     ir.haul.emplace(key, h);
     return h;

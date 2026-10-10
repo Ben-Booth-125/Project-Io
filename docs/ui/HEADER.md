@@ -23,7 +23,7 @@ Answer, at a glance and without opening a ledger: **how much money do I have, wh
 The header reads left to right as three figures:
 
 - **Balance** — the player corporation's running treasury balance (`corporation_component.balance` for `world::player_entity`). Negatives are flagged red (`palette::negative`), matching the economy-panel convention.
-- **Stockpile valuation** — an estimated liquid value of everything the player holds: each player `(corporation, body)` pool's quantities priced at that body's **current market price** and summed. A single currency figure, deliberately *not* a per-resource inventory — the per-body, per-resource breakdown stays in the Tile and Market ledgers. Resources on a body with no market contribute nothing.
+- **Cargo valuation** (labelled **CARGO**) — an estimated value of the goods the player **owns**: its trades' cargo in transit, each in-flight shipment priced at its **destination** market's current price — the price it lands into. Corporations hold no stockpiles (`../economy/MARKETS.md` § The shelf economy): what the player makes is sold where it lands, so its trades' cargo is the only stock it owns between purchase and sale (`../economy/TRADE.md` § A trade). A single currency figure, deliberately *not* a per-resource inventory; it reads zero with nothing in flight.
 - **Net + trend** — the **last economy tick's net change** as a coloured signed per-quarter figure (`fmt::rate(net, "qtr")`, coloured by `palette::value_colour`), followed by a small **sparkline** of recent balances (`ImGui::PlotLines` over a capped balance history maintained in `app`, pushed each `step_economy()`).
 - **Runway** (BL-177, budget runway legibility) — how long the balance lasts at the current burn: `RUNWAY  12q` (balance ÷ quarterly loss), or `in debt` when already underwater. **Shown only while it means something** — burning cash or in debt; a growing balance shows nothing rather than a lying "infinite quarters" figure. **Urgency-coloured**: red under 8 quarters of cushion (about two years — the point it needs acting on) and when in debt, plain text otherwise. Tooltip explains the arithmetic and its steady-burn assumption. Load-bearing, not decorative — it degrades through the fit ladder below but the fact is never simply lost.
 - **`[in debt]` flag** (BL-073, debt interest) — a negative balance is self-accelerating (interest accrues each quarter), so it is flagged in words beside the red number: `[in debt - interest accruing]` in full, compacting to `[in debt]` with the full text as tooltip when width is tight.
@@ -44,7 +44,7 @@ fixed order:
    carries the signal), compacting to `[in debt]` + tooltip.
 3. **Sparkline** — the last decorative element to drop.
 
-The three money figures (Balance / Stockpile / Net) are bounded-length (`fmt::credits` /
+The three money figures (Balance / Cargo / Net) are bounded-length (`fmt::credits` /
 `fmt::rate` abbreviate) and always drawn in full.
 
 This ladder is the **reference case for BL-215** (text-wrap render audit): the audit's job is to
@@ -54,7 +54,7 @@ make every other worded surface degrade this honestly rather than wrap or clip.
 
 The header design pass (2026-06-15) settled:
 
-- **Resource overview** — *not* a scarce per-resource icon strip; the single **stockpile valuation** figure instead. A per-resource header strip was judged too lossy at a glance and redundant with the ledgers.
+- **Resource overview** — *not* a scarce per-resource icon strip; the single **cargo valuation** figure instead. A per-resource header strip was judged too lossy at a glance and redundant with the ledgers.
 - **Per-tick delta** — yes, the header shows the **last-tick net** (not balance alone), plus a sparkline for direction of travel.
 - **Change animation** — none; the sparkline carries the trend. Flash/tick animation is a possible later polish, not specified here.
 

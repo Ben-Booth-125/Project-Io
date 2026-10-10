@@ -1,22 +1,28 @@
 # Project Io — Supply (Layer 5)
 
-> **Settles:** what a convoy is and what it carries · what triggers a dispatch and who may order
-> one · what a leg costs its owner · what arrival does to the destination pool · what
-> infrastructure a route demands before traffic runs on it.
-> **Not here:** the network beneath it — traversal cost, path, reach, roads, physical scale and
-> how long a leg takes, interdiction, and the movement cap (LOGISTICS) · the price the cargo
-> meets on arrival (MARKETS) · the promise a shipment may be settling (CONTRACTS).
+> **Settles:** what a convoy is and what it carries · what a leg costs the trader · what arrival
+> does at the destination · what infrastructure a route demands before traffic runs on it.
+> **Not here:** what ships, between which markets, and who decides — the trade (TRADE) · the
+> network beneath it — traversal cost, path, reach, roads, physical scale and how long a leg
+> takes, interdiction, and the movement cap (LOGISTICS) · the price the cargo meets on arrival
+> (MARKETS) · the promise a shipment may be settling (CONTRACTS).
 > *Logistics is the road; Supply is the traffic.*
-> **Confused with:** LOGISTICS.md, MARKETS.md, CONTRACTS.md.
+> **Confused with:** TRADE.md, LOGISTICS.md, MARKETS.md, CONTRACTS.md.
 
-> This document owns the **flow**: the convoy — its cargo, dispatch, cost and arrival.
+> This document owns the **flow**: the convoy — its cargo, cost and arrival.
+> **[`TRADE.md`](TRADE.md) owns what ships**: a trade decides the good, the source and destination
+> markets and the quantity; a convoy is that trade's **shipment** in transit.
 > **[`LOGISTICS.md`](LOGISTICS.md) owns the network it runs on** — traversal cost, A\*, the reach
 > field, roads, physical scale and travel time, cache invalidation, interdiction, and Logistic
 > Points. *Logistics is the road; Supply is the traffic.* **Travel time is the network's**: how
 > long a leg takes is a property of the ground crossed and the medium that crosses it, not of the
 > cargo, and a marching unit reads the same model a convoy does.
 
-Layer 5 of the economy is the **logistics / convoy layer** — the mechanism that physically moves goods between markets and bodies, coupling otherwise-isolated price pools through cargo movement. A convoy is the unit of flow; there is no abstract price-coupling term between bodies: the convoy *is* the coupling. The layer is BL-039 (supply convoys); `src/world/supply_system.{hpp,cpp}` is the implementation.
+Layer 5 of the economy is the **convoy layer** — the shipment that physically carries a trade's
+goods between markets and bodies. A convoy is the unit of flow; there is no abstract price-coupling
+term between bodies: trade is the coupling, and the convoy is how it travels
+(`TRADE.md`). The layer is BL-039 (supply convoys); `src/world/supply_system.{hpp,cpp}` is the
+implementation.
 
 ---
 
@@ -26,7 +32,7 @@ A convoy is a world ECS component. Each active convoy carries:
 
 | Field | Type / values | Notes |
 |---|---|---|
-| `source_market` | market entity | The market the cargo was dispatched from |
+| `source_market` | market entity | The market the cargo was bought at |
 | `dest_market` | market entity | The market the cargo is being delivered to |
 | `mode` | `{land, sea, air, space}` | Determines infrastructure gate and cost multiplier |
 | `cargo_resource` | resource enum | The good being transported |
@@ -35,14 +41,26 @@ A convoy is a world ECS component. Each active convoy carries:
 | `speed` | progress/Tick | Fixed linear advance per economy Tick |
 | `id` | uint32 | Stable handle from `world::allocate_convoy_id`; what `hold_convoy` names. Never reused. A **transient** id — valid only while the convoy is in flight |
 | `held` | bool | While true `advance_convoys` skips the convoy: stopped, not slowed |
-| `cost_paid` | credits | What the haul was charged at dispatch; read by the Convoys tab |
-| `origin_tile`, `port_a`, `port_b` | tile entities | An intra-body route's waypoints, fixed at dispatch (the leg paths between them are not): where the cargo left from, and the loading and unloading Ports of a route with a sea leg (none on a single overland leg). They make the lane the route the haul was priced on (§ Logistical cost) |
+| `cost_paid` | credits | What the haul was charged when the shipment left; read by the Convoys tab |
+| `origin_tile`, `port_a`, `port_b` | tile entities | An intra-body route's waypoints, fixed when the shipment leaves (the leg paths between them are not): the source market's centre, and the loading and unloading Ports of a route with a sea leg (none on a single overland leg). They make the lane the route the haul was priced on (§ Logistical cost) |
 
-The coupling is **market-to-market**, not body-to-body. A convoy is created when a seller's goods fetch more at another market, net of the haul, than at home (§ Dispatch trigger). It advances `progress` by `speed` each Tick (linear; no orbital mechanics in the prototype). On arrival (`progress >= 1.0`) it credits the destination **`(corp, market)`** pool, pays any import duty owed at a border (`MARKETS.md` § Tariffs), then is retired; the cargo reaches the destination market's supply through the ordinary auto-surplus path at the next clear — **at the destination, not at the owner's home market**, because the pool it lands in belongs to that market (`PRODUCTION.md` § Stockpile and output flow). There is no direct supply write on arrival — the clearing pass would zero it before pricing read it.
+The coupling is **market-to-market**, not body-to-body. A convoy is created only by a trade's
+shipment (`commit_trade_shipment`, the one place a convoy is made): the trade buys the cargo off
+the source market's shelf, pays the haul, and the convoy carries the goods (§ A shipment). It
+advances `progress` by `speed` each Tick (linear; no orbital mechanics in the prototype). On
+arrival (`progress >= 1.0`) the cargo **lands** on the destination market, pays any import duty
+owed at a border (`MARKETS.md` § Tariffs), and the convoy is retired; the landing is listed as that
+tick's supply and **sold to the market at that tick's clearing price** — at the destination, where
+it landed (`MARKETS.md` § The clearing tick). Landing is selling, for a trade's cargo as for a
+building's output.
 
-`speed` is fixed at dispatch from the leg's travel time, which [`LOGISTICS.md`](LOGISTICS.md) § 5 (physical scale and travel time) settles: the body's tile scale, the terrain weighting the path already carries, and the medium's rate, quantised to whole econ ticks.
+`speed` is fixed when the shipment leaves, from the leg's travel time, which
+[`LOGISTICS.md`](LOGISTICS.md) § 5 (physical scale and travel time) settles: the body's tile scale,
+the terrain weighting the path already carries, and the medium's rate, quantised to whole econ
+ticks.
 
-Cargo leaves the source pool at **dispatch**, not arrival. Goods in transit are committed — the source pool shrinks immediately when a convoy departs.
+Cargo leaves the source shelf when the shipment **leaves**, not when it arrives. Goods in transit
+are committed — the trader has bought them, and the source shelf shrinks immediately.
 
 **Trade-route recording** (BL-088, persistent trade routes). Before retiring an arrived convoy, `credit_arrived_convoys` (`src/world/supply_system.cpp`) also upserts a persistent `trade_route` into `world.trade_routes` — keyed on the unordered `(body_a, body_b)` pair + `corp`, with `last_tick` set to the completion Tick and `convoy_count` incremented. Intra-body lanes (source and destination collapse to the same body) are excluded — they light nothing. A route is never erased once recorded; staleness is a **read-time** concern owned by the activity fog, not a write-time one here. See `docs/ui/DISCOVERY.md` (BL-089, activity fog) for the fog that reads this substrate.
 
@@ -52,7 +70,7 @@ Cargo leaves the source pool at **dispatch**, not arrival. Goods in transit are 
 
 ## Logistical cost
 
-Each convoy incurs a budget outflow:
+Each shipment charges its trader a budget outflow:
 
 ```
 logistical_cost = base_logistics_cost × distance × cargo_qty
@@ -97,89 +115,77 @@ land haul stays cheaper than open sea at any length. Constants: `scripts/economy
 `logistics.base_cost_per_unit_distance` and `port_handling`; the 2.5 weight is `sea_leg_cost`
 (`src/world/logistics.cpp`).
 
-For **space convoys**, `distance` is the Euclidean distance between the parent bodies' centres (no path routing — straight-line in the prototype). For **intra-body convoys** (land / sea), `distance` is the **terrain-weighted A\* path** over the body's tile grid (BL-077, intra-body pathfinding; `src/world/logistics.{hpp,cpp}`): each tile weighted by its landform cost (TILES.md — plains 1.0 … mountain 2.0) and discounted by `road_level`, respecting the east–west cylinder wrap; the edge cost is the average of the two tiles (so the path is symmetric) and results cache per fixed endpoint pair. Water tiles carry a higher sea-leg cost, so the cheapest path prefers land and a water crossing selects **sea** mode.
+For **space legs**, `distance` is the Euclidean distance between the parent bodies' centres (no path routing — straight-line in the prototype). For **intra-body legs** (land / sea), `distance` is the **terrain-weighted A\* path** over the body's tile grid (BL-077, intra-body pathfinding; `src/world/logistics.{hpp,cpp}`): each tile weighted by its landform cost (TILES.md — plains 1.0 … mountain 2.0) and discounted by `road_level`, respecting the east–west cylinder wrap; the edge cost is the average of the two tiles (so the path is symmetric) and results cache per fixed endpoint pair. Water tiles carry a higher sea-leg cost, so the cheapest path prefers land and a water crossing selects **sea** mode.
 
 **Mode is a property of the leg, not of the whole route.** A route that crosses water is three legs: **land** from the source to a port, **sea** from port to port, **land** from the far port to the destination, each priced at its own mode and each travelling at its own speed. The ports are chosen to minimise the whole route's cost including both handling fees, and a sea leg runs only port to port (§ Infrastructure gates). A single route-wide `crosses_ocean` bit, which billed every land tile at the sea rate once any water appeared, cannot express a cheap sea leg between two land legs and is retired with this ordering.
 
-**The lane is the legs** (BL-1195, convoy lane follows legs). A convoy stands on, is seen along and is cut on the route its cargo travels and was priced on — overland, or land to the loading Port, port to port across the water, and land on from the unloading Port — never on the direct line between the two market centres. Its position along that lane follows the leg TIMES: each leg at its own speed (a land leg roughly five times slower than a sea leg), so the cargo stands where that clock puts it, not at an even share of the tiles. The times are recomputed from the current leg paths, so they equal the times the haul was priced on while the network is unchanged. The clock is stretched over the haul's whole travel ticks: a convoy's progress is the fraction of those ticks elapsed, and the lane's clock reads 0 at the origin and 1 at the destination. Within a leg, the time splits over its hops in proportion to each hop's priced edge cost — the same cost, river discount included, the leg's path was priced on. The head the canvas draws, the vision beam, interdiction and capture all read that one lane, `convoy_route_tiles` (`src/world/logistics.cpp`). **Interdiction sweeps the tick's travel**: a hostile unit standing on any tile the cargo crosses during a tick — a land leg inland, a Port, or the sea leg's water — intercepts it, and the first such tile in lane order is where it is cut; water the route never enters is no ambush. Capture credits the pool of that tile. **What is fixed at dispatch is the origin and the two Ports, nothing more.** Each leg's path between them is read from the network as it stands, so a road or hub built while the cargo is in transit can re-route a leg, and move the head along it, on the next read; a Port built or lost in transit never moves the crossing.
+**The lane is the legs** (BL-1195, convoy lane follows legs). A convoy stands on, is seen along and is cut on the route its cargo travels and was priced on — overland, or land to the loading Port, port to port across the water, and land on from the unloading Port — never on the direct line between the two market centres. Its position along that lane follows the leg TIMES: each leg at its own speed (a land leg roughly five times slower than a sea leg), so the cargo stands where that clock puts it, not at an even share of the tiles. The times are recomputed from the current leg paths, so they equal the times the haul was priced on while the network is unchanged. The clock is stretched over the haul's whole travel ticks: a convoy's progress is the fraction of those ticks elapsed, and the lane's clock reads 0 at the origin and 1 at the destination. Within a leg, the time splits over its hops in proportion to each hop's priced edge cost — the same cost, river discount included, the leg's path was priced on. The head the canvas draws, the vision beam, interdiction and capture all read that one lane, `convoy_route_tiles` (`src/world/logistics.cpp`). **Interdiction sweeps the tick's travel**: a hostile unit standing on any tile the cargo crosses during a tick — a land leg inland, a Port, or the sea leg's water — intercepts it, and the first such tile in lane order is where it is cut; water the route never enters is no ambush. **A captured cargo lands on the market under the interception tile**, and is sold there for the interceptor at that tick's clear; with no market under the tile, the cargo is destroyed. **What is fixed when the shipment leaves is the origin and the two Ports, nothing more.** Each leg's path between them is read from the network as it stands, so a road or hub built while the cargo is in transit can re-route a leg, and move the head along it, on the next read; a Port built or lost in transit never moves the crossing.
 
-The cost is charged in full at dispatch (`dispatch_convoys` debits `corp.balance` before the convoy is created; a corp that cannot afford the cheapest route dispatches nothing). It is the term that makes distant arbitrage marginal: a profitable inter-body trade requires `source_price + logistical_cost_per_unit < destination_price`.
+The cost is charged in full when the shipment leaves (`commit_trade_shipment` charges the trader before the convoy is created; a trader that cannot afford the cheapest route ships nothing). It is the term that makes distant arbitrage marginal: a profitable trade requires `source_price + logistical_cost_per_unit < destination_price`.
 
-**Logistics-node discount** (BL-148 / BL-149, logistics nodes). The intra-body haul cost is further discounted for each **logistics node** the A\* path crosses, so the world's cities — and the player's own hubs — form a cheap network the specialist corporation plugs into. A **population centre** on the path discounts by `logistics.node_discount.city_per_scale × centre.scale` (tier 1–5); an **Inland Logistics Hub** by a flat `logistics.node_discount.hub`. The summed discount is capped (`node_discount.cap`) so a route is never free, and is applied as `cost × (1 − discount)` (`dispatch_convoys`, over `logistics_path.tiles`). Since intra-body markets are city-seeded, most hauls deliver *into* a city and take the discount; the player extends the reach by placing hubs along a corridor. Deterministic — a pure function of the path tiles and the (population-centre / hub) node sets.
+**Logistics-node discount** (BL-148 / BL-149, logistics nodes). The intra-body haul cost is further discounted for each **logistics node** the A\* path crosses, so the world's cities — and the player's own hubs — form a cheap network the specialist corporation plugs into. A **population centre** on the path discounts by `logistics.node_discount.city_per_scale × centre.scale` (tier 1–5); an **Inland Logistics Hub** by a flat `logistics.node_discount.hub`. The summed discount is capped (`node_discount.cap`) so a route is never free, and is applied as `cost × (1 − discount)` (the leg pricing, over `logistics_path.tiles`). Since intra-body markets are city-seeded, most hauls deliver *into* a city and take the discount; the player extends the reach by placing hubs along a corridor. Deterministic — a pure function of the path tiles and the (population-centre / hub) node sets.
 
-**Same-body dispatch** moves goods from one of the corp's market pools to another market on the same body, hauling from the corp's lowest-id building in the source market's catchment (the market's own
-`centre_tile` when it holds none there — convoyed stock sits at the market) to the destination's
-`centre_tile`, at the per-leg cost above. It is real trade: the goods leave one pool and sell from another.
+**A same-body leg runs market centre to market centre** (`price_market_leg`): from the source
+market's `centre_tile` — the goods were bought off its shelf — to the destination's `centre_tile`,
+overland or through two Ports, at the per-leg cost above. It is real trade: the goods leave one
+shelf and land on another.
 
 ---
 
-## Dispatch trigger
+## A shipment
 
-**One beat per haul: arrivals land before the clear, and a seller hauls before it sells (Ben,
-2026-09-23).** Convoys move only on the economy tick, and within it the order is fixed: convoys
-**advance**, **arrivals are credited** to their destination market's pool, the economy runs, then
-**dispatch** — and only then do the markets **clear**. Dispatch sits before the clear because
-auto-surplus sells every unit a pool holds above its reservation to the local market, and a market's
-shelf belongs to no one and never moves: a seller that has not chosen to haul by the clear has sold
-at home. So the seller weighs home against elsewhere while the goods are still its own (the rule
-below), and a delivery reaches its destination's clear before it can move again, since cargo moves
-only toward a strictly better net price. The reverse order (dispatch at the top of the tick,
-arrivals at its end) re-exported every delivery before any clearing saw it, and cargo circulated
-market to market without reaching a shelf. Owner: BL-995 (trade reaches for price).
+**What ships is the trade's to decide; this section is how it travels.** A trade — manual or auto —
+names the good, the source and destination markets and, through its trade points, the most it may
+move this tick (`TRADE.md` § A trade, § Auto and reserved trade). Its shipment then runs these
+mechanics, the same for every owner and for manual and auto alike.
 
-**Auto-dispatch is the default, and it is the SELLER chasing a NET PRICE (Ben, 2026-09-15).** On each economy Tick, for every `(corp, market)` pool holding a good above its processor reservation, the system asks where that good fetches the most once the haul is paid, and sends it there if that beats selling at home. The loop runs without player intervention.
+**One beat per haul: arrivals land before the clear, and trade ships before it (Ben,
+2026-09-23; Ben, 2026-10-10).** Convoys move only on the economy tick, and within it the order is
+fixed: convoys **advance**, **arrivals land** on their destination market, the economy runs, the
+**trade pass** ships — and only then do the markets **clear**. An arrival is therefore that tick's
+supply at its destination, sold at that clear; a trade's purchase is a shelf draw billed at that
+clear's posted price. The reverse order (shipping at the top of the tick, arrivals at its end)
+re-exported every delivery before any clearing saw it, and cargo circulated market to market
+without reaching a shelf.
 
-It replaced a buyer-side rule — scan each market for a shortfall, fill it from the cheapest reachable source — that never read a price at all. Under it a seller never moved goods toward a better market, only toward an empty one, and trade stayed local however wide the gaps were.
+**A shipment, step by step** (`commit_trade_shipment`, `src/world/supply_system.cpp`):
 
-**The rule, stated so it can be checked.** Using last tick's resolved prices:
+1. **It buys at the source.** The cargo is bought off the source market's shelf at the posted
+   price, under the fair-price ceiling ([MARKETS.md](MARKETS.md) § Settled: every draw BUYS),
+   and the purchase is posted as want at the source like any bid. A shelf priced over the
+   ceiling sells the trade nothing.
+2. **On a space leg, it buys the launch.** The trader must hold a Launchpad on the source body, and
+   buys the launch's propellant off the same shelf (`PRODUCTION.md` § Launchpad). A cargo of
+   propellant cannot burn itself: the launch's own draw comes off the shelf first.
+3. **It is capped by the place.** On a leg within a body the cargo passes the **passive Logistic
+   Point** cap at the anchor nearest the source market's centre ([LOGISTICS.md](LOGISTICS.md)
+   § Logistic Points): a cargo sized above what the anchor still admits this tick leaves at what
+   it admits and pays that share of the leg's cost, rather than not leaving at all (Ben,
+   2026-10-05, NR-969). Trade points are the owner's capacity; Logistic Points are the place's; a
+   shipment passes both (`TRADE.md` § The Planetary Marketplace).
+4. **It pays the haul now.** The trader's balance is charged the leg's cost when the shipment
+   leaves (§ Logistical cost). A trader that cannot cover the haul and the purchase ships nothing.
+5. **It travels as a convoy** on the lane the haul was priced on, seen and interdicted along it.
+6. **It lands and sells at the destination** on arrival, at that tick's clearing price, and pays
+   any import duty at a border (`MARKETS.md` § Tariffs).
 
-```
-net(d) = price_d − haul_per_unit(src → d) − handling_per_unit − duty_per_unit(d)
-send to argmax_d net(d)   if   net(d) − price_src  >  margin_threshold × price_src
-```
+A shipment is **all-or-nothing on refusal**: a leg that is not viable, a shelf the ceiling refuses,
+a shelf or anchor that admits nothing, or a trader who cannot pay leaves nothing mutated.
 
-- **The destination is chosen by net price**, ties to the lower market id — a total order, so every run picks the same market.
-- **The quantity is what the gap can absorb, not what the pool holds.** From `price ∝ √(demand/supply)`, adding `q` units to a destination's supply brings its price down to the source's landed price when `q = supply_d × ((price_d / (price_src + haul + handling + duty))² − 1)`, `supply_d` being the supply the price law reads — the destination's listings plus its shelf's share, at most k ticks of its demand ([MARKETS.md](MARKETS.md) § Price resolution). The send is `min(surplus, q)`, less what the corp already has in transit to that market — so a gap draws enough to close it and no herd of convoys floods it. **The send keeps the margin it was chosen on (BL-1203 cold review, 2026-10-06).** It is sized so the destination's target lands at `landed × (1 + margin_threshold)`, not at the landed cost: `S* = D_hauler × (base / aim)² − supply_d`, a destination with no supply included (sending its whole unmet demand would aim it at base, under the landed cost of any haul that costs anything). `D_hauler` is the demand a hauler sees (next bullet). The ceiling-suppressed want enlarges a send only while the cargo's own sale — at the clear of its arrival tick, the posted price eased toward a target its silent buyers do not yet bid into — still realises the aim.
-- **What a hauler sees as unmet demand (Ben, 2026-10-05; BL-1203).** Two things a short market's posted demand hides are made visible to the dispatcher, and to it only — the price never reads them, so the fair-price ceiling's rule that a draw above it does not bid ([MARKETS.md](MARKETS.md) § Settled: a short pool BUYS) stands unchanged. (1) **Households at the landed price:** the households' bid is re-read at the price the cargo would land at, not the posted price, because at a scarcity price their elastic bid has collapsed though they would buy at the delivered one. (2) **The want the ceiling suppressed:** a processor's input and a construction site's material that went unbought because the posted price stood above the ceiling are recorded in a **hauler-only want register**, and counted as room only when the cargo's landed cost is under the buyer's ceiling — the price a buyer at that market would actually pay. So a clean-water plant short of water, or a site waiting on steel, is a destination a hauler can see, while the price signal stays exactly what the ceiling ruling made it.
-- **Logistic Points cap the send; they do not veto it (Ben, 2026-10-05, NR-969).** The send is at most what the passive LP at the anchor nearest the origin still admits this tick ([LOGISTICS.md](LOGISTICS.md) § Logistic Points). A cargo sized above it leaves at what the anchor admits — never below one unit, unless the cargo itself is smaller — and pays that share of the leg's cost, rather than not leaving at all. A market's export of its own shelf obeys the same cap the same way. A *commanded* leg names its quantity — the directed verb below, the rival scorer's directed dispatch — and over the cap it is refused outright (LOGISTICS.md § Refusal, surface and determinism).
-- **What a pool may haul is what it would list** ([MARKETS.md](MARKETS.md) step 4). A good under a
-  standing sell order still travels — an order is a floor, not a hold (Ben, 2026-10-07): its
-  floor stands in for `price_src` where it is the higher, so auto-dispatch never chooses a haul
-  that nets below it. A pad's pool keeps its propellant (Ben, 2026-10-09): where the corporation
-  holds a Launchpad on the pool's body, its propellant is reserved, so it is not hauled away.
-- **The threshold is authored in data and measured**, never zero: a margin of a rounding error is not a reason to move a cargo across a continent.
-- **A shortfall is not a separate trigger.** A market short of a good prices it high, so the net-price rule already reaches it — and reaches it from wherever landing it is cheapest, not merely from wherever is nearest.
+**The trader keeps the margin and pays the haul** (`TRADE.md` § A trade): the destination's
+clearing price on landing, less the source's posted price, less the haul. A margin is not
+guaranteed by sending: the landing moves the destination's price it is sold at.
 
-**It is one rule for every corporation, the player's included** (Ben, 2026-09-15). Auto-dispatch is logistics automation of the same kind as auto-surplus, not a strategic act on the player's behalf, so the player's goods move by the same rule a rival's do. The player keeps `hold_convoy` on any convoy and the directed verb below for any haul the rule would not choose. The rival scorer's own directed-dispatch valuation reads the same net price, home price subtracted — a scorer that valued a haul by the destination price alone would send goods away from a better home market.
+**`hold_convoy` stops a convoy; nothing cancels one.** Cargo leaves the source shelf when the
+shipment leaves, so a cancel would have to invent a return leg or mint the goods back at the
+source. `hold_convoy` instead flips a `held` flag that `advance_convoys` skips: the convoy stops
+dead on its lane, pays nothing further (the haul was paid once), and resumes from the same progress
+when the verb is issued again. A toggle, not a one-way door. **Held cargo is still in transit
+(Ben, 2026-09-24)**: a trade sizing its next shipment counts it as already on its way to its
+destination; releasing the hold is what delivers it.
 
-**Held cargo is still committed (Ben, 2026-09-24).** A convoy the player has held counts as in transit to its destination, so auto-dispatch does not send a second load to fill the same gap; releasing the hold is what delivers it.
-
-**A market exports its own shelf (Ben, 2026-09-24).** Stock on a market's shelf — what auto-surplus sold it, what a convoy delivered and nobody bought — belongs to no corporation, and without this rule it could never leave. So each market runs the same net-price rule on its own inventory: a good whose shelf stock another market prices above the landed cost, by more than the margin, is exported there, in the quantity that gap can absorb. The haul is paid out of the export itself — the landed cargo sells at the destination and the haul comes off what it realises — so an export that would not cover its own haul is never sent. It is the same rule a seller follows, on stock no seller holds any more, and it runs in the same dispatch step, after the corporations' own dispatch has claimed what room it wanted. Owner: BL-1071 (shelf stock moves).
-
-**Player-direction is the exception** (BL-452, convoy verbs). A player (or an agent) directs a
-specific convoy through the `dispatch_convoy` corp_verb: subject = source market, `counterparty` =
-destination market, `target` = cargo, `quantity` = units. It is the auto-dispatch body above
-**with the shortfall scan removed** — `price_convoy_leg` + `commit_convoy` (`supply_system.hpp`)
-are shared by both callers, so a player's convoy and a rival's of the same shape cost the same,
-travel at the same speed and pick the same mode. There is deliberately no fourth code path, and
-`tools/verify/convoy_command.cpp` asserts the two agree rather than trusting that they do.
-
-**`hold_convoy` stops a convoy; nothing cancels one.** Cargo leaves the source pool at dispatch, so
-a cancel would have to invent a return leg or mint the goods back at the source. `hold_convoy`
-instead flips a `held` flag that `advance_convoys` skips: the convoy stops dead on its lane, pays
-nothing further (the haul was paid once), and resumes from the same progress when the verb is issued
-again. A toggle, not a one-way door.
-
-**The in-app dispatch form lives on the market Selection card** (BL-607, dispatch form) — a
-dispatch starts from a source
-you are looking at, and it is a resource + quantity + destination-market form, not a press. The
-Market Ledger's Convoys tab (BL-453, convoys ledger) lists the result, shows `cost_paid`, and
-carries the Hold press.
-
-**Space launches auto-dispatch too.** `dispatch_convoys` auto-dispatches inter-body convoys exactly
-like intra-body ones, gated only on the corp holding a launchpad on the source body
-(`corp_has_launchpad_on`). Whether leaving the gravity well *should* be an explicit player
-decision is a design call that belongs to the space arc.
+**The Market Ledger's Convoys tab** (BL-453, convoys ledger) lists the shipments in flight, shows
+`cost_paid`, and carries the Hold press. Setting a trade is `TRADE.md`'s.
 
 **Reachability.** In the prototype all bodies are treated as reachable (Exploration is a data-model stub). Infrastructure gates (below) are the operative constraint on reachability, not exploration state.
 
@@ -204,7 +210,7 @@ Roads are a land cost-reducer over a **three-tier ladder** (BL-172, road tiers).
 | **Road** (regular) | 2 | ×0.50 | player, generation |
 | **Highway** (high-throughput backbone) | 3 | ×0.40 | player, generation (major-city backbone) |
 
-"Throughput" here is *cost-discount*, not a capacity cap — capacity is Logistic Points (LOGISTICS.md § Logistic Points). The **generated road network** (BL-146, road generation; `src/world/road_generation.cpp`, `generate_roads`): after nations + population centres exist, each nation's centres are joined by an MST backbone over terrain-weighted A\* costs, a loop admitted only where the network's route exceeds twice the direct one (LOGISTICS.md § 4, the detour test); each edge's tier is chosen from the two centres' scales — **Highway** between two major centres (population `scale ≥ 3`), **Road** when at least one endpoint is Town+ (`scale ≥ 2`), **Track** otherwise — rasterised along the A\* path (water skipped), with one **Track** border link between the nearest centre pair of each territorially-adjacent nation. Generation measures the lanes road-free (to lay the network out), then clears `world.astar_cost_cache` so gameplay dispatch recomputes against the stamped roads. **Player placement** (BL-147, player roads): the tile build front door offers all three tiers (`place_road(tile, tier)`, cost `economy.roads.{track,road,highway}`); placement is **upgrade-in-place** — valid when the chosen tier strictly exceeds the tile's current `road_level`, so a Track can be raised to a Highway but the same-or-lower tier is refused. The on-canvas render (PLANETARY.md) draws each roaded tile's own half of every shared edge, so a road **spans symmetrically** between the two tiles it joins with no "from vs to" asymmetry, weighted by tier. Determinism + connectivity + the 3-tier ceiling are pinned by `tools/verify/road_generation_harness.cpp`; placement + upgrade by `tools/verify/logistics_harness.cpp` (T10). A distinct **railroad** *mode* (not a road tier) is BL-173 (railroad mode).
+"Throughput" here is *cost-discount*, not a capacity cap — capacity is Logistic Points (LOGISTICS.md § Logistic Points). The **generated road network** (BL-146, road generation; `src/world/road_generation.cpp`, `generate_roads`): after nations + population centres exist, each nation's centres are joined by an MST backbone over terrain-weighted A\* costs, a loop admitted only where the network's route exceeds twice the direct one (LOGISTICS.md § 4, the detour test); each edge's tier is chosen from the two centres' scales — **Highway** between two major centres (population `scale ≥ 3`), **Road** when at least one endpoint is Town+ (`scale ≥ 2`), **Track** otherwise — rasterised along the A\* path (water skipped), with one **Track** border link between the nearest centre pair of each territorially-adjacent nation. Generation measures the lanes road-free (to lay the network out), then clears `world.astar_cost_cache` so gameplay shipments recompute against the stamped roads. **Player placement** (BL-147, player roads): the tile build front door offers all three tiers (`place_road(tile, tier)`, cost `economy.roads.{track,road,highway}`); placement is **upgrade-in-place** — valid when the chosen tier strictly exceeds the tile's current `road_level`, so a Track can be raised to a Highway but the same-or-lower tier is refused. The on-canvas render (PLANETARY.md) draws each roaded tile's own half of every shared edge, so a road **spans symmetrically** between the two tiles it joins with no "from vs to" asymmetry, weighted by tier. Determinism + connectivity + the 3-tier ceiling are pinned by `tools/verify/road_generation_harness.cpp`; placement + upgrade by `tools/verify/logistics_harness.cpp` (T10). A distinct **railroad** *mode* (not a road tier) is BL-173 (railroad mode).
 
 **River discount** (BL-170, rivers). A river is generated as a directed **edge** across one of a
 tile's 6 hex sides (never a tile-occupying feature — see `docs/generation/TILE_GENERATION.md`

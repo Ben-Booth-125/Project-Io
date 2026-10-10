@@ -37,12 +37,12 @@ void draw_header_panel(const world& w,
                        float left,
                        float right);
 
-/// Estimated liquid value of everything the player holds — each player `(corp, body)`
-/// pool's quantities priced at that body's current market price (resources on a body
-/// with no market/price contribute nothing). The header strip's "STOCKPILE" figure;
-/// also the Budget ledger's "Cargo Value" (BL-171). Exported so both surfaces share
-/// one valuation rather than duplicating it.
-float player_stockpile_value(const world& w);
+/// Estimated value of the goods the player OWNS — its trades' cargo in transit
+/// (BL-1269; no corporation holds a stockpile under the shelf economy), each
+/// in-flight convoy's cargo priced at its destination market's current price. The
+/// header strip's "CARGO" figure; also the Budget ledger's "Cargo Value" (BL-171).
+/// Exported so both surfaces share one valuation rather than duplicating it.
+float player_cargo_value(const world& w);
 
 /// Height of the header strip in pixels. Matches the identity card
 /// (profile_panel_height, 92) so the balance bar and the identity tile read as one

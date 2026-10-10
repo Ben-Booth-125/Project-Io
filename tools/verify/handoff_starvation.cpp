@@ -216,7 +216,7 @@ void snap_after_lap(const world& w, int lap, void* ctx)
         for (std::size_t r = 0; r < resource_count; ++r) p[r] = posted_price(mc, r);
         s->price[mid] = p;
     }
-    for (const auto& [key, sp] : w.corp_market_pools) s->pool[key] = sp.quantities;
+    // BL-1265: corporations hold no pools; `pool` stays empty (every pool read is 0).
     s->taken = true;
 }
 
@@ -538,8 +538,7 @@ void run_seed(std::uint32_t seed, seed_out& out)
         sr.flag[b_reach_gen]  = rg && !rp;
         sr.flag[b_no_reach]   = any_other && !rp && !rg && !sr.flag[b_own_mkt];
 
-        const stockpile_component* pool = nullptr;
-        if (const auto cp = w.corp_market_pools.find({sr.corp, C}); cp != w.corp_market_pools.end()) pool = &cp->second;
+        const stockpile_component* pool = nullptr; // BL-1265: no pools
         sr.obt_gen  = input_obtainable(w, reg, ir_gen, C, pool, r, sr.need, bid).obtainable;
         sr.obt_play = input_obtainable(w, reg, ir_play, C, pool, r, sr.need, bid).obtainable;
 

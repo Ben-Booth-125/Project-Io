@@ -83,6 +83,58 @@ colour32 tile_colour(terrain_substrate sub, terrain_cover cov, std::uint8_t dens
     return blend_round(base, cover_endpoint(cov), cover_fraction(density));
 }
 
+// BL-1256 (ground look): the baked ground's palette. Detail from it3 C-F,
+// COLOUR from it1 (RENDERING.md § Art direction and palette): fields and soil
+// a warm khaki-ochre, grassland an olive-khaki, forest a rich green, water a
+// blue-green teal, snow and ice white. Each entry keeps the luminance the C-F
+// pass tuned (the value structure is it3's) and takes it1's hue and chroma —
+// the grade and the relief then spread them from near black to off-white.
+colour32 ground_substrate_colour(terrain_substrate sub)
+{
+    switch (sub)
+    {
+        case terrain_substrate::barren:      return col32( 84,  68,  42, 255);
+        case terrain_substrate::rocky:       return col32( 70,  64,  52, 255);
+        case terrain_substrate::volcanic:    return col32( 56,  48,  42, 255);
+        case terrain_substrate::icy:         return col32(176, 180, 182, 255);
+        case terrain_substrate::ocean:       return col32( 22,  50,  58, 255);
+        case terrain_substrate::coast:       return col32( 36,  66,  70, 255);
+        case terrain_substrate::lake:        return col32( 30,  60,  66, 255);
+        case terrain_substrate::regolith:    return col32( 72,  65,  54, 255);
+        case terrain_substrate::metallic:    return col32( 73,  68,  60, 255);
+        case terrain_substrate::sedimentary: return col32( 82,  67,  42, 255);
+    }
+    return col32(60, 60, 60, 255);
+}
+
+colour32 ground_cover_endpoint(terrain_cover c)
+{
+    switch (c)
+    {
+        case terrain_cover::grass:  return col32( 66,  59,  34, 255);
+        case terrain_cover::forest: return col32( 30,  42,  20, 255);
+        case terrain_cover::marsh:  return col32( 38,  50,  36, 255);
+        case terrain_cover::scrub:  return col32( 64,  59,  36, 255);
+        case terrain_cover::snow:   return col32(198, 201, 202, 255);
+        case terrain_cover::dunes:  return col32(114,  94,  60, 255);
+        case terrain_cover::ash:    return col32( 46,  44,  41, 255);
+        case terrain_cover::salt:   return col32(152, 146, 132, 255);
+        case terrain_cover::urban:  return col32( 66,  62,  58, 255);
+        case terrain_cover::none:   break;
+    }
+    return col32(0, 0, 0, 0);
+}
+
+colour32 ground_tile_colour(terrain_substrate sub, terrain_cover cov, std::uint8_t density)
+{
+    const colour32 base = ground_substrate_colour(sub);
+    if (cov == terrain_cover::none || density == 0)
+        return base;
+    if (cov == terrain_cover::urban)
+        return ground_cover_endpoint(terrain_cover::urban);
+    return blend_round(base, ground_cover_endpoint(cov), cover_fraction(density));
+}
+
 float relief_amount(terrain_landform lf)
 {
     switch (lf)

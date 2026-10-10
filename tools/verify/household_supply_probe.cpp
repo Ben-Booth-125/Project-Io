@@ -202,14 +202,8 @@ void sample(const world& w, const recipe_registry& reg, const options& opt, int 
                 pb_w += pbase * hit->second; pb_n += hit->second;
             }
         }
-        for (const auto& [key, pool] : w.corp_market_pools)
-        {
-            pools += std::max(0.0f, pool.quantities[g]);
-            if (w.markets.find(key.second) != w.markets.end() &&
-                w.corporations.find(key.first) != w.corporations.end())
-                reserve += std::min(std::max(0.0f, pool.quantities[g]),
-                                    processor_reservation(w, reg, key.first, key.second)[g]);
-        }
+        // BL-1265: corporations hold no pools (and so no processor reservation);
+        // the pool and reserve columns read 0.
 
         // Exchanges of g this tick, by side.
         float sold_q = 0, sold_v = 0, drawn_q = 0, drawn_v = 0, matched_q = 0;

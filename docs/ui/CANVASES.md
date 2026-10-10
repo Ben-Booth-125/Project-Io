@@ -34,8 +34,9 @@ specifications for each rung are in their own documents:
 The Planetary canvas additionally draws two always-on chrome layers, neither lens-gated: **civic
 chrome** — tiered population-centre conurbation markers, sized by scale and labelled at City+
 (BL-083, civic markers; model in [`../economy/POPULATION.md`](../economy/POPULATION.md), glyph in
-[`ICONS.md`](ICONS.md)) — and **player-presence chrome** — a home-cluster ring + HQ star on
-`home_body` (BL-085, player presence), echoed by a home halo around the body on the Solar rung.
+[`ICONS.md`](ICONS.md)) — and **player-presence chrome** — the home-cluster ring, traced round
+each tile the player holds (BL-085, player presence; the HQ star retired from the canvas, Ben
+2026-10-10), echoed by a home halo around the body on the Solar rung.
 Full detail in [PLANETARY.md](PLANETARY.md) and [SOLAR.md](SOLAR.md).
 
 ---

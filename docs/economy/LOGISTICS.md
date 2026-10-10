@@ -4,8 +4,9 @@
 > reach · where roads come from and who may extend them · how physical scale becomes travel
 > time and how long a leg takes · what can cut a route · what caps how much may be in motion at
 > once.
-> **Not here:** the convoy itself — its cargo, dispatch, trigger and arrival (SUPPLY) · what the
-> cargo is worth at either end (MARKETS) · what the ground is made of (TILES).
+> **Not here:** what ships and who decides — the trade (TRADE) · the convoy itself — its cargo,
+> cost and arrival (SUPPLY) · what the cargo is worth at either end (MARKETS) · what the ground is
+> made of (TILES).
 > *Logistics is the road; Supply is the traffic.*
 > **Confused with:** SUPPLY.md, TILES.md, MARKETS.md.
 
@@ -14,7 +15,8 @@ and what the network permits. This document owns the **substrate**; `SUPPLY.md` 
 runs on it** (convoys).
 
 > The split, stated once so it stops being ambiguous: **LOGISTICS is the road; SUPPLY is the
-> traffic.** A convoy's existence, cargo, dispatch and arrival are SUPPLY's. The cost it pays per
+> traffic.** A convoy's existence, cargo and arrival are SUPPLY's; what it carries and where is a
+> trade's (TRADE). The cost it pays per
 > tile, the path it takes, how long that takes, and whether the leg is admissible at all are this
 > document's.
 
@@ -89,7 +91,7 @@ topology matches `nation_generation.cpp`: 4-cardinal neighbours, raster index
 `grid_y × grid_width + grid_x`. The core pathing design is BL-077 (intra-body pathfinding).
 
 Results cache on `world.astar_cost_cache` under the **ordered** (origin, destination) key, since a
-path is directed (§ 1), so the per-tick dispatch loop pays each search once.
+path is directed (§ 1), so the per-tick trade pass pays each search once.
 
 > **A trap worth carrying forward.** A cached path's tiles are stored low tile to high tile
 > whichever way it was asked, so a caller reading one must apply its own orientation.
@@ -370,8 +372,8 @@ timber** at authored per-element rates (`economy.network_upkeep`, scripts/econom
 tile in its territory by level, plus every active port and inland hub standing on its ground. The
 bill is **geography, never population** — network size is derived from the world each tick, so the
 channel scales exactly as MARKETS.md § Demand channels property 1 demands. The purchase is the
-state-purchase shape (NATIONS.md § A budget): a named supplier's pool, the supplier market's own
-price, the budget pass's direct transfer, and the goods **consumed** — repairs go into the roadbed.
+state-purchase shape (NATIONS.md § A budget): bought off the market's shelf at its posted price,
+under the fair-price ceiling, and the goods **consumed** — repairs go into the roadbed.
 Unlike the space programme's lumps the claim is **pro-rata** (rule 3): upkeep is continuous, so
 half the repair budget buys half the materials, and an underfunded quarter is a reported partial
 fill, never a banked lump. Consistent with the binary ruling above, an unfunded draw degrades
@@ -500,11 +502,11 @@ NR-350's discovered-on-contact rule). Interdiction is therefore **a known risk r
 surprise** — the ambush property `stance.hpp`'s directed hostility exists for still holds between
 rivals, but the player's first lost convoy is never the player's first news.
 
-**Capture, with destruction as the fallback** (Ben, 2026-08-17). Cargo leaves the source pool at
-dispatch, so the goods are already committed and either answer conserves. On interception the cargo
-credits the interceptor's pool at the interception tile's body; if no pool is reachable there it is
-destroyed instead, and the outcome says which. **An interceptor holding goods it cannot sell is a
-legitimate outcome that is not special-cased away.**
+**Capture, with destruction as the fallback** (Ben, 2026-08-17). Cargo leaves the source shelf when
+the shipment leaves, so the goods are already committed and either answer conserves. On
+interception the cargo **lands on the market under the interception tile** and is sold there for
+the interceptor at that tick's clear, as any landing is (`MARKETS.md` § The shelf economy); with no
+market under the tile it is destroyed instead, and the outcome says which.
 
 *Why capture rather than destroy:* destroy-only gives an interception a payoff of zero, so a
 scored-utility rival would correctly never rank it — interdiction would only ever fire when the
@@ -550,8 +552,8 @@ LP is the pipe; the tanks are separate.
 
 | | **Passive LP** | **Active LP** |
 |---|---|---|
-| Serves | automatic trading — the convoy layer that runs itself | movement a player or rival **directs** |
-| Drawn by | the market's own flow | **militaries draw active only** |
+| Serves | trade — every trade's shipment, manual or auto, capped where it leaves | movement a player or rival **directs** |
+| Drawn by | the goods a trade ships | **militaries draw active only** |
 | Owned? | ambient — the network's | **owned**, and not a rival's to use |
 
 **Cities generate it.** That answers two constraints at once: a node-generated rate is real from
@@ -562,6 +564,12 @@ a spatial locus — LP is *"how much can move through HERE"*, never a per-corp h
 active split explains how we would be unable to use rival active LP."* Ambient throughput serves
 everyone; directed throughput is yours. It also dissolves the asymmetry of a rival paying LP it
 cannot generate, since the half that serves trade is not owned by anybody.
+
+**Trade points are not Logistic Points (Ben, 2026-10-10).** Trade points are how much an *owner*
+can move, made by its Planetary Marketplaces and Ports (`TRADE.md`); passive LP is how much can move
+*through a place*. A shipment spends its owner's trade points and still passes the passive cap at
+the anchor nearest its source market's centre, on a leg within a body (`SUPPLY.md` § A shipment).
+Neither replaces the other.
 
 ### Active use costs credits — and that is not a reversal of "a cap, not a price"
 
@@ -646,10 +654,11 @@ LP is what makes that priority explicit, and it is the strongest argument for it
 - **A leg over the cap fails — refused outright, and the player is told why.** A refused leg is
   legible; a queued one is not. The cost is that LP reads as a wall, which is the honest trade.
   **Surfacing is non-optional** — a refusal nobody sees is silent interdiction again.
-  **The rule covers COMMANDED legs (Ben, 2026-10-05, NR-969):** a leg somebody named — the player's
-  verb, a rival's directed dispatch — is refused whole and told. The automatic dispatch has nobody
-  to tell, so a whole refusal there would be exactly the silent interdiction this rule forbids; it
-  sends what the pool admits instead (`SUPPLY.md` § Dispatch trigger).
+  **The rule covers COMMANDED legs (Ben, 2026-10-05, NR-969):** a leg somebody named for this
+  tick — a march — is refused whole and told. A trade is a standing route that ships every tick
+  on its own, with nobody to tell, so a whole refusal there would be exactly the silent
+  interdiction this rule forbids; its shipment sends what the anchor admits instead (`SUPPLY.md`
+  § A shipment).
 - **Throughput is a lens**, extending Reach. The Reach lens shows a binary field; throughput is
   that field with a magnitude, so it is a small step from an existing surface rather than a new one.
 - **Allocation under contention is order-independent** — a deterministic priority rule over a
@@ -660,7 +669,7 @@ LP is what makes that priority explicit, and it is the strongest argument for it
   landing items, argued against BL-543's (value anchor) unit-cost anchor and flagged for tuning
   rather than ruled ahead (NR-600).
 - **Armies claim first (Ben, 2026-09-24, NR-917).** Within a tick the march draws Logistic Points
-  before convoy dispatch does, so when an anchor is contended the front is supplied and the trade
+  before the trade pass does, so when an anchor is contended the front is supplied and the trade
   waits. That is a chosen priority, not a phase-order accident: an army's supply is the more urgent
   draw, and starving trade to feed a war is a legible cost a player can read and plan around.
 
@@ -672,7 +681,8 @@ LP is what makes that priority explicit, and it is the strongest argument for it
 |---|---|
 | Traversal cost, A\*, caches, reach field, scale, travel time | `src/world/logistics.{hpp,cpp}` |
 | Road generation and tiers | `src/world/road_generation.{hpp,cpp}` |
-| Convoy dispatch, cost, arrival, interdiction | `src/world/supply_system.{hpp,cpp}` |
+| A trade's shipment, its cost, arrival and interdiction | `src/world/supply_system.{hpp,cpp}` |
+| What a trade ships | `src/world/trade.{hpp,cpp}` |
 | Placement's reach refusal | `src/world/placement_rules.cpp` |
 | A marching unit spending the same cost | `src/world/economy_system.cpp` § `run_unit_march` |
 | The Reach lens | `docs/ui/LENSES.md` |

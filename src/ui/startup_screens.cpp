@@ -26,6 +26,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <atomic>
 #include <future>
 #include <optional>
@@ -114,6 +115,7 @@ void app::drop_wizard_slots(const char* why)
 {
     release_wizard_slots(why);
     drop_wizard_world(why);
+    drop_wizard_ground(why); // BL-1246: the homeworld goes with every slot
 }
 
 const char* app::wizard_next_wait_reason(int round) const
@@ -229,6 +231,9 @@ void app::refresh_wizard_preview()
     // starts -- the rounds below it went with the planetology already
     // (`invalidate_wizard_rounds_below`, called after this).
     m_wiz_slot[0].reset();
+    // BL-1246: a new gate world is a new homeworld: its master starts again
+    // from the Life round when that build lands (poll_wizard_surface).
+    drop_wizard_ground("the Life round is building a new gate world");
     if (!m_golden_dir.empty())
     {
         world scratch;
@@ -773,8 +778,11 @@ void app::launch_wizard_history_run(int lapse_index, bool live_under_verify)
     const auto cancel = std::make_shared<std::atomic<bool>>(false);
     m_wiz_run_cancel[lapse_index] = cancel;
 
+    // BL-1246: round 6 hands the ground an in-round snapshot only when a
+    // pre-bake can take it (the live app; never --verify).
+    const bool want_ground_roads = cache && m_ground_prebake_on && !m_ground_bake_all;
     auto run = [this, lapse_index, stage, start, cfg, cache, round6_record, cancel,
-                params = m_pending_world_params]() -> wizard_landing {
+                want_ground_roads, params = m_pending_world_params]() -> wizard_landing {
         generation_progress* const prog = &m_wiz_history_progress[lapse_index];
         // A stopped run hands back nothing: its round went stale, so the
         // landing drops it anyway. Round 6's record channel is always answered,
@@ -843,6 +851,39 @@ void app::launch_wizard_history_run(int lapse_index, bool live_under_verify)
         if (stopped()) return wizard_landing{};
         run_generation_to(c, generation_stage::tail);
         if (stopped()) return wizard_landing{};
+        // BL-1246 (STARTUP.md § Handoff, Ben 2026-10-10): THE GROUND'S
+        // IN-ROUND SNAPSHOT. The tail has just laid the campaign road network
+        // (`generate_roads`, then the old roads stamped from the history) and
+        // the companies, so this worker builds the home body's bake source
+        // from ITS OWN world -- no other thread reads or writes it -- and
+        // hands it to the main thread through the cache
+        // (`ground_take_roads_snapshot`): the roads bake while the search and
+        // the settle run, rather than landing with the settle's buildings at
+        // the end. Unmasked, as every wizard boundary is. A read of a world
+        // nothing else touches: the build is unchanged by it.
+        //
+        // Why HERE and not after the search's apply (measured 2026-10-10,
+        // Release, seed 0, 45 s dwell per round): the painting wait was 10.4 s
+        // with the snapshot after the apply, 7.2 s with both, 6.5 s with this
+        // one alone -- the search's few seconds are worth more to the roads'
+        // re-bake than the apply's road-tier and firm deltas are to theirs.
+        if (want_ground_roads)
+        {
+            const auto t0 = std::chrono::steady_clock::now();
+            auto src = std::make_shared<const ui::ground::bake_source>(
+                ui::ground::prepare_source(c.w, c.w.home_body, /*reveal_all=*/true,
+                                           &cache->registry));
+            {
+                std::lock_guard lk(cache->ground_mx);
+                cache->ground_roads      = std::move(src);
+                cache->ground_roads_body = c.w.home_body;
+            }
+            std::printf("[ground] round 6 worker: roads laid, ground source snapshot built "
+                        "(%.0f ms on the worker)\n",
+                        std::chrono::duration<double, std::milli>(
+                            std::chrono::steady_clock::now() - t0).count());
+            std::fflush(stdout);
+        }
         // THE SAME CALL BEGIN'S COLD WORKER MAKES, in the same order
         // (STARTUP.md § Handoff), so an adopted world and a cold build open
         // the campaign on one state hash.
@@ -1059,6 +1100,9 @@ void app::drop_wizard_world(const char* why)
     // reference, so its world is freed when that run's future is consumed, and
     // the landing finds no slot to cache.
     const bool held = (m_wiz_world != nullptr) || (m_wiz_world_pending != nullptr);
+    // BL-1246: the ground pre-bake is NOT stopped here. It belongs to the
+    // wizard's homeworld (started at the Life round), which a round-6 rerun
+    // keeps; a Begin that builds cold drops it in poll_worldgen.
     m_wiz_world.reset();
     m_wiz_world_pending.reset();
     if (held)
@@ -1125,6 +1169,10 @@ void app::poll_wizard_history()
             land_wizard_record(i, std::move(rec));
         };
         take_round6_record();
+        // BL-1246: round 6's in-round ground snapshot (its roads laid), the
+        // moment its worker hands one over -- never a stale run's.
+        if (round6 && m_wiz_world_pending && !m_wiz_history_stale[i])
+            ground_take_roads_snapshot(*m_wiz_world_pending);
 
         if (!m_wiz_history_future[i].valid())
             continue;
@@ -1165,6 +1213,17 @@ void app::poll_wizard_history()
             std::printf("[wizard world] round %d landed; its closing world is held (slot %d)\n",
                         i + wizard_planetology_round_count + 1, i + 1);
             std::fflush(stdout);
+            // BL-1246: A ROUND BOUNDARY. The worker has returned and the slot
+            // is the main thread's (the next round will copy it, never write
+            // it), so the ground master re-takes its source here; only the
+            // chunks this round moved re-bake.
+            if (m_wiz_slot[i + 1])
+            {
+                char what[64];
+                std::snprintf(what, sizeof what, "round %d landed",
+                              i + wizard_planetology_round_count + 1);
+                ground_round_boundary(m_wiz_slot[i + 1]->cursor.w, what);
+            }
             land_wizard_record(i, std::move(landed.record));
             continue;
         }
@@ -1184,6 +1243,12 @@ void app::poll_wizard_history()
                         m_wiz_world->params.span_seed[2], m_wiz_world->params.span_seed[3],
                         m_wiz_world->w.corporations.size());
             std::fflush(stdout);
+            // BL-1246 (STARTUP.md § Handoff): round 6's boundary --
+            // finish_campaign_world is done and its future consumed, so the
+            // cache is the main thread's. The master (baking since the Life
+            // round) re-takes its source: the tail's roads and companies and
+            // the settle's buildings re-bake only the chunks they touch.
+            ground_round_boundary(m_wiz_world->w, "round 6 landed (tail and settle done)");
         }
     }
 
@@ -1440,6 +1505,11 @@ void app::poll_wizard_surface()
     std::printf("[wizard world] the Life gate world is built and held (slot 0): %zu tiles\n",
                 m_wiz_slot[0]->cursor.w.tiles.size());
     std::fflush(stdout);
+    // BL-1246 (STARTUP.md § Handoff): the homeworld's terrain exists, so its
+    // ground master starts baking now, behind the rest of the wizard. Taken
+    // here, on the main thread, from the held slot: the gate worker has
+    // returned, and every round after it COPIES this slot, never writes it.
+    start_ground_prebake(m_wiz_slot[0]->cursor.w, /*wizard=*/true);
 }
 
 void app::draw_main_menu()
@@ -2866,13 +2936,44 @@ void app::draw_generation_screen()
                 m_wiz_round < wizard_round_count - 1
                     ? wizard_next_wait_reason(m_wiz_round) != nullptr
                     : m_wiz_history_future[wizard_lapse_round_count - 1].valid();
-            if (round_building)
+            // IO_AUTOSTART_DWELL_MS (BL-1246, a measurement switch): a player
+            // watches each lapse round before pressing Next; the walk dwells
+            // that long from its arrival on every lapse round.
+            static const long long dwell_ms = [] {
+                const char* v = SDL_getenv("IO_AUTOSTART_DWELL_MS");
+                return v ? std::atoll(v) : 0LL;
+            }();
+            if (m_autostart_round_t0 == std::chrono::steady_clock::time_point{})
+                m_autostart_round_t0 = std::chrono::steady_clock::now();
+            bool dwelling =
+                dwell_ms > 0 && m_wiz_round >= wizard_planetology_round_count
+                && std::chrono::steady_clock::now() - m_autostart_round_t0
+                       < std::chrono::milliseconds(dwell_ms);
+            // IO_AUTOSTART_BEGIN_DWELL_MS: Begin is held this long after round
+            // 6's world has landed -- the player reading the close, and the
+            // seat canvas a player is shown and the walk skips.
+            static const long long begin_dwell_ms = [] {
+                const char* v = SDL_getenv("IO_AUTOSTART_BEGIN_DWELL_MS");
+                return v ? std::atoll(v) : 0LL;
+            }();
+            if (begin_dwell_ms > 0 && !round_building && m_wiz_round == wizard_round_count - 1)
+            {
+                if (m_autostart_landed_t0 == std::chrono::steady_clock::time_point{})
+                    m_autostart_landed_t0 = std::chrono::steady_clock::now();
+                dwelling = dwelling
+                    || std::chrono::steady_clock::now() - m_autostart_landed_t0
+                           < std::chrono::milliseconds(begin_dwell_ms);
+            }
+            if (round_building || dwelling)
             {
                 // Still building: try again on the next multiple of 20.
             }
             else if (m_wiz_round < wizard_round_count - 1)
             {
                 ++m_wiz_round;
+                m_autostart_round_t0 = std::chrono::steady_clock::now();
+                std::printf("[autostart-windowed] Next: round %d\n", m_wiz_round + 1);
+                std::fflush(stdout);
                 // Dirty on the PLANETOLOGY rounds only, as the walk always
                 // meant (the chain preview and the surface build re-run per
                 // round); on a lapse round the Next press never dirties, and a

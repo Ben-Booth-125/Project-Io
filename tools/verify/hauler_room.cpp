@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // hauler_room — BL-1203 (water reaches dry markets): the hauler's room
 // ---------------------------------------------------------------------------
-// THE RULING (Ben, 2026-10-05; SUPPLY.md § Dispatch trigger, "What a hauler
+// THE RULING (Ben, 2026-10-05; SUPPLY.md § A shipment, "What a hauler
 // sees as unmet demand"). The dispatcher's room at a destination reads
 // (1) the households' bid re-read at the cargo's LANDED price and (2) a
 // HAULER-ONLY want register — processor input and construction material want

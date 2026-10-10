@@ -12,8 +12,9 @@
 //      spacecraft_components plant is no longer vetoed.
 //   U2 network upkeep, nothing held anywhere: its stone/timber bill is wanted.
 //   U3 procurement fulfilment (run_economy_step): the contract's quantity.
-//   U4 space-lane launch fuel taken from a corporation's pool (commit_convoy).
-//   U5 building upkeep met from a corporation's OWN pool (run_building_upkeep).
+//   U4 space-lane launch fuel, bought off the source shelf (commit_trade_shipment;
+//      BL-1265: no pools — posted as a want, demand after the clear).
+//   U5 building upkeep, bought off its market's shelf (run_building_upkeep; posted).
 //   U6 the cadence hold: a record 3 ticks old still counts (cadence_k 4); one
 //      older than the cadence does not.
 // Exits non-zero on any FAIL.
@@ -189,7 +190,13 @@ int main()
         check(!vetoed(f, resource_type::machinery), "U3 ... and a machinery plant there is not vetoed");
     }
 
-    std::printf("U4 space-lane launch fuel from a corporation's pool\n");
+    // BL-1265 (MARKETS.md § The shelf economy): corporations hold no pools, so a
+    // launch's fuel and a building's upkeep are no longer OWN-POOL takes that
+    // post nothing — they are BOUGHT off the market's shelf and posted as wants,
+    // which the clear turns into demand. U4/U5 now assert that: the purchase
+    // lands in the tick's want register at the market, and after the clear the
+    // good carries demand there and its plant is not vetoed.
+    std::printf("U4 space-lane launch fuel is bought off the source shelf\n");
     {
         fixture f = make_fixture();
         const recipe_registry reg;
@@ -208,26 +215,38 @@ int main()
         f.w.markets[m2] = m2c;
 
         const auto& fuel = launch_draw_per_convoy();
-        stockpile_component& pool = f.w.pool_at(f.corp, f.market);
-        pool.quantities[ri(resource_type::iron_ore)] = 100.0f;
+        market_component& shelf = f.w.markets.at(f.market);
+        shelf.inventory[ri(resource_type::iron_ore)] = 100.0f;
         std::size_t fuel_good = resource_count;
         for (std::size_t r = 0; r < resource_count; ++r)
-            if (fuel[r] > 0.0f) { pool.quantities[r] += 10.0f * fuel[r]; if (fuel_good == resource_count) fuel_good = r; }
+            // Exactly ONE launch's fuel: the launch empties the shelf, so the
+            // clear sees the want with nothing standing to glut it.
+            if (fuel[r] > 0.0f) { shelf.inventory[r] += fuel[r]; if (fuel_good == resource_count) fuel_good = r; }
         check(fuel_good < resource_count, "U4 not vacuous: a launch draws a fuel good");
         const resource_type fg = static_cast<resource_type>(fuel_good < resource_count ? fuel_good : 0);
-        f.w.markets.at(f.market).demand[ri(resource_type::iron_ore)] = 1.0f;
         check(vetoed(f, fg), "U4 not vacuous: before the launch, the fuel good is a dead market at M");
         convoy_leg leg;
         leg.viable = true; leg.mode = convoy_mode::space; leg.cost = 0.0f; leg.travel_ticks = 2;
-        const bool sent = commit_convoy(f.w, reg, f.corp, f.body, f.market, m2,
-                                        ri(resource_type::iron_ore), 10.0f, leg, nullptr, nullptr, false, nullptr);
-        check(sent, "U4 the space convoy launched");
-        check(fuel_good < resource_count && f.w.markets.at(f.market).unposted_bid[fuel_good] == fuel[fuel_good],
-              "U4 the launch fuel taken from the corporation's pool is recorded at the source market");
-        check(!vetoed(f, fg), "U4 ... and a fuel plant there is not vetoed");
+        economy_report rep;
+        const bool sent = commit_trade_shipment(f.w, reg, rep, f.corp, f.market, m2,
+                                                ri(resource_type::iron_ore), 10.0f, leg);
+        check(sent, "U4 the space shipment launched");
+        const auto wit = rep.wants.find(std::make_pair(f.corp, f.market));
+        check(fuel_good < resource_count && wit != rep.wants.end() && wit->second[fuel_good] == fuel[fuel_good],
+              "U4 the launch fuel is bought off the source shelf and posted as a want there");
+        (void)clear_markets(f.w, reg, rep);
+        check(fuel_good < resource_count && f.w.markets.at(f.market).demand[fuel_good] > 0.0f,
+              "U4 ... the clear turns it into demand at the source market");
+        // The want is POSTED now, so the market is no longer DEAD for the fuel
+        // good: it carries a bid (the dead-market veto's test). Whether a
+        // 5-a-tick plant against a one-launch want is then a GLUT is the glut
+        // forecast's separate question, and it rightly says yes here.
+        check(fuel_good < resource_count
+                  && composite_bid(f.w.markets.at(f.market), fuel_good, f.w.current_econ_tick, 4) > 0.0f,
+              "U4 ... and the fuel good is no longer a dead market at M (it carries a bid)");
     }
 
-    std::printf("U5 building upkeep met from the corporation's own pool\n");
+    std::printf("U5 building upkeep is bought off the building's market shelf\n");
     {
         fixture f = make_fixture();
         recipe_registry reg;
@@ -235,17 +254,29 @@ int main()
         up.goods[static_cast<std::size_t>(building_type::processing_facility)]
                 [static_cast<std::size_t>(era_band::any)][ri(resource_type::tools)] = 1.5f;
         reg.set_building_upkeep(up);
-        f.w.pool_at(f.corp, f.market).quantities[ri(resource_type::tools)] = 10.0f;
+        // The upkeep draw buys only under the fair-price ceiling, and with the
+        // ceiling OFF (the hand-built default, reservation_mult 0) it buys
+        // nothing: the shelf is the only source now, so the ceiling is set.
+        price_band_params pb = reg.price_band();
+        pb.reservation_mult = 2.0f;
+        reg.set_price_band(pb);
+        // Exactly the draw: the upkeep empties the shelf, so the clear sees the
+        // want with nothing standing to glut it.
+        f.w.markets.at(f.market).inventory[ri(resource_type::tools)] = 1.5f;
         check(vetoed(f, resource_type::tools), "U5 not vacuous: before the upkeep, tools are a dead market at M");
         economy_report rep;
         run_building_upkeep(f.w, reg, rep);
-        check(f.w.pool_at(f.corp, f.market).quantities[ri(resource_type::tools)] == 8.5f,
-              "U5 the upkeep was met from the corporation's own pool");
-        check(f.w.markets.at(f.market).unposted_bid[ri(resource_type::tools)] == 1.5f,
-              "U5 ... and that own-pool take is recorded as an unposted bid on its market");
-        check(!vetoed(f, resource_type::tools), "U5 ... and a tools plant there is not vetoed");
+        check(f.w.markets.at(f.market).inventory[ri(resource_type::tools)] == 0.0f,
+              "U5 the upkeep was met off the market's shelf (1.5 of 1.5)");
+        const auto wit = rep.wants.find(std::make_pair(f.corp, f.market));
+        check(wit != rep.wants.end() && wit->second[ri(resource_type::tools)] == 1.5f,
+              "U5 ... and posted as the corporation's want at its market");
+        (void)clear_markets(f.w, reg, rep);
+        check(f.w.markets.at(f.market).demand[ri(resource_type::tools)] > 0.0f,
+              "U5 ... which the clear turns into demand there");
+        check(composite_bid(f.w.markets.at(f.market), ri(resource_type::tools), f.w.current_econ_tick, 4) > 0.0f,
+              "U5 ... and tools are no longer a dead market at M (they carry a bid)");
     }
-
     std::printf("U6 the record is held for the scorer's cadence\n");
     {
         fixture f = make_fixture();
@@ -265,20 +296,20 @@ int main()
               "U6 a later tick's first record overwrites; same-tick records add");
     }
 
-    // U7 — A PAD'S POOL KEEPS ITS PROPELLANT (MARKETS.md step 4, Ben 2026-10-09).
-    // Propellant is priced at M (the fixture prices every good). A corp holding a
-    // Launchpad on the body makes propellant into its pool; a clear runs; the
-    // launch still dispatches. Contrary cases: without a pad the clear's
-    // auto-surplus sells it; with a pad a standing sell order still can.
-    std::printf("U7 a pad's pool keeps its propellant through a clear\n");
+    // U7 — THE SPACE LANE NEEDS A PAD AND ITS PROPELLANT ON THE SHELF (TRADE.md
+    // § A trade, "Between bodies"; BL-1266). The pool-keeps-its-propellant rows
+    // (MARKETS.md step 4: a pad's pool, auto-surplus, a standing sell order)
+    // retired with pools (BL-1265): the trader now BUYS the launch's propellant
+    // off the source shelf. What stands is the gate: `price_trade_leg` is viable
+    // on a space lane only with a Launchpad on the source body AND the launch's
+    // propellant on that shelf.
+    std::printf("U7 the space lane needs a pad and the launch's propellant on the shelf\n");
     {
         const std::size_t prop = ri(resource_type::propellant);
         const auto& fuel = launch_draw_per_convoy();
         check(fuel[prop] > 0.0f, "U7 not vacuous: the launch draw burns propellant");
 
-        // One run: optional pad, optional standing order; returns the fixture
-        // after one clear, and the far market id through `far`.
-        auto run = [&](bool pad, bool order, entity_id& far) {
+        auto leg_for = [&](bool pad, float propellant) {
             fixture f = make_fixture();
             const entity_id b2 = f.w.create_entity();
             body_component b2c{};
@@ -289,7 +320,7 @@ int main()
             tile_component t2c{};
             t2c.body = b2;
             f.w.tiles[t2] = t2c;
-            far = f.w.create_entity();
+            const entity_id far = f.w.create_entity();
             market_component m2c{};
             m2c.body = b2; m2c.centre_tile = t2;
             for (std::size_t r = 0; r < resource_count; ++r) m2c.base_price[r] = 2.0f;
@@ -303,63 +334,21 @@ int main()
                 f.w.buildings[lp] = lb;
                 f.w.corporations.at(f.corp).assets.push_back(lp);
             }
-            if (order)
-            {
-                sell_order so;
-                so.id = f.w.allocate_order_id();
-                so.corp = f.corp; so.body = f.body; so.resource = resource_type::propellant;
-                f.w.sell_orders.push_back(so);
-            }
-            stockpile_component& pool = f.w.pool_at(f.corp, f.market);
-            pool.quantities[prop]                         = 5.0f; // this tick's make
-            pool.quantities[ri(resource_type::iron_ore)] = 100.0f;
-            f.w.markets.at(f.market).demand[prop] = 50.0f; // a buyer is there
-            const recipe_registry reg;
-            economy_report rep{};
-            clear_markets(f.w, reg, rep);
-            return f;
-        };
-
-        {
-            entity_id far = null_entity;
-            fixture f = run(/*pad=*/true, /*order=*/false, far);
-            const float left = f.w.pool_at(f.corp, f.market).quantities[prop];
-            check(left == 5.0f, "U7a with a pad on the body, the clear's auto-surplus lists none of the pool's propellant");
+            f.w.markets.at(f.market).inventory[prop]                         = propellant;
+            f.w.markets.at(f.market).inventory[ri(resource_type::iron_ore)] = 100.0f;
             const recipe_registry reg;
             const logistics_nodes nodes = collect_logistics_nodes(f.w);
-            const convoy_leg leg = price_convoy_leg(f.w, reg, nodes, f.corp, f.market, far,
-                                                    ri(resource_type::iron_ore), 10.0f, 1.0f);
-            check(leg.viable && leg.mode == convoy_mode::space,
-                  "U7a ... so the space-lane gate still finds the pad fuelled after the clear");
-            const bool sent = leg.viable
-                && commit_convoy(f.w, reg, f.corp, f.body, f.market, far, ri(resource_type::iron_ore),
-                                 10.0f, leg, nullptr, nullptr, false, nullptr);
-            check(sent, "U7a ... and the launch dispatches");
-            check(f.w.pool_at(f.corp, f.market).quantities[prop] == 5.0f - fuel[prop],
-                  "U7a ... burning exactly the launch draw from the pad's pool");
-        }
-        {
-            entity_id far = null_entity;
-            fixture f = run(/*pad=*/false, /*order=*/false, far);
-            check(f.w.pool_at(f.corp, f.market).quantities[prop] == 0.0f,
-                  "U7b with no pad, the clear's auto-surplus sells the pool's propellant like any surplus");
-        }
-        {
-            entity_id far = null_entity;
-            fixture f = run(/*pad=*/true, /*order=*/true, far);
-            check(f.w.pool_at(f.corp, f.market).quantities[prop] < 5.0f,
-                  "U7c with a pad, a standing sell order still sells the pool's propellant");
-        }
-        {
-            fixture f = make_fixture();
-            const recipe_registry reg;
-            f.w.pool_at(f.corp, f.market).quantities[prop] = 5.0f;
-            check(auto_surplus_reservation(f.w, reg, f.corp, f.market)[prop] == 0.0f
-                      && !launch_burns_from_pool(f.w, f.corp, f.market),
-                  "U7d no pad: the auto-surplus reservation holds no propellant, and no launch burns from the pool");
-        }
+            return price_trade_leg(f.w, reg, nodes, f.corp, f.market, far,
+                                   ri(resource_type::iron_ore), 10.0f);
+        };
+        const convoy_leg ok = leg_for(/*pad=*/true, 5.0f * fuel[prop]);
+        check(ok.viable && ok.mode == convoy_mode::space,
+              "U7a a pad on the body and the launch's propellant on the shelf: the space lane is viable");
+        check(!leg_for(/*pad=*/false, 5.0f * fuel[prop]).viable,
+              "U7b no pad on the source body: no space lane");
+        check(!leg_for(/*pad=*/true, 0.0f).viable,
+              "U7c a pad but no propellant on the shelf: no space lane");
     }
-
     // U8 — NR-986 (Ben, 2026-10-09): at the handoff the seat's dial-idled plants
     // return to auto. Sibling of U-rows only by fixture; the subject is the
     // dial's hold, which the unposted bid's veto also reads.

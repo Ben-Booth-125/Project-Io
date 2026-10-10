@@ -24,7 +24,14 @@ balance += income − expenditure − maintenance − wages − interest − lev
 ```
 
 - **Income / expenditure** — the market cash flows from `clear_markets`
-  (`corp_cash_flow`): goods sold, inputs bought.
+  (`corp_cash_flow`). **Income** is what the corporation's landings sold for: everything it made,
+  every trade cargo that arrived, every cargo it captured, landed on a market and paid at that
+  tick's clearing price — the market is the buyer, bid or no bid (`MARKETS.md` § The shelf
+  economy). **Expenditure** is every draw it took off a shelf — inputs, materials, upkeep goods, a
+  trade's purchase and its launch propellant — billed at the posted price the draw was made at.
+  **The haul is the trader's (Ben, 2026-10-10):** a trade's shipment charges its leg cost to the
+  trader when it leaves (`SUPPLY.md` § A shipment), and the trader keeps the margin between the
+  two prices less that haul (`TRADE.md` § A trade).
 - **Maintenance / wages** — per-building operating costs, summed (below).
 - **Interest** — the debt charge, zero while the balance is non-negative.
 - **Levies** — what enacted law took (below). The prototype extraction levy is
@@ -33,8 +40,8 @@ balance += income − expenditure − maintenance − wages − interest − lev
 - **Upkeep** — standing-force upkeep (below): the credit half of a unit's upkeep vector.
 
 **Household consumption is not a flow.** A household draws its basket off the market's shelf and
-pays nothing for it (`MARKETS.md` § The clearing tick, step 12). The maker was already paid when
-the market bought the stock as buyer of last resort, so consumption moves goods, never credits.
+pays nothing for it (`MARKETS.md` § The clearing tick, step 9). The maker was already paid when
+the goods landed and the market bought them, so consumption moves goods, never credits.
 
 The seven flows are retained per corp in `corp_budget` (BL-072, budget breakdown); its
 `net()` is exactly the delta applied to the balance, so the ledger can never disagree with
@@ -54,10 +61,11 @@ in two different places on purpose:
 - The **credit** half is a money flow, so it is `apply_budget`'s own `upkeep` term —
   deliberately *not* folded into `wages`, because a hidden term is a term nobody tunes
   and the ledger has to be able to say what the army costs as against the factories.
-- The **goods** half is not money at all. It is a pool debit, run by `run_unit_upkeep`
-  (`economy_system.hpp`) against the owner's pool **on the unit's own body**, in
-  ascending unit id — the order is load-bearing, because two units of one corp on one
-  body draw the same stock and the order decides which goes short.
+- The **goods** half is bought off a market's shelf, run by `run_unit_upkeep`
+  (`economy_system.hpp`, `draw_goods_or_bid`) at the posted price under the ceiling (below), in
+  ascending unit id — the order is load-bearing, because two units drawing on one shelf draw
+  the same stock and the order decides which goes short. It is expenditure like any shelf draw,
+  billed by the clear; the credit half above is the wage.
 
 Rates are authored in `scripts/economy.lua` under `economy.military.unit_upkeep`
 (`unit_upkeep_params`, declared with the roster in `world/unit_roster.hpp`, since the
@@ -83,14 +91,13 @@ the owner can afford is the ceiling alone (Ben, 2026-10-03):** the draw reads th
 owner's balance. **A draw pays the posted price (Ben, 2026-10-03):** a
 draw from a market's shelf is decided and billed at the price that stood when it was made — the
 price it checked against the ceiling — with one exchange row at that price. The shelf's seller is
-the market, whose suppliers were paid when they listed, so the posted price leaves no unpaid gap,
+the market, whose suppliers were paid when their goods landed, so the posted price leaves no unpaid gap,
 and a unit beside a full shelf is never refused by a price its own want drove up. **The same
 ceiling governs every goods draw (Ben, 2026-10-03):** unit and building upkeep, processor inputs
 and construction alike buy only at or under it, and a draw over it does not bid either, so its
 want leaves the price and the price can ease back. **Nations' draws too (Ben, 2026-10-03):** a
 nation's network upkeep and its space programme draw under the same ceiling and the same posted
-price — every draw, whether out of a corporation's pool (priced at its market) or off a market's
-shelf. Measured on the curated seeds, a 50-head unit cost about 970 a year at the prices the market
+price — every draw off a market's shelf, and the shelf is the only stock there is. Measured on the curated seeds, a 50-head unit cost about 970 a year at the prices the market
 actually charged (rations ~3.5x and ordnance ~6x their base) against a hire price near 120, and
 standing-force upkeep was what wound most of the field up.
 
@@ -104,14 +111,14 @@ guard under no threat does not bleed its owner: a full cap of the cheapest row c
 of a median surviving firm's income**, on the leanest measured seed. Both halves of the vector
 move by the one factor, per the retuning rule above, so the equipment-to-wage anchor holds.
 
-**A short pool BUYS before it goes short (Ben, 2026-08-26, BL-654).** Before the shortfall rule
-below fires, the draw bids the missing quantity onto the market and pays for what it gets — so
+**A draw BUYS before it goes short (Ben, 2026-08-26, BL-654).** Before the shortfall rule
+below fires, the draw bids its need onto the market and pays for what it gets — so
 wanting a good becomes a price signal and somebody has a reason to supply it. It bids only below a
 **reservation ceiling**; above that it declines to buy and goes without, which is where the rule
 below takes over. One rule for every goods draw: this is the same shape building upkeep takes, not
-a second one. The market half is [MARKETS.md](MARKETS.md) § Settled: a short pool BUYS.
+a second one. The market half is [MARKETS.md](MARKETS.md) § Settled: every draw BUYS.
 
-**The shortfall rule is ONE rule with TWO triggers.** A pool can be empty, and when the
+**The shortfall rule is ONE rule with TWO triggers.** A shelf can be empty, and when the
 goods do not arrive the unit *weakens* rather than vanishing. The unit's
 `supply_factor_permille` takes the same subtraction whether (a) it is beyond the reach
 field (the out-of-supply decay of BL-325, reach as the placement constraint) or (b) its
@@ -133,8 +140,8 @@ left standing (base, on a market that has never resolved one), takes the good on
 price is at or under the ceiling, and is billed at it, with one exchange row at that price. The
 price the tick goes on to resolve is never what the draw pays. Above the ceiling the good is not
 drawn **and not bid for**, so its want leaves the price and the price can ease: a unit or
-building goes short and takes the shortfall rule, a processor runs on what its pool holds, a
-construction site pauses for want of that material (construction capacity over the ceiling
+building goes short and takes the shortfall rule, a processor idles on that input, a trade ships
+none of that good, a construction site pauses for want of that material (construction capacity over the ceiling
 stretches the build instead, as an empty yard does), and a nation buys elsewhere or not at all.
 What a draw is billed is only what the shelf gave.
 
@@ -244,9 +251,9 @@ The shape is already built and does not need inventing — it is § Standing-for
 to the other kind of asset:
 
 - The **credit** half stays where it is, in `maintenance` and `wages`.
-- The **goods** half is a pool draw against the owner's pool on the building's own body, in a fixed
-  order, exactly as `run_unit_upkeep` draws — because two buildings of one corp on one body draw the
-  same stock and the order decides which goes short.
+- The **goods** half is bought off the shelf of the building's own market, at the posted price
+  under the ceiling, in a fixed order, exactly as `run_unit_upkeep` draws — because two buildings
+  drawing on one shelf draw the same stock and the order decides which goes short.
 - **The shortfall rule is the same rule.** A draw that goes unmet weakens the building rather than
   destroying it, by the same subtraction an out-of-supply unit takes. A factory short of its tools
   runs badly; it does not vanish.
@@ -280,12 +287,13 @@ a background firm opens with working capital priced from its opening stock, not 
 buffer exists for the whole field and not only for the seat and the specialists. It is
 minted at generation, as `base_capital` is (Ben, 2026-10-03): no treasury or charter budget pays
 for it. The rule: cash is
-one quarter of the stock's value, each good at its base price in the market the stock is pooled in
-(`k_background_working_capital_of_stock`, `corporation_generation.cpp`). Base, never the live price,
-so an opening position is priced by worth rather than by the first tick's scarcity. A stock pooled
-at body level, on a body with no market carved yet, is priced at the lowest-id market on that body
+one quarter of the opening stock's value, each good at its base price in the corporation's home
+market (`k_background_working_capital_of_stock`, `corporation_generation.cpp`). Base, never the
+live price, so an opening position is priced by worth rather than by the first tick's scarcity. A
+corporation whose home body has no market carved yet is priced at the lowest-id market on that body
 — a fixed choice, so the figure cannot depend on container order; on a body with no market at all
-there is nowhere the stock could be sold, and the working capital is zero.
+there is nowhere the stock could be sold, and the working capital is zero. The stock itself is
+placed on the shelves (`MARKETS.md` § The shelf economy) and moves no money.
 
 The interest rate `k_debt_interest_per_quarter` is the single source of truth: the live loop and
 the `econ_bankruptcy` harness read the same value. Interest is a pure function of balance × rate — deterministic. Design: BL-073 (debt
@@ -461,14 +469,15 @@ disposition of every store follows one rule with three outcomes:
 
 | Outcome | What it applies to | Why |
 |---|---|---|
-| **TRANSFER** | Property — holdings, stockpile pools, the balance, filed returns, units, convoys in flight, trade routes, accepted contracts | It has value and a new owner exists to hold it. A convoy in flight transfers rather than cancels **because its cargo already left the pool** — cancelling would mint the goods back into nothing. |
-| **CANCEL** | A promise with nobody left to keep it — open market orders on both sides, unaccepted quotes, live battles | An order is a promise made by a party that no longer exists. Reassigning it would bind the acquirer to a bargain it never struck. |
+| **TRANSFER** | Property — holdings, the balance, filed returns, units, convoys in flight, trade routes, manual trades (with the Marketplaces that make their points), accepted contracts | It has value and a new owner exists to hold it. A convoy in flight transfers rather than cancels **because its cargo already left the source shelf** — cancelling would mint the goods back into nothing. |
+| **CANCEL** | A promise with nobody left to keep it — unaccepted quotes, live battles | A quote is a promise made by a party that no longer exists. Reassigning it would bind the acquirer to a bargain it never struck. |
 | **DROP** | An opinion or a permission that was the dissolved firm's alone — its stance rows, its embargo conditions, its modifiers, a contract that would leave the acquirer on both sides | These were *about* being that firm. There is no one left to hold the opinion, and inheriting it would be inventing one. |
 | **KEEP** | The historical record — a history entry naming the firm, a battle it fought, a contract it completed | **History is not property and is never rewritten.** A firm that existed and was bought did exist, and a ledger that edits its own past to tidy up a dissolution is worth nothing. This is the one outcome where a reference to the erased corp SURVIVES on purpose, so it is stated here rather than left to look like an oversight. |
 
 The three seams with the most moving parts: `hq_building` / `influence_range` recompute from the
 merged holding set (Pass 3b's rule, unchanged), standing units re-point to the acquiring owner
-through their recorded `muster_base`, and colliding pools **merge** — stock summed, never replaced.
+through their recorded `muster_base`. A corporation holds no goods, so there is no stock to merge:
+what it made is on the shelves, and stays there.
 
 **Two histories become one.** Filed returns merge pairwise from the newest end, summing flows and
 stock figures, because a return carries no tick stamp and concatenation would produce two rows for
@@ -548,9 +557,9 @@ resets the sentence.
 
 | Outcome | What it applies to |
 |---|---|
-| **LIQUIDATE** | Holdings (demolished through the ordinary verb), units (disbanded), pools and in-flight cargo — dumped to the local / destination market's **real inventory**, honouring the conservation law (inventory gains what pools lose). A body with no market loses the goods; stated, not hidden. |
+| **LIQUIDATE** | Holdings (demolished through the ordinary verb), units (disbanded), and in-flight cargo — put on the destination market's shelf, its **real inventory**, unpaid (nobody is left to pay), honouring the conservation law. A destination that no longer stands loses the goods; stated, not hidden. |
 | **DIE** | The balance (the debt is written off — the creditor was the void) and the filed returns, with the actor. |
-| **CANCEL** | Open orders, quotes, live battles — and, unlike the buyout, accepted contracts on **either** side: nobody is left to deliver or receive, and what was already paid stays paid. |
+| **CANCEL** | Manual trades, quotes, live battles — and, unlike the buyout, accepted contracts on **either** side: nobody is left to deliver or receive, and what was already paid stays paid. |
 | **DROP** | Stance, sentiment, embargo conditions, techs, modifiers, trade-route rows, workforce overrides. |
 | **KEEP** | History — never rewritten. |
 

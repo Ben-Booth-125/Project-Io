@@ -287,6 +287,13 @@ bool is_wharf_site(const world& w, entity_id tile_id, resource_type target)
     // same `<= 0` test can_place_in_world's Wharf gate reads.
     if (tc_it->second.resource_deposit[static_cast<std::size_t>(resource_type::agricultural_produce)] > 0.0f)
         return false;
+    // BL-1218: a Wharf stands on the SHORE, never in the water — the Well's
+    // `is_fresh_water_adjacent` rule. A coast-substrate water tile borders open
+    // ocean, so without this it read as a Wharf site: the construction ledger
+    // offered a Wharf there that `can_place` then refused as "Cannot build on
+    // water". World callers already filtered water ground, so only the UI moves.
+    if (is_water(tc_it->second.substrate))
+        return false;
     return is_coastal(w, tile_id);
 }
 

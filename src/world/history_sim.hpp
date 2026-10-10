@@ -2777,6 +2777,53 @@ struct trade_flow
     uint8_t  by_sea   = 0;
 };
 
+/// BL-1268 -- THE TRADE RECORD (TRADE.md sec Trade in generation: "a nation
+/// earns trade points where it trades, or where its relations with another are
+/// good"). ONE CELL PER (polity, region): what that polity's trade and good
+/// relations carried through that region, summed over every decision round of
+/// the Exploration and Industrialisation spans. The region is the polity's
+/// CAPITAL SEAT on the round the credit was earned -- the market a flow's want
+/// is read at and relieved on (`run_exploration_upkeep`), so the record says
+/// WHERE the trade took place, not merely who did it.
+///
+/// RAW HISTORY, NOT POINTS. The two quantities are the history's own readings,
+/// year-weighted so the record does not depend on the decision band:
+///   - `flow_volume`: the `trade_flow::volume_q` the polity sold or bought,
+///     times the round's step in years (both ends of a flow are credited, each
+///     at its own capital -- the earn rule of EXPLORATION.md sec Trade is a want
+///     met by throughput: "the flow earns both ends");
+///   - `relation_years`: the partner-years the polity held a standing mutual
+///     treaty (the four mutual clauses a binding forms together; tribute is a
+///     subjection, not a good relation), one per bound living partner per year.
+/// The conversion into trade points and Marketplaces is campaign data
+/// (`world_gen.trade_retrofit`, scripts/world_gen.lua), read at world setup --
+/// never here, so the history reads no Lua and a rate retune moves no history.
+/// GENERATION SCRATCH, NOT SAVED (the record is spent before the first tick).
+struct trade_record_cell
+{
+    int32_t polity         = -1;
+    int32_t region         = -1;
+    int64_t flow_volume    = 0;
+    int64_t relation_years = 0;
+};
+
+/// Credit one decision round to @p record (kept sorted ascending by (polity,
+/// region), cells merged): every flow in @p flows to both its ends' capitals,
+/// volume x @p step_years; every distinct living pair holding a standing
+/// mutual treaty clause in @p treaties, @p step_years to each party's capital.
+/// A dead polity or a capital out of range earns nothing. Pure and seedless.
+void accumulate_trade_record(std::vector<trade_record_cell>&   record,
+                             const std::vector<trade_flow>&    flows,
+                             const std::vector<dated_object>&  treaties,
+                             const std::vector<polity>&        polities,
+                             std::size_t                       region_count,
+                             int                               step_years);
+
+/// @p into += @p from, cell by cell (both sorted by (polity, region); the
+/// result is too). How world setup sums the two spans' records.
+void merge_trade_record(std::vector<trade_record_cell>& into,
+                        const std::vector<trade_record_cell>& from);
+
 /// THE UPKEEP STEP ITSELF (BL-931/BL-932), called once per decision round
 /// when `history_sim_params::exploration_upkeep_enabled` is set. "Earn, then
 /// pay stocks, then invest" (EXPLORATION.md sec The engine is shared) — this
@@ -4535,6 +4582,12 @@ struct history_sim_state
     /// Empty throughout the Empire span. GENERATION SCRATCH, NOT SAVED, same
     /// footing as `dated_objects` above.
     std::vector<trade_flow> trade_flows;
+
+    /// BL-1268 -- THE TRADE RECORD (`trade_record_cell`): ACCUMULATED, unlike
+    /// `trade_flows` above, over every decision round this run's upkeep ran.
+    /// Sorted ascending by (polity, region). Empty throughout the Empire span.
+    /// GENERATION SCRATCH, NOT SAVED; read by nothing inside the sim.
+    std::vector<trade_record_cell> trade_record;
 
     int      region_stride = 0; ///< Final region count (slice width for replay).
     int64_t  years           = 0; ///< Years simulated.
@@ -6390,6 +6443,14 @@ struct exploration_output
     /// among `dated_objects` above and both parties are alive in `polities`.
     /// Sorted ascending by (seller, buyer, good).
     std::vector<trade_flow> trade_flows;
+
+    /// BL-1268 -- THIS SPAN'S TRADE RECORD (`history_sim_state::trade_record`),
+    /// copied whole: every round of the span, not only the close, because the
+    /// record is what the campaign's Marketplaces are retrofitted from (TRADE.md
+    /// sec Trade in generation). NOT filtered over the dead -- trade a fallen
+    /// realm carried still took place where it did. Each span carries only its
+    /// own; world setup sums them (`merge_trade_record`).
+    std::vector<trade_record_cell> trade_record;
 
     /// BL-1097 -- the span's whole sea-leg record at the close
     /// (`history_sim_state::sea_legs`), sorted ascending by (a, b), `uses`

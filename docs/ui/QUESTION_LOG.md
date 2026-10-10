@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**62 surfaces** — 7 settled, 55 awaiting Ben's wording.
+**64 surfaces** — 7 settled, 57 awaiting Ben's wording.
 
 ---
 
@@ -51,14 +51,6 @@ alphabetical order.
 **Because:** A battle is a province-grain event drawn on a tile-grain canvas, so without a mark it has no position at all — the units are visible but nothing says they are in contact rather than merely adjacent. Drawn on the province anchor tile only, once per battle, because the fight IS the province envelope (BL-467 ruling 1) and scattering a glyph across every participating tile would say the opposite. The glyph is two crossed blades with cross-guards, deliberately not an X: X is already the 'close this' affordance everywhere else in the chrome, and a mark meaning 'a fight is here' must not read as a button meaning 'dismiss this'.
 
 *Demanded by BL-469, BL-467 · `src/ui/body_surface_canvas.cpp`, `src/ui/icons.cpp`, `src/ui/icons.hpp` · id `battle_marker`*
-
-### Stacked-tile ring (Planetary canvas building marker)
-
-**Answers:** This hex holds more than one building - which KINDS are standing here?
-
-**Because:** A tile carries as many buildings as its richness allows (BL-193, building stack capacity), and the canvas drew exactly one silhouette however many stood there. The '+N' count badge told the player a stack existed but never what was in it, and Ben rejected primary-plus-count for exactly that reason: it is always legible and never says WHICH. The ring is the only one of the three shapes considered that scales with the richness-derived cap AND names its contents - a glyph cluster becomes soup past three. It earns space it does not take from anything else: it occupies the empty annulus between the silhouette (0.48 r) and the rim, adds no chrome, no legend and no control, and it composes with the two marks already there rather than replacing them - the ring says which kinds, the centre glyph says which of them leads, the badge says how many in total. It draws nothing on a single-kind tile, so the world's ordinary built tiles are unchanged. Its LOD bound (draw_r > 10 px) is derived from the arc length one segment needs to read as a segment, and below it the tile degrades to the dominant kind's glyph alone - never to an empty hex.
-
-*Demanded by BL-596, BL-193 · `src/ui/icons.cpp`, `src/ui/icons.hpp`, `src/ui/body_surface_canvas.cpp`, `src/ui/presentation.cpp` · id `building_stack_ring`*
 
 ### Comms dock
 
@@ -156,13 +148,13 @@ alphabetical order.
 
 *Demanded by BL-303 · `src/ui/generation_ledger.cpp` · id `generation_ledger_body`*
 
-### The generation wait - every wizard loading round and the building screen
+### The generation wait - every wizard loading round, the building screen, and the Painting-the-ground step after the seat
 
 **Answers:** Is the world still being built, which step is it on, and how long has it taken?
 
-**Because:** A wait that sits still reads as a crash (Ben, 2026-09-24, watching the Industrialisation round load: the bar held on one step for the whole road pass). STARTUP.md § A wait never looks stopped: the outer bar is weighted by what each step COSTS, measured in Release (generation_step_cost_ms), not counted as equal steps; every step over about a second reports progress within itself on the inner bar (the spans by year, the borders by tile row, the roads by village, the old roads by corridor, the validation run by quarter); a caption names the step in generation's own words (generation_stage_labels); and an elapsed-seconds count shows the run is alive. One surface (ui::draw_generation_wait) draws every wizard loading round and the building screen, so there is one wait, not two. Nothing else is added: the loading round stays one line, the bars and these two lines - no map, no board.
+**Because:** A wait that sits still reads as a crash (Ben, 2026-09-24, watching the Industrialisation round load: the bar held on one step for the whole road pass). STARTUP.md § A wait never looks stopped: the outer bar is weighted by what each step COSTS, measured in Release (generation_step_cost_ms), not counted as equal steps; every step over about a second reports progress within itself on the inner bar (the spans by year, the borders by tile row, the roads by village, the old roads by corridor, the validation run by quarter); a caption names the step in generation's own words (generation_stage_labels); and an elapsed-seconds count shows the run is alive. One surface (ui::draw_generation_wait) draws every wizard loading round and the building screen, so there is one wait, not two. Nothing else is added: the loading round stays one line, the bars and these two lines - no map, no board. BL-1246 (Ben, 2026-10-09) adds ONE step after the seat, on the same surface: "Painting the ground", shown only while the home body's ground master (baking since round 6 arrived) has not yet arrived, its bar the master's chunks arrived over its total. It earns its place because the alternative is worse: play opening on ground that is still painting in. The wait never counts as game days (the clock rebases after it).
 
-*Demanded by BL-1072 · `src/ui/generation_wait.cpp`, `src/ui/startup_screens.cpp`, `src/core/app.cpp`, `src/world/hard_coded_world.cpp` · id `generation_wait`*
+*Demanded by BL-1072, BL-1246 · `src/ui/generation_wait.cpp`, `src/ui/startup_screens.cpp`, `src/core/app.cpp`, `src/world/hard_coded_world.cpp`, `src/core/ground_layer.cpp` · id `generation_wait`*
 
 ### God-view corp/rival readouts (Selection facts column, rival Status rows, rival hover detail) + the survey tell on the Planetary canvas
 
@@ -184,9 +176,9 @@ alphabetical order.
 
 **Answers:** Am I solvent, and what is the date?
 
-**Because:** The two facts that condition every other decision, needed at a glance without opening anything. Runway (BL-073) is here rather than in the ledger precisely because it is a warning, not an analysis.
+**Because:** The two facts that condition every other decision, needed at a glance without opening anything. Runway (BL-073) is here rather than in the ledger precisely because it is a warning, not an analysis. The middle figure reads CARGO (BL-1269): with no corporation holding a stockpile under the shelf economy (BL-1265), the only goods the player owns are its trades' cargo in transit, valued at the price where they land.
 
-*Demanded by BL-073, BL-171, BL-177 · `src/ui/header_panel.cpp` · id `header_panel`*
+*Demanded by BL-073, BL-171, BL-177, BL-1269 · `src/ui/header_panel.cpp` · id `header_panel`*
 
 ### Hover card
 
@@ -236,39 +228,25 @@ alphabetical order.
 
 *Demanded by BL-688 · `src/ui/market_ledger.cpp` · id `market_ledger_nation_row`*
 
-### Market Ledger - Trades tab
+### Market Ledger - Trades tab (and the market Selection card's 'Trades' door onto it)
 
-**Answers:** What positions do I hold here, what else is standing, and what could I be doing?
+**Answers:** What am I moving in and out of this market, how much of my trade capacity do I steer, and what could I be moving?
 
-**Because:** IT IS CALLED TRADES BECAUSE THE WORD CARRIES THE WIDENING (Ben, 2026-08-29). A sell order is one direction and one actor; a trade is a position either way round, held by anyone in the market, and -- now that the clearing tick retains a per-exchange record -- one that has already happened. The tab it replaces answered only 'what am I currently offering, at what floor?', which is the narrowest of the four things a player standing at a market wants to know.
+**Because:** TRADE IS THE ONLY WAY GOODS MOVE BETWEEN MARKETS (Ben, 2026-10-10; TRADE.md). The order book this tab used to read retired with corporation pools (BL-1265): production lands on the market's shelf and sells at the clearing price, so there is nothing left for a sell order to hold back, and the self-closing-order notice and the Selection card's Dispatch convoy form went with it. What the player steers now is a TRADE -- good R from market A to market B with P trade points -- and the reserve that decides how much of the points their Planetary Marketplaces and Ports make is theirs to steer and how much auto spends. Both are world state written only by the set_trade / clear_trade / set_trade_reserve verbs, and this tab is the only place a player can issue them, so without it the player could build trade capacity and never direct it.
 
-It earns its space because markets are the public intelligence channel under the visibility rule: a rival's production and stockpiles are private, so price and the ORDER BOOK are the only honest read the player has on a competitor -- and the book was visible nowhere. THREE READS, KEPT VISIBLY DISTINCT, because they are not equally cheap to know and presenting them as one table would claim they were: my standing trades (a filter on my own orders), the market's standing trades (the same book past a gate), and potential trades (a derivation with no store behind it -- buy price here against sell price there, less the haulage the route would cost, priced through the same price_convoy_leg the auto-dispatcher and the player's own dispatch verb use, so the figure the player acts on is the figure that would bill them).
+IT LIVES WHERE THE SELL ORDERS LIVED because the question is still asked standing at a market: which of my routes leave or land HERE. A trade touches two markets, so it lists under both, and a count says how many of the player's trades run elsewhere. THE READS STAY VISIBLY DISTINCT because they are not equally cheap to know: the trade-points line is one corporation record; my trades a filter on world::trades; all trades here the same list past the 'player owns a building on that body' gate (Ben, 2026-08-29, kept from the book it replaced); potential trades a derivation with no store at all, taken from rank_trade_routes -- the trade pass's own route ranking -- so a row is a route the pass itself would consider, at the margin it would see.
 
-THE GATE ON THE SECOND READ IS 'the player owns a building on that body' (Ben, 2026-08-29, choosing it over 'an order here', 'either', and 'any discovered market'). Orders are world state and the deliberate public signal, so this is a reading question rather than a disclosure one -- but 'operates in' is a real predicate and is enforced, not assumed: a player reads the books of markets they trade at, not of the whole system.
+THE POTENTIAL TRADE IS ONE PRESS FROM A REAL ONE, BUT NOT THE PRESS ITSELF. Its '+' fills the add form (good, from here, to there) and opens it; the player still sets the points and presses Add. Ranking stays permitted here (CONCEPT.md: rank where the top row is one input among several) because a ranked row cannot become a trade without the player choosing what it costs in points -- points auto would otherwise spend.
 
-THE HISTORY COLUMN IS REVENUE, NEVER PROFIT, and the limit is structural. stockpile_component is quantities[] and nothing else, so no cost basis exists anywhere in the model and the margin on a sale cannot be derived from it; quantity * unit_price is honest and a profit column would be a number the clearing loop never computed and a player would act on. An ABSENT counterparty renders as the market and not as 'unknown' -- three of the four clearing paths trade against the market as counterparty of last resort and they carry the volume, so blanking or skipping those rows would empty the section.
+THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (both markets must trade the good; the corporation's trades are capped at 64) and a refusal mutates nothing; the player is told why under the form. THE HISTORY COLUMN IS STILL REVENUE, NEVER PROFIT (no cost basis exists anywhere in the model), and an absent counterparty is still the market.
 
-RANKING IS PERMITTED HERE and this is the one surface where that has been ruled on explicitly (CONCEPT.md: rank where the top row is one input among several, not where it IS the move). Ben, same day: 'Market prices is a vital pillar of gameplay, but the strategy "just build the most profitable" is a red herring.' A potential trade sorted by margin is still weighed against reach, stock, competition and what the price does next.
-
-EACH LONG SECTION IS BOUNDED AND SCROLLS INSIDE ITSELF -- measured, not preferred: the book runs to 24 rows on the shipped fixture and the exchange read to 120, so laid out end to end the first fills the column and the other three reads are below the fold on open. A tab whose headline question is 'what could I be doing?' cannot open on a list of rival orders with the answer three screens down.
-
-*Demanded by BL-687 · `src/ui/market_ledger.cpp`, `src/ui/market_ledger.hpp` · id `market_ledger_trades`*
-
-### Market Ledger - Trades tab - 'Closed' table under My trades
-
-**Answers:** Which of my standing sell orders closed themselves, and why?
-
-**Because:** AN ORDER THAT CLOSES ITSELF IS A ROW THAT SILENTLY VANISHES. MARKETS.md step 4: an order whose pool stands empty for 4 quarters is removed by the clearing pass and the good returns to auto-surplus. The rule is right — a dead order should not hold a book slot forever — but a player who set a floor ON PURPOSE then finds the good selling at the market price when stock returns, and nothing on screen says the order is gone or why. The clearing pass already logs the close (an agency-topic history line, tagged with corp and body); nothing read it.
-
-IT LIVES UNDER MY TRADES, NOT IN A FEED. The question it answers is about the player's positions on this body, which is exactly what My trades lists; a closed order is the row that used to be there. The decision feed is the rivals' reasoning and the chat feed is economy_report events — routing an order-book fact into either would make the player look for it somewhere other than where the order stood. It is a notice, not a history: the newest 3 closes within the last 4 quarters, Closed (month) · Good · Floor, the log line itself on hover. DRAWN ONLY WHEN THERE IS ONE, so the section's measured height budget is untouched in the ordinary case.
-
-*Demanded by BL-1202 · `src/ui/market_ledger.cpp`, `src/ui/market_ledger.hpp`, `src/world/market_clearing.cpp` · id `market_ledger_trades_closed`*
+*Demanded by BL-687, BL-1269 · `src/ui/market_ledger.cpp`, `src/ui/market_ledger.hpp`, `src/ui/selection_panel.cpp`, `src/core/app.cpp` · id `market_ledger_trades`*
 
 ### National border band (Planetary canvas, plain-canvas chrome)
 
 **Answers:** Whose ground is this, and where does it stop?
 
-**Because:** A nation used to be a LENS - a territory-wide tint you had to switch to, which meant the political map was invisible unless you asked for it, and the tint occupied the same channel as terrain, texture and every other lens. The band answers the same question as always-on chrome instead, the way roads already do: colour at the boundary falling off inwards, so a nation reads as a bordered region and the middle of a territory stays free for whatever else is being shown. Two neighbours meeting therefore show two parallel rules and never average into a third nation's colour - which the old tint did, because it was composited INSIDE the blended fill. It also carries the route the lens used to own: clicking the band selects the nation, which is the only way to reach one (Ben, 2026-08-24: 'click the border itself'). The corridor is capped at 0.18 of the drawn hex radius so it narrows with the hex rather than swallowing a frontier tile, and hovering it names the nation immediately - well short of the hover card's dwell - so the target is readable before the click commits.
+**Because:** A nation used to be a LENS - a territory-wide tint you had to switch to, which meant the political map was invisible unless you asked for it, and the tint occupied the same channel as terrain, texture and every other lens. The band answers the same question as plain-canvas chrome instead: a hard edge only - an inset stroke in the nation's muted colour on its side of each boundary, with no wash inside the territory (Ben, 2026-10-10: 'a lot of visual clutter when many nations border each other ... removing shading inside national borders, and just go with the hard edges') - so a nation reads as a bordered region and the whole territory stays free for the ground. Two neighbours meeting therefore show two parallel rules and never average into a third nation's colour - which the old tint did, because it was composited INSIDE the blended fill. It also carries the route the lens used to own: clicking the band selects the nation, which is the only way to reach one (Ben, 2026-08-24: 'click the border itself'). The corridor is capped at 0.18 of the drawn hex radius so it narrows with the hex rather than swallowing a frontier tile, and hovering it names the nation immediately - well short of the hover card's dwell - so the target is readable before the click commits.
 
 *Demanded by BL-601 · `src/ui/body_surface_canvas.cpp`, `src/ui/ui_state.hpp`, `docs/ui/PLANETARY.md` · id `national_border_band`*
 
@@ -280,13 +258,45 @@ IT LIVES UNDER MY TRADES, NOT IN A FEED. The question it answers is about the pl
 
 *Demanded by BL-022, BL-027, BL-028 · `src/ui/nav_pane.cpp` · id `nav_pane`*
 
-### Roads and sea lanes (Planetary canvas, always-on route strokes)
+### Owner multi-select — the Corporation and Company lenses' picked owner set, owned-grey fill, checklist key and shift-click picker
+
+**Answers:** Where do I, and the one or two rivals (or firms) I am sizing up, hold ground on this body — against everyone else, who simply 'holds something here'?
+
+**Because:** Buildings no longer carry an owner colour on the canvas (RENDERING.md § Installations), so the Corporation and Company lenses became the only place ownership is read at a glance — and with every owner tinted at once they answered 'who owns what' with a map of every colour at once, which answers nothing. A picked set keeps the comparison the player is actually making in colour and folds every other owner into one owned-grey, which still says 'someone holds this' without competing. Ben, 2026-10-08 (the sprint 51 visibility pass). The key copies the Resource lens's search-and-checklist shape so there is no new vocabulary, rows exist only for owners with ground on the body, the Corporation set defaults to the player ('where am I, against everyone'), and shift-click makes the map itself the picker while a plain click keeps its BL-664 meaning. It costs no new screen space: the key fills the one lens chrome region the lens already owned.
+
+*Demanded by BL-1240 · `src/ui/body_surface_canvas.cpp`, `src/ui/ui_state.hpp`, `src/ui/presentation.hpp`, `src/core/verify_api.cpp`, `scripts/verify/owner_multi_select.lua` · id `owner_multi_select`*
+
+### The Planetary canvas ground at every zoom - one baked master per body, viewed at one 22.5-degree angle at every rung and under every lens
+
+**Answers:** What does this ground look like, at any zoom, the instant I look at it?
+
+**Because:** Ben, 2026-10-09, after walking the sprint 51 build: the ground lag was off-putting, because every zoom step had been a fresh bake that arrived late and softer first. One 128 px/hex master per body, pre-baked behind the handoff and held in RAM, makes every rung a downsample of the same picture: a rung change is final on arrival, and detail never changes with zoom, only scale - so the player learns one picture of a world, not five. One camera angle at every rung and under every lens is what makes one master possible (a second angle was a second bake), and it means neither a zoom step nor a lens toggle moves the map under the cursor. It adds no chrome and no control: it replaces the per-rung tiers, the stand-in that hid their fills, and the stepped tilt.
+
+*Demanded by BL-1246 · `src/core/ground_layer.cpp`, `src/core/ground_layer.hpp`, `src/ui/ground_bake.cpp`, `src/ui/body_surface_canvas.cpp` · id `planetary_ground_master`*
+
+### Baked landform relief and carved rivers (Planetary canvas ground) -- mountain as massif and ridge, canyon as a cut between paired rims, crater as a raised-rim bowl, rift as a dark fissure; rivers as curved courses widening downstream
+
+**Answers:** Where is the ground expensive to cross, and where does the water run and which way?
+
+**Because:** The four dramatic landforms are the <=1.5% of land whose movement cost is x1.3 or worse, so an invisible one is an expensive surprise; a river is an edge that discounts travel one way and gates wells and farms. Both used to be vector chrome laid over the painted ground -- a stroke-only glyph on the hex centre, a straight centre-to-centre stroke with chevrons -- and read as annotation on a painting (Ben, 2026-10-08, the sprint 51 form: mountains and rivers blend into the render). Baked, the same facts read as terrain: a contiguous run is one range, one cut, one fissure; a river is one smooth course whose width says which way it flows, so the chevrons have nothing left to say. The hover card still names the landform and its cost.
+
+*Demanded by BL-1242 · `src/ui/ground_bake.cpp`, `src/ui/body_surface_canvas.cpp`, `src/ui/hex_render.cpp` · id `planetary_landforms_rivers`*
+
+### Roads and sea lanes (Planetary canvas, always-on: painted into the ground at every rung; drawn as strokes only under the Throughput lens)
 
 **Answers:** Where can traffic move cheaply on this body - which ground is roaded, at what tier, and which water carries a lane?
 
-**Because:** Roads are terrain, not an overlay: the road ladder (Track / Road / Highway) and the sea lane both discount traversal cost for every convoy and every reach read (LOGISTICS.md sec 1, sec 4b), so a player planning a site or a haul needs them on the plain canvas under every lens. Ben, 2026-10-03, playing the build: "render [roads] as curves rather than lines, and make them thinner" and "sea lanes should always go over ocean, never over ground". So both draw as smooth curves through their tile chains (a quadratic through each tile's two shared-edge midpoints, junctions paired into through-curves), at one named width per tier, half the old straight-segment widths, keeping the 1 : 1.5 : 2 ladder so the tiers still read apart. The sea lane had no stroke on the campaign map at all, though the stamped field shapes every sea leg's cost; it now draws along its own stamped water tiles in the sea blue the wizard's lapse uses, so the curve can never leave the sea.
+**Because:** Roads are terrain, not an overlay: the road ladder (Track / Road / Highway) and the sea lane both discount traversal cost for every convoy and every reach read (LOGISTICS.md sec 1, sec 4b), so a player planning a site or a haul needs them on the plain canvas under every lens. Ben, 2026-10-03, playing the build: "render [roads] as curves rather than lines, and make them thinner" and "sea lanes should always go over ocean, never over ground". So both draw as smooth curves through their tile chains (a quadratic through each tile's two shared-edge midpoints, junctions paired into through-curves), at one named width per tier, half the old straight-segment widths, keeping the 1 : 1.5 : 2 ladder so the tiers still read apart. The sea lane had no stroke on the campaign map at all, though the stamped field shapes every sea leg's cost; it now draws along its own stamped water tiles in the sea blue the wizard's lapse uses, so the curve can never leave the sea. PAINTED INTO THE GROUND (BL-1253; Ben, 2026-10-09, walking the sprint 51 build: "roads go over buildings, rather than being painted as an optional part of the building tile sets. Roads are also so simplified, we want to paint a texture on roads"): the same curves are now a pass in the ground bake with a surface per tier - Track ruts and a grass crown, Road gravel with verges and ditches, Highway asphalt with kerbs and a centre line, a lane a faint broken wake on the water - so the tier reads from the surface itself, not only from a stroke weight. A road meets a built tile through that tile's roaded variant (the works step aside, the road bends round them and ends at a forecourt; a town keeps its blocks off its street), so a road never runs across a roof. The drawn strokes stayed at the two widest rungs for a while, so the web read where a painted road is under a pixel; Ben, 2026-10-10, retired them - they drew too much attention zoomed out - so the plain canvas draws no road network at any rung and the network as logistics is read on the Throughput lens.
 
-*Demanded by  · `src/ui/body_surface_canvas.cpp`, `docs/ui/RENDERING.md` · id `planetary_routes`*
+*Demanded by BL-1253 · `src/ui/body_surface_canvas.cpp`, `src/ui/route_paint.cpp`, `src/ui/structure_stamps.cpp`, `docs/ui/RENDERING.md` · id `planetary_routes`*
+
+### Baked structures (Planetary canvas ground: buildings, settlements, ruins, construction sites) and the Selection band's zoomed neighbourhood view of them
+
+**Answers:** What stands on this ground, roughly what is it, and how built-up is this region - without hovering anything?
+
+**Because:** A glyph layer over painterly ground made every built tile read as a label stuck on a picture, and one mark carried four answers on half a hex (type, kinds, count, owner). Ben's sprint 51 form (2026-10-08) moved the answer into the art: one procedural structure per depicted subject - a head-frame over a mine, a hall and stacks over a foundry, a quay toward the water at a port - so WHAT is made here reads by silhouette; a stacked tile stands a cluster of up to three, the dominant stack largest and in front; a settlement steps its footprint and height with scale and bakes as a pale paved patch at the far page, where the density dot stood; a razed centre bakes as a ruin and a site under construction as scaffolding. It earns its space by taking none: it IS the ground the canvas already draws, adds no chrome, no legend and no control, and frees the hex the ring, badge, emblem tag and skyline occupied. Finer questions moved to surfaces built for them - count and running state to the Production section, ownership to the hover card, the player footprint outline and the owner lenses. The Selection band's zoomed neighbourhood view draws the same baked page, so the picture of a selected tile matches the canvas it was pressed on.
+
+*Demanded by BL-1241 · `src/ui/structure_stamps.cpp`, `src/ui/structure_stamps.hpp`, `src/ui/ground_bake.cpp`, `src/core/ground_layer.cpp`, `src/ui/body_surface_canvas.cpp`, `src/ui/hex_render.cpp`, `docs/ui/RENDERING.md` · id `planetary_structures`*
 
 ### Profile panel
 
@@ -328,14 +338,6 @@ IT LIVES UNDER MY TRADES, NOT IN A FEED. The question it answers is about the pl
 
 *Demanded by BL-683, BL-682, BL-431, BL-430, BL-074 · `src/ui/selection_panel.cpp`, `src/ui/selection_panel.hpp`, `src/ui/selection_card.cpp`, `src/ui/detail_level.hpp`, `src/ui/ui_state.hpp` · id `selection_building_card`*
 
-### Selection band - Market card, Dispatch convoy form
-
-**Answers:** How much of what do I send from the market I'm looking at, to where?
-
-**Because:** SUPPLY.md always specified this front door -- 'a dispatch starts from a source you are looking at, and it is a resource + quantity + destination-market form, not a press' -- but BL-452 only ever wired dispatch_convoy onto the wire/agent dictionary; no UI site issued it, so the player's own corp had no way to direct a convoy at all (only the automatic shortfall scan moved goods). The form reuses the Sell Orders tab's own tradeable-resource test and the Convoys tab's market_city_name identity, so it cannot show a resource or destination the player couldn't already see traded or in flight, and a rejection (no route, insufficient funds) is surfaced inline rather than silently dropped.
-
-*Demanded by BL-607, BL-452 · `src/ui/selection_panel.cpp` · id `selection_market_dispatch`*
-
 ### Selection element
 
 **Answers:** What have I selected, and what can I do with it?
@@ -344,13 +346,21 @@ IT LIVES UNDER MY TRADES, NOT IN A FEED. The question it answers is about the pl
 
 *Demanded by BL-067, BL-068, BL-071, BL-367, BL-593 · `src/ui/selection_panel.cpp` · id `selection_panel`*
 
+### Selection band - the tile element's Production section (first in the section nav)
+
+**Answers:** What stands on this tile, is it running (and if not, why not), and what does what it makes - or what lies in the ground here - fetch at the market that prices it?
+
+**Because:** Running state had no home once the canvas art went static (RENDERING.md, installations): a building that sat idle for want of labour or an input looked exactly like one that ran, and the only place that said otherwise was a hover card that has to be found one building at a time. Ben, 2026-10-08 (the sprint 51 visibility pass): the tile opens on what is HAPPENING there - the initial market conditions, read from the ground the player is looking at. Tile grain is the point, not a shortcut: a building stands on a tile and a market's catchment is tile-keyed, so a province sum would blur exactly the two things this section joins. Part one gives one row per stack (the grouping Manage Buildings uses, and where the retired +N badge's count is now read), with output per tick and the running state WITH ITS REASON - labour short, or an input short named with its cause - classified by the one function the hover card and the building card's Status page also read, so the three cannot disagree. A rival's row shows type, count and owner and says 'private' for the rest (DISCOVERY.md). Part two names the market whose catchment holds the tile and prices every good made here, then every good deposited here, with short / balanced / surplus from public aggregates; each row is a drill-through door to the Market ledger aimed at that market and good. An unbuilt tile still earns the section: 'Nothing built here' is stated positively and its deposits are still priced, which on a fresh campaign is the whole read.
+
+*Demanded by BL-1239 · `src/ui/selection_panel.cpp`, `src/ui/building_state.cpp`, `src/ui/building_state.hpp`, `src/ui/hover_content.cpp`, `src/ui/market_ledger.cpp`, `src/ui/ui_state.hpp` · id `selection_tile_production`*
+
 ### Selection band - the tile element's section top nav
 
-**Answers:** Everything this ground has to say, in the order I can act on it: what can I still build here, what does the locality hold, what does this hex yield, who works here, what is the terrain?
+**Answers:** Everything this ground has to say, opening on what is happening here and then in the order I can act on it: what does this tile make and fetch, what can I still build here, what does the locality hold, what does this hex yield, who works here, what is the terrain?
 
-**Because:** The centre column was a PAGER, and the province was a second element with a pager of its own; both hid the list of questions the surface can answer behind a press. An accordion was built to show that list and was ruled out on sight, on a measurement rather than a taste: five stacked headers spent 169 of the band's 258 px on chrome to leave the open section 89. The nav keeps what the accordion was FOR - a visible sense of how many readings exist - by putting an i/N count beside the title, which costs one row instead of five, and returns the rest of the band to the reading you are actually doing. The chevrons straddle the span so the two presses are as far apart as the element allows; the title centres on the run between them; the full-canvas control is excepted and keeps the rightmost slot, which is where every other surface in the shell puts it. The ORDER is the other half of the argument (Ben, 2026-08-24): Buildings, Deposits, Resources, Population, Terrain runs from what the player can act on to what the ground merely is.
+**Because:** The centre column was a PAGER, and the province was a second element with a pager of its own; both hid the list of questions the surface can answer behind a press. An accordion was built to show that list and was ruled out on sight, on a measurement rather than a taste: five stacked headers spent 169 of the band's 258 px on chrome to leave the open section 89. The nav keeps what the accordion was FOR - a visible sense of how many readings exist - by putting an i/N count beside the title, which costs one row instead of five, and returns the rest of the band to the reading you are actually doing. The chevrons straddle the span so the two presses are as far apart as the element allows; the title centres on the run between them; the full-canvas control is excepted and keeps the rightmost slot, which is where every other surface in the shell puts it. The ORDER is the other half of the argument (Ben, 2026-08-24): Buildings, Deposits, Resources, Population, Terrain runs from what the player can act on to what the ground merely is. Ben, 2026-10-08 (the sprint 51 visibility pass) put Production in front of it - what is HAPPENING here - so the nav is six sections and wraps at six.
 
-*Demanded by BL-598 · `src/ui/selection_panel.cpp`, `src/ui/ui_state.hpp` · id `selection_tile_section_nav`*
+*Demanded by BL-598, BL-1239 · `src/ui/selection_panel.cpp`, `src/ui/ui_state.hpp` · id `selection_tile_section_nav`*
 
 ### Selection band - Unit (Soldier) card (3-column band)
 
@@ -380,9 +390,9 @@ IT LIVES UNDER MY TRADES, NOT IN A FEED. The question it answers is about the pl
 
 **Answers:** How much can move through here, and how far is this ground from the capacity that would move it?
 
-**Because:** Active Logistic Points are a CAP: a march over the cap is refused outright, and LOGISTICS.md makes surfacing that non-optional -- 'a refusal nobody sees is silent interdiction again'. Without a surface the player meets the cap only as a move that mysteriously did not happen. It earns its space by costing none: it extends the Reach field the placement rule already computes rather than adding a surface, which is exactly the shape Ben's ruling asked for -- 'throughput is that field with a magnitude, so it is a small step from an existing surface rather than a new one'. It is off the lens bar, so it takes no strip slot from the eight lenses that answer first-sight questions.
+**Because:** Active Logistic Points are a CAP: a march over the cap is refused outright, and LOGISTICS.md makes surfacing that non-optional -- 'a refusal nobody sees is silent interdiction again'. Without a surface the player meets the cap only as a move that mysteriously did not happen. It earns its space by costing none: it extends the Reach field the placement rule already computes rather than adding a surface, which is exactly the shape Ben's ruling asked for -- 'throughput is that field with a magnitude, so it is a small step from an existing surface rather than a new one'. It is off the lens bar, so it takes no strip slot from the eight lenses that answer first-sight questions. IT ALSO CARRIES THE NETWORK (BL-1257, Ben 2026-10-10): on the ground a road is a thin pale thread of the land, so the road and lane network as logistics -- every road by tier at full weight, every lane in its blue, at every rung -- is read here, over the reach-cost field that network produces; the plain canvas draws no road network at any rung (Ben, 2026-10-10: the drawn web drew too much attention zoomed out).
 
-*Demanded by BL-606 · `src/ui/body_surface_canvas.cpp` · id `throughput_lens`*
+*Demanded by BL-606, BL-1257 · `src/ui/body_surface_canvas.cpp` · id `throughput_lens`*
 
 ### Tile inspector
 
@@ -504,7 +514,7 @@ IT LIVES UNDER MY TRADES, NOT IN A FEED. The question it answers is about the pl
 
 **Answers:** How well am I doing?
 
-**Because:** ONE card, Balance: earnings against stacked expenses, and nothing else. The surface shipped with four roll-ups and three of them were answered better elsewhere — Production and Workforce by the Construction ledger's Buildings tab, which holds the estate AND the per-building levers; Trade by the Market and Convoys ledgers. What is left that only this surface can answer is how well the corporation is doing, and the honest answer to that today is money (Ben, 2026-08-29). The card earns its column because it shows its chart AT REST rather than a verdict line over an empty column, and because the chart is the whole of the quarter's arithmetic: earnings on the left, every outflow corp_budget::net() subtracts stacked on the right, each segment naming itself and its figure on hover. Interest is absent while the corp is solvent and present once it is in debt, so the segment count itself reads the solvency boundary. It is the same ui::charts drawer the building card's Revenue/Expenses graph uses, at a different grain — one chart, one arithmetic, two surfaces that cannot disagree. "Balance" is a sub-header inside the Corporation ledger, not a competing surface name, and its overlap with the Budget ledger is explicitly ACCEPTED (Ben, 2026-08-29) rather than an oversight to clean up. Research points, score, ranking and market cap are deferred by name until core gameplay is established; several have no store behind them at all.
+**Because:** ONE card, Balance: earnings against stacked expenses, and nothing else. The surface shipped with four roll-ups and three of them were answered better elsewhere — Production and Workforce by the Construction ledger's Buildings tab, which holds the estate AND the per-building levers; Trade by the Market and Convoys ledgers. What is left that only this surface can answer is how well the corporation is doing, and the honest answer to that today is money (Ben, 2026-08-29). The card earns its column because it shows its chart AT REST rather than a verdict line over an empty column, and because the chart is the whole of the quarter's arithmetic: earnings on the left, every outflow corp_budget::net() subtracts stacked on the right, each segment naming itself and its figure on hover. Interest is absent while the corp is solvent and present once it is in debt, so the segment count itself reads the solvency boundary. It is the same ui::charts drawer the building card's Revenue/Expenses graph uses, at a different grain — one chart, one arithmetic, two surfaces that cannot disagree. "Balance" is a sub-header inside the Corporation ledger, not a competing surface name, and its overlap with the Budget ledger is explicitly ACCEPTED (Ben, 2026-08-29) rather than an oversight to clean up. Research points, score, ranking and market cap are deferred by name until core gameplay is established; several have no store behind them at all. BL-1215 (refunds flow shown) adds one EARNINGS segment and one line: a refund the quarterly return booked (BL-1206, the seat's cancelled construction) is cash in that is not earnings, so it stacks beside Income as its own named segment and is named again under the net rather than folded into it - otherwise the header's return-based net and this card's operating net disagree with no visible reason.
 
 *Demanded by BL-081, BL-214, BL-343, BL-691 · `src/ui/corporation_dashboard.cpp`, `src/ui/charts.cpp` · id `corporation_dashboard`*
 

@@ -25,7 +25,8 @@ verify.goto_surface("home")
 verify.select_tile(s.unit.col, s.unit.row)
 verify.frames(3)
 
-local NAMES = { "Buildings", "Deposits", "Resources", "Population", "Terrain" }
+-- BL-1239: Production opens the nav, six sections, wrapping at six.
+local NAMES = { "Production", "Buildings", "Deposits", "Resources", "Population", "Terrain" }
 
 -- The nav row sits at the top of the centre column, between the hex cell and the
 -- action grid. These ARE screen coordinates, and after three coordinate failures in
@@ -61,7 +62,7 @@ for i = 1, #NAMES do
     shot("nav_fwd_" .. tostring(i) .. "_" .. NAMES[after + 1])
 end
 
-verify.expect(section() == start, "five presses of the right chevron return to the start")
+verify.expect(section() == start, "six presses of the right chevron return to the start")
 
 -- And back the other way, which is the half a one-directional pager never had.
 local before = section()

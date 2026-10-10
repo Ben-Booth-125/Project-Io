@@ -36,7 +36,7 @@ void balance_body(const corp_rollups& r, float chart_h)
         return;
     }
 
-    const balance_columns c = build_balance_columns(r.budget);
+    const balance_columns c = build_balance_columns(r.budget, r.refunds);
 
     const ImVec2 p  = ImGui::GetCursorScreenPos();
     const float  cw = ImGui::GetContentRegionAvail().x;
@@ -55,6 +55,20 @@ void balance_body(const corp_rollups& r, float chart_h)
     ImGui::Dummy({cw, chart_h});
 
     ImGui::Text("Net this quarter: %+.1f", static_cast<double>(r.budget.net()));
+
+    // BL-1215: the refund is named on its own line rather than folded into the
+    // net above. It is cash credited back (the seat's cancelled construction,
+    // BL-1206), not earnings: corp_command and spawn_seat both subtract it from
+    // trailing earnings, so the operating net stays the figure a player tunes.
+    // Kept short so it fits the ledger column; the why is on hover.
+    if (r.refunds > 0.0f)
+    {
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::positive),
+                           "Refunds: %+.1f (not earnings)", static_cast<double>(r.refunds));
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Construction cancelled when this seat was taken,\n"
+                              "credited back at what it had paid. Not counted as earnings.");
+    }
 
     // BL-454's force line. The UNMET part is called out explicitly: an army
     // quietly weakening because its goods never arrived is exactly the thing the
@@ -78,7 +92,8 @@ void balance_body(const corp_rollups& r, float chart_h)
 float chart_budget(const corp_rollups& r)
 {
     const float line = ImGui::GetTextLineHeightWithSpacing();
-    const int   tail = 1 + ((r.budget_measured && r.budget.force_units > 0) ? 1 : 0);
+    const int   tail = 1 + ((r.budget_measured && r.budget.force_units > 0) ? 1 : 0)
+                         + (r.refunds > 0.0f ? 1 : 0); // BL-1215's refunds line
     return std::max(140.0f, ImGui::GetContentRegionAvail().y - line * (tail + 1));
 }
 
@@ -89,7 +104,7 @@ std::size_t corp_card_count()
     return 1;
 }
 
-balance_columns build_balance_columns(const corp_budget& b)
+balance_columns build_balance_columns(const corp_budget& b, float refunds)
 {
     balance_columns c;
 
@@ -100,6 +115,12 @@ balance_columns build_balance_columns(const corp_budget& b)
     if (b.subsidies > 0.0f)
         c.earnings[c.earning_count++] =
             {b.subsidies, IM_COL32(120, 190, 255, 255), "Subsidies", nullptr};
+    // BL-1215: a refund the quarter's return booked (BL-1206) is cash in, so it
+    // stacks on the earnings side — named, never merged into Income.
+    if (refunds > 0.0f)
+        c.earnings[c.earning_count++] =
+            {refunds, IM_COL32(150, 215, 170, 255), "Refunds",
+             "Cancelled construction credited back - not earnings"};
 
     // Expenses — every outflow `corp_budget::net()` subtracts, each its OWN
     // segment. Levies and force upkeep are not folded into maintenance or wages
@@ -138,6 +159,8 @@ corp_rollups derive_corp_rollups(const world& w, const recipe_registry& reg,
     if (cit == w.corporations.end())
         return r;
     r.balance = cit->second.balance;
+    if (!cit->second.returns.empty())
+        r.refunds = cit->second.returns.back().refunds; // BL-1215
 
     const auto bit = report.budgets.find(corp);
     if (bit != report.budgets.end())

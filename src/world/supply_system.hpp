@@ -123,154 +123,49 @@ void advance_convoys(world& w);
 void credit_arrived_convoys(world& w, int tick = 0,
                             std::vector<interception_record>* out_cuts = nullptr);
 
-/// Auto-dispatch: the SELLER chases a NET PRICE (BL-995, SUPPLY.md § Dispatch
-/// trigger). For every (corp, market) pool — ascending key — holding a good above
-/// its processor reservation, at LAST tick's resolved prices:
-///   net(d) = price_d - haul_per_unit(src -> d)
-/// and the good goes to argmax_d net(d) (ties to the lower market id) only if
-/// net(d) - price_src > reg.dispatch_margin() x price_src. The quantity is
-/// min(surplus, q) less what the corp already has in transit to d, with
-/// q = supply_d x ((price_d / landed_cost)^2 - 1), or d's unmet demand when d
-/// has no supply. Runs AFTER run_economy_step and BEFORE clear_markets, so the
-/// seller hauls before auto-surplus sells at home. One rule for every corp,
-/// the player's included. There is no shortfall scan: a short market prices
-/// the good high and this rule reaches it.
-///
-/// Space-mode convoys require a building_type::launchpad in the source corp's assets
-/// on the source body. Land-mode is ungated. An intra-body haul is ROUTED (BL-1186,
-/// SUPPLY.md § Logistical cost): overland, or land -> port -> sea -> port -> land
-/// through the pair of active Ports that makes the whole route cheapest, handling
-/// paid at both; a convoy with a sea leg carries `convoy_mode::sea`. Air mode is not
-/// dispatched in the prototype.
-///
-/// @param w         World; convoys are appended and source pools debited.
-/// @param reg       Registry (for building type lookups).
-/// @param logistics_cost_land   base_cost_per_unit_distance for land mode.
-/// @param logistics_cost_space  base_cost_per_unit_distance for space mode.
-/// @param shared_lp_pools BL-597: forwarded to every `commit_convoy` call this
-///        pass makes. Null (the default) builds one private `lp_pool_map`
-///        local to this call, shared across every convoy THIS pass commits
-///        (so two hauls drawing on one anchor within one
-///        `dispatch_convoys` call already contend, mirroring how
-///        `run_unit_march` shares one pool across all its units) but
-///        discarded before the caller gets it back — the real per-tick driver
-///        passes its own instance to see that same pool drawn down further by
-///        this tick's `run_unit_march` call, which is what makes "war flips
-///        the queue" observable.
-/// @return This pass's counters — dispatched legs and passive-LP refusals,
-///        same shape/intent as `unit_march_tick` (BL-596). The auto-dispatch
-///        path had NO surfacing at all before this (not even for the
-///        pre-existing insolvency refusal `commit_convoy` already gated on);
-///        this is the first cut, matching BL-596's own counter-on-the-tick-
-///        summary convention rather than inventing a narration pathway.
-struct convoy_dispatch_tick
-{
-    int dispatched    = 0; ///< Convoys committed this pass.
-    int refused_no_lp = 0; ///< BL-597: shortfalls refused for want of passive LP.
-    /// BL-1071: convoys a MARKET sent from its own shelf this pass (owner
-    /// null_entity), counted apart — `dispatched` stays corporations' convoys.
-    int market_exports = 0;
-    /// BL-1186 E1: convoys (corporations' and markets' alike) the passive-LP cap
-    /// TRIMMED — sent at what the anchor still admitted, short of the sized cargo.
-    /// Counted inside `dispatched` / `market_exports`, not beside them.
-    int trimmed_by_lp = 0;
-};
-
-convoy_dispatch_tick dispatch_convoys(world& w, const recipe_registry& reg,
-                      float logistics_cost_land, float logistics_cost_space,
-                      lp_pool_map* shared_lp_pools = nullptr);
-
 // ---------------------------------------------------------------------------
-// BL-995 — the net-price rule's sizing, shared by dispatch_convoys and the rival
-// scorer's directed dispatch (corp_ai.cpp), so both size a haul identically.
+// The dispatcher RETIRED (BL-1265 / BL-1266; TRADE.md § What trade replaces):
+// the corporation convoy (a pool hauling its own surplus) and the market export
+// went with corporation pools. A convoy is now only ever a TRADE's shipment
+// (trade.hpp, `run_trades`), bought off one shelf and landed on another.
 // ---------------------------------------------------------------------------
-
-/// Per-pass memo of `auto_surplus_reservation` keyed (corp, pool key).
-using reservation_memo = std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>>;
 
 /// Last resolved price of good `r` in `mc`, base price as the fallback; 0 when
 /// the market does not price the good at all.
 float dispatch_market_price(const market_component& mc, std::size_t r);
 
-/// The HOME price of a pool: its market's last resolved price, or 0 for a
-/// body-level pool (no market to sell into) or a good its market does not price.
-float dispatch_home_price(const world& w, entity_id src_key, std::size_t r);
-
-/// BL-1229 (an order is a floor, not a hold; MARKETS.md step 4): the highest
-/// `floor_price` among the standing sell orders on each (corp, body, good).
-/// Built once per pass from `w.sell_orders`; a std::map, read only by lookup.
-using order_floor_map = std::map<std::tuple<entity_id, entity_id, std::size_t>, float>;
-order_floor_map collect_order_floors(const world& w);
-
-/// The SOURCE price a haul out of pool `src_key` must beat — the one rule the
-/// auto-dispatcher and the rival scorer's directed dispatch share. The pool's
-/// home price, or, where the corp holds a standing sell order on the good on
-/// the pool's body, max(home price, the highest floor): the order accepts no
-/// sale below its floor, at home or by haul, so a haul must beat it as it beats
-/// home, and is sized so the destination lands no lower than floor + haul.
-float dispatch_source_price(const world& w, const order_floor_map& floors, entity_id corp,
-                            entity_id src_key, std::size_t r);
-
 /// Supply `dest` can absorb before its UNSMOOTHED target price (`price_target`)
 /// falls to `landed_cost`: S* - S with S* = D x (base / landed)^2, clamped by the
 /// price band (+infinity when landed sits below the band's floor, 0 at or above
 /// its ceiling or with no demand); a zero-supply market absorbs its unmet demand.
-/// The derivation is written out at the definition.
+/// The derivation is written out at the definition. Auto trade sizes a route by
+/// it (TRADE.md § Auto and reserved trade).
 float dispatch_absorbable(const world& w, const recipe_registry& reg, entity_id dest,
                           std::size_t r, float landed_cost);
 
-/// Supply already on its way into `dest`'s next clear: EVERY corp's convoys
-/// bound there (held ones included), plus every corp's stock in (corp, dest)
-/// above its processor reservation. `sorted_corp_ids` fixes the float order.
-float dispatch_pending(const world& w, const recipe_registry& reg, entity_id dest,
-                       std::size_t r, const std::vector<entity_id>& sorted_corp_ids,
-                       reservation_memo& memo);
+/// Supply already on its way into `dest`'s next clear: EVERY owner's cargo
+/// bound there (held convoys included) plus this tick's landings on it.
+float trade_pending(const world& w, entity_id dest, std::size_t r);
 
-/// max(0, absorbable - pending): what one more haul into `dest` may carry.
-float dispatch_room(const world& w, const recipe_registry& reg, entity_id dest, std::size_t r,
-                    float landed_cost, const std::vector<entity_id>& sorted_corp_ids,
-                    reservation_memo& memo);
-
-/// This tick's delivery of good `r` into the (corp, key) pool
-/// (`world::arrived_this_tick`) — not shippable until it has met a clear.
-float dispatch_arrived(const world& w, entity_id corp, entity_id key, std::size_t r);
-
-/// BL-1071 (shelf stock moves): the stock of good `r` on `market`'s SHELF
-/// (`market_component::inventory`) the market may export this pass — the shelf
-/// less what its own consumers need (last clear's demand for the good there),
-/// less this tick's shelf deliveries; never negative. The reading and why it was
-/// chosen are written out at the definition. `dispatch_convoys` exports it, after
-/// every corporation's dispatch, by the same net-price rule: same body only, from
-/// the market's centre, into the room left once every pending cargo AND the
-/// destination's own shelf are subtracted. The convoy's owner is `null_entity`;
-/// it lands on the destination shelf, and no balance moves (the market holds no
-/// treasury — the haul is the margin the export gives up).
-float market_shelf_surplus(const world& w, entity_id market, std::size_t r);
+/// max(0, absorbable - pending): what one more shipment into `dest` may carry
+/// at `landed_cost` and still sell above it.
+float trade_room(const world& w, const recipe_registry& reg, entity_id dest, std::size_t r,
+                 float landed_cost);
 
 // ---------------------------------------------------------------------------
-// The shared dispatch (BL-452)
+// The shipment (TRADE.md § A trade; SUPPLY.md)
 // ---------------------------------------------------------------------------
-// dispatch_convoys above is TWO things bolted together: the net-price rule
-// (BL-995) that decides *what to haul from where to where*, and the dispatch
-// itself — price the leg, commit the cargo, put a convoy on the lane. Only the
-// first half is the auto-dispatcher's own opinion. The second half is what a
-// convoy IS, and the player's `dispatch_convoy` verb (corp_command.hpp) needs
-// exactly it with the rule removed.
-//
-// So it is factored out here rather than reimplemented there. There is no
-// fourth code path: `dispatch_convoys` and `apply_corp_command` call the same
-// two functions with the same arguments, so a player's convoy and a rival's of
-// the same shape cost the same and travel at the same speed — an assertion
-// tools/verify/convoy_command.cpp makes directly, because a silent divergence
-// here is exactly the bug a copy would introduce.
+// A trade buys on one shelf, pays the haul, and lands on another. Pricing the
+// leg and committing the shipment are the two functions below, shared by every
+// trade — manual or auto, the player's or a rival's — so a player's shipment and
+// a rival's of the same shape cost the same and travel at the same speed.
 
 /// BL-148/149 logistics-node lookups. `pop_tile_scale` maps a population
 /// centre's tile to its scale (tier 1–5 — cities are free hubs); `hub_tiles`
 /// holds every completed, active inland_logistics_hub's tile. An intra-body
 /// haul is discounted for each such node its A* path crosses.
 ///
-/// Built once per auto-dispatch pass (it is a walk of every building), and once
-/// per player command — a single press can afford the walk.
+/// Built once per trade pass (it is a walk of every building).
 struct logistics_nodes
 {
     std::unordered_map<entity_id, int> pop_tile_scale;
@@ -280,12 +175,13 @@ struct logistics_nodes
 logistics_nodes collect_logistics_nodes(const world& w);
 
 /// One priced candidate leg: what hauling `qty` of resource index `ri` from
-/// source pool `src_key` to `dest_market_id` would cost, in credits and in econ ticks.
+/// the source market's shelf to `dest_market_id` would cost, in credits and in
+/// econ ticks.
 struct convoy_leg
 {
-    /// False when the lane cannot be flown at all — no production anchor, no
-    /// reachable path, no launchpad on the source body, no propellant to launch
-    /// with, or a cost that is not a finite number. Nothing was mutated.
+    /// False when the lane cannot be run at all — no reachable path, no
+    /// launchpad on the source body, no propellant on its shelf to launch with,
+    /// or a cost that is not a finite number. Nothing was mutated.
     bool        viable       = false;
     convoy_mode mode         = convoy_mode::land;
     float       cost         = 0.0f; ///< Total credits the haul costs (already node-discounted).
@@ -298,149 +194,91 @@ struct convoy_leg
     entity_id   port_b       = null_entity;
 };
 
-/// Price one leg. A pure read of the world apart from the A* path cache, which
-/// is why `w` is non-const. Mutates no game state and creates nothing.
-///
-/// @param nodes                From collect_logistics_nodes; the intra-body discount source.
-/// @param src_key              BL-1003: the SOURCE POOL KEY — the market whose (corp, market)
-///                             pool the cargo leaves, or a body id for a market-less body's
-///                             body-level pool. The source body is `pool_key_body(src_key)`;
-///                             the intra-body origin is `convoy_origin_tile(src_key)`; the
-///                             launch draw reads this pool. `src_key == dest_market_id`
-///                             (a haul into the market the goods already sit in) answers
-///                             `viable = false`.
-/// @param ri                   Resource index; out-of-range answers `viable = false`.
-/// @param qty                  Units of cargo. Non-finite or non-positive answers `viable = false`.
-/// @param logistics_cost_space Space-lane base cost per unit distance per unit cargo. Every
-///                             caller passes `reg.logistics_cost(convoy_mode::space)`; it stays a
-///                             parameter only because `dispatch_convoys` has always taken it.
-convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
-                            const logistics_nodes& nodes, entity_id corp_id,
-                            entity_id src_key, entity_id dest_market_id,
-                            std::size_t ri, float qty, float logistics_cost_space,
-                            const entity_id* known_origin = nullptr);
-// BL-1079 (live tick speedups): `known_origin`, when given, is the caller's
-// already-resolved `convoy_origin_tile(corp, src_key)` — the SAME value this
-// function would compute (null_entity included), handed in so a caller pricing
-// one pool against every destination resolves it once per pool, not once per
-// leg. It must be computed against the world as it stands; nothing between the
-// two may move the corp's buildings or the market set.
+/// Price one trade leg from @p src_market's shelf to @p dest_market_id for
+/// @p corp_id. A pure read of the world apart from the A* path cache, which is
+/// why `w` is non-const. Same body: `price_market_leg`, centre to centre,
+/// corporation-independent. Between bodies (TRADE.md § A trade, "Between
+/// bodies"): the space lane, viable only when @p corp_id holds a Launchpad on
+/// the source body AND the source shelf holds the launch's propellant
+/// (`launch_draw_per_convoy`) under the fair-price ceiling. Never viable for a
+/// grid good (BL-708), a market to itself, an unknown market or corp, or a
+/// non-finite / non-positive @p qty.
+convoy_leg price_trade_leg(world& w, const recipe_registry& reg,
+                           const logistics_nodes& nodes, entity_id corp_id,
+                           entity_id src_market, entity_id dest_market_id,
+                           std::size_t ri, float qty);
 
-/// BL-1071: price a MARKET's own export leg of `qty` units from `src_market`'s
-/// centre to `dest_market`'s centre — the same intra-body router, port gate, node
-/// discount, handling and cost a corporation's leg uses (price_convoy_leg), with no
-/// corporation, launchpad or propellant. Not viable across bodies, from or to an
-/// unanchored market, or to itself.
+/// The corporation-independent SAME-BODY leg of `qty` units from `src_market`'s
+/// centre to `dest_market`'s centre — the intra-body router, port gate, node
+/// discount and handling every shipment uses. Not viable across bodies, from or
+/// to an unanchored market, or to itself.
 ///
 /// THE ONE QUESTION "is this pair viable" (BL-1186): viable exactly when the pair
 /// routes overland, or land -> port -> sea -> port -> land through two active Ports
 /// (SUPPLY.md § Logistical cost) — the ports need not sit on either market centre.
 /// BL-1185's placement asks this same call, so placement and shipping cannot disagree.
-convoy_leg price_market_export_leg(world& w, const recipe_registry& reg,
-                                   const logistics_nodes& nodes, entity_id src_market,
-                                   entity_id dest_market, float qty);
+convoy_leg price_market_leg(world& w, const recipe_registry& reg,
+                            const logistics_nodes& nodes, entity_id src_market,
+                            entity_id dest_market, float qty);
 
-/// Tile of the corp's lowest-id building on `body` (BL-077's production anchor).
-/// `null_entity` if the corp holds nothing on the body.
-entity_id corp_representative_tile(const world& w, const corporation_component& corp, entity_id body);
+/// True if `corp` has a launchpad building whose tile is on `body`.
+bool corp_has_launchpad_on(const world& w, const corporation_component& corp, entity_id body);
 
-/// Does the launch draw burn from pool (`corp`, `pool_key`)? True exactly when
-/// the corp holds a Launchpad on the pool's body (`pool_key_body`) — the SAME
-/// test `price_convoy_leg`'s space-lane gate applies before it reads this pool's
-/// launch draw, so a pool this answers true for is a pool a launch can burn
-/// from, and no other. "A pad's pool keeps its propellant" (MARKETS.md step 4,
-/// Ben 2026-10-09) reserves against exactly these pools. False for an unknown
-/// corp or a key with no body.
-bool launch_burns_from_pool(const world& w, entity_id corp, entity_id pool_key);
-
-/// BL-1003 — where a haul out of the source pool `src_key` starts: for a market
-/// pool, the corp's lowest-id building in that market's catchment, else the
-/// market's own centre tile (stock that arrived by convoy sits at the market);
-/// for a body-level pool, `corp_representative_tile` on that body.
-entity_id convoy_origin_tile(const world& w, const corporation_component& corp, entity_id src_key);
-
-/// The goods ONE space-mode convoy launch burns from the dispatching corp's
-/// on-body pool (BL-308) — per LAUNCH, not per tonne and not per AU: the pad is
-/// the thing being fuelled, so a launch costs the same whatever it carries.
+/// The goods ONE space-lane launch burns (BL-308) — per LAUNCH, not per tonne and
+/// not per AU: the pad is the thing being fuelled, so a launch costs the same
+/// whatever it carries. BL-1265: the trader BUYS it off the source shelf.
 ///
-/// EXPORTED, AND AS A VECTOR, because of BL-648 rather than for generality's
-/// own sake. `tools/verify/chain_depth.cpp` R1 no longer accepts a prose string
-/// as proof that a good has a consumer; it resolves each exemption against a
-/// registry of the passes that REALLY draw, and a private `constexpr float` in
-/// supply_system.cpp's anonymous namespace could only reach that registry as a
-/// second hand-maintained copy — precisely the loophole BL-648 closes. This is
-/// THE definition: `price_convoy_leg` gates on this vector and `commit_convoy`
-/// debits it, so the draw and the thing the registry reads are one object, and
-/// naming a second launch consumable is a one-line change here that the
-/// registry picks up with no harness edit at all.
+/// EXPORTED, AND AS A VECTOR, because of BL-648: `tools/verify/chain_depth.cpp`
+/// R1 resolves each consumer exemption against a registry of the passes that
+/// REALLY draw. This is THE definition: `price_trade_leg` gates on this vector
+/// and `commit_trade_shipment` buys it, so the draw and the thing the registry
+/// reads are one object.
 const std::array<float, resource_count>& launch_draw_per_convoy();
 
-/// Commit a priced leg: debit the corp's balance and its source pool, burn the
-/// launch's propellant on the space lane, and append the convoy. The ONE place
-/// a `convoy_component` is created.
+struct economy_report; // economy_system.hpp: the tick's want and fill registers
+
+/// Commit a priced trade shipment (TRADE.md § A trade, steps 1-2): BUY up to
+/// @p qty of good @p ri off @p src_market's shelf at its posted price, under the
+/// fair-price ceiling (into `report.purchases`, billed by the clear, and
+/// `report.wants`, so the buying reads to the price as any bid does); on a space
+/// leg also buy the launch's propellant there; PAY THE HAUL from the trader's
+/// balance; and append the convoy carrying the cargo to @p dest_market_id, where
+/// it lands and is sold on arrival (`credit_arrived_convoys`). The ONE place a
+/// `convoy_component` is created.
 ///
-/// All-or-nothing. Returns false — having mutated nothing — when the leg is not
-/// viable or the corp cannot afford `leg.cost`. The propellant availability
-/// gate lives in `price_convoy_leg`, so a viable space leg cannot drive the
-/// propellant pool negative here.
+/// THE SEND is the least of @p qty, the shelf (less the launch's own propellant
+/// when the cargo is that good) and — on a same-body leg — what the PASSIVE
+/// Logistic Point anchor nearest the source market's centre still admits this
+/// tick (BL-597, by cargo quantity; BL-1186 E1 trims rather than refuses).
+/// Trade points are the owner's capacity; LP the place's; a shipment passes both.
+/// A trimmed cargo pays its share of the leg's cost (cost is linear in quantity).
 ///
-/// @param src_body   The body the cargo leaves (the passive-LP gate's body).
-/// @param src_market BL-1003: the SOURCE MARKET — the pool debited is (corp, src_market),
-///                   and it is recorded as the convoy's `source_market`. `null_entity`
-///                   (or any non-market id) only for a market-less source body, whose
-///                   body-level pool (corp, src_body) is debited instead. Must be the
-///                   same source `price_convoy_leg` priced (its `src_key`).
+/// All-or-nothing on refusal: returns false, having mutated nothing, when the
+/// leg is not viable, the ceiling refuses the shelf, the shelf or the LP anchor
+/// admits nothing, or the trader cannot cover the haul plus the purchase.
 ///
-/// BL-597 (LOGISTICS.md § Logistic Points): before any mutation, an
-/// intra-body leg (`leg.mode != convoy_mode::space`) must also clear the
-/// PASSIVE-LP admissibility gate — LOGISTICS.md rule 1, "LP is a CAP, not a
-/// PRICE": no second credit charge, `leg.cost` (haulage) stays the only
-/// price, LP only decides whether the leg is admissible at all. The corp's
-/// dispatch tile (`convoy_origin_tile` of the source pool, the same
-/// origin `price_convoy_leg` routes from) draws against its NEAREST anchor's
-/// pool (`nearest_lp_anchor`, logistics.hpp — the same reduction BL-596's
-/// active march gate uses), by the leg's CARGO QUANTITY (Ben, 2026-08-25,
-/// ruling on NR-620): one passive LP admits one unit of goods through the
-/// anchor, as one active LP admits one march-point's worth of movement.
-/// Deliberately NOT distance — LOGISTICS.md constraint 3 ("if cost is
-/// proportional to distance, LP *is* haulage cost again") and rule 1
-/// (distance is already priced, in credits) both forbid that, and measured
-/// it collapsed real convoy traffic by 73%.
-/// A space leg (inter-body) skips this entirely: LOGISTICS.md's Logistic
-/// Points design is tile-grounded infrastructure ("cities are the locus"),
-/// out of scope for a lane with no intra-body path at all — matching
-/// BL-596's own march gate, which likewise only fires for a unit walking a
-/// tile path.
-///
-/// @param reg              For `reg.military().active_lp_per_anchor_tick` — the
-///                         ONE per-anchor LP rate LOGISTICS.md's bifold table
-///                         splits by use, not two authored numbers; see that
-///                         field's own doc comment (recipe_registry.hpp).
-/// @param shared_lp_pools  BL-597: forwarded to (and lazily built through)
-///                         `lp_pool_for_body`, same contract as
-///                         `run_unit_march`'s parameter of the same name —
-///                         null (the default) gets a private, per-call-fresh
-///                         pool; a non-null instance shared with the same
-///                         tick's `run_unit_march` call makes active and
-///                         passive draws genuinely contend.
+/// @param shared_lp_pools  BL-597: the tick's shared LP pool, so passive draws
+///                         contend with the same tick's marches. Null: private.
 /// @param out_refused_no_lp Optional; set true (never false) when this call
-///                         refused SPECIFICALLY for want of passive LP,
-///                         distinct from `false` returned for any other
-///                         reason (not viable, insolvent). Mirrors
-///                         `unit_march_tick::refused_no_lp`'s naming.
-bool commit_convoy(world& w, const recipe_registry& reg, entity_id corp_id, entity_id src_body,
-                   entity_id src_market, entity_id dest_market_id,
-                   std::size_t ri, float qty, const convoy_leg& leg,
-                   lp_pool_map* shared_lp_pools = nullptr,
-                   bool* out_refused_no_lp = nullptr,
-                   bool allow_partial_lp = false,
-                   float* out_sent = nullptr);
-// BL-1186 E1 — `allow_partial_lp`: when true, a cargo above what the nearest
-// anchor still holds is SENT AT THAT AMOUNT (never below one unit unless the cargo
-// is smaller) instead of refused whole; its cost is the leg's cost scaled by the
-// share sent (cost is linear in quantity), and the solvency gate weighs that
-// trimmed cost. The auto-dispatch passes (dispatch_convoys, and a market's own
-// export, which shares the rule) set it; a commanded quantity — the player's
-// dispatch_convoy verb, the rival scorer's directed dispatch — keeps the default:
-// whole or refused, mutating nothing. `out_sent`, when given, receives the units
-// actually sent on success.
+///                         refused SPECIFICALLY for want of passive LP.
+/// @param out_sent         Optional; the units actually sent on success.
+/// @param io_committed     Optional; the purchases this trader has already
+///                         committed this tick (billed at the clear, not yet
+///                         off its balance). The solvency gate weighs the
+///                         balance LESS this, and a success adds this
+///                         shipment's purchase to it — so a trader shipping
+///                         many routes in one pass cannot overdraw (cold
+///                         review). Null: the balance alone.
+/// The passive Logistic Points still left this tick at the anchor nearest
+/// market @p market_id's centre, in @p pools (built on first touch, nothing
+/// else mutated); 0 when no anchor reaches the centre or the market is unknown.
+float market_lp_left(world& w, const recipe_registry& reg, entity_id market_id,
+                     lp_pool_map& pools);
+
+bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report& report,
+                           entity_id corp_id, entity_id src_market, entity_id dest_market_id,
+                           std::size_t ri, float qty, const convoy_leg& leg,
+                           lp_pool_map* shared_lp_pools = nullptr,
+                           bool* out_refused_no_lp = nullptr,
+                           float* out_sent = nullptr,
+                           float* io_committed = nullptr);

@@ -56,11 +56,10 @@ the column.
   argued** (`tools/verify/convoy_cargo_census.cpp`). It was worth measuring, and the measurement
   overturned the premise this list was written with.
 
-  Neither dispatch path can commit an empty convoy, and both forbid it by construction: the auto
-  path (`dispatch_convoys`) skips a source whose surplus is `<= 0` and a destination whose
-  shortfall is `<= 0`, then takes `min(surplus, shortfall)`, strictly positive; the directed verb
-  (`corp_verb::dispatch_convoy`) rejects the whole command on `!(quantity > 0)`, finiteness first.
-  Over the real generated world the census found **1669 dispatches and zero with an empty hold**.
+  No convoy is committed empty, by construction: a trade's shipment (`commit_trade_shipment`,
+  `../../economy/TRADE.md`) sends nothing unless the quantity it can buy and pass is strictly
+  positive. Over the real generated world the census found **1669 dispatches and zero with an
+  empty hold**.
 
   What was wrong was the row. `cargo_qty` is a **float**, and the row printed it with `"x%.0f"` —
   which renders every cargo below 0.5 as `x0`. **4.6% of real convoys are below 0.5** (measured

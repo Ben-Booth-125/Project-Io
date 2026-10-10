@@ -126,9 +126,8 @@ int main()
     }
 
     // -- stock on B, to watch it move --
-    const entity_id corp = s.w.create_entity();
+    // BL-1265: corporations hold no pools — the shelf is all a fold moves.
     s.w.markets.at(s.b).inventory[0] = 7.0f;
-    s.w.pool_at(corp, s.b).quantities[0] = 3.0f;
 
     fold_market_into(s.w, s.b, s.a);
 
@@ -156,12 +155,8 @@ int main()
     check(s.w.markets.count(s.b) == 0 && s.w.folded_markets.count(s.b) == 1
               && s.w.folded_markets.at(s.b).into == s.a,
           "F5", "B is gone from the markets and its fold record names A");
-    {
-        const stockpile_component* pa = s.w.find_pool(corp, s.a);
-        check(s.w.markets.at(s.a).inventory[0] == 7.0f && pa != nullptr && pa->quantities[0] == 3.0f
-                  && s.w.find_pool(corp, s.b) == nullptr,
-              "F6", "B's inventory (7) and its pool (3) land in A; no pool is left keyed by B");
-    }
+    check(s.w.markets.at(s.a).inventory[0] == 7.0f,
+          "F6", "B's inventory (7) lands in A (BL-1265: no pools to move)");
 
     // -- a second fold re-points the first record: A into C --
     {

@@ -296,6 +296,82 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                                                const struct settlement_state* settle,
                                                charter_spend_report* report = nullptr);
 
+
+// ---------------------------------------------------------------------------
+// BL-1268 — THE RETROFIT: the history's trade record, spent on Marketplaces
+// (docs/economy/TRADE.md § Trade in generation)
+// ---------------------------------------------------------------------------
+
+struct trade_record_cell;     // history_sim.hpp
+struct trade_retrofit_params; // world_gen_config.hpp
+
+/// The history's trade record (`trade_record_cell`, both spans merged) in
+/// trade points at @p rates: per cell, `flow_volume x flow_points_per_1000 /
+/// 1000 + relation_years x relation_points_per_year`; cells earning 0 are
+/// dropped. Carries the two spend rates beside the cells. Pure.
+gen_trade_record gen_trade_record_from_history(const std::vector<trade_record_cell>& record,
+                                               const trade_retrofit_params&          rates);
+
+/// One market the retrofit read, for the measurement and the log.
+struct marketplace_retrofit_row
+{
+    entity_id market  = null_entity;
+    std::int64_t points = 0;     ///< The record's points whose seat stands in this catchment.
+    std::int64_t flow_volume    = 0; ///< Their raw history: flow volume x years ...
+    std::int64_t relation_years = 0; ///< ... and mutual-treaty partner-years.
+    int       bought  = 0;       ///< Marketplaces the points buy (capped at `max_per_market`).
+    int       placed  = 0;       ///< Marketplaces actually authored.
+    /// The corporation the market's Marketplaces go to -- the most buildings in
+    /// its catchment, ties to the lower id -- whether or not any were bought.
+    /// Null: no corporation (other than the seat) holds ground there.
+    entity_id owner   = null_entity;
+    int       owner_holdings = 0; ///< Its buildings in the catchment.
+};
+
+/// What one retrofit did. Every point is accounted for: placed on a market,
+/// or unspent with a reason.
+struct marketplace_retrofit_report
+{
+    std::int64_t points_total       = 0; ///< Every point in the record.
+    std::int64_t points_no_market   = 0; ///< Seats on no campaign market (off-grid, no tile).
+    std::int64_t points_below_one   = 0; ///< A market's remainder below one Marketplace's price.
+    std::int64_t points_over_cap    = 0; ///< Bought past `max_per_market`.
+    int          markets_with_record = 0;
+    int          bought              = 0;
+    int          placed              = 0;
+    int          no_owner            = 0; ///< Bought on a market no corporation holds ground in.
+    int          no_site             = 0; ///< Bought, owned, and no tile in the catchment took it.
+    std::vector<marketplace_retrofit_row> rows; ///< Ascending market id; markets with points only.
+};
+
+/// THE RETROFIT (TRADE.md § Trade in generation: "the trade points a history
+/// accumulated are consumed to retrofit Planetary Marketplaces where trade most
+/// likely took place: on the markets whose trade the history carried, owned by
+/// the corporations chartered there"). Run once, by the finish, after the
+/// winner's charters are laid and before the settle (so the 1960 settle trades
+/// on them). Reads `w.gen_trade_record` and `w.gen_settlement`; a world with
+/// either empty (a load, a no-prehistory fixture) retrofits nothing.
+///
+///   1. Each cell's seat region resolves to the campaign market its anchor tile
+///      clears against (`market_for_tile`), and the points sum per market.
+///   2. A market buys `min(max_per_market, points / points_per_marketplace)`
+///      Marketplaces. A market the history never traded buys none.
+///   3. The owner is the corporation with the MOST BUILDINGS in that market's
+///      catchment (ties: the lower id). The seat is never special-cased: a
+///      corporation that is `w.player_entity` when this runs is passed over (on
+///      the shipped path there is none yet; the seat is drawn after).
+///   4. Each Marketplace stands on the catchment tile nearest the market's
+///      centre (squared grid distance, ties by tile id) that holds no building
+///      and passes `placement_rules::can_place_in_world` for the owner (the tech
+///      gate, the type's authored placement gate, no reach budget). Authored as
+///      generation authors every building: complete, staffed at 0.5.
+/// Deterministic: sorted walks only, no draw.
+marketplace_retrofit_report retrofit_marketplaces(world& w, const recipe_registry& reg);
+
+/// The retrofit's one log line (`[trade_retrofit]`), for the finish and the
+/// harness mirror alike.
+void print_marketplace_retrofit(const marketplace_retrofit_report& r);
+
 struct lapse_event;
 
 /// BL-1099 — DATE THE CHARTERS AGAINST THE RECORD (CORPORATION_GENERATION.md

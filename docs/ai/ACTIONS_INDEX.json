@@ -31,11 +31,11 @@
   ],
   [
    "gameplay.place_sell_order",
-   "The 'Trades' tab of the Market Ledger, under the 'Place a trade' fold in its 'My trades' section (opened from the nav rail; the tab is scoped to the ledger's selected market body). The tab was called 'Sell Orders' until it widened to hold four reads. Since BL-293 the press is not the only route: place_sell_order is a corp_verb, so an agent issues it directly against the corp-command seam and a rival corp's scorer issues it too."
+   "RETIRED (BL-1265, 2026-10-10: the order book retired with corporation pools — no corporation holds goods; production lands on its market's shelf and is sold at the clearing price (MARKETS.md § The shelf economy), so there is nothing for a sell order to hold back or list). No surface issues it: the press was removed from the UI with the system it drove. The corp_verb slot `place_sell_order` survives only because the verb enum is append-only (stored commands and wire callers agree on its numbering)."
   ],
   [
    "gameplay.remove_sell_order",
-   "The 'x' button at the end of each row in the 'My trades' section of the Market Ledger's Trades tab; also a corp_verb, issuable directly. The tab was called 'Sell Orders' and the button 'Remove' until the tab widened to hold four reads."
+   "RETIRED (BL-1265, 2026-10-10: the order book retired with corporation pools (MARKETS.md § The shelf economy); there are no standing sell orders to remove). No surface issues it: the press was removed from the UI with the system it drove. The corp_verb slot `remove_sell_order` survives only because the verb enum is append-only (stored commands and wire callers agree on its numbering)."
   ],
   [
    "gameplay.request_quote",
@@ -63,7 +63,19 @@
   ],
   [
    "gameplay.dispatch_convoy",
-   "The market Selection card's Dispatch convoy form (BL-607, 2026-08-24) — a resource picker (the market's own tradeable goods), a quantity field and a destination-market picker (every other market, by city name), opened by selecting a market and reached without a nav-rail slot. Issued the same way against the corp-command seam, or over --serve, which needed no new wire key: it reuses subject / counterparty / target / quantity. The Market Ledger's Convoys tab (BL-453) shows the RESULT and carries the Hold press, but composes no dispatch."
+   "RETIRED (BL-1266, 2026-10-10: trade is the only way goods move between markets (TRADE.md); a convoy is now the SHIPMENT of a trade, created by the trade pass, never dispatched on its own. The market Selection card's Dispatch convoy form is gone; the card's Trade section carries a \"Trades\" door onto the Market Ledger's Trades tab instead). No surface issues it: the press was removed from the UI with the system it drove. The corp_verb slot `dispatch_convoy` survives only because the verb enum is append-only (stored commands and wire callers agree on its numbering)."
+  ],
+  [
+   "gameplay.set_trade",
+   "The 'Trades' tab of the Market Ledger (nav rail slot 6 -> tab 'Trades'; or a market's Selection card -> 'Trades', which opens the ledger aimed at that market). Issued the same way against the corp-command seam, or over --serve; a rival corporation's scorer issues it too under the AI_OPPONENT.md § 11 grant (a rival may set its own trades)."
+  ],
+  [
+   "gameplay.clear_trade",
+   "The 'Trades' tab of the Market Ledger (nav rail slot 6 -> tab 'Trades'; or a market's Selection card -> 'Trades', which opens the ledger aimed at that market). Issued the same way against the corp-command seam, or over --serve; a rival corporation's scorer issues it too under the AI_OPPONENT.md § 11 grant (a rival may set its own trades)."
+  ],
+  [
+   "gameplay.set_trade_reserve",
+   "The 'Trades' tab of the Market Ledger (nav rail slot 6 -> tab 'Trades'; or a market's Selection card -> 'Trades', which opens the ledger aimed at that market). Issued the same way against the corp-command seam, or over --serve; a rival corporation's scorer issues it too under the AI_OPPONENT.md § 11 grant (a rival may set its own trades). The 'Trade points' section heads the tab."
   ],
   [
    "gameplay.hold_convoy",
@@ -95,7 +107,7 @@
   ],
   [
    "canvas.hover",
-   "The Planetary surface canvas (tiles, buildings, market centres). The Solar and Circumplanetary rungs still use a lightweight ad-hoc tooltip (name, type, orbital radius) — the full card has not migrated there yet."
+   "The Planetary surface canvas (tiles and buildings; a market centre has no hover target of its own since its glyph retired, (Ben, 2026-10-10: 'We should remove the HQ glyph and market center glyphs')). The Solar and Circumplanetary rungs still use a lightweight ad-hoc tooltip (name, type, orbital radius) — the full card has not migrated there yet."
   ],
   [
    "canvas.lens_clear",
@@ -180,6 +192,14 @@
   [
    "lens.corporation",
    "Minimap lens bar, slot 1 (the seal-square glyph: filled square with centred inner dot)"
+  ],
+  [
+   "lens.owner_toggle",
+   "The Corporation or Company lens's key in the lens chrome region — the minimap's header, top right: a header with the picked count, a search box, and a checklist of the owners of that lens's kind holding ground on the active body, each row with its identity swatch (filled when picked, empty when not)."
+  ],
+  [
+   "lens.owner_shift_pick",
+   "The Planetary canvas under the Corporation or Company lens: any tile an owner of that lens's kind holds."
   ],
   [
    "lens.good_selector",
@@ -403,7 +423,11 @@
   ],
   [
    "ledger.selection_section_toggle",
-   "The Selection band's tile element — a five-section accordion in the centre column, ordered Buildings, Deposits, Resources, Population, Terrain. It replaced a three-view pager, and the province card that used to sit beside it (BL-598): the province is a SECTION here, not a selection of its own."
+   "The Selection band's tile element — a six-section top nav in the centre column (left/right chevrons straddling the span, title and i/6 count centred between them), ordered Production, Buildings, Deposits, Resources, Population, Terrain. The province is a SECTION here, not a selection of its own (BL-598); Production leads (BL-1239)."
+  ],
+  [
+   "ledger.tile_production_market_door",
+   "Selection band, tile element, Production section — a good row in the 'Sells at <market>' table (goods made on this tile, then goods deposited on it)"
   ],
   [
    "chrome.esc",
@@ -615,7 +639,7 @@
   ],
   [
    "canvas.border_band_select",
-   "The national border band on the Planetary canvas — plain-canvas chrome, not a lens, and suppressed while any lens is up. A nation's identity colour sits on its own side of every boundary it holds and falls off inwards over three depths."
+   "The national border band on the Planetary canvas — plain-canvas chrome, not a lens, and suppressed while any lens is up. A nation's border is a hard edge only (Ben, 2026-10-10): an inset stroke in its muted identity colour on its own side of every boundary it holds, with no wash inside the territory."
   ],
   [
    "ledger.company_open",

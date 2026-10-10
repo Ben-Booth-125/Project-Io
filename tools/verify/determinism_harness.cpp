@@ -151,16 +151,17 @@ int main()
         check(same, "history-log genesis+checkpoint chapter is field-identical, entry-for-entry, in order");
     }
 
-    // (corp,body) stockpile-pool keys.
+    // BL-1265: corporations hold no pools — the opening stock is on the market
+    // shelves, so the shelves are what two generations must agree on.
     {
-        std::vector<std::pair<entity_id, entity_id>> ka, kb;
-        ka.reserve(a.corp_market_pools.size());
-        kb.reserve(b.corp_market_pools.size());
-        for (const auto& kv : a.corp_market_pools) ka.push_back(kv.first);
-        for (const auto& kv : b.corp_market_pools) kb.push_back(kv.first);
-        std::sort(ka.begin(), ka.end());
-        std::sort(kb.begin(), kb.end());
-        check(ka == kb, "corp-body pool keys identical");
+        bool same = a.markets.size() == b.markets.size();
+        if (same)
+            for (const auto& [mid, ma] : a.markets)
+            {
+                const auto it = b.markets.find(mid);
+                if (it == b.markets.end() || it->second.inventory != ma.inventory) { same = false; break; }
+            }
+        check(same, "market shelves (the placed opening stock) identical");
     }
 
     // The province partition (BL-466). NOT covered by world::state_hash, and that

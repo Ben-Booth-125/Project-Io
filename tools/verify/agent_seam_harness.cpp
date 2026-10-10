@@ -226,8 +226,9 @@ scene make_scene()
         s.w.corporations[s.other] = cc;
     }
 
-    // Stock to sell: 100 steel in the (corp, body) pool.
-    s.w.pool_at(s.corp, pool_key_for_body(s.w, s.body)).quantities[ri(resource_type::steel)] = 100.0f;
+    // BL-1265/1266: the sell order this scene used to carry its float-valued
+    // command retired with the order book; `set_trade_reserve` (a finite
+    // quantity >= 0) now carries it, and needs no stock to apply.
 
     return s;
 }
@@ -358,9 +359,7 @@ int main()
     };
     const std::string c1 = line_set_wf(probe.corp, probe.bld, "150");
     const std::string c2 = "COMMAND corp=" + std::to_string(probe.corp)
-                         + " verb=" + std::to_string(vi(corp_verb::place_sell_order))
-                         + " subject=" + std::to_string(probe.body)
-                         + " target=" + std::to_string(steel)
+                         + " verb=" + std::to_string(vi(corp_verb::set_trade_reserve))
                          + " quantity=20 floor_price=2.5";
     const std::string c3 = "COMMAND corp=" + std::to_string(probe.corp)
                          + " verb=" + std::to_string(vi(corp_verb::idle))
@@ -417,7 +416,7 @@ int main()
         const bool shape =
             transcript.size() == 4
             && transcript[0].tick == 0 && transcript[0].cmd.verb == corp_verb::set_workforce
-            && transcript[1].tick == 1 && transcript[1].cmd.verb == corp_verb::place_sell_order
+            && transcript[1].tick == 1 && transcript[1].cmd.verb == corp_verb::set_trade_reserve
             && transcript[2].tick == 1 && transcript[2].cmd.verb == corp_verb::idle
             && transcript[3].tick == 2 && transcript[3].cmd.verb == corp_verb::resume;
         check(shape, "R1.7 transcript records (tick, corp, verb, args) in arrival order at boundaries");
@@ -446,9 +445,7 @@ int main()
                     cmd.subject   = s.bld;
                     cmd.workforce = wf;
                     break;
-                case corp_verb::place_sell_order:
-                    cmd.subject     = s.body;
-                    cmd.target      = resource_type::steel;
+                case corp_verb::set_trade_reserve:
                     cmd.quantity    = qty;
                     cmd.floor_price = floor;
                     break;
@@ -462,7 +459,7 @@ int main()
         bool all_applied = true;
         all_applied &= apply(corp_verb::set_workforce, 0, 0, 0, 150) == corp_command_result::applied;
         step_tick(s.w, reg, 1);
-        all_applied &= apply(corp_verb::place_sell_order, 1, 20.0f, 2.5f) == corp_command_result::applied;
+        all_applied &= apply(corp_verb::set_trade_reserve, 1, 20.0f, 2.5f) == corp_command_result::applied;
         all_applied &= apply(corp_verb::idle, 1) == corp_command_result::applied;
         step_tick(s.w, reg, 2);
         all_applied &= apply(corp_verb::resume, 2) == corp_command_result::applied;
@@ -516,20 +513,15 @@ int main()
             + line_set_wf(s.corp, s.bld, "4294967396") + "\n"                                        // would wrap to 100
             + line_set_wf(s.corp, s.bld, "250") + "\n"                                               // in-type, out-of-domain
             + line_set_wf(s.corp, s.bld, "7xyz") + "\n"                                              // malformed lexeme
-            + cmd_head + " verb=" + std::to_string(vi(corp_verb::place_sell_order))
-                       + " subject=" + std::to_string(s.body) + " target=" + std::to_string(steel)
+            + cmd_head + " verb=" + std::to_string(vi(corp_verb::set_trade_reserve))
                        + " quantity=nan floor_price=2\n"                                             // NaN
-            + cmd_head + " verb=" + std::to_string(vi(corp_verb::place_sell_order))
-                       + " subject=" + std::to_string(s.body) + " target=" + std::to_string(steel)
+            + cmd_head + " verb=" + std::to_string(vi(corp_verb::set_trade_reserve))
                        + " quantity=5 floor_price=1e300\n"                                           // finite double, infinite float
-            + cmd_head + " verb=" + std::to_string(vi(corp_verb::place_sell_order))
-                       + " subject=" + std::to_string(s.body) + " target=" + std::to_string(steel)
+            + cmd_head + " verb=" + std::to_string(vi(corp_verb::set_trade_reserve))
                        + " quantity=1e-60 floor_price=2\n"                                           // BL-1201: nonzero -> 0.0f = NO CAP
-            + cmd_head + " verb=" + std::to_string(vi(corp_verb::place_sell_order))
-                       + " subject=" + std::to_string(s.body) + " target=" + std::to_string(steel)
+            + cmd_head + " verb=" + std::to_string(vi(corp_verb::set_trade_reserve))
                        + " quantity=-1e-60 floor_price=2\n"                                          // BL-1201: nonzero -> -0.0f
-            + cmd_head + " verb=" + std::to_string(vi(corp_verb::place_sell_order))
-                       + " subject=" + std::to_string(s.body) + " target=" + std::to_string(steel)
+            + cmd_head + " verb=" + std::to_string(vi(corp_verb::set_trade_reserve))
                        + " quantity=5 floor_price=1e-60\n"                                           // BL-1201: floor narrows to 0 = market
             + "COMMAND corp=" + std::to_string(s.other) + " verb="
                        + std::to_string(vi(corp_verb::set_workforce))
@@ -579,8 +571,11 @@ int main()
               "R2.5 an unknown opcode answers ERR, not silence");
         check(s.w.buildings.at(s.bld).workforce_target == 100,
               "R2.6 workforce=250 neither applied nor CLAMPED to 200 (rejected whole)");
-        check(s.w.sell_orders.empty(),
-              "R2.7 no order book entry from the NaN / overflow / underflow values");
+        // BL-1266: the float rows ride set_trade_reserve, which APPLIES a 0 or
+        // -0 reserve and ignores floor_price — so only the protocol layer stands
+        // between 1e-60 / -1e-60 / floor_price=1e300|1e-60 and an applied command.
+        check(s.w.corporations.at(s.corp).trade_reserve == 0.0f && s.w.trades.empty(),
+              "R2.7 no trade reserve or trade set from the NaN / overflow / underflow values");
     }
 
     std::printf("\nagent_seam_harness: %d passed, %d failed\n", g_pass, g_fail);

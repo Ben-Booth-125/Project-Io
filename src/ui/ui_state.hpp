@@ -1,8 +1,8 @@
 #pragma once
 
 #include "detail_level.hpp"     // fold_state — the drill-through disclosure target (BL-214)
-#include "world/components.hpp"   // building_type / resource_type / sell_order
-#include "world/corp_command.hpp" // corp_command — the seam the order-book presses queue onto
+#include "world/components.hpp"   // building_type / resource_type
+#include "world/corp_command.hpp" // corp_command — the seam the ledger presses queue onto
 #include "world/entity.hpp"
 
 #include <imgui.h>
@@ -69,16 +69,16 @@ enum class overlay_mode
 };
 
 /// A selectable on-canvas marker registered each frame by the Planetary canvas
-/// draw pass. Hit-test priority (highest first): unit > building > market_centre
-/// > tile. Unit outranks building (BL-575) to match the repeat-click cycle's own
+/// draw pass. Hit-test priority (highest first): unit > building > tile. (No
+/// market-centre kind: its glyph and hit zone retired, Ben 2026-10-10.) Unit outranks building (BL-575) to match the repeat-click cycle's own
 /// order (battle, unit, province, building, tile — SELECTION.md), so a unit
 /// standing on a built tile is reachable on the FIRST click rather than only
 /// after cycling past the building.
 /// Cleared and rebuilt every frame by body_surface_canvas. See BL-059, BL-031.
 struct marker_hit_zone
 {
-    entity_id id = null_entity; ///< The entity this marker represents (building, market, or — for `kind::unit` — the lowest-id unit in the province/owner group the marker draws).
-    enum class kind : uint8_t { building, market_centre, unit } kind = kind::building;
+    entity_id id = null_entity; ///< The entity this marker represents (building, or — for `kind::unit` — the lowest-id unit in the province/owner group the marker draws).
+    enum class kind : uint8_t { building, unit } kind = kind::building;
     ImVec2    centre{};         ///< Marker centre in screen pixels (this frame).
     float     radius = 0.0f;   ///< Hit-test radius in screen pixels.
 };
@@ -196,18 +196,6 @@ struct construction_state
     /// into `unit_roster_table()`.
     entity_id     pending_hire_tile      = null_entity;
     std::uint16_t pending_hire_unit_type = 0;
-
-    /// Pending player convoy-dispatch request (BL-601) — set by the market
-    /// Selection card's dispatch form and executed by `app::render` via
-    /// `apply_corp_command`'s `dispatch_convoy` verb (BL-452's own player seam;
-    /// the form is the front door onto it SUPPLY.md always specified but nothing
-    /// built). Same deferred path as `pending_tile`, for the same reason (UI
-    /// surfaces hold only `const world&`). `pending_dispatch_source` = null_entity
-    /// means nothing pending; the other three fields are meaningless until it is set.
-    entity_id     pending_dispatch_source = null_entity; ///< Source market (the card's own selection).
-    entity_id     pending_dispatch_dest   = null_entity; ///< Destination market.
-    resource_type pending_dispatch_good   = resource_type::iron_ore;
-    float         pending_dispatch_qty    = 0.0f;
 
     /// Pending demolition request — set by the building Selection element's Demolish
     /// control and executed by `app::render` via `demolish_building`. Takes the same
@@ -334,26 +322,42 @@ struct ground_chunk_view
 };
 
 /// Everything the canvas needs to draw the baked ground for one body: the far
-/// page under everything, plus the ACTIVE zoom tier's ready chunks over it
-/// (the tier pairing with the stepped x2 zoom ladder — RENDERING.md § LOD).
+/// page under everything, plus the drawn LEVEL's chunks over it — one level of
+/// the body's one master (RENDERING.md § Level of detail, BL-1246).
 struct ground_view
 {
     entity_id body = null_entity;    ///< Body the bake describes; canvas ignores a mismatch.
-    double    tier_ppr = 0.0;        ///< Active tier's baked px per hex circumradius (0 = far only).
-    std::vector<ground_chunk_view> chunks; ///< The active tier's ready chunks.
+    double    level_ppr = 0.0;       ///< Drawn level's px per hex circumradius (0 = far page only).
+    std::vector<ground_chunk_view> chunks; ///< The drawn level's chunks on the GPU, in view.
     ground_chunk_view far;           ///< Low-res whole-body page (tex null until baked).
     bool far_ready = false;
+    /// BL-1241: the Selection band's neighbourhood view, baked as its own small
+    /// page around `neigh_tile` (tex null until baked) — so the zoomed view shows
+    /// the same baked ground, structures included, as the canvas.
+    ground_chunk_view neigh;
+    entity_id neigh_tile = null_entity;
+};
+
+/// The Selection band's neighbourhood-page request (BL-1241): the tile the
+/// view centres on and its ring radius. Written by the panel each frame it
+/// draws the view; read by ground_layer next frame.
+struct ground_neigh_request
+{
+    entity_id body = null_entity;
+    entity_id tile = null_entity;
+    int col = 0, row = 0, radius = 2;
+    bool valid = false;
 };
 
 /// The canvas's bake request: the canonical-space rect visible this frame plus
-/// the drawn hex radius (which picks the tier). Read by ground_layer next
+/// the drawn hex radius (which picks the level). Read by ground_layer next
 /// frame — one frame of latency, covered by the far page / vector fallback.
+/// No tilt field: the camera has one angle (RENDERING.md § One angle).
 struct ground_request
 {
     entity_id body = null_entity;
     float x0 = 0, y0 = 0, x1 = 0, y1 = 0;
     float draw_r = 0;                ///< Drawn hex circumradius, screen px.
-    float sy     = 1.0f;             ///< Camera squash cos(tilt); < 1 wants an oblique tier (BL-737).
     bool  valid = false;
 };
 
@@ -368,6 +372,7 @@ struct ui_state
     // --- baked ground (BL-732) ---
     ground_view    ground;          ///< Filled by app each frame from core/ground_layer.
     ground_request ground_req;      ///< Written by the Planetary canvas each frame.
+    ground_neigh_request ground_neigh_req; ///< BL-1241: written by the Selection band's neighbourhood view.
     /// Verify-only: suppress the national border band so a ground-judgement
     /// capture shows the bake bare (BL-732 R1; the band's weight over painterly
     /// ground is BL-734's open call). No player control sets this.
@@ -403,6 +408,82 @@ struct ui_state
     std::vector<resource_type> lens_resources{ resource_type::iron_ore };
     /// The Resource lens legend's search box text (filters its goods checklist).
     char lens_resource_filter[32] = {};
+    // --- Owner multi-select (BL-1240; LENSES.md § Corporation lens, Owner multi-select) ---
+    // The Corporation and Company lenses draw a PICKED SET of owners: a picked owner's
+    // ground takes its identity colour, an unpicked owner's takes palette::owned_grey.
+    // Two sets, so flipping between the lenses keeps each one's picks. UI state only —
+    // per session, never saved — and keyed by corp id, so it survives a body switch.
+    // The Corporation set defaults to the player; the player id is not known when
+    // ui_state is built, so the canvas seeds it (`seed_lens_corps`) once per seated
+    // player — a seat taken after the first frame still gets its default.
+    std::vector<entity_id> lens_corps;            ///< Picked corporations (player + rivals), in pick order.
+    entity_id              lens_corps_seed = null_entity; ///< The player the default was last applied for.
+    std::vector<entity_id> lens_companies;        ///< Picked background firms; default empty.
+    char                   lens_corps_filter[32]     = {}; ///< Corporation checklist's search box text.
+    char                   lens_companies_filter[32] = {}; ///< Company checklist's search box text.
+    /// The search box a lens's checklist reads — one per lens, like the sets.
+    char* lens_owner_filter(bool background) { return background ? lens_companies_filter : lens_corps_filter; }
+    /// Forget every pick, the seed and both searches. Called when a world is
+    /// replaced (new game, load): corp ids restart at 1, so a pick carried over
+    /// would silently name a different corporation in the new world.
+    void reset_lens_owners()
+    {
+        lens_corps.clear();
+        lens_companies.clear();
+        lens_corps_seed          = null_entity;
+        lens_corps_filter[0]     = '\0';
+        lens_companies_filter[0] = '\0';
+    }
+    /// Drop every pick whose corporation no longer exists (`alive(id)` false) —
+    /// a dissolved owner would otherwise sit in the header count with no row.
+    template <typename Alive>
+    void prune_lens_owners(Alive&& alive)
+    {
+        const auto prune = [&](std::vector<entity_id>& v) {
+            std::size_t keep = 0;
+            for (std::size_t i = 0; i < v.size(); ++i)
+                if (alive(v[i]))
+                    v[keep++] = v[i];
+            v.resize(keep);
+        };
+        prune(lens_corps);
+        prune(lens_companies);
+    }
+    /// Apply the Corporation set's default (the player) once per seated player; a
+    /// player who then unpicks themselves stays unpicked. A new seat REPLACES the
+    /// previous seat's default — the old corp was the default, not a pick.
+    void seed_lens_corps(entity_id player)
+    {
+        if (player == null_entity || player == lens_corps_seed)
+            return;
+        if (lens_corps_seed != null_entity && lens_owner_picked(lens_corps_seed, false))
+            toggle_lens_owner(lens_corps_seed, false);
+        lens_corps_seed = player;
+        if (!lens_owner_picked(player, false))
+            lens_corps.push_back(player);
+    }
+    /// The set a lens reads: companies for a background firm, corporations otherwise.
+    std::vector<entity_id>&       lens_owner_set(bool background)       { return background ? lens_companies : lens_corps; }
+    const std::vector<entity_id>& lens_owner_set(bool background) const { return background ? lens_companies : lens_corps; }
+    bool lens_owner_picked(entity_id corp, bool background) const
+    {
+        for (const entity_id id : lens_owner_set(background))
+            if (id == corp)
+                return true;
+        return false;
+    }
+    /// Toggle @p corp in or out of its lens's set (checklist row or shift-click).
+    void toggle_lens_owner(entity_id corp, bool background)
+    {
+        std::vector<entity_id>& v = lens_owner_set(background);
+        for (auto it = v.begin(); it != v.end(); ++it)
+            if (*it == corp)
+            {
+                v.erase(it);
+                return;
+            }
+        v.push_back(corp);
+    }
     /// Is the lens legend expanded? BL-533 (Ben, 2026-08-22) re-homed every
     /// legend into the right chrome column above the minimap and made it a
     /// dropdown that is COLLAPSED BY DEFAULT — so a lens switch no longer
@@ -418,8 +499,9 @@ struct ui_state
     int trade_flow_arrows  = 0;
     int trade_flow_markers = 0;
     int trade_flow_passes  = 0;
-    /// Which section of the tile Selection accordion stands OPEN: 0 Buildings,
-    /// 1 Deposits, 2 Resources, 3 Population, 4 Terrain — or -1 for none open
+    /// Which section of the tile Selection nav stands OPEN: 0 Production
+    /// (BL-1239), 1 Buildings, 2 Deposits, 3 Resources, 4 Population, 5 Terrain
+    /// — or -1 for none open
     /// (BL-598, Ben 2026-08-24). One section at a time: the band is a fixed
     /// ~260 px tall, so five open bodies would each get a sliver.
     ///
@@ -993,6 +1075,42 @@ struct ui_state
     /// both numbers on every run.
     bool market_goods_show_body = false;
 
+    // --- BL-1239 (tile production section): the Market ledger's AIM ---------
+    // A drill-through door (DRILL_THROUGH.md) from the tile element's
+    // Production section: a good row opens the Market ledger aimed at the
+    // market whose catchment holds the tile, and at that good. The ledger
+    // already follows a selected MARKET entity (BL-159), but the door must not
+    // replace the tile selection it was pressed from, so it aims through these
+    // instead. `market_ledger_aim_market` is ONE-SHOT: the ledger consumes it
+    // (jumps its body/market combos) and clears it, so the player can browse
+    // away afterwards. `market_ledger_aim_resource` is the good the Goods view
+    // highlights; it persists while the ledger shows that market, and
+    // `market_ledger_aim_scroll` is the one-shot request to scroll it into view.
+    entity_id market_ledger_aim_market   = null_entity;
+    int       market_ledger_aim_resource = -1;   ///< resource_type index, -1 = none.
+    bool      market_ledger_aim_scroll   = false;
+    /// The market the ledger last consumed an aim for — PERSISTENT, unlike
+    /// `market_ledger_aim_market`. The aimed good highlights only on this
+    /// market, and the Production row reads "aimed" (and so toggles the ledger
+    /// shut on a second press) only when its own market is this one.
+    entity_id market_ledger_aimed_market = null_entity;
+
+    /// Verify-only readout of the tile Production section AS DRAWN last frame
+    /// (BL-1239 fix round): one entry per Part 1 stack row and per Part 2 good
+    /// row. Cleared by the Selection dispatcher every frame, so it is empty
+    /// whenever the section did not draw. Exists so a script can assert what a
+    /// RIVAL row withholds (DISCOVERY.md, the operational fog) — an absence a
+    /// capture cannot prove. No player surface reads it.
+    struct tile_production_row
+    {
+        bool        stack = true;  ///< true: a Part 1 stack row; false: a Part 2 good row.
+        std::string label;         ///< Stack: line one as drawn. Good: the good's name.
+        std::string detail;        ///< Stack: line two as drawn. Good: "made" / "deposited".
+        std::string good;          ///< Stack: the good named on line one, "" when none shown.
+        bool        open  = false; ///< Stack: output and state shown (own, or god view).
+    };
+    std::vector<tile_production_row> tile_production_rows;
+
     /// History ledger: 0=Story (the body's biography), 1=Chain (the generation
     /// charts), 2=Ages (the Era -1 political time-lapse, BL-277), 3=Tectonics
     /// (the plate view, BL-660). BL-211. The names are `history_view_id` in
@@ -1115,11 +1233,10 @@ struct ui_state
     /// the UI surfaces hold a const world. null_entity = nothing pending.
     entity_id pending_survey_dispatch = null_entity;
 
-    /// Pending order-book commands (BL-293). The standing orders themselves moved
-    /// to `world::sell_orders` on 2026-08-07; what lives here is the REQUEST, for
-    /// the reason `pending_survey_dispatch` above lives here — the Market Ledger
-    /// holds a `const world&` and cannot mutate it, so it enqueues and
-    /// `app::render` applies.
+    /// Pending ledger commands (BL-293; the trade presses since BL-1269 —
+    /// `set_trade`, `clear_trade`, `set_trade_reserve`). What lives here is the
+    /// REQUEST, for the reason `pending_survey_dispatch` above lives here — the
+    /// ledgers do not mutate the world, so they enqueue and `app::render` applies.
     ///
     /// Applied through `apply_corp_command`, the same seam the rival-corp AI
     /// drives, so the player's press and the AI's command are the same code path
@@ -1127,6 +1244,18 @@ struct ui_state
     /// than a single slot because a frame can carry more than one press (add an
     /// order, remove another); drained in order each frame.
     std::vector<corp_command> pending_order_commands;
+
+    /// BL-1269: the seam's answer to the last TRADE press (`set_trade`,
+    /// `clear_trade`, `set_trade_reserve`), written by `app::render` when it drains
+    /// `pending_order_commands` and shown under the Trades tab's form. A refusal
+    /// mutates nothing, so the player is told why. Empty = nothing to say.
+    std::string trade_message;
+
+    /// BL-1269: an explicit request to aim the Market ledger at this market (the
+    /// market Selection card's Trades door). Consumed by the ledger's next draw;
+    /// unlike following `selected_entity`, it fires even when the selection has
+    /// not changed since the ledger last looked. null_entity = no request.
+    entity_id market_ledger_focus = null_entity;
 
     /// BL-323 S2b: the logistics-reach budget the UI must filter on, mirrored here
     /// from `recipe_registry::construction().max_logistics_reach` at load time.

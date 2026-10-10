@@ -227,4 +227,31 @@ world_gen = {
         -- Non-player corporations generated alongside the player's own.
         count = 8,
     },
+
+    -- BL-1268 — THE RETROFIT (docs/economy/TRADE.md § Trade in generation):
+    -- after Industrialisation the history's trade record is spent on completed
+    -- Planetary Marketplaces, on the markets whose trade the history carried.
+    -- The record is the history's own (flow volume and treaty partner-years, per
+    -- nation and per capital seat, 1200-1960); these rates turn it into trade
+    -- points and the points into Marketplaces. PROPOSED BY MEASUREMENT, NOT
+    -- FINAL: Ben approves them. Mirrored in world_gen_config.hpp's defaults.
+    --
+    -- MEASURED (tools/verify/trade_retrofit_probe.cpp, the 16 curated seeds,
+    -- 2026-10-10). A market's record runs from nothing to ~5.6M flow-volume-
+    -- years and ~160k partner-years. At 40/1000 the flow term leads (the top
+    -- markets read ~120-220k from flow against ~50-160k from relations), so
+    -- trade, not treaty count, decides where a Marketplace stands; relations
+    -- still lift a well-bound seat. At 40,000 a Marketplace and a cap of 3 the
+    -- 16 seeds place 164 (2-19 a seed, median ~11) on ~5 of ~28 markets each,
+    -- held by 86 corporations (~5 a seed of ~125, ~1 a specialist). Rungs read
+    -- (16-seed totals): price 30k -> 210, 50k -> 135, 80k -> 69; relations off
+    -- (0/yr) at 50k -> 85. Markets whose record buys but where no corporation
+    -- holds ground get none (the owner rule), and that is most of the gap
+    -- between bought and placed.
+    trade_retrofit = {
+        flow_points_per_1000     = 40,    -- points per 1000 flow-volume-years, each end
+        relation_points_per_year = 1,     -- points per partner-year of a mutual treaty
+        points_per_marketplace   = 40000, -- points one Marketplace costs
+        max_per_market           = 3,     -- the most one market's record may buy
+    },
 }

@@ -14,7 +14,7 @@
 // WITHIN REACH (the BL-1186 diagnosis, sprint-49-shipment-diagnosis.md § For
 // BL-1185): a producer in market P is within reach of a consumer in market C when
 //   (a) P == C, or
-//   (b) the dispatcher's own market leg `price_market_export_leg(P, C)` is viable
+//   (b) the dispatcher's own market leg `price_market_leg(P, C)` is viable
 //       AND the dispatcher's own export gate passes, in one of two forms:
 //         * PLAY (a report with rows): price_C - haul > (1 + dispatch_margin) x
 //           price_P on each market's current resolved price
@@ -96,7 +96,7 @@
 
 #include "entity.hpp"
 #include "components.hpp"    // resource_count
-#include "supply_system.hpp" // logistics_nodes, price_market_export_leg
+#include "supply_system.hpp" // logistics_nodes, price_market_leg
 
 #include <array>
 #include <map>

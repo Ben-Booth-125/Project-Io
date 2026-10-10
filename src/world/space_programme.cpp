@@ -143,49 +143,11 @@ std::vector<space_purchase> derive_space_programme_claims(const world& w,
                 continue;
             const std::size_t ri = static_cast<std::size_t>(good);
 
-            // The supplier: the (corp, market) pool holding the MOST unreserved
-            // stock that covers a WHOLE lump — strict >, so ties keep the
-            // lowest key the std::map walk reached first. The player's corp is
-            // never eligible (see the header: a forced sale is an unsanctioned
-            // auto-action on the player's corp). BL-1003: each pool is its own
-            // candidate, priced at its own market; the claim's subject stays
-            // the pool's BODY.
-            entity_id best_corp = null_entity;
-            entity_id best_key  = null_entity;
-            entity_id best_body = null_entity;
-            float     best_avail = 0.0f;
-            for (const auto& [key, pool] : w.corp_market_pools) // ascending (corp, pool key)
+            // BL-1265 (MARKETS.md § The shelf economy): the state BUYS ITS LUMP
+            // OFF A SHELF. Corporations hold no stockpiles, so there is no
+            // corporation pool to buy from; the supplier is always a market.
             {
-                const entity_id corp = key.first;
-                const entity_id body = pool_key_body(w, key.second);
-                if (corp == w.player_entity)
-                    continue;
-                if (w.corporations.find(corp) == w.corporations.end())
-                    continue;
-                if (body == null_entity)
-                    continue; // the claim's subject must survive the gather check
-                // BL-1172: a pool priced over the fair-price ceiling at its
-                // market is not a candidate (every draw, pool and shelf alike).
-                if (!pool_price_admitted(w, key.second, ri, reservation_mult))
-                    continue;
-                float avail = pool.quantities[ri];
-                const auto rit = reserved.find(std::make_tuple(corp, key.second, ri));
-                if (rit != reserved.end())
-                    avail -= rit->second;
-                if (avail >= lump && avail > best_avail)
-                {
-                    best_corp  = corp;
-                    best_key   = key.second;
-                    best_body  = body;
-                    best_avail = avail;
-                }
-            }
-            if (best_corp == null_entity)
-            {
-                // BL-742: no pool holds a whole lump — auto-surplus sweeps
-                // pools into market inventory every tick, so check the shelf
-                // before declaring the world short. The lump discipline is
-                // unchanged: one market must hold the WHOLE lump (the state
+                // The lump discipline (BL-742): one market must hold the WHOLE lump (the state
                 // splits no launch across shelves), the purchase bypasses the
                 // claim machinery (no corp payee), caps itself at the line's
                 // remaining share, and settles as a direct whole-or-nothing
@@ -251,47 +213,7 @@ std::vector<space_purchase> derive_space_programme_claims(const world& w,
                 sp.quantity = lump;
                 sp.credits  = amount;
                 out.push_back(sp);
-                continue;
             }
-
-            want(nid, best_key, good, lump); // BL-1227: wanted at the supplier pool's market
-
-            const float unit = unit_price_at(w, best_key, ri);
-            if (!std::isfinite(unit) || !(unit > 0.0f))
-                continue; // no price basis, no purchase
-
-            const float amount = lump * unit;
-            if (!std::isfinite(amount) || !(amount > 0.0f))
-                continue;
-
-            // The lump gate: claim only what the line's remaining share
-            // covers. Rule 3a would skip an oversized claim anyway; gating
-            // here as well keeps the RESERVATION honest — a nation that
-            // cannot pay does not hold stock against one that can. The share
-            // keeps accumulating (rule 2), so the lump fires on a later tick.
-            if (amount > share - line_claimed)
-                continue;
-            line_claimed += amount;
-
-            reserved[std::make_tuple(best_corp, best_key, ri)] += lump;
-
-            budget_claim c;
-            c.nation  = nid;
-            c.corp    = best_corp;
-            c.line    = budget_priority::space_programme;
-            c.amount  = amount;
-            c.subject = best_body;
-            claims.push_back(c);
-
-            space_purchase sp;
-            sp.nation   = nid;
-            sp.supplier = best_corp;
-            sp.body     = best_body;
-            sp.pool     = best_key;
-            sp.resource = good;
-            sp.quantity = lump;
-            sp.credits  = amount;
-            out.push_back(sp);
         }
     }
     return out;
@@ -377,26 +299,12 @@ void settle_space_purchases(world& w,
         space_purchase& sp = *match;
         sp.funded = true;
 
-        const std::size_t ri  = static_cast<std::size_t>(sp.resource);
-        const auto        pit = w.corp_market_pools.find(std::make_pair(sp.supplier, sp.pool));
-        if (pit != w.corp_market_pools.end() && pit->second.quantities[ri] >= sp.quantity)
+        // BL-1265: a corporation-supplied lump no longer exists (no pools), so
+        // a transfer matched to one cannot be settled in goods. Reverse it in
+        // the same two places the pass wrote it, as the failed survey earmark
+        // is defended (nation_step.cpp), so the books balance and the nation
+        // did not pay for a launch that never happened.
         {
-            // The terminal sink: the lump leaves the supplier's pool and
-            // is credited to nobody — the satellite launched. The credit
-            // half already landed on the supplier's balance and STAYS
-            // there; it is a sale, and run_nation_step folds it onto the
-            // corp's `subsidies` line so `net()` explains the delta.
-            pit->second.quantities[ri] -= sp.quantity;
-            sp.completed = true;
-        }
-        else
-        {
-            // The derivation's reservation makes this unreachable within
-            // one tick; defend it anyway, exactly as the failed survey
-            // earmark is defended (nation_step.cpp): reverse the transfer
-            // in the same two places the pass wrote it, so the tick's
-            // books still balance and the nation did not pay for a launch
-            // that never happened.
             const auto cit = w.corporations.find(t.corp);
             const auto nit = w.nations.find(t.nation);
             if (cit != w.corporations.end()) cit->second.balance -= t.credits;
