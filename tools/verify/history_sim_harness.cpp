@@ -2760,22 +2760,71 @@ int main()
                     static_cast<long long>(g.coastal_naval_ramp[2]));
         check(ramp_ok, "G1d  the coastal sea-tech count is the number of ramp years reached");
 
-        // G1e — with the naval ledger on, every living polity's sea-tech count
-        // is the ramp's at the last decision round, whoever it is.
+        // G1e — the naval ramp is COASTAL (Ben, 2026-10-10). With the ledger on,
+        // every living polity holding a coastal region (port_q > 0) on the
+        // closing map holds the ramp's count at the close, and no polity holds
+        // more. (A polity that lost its coast keeps its sailors, so an inland
+        // polity at the close may hold the count; it is not asserted to be 0.)
         history_sim_params n = params;
         n.naval_points_accrue = true;
         settlement_state sn = k1->settlement;
         const history_sim_state b = run_history_sim(sn, nullptr, no_terrain, kgw, kgh, n, 12345u);
-        int64_t last_round = n.start_year;
-        for (int64_t y = n.start_year; y < n.stop_year; y += step_for_year(n, y)) last_round = y;
-        const int64_t want = coastal_sea_techs_at(n, last_round);
-        int alive = 0, off_ramp = 0;
-        for (const polity& q : b.polities)
-            if (q.alive) { ++alive; if (q.naval_sea_techs != want) ++off_ramp; }
-        std::printf("      naval ramp: %d living polities, %d off the ramp's %lld at %lld\n",
-                    alive, off_ramp, static_cast<long long>(want), static_cast<long long>(last_round));
-        check(alive > 0 && off_ramp == 0,
-              "G1e  every living polity holds the ramp's coastal sea techs, none more, none fewer");
+        const int64_t want = coastal_sea_techs_at(n, n.stop_year - 1);
+        std::vector<char> coastal(b.polities.size(), 0);
+        for (const region& r : sn.regions)
+            if (r.port_q > 0 && r.nation >= 0 && static_cast<std::size_t>(r.nation) < coastal.size())
+                coastal[static_cast<std::size_t>(r.nation)] = 1;
+        int alive = 0, coastal_n = 0, off_ramp = 0, over = 0;
+        for (std::size_t i = 0; i < b.polities.size(); ++i)
+        {
+            const polity& q = b.polities[i];
+            if (q.naval_sea_techs > want) ++over;
+            if (!q.alive) continue;
+            ++alive;
+            if (coastal[i]) { ++coastal_n; if (q.naval_sea_techs != want) ++off_ramp; }
+        }
+        std::printf("      naval ramp: %d living polities, %d coastal at the close, %d of those off the ramp's %lld,"
+                    " %d polities over it\n", alive, coastal_n, off_ramp, static_cast<long long>(want), over);
+        check(coastal_n > 0 && off_ramp == 0 && over == 0,
+              "G1e  every living coastal polity holds the ramp's coastal sea techs at the close, and none holds more");
+
+        // G1f — the ramp on a hand-built table: coastal reads the count, inland
+        // reads 0, a held count is never lowered, and a polity minted after a
+        // tally is read by the next one (the sim tallies again at the close).
+        {
+            std::vector<polity> ps(2);
+            ps[0].id = 0; ps[0].alive = true;
+            ps[1].id = 1; ps[1].alive = true;
+            std::vector<region> rg(2);
+            rg[0].nation = 0; rg[0].port_q = 400;
+            rg[1].nation = 1; rg[1].port_q = 0;
+            const int64_t y3 = n.coastal_naval_ramp[2];
+            apply_coastal_naval_ramp(ps, rg, n, y3);
+            const bool first = ps[0].naval_sea_techs == 3 && ps[1].naval_sea_techs == 0;
+            rg[0].nation = 1; // the coast changes hands
+            ps.push_back(polity{}); ps[2].id = 2; ps[2].alive = true;
+            rg.push_back(region{}); rg[2].nation = 2; rg[2].port_q = 100;
+            apply_coastal_naval_ramp(ps, rg, n, y3);
+            check(first && ps[0].naval_sea_techs == 3 && ps[1].naval_sea_techs == 3 && ps[2].naval_sea_techs == 3,
+                  "G1f  the ramp reads coast, keeps a held count when the coast is lost, and reads a late-minted polity");
+        }
+
+        // G1g — sea legs are a date AND naval capacity (Ben, 2026-10-10).
+        {
+            polity q; q.id = 0; q.alive = true;
+            for (int d = 0; d < sim_domain_count; ++d) q.capacity[d] = 6;
+            std::vector<region> inland(1), harbour(1);
+            inland[0].nation = 0; inland[0].port_q = 0;
+            harbour[0].nation = 0; harbour[0].port_q = 1000;
+            const int64_t yl = n.sea_legs_year;
+            const bool before = !polity_holds_sea_legs(harbour, q, n, yl - 1);
+            const bool land   = !polity_holds_sea_legs(inland, q, n, yl);
+            const bool sea    = polity_holds_sea_legs(harbour, q, n, yl);
+            std::printf("      sea legs: before the year %s, inland after %s, harbour after %s\n",
+                        before ? "no" : "YES", land ? "no" : "YES", sea ? "yes" : "NO");
+            check(before && land && sea,
+                  "G1g  sea legs need the year and a held region that can field a navy (can_field_naval)");
+        }
     }
 
     std::printf("\n%s (%d failure%s)\n",

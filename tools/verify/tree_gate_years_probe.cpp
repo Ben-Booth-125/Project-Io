@@ -4,10 +4,10 @@
 // THE DATES THAT REPLACED THE GENERATION TREES, AND WHAT THEY OPEN.
 // docs/generation/trees/TREES.md: the pre-game history runs no technology
 // tree; three things the trees gated open on a calendar year instead, for
-// every polity alike:
-//   (a) sea legs        `history_sim_params::sea_legs_year`   (subjection across water)
+// every polity alike, save the two conditions below (Ben, 2026-10-10):
+//   (a) sea legs        `sea_legs_year` AND naval capacity (subjection across water)
 //   (b) post roads      `history_sim_params::post_roads_year` (the treasury-bought third rung)
-//   (c) coastal sea techs `history_sim_params::coastal_naval_ramp` (naval deeds, a ramp)
+//   (c) coastal sea techs `coastal_naval_ramp`, coastal polities only (naval deeds)
 // Each date is MEASURED, not picked. This probe prints the dates in force
 // and, per curated seed, what they open in the generated world: subjections
 // and post roads per span, and the fleets the naval ledger opens Exploration
@@ -18,6 +18,20 @@
 // history_sim that reported every key gained / sea tech taken at the Invest
 // verb with its year, plus a per-round census of living polities and holders.
 // The hook existed only for the measurement; this file is its successor.
+//
+// THE MEASUREMENT CANNOT BE RE-RUN ON THIS TREE: it needs the trees, which are
+// gone. To reproduce it, check out c05844d9 and add to history_sim a global
+// `void (*g_tree_gate_probe)(int64_t year, int kind, int a, int b)` called
+// (i) after each `apply_tree_effects(q)` at the three Invest purchase sites
+// with kind 1 / 2 when the `sea_legs` / `post_roads` bit of `q.tree_keys` is
+// newly set, a = q.id; (ii) at the EM coastal sea-tech increment with kind 3,
+// b = the new `naval_sea_techs`; and (iii) after the round-top fold with the
+// living count (kind 10) and the holders of each gate (kinds 11-15). Then
+// generate each library seed with `world_params{seed, epoch_year = 0}`, the
+// shipped scripts/world_gen.lua and scripts/works.lua (as this file does),
+// and take the median of the recorded years per kind, pooled over seeds.
+// That version of this file is the BL-1272 G1 run (c05844d9 plus the hook;
+// the hook was never committed).
 //
 //   gate          acquisitions  pooled median  median of per-seed medians  first
 //   sea legs           150          1640              1620                  112

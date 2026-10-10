@@ -264,8 +264,8 @@ struct region
     // two regions in three on a long arc. These two fields are the SAME window
     // survey, taken over every region's own tiles, once, at the Industrialisation
     // span's open (`survey_regions_at_span_open`). They are NEW fields rather
-    // than a rewrite of `energy_q` so Exploration, the empire tree, the
-    // treasury endowment and every gate mean are untouched.
+    // than a rewrite of `energy_q` so Exploration, the treasury endowment and
+    // every gate mean are untouched.
     //
     // -1 IS "NOT SURVEYED", and it is the honest value in two places: on every
     // path where the span does not run (the fields are never written), and on
@@ -275,10 +275,14 @@ struct region
     // parent's `survey_fuel_q` x0.7, as `energy_q` inherits; the forest score
     // is not inherited and stays -1 there.
     //
-    // READ ONLY BY the Industry scorer (the seam through
-    // `industry_fuel_reading_q`, and `industry_ground_forest_q`) and BL-1041's
-    // points rate. GENERATION SCRATCH, NOT SAVED: `w_region` does not write
-    // them, the same footing as `treasury` below.
+    // THE SIM READS ONLY `survey_fuel_q`, in BL-1041's points rate (through
+    // `industry_fuel_reading_q`). The forest score and the two raw shares below
+    // are read by nothing in the sim since the generation trees went (BL-1272):
+    // only harness reports read them (industrialisation_sim_harness's survey
+    // table, exploration_sim_harness T10). They are kept, computed in the same
+    // pass as the fuel score at no extra walk, as the survey's record.
+    // GENERATION SCRATCH, NOT SAVED: `w_region` does not write them, the same
+    // footing as `treasury` below.
 
     /// Coal + petroleum under the window, 0-1000, scored against the EXACT mean
     /// over every region at the span open (500 = that world's average region,
@@ -296,11 +300,10 @@ struct region
     /// pass: fuel is the window's coal + petroleum per-tile mean x1000
     /// (`endowment::energy`, floored at 0), forest the window's land share
     /// under forest per mille. -1 when not surveyed (ground the span founds is
-    /// never surveyed: DEFAULT A inherits the SCORE, not this). The Fuel
-    /// Doctrine's top-third bars rank these, not the scores, because a score
-    /// is capped at twice the world mean and a pile at the cap cannot be
-    /// ranked. Same footing as the scores: GENERATION SCRATCH, NOT SAVED, in
-    /// no digest.
+    /// never surveyed: DEFAULT A inherits the SCORE, not this). Unclamped
+    /// because a score is capped at twice the world mean. Read by no sim code
+    /// (see above). Same footing as the scores: GENERATION SCRATCH, NOT SAVED,
+    /// in no digest.
     int survey_fuel_raw   = -1;
     int survey_forest_raw = -1;
 

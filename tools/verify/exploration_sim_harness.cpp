@@ -636,11 +636,16 @@ int main()
             // 239/150/134, 0, 0, 0, 496, 4, 864 -> 86/83/112, 2, 0, 747063,
             // 359, 1, 778, read on main c77f2d5a. Subjects exist again on this
             // fixture, so the fork-off span and R3b's fork-on span no longer
-            // agree counter for counter: they share every war, treaty and
-            // ownership counter and differ only in tribute (747063 here
-            // against R3b's 2481129; the purchase fork is the only switch
-            // between them, its payment mechanism not traced further here).
-            // RE-PINNED 2026-10-10 (BL-1272, the history runs no technology tree; R3b's cause): 86/83/112, 2, 0, 747063, 359, 1, 778 -> 24/21/114, 5, 0, 37154178, 265, 0, 656.
+            // agree counter for counter.
+            // RE-PINNED 2026-10-10 (BL-1272, the history runs no technology
+            // tree; R3b's cause): 86/83/112, 2, 0, 747063, 359, 1, 778 ->
+            // 24/21/114, 5, 0, 37154178, 265, 0, 656. The fork-off span and
+            // R3b's fork-on span share every war, treaty and ownership counter
+            // and differ only in tribute (37154178 here against R3b's
+            // 37154489; the purchase fork is the only switch between them, its
+            // payment mechanism not traced further here). The BL-1272 fix round
+            // (sea legs need naval capacity; the coastal naval ramp) left both
+            // pins unmoved on this fixture.
             check(off.battles == 24 && off.conquests == 21 && off.foundings == 114
                && off.subjections_formed == 5 && off.subjections_freed == 0
                && off.tribute_remitted == 37154178 && off.treaties_formed == 265

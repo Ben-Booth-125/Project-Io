@@ -450,8 +450,10 @@ struct history_sim_params
     // library seeds): the median year the gating node was acquired in the
     // history as it stood before the trees were removed.
 
-    /// Sea legs: from this year a polity may arrive across water to subject a
-    /// coast (the subjection block). Was the Exploration tree's Oceanic
+    /// Sea legs: from this year a polity that can field a navy may arrive
+    /// across water to subject a coast (the subjection block,
+    /// `polity_holds_sea_legs`: the date AND naval capacity, Ben 2026-10-10).
+    /// Was the Exploration tree's Oceanic
     /// Navigation (the `sea_legs` key). MEASURED: 150 polities acquired the
     /// key over the 16 seeds (first 112 CE); the pooled median acquisition is
     /// 1640 (median of per-seed medians 1620). No seed ever had half its
@@ -465,16 +467,18 @@ struct history_sim_params
     /// (first 68 BCE); pooled median 1560 (median of per-seed medians 1552).
     int64_t post_roads_year = 1560;
 
-    /// Coastal sea technology as a date ramp: a polity holds one coastal sea
-    /// tech per year below at or before the round's year
-    /// (`coastal_sea_techs_at`), and each is a naval deed
+    /// Coastal sea technology as a date ramp: a COASTAL polity (Ben,
+    /// 2026-10-10; `apply_coastal_naval_ramp`) holds one coastal sea tech per
+    /// year below at or before the round's year (`coastal_sea_techs_at`), and
+    /// each is a naval deed
     /// (`polity::naval_sea_techs`, weighted by `naval_points_per_sea_tech`).
     /// Was the Empire tree's three coastal nodes (Deep-Hull Sail, Lateen &
     /// Long-Range Rig, Ocean-Rated Hulls). Ascending. MEASURED: the
     /// pooled median year a polity took its first, second and third coastal
     /// sea tech (253, 68 and 58 acquisitions; per-seed medians -104, 164,
     /// 176). Before, 116 of the 1,636 polities living at 1200 held one; now
-    /// every polity living in the Empires span from those years does.
+    /// every coastal polity living in the Empires span from those years does,
+    /// which is why `naval_points_per_sea_tech` is re-measured.
     static constexpr int coastal_naval_ramp_n = 3;
     int64_t coastal_naval_ramp[coastal_naval_ramp_n] = {-92, 152, 176};
 
@@ -2419,20 +2423,30 @@ struct history_sim_params
     bool naval_points_accrue = false;
 
     /// THE THREE DEEDS' WEIGHTS, naval points per deed -- a coastal province
-    /// held for a year, a sea crossing made, a coastal sea tech taken. How the
-    /// deeds weigh against each other is a READING FOR BEN (BL-1147); these
-    /// make each deed comparable in magnitude on the 16 curated seeds. MEASURED
-    /// (`ocean_currents_harness --naval`, 2026-09-26, coastal by the terrain):
-    /// the 1,665 polities living at 1200 did 2,212,520 coastal province-years,
-    /// 7,819 crossings and took 230 coastal sea techs, so at 1 / 280 / 9600 the
-    /// three pooled shares are 2.21M / 2.19M / 2.21M points -- a third each.
-    /// Per polity the deeds spread very differently (coastal years: 877
-    /// polities, median 200, max 61,744; crossings: 424 polities, median 4,
-    /// max 333; techs: 134 polities, at most 3), which is the reading.
+    /// held for a year, a sea crossing made, a coastal sea tech held. How the
+    /// deeds weigh against each other is a READING FOR BEN (BL-1147). The
+    /// coastal-year and crossing weights were set so each deed was comparable
+    /// in magnitude on the 16 curated seeds (`ocean_currents_harness --naval`,
+    /// 2026-09-26: 2,212,520 coastal province-years, 7,819 crossings, 230 sea
+    /// techs over 1,665 polities living at 1200 -> 2.21M / 2.19M / 2.21M points
+    /// at 1 / 280 / 9600).
+    ///
+    /// THE SEA-TECH WEIGHT IS RE-MEASURED (Ben, 2026-10-10, BL-1272): sea techs
+    /// are a date ramp for every coastal polity (`apply_coastal_naval_ramp`),
+    /// no longer a node a few polities bought, so the weight is set to keep
+    /// the world's pooled naval points at 1200 where the history as last
+    /// blessed had them. MEASURED (`ocean_currents_harness --naval`, the 16
+    /// library seeds): at c05844d9, 1,631 polities living at 1200 held
+    /// 2,756,312 coastal-year + 2,267,720 crossing + 1,929,600 tech points
+    /// (201 techs x 9600) = 6,953,632. With the ramp, 1,564 living polities
+    /// hold 4,299 techs beside 3,090,996 + 2,344,720 points, so 353 per tech
+    /// brings the total to 6,953,263 (techs 1,517,547, 22%). One weight cannot
+    /// also restore the old per-polity spread: the techs now fall on every
+    /// coastal polity, not on the 134 that bought them.
     /// Domain [0, 100000] each.
     int64_t naval_points_per_coastal_year = 1;
     int64_t naval_points_per_crossing     = 280;
-    int64_t naval_points_per_sea_tech     = 9600;
+    int64_t naval_points_per_sea_tech     = 353;
 
     /// THE CONVERSION, the one named constant: navy hulls per 1000 naval
     /// points, applied ONCE at a resumed span's open to every LIVING polity
@@ -3149,8 +3163,22 @@ int64_t isqrt64(int64_t v);
 /// technology; what a tree node used to gate opens on a calendar year for
 /// every polity alike.
 ///
-/// Sea legs: may this polity arrive across water to subject a coast?
+/// Sea legs, the date half: has the year come?
 inline bool sea_legs_open(const history_sim_params& p, int64_t year) { return year >= p.sea_legs_year; }
+/// Sea legs (Ben, 2026-10-10: a date AND naval capacity): may @p q arrive
+/// across water to subject a coast in @p year? True iff the date has come and
+/// some region @p q holds (`region::nation`) can field a navy at its military
+/// band -- `can_field_naval`, the test general ocean crossing already reads
+/// (a harbour and the band's naval rows).
+bool polity_holds_sea_legs(const std::vector<region>& regions, const polity& q,
+                           const history_sim_params& p, int64_t year);
+/// The naval ramp (Ben, 2026-10-10: coastal polities only): every living
+/// polity holding a coastal region (`region::port_q > 0`, the old `coastal`
+/// gate's reading) holds `coastal_sea_techs_at(year)` sea techs as naval
+/// deeds (`polity::naval_sea_techs`). A held count is never lowered: a polity
+/// that loses its coast keeps its sailors, as every deed does.
+void apply_coastal_naval_ramp(std::vector<polity>& polities, const std::vector<region>& regions,
+                              const history_sim_params& p, int64_t year);
 /// The treasury-bought third road rung (the Post Road): may it be bought?
 inline bool post_roads_open(const history_sim_params& p, int64_t year) { return year >= p.post_roads_year; }
 /// Coastal sea technology held, 0-3: the number of `coastal_naval_ramp`

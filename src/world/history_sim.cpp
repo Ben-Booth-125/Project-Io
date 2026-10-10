@@ -372,6 +372,35 @@ int64_t stack_size(const std::vector<army_stack_entry>& s)
 
 } // namespace
 
+void apply_coastal_naval_ramp(std::vector<polity>& polities, const std::vector<region>& regions,
+                              const history_sim_params& p, int64_t year)
+{
+    const int64_t techs = coastal_sea_techs_at(p, year);
+    if (techs <= 0) return;
+    std::vector<char> coastal(polities.size(), 0);
+    for (const region& r : regions)
+        if (r.port_q > 0 && r.nation >= 0 && static_cast<std::size_t>(r.nation) < coastal.size())
+            coastal[static_cast<std::size_t>(r.nation)] = 1;
+    for (std::size_t i = 0; i < polities.size(); ++i)
+    {
+        polity& q = polities[i];
+        if (!q.alive || q.id != static_cast<int>(i) || !coastal[i]) continue;
+        q.naval_sea_techs = std::max<int64_t>(q.naval_sea_techs, techs);
+    }
+}
+
+bool polity_holds_sea_legs(const std::vector<region>& regions, const polity& q,
+                           const history_sim_params& p, int64_t year)
+{
+    if (!sea_legs_open(p, year)) return false;
+    const roster_band band = roster_band_for_capacity(
+        clampi(q.capacity[static_cast<int>(sim_domain::military)], 1, 6));
+    for (const region& r : regions)
+        if (r.nation == q.id && can_field_naval(r, band)) return true;
+    return false;
+}
+
+
 // ---------------------------------------------------------------------------
 
 std::vector<uint16_t> owner_slice_at(const era_timelapse& t, int64_t year)
@@ -5077,17 +5106,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 out.polities[static_cast<std::size_t>(o)].naval_coastal_years += years;
             }
         }
-        // THE COASTAL SEA TECHS, A DATE RAMP (TREES.md, Ben 2026-10-10): every
-        // living polity holds one per `coastal_naval_ramp` year the round has
-        // reached, each a naval deed (`naval_sea_techs`). Was the Empire
-        // tree's three coastal nodes, bought at the Invest verb. A polity
-        // dead by now keeps what it held when it died, as every deed does.
+        // THE COASTAL SEA TECHS, A DATE RAMP FOR COASTAL POLITIES (TREES.md,
+        // Ben 2026-10-10): `apply_coastal_naval_ramp`. Run again at the
+        // span's close so a polity minted after this round's tally is read.
         if (params.naval_points_accrue)
-        {
-            const int64_t techs = coastal_sea_techs_at(params, y);
-            for (polity& q : out.polities)
-                if (q.alive) q.naval_sea_techs = techs;
-        }
+            apply_coastal_naval_ramp(out.polities, ss.regions, params, y);
 
         // ---- BL-931: OBJECTS WITH A TERM, AND THE UPKEEP STEP -------------
         //
@@ -5737,7 +5760,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 {
                     polity& arriving = out.polities[ai];
                     if (!arriving.alive || arriving.overlord >= 0) continue;
-                    if (!sea_legs_open(params, y)) continue; // A DATE, never a rank (TREES.md, Ben 2026-10-10)
+                    // A DATE AND NAVAL CAPACITY, never a rank (TREES.md, Ben 2026-10-10).
+                    if (!polity_holds_sea_legs(ss.regions, arriving, params, y)) continue;
                     if (arriving.capital < 0
                      || static_cast<std::size_t>(arriving.capital) >= ss.regions.size()) continue;
                     ++out.subjection_arrivals_walked; // BL-1171 diagnostic
@@ -9896,6 +9920,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     ? out.polities[static_cast<std::size_t>(o)].protection_q : 0;
         }
     }
+
+    // The naval ramp, once more at the close (see the round's tally): a
+    // polity minted during the last round is read on the closing map.
+    if (params.naval_points_accrue && params.stop_year > params.start_year)
+        apply_coastal_naval_ramp(out.polities, ss.regions, params, params.stop_year - 1);
 
     // BL-914: the final flush. The per-year publish above always lags by one
     // year, so the last year simulated is never folded in inside the loop —
