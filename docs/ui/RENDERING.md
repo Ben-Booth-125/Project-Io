@@ -115,7 +115,15 @@ ground retires only as coverage arrives.
     leave RAM it **spills to a disk cache** — its finished chunks written to local disk —
     and streams back from there on the next visit, in seconds from an SSD instead of a
     re-bake; only chunks whose content hash moved meanwhile re-bake. The far page stays
-    resident. The disk cache is a cache: deleting it costs a re-bake, never correctness. A background bake starts only where its whole
+    resident. The disk cache is a cache: deleting it costs a re-bake, never correctness. It lives
+    in the user's local app data (`%LOCALAPPDATA%\ProjectIo\ground_cache` on Windows), not beside
+    the saves — a regenerable per-machine cache does not belong in a folder that may sync. One
+    file per master chunk (its master piece, its mip pieces and the content hash it was baked
+    against), written by one background writer thread as a temp file renamed into place, so a
+    crash never leaves a half chunk that loads; each file is checked on load and a bad one
+    re-bakes. Files are packed losslessly (the alpha plane run-length coded, RGB raw: about 0.75
+    of raw). The cache is scoped to the run that wrote it — deleted at exit and on a new world —
+    and capped at 32 GB, the least recently visited body's files evicted first. A background bake starts only where its whole
     master fits the budget without dropping anything.
   - **The GPU** holds only the drawn level's chunks in view, a one-chunk ring
     around them, and the same view at the two adjacent levels — an LRU of at

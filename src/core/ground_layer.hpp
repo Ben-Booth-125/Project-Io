@@ -8,7 +8,10 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <deque>
+#include <filesystem>
 #include <memory>
+#include <string>
 #include <mutex>
 #include <thread>
 #include <unordered_map>
@@ -53,15 +56,26 @@
 // the window rule), re-deriving only those windows' mip pieces; past 40% of
 // the chunk, or on any terrain change, the chunk re-bakes whole.
 //
-// RAM: a budget across bodies (k_ram_budget) drops the least-recently-visited
-// body's master and chain, keeping its far page; background bakes start only
-// where they fit without dropping anything.
+// RAM (BL-1259, Ben 2026-10-10): the HOME body's master is pinned — never
+// dropped, and not counted against the budget. The other bodies share a
+// budget (ram_budget, 8 GB): when one must leave RAM, the least-recently-
+// visited one SPILLS to the disk cache — its finished chunks (master piece +
+// mip pieces + the content hash each was baked against) are written by one
+// writer thread, atomically (temp file + rename), and its RAM freed — keeping
+// its far page. A revisit streams its chunks back on the pool as LOAD jobs, in
+// the same view-first order as bakes; a chunk whose content hash moved
+// meanwhile re-bakes instead, and a missing or corrupt file falls back to a
+// re-bake silently. The cache is session-scoped (written and read by this run
+// only, deleted at exit and on a new world) and bounded (k_disk_cap, LRU by
+// body). Background bakes start only where they fit without dropping anything.
 //
 // Under --verify everything a frame draws is complete before tick returns: the
 // master chunks under the view are baked on the pool and WAITED for, the far
 // page and neighbourhood page bake on the main thread, and every visible
 // texture is uploaded with no budget — a capture can never race the pool.
-// Pre-bake and background bakes are off under --verify.
+// Pre-bake and background bakes are off under --verify, and so is the disk
+// cache (a budget drop is a plain drop) except where a script drives it
+// explicitly and synchronously (verify.ground_spill / ground_restore).
 // ---------------------------------------------------------------------------
 
 struct world;
@@ -164,6 +178,7 @@ public:
         bool      master_current = false;            ///< Active body: whole and swept against the latest snapshot.
         std::uint64_t uploads = 0;   ///< Texture uploads since reset_stats().
         int       pending_uploads = 0; ///< Visible chunks of the drawn level not yet on the GPU (last tick).
+        bool      view_final = false;  ///< Last tick: every master chunk under the view landed, current and uploaded.
     };
     stats stats_snapshot() const;
     void  reset_stats();
@@ -186,6 +201,16 @@ public:
         std::uint64_t patch_px      = 0; ///< Pixels the windows baked (no apron).
         std::uint64_t rebake_px     = 0; ///< Pixels whole-chunk re-bakes baked.
         double        rebake_ms     = 0; ///< Worker time of every re-bake, whole and patched.
+        // BL-1259, the disk cache:
+        std::uint64_t chunk_loads    = 0; ///< Master chunks restored from the disk cache (not counted as bakes).
+        std::uint64_t load_failures  = 0; ///< Loads that found a missing / corrupt / foreign file (re-baked instead).
+        std::uint64_t load_skipped   = 0; ///< Spilled chunks whose hash had moved: re-baked without a load.
+        std::uint64_t chunk_writes   = 0; ///< Chunk files written.
+        std::uint64_t write_skipped  = 0; ///< Spilled chunks whose file already held their pixels.
+        std::uint64_t write_failures = 0;
+        std::uint64_t spills         = 0; ///< Masters spilled.
+        double        load_ms        = 0; ///< Worker time of every load (read + check + decode).
+        double        load_read_ms   = 0; ///< Of which: opening and reading the file.
     };
     const bake_stats& bake_counters() const { return m_bake_counters; }
 
@@ -210,6 +235,54 @@ public:
     };
     std::vector<chunk_probe> probe_chunks() const;
 
+    // --- BL-1259: the disk cache ---------------------------------------
+    /// RAM budget across the bodies OTHER than home (home is pinned outside
+    /// it). Verify may lower it to force a spill (verify.ground_set_ram_budget).
+    long long ram_budget = k_ram_budget;
+    struct cache_body
+    {
+        entity_id     body = null_entity;
+        long long     bytes = 0;      ///< Chunk files of this body on disk.
+        long long     raw_bytes = 0;  ///< What those files hold uncompressed (the ratio).
+        int           files = 0;
+        int           pending = 0;    ///< Chunk writes queued, not done.
+        bool          resident = false; ///< Master in RAM (more than its far page).
+        bool          pinned = false;
+    };
+    struct cache_info
+    {
+        std::string   root;           ///< Empty = no usable location (the cache is off).
+        long long     cap = 0;        ///< Disk cap, bytes.
+        long long     bytes = 0;      ///< Every body of this session.
+        int           pending = 0;    ///< Chunk writes queued.
+        bool          live = false;   ///< The budget spills (false: --verify synchronous path, drops).
+        std::vector<cache_body> bodies;
+    };
+    cache_info cache_snapshot() const;
+    /// Spill @p body's master to the disk cache now (any body, the home one
+    /// included — a verify lever; the budget never spills home). @p sync: write
+    /// on the calling thread and land the results before returning (the
+    /// --verify synchronous path); otherwise queue to the writer thread.
+    /// Returns chunk files to write; @p skipped = chunks whose file already
+    /// held their pixels. -1 = no such body or no cache location.
+    int  spill_body(entity_id body, bool sync, int* skipped = nullptr);
+    /// Block until the writer thread is idle and its results have landed.
+    void wait_cache_idle();
+    /// Verify: bring back every spilled chunk of @p body from the cache on the
+    /// pool and wait — a moved hash re-bakes, a bad file re-bakes. The source
+    /// is re-taken from @p w and swept first.
+    struct restore_result { int loaded = 0, rebaked = 0, failed = 0; double ms = 0; bool ok = false; };
+    restore_result restore_body(const world& w, entity_id body, double timeout_ms);
+    /// Verify: a digest over every READY master chunk of @p body — the chunk's
+    /// index, its master piece and its share of every mip level — and how many.
+    std::uint64_t master_digest(entity_id body, int* chunks = nullptr) const;
+    /// Verify: drop @p body's master WITHOUT the cache (and forget its files) —
+    /// the re-bake baseline.
+    void drop_body(entity_id body);
+    /// Verify: corrupt the lowest-index cached chunk file of @p body (flip
+    /// bytes mid-payload). Returns that chunk index, or -1.
+    int  corrupt_cached_chunk(entity_id body);
+
     /// Per-frame GPU upload budget for the drawn view and its ring, chunks
     /// (each <= 1 MB) — RENDERING.md § Chunks, cache and invalidation.
     static constexpr int         k_upload_budget = 8;
@@ -219,9 +292,13 @@ public:
     static constexpr int         k_prefetch_budget = 2;
     /// GPU texture LRU cap (textures of the active body; each <= 1 MB).
     static constexpr std::size_t k_gpu_cap = 320;
-    /// RAM budget across bodies (TECH_FOUNDATIONS.md § Target hardware: 16 GB
-    /// minimum): the home body's master + chain is ~6.7 GB at 128 px per hex.
+    /// RAM budget across the bodies other than home (TECH_FOUNDATIONS.md §
+    /// Target hardware: 16 GB minimum; RENDERING.md § Chunks, cache and
+    /// invalidation): the home master is pinned outside it.
     static constexpr long long   k_ram_budget = 8LL * 1024 * 1024 * 1024;
+    /// Disk cache cap across bodies (BL-1259): LRU by body past it.
+    /// IO_GROUND_CACHE_CAP_GB overrides.
+    static constexpr long long   k_disk_cap = 32LL * 1024 * 1024 * 1024;
     /// Master supersampling: 1x (measured 2026-10-09: the 2x whole-home bake
     /// does not fit the 15 s pre-bake budget — RENDERING.md § Level of detail).
     static constexpr int         k_master_ss = 1;
@@ -253,6 +330,15 @@ private:
         std::vector<std::uint64_t> job;        ///< Sequence of the outstanding job (0 = none).
         std::vector<std::uint8_t>  ready;      ///< Landed at least once since the master was (re)allocated.
         std::vector<std::uint8_t>  dirty;      ///< Ready, but its hash moved: re-bake.
+        // BL-1259, the disk cache (per master chunk):
+        std::vector<std::uint8_t>  disk_has;     ///< A file for this chunk was written (or is queued) this session.
+        std::vector<std::uint64_t> disk_hash;    ///< The content hash that file was baked against.
+        std::vector<std::uint8_t>  disk_same;    ///< The RAM pixels are the file's (a spill need not rewrite it).
+        std::vector<std::uint8_t>  disk_pending; ///< Its write is queued: neither load nor bake it yet.
+        std::vector<std::uint32_t> disk_size;    ///< File bytes (0 = none).
+        std::vector<std::uint32_t> disk_raw;     ///< Uncompressed bytes the file holds.
+        std::filesystem::path      disk_dir;     ///< This body's cache directory (empty = not yet keyed).
+        bool                       disk_purged = false; ///< The directory was cleared for this session.
         int n_ready = 0;  ///< ready && !dirty
         int n_chunks = 0;
         bool master_alloc = false;             ///< Level buffers are live (false after a RAM drop).
@@ -283,7 +369,7 @@ private:
         long long     ram = 0;
     };
 
-    enum class job_kind : std::uint8_t { far, sweep, master, neigh };
+    enum class job_kind : std::uint8_t { far, sweep, master, neigh, load };
     struct job
     {
         job_kind      kind = job_kind::master;
@@ -302,6 +388,8 @@ private:
         std::uint64_t hash  = 0;               ///< Neighbourhood page's folded hash.
         entity_id     neigh_tile = null_entity;
         float         neigh_rect[4] = { 0, 0, 0, 0 };
+        std::filesystem::path file;            ///< Load jobs: the chunk file.
+        std::uint64_t stamp = 0;               ///< Load jobs: the stamp its header must carry.
     };
     struct result
     {
@@ -328,6 +416,8 @@ private:
         bool               patched = false;
         std::vector<patch> patches;
         double             ms = 0.0;           ///< Worker bake time (master jobs).
+        bool               loaded = false;     ///< Load jobs: the file decoded (else: re-bake).
+        double             read_ms = 0.0;      ///< Load jobs: opening and reading the file.
         entity_id     neigh_tile = null_entity;
         float         neigh_rect[4] = { 0, 0, 0, 0 };
     };
@@ -353,6 +443,8 @@ private:
     void land_boundary(body_state& b, std::shared_ptr<const ui::ground::bake_source> src,
                        const char* what);
     void make_room(long long need, entity_id keep_a, entity_id keep_b);
+    bool pinned(entity_id id) const { return id != null_entity && (id == m_home || id == m_prebake); }
+    long long budget_total() const; ///< RAM of every body outside the pin.
     static long long master_bytes(const body_state& b);
 
     // Pool.
@@ -362,6 +454,10 @@ private:
     static void run_job(const job& j, result& d, double* level_ms);
     std::uint64_t next_seq() { return ++m_seq_counter; }
     job make_master_job(const body_state& b, int idx, double prio);
+    /// The job that brings chunk @p idx back: a LOAD from the disk cache when
+    /// its file holds the current content (or the hashes are not yet known),
+    /// otherwise a bake. @p allow_disk false = always a bake.
+    job make_chunk_job(body_state& b, int idx, double prio, bool allow_disk);
     /// Start a far-page bake of @p b against its current source: one job per
     /// 512 px piece, enqueued on the pool.
     void start_far(body_state& b);
@@ -384,6 +480,65 @@ private:
     /// The master-chunk window under a level-l view (ci unwrapped; cj clamped).
     struct window { int ci_lo = 0, ci_hi = -1, cj_lo = 0, cj_hi = -1; };
     window window_of(const body_state& b, int level, const ground_request& req, int margin) const;
+
+    // --- The disk cache (BL-1259) ---
+    struct spill_chunk { int idx = 0, pw = 0, ph = 0; std::uint64_t hash = 0; };
+    struct disk_task
+    {
+        enum class kind : std::uint8_t { spill, remove_dir } k = kind::spill;
+        entity_id     body = null_entity;
+        std::uint64_t gen = 0;
+        std::filesystem::path dir;
+        bool          purge = false;       ///< Clear the directory first (its first spill this session).
+        std::uint64_t stamp = 0;
+        int           cw[L] = {};          ///< Level chunk columns.
+        int           lw[L] = {}, lh[L] = {}; ///< Level widths / heights, px.
+        std::vector<std::vector<std::uint32_t>> lv[L]; ///< The level chunks, moved out of the body.
+        std::vector<spill_chunk> chunks;   ///< The chunks to write.
+        /// Who may be evicted if the cap is passed: other bodies' directories,
+        /// least recently visited first (a main-thread snapshot).
+        std::vector<std::pair<entity_id, std::filesystem::path>> evict_order;
+    };
+    struct disk_result
+    {
+        entity_id     body = null_entity;
+        std::uint64_t gen = 0;
+        int           idx = -1;            ///< -1: a whole-body event (its files evicted).
+        bool          ok = false;
+        std::uint32_t bytes = 0;
+        std::uint32_t raw = 0;
+    };
+    bool cache_live() const { return m_cache_live && !m_disk_root.empty(); }
+    void cache_init();                     ///< Root, stamp, the stale-directory purge (once).
+    void ensure_disk_keys(body_state& b);
+    /// Move @p b's master out of RAM into a write task (and run it, @p sync).
+    int  spill_master(body_state& b, bool sync, int* skipped, const char* why = "RAM budget");
+    void writer_main();
+    void run_disk_task(disk_task& t, std::vector<disk_result>& out); ///< Writer thread (or the caller, sync).
+    void land_disk(const disk_result& r);
+    void drain_disk();
+    void forget_disk(body_state& b);       ///< Its files are no longer trusted.
+    static bool load_chunk_file(const job& j, result& d);
+
+    std::filesystem::path m_disk_root;
+    bool          m_disk_init = false;
+    bool          m_cache_live = true;      ///< False on the --verify synchronous path.
+    std::uint64_t m_disk_stamp = 0;         ///< Format version x executable identity x bake params.
+    long long     m_disk_cap = k_disk_cap;
+    std::uint64_t m_world_gen = 1;          ///< Bumps on forget_world: stale writer results land nowhere.
+    std::thread   m_writer;
+    std::mutex    m_wmx;
+    std::condition_variable m_wcv;          ///< The writer waits on tasks.
+    std::condition_variable m_widle_cv;     ///< wait_cache_idle waits on the writer.
+    std::deque<disk_task>    m_wtasks;
+    std::vector<disk_result> m_wresults;
+    bool          m_wbusy = false;
+    bool          m_wquit = false;
+    /// Writer-owned: bytes per body directory this session (the cap's ledger).
+    std::unordered_map<std::string, long long> m_wdir_bytes;
+    std::vector<std::filesystem::path> m_session_dirs; ///< Deleted at exit and on a new world.
+    entity_id     m_home = null_entity;     ///< The pinned body (the world's home body).
+    bool          m_view_final = false;
 
     std::unordered_map<entity_id, std::unique_ptr<body_state>> m_bodies;
     entity_id     m_active = null_entity;   ///< Body the canvas draws (GPU textures are its).

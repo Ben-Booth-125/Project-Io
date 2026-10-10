@@ -1072,6 +1072,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         t["bodies_resident"] = s.bodies_resident;
         t["uploads"]      = static_cast<double>(s.uploads);
         t["pending_uploads"] = s.pending_uploads;
+        t["view_final"]   = s.view_final; // BL-1259: the view's master chunks all landed, current, uploaded
         int ww = 0, wh = 0;
         SDL_GetWindowSize(m_window, &ww, &wh);
         t["window_w"] = ww;
@@ -1116,6 +1117,103 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // A part-baked frame: at most n master chunk bakes per tick (-1 =
     // unlimited, the --verify default) — a first visit caught mid-bake.
     v.set_function("ground_fill_limit", [this](int n) { m_ground.verify_fill_limit = n; });
+
+    // BL-1259 (ground disk cache). A body is named as goto_surface names it
+    // ("home", "moon", "inner", ...) or omitted for the active body.
+    //
+    //   ground_cache()            -> { root, cap, bytes, pending, live, bodies = { {body, bytes,
+    //                                raw_bytes, files, pending, resident, pinned}, ... } }
+    //   ground_spill([name])      -> { written, skipped } — the body's master to the cache, its RAM
+    //                                freed. SYNCHRONOUS on the --verify synchronous path (written on
+    //                                this thread, deterministic); queued to the writer on the pool
+    //                                path (IO_GROUND_BENCH — the live path, a hitch can be measured).
+    //   ground_cache_wait()       -> ms the writer took to go idle.
+    //   ground_restore([name])    -> { ok, loaded, rebaked, failed, ms } — every spilled chunk back,
+    //                                synchronously (loads; a moved hash or a bad file re-bakes).
+    //   ground_master_digest([name]) -> { digest (hex string), chunks } over every READY chunk:
+    //                                its master piece and its share of every mip level.
+    //   ground_drop([name])       -> drop the master WITHOUT the cache (the re-bake baseline).
+    //   ground_cache_corrupt([name]) -> the chunk index whose file was corrupted, or -1.
+    //   ground_set_ram_budget(gb) -> the previous budget in GB (the non-home budget; forces a spill).
+    //   ground_body_id([name])    -> the body's entity id.
+    const auto ground_body = [this](const sol::optional<std::string>& name) {
+        return name ? find_body(m_world, *name) : m_ui.active_body;
+    };
+    v.set_function("ground_body_id", [this, ground_body](sol::optional<std::string> name) {
+        return static_cast<double>(ground_body(name));
+    });
+    v.set_function("ground_cache", [this]() {
+        sol::state& lua = m_lua.state();
+        const ground_layer::cache_info c = m_ground.cache_snapshot();
+        sol::table t = lua.create_table();
+        t["root"]    = c.root;
+        t["cap"]     = static_cast<double>(c.cap);
+        t["bytes"]   = static_cast<double>(c.bytes);
+        t["pending"] = c.pending;
+        t["live"]    = c.live;
+        sol::table bodies = lua.create_table();
+        int k = 1;
+        for (const ground_layer::cache_body& b : c.bodies)
+        {
+            sol::table r = lua.create_table();
+            r["body"]      = static_cast<double>(b.body);
+            r["bytes"]     = static_cast<double>(b.bytes);
+            r["raw_bytes"] = static_cast<double>(b.raw_bytes);
+            r["files"]     = b.files;
+            r["pending"]   = b.pending;
+            r["resident"]  = b.resident;
+            r["pinned"]    = b.pinned;
+            bodies[k++] = r;
+        }
+        t["bodies"] = bodies;
+        return t;
+    });
+    v.set_function("ground_spill", [this, ground_body](sol::optional<std::string> name) {
+        int skipped = 0;
+        const int n = m_ground.spill_body(ground_body(name), !ground_layer::pool_path_under_verify(),
+                                          &skipped);
+        sol::table r = m_lua.state().create_table();
+        r["written"] = n;
+        r["skipped"] = skipped;
+        return r;
+    });
+    v.set_function("ground_cache_wait", [this]() {
+        const auto t0 = std::chrono::steady_clock::now();
+        m_ground.wait_cache_idle();
+        return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+    });
+    v.set_function("ground_restore", [this, ground_body](sol::optional<std::string> name) {
+        const ground_layer::restore_result rr = m_ground.restore_body(m_world, ground_body(name), 600000.0);
+        sol::table r = m_lua.state().create_table();
+        r["ok"]      = rr.ok;
+        r["loaded"]  = rr.loaded;
+        r["rebaked"] = rr.rebaked;
+        r["failed"]  = rr.failed;
+        r["ms"]      = rr.ms;
+        return r;
+    });
+    v.set_function("ground_master_digest", [this, ground_body](sol::optional<std::string> name) {
+        int n = 0;
+        const std::uint64_t d = m_ground.master_digest(ground_body(name), &n);
+        char hex[24];
+        std::snprintf(hex, sizeof hex, "%016llx", static_cast<unsigned long long>(d));
+        sol::table r = m_lua.state().create_table();
+        r["digest"] = std::string(hex);
+        r["chunks"] = n;
+        return r;
+    });
+    v.set_function("ground_drop", [this, ground_body](sol::optional<std::string> name) {
+        m_ground.drop_body(ground_body(name));
+    });
+    v.set_function("ground_cache_corrupt", [this, ground_body](sol::optional<std::string> name) {
+        return m_ground.corrupt_cached_chunk(ground_body(name));
+    });
+    v.set_function("ground_set_ram_budget", [this](double gb) {
+        const double prev = static_cast<double>(m_ground.ram_budget) / 1073741824.0;
+        if (std::isfinite(gb) && gb >= 0.0)
+            m_ground.ram_budget = static_cast<long long>(gb * 1073741824.0);
+        return prev;
+    });
     v.set_function("set_pan",  [this](float x, float y) {
         m_ui.planetary_pan_x = x;
         m_ui.planetary_pan_y = y;
@@ -4971,6 +5069,16 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         t["chunk_rebakes"]  = static_cast<double>(st.chunk_rebakes);
         t["neigh_bakes"]    = static_cast<double>(st.neigh_bakes);
         t["chunk_patches"]  = static_cast<double>(st.chunk_patches);
+        // BL-1259, the disk cache: loads are not bakes (chunk_bakes excludes them).
+        t["chunk_loads"]    = static_cast<double>(st.chunk_loads);
+        t["load_failures"]  = static_cast<double>(st.load_failures);
+        t["load_skipped"]   = static_cast<double>(st.load_skipped);
+        t["chunk_writes"]   = static_cast<double>(st.chunk_writes);
+        t["write_skipped"]  = static_cast<double>(st.write_skipped);
+        t["write_failures"] = static_cast<double>(st.write_failures);
+        t["spills"]         = static_cast<double>(st.spills);
+        t["load_ms"]        = st.load_ms;
+        t["load_read_ms"]   = st.load_read_ms;
         // A string: a 64-bit digest does not survive a Lua number.
         char buf[24];
         std::snprintf(buf, sizeof buf, "%016llx",
