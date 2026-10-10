@@ -27,7 +27,7 @@ Full, then the close. Branch `claude/tech-trees-game-eras-8036ed`.
   20 x sqrt(line spend) at 200 RP a cost unit; an age is about eighty years.
 - **Generation gates:** sea legs = date + naval capacity + a fleet afloat; coastal naval ramp
   re-weighted (9600 -> 353, naval points at 1200 match baseline); dates are the acquisition median.
-  Works lean from charter reach (NR-1026). Rocketry gates launch; propellant open. Institutes staffed.
+  Works lean from charter reach (NR-1032). Rocketry gates launch; propellant open. Institutes staffed.
 
 ### Landed
 - **BL-1271 (Digitisation tree store):** docs, the 160-node store, `tech_tree_store.js --check`; two
@@ -39,7 +39,7 @@ Full, then the close. Branch `claude/tech-trees-game-eras-8036ed`.
 
 ### Carried to sprint 53 (HANDOFF_TECH_TREE.md)
 BL-1272 (generation without research) — fleet threshold mid-edit; BL-1274 (tech effects wired) and
-BL-1276 (tech tree panel, shift-click) — fix rounds written, unbuilt; BL-1275, BL-1278, BL-1277 not
+BL-1276 (tech tree panel, shift-click) — fix rounds written, unbuilt; BL-1275, BL-1285, BL-1277 not
 started. Every lane needed a fix round after cold review.
 
 ## 2026-10-04 — Sprint 48 closes: three branches ruled, reviewed and merged; the overseas reach designed

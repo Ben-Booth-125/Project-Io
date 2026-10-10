@@ -63,7 +63,7 @@ call sites, `economy_system.cpp` (science), new `tools/verify/nation_tech_harnes
 - [ ] E1 BL-1274 (tech effects wired): machine effects in the store; wired levers; declared-unread
   register + audit. consumes: `dg::effect`, `nation_holds`.
 - [ ] A1 BL-1275 (nation research AI): scorer appends one frontier node. consumes: `enqueue_node`.
-- [ ] D1 BL-1278 (quest deed state): per-nation deed history; deed_met wired where the quantity exists. consumes: `dg::effect`, `deed_met`.
+- [ ] D1 BL-1285 (quest deed state): per-nation deed history; deed_met wired where the quantity exists. consumes: `dg::effect`, `deed_met`.
 - [ ] U1 BL-1276 (tech tree panel): ring render, inspect, plan mode, ACTIONS/question log/ui_elements,
   verify script; Ben's live click. consumes: `nation_tech_state`, `enqueue_node`, `dg::nodes[]`.
 

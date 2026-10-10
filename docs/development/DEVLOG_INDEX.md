@@ -10,7 +10,7 @@ the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
-| 2026-10-10 | [Sprint 52: the Digitisation tech tree designed and the nation core built](DEVLOG.md) | BL-1271 BL-1272 BL-1273 BL-1274 BL-1275 BL-1276 BL-1277 BL-1278 | DEVLOG.md |
+| 2026-10-10 | [Sprint 52: the Digitisation tech tree designed and the nation core built](DEVLOG.md) | BL-1271 BL-1272 BL-1273 BL-1274 BL-1275 BL-1276 BL-1277 BL-1285 | DEVLOG.md |
 | 2026-10-04 | [Sprint 48 closes: three branches ruled, reviewed and merged; the overseas reach designed](DEVLOG.md) | BL-1148 BL-1168 BL-1169 BL-1170 BL-1171 BL-1172 BL-1179 | DEVLOG.md |
 | 2026-09-22 | [Beat 1 ships: the span and the charter budget on by default, one re-bless](DEVLOG.md) | BL-1037 BL-1044 BL-1050 BL-977 | DEVLOG.md |
 | 2026-09-21 | [The charter price becomes the world's own, and the seat menu is read off the budget](DEVLOG.md) | BL-1043 BL-1044 BL-1050 BL-1064 | DEVLOG.md |

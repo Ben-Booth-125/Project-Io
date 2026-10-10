@@ -2026,7 +2026,7 @@
    "resolution": "Superseded by Ben's rulings 2026-10-10 in TREES.md (sea legs: date, naval capacity and a fleet afloat; naval ramp coastal, re-weighted; dates the acquisition median)."
   },
   {
-   "id": "NR-1025",
+   "id": "NR-1031",
    "title": "DECISION TAKEN: four loose ends of the retired generation trees",
    "raised": "2026-10-10",
    "kind": "decision-taken",
@@ -2042,10 +2042,11 @@
     "docs/generation/INDUSTRIALISATION.md",
     "docs/ui/question_log.json"
    ],
-   "resolution": "Written: CIVILISATION.md, EXPLORATION.md, INDUSTRIALISATION.md, question_log.json; deed subject = nation (RESEARCH.md; BL-1278)."
+   "resolution": "Written: CIVILISATION.md, EXPLORATION.md, INDUSTRIALISATION.md, question_log.json; deed subject = nation (RESEARCH.md; BL-1285).",
+   "renumbered_from": "NR-1025 on the sprint 52 branch; renumbered at the 2026-10-10 merge onto main, where NR-1025 was already taken"
   },
   {
-   "id": "NR-1026",
+   "id": "NR-1032",
    "title": "What derives a nation's works lean (State Arsenal / Private Works) now the Industry tree is gone?",
    "raised": "2026-10-10",
    "kind": "question",
@@ -2062,10 +2063,11 @@
    "files": [
     "docs/generation/INDUSTRIALISATION.md"
    ],
-   "resolution": "RULED (Ben, 2026-10-10): A - derived from charter reach. Written into INDUSTRIALISATION.md § Beat 1 (the works lean)."
+   "resolution": "RULED (Ben, 2026-10-10): A - derived from charter reach. Written into INDUSTRIALISATION.md § Beat 1 (the works lean).",
+   "renumbered_from": "NR-1026 on the sprint 52 branch; renumbered at the 2026-10-10 merge onto main, where NR-1026 was already taken"
   },
   {
-   "id": "NR-1027",
+   "id": "NR-1033",
    "title": "NOVEL WORK: the seated player's corporation edits its home nation's research queue (three new corp commands)",
    "raised": "2026-10-10",
    "kind": "novel-work",
@@ -2082,7 +2084,8 @@
     "src/world/corp_command.cpp",
     "tools/mcp/server.js",
     "src/ui/tech_tree_panel.cpp"
-   ]
+   ],
+   "renumbered_from": "NR-1027 on the sprint 52 branch; renumbered at the 2026-10-10 merge onto main, where NR-1027 was already taken"
   }
  ]
 }

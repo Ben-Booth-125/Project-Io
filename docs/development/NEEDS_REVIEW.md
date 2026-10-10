@@ -180,7 +180,7 @@ Direction is ruled: the player is a nation with a space programme, reversing NR-
 
 - Answer on one design form, then sweep in a single pass
 
-### NR-1027 — NOVEL WORK: the seated player's corporation edits its home nation's research queue (three new corp commands)
+### NR-1033 — NOVEL WORK: the seated player's corporation edits its home nation's research queue (three new corp commands)
 *novel-work · raised 2026-10-10 · from BL-1276 (tech tree panel), lane U*
 
 The research panel queues nodes through three verbs appended to corp_command (queue_research, unqueue_research, clear_research), accepted only from the SEATED corporation and acting on its home nation's queue; every other corporation is refused, the scorer never emits them, and the MCP verb list carries them with range checks. Taken as the bridge until sprint 53 (BL-1245, player is a nation) seats the player on the nation itself. Also taken: a press on a queued node unqueues it and every queued entry that needs it - the standing toggle rule applied to the queue.
@@ -1559,7 +1559,7 @@ Ben ruled ocean crossings in generation gated by date. The two sibling pieces th
 
 *Files: `docs/generation/trees/TREES.md`, `src/world/history_sim.cpp`*
 
-### NR-1025 — DECISION TAKEN: four loose ends of the retired generation trees
+### NR-1031 — DECISION TAKEN: four loose ends of the retired generation trees
 *decision taken on your behalf · raised 2026-10-10 · from Sprint 52 sibling-doc sweep (2026-10-10), after research left generation*
 
 (1) The explorer set dissolves: it was the Empire rim milestone and its only reader was entry to the Exploration tree; who crosses water is now date (sea legs), harbour and military capacity (can_field_naval). (2) No hard fuel gate replaces the Industry tree's fuel gate; fuel within reach stays a soft input to industry points. (3) The wizard board keeps no research column: the history researches nothing. (4) A quest's deed reads the NATION as its subject (condition_set gains a nation subject where it has only corps), wired with the effects (BL-1274, tech effects wired). The ancient roster stays authored as reference content no campaign nation is offered.
@@ -1568,11 +1568,11 @@ Ben ruled ocean crossings in generation gated by date. The two sibling pieces th
 
 > **Recommendation:** Taken.
 
-> **RESOLVED.** Written: CIVILISATION.md, EXPLORATION.md, INDUSTRIALISATION.md, question_log.json; deed subject = nation (RESEARCH.md; BL-1278).
+> **RESOLVED.** Written: CIVILISATION.md, EXPLORATION.md, INDUSTRIALISATION.md, question_log.json; deed subject = nation (RESEARCH.md; BL-1285).
 
 *Files: `docs/generation/CIVILISATION.md`, `docs/generation/EXPLORATION.md`, `docs/generation/INDUSTRIALISATION.md`, `docs/ui/question_log.json`*
 
-### NR-1026 — What derives a nation's works lean (State Arsenal / Private Works) now the Industry tree is gone?
+### NR-1032 — What derives a nation's works lean (State Arsenal / Private Works) now the Industry tree is gone?
 *question · raised 2026-10-10 · from Sprint 52 sibling-doc sweep (2026-10-10), after research left generation*
 
 The Industry tree's fork between State Arsenal (heavy plant nation-owned) and Private Works (corporations own processing) fed the regime stub at the 1960 handover (INDUSTRIALISATION.md property 6, the stubs table). With no tree the lean has no source; the sweep left it written as open.

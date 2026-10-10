@@ -620,7 +620,7 @@ stockpile becomes its charter budget (property 1).
 
 **The works lean: some polities spend into rail and force, others stockpile and charter.** That is
 a derived disposition, not a flag, and it is why two equally industrial powers open the campaign
-with different corporate webs. **It is derived from charter reach (Ben, 2026-10-10, NR-1026):** the share of the realm's
+with different corporate webs. **It is derived from charter reach (Ben, 2026-10-10, NR-1032):** the share of the realm's
 processing plant held by chartered firms at the 1960 fold. A realm whose firms hold most of its plant
 leans *Private Works* — corporations own processing; one whose plant the state holds leans *State
 Arsenal* — heavy plant nation-owned, corporations lease. The threshold is a dial, set by measurement

@@ -1275,7 +1275,7 @@
    "parked": false,
    "blocked_on": null,
    "author": "Ben (2026-10-10, the tech effects form: deed state in sprint 52); filed by Claude",
-   "id": "BL-1278",
+   "id": "BL-1285",
    "short_name": "QUEST_DEED_STATE",
    "category": "Economy",
    "priority": "A",
@@ -1294,7 +1294,8 @@
     "tools/verify/nation_tech_harness.cpp"
    ],
    "title": "A nation keeps the deed history its quests read, so a quest completes when its deed is met",
-   "design": "DESIGNED: RESEARCH.md § Quests key the next age (a deed is read from state the game carries). Add the per-nation deed state the nine deeds need where the game already carries the quantity: streak counters over quarters, first-time latches, the national stock-and-demand cover, trade partners by nation; saved. Wire deed_met for every deed whose quantity exists; the rest (Alarm, unrest, war outcomes) stay declared unread with the system they wait on. Never a counter kept only to unlock a node: each reads an in-world quantity. CARRIED to sprint 53 (2026-10-10). Not started; waits on BL-1274."
+   "design": "DESIGNED: RESEARCH.md § Quests key the next age (a deed is read from state the game carries). Add the per-nation deed state the nine deeds need where the game already carries the quantity: streak counters over quarters, first-time latches, the national stock-and-demand cover, trade partners by nation; saved. Wire deed_met for every deed whose quantity exists; the rest (Alarm, unrest, war outcomes) stay declared unread with the system they wait on. Never a counter kept only to unlock a node: each reads an in-world quantity. CARRIED to sprint 53 (2026-10-10). Not started; waits on BL-1274.",
+   "renumbered_from": "BL-1278 on the sprint 52 branch; renumbered at the 2026-10-10 merge onto main, where BL-1278 was already taken"
   }
  ]
 }

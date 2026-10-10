@@ -73,7 +73,7 @@
       "planned": [
         "WAVE 0 - THE DOCS. BL-1271 (Digitisation tree store): RESEARCH.md, DIGITISATION_TREE.md, the store and its check; TREES.md retired; the sibling sweep.",
         "WAVE 1 - TWO LANES. BL-1272 (generation without research), a world-mover reporting movement; BL-1273 (nation tech state), the campaign core.",
-        "WAVE 2 - ON THE CORE. BL-1274 (tech effects wired), BL-1275 (nation research AI), BL-1276 (tech tree panel, Ben's live click), BL-1278 (quest deed state).",
+        "WAVE 2 - ON THE CORE. BL-1274 (tech effects wired), BL-1275 (nation research AI), BL-1276 (tech tree panel, Ben's live click), BL-1285 (quest deed state).",
         "CLOSE - BL-1277 (tech wave re-bless), described by shape, authorised by Ben."
       ],
       "risk": "Two world-movers in one wave (the trees leaving generation; the band fixed industrial) - each measures its own before/after so the one re-bless can name both causes. 160 effects over levers that mostly do not exist yet - declared unread, never silent.",
@@ -81,8 +81,8 @@
       "notes": "Sprint 52 was the player-is-a-nation pivot until 2026-10-10; that sprint is now 53 (Ben).",
       "closed_date": "2026-10-10",
       "retro": {
-        "landed": "BL-1271 (Digitisation tree store): RESEARCH.md, DIGITISATION_TREE.md, the 160-node store and its check; TREES.md and the four generation trees retired; two sibling sweeps (25 docs). BL-1273 (nation tech state): nation-held state, pool, queue, save v47, the old per-corp gates retired, band fixed industrial, pacing ruled. Rulings: NR-1026 (works lean from charter reach), research pacing (base + sqrt, 200 RP a unit, eighty-year age), the generation gates (sea legs date + naval capacity + a fleet afloat; coastal naval ramp re-weighted; acquisition median), space gating (Rocketry gates launch, propellant open), institutes staffed, deed state in scope.",
-        "carried": "BL-1272 (generation without research) - fleet threshold mid-edit; BL-1274 (tech effects wired) - fix round written, unbuilt; BL-1276 (tech tree panel) - shift-click round written, unbuilt, live click owed; BL-1275 (nation research AI), BL-1278 (quest deed state), BL-1277 (tech wave re-bless) - not started.",
+        "landed": "BL-1271 (Digitisation tree store): RESEARCH.md, DIGITISATION_TREE.md, the 160-node store and its check; TREES.md and the four generation trees retired; two sibling sweeps (25 docs). BL-1273 (nation tech state): nation-held state, pool, queue, save v47, the old per-corp gates retired, band fixed industrial, pacing ruled. Rulings: NR-1032 (works lean from charter reach), research pacing (base + sqrt, 200 RP a unit, eighty-year age), the generation gates (sea legs date + naval capacity + a fleet afloat; coastal naval ramp re-weighted; acquisition median), space gating (Rocketry gates launch, propellant open), institutes staffed, deed state in scope.",
+        "carried": "BL-1272 (generation without research) - fleet threshold mid-edit; BL-1274 (tech effects wired) - fix round written, unbuilt; BL-1276 (tech tree panel) - shift-click round written, unbuilt, live click owed; BL-1275 (nation research AI), BL-1285 (quest deed state), BL-1277 (tech wave re-bless) - not started.",
         "lessons": "The design moved four times in one session (six domains, the 50/4 template, three trees of segments, then connected clusters at 160) before it settled; writing the template into TREES.md before the shape settled cost a rewrite. Cold reviews caught a weakened R0 assertion, a treasury drain with no purchase, unequal settle pools, a dead institute term and a landlocked naval ramp - every lane needed a fix round. Linear research in spending fails when treasuries span orders of magnitude; the base + concave shape was found by measuring all four shapes before asking."
       }
     }

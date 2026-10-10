@@ -6884,7 +6884,7 @@
      ],
      "requirement": "The queue: queuing a node queues its unheld requirement groups ahead of it (cheapest member of a choice); RP flow to the head and overflow on; a quest with an unmet deed is passed over and completes when its deed is met; a queue holding one side of a pair refuses the other.",
      "notes": "",
-     "result_metric": "queue rows PASS: prerequisite expansion, AND groups, pair refusal, overflow, quest passed over. Quest COMPLETION awaits deed_met (BL-1278)."
+     "result_metric": "queue rows PASS: prerequisite expansion, AND groups, pair refusal, overflow, quest passed over. Quest COMPLETION awaits deed_met (BL-1285)."
     },
     {
      "id": "R3",
@@ -7046,12 +7046,12 @@
   },
   {
    "brief": "quest-deed-state",
-   "title": "BL-1278 - A quest completes when its nation's deed is met",
+   "title": "BL-1285 - A quest completes when its nation's deed is met",
    "difficulty": 3,
    "importance": "A",
    "evaluated_difficulty": null,
    "status": "in-flight",
-   "promoted_from": "backlog.json BL-1278 - sprint 52 (Ben, 2026-10-10); carried to sprint 53 at sprint 52 close (2026-10-10)",
+   "promoted_from": "backlog.json BL-1285 - sprint 52 (Ben, 2026-10-10); carried to sprint 53 at sprint 52 close (2026-10-10)",
    "batch": "sprint-53",
    "resolved": null,
    "resolution": null,

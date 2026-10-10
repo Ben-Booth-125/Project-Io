@@ -102,7 +102,7 @@ Serial, not parallel (Ben, 2026-10-07, after a collision check): the lens and st
 **Goal.** The player plays a nation that runs a space programme, with a space corporation tied to it that can still acquire and raise funds internationally; generation decides how many nations run a programme.
 
 **Planned.**
-- CARRIED FROM 52 (Ben, 2026-10-10: "the next session is going to address generation again, so we can continue in sprint 53"). Generation first: BL-1272 (generation without research) - the fleet-afloat threshold, then cold review and merge; BL-1277 (tech wave re-bless). Then the tech tail: BL-1274 (tech effects wired), BL-1276 (tech tree panel, live click), BL-1278 (quest deed state), BL-1275 (nation research AI). Branches and checkpoints in NEXT_SESSION.md.
+- CARRIED FROM 52 (Ben, 2026-10-10: "the next session is going to address generation again, so we can continue in sprint 53"). Generation first: BL-1272 (generation without research) - the fleet-afloat threshold, then cold review and merge; BL-1277 (tech wave re-bless). Then the tech tail: BL-1274 (tech effects wired), BL-1276 (tech tree panel, live click), BL-1285 (quest deed state), BL-1275 (nation research AI). Branches and checkpoints in NEXT_SESSION.md.
 - WAVE 0 - THE RULING. BL-1245 (player is a nation): Ben answers NR-1020's six calls on one form; the settled design is written into CONCEPT.md § Player identity the moment it is settled.
 - WAVE 1 - THE SWEEP. Every doc that names the player a corporation holding a seat, the NR-885 sweep in reverse; grant register narrowed for the player's nation.
 - WAVE 2 - THE BUILD CUT. Items minted from the swept docs: the seat on a nation, the generation parameter, the nation step skipping the player, the player's verbs on the nation surfaces.
