@@ -19,14 +19,17 @@ nothing reads them.
 
 | Piece of the history | Was | Is |
 |---|---|---|
-| A power's sea legs — whether it may arrive across water to subject a coast | The Exploration tree's *Oceanic Navigation* | **A date** (Ben, 2026-10-10): every polity holds sea legs from a measured year |
+| A power's sea legs — whether it may arrive across water to subject a coast | The Exploration tree's *Oceanic Navigation* | **A date and naval capacity** (Ben, 2026-10-10): from a measured year, a polity that can field a navy — a harbour and the military band general ocean crossing already tests — holds sea legs |
 | The treasury-bought third road rung | The Exploration tree's *Post Roads* | A date, by the same rule as sea legs |
-| Naval points from coastal sea technology | The Empire tree's coastal nodes | A date ramp, by the same rule |
+| Naval points from coastal sea technology | The Empire tree's coastal nodes | A date ramp for **coastal polities only**, its per-tech weight re-measured so naval points match the history as last blessed (Ben, 2026-10-10) |
 | Defence, cohesion, industrial and research modifiers | Held nodes' `modifier` effects | Nothing — every polity carries the same, zero |
 | Industry points from the Industry tree | *Industry tree industrial* credit | Nothing — industry points come from urban mass alone |
 | Entry to the next round's tree | A rim milestone | Nothing — there is no next tree |
 
-Each date is **measured, not picked**: the year by which the median polity held the gating node in
-the history as last blessed, so the world keeps the shape it had and loses only its dependence on
-research. The capacity ladder that dates a polity's furnace crossing is unchanged: it was never a
+Each date is **measured, not picked**: the median year at which polities **acquired** the gating node
+in the history as last blessed (Ben, 2026-10-10). The median polity never held most of these nodes —
+on fifteen of sixteen curated seeds, half the living polities held none — so the year it held one
+does not exist; the acquisition median is the year the history's own acquirers reached it. A date
+opens a gate wider than a node did, which is why sea legs also read naval capacity and the naval
+ramp reads coast: the world keeps the shape it had as closely as an actor-free gate allows. The capacity ladder that dates a polity's furnace crossing is unchanged: it was never a
 tree, and its Invest progress stands.
