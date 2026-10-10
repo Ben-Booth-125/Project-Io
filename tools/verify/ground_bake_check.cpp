@@ -77,6 +77,14 @@
 //       (legacy look vs now) of each edge and of the wide plain, forest,
 //       scrub and bare ground.
 //
+//   --crisp (BL-1254, a reading, not a check): how crisp the ground reads
+//       against what stands on it — fine-band and mid-band energy and local
+//       contrast of the ground alone vs the structure and tree pixels, per
+//       subject, as baked and with the base hillshade's sign flipped (NR-1006
+//       (e)); crisp_<subject>[_flip].png. `--crisp --decomp` repeats it with
+//       crisp 0 (the pre-BL-1254 look, byte for byte), no variants, no
+//       detail and no grain. `--prof` carries a pre-BL-1254 configuration.
+//
 // Also prints bake time per tier (a measurement, not a check) and writes
 // feature_<form>_<tier>.png previews for the eye.
 //
@@ -1253,6 +1261,174 @@ void border_row(const bake_source& src, const body_component& hb, const bake_par
     }
 }
 
+/// --crisp (BL-1254, a reading): how crisp the ground reads against what
+/// stands on it. One 512 px master window per subject (plain, field, forest,
+/// scrub, bare, mountain, and the first installation); the ground alone
+/// (installations and trees off) and the full bake. On luminance: hf = mean
+/// |L - box3(L)| (the 1-2 px band — what reads as crisp), mid = mean |box3 -
+/// box11| (the 4-10 px band), lstd = mean 9x9 local standard deviation. The
+/// ground figures are the ground-only bake over every terrain pixel; the
+/// structure figures are the full bake over the pixels the structures and
+/// trees changed. Writes crisp_<subject><suffix>.png for the eye.
+void crisp_row(const bake_source& src, const bake_params& p, const char* suffix)
+{
+    const geometry gm = make_master_geometry(src.gw, src.gh);
+    const auto land = static_cast<std::uint8_t>(bake_source::tile_class::land);
+    struct subj { const char* name; int tile; };
+    std::vector<subj> subs;
+    subs.push_back({ "plain",  homogeneous_aim(src, terrain_cover::grass) });
+    {
+        // A cultivated field: a furrowed grass variant (0, 1) ringed by grass.
+        int f = -1;
+        for (int r = src.gh / 5 + 3; r < src.gh * 4 / 5 - 3 && f < 0; ++r)
+            for (int c = 0; c < src.gw && f < 0; ++c)
+            {
+                const int i = r * src.gw + c;
+                if (src.cls[i] != land || src.cover[i] != static_cast<std::uint8_t>(terrain_cover::grass)
+                    || src.variant[i] >= 2 || src.near_feature[i])
+                    continue;
+                bool ring = true;
+                for (int s = 0; s < 6 && ring; ++s)
+                {
+                    const hex_neighbors::coord nb = hex_neighbors::neighbour(c, r, s);
+                    const int j = nb.gy * src.gw + ((nb.gx % src.gw) + src.gw) % src.gw;
+                    ring = src.cls[j] == land && src.cover[j] == static_cast<std::uint8_t>(terrain_cover::grass);
+                }
+                if (ring)
+                    f = i;
+            }
+        subs.push_back({ "field", f });
+    }
+    subs.push_back({ "forest", homogeneous_aim(src, terrain_cover::forest) });
+    subs.push_back({ "scrub",  homogeneous_aim(src, terrain_cover::scrub) });
+    subs.push_back({ "bare",   homogeneous_aim(src, terrain_cover::none) });
+    {
+        int m = -1, links_best = -1;
+        for (int i = 0; i < static_cast<int>(src.cls.size()); ++i)
+            if (src.cls[i] == land && src.landform[i] == static_cast<std::uint8_t>(terrain_landform::mountain))
+            {
+                int links = 0;
+                for (int s = 0; s < 6; ++s)
+                    links += (src.lf_links[i] >> s) & 1;
+                if (links > links_best) { links_best = links; m = i; }
+            }
+        subs.push_back({ "mountain", m });
+    }
+    {
+        int t = -1;
+        // The installation with the most installations around it (a town),
+        // temperate rows only.
+        int best = -1;
+        for (int r = src.gh / 5; r < src.gh * 4 / 5; ++r)
+            for (int c = 0; c < src.gw; ++c)
+            {
+                const int i = r * src.gw + c;
+                if (src.inst.of_tile[static_cast<std::size_t>(i)] < 0 || src.cls[i] != land)
+                    continue;
+                int n = 0;
+                for (int s = 0; s < 6; ++s)
+                {
+                    const hex_neighbors::coord nb = hex_neighbors::neighbour(c, r, s);
+                    n += src.inst.of_tile[static_cast<std::size_t>(nb.gy * src.gw + ((nb.gx % src.gw) + src.gw) % src.gw)] >= 0;
+                }
+                if (n > best) { best = n; t = i; }
+            }
+        subs.push_back({ "structures", t });
+    }
+
+    constexpr int W = 512, H = 512;
+    const auto lum = [](std::uint32_t c) -> double
+    {
+        return 0.2126 * ui::palette::col_r(c) + 0.7152 * ui::palette::col_g(c) + 0.0722 * ui::palette::col_b(c);
+    };
+    // Box mean of L over a (2k+1)^2 window (clamped at the window edge).
+    const auto box = [&](const std::vector<double>& L, int k) -> std::vector<double>
+    {
+        std::vector<double> t(L.size()), o(L.size());
+        for (int y = 0; y < H; ++y)
+            for (int x = 0; x < W; ++x)
+            {
+                double s = 0.0;
+                for (int d = -k; d <= k; ++d)
+                    s += L[static_cast<std::size_t>(y) * W + std::clamp(x + d, 0, W - 1)];
+                t[static_cast<std::size_t>(y) * W + x] = s / (2 * k + 1);
+            }
+        for (int y = 0; y < H; ++y)
+            for (int x = 0; x < W; ++x)
+            {
+                double s = 0.0;
+                for (int d = -k; d <= k; ++d)
+                    s += t[static_cast<std::size_t>(std::clamp(y + d, 0, H - 1)) * W + x];
+                o[static_cast<std::size_t>(y) * W + x] = s / (2 * k + 1);
+            }
+        return o;
+    };
+    struct m3 { double hf = 0, mid = 0, lstd = 0; long n = 0; };
+    const auto metrics = [&](const std::vector<std::uint32_t>& px, const std::vector<std::uint8_t>& sel) -> m3
+    {
+        std::vector<double> L(px.size()), L2(px.size());
+        for (std::size_t i = 0; i < px.size(); ++i)
+        {
+            L[i] = lum(px[i]);
+            L2[i] = L[i] * L[i];
+        }
+        const auto b1 = box(L, 1), b5 = box(L, 5), b4 = box(L, 4), b4q = box(L2, 4);
+        m3 m;
+        for (int y = 6; y < H - 6; ++y)
+            for (int x = 6; x < W - 6; ++x)
+            {
+                const std::size_t i = static_cast<std::size_t>(y) * W + x;
+                if (!sel[i])
+                    continue;
+                m.hf   += std::fabs(L[i] - b1[i]);
+                m.mid  += std::fabs(b1[i] - b5[i]);
+                m.lstd += std::sqrt(std::max(0.0, b4q[i] - b4[i] * b4[i]));
+                ++m.n;
+            }
+        if (m.n)
+        {
+            m.hf /= m.n; m.mid /= m.n; m.lstd /= m.n;
+        }
+        return m;
+    };
+
+    bake_params ground = p;
+    ground.installations = false;
+    ground.tree_density  = 0.0f;
+    std::vector<std::uint32_t> a(static_cast<std::size_t>(W) * H), g(a.size());
+    for (const subj& s : subs)
+    {
+        if (s.tile < 0)
+        {
+            std::printf("CRISP %-10s none on this body\n", s.name);
+            continue;
+        }
+        const int tr = s.tile / src.gw, tc = s.tile % src.gw;
+        const double cx = 1.7320508075688772 * (tc + ((tr & 1) ? 0.5 : 0.0));
+        const int qx0 = static_cast<int>(cx * gm.s) - W / 2;
+        const int qy0 = std::clamp(static_cast<int>((1.5 * tr - gm.y_min - 0.3) * gm.s) - H / 2, 0, gm.H - H);
+        bake_region(src, gm, p, qx0, qy0, W, H, a.data());
+        bake_region(src, gm, ground, qx0, qy0, W, H, g.data());
+        std::vector<std::uint8_t> gsel(a.size()), ssel(a.size());
+        long nstruct = 0;
+        for (std::size_t i = 0; i < a.size(); ++i)
+        {
+            const bool terrain = ui::palette::col_a(g[i]) == 255;
+            gsel[i] = terrain;
+            ssel[i] = terrain && a[i] != g[i];
+            nstruct += ssel[i];
+        }
+        const m3 mg = metrics(g, gsel);
+        const m3 ms = metrics(a, ssel);
+        std::printf("CRISP %-10s [%d,%d]  ground hf %5.2f mid %5.2f lstd %5.2f   |  stands-on (%6ld px) hf %5.2f mid %5.2f lstd %5.2f   ground/stands hf %.2f\n",
+                    s.name, tc, tr, mg.hf, mg.mid, mg.lstd, nstruct, ms.hf, ms.mid, ms.lstd,
+                    ms.hf > 0.0 ? mg.hf / ms.hf : 0.0);
+        char path[160];
+        std::snprintf(path, sizeof path, "crisp_%s%s.png", s.name, suffix);
+        write_png_rgba(path, W, H, reinterpret_cast<const unsigned char*>(a.data()), W * 4);
+    }
+}
+
 int main(int argc, char** argv)
 {
     generation_report report;
@@ -1340,6 +1516,7 @@ int main(int argc, char** argv)
         struct cfg { const char* name; bake_params q; };
         std::vector<cfg> cfgs;
         cfgs.push_back({ "now", base });
+        { bake_params q = base; q.crisp = 0.0f; cfgs.push_back({ "pre-BL-1254", q }); }
         { bake_params q = base; q.pattern_strength = 0.0f; cfgs.push_back({ "no patterns", q }); }
         { bake_params q = base; q.border_strength = 0.0f;  cfgs.push_back({ "no borders", q }); }
         { bake_params q = base; q.border_strength = 0.0f; q.pattern_strength = 0.0f; cfgs.push_back({ "band only", q }); }
@@ -1376,6 +1553,27 @@ int main(int argc, char** argv)
                             nm, cfgs[k].name, wall[k], cyc[k] < 1e29 ? cyc[k] : -1.0,
                             100.0 * (wall[k] / wall.back() - 1.0));
         }
+        return 0;
+    }
+
+    // --crisp: the BL-1254 crispness reading, as baked and with the base
+    // hillshade's sign flipped (NR-1006 (e), Ben's call — an A/B, not a check).
+    if (argc > 1 && std::strcmp(argv[1], "--crisp") == 0)
+    {
+        if (argc > 2 && std::strcmp(argv[2], "--decomp") == 0)
+        {
+            bake_params d = p;
+            d.crisp = 0.0f;              crisp_row(src, d, "_c0");
+            d = p; d.variant_strength = 0.0f; crisp_row(src, d, "_novar");
+            d = p; d.detail_amp = 0.0f;  crisp_row(src, d, "_nodetail");
+            d = p; d.noise_strength = 0.0f; crisp_row(src, d, "_nonoise");
+            return 0;
+        }
+        crisp_row(src, p, "");
+        bake_params q = p;
+        q.hillshade_sign = -q.hillshade_sign;
+        std::printf("-- base hillshade sign flipped (%+.0f):\n", q.hillshade_sign);
+        crisp_row(src, q, "_flip");
         return 0;
     }
 
