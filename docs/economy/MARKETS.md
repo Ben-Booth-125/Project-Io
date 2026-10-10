@@ -18,6 +18,32 @@ A market is **anonymous, instant and price-only**. Every seller meets the market
 trade clears in the tick it is listed; and the only term is the price. Everything else about an
 exchange — a counterparty, a lead time, a refusal — is a contract, not a market.
 
+## The shelf economy
+
+**Corporations hold no stockpiles; every good is on a market's shelf (Ben, 2026-10-10).** The
+market owns its shelf. This replaces the corporation pool — the per-(corporation, market) store
+production used to land in, list from, and draw on — and with it everything that read a pool.
+
+- **Production lands on the shelf, and landing is selling.** What a building makes goes onto the
+  shelf of its own market the tick it is made, and its owner is paid the quantity at that tick's
+  clearing price. A glut lands at a low price: that is the signal, and the maker feels it.
+- **Everyone buys from the shelf.** A processor's inputs, a construction site's materials,
+  building upkeep, procurement, the space programme and a launch's propellant are all bought on
+  the shelf at the posted price, under the fair-price ceiling. A corporation buys even its own
+  output back: vertical integration is a location, not a free transfer.
+- **Goods leave a market only by trade** (`TRADE.md`), which buys on one shelf and lands on
+  another.
+- **The opening stock is on the shelves.** Generation's opening stockpile — the same total it
+  seeds — is placed on the shelves of the markets the corporations sit in, each corporation's
+  share on its own markets (`../generation/CORPORATION_GENERATION.md` § Pass 4b).
+
+**What retires with the pool.** Auto-surplus and the processor reservation; standing sell orders
+and their floor (step 4 below); the pad's propellant reserve; opening stock held until a bid; the
+corporation convoy and the market export (`TRADE.md` § What trades replaces); the workforce
+dial's stock-fed draws (`../ai/AI_OPPONENT.md` § 11 — with no pool, a plant's whole want is
+posted demand). Where a section below speaks of pools, auto-surplus, sell orders or the export,
+this section holds.
+
 ---
 
 ## Market centres and seeding
