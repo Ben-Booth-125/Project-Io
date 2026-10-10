@@ -21,7 +21,7 @@
   "(backlog.json's job). It answers 'what is this thing and how deep does it nest.'",
   "",
   "FIELDS.",
-  "  id                   — UI-XXX, zero-padded 3 digits. STABLE, NOT DENSE (changed 2026-08-27):\n                         a retired surface leaves its number behind rather than renumbering the\n                         file, because Sprint 21 works off these ids across several sessions and a\n                         shifting id is worse than a gap. Vacant today: 031, 035, 036, 087.",
+  "  id                   — UI-XXX, zero-padded 3 digits. STABLE, NOT DENSE (changed 2026-08-27):\n                         a retired surface leaves its number behind rather than renumbering the\n                         file, because Sprint 21 works off these ids across several sessions and a\n                         shifting id is worse than a gap. Vacant today: 031, 035, 036, 077, 087.",
   "  name                 — short human name for the element.",
   "  kind                 — canvas | panel | ledger | element | sub-element | control | view.",
   "                         canvas = one of the three primary spatial views (Solar/Circum/Planetary).",
@@ -831,7 +831,7 @@
    "source": [
     "docs/ui/SELECTION.md § The building element's fact is a profitability readout (BL-074)"
    ],
-   "summary": "A player building's hero action opens the Construction panel's management surface; its fact column shows a four-line profitability estimate (Revenue/Inputs/Wages/Maintenance/Net); a rival building shows owner-only, production/stockpile explicitly marked private.",
+   "summary": "A player building's hero action opens the Construction panel's management surface; its fact column shows a four-line profitability estimate (Revenue/Inputs/Wages/Maintenance/Net); a rival building shows owner-only, production explicitly marked private.",
    "interesting_question": "The doc itself asks whether Manage's controls should migrate fully into this Selection element instead of routing to the Construction panel, given both currently read/write the same selected entity in the same shared column.",
    "resolution": "Open — flagged verbatim in the ledger design Q&A: docs/ui/ledgers/construction.md § Open questions asks 'Should selecting a building auto-open Construction/Manage instead of the Selection card, or should Manage's controls migrate into the Selection element' with no resolution recorded.",
    "checks": [
@@ -908,7 +908,7 @@
     "src/ui/header_panel.hpp",
     "src/ui/header_panel.cpp"
    ],
-   "summary": "Always-visible full-width strip between the identity tile and time column: balance, stockpile valuation, net+trend, runway, and a debt flag — the persistent financial dashboard.",
+   "summary": "Always-visible full-width strip between the identity tile and time column: balance, cargo valuation, net+trend, runway, and a debt flag — the persistent financial dashboard.",
    "interesting_question": "The header is a 'guaranteed-fit strip' that never wraps and never silently clips a load-bearing number, degrading in a fixed order instead — why treat this one surface as the reference case for a wider text-wrap audit rather than just wrapping like other panels?",
    "resolution": "Explicit precedent-setting intent: HEADER.md states 'This ladder is the reference case for BL-215 (text-wrap render audit)... the audit's job is to make every other worded surface degrade this honestly rather than wrap or clip' — the header's ladder is meant to generalise, not stay a one-off.",
    "checks": [
@@ -934,15 +934,15 @@
   },
   {
    "id": "UI-053",
-   "name": "Stockpile valuation figure",
+   "name": "Cargo valuation figure",
    "kind": "sub-element",
    "parent": "UI-051",
    "source": [
     "docs/ui/HEADER.md § Contents"
    ],
-   "summary": "A single estimated liquid-value figure summing every player (corp, body) pool priced at that body's current market price; deliberately not a per-resource inventory.",
-   "interesting_question": "Resources on a body with no market contribute nothing to this figure — does that mean holdings on a market-less body are invisible to the header's headline valuation?",
-   "resolution": "Named plainly, not hidden: HEADER.md states this consequence directly ('Resources on a body with no market contribute nothing') as a stated property of the design, not flagged as a bug.",
+   "summary": "A single estimated value of the goods the player OWNS — its trades' cargo in transit, each in-flight convoy's cargo priced at its destination market's current price (BL-1269). No corporation holds a stockpile under the shelf economy (BL-1265), so the figure the strip once called STOCKPILE now reads CARGO.",
+   "interesting_question": "Under the shelf economy what the player makes is sold where it lands — is there anything left for a holdings figure to value?",
+   "resolution": "Yes, and only one thing: goods bought by a trade and not yet landed are the trader's until they sell on arrival (TRADE.md § A trade). The figure values exactly those, at the price they will land into; it reads zero for a corporation with nothing in flight, which is the honest answer.",
    "checks": [
     "header"
    ]
@@ -1329,21 +1329,6 @@
    ]
   },
   {
-   "id": "UI-077",
-   "name": "Sell Orders view",
-   "kind": "view",
-   "parent": "UI-074",
-   "source": [
-    "docs/ui/ledgers/construction.md § Sub-levels"
-   ],
-   "summary": "Per-body sell-order list for the player corp (resource x qty >= floor); add/remove, reading the body's market_component.",
-   "interesting_question": "n/a — see UI-074's parent-level open question about whether this view belongs here at all.",
-   "resolution": "n/a",
-   "checks": [
-    "sell_order"
-   ]
-  },
-  {
    "id": "UI-078",
    "name": "Corporation ledger (rail slot 8, Diplomacy)",
    "kind": "ledger",
@@ -1424,15 +1409,15 @@
    "parent": "UI-080",
    "source": [
     "docs/ui/ledgers/market.md § 2b",
-    "docs/economy/MARKETS.md § Trades"
+    "docs/economy/TRADE.md",
+    "docs/economy/MARKETS.md § The exchange record"
    ],
-   "summary": "Four headed sections, each bounded and scrolling inside itself. My trades (the player's standing orders on the body, sell and buy, with an x per row and the place-order form folded under it; beneath them, only when one exists, a Closed table of the player's orders on the body that closed themselves after 4 empty quarters — month, good, floor, the history-log line on hover); All trades here (the whole book on that body, GATED on the player owning a building there); Potential trades (a derivation — buy here, sell there, less the haulage price_convoy_leg charges for that route — ranked by margin); Recent trades (the exchange record filtered to this market, newest first, column headed REVENUE). An absent counterparty renders as the market, not as unknown.",
-   "interesting_question": "The three reads are not equally cheap to know — one is a filter on the player's own orders, one is the same book past a gate, one has no store behind it at all. What stops them collapsing into one table at 380 px, where four sections end-to-end put three of them below the fold on open?",
-   "resolution": "Bounded sections. Measured on the shipped fixture the book runs to 24 rows and the exchange read to 120, so laid out end to end the first fills the column; caps of 5 / 5 / 7 / 6 rows against a ~595 px content height keep all four HEADS on screen and put the depth one scroll inside the section that has it. The gate on the second read is enforced rather than assumed and is asserted against the world, including its SHUT state.",
+   "summary": "Five headed sections in one scroller, the long ones bounded and scrolling inside themselves (BL-1269; TRADE.md). Trade points (made last pass, reserve as used, the rest auto; the reserve field and Set reserve press; warnings when the reserve exceeds what is made or manual trades ask more than it covers); My trades (the player's manual trades that leave or land on the selected market, placement order, Good / Route by city / Pts, an x per row, a count of trades elsewhere, the Add a trade fold — good, from, to, points — and the seam's answer to the last trade press); All trades here (every corporation's manual trades touching this market, GATED on the player owning a building on the body); Potential trades (a derivation — buy here, sell there, less the haul price_trade_leg charges — ranked by margin, a + per row that fills the Add a trade form); Recent exchanges (the exchange record filtered to this market, newest first, column headed REVENUE). An absent counterparty renders as the market, not as unknown.",
+   "interesting_question": "The reads are not equally cheap to know — one corporation record, a filter on the player's own trades, the same list past a gate, a derivation with no store behind it. What stops them collapsing into one table at 380 px, and what makes a potential trade one press from a real one without the ranking becoming the move?",
+   "resolution": "Bounded sections keep every head on screen (caps 5 / 5 / 7 / 6 rows). The potential-trade '+' only FILLS the form — the player still picks the points and presses Add, so the ranking stays one input among several (CONCEPT.md § Player identity). The gate on the second read is enforced rather than assumed and is asserted against the world, including its SHUT state.",
    "checks": [
     "market_ledger",
-    "trades_tab",
-    "order_close_notice"
+    "trades_tab"
    ]
   },
   {

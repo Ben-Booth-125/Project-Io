@@ -1,24 +1,26 @@
--- The Market ledger's TRADES tab: my positions, the market's positions, what I
--- could be doing, and what actually moved.
+-- The Market ledger's TRADES tab (BL-1269; docs/economy/TRADE.md): my trade
+-- points and reserve, my manual trades through this market, every trade here,
+-- what I could be moving, and what actually cleared.
 --
 -- THIS ASSERTS RATHER THAN CAPTURING, for the reason goods_table.lua gives:
 -- `expect_no_clipping` records ZERO on this class of surface even over visibly
 -- clipped frames (NR-663), so a picture alone proves nothing about the content.
 -- Captures are kept at the end, but the verdict comes from the assertions.
 --
--- The four things this exists to hold down, all of them things the design says
--- explicitly and none of them visible in a screenshot:
+-- What this holds down:
 --
---   1. THE THREE READS ARE DISTINCT. My book, the whole book, and a derivation
---      are not one table and must not become one.
---   2. THE GATE ON READ 2 IS REAL. "The player owns a building on that body"
---      (Ben, 2026-08-29, over three alternatives) must actually exclude a body
---      where the player owns nothing. A gate that is assumed is not a gate.
---   3. AN ABSENT COUNTERPARTY IS THE MARKET, not "unknown". Three of the four
---      clearing paths trade against the market and carry the volume.
---   4. NO ROW PRINTS A PROFIT. There is no cost basis anywhere in the model, so
---      a margin is not derivable from a sale; `quantity * unit_price` is the
---      only honest figure and the column is REVENUE.
+--   1. THE PRESSES REACH THE SEAM. Add (set_trade), x (clear_trade) and Set
+--      reserve (set_trade_reserve) are enqueued exactly as the tab's buttons
+--      enqueue them, applied by app::render, and land in WORLD state; the tab's
+--      next frame draws what the world now holds, and the seam's answer is shown.
+--   2. THE TRADE-POINTS LINE IS THE WORLD'S. made / reserve / auto are the
+--      corporation record's, with the reserve clamped to what is made.
+--   3. THE READS ARE DISTINCT, AND THE GATE ON READ 2 IS REAL - including SHUT.
+--   4. AN ABSENT COUNTERPARTY IS THE MARKET; NO ROW PRINTS A PROFIT.
+--   5. READ 3's ARITHMETIC AND RANKING.
+--
+-- The retired order book (sell orders, the order-close notice) is gone; its two
+-- scripts (sell_order.lua, order_close_notice.lua) retired with it.
 
 verify.goto_surface("home")
 -- Enough clearing ticks that the exchange record has rows and prices have moved
@@ -31,228 +33,195 @@ verify.frames(2)
 local where = verify.trades_market()
 verify.expect(where.market ~= nil and where.market ~= 0,
     "the Trades tab drew for a market (market " .. tostring(where.market) .. ")")
-local home_body = where.body
+local here, home_body = where.market, where.body
 
 -- =========================================================================
--- 1. THE THREE READS ARE DISTINCT
+-- 2. THE TRADE-POINTS LINE IS THE WORLD'S
 -- =========================================================================
--- Not "three sections exist" - three DIFFERENT populations. Read 1 is a filter
--- on read 2; read 3 shares no row with either, because it is a derivation and
--- not a record at all.
+local function near(a, b) return math.abs(a - b) <= math.max(1e-3, math.abs(b) * 1e-4) end
 
+local pts = verify.trade_points_panel()
+verify.expect(pts.drawn, "the Trades tab drew its trade-points line")
+verify.expect(near(pts.made, verify.player_trade_points()),
+    "points made match the corporation record (" .. pts.made .. " vs " .. verify.player_trade_points() .. ")")
+print(string.format("MEASURED trade points: made %.2f, reserve %.2f (used %.2f), auto %.2f",
+    pts.made, pts.reserve, pts.reserve_used, pts.auto))
+
+verify.expect(verify.set_trade_reserve(3.0), "set_trade_reserve(3) applied")
+verify.frames(2)
+pts = verify.trade_points_panel()
+verify.expect(near(pts.reserve, 3.0), "the line reads the reserve as set (" .. pts.reserve .. ")")
+verify.expect(near(pts.reserve_used, math.min(3.0, pts.made)),
+    "the reserve is clamped to what is made (" .. pts.reserve_used .. ")")
+verify.expect(near(pts.auto, math.max(0.0, pts.made - pts.reserve_used)),
+    "auto is the rest (" .. pts.auto .. ")")
+verify.expect(not verify.set_trade_reserve(-1.0), "a negative reserve is refused")
+
+-- =========================================================================
+-- 1. THE PRESSES REACH THE SEAM
+-- =========================================================================
+-- A route to try: the best potential trade from here if any (it is a good trade
+-- carries, traded at both ends), else any other market on the body.
+local pot = verify.potential_trades()
+local candidates = {}
+for _, r in ipairs(pot) do candidates[#candidates + 1] = { key = r.good_key, to = r.to_market } end
+local others = {}
+for _, m in ipairs(verify.markets_on_body(home_body)) do if m ~= here then others[#others + 1] = m end end
+if #others > 0 then
+    for _, key in ipairs({ "iron_ore", "copper_ore", "agricultural_produce", "water", "steel", "refined_fuel" }) do
+        candidates[#candidates + 1] = { key = key, to = others[1] }
+    end
+end
+verify.expect(#candidates > 0, "a route to trade on exists from this market")
+
+local before = #verify.world_player_trades()
+local placed = nil
+for _, c in ipairs(candidates) do
+    verify.trades_tab_add(c.key, here, c.to, 2.0)
+    verify.frames(2)
+    if verify.trade_message() == "Trade set." then placed = c; break end
+end
+verify.expect(placed ~= nil, "the Add press set a trade (last answer: " .. verify.trade_message() .. ")")
+print("MEASURED: placed " .. tostring(placed and placed.key) .. " -> market " .. tostring(placed and placed.to))
+
+local wt = verify.world_player_trades()
+verify.expect(#wt == before + 1, "the world holds one more trade of mine (" .. #wt .. " vs " .. before .. ")")
+local placed_id = wt[#wt] and wt[#wt].trade_id
 local mine = verify.my_trades()
-local all  = verify.market_trades()
-local pot  = verify.potential_trades()
-local hist = verify.trade_history()
+local drawn = nil
+for _, r in ipairs(mine) do if r.trade_id == placed_id then drawn = r end end
+verify.expect(drawn ~= nil, "'My trades' draws the trade the world holds (id " .. tostring(placed_id) .. ")")
+if drawn then
+    verify.expect(drawn.mine and drawn.from_market == here and drawn.to_market == placed.to,
+        "the row is mine and runs from this market to the one named")
+    verify.expect(drawn.good_key == placed.key, "the row's good is the one named (" .. drawn.good_key .. ")")
+    verify.expect(near(drawn.points, 2.0), "the row carries the points set (" .. drawn.points .. ")")
+    verify.expect(drawn.units > 0.0, "the row ships a positive amount a tick (" .. drawn.units .. ")")
+    verify.expect(drawn.from ~= "" and drawn.to ~= "", "both ends are named by city")
+    print(string.format("MEASURED row: %s %s > %s, %.1f pts = %.1f units/tick",
+        drawn.good, drawn.from, drawn.to, drawn.points, drawn.units))
+end
+pts = verify.trade_points_panel()
+verify.expect(pts.manual_count == #wt, "the line counts my trades (" .. pts.manual_count .. ")")
 
-print(string.format("MEASURED Trades tab: %d mine, %d in the book (gate %s), %d potential, %d history",
+-- A refused press says why and mutates nothing: a market to itself.
+verify.trades_tab_add(placed and placed.key or "iron_ore", here, here, 1.0)
+verify.frames(2)
+verify.expect(verify.trade_message() ~= "Trade set.", "a trade to its own market is refused: " .. verify.trade_message())
+verify.expect(#verify.world_player_trades() == #wt, "the refusal mutated nothing")
+
+-- Remove it through the row's x.
+if placed_id then
+    verify.trades_tab_remove(placed_id)
+    verify.frames(2)
+    verify.expect(verify.trade_message() == "Trade removed.", "the x press removed it: " .. verify.trade_message())
+    local still = false
+    for _, r in ipairs(verify.my_trades()) do if r.trade_id == placed_id then still = true end end
+    verify.expect(not still, "'My trades' no longer draws it")
+    verify.expect(#verify.world_player_trades() == before, "the world holds it no longer")
+end
+
+-- Put one back for the gate checks below: the gate must hide something real.
+if placed then
+    verify.trades_tab_add(placed.key, here, placed.to, 1.0)
+    verify.frames(2)
+end
+
+-- =========================================================================
+-- 3. THE READS ARE DISTINCT, AND THE GATE IS REAL
+-- =========================================================================
+mine = verify.my_trades()
+local all = verify.market_trades()
+local hist = verify.trade_history()
+pot = verify.potential_trades()
+print(string.format("MEASURED Trades tab: %d mine, %d here (gate %s), %d potential, %d history",
     #mine, #all.rows, tostring(all.open), #pot, #hist))
 
--- Every row of read 1 says so; no row of read 2 is silently mine-only.
-local mine_not_mine = 0
-for _, r in ipairs(mine) do if not r.mine then mine_not_mine = mine_not_mine + 1 end end
-verify.expect(mine_not_mine == 0,
-    "every row of 'my trades' belongs to the player (" .. mine_not_mine .. " do not)")
+local not_mine = 0
+for _, r in ipairs(mine) do if not r.mine then not_mine = not_mine + 1 end end
+verify.expect(not_mine == 0, "every row of 'my trades' belongs to the player (" .. not_mine .. " do not)")
 
--- Read 1 is a SUBSET of read 2 by order id, and read 2 is strictly the wider
--- read. If they were the same population the design's distinction would be a
--- pair of headings over one list.
-if all.open then
-    local in_all = {}
-    for _, r in ipairs(all.rows) do in_all[r.order_id] = true end
-    local missing = 0
-    for _, r in ipairs(mine) do if not in_all[r.order_id] then missing = missing + 1 end end
-    verify.expect(missing == 0,
-        "every order in 'my trades' also stands in the market's book (" .. missing .. " missing)")
-    verify.expect(#all.rows >= #mine,
-        "the market's book is not narrower than my own (" .. #all.rows .. " vs " .. #mine .. ")")
-
-    -- AND IT MATCHES THE WORLD, not just itself. This is the read that would
-    -- pass against a table that drew nothing if it only compared the surface to
-    -- the surface.
-    local w = verify.world_orders_on_body(home_body)
-    verify.expect(#all.rows == w.sells + w.buys,
-        "the book lists every standing order on the body: " .. #all.rows ..
-        " drawn vs " .. (w.sells + w.buys) .. " in world state")
-    verify.expect(#mine == w.mine,
-        "'my trades' lists exactly my standing orders: " .. #mine .. " drawn vs " ..
-        w.mine .. " in world state")
-end
-
--- Read 3 shares no identity with the books: a potential trade has no order id,
--- because nobody has placed it. Assert it carries the derivation's own fields
--- instead, which is what makes it a different KIND of row.
-local pot_shape = 0
-for _, r in ipairs(pot) do
-    if r.order_id ~= nil then pot_shape = pot_shape + 1 end
-    if r.buy_price == nil or r.sell_price == nil or r.haulage == nil then
-        pot_shape = pot_shape + 1
-    end
-end
-verify.expect(pot_shape == 0,
-    "a potential trade is a derivation, not an order: no id, and all three terms present")
-
--- =========================================================================
--- 2. THE GATE ON READ 2 IS REAL
--- =========================================================================
--- The surface's own answer must equal the world's, and it must actually SHUT
--- somewhere. A gate asserted only where it is open has not been tested.
+local touches = 0
+for _, r in ipairs(mine) do if r.from_market ~= here and r.to_market ~= here then touches = touches + 1 end end
+verify.expect(touches == 0, "every row of 'my trades' leaves or lands on this market")
 
 verify.expect(all.open == verify.player_operates_on(home_body),
-    "the book's gate agrees with the world on the home body (open=" ..
-    tostring(all.open) .. ")")
-
-local bodies = verify.market_bodies()
-local shut_body, shut_market, shut_name = nil, nil, nil
-for _, b in ipairs(bodies) do
-    if not b.operates and b.market ~= nil and b.market ~= 0 then
-        shut_body, shut_market, shut_name = b.body, b.market, b.name
-        break
-    end
-end
-print("MEASURED market-bearing bodies: " .. #bodies)
-
-if shut_body ~= nil then
-    -- The easy route, when the fixture offers it: point the selectors at a body
-    -- the player has no building on and read the gate there.
-    verify.select_market(shut_market)
-    verify.frames(2)
-    local away = verify.market_trades()
-    local away_where = verify.trades_market()
-    verify.expect(away_where.body == shut_body,
-        "the selectors moved to " .. tostring(shut_name) .. " (body " .. shut_body .. ")")
-    verify.expect(away.open == false,
-        "the gate SHUTS on a body where the player owns no building (" .. tostring(shut_name) .. ")")
-    verify.expect(#away.rows == 0,
-        "a shut gate lists no rows (" .. #away.rows .. " listed)")
-    verify.capture("trades_gate_shut")
-    verify.select_market(where.market)
-    verify.frames(2)
-else
-    -- THE FIXTURE HAS ONLY ONE MARKET-BEARING BODY, AND THE PLAYER OPERATES ON
-    -- IT. Measured, not assumed: markets are seeded on the home body only and an
-    -- off-world one emerges when a building COMPLETES there, and none does -
-    -- still one market body after 400 econ ticks (a hundred years). So the shut
-    -- half is unreachable by re-pointing the selectors, in this fixture, ever.
-    --
-    -- It is tested at the FOOT of this script instead, by taking the player's
-    -- estate off the body through the real `demolish` verb - see § 6. Weakening
-    -- the assertion to "the gate agrees with the world (true == true)" would be
-    -- a check that cannot fail, which is what this file exists not to be.
-    print("MEASURED: no second market-bearing body - the SHUT half of the gate " ..
-          "is tested by demolition at the foot of this script")
+    "the gate agrees with the world on the home body (open=" .. tostring(all.open) .. ")")
+if all.open then
+    local in_all = {}
+    for _, r in ipairs(all.rows) do in_all[r.trade_id] = true end
+    local missing = 0
+    for _, r in ipairs(mine) do if not in_all[r.trade_id] then missing = missing + 1 end end
+    verify.expect(missing == 0, "every trade in 'my trades' also stands in 'all trades here' (" .. missing .. " missing)")
 end
 
--- =========================================================================
--- 3. AN ABSENT COUNTERPARTY IS THE MARKET
--- =========================================================================
+-- Read 3 shares no identity with the lists: a potential trade has no id.
+local pot_shape = 0
+for _, r in ipairs(pot) do
+    if r.trade_id ~= nil then pot_shape = pot_shape + 1 end
+    if r.buy_price == nil or r.sell_price == nil or r.haulage == nil then pot_shape = pot_shape + 1 end
+end
+verify.expect(pot_shape == 0, "a potential trade is a derivation: no id, and all three terms present")
 
-hist = verify.trade_history()
+-- =========================================================================
+-- 4. AN ABSENT COUNTERPARTY IS THE MARKET; NO ROW PRINTS A PROFIT
+-- =========================================================================
 verify.expect(verify.world_exchange_count() > 0,
     "the clearing tick filed exchanges at all (" .. verify.world_exchange_count() .. " in the ring)")
-verify.expect(#hist > 0,
-    "the history section drew rows for this market (" .. #hist .. ")")
-
-local blank_side, market_sides = 0, 0
+local span = verify.exchange_ring_span(here)
+print(string.format("MEASURED exchange ring: %d rows, ticks %d..%d, %d name this market",
+    span.rows, span.oldest_tick, span.newest_tick, span.rows_here))
+verify.expect(#hist > 0, "the history section drew rows for this market (" .. #hist .. ")")
+verify.expect(#hist == math.min(span.rows_here, 120),
+    "the history section drew every ring row for this market, to its cap (" .. #hist .. " of " .. span.rows_here .. ")")
+local blank_side, market_sides, profit_field, bad_revenue = 0, 0, 0, 0
 for _, r in ipairs(hist) do
-    if r.seller_is_market then
-        market_sides = market_sides + 1
-        if r.seller ~= "Market" then blank_side = blank_side + 1 end
-    end
-    if r.buyer_is_market then
-        market_sides = market_sides + 1
-        if r.buyer ~= "Market" then blank_side = blank_side + 1 end
-    end
-    -- Nothing may render as unknown, ever: a null side is the market and a
-    -- non-null side is a corp that exists.
+    if r.seller_is_market then market_sides = market_sides + 1; if r.seller ~= "Market" then blank_side = blank_side + 1 end end
+    if r.buyer_is_market then market_sides = market_sides + 1; if r.buyer ~= "Market" then blank_side = blank_side + 1 end end
     if r.seller == nil or r.seller == "" then blank_side = blank_side + 1 end
-    if r.buyer  == nil or r.buyer  == "" then blank_side = blank_side + 1 end
-end
-print("MEASURED: " .. market_sides .. " of " .. (#hist * 2) ..
-      " counterparty sides are the market itself")
-verify.expect(blank_side == 0,
-    "every counterparty renders as a name or as the market, never blank (" .. blank_side .. " bad)")
-verify.expect(market_sides > 0,
-    "the market-as-counterparty rows are KEPT, not skipped (" .. market_sides .. " sides)")
-
--- =========================================================================
--- 4. NO ROW PRINTS A PROFIT
--- =========================================================================
--- The strong form: the record has no profit FIELD, so nothing downstream can
--- print one by accident, and the revenue it does carry is exactly the term the
--- clearing statement accrued.
-
-local profit_field, bad_revenue, worst = 0, 0, 0.0
-for _, r in ipairs(hist) do
+    if r.buyer == nil or r.buyer == "" then blank_side = blank_side + 1 end
     if r.profit ~= nil or r.margin ~= nil then profit_field = profit_field + 1 end
     local want = r.quantity * r.unit_price
-    local err  = math.abs(r.revenue - want)
-    if err > worst then worst = err end
-    if err > math.max(1e-3, math.abs(want) * 1e-5) then bad_revenue = bad_revenue + 1 end
+    if math.abs(r.revenue - want) > math.max(1e-3, math.abs(want) * 1e-5) then bad_revenue = bad_revenue + 1 end
 end
-verify.expect(profit_field == 0,
-    "no history row carries a profit or margin field (" .. profit_field .. " do)")
-verify.expect(bad_revenue == 0,
-    "revenue is quantity * unit_price and nothing else (" .. bad_revenue ..
-    " wrong, worst err " .. string.format("%.6f", worst) .. ")")
+verify.expect(blank_side == 0, "every counterparty renders as a name or as the market (" .. blank_side .. " bad)")
+verify.expect(market_sides > 0, "the market-as-counterparty rows are KEPT (" .. market_sides .. " sides)")
+verify.expect(profit_field == 0, "no history row carries a profit or margin field")
+verify.expect(bad_revenue == 0, "revenue is quantity * unit_price and nothing else (" .. bad_revenue .. " wrong)")
 
 -- =========================================================================
 -- 5. READ 3's ARITHMETIC AND ITS RANKING
 -- =========================================================================
--- Ranking is permitted HERE and only here (CONCEPT.md § Player identity, and
--- Ben's 2026-08-29 qualification: the top row is one input among several, not
--- the move itself). So the ordering is a contract, and it is checked.
-
-pot = verify.potential_trades()
 print("MEASURED potential trades: " .. #pot .. " rows")
 if #pot > 0 then
     local bad_margin, out_of_order, non_positive = 0, 0, 0
     local prev = nil
     for _, r in ipairs(pot) do
         local want = r.sell_price - r.buy_price - r.haulage
-        if math.abs(r.margin - want) > math.max(1e-3, math.abs(want) * 1e-4) then
-            bad_margin = bad_margin + 1
-        end
+        if math.abs(r.margin - want) > math.max(1e-3, math.abs(want) * 1e-4) then bad_margin = bad_margin + 1 end
         if r.margin <= 0.0 then non_positive = non_positive + 1 end
         if prev ~= nil and r.margin > prev + 1e-4 then out_of_order = out_of_order + 1 end
         prev = r.margin
     end
-    verify.expect(bad_margin == 0,
-        "margin is sell there - buy here - haulage (" .. bad_margin .. " wrong)")
-    verify.expect(out_of_order == 0,
-        "potential trades are ranked by margin, best first (" .. out_of_order .. " out of order)")
-    verify.expect(non_positive == 0,
-        "a listed potential trade clears its haulage (" .. non_positive .. " do not)")
-    print(string.format("MEASURED best potential trade: %s to %s, buy %.2f sell %.2f haul %.2f margin %.2f in %d qtr",
-        pot[1].good, pot[1].to, pot[1].buy_price, pot[1].sell_price,
-        pot[1].haulage, pot[1].margin, pot[1].travel_ticks))
+    verify.expect(bad_margin == 0, "margin is sell there - buy here - haulage (" .. bad_margin .. " wrong)")
+    verify.expect(out_of_order == 0, "potential trades are ranked by margin, best first")
+    verify.expect(non_positive == 0, "a listed potential trade clears its haulage")
 else
-    -- Not a failure: a market where no route clears its haulage is a real state
-    -- and the section says so. But it is REPORTED, because a silent zero here
-    -- would let a broken derivation read as an honest empty one.
     print("MEASURED: no potential trade clears its haulage from this market")
 end
 
 -- =========================================================================
--- CAPTURES. At 1920x1080, the screen being reviewed - a density judgement taken
--- at 720p is taken against half the content height (NR-719's sibling finding).
+-- CAPTURES, at 1920x1080 (the screen being reviewed).
 -- =========================================================================
 verify.window(1920, 1080)
 verify.frames(2)
 verify.capture("trades_tab_head")
--- "market_trades", not "market": the tab strip's two views are two different
--- child scrollers and only one is on screen. Aiming the Goods child's name at a
--- frame showing Trades would have been NR-719 by a third route, so the Trades
--- child has a name of its own and `expect_scrolled` makes a miss loud.
 verify.scroll_panel("market_trades", 1.0)
 verify.frames(2)
 verify.expect_scrolled("the Trades tab's scroll request reached a real scroller")
 verify.capture("trades_tab_foot")
 verify.scroll_panel("market_trades", 0.0)
 verify.frames(2)
-
--- The Goods tab is the tab strip's other half; capture it beside Trades so the
--- strip's two labels are both on record.
 verify.panel_view("market", 0)
 verify.frames(2)
 verify.capture("trades_tab_strip_goods")
@@ -261,50 +230,25 @@ verify.frames(2)
 verify.capture("trades_tab_strip_trades")
 
 -- =========================================================================
--- 6. THE SHUT HALF OF THE GATE
+-- 6. THE SHUT HALF OF THE GATE - last, because it demolishes the estate
 -- =========================================================================
--- LAST, because it destroys the state every read above needs: it takes the
--- player's whole estate off the body through the `demolish` verb, which is what
--- `corporation_component::assets` shrinks on, and then asks the surface whether
--- it still shows the book.
---
--- This is the only route to the shut state in this fixture (§ 2 measured why),
--- and it is a REAL one - a corp that holds nothing on a body is a state the
--- game can reach, and demolish is the verb that reaches it. The gate is the
--- question: does `open` follow ownership, or is it hard-wired true?
-
 local player_here = {}
 for _, b in ipairs(verify.buildings()) do
     if b.player and b.body == home_body then player_here[#player_here + 1] = b.id end
 end
-print("MEASURED player estate on " .. tostring(home_body) .. ": " .. #player_here .. " buildings")
-verify.expect(#player_here > 0,
-    "the player holds buildings on this body before the demolition (" .. #player_here .. ")")
-
-local refused = 0
+verify.expect(#player_here > 0, "the player holds buildings on this body before the demolition (" .. #player_here .. ")")
 for _, bid in ipairs(player_here) do
-    local r = verify.corp_command{ verb = 1, subject = bid } -- 1 == corp_verb::demolish
-    if r ~= "applied" then refused = refused + 1 end
+    verify.corp_command{ verb = 1, subject = bid } -- 1 == corp_verb::demolish
 end
-print("MEASURED demolitions refused: " .. refused .. " of " .. #player_here)
-
 verify.frames(2)
 verify.expect(verify.player_operates_on(home_body) == false,
     "the world agrees the player now owns nothing on this body")
-
 local shut = verify.market_trades()
-verify.expect(shut.open == false,
-    "THE GATE SHUTS once the player owns no building on the body (open=" ..
-    tostring(shut.open) .. ")")
-verify.expect(#shut.rows == 0,
-    "a shut gate lists no rows (" .. #shut.rows .. " listed)")
-
--- And it is a GATE, not an empty book: the world still holds every one of those
--- orders. Without this line "no rows" would prove nothing at all.
+verify.expect(shut.open == false, "THE GATE SHUTS once the player owns no building on the body")
+verify.expect(#shut.rows == 0, "a shut gate lists no rows (" .. #shut.rows .. " listed)")
+-- And it is a GATE, not an empty list: the world still holds the trade.
 local still = verify.world_orders_on_body(home_body)
-print(string.format("MEASURED shut gate: world still holds %d sells + %d buys on the body; surface shows %d",
+print(string.format("MEASURED shut gate: world still holds %d trades out / %d in on the body; surface shows %d",
     still.sells, still.buys, #shut.rows))
-verify.expect(still.sells + still.buys > 0,
-    "the book the gate is hiding is still there (" .. (still.sells + still.buys) .. " orders)")
-
+verify.expect(still.sells + still.buys > 0, "the trades the gate hides are still there")
 verify.capture("trades_gate_shut")

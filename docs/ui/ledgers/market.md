@@ -1,7 +1,7 @@
 # Market — design Q&A
 
 > **Working design doc** for the ledger-mockup pass (Power BI). Strawman answers — Ben revises.
-> Menu slot: `nav rail slot 6 "Market Ledger"` · Source: `src/ui/market_ledger.cpp` · Mock table(s): `markets.csv`, `stockpiles.csv` · Owning items: `BL-453` (convoys ledger), `BL-037` (sell-order routing)
+> Menu slot: `nav rail slot 6 "Market Ledger"` · Source: `src/ui/market_ledger.cpp` · Mock table(s): `markets.csv` · Owning items: `BL-453` (convoys ledger), `BL-1269` (trade UI)
 > Host: shell fold-out column — **380 px at 1280, 384 px at 1920** (`shell_column_width` is `0.20 * disp_x` clamped to [380, 460], so it is effectively fixed across the common range; what resolution changes is the column's HEIGHT, and all of it).
 
 ## 1. Top question — the one thing this answers at first glance
@@ -64,35 +64,45 @@ text column more than doubles the name width. At 42 px `Iron Ore` and `Iron-Nick
 elide to `Iron ...`, which defeats the one thing a price board is for. It is kept as a one-line
 dial (`ui_state::market_goods_show_body`) rather than deleted, so the call is cheap to revisit.
 
-## 2b. Trades — four sections, and why they are four
+## 2b. Trades — five sections, and why they are five
 
-**The tab is called Trades** — Ben, 2026-08-29, naming it: *"we should call it Trades"*.
-Not Sell Orders and not Orders. The word carries the widening: a sell order is one direction and
-one actor; a trade is a position either way round, held by anyone in the market, and — since the
-clearing tick retains a per-exchange record — one that has already happened.
+**The tab is called Trades** — Ben, 2026-08-29, naming it: *"we should call it Trades"*. It read
+the order book until the order book retired with corporation pools (`MARKETS.md` § The shelf
+economy); it reads **trade** now (`TRADE.md`): the routes that move goods between markets, the
+trade points that pay for them, and the reserve that splits those points between the player's own
+routes and auto. The question it answers: **"What am I moving in and out of this market, how much
+of my trade capacity do I steer, and what could I be moving?"**
 
 | Section | Read | Columns |
 |---|---|---|
-| **My trades** | The acting corp's standing orders on the selected market's **body** (`sell_orders` *and* `buy_orders`) — and beneath them, **only when one exists**, a **Closed** table: the player's orders on that body that closed themselves after 4 empty quarters (BL-1202, order close notice) | Good · Qty · Limit · `x`; Closed: month · Good · Floor, the log line on hover |
-| **All trades here** | Every standing order on that body, whoever holds it | Good · Holder · Qty · Limit |
-| **Potential trades** | A derivation: buy here, sell there, less haulage. Per unit, ranked by margin | Good · To · Margin |
-| **Recent trades** | The exchange record filtered to this market, newest first | qtr · Good · With · **Revenue** |
+| **Trade points** | The acting corp's `trade_points` made on the last pass, its `trade_reserve` as used (clamped to what it makes), and the rest — auto. The reserve field and its **Set reserve** press (`set_trade_reserve`); a warning when the reserve exceeds what is made, or the manual trades ask for more than it covers | `Made X pts · manual Y · auto Z` |
+| **My trades** | The acting corp's manual trades (`world::trades`) that **leave or land on the selected market**, in placement order — the order the reserve is spent in. A count of its trades elsewhere; the **Add a trade** fold (good, from, to, points → `set_trade`); the seam's answer to the last trade press | Good · Route (`from > to`, by city) · Pts · `x` (`clear_trade`); units a tick on hover |
+| **All trades here** | Every corporation's manual trades touching this market | Good · Holder · Route · Pts |
+| **Potential trades** | A derivation: buy here, sell there, less haulage. Per unit, ranked by margin; only goods trade carries (capacity > 0) | Good · To · Margin · `+` (fills the Add a trade form) |
+| **Recent exchanges** | The exchange record filtered to this market, newest first | qtr · Good · With · **Revenue** |
 
-**Direction is the limit's operator, not a column.** `>= 0.6` is a sell's floor and `<= 0.6` a
-buy's ceiling — the shorthand the pre-rename row already used, and at ~380 px a fourth text
-column costs more than it says.
+**A trade lists under both of its markets.** It leaves one and lands on the other, and the
+question is asked standing at either. The player's trades elsewhere are counted, not hidden.
 
-**The gate on the second read is: the player owns a building on that body** (Ben, 2026-08-29,
-over "an order here", "either", and "any discovered market"). Shut, the section says so in words —
-"You hold no building on *X*" — because a shut gate and an empty book are different answers.
+**The gate on the third read is: the player owns a building on that body** (Ben, 2026-08-29,
+over "an order here", "either", and "any discovered market" — taken for the order book and kept
+for the trades that replaced it). Shut, the section says so in words — "You hold no building on
+*X*" — because a shut gate and an empty list are different answers.
 
-**Potential trades price the real leg.** The haulage term is `price_convoy_leg`'s own cost for a
-one-unit leg, so the figure the player acts on is the figure the dispatcher would bill; there is
+**Potential trades price the real leg.** The haulage term is `price_trade_leg`'s own cost for a
+one-unit leg, so the figure the player acts on is the figure the trade pass would bill; there is
 no second haulage model to disagree with the one that charges. A lane that will not price
 produces **no row** — an unreachable market is not a trade at a worse margin, it is not a trade.
 The read is cached against the econ tick and the player's asset count, because pricing runs an
 A\* on a cache miss and doing that per frame over every market is the shape of the stall that
 narrowed `invalidate_logistics_caches`.
+
+**The `+` fills the form; it does not trade.** A ranked row becomes a trade only when the player
+sets its points and presses Add — points auto would otherwise spend — so the ranking stays one
+input among several (`CONCEPT.md` § Player identity).
+
+**The market Selection card is a door onto this tab.** Its **Trades** press opens the ledger
+aimed at the selected market, on Trades — the place the retired Dispatch convoy form used to be.
 
 **The history column is REVENUE and the limit is structural.** `stockpile_component` is
 `quantities[]` and nothing else, so no cost basis exists anywhere in the model and a margin is

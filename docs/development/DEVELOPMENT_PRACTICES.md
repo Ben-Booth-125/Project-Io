@@ -288,11 +288,11 @@ game state through the *same code path the interactive control uses*, then asser
 
 - **The rule:** a verify commit primitive must call the **same function the UI control calls**, never
   a reimplementation or a bypass registry. `verify.set_building_recipe`/`set_building_workforce`
-  perform the exact writes the construction panel's combo/slider do; `verify.place_sell_order` pushes
-  onto the same `m_world.sell_orders` the panel appends to; `verify.dispatch_survey_of` calls the real
+  perform the exact writes the construction panel's combo/slider do; `verify.trades_tab_add` enqueues
+  the same `set_trade` command the Trades tab's Add press does; `verify.dispatch_survey_of` calls the real
   `dispatch_survey`. That fidelity is what makes the test catch a broken commit path.
 - **Shipped acceptance scripts:** `fresh_start_build.lua` (US-002 build), `recipe_workforce.lua`
-  (US-007), `sell_order.lua` (US-008), `survey_dispatch.lua` (US-011). Each traces to its user
+  (US-007), `survey_dispatch.lua` (US-011). Each traces to its user
   story's `testing.note`. `click_injection.lua` (BL-521) is the odd one out — its subject is the
   harness itself: that a synthesised press reaches the canvas's click handler, agrees with the
   shortcut it replaces, and that a second press is a second press.

@@ -9,10 +9,13 @@
 --
 --   S1  Fixture: two markets on Kepler whose cheapest haul for the player runs by
 --       sea with at least MIN_LAND land hops at each end (`verify.sea_route_fixture`,
---       priced by the dispatch's own price_convoy_leg; it lays two Ports only
+--       priced by the trade pass's own price_market_leg; it lays two Ports only
 --       where the world's own Ports give no such pair).
---   S2  The real dispatch_convoy verb puts a convoy on it, in sea mode, through
---       the fixture's two Ports.
+--   S2  A real manual TRADE (set_trade, BL-1266; the retired dispatch_convoy
+--       verb's successor) ships the fixture's goods off the source market's
+--       shelf: one econ tick's trade pass puts a convoy on the route, in sea
+--       mode, through the fixture's two Ports. The fixture's Ports make the
+--       trade points the trade spends; the reserve holds them for it.
 --   S3  The lane THE CANVAS DREW (`verify.convoy_lane`, the vision pass's own
 --       beam) passes through both Ports, carries water only on its sea leg, and
 --       is not the direct centre-to-centre path.
@@ -20,13 +23,13 @@
 --       land leg; and the head THE CANVAS PLACES, sampled at even steps of travel
 --       time across the whole lane, covers more tiles per step at sea than on
 --       land. Sampled by parking the convoy's progress (`set_convoy_progress`):
---       the dispatch's own travel time is a couple of econ ticks, too coarse to
+--       the shipment's own travel time is a couple of econ ticks, too coarse to
 --       step through. One real econ tick then shows the sim moving the head.
 --   S5  Captures: the canvas with the head mid-land-leg and mid-sea-leg.
 --
 -- Nothing here changes the game; the fixture is verify-only.
 
-local VERB_DISPATCH_CONVOY = 15 -- corp_verb::dispatch_convoy
+local VERB_CLEAR_TRADE = 31 -- corp_verb::clear_trade
 local CARGO, QTY = "iron_ore", 20
 
 verify.goto_surface("home") -- Kepler; the verify world names it generatively
@@ -40,18 +43,43 @@ if not fx.ok then return end
 print(string.format("sea_lane: markets %d -> %d, ports (%d,%d) / (%d,%d), %d seeded",
     fx.src, fx.dst, fx.port_a_x, fx.port_a_y, fx.port_b_x, fx.port_b_y, fx.seeded_ports))
 
--- --- S2: the dispatch ------------------------------------------------------
-local r = verify.corp_command{ verb = VERB_DISPATCH_CONVOY, subject = fx.src,
-                               counterparty = fx.dst, target_name = CARGO, quantity = QTY }
-verify.expect(r == "applied", "S2 dispatch_convoy onto the sea route: " .. r)
+-- --- S2: the trade's shipment --------------------------------------------
+-- Reserve every point the player makes for manual trades, and set one trade on
+-- the fixture's route with enough points to carry the whole seeded cargo.
+-- A trade building makes points only when its upkeep (fuel and building
+-- materials, bought off its own market's shelf) is met, and the verify world's
+-- shelves may be bare of them: stock every market on the body with both bands'
+-- upkeep goods, so the fixture's Ports run (TRADE.md § The Planetary Marketplace).
+for _, m in ipairs(verify.markets_on_body(fx.body)) do
+    for _, g in ipairs({ "charcoal", "refined_fuel", "timber", "stone" }) do
+        verify.stock_market(m, g, 200.0)
+    end
+end
+-- The player's trade points come from Ports it owns: the fixture's own seeded
+-- pair when it had to lay one (seeded_ports > 0); a pair the world already had
+-- may belong to anyone.
+print("sea_lane: fixture seeded " .. fx.seeded_ports .. " Port(s) for the player")
+verify.expect(verify.set_trade_reserve(1000.0), "S2 the trade reserve is set")
+local r = verify.set_trade(CARGO, fx.src, fx.dst, 1000.0)
+verify.expect(r == "applied", "S2 set_trade onto the sea route: " .. r)
 if r ~= "applied" then return end
+verify.econ_step(1) -- the trade pass ships it
+print(string.format("sea_lane: the player made %.2f trade points this tick", verify.player_trade_points()))
+verify.expect(verify.player_trade_points() > 0.0,
+    "S2 the player makes trade points to ship with (the fixture's Ports)")
 
 local cv
 for _, c in ipairs(verify.convoys()) do
-    if c.src == fx.src and c.dst == fx.dst and not c.arrived then cv = c end
+    if c.src == fx.src and c.dst == fx.dst and not c.arrived and cv == nil then cv = c end
 end
-verify.expect(cv ~= nil, "S2 the dispatched convoy is in flight")
+verify.expect(cv ~= nil, "S2 the trade's shipment is in flight")
 if not cv then return end
+-- One shipment is the subject; stop the trade so later econ ticks add no more.
+for _, t in ipairs(verify.world_player_trades()) do
+    if t.from_market == fx.src and t.to_market == fx.dst then
+        verify.corp_command{ verb = VERB_CLEAR_TRADE, order = t.trade_id }
+    end
+end
 verify.expect(cv.mode == "sea", "S2 the convoy travels in sea mode: " .. cv.mode)
 verify.expect(cv.port_a == fx.port_a and cv.port_b == fx.port_b,
     "S2 the convoy carries the fixture's two Ports")

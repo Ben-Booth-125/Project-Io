@@ -1,7 +1,7 @@
 #include "balance_ledger.hpp"
 
 #include "foldout_column.hpp" // shell fold-out column host (BL-122)
-#include "header_panel.hpp"   // player_stockpile_value — shared Cargo Value (BL-171)
+#include "header_panel.hpp"   // player_cargo_value — shared Cargo Value (BL-171)
 #include "presentation.hpp"
 
 #include "world/building_profit.hpp"  // estimate_building_profit (rank table, BL-171)
@@ -322,7 +322,7 @@ void draw_balance_ledger(const world& w, const recipe_registry& reg,
         income    = bit->second.income;
     }
     ImGui::Text("Income: Cr %.0f", static_cast<double>(income));
-    ImGui::Text("Cargo Value: Cr %.0f", static_cast<double>(player_stockpile_value(w)));
+    ImGui::Text("Cargo Value: Cr %.0f", static_cast<double>(player_cargo_value(w)));
     ImGui::Spacing();
 
     // --- Top-8 buildings by profit, with rank change vs a year ago (BL-171). Profit

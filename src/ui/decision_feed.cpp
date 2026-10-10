@@ -2,7 +2,7 @@
 
 #include "foldout_column.hpp" // the shell-column host this ledger draws into
 #include "format.hpp"         // fmt::date_from_day / month_abbrev / ordinal_day
-#include "market_ledger.hpp"  // market_city_name (BL-452: dispatch_convoy names two markets)
+#include "market_ledger.hpp"  // market_city_name (BL-1269: set_trade names two markets)
 #include "presentation.hpp"   // palette, building_type_name, resource_name
 #include "world/components.hpp"
 #include "world/corp_ai.hpp"    // corp_verb_label / corp_decision_reason_label / corp_decision_reason_count (BL-420)
@@ -147,13 +147,13 @@ std::string target_label(const world& w, const corp_command& c)
             return std::string(row) + " at " + tile_label(w, c.tile);
         }
 
+        // RETIRED verbs (BL-1265/BL-1266): the seam rejects them, so no new
+        // decision carries one; a record from an older save still names itself.
         case corp_verb::place_sell_order:
-            // `subject` is the body for this verb, and `target` is the good.
-            std::snprintf(buf, sizeof buf, " x%.0f at floor %.2f on ", c.quantity, c.floor_price);
-            return std::string(resource_name(c.target)) + buf + body_name(w, c.subject);
+            return std::string(resource_name(c.target)) + " sell order (retired)";
 
         case corp_verb::remove_sell_order:
-            std::snprintf(buf, sizeof buf, "order #%u", static_cast<unsigned>(c.order));
+            std::snprintf(buf, sizeof buf, "order #%u (retired)", static_cast<unsigned>(c.order));
             return buf;
 
         case corp_verb::request_quote:
@@ -168,14 +168,25 @@ std::string target_label(const world& w, const corp_command& c)
             std::snprintf(buf, sizeof buf, "contract #%u", static_cast<unsigned>(c.order));
             return buf;
 
-        // BL-452. `subject` is the SOURCE market and `counterparty` the
-        // destination — the one verb where counterparty names a market rather
-        // than a corporation, so it gets market_city_name, not corp_name.
         case corp_verb::dispatch_convoy:
-            std::snprintf(buf, sizeof buf, " x%.0f from ", c.quantity);
+            return std::string(resource_name(c.target)) + " convoy (retired)";
+
+        // BL-1266/BL-1269. `subject` is the SOURCE market and `counterparty` the
+        // destination — counterparty names a market rather than a corporation,
+        // so it gets market_city_name, not corp_name.
+        case corp_verb::set_trade:
+            std::snprintf(buf, sizeof buf, " %.1f pts from ", c.quantity);
             return std::string(resource_name(c.target)) + buf
                  + market_city_name(w, c.subject) + " to "
                  + market_city_name(w, c.counterparty);
+
+        case corp_verb::clear_trade:
+            std::snprintf(buf, sizeof buf, "trade #%u", static_cast<unsigned>(c.order));
+            return buf;
+
+        case corp_verb::set_trade_reserve:
+            std::snprintf(buf, sizeof buf, "reserve %.1f pts", c.quantity);
+            return buf;
 
         case corp_verb::hold_convoy:
             std::snprintf(buf, sizeof buf, "convoy #%u", static_cast<unsigned>(c.order));

@@ -372,7 +372,8 @@ header):
    - **Status** (`building_page_kind::status`) — the fallback: construction rate/ETA for a
      still-building building, "Operating." otherwise. **Rival buildings get ONLY this page** —
      the public building type plus (via `draw_rival_building_summary`) owner name, tile, and
-     explicit `private` rows for production/stockpile; `building_pages()` short-circuits to a
+     an explicit `private` row for production (there is no stockpile row: no corporation holds
+     one, `../economy/MARKETS.md` § The shelf economy); `building_pages()` short-circuits to a
      single Status page for any non-player-owned building rather than testing each page's
      guard against data it must not show.
 
