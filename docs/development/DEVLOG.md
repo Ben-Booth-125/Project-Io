@@ -10,6 +10,46 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-10-10 (later) — The shelf economy reviewed, ruled, re-blessed and merged into sprint 50
+
+**Runtime:** same session, continued; mode Delivery Full. Merged `claude/shelf-economy-trade-42f8f4`
+into `worktree-sprint-50`.
+
+### Ben's calls (review form, 2026-10-10)
+Live clicks passed. NR-1011..NR-1021 resolved: trade points belong to the market a trade building
+stands in, reach runs market centre to market centre, one reserve (NR-1018); a rival may build a
+Marketplace (NR-1013); exchange rows fold per market, good, side and tick (NR-1021); Converter
+Practice reads "has produced machinery" (NR-1015); the capacity table and the retrofit rates
+approved as built. All written into TRADE, AI_OPPONENT § 11, MARKETS and META_LAYER.
+
+### Built after the rulings
+- **The rival Marketplace scored as any build** (Ben, superseding the same day's flat score, which
+  raised ~1,900 Marketplaces over 16 seeds with 95% of their points unspent). Net is the profit of
+  the trades its points would carry, read from what the last tick left over: a good's spare
+  (supply less demand less hauler want) and the Logistic Points its market's anchor had left after
+  the trade pass (`market_component::trade_lp_spare`, save v46). Marketplaces at handoff 865.
+- Harness fix round for per-market points (six harnesses, a fixture bug behind convoy_command's
+  crash); a cold review of the estimate (no defect; LP spare now proved by a run, saved by value).
+
+### G1b traced
+5.3 before the rulings, 5.7 after; G1b 1.7 on sprint 50 before the shelf. Not the sprint-50
+merge (no game code), not the Converter Practice gate, not the rival build, not the exchange
+rows (never read by the sim): per-market trade points reshuffle which processors are fed, one
+to three per seed both ways. Ben accepted 5.7.
+
+### The re-bless (authorised by Ben against the shape)
+`docs/development/drafts/sprint-50-shelf-rebless.md`. History untouched (road length -3% from
+BL-1252). Sprint 50's own items cut the plant to its inputs; the shelf + trade core moves the
+rest: cities 2,934 -> 1,100 (households fed less: water 88% -> 74%), steel works 330 -> 136,
+military bases 954 -> 307, rival cash 7.0 M -> 5.0 M, trade between markets about 87% lower.
+Both digest tables re-pinned (16/16 PASS each arc); seed library unchanged. Ben: no trade-flow
+floor in the gate; the fixes wait for a later sprint whose items he files when he opens it.
+
+### Gate at merge (16 seeds, 50 ticks)
+G1 93.3, G1 t50 87.5, G1b 5.7 (accepted), G2 113.4, G3 99.8.
+
+---
+
 ## 2026-10-10 — Sprint 50 extended: the shelf economy and trade built (BL-1265..BL-1270)
 
 **Runtime:** one session, 2026-10-10; mode Delivery Full. Branch `claude/shelf-economy-trade-42f8f4`,

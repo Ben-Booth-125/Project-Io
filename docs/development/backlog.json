@@ -1875,7 +1875,7 @@
    "design": "RULED (Ben, 2026-10-10, the doc-check form): widen the code to match the doc. PRODUCTION.md (~545-549): 'for a building that makes or uses power, the solver reads power's supply and demand pooled over the building's grid'. The code applies the pooled read to OUTPUTS only, and only for processing facilities (economy_system.cpp ~976-992, ~1013-1015); a power input is priced at the plant's own market's posted price (~1082). WORK: price power as an input on the grid too, by the same pooled read; measure the 16-seed gate before/after; a cold review (the dial and the player's auto-solver both call solve_workforce_target)."
   },
   {
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "sprint": 50,
    "written": "2026-10-10",
@@ -1899,7 +1899,7 @@
    "design": "DESIGNED: MARKETS.md § The shelf economy (Ben, 2026-10-10). Retire corporation pools, auto-surplus, the processor reservation, the order book (buy and sell orders), the pad propellant reserve, opening stock held until a bid (world::opening_stock_held), the dial's stock-fed draw register (dial_pool_draw); production lands on its market's shelf, paid at the clearing price (the market is the counterparty); processors, construction, upkeep, procurement, the space programme and launches buy from the shelf under the ceiling; the opening stockpile (same total) goes onto the shelves of the corporations' markets. One save bump. Rewrite sibling docs that describe pools as the code changes. Handoff: docs/development/HANDOFF_SHELF_TRADE.md."
   },
   {
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "sprint": 50,
    "written": "2026-10-10",
@@ -1925,7 +1925,7 @@
    "design": "DESIGNED: TRADE.md (Ben, 2026-10-10). The Planetary Marketplace building and Port trade points (rates in data); trade-building upkeep of fuel and building materials from the shelf (unmet -> no points); per-resource trade capacity in data; the trade record (owner, source, destination, resource, points); auto allocation of unreserved points by margin per point; manual trades; a trade buys at the source shelf under the ceiling, pays the haul, travels as a convoy (BL-1195 legs, sweep, leg-time head) under the LP cap, lands and sells at the destination's clearing price; inter-body via a Launchpad and shelf propellant. Retire the corporation convoy and the market export. Handoff: docs/development/HANDOFF_SHELF_TRADE.md."
   },
   {
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "sprint": 50,
    "written": "2026-10-10",
@@ -1948,7 +1948,7 @@
    "design": "DESIGNED: AI_OPPONENT.md § 11, 'A rival may set its own trades' (Ben, 2026-10-10). Verbs: set, change, clear a manual trade; set the reserve. Scored by margin per point on public prices and the network haul. Read the whole register first; the grant's scope is the whole of what is allowed. place_sell_order and the convoy verbs retire from the candidate set (ACTIONS.json). Handoff: docs/development/HANDOFF_SHELF_TRADE.md."
   },
   {
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "sprint": 50,
    "written": "2026-10-10",
@@ -1970,10 +1970,10 @@
     "src/world/corporation_generation.cpp"
    ],
    "title": "Trade runs through the history: nations earn trade points, replacing the Exploration flows; after Industrialisation the record retrofits Marketplaces",
-   "design": "DESIGNED: TRADE.md § Trade in generation (Ben, 2026-10-10). Exploration (1200-1660) and Industrialisation (1660-1960): nations earn trade points where they trade or have good relations, moving goods between their markets by the same capacity and network, replacing EXPLORATION.md's trade flows. After Industrialisation the record is consumed to retrofit Planetary Marketplaces where trade took place, owned by the corporations chartered there. The 1960 settle runs trade as play does. The seat holds a Marketplace only if its corporation has one. Rates and the retrofit rule: proposed by measurement, Ben approves. Handoff: docs/development/HANDOFF_SHELF_TRADE.md."
+   "design": "DESIGNED: TRADE.md § Trade in generation (Ben, 2026-10-10). Exploration (1200-1660) and Industrialisation (1660-1960): nations earn trade points where they trade or have good relations, moving goods between their markets by the same capacity and network, replacing EXPLORATION.md's trade flows. After Industrialisation the record is consumed to retrofit Planetary Marketplaces where trade took place, owned by the corporations chartered there. The 1960 settle runs trade as play does. The seat holds a Marketplace only if its corporation has one. Rates and the retrofit rule: proposed by measurement, Ben approves. Handoff: docs/development/HANDOFF_SHELF_TRADE.md.\n\nCLOSED 2026-10-10 on Part A (the history trade record and the Marketplace retrofit). Part B (trade points replacing the Exploration flows) was planned and not built; Ben files the follow-ups when he opens the next sprint."
   },
   {
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "sprint": 50,
    "written": "2026-10-10",
@@ -1999,7 +1999,7 @@
    "design": "DESIGNED: TRADE.md (Ben, 2026-10-10). A ledger for manual trades (route, resource, points) and the reserve; the Planetary Marketplace in the Build door; sell-order and stockpile surfaces retire or read the shelf; ACTIONS.json and question_log entries; a live click. Coordinate with sprint 51's visibility pass and BL-1222 (trade-flow lens), which reads convoy records. Handoff: docs/development/HANDOFF_SHELF_TRADE.md."
   },
   {
-   "status": "designed",
+   "status": "complete",
    "glyph": "✓",
    "sprint": 50,
    "written": "2026-10-10",

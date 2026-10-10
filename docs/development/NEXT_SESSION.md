@@ -3,7 +3,18 @@
 Read this first after a compaction or in a new session. Then `REFINED.md` § Sprint 50 and the
 sprint 50 row in `sprints.json`. Mode for this work: **Delivery — Full**.
 
-## SPRINT 50 IS EXTENDED — read HANDOFF_SHELF_TRADE.md first (Ben, 2026-10-10)
+## SHELF ECONOMY AND TRADE MERGED; RE-BLESS DONE — next is the cut (2026-10-10, later)
+
+The shelf/trade branch is merged into `worktree-sprint-50` with the sprint's ONE re-bless, authorised
+by Ben against the shape (`docs/development/drafts/sprint-50-shelf-rebless.md`; DEVLOG 2026-10-10
+(later)). BL-1265..BL-1270 complete (BL-1268 on Part A only). Gate at merge: G1 93.3, G1 t50 87.5,
+G1b 5.7 (accepted by Ben), G2 113.4, G3 99.8. Ben (2026-10-10): **move towards cutting**; the fixes
+(trade about 87% lower, cities demoted, G1b, the estimate's optimism) wait for a later sprint whose
+items he files himself — do NOT file them. No trade-flow floor in the gate. Still owed for the cut:
+the visual checks on the merged tip (trades_tab, sea_lane, air_gate), `ruling-check`, retro, version
+cut, integration onto main. Scratch to clean: the session scratchpad's `base50` worktree.
+
+## (superseded) SPRINT 50 IS EXTENDED — read HANDOFF_SHELF_TRADE.md first (Ben, 2026-10-10)
 
 Ben redesigned the economy's spine mid-close: corporation pools retire (every good is on a market-owned
 shelf), and trade becomes the only way goods move between markets (Planetary Marketplaces and Ports make

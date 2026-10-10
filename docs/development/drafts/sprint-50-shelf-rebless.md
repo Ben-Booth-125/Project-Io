@@ -1,6 +1,6 @@
 # Sprint 50's one re-bless, with the shelf economy and trade — the shape, the causes, the pins
 
-**PREPARED 2026-10-10 for Ben's authorisation** against the SHAPE below (DELIVERY.md § The digest
+**AUTHORISED by Ben 2026-10-10 against this shape** (review form: authorise and merge into sprint 50; no trade-flow floor in the gate; the fixes are left for a later sprint, whose backlog items Ben files when he opens it). **Prepared 2026-10-10 for Ben's authorisation** against the SHAPE below (DELIVERY.md § The digest
 re-bless is one act per WAVE, rule 4), never against the hashes. Ben gave the go to run it on
 2026-10-10; the result is his to authorise before it merges into `worktree-sprint-50`.
 
