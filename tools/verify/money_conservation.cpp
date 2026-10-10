@@ -34,6 +34,7 @@
 #include "world/law.hpp"
 #include "world/market_clearing.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/supply_system.hpp" // credit_arrived_convoys: the tariff's point of charge
 #include "world/world.hpp"
 
 #include <cmath>
@@ -99,20 +100,14 @@ static uint64_t state_hash(const world& w)
     for (const auto& [cid, cc] : w.corporations) corps[cid] = &cc;
     for (const auto& [cid, cc] : corps) { mix(cid); mixf(cc->balance); }
 
-    std::map<std::pair<entity_id, entity_id>, const stockpile_component*> pools;
-    for (const auto& [key, pc] : w.corp_market_pools) pools[key] = &pc;
-    for (const auto& [key, pc] : pools)
-    {
-        mix(key.first); mix(key.second);
-        for (std::size_t r = 0; r < resource_count; ++r) mixf(pc->quantities[r]);
-    }
-
+    // BL-1265: no corporation pools — every good is on a shelf, hashed with
+    // its market below.
     std::map<entity_id, const market_component*> mkts;
     for (const auto& [mid, mc] : w.markets) mkts[mid] = &mc;
     for (const auto& [mid, mc] : mkts)
     {
         mix(mid);
-        for (std::size_t r = 0; r < resource_count; ++r) mixf(mc->price[r]);
+        for (std::size_t r = 0; r < resource_count; ++r) { mixf(mc->price[r]); mixf(mc->inventory[r]); }
     }
 
     std::map<entity_id, double> treas;
@@ -207,25 +202,27 @@ fixture build_fixture(recipe_registry& reg)
     return f;
 }
 
-/// Post a matched pair straight into `world::sell_orders` / `buy_orders`.
-///
-/// NOT through `corp_command`: there is no buy-order verb — `buy_order`'s own
-/// comment says so ("No press authors one yet — the buy side exists in the
-/// clearing algorithm and in the save format, waiting for its verb"). Writing
-/// the book directly is what the clearing tick reads either way, and inventing a
-/// verb here would be inventing the seam this harness exists to measure.
-void post_pair(world& w, entity_id seller, entity_id buyer, entity_id body,
-               resource_type r, float qty, float ask)
+/// Put an ARRIVED trade shipment of @p qty of @p r on the lane from market
+/// @p from to market @p to, owned by @p owner (BL-1266: a convoy is a trade's
+/// shipment). `credit_arrived_convoys` lands it — and, since MARKETS.md §
+/// Tariffs (Ben 2026-09-15), charges the destination nation's import duty when
+/// the lane crosses a border. Placed directly rather than through a trade pass
+/// so the only flow in play is the one this harness measures.
+void post_arrival(world& w, entity_id owner, entity_id from, entity_id to,
+                  resource_type r, float qty)
 {
-    sell_order s;
-    s.id = w.allocate_order_id(); s.corp = seller; s.body = body;
-    s.resource = r; s.quantity = qty; s.floor_price = ask;
-    w.sell_orders.push_back(s);
-
-    buy_order b;
-    b.id = w.allocate_order_id(); b.corp = buyer; b.body = body;
-    b.resource = r; b.quantity = qty; b.max_price = ask * 2.0f;
-    w.buy_orders.push_back(b);
+    convoy_component c;
+    c.id             = w.allocate_convoy_id();
+    c.source_market  = from;
+    c.dest_market    = to;
+    c.mode           = convoy_mode::space;
+    c.cargo_resource = r;
+    c.cargo_qty      = qty;
+    c.progress       = 1.0f;
+    c.speed          = 1.0f;
+    c.corp           = owner;
+    c.arrived        = true;
+    w.convoys.push_back(c);
 }
 
 } // namespace
@@ -301,9 +298,9 @@ int main()
         const double supplier_before = w.corporations.at(f.supplier).balance;
 
         // Pace the contract WITHOUT the clearing tick, so the only flows in
-        // play are the ones this item owns. (run_economy_step also produces
-        // extraction output into pools; that is goods, not credits, and the
-        // cash assertion is unaffected.)
+        // play are the ones this item owns. (run_economy_step also lands
+        // extraction output, unpaid until a clear; that is goods, not credits,
+        // and the cash assertion is unaffected.)
         for (int t = 0; t < pq.lead_time_ticks; ++t)
             run_economy_step(w, reg);
 
@@ -319,12 +316,17 @@ int main()
         std::printf("        buyer paid %.4f   supplier received %.4f\n", buyer_paid, supplier_received);
 
         // --- Delivery actually reaches the buyer ----------------------------
-        const double landed_here  = w.pool_at(f.buyer, pool_key_for_body(w, f.buyer_body)).quantities[ri(resource_type::iron_ore)];
-        const double landed_there = w.pool_at(f.buyer, pool_key_for_body(w, f.supplier_body)).quantities[ri(resource_type::iron_ore)];
+        // BL-1265: the delivery LANDS on the buyer's home market (sold to that
+        // market at the next clear); with no clear run here it is still in the
+        // tick's landing register.
+        const double landed_here  = w.landed(f.buyer, corp_home_market(w, f.buyer, f.buyer_body),
+                                             ri(resource_type::iron_ore));
+        const double landed_there = w.landed(f.buyer, market_on_body(w, f.supplier_body),
+                                             ri(resource_type::iron_ore));
         check(landed_here >= 100.0,
-              "P1.9 the full contracted quantity lands in the buyer's pool ON THE BUYER'S BODY");
+              "P1.9 the full contracted quantity lands on the buyer's market ON THE BUYER'S BODY");
         check(near(landed_there, 0.0),
-              "P1.10 nothing at all lands on the supplier's body (where it would be liquidated)");
+              "P1.10 nothing at all lands on the supplier's body");
 
         // --- The round trip, re-measured ------------------------------------
         // The recorded defect: a 20-unit iron round trip settled at exactly
@@ -405,7 +407,9 @@ int main()
         std::printf("        state_hash %016llX\n", static_cast<unsigned long long>(baseline_hash));
     }
 
-    // --- Enacted: a cross-border sale is taxed, and the money lands ---------
+    // --- Enacted: a cross-border shipment is taxed at ARRIVAL, the money lands
+    // (MARKETS.md § Tariffs, Ben 2026-09-15: the convoy is the one object that
+    // carries goods across a line, so arrival is the one point of charge).
     {
         recipe_registry reg;
         fixture f = build_fixture(reg);
@@ -417,70 +421,47 @@ int main()
         l.rate = 0.10f; l.enacted = true;
         w.laws.push_back(l);
 
-        // Stock both sides so there is something to trade, then post a matched
-        // pair on the SUPPLIER's market: a foreign buyer (the buyer corp,
-        // resident in the other nation) lifting a local seller's ask.
-        w.pool_at(f.supplier, pool_key_for_body(w, f.supplier_body)).quantities[ri(resource_type::iron_ore)] += 200.0f;
-
-        const float ask = 2.5f;
+        // The buyer corp (resident in the other nation) ships 40 units from its
+        // own market into the supplier's: an import into the enacting nation.
         const float qty = 40.0f;
-        post_pair(w, f.supplier, f.buyer, f.supplier_body, resource_type::iron_ore, qty, ask);
-        check(w.sell_orders.size() == 1 && w.buy_orders.size() == 1,
-              "P2.2 a local ask and a FOREIGN bid stand on the supplier's market");
+        post_arrival(w, f.buyer, f.buyer_mkt, f.supplier_mkt, resource_type::iron_ore, qty);
+        check(w.convoys.size() == 1,
+              "P2.2 a foreign shipment stands arrived at the supplier's market");
 
         const double cash_before     = total_corp_cash(w);
         const double treasury_before = total_nation_treasury(w);
+        const float  dest_price      = w.markets.at(f.supplier_mkt).price[ri(resource_type::iron_ore)] > 0.0f
+                                     ? w.markets.at(f.supplier_mkt).price[ri(resource_type::iron_ore)]
+                                     : w.markets.at(f.supplier_mkt).base_price[ri(resource_type::iron_ore)];
 
-        economy_report rep = run_economy_step(w, reg);
-        auto flows = clear_markets(w, reg, rep);
-        apply_budget(w, reg, flows, rep.workforce_contention);
+        credit_arrived_convoys(w, 0);
 
         const double treasury_gained = total_nation_treasury(w) - treasury_before;
         check(treasury_gained > 0.0,
-              "P2.4 the ENACTING nation's treasury is credited by a cross-border sale");
+              "P2.4 the ENACTING nation's treasury is credited by a cross-border arrival");
+        check(near(treasury_gained, qty * dest_price * 0.10, 1e-3),
+              "P2.4b the duty is the cargo's value at the destination's price, at the enacted rate");
         check(near(w.nations.at(f.supplier_nat).treasury, treasury_gained),
               "P2.5 the money lands in the AUTHOR's treasury, not in some other nation's");
         check(near(w.nations.at(f.buyer_nat).treasury, 0.0),
-              "P2.6 the buyer's own nation collects nothing on a sale in someone else's market");
-
-        // Conservation. The clearing tick is NOT a closed system (the market is
-        // a buyer of last resort), so the assertion is made against a control
-        // run of the identical world with the law un-enacted: the tariff must
-        // move exactly `treasury_gained` OUT of corporate cash and no more.
-        const double cash_after = total_corp_cash(w);
-        double control_cash_after = 0.0;
-        {
-            recipe_registry creg;
-            fixture c = build_fixture(creg);
-            c.w.pool_at(c.supplier, pool_key_for_body(c.w, c.supplier_body)).quantities[ri(resource_type::iron_ore)] += 200.0f;
-            post_pair(c.w, c.supplier, c.buyer, c.supplier_body, resource_type::iron_ore, qty, ask);
-            economy_report crep = run_economy_step(c.w, creg);
-            auto cflows = clear_markets(c.w, creg, crep);
-            apply_budget(c.w, creg, cflows, crep.workforce_contention);
-            control_cash_after = total_corp_cash(c.w);
-        }
-        check(near(control_cash_after - cash_after, treasury_gained, 1e-2),
+              "P2.6 the shipper's own nation collects nothing on an import into someone else's");
+        check(near(cash_before - total_corp_cash(w), treasury_gained, 1e-3),
               "P2.7 CONSERVED: corporate cash falls by EXACTLY what the treasury gained");
-        std::printf("        tariff collected %.4f;  corporate cash delta vs control %.4f\n",
-                    treasury_gained, control_cash_after - cash_after);
-        (void)cash_before;
+        std::printf("        tariff collected %.4f on %.0f units at %.4f\n",
+                    treasury_gained, qty, dest_price);
 
-        // --- Same-nation sale pays nothing ---------------------------------
-        // Move the buyer into the seller's nation and repeat: an internal sale
-        // is not an import, and a tariff that charged it would be a sales tax
-        // wearing the wrong name.
+        // --- Same-nation shipment pays nothing -----------------------------
+        // Put the source market in the destination's nation and repeat: an
+        // internal shipment is not an import.
         {
             recipe_registry creg;
             fixture c = build_fixture(creg);
             law dl = l; dl.enacting_nation = c.supplier_nat; c.w.laws.push_back(dl);
-            c.w.corporations[c.buyer].home_nation = c.supplier_nat; // now a domestic buyer
-            c.w.pool_at(c.supplier, pool_key_for_body(c.w, c.supplier_body)).quantities[ri(resource_type::iron_ore)] += 200.0f;
-            post_pair(c.w, c.supplier, c.buyer, c.supplier_body, resource_type::iron_ore, qty, ask);
-            economy_report crep = run_economy_step(c.w, creg);
-            auto cflows = clear_markets(c.w, creg, crep);
-            apply_budget(c.w, creg, cflows, crep.workforce_contention);
+            c.w.tile_to_nation[c.w.markets.at(c.buyer_mkt).centre_tile] = c.supplier_nat;
+            post_arrival(c.w, c.buyer, c.buyer_mkt, c.supplier_mkt, resource_type::iron_ore, qty);
+            credit_arrived_convoys(c.w, 0);
             check(near(total_nation_treasury(c.w), 0.0),
-                  "P2.8 a SAME-NATION sale is charged nothing");
+                  "P2.8 a SAME-NATION shipment is charged nothing");
         }
     }
 

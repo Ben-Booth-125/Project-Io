@@ -764,36 +764,33 @@ int main()
             continue;
         }
         ++stock_corps;
-        const auto pit = w.corp_market_pools.find(std::make_pair(cid, pool_key_for_body(w, hb)));
-        if (pit == w.corp_market_pools.end())
-        {
-            ++stock_bad;
-            std::printf("  BAD: corp=%u has no stockpile on its home body\n",
-                        static_cast<unsigned>(cid));
-            continue;
-        }
-        const auto& q = pit->second.quantities;
+        // BL-1265 (CORPORATION_GENERATION.md § Pass 4b): the opening stock is
+        // on the SHELVES of the markets the corp sits in, not in a pool of its
+        // own — so R1 reads those shelves: non-empty and prototype-scoped. The
+        // per-corp focus split (R2) cannot be read off a shared shelf.
         float total = 0.0f;
-        for (std::size_t r = 0; r < resource_count; ++r)
+        for (const entity_id mid : corp_markets(w, cid))
         {
-            total += q[r];
-            if (!is_prototype(r) && q[r] != 0.0f)
+            const auto& q = w.markets.at(mid).inventory;
+            for (std::size_t r = 0; r < resource_count; ++r)
             {
-                ++stock_bad;
-                std::printf("  BAD: corp=%u non-prototype res %zu stocked (%.2f)\n",
-                            static_cast<unsigned>(cid), r, q[r]);
+                total += q[r];
+                if (!is_prototype(r) && q[r] != 0.0f)
+                {
+                    ++stock_bad;
+                    std::printf("  BAD: corp=%u market=%u non-prototype res %zu stocked (%.2f)\n",
+                                static_cast<unsigned>(cid), static_cast<unsigned>(mid), r, q[r]);
+                }
             }
         }
         if (total <= 0.0f)
         {
             ++stock_bad;
-            std::printf("  BAD: corp=%u opens with an empty stockpile\n",
+            std::printf("  BAD: corp=%u sits on no stocked shelf\n",
                         static_cast<unsigned>(cid));
         }
-        float raw = 0.0f;
-        for (resource_type rr : raw_set) raw += q[ri(rr)];
-        if (corp.focus == industrial_focus::extraction) { ext_raw_sum += raw; ++ext_n; }
-        else if (corp.focus == industrial_focus::trade)  { trade_raw_sum += raw; ++trade_n; }
+        (void)raw_set;
+        (void)corp;
     }
     std::printf("Corp starting stockpiles: %d stocked corps, %d discrepancies\n",
                 stock_corps, stock_bad);
@@ -818,18 +815,16 @@ int main()
     }
 
     world w2 = make_hard_coded_world(no_prehistory());
-    bool det_ok = (w.corp_market_pools.size() == w2.corp_market_pools.size());
+    bool det_ok = (w.markets.size() == w2.markets.size());
     int det_bad = 0;
-    for (const auto& [key, pool] : w.corp_market_pools)
+    for (const auto& [mid, mc] : w.markets)
     {
-        const auto it2 = w2.corp_market_pools.find(key);
-        if (it2 == w2.corp_market_pools.end()) { ++det_bad; continue; }
-        for (std::size_t r = 0; r < resource_count; ++r)
-            if (pool.quantities[r] != it2->second.quantities[r]) { ++det_bad; break; }
+        const auto it2 = w2.markets.find(mid);
+        if (it2 == w2.markets.end() || it2->second.inventory != mc.inventory) ++det_bad;
     }
     if (det_bad != 0) det_ok = false;
-    std::printf("  BL-116 R3 stockpiles identical across two generations (%zu pools, %d mismatched): %s\n",
-                w.corp_market_pools.size(), det_bad, det_ok ? "PASS" : "FAIL");
+    std::printf("  BL-116 R3 opening shelves identical across two generations (%zu markets, %d mismatched): %s\n",
+                w.markets.size(), det_bad, det_ok ? "PASS" : "FAIL");
 
     const bool stockpile_ok = (stock_bad == 0) && focus_ok && det_ok;
 

@@ -1,5 +1,6 @@
 #include "supply_system.hpp"
 
+#include "law.hpp" // the import tariff at arrival: any_import_tariff_enacted / nation_tariff_rate
 #include "logistics.hpp"
 #include "market_clearing.hpp" // processor_reservation (BL-995)
 #include "orbital_system.hpp"
@@ -228,6 +229,45 @@ void credit_arrived_convoys(world& w, int tick, std::vector<interception_record>
                      static_cast<std::size_t>(convoy.cargo_resource), convoy.cargo_qty);
         if (convoy.corp == null_entity)
             continue; // no trade route: routes are a corporation's record
+
+        // THE IMPORT TARIFF (MARKETS.md § Tariffs, Ben 2026-09-15): a convoy
+        // arriving at a market whose nation differs from its source market's
+        // nation pays the destination nation's enacted import duty on the
+        // cargo, at the destination's last resolved price, charged to the
+        // convoy's owner and credited to that nation's treasury — a transfer,
+        // never a mint or a burn, in one statement pair. A market with no
+        // nation (an off-world market, or one off the jurisdiction map)
+        // charges nothing. Gated on `any_import_tariff_enacted`, so a world
+        // with no tariff law runs not one line of it. BL-1265: the order book's
+        // matched-trade charge retired with the book; this is the one point of
+        // charge.
+        if (any_import_tariff_enacted(w))
+        {
+            const auto nation_of = [&w](entity_id market) -> entity_id {
+                const auto m = w.markets.find(market);
+                if (m == w.markets.end() || m->second.centre_tile == null_entity)
+                    return null_entity;
+                const auto n = w.tile_to_nation.find(m->second.centre_tile);
+                return n == w.tile_to_nation.end() ? null_entity : n->second;
+            };
+            const entity_id dest_nation = nation_of(convoy.dest_market);
+            const entity_id src_nation  = nation_of(convoy.source_market);
+            const auto      tnit        = w.nations.find(dest_nation);
+            const auto      cit         = w.corporations.find(convoy.corp);
+            if (dest_nation != null_entity && dest_nation != src_nation
+                && tnit != w.nations.end() && cit != w.corporations.end())
+            {
+                const float rate = nation_tariff_rate(w, dest_nation, convoy.cargo_resource);
+                const float px   = dispatch_market_price(mit->second,
+                                                         static_cast<std::size_t>(convoy.cargo_resource));
+                const float duty = convoy.cargo_qty * px * rate;
+                if (rate > 0.0f && std::isfinite(duty) && duty > 0.0f)
+                {
+                    cit->second.balance  -= duty;
+                    tnit->second.treasury += duty;
+                }
+            }
+        }
 
         // Record the persistent trade route this completed lane ran (BL-088). The
         // route is body-level, so collapse both market endpoints to their bodies;
