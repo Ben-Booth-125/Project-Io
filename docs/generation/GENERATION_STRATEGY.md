@@ -272,7 +272,7 @@ the world's serialisation seam; the save file records it so a load rebuilds the 
 |---|---|---|
 | `seed` (`uint32_t`) | XOR-folded into each **per-body seed literal** (`params.seed ^ 0xC1D0001u`, …). Seed `0` yields the bare literals, so the **default descriptor is the reference world**. | cheap |
 | `abundance` (`sparse`/`lean`/`standard`) | A **deposit-density scalar** applied as a pure post-multiply in `generate_body_tiles` Pass 6 (`0.40` / `0.65` / `1.00`). Consumes no RNG, so `standard` (1.0) is bit-identical to the unscaled surface. | cheap, isolated |
-| `epoch_year` (`int64_t`) | The campaign epoch, 1960 by default: the calendar the clock rebases to at the handoff, applied after generation, and nothing else. Generation reads none of it, so every epoch builds the same world — the arc that once keyed on it is retired (Ben, 2026-09-18). It does **not** name the recipe band (Ben, 2026-09-24, superseding the 2026-09-18 reading): the band is a fact about the history, derived PER NATION at the 1960 fold (Ben, 2026-09-25, NR-929) — a nation is `industrial` iff the realm it grew from reaches the industrial rung (`roster_band_for_capacity`, the derivation `industrial_year` uses), else `ancient` — persisted on each nation and applied to its corporations' rosters on a new game and a loaded save alike (`../economy/ERAS.md` § Where the ladder starts). A nation whose history never crosses plays on the ancient roster, a legitimate outcome never reshaped to force `industrial`; grain finer than the nation rides the campaign tech state (the Industry mask into each corporation's earned techs, `INDUSTRIALISATION.md` § What crosses into play), not a band of its own. Epoch 0 is retired (Ben, 2026-09-25, NR-920). | cheap |
+| `epoch_year` (`int64_t`) | The campaign epoch, 1960 by default: the calendar the clock rebases to at the handoff, applied after generation, and nothing else. Generation reads none of it, so every epoch builds the same world — the arc that once keyed on it is retired (Ben, 2026-09-18). It does **not** name the recipe band: every nation opens on the industrial band and at the same tech level, whatever the history (Ben, 2026-10-10, overturning NR-929's band per nation; `../economy/ERAS.md` § Where the ladder starts). Epoch 0 is retired (Ben, 2026-09-25, NR-920). | cheap |
 | `prehistory_years` (`int`) | The era's **scope knob, not a tuning dial**: any positive value runs the year-tick history sim, `0` skips it, which is how harnesses that do not test the era avoid paying for it. Not a span length — the spans are the fixed years below. Part of the params, so determinism is untouched. | the most expensive pass |
 | `empires_start_year`, `empires_stop_year`, `exploration_stop_year`, `industrialisation_stop_year` (`int64_t`) | The spans' own calendar: 400 BCE → 1200 CE → 1660 → 1960 (`CIVILISATION.md`, `EXPLORATION.md`, `INDUSTRIALISATION.md`). Fixed years, never derived from the epoch; a harness binds a shorter span by moving one. | — |
 | `exploration_sim_enabled`, `industrialisation_span_enabled`, `resume_seeds_corridor_tier` (`bool`) | Which spans run and how a resumed span reopens its corridors — on by default; off builds the legacy arcs instruments pin. With the history seeds, these choose the history, so the save records them. | — |
@@ -529,16 +529,13 @@ proper noun never does.** Nothing in the generated world is named after an Earth
 future session reading this section must not turn either archetype into a name bank — see § Real
 history in, invented names out, which is not softened here.
 
-**Research is PARKED, and the placeholder is stated rather than designed (Ben, 2026-09-08).**
-Research points accumulate in proportion to a culture's population. Nothing else: no tree, no
-rates, no unlocks in this pass.
+**Research is not part of generation (Ben, 2026-10-10).** The history runs no technology tree,
+earns no research and unlocks nothing, and every nation starts the campaign at the same tech level
+(`trees/TREES.md`; `../economy/RESEARCH.md` § Who holds technology).
 
-That has one consequence for the leaderboard. Under the placeholder, *research speed* and
-*population* are the same number, so a research column would show a correlation the board did not
-measure; the board therefore ranks no research — its columns are people share, land share,
-population and might (§ The two watched passes), with industry joining on round 6 only
-(`../ui/STARTUP.md` § Rounds) — and a research column appears only once research is real. An
-unlabelled duplicate column is a chart that lies.
+So the leaderboard ranks no research — its columns are people share, land share, population and
+might (§ The two watched passes), with industry joining on round 6 only (`../ui/STARTUP.md`
+§ Rounds).
 
 **Two of the three owed items above are paid by this.** The region surface is round 4's globe;
 the market-carving explanation is round 6's carve. Background firms stopped being owed the same

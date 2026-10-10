@@ -122,7 +122,6 @@
 #include "world/road_generation.hpp" // g_road_probe_no_snap (--no-snap, BL-1119 R6)
 #include "world/supply_system.hpp"
 #include "world/recipe_registry.hpp"
-#include "world/tech_gate.hpp"
 #include "world/works_roster.hpp"
 #include "world/world.hpp"
 #include "world/world_gen_config.hpp"
@@ -706,7 +705,6 @@ far_seed_result run_far_seed(const far_options& o, std::uint32_t seed, recipe_re
         apply_budget(w, reg, flows, rep.workforce_contention, &rep.budgets, &rep.buildings,
                      &rep.building_labour);
         run_nation_step(w, reg, rep, econ_tick);
-        advance_tech_gates(w);
 
         run_firm_exits(w, reg.firm_exit(), &rep.firm_exits);
 

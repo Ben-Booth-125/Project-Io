@@ -28,7 +28,6 @@
 #include "harness_params.hpp"
 #include "world/market_clearing.hpp"
 #include "world/recipe_registry.hpp"
-#include "world/tech_gate.hpp"
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -163,7 +162,6 @@ void run_seed(uint32_t seed)
 
         std::map<entity_id, corp_budget> breakdown;
         apply_budget(w, reg, flows, rep.workforce_contention, &breakdown, &rep.buildings);
-        advance_tech_gates(w);
 
         for (const auto& [id, b] : breakdown)
         {

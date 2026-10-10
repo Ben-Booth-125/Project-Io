@@ -83,10 +83,9 @@ the tile assembly block in `tile_generation.cpp`.
 
 Use that route for anything linking the world superset — `world_audit`, `ai_skill_harness`,
 `history_ladder_harness`, **`settlement_harness`**, `data_creep_harness`, `corp_terrain_matrix`,
-`trade_routes_harness`, `tech_effect_union_harness` (BL-479: the tech effect union — a fixture
-modify_scalar tech moves the named scalar for the earning corp only, the stack-taper pre-pass
-prices the modified rate, and the no-effect real world's `state_hash` marks stay bit-identical
-to the pre-change build), `trade_routes_harness`, **`province_partition_harness`** (BL-466 — the
+`trade_routes_harness`, **`nation_tech_harness`** (BL-1273: every nation's Digitisation tree
+state — accrual, the queue, the save seam, a 16-seed campaign run; it replaced
+`tech_gate_harness`, `tech_effect_union_harness` and `military_capability_harness`), **`province_partition_harness`** (BL-466 — the
 province partition's invariants plus the three serialisation-seam properties over the HISTORY-LOG
 stream: the pre-BL-466 stream is a byte-exact prefix, an older stream still loads, and the round
 trip is bit-identical) — and for `font_glyph_harness`, which links ImGui and is hand-declared in
@@ -146,15 +145,9 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\resource_chain_harness.cpp ^
    /Fo:build_gen\verify\resource_chain_harness\ /Fe:build_gen\verify\resource_chain_harness.exe
 .\build_gen\verify\resource_chain_harness.exe
 
-:: Military capability points (BL-332) — a completed military_base credits its
-:: owning corp's military_points and a completed research_institute credits
-:: science, symmetric across player and non-player corps; neither accumulates
-:: while under construction or decommissioned.
-cl /nologo /std:c++20 /EHsc /I src tools\verify\military_capability_harness.cpp ^
-   src\world\world.cpp src\world\economy_system.cpp ^
-   src\world\market_clearing.cpp src\world\budget_system.cpp ^
-   /Fo:build_gen\verify\military_capability_harness\ /Fe:build_gen\verify\military_capability_harness.exe
-.\build_gen\verify\military_capability_harness.exe
+:: (military_capability_harness retired with BL-1273: the per-corp `science`
+:: accumulator it tested is gone; research institutes feed the nation's pool,
+:: covered by nation_tech_harness — `node tools/verify/build_harness.js nation_tech_harness`.)
 
 :: Laws MVP (BL-343, reshaped by BL-480) — the law record, per-tick resolution
 :: (evaluate_laws) and the enforcement seam in apply_budget: a repealed law is
@@ -222,7 +215,7 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\money_conservation.cpp ^
    src\world\condition_set.cpp src\world\survey_system.cpp src\world\logistics.cpp ^
    src\world\unit_roster.cpp src\world\law.cpp src\world\building_profit.cpp ^
    src\world\corp_ai.cpp src\world\stance.cpp src\world\supply_system.cpp ^
-   src\world\tech_gate.cpp src\world\river_generation.cpp ^
+   src\world\nation_tech.cpp src\world\river_generation.cpp ^
    /Fo:build_gen\verify\money_conservation\ /Fe:build_gen\verify\money_conservation.exe
 .\build_gen\verify\money_conservation.exe
 
@@ -240,7 +233,7 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\stance_determinism.cpp ^
    src\world\placement_rules.cpp src\world\condition_set.cpp src\world\survey_system.cpp ^
    src\world\logistics.cpp src\world\unit_roster.cpp src\world\economy_system.cpp ^
    src\world\market_clearing.cpp src\world\budget_system.cpp src\world\supply_system.cpp ^
-   src\world\stance.cpp src\world\tech_gate.cpp src\world\river_generation.cpp ^
+   src\world\stance.cpp src\world\nation_tech.cpp src\world\river_generation.cpp ^
    src\world\building_profit.cpp src\world\corp_ai.cpp src\world\law.cpp ^
    src\world\orbital_system.cpp ^
    /Fo:build_gen\verify\stance_determinism\ /Fe:build_gen\verify\stance_determinism.exe
@@ -265,7 +258,7 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\world_audit.cpp ^
 :: corp_command, survey_system, ...) — this drifted stale once (this recipe
 :: previously listed only world/construction/placement_rules and link-failed);
 :: it is now the full world/*.cpp set minus the sol2/Lua-dependent TUs
-:: (recipe_registry.cpp, tech_tree.cpp, world_gen_config.cpp).
+:: (recipe_registry.cpp, works_registry.cpp, world_gen_config.cpp).
 cl /nologo /std:c++20 /EHsc /I src tools\verify\construction_harness.cpp ^
    src\world\budget_system.cpp src\world\building_profit.cpp src\world\chemistry_tables.cpp ^
    src\world\city_names.cpp src\world\construction.cpp src\world\continents.cpp ^
@@ -333,7 +326,7 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\population_mvp.cpp ^
 :: unit routing (R1); the demand survives clear_markets' per-tick reset into the
 :: cleared state price resolution reads (R2); stale pre-clearing demand is erased
 :: while the injection lands (R3). Links the full SDL/Lua-free world superset
-:: (every src\world\*.cpp except recipe_registry.cpp and tech_tree.cpp).
+:: (every src\world\*.cpp except the sol2 TUs (recipe_registry, works_registry, world_gen_config)).
 :: (List current as of 2026-07-31; if it drifts, mirror CMakeLists' IO_WORLD_SOURCES glob.)
 cl /nologo /std:c++20 /EHsc /I src tools\verify\population_demand_harness.cpp ^
    src\world\budget_system.cpp src\world\building_profit.cpp src\world\chemistry_tables.cpp ^
@@ -459,7 +452,7 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\continents_harness.cpp ^
 :: floors at half, conquest cost can hold a frontier (C3); exactly one 1951
 :: common-tongue globalisation line, after every shrine (C4). Calls
 :: make_hard_coded_world, so it links the full SDL/Lua-free world superset
-:: (every src\world\*.cpp except recipe_registry.cpp and tech_tree.cpp) -
+:: (every src\world\*.cpp except the sol2 TUs (recipe_registry, works_registry, world_gen_config)) -
 :: mirror CMakeLists' IO_WORLD_SOURCES glob if this list drifts.
 cl /nologo /std:c++20 /EHsc /I src tools\verify\creeds_harness.cpp ^
    src\world\budget_system.cpp src\world\building_profit.cpp src\world\chemistry_tables.cpp ^
@@ -503,7 +496,7 @@ for the hand-`cl` fallback only.
 :: field-identically and reject a wrong-magic/wrong-version/truncated stream.
 :: R6: export_corp_blackboard / body_activity_visibility (neither touched by
 :: this item) still behave. Links the full SDL/Lua-free world superset (every
-:: src\world\*.cpp except recipe_registry.cpp/tech_tree.cpp/world_gen_config.cpp,
+:: src\world\*.cpp except recipe_registry.cpp/works_registry.cpp/world_gen_config.cpp,
 :: including history_log.cpp and river_generation.cpp) — mirror CMakeLists'
 :: IO_WORLD_SOURCES glob if this list drifts.
 cl /nologo /std:c++20 /EHsc /I src tools\verify\history_log_harness.cpp ^

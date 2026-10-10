@@ -1115,7 +1115,7 @@ ceiling is a generation-calibration signal (background production absent or unde
 > expensive market cannot satisfy a market condition on its own.** If a per-market predicate is
 > ever wanted, add a qualifier to `condition` rather than changing what this subject means.
 > `evaluate` also takes a **subject corp** (`condition_set::evaluate(set, world, subject_corp)`),
-> since every consumer — a levy charged to a corp, a tech earned per corp — is per-corporation;
+> since every consumer — a levy charged to a corp, a gate read for a corp — is per-corporation;
 > pass `null_entity` for a genuinely world-level predicate and the corp-scoped subjects measure
 > zero.
 

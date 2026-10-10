@@ -813,7 +813,6 @@ int main()
         // building and market are the same ones the rest of this harness uses.
         auto staged = [&](float cash) {
             scene s = make_scene(cash);
-            s.w.corporations.at(s.ai_corp).science = 8.0f;
             stockpile_component pool;
             pool.quantities[ri(resource_type::iron_ore)] = 30.0f;
             s.w.corp_market_pools[{s.ai_corp, pool_key_for_body(s.w, s.body)}] = pool;
@@ -839,8 +838,8 @@ int main()
                   "BL-700 R7: the economic component is cash + book value + stock at market");
 
             const float research = si.component[static_cast<std::size_t>(standing_component::research)];
-            check(std::fabs(research - 8.0f) < 1e-4f,
-                  "BL-700 R7: the research component reads the corp's science accumulator");
+            check(research == 0.0f,
+                  "BL-700 R7: the research component reads zero - the nation holds technology (BL-1273)");
 
             // 50 heads x quality 1.0 x full supply, in the x100 fixed point.
             const float military = si.component[static_cast<std::size_t>(standing_component::military)];

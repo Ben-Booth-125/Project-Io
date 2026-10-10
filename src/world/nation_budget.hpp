@@ -108,7 +108,7 @@ enum class budget_priority : uint8_t
     logistics_maintenance = 0, ///< Keeping the road/hub network standing (LOGISTICS.md).
     schooling             = 1, ///< Population capability; no consumer yet.
     military_research     = 2, ///< Force-side research; no consumer yet.
-    academic_research     = 3, ///< The civil tech ladder (`science` is reached, not spent).
+    academic_research     = 3, ///< The civil tech ladder: spent into the nation's research pool (BL-1273).
     public_exploration    = 4, ///< State-funded survey (DISCOVERY.md's geographic fog).
     contracted_force      = 5, ///< Buying force it does not raise (CONTRACTS.md, BL-377).
     strategic_reserve     = 6, ///< Buying goods to HOLD. Distinct from `reserve_fraction`,

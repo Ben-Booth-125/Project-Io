@@ -368,7 +368,6 @@ inline void print_shipped_landscape(const shipped_landscape& s)
 #include "world/standing.hpp"          // compute_corp_standings (phase 5, as app.cpp:1308)
 #include "world/supply_system.hpp"     // dispatch/advance/credit convoys
 #include "world/survey_system.hpp"     // init_survey_states
-#include "world/tech_gate.hpp"         // advance_tech_gates
 #include "world/works_roster.hpp"      // works_registry
 
 #include <chrono>                      // app_tick_timing (diagnostic wall time only)
@@ -632,6 +631,7 @@ inline void run_app_validation_settle(world& w, const recipe_registry& reg,
 {
     for (int econ_step = 0; econ_step < ticks; ++econ_step)  // app.cpp:655, 579-583
         run_app_validation_tick(w, reg, econ_step, timing);
+    clear_research_at_handover(w); // run_settle's handover (BL-1273): play opens with no research state
 }
 
 /// A LIVE WINDOW after the seat — BL-1033. @p ticks economy ticks as the app

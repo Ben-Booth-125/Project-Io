@@ -1,4 +1,5 @@
 #include "condition_set.hpp"
+#include "nation_tech.hpp" // BL-1273: corp_nation_holds (the research subject)
 
 #include "province.hpp"    // BL-570: province_holder_for
 #include "unit_roster.hpp" // BL-459: unit_strength (strength is derived, not stored)
@@ -43,10 +44,6 @@ bool condition_subject_is_integral(condition_subject s)
         case condition_subject::market:
         case condition_subject::surplus:
         case condition_subject::military_strength:
-        // BL-455: science accrues as a float per tick, so a corp genuinely sits
-        // at 12.5 research points. Rounding it to compare would be the same lie
-        // the comment above rejects for a 3.5-unit stockpile.
-        case condition_subject::science:
             return false;
     }
     return false;
@@ -62,7 +59,9 @@ float measure_condition(const condition& c, const world& w, entity_id subject_co
     switch (c.subject)
     {
         case condition_subject::research:
-            return w.has_tech(subject_corp, c.key) ? 1.0f : 0.0f;
+            // BL-1273: the subject corp's HOME NATION holds the node — the
+            // nation holds technology (RESEARCH.md). An unknown key reads 0.
+            return corp_nation_holds(w, subject_corp, io::dg::find_node(c.key)) ? 1.0f : 0.0f;
 
         case condition_subject::structure:
         {
@@ -105,14 +104,6 @@ float measure_condition(const condition& c, const world& w, entity_id subject_co
 
         case condition_subject::surplus:
             return cc.balance;
-
-        // BL-455: the first reader corporation_component::science has ever had.
-        // Accumulated by the BL-332 per-tick pass from every completed
-        // research_institute; a gate asks whether the corp has REACHED a level,
-        // and nothing debits it (see the enum comment for why spending would be
-        // a different mechanism, not a wiring choice).
-        case condition_subject::science:
-            return cc.science;
 
         case condition_subject::era:
         {
@@ -241,7 +232,6 @@ std::string condition_text(const condition& c,
         case condition_subject::era:               subject = "Era";               break;
         case condition_subject::military_units:    subject = "Units";             break;
         case condition_subject::military_strength: subject = "Military strength"; break;
-        case condition_subject::science:           subject = "Research";          break;
         // Unreachable (the early return above handles it); kept so the switch
         // stays exhaustive with no `default:` — the compiler catches the next
         // subject that forgets a label here.

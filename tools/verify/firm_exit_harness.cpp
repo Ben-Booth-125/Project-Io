@@ -170,8 +170,6 @@ bool world_holds(const world& w, entity_id id)
     for (const auto& kv : w.sentiment.pairs)
         if (kv.first.first == id || kv.first.second == id) return true;
     if (w.corp_embargo_conditions.count(id)) return true;
-    if (w.earned_techs.count(id)) return true;
-    if (w.corp_modifiers.count(id)) return true;
     for (const auto& kv : w.workforce_supply_overrides)
         if (kv.first.first == id) return true;
     return false;

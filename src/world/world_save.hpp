@@ -37,9 +37,6 @@
 //      in `src/core/save_game.{hpp,cpp}`, deliberately: `world/*` stays SDL-
 //      and UI-free, so the headless harness can exercise this half alone.
 //
-// corp_modifiers looks like bucket 2 and is NOT -- see the note on
-// `write_world_snapshot`, and NR-510.
-//
 // The history log and the province partition are written by EMBEDDING the
 // existing `write_history_log` / `read_history_log` pair whole, nested magic
 // and all, rather than by re-writing their records here. Reuse over a second
@@ -393,16 +390,22 @@ inline constexpr uint32_t world_save_magic =
 /// refused whole on the strict-equality contract, no migration. Claimed
 /// through `tools/session/next_save_version.js --kind world --claim` (renumbered 45 -> 43 at the
 /// sprint 50 integration, stacked on BL-1195's 42).
-inline constexpr uint32_t world_save_version = 43;
+/// Bumped to 47 by BL-1273 (every nation holds a Digitisation tree state, a
+/// research pool and a queue; RESEARCH.md, NR-1022/NR-1023): the per-corp
+/// `earned_techs` set and `corp_modifiers` list are gone from the stream and
+/// `world::nation_tech` takes their place beside the laws; the corporation
+/// record loses its `science` float; and `condition_subject::science` is removed,
+/// so `province_held` reads as 8, not 9. An older stream is refused whole on the
+/// strict-equality contract, no migration — a new campaign opens with every
+/// nation holding nothing. Claimed through
+/// `tools/session/next_save_version.js --kind world --claim` (44-46 are carried
+/// by in-flight branches).
+inline constexpr uint32_t world_save_version = 47;
 
 /// Write @p w as a complete world snapshot.
 ///
 /// Writes magic + version, then every serialised container in a fixed order.
-/// Derived caches are skipped (see `clear_derived_state`). `corp_modifiers` IS
-/// written despite being described on `world` as derived: its stored ORDER is
-/// the cross-tick earn order, which a re-fold from `earned_techs` x the gate
-/// table cannot reconstruct, and `modified_scalar` folds in stored order over
-/// operations that do not commute (NR-510).
+/// Derived caches are skipped (see `clear_derived_state`).
 ///
 /// Never fails by return value -- an unwritable stream surfaces through the
 /// stream's own state, which the caller in `save_game.cpp` checks once for the
@@ -437,7 +440,7 @@ bool read_world_snapshot(world& w, std::istream& in);
 /// Clears: `body_tile_index`, `astar_cost_cache`, `logistics_flood_fields`, the BL-1186 leg
 /// caches (`leg_flood_fields`, `leg_path_cache`, `body_port_tiles`), `body_reach_cost`,
 /// `lp_anchor_fields`, `body_market_index` (and its count/cursor stamps), `ai_decisions`, and
-/// `current_day_tick`. Does NOT touch `corp_modifiers` -- see above.
+/// `current_day_tick`.
 ///
 /// @param w World whose caches are dropped.
 void clear_derived_state(world& w);

@@ -1,9 +1,9 @@
 -- Visual verification for BL-593 (the Build door under a doubled roster).
--- Confirms the tech-lock filter added this item: `refined_copper` (Metal
--- Foundry, tech-locked by E0-EC-03 since BL-589) does not appear in the
--- ledger at all, the same way an era-locked or depth-locked candidate never
--- did — "the door not showing what the gate would refuse", extended to the
--- third lock kind.
+-- The door filters what the tech gate would refuse ("the door not showing what
+-- the gate would refuse"). SINCE BL-1273 NOTHING IS TECH-LOCKED: E0-EC-03's
+-- lock on `refined_copper` retired with the per-corp gates (NR-1022), so the
+-- recipe appears in the ledger like any other; the filter stays, reading the
+-- nation's tree (recipe_unlocked), for the nodes the effect pass will lock.
 --
 -- Run: ProjectIo --verify scripts/verify/build_door_wide_roster.lua
 

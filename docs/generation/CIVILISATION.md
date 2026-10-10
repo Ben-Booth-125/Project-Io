@@ -890,30 +890,20 @@ everyone can cross has no age of exploration in it, and neither has a world in w
 
 **THE CAPACITY IS A THRESHOLD CROSSED, NOT A SPREAD (Ben, 2026-09-11).** A realm either holds the
 institutions that let it mount a voyage or it does not, and the contract states it that way — a
-per-polity boolean at 1200 CE, read off the Empire tree's rim milestone
-(`trees/EMPIRE_TREE.md`, *The Enforceable Promise*, whose only effect opens the next tree). What
-is *tuned* is the forces that decide who reaches it; what is *stated* is the threshold.
+per-polity boolean at 1200 CE. What is *tuned* is the forces that decide who reaches it; what is
+*stated* is the threshold.
+
+**No tree decides it (Ben, 2026-10-10).** The history runs no technology tree (`trees/TREES.md`),
+so the boolean is not read off a held node, and no milestone opens a next tree. The ability to
+arrive across water — sea legs — is held by every polity from a measured date (`trees/TREES.md`,
+the table of what the trees gated). What separates the realms that explore from those that do not,
+when the date reaches all of them alike, is open.
 
 **TUNED FOR, NEVER CLAMPED, and read distributionally.** The requirement is a property of a seed
-spread: across a sweep, some surviving realms hold the rim and not all of them do. No world is
-steered to that outcome, no floor is raised to guarantee it, and a world where nobody crosses is a
-legitimate seed — it is the *spread* that must contain both, exactly as
+spread: across a sweep, some surviving realms cross the threshold and not all of them do. No world
+is steered to that outcome, no floor is raised to guarantee it, and a world where nobody crosses is
+a legitimate seed — it is the *spread* that must contain both, exactly as
 `GENERATION_STRATEGY.md` § Asymmetry is the deliverable requires.
-
-**THE SIM READS NODES (Ben, 2026-09-10, `trees/TREES.md`), AND THIS IS WHERE IT STARTS PAYING.**
-The seven-domain capacity band cannot express this: a band is a ladder everyone climbs in the same
-order, so difference under it is only ever *how far*, never *which way*. The rim is a node with
-named `requires`, and holding it is a fact about what a realm built.
-
-**THE FORK IS WHAT MAKES DIFFERENCE INDEPENDENT OF MIGHT (Ben, 2026-09-11).** A closed fork side
-goes dark permanently (`trees/TREES.md` § Diffusion follows kind), so two wealthy realms can end
-the phase incapable of the same things because they *chose* differently — not because one was
-poorer. Without a fork, technological difference collapses back into a restatement of size, which
-is the one thing this output must not be.
-
-**THE TREE IS NOT RENDERED DURING GENERATION (Ben, 2026-09-11).** It is surfaced later through the
-campaign's tech ledger, and there is no per-polity tree view to render it into. Wiring the tree
-into the sim and showing it to a player are separate decisions, and only the first is taken.
 
 ---
 
@@ -1006,7 +996,7 @@ per-world:
 
 | Reading | What it must show |
 |---|---|
-| **Explorer set** | Some surviving realms hold the rim milestone; not all do |
+| **Explorer set** | Some surviving realms cross the threshold; not all do |
 | **Strength spread** | Surviving realms of unequal size — some able to colonise, some only to be colonised |
 | **Contact** | At least one pair unmet, so there is somewhere to go |
 | **Directed wants** | Non-empty, and pointing across contact rather than within it |

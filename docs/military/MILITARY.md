@@ -336,10 +336,9 @@ produce a currency. The economy → military interface is the base tile plus the
 the recurring cost of force is credits and ordnance (§ Upkeep). A military-capacity scalar, if
 one is ever wanted, is a fresh field with its behaviour filed in the same change.
 
-**It is gated behind a technology, not a build menu.** `E0-ML-01` "Standing Garrison Doctrine"
-(`src/world/tech_gate.cpp`) unlocks it on two extraction sites plus a Cr 2,000 balance. A military
-*subject* is deliberately not used in that predicate — gating the first military building on
-already having a military would be circular.
+**No technology closes it.** The military base is open to every nation from the start — NR-1022
+(old gates open, Ben, 2026-10-10). A building type no node unlocks is open to every nation
+(`src/world/nation_tech.hpp` § `structure_unlocked`).
 
 **Hire happens at the base** (BL-325 S2). `corp_verb::hire_unit` takes `{tile, unit_type}` and
 checks, in order:
@@ -419,9 +418,8 @@ graduated dial; quantity-scaled readiness is a follow-on.
 **`campaign_roster_band_for(era_band)` derives the band from the campaign's own era.** It is
 fixed at no single value, and it is **not** derived from a military-capacity score — that is the
 Era −1 settlement model — but from `recipe_registry::era()`, the same coarse ancient/industrial
-split every other era gate reads — the campaign band derived from the history's industry state at
-the 1960 fold (`../economy/ERAS.md` § Where the ladder starts): a world whose history never crossed
-the industrial rung opens at the roster's lowest band (`classical`), one that did at its highest
+split every other era gate reads. Every nation opens on the industrial band (`../economy/ERAS.md`
+§ Where the ladder starts; Ben, 2026-10-10), so the campaign roster opens at its highest band
 (`industrial`). Because bands are
 cumulative, every earlier row the corp's ground supports is exposed either way.
 
@@ -690,12 +688,9 @@ first terminal military good (BL-457, ordnance), added so this draw has somethin
 Naming a good here is a one-line `economy.lua` change, never a code change.
 
 > **The ordnance recipe is industrial.** The Fabricator recipe that makes ordnance is tagged
-> `era = "industrial"` (`scripts/recipes.lua` id 27), and a campaign whose derived band is
-> ancient (`recipe_registry::era()`, `src/world/recipe_registry.hpp`; `../economy/ERAS.md` § Where
-> the ladder starts) masks it out of the allowed recipes. So
-> an ancient-band campaign cannot produce the good its upkeep draws; the draw goes unmet and the
-> decay rule fires. That is the rule working as written, and a fact to price against when the
-> rates are set.
+> `era = "industrial"` (`scripts/recipes.lua` id 27). Every nation opens on the industrial band
+> (`../economy/ERAS.md` § Where the ladder starts; Ben, 2026-10-10), so the good every unit's upkeep
+> draws is one every nation's firms may make.
 
 **One decay rule, two triggers.** A unit is unsupplied if it sits beyond the reach field *or* its
 goods draw went unmet. Both fire the **same** subtraction on `supply_factor_permille`, because both
@@ -803,10 +798,6 @@ it. B10–B11: a battle that fought emits a dispatch naming the fight, rounds/ma
 seed; a concluded dispatch names who held the field after the record is gone. B12: the three
 withdrawal terms sum to the total and **the quote matches the charge**. B13: twin worlds emit
 byte-identical dispatch sequences and stay identical. B14: every phase produces a line.
-
-**`military_capability_harness.cpp`** — the capability accumulator (BL-332). A completed research
-institute credits `science` on a *non-player* corp (the symmetry check), and neither a base under
-construction nor a decommissioned institute accumulates anything.
 
 **`unit_upkeep.cpp`** — the upkeep pass and derived strength. U1: the credit charge is exactly N ×
 the type's rate and nothing else in the budget moves; the goods debit is exactly N × each authored

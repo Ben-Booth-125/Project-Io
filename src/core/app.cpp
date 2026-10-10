@@ -51,7 +51,6 @@
 #include "world/budget_system.hpp"
 #include "world/nation_step.hpp"
 #include "world/construction.hpp"
-#include "world/tech_gate.hpp" // BL-344: gating_tech_for (refusal names the missing tech)
 #include "world/corp_ai.hpp"
 #include "world/corporation_generation.hpp"
 #include "world/history_log.hpp"
@@ -1578,11 +1577,6 @@ void app::finish_economy_presentation()
     // stated in both places and neither can quietly stop loading it.
     ensure_works_loaded();
 
-    // BL-087 mock tech/quest tree — display data for the F9 viewer only; no
-    // simulation system reads it (the tech system is post-prototype).
-    m_lua.load("scripts/tech_tree.lua");
-    m_tech_tree.load_from_lua(m_lua);
-
     // BL-652 — AN INJECTOR THAT CANNOT PRICE A BASKET ENTRY SAYS SO.
     //
     // Both demand-basket injectors skip a resource whose market base_price is 0,
@@ -2514,7 +2508,7 @@ void app::render()
     // real fold-out ledger like every other menu now, not chrome bolted onto
     // the canvas takeover. draw_tech_tree_panel (below, F11 HUD's neighbour)
     // is the canvas itself; this is where the era is actually chosen.
-    ui::draw_tech_tree_menu(m_tech_tree, m_ui);
+    ui::draw_tech_tree_menu(m_ui);
 
     // Selection band (BL-213 — supersedes the BL-194/195 Selection band) — a FIXED
     // rect at the bottom of the screen, sandwiched between the shell column and
@@ -2589,11 +2583,9 @@ void app::render()
             case construction_result::insufficient_materials:
                 m_ui.construction.last_message = "Not enough materials."; break;
             case construction_result::tech_locked:
-                // BL-344: name the missing technology rather than just refusing —
-                // BL-071's teach-the-player-why rule, applied to the tech gate.
-                m_ui.construction.last_message =
-                    "Not researched yet: " +
-                    gating_tech_for(m_ui.construction.pending_type) + "."; break;
+                // BL-1273: no Digitisation node locks a type yet; the effect
+                // pass (BL-1274) names the missing node here when one does.
+                m_ui.construction.last_message = "Not researched yet."; break;
             case construction_result::era_locked:
                 // BL-433: distinct from tech_locked on purpose — no amount of
                 // research reaches this one, so saying "not researched yet" would
@@ -2964,12 +2956,10 @@ void app::render()
         ImGui::End();
     }
 
-    // F9 mock tech-tree viewer (BL-087), also reachable from nav rail slot 4
-    // (BL-310). Read-only design aid over scripts/tech_tree.lua; no simulation
-    // coupling.
-    ui::draw_tech_tree_panel(m_tech_tree, m_world, m_world.player_entity,
-                             m_ui.show_tech_tree, m_ui.tech_tree_view,
-                              m_ui.tech_tree_pan_x, m_ui.tech_tree_pan_y, m_ui.tech_tree_zoom);
+    // F9 research canvas, also reachable from nav rail slot 4 (BL-310). The
+    // mock Lua tree it drew retired with BL-1273; the Digitisation tree panel
+    // is BL-1276's, and until it lands this draws a pending state.
+    ui::draw_tech_tree_panel(m_world, m_ui.show_tech_tree);
 
     // F11 frame-budget HUD (BL-249) — the v0.1.0 audit instrument. Drawn last so it
     // measures a full frame's worth of panels, and anchored (first use only; it is

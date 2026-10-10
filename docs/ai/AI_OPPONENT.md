@@ -119,7 +119,7 @@ of net worth, research, military strength… maybe others too"*):
 | Component | Quantity |
 |---|---|
 | Economic | Net worth — cash plus the assessed value of buildings and held stock |
-| Research | The corp's accumulated `science` (the BL-332 accumulator: reached, never spent) |
+| Research | Zero: the nation holds technology, not the corp (Ben, 2026-10-10). The slot stays so a corporation research stake (`../economy/RESEARCH.md` § What is open) lands as data |
 | Military | Summed `unit_strength` over the corp's fielded units |
 
 Balance alone is the wrong measure and would misread the game constantly — a corp that has just
@@ -133,8 +133,9 @@ composite is a data change** (the `trade_hold_threshold` discipline).
 
 **Denominated in credits.** Three components in three unrelated units cannot be added without a
 conversion, and a conversion nobody can state is a magic number. Each weight is therefore *credits
-per unit of its component*, anchored on something the world already prices: research on what a
-science point costs to produce (a research institute's per-tick running cost), military on what a
+per unit of its component*, anchored on something the world already prices: research on a research
+institute's per-tick running cost (a weight that multiplies zero while the component reads zero), military on what a
+
 fielded regiment costs **to keep** — its `unit_upkeep` draw, wages plus the goods half
 `value_anchor` holds at ~2 × wage, over a campaign-length service life. Net worth is already
 credits, so its weight is 1 by definition.

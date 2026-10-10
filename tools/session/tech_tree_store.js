@@ -7,6 +7,8 @@
 // (docs/economy/tech/<AGE>_TREE.md) owns the prose and carries the generated tables between the
 // BEGIN/END GENERATED markers. --check renders nothing and exits 1 if the doc's tables are stale.
 // The grammar every check enforces is docs/economy/RESEARCH.md § The shape of an age's tree.
+// Its sibling, tools/session/gen_tech_tree_table.js, renders the same store into the C++ table the
+// sim reads (src/world/digitisation_tree_data.hpp); re-run both after any store edit.
 'use strict';
 const fs = require('fs');
 const path = require('path');

@@ -143,7 +143,6 @@
 #include "world/nation_step.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/supply_system.hpp"
-#include "world/tech_gate.hpp"
 #include "world/world.hpp"
 #include "world/world_gen_config.hpp"
 
@@ -388,7 +387,6 @@ economy_report tick(world& w, const recipe_registry& reg, int t)
     apply_budget(w, reg, flows, rep.workforce_contention, &rep.budgets, &rep.buildings,
                  &rep.building_labour);
     run_nation_step(w, reg, rep, t);
-    advance_tech_gates(w);
     return rep;
 }
 

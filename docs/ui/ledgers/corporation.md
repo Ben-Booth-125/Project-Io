@@ -73,7 +73,8 @@ general licence to duplicate, and not an oversight for a later sweep to clean up
 **Deferred by name, not forgotten:** research points, score, ranking, market cap and other
 heuristics — *"we will revisit this once core gameplay is established"* (Ben, 2026-08-29).
 Several have no store behind them at all: there is no score, no ranking and no market cap in
-the model, and research points are a stub (`docs/economy/RESEARCH.md`).
+the model, and research points are the nation's, not the corporation's (`docs/economy/RESEARCH.md`
+§ Who holds technology).
 
 **Toggle semantics.** The rail's slot-1 icon toggles the ledger. The card's one control is the
 full-canvas `›`; the takeover's return control folds it back, as does Esc. There are no

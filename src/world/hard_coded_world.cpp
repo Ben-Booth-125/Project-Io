@@ -2028,21 +2028,19 @@ void run_industrialisation(generation_cursor& c)
                 record_handoff_violation(c, "industrialisation_output", why);
         }
 
-        // BL-1101 -- THE RECIPE BAND, DERIVED FROM THE HISTORY'S
-        // INDUSTRY STATE (Ben, 2026-09-24; PRODUCTION.md § The era
-        // band). Read off the polities the span actually closed
-        // on: `industrial` iff any living polity's materials
-        // capacity sits at the Industrial rung at 1960, `ancient`
-        // otherwise. The epoch reaches nothing here -- a 0 CE and
-        // a 1960 start build the same world and earn the same
-        // band. A seed on which nobody crossed opens on the
-        // ancient roster; that is the world the history made, and
-        // it is reported (history_sweep, industrialisation_sim_
-        // harness), never reshaped. Written once, here, and read
-        // from `w.campaign_band` by the app on a new game AND on a
-        // load (world_save v26), and by every harness through
-        // `band_registry_from_world`.
-        w.campaign_band = derive_campaign_band(kepler_industrialisation_hs.polities).band;
+        // THE RECIPE BAND IS INDUSTRIAL, FOR EVERY NATION (BL-1273;
+        // ERAS.md § Where the ladder starts, RESEARCH.md § Who holds
+        // technology, Ben 2026-10-10). Every nation starts the
+        // campaign at the same tech level, holding nothing, on the
+        // industrial band: a start is asymmetric through geography,
+        // history, population and the corporate web, never through
+        // tech. This used to be derived from the history's industry
+        // state (BL-1101's `derive_campaign_band`), which opened a
+        // seed on which nobody crossed on the ancient roster; that
+        // reading retired with this ruling. The field stays (and is
+        // saved) so a load reads it back; `campaign_band_from_world`
+        // bands every world industrial regardless.
+        w.campaign_band = era_band::industrial;
 
         // BL-1053 -- WORLD SETUP READS THE 1960 CLOSE, NOT THE 1660
         // ONE. The live settlement the span left (ownership,
