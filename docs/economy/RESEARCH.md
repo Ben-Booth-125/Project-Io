@@ -54,8 +54,9 @@ settled ahead of it.
 
 ## What is open
 
-- The RP economy: accrual rates, whether RP is per-corp, per-nation, or both, and whether it
-  trades.
+- The RP economy: accrual rates and whether RP trades. The **nation** holds technology and its
+  research pool (Ben, 2026-10-10, `../generation/trees/TREES.md` § Who holds a tree); whether a
+  corporation's research adds to its nation's pool is open there.
 - The tech graph: `scripts/tech_tree.lua` holds ~150 nodes of deliberately inert data with one
   resolving gate — whether that data becomes this system's graph or is replaced is undecided.
 - The pre-game layer is not this system: generation's three technology trees, and where research

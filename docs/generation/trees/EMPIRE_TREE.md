@@ -7,7 +7,7 @@
 > research comes from (TREES) · the phase it runs in — seats, stores, reach-gating, culture
 > relations (../CIVILISATION) · what a work row does once unlocked (../../lore/HISTORY § The
 > works roster) · what a unit row does (../MILITARY_HISTORY) · the trees either side of it
-> (COLONISATION_TREE, INDUSTRY_TREE).
+> (EXPLORATION_TREE, INDUSTRY_TREE).
 > **Confused with:** TREES.md, ../CIVILISATION.md, ../../research/ANCIENT_TECH_LADDER.md.
 
 The store is `empire_tree.json`; `node tools/session/tree_lint.js empire` holds the two together.

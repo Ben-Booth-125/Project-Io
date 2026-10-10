@@ -53,7 +53,7 @@ not earn. **The registry is actor-aware:** a corporation's browsable roster is m
 nation's band, so an ancient nation's firms are never offered the Launchpad, the petroleum and
 propellant chains or the spacecraft chain while an industrial neighbour's are. A world on which
 every nation derives `ancient` is a legitimate world, and the sim is never reshaped to force the
-other answer. Grain finer than the nation still reaches play as campaign tech (the Industry mask).
+other answer. Grain finer than the band reaches play as the nation's technology (`../generation/trees/TREES.md` § Who holds a tree).
 The design of the actor-aware registry is BL-1123's (band per nation). **Epoch 0 is retired (Ben,
 2026-09-25, NR-920):** the epoch names the calendar only. `docs/development/ROADMAP.md` § The two arcs owns which is the commercial product,
 and this document owns only the Era structure, which is the same on both.
@@ -130,9 +130,9 @@ history; the search itself is BL-770 (Era 0 candidate search).
   NR-929). The band is read off the finished history and never by it, so the band moves no
   generated world and no epoch moves the band. It answers *which product is this nation playing*
   — a per-nation fact fixed at generation (BL-433, era band) and saved with the world, so a
-  loaded save opens on the bands its history earned. Grain finer than the nation reaches
-  play as campaign tech state, the Industry tree mask seeding each corporation's `earned_techs`
-  (`../generation/INDUSTRIALISATION.md`). It is **not** the Era of this document.
+  loaded save opens on the bands its history earned. Grain finer than the band reaches
+  play as the nation's technology — its tree masks and research pool
+  (`../generation/trees/TREES.md` § Who holds a tree). It is **not** the Era of this document.
 - **`condition_subject::era`** (`src/world/condition_set.cpp`) is the predicate subject the laws
   and techs layers evaluate. It measures **1 for a corp that owns a launchpad and 0 otherwise** —
   a per-corp proxy for "has industrialised into space", chosen so that authored conditions keep
@@ -289,7 +289,7 @@ The Launchpad can be **constructed** during Era 1 (a ground installation; author
 
 This is the **keystone quest** that unlocks space access (BL-087). All three conditions must be met simultaneously:
 
-1. **Rocketry research purchased.** Rocketry is the only technology required for space access. It is a single standalone unlock with no prerequisite; the full quest tree is BL-087's.
+1. **Rocketry research purchased.** Rocketry is the only technology required for space access; the full quest tree is BL-087's (era tech/quest system). Whether it stands alone or is the Digitisation tree's Reach quest is open (`../generation/trees/TREES.md` § Open questions).
 2. **Launchpad constructed and staffed.** A Launchpad building exists on the home body with `workforce_assigned > 0`.
 3. **Propellant reserve met.** The home body's stockpile contains at least the minimum propellant quantity required for an initial launch. This threshold is a Lua balance value. Propellant is the product of the propellant loop (`docs/research/ERA1_TECH_LANDSCAPE.md`), not a roster resource of the ancient arc.
 

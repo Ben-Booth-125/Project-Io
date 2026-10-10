@@ -9,9 +9,9 @@
 > space (economy/ERAS).
 > **Confused with:** lore/HISTORY.md, research/TECH_EFFECTS.md, research/ERA1_TECH_LANDSCAPE.md.
 
-> **SUPERSEDED FOR THE PRE-GAME LAYER (Ben, 2026-09-10).** The pre-game technology trees are three
-> trees, not one web, and they live in `../generation/trees/` — `TREES.md` (the grammar),
-> `COLONISATION_TREE.md`, `EMPIRE_TREE.md`, `INDUSTRY_TREE.md`, each with its JSON store. Those
+> **SUPERSEDED FOR THE PRE-GAME LAYER (Ben, 2026-09-10).** The technology trees are separate
+> trees, not one web, and they live in `../generation/trees/` — `TREES.md` (the grammar) and one
+> document per tree, each with its JSON store. Those
 > are the authority. This document remains the **calibration reference** they were drawn from — the
 > band tables, the diffusion axis, the acquisition model and § What "not every nation is equal"
 > realistically means by 1960 — and its geometry section describes a shape the pre-game layer no

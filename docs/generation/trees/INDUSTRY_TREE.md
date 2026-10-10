@@ -8,9 +8,9 @@
 > scorer's shape, the JSON schema (TREES) · the phase this tree runs in and what crosses each
 > handoff (../GENERATION_STRATEGY) · what a works row does once unlocked (../../lore/HISTORY) ·
 > the unit roster and its band boundary (../MILITARY_HISTORY) · the other two trees
-> (COLONISATION_TREE, EMPIRE_TREE) · the exploration age's own tree, which now holds the
+> (EMPIRE_TREE, EXPLORATION_TREE) · the exploration age's own tree, which now holds the
 > maritime and chartering subjects this tree used to (EXPLORATION_TREE) · the 1960+
-> campaign tree (../../research/ERA1_TECH_LANDSCAPE).
+> campaign tree (DIGITISATION_TREE).
 > **Confused with:** ../../research/ANCIENT_TECH_LADDER.md, ../../research/TECH_EFFECTS.md,
 > ../../economy/RESEARCH.md, ../CORPORATION_GENERATION.md.
 

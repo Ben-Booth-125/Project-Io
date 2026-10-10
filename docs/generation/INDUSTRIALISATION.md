@@ -75,8 +75,8 @@ dates a polity's crossing (§ Beat 1; `../lore/HISTORY.md` § Stage 4) — and `
 The band is per nation, persisted on the nation and read on a new game and a loaded save alike,
 so a nation opens on the band its history earned, never on one a calendar implies, and each
 corporation's roster is masked on its own nation's band (`../economy/ERAS.md` § Where the ladder
-starts). Grain finer than the nation crosses through the Industry mask into each corporation's
-earned techs (§ What crosses into play). A nation whose realm never crosses by 1960 derives
+starts). Grain finer than the nation crosses as the nation's own tree masks and research pool
+(§ What crosses into play; `trees/TREES.md` § Who holds a tree). A nation whose realm never crosses by 1960 derives
 `ancient` and its firms open with the industrial roster masked — a legitimate world, counted by the seed
 spread and never reshaped until it crosses. Which of the three axes that say "era" in code this
 is: `../economy/ERAS.md` § Three things that say "era" in code.
@@ -500,7 +500,7 @@ already produces, so the campaign has a place to grow them later.
 
 | Stub | PROPOSED source | Lands in |
 |---|---|---|
-| **Technology** | The Industry tree mask; *The Renewed Line* opens the campaign tree | Earned techs on each corporation the nation charters, seeded from its mask (Ben, 2026-09-18) — a nation holds no tech field of its own |
+| **Technology** | The four tree masks and the research pool; *The Renewed Line* opens the Digitisation tree | The nation, which holds technology (Ben, 2026-10-10, overturning 2026-09-18's corporation holder; `trees/TREES.md` § Who holds a tree) |
 | **Political system** | The Works fork (State Arsenal / Private Works), charter reach, whether the polity was ever a subject, and whether it fought a world war | One regime field per nation, beside the three character enums in `NATION_GENERATION.md` |
 | **Armies** | Carried `army_stock` and navy, and beat 1's mechanised force | Nation garrison strength, which otherwise sizes from a treasury seeded at zero |
 
@@ -735,7 +735,7 @@ emigration stream with war as its push, so a war visibly empties toward the near
 overturned): a polity's Industry research rate reads the population of its largest held centres,
 superlinearly, rather than the industry slice of its ground. That turns Ben's *"centred around
 larger population centres"* into one input change to the tree's RATE, never to the scorer, which
-may not carry a term that grows with size (`trees/TREES.md` § State, and where research comes
+may not carry a term that grows with size (`trees/TREES.md` § Who holds a tree, and where research comes
 from). It also gives the leaderboard a research column that no longer restates population — the
 reason Empires refused one.
 
@@ -1023,8 +1023,9 @@ The epoch's handoff, and nothing else:
 - **Road tiers** with the rail rung, stamped from corridors.
 - **Culture shares** per region and per centre, for the lens and for demand.
 - **Standing war conditions** on provinces, with their patrons.
-- **Campaign tech state** per corporation — the earned techs each firm opens holding, seeded from
-  its nation's Industry mask (Ben, 2026-09-18); a nation holds no tech field of its own.
+- **Campaign tech state** per nation — the tree masks and research pool of the realm it grew
+  from (Ben, 2026-10-10, overturning 2026-09-18's per-corporation seeding; `trees/TREES.md`
+  § Who holds a tree).
 - **Per-nation Alarm** seeded from the span's wars, grudges and severed flows.
 - **Sea lanes**, a traffic count per sea leg stamped to a tier, discounting sea-leg
   traversal cost for every consumer of it
