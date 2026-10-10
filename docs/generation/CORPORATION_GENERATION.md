@@ -3,7 +3,7 @@
 > **Settles:** how a corporation is assigned a nation, an industrial focus and an ownership
 > class · how a charter reaches the ground · where starting assets, HQ and border range are
 > placed · what finances and stockpile a corp opens with · how a corp is named, and how
-> background firms are produced · how the player's corp and its seat are chosen · what
+> background firms are produced · how a major nation's champion is chartered, and how the seat is chosen · what
 > generation deliberately declines to seed.
 > **Not here:** how a rival *decides* anything (../ai/AI_OPPONENT) · how the nation it
 > registers in was made (NATION_GENERATION) · what its money does thereafter
@@ -83,6 +83,16 @@ the spread is the world's, not capped. **A world whose budget opens no specialis
 world with no budget** (Ben, 2026-09-21, NR-910), so the player is seated from a specialist. The one
 exception — a world whose affording centres all find no ground for their specialist — is reported
 and counted, not patched (Ben, 2026-09-22, NR-911; `INDUSTRIALISATION.md` § 1).
+
+**AMENDED FORWARD (Ben, 2026-10-10): one specialist per major nation, and it is that nation's
+champion.** Majors and seats are one-to-one (`docs/GLOSSARY.md` § Major nation), so the specialist
+roster **is** the set of champions: exactly one per major, none in a minor, and the roster's size is
+the major target (`NATION_GENERATION.md` § The nation count is a target). This overturns, for
+specialists, both the fixed count of 8 and the 2026-09-17 rule that a nation holds every seat its cities
+bought: a major's champion is chartered in its richest affording centre, and every other affording
+centre spends its budget on background firms. The budgets still decide **which** nations can afford a
+champion; the major target decides **how many** do, through the lean and reconciliation that
+`NATION_GENERATION.md` owns.
 
 ### Pass 2 — Industrial focus assignment
 
@@ -603,6 +613,13 @@ consequences of Pass 6's output — how real background supply meets real popula
 ---
 
 ## Player corporation
+
+**The player's corporation is its nation's champion (Ben, 2026-10-10; `docs/CONCEPT.md` § Player
+identity).** The seat is taken by picking a **major nation**, and the champion of that nation is the
+firm `is_player` lands on: the shortlist below is a list of majors, each read through its one
+champion. Everything else in this section stands, re-read at that grain — the settle in spectate,
+the static score, the marked-not-removed floor, the clean slate of construction and the day-one kit.
+Up to six humans may each take one major (`docs/ui/STARTUP.md` § The seat).
 
 One generated corporation is flagged as `is_player = true`. No special generation rules apply:
 the player starts on the same footing as any other corporation, and the flag is set **after** the

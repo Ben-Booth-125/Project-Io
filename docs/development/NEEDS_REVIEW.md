@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*97 entries — 17 open, 80 resolved.*
+*101 entries — 20 open, 81 resolved.*
 
 ---
 
@@ -171,14 +171,57 @@ To verify the air gate and the sea-route lane headlessly, the verify API gained 
 
 Ben (2026-10-10): remove corporation stockpiles - all of them, production lands on the shelf - and push initial goods to markets (the same total, redistributed to the markets the corporations sit in), to simplify the model and fix construction at game start; build now in sprint 50. Flagged as large scope growth mid-close: pools carry production, own-input draws, sell orders, corporation convoys, the launch fuel reservation, procurement, upkeep and the space programme, and several of this sprint’s rulings read pools (opening stock held, the dial’s stock-fed draws, R2’s spare charge). Paused for Ben’s design calls (who owns shelf goods; what replaces corporation hauling; extend 50 or own sprint) before any build. Owning docs to rewrite: MARKETS, PRODUCTION, SUPPLY, FINANCE, CORPORATION_GENERATION, AI_OPPONENT.
 
-### NR-1020 — The player is a nation: six calls before the doc sweep
-*question · raised 2026-10-08 · from Ben's 2026-10-08 direction (option A) - BL-1245 (player is a nation)*
+### NR-1025 — Up to six humans on the selection screen: is multiplayer now in prototype scope?
+*question · raised 2026-10-10 · from Ben, 2026-10-10 identity form ('Yes: the selection screen seats up to six humans')*
 
-Direction is ruled: the player is a nation with a space programme, reversing NR-885. Six calls remain, listed in BL-1245's design: the player's nation verbs; the nation step and grant register skipping the player's nation; what replaces 'answer to' in the design test; whether the space corporation is a separate actor or the space_programme line; the how-many-programmes generation parameter and its default; the elimination rule.
+TECH_FOUNDATIONS.md § Direction and MULTIPLAYER_PRINCIPLES.md hold multiplayer OUT of prototype scope and off the backlog. Your answer commits the seat screen to up to six human picks. Written so far: STARTUP § The seat and CORPORATION_GENERATION say up to six humans may each take a major; MANUAL no longer says single-player. Not written: any amendment to TECH_FOUNDATIONS.
 
-**Why it matters.** Every doc sweep and build item in sprint 52 reads these answers; NR-885's sweep touched 14 docs, and reversing it half-way leaves the corpus asserting two identities.
+**Why it matters.** The standing rules forbid building outside the prototype scope; BL-1281 (nation selection screen) cannot build six seats until the scope says so.
 
-- Answer on one design form, then sweep in a single pass
+- Amend TECH_FOUNDATIONS: multi-human seating (hot-seat or lockstep) enters scope
+- Design the screen for six seats, build one human seat now; scope stays as is
+- Single player only; drop the six-seat line
+
+> **Recommendation:** Option 2: it costs nothing now and keeps the shape; MULTIPLAYER_PRINCIPLES already protects the lockstep path.
+
+*Files: `docs/tech/TECH_FOUNDATIONS.md`, `docs/ui/STARTUP.md`, `docs/multiplayer/MULTIPLAYER_PRINCIPLES.md`*
+
+### NR-1026 — New AI subject: rival nations and corporations acting toward a nation a human plays
+*question · raised 2026-10-10 · from AI_OPPONENT.md § 11, raised 2026-10-10 with BL-1245 (player is a nation)*
+
+No grant names a human-played STATE as the subject of AI action. NR-517 covers a rival acting politically against a corp a human owns; the 2026-08-18 grant lets nations carry pair-state toward another polity, but every polity was AI. Under the new identity, rival nations will declare stances at, set tariffs against and go to war with the player's nation, and rival firms will lobby it. Per the standing rule this is raised, not assumed.
+
+**Why it matters.** Without it the AI nations must treat the player's nation as inert, which would gut Conflict; with it the register gains a new subject.
+
+- Grant: rival nations and corporations may act toward a human-played nation with the same verbs they use on any nation
+- Grant with exclusions (name them)
+- Not yet: rivals treat the player's nation as inert until a later sprint
+
+> **Recommendation:** Grant as option 1 - every verb is already legal toward an AI nation, and symmetry is a CONCEPT rule.
+
+*Files: `docs/ai/AI_OPPONENT.md`*
+
+### NR-1027 — DECISION TAKEN: 'major and seat-eligible are 1 to 1' read as one specialist per major and none elsewhere; minors keep background firms; majors are the space-programme nations
+*decision · raised 2026-10-10 · from Ben, 2026-10-10 identity session*
+
+Three readings taken on your behalf. (a) 1:1 means the specialist roster IS the champions - exactly one per major, so the specialist count equals the major target (1..6), overturning the fixed 8 and the rule that a nation holds every seat its cities bought. (b) Your 'minor: no corporations' is read as no SPECIALIST; background firms still form in minors, since without them a minor has no producers and its markets go empty. (c) BL-1245's 'how many nations run a space programme' parameter is the major target; a minor runs no space programme. Written: GLOSSARY, NATIONS § Major and minor nations, CORPORATION_GENERATION Pass 1.
+
+**Why it matters.** (a) cuts full-AI corporations from ~8 to at most 6, which moves the economy gate; (b) decides whether minors have an economy at all.
+
+> **Recommendation:** Confirm, or overturn (b) if minors should hold no firms at all.
+
+*Files: `docs/generation/CORPORATION_GENERATION.md`, `docs/politics/NATIONS.md`, `docs/GLOSSARY.md`*
+
+### NR-1028 — DECISION TAKEN: the nation buys equipment through the state procurement seam, not the market order book
+*decision · raised 2026-10-10 · from Ben, 2026-10-10 identity form ('buys equipment from corporations on the market')*
+
+NATIONS.md holds that a nation pays only by direct transfer and never places an order: the space programme already buys through the procurement seam at the supplier market's price. The form said 'on the market'; taken as that seam, so a nation still never touches the book. The rule that the player's corp is never drained by a state purchase stands, including by its own nation. Written: CONCEPT § Development through ages, MILITARY § The muster interface.
+
+**Why it matters.** If you meant a real market buyer, the nation gains an order-book role and NATIONS.md's conservation ruling changes.
+
+> **Recommendation:** Confirm.
+
+*Files: `docs/CONCEPT.md`, `docs/military/MILITARY.md`, `docs/politics/NATIONS.md`*
 
 ---
 
@@ -1505,4 +1548,15 @@ With BL-1235 a plant the scorer's dial zeroed in the settle is no longer mothbal
 AI_OPPONENT.md § Candidate enumeration ('A power-plant candidate is priced against its grid's shortfall', Ben 2026-10-07) and PRODUCTION.md § Power ('The scorer's power-plant estimate reads the same per-grid gap, and counts plants already under construction') state the scorer's power gate as the design. The code does not do it: corp_ai.cpp scores power recipes like any other processor group (~1586-1796); the gate exists only on branch bl1232-gate-remeasure (14969c85), unmerged, HELD by Ben. BL-1232 (power plants per grid) is complete, so no open item owns the held part. CALL: (a) file a backlog item that re-measures and merges the gate, docs unchanged; or (b) withdraw the rule from both docs until it is re-ruled.
 
 > **RESOLVED.** Ben, 2026-10-10 (doc-check form): file an item to re-measure the gate on the current tip, then merge or drop -> BL-1263 (power gate remeasure). Also ruled: power inputs read the grid too -> BL-1264 (power input on grid).
+
+### NR-1020 — The player is a nation: six calls before the doc sweep
+*question · raised 2026-10-08 · from Ben's 2026-10-08 direction (option A) - BL-1245 (player is a nation)*
+
+Direction is ruled: the player is a nation with a space programme, reversing NR-885. Six calls remain, listed in BL-1245's design: the player's nation verbs; the nation step and grant register skipping the player's nation; what replaces 'answer to' in the design test; whether the space corporation is a separate actor or the space_programme line; the how-many-programmes generation parameter and its default; the elimination rule.
+
+**Why it matters.** Every doc sweep and build item in sprint 52 reads these answers; NR-885's sweep touched 14 docs, and reversing it half-way leaves the corpus asserting two identities.
+
+- Answer on one design form, then sweep in a single pass
+
+> **RESOLVED.** Ben, 2026-10-10 (sprint 53 identity form): (1) verbs - budget weights, tariffs, law; force raised by the nation, its equipment bought; (2) the nation step skips the player's nation - recorded as a narrowing in AI_OPPONENT § 11; (3) design test - what the NATION can field / must answer to: other nations, its population, its corporations; (4) the space corporation is the CHAMPION, a separate corp the player operates directly; (5) the parameter is the MAJOR target (1..6, always hit) beside a TOTAL target (<= 40); a minor runs shallow with no specialist; (6) eliminated when it holds no territory. Written into the docs listed on BL-1245 (player is a nation).
 

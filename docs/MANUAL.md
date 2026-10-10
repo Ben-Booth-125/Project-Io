@@ -8,9 +8,10 @@
 
 ## Preface
 
-Project Io is a single-player grand strategy game about running a **corporation** in a
-procedurally generated world that opens in 1960. You are not a nation and you do not rule anyone.
-You find the ground worth industrialising, you build on it, and you fight for it when you must.
+Project Io is a grand strategy game about running a **nation** and its **champion corporation** in a
+procedurally generated world that opens in 1960. You govern the state, and you run the firm that
+builds for it. You find the ground worth industrialising, you build on it, and you fight for it when
+you must.
 
 This manual is for two readers. If you are **playing**, sections 1 through 4 are yours — what the
 game is, how to start, and every control. If you are **building** it, section 4 maps each system to
@@ -38,16 +39,19 @@ your business.
 
 ### 1.2 The player
 
-You are a **corporation**, chosen from a shortlist of seats when the campaign begins. Three things
-follow from that, and they are the design's spine:
+You are a **major nation**, chosen from the majors when the campaign begins, and you run its
+**champion** — the one corporation its ground produced. Three things follow from that, and they are
+the design's spine:
 
-- **You do not legislate.** Law, tax and policy are conditions you operate inside, not levers you
-  pull. When a law makes your work harder, your options are to route around it, price it in, or
-  take work somewhere else.
-- **You do not manufacture your force.** Equipment is bought from private companies who are
-  counterparties, not subsidiaries. They quote a price and a lead time, and they can refuse.
-- **You build to industrialise.** Your holdings extract, refine and sell, and the machinery you
-  build is the road to space.
+- **At home you legislate.** Your budget, your tariffs and your law are levers you pull. Abroad they
+  are conditions your champion operates inside: route around them, price them in, or pay to have
+  them changed.
+- **You raise your force; you do not manufacture it.** You muster your own units, and their
+  equipment is bought from corporations who are counterparties, not subsidiaries.
+- **You build to industrialise.** Your champion's holdings extract, refine and sell, and the
+  machinery it builds is your nation's road to space.
+
+You answer to three parties: other nations, your population, and your corporations.
 
 ### 1.3 The loop
 
@@ -80,7 +84,8 @@ worse.
 
 Losing is progressive and it is a spiral rather than an event. Lose ground and your income falls.
 With less income you can afford less upkeep and less force, which loses you the next piece of
-ground. A corporation can die of this without ever losing a battle it could not have won.
+ground. A nation can bleed out this way without ever losing a battle it could not have won. It is
+gone only when it holds no territory at all.
 
 The escape is the same as the trap, run backwards: stop reaching for what you cannot hold, hold what
 you have, and rebuild. That is a real strategic choice with a real cost in time.
@@ -101,7 +106,9 @@ Pausing is a legitimate way to play; nothing is hidden behind reaction speed.
 ### 2.1 Starting a campaign
 
 From the main menu, **New Game** opens the New World wizard. You set *preferences*, not parameters:
-how abundant the world's resources are, and the lean of the generation. The world is then generated
+how abundant the world's resources are, and the lean of the generation. The one exception is the
+nation count: before the world is built you choose how many nations it ends with (up to 40) and how
+many are **majors** (up to 6), and the history will arrive at exactly those numbers. The world is then generated
 in visible stages — planetology, continents, tiles, rivers, population, history, nations, roads,
 corporations — each stage a deterministic consequence of the one above it.
 

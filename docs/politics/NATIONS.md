@@ -3,7 +3,7 @@
 > **Settles:** what a nation is once generation has finished making it · what it holds — territory,
 > treasury, budget weights, law · how a law reaches the market · what an import tariff does and
 > which direction it points · what a nation may do, what it does each tick, and in what order it
-> spends · what a nation wants.
+> spends · what a nation wants · what separates a major nation from a minor one.
 > **Not here:** how a nation comes to exist — territory placement, resource profile, character,
 > naming (NATION_GENERATION) · which quantity says how a nation reads a corporation (RELATIONS) ·
 > the predicate/effect substrate a law is composed from (META_LAYER) · a corporation's own money loop
@@ -33,10 +33,27 @@ session. The mechanism design for that channel lives in its backlog items; the r
 A nation is a **territorial polity** in the campaign era. It owns tiles, it has a character, it
 holds money, it states what it cares about, and it is the only actor that can author law.
 
-It is **not** the player, and the player is not accountable to it beyond what law and stance
-impose. The player is a corporation: a **law subject**, never a
-legislator (`docs/MANUAL.md` § 1.2, and SYSTEMS.md § Policy). A nation is the thing whose rules you
-operate inside, route around, pay to have changed, or price in.
+**The player is a nation (Ben, 2026-10-10; `docs/CONCEPT.md` § Player identity).** The player
+plays one **major** nation and operates its **champion** corporation. For its own nation the player
+is the legislator: it sets the budget weights, the tariffs and the law that `nation_ai` sets for a
+rival. For every other nation it is what a corporation always was here — the thing whose rules its
+champion operates inside, routes around, pays to have changed, or prices in.
+
+### Major and minor nations — two depths of one actor
+
+A **major** nation holds a champion when generation ends; a **minor** nation is every other one
+(`docs/GLOSSARY.md` § Major nation; the counts are generation's,
+`docs/generation/NATION_GENERATION.md` § The nation count is a target). The split is the
+corporation/firm split applied to nations: the majors are the full actors, the minors are the
+cheap backdrop that is traded with and fought over.
+
+- **A major runs the whole of this document.** Treasury, budget, law, tariff, the nation step, the
+  scorer of § 5, and one champion on its ground. The player's major is the same object with the
+  scorer switched off for it (§ What a nation does each tick).
+- **A minor runs shallow (Ben, 2026-10-10).** It holds a treasury, sets budget weights and tariffs,
+  and is re-scored on a slower cadence than a major. It hosts **no champion and no specialist**.
+  It enacts no law of its own beyond what generation leaves it. It owns tiles and garrisons, so it
+  can be traded with, conquered and lobbied like any nation.
 
 It is also **not** a corporation. The two are different kinds of object with different faculties,
 and the distinction is load-bearing:
@@ -337,10 +354,14 @@ somebody else's machinery:
 
 The cadence key is `world::current_econ_tick` — the quarter counter, never the day tick.
 
-**This pass has no human subject.** It runs regardless of `corp_ai_params::spectating`. A subsidy
-landing on the player's corp is a transfer *to* the player, not an action *on* the player's corp,
-so the standing prohibition has nothing to protect here (NR-569d). The player corp is never a
-claimant, because `corp_ai` never scores it, so in a played session it is never funded either.
+**The player's nation is never scored (Ben, 2026-10-10).** Its weights are the player's: move 1
+skips it, so no scorer ever writes its slot of `w.nation_budgets`, and the player sets the slot
+through the budget verbs. Moves 2 to 4 are mechanical — they gather the claims the firms on its ground
+filed and pay them over the player's own weights — so the spend is the player's decision carried
+out, not a decision made for it. Under `corp_ai_params::spectating` there is no human, and the
+player's nation is scored like any rival. A subsidy landing on the player's champion is a transfer
+*to* the player, not an action *on* it (NR-569d). The champion is never a claimant, because
+`corp_ai` never scores it.
 
 ### The spend rules
 
@@ -397,10 +418,12 @@ It closes a circuit. The levy and the tariff **fill** a treasury; the budget is 
 makes a full loop — corp → nation → corp — instead of draining into a field no reader could account
 for.
 
-It also fits the player identity rather than straining it. A corporation is a **law subject,
-never a legislator**, which leaves it no lever of its own on the rules it works inside. Lobbying is
-the one mechanism that changes that without changing what the player is: **you do not pass the law,
-you pay someone who does.** The `lobby` verb is the *only* route to influence over a nation, and it
+It fits the player identity from both ends. A corporation is a **law subject, never a
+legislator**, which leaves it no lever of its own on the rules it works inside. Lobbying is the one
+mechanism that changes that: **you do not pass the law, you pay someone who does.** The player's
+champion lobbies foreign nations this way. The player's own nation is lobbied in turn by the firms on
+its ground, which is one of the three parties the design test says a nation answers to
+(`docs/CONCEPT.md` § Player identity). The `lobby` verb is the *only* route to influence over a nation, and it
 is owned by BL-539 (lobbying).
 
 ### 1. What a treasury is for — **a weighted budget over priority lines**
@@ -565,7 +588,7 @@ by mutating the thing it reads.
 
 A well-played nation in Io mostly **stays out of fights**. That is unusual for a strategy game and
 is much of the point — nations avoiding each other leaves the Conflict pillar to the companies,
-which is where the player lives.
+where the player's champion contests and the player's nation decides how far to back it.
 
 *Owned by BL-542 (nation scorer).*
 

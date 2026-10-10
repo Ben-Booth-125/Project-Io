@@ -257,6 +257,14 @@ the fixture-fitting this section exists to prevent.
 
 ---
 
+
+**The one sanctioned exception: the two nation counts (Ben, 2026-10-10).** The player sets how many
+nations a world ends with and how many of them are majors, and both are always hit
+(`NATION_GENERATION.md` § The nation count is a target). The exception is narrow by design. It names
+two counts, not a shape: which nations they are, where they lie, how rich, how armed and how unequal
+stays the world's. And a count is hit by events the history already knows — conquest, release, a
+national champion's charter, a cross-border buy-out — never by deleting or relabelling a nation, so
+even the exception tunes forces and records a cause.
 ## The world descriptor — seed + generation parameters
 
 Generation is driven by a small **world descriptor** (BL-114, world descriptor) — a master
@@ -371,7 +379,8 @@ They get one, in the wizard's own idiom (`../ui/STARTUP.md` § Rounds):
 
 **Each round takes leans, per pass.** A lean names a *force*, is resolved against the seed like
 any `world_preference`, and targets no outcome — the tune-the-forces-never-the-outcome rule of
-§ Asymmetry is the deliverable is not relaxed for being player-facing. The wizard's standing
+§ Asymmetry is the deliverable is not relaxed for being player-facing. The setup round's two nation
+counts are that section's one exception, and they are not leans. The wizard's standing
 premise carries over unchanged: **you set conditions, you do not steer.**
 
 **Round 6 shows the selected landscape, not the search.** Phase 6 scores candidates statically in
@@ -512,9 +521,10 @@ map they are being shown.
 
 It **tunes forces and never clamps a count.** A turbulence lean moves the spread of culture
 aggression, how sharply neighbours coalesce against a riser, and how fast reach decays with
-distance. It does not target a number of nations. The 2026-07-30 emergent-nation-count ruling,
-BL-224's non-hegemony invariant and § Asymmetry is the deliverable all survive intact — a world that
-comes out fragmented or consolidated is an outcome, not a quota.
+distance. It does not target a number of nations: the setup round's targets do that, by reconciliation after
+the leans have run (`NATION_GENERATION.md` § The nation count is a target; Ben, 2026-10-10,
+overturning the 2026-07-30 emergent-nation-count ruling). BL-224's non-hegemony invariant survives
+intact: inside the counts, a world that comes out fragmented or consolidated is an outcome.
 
 **Culture aggression is where the tuning lands.** `polity::aggression_q` already exists, derived
 from the culture's own `aggression_q`. Two archetypes are worth having and they are not the same

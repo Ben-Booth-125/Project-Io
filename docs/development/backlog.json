@@ -347,9 +347,9 @@
    "design": "Ben (the re-bless form, 2026-10-07): sprint 50, beside BL-1217 (inputs reach processors). The per-merge series is in docs/development/drafts/sprint-49-rebless.md. Trace: (1) BL-1209 (shelf k = 1) cuts rival cash by 1.96 M pooled and leaves 13 rivals with negative cash (was 1) - which flow; (2) BL-1203 (water reaches dry markets) runs 25% more convoys yet sells 12.8% less at destination; (3) BL-1198 (the Well) adds 33 water sites and moves haulage not at all, to the decimal; (4) at BL-1200 (lake cap) people in centres rise 11.9% while the settlement record falls 2.4%; (5) whole road networks flip between Highway and Road tiers on single seeds at four merges with no new length (sprint 48 saw the same). Each: name the mechanism, then decide whether it is intended."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 52,
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 53,
    "written": "2026-10-08",
    "requires": [],
    "blocked_on": null,
@@ -373,7 +373,7 @@
     "docs/generation/CORPORATION_GENERATION.md",
     "src/world/space_programme.cpp"
    ],
-   "design": "Ben, 2026-10-08: the player becomes a NATION with a space programme (option A, chosen over B - a state-chartered space corporation under an AI-run parent). Reason, in his words: \"there are many more gameplay systems available to a nation, and there's no real advantage to being just a corporation.\" Shape as he put it: the player starts with a space corporation tied directly to its parent nation; acquisitions and funding still work internationally. A generation parameter tunes HOW MANY nations run a space programme, and the seat shortlist draws from those. This reverses NR-885 (corporation holding a seat, 2026-09-17). OPEN CALLS before the doc sweep (NR-1020): (1) which nation verbs the player holds - budget weights, tariffs, law, territory, force production - and whether any stay closed; (2) the nation step and the grant register (AI_OPPONENT.md § 11) must stop acting on the player's own nation - a narrowing, recorded as such; (3) the FIELD / ANSWER-TO design test assumes a power above the player - what replaces 'answer to' for a state (rivals, its own population, the Era 1 nuclear test); (4) the space corporation: a separate actor the player directs (keeping the corp systems, acquisitions, international funding) or folded into the nation's space_programme line - and the 'player's corp is never a supplier to a state purchase' rule inverts for the player's own nation; (5) the generation parameter: how many nations run a space programme, its default, and what a non-programme nation does; (6) elimination: CONCEPT's 'parent nation must also be destroyed' becomes the whole rule. SWEEP once ruled: CONCEPT § Player identity, STARTUP § The seat, NATIONS (space_programme supplier rule; law subject vs legislator), MANUAL § 1.2, SYSTEMS § Policy, AI_OPPONENT § 11, standing rules' 'player's own corp' wording, and every doc NR-885's sweep touched (09a1b567)."
+   "design": "DESIGNED (Ben, 2026-10-10; NR-1020 resolved): the player is a MAJOR NATION operating its CHAMPION corporation. Written into CONCEPT.md § Player identity (identity; design test: what the NATION can field / must answer to - other nations, its population, its corporations; territorial existence), NATIONS.md (§ What a nation is; § Major and minor nations; the player's nation is never scored), GLOSSARY (Major nation, Minor nation, Champion), SYSTEMS, MANUAL § 1, ROADMAP, HISTORY, MILITARY § The muster interface (the nation musters and buys equipment through the state procurement seam), AI_OPPONENT § 11 (the narrowing; one subject raised, NR-1026), CORPORATION_GENERATION (one specialist per major; the player's corp is the champion), STARTUP § The seat. The major target IS this item's 'how many nations run a space programme' parameter (NR-1027). The build is split into BL-1278..BL-1284. Original direction (Ben, 2026-10-08, option A): the player becomes a nation with a space programme, reversing NR-885."
   },
   {
    "status": "designed",
@@ -1057,6 +1057,169 @@
    ],
    "title": "The first trade capacity table, Marketplace and Port point rates and upkeep, proposed by measurement and approved by Ben",
    "design": "DESIGNED: TRADE.md § The capacity table (Ben, 2026-10-10). Propose per-resource capacity, Marketplace and Port trade point rates, and trade-building upkeep; read the 16-seed market-viability gate with absolute counts; put the table to Ben. Not final until he approves. Handoff: docs/development/HANDOFF_SHELF_TRADE.md."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 53,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the sprint 53 nation-player session); filed by Claude",
+   "id": "BL-1278",
+   "short_name": "NATION_COUNT_TARGETS",
+   "category": "Generation",
+   "priority": "S",
+   "difficulty": 5,
+   "authority_doc": "docs/generation/NATION_GENERATION.md",
+   "requires": [
+    "BL-1279"
+   ],
+   "files": [
+    "src/world/nation_generation.cpp",
+    "src/world/nation_generation.hpp"
+   ],
+   "title": "Hit the total and major nation targets every time, by a lean and then in-world reconciliation",
+   "design": "DIRECTION RULED (Ben, 2026-10-10, option C; always hit): NATION_GENERATION.md § The nation count is a target. Total <= 40, major 1..6, total >= major. Stage 1, the lean: the total sets placement seed density; the major target leans charter-capital concentration. Stage 2, reconciliation by history verbs: conquest/absorption (too many nations), a subject freed or a province seceding (too few), a national champion chartered in the richest championless minor (too few majors), a cross-border buy-out (too many majors). OPEN before build: which span runs reconciliation; how the richest minor is read; buy-out pricing; how the merge pass's min-territory stop composes with a target. MEASURE FIRST: the natural total and major counts across the 16 library seeds (living polities run ~40-115, so the 40 cap reconciles on nearly every seed). Gate: every library seed lands on both targets across a grid of target pairs, each correction recorded as a history event."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 53,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the sprint 53 nation-player session); filed by Claude",
+   "id": "BL-1279",
+   "short_name": "WIZARD_SETUP_ROUND",
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/ui/STARTUP.md",
+   "requires": [],
+   "files": [
+    "src/ui/generation_screen.cpp",
+    "src/core/app.hpp"
+   ],
+   "title": "A setup round before Life, carrying the total and major nation targets",
+   "design": "RULED (Ben, 2026-10-10): STARTUP.md § Rounds, A SETUP ROUND PRECEDES LIFE. It takes the two nation targets before the Life round builds the world. OPEN: what else it holds (Ben: 'along with the existing choices at each phase' - whether per-round leans move here or stay on their rounds), and where it sits against System. The next design step of sprint 53."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 53,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the sprint 53 nation-player session); filed by Claude",
+   "id": "BL-1280",
+   "short_name": "LIFE_ROUND_2D_MAP",
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/ui/STARTUP.md",
+   "requires": [],
+   "files": [
+    "src/ui/generation_preview.cpp",
+    "src/ui/generation_screen.cpp"
+   ],
+   "title": "Retire the wizard globe; the Life round draws the homeworld on the pass rounds' 2D map",
+   "design": "DESIGNED (Ben, 2026-10-10): STARTUP.md § The Life map. The globe (48-slice render) is retired; System keeps its system drawing; the Life round draws the Life-gate world on the 2D map the pass rounds use, which holds through the Culture wait. Retire the globe code and its captures; update any golden or verify script that names it. OPEN: whether the Life map may pan/zoom for reading (no steering input either way). Needs a live click."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 53,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the sprint 53 nation-player session); filed by Claude",
+   "id": "BL-1281",
+   "short_name": "NATION_SELECTION_SCREEN",
+   "category": "UI",
+   "priority": "S",
+   "difficulty": 4,
+   "authority_doc": "docs/ui/STARTUP.md",
+   "requires": [
+    "BL-1283"
+   ],
+   "files": [
+    "docs/ai/ACTIONS.json",
+    "docs/ui/question_log.json"
+   ],
+   "title": "The seat becomes a nation selection screen: majors only, a six-part nation card, take_seat names a major",
+   "design": "DESIGNED (Ben, 2026-10-10): STARTUP.md § The seat. Rows are the majors (count = major target). Card: territory highlighted on the map, population and GDP, treasury/debt/budget weights, the champion (today's firm card), resource profile and deposits, neighbours with stances and grudges. take_seat names a major and seats its champion; its ACTIONS.json entry and the question_log surface question ('which nation am I?') change with it. Up to six humans each take one major - gated on NR-1025 (multiplayer scope). Needs a live click."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 53,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the sprint 53 nation-player session); filed by Claude",
+   "id": "BL-1282",
+   "short_name": "MINOR_NATIONS_SHALLOW",
+   "category": "Politics",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/politics/NATIONS.md",
+   "requires": [
+    "BL-1278"
+   ],
+   "files": [
+    "src/world/nation_ai.cpp",
+    "src/world/nation_step.cpp"
+   ],
+   "title": "Minor nations run shallow: treasury, budget weights and tariffs on a slow cadence, no law, no specialist",
+   "design": "DESIGNED (Ben, 2026-10-10): NATIONS.md § Major and minor nations. A minor keeps treasury, budget weights, tariffs and garrisons; is re-scored on a slower cadence than a major; enacts no law beyond what generation left it; hosts no specialist (background firms stay - NR-1027). Determinism: the cadence keys on the ascending-id set, like the major stagger."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 53,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the sprint 53 nation-player session); filed by Claude",
+   "id": "BL-1283",
+   "short_name": "ONE_CHAMPION_PER_MAJOR",
+   "category": "Generation",
+   "priority": "S",
+   "difficulty": 4,
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "requires": [
+    "BL-1278"
+   ],
+   "files": [
+    "src/world/corporation_generation.cpp"
+   ],
+   "title": "The specialist roster is the set of champions: exactly one per major nation",
+   "design": "DESIGNED (Ben, 2026-10-10): CORPORATION_GENERATION.md § Pass 1, AMENDED FORWARD 2026-10-10. One specialist per major, chartered in its richest affording centre; none in a minor; other affording centres spend on background firms. Overturns the fixed count of 8 and the 2026-09-17 multi-seat nation rule. Gate: market-viability and the 16-seed sweep - fewer specialists moves the economy, so it waits on the shelf/trade landing and takes a re-bless with Ben's go."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 53,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the sprint 53 nation-player session); filed by Claude",
+   "id": "BL-1284",
+   "short_name": "PLAYER_NATION_VERBS",
+   "category": "Politics",
+   "priority": "S",
+   "difficulty": 5,
+   "authority_doc": "docs/politics/NATIONS.md",
+   "requires": [
+    "BL-1245"
+   ],
+   "files": [
+    "src/world/nation_step.cpp",
+    "docs/ai/ACTIONS.json"
+   ],
+   "title": "The player governs its nation: budget, tariff and law verbs, the nation step skips it, and the nation musters",
+   "design": "DESIGNED IN PART (Ben, 2026-10-10): NATIONS.md § What a nation does each tick (the player's nation is never scored; moves 2-4 run on the player's weights); MILITARY.md § The muster interface (the nation raises units and buys equipment through the state procurement seam); CONCEPT.md § Territorial existence (eliminated at no territory). OPEN: the verb set and its seam validation (untrusted-input rule), who builds and owns a military base, the elimination check. Every new control gets an ACTIONS.json entry."
   }
  ]
 }

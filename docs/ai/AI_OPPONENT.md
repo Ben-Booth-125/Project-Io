@@ -2020,3 +2020,16 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   **What it does NOT admit.** No coordination between corporations; no trade on another owner's
   points; nothing for the player's corp beyond its own opt-out dial. Pure, seeded,
   deterministic, replayable, legal verbs only, never a planner.
+
+  **The player is a nation — a NARROWING, and one subject RAISED (Ben, 2026-10-10;
+  `../CONCEPT.md` § Player identity).** The player plays a major nation and operates its champion.
+  Two things follow without a new grant, because each takes behaviour away: the player's nation is
+  **never scored** by `nation_ai` (`../politics/NATIONS.md` § What a nation does each tick), and
+  its champion is the player's corp, never auto-acted on strategically, exactly as before. Minor
+  nations run shallower than the 2026-08-18 nation grant allows (`../politics/NATIONS.md` § Major
+  and minor nations), which is a narrowing too.
+
+  **Raised, not granted.** Rival nations and rival corporations acting toward a **nation a human
+  plays** — a stance declared at it, a tariff aimed at it, a lobby paid to it — is a subject no
+  entry above names: NR-517 reached a rival acting politically against a corp a human owns, not
+  against a human state. It waits on Ben's ruling and is not assumed (NEEDS_REVIEW, 2026-10-10).

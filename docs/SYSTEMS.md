@@ -11,9 +11,9 @@
 
 Two pillars define the game's end goals: **Trade** and **Conflict**. Every other system creates the conditions, constraints, or capabilities that flow into one or both.
 
-The player is a **corporation that holds a seat** (Ben, 2026-09-17, NR-885; CONCEPT.md § Player identity) — an operating firm like its rivals, whose role is to find the ground worth industrialising and build the machinery that gets to space. It does not legislate, and it procures its force from independent suppliers. The other **corporations** are its rivals and arm's-length counterparties, not a linked treasury or a shared economic arm; one becomes the player's own only by **buyout**, which takes the firm whole (`docs/economy/FINANCE.md` § Whole-firm acquisition). Profit is the motive for every corporation, and that shapes the economic layer throughout.
+The player is a **major nation operating its champion corporation** (Ben, 2026-10-10, overturning NR-885; CONCEPT.md § Player identity). As the state it sets its budget, tariffs and law, and it raises its own units, buying their equipment from corporations on the market. As the champion it builds, trades and contests like any firm, to find the ground worth industrialising and build the machinery that gets to space. The other **corporations**, its own nation's background firms included, are arm's-length counterparties, not a linked treasury; one becomes the champion's own only by **buyout**, which takes the firm whole (`docs/economy/FINANCE.md` § Whole-firm acquisition). Profit is the motive for every corporation, and that shapes the economic layer throughout.
 
-Each system below answers one test: **does it change what the company can field, or what it must answer to?** The company is the player's corporation (CONCEPT.md § Player identity).
+Each system below answers one test: **does it change what the nation can field, or what it must answer to?** The nation is the player's major nation, answering to other nations, its population and its corporations (CONCEPT.md § Player identity).
 
 Systems are grouped into three supporting tiers below the pillars.
 
