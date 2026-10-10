@@ -372,7 +372,13 @@ bool candidate_before(const candidate& a, const candidate& b)
     // siblings fall to std::sort's unspecified order among equivalents —
     // stable for one binary, not a property the simulation may rest on.
     if (a.cmd.target != b.cmd.target) return a.cmd.target < b.cmd.target;
-    return a.cmd.recipe < b.cmd.recipe;
+    if (a.cmd.recipe != b.cmd.recipe) return a.cmd.recipe < b.cmd.recipe;
+    // BL-1267 (cold review): two trade commands can tie on every field above
+    // (two unrunnable trades both clear at score 0 with defaulted subjects), so
+    // the trade they name and its far end break the tie — never std::sort's
+    // unspecified order among equivalents.
+    if (a.cmd.order != b.cmd.order) return a.cmd.order < b.cmd.order;
+    return a.cmd.counterparty < b.cmd.counterparty;
 }
 
 /// Strategy weight for a verb family under the corp's industrial focus —
@@ -2591,6 +2597,39 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 cands.push_back(c);
             }
 
+            // SHRINK (cold review): the share cap is read when a pin is made, so
+            // if the points the corporation makes fall after it pinned (labour,
+            // a lost building), its manual trades can come to hold more than
+            // `trade_pin_share` of them and starve auto. The LAST-placed trade is
+            // cut back by the excess — set_trade on its own id, smaller points —
+            // or cleared when the excess covers it. Must-Have, as an unpin is:
+            // it returns points the share rule says belong to auto.
+            {
+                const float excess = pinned_points - p.trade_pin_share * cc.trade_points;
+                if (excess > 1e-4f && !mine.empty())
+                {
+                    const standing_trade& t = mine.back();
+                    candidate c;
+                    c.cmd.tick  = tick;
+                    c.cmd.corp  = corp;
+                    c.cmd.order = t.id;
+                    if (t.points - excess > 1e-4f)
+                    {
+                        c.cmd.verb         = corp_verb::set_trade;
+                        c.cmd.subject      = t.from_market;
+                        c.cmd.counterparty = t.to_market;
+                        c.cmd.target       = t.resource;
+                        c.cmd.quantity     = t.points - excess;
+                    }
+                    else
+                        c.cmd.verb = corp_verb::clear_trade;
+                    c.score  = 0.0f;
+                    c.reason = corp_decision_reason::trade_unpin;
+                    c.bucket = bucket_for_reason(c.reason);
+                    cands.push_back(c);
+                }
+            }
+
             // PIN: the best-ranked route it does not already hold, sized to what
             // the destination absorbs above the landed cost (`trade_room`) and
             // the source shelf holds, capped so its manual trades together hold
@@ -2600,7 +2639,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             // solvency gate.
             const std::vector<entity_id> trade_reach = corp_trade_markets(w, corp);
             const float pin_room = p.trade_pin_share * cc.trade_points - pinned_points;
-            if (trade_reach.size() >= 2 && pin_room > 1e-4f)
+            // A full book (`max_trades_per_corp`) would refuse every pin: none
+            // is proposed then (cold review).
+            if (trade_reach.size() >= 2 && pin_room > 1e-4f && mine.size() < max_trades_per_corp)
             {
                 std::vector<trade_route_offer> routes;
                 rank_trade_routes(w, reg, trade_nodes, trade_memo, corp, trade_reach, routes);
