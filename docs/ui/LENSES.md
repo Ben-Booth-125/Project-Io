@@ -836,7 +836,10 @@ shows convoys in flight and Supply-routes the lanes they carved; Trade-flow show
 **decision** behind them — what the player's dispatcher sent this pass, to where, at what
 landed price, and what it refused. Owned by BL-1222 (trade-flow lens). Ruled by Ben
 (2026-10-07, the lens form): a player lens over the player's own flows; the whole-world
-diagnosis stays headless (the market-viability skill's logistics row).
+diagnosis stays headless (the market-viability skill's logistics row). **The player sees unmet
+want (Ben, 2026-10-08, the chain-start form):** the inputs a market's processors want and cannot
+get are shown to the player, on the market ledger or on this lens — which surface is open, and is
+asked of the player's question first. Owner: BL-1222 (trade-flow lens).
 
 **Visibility.** The player's own flows only (DISCOVERY.md § Competitor visibility). A market
 being short of a good is a public market signal; the refusal is a fact about the player's own

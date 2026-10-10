@@ -238,7 +238,7 @@ tradeable set is catalogued in `docs/economy/RESOURCES.md` § What trades.
    resource under a standing sell order is exempted — the order governs, and by default the order
    covers the same surplus (step 5), so nothing is stranded.
 
-   **A pad's pool keeps its propellant (Ben, 2026-10-09; BL-1217).** Where the corporation holds
+   **A pad's pool keeps its propellant (Ben, 2026-10-09; BL-1217, inputs reach processors).** Where the corporation holds
    a Launchpad on the pool's body (the body its launches burn from), its propellant is part of the reservation: auto-surplus
    lists none of it, because launches burn from that pool and a fuelled pad is the gate to space
    (`PRODUCTION.md` § Launchpad). The corporation may still sell it by a standing sell order. A
@@ -1015,7 +1015,7 @@ swept at k = 0/1/2/4/8 on seeds 0/43/10 with spoilage on and households eating, 
 took the share of consuming prices at the ceiling against a stocked shelf from 5.2% to 0.1%, every
 k above 0 left fewer firms alive (38% at 0, 21–23% above), and the ceiling that remains is empty
 shelves no k can reach. It is re-swept once water is supplied (BL-1198, the Well).
-**The shelf's share reads the want the ceiling silenced (Ben, 2026-10-07; BL-1209).** With the
+**The shelf's share reads the want the ceiling silenced (Ben, 2026-10-07; BL-1209, shelf sees silenced want).** With the
 share at `min(inventory, k × demand)`, a buyer silenced by the fair-price ceiling contributes no
 demand, so a full shelf priced over the ceiling counts as no supply and stays priced over it — a
 cycle that starved about 65% of the processors starved at handoff (BL-1207, handoff starvation).
@@ -1028,7 +1028,7 @@ k = 0/1/2/4 on seeds 0/43/10/28/38, k = 1 is the smallest k that takes a consumi
 at the ceiling against a stocked shelf to 0% (2.5% at k = 0); it passes run-rate income (50.8%
 against 47.2% at k = 0) and firm survival (83.5%, against 88.9% at k = 0), and lifts medical
 supply at ticks 20-50 from 31% to 51% of the household bid.
-**A short shelf is shared pro-rata (Ben, 2026-10-07; BL-1209).** When a shelf cannot meet every
+**A short shelf is shared pro-rata (Ben, 2026-10-07; BL-1209, shelf sees silenced want).** When a shelf cannot meet every
 draw admitted against it in a tick, each draw receives the same share of its need, not first-come
 by building id: a dip under the ceiling no longer lets the lowest-numbered plants empty the shelf
 while the rest starve. **The sharing is a floor, then the remainder.** A shelf is *contended* when

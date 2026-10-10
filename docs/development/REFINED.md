@@ -40,7 +40,7 @@ Ben (2026-10-07, the ceiling-lock form): try A and D, each ALONE on 5 seeds, the
 Both behind a registry switch, default OFF; no doc changes before the ruling.
 - [x] A Lane PRICE (b9480859, unmerged): no G1 lift - 57.0 / A1 56.5 / A2 56.2 on 5 seeds; the ceiling share moves to contended. Inflow is the constraint.
 - [x] D Lane PHANTOM (a9019c35): G1 57.0 -> 60.9, G2 52.8 -> 64.4, G3 90.0 -> 91.9 on 5 seeds. Ben ADOPTED it switch on, after cold review (running). A dropped (Ben). BL-1226 (background pull per doc) filed.
-- [ ] M Main session: readings side by side; Ben's ruling form; write the ruling into MARKETS.md.
+- [x] M Main session: readings side by side; Ben's ruling form; write the ruling into MARKETS.md. - ruled (D adopted, A dropped) and written: MARKETS.md step 3 "The pull consumes what it buys".
 
 ### Wave 2 — raw supply (widened, Ben, the supply lever form, 2026-10-07)
 
@@ -56,13 +56,13 @@ measured alone on the market-viability skill. G1 70% stays.
 
 Targets G1 >= 85% at handoff, G1b <= 5%; sprint extends. Rulings in bb09107e. G1 at t50 deferred with long-term viability (Ben, 2026-10-09).
 - [x] D1 DIALHOLD: BL-1235 (dial hold outlasts reflex) - merged 3bca733a.
-- [ ] D2 PROPELLANT: priced 64.0 on the air route; pad keeps its propellant; seat plants back to auto (NR-986) - rework building (route gate, save v41).
-- [ ] D3 Dial reads stock-fed consumers (grant narrowed 2026-10-09) + base forecast on never-cleared markets - narrowed rework building.
-- [ ] D4 Rescue reads an unpriced output as floored (AI_OPPONENT, reflex tier). With D3.
-- [ ] D5 Opening stock held, not listed, until the market bids (CORPORATION_GENERATION Pass 4b).
-- [ ] D6 No processor placed beyond its output's want - trace the ~34 refined-fuel plants per seed first.
+- [x] D2 PROPELLANT: priced 64.0 on the air route; pad keeps its propellant; seat plants back to auto (NR-986) - rework building (route gate, save v41). - MERGED 2aeb48ef (v41).
+- [x] D3 Dial reads stock-fed consumers (grant narrowed 2026-10-09) + base forecast on never-cleared markets - narrowed rework building. - MERGED 6d04dfe1 (v40).
+- [x] D4 Rescue reads an unpriced output as floored (AI_OPPONENT, reflex tier). With D3. - MERGED 6d04dfe1.
+- [x] D5 Opening stock held, not listed, until the market bids (CORPORATION_GENERATION Pass 4b). - MERGED 54a22ff7 (v39).
+- [x] D6 No processor placed beyond its output's want - trace the ~34 refined-fuel plants per seed first. - MERGED 54a22ff7.
 - [x] D7 Diagnose t50 mid-chain starvation - probe merged f98d43df; findings deferred with long-term viability.
-- [ ] D8 16-seed gate after D2-D6 merge (order D5/D6, D3/D4, D2); absolute running/built counts.
+- [x] D8 16-seed gate after D2-D6 merge (order D5/D6, D3/D4, D2); absolute running/built counts. - integrated gate 39907baf all pass (G1 96.6, G1b 1.9).
 
 ### Close — the doc check (Ben, 2026-10-08: "make sure all the various decisions are documented")
 
@@ -70,33 +70,45 @@ Run once every lane has merged, before the re-bless. For each ruling below: (1) 
 its owning doc, in state-independent words; (2) the code matches it; (3) no sibling doc still
 asserts the overturned claim — grep the OLD wording across docs/ (the same-day-ruling trap);
 (4) a backlog item owns any part not yet built. One NEEDS_REVIEW entry per gap found.
-- [ ] Sprint cut: all nine items, measure-led, extend rather than cut (sprints.json row 50)
-- [ ] Trade-flow lens: player lens over own flows; classes; record tagged by corp (LENSES.md)
-- [ ] Every lens has its own glyph on the strip (LENSES.md § strip; ICONS.md)
-- [ ] Lever D: background demand consumes; numbers at the split pull (MARKETS.md step 3, 12)
-- [ ] Background pull split by catchment; electronics stays until the household rung (MARKETS.md)
-- [ ] Power rides the province grid; market shelf on its centre's grid (LOGISTICS.md § 3a)
-- [ ] An order is a floor, not a hold (MARKETS.md step 4; ACTIONS place_sell_order; NR-982)
-- [ ] A mine candidate is priced at its stack rank (AI_OPPONENT.md)
-- [ ] A processor needs spare reachable supply at t_idle (CORPORATION_GENERATION.md Pass 3)
-- [ ] A refused processor's draw enters derived demand, tied to reach (CORPORATION_GENERATION.md)
-- [ ] Generation sized per power grid (PRODUCTION.md § Power)
-- [ ] The scorer's power estimate reads the grid's shortfall — HELD (AI_OPPONENT.md; mark held)
-- [ ] The solver prices inputs at the posted price; power read on the grid (PRODUCTION.md)
-- [ ] No bid vs listed supply, and a dead market in play, veto a build; what counts as a bid (AI_OPPONENT.md § 2B)
-- [ ] Grant: a rival reads its own refused processor as a bid for its own mine (AI_OPPONENT.md § 11)
-- [ ] A new processor is judged on supply, not stock (AI_OPPONENT.md, processing-facility candidate)
-- [ ] Targets: G1 >= 85%, G1b <= 5% (market-viability SKILL.md; BL-1217; sprint row)
-- [ ] G1 at tick 50 deferred with long-term viability (Ben 2026-10-09; sprint row; SKILL.md)
-- [ ] Propellant priced from its inputs (RESOURCES.md, PRODUCTION.md "What is exempt")
-- [ ] A dial-idled plant is not losing; the hold ends on recovery (AI_OPPONENT.md; BL-1235)
-- [ ] Grant: the dial reads stock-fed consumers - narrowed same day (AI_OPPONENT.md § 11; § 2B "dial" sentence)
-- [ ] The dial forecasts at base where no fact exists; rescue reads unpriced as floored (AI_OPPONENT.md)
-- [ ] Opening stock held until bid; no processor beyond its output's want (CORPORATION_GENERATION.md)
-- [ ] Road generation schema kept (no doc change; confirm nothing claims otherwise)
-- [ ] Quick Start; loading bars in a top band (STARTUP.md) — built and merged 7c39a626; Ben's live click passed 2026-10-08 ("Quick Start looks good")
-- [ ] Unmet want visible to the player in sprint 51 (BL-1222)
-- [ ] Wrap it as a reusable check (a script listing each sprint's dated rulings against their docs) if the pattern holds — ask Ben before adding a skill
+Run 2026-10-10. Repeat checks (1) and (3): `node tools/session/ruling_check.js --register
+tools/session/rulings/sprint-50.json`; list every dated ruling: `--since 2026-10-07`.
+- [x] Sprint cut: all nine items, measure-led, extend rather than cut (sprints.json row 50) — goal line updated to the raised targets
+- [x] Trade-flow lens: player lens over own flows; classes; record tagged by corp (LENSES.md)
+- [x] Every lens has its own glyph on the strip (LENSES.md § strip; ICONS.md)
+- [x] Lever D: background demand consumes; numbers at the split pull (MARKETS.md step 3, 12)
+- [x] Background pull split by catchment; electronics stays until the household rung (MARKETS.md)
+- [x] Power rides the province grid; market shelf on its centre's grid (LOGISTICS.md § 3a) — grid-level shelf cap added to LOGISTICS § 3a
+- [x] An order is a floor, not a hold (MARKETS.md step 4; ACTIONS place_sell_order; NR-982) — SUPPLY § Dispatch trigger now says it too
+- [x] A mine candidate is priced at its stack rank (AI_OPPONENT.md)
+- [x] A processor needs spare reachable supply at t_idle (CORPORATION_GENERATION.md Pass 3)
+- [x] A refused processor's draw enters derived demand, tied to reach (CORPORATION_GENERATION.md)
+- [x] Generation sized per power grid (PRODUCTION.md § Power)
+- [x] The scorer's power estimate reads the grid's shortfall — HELD (AI_OPPONENT.md; mark held) — HELD: code does not do it; no open owner -> NR-991
+- [x] The solver prices inputs at the posted price; power read on the grid (PRODUCTION.md) — code reads power pooled only as an OUTPUT of a processing facility - reported
+- [x] No bid vs listed supply, and a dead market in play, veto a build; what counts as a bid (AI_OPPONENT.md § 2B)
+- [x] Grant: a rival reads its own refused processor as a bid for its own mine (AI_OPPONENT.md § 11)
+- [x] A new processor is judged on supply, not stock (AI_OPPONENT.md, processing-facility candidate)
+- [x] Targets: G1 >= 85%, G1b <= 5% (market-viability SKILL.md; BL-1217; sprint row)
+- [x] G1 at tick 50 deferred with long-term viability (Ben 2026-10-09; sprint row; SKILL.md) — BL-1217 R2 requirement no longer gates t50; owner BL-1248 (plants survive to t50)
+- [x] Propellant priced from its inputs (RESOURCES.md, PRODUCTION.md "What is exempt")
+- [x] A dial-idled plant is not losing; the hold ends on recovery (AI_OPPONENT.md; BL-1235)
+- [x] Grant: the dial reads stock-fed consumers - narrowed same day (AI_OPPONENT.md § 11; § 2B "dial" sentence)
+- [x] The dial forecasts at base where no fact exists; rescue reads unpriced as floored (AI_OPPONENT.md)
+- [x] Opening stock held until bid; no processor beyond its output's want (CORPORATION_GENERATION.md)
+- [x] Road generation schema kept (no doc change; confirm nothing claims otherwise)
+- [x] Quick Start; loading bars in a top band (STARTUP.md) — built and merged 7c39a626; Ben's live click passed 2026-10-08 ("Quick Start looks good")
+- [x] Unmet want visible to the player in sprint 51 (BL-1222) — written into LENSES.md § Trade-flow lens; owner BL-1222
+- [x] Wrap it as a reusable check (a script listing each sprint's dated rulings against their docs) if the pattern holds — ask Ben before adding a skill — tools/session/ruling_check.js + tools/session/rulings/sprint-50.json; a skill is Ben's call
+- [x] ADDED: Re-ruled - the background pull leaves one tick of processor want, silenced want included (MARKETS.md step 3, step 12)
+- [x] ADDED: What counts as a bid also: off-book want held for the cadence, launch fuel, own-pool upkeep, running consumers; nation want at the capital (AI_OPPONENT.md § 2B; DISCOVERY.md; NR-984)
+- [x] ADDED: Generation serves unpowered grids first; an unreachable grid never holds up the others (PRODUCTION.md § Power; NR-985)
+- [x] ADDED: Every recipe switch (chase and rescue) is judged on supply; a resume keeps stock (AI_OPPONENT.md)
+- [x] ADDED: Grant - spare supply net of household and background draws; generation charges both baskets whole at base, accepted as built (AI_OPPONENT.md § 11; CORPORATION_GENERATION.md Pass 3)
+- [x] ADDED: Propellant anchors at 64.0 on the air route; electrolysis only airless, atmospheric only under air (RESOURCES.md; PRODUCTION.md § Chemical Plant; ACTIONS)
+- [x] ADDED: A pad's pool keeps its propellant from auto-surplus (MARKETS.md step 4; PRODUCTION.md § Launchpad; SUPPLY.md); rival drain owned by BL-1249 (pad fuel drained)
+- [x] ADDED: The seat's dial-idled plants return to auto at the handoff (AI_OPPONENT.md; NR-986)
+- [x] ADDED: A recipe-less processor with an unwanted default is not placed; the authored installation and a chartered firm's second works excepted (CORPORATION_GENERATION.md Pass 6)
+- [x] ADDED: Roads - a route is priced on the field its destination's flood was built on; the snap bounded at 1.75x (LOGISTICS.md § 4; BL-1252, no parallel roads) — detour-test sentence no longer claims no second road on the raster
 
 ## Sprint 48 — the world moves forward (opened 2026-09-25, CLOSED 2026-10-04)
 
