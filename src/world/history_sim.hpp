@@ -461,6 +461,12 @@ struct history_sim_params
     /// median polity held it" is undefined and the acquisition median stands.
     int64_t sea_legs_year = 1640;
 
+#ifndef IO_SEA_LEGS_FLEET_MIN
+#define IO_SEA_LEGS_FLEET_MIN 100
+#endif
+    /// MEASUREMENT PLACEHOLDER (removed before commit).
+    int64_t sea_legs_fleet_min = IO_SEA_LEGS_FLEET_MIN;
+
     /// The treasury-bought third road rung (the Post Road): from this year a
     /// polity may buy it. Was the Exploration tree's Post Roads (the
     /// `post_roads` key). MEASURED: 191 acquisitions

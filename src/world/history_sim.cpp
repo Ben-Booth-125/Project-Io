@@ -393,6 +393,7 @@ bool polity_holds_sea_legs(const std::vector<region>& regions, const polity& q,
                            const history_sim_params& p, int64_t year)
 {
     if (!sea_legs_open(p, year)) return false;
+    if (q.navy_stock < p.sea_legs_fleet_min) return false; // a fleet afloat (Ben, 2026-10-10)
     const roster_band band = roster_band_for_capacity(
         clampi(q.capacity[static_cast<int>(sim_domain::military)], 1, 6));
     for (const region& r : regions)

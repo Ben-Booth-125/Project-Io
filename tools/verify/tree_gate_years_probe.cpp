@@ -102,8 +102,10 @@ int main(int argc, char** argv)
                 static_cast<long long>(d.sea_legs_year), static_cast<long long>(d.post_roads_year),
                 static_cast<long long>(d.coastal_naval_ramp[0]), static_cast<long long>(d.coastal_naval_ramp[1]),
                 static_cast<long long>(d.coastal_naval_ramp[2]));
+    std::printf("sea legs fleet floor: %lld hulls afloat\n", static_cast<long long>(d.sea_legs_fleet_min));
     std::printf("  seed | alive 1200 | sea techs held @1200 | fleets opened (hulls) | subjections expl / ind |"
-                " post roads expl / ind\n");
+                " post roads expl / ind | subjects alive 1960 | treaties across water expl / ind\n");
+    int64_t t_se = 0, t_si = 0, t_live = 0, t_twe = 0, t_twi = 0;
     for (uint32_t sd : seeds)
     {
         world_params wp;
@@ -116,15 +118,28 @@ int main(int argc, char** argv)
         int64_t techs = 0;
         for (const polity& q : fx.pre_exploration_polities)
             if (q.alive) { ++alive; techs += q.naval_sea_techs; }
-        std::printf("  %4u | %10d | %20lld | %10lld (%8lld) | %10lld / %-4lld | %10lld / %lld\n", sd, alive,
+        int live = 0;
+        for (const polity& q : fx.industrialisation_handoff.polities)
+            if (q.alive && q.overlord >= 0) ++live;
+        t_se += fx.exploration_state.subjections_formed; t_si += fx.industrialisation_state.subjections_formed;
+        t_live += live;
+        t_twe += fx.exploration_state.treaties_formed_across_water;
+        t_twi += fx.industrialisation_state.treaties_formed_across_water;
+        std::printf("  %4u | %10d | %20lld | %10lld (%8lld) | %10lld / %-4lld | %10lld / %-4lld | %6d | %6lld / %lld\n", sd, alive,
                     static_cast<long long>(techs),
                     static_cast<long long>(fx.exploration_state.naval_fleets_opened),
                     static_cast<long long>(fx.exploration_state.naval_hulls_opened),
                     static_cast<long long>(fx.exploration_state.subjections_formed),
                     static_cast<long long>(fx.industrialisation_state.subjections_formed),
                     static_cast<long long>(fx.exploration_state.post_roads_built),
-                    static_cast<long long>(fx.industrialisation_state.post_roads_built));
+                    static_cast<long long>(fx.industrialisation_state.post_roads_built), live,
+                    static_cast<long long>(fx.exploration_state.treaties_formed_across_water),
+                    static_cast<long long>(fx.industrialisation_state.treaties_formed_across_water));
         std::fflush(stdout);
     }
+    std::printf("POOLED floor %lld: subjections expl %lld ind %lld | subjects alive 1960 %lld | treaties across water"
+                " expl %lld ind %lld\n", static_cast<long long>(d.sea_legs_fleet_min), static_cast<long long>(t_se),
+                static_cast<long long>(t_si), static_cast<long long>(t_live), static_cast<long long>(t_twe),
+                static_cast<long long>(t_twi));
     return 0;
 }
