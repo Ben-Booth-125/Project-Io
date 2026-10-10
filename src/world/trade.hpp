@@ -15,7 +15,12 @@
 #include "recipe_registry.hpp"
 #include "world.hpp"
 
+#include <cstddef>
+#include <map>
+#include <utility>
 #include <vector>
+
+struct logistics_nodes; // supply_system.hpp
 
 /// One trade pass's counters (TRADE.md), for the tick summary and the harnesses.
 struct trade_tick
@@ -64,6 +69,47 @@ std::vector<entity_id> corp_trade_markets(const world& w, entity_id corp);
 /// (capacity > 0, not a grid good) and finite points > 0? The command seam and
 /// the save loader both refuse a trade this rejects.
 bool trade_is_valid(const world& w, const recipe_registry& reg, const standing_trade& t);
+
+/// The same-body haul memo one ranking pass keeps (cost is linear in quantity,
+/// so a one-unit leg prices every quantity): per (source, destination) market,
+/// corporation- and good-independent. NaN = no route. Callers hold one per pass
+/// and hand it to every `rank_trade_routes` call in that pass.
+struct trade_haul_memo
+{
+    std::map<std::pair<entity_id, entity_id>, float> intra;
+};
+
+/// One route auto trade (and the scorer's trade candidate) can rank: good @p r
+/// from market @p a to market @p b.
+struct trade_route_offer
+{
+    float       score;  ///< Margin per POINT: `margin_per_unit x capacity(r)`.
+    entity_id   a;
+    entity_id   b;
+    std::size_t r;
+    float       landed; ///< Source price + haul per unit (the cost a unit lands at).
+    float       margin_per_unit; ///< `price_B - price_A - haul per unit`.
+};
+
+/// The haul per unit of good @p ri from @p a to @p b for @p corp: same body, the
+/// corporation-independent market leg (memoised in @p memo); between bodies,
+/// the corporation's space lane (`price_trade_leg`). NaN when not viable.
+float trade_haul_per_unit(world& w, const recipe_registry& reg, const logistics_nodes& nodes,
+                          trade_haul_memo& memo, entity_id corp, entity_id a, entity_id b,
+                          std::size_t ri);
+
+/// THE ROUTE RANKING auto trade spends by (TRADE.md § Auto and reserved trade),
+/// shared with the scorer's trade candidate (AI_OPPONENT.md § 11, "a rival may
+/// set its own trades") so there is one estimate, not two. Fills @p out with
+/// every route among @p reach that earns more than `dispatch_margin()` of its
+/// source price — the source shelf holds the good under the fair-price
+/// ceiling, `(price_B - price_A - haul) > margin x price_A` — best margin per
+/// point first (ties: source, destination, good, ascending). Reads public
+/// prices and the network's haul only. Writes nothing but logistics caches and
+/// @p memo. Deterministic: sorted walks.
+void rank_trade_routes(world& w, const recipe_registry& reg, const logistics_nodes& nodes,
+                       trade_haul_memo& memo, entity_id corp,
+                       const std::vector<entity_id>& reach, std::vector<trade_route_offer>& out);
 
 /// THE TRADE PASS, once per economy tick, after `run_economy_step` (its
 /// production has landed and its draws are made) and before `clear_markets`

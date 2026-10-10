@@ -432,7 +432,7 @@ candidate set is this subset of it:
 | `idle(building)` / `resume` | `decommissioned` flag | Tier-0 loss-streak rule, reversible |
 | `survey(body)` | survey_system | The AI pays for discovery like the player |
 | `hire_unit(tile, unit_type)` | `hire_unit` at the corp's own completed `military_base` | Availability gated on stockpile/market access, never on cash; spend subject to the solvency gate |
-| `place_sell_order(body, target, quantity, floor)` | the order book | § 2C |
+| `set_trade(from, to, good, points)` / `clear_trade(id)` / `set_trade_reserve(points)` | the trade pass (`../economy/TRADE.md`) | § 2C; the corporation's own manual trades on its own trade points |
 
 **A plant the dial idled is not losing (Ben, 2026-10-08; BL-1235, dial hold outlasts reflex).**
 When the workforce dial sets a plant to zero, the maintenance it pays while idle is the cost the
@@ -763,46 +763,51 @@ regression-checked against `corp_ai_harness.cpp`.
 
 Ben, 2026-08-07, resolving NR-083: *"Order book needs to be a background process, the AI must be
 able to trade as a player does."* A player-only fence over the trade verbs was proposed and
-explicitly rejected, so the scorer reaches the order book exactly as it reaches build and survey
-— `place_sell_order` is a `corp_verb`, and rival corps are the corps that drive the seam.
+explicitly rejected, so the scorer reaches trade exactly as it reaches build and survey — through
+the player's own verbs on the corp-command seam. The order book and its sell orders retired with
+corporation pools (`../economy/MARKETS.md` § The shelf economy); what a corporation trades now is
+the **manual trade** (`../economy/TRADE.md` § A trade), under the § 11 grant *a rival may set its
+own trades* (Ben, 2026-10-10).
 
-**This is a grant of reach, not of skill, and the distinction is the design.** "Can trade" is not
-"trades well": a scorer that dumps stock at the floor price is genuinely *worse* than one that
-does not trade, because it drags the resolved price down for everyone including itself — and the
-auto-surplus path clears that stock at the reference price anyway. So the rule is the narrowest
-thing that is still trading:
+**Auto trade is not a decision.** A corporation's unreserved trade points are spent by the trade
+pass on the best-margin routes every tick, for every owner alike (`TRADE.md` § Auto and reserved
+trade). The scorer decides only which routes to **pin** as manual trades, which to **clear**, and
+how many points to **reserve** for them.
 
-- **Candidate**: for each body, each resource the local market prices, the corp's stock summed
-  across its market pools on that body (`PRODUCTION.md` § Stockpile and output flow) above
-  `trade_hold_threshold` (50 units) — well clear of any processor's per-tick draw, so listing can
-  never compete with feeding the corp's own chain.
-- **Quantity**: none — the order is placed **uncapped**. An order is a price floor over the whole
-  surplus (`MARKETS.md` step 4, Ben 2026-10-05): clearing lists everything above the processor
-  reservation under it, tick by tick, so it keeps pace with what the corp produces, and an order
-  whose pool stands empty closes itself. The scorer has nothing to size and nothing to withdraw.
-- **Floor**: `trade_floor_multiple` × the market's `base_price` — the rarity-derived value floor,
-  the closest per-resource cost reference the world exposes. The authored value is **0.25**,
-  which is the price band's own floor (the lowest price a glutted market can resolve), so surplus
-  always clears at whatever the market resolves; anything above 0.25 makes the corp hold on a
-  deep glut — a strategy call, not a default.
-- **Score**: expected cash valued *at the floor*, not at the current price. The conservative
-  estimate, so a listing on a crashed market cannot outscore a genuinely profitable dial.
-- **Bucket**: Should-Have. Listing accumulated stock carries no capex — it brings cash *in* — so
-  it can never starve a higher bucket, which is the only test the buckets apply.
-- **Anti-thrash**: never a second order on a `(corp, body, resource)` that already has one, and
-  at most `max_trades` (1) order-book command per evaluation. A trade command's subject is a body,
-  not a building, so it takes no dial slot and records no building cooldown.
+**One estimate, one code path.** The scorer ranks routes with the trade pass's own ranking
+(`rank_trade_routes`): every route among the markets the corporation's own Marketplaces and Ports
+reach whose margin per unit — destination price less source price less the network's haul per
+unit — beats `dispatch_margin` of the source price, ordered by **margin per point** (margin per
+unit × the good's trade capacity), ties by source, destination and good. It reads public prices
+and the network's haul only — never another corporation's trades, points or plans.
 
-Both numbers are `corp_ai_params` fields, so tuning is a data change. Two limits are part of
-the shape: `base_price` is a rarity floor and not a production cost, so on a resource whose real
-cost sits above its rarity floor the AI will sell at a loss (the blackboard's lack of a reference
-price is BL-385, blackboard exports no reference price); and the book is **one-sided** — a corp
-can release stock and cannot bid for it, the dormant buy side being BL-383 (remove dormant buy
-side). A real strategy (price trend, timed release, targeting a rival's shortage) is later work.
+- **Eligible**: a corporation whose trade buildings made trade points on the last trade pass.
+  Never the player's corporation — not even under spectate, where every other family scores the
+  seat (§ 11 names "nothing for the player's corp", and that is not widened here).
+- **Pin** (`set_trade`): the best-ranked route the corporation does not already hold as a manual
+  trade, sized to what the destination can absorb above the landed cost (`trade_room`) and the
+  source shelf holds, and capped so its manual trades together hold at most `trade_pin_share`
+  (0.5) of the points it makes — the rest stays with auto. **Score**: the expected cash per tick,
+  margin per unit × the units its points move, × the personality jitter. **Spend**: one tick's
+  outlay at the landed cost, under the solvency gate. Bucket Nice-to-Have: a route lays cash out
+  at the source before its landing pays it back.
+- **Unpin** (`clear_trade`): a manual trade of its own whose route now loses — margin per unit
+  at or below zero at current prices and haul — or can no longer run. **Score**: the loss
+  avoided per tick, −margin × the units its points move (zero for a route that cannot run: it
+  ships nothing and costs nothing, and is cleared only to free its points). Bucket Must-Have, as
+  an idle is: a losing trade runs until its owner changes it, so it is a standing bleed. The gap
+  between the pin's margin floor and the unpin's zero is the hysteresis.
+- **Reserve** (`set_trade_reserve`): after any pin or unpin, the reserve is set to the sum of the
+  corporation's manual trades' points in the same evaluation, so a new pin is supplied on the very
+  next trade pass. Bookkeeping: no spend, outside the trade budget.
+- **Budget**: at most `max_trades` (1) pin or unpin per evaluation. A trade command's subject is a
+  market or a trade, never a building, so it takes no dial slot and records no building cooldown.
 
-Verified by `tools/verify/order_book_harness.cpp` § R5, which asserts the conservatism as
-behaviour rather than as intent: never below the rarity floor, never on a pool under the
-threshold, never a duplicate, and never on the player's own corp.
+`trade_pin_share` and `max_trades` are `corp_ai_params` fields. The rule is a grant of reach, not
+of skill: no price trend, no timing, no reading of a rival's shortage. Verified by
+`tools/verify/ai_trade_harness.cpp`: a rival pins the ranking's best route within its share,
+keeps its reserve equal to its manual points, unpins a route turned losing, never acts for the
+player's corporation, and two runs from one start issue the identical commands.
 
 ### Hysteresis & action budget
 
@@ -829,7 +834,8 @@ threshold, never a duplicate, and never on the player's own corp.
   scored for cutting its target and a loss-maker for raising it; a sign taken from the building's
   current variable margin would only ever find one direction.
 - **Budget**: per evaluation, at most `max_builds` (1) construction + `max_dials` (3) dial
-  changes + `max_trades` (1) order-book command + one hire per corp; total committed spend capped
+  changes + `max_trades` (1) trade pin or unpin + one hire per corp (the trade reserve's
+  correction is outside it); total committed spend capped
   by the solvency gate, each accepted candidate reserving its spend against the later ones in the
   same evaluation.
 - **Determinism**: stable iteration (sorted `corp_ids`, stored asset order, tile-index order);
@@ -853,7 +859,7 @@ every decision a corp took.
 **Scored within one budget family, never across.** The candidate families — build, dial, survey,
 hire, trade, dispatch — are the six action budgets above, and each is scored by **one formula in
 one unit**: a build by `net / capex`, a dial by the estimator's modelled per-tick gain, a trade
-by `quantity × floor`, a dispatch by `revenue − leg cost`. Those scales are unrelated, so a
+by the cash per tick a route pin earns or an unpin saves, a dispatch by `revenue − leg cost`. Those scales are unrelated, so a
 comparison across families states nothing, and an evaluation-wide maximum makes
 `runner_up ≥ winning_score` the ordinary case — which is a decision surface that reports the same
 thing about every decision. The runner-up is therefore **the best option foregone in the winner's

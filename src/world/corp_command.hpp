@@ -430,6 +430,10 @@ enum class corp_decision_reason : uint8_t
     survey_expand,    ///< Discovery spend within the solvency floor.
     hire_available,   ///< Roster row available under the corp's own campaign gate (BL-324).
     trade_surplus,    ///< BL-293: stock piled up past the hold threshold; list it with a floor.
+    // --- BL-1267 (a rival sets its own trades, AI_OPPONENT.md § 11), appended ---
+    trade_pin,        ///< A route's margin per point clears the floor; pin a manual trade on it.
+    trade_unpin,      ///< A manual trade's route now loses (or cannot run); clear it.
+    trade_reserve,    ///< Keep the reserve equal to the manual trades' points.
 };
 
 /// One past the highest reason — the count sentinel `decision_feed.cpp` uses to
@@ -437,7 +441,7 @@ enum class corp_decision_reason : uint8_t
 /// Bound to the same append-only rule: appending a reason means moving this
 /// with it.
 inline constexpr uint8_t corp_decision_reason_count =
-    static_cast<uint8_t>(corp_decision_reason::trade_surplus) + 1;
+    static_cast<uint8_t>(corp_decision_reason::trade_reserve) + 1;
 
 /// One ring-buffer entry: the command plus its score rationale.
 struct corp_decision
