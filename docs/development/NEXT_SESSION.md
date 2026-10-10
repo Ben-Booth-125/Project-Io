@@ -1,9 +1,7 @@
 > **Sprint 51 CLOSED 2026-10-10, cut as v0.1.29** (visibility: the ground and the opening market; merged to main).
 > Carried to sprint 52: BL-1247 (ground benchmark: the click-through painting wait is 46-68 s), BL-1293 (anchor rings
-> clip, cause not found), BL-1255 (rail rung). Five requirement rows owe Ben a live click: the Production good row,
-> the owner checklist and shift-click, owner picking under the wash, wharf placement, stacked-tile presses
-> (`requirements_query.js`, groups tile-production-section, owner-multi-select, lens-washes-ground,
-> wharf-placed-on-shore, structures-baked). The sprint 50 handoff below is unchanged.
+> clip, cause not found), BL-1255 (rail rung). All five live clicks passed 2026-10-10; Ben called the sprint a success.
+> Local main holds the close unpushed (4fee131e+); bring it onto origin from another session. The sprint 50 handoff below is unchanged.
 
 # Sprint 50 running handoff — logistics and trade flow (updated 2026-10-08)
 
