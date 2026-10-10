@@ -365,14 +365,13 @@
   },
   {
    "id": "UI-019",
-   "name": "Home-cluster ring + HQ star",
+   "name": "Home-cluster ring",
    "kind": "sub-element",
    "parent": "UI-013",
    "source": [
-    "docs/ui/PLANETARY.md § Visual elements",
-    "docs/ui/ICONS.md § hq glyph"
+    "docs/ui/PLANETARY.md § Visual elements"
    ],
-   "summary": "Always-on player-presence chrome on home_body only (BL-085/BL-092): a translucent ring around the player's holdings cluster, an HQ star on the building nearest the centroid.",
+   "summary": "Always-on player-presence chrome (BL-085): a player-identity ring traced round each tile the player holds, over a light wash on the plain canvas. The HQ star retired from the Planetary canvas (Ben, 2026-10-10).",
    "interesting_question": "n/a — narrowly-scoped, single-body chrome.",
    "resolution": "n/a",
    "checks": [
@@ -389,7 +388,7 @@
     "docs/ui/LENSES.md § Corporation lens § Corporate reach (BL-182)",
     "docs/ui/PLANETARY.md § Layers"
    ],
-   "summary": "Under the Corporation lens, each rival's HQ-projected reach ring (radius = influence_range · hex_size · zoom, persisted per corp) plus an HQ star, drawn through the same draw_corp_border path as the player's own always-on border.",
+   "summary": "Retired from the canvas: the reach ring went with BL-329 (corp-reach circle) and the HQ star with Ben's 2026-10-10 ruling. Under the Corporation lens an owner reads by its tile tint alone; influence_range is stored, not drawn.",
    "interesting_question": "The ring is described explicitly as 'render-only chrome — it gates nothing' — so a rival's visible reach ring implies no mechanical range restriction exists yet. Does that visual promise a rule the game does not enforce?",
    "resolution": "Named, not resolved: LENSES.md states the full gameplay mechanic (range that gates operations, multi-HQ via advancement) 'stays deferred in docs/development/backlog.json (BL-182)' — the render shipped ahead of the mechanic on purpose.",
    "checks": [
@@ -560,7 +559,7 @@
    "source": [
     "docs/ui/LENSES.md § Corporation lens"
    ],
-   "summary": "Tints tiles by owning corporation (a tile is owned iff a corp holds a building on it); player gets a white border, rivals a hashed identity colour; rival HQ reach rings compose in.",
+   "summary": "Tints tiles by owning corporation (a tile is owned iff a corp holds a building on it); player gets a white border, rivals a hashed identity colour; no HQ star or reach ring (both retired from the canvas).",
    "interesting_question": "There is 'no influence radius and no nation-domination heuristic' — ownership is literally the building tile only. Does that make corporate 'territory' read thinner than the Country lens's contiguous nation fields right beside it on the same strip?",
    "resolution": "Explicit, current-iteration scope: LENSES.md states 'only the literal building tile counts as owned' in this iteration, with no stated plan to add an influence radius beyond the separate BL-182 reach-ring layer.",
    "checks": [

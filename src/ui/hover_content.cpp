@@ -274,80 +274,6 @@ void hover_building_rival(const world& w, const recipe_registry* reg,
     ImGui::TextDisabled("Competitor \xe2\x80\x94 output private");
 }
 
-// --- Exemplar 3: market-centre × market lens ------------------------------------
-
-void hover_market_market(const world& w, entity_id eid, resource_type res)
-{
-    const auto mkt_it = w.markets.find(eid);
-    if (mkt_it == w.markets.end())
-    {
-        ImGui::TextDisabled("\xe2\x80\x94");
-        return;
-    }
-    const market_component& mkt = mkt_it->second;
-    const resource_presentation& rp = presentation_of(res);
-
-    // Title: body market name.
-    const auto body_it = w.bodies.find(mkt.body);
-    if (body_it != w.bodies.end())
-        ImGui::Text("%s Market", body_it->second.name.c_str());
-    else
-        ImGui::TextUnformatted("Market");
-
-    const std::size_t ri = static_cast<std::size_t>(res);
-
-    // Stat line 1: current price vs base price.
-    const float price      = mkt.price[ri];
-    const float base_price = mkt.base_price[ri];
-    const float move       = price - base_price;
-    ImGui::Text("%s price: %.2f", rp.name, static_cast<double>(price));
-
-    // Stat line 2: supply and demand.
-    ImGui::Text("Supply %.1f  Demand %.1f",
-                static_cast<double>(mkt.supply[ri]),
-                static_cast<double>(mkt.demand[ri]));
-
-    // Why-line: interpret the price signal.
-    ImGui::Spacing();
-    const float supply = mkt.supply[ri];
-    const float demand = mkt.demand[ri];
-    if (supply <= 0.0f && demand <= 0.0f)
-    {
-        ImGui::TextDisabled("No activity for this resource");
-    }
-    else if (move > base_price * 0.1f)
-    {
-        ImGui::TextDisabled("Price high \xe2\x80\x94 demand outpaces supply");
-    }
-    else if (move < -base_price * 0.1f)
-    {
-        ImGui::TextDisabled("Price low \xe2\x80\x94 supply exceeds demand");
-    }
-    else
-    {
-        ImGui::TextDisabled("Price stable");
-    }
-}
-
-// Fallback market content (non-market lens).
-void hover_market_default(const world& w, entity_id eid)
-{
-    const auto mkt_it = w.markets.find(eid);
-    if (mkt_it == w.markets.end())
-    {
-        ImGui::TextDisabled("\xe2\x80\x94");
-        return;
-    }
-    const market_component& mkt = mkt_it->second;
-    const auto body_it = w.bodies.find(mkt.body);
-    if (body_it != w.bodies.end())
-        ImGui::Text("%s Market", body_it->second.name.c_str());
-    else
-        ImGui::TextUnformatted("Market");
-
-    ImGui::TextDisabled("Switch to Market lens for prices");
-}
-
 } // namespace
 
 // --- Public entry point ---------------------------------------------------------
@@ -414,15 +340,9 @@ void draw_hover_content(const world& w, const ui_state& ui, entity_id eid,
         return;
     }
 
-    // Dispatch: market
-    if (w.markets.count(eid))
-    {
-        if (ui.overlay == overlay_mode::market)
-            hover_market_market(w, eid, ui.lens_resource);
-        else
-            hover_market_default(w, eid);
-        return;
-    }
+    // No market dispatch: the Planetary canvas's market-centre marker and its
+    // hover target retired (Ben, 2026-10-10), so a market never reaches here —
+    // under the Market lens the card's subject is the tile (BL-664).
 
     // Fallback: unknown entity kind — show nothing rather than crashing.
     ImGui::TextDisabled("Entity %u", static_cast<unsigned>(eid));

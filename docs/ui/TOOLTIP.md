@@ -31,7 +31,8 @@ See also: [LAYOUT.md](LAYOUT.md) (where the card sits in the shell),
 ## Where hover readouts live
 
 - **Planetary surface** — the shared hover card, glance-then-stick, serving
-  tiles, buildings, and market centres through the lens-keyed
+  tiles and buildings (a market centre is no hover target since its glyph
+  retired, Ben 2026-10-10) through the lens-keyed
   `draw_hover_content` dispatch (below).
 - **Solar / Circumplanetary** (`solar_system_canvas.cpp`,
   `circumplanetary_canvas.cpp`) — a lightweight `SetTooltip` on the hovered
@@ -117,8 +118,6 @@ lens is asking:
 | **Tile** | *(default)* | header, habitability, and the landform's movement-cost multiplier (`landform_logistics_cost`) when not plains |
 | **Building** (player) | any | type, target/recipe line, workforce, an operational why-line (idle / understaffed / active) |
 | **Building** (rival) | any | type + owner emblem only — production/stockpile stay private (the competitor-visibility rule, DISCOVERY.md) |
-| **Market centre** | Market | headline price vs base, supply/demand, a price-signal why-line |
-| **Market centre** | *(default)* | market identity + "Switch to Market lens for prices" |
 
 Every tile variant shares the **terrain header** — `composition · landform`,
 with plains left unnamed as the baseline — so the baked landform forms are

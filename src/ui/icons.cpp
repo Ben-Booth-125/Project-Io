@@ -1141,16 +1141,6 @@ void unit_marker(ImDrawList* dl, ImVec2 centre, float r, ImU32 fill, bool commit
     }
 }
 
-void market_centre(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
-{
-    // Circle outline.
-    dl->AddCircle(centre, r, colour, 0, 1.5f);
-    // Centred cross, arms reaching to 60 % of radius.
-    const float arm = r * 0.6f;
-    dl->AddLine({ centre.x - arm, centre.y }, { centre.x + arm, centre.y }, colour, 1.5f);
-    dl->AddLine({ centre.x, centre.y - arm }, { centre.x, centre.y + arm }, colour, 1.5f);
-}
-
 void settlement(ImDrawList* dl, ImVec2 centre, float r, int tier, ImU32 colour)
 {
     // A small skyline: `bars` towers sitting on a baseline, the middle tallest, the

@@ -37,7 +37,7 @@ by the cycle without a literal being kept in step by hand.
 
 | `overlay_mode` | Surface (one line) |
 |---|---|
-| `corporation` | Planetary tile tint per **picked** corporation, the rest greyed; picked HQ markers; owner checklist key |
+| `corporation` | Planetary tile tint per **picked** corporation, the rest greyed; owner checklist key |
 | `company` | The Corporation lens's mirror over background firms — picked firms tinted, the rest greyed |
 | `resource` | Planetary contiguous-deposit flat fill; good selector in the legend |
 | `market` | Planetary **catchment tint** — one colour per market + city-name key; Circumplanetary price strip |
@@ -94,7 +94,7 @@ ladder while the rest do not, and a copy drifts from the original silently.
 | Lens | Solar | Circumplanetary | Planetary |
 |---|---|---|---|
 | Supply *(keyboard-cycle only)* | per-convoy route lines | per-body convoy-count badge | per-tile convoy glyph |
-| **Corporation** | — | — | picked owners' tint, the rest grey + picked HQ markers + checklist key |
+| **Corporation** | — | — | picked owners' tint, the rest grey + checklist key |
 | **Resource** | — | — | contiguous-deposit flat fill + key |
 | **Market** | — | per-body price strip | catchment tint + city-name key |
 | **Population** | — | — | per-tile workforce-efficiency **heatmap** |
@@ -159,7 +159,7 @@ whose buildings they could not see.
   unpicked owned-grey washes are categorical; the unpicked owner's dark rim stays a stroke.
   The Continent boundary keeps its lift toward white inside the plate wash. A lit
   structure's hover wash is a wash too, at full tile radius, so it never draws a grid.
-- **The lens's own marks stay vector chrome** above the wash: keys, HQ markers, the owner
+- **The lens's own marks stay vector chrome** above the wash: keys, the owner
   rim, value marks, arrows, labels.
 - **Hit-testing is unchanged** — a lens still resolves a press to its own structure grain
   (SELECTION.md § A lens collapses selection to ONE TIER).
@@ -224,7 +224,7 @@ a national wash over a corporate read competes with the answer.
 **Population (settled 2026-08-28).** This lens admits **corporations only** — the
 player and its rivals — and never a background firm. Ben: *"The corporation lens
 narrows to player and rival, the company lens shows only background firms."*
-Before the narrowing, both the tile tint and the rival HQ-marker layer drew every
+Before the narrowing, the tile tint (and the rival HQ-marker layer, since retired) drew every
 non-player corp, and background firms outnumber the rivals — so a lens asked
 "where are my rivals" and was answered "here is everyone". Background firms have
 their own lens, drawn identically: see **Company lens** below. The two
@@ -289,8 +289,8 @@ once. The lens draws a **picked set** of owners instead:
   dossier, as under every lens (SELECTION.md § Lens-driven hover & selection resolution).
 - **Hover ignores the set.** Hovering an owned tile still lights that owner's whole group,
   picked or not — that is how a player finds whom to pick.
-- **HQ markers follow the set.** A rival's HQ star draws only while it is picked; the
-  player's own stays always-on chrome.
+- **The set drives the tint and nothing else.** No HQ star draws for a picked owner, nor for
+  the player — the HQ glyph retired from the Planetary canvas (Ben, 2026-10-10: "We should remove the HQ glyph and market center glyphs").
 - **The set is UI state** (`ui_state::lens_corps`), per session, not saved, and survives a
   body switch — a picked corporation absent from the new body simply has no row there.
 
@@ -304,23 +304,19 @@ on the player's tiles at the plain default, plus an outline drawn under **every*
 separate, always-on chrome (`is_player_tile`, `corp_identity(w.player_entity)` in
 `body_surface_canvas.cpp`) drawn once regardless of which lens (if any) is active. The
 Corporation lens does not add a second player outline — it *extends the same identity language
-to rivals*, giving every corporation (not just the player) a readable tile tint. The home ring /
-HQ star, drawn only on the player's home body, is a further, distinct layer of the same identity
-chrome.
+to rivals*, giving every corporation (not just the player) a readable tile tint. There is no HQ star on
+this canvas, the player's or anyone's (Ben, 2026-10-10: "We should remove the HQ glyph and market center glyphs").
 
-**Corporate HQ marker** (BL-182, corporate reach). Beyond tinting *held tiles*, the lens draws
-each **rival** corporation's `hq` star, in the corp's identity colour, reading the corp's
-**persisted** seat (`corporation_component::hq_building`, designated at generation —
-CORPORATION_GENERATION.md § Pass 3b). There is **no reach ring** around that seat: a fixed-radius
-ring never grows as a corp builds outward and, with the reach fog showing supply reach, "doesn't
-show anything informative" (Ben's live critique). `influence_range` is computed and stored — a
-future operate-gate may want it — but not drawn. The player's marker and every rival's are drawn
-through **one shared `draw_corp_hq` path**, each on that corp's **home body** (the single-home
-model; branch offices on other bodies are out of scope). The player's own marker stays always-on;
-the rival layer shows under this lens (no double-draw of the player). This layer is
-**render-only chrome** — it gates nothing. The *gameplay* mechanic (range that gates operations,
-the national origin gate, multi-HQ building via advancement, the tall/wide axis, law/tech
-levers) is BL-182's (corporate borders). See `scripts/verify/corporate_reach.lua`.
+**No corporate HQ marker** (Ben, 2026-10-10: "We should remove the HQ glyph and market center glyphs"). The lens reads an owner by its tiles alone: no
+`hq` star marks any corporation's seat (`corporation_component::hq_building`, designated at
+generation — CORPORATION_GENERATION.md § Pass 3b), the player's included, and no reach ring
+surrounds one — the ring went first, as a fixed-radius circle that never grows as a corp builds
+outward and "doesn't show anything informative" (Ben's live critique, BL-329). `influence_range`
+is computed and stored — a future operate-gate may want it — but not drawn. A corporation is
+reached from the map by a press on ground it holds (SELECTION.md § A lens collapses selection to
+ONE TIER). The *gameplay* mechanic (range that gates operations, the national origin gate,
+multi-HQ building via advancement, the tall/wide axis, law/tech levers) is BL-182's (corporate
+borders). See `scripts/verify/corporate_reach.lua`.
 
 ---
 
@@ -334,7 +330,7 @@ firm (`docs/GLOSSARY.md` § Company).
 
 **Drawn identically to the Corporation lens, deliberately.** Same identity tint for a
 picked firm and owned-grey for an unpicked one, same checklist key and shift-click
-picking, same HQ-marker layer for a picked firm's seat. The two lenses differ in what
+picking, and no HQ marker for a firm's seat either. The two lenses differ in what
 they admit and in one default:
 
 - **Default: no firm picked.** The player owns no company, so the Corporation lens's

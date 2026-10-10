@@ -450,22 +450,11 @@ void acquisition(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 ///                  landing needs no further change here.
 void unit_marker(ImDrawList* dl, ImVec2 centre, float r, ImU32 fill, bool committed);
 
-/// Draw a market-centre marker — a small circle with a centred cross (+) — in
-/// @p colour. Distinct from the building square/diamond/triangle glyphs.
-/// Used as an on-canvas selectable marker for market entities
-/// (BL-059, BL-031). For hit-zone display on the Planetary canvas.
-///
-/// @param dl     Draw list to render into.
-/// @param centre Marker centre, screen pixels.
-/// @param r      Half-extent (radius) of the glyph, screen pixels.
-/// @param colour Stroke colour.
-void market_centre(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
-
 /// Draw a settlement marker — a small skyline whose number of towers grows with
 /// @p tier (1 = outpost … 5 = metropolis) — in @p colour. The civilisation read on
 /// the Planetary canvas (population centres, BL-083); tier is carried by the glyph
 /// size/complexity, not colour (see palette::settlement). Distinct from the building
-/// square/diamond/triangle and the market-centre circle+cross.
+/// square/diamond/triangle glyphs.
 ///
 /// @param dl     Draw list to render into.
 /// @param centre Glyph centre, screen pixels.
@@ -486,10 +475,10 @@ void settlement(ImDrawList* dl, ImVec2 centre, float r, int tier, ImU32 colour);
 /// @param colour Civic colour; drawn dimmed, outline-only.
 void settlement_razed(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
-/// Draw the player's headquarters marker — a ringed eight-point star — in @p colour.
-/// Distinguishes the player's HQ building from ordinary holdings on the Planetary
-/// canvas (BL-085, folding BL-092). Distinct from the building glyphs, the market
-/// circle+cross, and the settlement skyline.
+/// Draw a headquarters marker — a ringed eight-point star — in @p colour. Marks a
+/// seat on the Seat screen's map. Not drawn on the Planetary canvas (retired
+/// there, Ben 2026-10-10). Distinct from the building glyphs and the settlement
+/// skyline.
 ///
 /// @param dl     Draw list to render into.
 /// @param centre Glyph centre, screen pixels.

@@ -7,7 +7,8 @@
 --   R2 the key is a checklist (count header, search box, swatch rows); two rivals
 --      picked via the verify API tint in colour; a SHIFT-click on an owned tile
 --      toggles its owner through the real input path and touches no selection.
---   R3 a picked rival's HQ star draws; the sets survive a body switch.
+--   R3 the sets survive a body switch. (A picked rival's HQ star no longer
+--      draws: the Planetary canvas's HQ glyphs retired, Ben 2026-10-10.)
 -- The live half (Ben shift-clicks and uses the checklist) is not this script.
 -- Run with: ProjectIo --verify scripts/verify/owner_multi_select.lua
 

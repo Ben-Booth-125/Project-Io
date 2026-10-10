@@ -649,7 +649,7 @@ click re-selects the same tile. That is the honest reading: there is nothing els
 to cycle to.
 
 A click on a **different** tile (or the first click anywhere) goes through the marker-hit precedence
-(`resolve_marker_hit`: unit > building > market_centre, nearest-wins within a kind) and only
+(`resolve_marker_hit`: unit > building, nearest-wins within a kind) and only
 additionally seeds the cycle anchor so a follow-up repeat click knows where to advance from. Unit
 was raised above building by BL-575 (unit marker and march UI) to match this section's own cycle
 order, where Soldier already precedes Building — a unit standing on a built tile is reachable on
@@ -773,10 +773,14 @@ rule has two parts: a fixed stack order, and a lens-evaluated validity filter ov
 ordered:
 
 ```
-building → market → unit  →  tile  →  body
+unit → building  →  tile  →  body
 ```
 
-(the marker kinds first, then the tile they occupy, then the body that hosts it). "Lowest" means
+(the marker kinds first, then the tile they occupy, then the body that hosts it). **A market is
+not in the stack** (Ben, 2026-10-10: "We should remove the HQ glyph and market center glyphs"): its centre glyph and hit zone retired from the
+Planetary canvas, so a market is selected from the map through the **Market lens** — a press on its
+catchment, by the rule in the next section — or from the Market ledger. With no lens, a press on a
+market's centre tile resolves as any other tile or building press. "Lowest" means
 **most-specific** — earliest in that order.
 
 **The stack is the NO-LENS rule.** With no lens active every drawn kind is valid, so resolution

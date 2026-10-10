@@ -95,7 +95,7 @@
   ],
   [
    "canvas.hover",
-   "The Planetary surface canvas (tiles, buildings, market centres). The Solar and Circumplanetary rungs still use a lightweight ad-hoc tooltip (name, type, orbital radius) — the full card has not migrated there yet."
+   "The Planetary surface canvas (tiles and buildings; a market centre has no hover target of its own since its glyph retired, (Ben, 2026-10-10: 'We should remove the HQ glyph and market center glyphs')). The Solar and Circumplanetary rungs still use a lightweight ad-hoc tooltip (name, type, orbital radius) — the full card has not migrated there yet."
   ],
   [
    "canvas.lens_clear",

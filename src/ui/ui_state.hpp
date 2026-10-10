@@ -69,16 +69,16 @@ enum class overlay_mode
 };
 
 /// A selectable on-canvas marker registered each frame by the Planetary canvas
-/// draw pass. Hit-test priority (highest first): unit > building > market_centre
-/// > tile. Unit outranks building (BL-575) to match the repeat-click cycle's own
+/// draw pass. Hit-test priority (highest first): unit > building > tile. (No
+/// market-centre kind: its glyph and hit zone retired, Ben 2026-10-10.) Unit outranks building (BL-575) to match the repeat-click cycle's own
 /// order (battle, unit, province, building, tile — SELECTION.md), so a unit
 /// standing on a built tile is reachable on the FIRST click rather than only
 /// after cycling past the building.
 /// Cleared and rebuilt every frame by body_surface_canvas. See BL-059, BL-031.
 struct marker_hit_zone
 {
-    entity_id id = null_entity; ///< The entity this marker represents (building, market, or — for `kind::unit` — the lowest-id unit in the province/owner group the marker draws).
-    enum class kind : uint8_t { building, market_centre, unit } kind = kind::building;
+    entity_id id = null_entity; ///< The entity this marker represents (building, or — for `kind::unit` — the lowest-id unit in the province/owner group the marker draws).
+    enum class kind : uint8_t { building, unit } kind = kind::building;
     ImVec2    centre{};         ///< Marker centre in screen pixels (this frame).
     float     radius = 0.0f;   ///< Hit-test radius in screen pixels.
 };
