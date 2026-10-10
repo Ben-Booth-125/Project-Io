@@ -481,6 +481,58 @@ first, converted for their own four vertices. Draw order is unchanged.
 - **Only frontier tiles draw the border rule** — the depth pass already ran the same
   neighbour test, so every interior tile skips six reads. Nothing that drew stops drawing.
 
+**The static strokes are cached, not rebuilt (Ben, 2026-10-10: 60 fps at every zoom).**
+The border band's wash, the drawn road and lane network, the border rule and the
+Throughput anchor rings do not move while the player pans, so they are not re-tessellated
+every frame. They are built per **bucket** — sixteen columns of one row — at the view
+origin, stored as finished vertices, and re-emitted each frame with the pan added, for
+each wrap copy and only for the bucket's tiles whose centres are on screen. A bucket is
+**content-addressed**: its key folds in every input its strokes read (each tile's road and
+lane levels, survey bit, vision and nation over the bucket widened by two columns and two
+rows — the lane rung test reads two steps out — and each own tile's band depth, frontier
+kind and anchor share), so it rebuilds exactly when something it draws from moves, and
+never on a pan. Whatever moves the world — a tick, a road laid while paused, a scripted
+survey, a different world — the hash sees it on the next frame; nothing is trusted to a
+change counter. A zoom step, a lens switch or a change of draw flags starts the cache over.
+The cache is off where its draw order would be wrong: without the baked ground (the vector
+fallback fills each tile over its neighbours' strokes) and under the god view.
+
+- **Draw order.** The cached strokes are emitted before the tile loop, so a tile's own marks
+  — the player ring, the owner rim, the Resource outline, markers, highlights — now sit over
+  a neighbour's road or rule rather than under it. At rungs 0-1 the captures differ from the
+  uncached ones in under 0.13% of canvas pixels by more than 8/255 (the junction caps of a
+  few road forks, whose degenerate spoke turns on a sub-pixel rounding difference); at rungs
+  2-4 they are identical.
+- **A tile record is a cache miss.** At the widest rung the band holds ~30k tiles, and a
+  read of a tile's record is a hash-map node somewhere in memory: the passes read it once, in
+  the band pass, and lay what they need into raster-indexed arrays there (the road and lane
+  levels beside the tile and nation already laid). Everything after reads the arrays — the
+  Throughput wash reads the reach field by raster position, the tile loop fetches a record
+  only for a pass that asks (a lens, construction, a hovered structure), and the unit and
+  battle markers, and the anchor ring, test a raster bit before their lookup.
+
+Measured (Release, 1720×1080, home body, sustained pan, an idle machine, the play ground
+path — `IO_GROUND_BENCH=1`, below). Canvas CPU is the pass meter's per-frame total, its own
+cost included; work is the frame CSV's build + submit, the better of two runs' medians:
+
+| Rung | Canvas CPU, plain | Corporation | Throughput | Frame work, plain | Corporation | Throughput |
+|---|---|---|---|---|---|---|
+| 0 (~6 px) | 9.0 → 5.8 ms | 7.9 → 6.0 | 8.7 → 5.8 | 10.4 → 5.7 ms | 7.5 → 4.6 | 14.7 → 7.7 |
+| 1 (~13 px) | 3.7 → 2.4 | 3.5 → 2.2 | 4.2 → 2.3 | 5.5 → 3.6 | 4.4 → 3.3 | 8.4 → 4.8 |
+| 2 (~27 px) | 1.1 → 0.9 | 1.1 → 0.8 | 1.4 → 0.9 | 1.9 → 1.7 | 1.6 → 1.2 | 3.5 → 3.0 |
+| 3 (~55 px) | 0.6 → 0.5 | 0.5 → 0.5 | 0.6 → 0.5 | 1.2 → 1.1 | 1.2 → 0.9 | 1.9 → 1.8 |
+| 4 (~110 px) | 0.3 → 0.4 | 0.3 → 0.3 | 0.4 → 0.3 | 1.1 → 0.9 | 1.0 → 0.7 | 1.5 → 1.4 |
+
+Vertex counts are unchanged at every rung, and every rung holds the 16.7 ms frame. Under
+heavy load (a game and a parallel compile on the same machine) rung 0 is the one still at
+the edge: 13.3 ms of work plain against 16.4 before, 12.9 under Throughput against 15.9.
+
+**Frame timings need the live ground path.** Under `--verify` the ground layer re-snapshots
+the world into its bake source every frame (`ground_layer::tick`, the `--verify` path, so a
+capture sees that frame's world) — ~15 ms of every `build_ms` sample that play never pays.
+Read frame totals with `IO_GROUND_BENCH=1`, which runs `--verify` on the play path; the pass
+meter's canvas split is unaffected either way.
+
 **No layer is dropped at any rung.** Terrain, relief, survey mask, fog, roads, lanes,
 the border band and rule, markers and labels all draw at every rung they drew at
 before (roads and lanes are drawn at the two widest rungs and painted into the ground
@@ -489,7 +541,9 @@ by more than 8/255, and in under 0.1% by more than 32/255.
 
 `IO_CANVAS_PASS_LOG=1` prints, every 120 frames, each map pass's vertices and CPU time
 per frame (`CANVAS_PASS ...`); the meter costs ~0.4 ms per pass at rung 0, so read it for
-the split, and `frame_csv` for the totals.
+the split, and `frame_csv` for the totals. Its `static` pass is the stroke cache (hash and
+re-emit), and `static builds` counts the buckets rebuilt in the tally — zero on a still
+view, a column of buckets per block a pan uncovers.
 
 ### Fill level-of-detail at far zoom
 
