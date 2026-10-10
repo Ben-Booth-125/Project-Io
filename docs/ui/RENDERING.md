@@ -408,6 +408,33 @@ and both read as annotation laid on a painting. They move into the bake.
 
 ### Roads and sea lanes — smooth curves on their own tiles
 
+**Roads are part of the ground's tile sets, not threads laid on it** (Ben, 2026-10-10, walking
+the C-F build: *"various tile sets with roads, highways, and railroads on them, so the roads don't
+appear just painted on top … roads curving around hills / buildings, and connecting at various
+points on the tile edge, not just the centre"*). This revises the geometry rule below:
+
+- **A road crosses a tile edge at its own point, not the midpoint.** Each shared edge a road
+  crosses carries a **crossing point** placed by a hash of the edge (within the inner 70% of the
+  edge), computed identically from both tiles so the road is continuous; a road of a higher tier
+  and a lower one crossing the same edge take separate points.
+- **Inside the tile the road finds its way.** The path from crossing to crossing (or to a
+  junction, or to a building's forecourt) is a smooth curve that **bends around higher ground** —
+  it keeps to the lower side of the tile's relief rather than climbing over a hill — and **around
+  the tile's structures** (the shared road plan). It passes through the centre only where the
+  ground lets it.
+- **Each terrain family carries its own road treatment** — the road's tile set: on a slope the
+  road is **cut into the hillside** with a shaded bank on the uphill side; across wet or low ground
+  it runs on a low **embankment**; through forest it runs in a **cleared corridor**; on open
+  ground a verge of worn grass; in a town it is the street. The road reads as built into the land,
+  in the same light and grade.
+- **Rail** follows the same routing with **gentler curvature** (a railway cannot turn as tightly
+  as a road) and its own treatment — ballast, sleepers, twin rails, cuttings and embankments
+  deeper than a road's — painted wherever the world lays the rail rung (BL-1255 rail rung).
+- **No drawn road network on the plain canvas at any rung** (Ben, 2026-10-10: roads drew too much
+  attention when zoomed out, because the drawn web kept a minimum width). Roads are the painted
+  ground at every zoom and shrink with it like the ground; **the network as logistics is read on
+  the Throughput lens** (LENSES.md § Throughput lens).
+
 **Roads and sea lanes are painted into the ground** (Ben, 2026-10-09, after walking the
 sprint 51 build: *"roads go over buildings, rather than being painted as an optional part of
 the building tile sets. Roads are also so simplified, we want to paint a texture on roads"*).

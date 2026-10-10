@@ -292,6 +292,13 @@ the card's contents — are in [SELECTION.md](SELECTION.md) § The province elem
 
 ## The national border band
 
+**Hard edges only — no wash inside the border** (Ben, 2026-10-10, walking the build: *"there's a
+lot of visual clutter when many nations border each other. One fix would be removing shading inside
+national borders, and just go with the hard edges"*). A nation's border is the **inset boundary
+stroke** alone, in its identity colour; the inward falloff wash below is **retired** — no tile is
+tinted by its nation. What follows about the wash is kept as the record of why the stroke is inset
+and never shared; read it as describing the stroke only.
+
 **A nation reads as a bordered region, not as a tinted field.** Its identity colour
 (`palette::nation_colour`) lives at the boundary and falls off inwards; the middle of a territory
 stays plain. That is what makes the read affordable at all — a full-territory tint would own the
