@@ -32,13 +32,20 @@ and every nation opens on the industrial recipe band (`ERAS.md` § Where the lad
 
 ## Research points
 
-**RP accrue to the nation each quarter and are spent only on nodes.** Two sources; the rates are
+**RP accrue to the nation each quarter and are spent only on nodes.** Four sources; the rates are
 dials:
 
 | Source | What it is |
 |---|---|
-| **The research budget line** | The national budget's academic-research priority (`../politics/NATIONS.md`): treasury the line spends converts to RP at a fixed rate |
+| **A base** | Every nation earns a fixed RP a quarter whatever its treasury, so every nation reaches its power surges |
+| **The research budget line** | The national budget's academic-research priority (`../politics/NATIONS.md`): RP grow with the **square root** of what the line spends, so wealth buys a lead with diminishing returns. The line pays only what the queue still owes; an empty queue spends nothing |
+| **Research institutes** | Each staffed research institute adds RP a quarter to its owner's nation |
 | **Universities** | Each staffed University in the nation adds RP per quarter. A University may stand only in a City (4)+ centre (`POPULATION.md` § Strata gate buildings), and it also raises the nation's qualification fraction |
+
+**Why a base and a square root (Ben, 2026-10-10).** National treasuries span orders of magnitude.
+Research linear in spending let the richest nation buy the whole tree in a few years while half the
+field never reached its first major; a base with a concave line keeps every nation on the surge
+cadence and lets spending separate nations by a factor of about three, not a hundred thousand.
 
 A held node's research modifier (*+N% national research*) scales the total. RP never trade between
 nations.
@@ -118,6 +125,10 @@ cluster's shape — two minors and a major — no effect, and it names the syste
 whose branch carries a placeholder needs only the branch's real rim major until the system lands.
 
 ### Cost
+
+**An age lasts about eighty years (Ben, 2026-10-10)**, and the tree is priced to it: the richest
+nation, researching without pause, completes the whole tree inside the age, and the median nation
+reaches its first ring-2 major in about five years.
 
 **A node costs its tier's base × its ring × the RP unit.** The unit is a dial, set so that a nation
 spending a typical research share reaches a power surge — a major — at steady intervals through the
