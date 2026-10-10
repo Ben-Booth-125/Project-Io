@@ -623,7 +623,7 @@
   ],
   [
    "canvas.border_band_select",
-   "The national border band on the Planetary canvas — plain-canvas chrome, not a lens, and suppressed while any lens is up. A nation's identity colour sits on its own side of every boundary it holds and falls off inwards over three depths."
+   "The national border band on the Planetary canvas — plain-canvas chrome, not a lens, and suppressed while any lens is up. A nation's border is a hard edge only (Ben, 2026-10-10): an inset stroke in its muted identity colour on its own side of every boundary it holds, with no wash inside the territory."
   ],
   [
    "ledger.company_open",

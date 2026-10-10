@@ -219,7 +219,7 @@ who owns what, and how the player's footprint sits against rivals. National
 territory is the border band's job — and **the band is suppressed while any lens
 is up** (Ben, 2026-08-28), so nation context is absent from this lens by
 construction rather than merely absent from its fill. A lens asks one question;
-a national wash over a corporate read competes with the answer.
+a national border over a corporate read competes with the answer.
 
 **Population (settled 2026-08-28).** This lens admits **corporations only** — the
 player and its rivals — and never a background firm. Ben: *"The corporation lens
@@ -365,13 +365,13 @@ should borders extending their colour inwards. With this, we can drop the nation
 lens."*
 
 **The lens dissolved rather than being deleted: its content became chrome.** A
-nation's identity colour sits at its frontier and falls off inwards over three
-tiles, drawn **on the plain canvas and suppressed while any lens is up** (Ben,
-2026-08-28, reaffirmed 2026-09-07). Roads are *not* the precedent here, and the
+nation's border is an inset stroke in its identity colour — **hard edges only**,
+no wash inside the territory (Ben, 2026-10-10) — drawn **on the plain canvas and
+suppressed while any lens is up** (Ben, 2026-08-28, reaffirmed 2026-09-07). Roads are *not* the precedent here, and the
 difference is the point: a road is terrain a lens reads over, while a national
-wash is a second political answer competing with the one the lens was opened to
-ask. The full render spec, the falloff table, and the
-never-average-two-nations constraint that decides both halves of the pass are in
+border is a second political answer competing with the one the lens was opened to
+ask. The full render spec, the edge weights, and the
+never-average-two-nations constraint that decides the stroke's inset are in
 [PLANETARY.md](PLANETARY.md) § The national border band.
 
 **The identity colour is the realm's, pinned per world (Ben, 2026-09-24).** A

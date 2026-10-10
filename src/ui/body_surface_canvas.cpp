@@ -55,11 +55,11 @@ namespace {
 // ---------------------------------------------------------------------------
 struct canvas_pass_meter
 {
-    enum pass : int { setup, ground, shade, band_depth, tile_misc, fill, band_wash,
+    enum pass : int { setup, ground, shade, tile_misc, fill,
                       lens_marks, roads, lanes, border_rule, player_ring, markers,
                       outline, post, stat, count };
     static constexpr const char* k_names[count] = {
-        "setup", "ground", "shade", "bdepth", "tile", "fill", "bwash", "lensmk",
+        "setup", "ground", "shade", "tile", "fill", "lensmk",
         "roads", "lanes", "brule", "pring", "markers", "outline", "post", "static" };
 
     bool        on = false;
@@ -257,46 +257,27 @@ constexpr int k_side_verts[6][2] = { {5,0}, {4,5}, {3,4}, {2,3}, {1,2}, {0,1} };
 constexpr float k_land_blend_strength = 0.35f;
 
 // ---------------------------------------------------------------------------
-// BL-601 — the national border band (always-on chrome, no longer a lens)
+// BL-601 — the national border band (plain-canvas chrome, no longer a lens)
 // ---------------------------------------------------------------------------
-// Ben, 2026-08-24: "National borders should not diffuse together, instead they
-// should borders extending their colour inwards. With this, we can drop the
-// nation lens."
+// HARD EDGES ONLY (BL-1262; Ben, 2026-10-10: "a lot of visual clutter when many
+// nations border each other. One fix would be removing shading inside national
+// borders, and just go with the hard edges"). A nation reads as a BORDERED
+// REGION: its identity colour is the inset boundary stroke and nothing else —
+// no tile is tinted by its nation (the inward falloff wash of 2026-08-24 is
+// retired). PLANETARY.md § The national border band.
 //
-// A nation reads as a BORDERED REGION, not a tinted field. Its identity colour
-// lives at the boundary and falls off inwards over a few tiles, which is what
-// makes an always-on read affordable at all: the middle of a territory stays
-// free for terrain, texture and whatever lens is active, which a full-territory
-// tint cannot do. Roads set the precedent — drawn always, not behind a lens.
-//
-// TWO NEIGHBOURS MEETING MUST NEVER BLEND INTO A THIRD COLOUR. That is exactly
-// the objection PLANETARY.md's categorical refusal raised against blending the
-// old Country lens (overruled by BL-532, and reinstated here in a shape that
-// does not need the refusal): the band is composited PER TILE, after the
-// province blend has already run, and each tile takes only its OWN nation's
-// colour. Nothing in this pass ever averages two nations' hues.
+// TWO NEIGHBOURS MEETING MUST NEVER BLEND INTO A THIRD COLOUR: the stroke is
+// inset into each nation's own side (k_border_stroke_inset), so a frontier is
+// two parallel rules and no pass ever averages two nations' hues.
 
-/// Depth of the inward band, in tiles. Depth 0 is a tile touching a foreign
-/// owner — another nation, or unclaimed ground, so a coastline is a border too.
-///
-/// ONE TILE (Ben, 2026-09-01, judging the baked ground): the three-ring falloff
-/// was tuned against flat saturated hexes; over the muted painterly bake the
-/// band inverted its contrast relationship with the ground and became the
-/// loudest mark on the map. "A 1 tile glow, rather than the current 2/3 tile
-/// glow" — the frontier ring alone, in a muted colour (below).
-constexpr int k_border_band_tiles = 1;
-
-/// Wash opacity by depth — the single frontier ring.
-constexpr float k_border_band_alpha[k_border_band_tiles] = { 0.35f };
-
-/// How far the band's colour is pulled toward its own luma before drawing —
-/// the "muted colour palette" half of the same 2026-09-01 ruling. Applied to
-/// the wash AND the stroke; the border-corridor hover label keeps the full
-/// identity colour, because a label must be read, not weighed.
+/// How far the stroke's colour is pulled toward its own luma before drawing —
+/// the "muted colour palette" ruling (Ben, 2026-09-01). The border-corridor
+/// hover label keeps the full identity colour, because a label must be read,
+/// not weighed.
 constexpr float k_border_mute = 0.55f;
 
-/// Mute a nation identity colour for the band: desaturate toward its own luma
-/// by k_border_mute and sit it down slightly, so the ring reads as a claim on
+/// Mute a nation identity colour for the stroke: desaturate toward its own luma
+/// by k_border_mute and sit it down slightly, so the rule reads as a claim on
 /// the ground rather than as chrome over it.
 inline ImU32 muted_nation_colour(ImU32 nc)
 {
@@ -371,20 +352,16 @@ inline ImU32 with_alpha(ImU32 c, float a)
 constexpr float k_seam_min_drawn_r = 40.0f;
 constexpr float k_seam_alpha       = 0.16f;
 
-/// Scale applied to the whole treatment — wash AND stroke — where the frontier
+/// Scale applied to the stroke — its alpha AND its thickness — where an edge
 /// faces UNCLAIMED ground rather than another nation (Ben, 2026-08-24: "reduce
 /// the border band on edges facing unclaimed ground").
 ///
 /// Both kinds of edge are still borders — a coastline is where a nation stops —
 /// but they are not the same claim, and drawing them at the same weight made the
-/// band read as heavy on exactly the nations that have the most of it. A country
-/// of small islands is nearly all frontier, so at full strength almost none of
-/// its land showed plain terrain: the treatment that was meant to be an edge
-/// effect became a tint again for the shapes least able to afford it.
-///
-/// A tile touching BOTH a foreign nation and unclaimed ground counts as
-/// political — the stronger claim wins, so a coastal frontier between two
-/// countries does not quietly fade.
+/// band read as heavy on exactly the nations that have the most of it: a country
+/// of small islands is nearly all frontier. Resolved PER EDGE — a headland facing
+/// the sea on three sides and a neighbour on the fourth draws three light rules
+/// and one full one.
 constexpr float k_border_unclaimed_scale = 0.40f;
 
 /// The boundary stroke is INSET toward the drawing tile's own centre by this
@@ -557,8 +534,8 @@ ImU32 fog_dim(ImU32 c, float vision)
 
 /// ROUTE STROKE WIDTHS, one named constant per tier (RENDERING.md § Roads and sea
 /// lanes; Ben, 2026-10-03: "make them thinner"). These are the DRAWN network's weights —
-/// the thin network at the two widest rungs and the Throughput lens's full-weight network
-/// at every rung (BL-1257) — not the painted roads, which are thin threads in the bake
+/// the Throughput lens's full-weight network at every rung (BL-1257) and the vector
+/// fallback's — not the painted roads, which are thin threads in the bake
 /// (route_paint.hpp k_route_width). Each is the stroke width as a fraction
 /// of the drawn hex circumradius, which is floored at 10 px before it is applied so
 /// the tiers stay apart on the whole-grid view. Half the widths the straight-segment
@@ -573,9 +550,10 @@ constexpr float k_lane_width         = 0.10f;
 /// Below this DRAWN hex radius a road or lane curve takes the wide-rung LOD: one
 /// stroke per curve, two segments a half (chords at the coarse fill), no apex
 /// joint (RENDERING.md § Roads and sea lanes; the 60 fps budget, Ben 2026-10-09).
-/// 20 px sits between the second rung (~13 px) and the third (~27 px). It is also
-/// where the drawn network ENDS (BL-1253, roads painted): from the third rung up a
-/// road or lane over baked ground is painted into the bake, not drawn.
+/// 20 px sits between the second rung (~13 px) and the third (~27 px). The drawn
+/// network itself is the Throughput lens's (and the vector fallback's): on the plain
+/// canvas a road or lane over baked ground is painted into the bake at every rung,
+/// never drawn (BL-1262; Ben, 2026-10-10).
 constexpr float k_route_lod_radius_px = 20.0f;
 
 /// Building silhouette radius as a fraction of the hex circumradius — since BL-1241
@@ -3740,14 +3718,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // COLUMN CULL for the band passes (the 60 fps budget, PLANETARY.md
     // § Draw-loop cost model). The tile loop has always skipped a column with no
     // visible wrap copy, but the passes that run one ahead of it — this shade
-    // cache and the border depth — walked every column of the band, and even at
-    // the widest rung the body is wider than the canvas. A column is live when
-    // either row parity of it has a copy on screen; the mask is then widened by
-    // the one-tile neighbourhood those passes read (the blend corners, the
-    // frontier test). An unmasked column falls back to the lookup.
+    // cache — walked every column of the band, and even at the widest rung the
+    // body is wider than the canvas. A column is live when either row parity of
+    // it has a copy on screen; the mask is then widened by the one-tile
+    // neighbourhood the passes read (the blend corners, the border rule's
+    // neighbour test). An unmasked column falls back to the lookup.
     // THE STATIC STROKE CACHE (BL-1260; PLANETARY.md § Draw-loop cost model).
-    // The band wash, the drawn road and lane network, the border rule and the
-    // Throughput anchors do not move while the player pans: they are rebuilt
+    // The border rule, the Throughput lens's road and lane network and its
+    // anchors do not move while the player pans: they are rebuilt
     // only when what they draw from moves. Ground on, no god view (whose lifted
     // fills draw over strokes in the loop), a full raster.
     constexpr int k_static_block = 16; // columns per cached bucket
@@ -3781,7 +3759,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     for (int cc = b0; cc < b1; ++cc)
                         col_seen[static_cast<std::size_t>(cc)] = 1u;
             }
-        const int margin = std::max(1, k_border_band_tiles);
+        const int margin = 1;
         for (int cc = 0; cc < gw; ++cc)
         {
             if (!col_seen[static_cast<std::size_t>(cc)])
@@ -3793,7 +3771,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     const bool lens_blends = lens_blend_mode(state.overlay);
     // The same band's tile records and nation owners, looked up ONCE a frame:
     // the passes below read a tile's neighbours again and again (the border
-    // depth, the border rule, the road and lane chains), and at the widest rung
+    // rule, the road and lane chains), and at the widest rung
     // that was ~30k tiles x six hash lookups per pass (the 60 fps budget,
     // PLANETARY.md § Draw-loop cost model). Rows outside the band fall back to
     // the lookup (tile_rc / nation_rc below).
@@ -3887,135 +3865,24 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             ? nation_cache[ci] : nation_of(raster[ci]);
     };
 
-    // --- BL-601: the national border band's inward falloff ------------------
-    // Per-tile depth from the nation's frontier: 0 = touching a foreign owner
-    // (another nation, or unclaimed ground — a coastline is a border too), 1 and
-    // 2 = one and two tiles in, 0xFF = beyond the band or claimed by nobody.
-    // This is the "colour extending inwards" of Ben's ruling, made a scalar: the
-    // wash below reads it straight out of k_border_band_alpha.
+    // --- BL-601: the national border band ------------------------------------
+    // SUPPRESSED UNDER EVERY LENS (Ben, 2026-08-28). The band is chrome on the
+    // plain canvas — that is what BL-601 made it, and it is why the default view
+    // IS the country view. But a lens is a question about one subject, and a
+    // national border over a corporate or resource read competes with the
+    // answer. Ben, on the Corporation lens: "we will not display country borders
+    // when displaying that lens. This will bring focus on to corporations" —
+    // extended to all lenses on the same instruction.
     //
-    // Computed over the visible band PLUS the band depth in rows each way, so a
-    // visible tile's chain back to its own frontier is complete. Depth 0 is
-    // marked from `nation_of` directly (a raster index, not the cache), so the
-    // top and bottom rows of the computed range are still correct; only the
-    // relaxation is short there, and those rows are already off screen.
-    //
-    // COARSE ZOOM TAKES DEPTH 0 ONLY. At the whole-grid view every one of the
-    // ~15k hexes is in range and a three-ring relaxation over all of them is the
-    // one place this pass could cost real time. A single ring still draws the
-    // political outline, which is the whole read at that zoom.
-    static std::vector<uint8_t> border_depth;
-    border_depth.assign(static_cast<std::size_t>(gw) * gh, 0xFFu);
-    // Which KIND of frontier a banded tile belongs to: 1 where the nation faces
-    // another nation, 0 where it faces only unclaimed ground (Ben, 2026-08-24).
-    // Carried beside the depth rather than recomputed at the wash, because a
-    // depth-1 or depth-2 tile is not on the frontier at all and cannot answer the
-    // question by looking at its own neighbours — it inherits the answer from the
-    // frontier tile that seeded it.
-    static std::vector<uint8_t> border_political;
-    border_political.assign(static_cast<std::size_t>(gw) * gh, 0u);
-    const int band_depth = coarse_fill ? 1 : k_border_band_tiles;
-    const int band_lo    = std::max(0,      row_lo - band_depth);
-    const int band_hi    = std::min(gh - 1, row_hi + band_depth);
-    // SUPPRESSED UNDER EVERY LENS (Ben, 2026-08-28). The band is always-on chrome
-    // on the plain canvas — that is what BL-601 made it, and it is why the default
-    // view IS the country view. But a lens is a question about one subject, and a
-    // national wash over a corporate or resource read competes with the answer.
-    // Ben, on the Corporation lens: "we will not display country borders when
-    // displaying that lens. This will bring focus on to corporations" — extended
-    // to all lenses on the same instruction.
-    //
-    // Gated on the COMPUTATION, not just the wash below, so the three-ring
-    // relaxation over the visible band costs nothing while a lens is up. Every
-    // depth stays 0xFF, and the wash's `depth < band_depth` test then fails on
-    // its own without needing a second guard.
+    // The band is the inset rule alone (BL-1262, hard edges only): the per-tile
+    // frontier depth and its inward wash are retired, so there is no pass here —
+    // the rule's own neighbour test (emit_routes) is the frontier test.
     const bool draw_border_band = (state.overlay == overlay_mode::none)
                                && !state.dbg_hide_border_band;
-    if (draw_border_band && raster_ok && !w.tile_to_nation.empty())
-    {
-        for (int cr = band_lo; cr <= band_hi; ++cr)
-        for (int cc = 0; cc < gw; ++cc)
-        {
-            if (!col_live[static_cast<std::size_t>(cc)])
-                continue;
-            const std::size_t ci = static_cast<std::size_t>(cr) * gw + cc;
-            const entity_id cid  = raster[ci];
-            if (cid == null_entity)
-                continue;
-            const entity_id nat = nation_rc(cc, cr);
-            if (nat == null_entity)
-                continue; // Unclaimed ground has no colour to extend inwards.
-            const int (*off)[2] = hex_neighbors::offsets(cr);
-            for (int n = 0; n < 6; ++n)
-            {
-                const int nrow = cr + off[n][1];
-                if (nrow < 0 || nrow >= gh)
-                    continue; // Off the pole: no neighbour, so not a frontier.
-                int ncol = (cc + off[n][0]) % gw;
-                if (ncol < 0)
-                    ncol += gw;
-                const entity_id nb_nat = nation_rc(ncol, nrow);
-                if (nb_nat != nat)
-                {
-                    border_depth[ci] = 0u;
-                    // Do NOT break on the first foreign edge: a tile can face
-                    // both a neighbour nation and open ground, and the political
-                    // claim is the stronger one. Keep looking until a political
-                    // edge is found, so a coastal frontier between two countries
-                    // is not quietly faded by the sea on its other side.
-                    if (nb_nat != null_entity)
-                    {
-                        border_political[ci] = 1u;
-                        break;
-                    }
-                }
-            }
-        }
-        for (uint8_t d = 1; d < static_cast<uint8_t>(band_depth); ++d)
-        {
-            for (int cr = band_lo; cr <= band_hi; ++cr)
-            for (int cc = 0; cc < gw; ++cc)
-            {
-                if (!col_live[static_cast<std::size_t>(cc)])
-                    continue;
-                const std::size_t ci = static_cast<std::size_t>(cr) * gw + cc;
-                if (border_depth[ci] != 0xFFu)
-                    continue;
-                const entity_id cid = raster[ci];
-                if (cid == null_entity)
-                    continue;
-                const entity_id nat = nation_rc(cc, cr);
-                if (nat == null_entity)
-                    continue;
-                const int (*off)[2] = hex_neighbors::offsets(cr);
-                for (int n = 0; n < 6; ++n)
-                {
-                    const int nrow = cr + off[n][1];
-                    if (nrow < band_lo || nrow > band_hi)
-                        continue;
-                    int ncol = (cc + off[n][0]) % gw;
-                    if (ncol < 0)
-                        ncol += gw;
-                    const std::size_t ni = static_cast<std::size_t>(nrow) * gw + ncol;
-                    // Same nation only: depth propagates INSIDE a territory. A
-                    // neighbour across the frontier is a different nation's
-                    // band and must never seed this one's.
-                    if (border_depth[ni] == d - 1u && nation_rc(ncol, nrow) == nat)
-                    {
-                        border_depth[ci]     = d;
-                        border_political[ci] = border_political[ni];
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    pm.mark(canvas_pass_meter::band_depth, dl);
     // ---- The static stroke layer of one tile copy ---------------------------
-    // Three pieces, each drawn into @p out at the tile centre (cx, cy): the
-    // border band's wash, the drawn road/lane network with the border rule, and
-    // the Throughput anchor ring. The tile loop calls them in place when the
+    // Two pieces, each drawn into @p out at the tile centre (cx, cy): the drawn
+    // road/lane network (the Throughput lens's) with the border rule, and the
+    // Throughput anchor ring. The tile loop calls them in place when the
     // static cache is off; the cache calls them once per bucket build, at the
     // view origin (0, 0) and copy 0, and re-emits the result with the pan.
     // `vo` is the view origin the neighbour centres are placed against, `k` the
@@ -4023,53 +3890,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     const auto to_scr = [&](ImVec2 vo, ImVec2 lp) -> ImVec2 {
         return { vo.x + (lp.x - grid_cx) * zoom, vo.y + (lp.y - grid_cy) * zoom };
     };
-    // National border band — the inward falloff (BL-601). Always-on
-    // chrome, drawn under every lens exactly as roads are: the national
-    // read is terrain-grade context now, not a mode the player enters.
-    //
-    // Each tile takes ITS OWN nation's colour at an alpha keyed to its
-    // depth from the frontier, composited over the finished fill. That
-    // per-tile compositing is the guarantee Ben's ruling asks for: two
-    // neighbours meeting draw two different colours side by side and
-    // never average into a third nation's hue, because no arithmetic in
-    // this pass sees more than one nation.
-    //
-    // Gated on `revealed` (by the caller) for the same reason the province
-    // edge was: a border drawn through the survey mask would leak the political
-    // shape of ground the player has not paid to survey.
-    const auto emit_band = [&](ImDrawList* out, int t_col, int t_row, float cx, float cy)
-    {
-        const std::size_t si = static_cast<std::size_t>(t_row) * gw + t_col;
-        const uint8_t depth = border_depth[si];
-        if (depth >= band_depth)
-            return;
-        const entity_id nat = nation_rc(t_col, t_row);
-        if (nat == null_entity)
-            return;
-        // Muted (2026-09-01): the identity colour desaturated for
-        // the band, so the claim reads without shouting over the
-        // painterly ground.
-        const ImU32 nc = muted_nation_colour(palette::nation_colour(nat));
-        const float scale = border_political[si] ? 1.0f : k_border_unclaimed_scale;
-        const int   a  = static_cast<int>(k_border_band_alpha[depth] * scale * 255.0f);
-        const ImU32 wash = IM_COL32((nc >> IM_COL32_R_SHIFT) & 0xFFu,
-                                    (nc >> IM_COL32_G_SHIFT) & 0xFFu,
-                                    (nc >> IM_COL32_B_SHIFT) & 0xFFu, a);
-        if (coarse_fill)
-        {
-            const float step = draw_r + 1.0f;
-            const float hw   = kSqrt3 * step * 0.5f - 0.5f;
-            const float hh   = 1.5f   * step * 0.5f - 0.5f;
-            out->AddRectFilled({ cx - hw, cy - hh }, { cx + hw, cy + hh }, wash);
-        }
-        else
-        {
-            ImVec2 verts[6];
-            hex_verts_fast(verts, cx, cy, draw_r);
-            out->AddConvexPolyFilled(verts, 6, wash);
-        }
-    };
-
     // The road and lane network and the border rule of one tile copy.
     const auto emit_routes = [&](ImDrawList* out, int t_col, int t_row, const tile_component& tile,
                                  float cx, float cy, ImVec2 vo, int k, bool on_bake, float vision,
@@ -4287,12 +4107,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // corridor's roads should not darken one hop early at its rim. Survey (BL-067) still
         // owns genuinely unrevealed tiles; this is only the commercial-reach fog.
         //
-        // PAINTED FROM THE THIRD RUNG UP (BL-1253; RENDERING.md § Roads and sea lanes).
-        // Roads and lanes are painted into the baked ground (ui/route_paint.cpp), with a
-        // surface per tier. The thin drawn network stays only where the painted roads fall
-        // below a pixel: the two widest rungs, a drawn radius under k_route_lod_radius_px
-        // (20 px — between rung 2, ~14 px, and rung 3, ~27 px). A tile whose ground is not
-        // yet baked (the vector fallback) keeps the drawn network at every rung.
+        // PAINTED, NOT DRAWN, ON THE PLAIN CANVAS AT EVERY RUNG (BL-1253, BL-1262;
+        // RENDERING.md § Roads and sea lanes). Roads and lanes are painted into the baked
+        // ground (ui/route_paint.cpp), with a surface per tier, and the plain canvas draws
+        // no network over them at any rung (Ben, 2026-10-10: the drawn web drew too much
+        // attention zoomed out). A tile whose ground is not yet baked (the vector fallback)
+        // has no painted road, so it keeps the drawn network.
         //
         // THE THROUGHPUT LENS DRAWS THE NETWORK AT EVERY RUNG (BL-1257; Ben, 2026-10-10;
         // LENSES.md § Throughput lens). On the ground a road is a thin pale thread of the
@@ -4300,7 +4120,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // LOGISTICS — every road by tier at the 1 : 1.5 : 2 weights below, every lane in its
         // blue — is read through this lens, over the reach-cost field it produces.
         const bool route_lens  = state.overlay == overlay_mode::throughput;
-        const bool route_drawn = !on_bake || draw_r < k_route_lod_radius_px || route_lens;
+        const bool route_drawn = !on_bake || route_lens;
         const float route_r = std::max(10.0f, draw_r) * state.dbg_route_width_scale;
         if (route_drawn && tile.road_level > 0)
         {
@@ -4331,21 +4151,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // § Mountains, rivers and terrain variety). The width gradient says which way
         // the water flows, so the stroke and its chevrons are retired.
 
-        // National borders - the coloured rule (BL-601). The band's wash
-        // above says "this ground is near a frontier"; this pass says WHICH
+        // National borders - the coloured rule (BL-601), the whole of the
+        // band since BL-1262 (hard edges only: no inward wash). It says WHICH
         // frontier and whose, and it is what carries the hit corridor.
         //
         // ON THE PLAIN CANVAS ONLY (Ben, 2026-08-28). It was "always on,
         // under every lens" from BL-601 until now - the national read became
         // chrome on the same footing as roads and rivers. Ben, reviewing the
         // lens sweep: "All: We can still see nation borders."
-        //
-        // THIS IS THE SECOND OF TWO NATION-BORDER PASSES and the reason the
-        // first suppression looked ineffective: the inward WASH (gated at
-        // `draw_border_band` above) says "this ground is near a frontier",
-        // while this pass draws the coloured rule that says WHICH frontier and
-        // whose. Suppressing only the wash left the rule drawing, so the
-        // borders were still plainly there. Both now answer to one flag.
         //
         // The hit corridor goes with it, deliberately: it is built inside this
         // same loop, and a border that is invisible but still clickable is a
@@ -4361,17 +4174,16 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // side: the pair reads as two parallel coloured lines with the
         // frontier between them, and no pixel ever belongs to a colour that
         // is neither neighbour's.
-        // Only a frontier tile (depth 0: it touches a foreign owner — the
-        // depth pass ran this same neighbour test) draws a rule; every other
-        // tile skips its six neighbour reads.
-        const std::size_t shade_idx = static_cast<std::size_t>(t_row) * gw + t_col;
-        if (draw_border_band && border_depth[shade_idx] == 0u)
+        // Each edge whose neighbour has a different owner draws a rule; an
+        // interior tile draws none. On the baked ground this runs only when a
+        // static bucket rebuilds, not per frame.
+        if (draw_border_band)
         {
             const entity_id own_nation = nation_rc(t_col, t_row);
             if (own_nation != null_entity)
             {
-                // Muted like the wash (2026-09-01) — the pair must read as
-                // one treatment.
+                // Muted (2026-09-01): the identity colour desaturated, so
+                // the claim reads without shouting over the painterly ground.
                 const ImU32 border_col = muted_nation_colour(palette::nation_colour(own_nation));
 
                 // Standard odd-r neighbour offsets (col, row deltas; canonical table, BL-363).
@@ -4397,13 +4209,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
                     // An edge facing UNCLAIMED ground is drawn lighter and
                     // thinner than one facing another nation (Ben,
-                    // 2026-08-24). The wash carries this per TILE, inherited
-                    // inward from the frontier; the stroke can do better,
-                    // because it already knows what is on the other side of
-                    // each individual edge — so a headland that faces the sea
-                    // on three sides and a neighbour on the fourth draws three
-                    // light rules and one full one, rather than four of a
-                    // single averaged weight.
+                    // 2026-08-24), per EDGE — so a headland that faces the
+                    // sea on three sides and a neighbour on the fourth draws
+                    // three light rules and one full one.
                     const bool  political  = (nb_nation != null_entity);
                     const float edge_scale = political ? 1.0f : k_border_unclaimed_scale;
 
@@ -4530,7 +4338,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // bucket's hash folds in every input its strokes read — each tile's road
     // and lane levels, survey bit, vision and nation over the bucket widened by
     // two columns and two rows (the lane rung test reads two steps out), and
-    // each own tile's band depth, frontier kind and anchor share — so a bucket
+    // each own tile's anchor share — so a bucket
     // rebuilds exactly when something it draws from moved, and never on a pan.
     // The geometry is stored at the view origin and copy 0 and re-emitted per
     // visible copy with the pan added: the vertices are the same, only their
@@ -4692,8 +4500,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             for (int cc = c0; cc < c1; ++cc)
             {
                 const std::size_t ci = static_cast<std::size_t>(r) * gw + cc;
-                std::uint64_t own = (std::uint64_t{ border_depth[ci] } << 8)
-                                  | border_political[ci];
+                std::uint64_t own = 0x0Bull;
                 if (tile_flags[ci] & 16u)
                     own ^= fbits(anchor_share(raster[ci])) << 16;
                 h = mix(h, own);
@@ -4715,13 +4522,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     const std::size_t ci = static_cast<std::size_t>(r) * gw + cc;
                     if (raster[ci] == null_entity
                         || !survey_tile_visible(body.survey, gw, gh, cc, r))
-                        continue; // the mask owns it: no band, route or rule
+                        continue; // the mask owns it: no route or rule
                     const tile_component* t = tile_rc(cc, r);
                     if (!t)
                         continue;
                     ImVec2 tc = to_scr(vo, hex_local_centre(cc, r, hex_size));
                     tc.x += static_cast<float>(k) * period_px;
-                    emit_band(out, cc, r, tc.x, tc.y);
                     emit_routes(out, cc, r, *t, tc.x, tc.y, vo, k,
                                 /*on_bake=*/true, vision_rc(cc, r), zones);
                     if (tile_flags[ci] & 16u)
@@ -5200,18 +5006,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (!revealed)
                 continue;
 
-            // National border band (BL-601; emit_band above). From the static
-            // cache when it is on, drawn before this loop.
-            if (!static_cache_on)
-                emit_band(dl, t_col, t_row, cx, cy);
-
-            pm.mark(canvas_pass_meter::band_wash, dl);
             // Owner multi-select rim (BL-1240): ground held by an UNPICKED owner of
             // the lens's kind takes owned_grey AND a dark inset rim. The grey alone
             // is a value, and some terrain sits at that value (urban, regolith,
             // metallic); the rim is the colour-independent channel that says "held,
-            // not picked" whatever the ground beside it. Drawn after the border
-            // band so the national wash cannot bury it; skipped under coarse_fill,
+            // not picked" whatever the ground beside it. Skipped under coarse_fill,
             // where a hex is a few pixels and a rim would be the whole tile.
             if (!coarse_fill && has_owner
                 && (state.overlay == overlay_mode::corporation
