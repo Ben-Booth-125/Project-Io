@@ -51,7 +51,7 @@ print(string.format("sea_lane: markets %d -> %d, ports (%d,%d) / (%d,%d), %d see
 -- shelves may be bare of them: stock every market on the body with both bands'
 -- upkeep goods, so the fixture's Ports run (TRADE.md § The Planetary Marketplace).
 for _, m in ipairs(verify.markets_on_body(fx.body)) do
-    for _, g in ipairs({ "charcoal", "refined_fuel", "timber", "stone" }) do
+    for _, g in ipairs({ "charcoal", "coal", "timber", "stone" }) do
         verify.stock_market(m, g, 200.0)
     end
 end

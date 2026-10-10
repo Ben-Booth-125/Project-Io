@@ -32,6 +32,23 @@ verify.show_panel("market", true)
 verify.panel_view("market", 1) -- Trades
 verify.frames(2)
 
+-- BL-1265: under the shelf economy a market files an exchange only for a
+-- landing or a shelf draw there, so the body's lowest-id market (the ledger's
+-- default) can clear nothing at all. Aim the tab at the home-body market that
+-- clears the most, so the history read below is about a market with history.
+do
+    local first = verify.trades_market()
+    local best, best_rows = nil, -1
+    for _, m in ipairs(verify.markets_on_body(first.body)) do
+        local s = verify.exchange_ring_span(m)
+        if s.rows_here > best_rows then best, best_rows = m, s.rows_here end
+    end
+    if best ~= nil then
+        verify.select_market(best)
+        verify.frames(2)
+    end
+end
+
 local where = verify.trades_market()
 verify.expect(where.market ~= nil and where.market ~= 0,
     "the Trades tab drew for a market (market " .. tostring(where.market) .. ")")

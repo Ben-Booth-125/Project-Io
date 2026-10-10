@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*105 entries — 25 open, 80 resolved.*
+*107 entries — 27 open, 80 resolved.*
 
 ---
 
@@ -301,6 +301,37 @@ Built: through Exploration and Industrialisation each nation earns a trade recor
 > **Recommendation:** Approve as built after the 16-seed gate reads; write the owner and siting rules into TRADE.md § Trade in generation; Part B as its own item after the re-bless.
 
 *Files: `src/world/history_sim.cpp (accumulate_trade_record)`, `src/world/corporation_generation.cpp (retrofit_marketplaces)`, `scripts/world_gen.lua (trade_retrofit)`, `tools/verify/trade_retrofit_probe.cpp`*
+
+### NR-1020 — Trade capacity table, point rates and trade-building upkeep: the proposal and its 16-seed reading (BL-1270)
+*question · raised 2026-10-10 · from BL-1270 (trade capacity table), main session, 2026-10-10*
+
+Proposed (scripts/economy.lua economy.trade and building_upkeep.goods): capacity ~40 credits of base value per point per good; Marketplace 20 points per unit of effective workforce (10/tick staffed at 0.5), Port 4 flat; upkeep Port charcoal|coal 0.15 + timber 0.10 + stone 0.10, Marketplace charcoal 0.15|coal 0.25 + timber 0.15 + stone 0.15 (refined fuel was tried first and stood over the fair-price ceiling at every Marketplace market, so none ever made points). Retrofit rates in NR-1019. 16-seed gate, 400 ticks, on the integrated branch: G1 93.6 (base 96.7), G1b 5.3 FAIL vs <= 5 (base 1.7), G1 t50 90.0 (base 87.3), G2 116.7 (base 95.6), G3 96.6 at t400. Trade per seed-tick: ~87 points made, ~27 spent, ~154 units moved; 125 of 163 Marketplaces making points at t50. Most unspent points are refused by the passive Logistic Point cap at the source anchor. With trade nearly silent (the refined-fuel run) G1b read 4.6: moving goods costs ~0.7 points of G1b and buys G1 t50 and G2. Leaving one tick of processor want on the source shelf in auto trade was measured and did not help (5.5); it is not built.
+
+**Why it matters.** The gate passes every target but G1b, by 0.3 points; the values are Ben's to approve.
+
+- Approve as proposed and accept G1b 5.3 (target or table to move)
+- Raise passive LP so points are spent (moves every convoy)
+- Lower capacity so trade moves less
+- Diagnose the 65 plants decommissioned after starving before approving
+
+> **Recommendation:** Diagnose the starved-then-decommissioned plants first (BL-1248 territory); approve the table otherwise.
+
+*Files: `scripts/economy.lua`, `tools/verify/market_viability.cpp (T trade row)`*
+
+### NR-1021 — The exchange ring now covers about six ticks
+*question · raised 2026-10-10 · from BL-1269 trades_tab check, 2026-10-10*
+
+Every landing and every shelf draw files an exchange row, ~1,170 rows a tick on the verify world (one market alone 6,295 rows in six ticks), so the 8,192-row ring holds ticks 10..15. The ring's sizing comment extrapolated ~120 rows a quarter. The Trades tab's Recent exchanges therefore show only the last few ticks, and a market that clears nothing shows none (trades_tab.lua now aims at the busiest home-body market).
+
+**Why it matters.** History the player reads; widening the ring is a save-format change.
+
+- Widen the ring (save change, measure size)
+- Aggregate rows per (market, good, side, tick)
+- Accept the short window
+
+> **Recommendation:** Aggregate per (market, good, side, tick): the history keeps its span without growing the save.
+
+*Files: `src/world/components.hpp (exchange_record_ring)`, `src/world/market_clearing.cpp (record_exchange)`*
 
 ---
 
