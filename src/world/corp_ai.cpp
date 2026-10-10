@@ -2449,6 +2449,102 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             }
         }
 
+        // ---- Planetary Marketplace build candidate (Ben, 2026-10-10, NR-1013;
+        // AI_OPPONENT.md § 11, "a rival may build a Planetary Marketplace") ---
+        // A Marketplace makes trade points for the market it stands in
+        // (TRADE.md; NR-1018), so a rival builds one where it already holds
+        // ground, has no trade building yet, and the trade pass's own ranking
+        // (`rank_trade_routes`, public prices and the network's haul) finds a
+        // route leaving that market with margin. One flat, modest score — the
+        // muster base's shape: the building sells no good, so there is no
+        // net/capex curve to price it on, and it must never out-bid a genuine
+        // economic build. One at a time: none while another of its trade
+        // buildings is still under construction. Never the player's corp.
+        if (!(cc.is_player || corp == w.player_entity))
+        {
+            bool building_one = false;
+            for (const entity_id bid : cc.assets)
+            {
+                const auto bit = w.buildings.find(bid);
+                if (bit != w.buildings.end() && is_trade_building(bit->second.type)
+                    && bit->second.ticks_remaining > 0 && !bit->second.decommissioned)
+                {
+                    building_one = true;
+                    break;
+                }
+            }
+            const auto nation_it = w.nations.find(cc.home_nation);
+            if (!building_one && nation_it != w.nations.end())
+            {
+                const std::vector<entity_id> trading = corp_trade_markets(w, corp);
+                const logistics_nodes        mp_nodes = collect_logistics_nodes(w);
+                trade_haul_memo              mp_memo;
+                std::vector<trade_route_offer> routes;
+                entity_id best_market = null_entity;
+                float     best_route  = 0.0f;
+                for (const entity_id mid : corp_markets(w, corp)) // ascending
+                {
+                    if (std::binary_search(trading.begin(), trading.end(), mid))
+                        continue; // already trades from here
+                    rank_trade_routes(w, reg, mp_nodes, mp_memo, corp, std::vector<entity_id>{mid}, routes);
+                    if (!routes.empty() && routes.front().score > best_route)
+                    {
+                        best_route  = routes.front().score;
+                        best_market = mid;
+                    }
+                }
+                entity_id best_tile = null_entity;
+                if (best_market != null_entity)
+                {
+                    const market_component& bm = w.markets.at(best_market);
+                    long long cx = 0, cy = 0;
+                    const auto ct = w.tiles.find(bm.centre_tile);
+                    if (ct != w.tiles.end()) { cx = ct->second.grid_x; cy = ct->second.grid_y; }
+                    const float mp_reach = reg.construction().max_logistics_reach;
+                    long long best_d2 = std::numeric_limits<long long>::max();
+                    for (const entity_id tid : nation_it->second.tiles)
+                    {
+                        if (market_for_tile(w, tid) != best_market)
+                            continue;
+                        const auto tit = w.tiles.find(tid);
+                        if (tit == w.tiles.end())
+                            continue;
+                        const long long dx = tit->second.grid_x - cx;
+                        const long long dy = tit->second.grid_y - cy;
+                        const long long d2 = dx * dx + dy * dy;
+                        if (!(d2 < best_d2 || (d2 == best_d2 && tid < best_tile)))
+                            continue;
+                        body_reach_field(w, tit->second.body);
+                        if (!placement_rules::can_place_in_world(w, tid, building_type::planetary_marketplace,
+                                                                  resource_type::iron_ore, mp_reach, corp))
+                            continue;
+                        best_d2   = d2;
+                        best_tile = tid;
+                    }
+                }
+                if (best_tile != null_entity
+                    && !construction_materials_obtainable(w, reg, reach(), standing(), best_tile,
+                                                          building_type::planetary_marketplace,
+                                                          resource_type::iron_ore, no_recipe))
+                    best_tile = null_entity;
+                if (best_tile != null_entity)
+                {
+                    candidate c;
+                    c.cmd.tick = tick;
+                    c.cmd.corp = corp;
+                    c.cmd.verb = corp_verb::build;
+                    c.cmd.tile = best_tile;
+                    c.cmd.type = building_type::planetary_marketplace;
+                    c.score  = 0.4f * jitter; // the bootstrap port's flat, modest score
+                    c.spend  = std::max(1.0f, construction_capex(
+                        w, reg, best_tile, building_type::planetary_marketplace, resource_type::iron_ore));
+                    c.reason = corp_decision_reason::best_build;
+                    c.bucket = bucket_for_reason(c.reason);
+                    cands.push_back(c);
+                }
+            }
+        }
+
         // ---- Hire candidates: campaign roster, AVAILABILITY gated on the ----
         // corp's OWN stockpile/market access (unit_roster.hpp), never on cash.
         //
@@ -2641,8 +2737,11 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             const float pin_room = p.trade_pin_share * cc.trade_points - pinned_points;
             // A full book (`max_trades_per_corp`) would refuse every pin: none
             // is proposed then (cold review).
-            if (trade_reach.size() >= 2 && pin_room > 1e-4f && mine.size() < max_trades_per_corp)
+            if (!trade_reach.empty() && pin_room > 1e-4f && mine.size() < max_trades_per_corp)
             {
+                // NR-1018: a market's points pay for trades leaving it, so a
+                // pin is also capped at what its source market makes.
+                const std::map<entity_id, float> src_points = market_trade_points(w, reg, nullptr, corp);
                 std::vector<trade_route_offer> routes;
                 rank_trade_routes(w, reg, trade_nodes, trade_memo, corp, trade_reach, routes);
                 for (const trade_route_offer& r : routes)
@@ -2661,7 +2760,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     const float shelf = std::max(0.0f, w.markets.at(r.a).inventory[r.r]);
                     const float room  = trade_room(w, reg, r.b, r.r, r.landed);
                     const float fit   = std::min(shelf, room);
-                    const float pts   = std::min({fit / cap, pin_room, max_trade_points});
+                    const auto  sp    = src_points.find(r.a);
+                    const float at_src = (sp != src_points.end()) ? sp->second : 0.0f;
+                    const float pts   = std::min({fit / cap, pin_room, at_src, max_trade_points});
                     if (!(pts > 1e-4f) || !std::isfinite(pts))
                         continue;
                     const float units = pts * cap;

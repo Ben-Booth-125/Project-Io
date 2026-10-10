@@ -798,6 +798,12 @@ recorded. A surface renders the empty side as the market; treating it as missing
 the whole history the record exists to keep. The households', the background's and spoilage's
 takes move no money and are not exchanges.
 
+**One row per market, good, side and tick (Ben, 2026-10-10).** Every corporation's landings of a
+good on a market in one tick fold into one sale row, and every draw into one purchase row, at the
+volume-weighted price; the row counts the corporations folded into it and names the corporation
+when there is only one. The player's own exchanges keep a row of their own, so its history reads
+what it bought and sold.
+
 **It records REVENUE, not profit, and that limit is structural rather than an omission.** There
 is **no cost basis anywhere in the model**: a unit on a shelf does not know what it cost to extract
 or to carry there, so the margin on selling it cannot be derived from the sale.

@@ -320,27 +320,10 @@ std::vector<potential_trade_record> derive_potential_trades(
     const logistics_nodes nodes = collect_logistics_nodes(w);
     trade_haul_memo       memo;
 
-    // Ascending market id — deterministic, and the same order on every frame.
-    std::vector<entity_id> dests;
-    for (const auto& [mid, mc] : w.markets)
-    {
-        (void)mc;
-        if (mid != here_mid)
-            dests.push_back(mid);
-    }
-    std::sort(dests.begin(), dests.end());
-
+    // Every route leaving this market, to any market a leg reaches (reach runs
+    // from market centre to market centre — NR-1018), in the pass's own order.
     std::vector<trade_route_offer> offers;
-    std::vector<trade_route_offer> pair_offers;
-    for (const entity_id dm : dests)
-    {
-        const std::vector<entity_id> reach = (here_mid < dm)
-            ? std::vector<entity_id>{here_mid, dm} : std::vector<entity_id>{dm, here_mid};
-        rank_trade_routes(w, reg, nodes, memo, corp, reach, pair_offers);
-        for (const trade_route_offer& o : pair_offers)
-            if (o.a == here_mid)
-                offers.push_back(o);
-    }
+    rank_trade_routes(w, reg, nodes, memo, corp, std::vector<entity_id>{here_mid}, offers);
 
     // RANKING IS PERMITTED HERE, and this is the one surface where that has been
     // ruled on explicitly (`CONCEPT.md` § Player identity, and Ben the same day:
@@ -399,8 +382,22 @@ std::vector<exchange_row_record> derive_exchange_rows(const world& w, entity_id 
         // only honest figure a sale yields; a "profit" column would be a number
         // the clearing loop never computed and a player would act on.
         r.revenue    = e.quantity * e.unit_price;
-        r.seller     = counterparty_label(w, e.seller, r.seller_is_market);
-        r.buyer      = counterparty_label(w, e.buyer,  r.buyer_is_market);
+        // NR-1021: a row folds every corporation's exchange of a good on this
+        // market in a tick; `side` says which end is the market, `parties` how
+        // many corporations stand on the other.
+        const std::string many = std::to_string(e.parties) + " corporations";
+        if (e.side == 0)
+        {
+            r.buyer  = counterparty_label(w, null_entity, r.buyer_is_market);
+            r.seller = (e.parties > 1) ? many : counterparty_label(w, e.seller, r.seller_is_market);
+            if (e.parties > 1) r.seller_is_market = false;
+        }
+        else
+        {
+            r.seller = counterparty_label(w, null_entity, r.seller_is_market);
+            r.buyer  = (e.parties > 1) ? many : counterparty_label(w, e.buyer, r.buyer_is_market);
+            if (e.parties > 1) r.buyer_is_market = false;
+        }
         out.push_back(r);
     }
     return out;

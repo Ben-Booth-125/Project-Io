@@ -18,6 +18,7 @@
 #include <cstddef>
 #include <map>
 #include <utility>
+#include <map>
 #include <vector>
 
 struct logistics_nodes; // supply_system.hpp
@@ -52,21 +53,29 @@ inline bool is_trade_building(building_type t)
 float building_trade_points(const recipe_registry& reg, const building_component& b,
                             float contention, bool upkeep_met);
 
+/// The trade points @p corp's trade buildings make, PER MARKET (Ben,
+/// 2026-10-10, NR-1018: each building makes its points for the market it
+/// stands in), ascending market id. With @p report, this tick's labour
+/// contention and unmet upkeep apply; null reads every building as staffed at
+/// its own assignment with its upkeep met (the scorer's structural estimate).
+std::map<entity_id, float> market_trade_points(const world& w, const recipe_registry& reg,
+                                               const economy_report* report, entity_id corp);
+
 /// The trade points @p corp's trade buildings make this tick (the sum of
-/// `building_trade_points`, its assets in stored order).
+/// `market_trade_points`).
 float corp_trade_points(const world& w, const recipe_registry& reg,
                         const economy_report& report, entity_id corp);
 
-/// The markets @p corp's trade reaches (TRADE.md § Auto and reserved trade:
-/// "among the markets the owner's Marketplaces reach"): every market on a body
-/// where it holds a completed, active trade building, ascending market id. A
-/// route between two of them still needs a viable leg — between bodies, a
-/// Launchpad and propellant on the source body (`price_trade_leg`).
+/// The markets @p corp TRADES FROM: every market whose catchment holds one of
+/// its completed, active trade buildings, ascending id (Ben, 2026-10-10,
+/// NR-1018). Its trades — auto and manual — leave from these; they reach any
+/// market a leg reaches from the source's centre (`rank_trade_routes`).
 std::vector<entity_id> corp_trade_markets(const world& w, entity_id corp);
 
 /// Is @p t a well-formed manual trade in @p w as it stands — a live owner
 /// corporation, two distinct existing markets, a good trade carries
-/// (capacity > 0, not a grid good) and finite points > 0? The command seam refuses a trade
+/// (capacity > 0, not a grid good), finite points > 0, and a source market
+/// the owner trades from (`corp_trade_markets`; NR-1018)? The command seam refuses a trade
 /// this rejects; the save loader, which has no registry, checks the owner,
 /// the markets, the points and the per-owner cap, and the trade pass re-checks
 /// this every tick (a trade it rejects ships nothing).
@@ -103,7 +112,9 @@ float trade_haul_per_unit(world& w, const recipe_registry& reg, const logistics_
 /// THE ROUTE RANKING auto trade spends by (TRADE.md § Auto and reserved trade),
 /// shared with the scorer's trade candidate (AI_OPPONENT.md § 11, "a rival may
 /// set its own trades") so there is one estimate, not two. Fills @p out with
-/// every route among @p reach that earns more than `dispatch_margin()` of its
+/// every route from a market in @p sources to ANY market (reach runs from
+/// market centre to market centre; the leg decides viability — NR-1018) that
+/// earns more than `dispatch_margin()` of its
 /// source price — the source shelf holds the good under the fair-price
 /// ceiling, `(price_B - price_A - haul) > margin x price_A` — best margin per
 /// point first (ties: source, destination, good, ascending). Reads public
@@ -111,20 +122,23 @@ float trade_haul_per_unit(world& w, const recipe_registry& reg, const logistics_
 /// @p memo. Deterministic: sorted walks.
 void rank_trade_routes(world& w, const recipe_registry& reg, const logistics_nodes& nodes,
                        trade_haul_memo& memo, entity_id corp,
-                       const std::vector<entity_id>& reach, std::vector<trade_route_offer>& out);
+                       const std::vector<entity_id>& sources, std::vector<trade_route_offer>& out);
 
 /// THE TRADE PASS, once per economy tick, after `run_economy_step` (its
 /// production has landed and its draws are made) and before `clear_markets`
 /// (which bills the trades' purchases and prices their wants). For every
 /// corporation, ascending id:
-///   1. its trade points this tick (`corp_trade_points`), stored on
-///      `corporation_component::trade_points`;
+///   1. its trade points this tick, PER MARKET (`market_trade_points`), their
+///      sum stored on `corporation_component::trade_points`;
 ///   2. its MANUAL trades (`world::trades`, placement order) spend up to its
-///      reserve (`trade_reserve`, clamped to the points made): each ships up to
+///      one reserve (`trade_reserve`, clamped to the points made), each out of
+///      the points of the market it leaves: each ships up to
 ///      `points x capacity(R)` — bought, hauled, landed — margin or no margin;
-///   3. AUTO spends the rest on the routes with the best margin per point,
-///      `(price_B - price_A - haul per unit) x capacity(R)`, among the markets
-///      `corp_trade_markets` names, best first (ties: source, destination,
+///   3. the reserve manual trades left unspent is held back from every market
+///      in proportion to what it has left; AUTO spends the rest, each market's
+///      points on routes leaving it, best margin per point first,
+///      `(price_B - price_A - haul per unit) x capacity(R)`, to any market a
+///      leg reaches (ties: source, destination,
 ///      good, ascending), each route sized to what B can absorb above the
 ///      landed cost (`trade_room`) and what A's shelf holds, until the points
 ///      run out or no route earns more than `dispatch_margin()` of its source

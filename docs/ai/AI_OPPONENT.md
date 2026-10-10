@@ -2046,3 +2046,18 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   **What it does NOT admit.** No coordination between corporations; no trade on another owner's
   points; nothing for the player's corp beyond its own opt-out dial. Pure, seeded,
   deterministic, replayable, legal verbs only, never a planner.
+
+  **A rival may build a Planetary Marketplace (Ben, 2026-10-10; `../economy/TRADE.md`).**
+  Without it a rival's trade capacity would be fixed at what generation retrofits and the Ports it
+  holds. The grant: the scorer may propose building a Marketplace in a market where the
+  corporation already holds ground and no trade building, when the trade pass's own route ranking
+  (public prices, the network's haul) finds a route with margin leaving that market. It is scored
+  with a **modest flat score** — the bootstrap port's shape — so it never out-bids a genuine
+  economic build, and only one trade building is under construction at a time.
+
+  **What it admits.** One build candidate through the ordinary build verb, sited at the free tile
+  of that market's catchment nearest its centre, under the usual placement, reach and materials
+  gates and the solvency gate.
+
+  **What it does NOT admit.** No forecast of a rival's trade, no race for a market, nothing for the
+  player's corp. Pure, seeded, deterministic, replayable, legal verbs only, never a planner.

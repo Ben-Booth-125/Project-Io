@@ -46,7 +46,7 @@ constexpr auto max_ideology   = ideology::isolationist;
 constexpr auto max_posture    = expansionism::aggressive;
 constexpr auto max_econ_focus = economic_focus::trade;
 constexpr auto max_law_effect = law_effect_kind::import_tariff;
-constexpr auto max_cond_subj  = condition_subject::province_held; // BL-570: appended after science
+constexpr auto max_cond_subj  = condition_subject::produced; // NR-1015 appended after province_held (BL-570)
 constexpr auto max_cond_cmp   = condition_comparator::less_than;
 constexpr auto max_mod_subj   = modifier_subject::collapse_strain;
 constexpr auto max_mod_op     = modifier_op::multiply;
@@ -514,13 +514,16 @@ void w_exchange(std::ostream& o, const exchange_record& e)
     w_f32(o, e.unit_price);
     w_id(o, e.seller);
     w_id(o, e.buyer);
+    w_u8(o, e.side);     // NR-1021: world_save_version 46
+    w_u16(o, e.parties); // NR-1021: world_save_version 46
 }
 
 bool r_exchange(std::istream& i, exchange_record& e)
 {
     return r_int(i, e.tick) && r_id(i, e.market) && r_enum(i, e.resource, max_resource)
         && r_f32(i, e.quantity) && r_f32(i, e.unit_price) && r_id(i, e.seller)
-        && r_id(i, e.buyer);
+        && r_id(i, e.buyer) && r_u8(i, e.side) && r_u16(i, e.parties)
+        && e.side <= 1 && e.parties >= 1;
 }
 
 void w_quote(std::ostream& o, const procurement_quote& q)

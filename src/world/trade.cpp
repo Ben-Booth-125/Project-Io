@@ -39,24 +39,44 @@ float building_trade_points(const recipe_registry& reg, const building_component
     return (std::isfinite(pts) && pts > 0.0f) ? pts : 0.0f;
 }
 
-float corp_trade_points(const world& w, const recipe_registry& reg,
-                        const economy_report& report, entity_id corp)
+std::map<entity_id, float> market_trade_points(const world& w, const recipe_registry& reg,
+                                               const economy_report* report, entity_id corp)
 {
+    std::map<entity_id, float> out;
     const auto cit = w.corporations.find(corp);
     if (cit == w.corporations.end())
-        return 0.0f;
-    float total = 0.0f;
+        return out;
     for (const entity_id bid : cit->second.assets)
     {
         const auto bit = w.buildings.find(bid);
         if (bit == w.buildings.end() || !trade_building_active(bit->second))
             continue;
-        const entity_id body = building_body_of(w, bit->second);
-        const auto cont = report.workforce_contention.find(std::make_pair(corp, body));
-        const float contention = (cont != report.workforce_contention.end()) ? cont->second : 1.0f;
-        const bool met = report.upkeep_unmet.count(bid) == 0;
-        total += building_trade_points(reg, bit->second, contention, met);
+        const entity_id mid = market_for_tile(w, bit->second.tile);
+        if (mid == null_entity)
+            continue; // no market under it: no shelf to trade from
+        float contention = 1.0f;
+        bool  met        = true;
+        if (report != nullptr)
+        {
+            const entity_id body = building_body_of(w, bit->second);
+            const auto cont = report->workforce_contention.find(std::make_pair(corp, body));
+            if (cont != report->workforce_contention.end())
+                contention = cont->second;
+            met = report->upkeep_unmet.count(bid) == 0;
+        }
+        const float p = building_trade_points(reg, bit->second, contention, met);
+        if (p > 0.0f)
+            out[mid] += p;
     }
+    return out;
+}
+
+float corp_trade_points(const world& w, const recipe_registry& reg,
+                        const economy_report& report, entity_id corp)
+{
+    float total = 0.0f;
+    for (const auto& [mid, p] : market_trade_points(w, reg, &report, corp))
+        total += p; // ascending market id: a fixed summation order
     return total;
 }
 
@@ -66,22 +86,16 @@ std::vector<entity_id> corp_trade_markets(const world& w, entity_id corp)
     const auto cit = w.corporations.find(corp);
     if (cit == w.corporations.end())
         return out;
-    std::set<entity_id> bodies;
     for (const entity_id bid : cit->second.assets)
     {
         const auto bit = w.buildings.find(bid);
         if (bit == w.buildings.end() || !trade_building_active(bit->second))
             continue;
-        const entity_id body = building_body_of(w, bit->second);
-        if (body != null_entity)
-            bodies.insert(body);
-    }
-    if (bodies.empty())
-        return out;
-    for (const auto& [mid, mc] : w.markets)
-        if (bodies.count(mc.body) != 0)
+        if (const entity_id mid = market_for_tile(w, bit->second.tile); mid != null_entity)
             out.push_back(mid);
+    }
     std::sort(out.begin(), out.end());
+    out.erase(std::unique(out.begin(), out.end()), out.end());
     return out;
 }
 
@@ -98,7 +112,12 @@ bool trade_is_valid(const world& w, const recipe_registry& reg, const standing_t
         return false;
     if (reg.grid_goods().grid(r) || !(reg.trade().capacity[r] > 0.0f))
         return false;
-    return std::isfinite(t.points) && t.points > 0.0f;
+    if (!(std::isfinite(t.points) && t.points > 0.0f))
+        return false;
+    // Ben, 2026-10-10 (NR-1018): a manual trade obeys auto's reach — it leaves
+    // from a market where the owner holds a trade building.
+    const std::vector<entity_id> src = corp_trade_markets(w, t.owner);
+    return std::binary_search(src.begin(), src.end(), t.from_market);
 }
 
 float trade_haul_per_unit(world& w, const recipe_registry& reg, const logistics_nodes& nodes,
@@ -124,13 +143,25 @@ float trade_haul_per_unit(world& w, const recipe_registry& reg, const logistics_
 
 void rank_trade_routes(world& w, const recipe_registry& reg, const logistics_nodes& nodes,
                        trade_haul_memo& memo, entity_id corp,
-                       const std::vector<entity_id>& reach, std::vector<trade_route_offer>& out)
+                       const std::vector<entity_id>& sources, std::vector<trade_route_offer>& out)
 {
     out.clear();
     const trade_params& tp = reg.trade();
     const float res_mult = reg.price_band().reservation_mult;
     const float margin   = reg.dispatch_margin();
-    for (const entity_id a : reach)
+    // Ben, 2026-10-10 (NR-1018): reach runs from market centre to market
+    // centre — every market a leg reaches from the source's centre is a
+    // destination (the leg prices and gates it: same body, overland or by
+    // Ports; another body, the trader's pad and propellant). Ascending id.
+    std::vector<entity_id> dests;
+    dests.reserve(w.markets.size());
+    for (const auto& [mid, mc] : w.markets)
+    {
+        (void)mc;
+        dests.push_back(mid);
+    }
+    std::sort(dests.begin(), dests.end());
+    for (const entity_id a : sources)
     {
         const market_component& ma = w.markets.at(a);
         for (std::size_t ri = 0; ri < resource_count; ++ri)
@@ -142,7 +173,7 @@ void rank_trade_routes(world& w, const recipe_registry& reg, const logistics_nod
             const float price_a = posted_price(ma, ri);
             if (!(price_a > 0.0f))
                 continue;
-            for (const entity_id b : reach)
+            for (const entity_id b : dests)
             {
                 if (b == a)
                     continue;
@@ -185,14 +216,19 @@ trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& repo
 
     // Every corporation's points this tick are stored whether or not it trades,
     // so a building lost or an upkeep unmet reads as zero, not as last tick's.
-    std::map<entity_id, float> points;
+    // Ben, 2026-10-10 (NR-1018): each trade building makes its points for the
+    // MARKET it stands in, and they are spent on trades leaving that market.
+    std::map<entity_id, std::map<entity_id, float>> points; // corp -> market -> points
     for (const entity_id corp : corp_ids)
     {
-        const float p = corp_trade_points(w, reg, report, corp);
+        std::map<entity_id, float> pm = market_trade_points(w, reg, &report, corp);
+        float p = 0.0f;
+        for (const auto& [mid, v] : pm)
+            p += v;
         w.corporations.at(corp).trade_points = p;
         if (p > 0.0f)
         {
-            points[corp] = p;
+            points[corp] = std::move(pm);
             out.points_made += p;
             ++out.corps_trading;
         }
@@ -249,39 +285,60 @@ trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& repo
 
         std::vector<trade_route_offer> cands;
 
-        for (const auto& [corp, made] : points)
+        for (auto& [corp, mpts] : points)
         {
             const corporation_component& cc = w.corporations.at(corp);
-            const float reserve = std::clamp(cc.trade_reserve, 0.0f, made);
-            float auto_pts      = made - reserve;
+            float made = 0.0f;
+            for (const auto& [mid, v] : mpts)
+                made += v;
+            // ONE reserve per corporation (Ben, 2026-10-10): the points held
+            // back from auto for its manual trades, clamped to what it makes.
+            float reserve_left = std::clamp(cc.trade_reserve, 0.0f, made);
 
-            // --- MANUAL: the owner's trades, in placement order, spend the reserve.
-            float reserve_left = reserve;
+            // --- MANUAL: the owner's trades, in placement order, spend the
+            // reserve out of the points of the market each one leaves.
             for (std::size_t i = 0; i < w.trades.size() && reserve_left > 0.0f; ++i)
             {
                 const standing_trade t = w.trades[i]; // a copy: shipping appends convoys, not trades
                 if (t.owner != corp || !trade_is_valid(w, reg, t))
                     continue;
+                const auto mit = mpts.find(t.from_market);
+                if (mit == mpts.end() || !(mit->second > 0.0f))
+                    continue; // its source made no points this tick
                 const std::size_t ri = static_cast<std::size_t>(t.resource);
-                const float pts  = std::min(t.points, reserve_left);
+                const float pts  = std::min({t.points, reserve_left, mit->second});
                 const float sent = ship(corp, t.from_market, t.to_market, ri, pts * tp.capacity[ri],
                                         /*is_auto=*/false);
-                const float used = sent / tp.capacity[ri];
-                reserve_left -= std::min(pts, used);
-                out.points_spent += std::min(pts, used);
+                const float used = std::min(pts, sent / tp.capacity[ri]);
+                reserve_left -= used;
+                mit->second  -= used;
+                out.points_spent += used;
             }
 
-            // --- AUTO: the unreserved points, best margin per point first.
-            if (!(auto_pts > 0.0f))
+            // --- AUTO: what is left at each market, less the reserve manual
+            // trades did not spend — held back from every market in proportion
+            // to what it has left (ascending id), so a reserve stays reserved.
+            float left_total = 0.0f;
+            for (const auto& [mid, v] : mpts)
+                left_total += std::max(0.0f, v);
+            if (!(left_total > reserve_left))
                 continue;
-            const std::vector<entity_id> reach = corp_trade_markets(w, corp);
-            if (reach.size() < 2)
+            const float keep = (left_total > 0.0f) ? (1.0f - reserve_left / left_total) : 0.0f;
+            std::vector<entity_id> sources;
+            for (auto& [mid, v] : mpts)
+            {
+                v = std::max(0.0f, v) * keep;
+                if (v > 1e-6f)
+                    sources.push_back(mid);
+            }
+            if (sources.empty())
                 continue;
-            rank_trade_routes(w, reg, nodes, haul_memo, corp, reach, cands);
+            rank_trade_routes(w, reg, nodes, haul_memo, corp, sources, cands);
             for (const trade_route_offer& c : cands)
             {
+                float& auto_pts = mpts.at(c.a);
                 if (!(auto_pts > 1e-6f))
-                    break;
+                    continue;
                 const float cap   = tp.capacity[c.r];
                 const float shelf = std::max(0.0f, w.markets.at(c.a).inventory[c.r]);
                 const float room  = trade_room(w, reg, c.b, c.r, c.landed);

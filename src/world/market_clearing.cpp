@@ -411,6 +411,7 @@ float buy_from_corp_shelves(world& w, entity_id corp, std::size_t r, float qty,
         e.unit_price = px;
         e.seller     = null_entity;
         e.buyer      = corp;
+        e.side       = 1; // a purchase FROM the market (NR-1021)
         w.exchanges.push(e);
     }
     return bought;
@@ -1313,19 +1314,53 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // `economy_report::purchases`) with the resource index ascending inside each
     // row. `world::markets` is an unordered_map and is NEVER the thing walked to
     // emit a row. A ZERO-QUANTITY row is not an exchange and is dropped.
-    auto record_exchange = [&w](entity_id market, std::size_t r, float qty, float price,
-                                entity_id seller, entity_id buyer) {
+    //
+    // NR-1021 (Ben, 2026-10-10): ONE ROW PER (market, good, side, tick). Every
+    // corporation's sale of a good on a market this tick folds into one sale
+    // row, every purchase into one purchase row, at the volume-weighted price;
+    // the player's own exchanges keep a row of their own (its history reads
+    // "what I bought"). Accumulated in a std::map and flushed in key order once
+    // both sites have run, so the ring's order is the map's — deterministic.
+    struct exchange_acc { float qty = 0.0f; float value = 0.0f; entity_id corp = null_entity; std::uint16_t parties = 0; };
+    std::map<std::tuple<entity_id, std::size_t, std::uint8_t, bool>, exchange_acc> exchange_rows;
+    auto record_exchange = [&w, &exchange_rows](entity_id market, std::size_t r, float qty, float price,
+                                                entity_id seller, entity_id buyer) {
         if (qty <= 0.0f)
             return;
-        exchange_record e;
-        e.tick       = w.current_econ_tick;
-        e.market     = market;
-        e.resource   = static_cast<resource_type>(r);
-        e.quantity   = qty;
-        e.unit_price = price;
-        e.seller     = seller;
-        e.buyer      = buyer;
-        w.exchanges.push(e);
+        const std::uint8_t side = (buyer == null_entity) ? 0 : 1; // 0: sold TO the market
+        const entity_id    corp = (side == 0) ? seller : buyer;
+        const bool         mine = corp != null_entity && corp == w.player_entity;
+        exchange_acc& a = exchange_rows[std::make_tuple(market, r, side, mine)];
+        a.qty   += qty;
+        a.value += qty * price;
+        if (a.parties == 0 || a.corp == corp)
+            a.corp = corp;
+        else
+            a.corp = null_entity; // more than one corporation: unnamed
+        if (a.parties < 65535)
+            ++a.parties;
+    };
+    auto flush_exchanges = [&w, &exchange_rows]() {
+        for (const auto& [key, a] : exchange_rows)
+        {
+            if (!(a.qty > 0.0f))
+                continue;
+            exchange_record e;
+            e.tick       = w.current_econ_tick;
+            e.market     = std::get<0>(key);
+            e.resource   = static_cast<resource_type>(std::get<1>(key));
+            e.side       = std::get<2>(key);
+            e.quantity   = a.qty;
+            e.unit_price = a.value / a.qty;
+            // A row that folded several exchanges of ONE corporation still
+            // names it; several corporations leave the side unnamed.
+            const bool named = a.corp != null_entity;
+            e.parties    = named ? 1 : a.parties;
+            e.seller     = (e.side == 0) ? a.corp : null_entity;
+            e.buyer      = (e.side == 1) ? a.corp : null_entity;
+            w.exchanges.push(e);
+        }
+        exchange_rows.clear();
     };
 
     // Captured BEFORE the reset below, so it carries the PREVIOUS tick's
@@ -1536,6 +1571,7 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // was fixed. The nation's network upkeep and space programme draw LATER in
     // the tick from what households leave (Ben, 2026-10-05: households come
     // before the nation — MARKETS.md step 12).
+    flush_exchanges(); // NR-1021: the tick's aggregated exchange rows
     draw_household_basket(w);
 
     // BL-1217 lever D: the background basket draws what the households left,

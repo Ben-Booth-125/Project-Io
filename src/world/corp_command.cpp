@@ -1368,6 +1368,15 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             t.points      = cmd.quantity;
             if (!(t.points <= max_trade_points) || !trade_is_valid(w, reg, t))
                 return corp_command_result::rejected_invalid;
+            // NR-1018: reach runs from market centre to market centre — a leg
+            // must reach the destination (same body, overland or by Ports;
+            // another body, the owner's pad and propellant).
+            {
+                const logistics_nodes nodes = collect_logistics_nodes(w);
+                if (!price_trade_leg(w, reg, nodes, cmd.corp, t.from_market, t.to_market,
+                                     static_cast<std::size_t>(t.resource), 1.0f).viable)
+                    return corp_command_result::rejected_placement;
+            }
             if (cmd.order != 0)
             {
                 // CHANGE an existing trade, keeping its id and its place in the

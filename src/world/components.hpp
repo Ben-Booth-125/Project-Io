@@ -2182,6 +2182,16 @@ struct exchange_record
     /// render such a side as the market, never blank the row.
     entity_id     seller     = null_entity;
     entity_id     buyer      = null_entity;
+    /// NR-1021 (Ben, 2026-10-10): one row per (market, good, side, tick) — every
+    /// corporation's landings of a good on a market in a tick fold into ONE sale
+    /// row, every draw into ONE purchase row (the player's own kept apart, so its
+    /// history still reads "what I bought"). `side` 0 = a sale TO the market
+    /// (`buyer` is the market), 1 = a purchase FROM it (`seller` is the market).
+    /// `parties` counts the corporations folded in; with more than one the
+    /// corporation side is `null_entity` and a reader renders "N corporations".
+    /// `unit_price` is then the row's volume-weighted price.
+    std::uint8_t  side       = 0;
+    std::uint16_t parties    = 1;
 };
 
 /// Fixed-capacity ring of the most recent exchanges, world-wide — capped the way

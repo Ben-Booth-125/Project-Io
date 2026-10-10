@@ -25,7 +25,13 @@ not a stock: made and spent within the tick, never banked — the Logistic Point
 (`LOGISTICS.md` § Logistic Points), applied to an owner's capacity.
 
 **Ports make trade points too (Ben, 2026-10-10).** A Port, besides its sea-lane role, makes trade
-points for its owner each tick, as a Marketplace does at a lower rate the data sets.
+points for its owner each tick, as a Marketplace does at a lower rate the data sets. A Marketplace
+makes its points at its staffed rate; a Port, which staffs at zero, makes its flat rate.
+
+**Points belong to the market the building stands in (Ben, 2026-10-10).** Each trade building
+makes its points for the **market whose catchment holds it**, and those points move goods
+*leaving that market*. An owner trades from the markets where it holds a trade building, and from
+nowhere else.
 
 **Trade buildings have upkeep (Ben, 2026-10-10).** A Planetary Marketplace and a Port each draw an
 upkeep of **fuel and building materials** every tick, bought from their own market's shelf like
@@ -66,18 +72,26 @@ body, and each launch burns propellant the trader buys from that body's shelf
 
 ## Auto and reserved trade
 
-Each owner chooses, per Marketplace or for all of them, how much of its trade points to
-**reserve for manual trades**; the rest is **auto**.
+Each owner chooses **one reserve** — how much of its trade points to **reserve for manual
+trades** (Ben, 2026-10-10); the rest is **auto**.
 
-- **Manual trades** are the routes the owner sets, each with its points.
+**Reach runs from market centre to market centre (Ben, 2026-10-10).** A trade leaves a market
+where its owner holds a trade building and may go to any market a leg reaches from that market's
+centre: on the same body, overland or through Ports; to another body, by the owner's Launchpad
+and propellant (`LOGISTICS.md`, `SUPPLY.md`). The same reach binds manual and auto alike.
+
+- **Manual trades** are the routes the owner sets, each with its points, spent out of the points
+  of the market it leaves, in the order they were set, up to the reserve.
 - **Auto** assigns the unreserved points each tick to the routes with the best margin per point
   — destination price less source price less haul, per unit, times the resource's capacity —
-  among the markets the owner's Marketplaces reach, best first, until the points run out or no
-  route earns. Deterministic: candidates in a fixed order, ties broken by market and resource id.
+  each market's points on routes leaving it, best first, until the points run out or no route
+  earns more than the network's dispatch margin of its source price. Reserved points a manual
+  trade did not spend stay reserved: they are held back from every market in proportion to what
+  it has left. Deterministic: candidates in a fixed order, ties broken by market and resource id.
 
 **Who may trade (Ben, 2026-10-10).** The player and every AI corporation. An AI corporation may
-set **manual** trades as well as run auto — a grant in `../ai/AI_OPPONENT.md` § 11 — under the
-grant constraints every AI decision is bound by.
+set **manual** trades as well as run auto, and may **build a Planetary Marketplace** — two grants
+in `../ai/AI_OPPONENT.md` § 11 — under the grant constraints every AI decision is bound by.
 
 ## Trade in generation
 
@@ -93,9 +107,16 @@ campaign opens with (Ben, 2026-10-10).**
 - **After Industrialisation, the record is spent.** The trade points a history accumulated are
   consumed to **retrofit Planetary Marketplaces** where trade most likely took place: on the
   markets whose trade the history carried, owned by the corporations chartered there. A route
-  the history never traded gets no Marketplace for its sake. How many points a nation earns per
-  unit of history trade or relation, and how the record converts into Marketplaces (count, size,
-  owner), are proposed by measurement and approved by Ben (2026-10-10), as the capacity table is.
+  the history never traded gets no Marketplace for its sake.
+- **How the record is read (approved by Ben, 2026-10-10).** Each round, a nation's trade flows
+  credit their volume to both ends, each at its own capital, and each standing mutual treaty
+  credits its years to both sides' capitals (tribute does not count). At the end of generation
+  the record converts to points by authored rates (`world_gen.trade_retrofit` in data) and each
+  market whose history traded buys up to a capped count of Marketplaces at an authored price in
+  points. **Owner:** the corporation, other than the seat, with the most buildings in that
+  market's catchment (ties to the lower id); a market where no corporation holds ground gets
+  none. **Site:** the free tile of the catchment nearest the market's centre that placement
+  allows. A retrofitted Marketplace is built and staffed when the campaign opens.
 - **The 1960 settle** runs trade as play does, on the corporations' Marketplaces.
 - **The seat holds a Marketplace only if its corporation has one by the end of generation**
   (Ben, 2026-10-10); the player builds the first otherwise.
