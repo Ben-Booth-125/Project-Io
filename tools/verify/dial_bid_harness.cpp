@@ -1,32 +1,28 @@
 // Headless harness: BL-1217 (G1 plants running) — the background workforce
-// dial's buyer signal, `dial_bid` (components.hpp; AI_OPPONENT.md § 11, "the
-// dial reads stock-fed consumers", Ben 2026-10-09): posted demand PLUS what
-// running processors drew from their owners' pools and did not post as demand,
-// held for the scorer's cadence, each unit counted once. No SDL / Lua / ImGui.
-// Sibling of unposted_bid_harness; same build line.
+// dial's buyer signal, `dial_bid` (components.hpp; AI_OPPONENT.md § 11). No
+// SDL / Lua / ImGui. Sibling of unposted_bid_harness; same build line.
 //
-// Every row drives the REAL economy step (run_economy_step: want, draw,
-// collect_dial_pool_draws) and the REAL clear (clear_markets: demand and the
-// dial record written together), and reads `dial_bid` at the age the scorer
-// reads it — AGE 1: the scorer runs inside the NEXT tick's economy step, after
-// that tick's production but before its clear, so it sees the previous clear's
-// demand and dial record. (`at_age1` reads with current_econ_tick + 1.)
+// BL-1265 (MARKETS.md § The shelf economy, Ben 2026-10-10): corporations hold
+// no pools, so every want a processor has is POSTED demand, and the dial's
+// stock-fed draw register retired with the pool — `dial_bid` collapses to the
+// market's posted demand. The rows that tested the pool-draw register (a pool
+// running dry, a refilled pool, two processors sharing a pool, the draw held
+// for the cadence) retired with it; what stands is the collapsed rule, checked
+// on the real step and clear, and D6, which never read a pool.
+//
+// Every row drives the REAL economy step and the REAL clear, and reads
+// `dial_bid` at the age the scorer reads it — AGE 1: the scorer runs inside the
+// NEXT tick's economy step, after that tick's production but before its clear.
 //
 // Fixture: one body, one market M; a coal -> steel processor P owned by the
 // PLAYER corp (so the scorer never dials it and the reflex never rescues it);
-// coal on M's shelf where a row needs a shelf. N = P's full-run coal need, read
-// off a calibration tick (a pool-fed tick's dial record).
+// coal on M's shelf. N = P's full-run coal need, read off a calibration tick.
 //
-//   D1 the pool runs dry and P moves to the shelf: N, N, N across the
-//      transition (never 2N: the old draw is not held beside the new demand;
-//      never 0: the first shelf tick's demand and record are the same clear's).
-//   D2 a shelf buyer moves to a refilled pool: N (demand) then N (draw).
-//   D3 a starved processor that still posts its want stamps 0 and replaces its
-//      old held draw: N, with the record 0 at the new tick (not N + N).
-//   D4 a processor that stops entirely (decommissioned: no want, no stamp) ages
-//      out: its last draw is read through the hold (cadence 4), and 0 after.
-//   D5 two processors on one market share one pool: their draws sum; when the
-//      pool covers only one, the other's 0-stamp does not erase the first's draw.
+//   D1 a shelf-fed P posts N as demand, and the dial reads N, tick after tick.
+//   D3 a starved P (an empty shelf) still posts its whole want: the dial reads N.
+//   D4 a P that stops entirely (decommissioned: no want) reads 0 the next tick —
+//      nothing is held any more.
+//   D5 two processors on one shelf: their posted wants sum (2N).
 //   D6 market_has_cleared on a market spawned mid-step (maybe_spawn_market):
 //      false before its first clear even with an unposted bid recorded on it the
 //      same step (the old reading would have said cleared), true after the clear.
@@ -132,20 +128,19 @@ fixture make_fixture(const recipe_registry& reg, bool two_plants)
     return f;
 }
 
-/// Set P's pool coal and M's shelf coal exactly, then run one real economy step
-/// and the real clear at the current tick, and advance the tick.
-void tick(fixture& f, const recipe_registry& reg, float pool_coal, float shelf_coal)
+/// Set M's shelf coal exactly, then run one real economy step and the real
+/// clear at the current tick, and advance the tick. (BL-1265: no pool to set.)
+void tick(fixture& f, const recipe_registry& reg, float shelf_coal)
 {
-    f.w.pool_at(f.corp, f.market).quantities[r_coal] = pool_coal;
-    f.w.markets.at(f.market).inventory[r_coal]       = shelf_coal;
+    f.w.markets.at(f.market).inventory[r_coal] = shelf_coal;
     economy_report rep = run_economy_step(f.w, reg, /*spectating=*/false);
     (void)clear_markets(f.w, reg, rep);
     ++f.w.current_econ_tick;
 }
 
 /// `dial_bid` as the scorer reads it: inside the next step, before its clear —
-/// the record and demand of the clear just run, at age 1. `tick` has already
-/// advanced current_econ_tick, so this is the current tick.
+/// the demand of the clear just run, at age 1. `tick` has already advanced
+/// current_econ_tick, so this is the current tick.
 float at_age1(const fixture& f)
 {
     return dial_bid(f.w.markets.at(f.market), r_coal, f.w.current_econ_tick, k_hold);
@@ -155,118 +150,68 @@ float at_age1(const fixture& f)
 
 int main()
 {
-    std::printf("dial_bid_harness — BL-1217 the dial's buyer signal\n");
+    std::printf("dial_bid_harness — BL-1217 the dial's buyer signal (BL-1265: posted demand)\n");
     const recipe_registry reg = make_registry();
 
-    // Calibration: N, P's full-run coal need, off a pool-fed tick's record.
+    // Calibration: N, P's full-run coal need, off a shelf-fed tick's posted demand.
     float N = 0.0f;
     {
         fixture f = make_fixture(reg, false);
-        tick(f, reg, 1000.0f, 0.0f);
+        tick(f, reg, 1000.0f);
         const market_component& m = f.w.markets.at(f.market);
-        N = m.dial_pool_draw[r_coal];
-        std::printf("  calibration: N = %.4f coal per run (demand %.4f)\n", N, m.demand[r_coal]);
-        check(N > 0.0f && m.demand[r_coal] == 0.0f,
-              "C0 not vacuous: a pool-fed P records a positive draw and posts no coal demand");
+        N = m.demand[r_coal];
+        std::printf("  calibration: N = %.4f coal per run (posted demand)\n", N);
+        check(N > 0.0f, "C0 not vacuous: a shelf-fed P posts a positive coal demand");
     }
 
-    std::printf("D1 the pool runs dry: P moves to the shelf\n");
+    std::printf("D1 a shelf-fed P: the dial reads its posted want\n");
     {
         fixture f = make_fixture(reg, false);
-        tick(f, reg, N, 10.0f * N);
+        tick(f, reg, 10.0f * N);
         const float a = at_age1(f);
-        tick(f, reg, N, 10.0f * N);
+        tick(f, reg, 10.0f * N);
         const float b = at_age1(f);
-        tick(f, reg, 0.0f, 10.0f * N); // the pool is dry: P posts N and buys off the shelf
-        const market_component& m = f.w.markets.at(f.market);
-        const float c = at_age1(f);
-        const bool  posted = near(m.demand[r_coal], N) && m.dial_pool_draw[r_coal] == 0.0f;
-        tick(f, reg, 0.0f, 10.0f * N);
-        const float d = at_age1(f);
-        std::printf("    dial_bid: %.4f %.4f | %.4f %.4f\n", a, b, c, d);
-        check(near(a, N) && near(b, N), "D1 pool-fed ticks read N (the held draw)");
-        check(posted, "D1 not vacuous: on the first dry tick P posts N as demand and its record is stamped 0");
-        check(near(c, N), "D1 the transition tick reads N: never 2N (old draw beside new demand), never 0");
-        check(near(d, N), "D1 ... and the next shelf tick reads N");
+        std::printf("    dial_bid: %.4f %.4f\n", a, b);
+        check(near(a, N) && near(b, N), "D1 every shelf-fed tick reads N (posted demand, never 2N)");
     }
 
-    std::printf("D2 a shelf buyer moves to a refilled pool\n");
+    std::printf("D3 a starved processor still posts its whole want\n");
     {
         fixture f = make_fixture(reg, false);
-        tick(f, reg, 0.0f, 10.0f * N);
-        const float a = at_age1(f);
-        const bool  on_shelf = near(f.w.markets.at(f.market).demand[r_coal], N);
-        tick(f, reg, N, 10.0f * N);
-        const float b = at_age1(f);
-        const bool  on_pool = f.w.markets.at(f.market).demand[r_coal] == 0.0f
-                           && near(f.w.markets.at(f.market).dial_pool_draw[r_coal], N);
-        std::printf("    dial_bid: %.4f then %.4f\n", a, b);
-        check(on_shelf && on_pool, "D2 not vacuous: P posts N on the shelf tick, draws N from the pool the next");
-        check(near(a, N) && near(b, N), "D2 W then W: N (demand) then N (draw), never 2N");
-    }
-
-    std::printf("D3 a starved processor that still posts stamps 0\n");
-    {
-        fixture f = make_fixture(reg, false);
-        tick(f, reg, N, 0.0f);
-        const int t_fed = f.w.markets.at(f.market).dial_pool_draw_tick[r_coal];
-        const float a = at_age1(f);
-        tick(f, reg, 0.0f, 0.0f); // nothing in the pool or on the shelf: P is starved, still posts N
+        tick(f, reg, 0.0f); // nothing on the shelf: P is starved, still posts N
         const market_component& m = f.w.markets.at(f.market);
         const float b = at_age1(f);
-        std::printf("    dial_bid: %.4f then %.4f (record %.4f at tick %d, was tick %d)\n", a, b,
-                    m.dial_pool_draw[r_coal], m.dial_pool_draw_tick[r_coal], t_fed);
-        check(near(a, N), "D3 the pool-fed tick reads N");
+        std::printf("    dial_bid: %.4f (demand %.4f)\n", b, m.demand[r_coal]);
         check(near(m.demand[r_coal], N), "D3 not vacuous: the starved P still posts N as demand");
-        check(m.dial_pool_draw[r_coal] == 0.0f && m.dial_pool_draw_tick[r_coal] > t_fed,
-              "D3 ... and STAMPS 0 at the new tick, replacing its old held draw");
-        check(near(b, N), "D3 the starved tick reads N, not N + N");
+        check(near(b, N), "D3 the starved tick reads N");
     }
 
-    std::printf("D4 a processor that stops entirely ages out after the hold\n");
+    std::printf("D4 a processor that stops entirely reads 0 the next tick\n");
     {
         fixture f = make_fixture(reg, false);
-        tick(f, reg, N, 0.0f);
-        const int t_rec = f.w.markets.at(f.market).dial_pool_draw_tick[r_coal];
-        f.w.buildings.at(f.p1).decommissioned = true; // no want, no draw, no stamp
-        bool held = true;
-        float last = 0.0f;
-        int   age  = f.w.current_econ_tick - t_rec;
-        for (; age <= k_hold; ++age)
-        {
-            held = held && near(at_age1(f), N) && f.w.markets.at(f.market).demand[r_coal] == 0.0f;
-            tick(f, reg, 0.0f, 0.0f);
-        }
-        last = at_age1(f);
-        std::printf("    record from tick %d; read at age %d = %.4f\n", t_rec, f.w.current_econ_tick - t_rec, last);
-        check(f.w.markets.at(f.market).dial_pool_draw_tick[r_coal] == t_rec,
-              "D4 not vacuous: a stopped processor writes no new record");
-        check(held, "D4 its last draw is read at every age up to the hold (cadence 4)");
-        check(last == 0.0f, "D4 ... and 0 once the record is older than the hold");
+        tick(f, reg, 10.0f * N);
+        const float a = at_age1(f);
+        f.w.buildings.at(f.p1).decommissioned = true; // no want
+        tick(f, reg, 10.0f * N);
+        const float b = at_age1(f);
+        std::printf("    dial_bid: %.4f then %.4f\n", a, b);
+        check(near(a, N), "D4 not vacuous: the running P read N");
+        check(b == 0.0f, "D4 once it stops, the dial reads 0 (no stock-fed draw is held any more)");
     }
 
-    std::printf("D5 two processors share one pool\n");
+    std::printf("D5 two processors on one shelf\n");
     {
         fixture f = make_fixture(reg, true);
-        tick(f, reg, 2.0f * N, 0.0f);
-        const float both = f.w.markets.at(f.market).dial_pool_draw[r_coal];
+        tick(f, reg, 10.0f * N);
         const float a = at_age1(f);
-        tick(f, reg, N, 10.0f * N); // the pool covers ONE: the other posts N and buys off the shelf
-        const market_component& m = f.w.markets.at(f.market);
-        const float rec = m.dial_pool_draw[r_coal];
-        const float b = at_age1(f);
-        std::printf("    pool-fed both: record %.4f, dial %.4f | one: record %.4f demand %.4f dial %.4f\n",
-                    both, a, rec, m.demand[r_coal], b);
-        check(near(both, 2.0f * N) && near(a, 2.0f * N), "D5 two pool-fed processors' draws sum (2N)");
-        check(near(m.demand[r_coal], N), "D5 not vacuous: when the pool covers one, the other posts N");
-        check(near(rec, N), "D5 ... and its 0-stamp does not erase the first's draw (record N, not 0)");
-        check(near(b, 2.0f * N), "D5 the dial reads both buyers once each (2N)");
+        std::printf("    dial_bid: %.4f\n", a);
+        check(near(a, 2.0f * N), "D5 two shelf-fed processors' posted wants sum (2N)");
     }
 
     std::printf("D6 market_has_cleared on a market spawned mid-step\n");
     {
         fixture f = make_fixture(reg, false);
-        tick(f, reg, N, 0.0f); // the home market has cleared
+        tick(f, reg, 10.0f * N); // the home market has cleared
         // A second body with no market; spawned the way a building's completion
         // spawns one inside the economy step.
         const entity_id b2 = f.w.create_entity();
@@ -284,7 +229,7 @@ int main()
         {
             // The same step's production pass records an unposted bid on it.
             note_unposted_bid(f.w.markets.at(mid), r_coal, 5.0f, f.w.current_econ_tick);
-            f.w.pool_at(f.corp, mid).quantities[r_steel] = 50.0f; // a pool its first clear will list
+            f.w.land_goods(f.corp, mid, r_steel, 50.0f); // a landing its first clear will list (BL-1265)
             const market_component& m2 = f.w.markets.at(mid);
             check(m2.unposted_bid[r_coal] > 0.0f, "D6 not vacuous: it carries an unposted bid before any clear");
             check(!market_has_cleared(m2, f.w.current_econ_tick),

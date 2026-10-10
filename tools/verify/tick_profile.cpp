@@ -27,6 +27,7 @@
 #include "world/recipe_registry.hpp"
 #include "world/supply_system.hpp"
 #include "world/survey_system.hpp"
+#include "world/trade.hpp"
 
 #include <chrono>
 #include <cstdio>
@@ -96,9 +97,10 @@ int main(int argc, char* argv[])
     {
         economy_report report;
         pt.add("advance_orbits",        timed([&]{ advance_orbits(w, t); }));
-        pt.add("dispatch_convoys",      timed([&]{ dispatch_convoys(w, reg, 1.0f, 5.0f); }));
         pt.add("advance_convoys",       timed([&]{ advance_convoys(w); }));
         pt.add("run_economy_step",      timed([&]{ report = run_economy_step(w, reg); }));
+        // BL-1266: the trade pass replaced dispatch_convoys, after the economy step.
+        pt.add("run_trades",            timed([&]{ run_trades(w, reg, report); }));
         std::unordered_map<entity_id, corp_cash_flow> flows;
         pt.add("clear_markets",         timed([&]{ flows = clear_markets(w, reg, report); }));
         pt.add("apply_budget",          timed([&]{ apply_budget(w, reg, flows, report.workforce_contention); }));

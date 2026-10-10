@@ -3829,9 +3829,7 @@ int main(int argc, char** argv)
 
         // ================ Evidence behind the n/a lines ======================
         row.battles_standing = w.battles.size();
-        row.buy_orders       = w.buy_orders.size();
-        for (const buy_order& bo : w.buy_orders)
-            if (bo.preferred_seller != null_entity) ++row.buy_orders_with_preferred_seller;
+        row.buy_orders       = 0; // BL-1265: the order book retired; no buy orders exist
         row.trade_routes = w.trade_routes.size();
 
         rows.push_back(row);

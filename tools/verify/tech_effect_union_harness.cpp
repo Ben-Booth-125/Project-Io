@@ -233,6 +233,7 @@ struct fixture
     entity_id corp_b = null_entity; ///< The rival (poor: never passes it).
     entity_id bld_a  = null_entity;
     entity_id bld_b  = null_entity;
+    entity_id market = null_entity; ///< BL-1265: where production lands (no pools).
 };
 
 entity_id add_iron_tile(world& w, entity_id body, int gx, float remaining)
@@ -297,6 +298,16 @@ fixture make_fixture()
 
     f.bld_a = add_site(f.w, f.corp_a, add_iron_tile(f.w, f.body, 0, 1.0e6f));
     f.bld_b = add_site(f.w, f.corp_b, add_iron_tile(f.w, f.body, 4, 1.0e6f));
+
+    // BL-1265: production LANDS on a market's shelf (MARKETS.md § The shelf
+    // economy); with no market on the body it would land nowhere. One market,
+    // so both sites land on it.
+    f.market = f.w.create_entity();
+    market_component mc{};
+    mc.body = f.body;
+    mc.base_price[static_cast<std::size_t>(resource_type::iron_ore)] = 4.0f;
+    mc.price = mc.base_price;
+    f.w.markets[f.market] = mc;
     return f;
 }
 
@@ -472,9 +483,9 @@ void section_u4()
 
     check(near(a1, a0 * 1.25f), "U4b the earning corp's extraction moved by exactly *1.25");
     check(b1 == b0, "U4c the rival's output is BIT-identical to baseline");
-    check(mod.w.pool_at(mod.corp_a, pool_key_for_body(mod.w, mod.body)).quantities[ri(resource_type::iron_ore)] >
-          base.w.pool_at(base.corp_a, pool_key_for_body(base.w, base.body)).quantities[ri(resource_type::iron_ore)],
-          "U4d ...and the extra units really landed in the earner's pool");
+    check(mod.w.landed(mod.corp_a, mod.market, ri(resource_type::iron_ore)) >
+          base.w.landed(base.corp_a, base.market, ri(resource_type::iron_ore)),
+          "U4d ...and the extra units really landed for the earner (its landing this tick)");
 
     // U4b' — the STACK TAPER pre-pass (the second read site). Two A-owned
     // sites stacked on one tight-reserve tile: in the taper-bound regime the

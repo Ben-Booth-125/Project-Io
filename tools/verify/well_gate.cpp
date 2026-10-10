@@ -236,7 +236,7 @@ int main()
         w.current_day_tick = t;
         const economy_report rep = run_economy_step(w, reg);
         float held = 0.0f;
-        for (const auto& [key, pool] : w.corp_market_pools)
+        for (const auto& [key, pool] : w.landed_this_tick) // BL-1265: landings (no clear runs here)
             if (key.first == corp) held += pool.quantities[rw];
         const float delta = held - last;
         last = held;

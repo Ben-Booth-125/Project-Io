@@ -71,11 +71,13 @@ int main()
     const entity_id corp = w.create_entity();
     { corporation_component cc; cc.name = "Welfare Co"; cc.starting_capital = cc.balance = 1.0e6f;
       cc.is_player = true; w.corporations[corp] = cc; }
-    stockpile_component& pool = w.pool_at(corp, pool_key_for_body(w, body));
-    pool.quantities[ri(resource_type::water)]                = 1.0e5f;
-    pool.quantities[ri(resource_type::food_rations)]          = 1.0e5f;
-    pool.quantities[ri(resource_type::steel)]                 = 1.0e5f;
-    pool.quantities[ri(resource_type::agricultural_produce)]  = 1.0e5f;
+    // BL-1265: corporations hold no pools — the inputs go on the market's shelf,
+    // which the processors buy from at the posted price.
+    auto& pool_q = w.markets.at(market).inventory;
+    pool_q[ri(resource_type::water)]                = 1.0e5f;
+    pool_q[ri(resource_type::food_rations)]          = 1.0e5f;
+    pool_q[ri(resource_type::steel)]                 = 1.0e5f;
+    pool_q[ri(resource_type::agricultural_produce)]  = 1.0e5f;
 
     auto make_processor = [&](uint16_t recipe_id) {
         const entity_id bld = w.create_entity();

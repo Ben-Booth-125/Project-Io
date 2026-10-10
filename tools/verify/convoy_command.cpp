@@ -1,54 +1,55 @@
-// Headless convoy-command harness (BL-452; no SDL / Lua / ImGui).
+// Headless convoy-command harness (BL-452 → BL-1266; no SDL / Lua / ImGui).
 //
 // BL-452 put Layer 5 — the logistics layer, and the only coupling between two
-// markets' prices — onto the corp-command seam for the first time. Two verbs
-// (`dispatch_convoy`, `hold_convoy`) and one refactor (the auto-dispatcher's
-// dispatch half factored out so both callers share it). Each has a way of being
-// subtly wrong that a build does not catch, and this harness is the assertion
-// for each.
+// markets' prices — onto the corp-command seam. BL-1266 (TRADE.md) retired the
+// directed `dispatch_convoy` verb with the dispatcher and corporation pools:
+// goods move between markets only by a TRADE, and the seam's verbs for it are
+// `set_trade` / `clear_trade` / `set_trade_reserve`. `hold_convoy` stands. This
+// harness is the assertion for each, on the same fixture and with the same
+// discipline the dispatch verb had.
 //
-//   R0  THE VERB WORKS. dispatch_convoy with valid arguments creates exactly
-//       one convoy, debits the source pool by exactly the quantity, and moves
-//       nothing else — no other resource, no other corp, no market array.
+//   R0  THE VERB WORKS. set_trade (with points reserved for manual trades)
+//       standing on a fixture makes the next trade pass ship exactly one convoy
+//       of points x capacity, buying exactly that off the SOURCE SHELF, paying
+//       the haul and nothing else — no other good, no destination shelf, no
+//       market supply/demand moves (the cargo lands at ARRIVAL).
 //
-//   R1  A REJECTED COMMAND MUTATES NOTHING. Every rejection path (bad market,
-//       bad resource, non-positive quantity, quantity above the pool, unknown
-//       corp, foreign/nonexistent convoy) is asserted against a FULL world
-//       fingerprint taken before the command, not against a spot check. The
-//       seam is an untrusted input boundary (io-standing-rules.md, 2026-08-14):
-//       a refusal that half-applies is the failure mode the rule exists for.
+//   R1  A REJECTED COMMAND MUTATES NOTHING. Every rejection path (unknown corp,
+//       bad market, the same market twice, a good trade does not carry, bad
+//       resource, non-positive points, another corp's trade, a foreign or
+//       nonexistent convoy) is asserted against a FULL world fingerprint taken
+//       before the command, not against a spot check. The seam is an untrusted
+//       input boundary (io-standing-rules.md, 2026-08-14).
 //
 //   R2  NON-FINITE AND OUT-OF-RANGE ARE REJECTED, NOT CLAMPED. NaN, +/-inf and
-//       an absurd finite quantity are refused whole. The distinction matters:
-//       a clamp would silently haul a different quantity than the one asked
-//       for, which is worse than a refusal because nothing reports it.
+//       points above `max_trade_points` are refused whole — for set_trade and
+//       for set_trade_reserve — and the bound itself is accepted.
 //
 //   R3  HOLD IS A STOP, NOT A CANCEL. A held convoy stops advancing; issuing
 //       the verb again releases it and it resumes from where it stopped; and
 //       across the whole hold/release/arrive cycle the cargo is conserved —
-//       never duplicated, never lost. Cargo left the source pool at dispatch,
-//       so a cancel would have to mint goods; there is deliberately no verb
-//       that does.
+//       never duplicated, never lost — landing whole at the destination.
 //
-//   R4  NO FOURTH CODE PATH (the assertion the refactor earns). A convoy the
-//       player dispatched and one the auto-dispatcher dispatched, of the same
-//       shape on the same lane, carry IDENTICAL cost, speed and mode. If the
-//       two ever diverge, the player's logistics have stopped being the AI's,
-//       and R4 is what says so.
+//   R4  NO SECOND CODE PATH. A player's MANUAL trade and a rival's AUTO trade
+//       of the same shape on the same lane carry IDENTICAL cost, speed and
+//       mode: both go through the trade pass's one shipment funnel.
 //
-//   R5  DETERMINISM. Two runs of the same scripted sequence — auto dispatch and
-//       player commands interleaved — produce byte-identical convoy sets. The
-//       auto-dispatcher walks unordered_maps (corporations, markets) and the
-//       convoy vector's insertion order is the trade-route creation order and
-//       the world history log's, so a hash-layout leak here is a replay break.
+//   R5  DETERMINISM. Two runs of the same scripted sequence — auto trade and
+//       player commands interleaved — produce byte-identical convoy sets.
+//
+// RETIRED with the verb (BL-1265/1266): "a corp with no stock in the source
+// pool cannot haul it" and "a quantity above the pool" (a trade buys off a
+// shared shelf and ships what it holds; it carries no quantity to refuse).
 //
 // The process exits non-zero if any assertion FAILs.
 
 #include "world/components.hpp"
 #include "world/corp_command.hpp"
+#include "world/economy_system.hpp"
 #include "world/logistics.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/supply_system.hpp"
+#include "world/trade.hpp"
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -71,15 +72,18 @@ void check(bool ok, const char* what)
 
 constexpr std::size_t r_iron = static_cast<std::size_t>(resource_type::iron_ore);
 
+/// Iron's trade capacity in this harness: one trade point moves 25 units.
+constexpr float k_cap = 25.0f;
+
 // ---------------------------------------------------------------------------
 // World fingerprint — the whole point of R1
 // ---------------------------------------------------------------------------
 // A rejection test that checks "no convoy was created" passes while the corp's
 // balance quietly moves. So the rejection assertions compare a string built
-// from EVERY field a dispatch could touch: balances, every pool quantity, every
-// convoy field, the id counter, and each market's supply/demand/price/inventory.
-// Sorted id walks throughout, so the fingerprint itself cannot inherit hash
-// layout and give a false PASS.
+// from EVERY field a command could touch: balances and trade reserves, every
+// standing trade, every landing, every convoy field, the id counters, and each
+// market's supply/demand/price/inventory. Sorted id walks throughout, so the
+// fingerprint itself cannot inherit hash layout and give a false PASS.
 std::string fingerprint(const world& w)
 {
     std::ostringstream o;
@@ -89,13 +93,17 @@ std::string fingerprint(const world& w)
     for (const auto& kv : w.corporations) corp_ids.push_back(kv.first);
     std::sort(corp_ids.begin(), corp_ids.end());
     for (const entity_id id : corp_ids)
-        o << "C" << id << ':' << w.corporations.at(id).balance << ';';
+        o << "C" << id << ':' << w.corporations.at(id).balance << ':'
+          << w.corporations.at(id).trade_reserve << ';';
 
-    // corp_market_pools is a std::map — already in (corp, pool key) order.
-    for (const auto& [key, sc] : w.corp_market_pools)
+    for (const standing_trade& t : w.trades) // placement order: the spending order
+        o << "X" << t.id << ':' << t.owner << ':' << static_cast<int>(t.resource) << ':'
+          << t.from_market << '>' << t.to_market << ':' << t.points << ';';
+
+    for (const auto& [key, sp] : w.landed_this_tick) // std::map: (owner, market) order
     {
-        o << "P" << key.first << '/' << key.second << ':';
-        for (const float q : sc.quantities) o << q << ',';
+        o << "L" << key.first << '/' << key.second << ':';
+        for (const float q : sp.quantities) o << q << ',';
         o << ';';
     }
 
@@ -138,10 +146,11 @@ std::string convoy_fingerprint(const world& w)
 }
 
 // ---------------------------------------------------------------------------
-// Fixture: one body, a plains column, a corp anchored at one end and two
-// markets — a source at the anchor and a destination three tiles away. Follows
-// logistics_harness.cpp's hand-built-grid idiom; a synthetic world states the
-// preconditions in the test rather than hoping the generator produced them.
+// Fixture: one body, a plains column, a corp holding a staffed Planetary
+// Marketplace (one trade point a tick) and two markets — a source at row 0 and
+// a destination three tiles away. Follows logistics_harness.cpp's
+// hand-built-grid idiom; a synthetic world states the preconditions in the
+// test rather than hoping the generator produced them.
 // ---------------------------------------------------------------------------
 struct scenario
 {
@@ -159,9 +168,28 @@ entity_id tile_at(world& w, entity_id body, int c, int r)
                                    + static_cast<std::size_t>(c)];
 }
 
-/// `stock` units of iron ore in the corp's on-body pool; a four-tile plains
-/// column with the corp's anchor at row 0 and the destination market's centre
-/// at row 3.
+/// A corporation holding one staffed Planetary Marketplace on the body (one
+/// trade point a tick at the registry's rate), far off every haul route.
+entity_id add_trader(scenario& s, float balance)
+{
+    const entity_id c = s.w.create_entity();
+    corporation_component cc;
+    cc.balance   = balance;
+    cc.is_player = true; // keep the BL-202 strategic tier out of this harness
+    const entity_id mp = s.w.create_entity();
+    building_component b{};
+    b.tile               = tile_at(s.w, s.body, 20, 2);
+    b.type               = building_type::planetary_marketplace;
+    b.workforce_assigned = 1.0f;
+    s.w.buildings[mp] = b;
+    cc.assets.push_back(mp);
+    s.w.corporations[c] = cc;
+    return c;
+}
+
+/// `stock` units of iron ore on the SOURCE market's shelf (BL-1265); a
+/// four-tile plains column with the source centre at row 0 and the
+/// destination market's centre at row 3.
 scenario make_scenario(float stock = 100.0f, float balance = 1000.0f)
 {
     scenario s;
@@ -191,40 +219,23 @@ scenario make_scenario(float stock = 100.0f, float balance = 1000.0f)
             s.w.tiles[t] = tc;
         }
 
-    s.corp = s.w.create_entity();
-    corporation_component cc;
-    cc.balance   = balance;
-    cc.is_player = true; // keep the BL-202 strategic tier out of this harness
-
-    const entity_id anchor = tile_at(s.w, s.body, 0, 0);
-    const entity_id bld    = s.w.create_entity();
-    building_component b{};
-    b.tile = anchor;
-    b.type = building_type::extraction_site;
-    s.w.buildings[bld] = b;
-    cc.assets.push_back(bld);
-    s.w.corporations[s.corp] = cc;
+    s.corp = add_trader(s, balance);
     s.w.player_entity = s.corp;
 
-    // BL-597: a supply anchor (city) near — but NOT on — the corp's own
-    // haul route, so every intra-body dispatch in this file clears the
-    // passive-LP admissibility gate (a short, cheap, always-affordable draw
-    // against the generous rate `main()`'s `reg` sets below) WITHOUT also
-    // tripping BL-148/149's node discount, which shares the exact same
-    // `w.population_centre_tile` vocabulary — an anchor ON the route would
-    // silently discount R0.8's exact cost assertion. One column over, same
-    // row: reachable from the dispatch tile at a short A* hop, off the
-    // straight column-0 path every haul in this file actually travels
-    // (mirrors unit_march_harness.cpp's own fix when BL-596 landed its
-    // gate — a generous rate paired with a reachable anchor).
+    // BL-597: a supply anchor (city) near — but NOT on — the haul route, so
+    // every intra-body shipment clears the passive-LP gate (against the
+    // generous rate `main()`'s `reg` sets) WITHOUT tripping BL-148/149's node
+    // discount, which shares `w.population_centre_tile` — an anchor ON the
+    // route would silently discount R0's exact cost assertion.
     s.w.population_centre_tile[s.w.create_entity()] = tile_at(s.w, s.body, 1, 0);
 
     s.src_market = s.w.create_entity();
     market_component sm{};
     sm.body          = s.body;
-    sm.centre_tile   = anchor;
+    sm.centre_tile   = tile_at(s.w, s.body, 0, 0);
     sm.base_price[r_iron] = 5.0f;
     sm.price         = sm.base_price;
+    sm.inventory[r_iron]  = stock;
     s.w.markets[s.src_market] = sm;
 
     s.dst_market = s.w.create_entity();
@@ -234,21 +245,28 @@ scenario make_scenario(float stock = 100.0f, float balance = 1000.0f)
     dm.base_price[r_iron] = 5.0f;
     dm.price         = dm.base_price;
     s.w.markets[s.dst_market] = dm;
-
-    s.w.pool_at(s.corp, s.src_market).quantities[r_iron] = stock; // BL-1003: the source market's pool
     return s;
 }
 
-corp_command dispatch_cmd(const scenario& s, float qty,
-                          resource_type r = resource_type::iron_ore)
+corp_command trade_cmd(const scenario& s, float points,
+                       resource_type r = resource_type::iron_ore)
 {
     corp_command cmd;
     cmd.corp         = s.corp;
-    cmd.verb         = corp_verb::dispatch_convoy;
+    cmd.verb         = corp_verb::set_trade;
     cmd.subject      = s.src_market;
     cmd.counterparty = s.dst_market;
     cmd.target       = r;
-    cmd.quantity     = qty;
+    cmd.quantity     = points;
+    return cmd;
+}
+
+corp_command reserve_cmd(entity_id corp, float points)
+{
+    corp_command cmd;
+    cmd.corp     = corp;
+    cmd.verb     = corp_verb::set_trade_reserve;
+    cmd.quantity = points;
     return cmd;
 }
 
@@ -261,27 +279,34 @@ corp_command hold_cmd(entity_id corp, uint32_t convoy_id)
     return cmd;
 }
 
-/// Iron ore in the corp's SOURCE market pool (BL-1003: pools key (corp, market)).
+/// One trade pass, as the tick runs it (its purchases bill at a clear this
+/// harness does not run).
+trade_tick trade_pass(scenario& s, const recipe_registry& reg)
+{
+    economy_report rep;
+    return run_trades(s.w, reg, rep);
+}
+
+/// Iron ore on the SOURCE market's shelf (BL-1265: was the corporation's pool).
 float pool_iron(const scenario& s)
 {
-    const auto it = s.w.corp_market_pools.find({s.corp, s.src_market});
-    return it != s.w.corp_market_pools.end() ? it->second.quantities[r_iron] : 0.0f;
+    return s.w.markets.at(s.src_market).inventory[r_iron];
 }
 
-/// Iron ore in the corp's DESTINATION market pool — where a delivery lands.
-float dst_pool_iron(const scenario& s)
+/// Iron ore the corp has LANDED on the destination market — where a delivery
+/// lands, to be sold at the next clear.
+float dst_landed_iron(const scenario& s)
 {
-    const auto it = s.w.corp_market_pools.find({s.corp, s.dst_market});
-    return it != s.w.corp_market_pools.end() ? it->second.quantities[r_iron] : 0.0f;
+    return s.w.landed(s.corp, s.dst_market, r_iron);
 }
 
-/// Iron ore held by the corp anywhere at all — in either pool or in flight. The
-/// conservation quantity R3 tracks.
+/// Iron ore anywhere at all in the fixture — on either shelf, landed, or in
+/// flight. The conservation quantity R3 tracks.
 float iron_everywhere(const scenario& s)
 {
-    float total = pool_iron(s) + dst_pool_iron(s);
+    float total = pool_iron(s) + s.w.markets.at(s.dst_market).inventory[r_iron] + dst_landed_iron(s);
     for (const convoy_component& c : s.w.convoys)
-        if (c.corp == s.corp && c.cargo_resource == resource_type::iron_ore)
+        if (c.cargo_resource == resource_type::iron_ore)
             total += c.cargo_qty;
     return total;
 }
@@ -304,19 +329,23 @@ void check_rejected(scenario& s, const recipe_registry& reg, const corp_command&
 
 int main()
 {
-    std::printf("=== convoy_command (BL-452: the logistics layer joins the seam) ===\n");
+    std::printf("=== convoy_command (BL-452 -> BL-1266: trade joins the seam) ===\n");
 
     // Default per-mode logistics costs {land .02, sea .05, air .15, space 1.0}.
     recipe_registry reg;
     {
-        // BL-597: a deliberately generous per-anchor LP rate, same reasoning
-        // as unit_march_harness.cpp's `registry_with_march` — this file's
-        // subject is BL-452's verb contract, not BL-597's admissibility gate,
-        // so the gate is set up to never bind here (paired with the anchor
-        // make_scenario now places at zero distance from every dispatch).
+        // BL-597: a deliberately generous per-anchor LP rate — this file's
+        // subject is the seam's verb contract, not BL-597's admissibility gate,
+        // so the gate is set up to never bind here.
         military_capability_params mp = reg.military();
         mp.active_lp_per_anchor_tick = 1.0e6f;
         reg.set_military(mp);
+        // BL-1266: iron moves k_cap units per trade point; a Marketplace makes
+        // one point per unit of effective workforce.
+        trade_params tp;
+        tp.capacity[r_iron]   = k_cap;
+        tp.marketplace_points = 1.0f;
+        reg.set_trade(tp);
     }
 
     // -----------------------------------------------------------------------
@@ -326,50 +355,57 @@ int main()
         scenario s = make_scenario(100.0f);
         const float bal_before = s.w.corporations.at(s.corp).balance;
 
-        const corp_command_result r = apply_corp_command(s.w, reg, dispatch_cmd(s, 25.0f));
-        check(r == corp_command_result::applied, "R0.1 dispatch_convoy applies through the seam");
-        check(s.w.convoys.size() == 1, "R0.2 exactly one convoy is created");
+        const corp_command_result r = apply_corp_command(s.w, reg, trade_cmd(s, 1.0f));
+        check(r == corp_command_result::applied, "R0.1 set_trade applies through the seam");
+        check(s.w.trades.size() == 1 && s.w.trades.front().id != 0 && s.w.trades.front().owner == s.corp,
+              "R0.2 exactly one trade stands, with a nonzero stable id, owned by the actor");
+        check(apply_corp_command(s.w, reg, reserve_cmd(s.corp, 1.0f)) == corp_command_result::applied,
+              "R0.3 set_trade_reserve applies (the point is reserved for manual trades)");
+        check(s.w.convoys.empty(), "R0.4 setting a trade ships nothing until the trade pass");
+
+        const trade_tick t = trade_pass(s, reg);
+        check(t.manual_shipments == 1 && s.w.convoys.size() == 1,
+              "R0.5 the trade pass ships exactly one convoy for the manual trade");
 
         if (s.w.convoys.size() == 1)
         {
             const convoy_component& c = s.w.convoys.front();
-            check(c.id != 0, "R0.3 the convoy carries a nonzero stable id");
+            check(c.id != 0, "R0.6 the convoy carries a nonzero stable id");
             check(c.corp == s.corp && c.cargo_resource == resource_type::iron_ore &&
-                  std::fabs(c.cargo_qty - 25.0f) < 1e-4f,
-                  "R0.4 it names the acting corp, the cargo and the quantity asked for");
+                  std::fabs(c.cargo_qty - k_cap) < 1e-4f,
+                  "R0.7 it names the trading corp, the cargo and points x capacity (25)");
             check(c.source_market == s.src_market && c.dest_market == s.dst_market,
-                  "R0.5 it records the NAMED source and destination markets");
+                  "R0.8 it records the NAMED source and destination markets");
             check(c.mode == convoy_mode::land && !c.held && !c.arrived,
-                  "R0.6 an all-plains intra-body lane is land mode, moving, not held");
+                  "R0.9 an all-plains intra-body lane is land mode, moving, not held");
             check(c.cost_paid > 0.0f &&
                   std::fabs((bal_before - s.w.corporations.at(s.corp).balance) - c.cost_paid) < 1e-4f,
-                  "R0.7 the haul cost is recorded on the convoy and debited from the balance");
+                  "R0.10 the haul cost is recorded on the convoy and debited from the balance "
+                  "(the purchase is billed at the clear)");
             // A* down a 4-tall plains column = 3 edges = 3.0; land unit cost 0.02.
-            check(std::fabs(c.cost_paid - 0.02f * 3.0f * 25.0f) < 1e-3f,
-                  "R0.8 cost = land(0.02) x A*(3.0) x qty(25) = 1.5");
+            check(std::fabs(c.cost_paid - 0.02f * 3.0f * k_cap) < 1e-3f,
+                  "R0.11 cost = land(0.02) x A*(3.0) x qty(25) = 1.5");
         }
 
         check(std::fabs(pool_iron(s) - 75.0f) < 1e-4f,
-              "R0.9 the source pool is debited by EXACTLY the quantity (100 -> 75)");
+              "R0.12 the source SHELF is debited by EXACTLY the shipment (100 -> 75)");
 
-        // Nothing else moved: every other resource in the pool, and both
-        // markets' arrays, are untouched.
-        bool other_resources_clean = true;
-        const auto& q = s.w.corp_market_pools.at({s.corp, s.src_market}).quantities;
-        for (std::size_t i = 0; i < resource_count; ++i)
-            if (i != r_iron && q[i] != 0.0f) other_resources_clean = false;
-        check(other_resources_clean, "R0.10 no other resource in the pool moved");
-
+        // Nothing else moved: every other good on the source shelf, the
+        // destination shelf, and both markets' supply/demand are untouched.
         bool markets_clean = true;
         for (const entity_id mid : { s.src_market, s.dst_market })
         {
             const market_component& m = s.w.markets.at(mid);
             for (std::size_t i = 0; i < resource_count; ++i)
-                if (m.supply[i] != 0.0f || m.demand[i] != 0.0f || m.inventory[i] != 0.0f)
+            {
+                if (m.supply[i] != 0.0f || m.demand[i] != 0.0f)
                     markets_clean = false;
+                if (m.inventory[i] != 0.0f && !(mid == s.src_market && i == r_iron))
+                    markets_clean = false;
+            }
         }
-        check(markets_clean,
-              "R0.11 no market supply/demand/inventory moved (cargo lands at ARRIVAL, not dispatch)");
+        check(markets_clean && s.w.landed_this_tick.empty(),
+              "R0.13 no other shelf, no supply/demand and no landing moved (cargo lands at ARRIVAL)");
     }
 
     // -----------------------------------------------------------------------
@@ -379,45 +415,42 @@ int main()
         scenario s = make_scenario(50.0f);
 
         {   // Unknown acting corporation.
-            corp_command c = dispatch_cmd(s, 10.0f);
+            corp_command c = trade_cmd(s, 1.0f);
             c.corp = s.w.create_entity();
             check_rejected(s, reg, c, corp_command_result::rejected_no_corp,
                            "R1.1 an unknown corp is rejected_no_corp and mutates nothing");
         }
         {   // Source market that is not a market.
-            corp_command c = dispatch_cmd(s, 10.0f);
+            corp_command c = trade_cmd(s, 1.0f);
             c.subject = s.w.create_entity();
             check_rejected(s, reg, c, corp_command_result::rejected_invalid,
                            "R1.2 an unreal SOURCE market id is rejected_invalid and mutates nothing");
         }
         {   // Destination market that is not a market.
-            corp_command c = dispatch_cmd(s, 10.0f);
+            corp_command c = trade_cmd(s, 1.0f);
             c.counterparty = s.w.create_entity();
             check_rejected(s, reg, c, corp_command_result::rejected_invalid,
                            "R1.3 an unreal DESTINATION market id is rejected_invalid and mutates nothing");
         }
-        {   // A body the corp has stock on, but a corp that does not own the stock.
-            const entity_id other = s.w.create_entity();
-            corporation_component oc;
-            oc.balance = 1000.0f;
-            s.w.corporations[other] = oc;
-            corp_command c = dispatch_cmd(s, 10.0f);
-            c.corp = other; // real corp, but its (corp, body) pool is empty
-            check_rejected(s, reg, c, corp_command_result::rejected_state,
-                           "R1.4 WRONG OWNER: a corp with no stock in the source pool cannot haul it");
+        {   // A market to itself.
+            corp_command c = trade_cmd(s, 1.0f);
+            c.counterparty = s.src_market;
+            check_rejected(s, reg, c, corp_command_result::rejected_invalid,
+                           "R1.4 a trade from a market to ITSELF is rejected_invalid and mutates nothing");
         }
-        {   // Quantity above the pool.
-            check_rejected(s, reg, dispatch_cmd(s, 50.001f), corp_command_result::rejected_state,
-                           "R1.5 a quantity above the pool is rejected_state and mutates nothing");
+        {   // A good trade does not carry (no authored capacity).
+            check_rejected(s, reg, trade_cmd(s, 1.0f, resource_type::coal),
+                           corp_command_result::rejected_invalid,
+                           "R1.5 a good with no trade capacity is rejected_invalid and mutates nothing");
         }
-        {   // Zero and negative quantities.
-            check_rejected(s, reg, dispatch_cmd(s, 0.0f), corp_command_result::rejected_invalid,
-                           "R1.6 a zero quantity is rejected_invalid and mutates nothing");
-            check_rejected(s, reg, dispatch_cmd(s, -10.0f), corp_command_result::rejected_invalid,
-                           "R1.7 a negative quantity is rejected_invalid and mutates nothing");
+        {   // Zero and negative points.
+            check_rejected(s, reg, trade_cmd(s, 0.0f), corp_command_result::rejected_invalid,
+                           "R1.6 zero points is rejected_invalid and mutates nothing");
+            check_rejected(s, reg, trade_cmd(s, -1.0f), corp_command_result::rejected_invalid,
+                           "R1.7 negative points is rejected_invalid and mutates nothing");
         }
         {   // A resource index past the enum's tail, as the wire could send it.
-            corp_command c = dispatch_cmd(s, 10.0f);
+            corp_command c = trade_cmd(s, 1.0f);
             c.target = static_cast<resource_type>(resource_count + 5);
             check_rejected(s, reg, c, corp_command_result::rejected_invalid,
                            "R1.8 an out-of-domain resource is rejected_invalid and mutates nothing");
@@ -429,36 +462,43 @@ int main()
         {   // Zero is never a valid handle.
             check_rejected(s, reg, hold_cmd(s.corp, 0u), corp_command_result::rejected_invalid,
                            "R1.10 hold_convoy with a zero id is rejected_invalid and mutates nothing");
+            corp_command c;
+            c.corp = s.corp; c.verb = corp_verb::clear_trade; c.order = 0;
+            check_rejected(s, reg, c, corp_command_result::rejected_invalid,
+                           "R1.11 clear_trade with a zero id is rejected_invalid and mutates nothing");
         }
 
-        check(s.w.convoys.empty() && std::fabs(pool_iron(s) - 50.0f) < 1e-4f,
-              "R1.11 after ten rejections: no convoy exists and the pool is untouched");
+        check(s.w.convoys.empty() && s.w.trades.empty() && std::fabs(pool_iron(s) - 50.0f) < 1e-4f,
+              "R1.12 after the rejections: no trade, no convoy, and the shelf is untouched");
 
-        // A rival's convoy is indistinguishable from one that does not exist
-        // (BL-397's oracle rule), and holding it changes nothing.
+        // A rival's trade and a rival's convoy are indistinguishable from ones
+        // that do not exist (BL-397's oracle rule), and touching them changes
+        // nothing.
         {
-            const entity_id rival = s.w.create_entity();
-            corporation_component rc;
-            rc.balance = 1000.0f;
-            s.w.corporations[rival] = rc;
-            s.w.pool_at(rival, pool_key_for_body(s.w, s.body)).quantities[r_iron] = 40.0f;
-            // The rival needs its own anchor to have a route at all.
-            const entity_id rb = s.w.create_entity();
-            building_component b{};
-            b.tile = tile_at(s.w, s.body, 0, 0);
-            b.type = building_type::extraction_site;
-            s.w.buildings[rb] = b;
-            s.w.corporations[rival].assets.push_back(rb);
-
-            corp_command rc_cmd = dispatch_cmd(s, 5.0f);
-            rc_cmd.corp = rival;
-            check(apply_corp_command(s.w, reg, rc_cmd) == corp_command_result::applied,
-                  "R1.12 fixture: a rival corp dispatches its own convoy through the same verb");
-            const uint32_t rival_convoy = s.w.convoys.back().id;
+            const entity_id rival = add_trader(s, 1000.0f);
+            corp_command rt = trade_cmd(s, 0.2f); // 5 units
+            rt.corp = rival;
+            check(apply_corp_command(s.w, reg, rt) == corp_command_result::applied
+                      && apply_corp_command(s.w, reg, reserve_cmd(rival, 1.0f))
+                             == corp_command_result::applied,
+                  "R1.13 fixture: a rival corp sets its own trade through the same verb");
+            trade_pass(s, reg);
+            check(s.w.convoys.size() == 1 && s.w.convoys.back().corp == rival,
+                  "R1.14 fixture: the rival's trade ships its own convoy");
+            const uint32_t rival_trade  = s.w.trades.front().id;
+            const uint32_t rival_convoy = s.w.convoys.empty() ? 0u : s.w.convoys.back().id;
             check_rejected(s, reg, hold_cmd(s.corp, rival_convoy),
                            corp_command_result::rejected_invalid,
-                           "R1.13 holding ANOTHER corp's convoy is rejected_invalid "
+                           "R1.15 holding ANOTHER corp's convoy is rejected_invalid "
                            "(indistinguishable from R1.9) and mutates nothing");
+            corp_command clr;
+            clr.corp = s.corp; clr.verb = corp_verb::clear_trade; clr.order = rival_trade;
+            check_rejected(s, reg, clr, corp_command_result::rejected_invalid,
+                           "R1.16 clearing ANOTHER corp's trade is rejected_invalid and mutates nothing");
+            corp_command chg = trade_cmd(s, 2.0f);
+            chg.order = rival_trade;
+            check_rejected(s, reg, chg, corp_command_result::rejected_invalid,
+                           "R1.17 changing ANOTHER corp's trade is rejected_invalid and mutates nothing");
         }
     }
 
@@ -470,21 +510,27 @@ int main()
         const float qnan = std::numeric_limits<float>::quiet_NaN();
         const float inf  = std::numeric_limits<float>::infinity();
 
-        check_rejected(s, reg, dispatch_cmd(s, qnan), corp_command_result::rejected_invalid,
-                       "R2.1 a NaN quantity is REJECTED, not clamped");
-        check_rejected(s, reg, dispatch_cmd(s, inf), corp_command_result::rejected_invalid,
-                       "R2.2 a +inf quantity is REJECTED, not clamped");
-        check_rejected(s, reg, dispatch_cmd(s, -inf), corp_command_result::rejected_invalid,
-                       "R2.3 a -inf quantity is REJECTED, not clamped");
-        check_rejected(s, reg, dispatch_cmd(s, 1.0e30f), corp_command_result::rejected_state,
-                       "R2.4 an absurd finite quantity is REJECTED against the pool, not clamped to it");
-        check(s.w.convoys.empty(), "R2.5 no rejected quantity produced a phantom convoy");
+        check_rejected(s, reg, trade_cmd(s, qnan), corp_command_result::rejected_invalid,
+                       "R2.1 NaN points are REJECTED, not clamped");
+        check_rejected(s, reg, trade_cmd(s, inf), corp_command_result::rejected_invalid,
+                       "R2.2 +inf points are REJECTED, not clamped");
+        check_rejected(s, reg, trade_cmd(s, -inf), corp_command_result::rejected_invalid,
+                       "R2.3 -inf points are REJECTED, not clamped");
+        check_rejected(s, reg, trade_cmd(s, 1.0e30f), corp_command_result::rejected_invalid,
+                       "R2.4 points above max_trade_points are REJECTED, not clamped to it");
+        check_rejected(s, reg, reserve_cmd(s.corp, qnan), corp_command_result::rejected_invalid,
+                       "R2.5 a NaN trade reserve is REJECTED");
+        check_rejected(s, reg, reserve_cmd(s.corp, -1.0f), corp_command_result::rejected_invalid,
+                       "R2.6 a negative trade reserve is REJECTED");
+        check_rejected(s, reg, reserve_cmd(s.corp, 1.0e30f), corp_command_result::rejected_invalid,
+                       "R2.7 a trade reserve above max_trade_points is REJECTED, not clamped");
+        check(s.w.trades.empty(), "R2.8 no rejected value produced a phantom trade");
 
-        // The gate is PRECISE, not a blanket refusal: exactly the pool's
-        // contents is a legal haul, so the four refusals above are about the
-        // values they named and nothing else.
-        check(apply_corp_command(s.w, reg, dispatch_cmd(s, 100.0f)) == corp_command_result::applied,
-              "R2.6 a quantity EXACTLY equal to the pool is accepted");
+        // The gate is PRECISE, not a blanket refusal: the bound itself is legal.
+        check(apply_corp_command(s.w, reg, trade_cmd(s, max_trade_points)) == corp_command_result::applied
+                  && apply_corp_command(s.w, reg, reserve_cmd(s.corp, max_trade_points))
+                         == corp_command_result::applied,
+              "R2.9 points EXACTLY max_trade_points are accepted, for a trade and a reserve");
     }
 
     // -----------------------------------------------------------------------
@@ -492,82 +538,90 @@ int main()
     // -----------------------------------------------------------------------
     {
         scenario s = make_scenario(100.0f);
-        check(apply_corp_command(s.w, reg, dispatch_cmd(s, 30.0f)) == corp_command_result::applied,
-              "R3.1 fixture: a convoy is in flight");
-        const uint32_t id = s.w.convoys.front().id;
-        const float    conserved = iron_everywhere(s);
-
-        advance_convoys(s.w);
-        const float moving_progress = s.w.convoys.front().progress;
-        check(moving_progress > 0.0f, "R3.2 fixture: an unheld convoy advances");
-
-        check(apply_corp_command(s.w, reg, hold_cmd(s.corp, id)) == corp_command_result::applied,
-              "R3.3 hold_convoy applies");
-        check(s.w.convoys.front().held, "R3.4 the convoy is marked held");
-
-        for (int i = 0; i < 5; ++i) advance_convoys(s.w);
-        check(std::fabs(s.w.convoys.front().progress - moving_progress) < 1e-6f,
-              "R3.5 five ticks later a HELD convoy has not advanced at all");
-        check(!s.w.convoys.front().arrived, "R3.6 ...and it has not arrived");
-        check(std::fabs(iron_everywhere(s) - conserved) < 1e-4f,
-              "R3.7 holding neither duplicates nor loses the cargo");
-
-        check(apply_corp_command(s.w, reg, hold_cmd(s.corp, id)) == corp_command_result::applied,
-              "R3.8 issuing hold_convoy again applies (it is a toggle)");
-        check(!s.w.convoys.front().held, "R3.9 ...and releases the convoy");
-
-        advance_convoys(s.w);
-        check(s.w.convoys.front().progress > moving_progress,
-              "R3.10 a released convoy resumes from where it stopped");
-
-        // Run it to arrival and credit it.
-        for (int i = 0; i < 20 && !s.w.convoys.empty(); ++i)
+        const float conserved = iron_everywhere(s);
+        apply_corp_command(s.w, reg, trade_cmd(s, 1.0f));
+        apply_corp_command(s.w, reg, reserve_cmd(s.corp, 1.0f));
+        trade_pass(s, reg);
+        check(s.w.convoys.size() == 1, "R3.1 fixture: a convoy is in flight");
+        if (s.w.convoys.size() == 1)
         {
+            const uint32_t id = s.w.convoys.front().id;
+            check(std::fabs(iron_everywhere(s) - conserved) < 1e-4f,
+                  "R3.2 shipping moves the cargo off the shelf, neither minting nor losing it");
+
             advance_convoys(s.w);
-            credit_arrived_convoys(s.w, i);
+            const float moving_progress = s.w.convoys.front().progress;
+            check(moving_progress > 0.0f, "R3.3 fixture: an unheld convoy advances");
+
+            check(apply_corp_command(s.w, reg, hold_cmd(s.corp, id)) == corp_command_result::applied,
+                  "R3.4 hold_convoy applies");
+            check(s.w.convoys.front().held, "R3.5 the convoy is marked held");
+
+            for (int i = 0; i < 5; ++i) advance_convoys(s.w);
+            check(std::fabs(s.w.convoys.front().progress - moving_progress) < 1e-6f,
+                  "R3.6 five ticks later a HELD convoy has not advanced at all");
+            check(!s.w.convoys.front().arrived, "R3.7 ...and it has not arrived");
+            check(std::fabs(iron_everywhere(s) - conserved) < 1e-4f,
+                  "R3.8 holding neither duplicates nor loses the cargo");
+
+            check(apply_corp_command(s.w, reg, hold_cmd(s.corp, id)) == corp_command_result::applied,
+                  "R3.9 issuing hold_convoy again applies (it is a toggle)");
+            check(!s.w.convoys.front().held, "R3.10 ...and releases the convoy");
+
+            advance_convoys(s.w);
+            check(s.w.convoys.front().progress > moving_progress,
+                  "R3.11 a released convoy resumes from where it stopped");
+
+            // Run it to arrival and credit it.
+            for (int i = 0; i < 20 && !s.w.convoys.empty(); ++i)
+            {
+                advance_convoys(s.w);
+                credit_arrived_convoys(s.w, i);
+            }
+            check(s.w.convoys.empty(), "R3.12 the convoy arrives and is retired");
+            check(std::fabs(pool_iron(s) - 75.0f) < 1e-3f &&
+                      std::fabs(dst_landed_iron(s) - k_cap) < 1e-3f,
+                  "R3.13 CONSERVATION: the delivered cargo LANDS at the destination in full "
+                  "(75 left on the source shelf + 25 landed at the destination = 100)");
         }
-        check(s.w.convoys.empty(), "R3.11 the convoy arrives and is retired");
-        // BL-1003: a same-body lane now DELIVERS — the 30 land in the
-        // destination market's pool, not back in the source pool it left.
-        check(std::fabs(pool_iron(s) - 70.0f) < 1e-3f &&
-              std::fabs(dst_pool_iron(s) - 30.0f) < 1e-3f,
-              "R3.12 CONSERVATION: the delivered cargo lands in the DESTINATION market's pool in full "
-              "(same-body lane: 70 held at source + 30 delivered at destination = 100)");
     }
 
     // -----------------------------------------------------------------------
-    // R4 — NO FOURTH CODE PATH: the player's convoy IS the auto-dispatcher's
+    // R4 — NO SECOND CODE PATH: the player's manual trade IS the rival's auto
     // -----------------------------------------------------------------------
     {
-        // Two identical fixtures. In one, the auto-dispatcher fills a shortfall
-        // of 25 at the destination market; in the other the player dispatches
+        // Two identical fixtures. In one, AUTO trade fills a shortfall of 25 at
+        // the destination market; in the other the player's MANUAL trade ships
         // the same 25 down the same lane. The two convoys must agree on cost,
         // speed and mode — the three numbers a duplicated implementation would
-        // get subtly wrong.
-        //
-        // BL-995: the auto-dispatcher is now the SELLER chasing a net price,
-        // so the destination must price the good above home (10 vs 5) for it
-        // to haul at all; with zero supply there, the quantity is its unmet
-        // demand — the same 25. The player's fixture carries the same prices.
+        // get subtly wrong. Auto chases a margin, so the destination prices the
+        // good above home (10 vs 5), and its demand is deep enough that the
+        // room (`trade_room`, sized to the target price at the landed cost
+        // plus the margin) never binds: auto ships the one point's 25, the
+        // same 25 the manual trade's one point ships.
         scenario a = make_scenario(100.0f);
         a.w.markets.at(a.dst_market).price[r_iron]  = 10.0f;
-        a.w.markets.at(a.dst_market).demand[r_iron] = 25.0f;
+        a.w.markets.at(a.dst_market).demand[r_iron] = 1000.0f;
         a.w.markets.at(a.dst_market).supply[r_iron] = 0.0f;
-        dispatch_convoys(a.w, reg, reg.logistics_cost(convoy_mode::land),
-                         reg.logistics_cost(convoy_mode::space));
+        const trade_tick ta = trade_pass(a, reg); // reserve 0: every point is auto
 
         scenario p = make_scenario(100.0f);
         p.w.markets.at(p.dst_market).price[r_iron] = 10.0f;
-        apply_corp_command(p.w, reg, dispatch_cmd(p, 25.0f));
+        apply_corp_command(p.w, reg, trade_cmd(p, 1.0f));
+        apply_corp_command(p.w, reg, reserve_cmd(p.corp, 1.0f));
+        const trade_tick tp = trade_pass(p, reg);
 
-        check(a.w.convoys.size() == 1 && p.w.convoys.size() == 1,
-              "R4.1 fixture: one auto convoy and one player convoy");
+        check(a.w.convoys.size() == 1 && p.w.convoys.size() == 1
+                  && ta.auto_shipments == 1 && tp.manual_shipments == 1,
+              "R4.1 fixture: one auto convoy and one manual convoy");
         if (a.w.convoys.size() == 1 && p.w.convoys.size() == 1)
         {
             const convoy_component& ac = a.w.convoys.front();
             const convoy_component& pc = p.w.convoys.front();
+            std::printf("       auto: cargo %.4f cost %.4f speed %.4f | manual: cargo %.4f cost %.4f speed %.4f\n",
+                        ac.cargo_qty, ac.cost_paid, ac.speed, pc.cargo_qty, pc.cost_paid, pc.speed);
             check(std::fabs(ac.cost_paid - pc.cost_paid) < 1e-6f,
-                  "R4.2 IDENTICAL COST: the player pays exactly what the auto-dispatcher pays");
+                  "R4.2 IDENTICAL COST: the player pays exactly what auto trade pays");
             check(std::fabs(ac.speed - pc.speed) < 1e-6f,
                   "R4.3 IDENTICAL SPEED: the same lane takes the same number of ticks");
             check(ac.mode == pc.mode && ac.cargo_qty == pc.cargo_qty,
@@ -584,37 +638,43 @@ int main()
     {
         auto run = [&reg](std::vector<std::string>& out) {
             scenario s = make_scenario(400.0f);
-            // A second corp, so the auto-dispatcher's sorted-corp walk has more
-            // than one entry to order — the hash-layout leak this asserts against
-            // is invisible with a single corp.
-            const entity_id other = s.w.create_entity();
-            corporation_component oc;
-            oc.balance = 1000.0f;
-            s.w.corporations[other] = oc;
-            s.w.pool_at(other, pool_key_for_body(s.w, s.body)).quantities[r_iron] = 200.0f;
-            const entity_id ob = s.w.create_entity();
-            building_component b{};
-            b.tile = tile_at(s.w, s.body, 0, 0);
-            b.type = building_type::extraction_site;
-            s.w.buildings[ob] = b;
-            s.w.corporations[other].assets.push_back(ob);
+            // A second trader on auto, so the trade pass's sorted-corp walk has
+            // more than one entry to order — the hash-layout leak this asserts
+            // against is invisible with a single corp.
+            add_trader(s, 1000.0f);
 
             for (int t = 0; t < 6; ++t)
             {
                 s.w.current_day_tick  = t;
                 s.w.current_econ_tick = t;
-                // Player traffic on even ticks; a hold on tick 3.
-                if (t % 2 == 0)
-                    apply_corp_command(s.w, reg, dispatch_cmd(s, 5.0f + static_cast<float>(t)));
+                // Player traffic: a trade on tick 0, re-pointed on tick 2,
+                // cleared on tick 4; the reserve set once; a hold on tick 3.
+                if (t == 0)
+                {
+                    apply_corp_command(s.w, reg, trade_cmd(s, 0.2f));
+                    apply_corp_command(s.w, reg, reserve_cmd(s.corp, 1.0f));
+                }
+                if (t == 2 && !s.w.trades.empty())
+                {
+                    corp_command chg = trade_cmd(s, 0.4f);
+                    chg.order = s.w.trades.front().id;
+                    apply_corp_command(s.w, reg, chg);
+                }
                 if (t == 3 && !s.w.convoys.empty())
                     apply_corp_command(s.w, reg, hold_cmd(s.corp, s.w.convoys.front().id));
+                if (t == 4 && !s.w.trades.empty())
+                {
+                    corp_command clr;
+                    clr.corp = s.corp; clr.verb = corp_verb::clear_trade;
+                    clr.order = s.w.trades.front().id;
+                    apply_corp_command(s.w, reg, clr);
+                }
                 // Auto traffic: a standing shortfall at the destination market,
-                // priced above home (BL-995: the seller hauls toward price).
+                // priced above home.
                 s.w.markets.at(s.dst_market).price[r_iron]  = 10.0f;
                 s.w.markets.at(s.dst_market).demand[r_iron] = 12.0f;
                 s.w.markets.at(s.dst_market).supply[r_iron] = 0.0f;
-                dispatch_convoys(s.w, reg, reg.logistics_cost(convoy_mode::land),
-                                 reg.logistics_cost(convoy_mode::space));
+                trade_pass(s, reg);
                 advance_convoys(s.w);
                 credit_arrived_convoys(s.w, t);
                 out.push_back(convoy_fingerprint(s.w));

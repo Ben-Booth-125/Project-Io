@@ -59,6 +59,7 @@
 #include "world/spawn_seat.hpp"
 #include "world/standing.hpp"
 #include "world/supply_system.hpp"
+#include "world/trade.hpp"
 #include "world/tech_gate.hpp"
 #include "world/world.hpp"
 
@@ -98,8 +99,7 @@ economy_report probe_tick(world& w, const recipe_registry& reg, int econ_step, b
     credit_arrived_convoys(w, 0);
     economy_report report = run_economy_step(w, reg, spectating, &tick_lp_pools);
     read(report); // READ ONLY
-    dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
-                     reg.logistics_cost(convoy_mode::space), &tick_lp_pools);
+    run_trades(w, reg, report, &tick_lp_pools); // BL-1266: the trade pass (was dispatch_convoys), before the clear
     auto flows = clear_markets(w, reg, report);
     apply_budget(w, reg, flows, report.workforce_contention, &report.budgets,
                  &report.buildings, &report.building_labour);
@@ -281,7 +281,7 @@ int main(int argc, char** argv)
                             o.shelf = std::max(0.0f, mit->second.inventory[g]);
                             o.shelf_ok = shelf_admits(mit->second, g, jr.reservation_mult, true);
                         }
-                        if (const stockpile_component* pl = w.find_pool(b.corp, pool_key_for_tile(w, bit->second.tile)))
+                        if (const stockpile_component* pl = nullptr) // BL-1265: corporations hold no pools
                             o.pool = std::max(0.0f, pl->quantities[g]);
                         o.spare = reachable_supply(w, reg, jr, b.market, g, b.bid).spare;
                         for (const input_rec& i : b.ins) if (i.r == g) o.floor = i.floor;
@@ -363,7 +363,7 @@ int main(int argc, char** argv)
                     br.step = step; br.bid = bid; br.recipe = b.recipe;
                     br.corp = owner.count(bid) ? owner[bid] : null_entity;
                     br.market = market_for_tile(w, b.tile);
-                    const stockpile_component* pl = w.find_pool(br.corp, pool_key_for_tile(w, b.tile));
+                    const stockpile_component* pl = nullptr; // BL-1265: corporations hold no pools
                     std::array<float, resource_count> cost{};
                     br.reproduced = recipe_inputs_obtainable(w, reg, ir, br.market, pl, *rc, batches, null_entity, cost);
                     const auto mit = w.markets.find(br.market);

@@ -247,23 +247,9 @@ void pool_state(const world& w, const recipe_registry& reg, std::size_t r,
                 double& total, double& reserved, double& order_held, int& pools)
 {
     total = reserved = order_held = 0.0; pools = 0;
-    for (const auto& [key, pool] : w.corp_market_pools)
-    {
-        const double q = pool.quantities[r];
-        if (q <= 0.0) continue;
-        ++pools;
-        total += q;
-        const auto mit = w.markets.find(key.second);
-        if (mit == w.markets.end()) continue;
-        bool held = false;
-        for (const sell_order& o : w.sell_orders)
-            if (o.corp == key.first && o.body == mit->second.body
-                && static_cast<std::size_t>(o.resource) == r && o.quantity > 0.0f)
-                held = true;
-        if (held) { order_held += q; continue; }
-        if (w.corporations.count(key.first))
-            reserved += std::min(q, static_cast<double>(processor_reservation(w, reg, key.first, key.second)[r]));
-    }
+    // BL-1265: corporations hold no pools, no reservation and no sell orders —
+    // every column here reads 0 (kept so the trace's layout is unchanged).
+    (void)w; (void)reg; (void)r;
 }
 
 struct income_window

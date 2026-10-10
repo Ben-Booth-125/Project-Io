@@ -66,8 +66,12 @@ constexpr uint32_t rep_after_complete_2 = 0x40000000u; //  2
 constexpr uint32_t rep_after_complete_3 = 0x40400000u; //  3
 constexpr uint32_t rep_after_cancel_1   = 0x3F800000u; //  1  (3 − 2)
 constexpr uint32_t buyer_balance        = 0x461BF3B2u; //  9980.92383
-constexpr uint32_t supplier_balance     = 0x461DF9A3u; // 10110.4092
-constexpr uint32_t buyer_pool_iron      = 0x00000000u; //  0 (auto-sold)
+// BL-1265 MOVED THIS PIN (was 0x461DF9A3u, 10110.4092): under the shelf economy
+// a completing contract's supplier BUYS its home shelf at the posted price —
+// here the iron the buyer's earlier deliveries landed and sold onto it —
+// instead of drawing its own pool for free (MARKETS.md § The shelf economy).
+constexpr uint32_t supplier_balance     = 0x461C7CF9u; // 10015.2432
+// buyer_pool_iron retired (BL-1265): corporations hold no pools.
 constexpr uint32_t quote_unit_price     = 0x401C0000u; //  2.4375
 constexpr uint32_t quote_quantity       = 0x41A00000u; // 20
 constexpr uint32_t quote_freight        = 0x00000000u; //  0 (same-body)
@@ -247,8 +251,11 @@ int main()
         if (final_tick)
         {
             check(w.procurement_contracts.empty(), "R0.3 the contract completes and is removed within its own lead time");
-            check(near(w.pool_at(buyer, pool_key_for_body(w, body)).quantities[ri(resource_type::iron_ore)], 20.0f),
-                  "R0.3 the full quantity lands in the BUYER's pool on completion, before any auto-sell");
+            // BL-1265: the delivery LANDS on the buyer's home market (landing is
+            // selling: the clear pays it and shelves it), so it is read off the
+            // tick's landings, before that clear.
+            check(near(w.landed(buyer, corp_home_market(w, buyer, body), ri(resource_type::iron_ore)), 20.0f),
+                  "R0.3 the full quantity lands for the BUYER on its home market on completion, before the clear");
             check(near(w.corporations[buyer].balance, starting_balance - total),
                   "Q1 SPLIT: by completion the treasury has paid exactly the deposit plus the paced remainder, before any auto-sell income");
         }
@@ -380,11 +387,17 @@ int main()
 
         check(bit_eq(f.w.corporations[f.buyer].balance, baseline::buyer_balance),
               "R1 the buyer's balance after the whole run is bit-identical");
+        {
+            const float sb = f.w.corporations[f.supplier].balance;
+            uint32_t bits = 0;
+            std::memcpy(&bits, &sb, sizeof bits);
+            std::printf("    supplier balance %.6f (bits 0x%08X)\n", static_cast<double>(sb),
+                        static_cast<unsigned>(bits));
+        }
         check(bit_eq(f.w.corporations[f.supplier].balance, baseline::supplier_balance),
               "R1 the supplier's balance after the whole run is bit-identical");
-        check(bit_eq(f.w.pool_at(f.buyer, pool_key_for_body(f.w, f.body)).quantities[ri(resource_type::iron_ore)],
-                     baseline::buyer_pool_iron),
-              "R1 the buyer's iron pool after the whole run is bit-identical");
+        // BL-1265: the "buyer's iron pool" row retired with corporation pools
+        // (the buyer holds no stock; its deliveries land and sell on its shelf).
     }
     {
         // The four refusals, in the order request_quote tests them. Captured as

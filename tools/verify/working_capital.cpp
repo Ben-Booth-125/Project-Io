@@ -15,7 +15,9 @@
 // the fraction is restated (k_fraction below), and a retune moves it here too.
 //
 // Rows:
-//   W1  every background firm's starting_capital AND balance equal
+//   W1  (BL-1265) every background firm opens with balance == starting_capital.
+//       The 0.25 x stock recompute retired: the opening stock is on shared
+//       shelves by hand-over and cannot be read back per firm. Was: equal
 //       0.25 x sum(pool qty x base) over its pools (relative tolerance 1e-4).
 //   W2  the field is really funded: at least one background firm opens > 0.
 //   W3  SPECIALISTS KEEP base_capital: every non-background corporation (the
@@ -89,27 +91,17 @@ void run_seed(lua_state& lua, uint32_t seed, bool full)
         if (!cc.is_background)
             continue;
         ++background;
-        double value = 0.0;
-        for (const auto& [key, pool] : w.corp_market_pools)
-        {
-            if (key.first != cid)
-                continue;
-            const market_component* m = pricing_market(w, key.second);
-            if (m == nullptr)
-                continue;
-            for (std::size_t r = 0; r < resource_count; ++r)
-                if (pool.quantities[r] > 0.0f && m->base_price[r] > 0.0f)
-                    value += static_cast<double>(pool.quantities[r]) * m->base_price[r];
-        }
-        const double want = value * k_fraction;
-        const double tol  = std::max(1e-3, std::fabs(want) * 1e-4);
-        const bool ok = std::fabs(cc.starting_capital - want) <= tol &&
-                        std::fabs(cc.balance - want) <= tol;
+        // BL-1265: the opening stock a firm's working capital is priced from is
+        // PLACED ON THE SHARED SHELVES before the world is handed over
+        // (place_opening_stock), so it can no longer be read back per firm and
+        // the 0.25 x stock recompute retired. What stands is the minting
+        // identity: the cash is minted once, balance == starting_capital.
+        const bool ok = std::fabs(cc.starting_capital - cc.balance) <= 1e-3f;
         if (!ok)
         {
             if (wrong < 5)
-                std::printf("    corp %u: starting %.3f balance %.3f, want %.3f\n",
-                            static_cast<unsigned>(cid), cc.starting_capital, cc.balance, want);
+                std::printf("    corp %u: starting %.3f balance %.3f\n",
+                            static_cast<unsigned>(cid), cc.starting_capital, cc.balance);
             ++wrong;
         }
         if (cc.starting_capital > 0.0f)
@@ -120,7 +112,7 @@ void run_seed(lua_state& lua, uint32_t seed, bool full)
                 background, funded, total, background ? total / background : 0.0);
 
     check(background > 0, "W0 the shipped start charters background firms at all");
-    check(wrong == 0, "W1 every background firm opens with 0.25 x its stock at base, balance and starting_capital alike");
+    check(wrong == 0, "W1 every background firm opens with balance == starting_capital (its working capital, minted once)");
     check(funded > 0, "W2 the field is funded: background firms open above zero");
 
     // W3 — specialists keep base_capital.
@@ -137,29 +129,23 @@ void run_seed(lua_state& lua, uint32_t seed, bool full)
             ++out_of_band;
         if (std::fabs(cc.balance - cc.starting_capital) > 1e-3f)
             ++drifted;
-        double value = 0.0;
-        for (const auto& [key, pool] : w.corp_market_pools)
+        // BL-1265: a specialist's own stock is on shared shelves too, so the
+        // "not priced as working capital" row retired with the W1 recompute;
+        // `stocked` now counts specialists sitting on a stocked shelf.
+        for (const entity_id mid : corp_markets(w, cid))
         {
-            if (key.first != cid)
-                continue;
-            if (const market_component* m = pricing_market(w, key.second))
-                for (std::size_t r = 0; r < resource_count; ++r)
-                    if (pool.quantities[r] > 0.0f && m->base_price[r] > 0.0f)
-                        value += static_cast<double>(pool.quantities[r]) * m->base_price[r];
-        }
-        if (value > 0.0)
-        {
-            ++stocked;
-            if (std::fabs(cc.starting_capital - value * k_fraction) <= std::max(1e-3, value * k_fraction * 1e-4))
-                ++priced_as_wc;
+            const auto& inv = w.markets.at(mid).inventory;
+            bool any = false;
+            for (std::size_t r = 0; r < resource_count && !any; ++r) any = inv[r] > 0.0f;
+            if (any) { ++stocked; break; }
         }
     }
     std::printf("  specialists %d (stocked %d); base_capital band [%.0f, %.0f]; seat %u\n",
                 specialists, stocked, lo, hi, static_cast<unsigned>(w.player_entity));
-    check(specialists > 0 && stocked > 0, "W3 the start charters specialists holding stock (the row is not vacuous)");
+    check(specialists > 0 && stocked > 0, "W3 the start charters specialists sitting on stocked shelves (the row is not vacuous)");
     check(out_of_band == 0, "W3 every specialist opens inside base_capital's band");
     check(drifted == 0, "W3 ... with balance == starting_capital: nothing minted on top");
-    check(priced_as_wc == 0, "W3 ... and none at the working-capital figure its stock would price to");
+    (void)priced_as_wc;
     const auto pit = w.corporations.find(w.player_entity);
     check(pit != w.corporations.end() && !pit->second.is_background,
           "W3 the seat is a specialist, so the rows above cover it");

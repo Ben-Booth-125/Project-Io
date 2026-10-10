@@ -121,6 +121,24 @@ void anchor(fixture& f, int c, int r)
     f.w.body_reach_cost.clear();
 }
 
+/// BL-1265 (MARKETS.md § The shelf economy): corporations hold no pools, so a
+/// unit's goods draw is bought off the shelf of the market its TILE routes to.
+/// One market centred on (c, r) — each unit below gets its own, so a shelf
+/// stocked for one unit cannot feed another — with @p ordnance units on it,
+/// priced at base (inside the authored fair-price ceiling).
+entity_id add_market(fixture& f, int c, int r, float ordnance)
+{
+    const entity_id m = f.w.create_entity();
+    market_component mc{};
+    mc.body        = f.body;
+    mc.centre_tile = at(f, c, r);
+    mc.base_price[static_cast<std::size_t>(resource_type::ordnance)] = 10.0f;
+    mc.price = mc.base_price;
+    mc.inventory[static_cast<std::size_t>(resource_type::ordnance)] = ordnance;
+    f.w.markets.emplace(m, mc);
+    return m;
+}
+
 entity_id add_corp(world& w)
 {
     const entity_id c = w.create_entity();
@@ -226,10 +244,13 @@ scenario_result run_scenario(const recipe_registry& reg)
     const entity_id u_out_unmet = add_unit(f.w, corp_out_unmet, at(f, 12, 0), 10, 1000);
 
     // Fund only the MET units' goods draw: 10 heads x 2.0 ordnance/head =
-    // 20.0 needed, credited generously. The unmet corps' pools stay at their
-    // auto-created zero, so their draw is fully unmet.
-    f.w.pool_at(corp_in_met, pool_key_for_body(f.w, f.body)).quantities[ordnance_idx()]  = 1000.0f;
-    f.w.pool_at(corp_out_met, pool_key_for_body(f.w, f.body)).quantities[ordnance_idx()] = 1000.0f;
+    // 20.0 needed, stocked generously. BL-1265: each unit stands in its own
+    // market (centred on its tile); only the MET units' shelves hold ordnance,
+    // so the unmet units' draws find an empty shelf and go fully unmet.
+    add_market(f, 2, 0, 1000.0f);
+    add_market(f, 3, 0, 0.0f);
+    add_market(f, 10, 0, 1000.0f);
+    add_market(f, 12, 0, 0.0f);
 
     unit_upkeep_tick tick = run_unit_upkeep(f.w, reg, g_upkeep_report);
 
@@ -321,7 +342,7 @@ int main()
         anchor(f, 0, 0);
         const entity_id corp = add_corp(f.w);
         const entity_id u    = add_unit(f.w, corp, at(f, 2, 0), 10, 560);
-        f.w.pool_at(corp, pool_key_for_body(f.w, f.body)).quantities[ordnance_idx()] = 1000.0f;
+        add_market(f, 2, 0, 1000.0f); // BL-1265: the unit's own stocked shelf
         run_unit_upkeep(f.w, reg, g_upkeep_report);
         check(f.w.units.at(u).supply_factor_permille == 620,
               "U6 recovery continues on a second in-supply tick (560 -> 620)");

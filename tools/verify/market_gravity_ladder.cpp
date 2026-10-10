@@ -288,7 +288,7 @@ int main(int argc, char** argv)
                     for (std::size_t g = 0; g < resource_count; ++g)
                     {
                         w.markets.at(mid).inventory[g] += 1.0f;
-                        if (corp != null_entity) w.pool_at(corp, mid).quantities[g] += 1.0f;
+                        (void)corp; // BL-1265: no pools to stock
                     }
             }
             if (rungs[k] == world_gen_config{}.market_carving.gravity_reach)
@@ -300,10 +300,7 @@ int main(int argc, char** argv)
                             tu.folds_across_water);
             }
             const market_fold_tally t = fold_markets_by_gravity(w, home, rungs[k], &ports);
-            bool orphan_pool = false;
-            for (const market_fold_record& fr : t.records)
-                for (const auto& [key, pool] : w.corp_market_pools)
-                    if (key.second == fr.folded) orphan_pool = true;
+            bool orphan_pool = false; // BL-1265: corporations hold no pools to orphan
             reading r = read_world(w, home, cfg);
             r.folds = t.folds;
             r.across_water = t.folds_across_water;

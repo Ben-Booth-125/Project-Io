@@ -103,6 +103,7 @@
 #include "world/recipe_registry.hpp"
 #include "world/spawn_seat.hpp"
 #include "world/supply_system.hpp"
+#include "world/trade.hpp"
 #include "world/tech_gate.hpp"
 #include "world/world.hpp"
 #include "world/world_gen_config.hpp"
@@ -223,8 +224,7 @@ void tick(world& w, const recipe_registry& reg, int t, bool spectating)
     advance_convoys(w);
     credit_arrived_convoys(w, t); // app order: arrivals before the economy
     economy_report rep = run_economy_step(w, reg, spectating, &lp);
-    dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land), // BL-995: before the clear
-                     reg.logistics_cost(convoy_mode::space), &lp);
+    run_trades(w, reg, rep, &lp); // BL-1266: the trade pass (was dispatch_convoys), before the clear
     auto flows = clear_markets(w, reg, rep);
     apply_budget(w, reg, flows, rep.workforce_contention, &rep.budgets, &rep.buildings,
                  &rep.building_labour);
