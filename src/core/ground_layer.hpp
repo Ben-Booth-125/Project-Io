@@ -106,6 +106,16 @@ public:
     /// pre-bake target or @p w no longer holds it at the same grid (the
     /// homeworld changed identity): the caller starts again.
     bool resnapshot(const world& w, bool assume_surveyed);
+    /// AN IN-ROUND SNAPSHOT (STARTUP.md § Handoff, Ben 2026-10-10): the same
+    /// as resnapshot, with a source a round worker built from its OWN world at
+    /// a point inside the round (round 6, right after the campaign road
+    /// network is laid) and handed across — the main thread never reads a
+    /// world a worker is writing. @p src must be prepare_source of @p body with
+    /// reveal_all == @p assume_surveyed and the registry play runs on, so its
+    /// hashes agree with the boundary that follows. False when the pre-bake
+    /// target is not @p body at the same grid.
+    bool resnapshot(entity_id body, std::shared_ptr<const ui::ground::bake_source> src,
+                    bool assume_surveyed);
     /// The master is complete AND current: every chunk landed against the
     /// latest source snapshot, and that snapshot's sweep has run (a chunk
     /// a boundary moved is not counted whole until it has re-baked).
@@ -337,6 +347,11 @@ private:
     void alloc_master(body_state& b);
     void drop_master(body_state& b);
     void refresh_source(body_state& b, const world& w);
+    void set_source(body_state& b, std::shared_ptr<const ui::ground::bake_source> src);
+    /// A boundary's new source (either resnapshot): log what moved, set it,
+    /// and feed the pool so its sweep runs.
+    void land_boundary(body_state& b, std::shared_ptr<const ui::ground::bake_source> src,
+                       const char* what);
     void make_room(long long need, entity_id keep_a, entity_id keep_b);
     static long long master_bytes(const body_state& b);
 

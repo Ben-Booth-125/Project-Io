@@ -350,8 +350,13 @@ ground_layer::body_state* ground_layer::ensure_body(const world& w, entity_id id
 
 void ground_layer::refresh_source(body_state& b, const world& w)
 {
-    b.src = std::make_shared<const gb::bake_source>(
-        gb::prepare_source(w, b.id, b.reveal_all, registry));
+    set_source(b, std::make_shared<const gb::bake_source>(
+                      gb::prepare_source(w, b.id, b.reveal_all, registry)));
+}
+
+void ground_layer::set_source(body_state& b, std::shared_ptr<const gb::bake_source> src)
+{
+    b.src = std::move(src);
     ++b.src_epoch;
     b.src_age = 0;
     // The whole-body digest (the far page's hash): when it holds still,
@@ -520,10 +525,31 @@ bool ground_layer::resnapshot(const world& w, bool assume_surveyed)
     if (bit == w.bodies.end() || bit->second.grid_width != b->gw
         || bit->second.grid_height != b->gh)
         return false; // the homeworld is not this one any more
+    b->reveal_all = assume_surveyed;
+    land_boundary(*b, std::make_shared<const gb::bake_source>(
+                          gb::prepare_source(w, b->id, b->reveal_all, registry)),
+                  "round-boundary");
+    return true;
+}
+
+bool ground_layer::resnapshot(entity_id body, std::shared_ptr<const gb::bake_source> src,
+                              bool assume_surveyed)
+{
+    body_state* b = find(m_prebake);
+    if (!b || !src || b->id != body || src->gw != b->gw || src->gh != b->gh)
+        return false;
+    b->reveal_all = assume_surveyed;
+    land_boundary(*b, std::move(src), "in-round (roads laid)");
+    return true;
+}
+
+void ground_layer::land_boundary(body_state& bs, std::shared_ptr<const gb::bake_source> src,
+                                 const char* what)
+{
+    body_state* const b = &bs;
     const std::uint64_t before = b->src_digest;
     const std::shared_ptr<const gb::bake_source> old_src = b->src;
-    b->reveal_all = assume_surveyed;
-    refresh_source(*b, w);
+    set_source(*b, std::move(src));
     if (fill_log_on() && old_src && b->src && b->src_digest != before)
     {
         // What the boundary moved, per source field, in tiles.
@@ -547,13 +573,12 @@ bool ground_layer::resnapshot(const world& w, bool assume_surveyed)
     }
     if (b->src_digest != before)
         m_boundary_log = true; // name the sweep this boundary causes
-    std::printf("[ground] round-boundary snapshot of body %u: %s (%d of %d master chunks landed)\n",
-                static_cast<unsigned>(b->id),
+    std::printf("[ground] %s snapshot of body %u: %s (%d of %d master chunks landed)\n",
+                what, static_cast<unsigned>(b->id),
                 b->src_digest == before ? "unchanged, nothing re-bakes" : "moved, sweeping",
                 b->n_ready, b->n_chunks);
     std::fflush(stdout);
     feed(/*verify=*/false);
-    return true;
 }
 
 void ground_layer::touch()
