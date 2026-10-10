@@ -2045,7 +2045,7 @@
    "title": "What derives a nation's works lean (State Arsenal / Private Works) now the Industry tree is gone?",
    "raised": "2026-10-10",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "Sprint 52 sibling-doc sweep (2026-10-10), after research left generation",
    "what": "The Industry tree's fork between State Arsenal (heavy plant nation-owned) and Private Works (corporations own processing) fed the regime stub at the 1960 handover (INDUSTRIALISATION.md property 6, the stubs table). With no tree the lean has no source; the sweep left it written as open.",
    "why_it_matters": "The regime stub, and how much of a nation's heavy plant its corporations may own at the epoch, read this lean.",
@@ -2057,7 +2057,8 @@
    "recommendation": "A.",
    "files": [
     "docs/generation/INDUSTRIALISATION.md"
-   ]
+   ],
+   "resolution": "RULED (Ben, 2026-10-10): A - derived from charter reach. Written into INDUSTRIALISATION.md § Beat 1 (the works lean)."
   }
  ]
 }

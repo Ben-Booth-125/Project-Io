@@ -620,9 +620,12 @@ stockpile becomes its charter budget (property 1).
 
 **The works lean: some polities spend into rail and force, others stockpile and charter.** That is
 a derived disposition, not a flag, and it is why two equally industrial powers open the campaign
-with different corporate webs. It was read off a tree fork (*State Arsenal* / *Private Works*), and
-the history holds no tree (Ben, 2026-10-10; `trees/TREES.md`); what derives the lean instead is
-open.
+with different corporate webs. **It is derived from charter reach (Ben, 2026-10-10, NR-1026):** the share of the realm's
+processing plant held by chartered firms at the 1960 fold. A realm whose firms hold most of its plant
+leans *Private Works* — corporations own processing; one whose plant the state holds leans *State
+Arsenal* — heavy plant nation-owned, corporations lease. The threshold is a dial, set by measurement
+across the curated seeds. It is an in-world quantity with a visible cause: the lens shows who owns
+the plant.
 
 **An industry point is a second currency beside the treasury, and that cost is accepted.** It
 earns its place because it is located and the treasury is not spread to cities; the alternative —
@@ -1077,5 +1080,5 @@ Owed from Ben when they bite, not before:
 - **Whether a standing war condition ever becomes a live nation war** — that is a new widening of
   `../ai/AI_OPPONENT.md` § 11, raised when the campaign wants it.
 - **The PROPOSED readings above that the form did not ask about** — computing as electronics,
-  located industry points, the works lean and what derives it, the migration streams, colony loss by rising cost,
+  located industry points, the works lean, the migration streams, colony loss by rising cost,
   proxy war as a patron link, the three war-death mechanisms, and the stub sources.

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*102 entries — 22 open, 80 resolved.*
+*102 entries — 21 open, 81 resolved.*
 
 ---
 
@@ -223,21 +223,6 @@ Ben ruled ocean crossings in generation gated by date. The two sibling pieces th
 > **Recommendation:** Taken.
 
 *Files: `docs/generation/CIVILISATION.md`, `docs/generation/EXPLORATION.md`, `docs/generation/INDUSTRIALISATION.md`, `docs/ui/question_log.json`*
-
-### NR-1026 — What derives a nation's works lean (State Arsenal / Private Works) now the Industry tree is gone?
-*question · raised 2026-10-10 · from Sprint 52 sibling-doc sweep (2026-10-10), after research left generation*
-
-The Industry tree's fork between State Arsenal (heavy plant nation-owned) and Private Works (corporations own processing) fed the regime stub at the 1960 handover (INDUSTRIALISATION.md property 6, the stubs table). With no tree the lean has no source; the sweep left it written as open.
-
-**Why it matters.** The regime stub, and how much of a nation's heavy plant its corporations may own at the epoch, read this lean.
-
-- A: derive it from charter reach - the share of the realm's processing plant held by chartered firms at the 1960 fold (an in-world quantity with a visible cause)
-- B: drop the lean; the regime reads subject history and world war only
-- C: seed it from the nation's character enums
-
-> **Recommendation:** A.
-
-*Files: `docs/generation/INDUSTRIALISATION.md`*
 
 ---
 
@@ -1564,4 +1549,21 @@ With BL-1235 a plant the scorer's dial zeroed in the settle is no longer mothbal
 AI_OPPONENT.md § Candidate enumeration ('A power-plant candidate is priced against its grid's shortfall', Ben 2026-10-07) and PRODUCTION.md § Power ('The scorer's power-plant estimate reads the same per-grid gap, and counts plants already under construction') state the scorer's power gate as the design. The code does not do it: corp_ai.cpp scores power recipes like any other processor group (~1586-1796); the gate exists only on branch bl1232-gate-remeasure (14969c85), unmerged, HELD by Ben. BL-1232 (power plants per grid) is complete, so no open item owns the held part. CALL: (a) file a backlog item that re-measures and merges the gate, docs unchanged; or (b) withdraw the rule from both docs until it is re-ruled.
 
 > **RESOLVED.** Ben, 2026-10-10 (doc-check form): file an item to re-measure the gate on the current tip, then merge or drop -> BL-1263 (power gate remeasure). Also ruled: power inputs read the grid too -> BL-1264 (power input on grid).
+
+### NR-1026 — What derives a nation's works lean (State Arsenal / Private Works) now the Industry tree is gone?
+*question · raised 2026-10-10 · from Sprint 52 sibling-doc sweep (2026-10-10), after research left generation*
+
+The Industry tree's fork between State Arsenal (heavy plant nation-owned) and Private Works (corporations own processing) fed the regime stub at the 1960 handover (INDUSTRIALISATION.md property 6, the stubs table). With no tree the lean has no source; the sweep left it written as open.
+
+**Why it matters.** The regime stub, and how much of a nation's heavy plant its corporations may own at the epoch, read this lean.
+
+- A: derive it from charter reach - the share of the realm's processing plant held by chartered firms at the 1960 fold (an in-world quantity with a visible cause)
+- B: drop the lean; the regime reads subject history and world war only
+- C: seed it from the nation's character enums
+
+> **Recommendation:** A.
+
+> **RESOLVED.** RULED (Ben, 2026-10-10): A - derived from charter reach. Written into INDUSTRIALISATION.md § Beat 1 (the works lean).
+
+*Files: `docs/generation/INDUSTRIALISATION.md`*
 
