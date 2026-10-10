@@ -173,7 +173,7 @@ inline double tier_out(std::uint8_t tier)
 // surfaced half-width, for a Road; treat_scale sizes them per tier. They widen
 // the road's footprint in the ground, never the road line itself: at the
 // master a Road's surface is ~3 px and its treatment a few pixels either side.
-constexpr double k_corridor_w = 0.050; ///< Forest / scrub: the cleared corridor (trees keep off it).
+constexpr double k_corridor_w = 0.090; ///< Forest / scrub: the cleared corridor (trees keep off it).
 constexpr double k_cut_w      = 0.032; ///< A slope: the cut's uphill bank, at a full cut.
 constexpr double k_spoil_w    = 0.014; ///< A slope: the downhill spoil edge.
 constexpr double k_bank_w     = 0.024; ///< Wet / low ground: the embankment's side slope.
@@ -199,7 +199,9 @@ inline double piece_out(std::uint8_t tier, std::uint8_t flags)
 {
     if ((tier & 0x80u) || (flags & route_piece::f_street))
         return tier_out(tier) + ((tier & 0x80u) ? 0.0 : k_kerb_w);
-    return std::max(tier_out(tier), k_corridor_w * treat_scale(tier));
+    const double ts = treat_scale(tier);
+    const double ground = std::max({ k_cut_w * (tier == k_route_rail ? 1.25 : 1.0), k_bank_w, k_verge_w }) * ts;
+    return std::max(tier_out(tier), (flags & route_piece::f_wood) ? std::max(ground, k_corridor_w * ts) : ground);
 }
 
 void finish_piece(route_piece& pc)
@@ -427,8 +429,11 @@ route_piece routed(const bake_source& s, const tile_ground& tg, const route_end&
             ex = fx; ey = fy; el = fl;
         }
         double c = 0.35 * (chord > 1e-9 ? len / chord - 1.0 : 0.0) + rc.bend_w * bend;
+        // The least turning radius is a hard floor while any candidate keeps
+        // it (a railway cannot turn tighter); a tile whose crossings force a
+        // tighter bend takes the gentlest candidate.
         if (rmin < rc.r_min)
-            c += 2.0 * (rc.r_min - rmin) / rc.r_min;
+            c += 1e6 * (rc.r_min - rmin) / rc.r_min;
         // The ground under it: the mean of the interior's even samples.
         double v = 0.0;
         int nv = 0;
@@ -504,6 +509,21 @@ std::uint8_t tile_flags(const bake_source& s, std::size_t i)
     const bool river = (s.river_in.size() == s.cls.size() && (s.river_in[i] | s.river_out[i]) != 0);
     if (marsh || river)
         f |= route_piece::f_wet;
+    // Trees can stand within the piece's reach (its tile or its ring): it
+    // carries the forest corridor's wider reach, which the trees keep off.
+    const auto land = static_cast<std::uint8_t>(bake_source::tile_class::land);
+    for (int k = -1; k < 6; ++k)
+    {
+        const int t = k < 0 ? static_cast<int>(i) : nb_index(s, static_cast<int>(i), k);
+        if (t < 0 || s.cls[static_cast<std::size_t>(t)] != land)
+            continue;
+        const auto cv = static_cast<terrain_cover>(s.cover[static_cast<std::size_t>(t)]);
+        if (cv == terrain_cover::forest || cv == terrain_cover::scrub)
+        {
+            f |= route_piece::f_wood;
+            break;
+        }
+    }
     return f;
 }
 
@@ -1048,13 +1068,22 @@ void paint_routes(const bake_source& s, const geometry& g, const bake_params& p,
                              ws > 0.0 ? static_cast<float>(hs / ws) : 0.0f, hx, hy);
                 Gx += hx;
                 Gy += hy;
-                L = 1.0 + std::clamp(static_cast<double>(p.hillshade_sign) * (Gx * Lx + Gy * Ly) * 0.8, -0.40, 0.40);
+                // The ground's own shade (bake_window's hillshade term and
+                // clamp at the master), so the road is lit as the land is.
+                const double rk = 0.8 + 0.2 * std::clamp((nominal_s(g) - 24.0) / 48.0, 0.0, 1.0);
+                L = 1.0 + std::clamp(static_cast<double>(p.hillshade_sign) * (Gx * Lx + Gy * Ly),
+                                     -static_cast<double>(p.shade_lo) * rk, static_cast<double>(p.shade_hi) * rk);
             }
             const double wear  = 0.92 + 0.16 * rnoise(abx, aby, wear_c, wear_n, 0x3A01u);
             // The speckle is the rail bed's alone: the road tiers are too
             // thin to carry a pixel-scale grain (BL-1257).
             const double speck = fine && h.tier == k_route_rail ? (rspeck(abx, aby, speck_c, speck_n, 0x3A02u) - 0.5) : 0.0;
-            const double lit = L * wear;
+            // BL-1261: the surface takes a share of the ground it crosses —
+            // dust off a dark slope darkens it, a pale plain lifts it — so a
+            // road reads as made of the land it runs on, not laid over it.
+            const double gl  = 0.299 * gr + 0.587 * gg + 0.114 * gb;
+            const double env = std::clamp(0.62 + 0.38 * gl / 100.0, 0.70, 1.10);
+            const double lit = L * wear * env;
 
             // THE TREATMENT (BL-1261, RENDERING.md § Roads and sea lanes: the
             // road's tile set): the ground either side of the surface, by the
@@ -1084,23 +1113,23 @@ void paint_routes(const bake_source& s, const geometry& g, const bake_params& p,
                     // side: the pixel stands uphill of the road).
                     const double across = Gx * h.nx + Gy * h.ny;
                     const double kcut = wet ? 0.0 : smooth01(0.15, 0.70, std::fabs(across));
-                    if (wooded)
+                    if (wooded && (h.flags & route_piece::f_wood))
                     {
                         // A cleared corridor: lighter undergrowth where the
                         // trees were felled, and the tree line's shade at its
                         // edge (the stamp keeps every tree off it).
                         const double wc = k_corridor_w * ts;
-                        const double clear = 0.34 * (1.0 - smooth01(0.60 * wc, wc, o));
-                        mixc(r_, g_, b_, gr * 1.10f + 12.0f, gg * 1.10f + 12.0f, gb * 1.02f + 5.0f, clear * band_k(wc) * k);
-                        const double edge = 0.32 * smooth01(0.40 * wc, 0.85 * wc, o) * (1.0 - smooth01(0.85 * wc, wc + pxc, o));
-                        mixc(r_, g_, b_, gr * 0.60f, gg * 0.62f, gb * 0.60f, edge * band_k(0.3 * wc) * k);
+                        const double clear = 0.45 * (1.0 - smooth01(0.55 * wc, wc, o));
+                        mixc(r_, g_, b_, gr * 1.14f + 14.0f, gg * 1.16f + 14.0f, gb * 1.04f + 6.0f, clear * band_k(wc) * k);
+                        const double edge = 0.50 * smooth01(0.50 * wc, 0.85 * wc, o) * (1.0 - smooth01(0.85 * wc, wc + pxc, o));
+                        mixc(r_, g_, b_, gr * 0.52f, gg * 0.56f, gb * 0.52f, edge * band_k(0.3 * wc) * k);
                     }
                     else if (!wet)
                     {
                         // Open ground: a worn verge either side.
                         const double wv = k_verge_w * ts;
-                        const double a = 0.24 * (1.0 - smooth01(0.40 * wv, wv, o)) * (1.0 - 0.6 * kcut);
-                        mixc(r_, g_, b_, gr * 1.07f + 7.0f, gg * 1.08f + 7.0f, gb * 1.02f + 3.0f, a * band_k(wv) * k);
+                        const double a = 0.32 * (1.0 - smooth01(0.40 * wv, wv, o)) * (1.0 - 0.6 * kcut);
+                        mixc(r_, g_, b_, gr * 1.10f + 9.0f, gg * 1.10f + 9.0f, gb * 1.03f + 4.0f, a * band_k(wv) * k);
                     }
                     if (wet)
                     {
@@ -1108,13 +1137,13 @@ void paint_routes(const bake_source& s, const geometry& g, const bake_params& p,
                         // side slopes lit or shaded by the way they face, a
                         // dark wet line at their toe.
                         const double wb = k_bank_w * ts;
-                        const double shade = 1.0 + 0.45 * face;
-                        const float er = static_cast<float>((gr * 0.55 + 140.0 * 0.45) * shade);
-                        const float eg = static_cast<float>((gg * 0.55 + 128.0 * 0.45) * shade);
-                        const float eb = static_cast<float>((gb * 0.55 +  96.0 * 0.45) * shade);
-                        mixc(r_, g_, b_, er, eg, eb, 0.80 * (1.0 - smooth01(0.70 * wb, wb, o)) * band_k(wb) * k);
-                        const double toe = smooth01(0.75 * wb, wb, o) * (1.0 - smooth01(wb, wb + 1.5 * pxc, o));
-                        mixc(r_, g_, b_, gr * 0.62f, gg * 0.64f, gb * 0.66f, 0.28 * toe * band_k(0.25 * wb) * k);
+                        const double shade = 0.92 + 0.55 * face;
+                        const float er = static_cast<float>((gr * 0.50 + 134.0 * 0.50) * shade);
+                        const float eg = static_cast<float>((gg * 0.50 + 124.0 * 0.50) * shade);
+                        const float eb = static_cast<float>((gb * 0.50 +  92.0 * 0.50) * shade);
+                        mixc(r_, g_, b_, er, eg, eb, 0.85 * (1.0 - smooth01(0.70 * wb, wb, o)) * band_k(wb) * k);
+                        const double toe = smooth01(0.70 * wb, wb, o) * (1.0 - smooth01(wb, wb + 1.5 * pxc, o));
+                        mixc(r_, g_, b_, gr * 0.55f, gg * 0.58f, gb * 0.62f, 0.45 * toe * band_k(0.25 * wb) * k);
                     }
                     else if (kcut > 0.0)
                     {
@@ -1124,22 +1153,22 @@ void paint_routes(const bake_source& s, const geometry& g, const bake_params& p,
                             // the road and mostly from the light; a thin dark
                             // crest where it meets the slope above.
                             const double wcut = k_cut_w * ts * (0.5 + 0.5 * kcut) * (rail ? 1.25 : 1.0);
-                            const double shade = 0.66 + 0.30 * (-face);
-                            const float er = static_cast<float>((gr * 0.35 + 124.0 * 0.65) * shade);
-                            const float eg = static_cast<float>((gg * 0.35 + 106.0 * 0.65) * shade);
-                            const float eb = static_cast<float>((gb * 0.35 +  82.0 * 0.65) * shade);
+                            const double shade = (0.55 + 0.45 * std::max(0.0, -face)) * L;
+                            const float er = static_cast<float>((gr * 0.45 + 120.0 * 0.55) * shade);
+                            const float eg = static_cast<float>((gg * 0.45 + 102.0 * 0.55) * shade);
+                            const float eb = static_cast<float>((gb * 0.45 +  80.0 * 0.55) * shade);
                             mixc(r_, g_, b_, er, eg, eb,
-                                 kcut * 0.85 * (1.0 - smooth01(0.75 * wcut, wcut, o)) * band_k(wcut) * k);
-                            const double crest = smooth01(0.80 * wcut, wcut, o) * (1.0 - smooth01(wcut, wcut + pxc, o));
-                            mixc(r_, g_, b_, gr * 0.58f, gg * 0.58f, gb * 0.60f, 0.30 * kcut * crest * band_k(0.2 * wcut) * k);
+                                 kcut * 0.90 * (1.0 - smooth01(0.75 * wcut, wcut, o)) * band_k(wcut) * k);
+                            const double crest = smooth01(0.75 * wcut, wcut, o) * (1.0 - smooth01(wcut, wcut + pxc, o));
+                            mixc(r_, g_, b_, gr * 0.50f, gg * 0.50f, gb * 0.54f, 0.45 * kcut * crest * band_k(0.2 * wcut) * k);
                         }
                         else
                         {
                             // Downhill: the spoil the cut threw out, a paler
                             // edge on the slope below.
                             const double ws = k_spoil_w * ts * kcut * (rail ? 1.25 : 1.0);
-                            mixc(r_, g_, b_, gr * 1.10f + 8.0f, gg * 1.09f + 7.0f, gb * 1.04f + 4.0f,
-                                 0.38 * kcut * (1.0 - smooth01(0.45 * ws, ws, o)) * band_k(ws) * k);
+                            mixc(r_, g_, b_, gr * 1.16f + 10.0f, gg * 1.14f + 9.0f, gb * 1.06f + 5.0f,
+                                 0.45 * kcut * (1.0 - smooth01(0.45 * ws, ws, o)) * band_k(ws) * k);
                         }
                     }
                 }
@@ -1188,11 +1217,11 @@ void paint_routes(const bake_source& s, const geometry& g, const bake_params& p,
                     if (edged)
                     {
                         const double sh = smooth01(hw - pxc, hw + pxc, d) * (1.0 - smooth01(hw + 0.4 * tier_out(h.tier), hw + tier_out(h.tier), d));
-                        mixc(r_, g_, b_, 172.0f * static_cast<float>(L), 168.0f * static_cast<float>(L),
-                             154.0f * static_cast<float>(L), 0.65 * sh * k);
+                        mixc(r_, g_, b_, 172.0f * static_cast<float>(L * env), 168.0f * static_cast<float>(L * env),
+                             154.0f * static_cast<float>(L * env), 0.65 * sh * k);
                     }
                     const double base = 0.96 + 0.08 * wear;
-                    double sr = 112.0 * L * base, sg = 113.0 * L * base, sb = 114.0 * L * base;
+                    double sr = 112.0 * L * env * base, sg = 113.0 * L * env * base, sb = 114.0 * L * env * base;
                     if (lined && ns * 2.0 * hw >= 8.0)
                     {
                         const double lhw = std::max(0.0045, 0.5 / ns);
@@ -1207,8 +1236,8 @@ void paint_routes(const bake_source& s, const geometry& g, const bake_params& p,
                 {
                     // Ballast spill, the bed, sleepers across it, twin rails.
                     if (mid)
-                        mixc(r_, g_, b_, 120.0f * static_cast<float>(L), 114.0f * static_cast<float>(L),
-                             104.0f * static_cast<float>(L),
+                        mixc(r_, g_, b_, 120.0f * static_cast<float>(L * env), 114.0f * static_cast<float>(L * env),
+                             104.0f * static_cast<float>(L * env),
                              0.40 * (1.0 - smooth01(hw, hw + tier_out(h.tier), d)) * k);
                     const double base = 1.0 + 0.36 * speck;
                     double sr = 130.0 * lit * base, sg = 122.0 * lit * base, sb = 112.0 * lit * base;
@@ -1216,12 +1245,12 @@ void paint_routes(const bake_source& s, const geometry& g, const bake_params& p,
                     {
                         const double across = std::clamp((0.78 * hw - d) / pxc + 0.5, 0.0, 1.0);
                         const double sl = across * dashes(h.along, h.half, 0.040, 0.36, pxc);
-                        sr += (88.0 * L - sr) * sl; sg += (68.0 * L - sg) * sl; sb += (50.0 * L - sb) * sl;
+                        sr += (88.0 * L * env - sr) * sl; sg += (68.0 * L * env - sg) * sl; sb += (50.0 * L * env - sb) * sl;
                         const double rd = std::fabs(d - 0.40 * hw);
                         const double under = std::clamp((0.0080 - rd) / pxc + 0.5, 0.0, 1.0);
                         sr *= 1.0 - 0.30 * under; sg *= 1.0 - 0.30 * under; sb *= 1.0 - 0.30 * under;
                         const double rail = std::clamp((0.0045 - rd) / pxc + 0.5, 0.0, 1.0);
-                        sr += (182.0 * L - sr) * rail; sg += (186.0 * L - sg) * rail; sb += (192.0 * L - sb) * rail;
+                        sr += (182.0 * L * env - sr) * rail; sg += (186.0 * L * env - sg) * rail; sb += (192.0 * L * env - sb) * rail;
                     }
                     mixc(r_, g_, b_, static_cast<float>(sr), static_cast<float>(sg), static_cast<float>(sb), cov * k);
                     break;

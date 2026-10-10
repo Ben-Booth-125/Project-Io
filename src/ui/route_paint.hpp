@@ -86,7 +86,7 @@ struct route_piece
     /// flags: the road's treatment that the TILE decides (the rest — forest
     /// corridor, hillside cut — the route pass reads per pixel from the cover
     /// and the slope under it).
-    enum flag_t : std::uint8_t { f_street = 1, f_wet = 2 };
+    enum flag_t : std::uint8_t { f_street = 1, f_wet = 2, f_wood = 4 };
     float x[k_pts] = {}, y[k_pts] = {};
     float cum[k_pts] = {};      ///< Cumulative arclength at each point.
     float split = 0.0f;         ///< Arclength where the two halves meet (a curve's apex); spokes: 0.
