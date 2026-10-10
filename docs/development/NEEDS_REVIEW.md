@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*103 entries — 23 open, 80 resolved.*
+*104 entries — 24 open, 80 resolved.*
 
 ---
 
@@ -270,6 +270,21 @@ Built: output goes into a per-tick landing register and onto the shelf at that t
 > **Recommendation:** Keep.
 
 *Files: `src/world/economy_system.cpp`, `src/world/market_clearing.cpp`*
+
+### NR-1018 — Manual trades: any two markets, and one reserve per corporation
+*question · raised 2026-10-10 · from BL-1266 (trade core) cold review, 2026-10-10*
+
+Two places TRADE.md leaves room the build filled narrowly. (1) REACH: auto trade runs only among the markets on bodies where the owner holds a trade building; a MANUAL trade may name any two markets anywhere (the seam checks only that both stand and differ), so a corporation with one Port can ship between two markets on a body where it holds nothing. (2) RESERVE: TRADE.md says the reserve is chosen "per Marketplace or for all of them"; built is one reserve per corporation (the "for all of them" case).
+
+**Why it matters.** Reach decides whether a Marketplace is a place or just a points source; the per-Marketplace reserve is a UI and save shape.
+
+- Keep both as built
+- Limit manual trades to the auto reach (markets on bodies holding one of its trade buildings)
+- Add a per-Marketplace reserve beside the corporation-wide one
+
+> **Recommendation:** Limit manual trades to the auto reach (one rule for both); keep the single reserve until a surface asks for more.
+
+*Files: `src/world/trade.cpp (trade_is_valid, corp_trade_markets)`, `src/world/corp_command.cpp (set_trade)`*
 
 ---
 

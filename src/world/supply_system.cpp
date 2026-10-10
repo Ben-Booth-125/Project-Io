@@ -889,7 +889,7 @@ bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report&
                            entity_id corp_id, entity_id src_market, entity_id dest_market_id,
                            std::size_t ri, float qty, const convoy_leg& leg,
                            lp_pool_map* shared_lp_pools, bool* out_refused_no_lp,
-                           float* out_sent)
+                           float* out_sent, float* io_committed)
 {
     if (!leg.viable || ri >= resource_count || !std::isfinite(qty) || !(qty > 0.0f))
         return false;
@@ -953,8 +953,10 @@ bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report&
             if (launch_draw[dr] > 0.0f)
                 purchase += launch_draw[dr] * posted_price(src, dr);
     // The solvency gate, in ONE place for every trade: the trader pays the haul
-    // now and the purchase at this tick's clear, and must be able to cover both.
-    if (!(corp.balance >= haul + purchase))
+    // now and the purchase at this tick's clear, and must be able to cover both
+    // — beside every purchase it has already committed this tick.
+    const float already = (io_committed != nullptr) ? *io_committed : 0.0f;
+    if (!(corp.balance - already >= haul + purchase))
         return false;
 
     // Granted: consume the anchor's capacity (LP is the CAP, not a second PRICE).
@@ -1001,6 +1003,8 @@ bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report&
     w.convoys.push_back(c);
     if (out_sent)
         *out_sent = send;
+    if (io_committed)
+        *io_committed += purchase;
     return true;
 }
 
@@ -1055,7 +1059,17 @@ float dispatch_absorbable(const world& w, const recipe_registry& reg, entity_id 
     // shelf's share, k ticks of demand at most (`pricing_supply`,
     // market_clearing.hpp; here the last clear's demand, as D below is). The
     // shipped k is 0 — listings only — until shelf spoilage, BL-1179.
-    const float S = pricing_supply(dm, r, reg.price_band().shelf_supply_ticks);
+    // BL-1265 (cold review): read between clears, `dm.supply` is the LAST
+    // clear's landings — which that clear already moved onto the shelf — so
+    // `pricing_supply` would count them twice (as listings and as the shelf's
+    // share). What the market already has to sell at its next clear is the
+    // shelf's share alone; with the shelf not counted as supply (k <= 0) the
+    // last listings stand in, as before.
+    const float k = reg.price_band().shelf_supply_ticks;
+    const float S = (k > 0.0f)
+        ? std::min(std::max(0.0f, dm.inventory[r]),
+                   k * (std::max(0.0f, dm.demand[r]) + std::max(0.0f, dm.hauler_want[r])))
+        : std::max(0.0f, dm.supply[r]);
     if (!(landed_cost > 0.0f))
         return (S <= 0.0f) ? std::max(0.0f, dm.demand[r]) : std::numeric_limits<float>::infinity();
     // BL-1203 COLD REVIEW, FIX 1 — THE SHIPPER'S MARGIN. The send is sized to

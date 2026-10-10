@@ -3254,7 +3254,9 @@ int remove_specialist_roster(world& w)
             w.stockpiles.erase(cc.hq_building);
         }
 
-        // BL-1265: its held opening stock goes with it (never placed).
+        // BL-1265: its opening stock goes with it — taken back off the shelves
+        // if it was already placed, then erased with the corporation.
+        unplace_opening_stock(w, cid);
         w.gen_opening_stock.erase(cid);
 
         // Units are keyed by their own id; collect then erase so the map is not
@@ -3847,8 +3849,10 @@ unplace_tally unplace_and_reseat(world& w, const std::map<entity_id, std::vector
             if (corp.is_player)
                 ++out.player_holdless;
         }
-        // BL-1265: no pools to re-key — the opening stock is held per
-        // corporation until `place_opening_stock` reads the buildings it keeps.
+        // BL-1265: its opening stock follows its holdings — taken back off the
+        // shelves it was placed on, held until the next `place_opening_stock`
+        // places it by the buildings it keeps.
+        unplace_opening_stock(w, cid);
     }
     return out;
 }

@@ -1838,10 +1838,19 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                     {
                         shelf -= take;
                         report.purchases[std::make_pair(c.supplier, supply_mid)][ri] += take;
+                        report.wants[std::make_pair(c.supplier, supply_mid)][ri]     += take; // it bids
                     }
                 }
                 const entity_id land_on = (c.delivery_body != null_entity) ? c.delivery_body : c.body;
-                w.land_goods(c.buyer, corp_home_market(w, c.buyer, land_on), ri, c.quantity);
+                // A delivery body with no market has no shelf to land on: the
+                // goods land at the buyer's HQ market, else the supplier's —
+                // never destroyed after the buyer has paid (cold review).
+                entity_id land_mid = corp_home_market(w, c.buyer, land_on);
+                if (land_mid == null_entity)
+                    land_mid = corp_hq_market(w, c.buyer);
+                if (land_mid == null_entity)
+                    land_mid = supply_mid;
+                w.land_goods(c.buyer, land_mid, ri, c.quantity);
                 // BL-546: one `contract_completed` occurrence folded into the
                 // relational substrate, at the weight economy.lua authors
                 // (seeded from `reputation_on_complete`, so the magnitude is
@@ -3069,9 +3078,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // same decay rule, on the other kind of asset. Beside the unit pass rather
     // than earlier, for the same reason it is last: the strategic tier above
     // demolishes at tick rate, so a building torn down THIS tick is already gone
-    // from `w.buildings` and never draws. Running after production also means a
-    // building may consume what it just made, which is the honest ordering — a
-    // workshop's tools come out of stock, not out of next quarter's.
+    // from `w.buildings` and never draws. (BL-1265: this tick's output lands on
+    // the shelf only at the clear, so upkeep draws what earlier ticks left there.)
     run_building_upkeep(w, reg, report);
     phase_stamp(13); // building_upkeep
 

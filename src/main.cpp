@@ -282,8 +282,11 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
                      static_cast<unsigned>(cre.seat), cre.seat_redrawn ? " (redrawn)" : "");
         // BL-365: real background corporations, generated now that reg is loaded.
         generate_background_firms(w, reg, /*seed=*/0x8A21F00Du);
+        place_opening_stock(w); // BL-1265: the firms' opening stock goes on the shelves
     }
     else
+    {
+        place_opening_stock(w); // BL-1265: the spent roster's opening stock goes on the shelves
         std::fprintf(stderr, "[stockpile_budget] headless run: %lld points spent on the seed candidate "
                              "(%zu specialists, %zu firms)%s\n",
                      static_cast<long long>(scs.report.points_spent),
@@ -291,6 +294,7 @@ int run_blackboard_export(const std::string& which, const std::string& out_dir, 
                      scs.report.refused     ? " — spend REFUSED, the no-budget world"
                      : scs.report.fell_back ? " — no specialist affordable, the no-budget world (NR-910)"
                                             : "");
+    }
 
     for (int t = 1; t <= ticks; ++t)
     {

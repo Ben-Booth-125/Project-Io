@@ -262,9 +262,17 @@ struct economy_report; // economy_system.hpp: the tick's want and fill registers
 /// @param out_refused_no_lp Optional; set true (never false) when this call
 ///                         refused SPECIFICALLY for want of passive LP.
 /// @param out_sent         Optional; the units actually sent on success.
+/// @param io_committed     Optional; the purchases this trader has already
+///                         committed this tick (billed at the clear, not yet
+///                         off its balance). The solvency gate weighs the
+///                         balance LESS this, and a success adds this
+///                         shipment's purchase to it — so a trader shipping
+///                         many routes in one pass cannot overdraw (cold
+///                         review). Null: the balance alone.
 bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report& report,
                            entity_id corp_id, entity_id src_market, entity_id dest_market_id,
                            std::size_t ri, float qty, const convoy_leg& leg,
                            lp_pool_map* shared_lp_pools = nullptr,
                            bool* out_refused_no_lp = nullptr,
-                           float* out_sent = nullptr);
+                           float* out_sent = nullptr,
+                           float* io_committed = nullptr);

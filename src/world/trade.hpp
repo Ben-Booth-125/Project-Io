@@ -66,8 +66,10 @@ std::vector<entity_id> corp_trade_markets(const world& w, entity_id corp);
 
 /// Is @p t a well-formed manual trade in @p w as it stands — a live owner
 /// corporation, two distinct existing markets, a good trade carries
-/// (capacity > 0, not a grid good) and finite points > 0? The command seam and
-/// the save loader both refuse a trade this rejects.
+/// (capacity > 0, not a grid good) and finite points > 0? The command seam refuses a trade
+/// this rejects; the save loader, which has no registry, checks the owner,
+/// the markets, the points and the per-owner cap, and the trade pass re-checks
+/// this every tick (a trade it rejects ships nothing).
 bool trade_is_valid(const world& w, const recipe_registry& reg, const standing_trade& t);
 
 /// The same-body haul memo one ranking pass keeps (cost is linear in quantity,

@@ -830,9 +830,11 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                     cre.processors_redecided, cre.processors_unplaced, cre.holdless,
                     static_cast<unsigned>(cre.seat), cre.seat_redrawn ? " (redrawn)" : "");
         generate_background_firms(m_world, m_registry, /*seed=*/0x8A21F00Du);
+        place_opening_stock(m_world); // BL-1265: the firms' opening stock goes on the shelves
     }
     else
     {
+        place_opening_stock(m_world); // BL-1265: the spent roster's opening stock goes on the shelves
         // The spend replaced world-gen's roster: frame on the player it seated.
         frame_launch_view();
         // BL-1099: DATE THE CHARTERS as the worker's finish does

@@ -496,7 +496,8 @@ bool r_trade(std::istream& i, standing_trade& t)
 {
     return r_u32(i, t.id) && r_id(i, t.owner) && r_enum(i, t.resource, max_resource)
         && r_id(i, t.from_market) && r_id(i, t.to_market) && r_f32(i, t.points)
-        && t.id != 0 && std::isfinite(t.points) && t.points > 0.0f;
+        && t.id != 0 && std::isfinite(t.points) && t.points > 0.0f
+        && t.points <= 1.0e6f; // corp_command.hpp's max_trade_points: the seam's own bound
 }
 
 // --- the exchange record (BL-685) ------------------------------------------
@@ -1222,8 +1223,10 @@ bool read_world_snapshot(world& w, std::istream& in)
     // ids distinct — the only trades the seam can write. Refused whole.
     {
         std::set<uint32_t> ids;
+        std::map<entity_id, std::size_t> per_owner;
         for (const standing_trade& t : s.trades)
         {
+            if (++per_owner[t.owner] > 64) return false; // max_trades_per_corp
             if (s.corporations.count(t.owner) == 0) return false;
             if (t.from_market == t.to_market) return false;
             if (s.markets.count(t.from_market) == 0 || s.markets.count(t.to_market) == 0) return false;

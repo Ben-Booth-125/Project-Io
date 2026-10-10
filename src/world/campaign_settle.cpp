@@ -110,6 +110,7 @@ void run_settle(world& w, const recipe_registry& reg, int ticks,
     // held — a roster regenerated after the base world placed its own — goes on
     // the shelves before the first tick. Idempotent: a no-op when none is held.
     place_opening_stock(w);
+    w.gen_opening_placed.clear(); // generation is over: nothing is unplaced after this
     // Every settle tick is spectating (nobody is seated: the seat is drawn from
     // what these ticks produce) at day tick 0 (the sim loop is rebuilt at Begin
     // and never advanced on the building screen). Econ steps 0..ticks-1: live

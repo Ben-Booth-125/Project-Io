@@ -370,9 +370,12 @@ float corp_shelf_stock(const world& w, entity_id corp, std::size_t r)
 {
     if (r >= resource_count)
         return 0.0f;
+    // Unpriced goods (base 0) are unbuyable, so they are not stock the
+    // corporation could buy (cold review): only priced shelves count.
     float total = 0.0f;
     for (const entity_id mid : corp_markets(w, corp))
-        total += std::max(0.0f, w.markets.at(mid).inventory[r]);
+        if (w.markets.at(mid).base_price[r] > 0.0f)
+            total += std::max(0.0f, w.markets.at(mid).inventory[r]);
     return total;
 }
 
@@ -388,14 +391,27 @@ float buy_from_corp_shelves(world& w, entity_id corp, std::size_t r, float qty,
         if (!(qty - bought > 0.0f))
             break;
         market_component& mc = w.markets.at(mid);
+        if (!(mc.base_price[r] > 0.0f)) // unpriced == unbuyable, ceiling or not
+            continue;
         if (!shelf_admits(mc, r, reservation_mult, /*off_buys=*/true))
             continue;
         const float take = std::min(qty - bought, std::max(0.0f, mc.inventory[r]));
         if (!(take > 0.0f))
             continue;
-        cit->second.balance -= take * posted_price(mc, r);
+        const float px = posted_price(mc, r);
+        cit->second.balance -= take * px;
         mc.inventory[r]     -= take;
         bought              += take;
+        // The exchange record (BL-685): the market sells, the corporation buys.
+        exchange_record e;
+        e.tick       = w.current_econ_tick;
+        e.market     = mid;
+        e.resource   = static_cast<resource_type>(r);
+        e.quantity   = take;
+        e.unit_price = px;
+        e.seller     = null_entity;
+        e.buyer      = corp;
+        w.exchanges.push(e);
     }
     return bought;
 }
@@ -439,16 +455,48 @@ void place_opening_stock(world& w)
             total += n;
         if (total <= 0)
             continue; // no market anywhere: nothing to place it on
+        auto& placed = w.gen_opening_placed[corp];
         for (const auto& [mid, n] : weight)
         {
             market_component& mc = w.markets.at(mid);
             const float share = static_cast<float>(n) / static_cast<float>(total);
+            std::array<float, resource_count> put{};
             for (std::size_t r = 0; r < resource_count; ++r)
                 if (held.quantities[r] > 0.0f)
-                    mc.inventory[r] += held.quantities[r] * share;
+                {
+                    put[r] = held.quantities[r] * share;
+                    mc.inventory[r] += put[r];
+                }
+            placed.emplace_back(mid, put);
         }
     }
     w.gen_opening_stock.clear();
+}
+
+void unplace_opening_stock(world& w, entity_id corp)
+{
+    const auto pit = w.gen_opening_placed.find(corp);
+    if (pit == w.gen_opening_placed.end())
+        return;
+    stockpile_component& held = w.gen_opening_stock[corp];
+    for (const auto& [mid, put] : pit->second)
+    {
+        const auto mit = w.markets.find(mid);
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            if (!(put[r] > 0.0f))
+                continue;
+            float take = put[r];
+            if (mit != w.markets.end())
+            {
+                float& inv = mit->second.inventory[r];
+                take = std::min(take, std::max(0.0f, inv));
+                inv -= take;
+            }
+            held.quantities[r] += take;
+        }
+    }
+    w.gen_opening_placed.erase(pit);
 }
 
 void inject_population_demand(world& w, const recipe_registry& reg)

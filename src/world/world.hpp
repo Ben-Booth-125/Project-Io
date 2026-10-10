@@ -463,6 +463,15 @@ struct world
     /// placement walks ascending corp id.
     std::map<entity_id, stockpile_component> gen_opening_stock;
 
+    /// GENERATION-TIME ONLY, beside `gen_opening_stock`: where each corporation's
+    /// opening stock was PLACED (market, quantities), so generation can take it
+    /// back off the shelves when it removes a roster or re-seats a corporation
+    /// (`unplace_opening_stock`) — the stock goes with the corporation, as its
+    /// pool once did (cold review, 2026-10-10). Cleared at the settle's start;
+    /// never saved or hashed.
+    std::map<entity_id, std::vector<std::pair<entity_id, std::array<float, resource_count>>>>
+        gen_opening_placed;
+
     /// BL-1217 D6 (Ben, 2026-10-09, the exceptions) — the PRE-AUTHORED
     /// installation's processor, recorded when `make_hard_coded_world` authors
     /// it: the one processor `assign_default_recipes` gives its default whatever
@@ -1167,6 +1176,14 @@ void seed_opening_stock(world& w, entity_id corp, const std::array<float, resour
 /// all places nothing. Idempotent; called once the markets stand, and again
 /// (as a no-op, or for a roster regenerated since) before the first tick.
 void place_opening_stock(world& w);
+
+/// GENERATION ONLY: take @p corp's placed opening stock back OFF the shelves it
+/// was placed on (`world::gen_opening_placed`) into `world::gen_opening_stock`,
+/// so a later `place_opening_stock` places it where the corporation then
+/// stands — or a roster removal erases it with the corporation. Before any
+/// tick the shelves still hold exactly what was placed; the take is clamped at
+/// the shelf regardless. A no-op for a corporation with nothing placed.
+void unplace_opening_stock(world& w, entity_id corp);
 
 /// Resolve the corporation that owns @p building by scanning each corporation's
 /// `assets`. Siblings of `pool_at` / `workforce_supply`.

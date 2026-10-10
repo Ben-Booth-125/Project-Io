@@ -566,9 +566,20 @@ void dissolve_into(world& w, entity_id acquirer, entity_id target)
     // the target's goods were the market's from the moment they landed. Its
     // standing trades change hands with its Marketplaces: each keeps its id and
     // its place in the spending order, now spending the acquirer's reserve.
-    for (standing_trade& t : w.trades)
-        if (t.owner == target)
-            t.owner = acquirer;
+    // Up to the acquirer's own cap (`max_trades_per_corp`): trades past it are
+    // dropped, in placement order, so the bound the seam keeps still holds.
+    {
+        std::size_t held = 0;
+        for (const standing_trade& t : w.trades)
+            if (t.owner == acquirer)
+                ++held;
+        for (standing_trade& t : w.trades)
+            if (t.owner == target)
+                t.owner = (held++ < max_trades_per_corp) ? acquirer : null_entity;
+        w.trades.erase(std::remove_if(w.trades.begin(), w.trades.end(),
+                                      [](const standing_trade& t) { return t.owner == null_entity; }),
+                       w.trades.end());
+    }
 
     // --- TRANSFER: workforce supply overrides ------------------------------
     // The acquirer now runs the target's buildings on those bodies, so the

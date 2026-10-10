@@ -214,6 +214,9 @@ trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& repo
 
         // Ship up to `units` of good `ri` from `a` to `b` for `corp`. Returns
         // the units actually sent.
+        // Purchases each trader has committed this pass (billed at the clear):
+        // the solvency gate weighs its balance less these (cold review).
+        std::map<entity_id, float> committed;
         auto ship = [&](entity_id corp, entity_id a, entity_id b, std::size_t ri, float units,
                         bool is_auto) -> float {
             if (!(units > 0.0f) || !std::isfinite(units))
@@ -224,7 +227,7 @@ trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& repo
             bool  refused_lp = false;
             float sent       = 0.0f;
             if (!commit_trade_shipment(w, reg, report, corp, a, b, ri, units, leg, lp,
-                                       &refused_lp, &sent))
+                                       &refused_lp, &sent, &committed[corp]))
             {
                 if (refused_lp)
                     ++out.refused_no_lp;
