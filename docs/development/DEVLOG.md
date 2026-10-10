@@ -10,6 +10,45 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-10-10 — Sprint 51 closes: the ground you can read — version 0.1.29
+
+**Runtime:** 2026-10-08 to 2026-10-10; modes Design (the sprint cut), then Delivery Full in parallel
+lanes, re-walked by Ben after each wave, then the close.
+
+### Built
+- **Wave 1, six lanes:** BL-1239 (tile production section), BL-1240 (owner multi-select),
+  BL-1244 (ground never magnified), BL-1241 (structures baked), BL-1242 (landforms and rivers baked),
+  BL-1218 (wharf placed on shore) with BL-1215 (refunds flow shown). **Wave 2:** BL-1243 (terrain
+  variant families).
+- **Grown on Ben's walks:**
+  - BL-1246 (ground one master): one 22.5° angle and one 128 px master per body, pre-baked from the
+    Life round, with partial re-bake. It superseded BL-1244's tier ladder.
+  - BL-1250 (lens washes ground), BL-1251 (tiles hold their own ground), BL-1253 (roads painted),
+    BL-1254 (ground crisper) and BL-1256 (ground look C-F).
+  - BL-1257 (roads thin lens), BL-1258 (towns denser), BL-1259 (ground disk cache) and
+    BL-1260 (canvas wide-rung build).
+  - BL-1291 (roads as tile sets), BL-1292 (borders hard edges), and flat land renders flat.
+- **Map chrome:** fog at 20%. The HQ and market-centre glyphs are gone.
+
+### Rulings (register: `tools/session/rulings/sprint-51.json`, 24/24 pass)
+- One angle; no detail added on zoom. The master is 128 px, pinned for the home body, with a
+  session disk cache for others. The ground may hold 45% of installed RAM.
+- The pre-bake starts at the Life round. A snapshot is taken after the roads are laid. The painting
+  wait is budgeted for a player who reads the rounds.
+- Target hardware: 8C/16T, 16 GB, an 8 GB GPU.
+- The look takes detail from it3 C-F and colour from it1, keeping per-tile tone.
+- Roads are tile sets with no drawn network; rail goes to sprint 52. Borders are hard edges only.
+
+### Close
+- Merged main (sprint 50 pre-shelf, sprint 53 design) into the sprint branch (18401ff2). Our
+  BL-1261..1263 were renumbered to BL-1291..1293, and our NRs to NR-1001+.
+- Gate: Release build; `ground_bake_check` 137/137; `world_determinism` twice with digests
+  identical to main; `save_roundtrip`.
+- Carried to sprint 52: BL-1247 (ground benchmark), BL-1293 (anchor rings clip), BL-1255 (rail rung).
+  Five requirement rows owe a live click.
+
+---
+
 ## 2026-10-04 — Sprint 48 closes: three branches ruled, reviewed and merged; the overseas reach designed
 
 **Runtime:** 2026-10-03 evening to 2026-10-04; modes Delivery Full (the three held branches), then

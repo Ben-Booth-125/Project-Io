@@ -498,6 +498,107 @@
       ],
       "resolution": "Closed at the sprint 48 close (2026-10-04): every row terminal; see row evidence."
     },
+    "gate-logistics-row": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: water_pair_probe --seeds 0,43,10 before and after; the water rows read identically"
+          ],
+          "requirement": "The dispatcher-order refusal classifier lives in one shared reader that water_pair_probe and market_viability both call; water_pair_probe's output is unchanged by the move.",
+          "notes": "",
+          "result_metric": "cd6c3fc8..e94f6697: water_pair_probe --seeds 0,43 --ticks 50 --probe 30,50 identical apart from timing lines (lane run, rounds 0-2)."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: market_viability --seeds 0,43 --ticks 100"
+          ],
+          "requirement": "market_viability prints a logistics row at several play ticks: units shipped between markets and the share landing at a market short of the good; dry markets per good; dry markets by best refusal class; and per input-starved processor its scarcest input with that input's best class at its market, pooled by class and by good.",
+          "notes": "Reported, no target.",
+          "result_metric": "Merged cc40b100. 16 seeds on worktree-sprint-50 (972 s): L all, 64 reads: 184 convoys / 683 u per read, 67.8% to a short market, 20.7% to a dry one; 130.3 dry (market, good) of 159.4; input-starved 47.0 per read."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "headless: world_determinism twice; market_viability G1/G2/G3 unchanged on the same seeds"
+          ],
+          "requirement": "A pure reader: G1-G4 read identically with the row added, and the world is unchanged.",
+          "notes": "",
+          "result_metric": "16 seeds: G1 54.7 / G2 54.4 / G3 88.9, identical to the sprint 49 close; --no-logistics identical G lines on seeds 0,43 (lane). Two static cold reviews: pure."
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "verification": [
+            "review: the SKILL.md section read against the printed row"
+          ],
+          "requirement": "The market-viability skill documents the row, each class, and how to read the processor-input block.",
+          "notes": "",
+          "result_metric": "SKILL.md logistics row (L) section; review rounds 1-2 corrected the class labels and the bias notes."
+        }
+      ],
+      "resolution": "complete"
+    },
+    "ground-never-magnified": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "visual: a capture per rung with the HUD reading recorded"
+          ],
+          "requirement": "Before and after: the frame HUD texel/px (tier px over drawn px) per rung at 1720x1080 and at a 4K-height window; after, every rung reads at or above 1.0 (minified, never magnified).",
+          "notes": "Wording corrected 2026-10-08 (lane L3): texel/px above 1.0 means minified. Lane reading: every rung >= 1.75 at 1720x1080; the 4K top rung reads 0.863 (draw_r 222 past the 192 tier). Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
+          "result_metric": ""
+        },
+        {
+          "id": "R2",
+          "status": "cancelled",
+          "verification": [
+            "headless: ground_bake_check (tier chooser rows)"
+          ],
+          "requirement": "A 192 px chunked tier exists; the chooser takes the smallest tier with ppr >= draw_r; minification never exceeds 2:1.",
+          "notes": "Cancelled: the tier ladder was superseded by one 128 px master per body with a mip chain (Ben, 2026-10-09, BL-1246 one master).",
+          "result_metric": ""
+        },
+        {
+          "id": "R3",
+          "status": "cancelled",
+          "verification": [
+            "headless: bake time per tier, before and after, in the result"
+          ],
+          "requirement": "Every tier bakes at 2x and box-downsamples before upload; bake time per tier is recorded before and after.",
+          "notes": "Cancelled: 2x supersampling rejected on bake cost; the master bakes at 1x (Ben, 2026-10-09).",
+          "result_metric": ""
+        },
+        {
+          "id": "R4",
+          "status": "cancelled",
+          "verification": [
+            "visual: a mid-fill capture"
+          ],
+          "requirement": "While a tier fills, the stand-in is the next tier down where resident, the far page only where nothing closer is.",
+          "notes": "Cancelled: superseded by the one master; the stand-in is the next mip level, then the far page (BL-1246).",
+          "result_metric": ""
+        },
+        {
+          "id": "R5",
+          "status": "complete",
+          "verification": [
+            "headless: world_determinism twice, digests identical to the base (render-only change)",
+            "live click: Ben walks every rung"
+          ],
+          "requirement": "The world is untouched; Ben judges the sharpness live at every rung.",
+          "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
+          "result_metric": ""
+        }
+      ],
+      "resolution": "Closed with sprint 51 (v0.1.29). Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10."
+    },
     "highways-on-shipped-worlds": {
       "rows": [
         {
@@ -589,6 +690,54 @@
         }
       ],
       "resolution": "merged a83e6188"
+    },
+    "landforms-and-rivers-baked": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "visual: landform_relief.lua re-pointed at the baked forms",
+            "headless: ground_bake_check rows"
+          ],
+          "requirement": "Mountain (massif, ridge), canyon (cut between rims), crater (raised-rim bowl), rift (fissure) bake as forms; contiguous runs bake as one form; deterministic and wrap-exact.",
+          "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
+          "result_metric": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "visual: a river from source to mouth at two rungs"
+          ],
+          "requirement": "Rivers bake along river_edges as a smooth quadratic B-spline widening downstream with bank shelving.",
+          "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
+          "result_metric": ""
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "visual: captured",
+            "review: the retired draw code is removed, not hidden"
+          ],
+          "requirement": "The canvas draws no landform glyph, landform span, river stroke or chevron.",
+          "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
+          "result_metric": ""
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "verification": [
+            "headless: world_determinism twice, digests identical to the base (render-only change)",
+            "live click: Ben looks at a range, a rift and a river mouth"
+          ],
+          "requirement": "The world is untouched; Ben judges the read at every rung.",
+          "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
+          "result_metric": ""
+        }
+      ],
+      "resolution": "Closed with sprint 51 (v0.1.29). Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10."
     },
     "lane-port-at-coastal-seat": {
       "rows": [
@@ -962,6 +1111,31 @@
         }
       ],
       "resolution": "Closed at the sprint 48 close (2026-10-04): every row terminal; see row evidence."
+    },
+    "refunds-flow-shown": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "visual: the dashboard captured on a seat that received a refund"
+          ],
+          "requirement": "Where the quarterly return lists its flows, refunds is a named line beside them.",
+          "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
+          "result_metric": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: world_determinism twice, digests identical to the base (render-only change)"
+          ],
+          "requirement": "The world is untouched.",
+          "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
+          "result_metric": ""
+        }
+      ],
+      "resolution": "Closed with sprint 51 (v0.1.29). Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10."
     },
     "rival-coalitions": {
       "rows": [
@@ -1436,6 +1610,42 @@
         }
       ],
       "resolution": "Closed at the sprint 48 close (2026-10-04): every row terminal; see row evidence."
+    },
+    "terrain-variant-families": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "visual: a wide plain, a forest and a range at the two close rungs, before and after"
+          ],
+          "requirement": "Each terrain family (substrate x cover, and each dramatic landform form) carries several procedural variants picked by a hash of grid coordinates and cross-faded across tile boundaries; no variant edge is drawn.",
+          "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
+          "result_metric": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: ground_bake_check new rows (P17+)"
+          ],
+          "requirement": "Deterministic, wrap-exact and chunk-seamless; character keyed on the nominal scale; bake ms per tier recorded before and after.",
+          "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
+          "result_metric": ""
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "headless: world_determinism twice, digests identical to the base (render-only change)",
+            "live click: Ben looks at a plain and a forest at the close rungs"
+          ],
+          "requirement": "The world is untouched; Ben judges the variety live.",
+          "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
+          "result_metric": ""
+        }
+      ],
+      "resolution": "Closed with sprint 51 (v0.1.29). Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10."
     },
     "world-built-once-and-moved": {
       "rows": [

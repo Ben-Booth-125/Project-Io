@@ -1128,7 +1128,7 @@ the seat) lands in the same re-bless.
   - [ ] T4 trade_reaches_for_price harness (R7); main session: determinism, far trade, the BL-1066 probe, cold review (R8-R10).
 - [ ] **BL-1066 (the player cannot build)** — after BL-1003: price the site multiplier at placement (gate, Build door preview, rival scorer); construction capacity where the player stands (measure first); the fixture places near home and waits out the tech gate.
 
-## Sprint 51 — visibility: initial market conditions and the ground (opened 2026-10-08)
+## Sprint 51 — visibility: initial market conditions and the ground (opened 2026-10-08, CLOSED 2026-10-10, v0.1.29)
 
 Ben's design form (2026-10-08); the design is in SELECTION.md, LENSES.md, RENDERING.md and
 PLANETARY.md. Base: `claude/parallel-sprints-collision-check-b5090c`, which carries sprint 50 through
@@ -1140,28 +1140,30 @@ PLANETARY.md. Base: `claude/parallel-sprints-collision-check-b5090c`, which carr
 in the order L6, L1, L2, L3, L4, L5 (the bake lanes last, L3 first among them), builds, verifies, and
 takes a cold review per item. **Wave 2:** BL-1243 (terrain variant families) after L5 merges.
 
-- [ ] **L1 — BL-1239 (tile production section).** Files: `selection_panel.cpp`, `hover_content.cpp`, `ui_state.hpp`, `question_log.json`.
-  - [ ] T1 extract the building running-state classification from `hover_building_detail` into one shared function. provides: `classify_building_state` (name the lane's choice).
-  - [ ] T2 the Production section (stack rows, then the catchment market rows, the unbuilt and rival cases); the nav at six (R1-R4). consumes: T1.
-  - [ ] T3 the Status page reads T1 (R5); question_log entry; a `scripts/verify/tile_production.lua` check (R6).
-- [ ] **L2 — BL-1240 (owner multi-select).** Files: `body_surface_canvas.cpp` (fill, key, click), `ui_state.hpp`, `presentation.hpp`, `overlay.cpp`, `ACTIONS.json`, `question_log.json`.
-  - [ ] T1 `ui_state::lens_corps` / `lens_companies` with their defaults; `palette::owned_grey`. provides: both sets, the grey.
-  - [ ] T2 the fill, the HQ gate and the hover rule (R1, R3). consumes: T1.
-  - [ ] T3 the checklist key and shift-click picking (R2); ACTIONS and question_log (R4); verify API hooks to pick an owner if needed.
-- [ ] **L3 — BL-1244 (ground never magnified).** Files: `src/core/ground_layer.*`, the bake entry in `ground_bake.cpp`, the stand-in in `body_surface_canvas.cpp`.
-  - [ ] T1 measure the HUD texel/px per rung and bake time per tier on the base (R1, R3 before).
-  - [ ] T2 the chooser rule and the 192 px tier (R2); the next-tier-down stand-in (R4).
-  - [ ] T3 2x supersample and box-downsample, unsharp re-tuned (R3); measure after (R1, R3).
-- [ ] **L4 — BL-1241 (structures baked).** Files: `ground_bake.*`, `ground_layer.cpp` (hash), `body_surface_canvas.cpp` (glyph removal), `selection_panel.cpp` (neighbourhood view only), `scripts/verify/ground_bake.lua`.
-  - [ ] T1 the stamp seam and the installation pass with one form per type, the cluster, settlements, ruins, scaffolding, oblique standing (R1, R2). provides: the stamp seam (`structure_stamp` or the lane's name).
-  - [ ] T2 the chunk hash folds installations (R3).
-  - [ ] T3 retire the canvas building, ring, badge, emblem, settlement, ruin and density-dot draws; the neighbourhood view reads the bake (R4); bake time before and after (R5).
-- [ ] **L5 — BL-1242 (landforms and rivers baked).** Files: `ground_bake.cpp`, `body_surface_canvas.cpp` (strokes), `hex_render.cpp`, `scripts/verify/landform_relief.lua`.
-  - [ ] T1 the landform relief pass and contiguous runs (R1).
-  - [ ] T2 the river pass along `river_edges`, curved, widening (R2).
-  - [ ] T3 retire the landform glyphs, spans, river strokes and chevrons (R3).
-- [ ] **L6 — BL-1218 (wharf placed on shore) + BL-1215 (refunds flow shown).** Files: the construction offer path and `placement_rules` if the rule is wrong; the corporation dashboard and selection panel return lines.
-  - [ ] T1 find which side disagrees (offer or rule) for the wharf and the well; fix it; world_determinism before and after (BL-1218 R1, R2).
-  - [ ] T2 the refunds line (BL-1215 R1, R2).
-- [ ] **Main session.** Merge, the review barrier (`verifier-review`), the integrating build, world_determinism, the visual checks, a cold review per item, Ben's live walk, one commit per item.
-- [ ] **Wave 2 — L7, BL-1243 (terrain variant families)** — launched 2026-10-08 on top of 8bfad073 (all six wave-1 lanes merged). Group `terrain-variant-families`.
+- [x] **L1 — BL-1239 (tile production section).** Files: `selection_panel.cpp`, `hover_content.cpp`, `ui_state.hpp`, `question_log.json`.
+  - [x] T1 extract the building running-state classification from `hover_building_detail` into one shared function. provides: `classify_building_state` (name the lane's choice).
+  - [x] T2 the Production section (stack rows, then the catchment market rows, the unbuilt and rival cases); the nav at six (R1-R4). consumes: T1.
+  - [x] T3 the Status page reads T1 (R5); question_log entry; a `scripts/verify/tile_production.lua` check (R6).
+- [x] **L2 — BL-1240 (owner multi-select).** Files: `body_surface_canvas.cpp` (fill, key, click), `ui_state.hpp`, `presentation.hpp`, `overlay.cpp`, `ACTIONS.json`, `question_log.json`.
+  - [x] T1 `ui_state::lens_corps` / `lens_companies` with their defaults; `palette::owned_grey`. provides: both sets, the grey.
+  - [x] T2 the fill, the HQ gate and the hover rule (R1, R3). consumes: T1.
+  - [x] T3 the checklist key and shift-click picking (R2); ACTIONS and question_log (R4); verify API hooks to pick an owner if needed.
+- [x] **L3 — BL-1244 (ground never magnified).** Files: `src/core/ground_layer.*`, the bake entry in `ground_bake.cpp`, the stand-in in `body_surface_canvas.cpp`.
+  - [x] T1 measure the HUD texel/px per rung and bake time per tier on the base (R1, R3 before).
+  - [-] T2 (cancelled: superseded by one master, BL-1246) the chooser rule and the 192 px tier (R2); the next-tier-down stand-in (R4).
+  - [-] T3 (cancelled: 2x rejected on cost) 2x supersample and box-downsample, unsharp re-tuned (R3); measure after (R1, R3).
+- [x] **L4 — BL-1241 (structures baked).** Files: `ground_bake.*`, `ground_layer.cpp` (hash), `body_surface_canvas.cpp` (glyph removal), `selection_panel.cpp` (neighbourhood view only), `scripts/verify/ground_bake.lua`.
+  - [x] T1 the stamp seam and the installation pass with one form per type, the cluster, settlements, ruins, scaffolding, oblique standing (R1, R2). provides: the stamp seam (`structure_stamp` or the lane's name).
+  - [x] T2 the chunk hash folds installations (R3).
+  - [x] T3 retire the canvas building, ring, badge, emblem, settlement, ruin and density-dot draws; the neighbourhood view reads the bake (R4); bake time before and after (R5).
+- [x] **L5 — BL-1242 (landforms and rivers baked).** Files: `ground_bake.cpp`, `body_surface_canvas.cpp` (strokes), `hex_render.cpp`, `scripts/verify/landform_relief.lua`.
+  - [x] T1 the landform relief pass and contiguous runs (R1).
+  - [x] T2 the river pass along `river_edges`, curved, widening (R2).
+  - [x] T3 retire the landform glyphs, spans, river strokes and chevrons (R3).
+- [x] **L6 — BL-1218 (wharf placed on shore) + BL-1215 (refunds flow shown).** Files: the construction offer path and `placement_rules` if the rule is wrong; the corporation dashboard and selection panel return lines.
+  - [x] T1 find which side disagrees (offer or rule) for the wharf and the well; fix it; world_determinism before and after (BL-1218 R1, R2).
+  - [x] T2 the refunds line (BL-1215 R1, R2).
+- [x] **Main session.** Merge, the review barrier (`verifier-review`), the integrating build, world_determinism, the visual checks, a cold review per item, Ben's live walk, one commit per item.
+- [x] **Wave 2 — L7, BL-1243 (terrain variant families)** — launched 2026-10-08 on top of 8bfad073 (all six wave-1 lanes merged). Group `terrain-variant-families`.
+
+**Closed 2026-10-10.** Every lane merged. Grown on Ben's walks: BL-1246 (ground one master), BL-1250 (lens washes ground), BL-1251 (tiles hold their own ground), BL-1253 (roads painted), BL-1254 (ground crisper), BL-1256 (ground look C-F), BL-1257 (roads thin lens), BL-1258 (towns denser), BL-1259 (ground disk cache), BL-1260 (canvas wide-rung build), BL-1291 (roads as tile sets), BL-1292 (borders hard edges). Carried to sprint 52: BL-1247 (ground benchmark), BL-1293 (anchor rings clip), BL-1255 (rail rung). Live clicks still owed are the pending rows in requirements.json.

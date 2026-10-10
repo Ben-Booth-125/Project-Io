@@ -6634,49 +6634,7 @@
    "promoted_from": "backlog.json BL-1223 - sprint 50 (cut 2026-10-07, Ben's cut form)",
    "batch": "sprint-50",
    "resolved": "2026-10-07",
-   "resolution": "complete",
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: water_pair_probe --seeds 0,43,10 before and after; the water rows read identically"
-     ],
-     "requirement": "The dispatcher-order refusal classifier lives in one shared reader that water_pair_probe and market_viability both call; water_pair_probe's output is unchanged by the move.",
-     "notes": "",
-     "result_metric": "cd6c3fc8..e94f6697: water_pair_probe --seeds 0,43 --ticks 50 --probe 30,50 identical apart from timing lines (lane run, rounds 0-2)."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: market_viability --seeds 0,43 --ticks 100"
-     ],
-     "requirement": "market_viability prints a logistics row at several play ticks: units shipped between markets and the share landing at a market short of the good; dry markets per good; dry markets by best refusal class; and per input-starved processor its scarcest input with that input's best class at its market, pooled by class and by good.",
-     "notes": "Reported, no target.",
-     "result_metric": "Merged cc40b100. 16 seeds on worktree-sprint-50 (972 s): L all, 64 reads: 184 convoys / 683 u per read, 67.8% to a short market, 20.7% to a dry one; 130.3 dry (market, good) of 159.4; input-starved 47.0 per read."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "headless: world_determinism twice; market_viability G1/G2/G3 unchanged on the same seeds"
-     ],
-     "requirement": "A pure reader: G1-G4 read identically with the row added, and the world is unchanged.",
-     "notes": "",
-     "result_metric": "16 seeds: G1 54.7 / G2 54.4 / G3 88.9, identical to the sprint 49 close; --no-logistics identical G lines on seeds 0,43 (lane). Two static cold reviews: pure."
-    },
-    {
-     "id": "R4",
-     "status": "complete",
-     "verification": [
-      "review: the SKILL.md section read against the printed row"
-     ],
-     "requirement": "The market-viability skill documents the row, each class, and how to read the processor-input block.",
-     "notes": "",
-     "result_metric": "SKILL.md logistics row (L) section; review rounds 1-2 corrected the class labels and the bias notes."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "inputs-reach-processors",
@@ -6776,27 +6734,27 @@
    "promoted_from": "backlog.json BL-1239 - sprint 51 (Ben's design form, 2026-10-08)",
    "batch": "sprint-51",
    "resolved": null,
-   "resolution": null,
+   "resolution": "Sprint 51 closed 2026-10-10 with this group built; only the live-click rows remain pending.",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: scripts/verify/tile_production.lua captures the band on a built tile"
      ],
      "requirement": "The tile nav carries six sections with Production first; the nav wraps at six.",
-     "notes": "",
+     "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
      "result_metric": ""
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: a stacked tile and an idle building captured",
       "review: one classification function, two callers"
      ],
      "requirement": "Production lists one row per stack (stack_members) with type glyph, count, good, output per tick and running state with its reason; the reason comes from the same classification function the building hover card calls.",
-     "notes": "",
+     "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
      "result_metric": ""
     },
     {
@@ -6807,38 +6765,38 @@
       "live click: Ben presses a good row"
      ],
      "requirement": "The catchment market is named with one row per good made then per good deposited: price and short/balanced/surplus; a row press opens the Market ledger aimed at that market and good.",
-     "notes": "",
+     "notes": "Live click owed: Ben presses a good row (not walked at the close).",
      "result_metric": ""
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: unbuilt and rival tiles captured"
      ],
      "requirement": "An unbuilt tile states \"Nothing built here\" and lists its deposited goods at their market; a rival stack row shows type, count, owner and \"private\".",
-     "notes": "",
+     "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
      "result_metric": ""
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: captured"
      ],
      "requirement": "The building card Status page shows running state with its reason, never a bare \"Operating.\".",
-     "notes": "",
+     "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
      "result_metric": ""
     },
     {
      "id": "R6",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: question_log entry rendered",
       "headless: world_determinism twice, digests identical to the base (render-only change)"
      ],
      "requirement": "question_log.json carries the section; the world is untouched.",
-     "notes": "",
+     "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
      "result_metric": ""
     }
    ]
@@ -6853,16 +6811,16 @@
    "promoted_from": "backlog.json BL-1240 - sprint 51 (Ben's design form, 2026-10-08)",
    "batch": "sprint-51",
    "resolved": null,
-   "resolution": null,
+   "resolution": "Sprint 51 closed 2026-10-10 with this group built; only the live-click rows remain pending.",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: lens_modes.lua (or a new owner_multi_select.lua) default captures for both lenses"
      ],
      "requirement": "Picked owners tint their identity colour, unpicked owners one owned-grey distinct from unowned ground; Corporation defaults to the player, Company to none.",
-     "notes": "",
+     "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
      "result_metric": ""
     },
     {
@@ -6873,28 +6831,28 @@
       "live click: Ben shift-clicks and uses the checklist"
      ],
      "requirement": "The key is a checklist (count header, search, swatch rows for owners on the active body); shift-click on an owned tile toggles its owner; a plain click is unchanged.",
-     "notes": "",
+     "notes": "Live click owed: Ben shift-clicks and uses the checklist (lenses walked 2026-10-10, picking not explicitly).",
      "result_metric": ""
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: captured"
      ],
      "requirement": "Rival HQ stars draw only while picked; hover lights the hovered owner group regardless of the set; the sets survive a body switch.",
-     "notes": "",
+     "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
      "result_metric": ""
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "review: mirrors rendered",
       "headless: world_determinism twice, digests identical to the base (render-only change)"
      ],
      "requirement": "ACTIONS.json and question_log.json updated; the world is untouched.",
-     "notes": "",
+     "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
      "result_metric": ""
     }
    ]
@@ -6905,64 +6863,11 @@
    "difficulty": 2,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1244 - sprint 51 (Ben's design form, 2026-10-08)",
    "batch": "sprint-51",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "pending",
-     "verification": [
-      "visual: a capture per rung with the HUD reading recorded"
-     ],
-     "requirement": "Before and after: the frame HUD texel/px (tier px over drawn px) per rung at 1720x1080 and at a 4K-height window; after, every rung reads at or above 1.0 (minified, never magnified).",
-     "notes": "Wording corrected 2026-10-08 (lane L3): texel/px above 1.0 means minified. Lane reading: every rung >= 1.75 at 1720x1080; the 4K top rung reads 0.863 (draw_r 222 past the 192 tier).",
-     "result_metric": ""
-    },
-    {
-     "id": "R2",
-     "status": "pending",
-     "verification": [
-      "headless: ground_bake_check (tier chooser rows)"
-     ],
-     "requirement": "A 192 px chunked tier exists; the chooser takes the smallest tier with ppr >= draw_r; minification never exceeds 2:1.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R3",
-     "status": "pending",
-     "verification": [
-      "headless: bake time per tier, before and after, in the result"
-     ],
-     "requirement": "Every tier bakes at 2x and box-downsamples before upload; bake time per tier is recorded before and after.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R4",
-     "status": "pending",
-     "verification": [
-      "visual: a mid-fill capture"
-     ],
-     "requirement": "While a tier fills, the stand-in is the next tier down where resident, the far page only where nothing closer is.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R5",
-     "status": "pending",
-     "verification": [
-      "headless: world_determinism twice, digests identical to the base (render-only change)",
-      "live click: Ben walks every rung"
-     ],
-     "requirement": "The world is untouched; Ben judges the sharpness live at every rung.",
-     "notes": "",
-     "result_metric": ""
-    }
-   ]
+   "resolved": "2026-10-10",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "structures-baked",
@@ -6974,37 +6879,37 @@
    "promoted_from": "backlog.json BL-1241 - sprint 51 (Ben's design form, 2026-10-08)",
    "batch": "sprint-51",
    "resolved": null,
-   "resolution": null,
+   "resolution": "Sprint 51 closed 2026-10-10 with this group built; only the live-click rows remain pending.",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: ground_bake_check extended (wrap and determinism rows)",
       "visual: ground_bake.lua staged buildings of every type"
      ],
      "requirement": "An installation pass behind a stamp seam keyed by what a stamp depicts draws one procedural form per placeable building type (processing keyed on the recipe family), NW-lit, before the grade, deterministic and wrap-exact.",
-     "notes": "",
+     "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
      "result_metric": ""
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: staged stacked tile, settlement ladder, rival plant"
      ],
      "requirement": "A stacked tile stands up to three structures, one per stack, dominant largest and front; settlements step by scale, razed as ruin; a site under construction bakes as scaffolding; no owner colour, no state cue.",
-     "notes": "",
+     "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
      "result_metric": ""
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: re-bake count over a play year recorded"
      ],
      "requirement": "The chunk content hash folds installations and nothing tick-rate; re-bakes over a play year follow construction events only.",
-     "notes": "",
+     "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
      "result_metric": ""
     },
     {
@@ -7015,18 +6920,18 @@
       "live click: Ben presses single and stacked tiles"
      ],
      "requirement": "The canvas draws no building glyph, stack ring, +N badge, corp emblem tag, settlement or ruin skyline or density dot; hit zones unchanged; the Selection neighbourhood view shows the baked ground.",
-     "notes": "",
+     "notes": "Live click owed: Ben presses single and stacked tiles (look walked and approved 2026-10-10).",
      "result_metric": ""
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism twice, digests identical to the base (render-only change)",
       "live click: Ben looks at every rung including the far page"
      ],
      "requirement": "Bake time per tier recorded before and after; the oblique tiers stand structures up; the world is untouched.",
-     "notes": "",
+     "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
      "result_metric": ""
     }
    ]
@@ -7037,56 +6942,11 @@
    "difficulty": 4,
    "importance": "B",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1242 - sprint 51 (Ben's design form, 2026-10-08)",
    "batch": "sprint-51",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "pending",
-     "verification": [
-      "visual: landform_relief.lua re-pointed at the baked forms",
-      "headless: ground_bake_check rows"
-     ],
-     "requirement": "Mountain (massif, ridge), canyon (cut between rims), crater (raised-rim bowl), rift (fissure) bake as forms; contiguous runs bake as one form; deterministic and wrap-exact.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R2",
-     "status": "pending",
-     "verification": [
-      "visual: a river from source to mouth at two rungs"
-     ],
-     "requirement": "Rivers bake along river_edges as a smooth quadratic B-spline widening downstream with bank shelving.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R3",
-     "status": "pending",
-     "verification": [
-      "visual: captured",
-      "review: the retired draw code is removed, not hidden"
-     ],
-     "requirement": "The canvas draws no landform glyph, landform span, river stroke or chevron.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R4",
-     "status": "pending",
-     "verification": [
-      "headless: world_determinism twice, digests identical to the base (render-only change)",
-      "live click: Ben looks at a range, a rift and a river mouth"
-     ],
-     "requirement": "The world is untouched; Ben judges the read at every rung.",
-     "notes": "",
-     "result_metric": ""
-    }
-   ]
+   "resolved": "2026-10-10",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "wharf-placed-on-shore",
@@ -7098,7 +6958,7 @@
    "promoted_from": "backlog.json BL-1218 - sprint 51 (Ben's design form, 2026-10-08)",
    "batch": "sprint-51",
    "resolved": null,
-   "resolution": null,
+   "resolution": "Sprint 51 closed 2026-10-10 with this group built; only the live-click rows remain pending.",
    "rows": [
     {
      "id": "R1",
@@ -7108,17 +6968,17 @@
       "visual: construction ledger on a coastal land tile"
      ],
      "requirement": "The wharf appears in the construction ledger on a land tile with coast adjacency and places there; on water it is not offered; the Well is checked for the same mismatch.",
-     "notes": "",
+     "notes": "Live click owed: Ben places a wharf on a coastal land tile.",
      "result_metric": ""
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism before and after"
      ],
      "requirement": "Digest movement reported if the placement rule changed (AI placement reads it); never re-blessed.",
-     "notes": "",
+     "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
      "result_metric": ""
     }
    ]
@@ -7129,33 +6989,11 @@
    "difficulty": 1,
    "importance": "C",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1215 - sprint 51 (Ben's design form, 2026-10-08)",
    "batch": "sprint-51",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "pending",
-     "verification": [
-      "visual: the dashboard captured on a seat that received a refund"
-     ],
-     "requirement": "Where the quarterly return lists its flows, refunds is a named line beside them.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R2",
-     "status": "pending",
-     "verification": [
-      "headless: world_determinism twice, digests identical to the base (render-only change)"
-     ],
-     "requirement": "The world is untouched.",
-     "notes": "",
-     "result_metric": ""
-    }
-   ]
+   "resolved": "2026-10-10",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "terrain-variant-families",
@@ -7163,44 +7001,11 @@
    "difficulty": 3,
    "importance": "B",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1243 - sprint 51 wave 2 (Ben's design form, 2026-10-08)",
    "batch": "sprint-51",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "pending",
-     "verification": [
-      "visual: a wide plain, a forest and a range at the two close rungs, before and after"
-     ],
-     "requirement": "Each terrain family (substrate x cover, and each dramatic landform form) carries several procedural variants picked by a hash of grid coordinates and cross-faded across tile boundaries; no variant edge is drawn.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R2",
-     "status": "pending",
-     "verification": [
-      "headless: ground_bake_check new rows (P17+)"
-     ],
-     "requirement": "Deterministic, wrap-exact and chunk-seamless; character keyed on the nominal scale; bake ms per tier recorded before and after.",
-     "notes": "",
-     "result_metric": ""
-    },
-    {
-     "id": "R3",
-     "status": "pending",
-     "verification": [
-      "headless: world_determinism twice, digests identical to the base (render-only change)",
-      "live click: Ben looks at a plain and a forest at the close rungs"
-     ],
-     "requirement": "The world is untouched; Ben judges the variety live.",
-     "notes": "",
-     "result_metric": ""
-    }
-   ]
+   "resolved": "2026-10-10",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "lens-washes-ground",
@@ -7212,16 +7017,16 @@
    "promoted_from": "backlog.json BL-1250 - sprint 51 (Ben, 2026-10-09, NR-1003)",
    "batch": "sprint-51",
    "resolved": null,
-   "resolution": null,
+   "resolution": "Sprint 51 closed 2026-10-10 with this group built; only the live-click rows remain pending.",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: lens_modes.lua over a built region, every lens"
      ],
      "requirement": "Under every lens the baked ground draws with its structures, settlements, landforms and rivers, and the lens colours tiles as a translucent wash in the same geometry; unanswered tiles take no wash.",
-     "notes": "",
+     "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
      "result_metric": ""
     },
     {
@@ -7232,18 +7037,18 @@
       "live click: Ben picks owners and sees their buildings"
      ],
      "requirement": "The owner lenses: picked identity wash, unpicked grey wash plus rim; buildings visible through both.",
-     "notes": "",
+     "notes": "Live click owed: Ben picks owners and sees their buildings through the wash.",
      "result_metric": ""
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: lens press checks still pass",
       "headless: frame time under a lens at every rung"
      ],
      "requirement": "Hit-testing under a lens unchanged; 60 fps at every rung under a lens; the world untouched.",
-     "notes": "",
+     "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
      "result_metric": ""
     }
    ]
