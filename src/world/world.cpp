@@ -363,8 +363,11 @@ uint64_t world::state_hash(int tick) const
         }
         // BL-1273: each nation's tech state — held set, pool (the head's
         // progress) and queue. Live state the quarterly research pass writes.
-        // Folded only when the map is non-empty, on the budgets' precedent, so a
-        // world in which no nation has researched hashes as before. A std::map:
+        // Folded only when the map is non-empty, on the budgets' precedent. The
+        // map IS empty where no nation has anything to hold: the research pass
+        // creates an entry only for a nation with RP, a queue or a held node,
+        // and the settle's handover clears it — so such a world hashes as it
+        // did before this state existed. The pool folds as its int64. A std::map:
         // ascending with no sort; the held set folds as 32-bit words.
         if (!nation_tech.empty())
         {
@@ -373,7 +376,8 @@ uint64_t world::state_hash(int tick) const
             for (const auto& [nid, st] : nation_tech)
             {
                 fnv1a_u32(h, nid);
-                fnv1a_f32(h, st.pool);
+                fnv1a_u32(h, static_cast<uint32_t>(static_cast<uint64_t>(st.pool_milli) & 0xFFFFFFFFull));
+                fnv1a_u32(h, static_cast<uint32_t>(static_cast<uint64_t>(st.pool_milli) >> 32));
                 for (int i = 0; i < io::dg::node_count; i += 32)
                 {
                     uint32_t word = 0;

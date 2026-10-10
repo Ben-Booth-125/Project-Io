@@ -631,6 +631,7 @@ inline void run_app_validation_settle(world& w, const recipe_registry& reg,
 {
     for (int econ_step = 0; econ_step < ticks; ++econ_step)  // app.cpp:655, 579-583
         run_app_validation_tick(w, reg, econ_step, timing);
+    clear_research_at_handover(w); // run_settle's handover (BL-1273): play opens with no research state
 }
 
 /// A LIVE WINDOW after the seat — BL-1033. @p ticks economy ticks as the app

@@ -60,7 +60,7 @@ struct planner
     const std::bitset<io::dg::node_count>& held;
     const std::vector<std::uint16_t>&      queue;
     std::vector<std::uint16_t>             plan; // new entries, in queue order
-    float                                  rp_unit;
+    research_params                        params;
 
     bool present(int n) const
     {
@@ -73,11 +73,11 @@ struct planner
         return ex >= 0 && present(ex);
     }
 
-    float plan_cost() const
+    std::int64_t plan_cost() const
     {
-        float c = 0.0f;
+        std::int64_t c = 0;
         for (const std::uint16_t n : plan)
-            c += static_cast<float>(node_at(n).cost_units) * rp_unit;
+            c += node_cost_milli(n, params);
         return c;
     }
 
@@ -106,16 +106,16 @@ struct planner
             // A choice: the member that is cheapest to REACH from here, its own
             // unheld path included; ties go to the earlier member (store order).
             bool        found     = false;
-            float       best_cost = std::numeric_limits<float>::infinity();
+            std::int64_t best_cost = std::numeric_limits<std::int64_t>::max();
             std::vector<std::uint16_t> best_plan;
             for (const std::int16_t m : grp)
             {
                 if (m < 0)
                     continue;
-                planner trial{held, queue, plan, rp_unit};
+                planner trial{held, queue, plan, params};
                 if (!trial.expand(m, depth + 1))
                     continue;
-                const float c = trial.plan_cost();
+                const std::int64_t c = trial.plan_cost();
                 if (!found || c < best_cost)
                 {
                     found     = true;
@@ -137,11 +137,48 @@ struct planner
 
 } // namespace
 
-float node_cost_rp(int node, const research_params& p)
+namespace {
+std::int64_t to_milli(double rp)
+{
+    if (!std::isfinite(rp) || rp <= 0.0)
+        return 0;
+    return static_cast<std::int64_t>(std::llround(rp * static_cast<double>(k_milli_per_rp)));
+}
+} // namespace
+
+std::int64_t node_cost_milli(int node, const research_params& p)
 {
     if (!valid_node(node))
-        return 0.0f;
-    return static_cast<float>(node_at(node).cost_units) * p.rp_per_cost_unit;
+        return 0;
+    return to_milli(static_cast<double>(node_at(node).cost_units)
+                    * static_cast<double>(p.rp_per_cost_unit));
+}
+
+std::int64_t line_rp_milli(float credits, const research_params& p)
+{
+    if (!(credits > 0.0f) || !std::isfinite(credits))
+        return 0;
+    const double c = static_cast<double>(credits);
+    return to_milli(static_cast<double>(p.rp_per_research_credit) * c
+                    + static_cast<double>(p.rp_per_research_credit_sqrt) * std::sqrt(c));
+}
+
+double line_credits_for(std::int64_t milli, const research_params& p)
+{
+    if (milli <= 0)
+        return 0.0;
+    const double need = static_cast<double>(milli) / static_cast<double>(k_milli_per_rp);
+    const double a = std::max(0.0, static_cast<double>(p.rp_per_research_credit));
+    const double b = std::max(0.0, static_cast<double>(p.rp_per_research_credit_sqrt));
+    // a*c + b*sqrt(c) = need, with s = sqrt(c): a*s^2 + b*s - need = 0.
+    double s = 0.0;
+    if (a > 0.0)
+        s = (-b + std::sqrt(b * b + 4.0 * a * need)) / (2.0 * a);
+    else if (b > 0.0)
+        s = need / b;
+    else
+        return std::numeric_limits<double>::infinity();
+    return s * s;
 }
 
 bool nation_holds(const world& w, entity_id nation, int node)
@@ -193,7 +230,7 @@ enqueue_result enqueue_node(world& w, entity_id nation, int node)
     if (in_list(st.queue, node))
         return enqueue_result::already_queued;
 
-    planner pl{st.held, st.queue, {}, research_params{}.rp_per_cost_unit};
+    planner pl{st.held, st.queue, {}, research_params{}};
     if (!pl.expand(node, 0))
         return enqueue_result::refused_pair;
 
@@ -264,11 +301,11 @@ int flow_research_queue(world& w, entity_id nation, const research_params& p)
             if (!groups_met(st.held, n) || !deed_met(w, nation, n))
                 continue;
 
-            const float cost = node_cost_rp(n, p);
-            if (st.pool < cost)
+            const std::int64_t cost = node_cost_milli(n, p);
+            if (st.pool_milli < cost)
                 return completed; // the head waits for funding; RP stay in the pool
 
-            st.pool -= cost;
+            st.pool_milli -= cost;
             st.held.set(static_cast<std::size_t>(n));
             st.queue.erase(st.queue.begin() + static_cast<std::ptrdiff_t>(i));
             ++completed;
@@ -277,6 +314,11 @@ int flow_research_queue(world& w, entity_id nation, const research_params& p)
         }
     }
     return completed;
+}
+
+void clear_research_at_handover(world& w)
+{
+    w.nation_tech.clear();
 }
 
 void advance_research(world& w, const research_params& p, std::vector<research_accrual>* out)
@@ -325,11 +367,40 @@ void advance_research(world& w, const research_params& p, std::vector<research_a
         research_accrual row;
         row.nation = nid;
 
+        if (const auto u = universities.find(nid); u != universities.end())
+            row.universities = u->second;
+        if (const auto r = institutes.find(nid); r != institutes.end())
+            row.institutes = r->second;
+        row.multiplier = research_multiplier(w, nid);
+        const double mult = std::isfinite(row.multiplier) && row.multiplier > 0.0f
+                                ? static_cast<double>(row.multiplier) : 0.0;
+
+        // The RP that cost no treasury: the base and the buildings.
+        const std::int64_t free_milli = static_cast<std::int64_t>(std::llround(
+            static_cast<double>(to_milli(static_cast<double>(p.base_rp_per_nation)
+                                         + static_cast<double>(row.universities) * p.rp_per_university
+                                         + static_cast<double>(row.institutes) * p.rp_per_institute))
+            * mult));
+
+        // What the queue still owes: every queued node's cost, less the pool
+        // and less what the free RP will bring this quarter.
+        const auto sit = w.nation_tech.find(nid);
+        std::int64_t owed = 0;
+        if (sit != w.nation_tech.end())
+        {
+            for (const std::uint16_t n : sit->second.queue)
+                owed += node_cost_milli(n, p);
+            owed -= sit->second.pool_milli;
+        }
+        row.owed_milli = std::max<std::int64_t>(0, owed);
+        const std::int64_t line_need = std::max<std::int64_t>(0, owed - free_milli);
+
         // The line's share: run_national_budget's own formula, recomputed on
         // the run_nation_garrison_upkeep precedent (a line with no corp
-        // claimant never reaches that pass's report). Spent whole: research
-        // absorbs whatever the line is given, and the credits leave the
-        // modelled economy (a direct expenditure, credited to nobody).
+        // claimant never reaches that pass's report). It pays min(share, what
+        // the queue owes) — the garrison's min(share, bill) — as a direct
+        // expenditure, credited to nobody. An empty queue owes nothing and
+        // spends nothing.
         if (nc.treasury > 0.0f)
         {
             const auto bit = w.nation_budgets.find(nid);
@@ -344,28 +415,31 @@ void advance_research(world& w, const research_params& p, std::vector<research_a
                         weight_total += bud.weights[i];
                 if (spendable > 0.0f && weight_total > 0.0f
                     && std::isfinite(bud.weights[ai]) && bud.weights[ai] > 0.0f)
-                    row.line_spend = std::min(nc.treasury,
+                    row.line_share = std::min(nc.treasury,
                                               spendable * (bud.weights[ai] / weight_total));
             }
+        }
+        if (row.line_share > 0.0f && line_need > 0 && mult > 0.0)
+        {
+            const double bill = line_credits_for(static_cast<std::int64_t>(
+                                                     std::ceil(static_cast<double>(line_need) / mult)), p);
+            row.line_spend = static_cast<float>(std::min(static_cast<double>(row.line_share), bill));
         }
         if (row.line_spend > 0.0f)
             nc.treasury -= row.line_spend;
 
-        if (const auto u = universities.find(nid); u != universities.end())
-            row.universities = u->second;
-        if (const auto r = institutes.find(nid); r != institutes.end())
-            row.institutes = r->second;
+        const std::int64_t line_milli = static_cast<std::int64_t>(
+            std::llround(static_cast<double>(line_rp_milli(row.line_spend, p)) * mult));
+        row.rp_milli = free_milli + line_milli;
 
-        row.multiplier = research_multiplier(w, nid);
-        row.rp = (row.line_spend * p.rp_per_research_credit
-                  + static_cast<float>(row.universities) * p.rp_per_university
-                  + static_cast<float>(row.institutes) * p.rp_per_institute)
-                 * row.multiplier;
-
-        nation_tech_state& st = w.nation_tech[nid];
-        if (row.rp > 0.0f && std::isfinite(row.rp))
-            st.pool += row.rp;
-        row.completed = flow_research_queue(w, nid, p);
+        // An entry is created only when there is something to hold, so a world
+        // where nothing researches keeps an empty map (and its state_hash).
+        if (row.rp_milli > 0 || sit != w.nation_tech.end())
+        {
+            nation_tech_state& st = w.nation_tech[nid];
+            st.pool_milli += row.rp_milli;
+            row.completed = flow_research_queue(w, nid, p);
+        }
 
         if (out != nullptr)
             out->push_back(row);

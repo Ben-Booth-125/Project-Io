@@ -172,7 +172,7 @@ const SUBSYSTEM_MAP = [
     },
     {
         subsystem: 'Research / Tech tree',
-        files: ['tech_tree.cpp', 'tech_gate.cpp'],
+        files: ['nation_tech.cpp', 'nation_tech.hpp'],
         verbs: [],
     },
     {

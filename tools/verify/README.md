@@ -215,7 +215,7 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\money_conservation.cpp ^
    src\world\condition_set.cpp src\world\survey_system.cpp src\world\logistics.cpp ^
    src\world\unit_roster.cpp src\world\law.cpp src\world\building_profit.cpp ^
    src\world\corp_ai.cpp src\world\stance.cpp src\world\supply_system.cpp ^
-   src\world\tech_gate.cpp src\world\river_generation.cpp ^
+   src\world\nation_tech.cpp src\world\river_generation.cpp ^
    /Fo:build_gen\verify\money_conservation\ /Fe:build_gen\verify\money_conservation.exe
 .\build_gen\verify\money_conservation.exe
 
@@ -233,7 +233,7 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\stance_determinism.cpp ^
    src\world\placement_rules.cpp src\world\condition_set.cpp src\world\survey_system.cpp ^
    src\world\logistics.cpp src\world\unit_roster.cpp src\world\economy_system.cpp ^
    src\world\market_clearing.cpp src\world\budget_system.cpp src\world\supply_system.cpp ^
-   src\world\stance.cpp src\world\tech_gate.cpp src\world\river_generation.cpp ^
+   src\world\stance.cpp src\world\nation_tech.cpp src\world\river_generation.cpp ^
    src\world\building_profit.cpp src\world\corp_ai.cpp src\world\law.cpp ^
    src\world\orbital_system.cpp ^
    /Fo:build_gen\verify\stance_determinism\ /Fe:build_gen\verify\stance_determinism.exe
@@ -258,7 +258,7 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\world_audit.cpp ^
 :: corp_command, survey_system, ...) — this drifted stale once (this recipe
 :: previously listed only world/construction/placement_rules and link-failed);
 :: it is now the full world/*.cpp set minus the sol2/Lua-dependent TUs
-:: (recipe_registry.cpp, tech_tree.cpp, world_gen_config.cpp).
+:: (recipe_registry.cpp, works_registry.cpp, world_gen_config.cpp).
 cl /nologo /std:c++20 /EHsc /I src tools\verify\construction_harness.cpp ^
    src\world\budget_system.cpp src\world\building_profit.cpp src\world\chemistry_tables.cpp ^
    src\world\city_names.cpp src\world\construction.cpp src\world\continents.cpp ^
@@ -326,7 +326,7 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\population_mvp.cpp ^
 :: unit routing (R1); the demand survives clear_markets' per-tick reset into the
 :: cleared state price resolution reads (R2); stale pre-clearing demand is erased
 :: while the injection lands (R3). Links the full SDL/Lua-free world superset
-:: (every src\world\*.cpp except recipe_registry.cpp and tech_tree.cpp).
+:: (every src\world\*.cpp except the sol2 TUs (recipe_registry, works_registry, world_gen_config)).
 :: (List current as of 2026-07-31; if it drifts, mirror CMakeLists' IO_WORLD_SOURCES glob.)
 cl /nologo /std:c++20 /EHsc /I src tools\verify\population_demand_harness.cpp ^
    src\world\budget_system.cpp src\world\building_profit.cpp src\world\chemistry_tables.cpp ^
@@ -452,7 +452,7 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\continents_harness.cpp ^
 :: floors at half, conquest cost can hold a frontier (C3); exactly one 1951
 :: common-tongue globalisation line, after every shrine (C4). Calls
 :: make_hard_coded_world, so it links the full SDL/Lua-free world superset
-:: (every src\world\*.cpp except recipe_registry.cpp and tech_tree.cpp) -
+:: (every src\world\*.cpp except the sol2 TUs (recipe_registry, works_registry, world_gen_config)) -
 :: mirror CMakeLists' IO_WORLD_SOURCES glob if this list drifts.
 cl /nologo /std:c++20 /EHsc /I src tools\verify\creeds_harness.cpp ^
    src\world\budget_system.cpp src\world\building_profit.cpp src\world\chemistry_tables.cpp ^
@@ -496,7 +496,7 @@ for the hand-`cl` fallback only.
 :: field-identically and reject a wrong-magic/wrong-version/truncated stream.
 :: R6: export_corp_blackboard / body_activity_visibility (neither touched by
 :: this item) still behave. Links the full SDL/Lua-free world superset (every
-:: src\world\*.cpp except recipe_registry.cpp/tech_tree.cpp/world_gen_config.cpp,
+:: src\world\*.cpp except recipe_registry.cpp/works_registry.cpp/world_gen_config.cpp,
 :: including history_log.cpp and river_generation.cpp) — mirror CMakeLists'
 :: IO_WORLD_SOURCES glob if this list drifts.
 cl /nologo /std:c++20 /EHsc /I src tools\verify\history_log_harness.cpp ^

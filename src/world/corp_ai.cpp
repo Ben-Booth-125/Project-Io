@@ -2392,13 +2392,12 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     {
                         body_reach_field(w, tile_body(w, tid));
                         // Pass `corp` (unlike the un-owned tile-only checks
-                        // elsewhere in this file) so BL-344's tech gate is
-                        // live here: a corp that has not earned E0-ML-01 gets
-                        // NO candidate rather than one that is re-proposed and
-                        // rejected every single eval for as long as the gate
-                        // stays unmet (the ai_skill_harness debug trace showed
-                        // most corps in the golden seeds never earning the
-                        // gate's 2-extraction-sites/Cr2000 condition at all).
+                        // elsewhere in this file) so the tech gate is live
+                        // here: a corp whose nation does not hold a node that
+                        // locks the military base gets NO candidate rather than
+                        // one re-proposed and rejected every eval. Since BL-1273
+                        // no node locks it (NR-1022 retired BL-344's E0-ML-01),
+                        // so every corp sees military_base candidates.
                         if (!placement_rules::can_place_in_world(w, tid, building_type::military_base,
                                                                   resource_type::iron_ore, reach_budget, corp))
                             continue;

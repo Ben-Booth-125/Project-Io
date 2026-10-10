@@ -501,6 +501,13 @@ struct economy_report
     /// could not pay. In emission order (ascending nation, stone then timber).
     std::vector<network_purchase> network_purchases;
 
+    /// What the research pass did this tick (BL-1273): one row per nation,
+    /// ascending — the academic-research line's share, what it actually spent
+    /// out of the treasury (min(share, what the queue owes); a direct
+    /// expenditure credited to nobody), the RP that reached the pool and the
+    /// nodes completed. The treasury ledger's explanation of the research debit.
+    std::vector<research_accrual> research;
+
     /// Which firms the insolvency wind-up erased this tick (BL-743), with the
     /// written-off balance and what was liquidated. Report-only — the lapse
     /// and census read it; nothing feeds it back into the sim.

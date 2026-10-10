@@ -744,10 +744,10 @@ int main()
             nation_tech_state& sa = m.nation_tech[a];
             sa.held.set(static_cast<std::size_t>(io::dg::find_node("DG-PR-EX-T1")));
             sa.held.set(static_cast<std::size_t>(io::dg::find_node("DG-PR-EX-T2")));
-            sa.pool = 137.25f;
+            sa.pool_milli = 137250;
             enqueue_node(m, a, io::dg::find_node("DG-PR-EX-A"));
             enqueue_node(m, b, io::dg::find_node("DG-ST-AC-C"));
-            m.nation_tech[b].pool = 1.0f / 3.0f; // non-dyadic: bits, not a rounded print
+            m.nation_tech[b].pool_milli = 333; // a third of an RP, held exactly
 
             world back;
             const bool ok = from_bytes(to_bytes(m), back);
@@ -758,14 +758,14 @@ int main()
                 {
                     const auto it = back.nation_tech.find(nid);
                     same = same && it != back.nation_tech.end() && it->second.held == st.held
-                        && it->second.pool == st.pool && it->second.queue == st.queue;
+                        && it->second.pool_milli == st.pool_milli && it->second.queue == st.queue;
                 }
             check(same, "P5 held set, pool and queue survive the load exactly, per nation");
             check(ok && !back.nation_tech.at(b).queue.empty()
                       && back.nation_tech.at(a).queue.size() == 3,
                   "P5 the queues are not vacuous (A1, A2, then the major; B's path)");
-            std::printf("     nation %u: held %zu, pool %.2f, queue %zu | nation %u: queue %zu\n",
-                        (unsigned)a, m.nation_tech.at(a).held.count(), m.nation_tech.at(a).pool,
+            std::printf("     nation %u: held %zu, pool %lld milli-RP, queue %zu | nation %u: queue %zu\n",
+                        (unsigned)a, m.nation_tech.at(a).held.count(), static_cast<long long>(m.nation_tech.at(a).pool_milli),
                         m.nation_tech.at(a).queue.size(), (unsigned)b,
                         m.nation_tech.at(b).queue.size());
 

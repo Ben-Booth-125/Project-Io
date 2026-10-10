@@ -5,6 +5,7 @@
 #include "sentiment.hpp"   // BL-545/BL-546: sentiment_params — the authored factor table
 #include "corp_command.hpp"    // BL-743: firm_exit_params — the insolvency wind-up trigger
 #include "network_upkeep.hpp"  // BL-643: network_upkeep_params — the logistics_maintenance line's material rates
+#include "nation_tech.hpp"     // BL-1273: research_params — the research dials
 #include "space_programme.hpp" // BL-644: space_programme_params — the tenth budget line's purchase lumps
 #include "unit_roster.hpp" // BL-454: unit_upkeep_params — per-type unit data lives with the roster
 
@@ -1196,6 +1197,10 @@ public:
     /// rather than clamped, the space_programme discipline.
     const network_upkeep_params& network_upkeep() const { return m_network_upkeep; }
 
+    /// BL-1273 the research dials (economy.research in Lua; nation_tech.hpp
+    /// documents the conversion). Defaults are research_params' own.
+    const research_params& research() const { return m_research; }
+
     /// BL-628 whole-firm acquisition tunables (economy.acquisition in Lua).
     /// One number, `multiple`, range-checked at load and rejected rather than
     /// clamped. The trailing WINDOW is not here: it is
@@ -1434,6 +1439,7 @@ public:
     const firm_exit_params& firm_exit() const { return m_firm_exit; }
     void set_firm_exit(const firm_exit_params& p) { m_firm_exit = p; }
     void set_network_upkeep(const network_upkeep_params& p) { m_network_upkeep = p; }
+    void set_research(const research_params& p) { m_research = p; }
     void set_recipe_switch(const recipe_switch_params& p) { m_recipe_switch = p; }
     void set_acquisition(const acquisition_params& p) { m_acquisition = p; }
     void set_economics(building_type type, const building_economics& e)
@@ -1715,6 +1721,9 @@ private:
     /// Default-constructed — every rate zero, so a hand-built harness registry
     /// derives no upkeep draw unless it sets them.
     network_upkeep_params m_network_upkeep = {};
+
+    /// BL-1273 the research dials (economy.research).
+    research_params m_research = {};
 
     /// BL-430 recipe-switch cost/cooldown. Defaults to free/instant so a
     /// hand-built harness registry that never sets this behaves as it always did.

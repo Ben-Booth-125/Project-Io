@@ -513,10 +513,9 @@ in `tools/verify/README.md`.
   **G5 — the start gate: a RULED opening, exactly, and nothing stranded** (BL-589, 2026-08-24).
   A fresh ancient corp (reached depth 0, no tech earned) is walked against a table of the opening
   Ben actually ruled — not a narrower first-cut guess — and every recipe outside the one deliberate
-  lock (`refined_copper`, gated by `E0-EC-03`) must match its ruled open/closed state exactly. Then
-  proves the lock is not a permanent orphan: builds a corp meeting `E0-EC-03`'s own authored
-  predicate (one processing facility, Cr 400+ surplus), calls `advance_tech_gates`, and confirms the
-  gate resolves and `recipe_unlocked` flips. Four assertions, all currently green.
+  closure (`refined_copper`, now closed on the ancient band by its era tag) must match its ruled
+  open/closed state exactly. The per-corp tech gates (`E0-EC-03`, `E0-EC-01`) retired with BL-1273
+  (NR-1022), so the Toolmaker is in the opening and the "the gate resolves" rows went with the gate.
 
   **R3 — every named building's material basket is obtainable in its own band** (BL-590/BL-592,
   2026-08-24). A per-building material override (BL-590) could name a good only the industrial arc

@@ -1002,6 +1002,28 @@ void recipe_registry::load_from_lua(lua_state& lua)
         m_network_upkeep = np;
     }
 
+    // BL-1273 the research dials (economy.research; RESEARCH.md § What is
+    // open). The network_upkeep discipline: a non-finite or negative value is
+    // rejected by key; an absent key (or table) keeps the research_params
+    // default. The RP unit must be positive — a zero unit makes every node free.
+    sol::optional<sol::table> res_tbl = (*econ)["research"];
+    if (res_tbl)
+    {
+        const std::string ctx = "economy.research";
+        const double      inf = std::numeric_limits<double>::infinity();
+        research_params   rp  = m_research;
+        const sol::table& t   = *res_tbl;
+
+        read_checked(t, "base_rp_per_nation",          rp.base_rp_per_nation,          0.0,   inf, ctx);
+        read_checked(t, "rp_per_research_credit",      rp.rp_per_research_credit,      0.0,   inf, ctx);
+        read_checked(t, "rp_per_research_credit_sqrt", rp.rp_per_research_credit_sqrt, 0.0,   inf, ctx);
+        read_checked(t, "rp_per_university",           rp.rp_per_university,           0.0,   inf, ctx);
+        read_checked(t, "rp_per_institute",            rp.rp_per_institute,            0.0,   inf, ctx);
+        read_checked(t, "rp_per_cost_unit",            rp.rp_per_cost_unit,            1e-3,  inf, ctx);
+
+        m_research = rp;
+    }
+
     // BL-430 player-facing recipe-switch cost/cooldown (economy.recipe_switch).
     sol::optional<sol::table> recipe_switch = (*econ)["recipe_switch"];
     if (recipe_switch)

@@ -172,12 +172,11 @@ recipe_registry make_registry()
 }
 
 /// One full sim tick: economy step (incl. the BL-202 strategic tier, which
-/// commands every due non-player corp) -> market clearing -> budget -> tech
-/// gates. Tech-gate advancement was missing here before BL-325 S2 — no
-/// harness corp could ever earn E0-ML-01, so military_base could never be
-/// built and hire_unit silently zeroed out (caught rerunning this golden
-/// after S2 landed). main.cpp / core/app.cpp both call this every real tick;
-/// this brings the harness's rollout back in line with actual play.
+/// commands every due non-player corp) -> market clearing -> budget. The tech
+/// gates that used to close this tick (BL-325 S2 added them so a harness corp
+/// could earn E0-ML-01 and build a military_base) retired with BL-1273
+/// (NR-1022): the base is open to every corp, and research runs in the nation
+/// step, which this harness's tick does not call.
 /// @param out_idled_events Optional. Receives the count of `agency_event::kind::idled`
 ///        reported this tick — BOTH tiers, since both narrate an idling that way.
 ///        Subtracting the decision ring's own `corp_verb::idle` tally leaves the

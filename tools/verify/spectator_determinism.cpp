@@ -500,9 +500,8 @@ int families_covered(const std::map<verb_family, int>& f)
 }
 
 /// One full sim tick, matching ai_skill_harness's loop exactly (economy step →
-/// market clearing → budget → tech gates). The tech-gate advance is not
-/// optional garnish: without it no corp ever earns E0-ML-01, so military_base
-/// can never complete and the hire/muster path silently zeroes out.
+/// market clearing → budget). The tech-gate advance that closed it retired with
+/// BL-1273 (NR-1022): military_base is open to every corp without it.
 void run_tick(world& w, const recipe_registry& reg, int tick, bool spectating)
 {
     w.current_day_tick  = tick;

@@ -3946,10 +3946,9 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
     // Ben's ruling (2026-08-24, the same shape as the era precedent above, not
     // a new one): filtered out, not shown-and-locked — "the door not showing
     // what the gate would refuse" is the standing argument, unchanged by this
-    // item. `refined_copper` (E0-EC-03, BL-589) is the first recipe this
-    // clause actually removes; before it, every tech gate targeted a
-    // building_type, never a recipe, so this branch was dead code on every
-    // prior campaign.
+    // item. Since BL-1273 no node locks a recipe (E0-EC-03's lock on
+    // `refined_copper` retired with the per-corp gates, NR-1022), so this
+    // branch removes nothing until the effect pass gives a node an unlock.
     cands.erase(std::remove_if(cands.begin(), cands.end(),
                                [&w, &reg, tile_id](const candidate& c)
                                {

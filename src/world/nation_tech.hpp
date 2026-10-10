@@ -28,29 +28,47 @@ class recipe_registry;
 //
 // THE POOL IS THE IN-PROGRESS REMAINDER. RP flow to the head of the queue; what
 // the head has not yet consumed stays in `pool`. There is no second "progress"
-// float that could disagree with the pool: the head's progress is
-// `min(pool, cost(head))`, and the remainder after a completion is simply what
+// counter that could disagree with the pool: the head's progress is
+// `min(pool_milli, cost(head))`, and the remainder after a completion is simply what
 // is left in the pool, which flows on to the next entry in the same pass.
 //
 // Deterministic: nations walked ascending, queue walked in stored order, every
-// float written in a fixed order. Nothing here reads the clock or a RNG.
+// RP sum in integer milli-RP. Nothing here reads the clock or a RNG.
 // ---------------------------------------------------------------------------
 
 /// The research dials (RESEARCH.md § What is open: the line's conversion rate,
-/// the University's RP and the RP unit are dials for the sweep). A FIRST CUT,
-/// measured against the pacing rule on the 16 curated seeds (2026-10-10,
-/// nation_tech_harness's RATE SOLVE row): the median nation holds its first
-/// ring-2 major (DG-PR-EX-A, 18 cost units with its path) by live quarter ~10
-/// at 11.5 RP per credit, rounded to 12. The measurement also shows the cost of
-/// a linear conversion over treasuries that span orders of magnitude: a quarter
-/// of nations need 10^5x that rate and the richest would buy the whole tree in
-/// ~12 quarters. No University or institute stands on any curated seed at the
-/// seat, so their two rates are UNMEASURED placeholders (one and half a cost
-/// unit a quarter).
+/// the University's RP and the RP unit are dials for the sweep).
+///
+/// THE CONVERSION. A nation's RP for a quarter is
+///
+///     base_rp_per_nation
+///   + rp_per_research_credit      x credits_spent
+///   + rp_per_research_credit_sqrt x sqrt(credits_spent)
+///   + rp_per_university x Universities + rp_per_institute x institutes
+///
+/// all times `research_multiplier`. Its SHAPE is a dial change, not a code
+/// change: the defaults below are the linear first cut (base 0, sqrt 0), and a
+/// concave or floored conversion is a matter of setting the other two terms.
+/// Why the shape is open: treasuries span orders of magnitude, so a linear
+/// conversion tuned to the median nation lets the richest buy the tree in
+/// about three years while a quarter of nations never reach a major
+/// (nation_tech_harness's R0 pacing rows print the measurement).
+///
+/// THE LINE PAYS WHAT THE QUEUE OWES. The academic-research line spends
+/// min(its share, the credits that would buy the RP the queue still owes) —
+/// the garrison-upkeep precedent of min(share, bill). An empty queue spends
+/// nothing; the treasury keeps the share.
+///
+/// No University or institute stands on any curated seed at the seat, so their
+/// two rates are UNMEASURED placeholders (one and half a cost unit a quarter).
 struct research_params
 {
-    /// RP per credit the academic-research budget line spends.
+    /// RP every nation gets each quarter, at no treasury cost.
+    float base_rp_per_nation = 0.0f;
+    /// RP per credit the academic-research budget line spends (the linear term).
     float rp_per_research_credit = 12.0f;
+    /// RP per sqrt(credit) the line spends (the concave term).
+    float rp_per_research_credit_sqrt = 0.0f;
     /// RP per quarter per completed University standing in the nation's territory.
     float rp_per_university = 100.0f;
     /// RP per quarter per completed research institute whose owner corp's home
@@ -60,12 +78,18 @@ struct research_params
     float rp_per_cost_unit = 100.0f;
 };
 
+/// RP are held in MILLI-RP, an integer: a pool accrues small increments for
+/// years, and a float pool stops registering them once it is large.
+inline constexpr std::int64_t k_milli_per_rp = 1000;
+
 /// One nation's tech state.
 struct nation_tech_state
 {
-    std::bitset<io::dg::node_count> held;  ///< Nodes held, by `io::dg` index.
-    float                           pool = 0.0f; ///< RP in hand; the head's progress.
-    std::vector<std::uint16_t>      queue;  ///< Node indices, head first.
+    std::bitset<io::dg::node_count> held;           ///< Nodes held, by `io::dg` index.
+    std::int64_t                    pool_milli = 0; ///< RP in hand (milli-RP); the head's progress.
+    std::vector<std::uint16_t>      queue;          ///< Node indices, head first.
+
+    bool empty() const { return held.none() && pool_milli == 0 && queue.empty(); }
 };
 
 /// What `enqueue_node` did.
@@ -82,17 +106,27 @@ enum class enqueue_result : std::uint8_t
 /// One nation's accrual this quarter — reported, not stored.
 struct research_accrual
 {
-    entity_id nation        = null_entity;
-    float     line_spend    = 0.0f; ///< Credits the academic-research line spent.
-    int       universities  = 0;
-    int       institutes    = 0;
-    float     multiplier    = 1.0f; ///< `research_multiplier` (identity until the effect pass).
-    float     rp            = 0.0f; ///< RP added to the pool.
-    int       completed     = 0;    ///< Nodes completed this quarter.
+    entity_id    nation       = null_entity;
+    float        line_share   = 0.0f; ///< The research line's share of the treasury this quarter.
+    float        line_spend   = 0.0f; ///< Credits it actually spent: min(share, what the queue owes).
+    std::int64_t owed_milli   = 0;    ///< RP the queue still owed before this quarter's accrual.
+    int          universities = 0;
+    int          institutes   = 0;
+    float        multiplier   = 1.0f; ///< `research_multiplier` (identity until the effect pass).
+    std::int64_t rp_milli     = 0;    ///< Milli-RP added to the pool.
+    int          completed    = 0;    ///< Nodes completed this quarter.
 };
 
-/// The RP cost of node @p node under @p p.
-float node_cost_rp(int node, const research_params& p = {});
+/// The cost of node @p node under @p p, in milli-RP (0 for an unknown node).
+std::int64_t node_cost_milli(int node, const research_params& p = {});
+
+/// RP (as milli-RP) the line converts @p credits into, before the multiplier:
+/// the linear and sqrt terms only (no base, no buildings).
+std::int64_t line_rp_milli(float credits, const research_params& p = {});
+
+/// The credits the line must spend to convert into @p milli RP — the inverse
+/// of `line_rp_milli` (+infinity when the line converts nothing).
+double line_credits_for(std::int64_t milli, const research_params& p = {});
 
 /// Whether @p nation holds node @p node. Unknown nation or index: false.
 bool nation_holds(const world& w, entity_id nation, int node);
@@ -142,15 +176,21 @@ bool recipe_unlocked(const world& w, const recipe_registry& reg, entity_id corp,
                      std::uint16_t recipe_id);
 
 /// The quarterly research pass, once per economy tick from the nation step:
-/// for every nation (ascending id) accrue RP — the academic-research line's
-/// share of the treasury (debited, a direct expenditure on the garrison-upkeep
-/// precedent) x `rp_per_research_credit`, plus Universities and research
-/// institutes — scaled by `research_multiplier`, then flow the pool down the
-/// queue: the head completes when its cost is met and the remainder flows on;
-/// a quest with an unmet deed (or an entry whose requirements are not yet
-/// held) is passed over and stays queued. An empty queue lets the pool wait.
+/// for every nation (ascending id) accrue RP — the academic-research line pays
+/// min(its share of the treasury, the credits that buy the RP its queue still
+/// owes) as a direct expenditure (the garrison-upkeep precedent), converted by
+/// the `research_params` conversion; Universities, research institutes and the
+/// per-nation base add RP at no treasury cost — scaled by
+/// `research_multiplier`, then flow the pool down the queue: the head completes
+/// when its cost is met and the remainder flows on; a quest with an unmet deed
+/// (or an entry whose requirements are not yet held) is passed over and stays
+/// queued. An empty queue lets the pool wait and spends no treasury.
 ///
-/// @param out Optional per-nation rows, ascending nation id.
+/// A nation's entry in `world::nation_tech` is created only when it has
+/// something to hold (RP, a queue, a held node), so a world where nothing
+/// researches carries an empty map.
+///
+/// @param out Optional per-nation rows, ascending nation id (every nation).
 void advance_research(world& w, const research_params& p = {},
                       std::vector<research_accrual>* out = nullptr);
 
@@ -158,3 +198,11 @@ void advance_research(world& w, const research_params& p = {},
 /// Exposed so a harness can drive the queue semantics with a hand-set pool.
 /// @return Nodes completed.
 int flow_research_queue(world& w, entity_id nation, const research_params& p = {});
+
+/// THE HANDOVER (RESEARCH.md § Who holds technology: no nation opens ahead in
+/// technology). Empties every nation's tech state — pool, queue and held set —
+/// so play opens with `world::nation_tech` empty. Called at the end of the
+/// campaign settle (`run_settle`, and the harness mirror of it): the settle's
+/// ticks run the nation step like any other, so Universities, institutes and
+/// the base accrue through it; none of that may carry into play.
+void clear_research_at_handover(world& w);

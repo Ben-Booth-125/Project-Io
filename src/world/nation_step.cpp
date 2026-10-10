@@ -177,7 +177,7 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     // recomputed and spent as a direct expenditure), plus Universities and
     // research institutes, into each nation's pool and down its queue. Once
     // per economy tick, which is the quarter.
-    advance_research(w);
+    advance_research(w, reg.research(), &report.research);
 }
 
 

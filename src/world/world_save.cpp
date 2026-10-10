@@ -623,15 +623,18 @@ bool r_law(std::istream& i, law& l)
 
 // --- Nation tech state (BL-1273, format v47) ---------------------------------
 //
-// One record per nation: the pool, the held set and the queue. The held set is
-// written as the node count it was written under, then that many bits packed
-// into 32-bit words, so a store that APPENDS nodes (the store is append-only:
-// gen_tech_tree_table.js) still reads an older bitset — the new tail reads
-// unheld. A count past this build's tree, a set bit past the count, a queue
-// entry outside the tree, or a non-finite / negative pool refuses the stream.
+// One record per nation: the pool (milli-RP, int64), the held set and the
+// queue. The held set is written as the node count it was written under, then
+// that many bits packed into 32-bit words, so a store that APPENDS nodes (the
+// store is append-only: gen_tech_tree_table.js) still reads an older bitset —
+// the new tail reads unheld. Refused whole, never repaired: a count past this
+// build's tree, a set bit past the count, a negative pool, a queue entry
+// outside the tree, a duplicate queue entry, a queued node already held, and
+// both sides of a pick-one pair held or queued together — every one of them a
+// state `enqueue_node` and `flow_research_queue` can never produce.
 void w_nation_tech(std::ostream& o, const nation_tech_state& t)
 {
-    w_f32(o, t.pool);
+    w_i64(o, t.pool_milli);
     const uint32_t count = static_cast<uint32_t>(io::dg::node_count);
     w_u32(o, count);
     for (uint32_t i = 0; i < count; i += 32)
@@ -648,9 +651,9 @@ void w_nation_tech(std::ostream& o, const nation_tech_state& t)
 bool r_nation_tech(std::istream& i, nation_tech_state& t)
 {
     uint32_t count = 0;
-    if (!(r_f32(i, t.pool) && r_u32(i, count)))
+    if (!(r_i64(i, t.pool_milli) && r_u32(i, count)))
         return false;
-    if (!std::isfinite(t.pool) || t.pool < 0.0f)
+    if (t.pool_milli < 0)
         return false;
     if (count > static_cast<uint32_t>(io::dg::node_count))
         return false;
@@ -671,9 +674,25 @@ bool r_nation_tech(std::istream& i, nation_tech_state& t)
     }
     if (!r_vec(i, t.queue, [](std::istream& s, uint16_t& n) { return r_u16(s, n); }))
         return false;
+    std::bitset<io::dg::node_count> queued;
     for (const uint16_t n : t.queue)
+    {
         if (n >= static_cast<uint16_t>(io::dg::node_count))
-            return false;
+            return false; // outside the tree
+        if (queued.test(n) || t.held.test(n))
+            return false; // queued twice, or queued while already held
+        queued.set(n);
+    }
+    for (int n = 0; n < io::dg::node_count; ++n)
+    {
+        const int ex = io::dg::nodes[static_cast<std::size_t>(n)].excludes;
+        if (ex < 0)
+            continue;
+        const bool a = t.held.test(static_cast<std::size_t>(n)) || queued.test(static_cast<std::size_t>(n));
+        const bool b = t.held.test(static_cast<std::size_t>(ex)) || queued.test(static_cast<std::size_t>(ex));
+        if (a && b)
+            return false; // both sides of a pick-one pair
+    }
     return true;
 }
 

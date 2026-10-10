@@ -274,8 +274,8 @@ economy = {
         },
         -- BL-332: Research Institute — the dedicated tech-progress building.
         -- Same passive shape as military_base (base_rate 0, staffs at zero);
-        -- its output is a flat per-tick credit to the owning corp's
-        -- military.science accumulator (economy.military below), not a
+        -- its output is research points, each quarter, into the owning corp's
+        -- home nation's pool (economy.research below, BL-1273), not a
         -- resource_type good. Priced like military_base — a garrison-grade
         -- installation, not a waypoint.
         research_institute = {
@@ -322,10 +322,8 @@ economy = {
         },
     },
 
-    -- BL-332: research accumulation rate. Flat per-tick credit to the owning
-    -- corp's corporation_component.science for every COMPLETED
-    -- research_institute it owns — passive, no workforce dependency (the
-    -- building staffs at zero). First-cut authored constant; retune by playtest.
+    -- (BL-332's per-corp research accumulation rate lived here; BL-1273 moved
+    -- research to the nation — see economy.research.)
     --
     -- BL-641: BUILDING UPKEEP IN GOODS — the Industry demand channel.
     --
@@ -981,6 +979,22 @@ economy = {
         timber_highway = 0.20,  -- ...per Highway tile
         stone_hub      = 5.0,   -- stone per active port / inland hub per quarter
         timber_hub     = 2.5,   -- timber per active port / inland hub per quarter
+    },
+
+    -- BL-1273: the research dials (RESEARCH.md § What is open; the conversion is
+    -- documented on research_params in src/world/nation_tech.hpp). A nation's RP
+    -- per quarter = base + credit x spend + credit_sqrt x sqrt(spend) + per
+    -- University + per institute, and the research line spends only what its
+    -- queue still owes. The SHAPE is these dials: linear today (base 0, sqrt 0).
+    -- First cut; nation_tech_harness's R0 pacing rows are the measurement. The
+    -- loader rejects a negative or non-finite value by key.
+    research = {
+        base_rp_per_nation          = 0.0,
+        rp_per_research_credit      = 12.0,
+        rp_per_research_credit_sqrt = 0.0,
+        rp_per_university           = 100.0, -- unmeasured: no University stands on any curated seed
+        rp_per_institute            = 50.0,  -- unmeasured: likewise
+        rp_per_cost_unit            = 100.0,
     },
 
     -- BL-545/BL-546: the relational substrate's DECAY (sentiment.hpp). Each
