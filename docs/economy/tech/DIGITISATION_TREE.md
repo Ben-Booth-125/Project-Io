@@ -106,6 +106,25 @@ sketched by what the quests open:
 | Order | Broad Consensus | Settlement Charters — governing off-world population |
 | Accord | Quiet Borders | Planetary Accords — the climate catastrophe's Ceiling |
 
+## Effects
+
+A node's **advantage** is the player-facing prose; its **effects** in the store are the same
+advantage in machine form, one entry per lever (`../RESEARCH.md` § Effects no system reads yet):
+
+| Kind | Fields | Moves |
+|---|---|---|
+| `modifier` | `subject`, `scope`, `op`, `value` | A named scalar (`modifier_subject`) where the scope matches: `all`, `resource:<good>`, `group:<recipe group>`, `recipe:<recipe>` or `building:<type>`. A list of scopes is one modifier per member. `+5%` is `multiply 1.05`; a *+N% national research* share is `add 0.0N`, summed |
+| `unlock_recipe` | `recipe` | Closes a registry recipe until the corporation's nation holds the node |
+| `unlock_structure` | `structure` | The same, for a building type |
+| `mechanic` | `key` | A named rule a system switches on |
+| `unread` | `what`, `waits_on` | Nothing: the lever is a system the game does not carry; `waits_on` names it |
+
+An unlock or mechanic may carry `deferred` — authored, and not enforced until the named ruling is
+taken. A quest's **deed** has the same pair: a machine form, or a `deed_effect` of kind `unread`
+naming the system it waits on. A placeholder carries one `unread` effect waiting on its system.
+Held effects fold in node order. `tools/session/tech_tree_store.js --check` holds the store's
+shape; `nation_tech_harness` holds the store to what the code reads.
+
 ## Every node
 
 <!-- BEGIN GENERATED NODES (tools/session/tech_tree_store.js) -->

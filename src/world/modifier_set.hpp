@@ -63,21 +63,26 @@
 /// lever wants to move, not by symmetry with a sibling.
 enum class modifier_subject : uint8_t
 {
-    extraction_rate = 0, ///< Units/tick an extraction site draws. WIRED (BL-479):
-                         ///  applied per-corp in `extraction_nominal`
-                         ///  (economy_system.cpp), the single definition of one
-                         ///  site's nominal draw.
+    extraction_rate = 0, ///< Units/tick an extraction site draws. WIRED: the owning
+                         ///  corp's home nation's held nodes, folded in
+                         ///  `extraction_nominal` (economy_system.cpp), the single
+                         ///  definition of one site's nominal draw. Scope: the
+                         ///  site's resource.
     // BEN'S RULE, 2026-08-22: an unwired subject must NAME THE ITEM THAT WILL
     // WIRE IT. Vocabulary-only is a PROMISE, not a state — "a shape is only
     // proven by an instance" justifies the first unwired entry and does not
     // justify the fifth. A subject that cannot name an item has not earned its
     // row, and should be removed rather than left waiting.
-    processing_yield,    ///< Output units per recipe batch. Wired by: BL-513 (denser
-                         ///  facilities raise the province ceiling's effective cap).
+    processing_yield,    ///< Output units per recipe batch. WIRED (BL-1274): folded
+                         ///  per output good in `credit_processing_outputs`
+                         ///  (economy_system.cpp), where a run's output accrues.
+                         ///  Scope: the output good, the recipe, its group.
     unit_upkeep,         ///< A unit's per-tick upkeep draw (BL-454). Wired by: BL-543
                          ///  (the value anchor turns the authored rates on).
-    logistics_cost,      ///< Per-unit haulage on the reach/convoy network. Wired by:
-                         ///  BL-464 (logistic points — active LP resolution costs credits).
+    logistics_cost,      ///< A corporation's convoy leg cost. WIRED (BL-1274): folded
+                         ///  into the priced leg in `price_convoy_leg`
+                         ///  (supply_system.cpp), the one seam every corporate
+                         ///  dispatch prices through. Scope: the cargo good.
     wage_floor,          ///< The wage term of building opex (BL-049). Wired by: BL-538
                          ///  (the schooling budget line raises labour productivity).
     collapse_strain,     ///< The era's collapse pressure (BL-477): the ancient
@@ -87,6 +92,11 @@ enum class modifier_subject : uint8_t
                          ///  2026-08-22 that events EXPRESS the collapse metagame
                          ///  rather than driving it, so BL-548 reads this subject
                          ///  and does not own it.
+    national_research,   ///< A nation's research points a quarter. WIRED (BL-1274),
+                         ///  appended: scope "all" with op add is a "+N% national
+                         ///  research" share, summed into `research_multiplier`;
+                         ///  scope "building:university" with op multiply scales
+                         ///  the University term of `advance_research`.
 };
 
 /// How a modifier combines with the value it moves. The three ops the BL-479
@@ -111,8 +121,7 @@ struct scalar_modifier
 
 /// Apply one modifier to a value. Pure, branch-on-enum arithmetic — the whole
 /// effect model, on purpose. Fold order over a modifier LIST is the caller's
-/// contract (`nation_scalar` must fold in a stated order — BL-1274 — the earn
-/// order), because add and multiply do not commute and determinism requires
+/// contract (`nation_scalar` folds in NODE-INDEX order — BL-1274), because add and multiply do not commute and determinism requires
 /// the order to be stated rather than accidental.
 inline float apply_scalar_modifier(float value, const scalar_modifier& m)
 {

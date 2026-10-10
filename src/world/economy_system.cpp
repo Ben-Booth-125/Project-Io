@@ -138,13 +138,15 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
          * wt_scalar
          * building_supply_scalar(b)
          * (1.0f - tc.hazard_level);
-    // BL-1273: the owning corp's home nation's held-node extraction_rate
-    // multiplier, folded into the single definition of the draw (BL-479's
-    // per-corp read site before it). `nation_scalar` hands back `nominal`
-    // untouched — no arithmetic — until the effect pass (BL-1274) fills it.
+    // BL-1273/BL-1274: the owning corp's home nation's held-node
+    // extraction_rate modifiers (scoped to this site's resource, or "all"),
+    // folded into the single definition of the draw. A nation holding nothing
+    // gets `nominal` back untouched — no arithmetic.
     const auto cit = w.corporations.find(corp);
     const entity_id nation = cit != w.corporations.end() ? cit->second.home_nation : null_entity;
-    return nation_scalar(w, nation, modifier_subject::extraction_rate, nominal);
+    effect_target at;
+    at.resource = static_cast<int>(b.target_resource);
+    return nation_scalar(w, nation, modifier_subject::extraction_rate, at, nominal);
 }
 
 // BL-1209 (MARKETS.md § Price resolution, "A short shelf is shared pro-rata",
@@ -484,12 +486,25 @@ float credit_processing_outputs(world& w, const recipe_registry& reg, entity_id 
     // block is arithmetically inert in a world that authors no ceiling.
     const grid_goods_params& grid = reg.grid_goods();
 
+    // BL-1274: the owning corp's home nation's held-node processing_yield
+    // modifiers, per output good (scope "all", the good, the recipe or its
+    // group), applied where the output accrues. A nation holding nothing gets
+    // the batch output back untouched. The run's INPUTS are unchanged — a
+    // yield node makes more from the same draw.
+    const auto      cit    = w.corporations.find(corp);
+    const entity_id nation = cit != w.corporations.end() ? cit->second.home_nation : null_entity;
+    effect_target   at;
+    at.group  = rcp.group;
+    at.recipe = rcp.name;
+
     float produced = 0.0f;
     for (std::size_t r = 0; r < resource_count; ++r)
     {
         float outq = rcp.outputs[r] * batches;
         if (outq <= 0.0f)
             continue;
+        at.resource = static_cast<int>(r);
+        outq = nation_scalar(w, nation, modifier_subject::processing_yield, at, outq);
         const float cap = grid.ceiling(r);
         if (cap > 0.0f)
         {

@@ -1,5 +1,5 @@
 {
- "_schema": "digitisation_tree.json — the Digitisation tech tree store (DIGITISATION_TREE.md is the authority; this file holds every node). requires = AND over groups, each group satisfied by ANY member. cost = cost_units x RP_PER_UNIT (DIGITISATION_TREE.md § Cost). Effects are prose until the effect pass gives each a machine form.",
+ "_schema": "digitisation_tree.json — the Digitisation tech tree store (DIGITISATION_TREE.md is the authority; this file holds every node). requires = AND over groups, each group satisfied by ANY member. cost = cost_units x RP_PER_UNIT (DIGITISATION_TREE.md § Cost). advantage is the player-facing prose; effects is its machine form (DIGITISATION_TREE.md § Effects): every node carries at least one, and an effect no system reads is kind \"unread\" naming the system it waits on.",
  "_note": "Every advantage, cost and deed is a placeholder to be re-priced in play (Ben, 2026-10-10). Validate with tools/session/tree_lint.js digitisation.",
  "tree": "digitisation",
  "age": "Digitisation",
@@ -91,6 +91,15 @@
    "branch": "PR-EX",
    "requires": [],
    "advantage": "+1% extraction rate at every extraction building",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "extraction_rate",
+     "scope": "all",
+     "op": "multiply",
+     "value": 1.01
+    }
+   ],
    "cost_units": 1
   },
   {
@@ -106,6 +115,15 @@
     ]
    ],
    "advantage": "+1% extraction rate at every extraction building",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "extraction_rate",
+     "scope": "all",
+     "op": "multiply",
+     "value": 1.01
+    }
+   ],
    "cost_units": 1
   },
   {
@@ -121,6 +139,13 @@
     ]
    ],
    "advantage": "deposits in your provinces reveal 1 province further",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "deposits in your provinces reveal 1 province further",
+     "waits_on": "survey reach"
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -136,6 +161,15 @@
     ]
    ],
    "advantage": "Oil Platforms +5% extraction rate",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "extraction_rate",
+     "scope": "resource:petroleum",
+     "op": "multiply",
+     "value": 1.05
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -154,6 +188,20 @@
     ]
    ],
    "advantage": "Oil Platforms may be placed on shelf sea; Oil Platforms +25% extraction rate",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "Oil Platforms may be placed on shelf sea",
+     "waits_on": "offshore placement"
+    },
+    {
+     "kind": "modifier",
+     "subject": "extraction_rate",
+     "scope": "resource:petroleum",
+     "op": "multiply",
+     "value": 1.25
+    }
+   ],
    "cost_units": 12
   },
   {
@@ -169,6 +217,15 @@
     ]
    ],
    "advantage": "+1% extraction rate at every extraction building",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "extraction_rate",
+     "scope": "all",
+     "op": "multiply",
+     "value": 1.01
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -184,6 +241,15 @@
     ]
    ],
    "advantage": "+1% extraction rate at every extraction building",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "extraction_rate",
+     "scope": "all",
+     "op": "multiply",
+     "value": 1.01
+    }
+   ],
    "cost_units": 3
   },
   {
@@ -199,6 +265,15 @@
     ]
    ],
    "advantage": "+1% extraction rate at every extraction building",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "extraction_rate",
+     "scope": "all",
+     "op": "multiply",
+     "value": 1.01
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -214,6 +289,15 @@
     ]
    ],
    "advantage": "+1% extraction rate at every extraction building",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "extraction_rate",
+     "scope": "all",
+     "op": "multiply",
+     "value": 1.01
+    }
+   ],
    "cost_units": 3
   },
   {
@@ -229,6 +313,22 @@
     ]
    ],
    "advantage": "Mines +5% extraction rate",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "extraction_rate",
+     "scope": [
+      "resource:iron_ore",
+      "resource:coal",
+      "resource:silica",
+      "resource:copper_ore",
+      "resource:rare_earth_ore",
+      "resource:peat"
+     ],
+     "op": "multiply",
+     "value": 1.05
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -244,6 +344,13 @@
     ]
    ],
    "advantage": "Mine maintenance -10%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "Mine maintenance -10%",
+     "waits_on": "building maintenance by nation"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -262,6 +369,27 @@
     ]
    ],
    "advantage": "province building ceiling +1 for extraction buildings; Mines +10% extraction rate",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "province building ceiling +1 for extraction buildings",
+     "waits_on": "province building ceiling by type"
+    },
+    {
+     "kind": "modifier",
+     "subject": "extraction_rate",
+     "scope": [
+      "resource:iron_ore",
+      "resource:coal",
+      "resource:silica",
+      "resource:copper_ore",
+      "resource:rare_earth_ore",
+      "resource:peat"
+     ],
+     "op": "multiply",
+     "value": 1.1
+    }
+   ],
    "cost_units": 24
   },
   {
@@ -277,6 +405,15 @@
     ]
    ],
    "advantage": "Farms +5% output",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "extraction_rate",
+     "scope": "resource:agricultural_produce",
+     "op": "multiply",
+     "value": 1.05
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -292,6 +429,20 @@
     ]
    ],
    "advantage": "coastal Water extraction sites; Water extraction +10%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "coastal Water extraction sites",
+     "waits_on": "coastal water placement"
+    },
+    {
+     "kind": "modifier",
+     "subject": "extraction_rate",
+     "scope": "resource:water",
+     "op": "multiply",
+     "value": 1.1
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -310,6 +461,20 @@
     ]
    ],
    "advantage": "Farms +25% output; Chemical Plants unlock the fertiliser recipe",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "extraction_rate",
+     "scope": "resource:agricultural_produce",
+     "op": "multiply",
+     "value": 1.25
+    },
+    {
+     "kind": "unread",
+     "what": "Chemical Plants unlock the fertiliser recipe",
+     "waits_on": "fertiliser recipe"
+    }
+   ],
    "cost_units": 24
   },
   {
@@ -329,6 +494,15 @@
     ]
    ],
    "advantage": "+3% extraction rate at every extraction building",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "extraction_rate",
+     "scope": "all",
+     "op": "multiply",
+     "value": 1.03
+    }
+   ],
    "cost_units": 4
   },
   {
@@ -344,7 +518,28 @@
     ]
    ],
    "deed": "your own stock of crude oil and iron ore covers 4 quarters of your demand",
+   "deed_effect": {
+    "kind": "unread",
+    "waits_on": "national stock and demand ledger"
+   },
    "advantage": "Mines and Oil Platforms +5% extraction rate",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "extraction_rate",
+     "scope": [
+      "resource:iron_ore",
+      "resource:coal",
+      "resource:silica",
+      "resource:copper_ore",
+      "resource:rare_earth_ore",
+      "resource:peat",
+      "resource:petroleum"
+     ],
+     "op": "multiply",
+     "value": 1.05
+    }
+   ],
    "keys_next_branch": "Asteroid Prospecting",
    "cost_units": 6
   },
@@ -357,6 +552,15 @@
    "branch": "PR-PC",
    "requires": [],
    "advantage": "+1% output per batch at every processing building",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "all",
+     "op": "multiply",
+     "value": 1.01
+    }
+   ],
    "cost_units": 1
   },
   {
@@ -372,6 +576,15 @@
     ]
    ],
    "advantage": "+1% output per batch at every processing building",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "all",
+     "op": "multiply",
+     "value": 1.01
+    }
+   ],
    "cost_units": 1
   },
   {
@@ -387,6 +600,15 @@
     ]
    ],
    "advantage": "Chemical Plants +5% output per batch",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "group:Chemical Works",
+     "op": "multiply",
+     "value": 1.05
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -402,6 +624,13 @@
     ]
    ],
    "advantage": "plastics recipe inputs -10%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "plastics recipe inputs -10%",
+     "waits_on": "plastics recipe"
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -420,6 +649,20 @@
     ]
    ],
    "advantage": "Chemical Plants unlock the plastics recipe; Refineries +20% output per batch",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "Chemical Plants unlock the plastics recipe",
+     "waits_on": "plastics recipe"
+    },
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "group:Refinery",
+     "op": "multiply",
+     "value": 1.2
+    }
+   ],
    "cost_units": 12
   },
   {
@@ -435,6 +678,15 @@
     ]
    ],
    "advantage": "+1% output per batch at every processing building",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "all",
+     "op": "multiply",
+     "value": 1.01
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -450,6 +702,15 @@
     ]
    ],
    "advantage": "+1% output per batch at every processing building",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "all",
+     "op": "multiply",
+     "value": 1.01
+    }
+   ],
    "cost_units": 3
   },
   {
@@ -465,6 +726,15 @@
     ]
    ],
    "advantage": "+1% output per batch at every processing building",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "all",
+     "op": "multiply",
+     "value": 1.01
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -480,6 +750,15 @@
     ]
    ],
    "advantage": "+1% output per batch at every processing building",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "all",
+     "op": "multiply",
+     "value": 1.01
+    }
+   ],
    "cost_units": 3
   },
   {
@@ -495,6 +774,13 @@
     ]
    ],
    "advantage": "microchip recipe +10% yield",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "microchip recipe +10% yield",
+     "waits_on": "microchip recipe"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -510,6 +796,15 @@
     ]
    ],
    "advantage": "Electronics Labs +5% output per batch",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "group:Electronics",
+     "op": "multiply",
+     "value": 1.05
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -528,6 +823,20 @@
     ]
    ],
    "advantage": "Electronics Labs unlock the microchip recipe; Electronics Labs +10% output per batch",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "Electronics Labs unlock the microchip recipe",
+     "waits_on": "microchip recipe"
+    },
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "group:Electronics",
+     "op": "multiply",
+     "value": 1.1
+    }
+   ],
    "cost_units": 24
   },
   {
@@ -543,6 +852,15 @@
     ]
    ],
    "advantage": "Fabricators +5% output per batch",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "group:Advanced Fabrication",
+     "op": "multiply",
+     "value": 1.05
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -558,6 +876,13 @@
     ]
    ],
    "advantage": "wages in processing buildings -5%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "wages in processing buildings -5%",
+     "waits_on": "wage_floor"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -576,6 +901,20 @@
     ]
    ],
    "advantage": "every processing building +20% output per batch and wages -10%",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "all",
+     "op": "multiply",
+     "value": 1.2
+    },
+    {
+     "kind": "unread",
+     "what": "wages in processing buildings -10%",
+     "waits_on": "wage_floor"
+    }
+   ],
    "cost_units": 24
   },
   {
@@ -595,6 +934,15 @@
     ]
    ],
    "advantage": "+3% output per batch at every processing building",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "all",
+     "op": "multiply",
+     "value": 1.03
+    }
+   ],
    "cost_units": 4
   },
   {
@@ -610,7 +958,20 @@
     ]
    ],
    "deed": "your microchip output covers your own electronics demand for 4 quarters",
+   "deed_effect": {
+    "kind": "unread",
+    "waits_on": "microchip recipe"
+   },
    "advantage": "Electronics Labs +10% output per batch",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "group:Electronics",
+     "op": "multiply",
+     "value": 1.1
+    }
+   ],
    "keys_next_branch": "Orbital Assembly",
    "cost_units": 12
   },
@@ -623,6 +984,13 @@
    "branch": "PR-EN",
    "requires": [],
    "advantage": "-1% fuel draw at every building",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-1% fuel draw at every building",
+     "waits_on": "building fuel draw"
+    }
+   ],
    "cost_units": 1
   },
   {
@@ -638,6 +1006,13 @@
     ]
    ],
    "advantage": "-1% fuel draw at every building",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-1% fuel draw at every building",
+     "waits_on": "building fuel draw"
+    }
+   ],
    "cost_units": 1
   },
   {
@@ -653,6 +1028,15 @@
     ]
    ],
    "advantage": "fuel logistics cost -10%",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "logistics_cost",
+     "scope": "resource:refined_fuel",
+     "op": "multiply",
+     "value": 0.9
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -668,6 +1052,13 @@
     ]
    ],
    "advantage": "fuel draw of processing buildings -5%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "fuel draw of processing buildings -5%",
+     "waits_on": "building fuel draw"
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -686,6 +1077,15 @@
     ]
    ],
    "advantage": "Refineries +20% refined fuel per batch",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "resource:refined_fuel",
+     "op": "multiply",
+     "value": 1.2
+    }
+   ],
    "cost_units": 12
   },
   {
@@ -701,6 +1101,13 @@
     ]
    ],
    "advantage": "-1% fuel draw at every building",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-1% fuel draw at every building",
+     "waits_on": "building fuel draw"
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -716,6 +1123,13 @@
     ]
    ],
    "advantage": "-1% fuel draw at every building",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-1% fuel draw at every building",
+     "waits_on": "building fuel draw"
+    }
+   ],
    "cost_units": 3
   },
   {
@@ -731,6 +1145,13 @@
     ]
    ],
    "advantage": "-1% fuel draw at every building",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-1% fuel draw at every building",
+     "waits_on": "building fuel draw"
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -746,6 +1167,13 @@
     ]
    ],
    "advantage": "-1% fuel draw at every building",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-1% fuel draw at every building",
+     "waits_on": "building fuel draw"
+    }
+   ],
    "cost_units": 3
   },
   {
@@ -761,6 +1189,13 @@
     ]
    ],
    "advantage": "each Nuclear Plant raises rivals’ Alarm by 1 instead of 2",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "each Nuclear Plant raises rivals’ Alarm by 1 instead of 2",
+     "waits_on": "Alarm"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -776,6 +1211,13 @@
     ]
    ],
    "advantage": "Nuclear Plant output +25%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "Nuclear Plant output +25%",
+     "waits_on": "Nuclear Plant"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -794,6 +1236,18 @@
     ]
    ],
    "advantage": "unlocks the Nuclear Plant: powers 4 province buildings with no fuel draw. Trap: each one raises every rival’s Alarm toward you by 2",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "unlocks the Nuclear Plant: powers 4 province buildings with no fuel draw",
+     "waits_on": "Nuclear Plant"
+    },
+    {
+     "kind": "unread",
+     "what": "each Nuclear Plant raises every rival’s Alarm toward you by 2",
+     "waits_on": "Alarm"
+    }
+   ],
    "cost_units": 24
   },
   {
@@ -809,6 +1263,13 @@
     ]
    ],
    "advantage": "propellant holding losses -50%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "propellant holding losses -50%",
+     "waits_on": "holding losses by nation"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -824,6 +1285,15 @@
     ]
    ],
    "advantage": "propellant recipe +5% yield",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "resource:propellant",
+     "op": "multiply",
+     "value": 1.05
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -842,6 +1312,25 @@
     ]
    ],
    "advantage": "Chemical Plants unlock the propellant recipe at +20% yield",
+   "effects": [
+    {
+     "kind": "unlock_recipe",
+     "recipe": "propellant_atmospheric",
+     "deferred": "ruling owed (BL-1274): gating it closes the space programme at the start of play"
+    },
+    {
+     "kind": "unlock_recipe",
+     "recipe": "propellant_electrolysis",
+     "deferred": "ruling owed (BL-1274): gating it closes the space programme at the start of play"
+    },
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "resource:propellant",
+     "op": "multiply",
+     "value": 1.2
+    }
+   ],
    "cost_units": 24
   },
   {
@@ -861,6 +1350,13 @@
     ]
    ],
    "advantage": "-3% fuel draw at every building",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-3% fuel draw at every building",
+     "waits_on": "building fuel draw"
+    }
+   ],
    "cost_units": 4
   },
   {
@@ -876,7 +1372,20 @@
     ]
    ],
    "deed": "a propellant plant fully staffed for 8 quarters",
+   "deed_effect": {
+    "kind": "unread",
+    "waits_on": "deed history"
+   },
    "advantage": "propellant output +15%",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "resource:propellant",
+     "op": "multiply",
+     "value": 1.15
+    }
+   ],
    "keys_next_branch": "In-Situ Propellant",
    "cost_units": 12
   },
@@ -889,6 +1398,15 @@
    "branch": "NE-SO",
    "requires": [],
    "advantage": "+1% national research",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "national_research",
+     "scope": "all",
+     "op": "add",
+     "value": 0.01
+    }
+   ],
    "cost_units": 1
   },
   {
@@ -904,6 +1422,15 @@
     ]
    ],
    "advantage": "+1% national research",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "national_research",
+     "scope": "all",
+     "op": "add",
+     "value": 0.01
+    }
+   ],
    "cost_units": 1
   },
   {
@@ -919,6 +1446,13 @@
     ]
    ],
    "advantage": "rivals’ prices and stocks seen 1 quarter fresher",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "rivals’ prices and stocks seen 1 quarter fresher",
+     "waits_on": "activity fog"
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -934,6 +1468,15 @@
     ]
    ],
    "advantage": "universities +20% research",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "national_research",
+     "scope": "building:university",
+     "op": "multiply",
+     "value": 1.2
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -952,6 +1495,15 @@
     ]
    ],
    "advantage": "national research +15%",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "national_research",
+     "scope": "all",
+     "op": "add",
+     "value": 0.15
+    }
+   ],
    "cost_units": 12
   },
   {
@@ -967,6 +1519,15 @@
     ]
    ],
    "advantage": "+1% national research",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "national_research",
+     "scope": "all",
+     "op": "add",
+     "value": 0.01
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -982,6 +1543,15 @@
     ]
    ],
    "advantage": "+1% national research",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "national_research",
+     "scope": "all",
+     "op": "add",
+     "value": 0.01
+    }
+   ],
    "cost_units": 3
   },
   {
@@ -997,6 +1567,15 @@
     ]
    ],
    "advantage": "+1% national research",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "national_research",
+     "scope": "all",
+     "op": "add",
+     "value": 0.01
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -1012,6 +1591,15 @@
     ]
    ],
    "advantage": "+1% national research",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "national_research",
+     "scope": "all",
+     "op": "add",
+     "value": 0.01
+    }
+   ],
    "cost_units": 3
   },
   {
@@ -1027,6 +1615,13 @@
     ]
    ],
    "advantage": "Launchpad build cost -25%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "Launchpad build cost -25%",
+     "waits_on": "construction cost by nation"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -1042,6 +1637,13 @@
     ]
    ],
    "advantage": "launch propellant -5%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "launch propellant -5%",
+     "waits_on": "launch draw by nation"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -1060,6 +1662,14 @@
     ]
    ],
    "advantage": "the Launchpad may operate (with the staffed pad and propellant reserve); convoys may dispatch to other bodies",
+   "effects": [
+    {
+     "kind": "mechanic",
+     "key": "space_dispatch",
+     "what": "the Launchpad may operate; convoys may dispatch to other bodies",
+     "deferred": "ruling owed (BL-1274): gating it closes the space programme at the start of play"
+    }
+   ],
    "cost_units": 24
   },
   {
@@ -1076,6 +1686,13 @@
    ],
    "placeholder": "espionage",
    "advantage": "reserved for espionage: signals intelligence",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "reserved for espionage: signals intelligence",
+     "waits_on": "espionage"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -1092,6 +1709,13 @@
    ],
    "placeholder": "espionage",
    "advantage": "reserved for espionage: signals intelligence",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "reserved for espionage: signals intelligence",
+     "waits_on": "espionage"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -1111,6 +1735,13 @@
    ],
    "placeholder": "espionage",
    "advantage": "placeholder cluster: signals intelligence; effects authored when the espionage system exists",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "placeholder cluster: signals intelligence; effects authored when the espionage system exists",
+     "waits_on": "espionage"
+    }
+   ],
    "cost_units": 24
   },
   {
@@ -1127,6 +1758,15 @@
     ]
    ],
    "advantage": "+3% national research",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "national_research",
+     "scope": "all",
+     "op": "add",
+     "value": 0.03
+    }
+   ],
    "pending_requires": [
     [
      "DG-NE-SO-C"
@@ -1147,7 +1787,18 @@
     ]
    ],
    "deed": "one convoy completed to another body",
+   "deed_effect": {
+    "kind": "unread",
+    "waits_on": "deed history"
+   },
    "advantage": "launch propellant -5%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "launch propellant -5%",
+     "waits_on": "launch draw by nation"
+    }
+   ],
    "keys_next_branch": "Interplanetary Convoys",
    "cost_units": 12
   },
@@ -1160,6 +1811,13 @@
    "branch": "NE-MK",
    "requires": [],
    "advantage": "+1% trade capacity at every Marketplace",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+1% trade capacity at every Marketplace",
+     "waits_on": "Marketplace trade capacity"
+    }
+   ],
    "cost_units": 1
   },
   {
@@ -1175,6 +1833,13 @@
     ]
    ],
    "advantage": "+1% trade capacity at every Marketplace",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+1% trade capacity at every Marketplace",
+     "waits_on": "Marketplace trade capacity"
+    }
+   ],
    "cost_units": 1
   },
   {
@@ -1190,6 +1855,13 @@
     ]
    ],
    "advantage": "trade capacity +5% at your Marketplaces",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "trade capacity +5% at your Marketplaces",
+     "waits_on": "Marketplace trade capacity"
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -1205,6 +1877,13 @@
     ]
    ],
    "advantage": "household demand in your markets +3%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "household demand in your markets +3%",
+     "waits_on": "household demand by nation"
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -1223,6 +1902,18 @@
     ]
    ],
    "advantage": "trades settle the tick they clear; Ports earn +25% trade points",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "trades settle the tick they clear",
+     "waits_on": "trade settlement timing"
+    },
+    {
+     "kind": "unread",
+     "what": "Ports earn +25% trade points",
+     "waits_on": "trade points"
+    }
+   ],
    "cost_units": 12
   },
   {
@@ -1238,6 +1929,13 @@
     ]
    ],
    "advantage": "+1% trade capacity at every Marketplace",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+1% trade capacity at every Marketplace",
+     "waits_on": "Marketplace trade capacity"
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -1253,6 +1951,13 @@
     ]
    ],
    "advantage": "+1% trade capacity at every Marketplace",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+1% trade capacity at every Marketplace",
+     "waits_on": "Marketplace trade capacity"
+    }
+   ],
    "cost_units": 3
   },
   {
@@ -1268,6 +1973,13 @@
     ]
    ],
    "advantage": "+1% trade capacity at every Marketplace",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+1% trade capacity at every Marketplace",
+     "waits_on": "Marketplace trade capacity"
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -1283,6 +1995,13 @@
     ]
    ],
    "advantage": "+1% trade capacity at every Marketplace",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+1% trade capacity at every Marketplace",
+     "waits_on": "Marketplace trade capacity"
+    }
+   ],
    "cost_units": 3
   },
   {
@@ -1298,6 +2017,13 @@
     ]
    ],
    "advantage": "activity fog lifts on every market you trade with",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "activity fog lifts on every market you trade with",
+     "waits_on": "activity fog"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -1313,6 +2039,13 @@
     ]
    ],
    "advantage": "stock holding cost and spoilage -20%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "stock holding cost and spoilage -20%",
+     "waits_on": "holding losses by nation"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -1331,6 +2064,20 @@
     ]
    ],
    "advantage": "trade capacity +30% at every Marketplace; national research +10%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "trade capacity +30% at every Marketplace",
+     "waits_on": "Marketplace trade capacity"
+    },
+    {
+     "kind": "modifier",
+     "subject": "national_research",
+     "scope": "all",
+     "op": "add",
+     "value": 0.1
+    }
+   ],
    "cost_units": 24
   },
   {
@@ -1347,6 +2094,13 @@
    ],
    "placeholder": "politics",
    "advantage": "reserved for politics: lobbying and market regulation",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "reserved for politics: lobbying and market regulation",
+     "waits_on": "politics"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -1363,6 +2117,13 @@
    ],
    "placeholder": "politics",
    "advantage": "reserved for politics: lobbying and market regulation",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "reserved for politics: lobbying and market regulation",
+     "waits_on": "politics"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -1382,6 +2143,13 @@
    ],
    "placeholder": "politics",
    "advantage": "placeholder cluster: lobbying and market regulation; effects authored when the politics system exists",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "placeholder cluster: lobbying and market regulation; effects authored when the politics system exists",
+     "waits_on": "politics"
+    }
+   ],
    "cost_units": 24
   },
   {
@@ -1398,6 +2166,13 @@
     ]
    ],
    "advantage": "+3% trade capacity at every Marketplace",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+3% trade capacity at every Marketplace",
+     "waits_on": "Marketplace trade capacity"
+    }
+   ],
    "pending_requires": [
     [
      "DG-NE-MK-C"
@@ -1418,7 +2193,18 @@
     ]
    ],
    "deed": "trade with the markets of 3 other nations in one quarter",
+   "deed_effect": {
+    "kind": "unread",
+    "waits_on": "trade partners by nation"
+   },
    "advantage": "trade points +5%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "trade points +5%",
+     "waits_on": "trade points"
+    }
+   ],
    "keys_next_branch": "Off-World Exchange",
    "cost_units": 6
   },
@@ -1431,6 +2217,15 @@
    "branch": "NE-FR",
    "requires": [],
    "advantage": "-1% logistics cost",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "logistics_cost",
+     "scope": "all",
+     "op": "multiply",
+     "value": 0.99
+    }
+   ],
    "cost_units": 1
   },
   {
@@ -1446,6 +2241,15 @@
     ]
    ],
    "advantage": "-1% logistics cost",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "logistics_cost",
+     "scope": "all",
+     "op": "multiply",
+     "value": 0.99
+    }
+   ],
    "cost_units": 1
   },
   {
@@ -1461,6 +2265,13 @@
     ]
    ],
    "advantage": "handling cost -5%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "handling cost -5%",
+     "waits_on": "port handling by nation"
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -1476,6 +2287,13 @@
     ]
    ],
    "advantage": "Port throughput +10%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "Port throughput +10%",
+     "waits_on": "Port throughput"
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -1494,6 +2312,18 @@
     ]
    ],
    "advantage": "convoys carry +50% cargo per dispatch; Ports upgrade to Container Ports",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "convoys carry +50% cargo per dispatch",
+     "waits_on": "convoy cargo capacity"
+    },
+    {
+     "kind": "unread",
+     "what": "Ports upgrade to Container Ports",
+     "waits_on": "Container Port"
+    }
+   ],
    "cost_units": 12
   },
   {
@@ -1509,6 +2339,15 @@
     ]
    ],
    "advantage": "-1% logistics cost",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "logistics_cost",
+     "scope": "all",
+     "op": "multiply",
+     "value": 0.99
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -1524,6 +2363,15 @@
     ]
    ],
    "advantage": "-1% logistics cost",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "logistics_cost",
+     "scope": "all",
+     "op": "multiply",
+     "value": 0.99
+    }
+   ],
    "cost_units": 3
   },
   {
@@ -1539,6 +2387,15 @@
     ]
    ],
    "advantage": "-1% logistics cost",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "logistics_cost",
+     "scope": "all",
+     "op": "multiply",
+     "value": 0.99
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -1554,6 +2411,15 @@
     ]
    ],
    "advantage": "-1% logistics cost",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "logistics_cost",
+     "scope": "all",
+     "op": "multiply",
+     "value": 0.99
+    }
+   ],
    "cost_units": 3
   },
   {
@@ -1569,6 +2435,13 @@
     ]
    ],
    "advantage": "road maintenance -10%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "road maintenance -10%",
+     "waits_on": "roads"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -1584,6 +2457,13 @@
     ]
    ],
    "advantage": "inland convoy capacity +10%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "inland convoy capacity +10%",
+     "waits_on": "convoy cargo capacity"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -1602,6 +2482,13 @@
     ]
    ],
    "advantage": "road-tier upgrades cost -30%; road travel time -15%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "road-tier upgrades cost -30%; road travel time -15%",
+     "waits_on": "roads"
+    }
+   ],
    "cost_units": 24
   },
   {
@@ -1617,6 +2504,13 @@
     ]
    ],
    "advantage": "high-value convoy capacity +10%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "high-value convoy capacity +10%",
+     "waits_on": "convoy cargo capacity"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -1632,6 +2526,13 @@
     ]
    ],
    "advantage": "travel time -5% everywhere",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "travel time -5% everywhere",
+     "waits_on": "travel time by nation"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -1650,6 +2551,13 @@
     ]
    ],
    "advantage": "perishables and electronics travel time -40%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "perishables and electronics travel time -40%",
+     "waits_on": "travel time by nation"
+    }
+   ],
    "cost_units": 24
   },
   {
@@ -1669,6 +2577,15 @@
     ]
    ],
    "advantage": "-3% logistics cost",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "logistics_cost",
+     "scope": "all",
+     "op": "multiply",
+     "value": 0.97
+    }
+   ],
    "cost_units": 4
   },
   {
@@ -1684,7 +2601,20 @@
     ]
    ],
    "deed": "10 convoy routes served every quarter for 4 quarters",
+   "deed_effect": {
+    "kind": "unread",
+    "waits_on": "deed history"
+   },
    "advantage": "logistics cost -5%",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "logistics_cost",
+     "scope": "all",
+     "op": "multiply",
+     "value": 0.95
+    }
+   ],
    "keys_next_branch": "Orbital Port & Depots",
    "cost_units": 12
   },
@@ -1697,6 +2627,13 @@
    "branch": "ST-FO",
    "requires": [],
    "advantage": "+1% strength for every unit",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+1% strength for every unit",
+     "waits_on": "unit strength"
+    }
+   ],
    "cost_units": 1
   },
   {
@@ -1712,6 +2649,13 @@
     ]
    ],
    "advantage": "+1% strength for every unit",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+1% strength for every unit",
+     "waits_on": "unit strength"
+    }
+   ],
    "cost_units": 1
   },
   {
@@ -1727,6 +2671,13 @@
     ]
    ],
    "advantage": "land unit upkeep -5%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "land unit upkeep -5%",
+     "waits_on": "unit_upkeep"
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -1742,6 +2693,13 @@
     ]
    ],
    "advantage": "home-province defence +10%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "home-province defence +10%",
+     "waits_on": "battle resolution"
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -1760,6 +2718,18 @@
     ]
    ],
    "advantage": "unlocks mechanised infantry; every land unit +20% strength",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "unlocks mechanised infantry",
+     "waits_on": "unit unlock"
+    },
+    {
+     "kind": "unread",
+     "what": "every land unit +20% strength",
+     "waits_on": "unit strength"
+    }
+   ],
    "cost_units": 12
   },
   {
@@ -1775,6 +2745,13 @@
     ]
    ],
    "advantage": "+1% strength for every unit",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+1% strength for every unit",
+     "waits_on": "unit strength"
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -1790,6 +2767,13 @@
     ]
    ],
    "advantage": "+1% strength for every unit",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+1% strength for every unit",
+     "waits_on": "unit strength"
+    }
+   ],
    "cost_units": 3
   },
   {
@@ -1805,6 +2789,13 @@
     ]
    ],
    "advantage": "+1% strength for every unit",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+1% strength for every unit",
+     "waits_on": "unit strength"
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -1820,6 +2811,13 @@
     ]
    ],
    "advantage": "+1% strength for every unit",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+1% strength for every unit",
+     "waits_on": "unit strength"
+    }
+   ],
    "cost_units": 3
   },
   {
@@ -1835,6 +2833,13 @@
     ]
    ],
    "advantage": "muster time -10%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "muster time -10%",
+     "waits_on": "muster time"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -1850,6 +2855,13 @@
     ]
    ],
    "advantage": "units +10% strength when attacking",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "units +10% strength when attacking",
+     "waits_on": "unit strength"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -1868,6 +2880,13 @@
     ]
    ],
    "advantage": "unit movement +50% along reach",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "unit movement +50% along reach",
+     "waits_on": "unit movement"
+    }
+   ],
    "cost_units": 24
   },
   {
@@ -1884,6 +2903,13 @@
    ],
    "placeholder": "espionage",
    "advantage": "reserved for espionage: covert operations",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "reserved for espionage: covert operations",
+     "waits_on": "espionage"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -1900,6 +2926,13 @@
    ],
    "placeholder": "espionage",
    "advantage": "reserved for espionage: covert operations",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "reserved for espionage: covert operations",
+     "waits_on": "espionage"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -1919,6 +2952,13 @@
    ],
    "placeholder": "espionage",
    "advantage": "placeholder cluster: covert operations; effects authored when the espionage system exists",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "placeholder cluster: covert operations; effects authored when the espionage system exists",
+     "waits_on": "espionage"
+    }
+   ],
    "cost_units": 24
   },
   {
@@ -1935,6 +2975,13 @@
     ]
    ],
    "advantage": "+3% strength for every unit",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+3% strength for every unit",
+     "waits_on": "unit strength"
+    }
+   ],
    "pending_requires": [
     [
      "DG-ST-FO-C"
@@ -1955,7 +3002,18 @@
     ]
    ],
    "deed": "every home province held through a war, or a war won",
+   "deed_effect": {
+    "kind": "unread",
+    "waits_on": "war outcomes"
+   },
    "advantage": "muster time -20%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "muster time -20%",
+     "waits_on": "muster time"
+    }
+   ],
    "keys_next_branch": "Space Force",
    "cost_units": 6
   },
@@ -1968,6 +3026,13 @@
    "branch": "ST-OR",
    "requires": [],
    "advantage": "-1% unrest in every province",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-1% unrest in every province",
+     "waits_on": "unrest"
+    }
+   ],
    "cost_units": 1
   },
   {
@@ -1983,6 +3048,13 @@
     ]
    ],
    "advantage": "-1% unrest in every province",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-1% unrest in every province",
+     "waits_on": "unrest"
+    }
+   ],
    "cost_units": 1
   },
   {
@@ -1998,6 +3070,13 @@
     ]
    ],
    "advantage": "unrest -3% in every province",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "unrest -3% in every province",
+     "waits_on": "unrest"
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -2013,6 +3092,13 @@
     ]
    ],
    "advantage": "tax yield +3%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "tax yield +3%",
+     "waits_on": "tax yield"
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -2031,6 +3117,18 @@
     ]
    ],
    "advantage": "unrest -10% in every province; wage floor +5% (a cost)",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "unrest -10% in every province",
+     "waits_on": "unrest"
+    },
+    {
+     "kind": "unread",
+     "what": "wage floor +5% (a cost)",
+     "waits_on": "wage_floor"
+    }
+   ],
    "cost_units": 12
   },
   {
@@ -2046,6 +3144,13 @@
     ]
    ],
    "advantage": "-1% unrest in every province",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-1% unrest in every province",
+     "waits_on": "unrest"
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -2061,6 +3166,13 @@
     ]
    ],
    "advantage": "-1% unrest in every province",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-1% unrest in every province",
+     "waits_on": "unrest"
+    }
+   ],
    "cost_units": 3
   },
   {
@@ -2076,6 +3188,13 @@
     ]
    ],
    "advantage": "-1% unrest in every province",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-1% unrest in every province",
+     "waits_on": "unrest"
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -2091,6 +3210,13 @@
     ]
    ],
    "advantage": "-1% unrest in every province",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-1% unrest in every province",
+     "waits_on": "unrest"
+    }
+   ],
    "cost_units": 3
   },
   {
@@ -2106,6 +3232,13 @@
     ]
    ],
    "advantage": "unrest forecast 2 quarters ahead",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "unrest forecast 2 quarters ahead",
+     "waits_on": "unrest"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -2121,6 +3254,23 @@
     ]
    ],
    "advantage": "tax yield +10%; unrest -15%; assimilation +20%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "tax yield +10%",
+     "waits_on": "tax yield"
+    },
+    {
+     "kind": "unread",
+     "what": "unrest -15%",
+     "waits_on": "unrest"
+    },
+    {
+     "kind": "unread",
+     "what": "assimilation +20%",
+     "waits_on": "assimilation"
+    }
+   ],
    "cost_units": 24,
    "excludes": "DG-ST-OR-Bb"
   },
@@ -2137,6 +3287,13 @@
     ]
    ],
    "advantage": "unrest -30% now, but the unrest floor rises 5 points a year. Destabiliser",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "unrest -30% now, but the unrest floor rises 5 points a year",
+     "waits_on": "unrest"
+    }
+   ],
    "cost_units": 24,
    "excludes": "DG-ST-OR-Ba"
   },
@@ -2154,6 +3311,13 @@
    ],
    "placeholder": "politics",
    "advantage": "reserved for politics: regime, elections, succession",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "reserved for politics: regime, elections, succession",
+     "waits_on": "politics"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -2170,6 +3334,13 @@
    ],
    "placeholder": "politics",
    "advantage": "reserved for politics: regime, elections, succession",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "reserved for politics: regime, elections, succession",
+     "waits_on": "politics"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -2189,6 +3360,13 @@
    ],
    "placeholder": "politics",
    "advantage": "placeholder cluster: regime, elections, succession; effects authored when the politics system exists",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "placeholder cluster: regime, elections, succession; effects authored when the politics system exists",
+     "waits_on": "politics"
+    }
+   ],
    "cost_units": 24
   },
   {
@@ -2206,6 +3384,13 @@
     ]
    ],
    "advantage": "-3% unrest in every province",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-3% unrest in every province",
+     "waits_on": "unrest"
+    }
+   ],
    "pending_requires": [
     [
      "DG-ST-OR-C"
@@ -2227,7 +3412,18 @@
     ]
    ],
    "deed": "unrest below the floor in every province for 8 quarters",
+   "deed_effect": {
+    "kind": "unread",
+    "waits_on": "unrest"
+   },
    "advantage": "tax yield +5%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "tax yield +5%",
+     "waits_on": "tax yield"
+    }
+   ],
    "keys_next_branch": "Settlement Charters",
    "cost_units": 12
   },
@@ -2240,6 +3436,13 @@
    "branch": "ST-AC",
    "requires": [],
    "advantage": "-1% Alarm toward you",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-1% Alarm toward you",
+     "waits_on": "Alarm"
+    }
+   ],
    "cost_units": 1
   },
   {
@@ -2255,6 +3458,13 @@
     ]
    ],
    "advantage": "-1% Alarm toward you",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-1% Alarm toward you",
+     "waits_on": "Alarm"
+    }
+   ],
    "cost_units": 1
   },
   {
@@ -2270,6 +3480,13 @@
     ]
    ],
    "advantage": "sentiment +5 with every nation you trade with",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "sentiment +5 with every nation you trade with",
+     "waits_on": "sentiment"
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -2285,6 +3502,18 @@
     ]
    ],
    "advantage": "tariffs with accord partners fall to 0; their Alarm toward you -10",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "tariffs with accord partners fall to 0",
+     "waits_on": "tariffs"
+    },
+    {
+     "kind": "unread",
+     "what": "accord partners’ Alarm toward you -10",
+     "waits_on": "Alarm"
+    }
+   ],
    "cost_units": 12,
    "excludes": "DG-ST-AC-Ab"
   },
@@ -2301,6 +3530,30 @@
     ]
    ],
    "advantage": "tariffs +20%; domestic processing +10%. Severer: rivals’ Alarm +5, export routes thin",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "tariffs +20%",
+     "waits_on": "tariffs"
+    },
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "all",
+     "op": "multiply",
+     "value": 1.1
+    },
+    {
+     "kind": "unread",
+     "what": "rivals’ Alarm +5",
+     "waits_on": "Alarm"
+    },
+    {
+     "kind": "unread",
+     "what": "export routes thin",
+     "waits_on": "tariffs"
+    }
+   ],
    "cost_units": 12,
    "excludes": "DG-ST-AC-Aa"
   },
@@ -2318,6 +3571,13 @@
     ]
    ],
    "advantage": "-1% Alarm toward you",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-1% Alarm toward you",
+     "waits_on": "Alarm"
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -2333,6 +3593,13 @@
     ]
    ],
    "advantage": "-1% Alarm toward you",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-1% Alarm toward you",
+     "waits_on": "Alarm"
+    }
+   ],
    "cost_units": 3
   },
   {
@@ -2349,6 +3616,13 @@
     ]
    ],
    "advantage": "-1% Alarm toward you",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-1% Alarm toward you",
+     "waits_on": "Alarm"
+    }
+   ],
    "cost_units": 2
   },
   {
@@ -2364,6 +3638,13 @@
     ]
    ],
    "advantage": "-1% Alarm toward you",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-1% Alarm toward you",
+     "waits_on": "Alarm"
+    }
+   ],
    "cost_units": 3
   },
   {
@@ -2379,6 +3660,13 @@
     ]
    ],
    "advantage": "Alarm spikes decay 20% faster",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "Alarm spikes decay 20% faster",
+     "waits_on": "Alarm"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -2394,6 +3682,18 @@
     ]
    ],
    "advantage": "attackers’ odds -50% on your home provinces. Escalator: every rival’s Alarm toward you +10",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "attackers’ odds -50% on your home provinces",
+     "waits_on": "battle resolution"
+    },
+    {
+     "kind": "unread",
+     "what": "every rival’s Alarm toward you +10",
+     "waits_on": "Alarm"
+    }
+   ],
    "cost_units": 24,
    "excludes": "DG-ST-AC-Bb"
   },
@@ -2410,6 +3710,18 @@
     ]
    ],
    "advantage": "units +25% defence; Alarm toward you drifts -5% a year. Looks aggressive, stabilises",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "units +25% defence",
+     "waits_on": "battle resolution"
+    },
+    {
+     "kind": "unread",
+     "what": "Alarm toward you drifts -5% a year",
+     "waits_on": "Alarm"
+    }
+   ],
    "cost_units": 24,
    "excludes": "DG-ST-AC-Ba"
   },
@@ -2426,6 +3738,13 @@
     ]
    ],
    "advantage": "world Ceiling +3",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "world Ceiling +3",
+     "waits_on": "Ceiling"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -2441,6 +3760,13 @@
     ]
    ],
    "advantage": "Alarm toward you -5%",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "Alarm toward you -5%",
+     "waits_on": "Alarm"
+    }
+   ],
    "cost_units": 6
   },
   {
@@ -2459,6 +3785,18 @@
     ]
    ],
    "advantage": "every nation’s Alarm toward you -25%; world Ceiling +10",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "every nation’s Alarm toward you -25%",
+     "waits_on": "Alarm"
+    },
+    {
+     "kind": "unread",
+     "what": "world Ceiling +10",
+     "waits_on": "Ceiling"
+    }
+   ],
    "cost_units": 24
   },
   {
@@ -2479,6 +3817,13 @@
     ]
    ],
    "advantage": "-3% Alarm toward you",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-3% Alarm toward you",
+     "waits_on": "Alarm"
+    }
+   ],
    "cost_units": 4
   },
   {
@@ -2495,7 +3840,18 @@
     ]
    ],
    "deed": "Alarm toward you below Ceiling for 8 quarters",
+   "deed_effect": {
+    "kind": "unread",
+    "waits_on": "Alarm"
+   },
    "advantage": "Alarm toward you decays 10% faster",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "Alarm toward you decays 10% faster",
+     "waits_on": "Alarm"
+    }
+   ],
    "keys_next_branch": "Planetary Accords",
    "cost_units": 6
   },
@@ -2516,6 +3872,22 @@
     ]
    ],
    "advantage": "+1% extraction rate and +1% processing output",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "extraction_rate",
+     "scope": "all",
+     "op": "multiply",
+     "value": 1.01
+    },
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "all",
+     "op": "multiply",
+     "value": 1.01
+    }
+   ],
    "cost_units": 3
   },
   {
@@ -2535,6 +3907,20 @@
     ]
    ],
    "advantage": "+1% processing output and -1% fuel draw",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "all",
+     "op": "multiply",
+     "value": 1.01
+    },
+    {
+     "kind": "unread",
+     "what": "-1% fuel draw",
+     "waits_on": "building fuel draw"
+    }
+   ],
    "cost_units": 3
   },
   {
@@ -2554,6 +3940,22 @@
     ]
    ],
    "advantage": "+2% propellant output and +1% national research",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "processing_yield",
+     "scope": "resource:propellant",
+     "op": "multiply",
+     "value": 1.02
+    },
+    {
+     "kind": "modifier",
+     "subject": "national_research",
+     "scope": "all",
+     "op": "add",
+     "value": 0.01
+    }
+   ],
    "cost_units": 3
   },
   {
@@ -2573,6 +3975,20 @@
     ]
    ],
    "advantage": "+1% national research and +1% trade capacity",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "national_research",
+     "scope": "all",
+     "op": "add",
+     "value": 0.01
+    },
+    {
+     "kind": "unread",
+     "what": "+1% trade capacity",
+     "waits_on": "Marketplace trade capacity"
+    }
+   ],
    "cost_units": 3
   },
   {
@@ -2592,6 +4008,20 @@
     ]
    ],
    "advantage": "+3% unit movement and -1% logistics cost",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "+3% unit movement",
+     "waits_on": "unit movement"
+    },
+    {
+     "kind": "modifier",
+     "subject": "logistics_cost",
+     "scope": "all",
+     "op": "multiply",
+     "value": 0.99
+    }
+   ],
    "cost_units": 3
   },
   {
@@ -2611,6 +4041,18 @@
     ]
    ],
    "advantage": "-1% unrest and -1% Alarm toward you",
+   "effects": [
+    {
+     "kind": "unread",
+     "what": "-1% unrest",
+     "waits_on": "unrest"
+    },
+    {
+     "kind": "unread",
+     "what": "-1% Alarm toward you",
+     "waits_on": "Alarm"
+    }
+   ],
    "cost_units": 3
   },
   {
@@ -2630,6 +4072,20 @@
     ]
    ],
    "advantage": "+1% extraction rate and -1% Alarm toward you",
+   "effects": [
+    {
+     "kind": "modifier",
+     "subject": "extraction_rate",
+     "scope": "all",
+     "op": "multiply",
+     "value": 1.01
+    },
+    {
+     "kind": "unread",
+     "what": "-1% Alarm toward you",
+     "waits_on": "Alarm"
+    }
+   ],
    "cost_units": 3
   }
  ]

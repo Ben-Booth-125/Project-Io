@@ -2,6 +2,7 @@
 
 #include "logistics.hpp"
 #include "market_clearing.hpp" // processor_reservation (BL-995)
+#include "nation_tech.hpp"     // nation_scalar: logistics_cost (BL-1274)
 #include "orbital_system.hpp"
 #include "stance.hpp"
 
@@ -817,6 +818,20 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
     const market_component&      dest_market = mit->second;
     const entity_id              dest_body   = dest_market.body;
 
+    // BL-1274: the corp's home nation's held-node logistics_cost modifiers
+    // (scope "all" or the cargo good), folded into the priced leg at this one
+    // seam, so the dispatcher, the player's verb and the rival scorer all pay
+    // the same figure. A nation holding nothing gets the cost back untouched.
+    const auto nation_priced = [&](convoy_leg l) {
+        if (l.viable)
+        {
+            effect_target at;
+            at.resource = static_cast<int>(ri);
+            l.cost = nation_scalar(w, corp.home_nation, modifier_subject::logistics_cost, at, l.cost);
+        }
+        return l;
+    };
+
     if (src_body == dest_body)
     {
         // Intra-body (BL-077, BL-1186): haul the source pool's stock from its
@@ -833,7 +848,7 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
             return leg;
         leg = finish_route(route, qty, reg.port_handling());
         leg.origin_tile = origin; // BL-1195: the lane starts where the haul was priced from
-        return leg;
+        return nation_priced(leg);
     }
 
     convoy_mode mode;
@@ -867,7 +882,7 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
         travel_ticks = (dist > 1.0f) ? static_cast<int>(dist + 0.999f) : 1;
     }
 
-    return finish_leg(mode, unit_cost, dist, qty, 0.0f, travel_ticks);
+    return nation_priced(finish_leg(mode, unit_cost, dist, qty, 0.0f, travel_ticks));
 }
 
 convoy_leg price_market_export_leg(world& w, const recipe_registry& reg,

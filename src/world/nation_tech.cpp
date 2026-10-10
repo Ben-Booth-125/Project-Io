@@ -2,13 +2,18 @@
 
 #include "components.hpp"
 #include "nation_budget.hpp"
+#include "recipe_registry.hpp"
+#include "resource_names.hpp"
 #include "world.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <iterator>
 #include <limits>
 #include <map>
+#include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -211,9 +216,14 @@ bool deed_met(const world& /*w*/, entity_id /*nation*/, int node)
 {
     if (!valid_node(node))
         return false;
-    // Every deed is prose until the effect pass (BL-1274) gives it a reader on
-    // the condition_set substrate. Until then a quest waits in the queue.
-    return !node_at(node).is_quest;
+    const io::dg::node& n = node_at(node);
+    if (!n.is_quest)
+        return true;
+    // Every Digitisation deed is declared unread (`deed_waits_on`): each reads
+    // a quantity the campaign does not carry (tech_tree_store.js holds the
+    // store to that). A deed given a machine form is evaluated HERE, against
+    // the nation; until one is, a quest waits in the queue.
+    return false;
 }
 
 enqueue_result enqueue_node(world& w, entity_id nation, int node)
@@ -240,36 +250,354 @@ enqueue_result enqueue_node(world& w, entity_id nation, int node)
     return enqueue_result::queued;
 }
 
-float research_multiplier(const world& /*w*/, entity_id /*nation*/)
+// ---------------------------------------------------------------------------
+// Node effects (BL-1274)
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// THE CODE'S DECLARATION. Each list below is what this file (and the read
+// sites it serves) actually consumes; nation_tech_harness R1 holds the store
+// to it. Adding a reader means adding it here in the same change.
+
+/// Modifier subjects with a live consumer: extraction_rate (extraction_nominal),
+/// processing_yield (credit_processing_outputs), logistics_cost
+/// (price_convoy_leg), national_research (advance_research). unit_upkeep and
+/// wage_floor have no read site that carries a nation (resolve_unit_upkeep and
+/// compute_building_opex take none); collapse_strain has no campaign accumulator.
+constexpr modifier_subject k_read_subjects[] = {
+    modifier_subject::extraction_rate, modifier_subject::processing_yield,
+    modifier_subject::logistics_cost, modifier_subject::national_research,
+};
+
+/// Mechanic keys code knows. None is read yet; `space_dispatch` (the Launchpad
+/// may operate, convoys may dispatch to other bodies) is DEFERRED: its reader
+/// would be price_convoy_leg's inter-body branch, and enforcing it closes the
+/// space programme at the start of play — a ruling owed (BL-1274 report).
+constexpr std::string_view k_read_mechanics[]     = { "" };
+constexpr std::string_view k_deferred_mechanics[] = { "space_dispatch" };
+
+/// The systems an unread effect or deed may wait on. Each is a lever the
+/// campaign does not carry today (or carries without a nation to read it by).
+constexpr std::string_view k_unread_systems[] = {
+    "Alarm", "Ceiling", "Container Port", "Marketplace trade capacity", "Nuclear Plant",
+    "Port throughput", "activity fog", "assimilation", "battle resolution",
+    "building fuel draw", "building maintenance by nation", "coastal water placement",
+    "construction cost by nation", "convoy cargo capacity", "deed history", "espionage",
+    "fertiliser recipe", "holding losses by nation", "household demand by nation",
+    "launch draw by nation", "microchip recipe", "muster time",
+    "national stock and demand ledger", "offshore placement", "plastics recipe", "politics",
+    "port handling by nation", "province building ceiling by type", "roads", "sentiment",
+    "survey reach", "tariffs", "tax yield", "trade partners by nation", "trade points",
+    "trade settlement timing", "travel time by nation", "unit movement", "unit strength",
+    "unit unlock", "unit_upkeep", "unrest", "wage_floor", "war outcomes",
+};
+
+bool parse_subject(std::string_view s, modifier_subject& out)
 {
-    // BL-1274 fills this from the held nodes' "+N% national research" effects.
-    return 1.0f;
+    static constexpr std::pair<std::string_view, modifier_subject> table[] = {
+        { "extraction_rate", modifier_subject::extraction_rate },
+        { "processing_yield", modifier_subject::processing_yield },
+        { "unit_upkeep", modifier_subject::unit_upkeep },
+        { "logistics_cost", modifier_subject::logistics_cost },
+        { "wage_floor", modifier_subject::wage_floor },
+        { "collapse_strain", modifier_subject::collapse_strain },
+        { "national_research", modifier_subject::national_research },
+    };
+    for (const auto& [name, v] : table)
+        if (name == s)
+        {
+            out = v;
+            return true;
+        }
+    return false;
 }
 
-float nation_scalar(const world& /*w*/, entity_id /*nation*/, modifier_subject /*subject*/,
-                    float base)
+bool parse_building(std::string_view s, building_type& out)
 {
-    // BL-1274 fills this from the held nodes' machine effects. Identity until
-    // then: the same bits back, no arithmetic performed.
+    // The scripts/economy.lua keys (recipe_registry.cpp's own table).
+    static constexpr std::pair<std::string_view, building_type> table[] = {
+        { "extraction_site", building_type::extraction_site },
+        { "processing_facility", building_type::processing_facility },
+        { "port", building_type::port },
+        { "launchpad", building_type::launchpad },
+        { "inland_logistics_hub", building_type::inland_logistics_hub },
+        { "military_base", building_type::military_base },
+        { "research_institute", building_type::research_institute },
+        { "schooling", building_type::schooling },
+        { "university", building_type::university },
+    };
+    for (const auto& [name, v] : table)
+        if (name == s)
+        {
+            out = v;
+            return true;
+        }
+    return false;
+}
+
+enum class scope_kind : std::uint8_t { all, resource, group, recipe, building, bad };
+
+struct resolved_modifier
+{
+    std::size_t      node     = 0;
+    modifier_subject subject  = modifier_subject::extraction_rate;
+    scope_kind       scope    = scope_kind::bad;
+    int              resource = -1;
+    building_type    building = building_type::none;
+    std::string_view text;  // the group or recipe name
+    scalar_modifier  mod;
+};
+
+struct resolved_unlock
+{
+    std::size_t      node = 0;
+    std::string_view recipe;                       // unlock_recipe
+    building_type    building = building_type::none; // unlock_structure
+    bool             deferred = false;
+};
+
+constexpr std::string_view k_resource_prefix = "resource:";
+constexpr std::string_view k_group_prefix    = "group:";
+constexpr std::string_view k_recipe_prefix   = "recipe:";
+constexpr std::string_view k_building_prefix = "building:";
+
+void parse_scope(std::string_view s, resolved_modifier& r)
+{
+    auto starts = [&](std::string_view p) { return s.substr(0, p.size()) == p; };
+    if (s == "all")
+        r.scope = scope_kind::all;
+    else if (starts(k_resource_prefix))
+    {
+        bool ok = false;
+        const resource_type t = resource_names::resource_from_name(
+            std::string(s.substr(k_resource_prefix.size())), ok);
+        if (ok)
+        {
+            r.scope    = scope_kind::resource;
+            r.resource = static_cast<int>(t);
+        }
+    }
+    else if (starts(k_group_prefix) && s.size() > k_group_prefix.size())
+    {
+        r.scope = scope_kind::group;
+        r.text  = s.substr(k_group_prefix.size());
+    }
+    else if (starts(k_recipe_prefix) && s.size() > k_recipe_prefix.size())
+    {
+        r.scope = scope_kind::recipe;
+        r.text  = s.substr(k_recipe_prefix.size());
+    }
+    else if (starts(k_building_prefix) && parse_building(s.substr(k_building_prefix.size()), r.building))
+        r.scope = scope_kind::building;
+}
+
+struct effect_tables
+{
+    // Read modifiers, per subject, in node-index order (the effects table's own order).
+    std::vector<resolved_modifier> by_subject[static_cast<std::size_t>(modifier_subject::national_research) + 1];
+    std::vector<resolved_unlock>   recipe_unlocks;    // read or deferred
+    std::vector<resolved_unlock>   structure_unlocks; // read or deferred
+};
+
+const effect_tables& tables()
+{
+    // Built once from the constexpr store table: a pure function of the
+    // header, so every process holds the same rows in the same order.
+    static const effect_tables t = [] {
+        effect_tables out;
+        for (const io::dg::effect& e : io::dg::effects)
+        {
+            const effect_reading how = classify_effect(e);
+            if (how == effect_reading::unread || how == effect_reading::invalid)
+                continue;
+            const std::size_t node = static_cast<std::size_t>(e.node);
+            if (e.kind == io::dg::effect_kind::modifier)
+            {
+                resolved_modifier r;
+                r.node = node;
+                parse_subject(e.subject, r.subject);
+                parse_scope(e.scope, r);
+                r.mod.subject   = r.subject;
+                r.mod.op        = e.op == io::dg::effect_op::add ? modifier_op::add : modifier_op::multiply;
+                r.mod.magnitude = e.value;
+                out.by_subject[static_cast<std::size_t>(r.subject)].push_back(r);
+            }
+            else if (e.kind == io::dg::effect_kind::unlock_recipe)
+                out.recipe_unlocks.push_back({ node, e.target, building_type::none,
+                                               how == effect_reading::deferred });
+            else if (e.kind == io::dg::effect_kind::unlock_structure)
+            {
+                resolved_unlock u{ node, {}, building_type::none, how == effect_reading::deferred };
+                parse_building(e.target, u.building);
+                out.structure_unlocks.push_back(u);
+            }
+        }
+        return out;
+    }();
+    return t;
+}
+
+bool scope_matches(const resolved_modifier& r, const effect_target& t)
+{
+    switch (r.scope)
+    {
+        case scope_kind::all:      return !t.scoped_only;
+        case scope_kind::resource: return t.resource >= 0 && r.resource == t.resource;
+        case scope_kind::group:    return !t.group.empty() && r.text == t.group;
+        case scope_kind::recipe:   return !t.recipe.empty() && r.text == t.recipe;
+        case scope_kind::building: return t.building != building_type::none && r.building == t.building;
+        case scope_kind::bad:      return false;
+    }
+    return false;
+}
+
+template <std::size_t N>
+bool in(const std::string_view (&list)[N], std::string_view s)
+{
+    return !s.empty() && std::find(std::begin(list), std::end(list), s) != std::end(list);
+}
+
+bool recipe_gate(const world& w, const recipe_registry& reg, entity_id corp,
+                 std::uint16_t recipe_id, bool enforce_deferred)
+{
+    const effect_tables& t = tables();
+    if (t.recipe_unlocks.empty() || corp == null_entity)
+        return true;
+    const recipe* rc = reg.get_recipe(recipe_id);
+    if (rc == nullptr)
+        return true;
+    // A recipe one or more nodes unlock is open once the corp's home nation
+    // holds ANY of them; a recipe no node names is open.
+    bool named = false;
+    for (const resolved_unlock& u : t.recipe_unlocks)
+    {
+        if ((u.deferred && !enforce_deferred) || u.recipe != rc->name)
+            continue;
+        named = true;
+        if (corp_nation_holds(w, corp, static_cast<int>(u.node)))
+            return true;
+    }
+    return !named;
+}
+
+} // namespace
+
+bool modifier_subject_read(modifier_subject subject)
+{
+    return std::find(std::begin(k_read_subjects), std::end(k_read_subjects), subject)
+           != std::end(k_read_subjects);
+}
+
+const std::vector<std::string_view>& declared_unread_systems()
+{
+    static const std::vector<std::string_view> v(std::begin(k_unread_systems), std::end(k_unread_systems));
+    return v;
+}
+
+effect_reading classify_effect(const io::dg::effect& e, const recipe_registry* reg)
+{
+    const std::string_view target   = e.target;
+    const bool             deferred = e.deferred[0] != '\0';
+    switch (e.kind)
+    {
+        case io::dg::effect_kind::modifier:
+        {
+            modifier_subject s{};
+            if (deferred || !parse_subject(e.subject, s) || !modifier_subject_read(s))
+                return effect_reading::invalid;
+            resolved_modifier r;
+            parse_scope(e.scope, r);
+            if (r.scope == scope_kind::bad || !std::isfinite(e.value))
+                return effect_reading::invalid;
+            if (reg != nullptr && (r.scope == scope_kind::group || r.scope == scope_kind::recipe))
+            {
+                bool found = false;
+                for (std::size_t i = 0; i < reg->recipe_count() && !found; ++i)
+                    if (const recipe* rc = reg->get_recipe(static_cast<std::uint16_t>(i)))
+                        found = r.scope == scope_kind::group ? rc->group == r.text : rc->name == r.text;
+                if (!found)
+                    return effect_reading::invalid;
+            }
+            return effect_reading::read;
+        }
+        case io::dg::effect_kind::unlock_recipe:
+            if (target.empty())
+                return effect_reading::invalid;
+            if (reg != nullptr && reg->recipe_id(std::string(target)) == no_recipe)
+                return effect_reading::invalid; // a recipe the registry lacks is `unread`
+            return deferred ? effect_reading::deferred : effect_reading::read;
+        case io::dg::effect_kind::unlock_structure:
+        {
+            building_type b{};
+            if (!parse_building(target, b))
+                return effect_reading::invalid;
+            return deferred ? effect_reading::deferred : effect_reading::read;
+        }
+        case io::dg::effect_kind::mechanic:
+            if (deferred && (in(k_deferred_mechanics, target) || in(k_read_mechanics, target)))
+                return effect_reading::deferred;
+            if (!deferred && in(k_read_mechanics, target))
+                return effect_reading::read;
+            return effect_reading::invalid;
+        case io::dg::effect_kind::unread:
+            if (deferred || e.what[0] == '\0' || !in(k_unread_systems, e.waits_on))
+                return effect_reading::invalid;
+            return effect_reading::unread;
+    }
+    return effect_reading::invalid;
+}
+
+float nation_scalar(const world& w, entity_id nation, modifier_subject subject,
+                    const effect_target& target, float base)
+{
+    const nation_tech_state* st = state_of(w, nation);
+    if (st == nullptr || st->held.none())
+        return base; // holding nothing: the same bits back, no arithmetic
+    const std::size_t si = static_cast<std::size_t>(subject);
+    const effect_tables& t = tables();
+    if (si >= std::size(t.by_subject))
+        return base;
+    // Node-index order: the held set has no earn order, and needs none saved.
+    for (const resolved_modifier& r : t.by_subject[si])
+        if (st->held.test(r.node) && scope_matches(r, target))
+            base = apply_scalar_modifier(base, r.mod);
     return base;
 }
 
-bool structure_unlocked(const world& /*w*/, entity_id /*corp*/, building_type /*type*/)
+float research_multiplier(const world& w, entity_id nation)
 {
-    // No node of the Digitisation tree carries a machine `unlock_structure`
-    // effect yet (BL-1274 authors them): every type is open to every nation
-    // (NR-1022). When one does, this becomes "the corp's home nation holds
-    // every node whose effect unlocks `type`", read through corp_nation_holds.
-    return true;
+    // 1 + the held "+N% national research" shares (scope "all", op add).
+    return nation_scalar(w, nation, modifier_subject::national_research, effect_target{}, 1.0f);
 }
 
-bool recipe_unlocked(const world& /*w*/, const recipe_registry& /*reg*/, entity_id /*corp*/,
-                     std::uint16_t /*recipe_id*/)
+bool structure_unlocked(const world& w, entity_id corp, building_type type)
 {
-    // As structure_unlocked: no node carries an `unlock_recipe` effect yet, so
-    // every recipe is open (NR-1022 — the Toolmaker, Bessemer steel and refined
-    // copper gates retired with the per-corp tech set).
-    return true;
+    const effect_tables& t = tables();
+    if (t.structure_unlocks.empty() || corp == null_entity)
+        return true;
+    bool named = false;
+    for (const resolved_unlock& u : t.structure_unlocks)
+    {
+        if (u.deferred || u.building != type)
+            continue;
+        named = true;
+        if (corp_nation_holds(w, corp, static_cast<int>(u.node)))
+            return true;
+    }
+    return !named;
+}
+
+bool recipe_unlocked(const world& w, const recipe_registry& reg, entity_id corp,
+                     std::uint16_t recipe_id)
+{
+    return recipe_gate(w, reg, corp, recipe_id, /*enforce_deferred=*/false);
+}
+
+bool recipe_unlocked_if_ruled(const world& w, const recipe_registry& reg, entity_id corp,
+                              std::uint16_t recipe_id)
+{
+    return recipe_gate(w, reg, corp, recipe_id, /*enforce_deferred=*/true);
 }
 
 int flow_research_queue(world& w, entity_id nation, const research_params& p)
@@ -337,9 +665,14 @@ void advance_research(world& w, const research_params& p, std::vector<research_a
             if (bit == w.buildings.end())
                 continue;
             const building_component& b = bit->second;
-            // Both types staff at zero (components.hpp): a completed, standing
-            // building is a staffed one.
-            if (b.ticks_remaining > 0 || b.decommissioned)
+            // RESEARCH.md § Research points: each STAFFED University and
+            // institute adds RP — completed, standing, and with workforce
+            // assigned. Neither type enters the labour claims (economy_system),
+            // so `workforce_assigned` is the staffing the building was given:
+            // construction staffs a University at 0.5 and a research institute
+            // at ZERO (construction.cpp, corporation_generation.cpp), so an
+            // institute counts only once something staffs it (BL-1274 report).
+            if (b.ticks_remaining > 0 || b.decommissioned || !(b.workforce_assigned > 0.0f))
                 continue;
             if (b.type == building_type::university)
             {
@@ -375,10 +708,19 @@ void advance_research(world& w, const research_params& p, std::vector<research_a
         const double mult = std::isfinite(row.multiplier) && row.multiplier > 0.0f
                                 ? static_cast<double>(row.multiplier) : 0.0;
 
+        // The University factor: held national_research multiplies scoped to
+        // the University only (exactly 1 when none is held).
+        effect_target uni;
+        uni.building    = building_type::university;
+        uni.scoped_only = true;
+        const double uni_factor = static_cast<double>(
+            nation_scalar(w, nid, modifier_subject::national_research, uni, 1.0f));
+
         // The RP that cost no treasury: the base and the buildings.
         const std::int64_t free_milli = static_cast<std::int64_t>(std::llround(
             static_cast<double>(to_milli(static_cast<double>(p.base_rp_per_nation)
                                          + static_cast<double>(row.universities) * p.rp_per_university
+                                               * uni_factor
                                          + static_cast<double>(row.institutes) * p.rp_per_institute))
             * mult));
 

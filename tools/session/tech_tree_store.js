@@ -59,6 +59,49 @@ for (const b of branches) {
 }
 // Roots: only first travel nodes are open from the start.
 for (const n of nodes) if (!n.requires.length && !(n.tier === 'travel' && /-T1$/.test(n.id))) err(`${n.id}: only a branch's first travel node may have no requirement`);
+// ---- the effects (RESEARCH.md § Effects no system reads yet; BL-1274) ----------------------
+// Every node carries >= 1 machine effect; each is well-formed for its kind. Whether CODE reads an
+// effect is nation_tech.cpp's declaration, and nation_tech_harness's R1 audit holds the two together
+// (the header this store renders into, via gen_tech_tree_table.js, is what that audit reads).
+const SUBJECTS = new Set(['extraction_rate', 'processing_yield', 'unit_upkeep', 'logistics_cost',
+                          'wage_floor', 'collapse_strain', 'national_research']); // modifier_set.hpp
+const SCOPE_RE = /^(all|resource:[a-z_]+|group:[A-Za-z &]+|recipe:[a-z_]+|building:[a-z_]+)$/;
+const str = v => typeof v === 'string' && v.length > 0;
+for (const n of nodes) {
+  if (!Array.isArray(n.effects) || !n.effects.length) { err(`${n.id}: needs at least one effect`); continue; }
+  for (const e of n.effects) {
+    const at = `${n.id}: effect ${JSON.stringify(e)}`;
+    if (e.deferred !== undefined && !str(e.deferred)) err(`${at}: deferred must name the ruling it waits on`);
+    switch (e.kind) {
+      case 'modifier': {
+        if (!SUBJECTS.has(e.subject)) err(`${at}: unknown modifier subject`);
+        const scopes = Array.isArray(e.scope) ? e.scope : [e.scope];
+        if (!scopes.length || !scopes.every(s => typeof s === 'string' && SCOPE_RE.test(s))) err(`${at}: bad scope`);
+        if (Array.isArray(e.scope) && new Set(e.scope).size !== e.scope.length) err(`${at}: duplicate scope`);
+        if (e.op !== 'multiply' && e.op !== 'add') err(`${at}: op must be multiply or add`);
+        if (typeof e.value !== 'number' || !Number.isFinite(e.value)) err(`${at}: value must be a finite number`);
+        if (e.op === 'multiply' && !(e.value > 0)) err(`${at}: a multiply must be positive`);
+        if (e.deferred !== undefined) err(`${at}: a modifier is never deferred`);
+        break;
+      }
+      case 'unlock_recipe': if (!str(e.recipe)) err(`${at}: needs recipe`); break;
+      case 'unlock_structure': if (!str(e.structure)) err(`${at}: needs structure`); break;
+      case 'mechanic': if (!str(e.key)) err(`${at}: needs key`); break;
+      case 'unread':
+        if (!str(e.what) || !str(e.waits_on)) err(`${at}: unread needs what and waits_on`);
+        if (e.deferred !== undefined) err(`${at}: an unread effect is not deferred`);
+        break;
+      default: err(`${at}: unknown kind`);
+    }
+  }
+  if (n.placeholder && !(n.effects.length === 1 && n.effects[0].kind === 'unread' && n.effects[0].waits_on === n.placeholder))
+    err(`${n.id}: a placeholder carries one unread effect waiting on ${n.placeholder}`);
+  if (n.tier === 'quest') {
+    const d = n.deed_effect;
+    if (!d || d.kind !== 'unread' || !str(d.waits_on)) err(`${n.id}: a quest's deed_effect is {kind: "unread", waits_on} until a deed reader exists`);
+  } else if (n.deed_effect !== undefined) err(`${n.id}: only a quest carries a deed_effect`);
+}
+
 // Reachability from the roots (placeholders count as reachable; they can be researched).
 const held = new Set(nodes.filter(n => !n.requires.length).map(n => n.id));
 for (let changed = true; changed;) {
@@ -94,7 +137,8 @@ const doc = fs.readFileSync(docPath, 'utf8');
 const i = doc.indexOf(BEGIN), j = doc.indexOf(END);
 if (i < 0 || j < 0) err(`${path.basename(docPath)}: generated markers missing`);
 const next = i >= 0 && j >= 0 ? doc.slice(0, i + BEGIN.length) + '\n\n' + out + '\n' + doc.slice(j) : doc;
-const stale = next !== doc;
+// Line endings are git's (a CRLF checkout of an LF render is not stale).
+const stale = next.replace(/\r\n/g, '\n') !== doc.replace(/\r\n/g, '\n');
 
 if (errors.length) { for (const e of errors) console.log('FAIL ' + e); }
 if (checkOnly) {

@@ -9,6 +9,10 @@
 // the sim and on the save seam — reordering the store re-points every saved held set, so the
 // store is append-only once a save carries it). Requirement groups become index lists (AND over
 // groups, any member satisfies a group), `excludes` an index or -1.
+// Each node's machine `effects` (BL-1274) become a slice of the flat
+// `effects` table, in node order then store order; a list-valued scope expands to one row per member
+// (one row matches a given target at most once, so the expansion never double-applies). A quest's
+// `deed_effect` becomes `deed_waits_on` while it is declared unread.
 //
 // Deterministic: the output is a pure function of the store bytes — no timestamp, no host path.
 // --check writes nothing and exits 1 when the checked-in header is stale. Run it beside
@@ -36,7 +40,30 @@ for (const n of nodes) {
   for (const g of n.requires) for (const r of g)
     if (!index.has(r)) { console.error(`${n.id}: requires unknown ${r}`); process.exit(1); }
   if (n.excludes && !index.has(n.excludes)) { console.error(`${n.id}: excludes unknown ${n.excludes}`); process.exit(1); }
+  if (!Array.isArray(n.effects) || !n.effects.length) { console.error(`${n.id}: no effects (run tech_tree_store.js --check)`); process.exit(1); }
 }
+
+// The flat effect table (BL-1274). Field validation is tech_tree_store.js --check's; this only shapes.
+const KINDS = { modifier: 1, unlock_recipe: 1, unlock_structure: 1, mechanic: 1, unread: 1 };
+const OPS = { multiply: 1, add: 1 };
+const flt = v => { const s = String(v); return (/[.e]/.test(s) ? s : s + '.0') + 'f'; };
+const effects = [];
+const effectRange = [];
+nodes.forEach((n, i) => {
+  const begin = effects.length;
+  for (const e of n.effects) {
+    if (!KINDS[e.kind]) { console.error(`${n.id}: unknown effect kind ${e.kind}`); process.exit(1); }
+    const scopes = e.kind === 'modifier' ? (Array.isArray(e.scope) ? e.scope : [e.scope]) : [''];
+    for (const sc of scopes) {
+      if (e.kind === 'modifier' && !OPS[e.op]) { console.error(`${n.id}: unknown op ${e.op}`); process.exit(1); }
+      effects.push({ node: i, kind: e.kind, subject: e.subject || '', scope: sc || '',
+        op: e.kind === 'modifier' ? e.op : 'multiply', value: e.kind === 'modifier' ? e.value : 1,
+        target: e.recipe || e.structure || e.key || '', what: e.what || '', waits_on: e.waits_on || '',
+        deferred: e.deferred || '' });
+    }
+  }
+  effectRange.push([begin, effects.length]);
+});
 
 // A C string literal in plain ASCII: every non-ASCII byte of the UTF-8 encoding is written as a
 // three-digit octal escape (octal never swallows a following character, unlike \x), so the header
@@ -69,9 +96,15 @@ lines.push('namespace io::dg {');
 lines.push('');
 lines.push('enum class tier : std::uint8_t { travel = 0, minor = 1, major = 2, quest = 3 };');
 lines.push('');
+lines.push('/// What a node\'s effect does (docs/economy/RESEARCH.md, section "Effects no system reads yet").');
+lines.push('/// Whether code READS a row is nation_tech.cpp\'s declaration (`classify_effect`), not this table\'s.');
+lines.push('enum class effect_kind : std::uint8_t { modifier = 0, unlock_recipe = 1, unlock_structure = 2, mechanic = 3, unread = 4 };');
+lines.push('enum class effect_op : std::uint8_t { multiply = 0, add = 1 };');
+lines.push('');
 lines.push(`inline constexpr int node_count        = ${nodes.length};`);
 lines.push(`inline constexpr int max_groups        = ${maxGroups}; ///< Most requirement groups any node has.`);
 lines.push(`inline constexpr int max_group_members = ${maxMembers}; ///< Most members any one group has.`);
+lines.push(`inline constexpr int effect_count      = ${effects.length}; ///< Rows in \`effects\` (a list scope is one row per member).`);
 lines.push('');
 lines.push('/// One node of the Digitisation tree. `groups[g][m]` is a node index, -1 past the group\'s end;');
 lines.push('/// a node is open when every one of its `group_count` groups has at least one held member.');
@@ -93,7 +126,29 @@ lines.push('    bool         is_joint;');
 lines.push('    const char*  branch;      ///< "PR-EX" etc.; "" for a joint.');
 lines.push('    const char*  placeholder; ///< The system a placeholder holds the place of; "" otherwise.');
 lines.push('    const char*  deed;        ///< A quest\'s deed prose; "" otherwise.');
-lines.push('    const char*  advantage;   ///< The effect, as prose. Machine effects are the effect pass\'s.');
+lines.push('    const char*  advantage;   ///< The player-facing prose; `effects` is its machine form.');
+lines.push('    std::uint16_t effect_begin; ///< This node\'s rows in `effects`: [effect_begin, effect_end).');
+lines.push('    std::uint16_t effect_end;');
+lines.push('    const char*  deed_waits_on; ///< A quest whose deed is declared unread: the system it waits on. "" otherwise.');
+lines.push('};');
+lines.push('');
+lines.push('/// One machine effect of one node. A modifier moves `subject` (a modifier_subject key) where its');
+lines.push('/// `scope` matches: "all", "resource:<good>", "group:<recipe group>", "recipe:<recipe>",');
+lines.push('/// "building:<type>". An unlock names its recipe or structure in `target`; a mechanic its key.');
+lines.push('/// `unread` names the system it waits on. `deferred` non-empty: authored, read by nothing until');
+lines.push('/// the named ruling is taken.');
+lines.push('struct effect');
+lines.push('{');
+lines.push('    std::int16_t node;');
+lines.push('    effect_kind  kind;');
+lines.push('    const char*  subject;');
+lines.push('    const char*  scope;');
+lines.push('    effect_op    op;');
+lines.push('    float        value;');
+lines.push('    const char*  target;');
+lines.push('    const char*  what;');
+lines.push('    const char*  waits_on;');
+lines.push('    const char*  deferred;');
 lines.push('};');
 lines.push('');
 lines.push('inline constexpr std::array<node, node_count> nodes = {{');
@@ -111,7 +166,16 @@ nodes.forEach((n, i) => {
   lines.push(`    /* ${String(i).padStart(3)} */ {${cstr(n.id)}, ${cstr(n.name)}, tier::${n.tier}, ${n.ring}, ${n.cost_units}, ` +
     `${n.requires.length}, {{${groups.join(', ')}}}, ${ex}, ${n.tier === 'quest'}, ${!!n.placeholder}, ` +
     `${n.requires.length === 0}, ${!!n.mastery}, ${!!n.joint}, ${cstr(n.branch || '')}, ` +
-    `${cstr(n.placeholder || '')}, ${cstr(n.deed || '')}, ${cstr(n.advantage || '')}},`);
+    `${cstr(n.placeholder || '')}, ${cstr(n.deed || '')}, ${cstr(n.advantage || '')}, ` +
+    `${effectRange[i][0]}, ${effectRange[i][1]}, ` +
+    `${cstr(n.deed_effect && n.deed_effect.kind === 'unread' ? n.deed_effect.waits_on : '')}},`);
+});
+lines.push('}};');
+lines.push('');
+lines.push('inline constexpr std::array<effect, effect_count> effects = {{');
+effects.forEach((e, k) => {
+  lines.push(`    /* ${String(k).padStart(3)} */ {${e.node}, effect_kind::${e.kind}, ${cstr(e.subject)}, ${cstr(e.scope)}, ` +
+    `effect_op::${e.op}, ${flt(e.value)}, ${cstr(e.target)}, ${cstr(e.what)}, ${cstr(e.waits_on)}, ${cstr(e.deferred)}},`);
 });
 lines.push('}};');
 lines.push('');
@@ -136,4 +200,4 @@ if (checkOnly) {
 }
 if (current === out) { console.log(`unchanged: ${path.relative(root, outPath)} (${nodes.length} nodes)`); process.exit(0); }
 fs.writeFileSync(outPath, out);
-console.log(`wrote ${path.relative(root, outPath)} (${nodes.length} nodes, ${maxGroups} groups x ${maxMembers} members max)`);
+console.log(`wrote ${path.relative(root, outPath)} (${nodes.length} nodes, ${effects.length} effect rows, ${maxGroups} groups x ${maxMembers} members max)`);
