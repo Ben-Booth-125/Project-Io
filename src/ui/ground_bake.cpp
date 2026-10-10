@@ -806,6 +806,63 @@ namespace {
 /// it rather than being painted over; every other tree draws here (which = 1).
 /// 0 = every tree, no split. With no road near, 1 draws exactly what 0 does.
 enum class tree_set : std::uint8_t { all = 0, clear_of_roads = 1, over_roads = 2 };
+
+/// One tree of a tile's stand: its root (tile-relative) and crown radius, and
+/// whether the stand keeps it (a works' cleared ground thins it). stamp_trees
+/// and tree_patch_boxes (BL-1261) share it, so the partial re-bake bounds
+/// exactly the trees the stamp draws.
+struct stand_tree_t { double ox, oy; float cr; bool kept; };
+inline stand_tree_t stand_tree(int cw, int r, int k, float v_clump, float v_size, double g_x, double g_y,
+                               float clear_r, bool forest)
+{
+    stand_tree_t t{};
+    const float a1 = hash01(cw, r, 0x7E00u + static_cast<std::uint32_t>(k) * 3u);
+    const float a2 = hash01(cw, r, 0x7E01u + static_cast<std::uint32_t>(k) * 3u);
+    const float a3 = hash01(cw, r, 0x7E02u + static_cast<std::uint32_t>(k) * 3u);
+    const double ang = a1 * 6.283185307;
+    const double rad = 0.82 * std::sqrt(a2);
+    t.kept = !(rad < clear_r);
+    double ox_ = rad * std::cos(ang);
+    double oy_ = rad * std::sin(ang) * 0.9;
+    if (v_clump > 0.0f)
+    {
+        // Pull toward the grove: the stand gathers, a glade opens.
+        ox_ += (g_x + 0.45 * ox_ - ox_) * v_clump;
+        oy_ += (g_y + 0.45 * oy_ - oy_) * v_clump;
+        if (std::sqrt(ox_ * ox_ + (oy_ / 0.9) * (oy_ / 0.9)) < clear_r)
+            t.kept = false; // the grove still keeps clear of the works
+    }
+    t.ox = ox_;
+    t.oy = oy_;
+    t.cr = (0.085f + 0.055f * a3) * (forest ? 1.0f : 0.62f) * v_size;
+    return t;
+}
+
+/// A tile's stand parameters (its count and its variant's character).
+struct stand_t { int n; float v_clump, v_size, v_warm; double g_x, g_y; bool forest; };
+inline bool stand_of(const bake_source& src, const bake_params& p, std::size_t i, int cw, int r, stand_t& st)
+{
+    if (src.cls[i] != static_cast<std::uint8_t>(bake_source::tile_class::land))
+        return false;
+    const auto cov = static_cast<terrain_cover>(src.cover[i]);
+    st.forest = cov == terrain_cover::forest;
+    if (!st.forest && cov != terrain_cover::scrub)
+        return false;
+    const float dens = src.density[i] / 255.0f;
+    const float* tv = k_tree_var[src.variant[i]];
+    const float  vs = p.variant_strength;
+    const float  v_count = 1.0f + (tv[0] - 1.0f) * vs;
+    st.v_clump = tv[1] * vs;
+    st.v_size  = 1.0f + (tv[2] - 1.0f) * vs;
+    st.v_warm  = tv[3] * vs;
+    st.n = static_cast<int>(std::lround(
+        (st.forest ? 6.0f + 13.0f * dens : 2.0f + 4.0f * dens) * p.tree_density * v_count));
+    const double g_ang = hash01(cw, r, 0x7E90u) * 6.283185307;
+    const double g_rad = 0.45 * hash01(cw, r, 0x7E91u);
+    st.g_x = g_rad * std::cos(g_ang);
+    st.g_y = g_rad * std::sin(g_ang) * 0.9;
+    return true;
+}
 void stamp_trees(const bake_source& src, const geometry& g, const bake_params& p,
                  int px0, int py0, int pw, int ph, std::uint32_t* out,
                  const std::uint8_t* tag, tree_set which = tree_set::all)
@@ -912,26 +969,13 @@ void stamp_trees(const bake_source& src, const geometry& g, const bake_params& p
             const road_plan plan = tile_road_plan(src, i);           // BL-1253: where a roaded cluster stands
             for (int k = 0; k < n; ++k)
             {
-                const float a1 = hash01(cw, r, 0x7E00u + static_cast<std::uint32_t>(k) * 3u);
-                const float a2 = hash01(cw, r, 0x7E01u + static_cast<std::uint32_t>(k) * 3u);
-                const float a3 = hash01(cw, r, 0x7E02u + static_cast<std::uint32_t>(k) * 3u);
-                const double ang = a1 * 6.283185307;
-                const double rad = 0.82 * std::sqrt(a2);
-                if (rad < clear_r)
+                const stand_tree_t st = stand_tree(cw, r, k, v_clump, v_size, g_x, g_y, clear_r, forest);
+                if (!st.kept)
                     continue;
-                double ox_ = rad * std::cos(ang);
-                double oy_ = rad * std::sin(ang) * 0.9;
-                if (v_clump > 0.0f)
-                {
-                    // Pull toward the grove: the stand gathers, a glade opens.
-                    ox_ += (g_x + 0.45 * ox_ - ox_) * v_clump;
-                    oy_ += (g_y + 0.45 * oy_ - oy_) * v_clump;
-                    if (std::sqrt(ox_ * ox_ + (oy_ / 0.9) * (oy_ / 0.9)) < clear_r)
-                        continue; // the grove still keeps clear of the works
-                }
+                const double ox_ = st.ox, oy_ = st.oy;
                 const double tx  = hx + ox_;
                 const double ty  = hy + oy_;
-                const float  cr  = (0.085f + 0.055f * a3) * (forest ? 1.0f : 0.62f) * v_size;
+                const float  cr  = st.cr;
                 // BL-1253: no tree stands on a road or its verges, nor inside a
                 // roaded cluster that stepped off the tile centre.
                 if (route_clearance(src, tx, ty) < cr + 0.02)
@@ -4191,6 +4235,121 @@ bool installation_patch_rects(const bake_source& old_src, const bake_source& new
         return false;
     }
     return true;
+}
+
+float hill_field(const bake_source& s, double x, double y, float& gx, float& gy)
+{
+    // The same periodic lattices bake_window derives (its period is the
+    // geometry's gw * sqrt 3, and every geometry of a source shares s.gw).
+    const double period = std::max(1, s.gw) * kSqrt3;
+    const auto cell = [&](double target, int& n) {
+        n = std::max(1, static_cast<int>(std::lround(period / target)));
+        return period / n;
+    };
+    int na, nb;
+    const double ca = cell(1.15, na), cb = cell(0.75, nb);
+    return hill_noise(x, y, ca, na, cb, nb, gx, gy);
+}
+
+void relief_slope(const bake_source& s, const geometry& g, const bake_params& p, double x, double y,
+                  float shape_bias, float h, float& gx, float& gy)
+{
+    // bake_window's own fold and hill terms, as its hillshade reads them
+    // (the variant's detail multiplier aside): the same lattices, the same
+    // amplitude, the same narrowed gradient span.
+    const double period = g.gw * kSqrt3;
+    const auto cell = [&](double target, int& n) {
+        n = std::max(1, static_cast<int>(std::lround(period / target)));
+        return period / n;
+    };
+    const double ns = nominal_s(g);
+    const float res_t = static_cast<float>(std::clamp((ns - 24.0) / 48.0, 0.0, 1.0));
+    const float detail_mul = 1.0f + 1.1f * res_t;
+    const float ck = p.crisp * static_cast<float>(std::clamp((ns - 40.0) / 40.0, 0.0, 1.0));
+    int dc, dcb, swc;
+    const double detail_cell   = cell(p.detail_cell, dc);
+    const double detail_cell_b = cell(p.detail_cell * 0.62, dcb);
+    const double swell_cell    = cell(2.4, swc);
+    const float amp = relief_amp(p, detail_mul, shape_bias, h, roll_swell(x, y, swell_cell, swc));
+    const float rw0 = ridge_weight0(p, shape_bias);
+    const float ridge_w = fold_ridge(p, rw0, ck);
+    const auto fold = [&](float n) -> float {
+        const float smooth = n - 0.5f;
+        const float ridged = (0.25f - std::fabs(n - 0.5f)) * 2.0f;
+        return smooth + (ridged - smooth) * ridge_w;
+    };
+    const auto lo = [&](double sx, double sy) {
+        return fold(fold_noise(sx, sy, detail_cell, dc, detail_cell_b, dcb));
+    };
+    const double eps = detail_cell * (0.5 - 0.3 * ck);
+    const float ddx = (lo(x + eps, y) - lo(x - eps, y)) / static_cast<float>(2.0 * eps);
+    const float ddy = (lo(x, y + eps) - lo(x, y - eps)) / static_cast<float>(2.0 * eps);
+    const float soft_ease = 1.0f - p.plain_ease * ck * (1.0f - rw0);
+    gx = ddx * amp * 0.75f * soft_ease;
+    gy = ddy * amp * 0.75f * soft_ease;
+    if (p.hill_amp > 0.0f)
+    {
+        float hx, hy;
+        hill_field(s, x, y, hx, hy);
+        gx += hx * p.hill_amp;
+        gy += hy * p.hill_amp;
+    }
+}
+
+int tree_patch_boxes(const bake_source& src, const geometry& g, const bake_params& p, int c, int r,
+                     double bx0, double by0, double bx1, double by1, std::vector<pixel_rect>& out)
+{
+    if (r < 0 || r >= src.gh || src.gw <= 0)
+        return 0;
+    const int cw = ((c % src.gw) + src.gw) % src.gw;
+    const std::size_t i = static_cast<std::size_t>(r) * src.gw + cw;
+    stand_t st;
+    if (!stand_of(src, p, i, cw, r, st))
+        return 0;
+    const double hx = kSqrt3 * (c + ((r & 1) ? 0.5 : 0.0));
+    const double hy = 1.5 * r;
+    int n = 0;
+    for (int k = 0; k < st.n; ++k)
+    {
+        // Every tree, kept or not: a works' clearing is the installation
+        // rule's to bound, and a superset costs only pixels.
+        const stand_tree_t t = stand_tree(cw, r, k, st.v_clump, st.v_size, st.g_x, st.g_y, 0.0f, st.forest);
+        const double cr = t.cr;
+        // A road change moves this tree only if the road's reach band takes
+        // its root (within its crown and the 0.02 clearance) or one of the
+        // points stamp_trees tests for "over a road" (up to 1.3 crowns
+        // across, 3.1 north and 0.85 south of the root).
+        if (t.ox < bx0 - 1.3 * cr - 0.02 || t.ox > bx1 + 1.3 * cr + 0.02
+            || t.oy < by0 - cr - 0.02 || t.oy > by1 + 3.1 * cr + 0.02)
+            continue;
+        // The tree's pixels (stamp_trees' blobs): its canopy, trunk and
+        // shadow, with the anti-aliased rims.
+        const double pxc = (hx + t.ox) * g.s;
+        const double pr  = cr * g.s;
+        double x0, x1, y0, y1;
+        if (g.lift > 0.0)
+        {
+            const double invsy = 1.0 / g.tilt_sy;
+            const double ygr = (hy + t.oy - src.height[i] * g.lift - g.y_min) * g.s;
+            x0 = pxc - pr;
+            x1 = pxc + 1.30 * pr;
+            y0 = ygr - (1.1 + 1.75) * pr * invsy;
+            y1 = ygr + 0.84 * pr;
+        }
+        else
+        {
+            const double pyc = (hy + t.oy - g.y_min) * g.s;
+            x0 = pxc - pr;
+            x1 = pxc + 1.45 * pr;
+            y0 = pyc - pr;
+            y1 = pyc + 1.42 * pr;
+        }
+        const int ix0 = static_cast<int>(std::floor(x0)) - 3, iy0 = static_cast<int>(std::floor(y0)) - 3;
+        const int ix1 = static_cast<int>(std::ceil(x1)) + 3,  iy1 = static_cast<int>(std::ceil(y1)) + 3;
+        out.push_back({ ix0, iy0, ix1 - ix0, iy1 - iy0 });
+        ++n;
+    }
+    return n;
 }
 
 } // namespace ui::ground

@@ -69,21 +69,49 @@ inline constexpr std::uint8_t k_route_rail    = 4;
 inline constexpr float k_route_width[5] = { 0.0f, 0.015f, 0.022f, 0.03f, 0.10f };
 inline constexpr float k_lane_paint_width = 0.025f;
 
-/// One painted piece of a tile's route: a quadratic through-curve, a straight
-/// spoke, or a lone tile's yard, sampled as a polyline in TILE-RELATIVE
-/// canonical units (the tile centre is the origin).
+/// One painted piece of a tile's route: a through-curve, a spoke (one free
+/// end, at x[0]; the far end lies on a tile edge), a lone tile's yard, or a
+/// forecourt spur, sampled as a polyline in TILE-RELATIVE canonical units (the
+/// tile centre is the origin).
+///
+/// BL-1261 (roads as tile sets): a curve or spoke ENDS at its edge's CROSSING
+/// POINT (route_crossing), heading straight across the edge, so the
+/// neighbour's piece leaves the same point in the same direction; between its
+/// ends it is a cubic bowed by a search that keeps it to the lower ground and
+/// clear of the tile's road-plan cluster.
 struct route_piece
 {
-    static constexpr int k_pts = 9; ///< 8 segments: the curve is < 0.005 off its polyline.
+    static constexpr int k_pts = 13; ///< 12 segments: a bend of radius 0.3 is < 0.01 off its polyline.
     enum kind_t : std::uint8_t { curve = 0, spoke = 1, yard = 2, spur = 3 };
+    /// flags: the road's treatment that the TILE decides (the rest — forest
+    /// corridor, hillside cut — the route pass reads per pixel from the cover
+    /// and the slope under it).
+    enum flag_t : std::uint8_t { f_street = 1, f_wet = 2 };
     float x[k_pts] = {}, y[k_pts] = {};
     float cum[k_pts] = {};      ///< Cumulative arclength at each point.
     float split = 0.0f;         ///< Arclength where the two halves meet (a curve's apex); spokes: 0.
     float bx0 = 0, by0 = 0, bx1 = 0, by1 = 0; ///< Polyline bounding box, tile-relative.
     std::uint8_t tier = 0;      ///< 1-4 road ladder; 0x80 | lane tier for a sea lane.
     std::uint8_t kind = curve;
-    std::uint8_t pad_[2] = {};
+    std::uint8_t flags = 0;
+    std::uint8_t pad_ = 0;
 };
+
+/// BL-1261: where a route crosses tile edge (link @p n of tile (@p c, @p r);
+/// links E, W, S, N = 0-3), TILE-RELATIVE to (c, r), and the edge's outward
+/// unit normal. A hash of the edge — keyed on its WEST / NORTH tile's wrapped
+/// column and row and its axis, so both tiles, and both sides of the cylinder
+/// seam, compute one point — places it within the inner 70% of the edge
+/// (k_cross_band either side of the midpoint). @p net separates networks that
+/// can share an edge: 0 the road ladder, 1 rail (a rail point stands half the
+/// band from the road's, so the two never meet), 2 a sea lane.
+inline constexpr double k_cross_band = 0.35;
+void route_crossing(int gw, int c, int r, int n, int net, double& x, double& y, double& nx, double& ny);
+
+/// BL-1261: the painted reach of a piece past its surfaced half-width — the
+/// tier's own margin and its terrain treatment (verge, hillside cut, forest
+/// corridor, embankment; RENDERING.md § Roads and sea lanes).
+double route_piece_out(const route_piece& pc);
 
 /// How a road meets a BUILT tile — the roaded variant of its forms (RENDERING.md
 /// § Roads and sea lanes: "a road meets a built tile through the building's

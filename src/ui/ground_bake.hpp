@@ -351,6 +351,34 @@ bake_source prepare_source(const world& w, entity_id body, bool reveal_all = fal
 /// or family arrays in place (the harness builds neighbour variations so).
 void rederive_border_sets(bake_source& s);
 
+/// BL-1261 (roads as tile sets): the hills field the base bake shades (the
+/// broad relief under the folds, ~1.15 and ~0.75 canonical, in [0, 1]) at
+/// ground point (x, y) — canonical, x unwrapped (the field is wrap-periodic)
+/// — with its gradient in @p gx, @p gy. The route derivation reads it to keep
+/// a road to the lower ground and the route pass to cut a road into a slope.
+/// Pure; byte-identical to the field bake_window samples.
+float hill_field(const bake_source& s, double x, double y, float& gx, float& gy);
+
+/// BL-1261: the sub-tile relief's slope at ground point (x, y) as the base
+/// hillshade reads it — the fold field (its amplitude from @p shape_bias and
+/// @p h, the interpolated relief bias and height there) plus the hills — in
+/// shading units (a slope of 1 is a full stop of light). The tile gradient
+/// (relief_gain x grad) is the caller's to add. The route pass cuts a road
+/// into the slope the eye sees with it.
+void relief_slope(const bake_source& s, const geometry& g, const bake_params& p, double x, double y,
+                  float shape_bias, float h, float& gx, float& gy);
+
+struct pixel_rect;
+/// BL-1261: the partial re-bake's tree bound for a road change. Appends the
+/// pixel boxes (absolute bake pixels) of every tree of tile (@p c, @p r) — @p c
+/// unwrapped — that a change to a road whose reach band lies within
+/// [bx0, bx1] x [by0, by1] (canonical, relative to that tile's centre) could
+/// clear, restore, or move across the road (stamp_trees' "over a road"
+/// split). Returns the count. Exact to the stand, so a road through a wood
+/// re-bakes the trees it touches, not the wood's whole reach.
+int tree_patch_boxes(const bake_source& src, const geometry& g, const bake_params& p, int c, int r,
+                     double bx0, double by0, double bx1, double by1, std::vector<pixel_rect>& out);
+
 /// Bake pixels [px0, px0+pw) x [py0, py0+ph) of @p g into @p out (pw*ph RGBA8,
 /// ABGR u32, row-major). Pixels outside the grid's vertical extent bake
 /// transparent (the canvas background shows through). Pure and deterministic:

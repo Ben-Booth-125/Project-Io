@@ -82,18 +82,6 @@ inline int nb_index(const bake_source& s, int i, int side)
     return nb.gy * s.gw + cw;
 }
 
-/// sin^2(pi t) at t = k/16, k = 0..16: the bow's profile, tabled once (the
-/// snapshot re-derives every piece on the main thread, so no sin per point).
-const double* bow16()
-{
-    static const struct table
-    {
-        double v[17];
-        table() { for (int k = 0; k <= 16; ++k) { const double sn = std::sin(kPi * k / 16.0); v[k] = sn * sn; } }
-    } t;
-    return t.v;
-}
-
 inline bool has_routes(const bake_source& s)
 {
     const std::size_t n = static_cast<std::size_t>(s.gw) * s.gh;
@@ -180,6 +168,40 @@ inline double tier_out(std::uint8_t tier)
     }
 }
 
+// BL-1261 (roads as tile sets): the terrain treatments — the road's tile set,
+// RENDERING.md § Roads and sea lanes. Widths are canonical units PAST the
+// surfaced half-width, for a Road; treat_scale sizes them per tier. They widen
+// the road's footprint in the ground, never the road line itself: at the
+// master a Road's surface is ~3 px and its treatment a few pixels either side.
+constexpr double k_corridor_w = 0.050; ///< Forest / scrub: the cleared corridor (trees keep off it).
+constexpr double k_cut_w      = 0.032; ///< A slope: the cut's uphill bank, at a full cut.
+constexpr double k_spoil_w    = 0.014; ///< A slope: the downhill spoil edge.
+constexpr double k_bank_w     = 0.024; ///< Wet / low ground: the embankment's side slope.
+constexpr double k_verge_w    = 0.014; ///< Open ground: the worn verge.
+constexpr double k_kerb_w     = 0.006; ///< A town: the street's kerb.
+
+/// A tier's scale for its treatments: a Track's cut is shallower than a
+/// Highway's; a railway's cuttings and embankments are deeper than a road's.
+inline double treat_scale(std::uint8_t tier)
+{
+    switch (tier)
+    {
+        case k_route_track:   return 0.7;
+        case k_route_road:    return 1.0;
+        case k_route_highway: return 1.2;
+        default:              return 1.7; // rail
+    }
+}
+
+/// The painted reach past the surface: the tier's own margin, or its widest
+/// treatment (a town's street keeps to its kerb).
+inline double piece_out(std::uint8_t tier, std::uint8_t flags)
+{
+    if ((tier & 0x80u) || (flags & route_piece::f_street))
+        return tier_out(tier) + ((tier & 0x80u) ? 0.0 : k_kerb_w);
+    return std::max(tier_out(tier), k_corridor_w * treat_scale(tier));
+}
+
 void finish_piece(route_piece& pc)
 {
     pc.cum[0] = 0.0f;
@@ -195,13 +217,15 @@ void finish_piece(route_piece& pc)
     pc.split = pc.kind == route_piece::curve ? pc.cum[route_piece::k_pts / 2] : 0.0f;
 }
 
-/// A straight piece from (ax, ay) to (bx, by): the far end (b) is the shared
-/// edge's midpoint, where a dash pattern's phase is pinned.
-route_piece spoke(double ax, double ay, double bx, double by, std::uint8_t tier, std::uint8_t kind)
+/// A straight piece from (ax, ay) to (bx, by): a lone tile's yard (a point)
+/// and a forecourt spur. The far end (b) is where a dash pattern is pinned.
+route_piece straight(double ax, double ay, double bx, double by, std::uint8_t tier, std::uint8_t kind,
+                     std::uint8_t flags)
 {
     route_piece pc;
     pc.tier = tier;
     pc.kind = kind;
+    pc.flags = flags;
     for (int k = 0; k < route_piece::k_pts; ++k)
     {
         const double t = static_cast<double>(k) / (route_piece::k_pts - 1);
@@ -212,48 +236,309 @@ route_piece spoke(double ax, double ay, double bx, double by, std::uint8_t tier,
     return pc;
 }
 
-/// The quadratic m_a -> (0, 0) -> m_b, bowed by (bwx, bwy) * sin^2(pi t): the
-/// bow and its derivative vanish at both ends, so a bowed curve still meets
-/// its neighbours tangent-continuous at the shared midpoints.
-route_piece curve(double ax, double ay, double bx, double by, double bwx, double bwy,
-                  std::uint8_t tier)
+// ---------------------------------------------------------------------------
+// BL-1261 (roads as tile sets) — the in-tile routing. RENDERING.md § Roads and
+// sea lanes: a road crosses each edge at its own point and, inside the tile,
+// finds its way — a smooth curve that keeps to the lower side of the tile's
+// relief and clear of its road-plan cluster.
+//
+// A piece runs from one END to another; an end is a point and a heading (at a
+// crossing, the edge's normal: the piece arrives straight across the edge, and
+// its neighbour leaves the same point the same way, so the two meet tangent-
+// continuous). Between them it is the cubic Bezier those headings set, plus a
+// BOW along the chord's perpendicular weighted 64 t^3 (1-t)^3 — zero, with its
+// first two derivatives, at both ends, so a bow never moves an end, its heading
+// or its curvature there (the bend lives in the tile's middle). The
+// bow is the search's one free parameter: a bounded grid of candidates, each
+// costed by the ground under it, kept inside the hex, clear of the cluster and
+// above the tier's least turning radius; the cheapest wins, ties to the first.
+// ---------------------------------------------------------------------------
+
+constexpr int kK = route_piece::k_pts;
+
+/// The cubic's Bernstein weights and the bow profile at t = k / (kK - 1):
+/// polynomials only, so the table is exact and identical on every compiler.
+struct curve_weights
+{
+    double b0[kK], b1[kK], b2[kK], b3[kK], w[kK];
+    curve_weights()
+    {
+        for (int k = 0; k < kK; ++k)
+        {
+            const double t = static_cast<double>(k) / (kK - 1), u = 1.0 - t;
+            b0[k] = u * u * u;
+            b1[k] = 3.0 * u * u * t;
+            b2[k] = 3.0 * u * t * t;
+            b3[k] = t * t * t;
+            w[k]  = 64.0 * t * t * t * u * u * u;
+        }
+    }
+};
+const curve_weights& cw()
+{
+    static const curve_weights t;
+    return t;
+}
+
+/// The search's view of the ground: the tile's land ring (its own centre and
+/// its six neighbours', with their heights) interpolated as the hillshade's
+/// slope is, plus the hills field — each in the hillshade's own units
+/// (relief_gain x height, hill_amp x hills), so "lower" is what the light
+/// shows. A masked or water neighbour contributes nothing.
+struct tile_ground
+{
+    double cx = 0.0, cy = 0.0; ///< Absolute centre (wrapped column).
+    int    n = 0;
+    double ox[7] = {}, oy[7] = {}, h[7] = {};
+    double gain = 9.0, hill = 0.7;
+};
+
+tile_ground make_ground(const bake_source& s, std::size_t i)
+{
+    tile_ground tg;
+    const int r = static_cast<int>(i) / s.gw, c = static_cast<int>(i) % s.gw;
+    tg.cx = kSqrt3 * (c + ((r & 1) ? 0.5 : 0.0));
+    tg.cy = 1.5 * r;
+    const bake_params defaults{}; // geometry, not a look: the route never moves with a dial
+    tg.gain = defaults.relief_gain;
+    tg.hill = defaults.hill_amp;
+    const auto land = static_cast<std::uint8_t>(bake_source::tile_class::land);
+    for (int k = -1; k < 6; ++k)
+    {
+        const int t = k < 0 ? static_cast<int>(i) : nb_index(s, static_cast<int>(i), k);
+        if (t < 0 || s.cls[static_cast<std::size_t>(t)] != land)
+            continue;
+        tg.ox[tg.n] = k < 0 ? 0.0 : kNbDx[k];
+        tg.oy[tg.n] = k < 0 ? 0.0 : kNbDy[k];
+        tg.h[tg.n]  = s.height[static_cast<std::size_t>(t)];
+        ++tg.n;
+    }
+    return tg;
+}
+
+double ground_v(const bake_source& s, const tile_ground& tg, double x, double y)
+{
+    double hs = 0.0, ws = 0.0;
+    for (int k = 0; k < tg.n; ++k)
+    {
+        const double dx = x - tg.ox[k], dy = y - tg.oy[k];
+        double w = std::max(0.0, 2.1 - (dx * dx + dy * dy));
+        w *= w;
+        hs += w * tg.h[k];
+        ws += w;
+    }
+    float gx, gy;
+    const double hv = hill_field(s, tg.cx + x, tg.cy + y, gx, gy);
+    return tg.gain * (ws > 0.0 ? hs / ws : 0.0) + tg.hill * hv;
+}
+
+/// Hex distance: the largest projection on the six edge normals (inside the
+/// hex where it is at most the 0.866 inradius).
+inline double hex_dist(double x, double y)
+{
+    const double a = std::fabs(x);
+    const double b = std::fabs(0.5 * x + 0.8660254037844386 * y);
+    const double c = std::fabs(-0.5 * x + 0.8660254037844386 * y);
+    return std::max(a, std::max(b, c));
+}
+
+/// One end of a piece: a point and its unit heading (at the start, the way
+/// the piece leaves; at the end, the way it arrives).
+struct route_end { double x, y, tx, ty; };
+
+/// The tier's routing character. A rail cannot turn as tightly as a road: its
+/// arms are longer (a flatter cubic), its bends cost more, and its least
+/// turning radius is larger (RENDERING.md § Roads and sea lanes).
+struct route_char { double arm, r_min, bend_w; };
+inline route_char route_character(std::uint8_t tier, std::uint8_t kind)
+{
+    if (tier == k_route_rail)
+        return { kind == route_piece::spoke ? 0.42 : 0.52, 0.60, 0.20 };
+    return { kind == route_piece::spoke ? 0.30 : 0.38, 0.22, 0.02 };
+}
+
+inline void sample(const route_end& a, const route_end& b, double arm, double beta, double dx, double dy,
+                   double* px, double* py)
+{
+    const curve_weights& W = cw();
+    const double L = std::hypot(b.x - a.x, b.y - a.y);
+    const double p1x = a.x + a.tx * arm * L, p1y = a.y + a.ty * arm * L;
+    const double p2x = b.x - b.tx * arm * L, p2y = b.y - b.ty * arm * L;
+    for (int k = 0; k < kK; ++k)
+    {
+        px[k] = W.b0[k] * a.x + W.b1[k] * p1x + W.b2[k] * p2x + W.b3[k] * b.x + W.w[k] * beta * dx;
+        py[k] = W.b0[k] * a.y + W.b1[k] * p1y + W.b2[k] * p2y + W.b3[k] * b.y + W.w[k] * beta * dy;
+    }
+}
+
+/// The routed piece from @p a to @p b. @p keep > 0: the interior must stay
+/// that far from (kx, ky) (the roaded cluster's disc grown by the road and its
+/// verges). @p search false: no bow (a sea lane: the water is flat).
+route_piece routed(const bake_source& s, const tile_ground& tg, const route_end& a, const route_end& b,
+                   std::uint8_t tier, std::uint8_t kind, std::uint8_t flags, bool search,
+                   double kx, double ky, double keep)
 {
     route_piece pc;
     pc.tier = tier;
-    pc.kind = route_piece::curve;
-    static_assert(route_piece::k_pts == 9, "the bow table steps in sixteenths");
-    const double* bow = bow16();
-    for (int k = 0; k < route_piece::k_pts; ++k)
+    pc.kind = kind;
+    pc.flags = flags;
+    const double chord = std::hypot(b.x - a.x, b.y - a.y);
+    const route_char rc = route_character(tier, kind);
+    double dx = 0.0, dy = 0.0;
+    if (chord > 1e-9)
     {
-        const double t = static_cast<double>(k) / (route_piece::k_pts - 1);
-        const double a = (1.0 - t) * (1.0 - t), c = t * t;
-        const double w = bow[2 * k];
-        pc.x[k] = static_cast<float>(a * ax + c * bx + w * bwx);
-        pc.y[k] = static_cast<float>(a * ay + c * by + w * bwy);
+        dx = -(b.y - a.y) / chord;
+        dy =  (b.x - a.x) / chord;
+    }
+    double px[kK], py[kK];
+    // A candidate's cost (+inf when infeasible) and how far it misses the
+    // disc (the fallback's measure when no bow clears it).
+    const auto cost_of = [&](double beta, double& miss) -> double {
+        sample(a, b, rc.arm, beta, dx, dy, px, py);
+        miss = 0.0;
+        bool inside = true;
+        for (int k = 1; k < kK - 1; ++k)
+        {
+            if (hex_dist(px[k], py[k]) > 0.8660254037844386)
+                inside = false;
+            if (keep > 0.0)
+                miss = std::max(miss, keep - std::hypot(px[k] - kx, py[k] - ky));
+        }
+        if (!inside || miss > 0.0)
+            return 1e30;
+        // Length, bends and the least turning radius.
+        double len = 0.0, bend = 0.0, rmin = 1e9;
+        double ex = px[1] - px[0], ey = py[1] - py[0];
+        double el = std::hypot(ex, ey);
+        len += el;
+        for (int k = 1; k < kK - 1; ++k)
+        {
+            const double fx = px[k + 1] - px[k], fy = py[k + 1] - py[k];
+            const double fl = std::hypot(fx, fy);
+            len += fl;
+            if (el > 1e-9 && fl > 1e-9)
+            {
+                const double cs = std::clamp((ex * fx + ey * fy) / (el * fl), -1.0, 1.0);
+                const double th = std::acos(cs);
+                bend += th * th;
+                if (th > 1e-9)
+                    rmin = std::min(rmin, 0.5 * (el + fl) / th);
+            }
+            ex = fx; ey = fy; el = fl;
+        }
+        double c = 0.35 * (chord > 1e-9 ? len / chord - 1.0 : 0.0) + rc.bend_w * bend;
+        if (rmin < rc.r_min)
+            c += 2.0 * (rc.r_min - rmin) / rc.r_min;
+        // The ground under it: the mean of the interior's even samples.
+        double v = 0.0;
+        int nv = 0;
+        for (int k = 2; k < kK - 1; k += 2)
+        {
+            v += ground_v(s, tg, px[k], py[k]);
+            ++nv;
+        }
+        return c + v / nv;
+    };
+
+    double best_beta = 0.0;
+    if (search && chord > 1e-9)
+    {
+        // A coarse grid either side, then a refinement about the winner.
+        double best = 1e30, best_miss = 1e30, miss_beta = 0.0;
+        const auto consider = [&](double beta) {
+            double miss = 0.0;
+            const double cst = cost_of(beta, miss);
+            if (cst < best) { best = cst; best_beta = beta; }
+            if (cst >= 1e30 && miss > 0.0 && miss < best_miss) { best_miss = miss; miss_beta = beta; }
+        };
+        // A spoke (an end, a fork's branch) is half a through-curve's length
+        // and bows half as far.
+        static constexpr double kGrid[9] = { 0.0, -0.15, 0.15, -0.30, 0.30, -0.45, 0.45, -0.60, 0.60 };
+        const double gs = kind == route_piece::spoke ? 0.5 : 1.0;
+        for (double beta : kGrid)
+            consider(beta * gs);
+        if (best < 1e30)
+        {
+            const double c0 = best_beta;
+            for (double dlt : { -0.075, 0.075, -0.0375, 0.0375 })
+                consider(c0 + dlt * gs);
+        }
+        else if (keep > 0.0)
+        {
+            // Nothing inside the hex clears the cluster: bow farther, the hex
+            // edge given up before the cluster is (a road is never painted
+            // across a roof or a pad).
+            best_beta = miss_beta;
+            for (int m = 1; m <= 20; ++m)
+            {
+                const double beta = (miss_beta < 0.0 ? -1.0 : 1.0) * (0.60 + 0.04 * m);
+                sample(a, b, rc.arm, beta, dx, dy, px, py);
+                double miss = 0.0;
+                for (int k = 1; k < kK - 1; ++k)
+                    miss = std::max(miss, keep - std::hypot(px[k] - kx, py[k] - ky));
+                best_beta = beta;
+                if (miss <= 0.0)
+                    break;
+            }
+        }
+    }
+    sample(a, b, rc.arm, best_beta, dx, dy, px, py);
+    for (int k = 0; k < kK; ++k)
+    {
+        pc.x[k] = static_cast<float>(px[k]);
+        pc.y[k] = static_cast<float>(py[k]);
     }
     finish_piece(pc);
     return pc;
 }
 
-/// The pieces of tile @p i on one network (the canvas's draw_network, ported):
-/// through-curves paired most-opposite first, an odd branch or an end a spoke,
-/// a lone tile a yard. On a roaded built tile (@p plan) a through-curve bows
-/// away from the cluster, an arriving road ends at the forecourt apron, and a
+/// The tile's own treatment flags: a town's street; low wet ground (marsh, or
+/// a river's floodplain) where a road runs on an embankment.
+std::uint8_t tile_flags(const bake_source& s, std::size_t i)
+{
+    std::uint8_t f = 0;
+    if (s.inst.of_tile.size() == s.cls.size() && s.inst.of_tile[i] >= 0
+        && s.inst.list[static_cast<std::size_t>(s.inst.of_tile[i])].settlement.subject == stamp_subject::settlement)
+        f |= route_piece::f_street;
+    const bool marsh = static_cast<terrain_cover>(s.cover[i]) == terrain_cover::marsh;
+    const bool river = (s.river_in.size() == s.cls.size() && (s.river_in[i] | s.river_out[i]) != 0);
+    if (marsh || river)
+        f |= route_piece::f_wet;
+    return f;
+}
+
+/// The pieces of tile @p i on one network: through-curves paired most-opposite
+/// first (by the links' directions), an odd branch or an end a spoke, a lone
+/// tile a yard. Every curve and spoke ends at its edge's crossing point
+/// (route_crossing). On a roaded built tile (@p plan) a through-curve keeps
+/// clear of the cluster, an arriving road ends at the forecourt apron, and a
 /// short spur joins a through-road to it.
 void tile_pieces(const bake_source& s, std::size_t i, std::uint8_t links, std::uint8_t tier,
                  const road_plan* plan, std::vector<route_piece>& out)
 {
-    const int r = static_cast<int>(i) / s.gw;
+    const bool lane = (tier & 0x80u) != 0;
+    const int r = static_cast<int>(i) / s.gw, c = static_cast<int>(i) % s.gw;
     double mx[4], my[4];
-    int    deg = 0;
+    route_end xc[4]; // the crossings, heading OUT across their edges
+    int deg = 0;
     for (int n = 0; n < 4; ++n)
         if (links & (1u << n))
         {
             link_mid(r, n, mx[deg], my[deg]);
+            int net = lane ? 2 : 0;
+            if (!lane && tier == k_route_rail)
+            {
+                const int nc = c + k_card[n][0], nr = r + k_card[n][1];
+                if (nr >= 0 && nr < s.gh
+                    && s.road[static_cast<std::size_t>(nr) * s.gw + ((nc % s.gw) + s.gw) % s.gw] == k_route_rail)
+                    net = 1;
+            }
+            route_crossing(s.gw, c, r, n, net, xc[deg].x, xc[deg].y, xc[deg].tx, xc[deg].ty);
             ++deg;
         }
     const double hw = tier_hw(tier);
     const bool roaded = plan && plan->roaded;
+    const std::uint8_t flags = lane ? 0 : tile_flags(s, i);
     const std::size_t mine = out.size(); // this tile's pieces start here
 
     if (deg == 0)
@@ -262,12 +547,14 @@ void tile_pieces(const bake_source& s, std::size_t i, std::uint8_t links, std::u
         // tile that stands something: its own forms carry the ground there.
         const bool built = s.inst.of_tile.size() == s.cls.size() && s.inst.of_tile[i] >= 0;
         if (!built)
-        {
-            route_piece pc = spoke(0.0, 0.0, 0.0, 0.0, tier, route_piece::yard);
-            out.push_back(pc);
-        }
+            out.push_back(straight(0.0, 0.0, 0.0, 0.0, tier, route_piece::yard, flags));
         return;
     }
+
+    const tile_ground tg = lane ? tile_ground{} : make_ground(s, i);
+    const bool search = !lane;
+    const double keep = roaded ? plan->radius + hw + tier_out(tier) + 0.02 : 0.0;
+    const double kx = roaded ? plan->kx : 0.0, ky = roaded ? plan->ky : 0.0;
 
     bool   used[4] = { false, false, false, false };
     double hubx = 0.0, huby = 0.0;
@@ -292,55 +579,26 @@ void tile_pieces(const bake_source& s, std::size_t i, std::uint8_t links, std::u
         if (pa < 0)
             break;
         used[pa] = used[pb] = true;
-        double bwx = 0.0, bwy = 0.0;
-        if (roaded)
-        {
-            // Bow away from the cluster until the road and its verges clear
-            // its keep-out disc along the middle of the curve.
-            const double clr2 = sq(plan->radius + hw + tier_out(tier) + 0.02);
-            const double* bow = bow16();
-            const auto clear_at = [&](double beta) {
-                for (int k = 1; k < 16; ++k)
-                {
-                    const double t = k / 16.0;
-                    const double a = (1.0 - t) * (1.0 - t), c = t * t;
-                    const double px = a * mx[pa] + c * mx[pb] - bow[k] * plan->fx * beta;
-                    const double py = a * my[pa] + c * my[pb] - bow[k] * plan->fy * beta;
-                    if (sq(px - plan->kx) + sq(py - plan->ky) < clr2)
-                        return false;
-                }
-                return true;
-            };
-            // The least bow, in steps of 0.02 up to 0.6, that clears: none
-            // when the straight curve already does, else a bisection over the
-            // steps (the clearance grows with the bow along its whole middle).
-            int lo = 0, hi = 30;
-            if (clear_at(0.0))
-                hi = 0;
-            else if (!clear_at(0.6))
-                hi = 30;
-            else
-                while (hi - lo > 1)
-                {
-                    const int m = (lo + hi) / 2;
-                    (clear_at(m * 0.02) ? hi : lo) = m;
-                }
-            bwx = -plan->fx * hi * 0.02;
-            bwy = -plan->fy * hi * 0.02;
-        }
-        out.push_back(curve(mx[pa], my[pa], mx[pb], my[pb], bwx, bwy, tier));
-        // The hub an odd branch joins: this curve's apex.
-        hubx = (mx[pa] + mx[pb]) * 0.25 + bwx;
-        huby = (my[pa] + my[pb]) * 0.25 + bwy;
+        const route_end ea{ xc[pa].x, xc[pa].y, -xc[pa].tx, -xc[pa].ty }; // in across edge a
+        const route_end eb = xc[pb];                                       // out across edge b
+        out.push_back(routed(s, tg, ea, eb, tier, route_piece::curve, flags, search, kx, ky, keep));
+        // The hub an odd branch joins: this curve's middle.
+        hubx = out.back().x[kK / 2];
+        huby = out.back().y[kK / 2];
         have_curve = true;
     }
     for (int a = 0; a < deg; ++a)
         if (!used[a])
         {
-            if (roaded && !have_curve)
-                out.push_back(spoke(plan->apx, plan->apy, mx[a], my[a], tier, route_piece::spoke)); // ends at the forecourt
-            else
-                out.push_back(spoke(hubx, huby, mx[a], my[a], tier, route_piece::spoke));
+            // An end (or a fork's odd branch): from the forecourt, the hub or
+            // the centre, heading at the crossing first, out across its edge.
+            const bool to_apron = roaded && !have_curve;
+            const double sx = to_apron ? plan->apx : hubx, sy = to_apron ? plan->apy : huby;
+            const double ddx = xc[a].x - sx, ddy = xc[a].y - sy;
+            const double dl = std::max(1e-9, std::hypot(ddx, ddy));
+            const route_end es{ sx, sy, ddx / dl, ddy / dl };
+            out.push_back(routed(s, tg, es, xc[a], tier, route_piece::spoke, flags, search, kx, ky,
+                                 to_apron ? plan->radius + hw : keep)); // the apron stands just off the disc
         }
     if (roaded && have_curve)
     {
@@ -348,14 +606,14 @@ void tile_pieces(const bake_source& s, std::size_t i, std::uint8_t links, std::u
         // forecourt, when the apron does not already touch the road.
         double bx = 0.0, by = 0.0, bd = 1e9;
         for (std::size_t q = mine; q < out.size(); ++q)
-            for (int k = 0; k < route_piece::k_pts; ++k)
+            for (int k = 0; k < kK; ++k)
             {
                 const route_piece& pc = out[q];
                 const double d = std::hypot(pc.x[k] - plan->apx, pc.y[k] - plan->apy);
                 if (d < bd) { bd = d; bx = pc.x[k]; by = pc.y[k]; }
             }
         if (bd > hw * 1.5)
-            out.push_back(spoke(plan->apx, plan->apy, bx, by, tier, route_piece::spur));
+            out.push_back(straight(plan->apx, plan->apy, bx, by, tier, route_piece::spur, flags));
     }
 }
 
@@ -393,9 +651,12 @@ struct route_hit
     double hw    = 0.0;
     double along = 0.0;   ///< Arclength from the piece's nearer pinned end.
     double half  = 1.0;   ///< Length of that half (dash counts are whole per half).
-    std::uint8_t tier = 0, kind = 0;
+    std::uint8_t tier = 0, kind = 0, flags = 0;
     int    covers = 0;    ///< Pieces whose surface covers the point (>= 2: a junction).
     int    tile = -1;
+    double out   = 0.0;   ///< The chosen piece's reach past its surface (piece_out).
+    double nx = 0.0, ny = 0.0; ///< Unit vector from the chosen centreline to the point (0 on it).
+    double clr   = 1e9;   ///< min over pieces of (e - out): negative inside some piece's reach.
 };
 
 /// Walk the pieces of the point's nearest tile and its six neighbours on one
@@ -433,10 +694,11 @@ void query(const bake_source& s, double x, double y, bool lanes, route_hit& h,
             double hw = tier_hw(pc.tier);
             if (pc.kind == route_piece::yard)
                 hw *= 1.5;
-            const double reach = hw + tier_out(pc.tier) + slack;
+            const double pout = piece_out(pc.tier, pc.flags);
+            const double reach = hw + pout + slack;
             if (qx < pc.bx0 - reach || qx > pc.bx1 + reach || qy < pc.by0 - reach || qy > pc.by1 + reach)
                 continue;
-            double bd2 = 1e30, bs = 0.0;
+            double bd2 = 1e30, bs = 0.0, bdx = 0.0, bdy = 0.0;
             for (int q = 1; q < route_piece::k_pts; ++q)
             {
                 const double ax = pc.x[q - 1], ay = pc.y[q - 1];
@@ -449,16 +711,21 @@ void query(const bake_source& s, double x, double y, bool lanes, route_hit& h,
                 {
                     bd2 = d2;
                     bs  = pc.cum[q - 1] + u * (pc.cum[q] - pc.cum[q - 1]);
+                    bdx = dx; bdy = dy;
                 }
             }
             const double d = std::sqrt(bd2);
             const double e = d - hw;
             if (e < 0.0)
                 ++h.covers;
+            h.clr = std::min(h.clr, e - pout);
             if (e < h.e)
             {
                 const double total = pc.cum[route_piece::k_pts - 1];
                 h.e = e; h.d = d; h.hw = hw; h.tier = pc.tier; h.kind = pc.kind; h.tile = t;
+                h.flags = pc.flags; h.out = pout;
+                h.nx = d > 1e-12 ? bdx / d : 0.0;
+                h.ny = d > 1e-12 ? bdy / d : 0.0;
                 if (pc.kind == route_piece::curve)
                 {
                     if (bs <= pc.split) { h.along = bs;         h.half = pc.split; }
@@ -466,7 +733,7 @@ void query(const bake_source& s, double x, double y, bool lanes, route_hit& h,
                 }
                 else
                 {
-                    h.along = total - bs; // pinned at the far end: the shared midpoint
+                    h.along = total - bs; // pinned at the far end: the edge's crossing point
                     h.half  = total;
                 }
             }
@@ -500,6 +767,40 @@ inline double dashes(double along, double half, double period, double duty, doub
 // =============================================================================
 // The plan and the derivation
 // =============================================================================
+
+void route_crossing(int gw, int c, int r, int n, int net, double& x, double& y, double& nx, double& ny)
+{
+    double mx, my;
+    link_mid(r, n, mx, my);
+    const double ml = std::sqrt(mx * mx + my * my);
+    nx = mx / ml;
+    ny = my / ml;
+    // The edge's key tile is its WEST (E/W links) or NORTH (S/N links) tile:
+    // the same column one row up is the S link's far tile (k_card), so both
+    // tiles name one edge, and the wrapped column names it on both sides of
+    // the cylinder seam.
+    int kc = c, kr = r;
+    double sgn = 1.0;
+    if (n == 1) { kc = c - 1; sgn = -1.0; }
+    else if (n == 3) { kr = r - 1; sgn = -1.0; }
+    const int axis = n >= 2 ? 1 : 0;
+    const int kw = gw > 0 ? ((kc % gw) + gw) % gw : 0;
+    // Along the edge: the key tile's outward normal turned a quarter, so both
+    // tiles measure the offset in one direction.
+    const double ax = sgn * nx, ay = sgn * ny;
+    const double tx = -ay, ty = ax;
+    double f = rh01(kw, kr, (net == 2 ? 0xC5A7u : 0xC511u) + static_cast<std::uint32_t>(axis));
+    if (net == 1)
+        f = f + 0.5 - std::floor(f + 0.5); // half the band from the road's point
+    const double u = k_cross_band * (2.0 * f - 1.0);
+    x = mx + u * tx;
+    y = my + u * ty;
+}
+
+double route_piece_out(const route_piece& pc)
+{
+    return piece_out(pc.tier, pc.flags);
+}
 
 road_plan tile_road_plan(const bake_source& s, std::size_t i)
 {
@@ -623,7 +924,7 @@ double route_clearance(const bake_source& s, double x, double y)
     query(s, x, y, /*lanes=*/false, h, nullptr, nullptr, /*slack=*/0.6);
     if (h.tile < 0)
         return 1e9;
-    return h.e - tier_out(h.tier);
+    return h.clr;
 }
 
 // =============================================================================
@@ -668,9 +969,8 @@ void paint_routes(const bake_source& s, const geometry& g, const bake_params& p,
             query(s, qx, qy, water, h, &t0, &cx0);
             if (h.tile < 0)
                 continue;
-            const double reach = h.e - tier_out(h.tier);
-            if (reach >= 0.0)
-                continue;
+            if (h.e - h.out >= 0.0)
+                continue; // past the chosen piece's reach (its surface, margin and treatment)
             // Absolute position for the noise, from the WRAPPED tile centre.
             const int c0w = t0 % s.gw;
             const double abx = qx - cx0 + kSqrt3 * (c0w + (((t0 / s.gw) & 1) ? 0.5 : 0.0));
@@ -708,11 +1008,15 @@ void paint_routes(const bake_source& s, const geometry& g, const bake_params& p,
                 continue;
             }
 
-            // The light: the ground's slope under the road, interpolated over
-            // the nearest centres, from the NW light like the hillshade.
-            double L = 1.0;
+            // The ground's VISUAL slope under the road (BL-1261): the tile
+            // gradient interpolated over the nearest centres plus the hills
+            // field, each in the hillshade's units — what the light shows. It
+            // lights the surface as the ground is lit (the hillshade's own
+            // sign: one NW light), and its cross-fall cuts the road into a
+            // slope.
+            double L = 1.0, Gx = 0.0, Gy = 0.0;
             {
-                double gx = 0.0, gy = 0.0, ws = 0.0;
+                double gx = 0.0, gy = 0.0, ws = 0.0, hs = 0.0, bs = 0.0;
                 int cc = 0, rr0 = 0;
                 const int tn = nearest_tile(s, qx, qy, cc, rr0);
                 if (tn >= 0)
@@ -728,17 +1032,118 @@ void paint_routes(const bake_source& s, const geometry& g, const bake_params& p,
                         const double w = std::max(0.0, 2.1 - (dx * dx + dy * dy));
                         gx += w * w * s.grad_x[static_cast<std::size_t>(t)];
                         gy += w * w * s.grad_y[static_cast<std::size_t>(t)];
+                        hs += w * w * s.height[static_cast<std::size_t>(t)];
+                        bs += w * w * s.relief_bias[static_cast<std::size_t>(t)];
                         ws += w * w;
                     }
                     if (ws > 0.0)
-                        L = 1.0 + std::clamp((gx * Lx + gy * Ly) / ws * p.relief_gain * 0.8, -0.40, 0.40);
+                    {
+                        Gx = gx / ws * p.relief_gain;
+                        Gy = gy / ws * p.relief_gain;
+                    }
                 }
+                // The folds and the hills: the sub-tile relief the eye reads.
+                float hx = 0.0f, hy = 0.0f;
+                relief_slope(s, g, p, abx, aby, ws > 0.0 ? static_cast<float>(bs / ws) : 0.0f,
+                             ws > 0.0 ? static_cast<float>(hs / ws) : 0.0f, hx, hy);
+                Gx += hx;
+                Gy += hy;
+                L = 1.0 + std::clamp(static_cast<double>(p.hillshade_sign) * (Gx * Lx + Gy * Ly) * 0.8, -0.40, 0.40);
             }
             const double wear  = 0.92 + 0.16 * rnoise(abx, aby, wear_c, wear_n, 0x3A01u);
             // The speckle is the rail bed's alone: the road tiers are too
             // thin to carry a pixel-scale grain (BL-1257).
             const double speck = fine && h.tier == k_route_rail ? (rspeck(abx, aby, speck_c, speck_n, 0x3A02u) - 0.5) : 0.0;
             const double lit = L * wear;
+
+            // THE TREATMENT (BL-1261, RENDERING.md § Roads and sea lanes: the
+            // road's tile set): the ground either side of the surface, by the
+            // terrain under the pixel. It widens the road's footprint in the
+            // ground, never the line: each band is a few master pixels, and
+            // its strength is its share of a pixel where a pixel is wider
+            // than it (the far page), so a treatment never smears.
+            {
+                const double o  = d - hw; // past the surface's edge (negative on it)
+                const double ts = treat_scale(h.tier);
+                const bool   rail = h.tier == k_route_rail;
+                const int    cv = static_cast<int>(cover[idx]) - 1;
+                const auto   band_k = [&](double w) { return std::min(1.0, w / pxc); };
+                const double face = h.nx * Lx + h.ny * Ly; // > 0: the side facing the NW light
+                if (h.flags & route_piece::f_street)
+                {
+                    // A town's street: a kerb line along its edge.
+                    const double a = 0.30 * (1.0 - smooth01(0.4 * k_kerb_w, k_kerb_w, o)) * smooth01(-pxc, 0.0, o);
+                    mixc(r_, g_, b_, gr * 0.74f, gg * 0.74f, gb * 0.76f, a * band_k(k_kerb_w) * k);
+                }
+                else
+                {
+                    const bool wooded = cv == static_cast<int>(terrain_cover::forest)
+                                     || cv == static_cast<int>(terrain_cover::scrub);
+                    const bool wet = (h.flags & route_piece::f_wet) || cv == static_cast<int>(terrain_cover::marsh);
+                    // The cross-fall: the slope across the road (> 0 on this
+                    // side: the pixel stands uphill of the road).
+                    const double across = Gx * h.nx + Gy * h.ny;
+                    const double kcut = wet ? 0.0 : smooth01(0.15, 0.70, std::fabs(across));
+                    if (wooded)
+                    {
+                        // A cleared corridor: lighter undergrowth where the
+                        // trees were felled, and the tree line's shade at its
+                        // edge (the stamp keeps every tree off it).
+                        const double wc = k_corridor_w * ts;
+                        const double clear = 0.34 * (1.0 - smooth01(0.60 * wc, wc, o));
+                        mixc(r_, g_, b_, gr * 1.10f + 12.0f, gg * 1.10f + 12.0f, gb * 1.02f + 5.0f, clear * band_k(wc) * k);
+                        const double edge = 0.32 * smooth01(0.40 * wc, 0.85 * wc, o) * (1.0 - smooth01(0.85 * wc, wc + pxc, o));
+                        mixc(r_, g_, b_, gr * 0.60f, gg * 0.62f, gb * 0.60f, edge * band_k(0.3 * wc) * k);
+                    }
+                    else if (!wet)
+                    {
+                        // Open ground: a worn verge either side.
+                        const double wv = k_verge_w * ts;
+                        const double a = 0.24 * (1.0 - smooth01(0.40 * wv, wv, o)) * (1.0 - 0.6 * kcut);
+                        mixc(r_, g_, b_, gr * 1.07f + 7.0f, gg * 1.08f + 7.0f, gb * 1.02f + 3.0f, a * band_k(wv) * k);
+                    }
+                    if (wet)
+                    {
+                        // Low wet ground: the road on a low embankment — its
+                        // side slopes lit or shaded by the way they face, a
+                        // dark wet line at their toe.
+                        const double wb = k_bank_w * ts;
+                        const double shade = 1.0 + 0.45 * face;
+                        const float er = static_cast<float>((gr * 0.55 + 140.0 * 0.45) * shade);
+                        const float eg = static_cast<float>((gg * 0.55 + 128.0 * 0.45) * shade);
+                        const float eb = static_cast<float>((gb * 0.55 +  96.0 * 0.45) * shade);
+                        mixc(r_, g_, b_, er, eg, eb, 0.80 * (1.0 - smooth01(0.70 * wb, wb, o)) * band_k(wb) * k);
+                        const double toe = smooth01(0.75 * wb, wb, o) * (1.0 - smooth01(wb, wb + 1.5 * pxc, o));
+                        mixc(r_, g_, b_, gr * 0.62f, gg * 0.64f, gb * 0.66f, 0.28 * toe * band_k(0.25 * wb) * k);
+                    }
+                    else if (kcut > 0.0)
+                    {
+                        if (across > 0.0)
+                        {
+                            // Uphill: the cut's bank, a face turned toward
+                            // the road and mostly from the light; a thin dark
+                            // crest where it meets the slope above.
+                            const double wcut = k_cut_w * ts * (0.5 + 0.5 * kcut) * (rail ? 1.25 : 1.0);
+                            const double shade = 0.66 + 0.30 * (-face);
+                            const float er = static_cast<float>((gr * 0.35 + 124.0 * 0.65) * shade);
+                            const float eg = static_cast<float>((gg * 0.35 + 106.0 * 0.65) * shade);
+                            const float eb = static_cast<float>((gb * 0.35 +  82.0 * 0.65) * shade);
+                            mixc(r_, g_, b_, er, eg, eb,
+                                 kcut * 0.85 * (1.0 - smooth01(0.75 * wcut, wcut, o)) * band_k(wcut) * k);
+                            const double crest = smooth01(0.80 * wcut, wcut, o) * (1.0 - smooth01(wcut, wcut + pxc, o));
+                            mixc(r_, g_, b_, gr * 0.58f, gg * 0.58f, gb * 0.60f, 0.30 * kcut * crest * band_k(0.2 * wcut) * k);
+                        }
+                        else
+                        {
+                            // Downhill: the spoil the cut threw out, a paler
+                            // edge on the slope below.
+                            const double ws = k_spoil_w * ts * kcut * (rail ? 1.25 : 1.0);
+                            mixc(r_, g_, b_, gr * 1.10f + 8.0f, gg * 1.09f + 7.0f, gb * 1.04f + 4.0f,
+                                 0.38 * kcut * (1.0 - smooth01(0.45 * ws, ws, o)) * band_k(ws) * k);
+                        }
+                    }
+                }
+            }
 
             switch (h.tier)
             {
@@ -925,10 +1330,8 @@ int route_patch_boxes(const bake_source& a, const bake_source& b, const geometry
     };
     // A tree whose root stands within its crown of a road's reach is left out
     // of the stamp, and one whose canopy or shadow stands over the road draws
-    // after it (ground_bake.cpp stamp_trees): its root lies within ~0.55 north
-    // or 0.15 south of the reach, its canopy reaches 0.24 sideways and down
-    // from the root, and stands up to 0.55 plus the oblique lift above it.
-    const double t_side = 0.50, t_down = 0.60 + 0.24 + 0.05, t_up = 0.15 + 0.55 + 0.30;
+    // after it (ground_bake.cpp stamp_trees); tree_patch_boxes (BL-1261) boxes
+    // exactly the trees of a stand whose root a changed reach band can touch.
     // A structure's reach is rasterised (installation_tile_bounds) once per
     // tile per call, however many changed pieces pass near it: a settle that
     // lays every road at once would otherwise bound each town many times over.
@@ -962,6 +1365,12 @@ int route_patch_boxes(const bake_source& a, const bake_source& b, const geometry
             const auto cv = static_cast<terrain_cover>(b.cover[static_cast<std::size_t>(t)]);
             return cv == terrain_cover::forest || cv == terrain_cover::scrub;
         };
+        // A tile's own stand reaches this far from its centre (the plan_moved
+        // box below): roots within 0.9, crowns and shadows past them, the
+        // standing canopy lifted up the oblique.
+        const double st_side = 0.9 + 0.16 * 1.5;
+        const double st_up   = 0.9 + g.lift + 2.85 * 0.16 / g.tilt_sy;
+        const double st_down = 0.9 + 0.16 * 1.5;
         bool wooded = false;
         for (int kk = -1; kk < 6 && trees && !wooded; ++kk)
             wooded = wooded_at(kk < 0 ? static_cast<int>(i) : nb_index(b, static_cast<int>(i), kk));
@@ -1003,7 +1412,7 @@ int route_patch_boxes(const bake_source& a, const bake_source& b, const geometry
                 for (int j = 0; j < cnt; ++j)
                 {
                     const route_piece& pc = src->route_pieces[static_cast<std::size_t>(src->route_first[i] + j)];
-                    const double reach = tier_hw(pc.tier) * 1.5 + tier_out(pc.tier);
+                    const double reach = tier_hw(pc.tier) * 1.5 + piece_out(pc.tier, pc.flags);
                     // Only a road clears trees (a lane lies on open water),
                     // and only where trees grow.
                     const bool road = (pc.tier & 0x80u) == 0 && wooded;
@@ -1020,8 +1429,23 @@ int route_patch_boxes(const bake_source& a, const bake_source& b, const geometry
                             x0 = std::min(x0, static_cast<double>(pc.x[k])); x1 = std::max(x1, static_cast<double>(pc.x[k]));
                             y0 = std::min(y0, static_cast<double>(pc.y[k])); y1 = std::max(y1, static_cast<double>(pc.y[k]));
                         }
-                        box(cx, cy, x0 - reach - (road ? t_side : 0.0), y0 - reach - hl - (road ? t_up : 0.0),
-                            x1 + reach + (road ? t_side : 0.0), y1 + reach - hs + (road ? t_down : 0.0));
+                        box(cx, cy, x0 - reach, y0 - reach - hl, x1 + reach, y1 + reach - hs);
+                        if (!road)
+                            continue;
+                        // The trees it clears, restores or now stands under
+                        // (BL-1261): the stand's own trees whose root the
+                        // half's reach band can touch, each boxed exactly
+                        // (tree_patch_boxes), on this tile and its ring.
+                        for (int kk = -1; kk < 6; ++kk)
+                        {
+                            if (!wooded_at(kk < 0 ? static_cast<int>(i) : nb_index(b, static_cast<int>(i), kk)))
+                                continue;
+                            const double ox = kk < 0 ? 0.0 : kNbDx[kk], oy = kk < 0 ? 0.0 : kNbDy[kk];
+                            const int    tr  = r + (kk < 0 ? 0 : static_cast<int>(std::lround(oy / 1.5)));
+                            const int    tc  = static_cast<int>(std::lround((cx + ox) / kSqrt3 - ((tr & 1) ? 0.5 : 0.0)));
+                            n += tree_patch_boxes(b, g, p, tc, tr, x0 - reach - ox, y0 - reach - oy,
+                                                  x1 + reach - ox, y1 + reach - oy, out);
+                        }
                     }
                 }
             }
@@ -1045,10 +1469,7 @@ int route_patch_boxes(const bake_source& a, const bake_source& b, const geometry
         // disc clears them).
         if (plan_moved && trees && wooded_at(static_cast<int>(i)))
         {
-            const double side = 0.9 + 0.16 * 1.5;
-            const double up   = 0.9 + g.lift + 2.85 * 0.16 / g.tilt_sy;
-            const double down = 0.9 + 0.16 * 1.5;
-            box(cx, cy, -side, -up, side, down);
+            box(cx, cy, -st_side, -st_up, st_side, st_down);
         }
     });
     return n;
