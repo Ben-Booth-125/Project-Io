@@ -2059,6 +2059,26 @@
     "docs/generation/INDUSTRIALISATION.md"
    ],
    "resolution": "RULED (Ben, 2026-10-10): A - derived from charter reach. Written into INDUSTRIALISATION.md § Beat 1 (the works lean)."
+  },
+  {
+   "id": "NR-1027",
+   "title": "NOVEL WORK: the seated player's corporation edits its home nation's research queue (three new corp commands)",
+   "raised": "2026-10-10",
+   "kind": "novel-work",
+   "status": "open",
+   "source": "BL-1276 (tech tree panel), lane U",
+   "what": "The research panel queues nodes through three verbs appended to corp_command (queue_research, unqueue_research, clear_research), accepted only from the SEATED corporation and acting on its home nation's queue; every other corporation is refused, the scorer never emits them, and the MCP verb list carries them with range checks. Taken as the bridge until sprint 53 (BL-1245, player is a nation) seats the player on the nation itself. Also taken: a press on a queued node unqueues it and every queued entry that needs it - the standing toggle rule applied to the queue.",
+   "why_it_matters": "A corporation acting on its nation's state is a new reach for the player seat. When the player becomes the nation (sprint 53) these verbs move to the nation; a wire agent seated as a corp can steer its nation's research meanwhile.",
+   "options": [
+    "Keep as the bridge until sprint 53",
+    "Restrict to the in-app UI only (not the wire)"
+   ],
+   "recommendation": "Keep as the bridge.",
+   "files": [
+    "src/world/corp_command.cpp",
+    "tools/mcp/server.js",
+    "src/ui/tech_tree_panel.cpp"
+   ]
   }
  ]
 }

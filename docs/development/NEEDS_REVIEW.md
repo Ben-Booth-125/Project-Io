@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*102 entries — 21 open, 81 resolved.*
+*103 entries — 22 open, 81 resolved.*
 
 ---
 
@@ -223,6 +223,20 @@ Ben ruled ocean crossings in generation gated by date. The two sibling pieces th
 > **Recommendation:** Taken.
 
 *Files: `docs/generation/CIVILISATION.md`, `docs/generation/EXPLORATION.md`, `docs/generation/INDUSTRIALISATION.md`, `docs/ui/question_log.json`*
+
+### NR-1027 — NOVEL WORK: the seated player's corporation edits its home nation's research queue (three new corp commands)
+*novel-work · raised 2026-10-10 · from BL-1276 (tech tree panel), lane U*
+
+The research panel queues nodes through three verbs appended to corp_command (queue_research, unqueue_research, clear_research), accepted only from the SEATED corporation and acting on its home nation's queue; every other corporation is refused, the scorer never emits them, and the MCP verb list carries them with range checks. Taken as the bridge until sprint 53 (BL-1245, player is a nation) seats the player on the nation itself. Also taken: a press on a queued node unqueues it and every queued entry that needs it - the standing toggle rule applied to the queue.
+
+**Why it matters.** A corporation acting on its nation's state is a new reach for the player seat. When the player becomes the nation (sprint 53) these verbs move to the nation; a wire agent seated as a corp can steer its nation's research meanwhile.
+
+- Keep as the bridge until sprint 53
+- Restrict to the in-app UI only (not the wire)
+
+> **Recommendation:** Keep as the bridge.
+
+*Files: `src/world/corp_command.cpp`, `tools/mcp/server.js`, `src/ui/tech_tree_panel.cpp`*
 
 ---
 
