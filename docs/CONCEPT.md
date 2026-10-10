@@ -30,7 +30,7 @@ This is the player-facing twin of the AI-behaviour prohibition in `.claude/rules
 ### Territorial existence
 The player persists as long as its nation holds any territory (Ben, 2026-10-10). A nation that holds no tile is eliminated, whatever its champion still owns abroad; a champion that goes bankrupt or is seized is a heavy, progressive loss, not the end. This replaces asset-based existence, under which owning a single building kept the company alive.
 ### Development through ages
-Early game involves buying land, building industrial chains, and raising forces before space becomes viable. The nation **raises its own units and buys their equipment from corporations on the market** (Ben, 2026-10-10): it musters, and it does not run arsenals of its own. The purchase rides the state procurement seam the space programme already uses (`docs/politics/NATIONS.md` § A budget), priced at the supplier market's price and never an order on the book. The Era 1 → Era 2 gate — ERAS.md's rocketry + launchpad + propellant set — is what the player is equipping toward from the opening tick.
+Early game involves buying land, building industrial chains, and raising forces before space becomes viable. The nation **raises its own units and buys their equipment from corporations on the market** (Ben, 2026-10-10): it musters, and it does not run arsenals of its own. It buys that equipment **as a real buyer on the order book** (Ben, 2026-10-10, NR-1028), bidding and clearing like any other buyer (`docs/politics/NATIONS.md` § 2. Conservation). The Era 1 → Era 2 gate — ERAS.md's rocketry + launchpad + propellant set — is what the player is equipping toward from the opening tick.
 
 ## Trade — economy
 ### Dynamic pricing

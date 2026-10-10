@@ -61,15 +61,16 @@ and the distinction is load-bearing:
 | | Corporation | Nation |
 |---|---|---|
 | Owns | buildings, stockpiles, orders | **tiles** |
-| Money | `balance`, spent on the market every tick | `treasury`, spent **only by direct transfer** |
+| Money | `balance`, spent on the market every tick | `treasury`, spent by direct transfer, and on the order book for military equipment only |
 | Acts through | `corp_command`'s verbs | the **national budget** — a weight vector over priority lines |
 | Decides | `corp_ai`, every tick | `nation_ai`, on the same staggered cadence |
 | Objective | profit — accumulative, unbounded | **positional** — needed and unthreatened |
 | Can author law | no | **yes — and only it can** |
 
 That table is the whole of this document in miniature. A nation has the two faculties a
-corporation lacks — territory and legislative authority — and it never touches the market: every
-credit that leaves it lands on a named corporation's balance.
+corporation lacks — territory and legislative authority — and it touches the market for one thing
+only, the equipment its units carry (§ 2. Conservation). Every other credit that leaves it lands on
+a named corporation's balance.
 
 ---
 
@@ -422,7 +423,7 @@ It fits the player identity from both ends. A corporation is a **law subject, ne
 legislator**, which leaves it no lever of its own on the rules it works inside. Lobbying is the one
 mechanism that changes that: **you do not pass the law, you pay someone who does.** The player's
 champion lobbies foreign nations this way. The player's own nation is lobbied in turn by the firms on
-its ground, which is one of the three parties the design test says a nation answers to
+its ground (Ben, 2026-10-10, NR-1026, granted), which is one of the three parties the design test says a nation answers to
 (`docs/CONCEPT.md` § Player identity). The `lobby` verb is the *only* route to influence over a nation, and it
 is owned by BL-539 (lobbying).
 
@@ -447,7 +448,13 @@ credits another in the same float and the same tick, never bidding and never cle
 sides accumulate**: a nation does not spend to zero, a reserve is held back, and an underspent line
 carries forward.
 
-The market is untouched. `clear_markets` remains a buyer of last resort that pays sellers with
+**One exception: a nation buys military equipment on the order book (Ben, 2026-10-10, NR-1028).**
+The nation that musters its own units (`../military/MILITARY.md` § The muster interface) bids for
+their equipment as a real buyer, and its bids clear against the shelf like any other. That purchase
+is a market purchase, not a transfer, so the two rules above do not reach it. Every other
+nation↔corp flow, the space programme's procurement included, stays a direct transfer.
+
+The market is otherwise untouched. `clear_markets` remains a buyer of last resort that pays sellers with
 nobody's money, and total corporate cash rises and falls every tick by design. The two standards
 are explicitly different things, which is what BL-392's silent value destruction came from
 conflating.

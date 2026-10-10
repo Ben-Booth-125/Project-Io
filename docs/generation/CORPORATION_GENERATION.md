@@ -619,7 +619,7 @@ identity).** The seat is taken by picking a **major nation**, and the champion o
 firm `is_player` lands on: the shortlist below is a list of majors, each read through its one
 champion. Everything else in this section stands, re-read at that grain — the settle in spectate,
 the static score, the marked-not-removed floor, the clean slate of construction and the day-one kit.
-Up to six humans may each take one major (`docs/ui/STARTUP.md` § The seat).
+The seat is shaped for up to six humans, one major each, and the prototype seats one (`docs/ui/STARTUP.md` § The seat).
 
 One generated corporation is flagged as `is_player = true`. No special generation rules apply:
 the player starts on the same footing as any other corporation, and the flag is set **after** the

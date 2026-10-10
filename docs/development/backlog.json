@@ -373,7 +373,7 @@
     "docs/generation/CORPORATION_GENERATION.md",
     "src/world/space_programme.cpp"
    ],
-   "design": "DESIGNED (Ben, 2026-10-10; NR-1020 resolved): the player is a MAJOR NATION operating its CHAMPION corporation. Written into CONCEPT.md § Player identity (identity; design test: what the NATION can field / must answer to - other nations, its population, its corporations; territorial existence), NATIONS.md (§ What a nation is; § Major and minor nations; the player's nation is never scored), GLOSSARY (Major nation, Minor nation, Champion), SYSTEMS, MANUAL § 1, ROADMAP, HISTORY, MILITARY § The muster interface (the nation musters and buys equipment through the state procurement seam), AI_OPPONENT § 11 (the narrowing; one subject raised, NR-1026), CORPORATION_GENERATION (one specialist per major; the player's corp is the champion), STARTUP § The seat. The major target IS this item's 'how many nations run a space programme' parameter (NR-1027). The build is split into BL-1278..BL-1284. Original direction (Ben, 2026-10-08, option A): the player becomes a nation with a space programme, reversing NR-885."
+   "design": "DESIGNED (Ben, 2026-10-10; NR-1020 resolved): the player is a MAJOR NATION operating its CHAMPION corporation. Written into CONCEPT.md § Player identity (identity; design test: what the NATION can field / must answer to - other nations, its population, its corporations; territorial existence), NATIONS.md (§ What a nation is; § Major and minor nations; the player's nation is never scored), GLOSSARY (Major nation, Minor nation, Champion), SYSTEMS, MANUAL § 1, ROADMAP, HISTORY, MILITARY § The muster interface (the nation musters and buys equipment on the order book, NR-1028), AI_OPPONENT § 11 (the narrowing; AI acting toward a human nation granted, NR-1026), CORPORATION_GENERATION (one specialist per major; the player's corp is the champion), STARTUP § The seat. The major target IS this item's 'how many nations run a space programme' parameter (NR-1027). The build is split into BL-1278..BL-1284. Original direction (Ben, 2026-10-08, option A): the player becomes a nation with a space programme, reversing NR-885."
   },
   {
    "status": "designed",
@@ -1148,7 +1148,7 @@
     "docs/ui/question_log.json"
    ],
    "title": "The seat becomes a nation selection screen: majors only, a six-part nation card, take_seat names a major",
-   "design": "DESIGNED (Ben, 2026-10-10): STARTUP.md § The seat. Rows are the majors (count = major target). Card: territory highlighted on the map, population and GDP, treasury/debt/budget weights, the champion (today's firm card), resource profile and deposits, neighbours with stances and grudges. take_seat names a major and seats its champion; its ACTIONS.json entry and the question_log surface question ('which nation am I?') change with it. Up to six humans each take one major - gated on NR-1025 (multiplayer scope). Needs a live click."
+   "design": "DESIGNED (Ben, 2026-10-10): STARTUP.md § The seat. Rows are the majors (count = major target). Card: territory highlighted on the map, population and GDP, treasury/debt/budget weights, the champion (today's firm card), resource profile and deposits, neighbours with stances and grudges. take_seat names a major and seats its champion; its ACTIONS.json entry and the question_log surface question ('which nation am I?') change with it. Shaped for up to six humans, one major each; the prototype seats one (NR-1025). Needs a live click."
   },
   {
    "status": "designed",
@@ -1219,7 +1219,7 @@
     "docs/ai/ACTIONS.json"
    ],
    "title": "The player governs its nation: budget, tariff and law verbs, the nation step skips it, and the nation musters",
-   "design": "DESIGNED IN PART (Ben, 2026-10-10): NATIONS.md § What a nation does each tick (the player's nation is never scored; moves 2-4 run on the player's weights); MILITARY.md § The muster interface (the nation raises units and buys equipment through the state procurement seam); CONCEPT.md § Territorial existence (eliminated at no territory). OPEN: the verb set and its seam validation (untrusted-input rule), who builds and owns a military base, the elimination check. Every new control gets an ACTIONS.json entry."
+   "design": "DESIGNED IN PART (Ben, 2026-10-10): NATIONS.md § What a nation does each tick (the player's nation is never scored; moves 2-4 run on the player's weights); MILITARY.md § The muster interface (the nation raises units and buys their equipment as a real buyer on the order book, NR-1028); CONCEPT.md § Territorial existence (eliminated at no territory). OPEN: the verb set and its seam validation (untrusted-input rule), who builds and owns a military base, the elimination check. Every new control gets an ACTIONS.json entry."
   }
  ]
 }

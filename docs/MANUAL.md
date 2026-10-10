@@ -8,7 +8,7 @@
 
 ## Preface
 
-Project Io is a grand strategy game about running a **nation** and its **champion corporation** in a
+Project Io is a single-player grand strategy game about running a **nation** and its **champion corporation** in a
 procedurally generated world that opens in 1960. You govern the state, and you run the firm that
 builds for it. You find the ground worth industrialising, you build on it, and you fight for it when
 you must.

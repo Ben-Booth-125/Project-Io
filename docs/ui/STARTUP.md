@@ -703,8 +703,10 @@ at every round boundary, not only at Begin.
 `../CONCEPT.md` § Player identity).** This overturns the corporation selection canvas below at the
 grain of the pick: the list is of **major nations**, and picking one is becoming that nation and
 operating its champion. Only majors are offered; a minor cannot be played. Majors and seats are
-one-to-one, so the screen offers exactly the major target's count of rows. **Up to six humans may
-each take one major (Ben, 2026-10-10)**; no two take the same one.
+one-to-one, so the screen offers exactly the major target's count of rows. **The screen is shaped for up to
+six humans, each taking one major, and seats one (Ben, 2026-10-10, NR-1025)**: multiplayer stays
+outside the prototype scope (`../tech/TECH_FOUNDATIONS.md`), so the prototype seats a single human
+and nothing in the screen's design assumes there is only one.
 
 **The nation card (Ben, 2026-10-10).** *Its question: which nation am I?* The card carries six
 things, and the screen gives the nation more room than the firm card did:

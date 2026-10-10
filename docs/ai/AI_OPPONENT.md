@@ -2029,7 +2029,15 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   nations run shallower than the 2026-08-18 nation grant allows (`../politics/NATIONS.md` § Major
   and minor nations), which is a narrowing too.
 
-  **Raised, not granted.** Rival nations and rival corporations acting toward a **nation a human
-  plays** — a stance declared at it, a tariff aimed at it, a lobby paid to it — is a subject no
-  entry above names: NR-517 reached a rival acting politically against a corp a human owns, not
-  against a human state. It waits on Ben's ruling and is not assumed (NEEDS_REVIEW, 2026-10-10).
+  **A rival may act toward a nation a human plays — granted (Ben, 2026-10-10, NR-1026).** Rival
+  nations and rival corporations may use **the same verbs toward a human-played nation that they
+  use toward any nation**: a stance declared at it, a tariff aimed at it, war, a lobby paid to it.
+  It is a new subject, not a reading of NR-517, which reached only a corp a human owns.
+
+  **What it admits.** Exactly the verb set already legal toward an AI nation, chosen by the same
+  scorers on the same inputs; the human-played nation is scored as a counterparty like any other.
+
+  **What it does NOT admit.** No verb that exists only because the target is human; no read of the
+  player's private state beyond what any nation may observe; nothing that acts ON the player's
+  nation or champion, which stay unscored. Pure, seeded, deterministic, replayable, legal verbs
+  only, never a planner.
