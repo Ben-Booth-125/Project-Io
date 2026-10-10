@@ -652,6 +652,9 @@ bake_source prepare_source(const world& w, entity_id body, bool reveal_all,
     // river, and a visible reach's width must not change when ground upstream
     // is surveyed.
     std::vector<std::uint8_t> raw_in(n, 0), raw_out(n, 0);
+    // BL-1253: road and lane tiers, read in this same pass over the tiles.
+    s.road.assign(n, 0);
+    s.lane.assign(n, 0);
 
     for (const auto& [id, t] : w.tiles)
     {
@@ -681,6 +684,13 @@ bake_source prepare_source(const world& w, entity_id body, bool reveal_all,
 
         s.cls[i]    = static_cast<std::uint8_t>(water ? bake_source::tile_class::water
                                                       : bake_source::tile_class::land);
+        // BL-1253: a revealed tile's route (a masked one carries none). Roads
+        // on land, lanes on water, as the world lays them; rail is a tier
+        // value (k_route_rail) no world sets yet.
+        if (!water && t.road_level > 0)
+            s.road[i] = static_cast<std::uint8_t>(std::min<int>(t.road_level, k_route_highway));
+        if (water && t.lane_level > 0)
+            s.lane[i] = t.lane_level;
         s.colour[i] = palette::tile_colour(t.substrate, t.cover, t.cover_density);
         s.height[i] = t.height;
         s.relief_bias[i] = palette::relief_amount(t.landform);
@@ -716,7 +726,7 @@ bake_source prepare_source(const world& w, entity_id body, bool reveal_all,
                 (height_at(s, c, r + 1) - height_at(s, c, r - 1)) / (2.0 * 1.5));
         }
     extract_installations(w, body, reg, s); // BL-1241 (structures baked)
-    extract_routes(w, body, s);             // BL-1253 (roads painted): after the installations, whose plan it reads
+    rederive_routes(s); // BL-1253 (roads painted): after the installations, whose plan the pieces read
     return s;
 }
 

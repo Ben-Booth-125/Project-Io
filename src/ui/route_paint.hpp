@@ -104,13 +104,11 @@ struct road_plan
 /// (bake_source::route_links) and what it stands (stack count, settlement).
 road_plan tile_road_plan(const bake_source& src, std::size_t i);
 
-/// Snapshot road_level / lane_level of @p body's REVEALED tiles into the
-/// source (a masked tile carries no route, so none leaks through the survey
-/// mask) and derive the pieces. Call after extract_installations.
-void extract_routes(const world& w, entity_id body, bake_source& s);
-
-/// Re-derive links, plans' pieces and the cull after a caller edits
-/// bake_source::road / lane (or the class / installations) in place.
+/// Derive links, the plans' pieces and the cull from bake_source::road / lane
+/// (prepare_source reads road_level / lane_level of the REVEALED tiles in its
+/// one tile pass — a masked tile carries no route, so none leaks through the
+/// survey mask — and calls this after extract_installations). A caller that
+/// edits road / lane, the classes or the installations in place calls it again.
 void rederive_routes(bake_source& s);
 
 /// The route pass over a window (absolute bake pixels px0, py0; pw x ph),

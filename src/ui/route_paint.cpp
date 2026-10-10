@@ -59,6 +59,8 @@ float rspeck(double x, double y, double cell, int period_cells, std::uint32_t sa
     return rh01(((ix % period_cells) + period_cells) % period_cells, iy, salt);
 }
 
+inline double sq(double v) { return v * v; }
+
 inline double smooth01(double e0, double e1, double x)
 {
     const double t = std::clamp((x - e0) / (e1 - e0), 0.0, 1.0);
@@ -78,6 +80,18 @@ inline int nb_index(const bake_source& s, int i, int side)
         return -1;
     const int cw = ((nb.gx % s.gw) + s.gw) % s.gw;
     return nb.gy * s.gw + cw;
+}
+
+/// sin^2(pi t) at t = k/16, k = 0..16: the bow's profile, tabled once (the
+/// snapshot re-derives every piece on the main thread, so no sin per point).
+const double* bow16()
+{
+    static const struct table
+    {
+        double v[17];
+        table() { for (int k = 0; k <= 16; ++k) { const double sn = std::sin(kPi * k / 16.0); v[k] = sn * sn; } }
+    } t;
+    return t.v;
 }
 
 inline bool has_routes(const bake_source& s)
@@ -204,12 +218,13 @@ route_piece curve(double ax, double ay, double bx, double by, double bwx, double
     route_piece pc;
     pc.tier = tier;
     pc.kind = route_piece::curve;
+    static_assert(route_piece::k_pts == 9, "the bow table steps in sixteenths");
+    const double* bow = bow16();
     for (int k = 0; k < route_piece::k_pts; ++k)
     {
         const double t = static_cast<double>(k) / (route_piece::k_pts - 1);
         const double a = (1.0 - t) * (1.0 - t), c = t * t;
-        const double sn = std::sin(kPi * t);
-        const double w = sn * sn;
+        const double w = bow[2 * k];
         pc.x[k] = static_cast<float>(a * ax + c * bx + w * bwx);
         pc.y[k] = static_cast<float>(a * ay + c * by + w * bwy);
     }
@@ -279,25 +294,36 @@ void tile_pieces(const bake_source& s, std::size_t i, std::uint8_t links, std::u
         {
             // Bow away from the cluster until the road and its verges clear
             // its keep-out disc along the middle of the curve.
-            const double clr = plan->radius + hw + tier_out(tier) + 0.02;
-            for (double beta = 0.0; beta <= 0.6001; beta += 0.02)
-            {
-                bwx = -plan->fx * beta;
-                bwy = -plan->fy * beta;
-                bool clear = true;
-                for (int k = 1; k < 16 && clear; ++k)
+            const double clr2 = sq(plan->radius + hw + tier_out(tier) + 0.02);
+            const double* bow = bow16();
+            const auto clear_at = [&](double beta) {
+                for (int k = 1; k < 16; ++k)
                 {
                     const double t = k / 16.0;
                     const double a = (1.0 - t) * (1.0 - t), c = t * t;
-                    const double sn = std::sin(kPi * t);
-                    const double px = a * mx[pa] + c * mx[pb] + sn * sn * bwx;
-                    const double py = a * my[pa] + c * my[pb] + sn * sn * bwy;
-                    if (std::hypot(px - plan->kx, py - plan->ky) < clr)
-                        clear = false;
+                    const double px = a * mx[pa] + c * mx[pb] - bow[k] * plan->fx * beta;
+                    const double py = a * my[pa] + c * my[pb] - bow[k] * plan->fy * beta;
+                    if (sq(px - plan->kx) + sq(py - plan->ky) < clr2)
+                        return false;
                 }
-                if (clear)
-                    break;
-            }
+                return true;
+            };
+            // The least bow, in steps of 0.02 up to 0.6, that clears: none
+            // when the straight curve already does, else a bisection over the
+            // steps (the clearance grows with the bow along its whole middle).
+            int lo = 0, hi = 30;
+            if (clear_at(0.0))
+                hi = 0;
+            else if (!clear_at(0.6))
+                hi = 30;
+            else
+                while (hi - lo > 1)
+                {
+                    const int m = (lo + hi) / 2;
+                    (clear_at(m * 0.02) ? hi : lo) = m;
+                }
+            bwx = -plan->fx * hi * 0.02;
+            bwy = -plan->fy * hi * 0.02;
         }
         out.push_back(curve(mx[pa], my[pa], mx[pb], my[pb], bwx, bwy, tier));
         // The hub an odd branch joins: this curve's apex.
@@ -570,41 +596,20 @@ void rederive_routes(bake_source& s)
             std::min<std::size_t>(255, s.route_pieces.size() - static_cast<std::size_t>(s.route_first[i])));
     }
     // The cull: a point whose nearest tile is i can be reached only by the
-    // pieces of i and its six neighbours.
+    // pieces of i and its six neighbours — scattered from the route tiles.
     for (std::size_t i = 0; i < n; ++i)
     {
-        std::uint8_t bits = 0;
-        for (int k = -1; k < 6; ++k)
-        {
-            const int t = k < 0 ? static_cast<int>(i) : nb_index(s, static_cast<int>(i), k);
-            if (t < 0)
-                continue;
-            if (s.road[static_cast<std::size_t>(t)]) bits |= 1u;
-            if (s.lane[static_cast<std::size_t>(t)]) bits |= 2u;
-        }
-        s.near_route[i] = bits;
-    }
-}
-
-void extract_routes(const world& w, entity_id body, bake_source& s)
-{
-    const std::size_t n = static_cast<std::size_t>(s.gw) * s.gh;
-    s.road.assign(n, 0);
-    s.lane.assign(n, 0);
-    const auto land  = static_cast<std::uint8_t>(bake_source::tile_class::land);
-    const auto water = static_cast<std::uint8_t>(bake_source::tile_class::water);
-    for (const auto& [id, t] : w.tiles)
-    {
-        if (t.body != body || t.grid_x < 0 || t.grid_x >= s.gw || t.grid_y < 0 || t.grid_y >= s.gh)
+        const std::uint8_t bits = static_cast<std::uint8_t>((s.road[i] ? 1u : 0u) | (s.lane[i] ? 2u : 0u));
+        if (!bits)
             continue;
-        const std::size_t i = static_cast<std::size_t>(t.grid_y) * s.gw + t.grid_x;
-        // Survey mask: a masked tile carries no route (its class is neither).
-        if (s.cls[i] == land && t.road_level > 0)
-            s.road[i] = static_cast<std::uint8_t>(std::min<int>(t.road_level, k_route_highway));
-        if (s.cls[i] == water && t.lane_level > 0)
-            s.lane[i] = t.lane_level;
+        s.near_route[i] |= bits;
+        for (int k = 0; k < 6; ++k)
+        {
+            const int t = nb_index(s, static_cast<int>(i), k);
+            if (t >= 0)
+                s.near_route[static_cast<std::size_t>(t)] |= bits;
+        }
     }
-    rederive_routes(s);
 }
 
 double route_clearance(const bake_source& s, double x, double y)
@@ -936,6 +941,23 @@ int route_patch_boxes(const bake_source& a, const bake_source& b, const geometry
     // or 0.15 south of the reach, its canopy reaches 0.24 sideways and down
     // from the root, and stands up to 0.55 plus the oblique lift above it.
     const double t_side = 0.50, t_down = 0.60 + 0.24 + 0.05, t_up = 0.15 + 0.55 + 0.30;
+    // A structure's reach is rasterised (installation_tile_bounds) once per
+    // tile per call, however many changed pieces pass near it: a settle that
+    // lays every road at once would otherwise bound each town many times over.
+    std::vector<std::int64_t> bounded;
+    const auto bound_tile = [&](int col, int row) {
+        const std::int64_t key = (static_cast<std::int64_t>(col) << 20) ^ static_cast<std::int64_t>(row);
+        if (std::find(bounded.begin(), bounded.end(), key) != bounded.end())
+            return;
+        bounded.push_back(key);
+        int x0, y0, x1, y1;
+        for (const bake_source* src : { &a, &b })
+            if (installation_tile_bounds(*src, g, p, col, row, x0, y0, x1, y1))
+            {
+                out.push_back({ x0, y0, x1 - x0, y1 - y0 });
+                ++n;
+            }
+    };
     walk_tiles(b, g, px0, py0, pw, ph, 4.0, [&](int c, int r, std::size_t i) {
         const road_plan pa = has_routes(a) ? tile_road_plan(a, i) : road_plan{};
         const road_plan pb = has_routes(b) ? tile_road_plan(b, i) : road_plan{};
@@ -964,22 +986,27 @@ int route_patch_boxes(const bake_source& a, const bake_source& b, const geometry
         if (pieces_moved)
         {
             // The oblique lift a pixel here can be drawn at: the ground's
-            // height there is a blend of centres within two rings of the tile.
-            double hmax = b.height[i];
+            // height there is a convex blend of centres within two rings of
+            // the tile, so it lies between their least and greatest height.
+            double hmax = b.height[i], hmin = b.height[i];
             for (int k1 = 0; k1 < 6; ++k1)
             {
                 const int t1 = nb_index(b, static_cast<int>(i), k1);
                 if (t1 < 0)
                     continue;
-                hmax = std::max(hmax, static_cast<double>(b.height[static_cast<std::size_t>(t1)]));
+                const double h1 = b.height[static_cast<std::size_t>(t1)];
+                hmax = std::max(hmax, h1); hmin = std::min(hmin, h1);
                 for (int k2 = 0; k2 < 6; ++k2)
                 {
                     const int t2 = nb_index(b, t1, k2);
-                    if (t2 >= 0)
-                        hmax = std::max(hmax, static_cast<double>(b.height[static_cast<std::size_t>(t2)]));
+                    if (t2 < 0)
+                        continue;
+                    const double h2 = b.height[static_cast<std::size_t>(t2)];
+                    hmax = std::max(hmax, h2); hmin = std::min(hmin, h2);
                 }
             }
-            const double hl = std::clamp(hmax, 0.0, 1.0) * g.lift;
+            const double hl = std::clamp(hmax, 0.0, 1.0) * g.lift; // drawn this far up at most
+            const double hs = std::clamp(hmin, 0.0, 1.0) * g.lift; // and at least this far
             for (const bake_source* src : { &a, &b })
             {
                 if (!has_routes(*src))
@@ -1006,7 +1033,7 @@ int route_patch_boxes(const bake_source& a, const bake_source& b, const geometry
                             y0 = std::min(y0, static_cast<double>(pc.y[k])); y1 = std::max(y1, static_cast<double>(pc.y[k]));
                         }
                         box(cx, cy, x0 - reach - (road ? t_side : 0.0), y0 - reach - hl - (road ? t_up : 0.0),
-                            x1 + reach + (road ? t_side : 0.0), y1 + reach + (road ? t_down : 0.0));
+                            x1 + reach + (road ? t_side : 0.0), y1 + reach - hs + (road ? t_down : 0.0));
                     }
                 }
             }
@@ -1021,25 +1048,11 @@ int route_patch_boxes(const bake_source& a, const bake_source& b, const geometry
                 const int    tr  = r + (kk < 0 ? 0 : static_cast<int>(std::lround(kNbDy[kk] / 1.5)));
                 const double ncx = cx + (kk < 0 ? 0.0 : kNbDx[kk]);
                 const int ncol = static_cast<int>(std::lround(ncx / kSqrt3 - ((tr & 1) ? 0.5 : 0.0)));
-                int x0, y0, x1, y1;
-                for (const bake_source* src : { &a, &b })
-                    if (installation_tile_bounds(*src, g, p, ncol, tr, x0, y0, x1, y1))
-                    {
-                        out.push_back({ x0, y0, x1 - x0, y1 - y0 });
-                        ++n;
-                    }
+                bound_tile(ncol, tr);
             }
         }
         if (plan_moved)
-        {
-            int x0, y0, x1, y1;
-            for (const bake_source* src : { &a, &b })
-                if (installation_tile_bounds(*src, g, p, c, r, x0, y0, x1, y1))
-                {
-                    out.push_back({ x0, y0, x1 - x0, y1 - y0 });
-                    ++n;
-                }
-        }
+            bound_tile(c, r);
         // The tile's own trees, when its cluster moved (a roaded cluster's
         // disc clears them).
         if (plan_moved && trees && wooded_at(static_cast<int>(i)))

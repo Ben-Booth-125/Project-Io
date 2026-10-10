@@ -1416,6 +1416,43 @@ void route_row(world& w, entity_id home, const bake_source& src0, const bake_par
             std::printf("ROUTE-PROF  window rule, network laid at once: %.2f ms, %s, %zu windows, %.1f%% of the chunk\n",
                         best, ok ? "patched" : "whole", rr.size(), 100.0 * area / (512.0 * 512.0));
         }
+        // The snapshot's own cost: the source is re-taken on the main thread
+        // (every 30 frames in play, every frame under --verify), so deriving
+        // the pieces must stay cheap. A lattice about the campaign's density
+        // (every third row and every fourth column of land roaded).
+        {
+            bake_source dense = src0;
+            dense.road.assign(dense.cls.size(), 0);
+            dense.lane.assign(dense.cls.size(), 0);
+            int nr = 0;
+            for (std::size_t i = 0; i < dense.cls.size(); ++i)
+            {
+                const int r = static_cast<int>(i) / dense.gw, c = static_cast<int>(i) % dense.gw;
+                if (dense.cls[i] == land && (r % 3 == 0 || c % 4 == 0))
+                {
+                    dense.road[i] = static_cast<std::uint8_t>(1 + (r + c) % 3);
+                    ++nr;
+                }
+            }
+            double best = 1e30;
+            for (int rep_ = 0; rep_ < 7; ++rep_)
+            {
+                const auto t0 = std::chrono::steady_clock::now();
+                rederive_routes(dense);
+                best = std::min(best, std::chrono::duration<double, std::milli>(
+                                          std::chrono::steady_clock::now() - t0).count());
+            }
+            double ps = 1e30;
+            for (int rep_ = 0; rep_ < 3; ++rep_)
+            {
+                const auto t0 = std::chrono::steady_clock::now();
+                const bake_source again = prepare_source(w, home, /*reveal_all=*/true);
+                ps = std::min(ps, std::chrono::duration<double, std::milli>(
+                                      std::chrono::steady_clock::now() - t0).count());
+            }
+            std::printf("ROUTE-PROF  rederive_routes on %d road tiles (%zu pieces): %.2f ms; prepare_source (this world): %.2f ms\n",
+                        nr, dense.route_pieces.size(), best, ps);
+        }
         return;
     }
 
