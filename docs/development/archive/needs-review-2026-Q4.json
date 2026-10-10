@@ -1,0 +1,448 @@
+{
+  "_schema": "needs-review-archive/io-v1",
+  "_note": [
+    "Cold store for NEEDS_REVIEW.json entries resolved in 2026-Q4.",
+    "Written by tools/session/archive_reviews.js. Records are FROZEN: the entry verbatim,",
+    "resolution included. The live queue is docs/development/NEEDS_REVIEW.json, which",
+    "holds open entries only."
+  ],
+  "bucket": "2026-Q4",
+  "records": {
+    "NR-962": {
+      "id": "NR-962",
+      "title": "CALL: rivers divide provinces much less once the fill crosses the settled line, and the river cost never made a river divide its banks",
+      "raised": "2026-09-27",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1150 (province fill crosses the settled line), lane adc45b16, cold review 2026-09-27",
+      "what": "Ruling 2 (PROVINCES.md): 'Boundaries are rivers and elevation difference.' After BL-1150, on the home body a river edge is a province border 14.92% of the time against 12.13% for plain ground (1.23x), down from 44.52% vs 27.73% (1.61x); on 3 of 16 shipped seeds rivers divide no more than plain ground. Mechanism (review, from the code): the settled line used to be a 100% border, and river courses cross that line more than plain ground does (colonisation prices river tiles as corridors, and streams cross unfarmable ground), so removing the lock removed borders that happened to sit on rivers. DEEPER, PRE-EXISTING: the river cost (+40, k_province_river_edge_cost) is charged on the step ALONG a course, from a course tile to its downstream neighbour (river_generation.cpp ~223-230, province.cpp ~212-213). So the fill pays to travel along a river, and crossing from one bank to the other through a course tile over two plain edges costs nothing. A river never divided its banks; borders 'on river edges' cut the river across. The river row (C2a) likely passes even with the river cost at 0 -- the lane is running that mutation now. ON THE SHIPPED WORLDS (fix round 67118846, 16 seeds pooled, home body): rivers were already weak before BL-1150 -- a river edge is a border 1.19x as often as plain ground on main (41.61% vs 34.87%) and 1.18x after (29.63% vs 25.15%); the 1.61 -> 1.23 drop is the harness world only. Per seed, rivers divide no more than plain on 1 seed on main (38) and 3 after (12, 37, 38). The river cost does matter on shipped worlds: at cost 0, 7 of 16 go red (the harness world still passes, so its row never tested the cost). The geometry is confirmed from the code: the +40 is paid travelling along a course; crossing bank to bank costs nothing extra.",
+      "why_it_matters": "Rivers as borders is a named property of the map, and as built it holds only by accident of where centres and the settled line fall.",
+      "options": [
+        "A: accept the weaker river borders as the cost of a centre holding its whole ground",
+        "B: make a river divide its banks -- the fill pays to CROSS a course (stepping onto or off it across the flow), not to travel along it; measured first",
+        "C: raise the river cost on today's geometry",
+        "D: other"
+      ],
+      "recommendation": "B: rivers divide banks as ruling 2 says -- on shipped worlds they barely divide at all today (1.19x plain), with or without BL-1150. BL-1150 can merge first; the red C13 river row is this call.",
+      "files": [
+        "src/world/province.cpp",
+        "src/world/province.hpp",
+        "tools/verify/province_partition_harness.cpp",
+        "docs/generation/PROVINCES.md"
+      ],
+      "resolution": "RULED (Ben, 2026-10-01, the open calls form): B: a river divides its banks -- the fill pays to cross a course, not to travel along it; measured first, with a row that fails at river cost 0. PROVINCES.md; BL-1156 (rivers divide banks).",
+      "resolved": "2026-10-01"
+    },
+    "NR-963": {
+      "id": "NR-963",
+      "title": "CALL: the rival corporations open unarmed and cannot arm inside the settle -- should they start with a force?",
+      "raised": "2026-09-27",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1154 (rivals field no force), traced by the BL-1146 cold review, 2026-09-27",
+      "what": "spawn_solvency R4 ('the field still fields a standing force') reads 0 rival units over 12 seeds (baseline 15-20 a seed in 2026-08; 0 since the settle went from 80 ticks to 12). The chain, from the code: a hire needs a completed military base the corp owns (corp_ai.cpp ~1808-1832); the charter web never builds one; the opening force (seed_starting_military, BL-331/BL-476 'rivals start armed') has been OPT-IN since 2026-08-26 (corporation_params::seed_starting_force, default false), turned off when the seated corp's standing-force upkeep was 90% of its outgoings (BL-635); a base needs tech E0-ML-01, which needs two extraction sites and a Cr 2,000 balance, and rivals open at Cr 0 (budget firms) or at most Cr 644 (specialists); the settle is 12 ticks, a corp evaluates 3 times in it, and a base takes 4 ticks to build. So no rival can arm before play. MILITARY.md still says every non-background corp starts with a unit beside its base -- the doc and the code disagree either way.",
+      "why_it_matters": "Every system should feed Trade or Conflict; a field that opens unarmed has no conflict until a rival earns Cr 2,000 and a tech, and the seat's rivals read as traders only.",
+      "options": [
+        "A: rivals start armed again (BL-476 as MILITARY.md says); the seat keeps opening unarmed as BL-635 left it; measure rival solvency with the upkeep back",
+        "B: rivals earn their force in play -- the E0-ML-01 gate or the base's cost is re-read against what a rival holds at the start",
+        "C: accept an unarmed opening field; MILITARY.md corrected, and R4 retired as a requirement of the settle",
+        "D: other"
+      ],
+      "recommendation": "A: it is the doc as written and restores conflict from the first tick; the seat's opt-out stays, so BL-635's cause does not return for the player. It costs rival solvency (upkeep was the dominant outgoing when armed) -- read that before it ships.",
+      "files": [
+        "src/world/corporation_generation.cpp",
+        "src/world/corporation_generation.hpp",
+        "src/world/corp_ai.cpp",
+        "docs/military/MILITARY.md",
+        "tools/verify/spawn_solvency.cpp"
+      ],
+      "resolution": "RULED (Ben, 2026-10-01, the open calls form): A: the rivals start armed again (MILITARY.md as written); the seat keeps opening unarmed; rival solvency measured with the upkeep back. BL-1154 builds it.",
+      "resolved": "2026-10-01"
+    },
+    "NR-964": {
+      "id": "NR-964",
+      "title": "CALL: should a treasury's share of industry points spread by employed heads, now that scale credit does?",
+      "raised": "2026-09-27",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1149 (scale credit from the works), its lane report and cold review, 2026-09-27",
+      "what": "NR-897 spreads a treasury's share of industry points over its realm's centre-holding regions by urban heads. BL-1149 made scale credit read only the heads a work employs (min(urban heads, employed)); the treasury half still reads urban heads (history_sim.cpp ~10344-10348), so part of every region's points still follows the crowd. On the lane's reading 94% of 1960 urban heads are employed by no work.",
+      "why_it_matters": "Whether all industry points follow the works, or the treasury still builds where the people are.",
+      "options": [
+        "A: spread by employed heads, so every point follows the works",
+        "B: keep urban heads (a treasury builds where its people are)",
+        "C: other"
+      ],
+      "recommendation": "A: one rule for both halves of the points; read after BL-1155 (every centre a work candidate) raises the employed share.",
+      "files": [
+        "src/world/history_sim.cpp",
+        "docs/generation/INDUSTRIALISATION.md"
+      ],
+      "resolution": "RULED (Ben, 2026-10-01, the open calls form): A: the treasury share spreads by the heads a region's works employ. INDUSTRIALISATION.md § 1; the centres lane builds it on the BL-1137 branch.",
+      "resolved": "2026-10-01"
+    },
+    "NR-965": {
+      "id": "NR-965",
+      "title": "CALL: the campaign scorer cannot see the fleet rule, so a realm with no fleet picks the same failing crossing every round",
+      "raised": "2026-09-27",
+      "kind": "question",
+      "status": "resolved",
+      "source": "BL-1152 (fleets project power), lane checkpoint c4b5027e, 2026-09-27",
+      "what": "With the fleet rule on, a crossing whose fleet cannot lift the army, or which the defenders out-project, never sails. But the campaign scorer does not read either test, so a realm without a fleet scores the same crossing best every round and fails it every round: at 1 man per hull, on 7 seeds, 4,161 such failures against 672 real crossings. Most crossings today launch from a hub with no built port (88-90%) and with no fleet (69-77%).",
+      "why_it_matters": "A realm that wastes every round on a crossing it cannot make stops acting; the fleet rule would freeze overseas realms rather than make fleets matter.",
+      "options": [
+        "A: the candidate list drops a crossing the rule would refuse (a legality filter, like the other gates on a verb, not a scorer term)",
+        "B: a refused crossing is remembered and not re-scored for a term (a cooldown)",
+        "C: other"
+      ],
+      "recommendation": "A: the scorer already only scores legal verbs; the fleet test becomes part of legality. Check it against the grant register (AI_OPPONENT.md § 11) first.",
+      "files": [
+        "src/world/history_sim.cpp",
+        "docs/generation/EXPLORATION.md"
+      ],
+      "resolution": "RULED (Ben, 2026-10-01, the open calls form): A: a crossing the fleet rule would refuse is not a candidate -- a legality filter, like every other verb gate, not a scorer term. EXPLORATION.md; BL-1152 builds it.",
+      "resolved": "2026-10-01"
+    },
+    "NR-967": {
+      "id": "NR-967",
+      "title": "CALL (was a decision taken): the household growth basket is right, and households are unserved - merge, hold, or reweight? (BL-1163)",
+      "raised": "2026-10-04",
+      "kind": "question",
+      "status": "resolved",
+      "source": "the sprint 49 main session (Ben: \"I'll also trust your judgement\")",
+      "what": "Your 2026-10-03 ruling left the basket's contents to a short design pass. Taken: the goods and weights a centre grows on are exactly the basket it already bids into its market (shared tranche food rations 0.60 / agricultural produce 0.20 / water 0.30, plus the industrial tranche clean water 0.35 / consumer goods 0.25 / medical supplies 0.15, or the ancient tranche). The met ratio is the share of the centre's own population bid its market filled. economy.lua population_growth.demand_basket (food, agri, steel, water, refined fuel, iron ore, petroleum) retires. Threshold stays 0.50. Written into POPULATION.md.\n\nBUILT AND HELD UNMERGED (2026-10-04, 26cb6cbe on worktree-agent-a7a4ad16f983163e4; population_mvp ALL PASS 16): the per-market household gate reads the world correctly and the world fails it. centre_decline_trace, 400 play ticks: before, every centre declines from ~t180-260 (seed 0 heads 64.1M -> 76.7M -> 44.7M); after, every centre declines from the settle (seed 0 61.8M -> 32.4M -> 14.9M; seeds 10/41/43 alike), median met 0.10-0.11 at t400, never more than 70 centres at >= 0.50. Cause: water, clean water and medical supplies are supplied 0 on every seed (one exception, gone by t400), consumer goods fall to ~0 by t~100, food rations run 25-45% of demand. Those three zero goods carry 0.80 of the basket's 1.85 weight, so the best reachable ratio is 0.57 even with food and consumer goods met. The lane also defined the household fill as PRO-RATA (households get min(1, supply/demand) like every bidder; no new saved field) - a decision taken, alternatives being households first or last, each needing a saved per-market household record.\n\nUPDATE (2026-10-05): BL-1196 (households consume) is built on top of this branch: households really eat now and the gate reads what they received. Centres still shrink everywhere (seed 0 heads 65.2M -> 19.5M by t400), because water, clean water and medical supplies are never produced. Option A (hold) stands; the supply-side items (BL-1197 gap firm digs the gap, BL-1185 chain-feasible placement, BL-1187 build only what runs) are what release it.",
+      "why_it_matters": "One basket is legible (what a city eats is what makes it grow) and cannot drift from the bid. The cost: a good that is in the bid but rarely made (medical supplies on some seeds) now weighs on growth; if it pins centres low, the weights are the dial.",
+      "options": [
+        "A: HOLD BL-1163 unmerged until households are supplied (BL-1193, household goods unsupplied, diagnoses why first); the old body-wide gate stays live meanwhile",
+        "B: merge now with weights on food only until BL-1193 lands (honest about what is made; reweight later)",
+        "C: merge as built - centres shrink from day 1 and the shortage is the signal the market should answer",
+        "D: other"
+      ],
+      "recommendation": "A. The gate is right and the world is wrong; merging it now would shrink every world from the settle and move the start, before the supply side is even diagnosed. Pro-rata fill: keep it (no new saved field, and no doc states a priority).",
+      "files": [
+        "docs/economy/POPULATION.md",
+        "scripts/economy.lua",
+        "src/world/economy_system.cpp"
+      ],
+      "resolution": "RULED (Ben, the market calls form, 2026-10-05): option A - BL-1163 is HELD (now carried by BL-1196, households consume) until households are supplied; the old body-wide gate stays live meanwhile. Pro-rata fill superseded by the real household draw (BL-1196)."
+    },
+    "NR-968": {
+      "id": "NR-968",
+      "title": "CALL: how to break the price cycle that silences consuming markets three ticks in four (BL-1186)",
+      "raised": "2026-10-04",
+      "kind": "question",
+      "status": "resolved",
+      "source": "the BL-1186 diagnosis (3a353f82)",
+      "what": "With nothing listed (the shelf is not counted as supply: shelf_supply_ticks = 0), a bid aims at 10x base and the price moves halfway; above the 2x reservation ceiling BL-1172 removes the want entirely so the price can ease. Together every market on a landmass cycles 1.6x -> 5.8x -> 3.4x -> 2.2x in step: a consuming market bids one tick in four, so a hauler sees zero demand at the destination and ships nothing, and a site whose own shelf holds steel may not draw it (BL-1183). Routing fixes (ports, partial LP sends) are going ahead regardless; this is the price half.\n\nUPDATE (2026-10-04, the BL-1193 diagnosis): the household bid is a pricing pull that never takes goods off a shelf, so household-good shelves only grow - the premise behind holding k at 0 until spoilage. BL-1196 (households consume) makes households drain the shelf as POPULATION.md already says. The same diagnosis finds the cycle's worst case: households bid water nobody lists, water sits at 10x everywhere, and the makers of clean water and medical supplies may not draw their own input. Option B (keep the over-ceiling want visible) would make that lock worse.",
+      "why_it_matters": "Without it, even routable surplus moves one tick in four; with it, shortages price into shipments. Option B partly reverses your 2026-10-03 ruling (BL-1172), so it is yours.",
+      "options": [
+        "A: count the shelf as supply (shelf supply k > 0) - your 2026-10-03 path - which brings BL-1179 (shelf spoilage) forward into wave 1, since k was to follow it",
+        "B: an over-ceiling draw still registers its want (the price sees it) but does not buy - a partial reversal of BL-1172",
+        "C: haulers read a separate unmet-want register over several clears; the price still eases as BL-1172 wants (a new saved field)",
+        "D: other"
+      ],
+      "recommendation": "A, built together with BL-1196 (households consume from the shelf): with households draining shelves, a shelf counted as supply no longer only grows, so k > 0 is safe without waiting for spoilage; BL-1179 (shelf spoilage) stays as the drain for goods no household eats. Not B.",
+      "files": [
+        "src/world/market_clearing.cpp",
+        "scripts/economy.lua",
+        "src/world/economy_system.cpp"
+      ],
+      "resolution": "RULED (Ben, the market calls form, 2026-10-05): option A - the shelf counts as supply (k > 0) and BL-1179 (shelf spoilage) is brought forward into wave 1. Spoilage settled in MARKETS.md (2026-10-05, on Ben's delegation; NR-970); k is set by measurement on the market viability gate once the shelf drains (households eat via BL-1196, and it spoils)."
+    },
+    "NR-969": {
+      "id": "NR-969",
+      "title": "CALL: does \"a leg over the LP cap is refused outright\" cover the automatic dispatch, or only commanded legs? (BL-1186 E1)",
+      "raised": "2026-10-04",
+      "kind": "question",
+      "status": "resolved",
+      "source": "the BL-1186 routing lane (baede06c)",
+      "what": "LOGISTICS.md sec Refusal, surface and determinism (Ben, 2026-08-22): \"A leg over the cap fails - refused outright, and the player is told why ... a refusal nobody sees is silent interdiction again.\" The routing lane built E1: the AUTOMATIC dispatch passes (a market exporting its own shelf, the auto-surplus) now send what the nearest anchor's passive-LP pool still allows (minimum 1 unit, cost scaled), while the player's verb and the scorer's directed dispatch still send whole or are refused. It wrote that reading into SUPPLY.md sec Dispatch trigger. Before E1, a 20 u-per-anchor pool refused every larger cargo whole, so once routes open the passive cap would block nearly all automatic haulage.",
+      "why_it_matters": "Your ruling's wording is general; the lane read it as covering commanded legs only. Narrowing a ruling is yours, not a lane's (the BL-1146 lesson).",
+      "options": [
+        "A: confirm the reading - commanded legs are refused whole and told; the automatic dispatch trims to the pool",
+        "B: the ruling covers every leg - the automatic dispatch is refused whole too (E1 comes out; the passive pool size becomes the lever)",
+        "C: other"
+      ],
+      "recommendation": "A. The ruling is about legibility of a press: a commanded leg the player chose is refused and told. An automatic dispatch has no one to tell, so a whole refusal there IS the silent interdiction the ruling exists to prevent; a trimmed send is visible as traffic.",
+      "files": [
+        "docs/economy/LOGISTICS.md",
+        "docs/economy/SUPPLY.md",
+        "src/world/supply_system.cpp"
+      ],
+      "resolution": "RULED (Ben, the market calls form, 2026-10-05): option A - the refusal rule covers commanded legs; the automatic dispatch trims to the passive-LP pool. Written into LOGISTICS.md sec Refusal, surface and determinism; SUPPLY.md cites it."
+    },
+    "NR-971": {
+      "id": "NR-971",
+      "title": "CALL: where does a habitable world's water come from? (BL-1198)",
+      "raised": "2026-10-05",
+      "kind": "question",
+      "status": "resolved",
+      "source": "the sprint 49 main session",
+      "what": "Water deposits are seeded on icy substrate only (RESOURCES.md:147). On an earthlike home body that puts all extractable water at the poles, far from the people who bid for it, so household water, clean water and medical supplies go unsupplied on most seeds (no water extractor at all on seeds 10/11/13/37). Every other sprint 49 fix (routing, placement, scorer, households eating, spoilage) leaves this untouched.",
+      "why_it_matters": "Water is the heaviest unmet line in the household basket and the input of two more household goods; while it is unsupplied no centre can reach the growth threshold and the held household gate (BL-1163/1196) cannot merge.",
+      "options": [
+        "A: a Well / pumping station - an extraction site gated on adjacency to fresh water (river or lake), as the Fishing Wharf is gated on coast; cities on rivers drink",
+        "B: groundwater - every habitable land tile holds a small water deposit, scaled by habitability or rainfall",
+        "C: on a habitable body water is free - drop raw water from the household basket and keep clean water (from a plant that draws local water at no input cost)",
+        "D: other"
+      ],
+      "recommendation": "A. It follows the Fishing Wharf precedent (adjacency-gated extraction, no new deposit field), it is a deterministic consequence of terrain generation already has (rivers, lakes), and it is legible: where the river runs, water is cheap - which makes river cities matter, a Trade-shaped consequence.",
+      "files": [
+        "docs/economy/RESOURCES.md",
+        "docs/economy/PRODUCTION.md",
+        "scripts/world_gen.lua"
+      ],
+      "resolution": "RULED (Ben, the water and shelf form, 2026-10-05): option A - a Well, an extraction site gated on fresh-water adjacency (a land tile on a river or beside a lake), as the Fishing Wharf is gated on coast. Written into PRODUCTION.md sec Extraction buildings and RESOURCES.md; the work is BL-1198 (water where people live)."
+    },
+    "NR-972": {
+      "id": "NR-972",
+      "title": "CALL: ratify shelf supply k (the measurement says k barely matters and k = 1 costs firms) (BL-1179)",
+      "raised": "2026-10-05",
+      "kind": "question",
+      "status": "resolved",
+      "source": "the BL-1179 lane (1f589398)",
+      "what": "Your NR-968 ruling: the shelf counts as supply (k > 0), set by measurement once the shelf drains. k sweep (BL-1179 lane, 1f589398, seeds 0/43/10, spoilage on, households eating): consuming prices at the ceiling AGAINST A STOCKED SHELF 0.1% at k=0, 0.0% at k=1-8, 5.2% with spoilage off; at the ceiling on ANY shelf ~76% at every k (empty shelves: goods nobody makes enough of); G3 firms alive 38.2% at k=0 vs 21.3% at k=1 (22-23% at k=2-8); G2 20.9% at k=0 vs 24.0-26.9% at k>0; centres grew 0 with spoilage on at every k (193 with it off). Reading: spoilage, not k, is what clears the ceiling against stocked shelves; the remaining ~76% of ceiling prices sit on EMPTY shelves (supply, not k); and k = 1 halves firm survival relative to k = 0, because a counted shelf lowers prices where stock exists.",
+      "why_it_matters": "k > 0 was your ruling's mechanism; the data says it buys almost nothing now and costs firms. The lane chose k = 1 to honour the ruling.",
+      "options": [
+        "A: keep k = 0 for now; spoilage + households eating do the job; re-sweep k once water and the household chains are supplied (BL-1198)",
+        "B: ratify k = 1 as measured",
+        "C: other"
+      ],
+      "recommendation": "A. The measurement answers the question the ruling asked (a consuming price off the ceiling against a stocked shelf): 0.1% at k = 0 with spoilage. Re-sweep after BL-1198, when shelves are stocked often enough for k to matter.",
+      "files": [
+        "scripts/economy.lua",
+        "docs/economy/MARKETS.md"
+      ],
+      "resolution": "RULED (Ben, the water and shelf form, 2026-10-05): option A - k = 0 for now (spoilage and households eating keep stocked shelves off the ceiling); re-sweep k after BL-1198 supplies water."
+    },
+    "NR-973": {
+      "id": "NR-973",
+      "title": "NOVEL WORK: the scorer's Well candidate bucket (BL-1198)",
+      "raised": "2026-10-05",
+      "kind": "novel-work",
+      "status": "resolved",
+      "source": "the BL-1198 lane (a14a559f)",
+      "what": "To let background firms build Wells, the lane added a Well candidate bucket to corp_ai's build scorer: K = 2 candidates world-wide per tick, ranked by habitability x water demand pull, placeable tiles only, priced at the Well rate. It is a new candidate SOURCE for the existing build verb (no new verb, subject or planner), so it reads as inside the scored-build grant (AI_OPPONENT.md sec 11), but it is a new AI siting rule no doc owned.",
+      "why_it_matters": "Novelty should be chosen, not accreted. A per-market bucket would put wells near people across the map but widens the siting rule further; the main session held it at K = 2 and routes the bulk of well placement through generation (BL-1197).",
+      "options": [
+        "A: keep the bucket as built (K = 2 world-wide), within the build grant",
+        "B: per-market bucket (wells near every market) - a wider siting rule",
+        "C: no scorer bucket; wells come from generation only",
+        "D: other"
+      ],
+      "recommendation": "A for now; re-read after BL-1197 places wells at generation.",
+      "files": [
+        "src/world/corp_ai.cpp",
+        "docs/ai/AI_OPPONENT.md"
+      ],
+      "resolution": "RULED (Ben, the lake and well form, 2026-10-05): option A - keep the scorer's Well bucket at K = 2 world-wide; and \"we can add wells to generation\" - generation places Wells (BL-1197 rework)."
+    },
+    "NR-974": {
+      "id": "NR-974",
+      "title": "CALL: is every enclosed water body a fresh-water lake? (the Well, BL-1198)",
+      "raised": "2026-10-05",
+      "kind": "question",
+      "status": "resolved",
+      "source": "the BL-1198 cold review",
+      "what": "Tile generation marks every ocean component except the largest as terrain_substrate::lake, with no size cap (tile_generation.cpp:283-291). Before the Well this only removed options (no port, no Fishing Wharf on a lake shore). Now every land tile on such a shore is a Well site: deposit-free water that never tapers. On a seed whose ocean splits into two large basins, or with a big enclosed inland sea, the whole shoreline of the smaller one offers unlimited fresh water while refusing ports and wharves.",
+      "why_it_matters": "Fresh water is now a production rule, so what counts as a lake decides where cities drink cheaply - a geography call, not a code one.",
+      "options": [
+        "A: a lake is an enclosed water body below a size threshold; larger enclosed bodies are seas (ports and wharves yes, Wells no) - a generation change, world-mover",
+        "B: accept it - every enclosed body is fresh (an inland sea reads as a great lake)",
+        "C: other"
+      ],
+      "recommendation": "A, with the threshold measured on the 16 curated seeds (how many enclosed bodies, their sizes) before a number is picked. It keeps the river-city advantage for real lakes and gives inland seas their ports back.",
+      "files": [
+        "src/world/tile_generation.cpp",
+        "docs/economy/TILES.md",
+        "docs/economy/PRODUCTION.md"
+      ],
+      "resolution": "RULED (Ben, the lake and well form, 2026-10-05): option A - a lake is an enclosed water body below a measured size cap; larger enclosed bodies are seas (coast, ports and wharves; no Wells). Written into TILES.md sec Water kinds (replacing \"no size cut-off\"); the work is BL-1200 (lake size cap), the cap read off the 16 curated seeds."
+    },
+    "NR-976": {
+      "id": "NR-976",
+      "title": "DECISION TAKEN: generation charters a missing raw input so a chain is absent only when the ground lacks it (BL-1197)",
+      "raised": "2026-10-05",
+      "kind": "decision",
+      "status": "resolved",
+      "source": "the sprint 49 main session, on Ben's delegation",
+      "what": "BL-1197 round 2 (no fallback for water-gap firms) cost seeds 0 and 43 their alloys/machinery chains and left 401 / 270 centres chain-infeasible: the fallback firms had been the only diggers of those chains' raw inputs, which the per-good turn never charters for. Under your hard rule a chain with no feasible site is absent - but this absence came from chartering order, not geography. Decided: when a wanted processing good is infeasible only because a raw input has no producer in reach, and that raw lies in the centre's windows, generation charters its extractor first (booked as that raw's firm, within caps and budget) and retries; one level deep (raw inputs only).",
+      "why_it_matters": "Keeps the hard rule honest: absent chains mean the world lacks the ground, which is the legibility the rule exists for.",
+      "options": [
+        "A: keep it (one level of input chartering)",
+        "B: no input chartering - chains absent whenever their raws were not chartered",
+        "C: recurse through intermediate goods too",
+        "D: other"
+      ],
+      "recommendation": "A.",
+      "files": [
+        "src/world/corporation_generation.cpp",
+        "docs/generation/CORPORATION_GENERATION.md"
+      ],
+      "resolution": "SUPERSEDED by Ben's ruling (the charter walk form, 2026-10-05): option A - the charter walk counts derived demand (a processor's input demand is demand it fills), so steel and every intermediate are chartered in their own right; written into CORPORATION_GENERATION.md sec Pass 6. The raw-input special case is replaced by it."
+    },
+    "NR-981": {
+      "id": "NR-981",
+      "title": "Decision taken on your behalf: electronics STAYS in the background stopgap (the household rung that was to take it was cancelled)",
+      "raised": "2026-10-07",
+      "kind": "decision",
+      "status": "resolved",
+      "source": "the BL-1226 (background pull per doc) cold review, 2026-10-07",
+      "what": "MARKETS.md said electronics \"left\" the background basket when the metropolis rung of the household ladder took it (Ben, 2026-09-15). That rung was BL-996 (stratum demand ladder), cancelled unmerged on 2026-09-16, so no household bids electronics; the BL-1226 lane removed it from the basket to match the doc, which would have left electronics with almost no final buyer (only the Assembly Plant feeding militia-only spacecraft components) and shifted generation's body_demand. TAKEN: kept electronics in the stopgap (what the code always did) and reworded MARKETS.md to \"leaves it when the metropolis rung takes it, and not before\". Reversible. Your call if instead you want BL-996 revived, or electronics retired some other way.",
+      "resolution": "Ben, 2026-10-07 (the path form): keep electronics in the stopgap, as now."
+    },
+    "NR-986": {
+      "id": "NR-986",
+      "title": "Question: should the player's seat get its dial-zeroed plants back on auto at the handoff? (BL-1235)",
+      "raised": "2026-10-09",
+      "kind": "question",
+      "status": "resolved",
+      "source": "cold review of the BL-1235 (dial hold outlasts reflex) merge 3bca733a, sprint 50",
+      "what": "With BL-1235 a plant the scorer's dial zeroed in the settle is no longer mothballed; it reaches the handoff with workforce_auto off and target 0. On the corp the player takes, the scorer and the reflex stop acting, and the player's auto-solver skips it (workforce_auto off), so nothing re-raises it until the player touches each plant. Before, the same plants arrived mothballed, which also needed a player action - not a regression in kind, but it bears on G1 (plants running at handoff) for the seat. CALL: hand the seat's dial-zeroed plants back to auto at the handoff (workforce_auto on), or leave them as the rival left them?",
+      "resolution": "Ben, 2026-10-09 (propellant form): yes - the seat's dial-idled plants return to auto at the handoff. Written into AI_OPPONENT.md beside BL-1235.",
+      "resolved": "2026-10-09"
+    },
+    "NR-991": {
+      "id": "NR-991",
+      "title": "Question: the held AI power-plant gate is written as design but is not on the sprint branch and no open item owns it (BL-1232, power plants per grid)",
+      "raised": "2026-10-10",
+      "kind": "question",
+      "status": "resolved",
+      "source": "sprint 50 close: the doc check",
+      "what": "AI_OPPONENT.md § Candidate enumeration ('A power-plant candidate is priced against its grid's shortfall', Ben 2026-10-07) and PRODUCTION.md § Power ('The scorer's power-plant estimate reads the same per-grid gap, and counts plants already under construction') state the scorer's power gate as the design. The code does not do it: corp_ai.cpp scores power recipes like any other processor group (~1586-1796); the gate exists only on branch bl1232-gate-remeasure (14969c85), unmerged, HELD by Ben. BL-1232 (power plants per grid) is complete, so no open item owns the held part. CALL: (a) file a backlog item that re-measures and merges the gate, docs unchanged; or (b) withdraw the rule from both docs until it is re-ruled.",
+      "resolved": "2026-10-10",
+      "resolution": "Ben, 2026-10-10 (doc-check form): file an item to re-measure the gate on the current tip, then merge or drop -> BL-1263 (power gate remeasure). Also ruled: power inputs read the grid too -> BL-1264 (power input on grid)."
+    },
+    "NR-1006": {
+      "id": "NR-1006",
+      "title": "BL-1244 sharpness: fill time, the 4K top rung, memory, the tilted rungs' vertical minification, and the hillshade sign",
+      "raised": "2026-10-08",
+      "kind": "question",
+      "status": "resolved",
+      "source": "lane L3 report and the BL-1244/BL-1242 cold review, sprint 51",
+      "what": "(a) FILL TIME: never-magnify + 2x supersampling makes a viewport fill take 14-22 s at 1720x1080 (was 1.4-2.6 s; the softer tier stands in meanwhile). Options: a pool of bake workers (the bake is pure; RENDERING.md says \"a worker thread\"); drop 2x; 2x only on the close tiers; accept. The 192 tier bakes at 1x today (2x took ~30 s). (b) 4K: the top rung draws at ~222 px, past the 192 tier, so it is ~16% magnified, against RENDERING.md's \"up to a 4K-height canvas\" and R1. Add a 384 tier, or correct the doc. (c) MEMORY: ground textures after walking every rung at 4K go ~230 MB -> ~660 MB measured; the review estimates up to ~1.2 GB because lower tiers keep their cap until a body switch. Cap or evict inactive tiers? (d) TILTED RUNGS: the chooser ignores the 2.5D y-squash, so at rung 4 (45 deg) the ground is minified ~2.45:1 vertically, past the 2:1 no-shimmer bound. Never-magnify horizontally and <= 2:1 vertically cannot both hold with a x2 ladder at 45 deg (110 px needs a tier in [110, 155]). Options: accept the vertical shimmer risk; an intermediate tilted tier; or let the tilted rungs magnify slightly horizontally. (e) HILLSHADE SIGN: the base hillshade lights SE-facing slopes (shade = g.L with L toward the NW light), the opposite of the new landform pass and the tree shadows, so on mountains the two shade terms partly cancel. Flipping it is right by the doc but moves every golden - a re-bless call. (f) RUNG 0 (the whole-grid view): with the 1 px chooser error fixed (fix round F34), the drawn radius at the reference window is 6.93 px, so never-magnify now takes the 12 px CHUNKED tier at rung 0 instead of the 6 px whole-body far page (which would be 1.16x magnified). A whole body of 12 px chunks then bakes and stays resident at the bottom rung - more bake time and memory. Options: accept; let the far page magnify slightly (<= ~1.2x) at rung 0 only; or raise the far page's px per hex so it covers rung 0 at the reference window. RULED IN PART (Ben, 2026-10-09, the ground render form): (a), (b), (c), (d) and (f) are superseded by one 22.5 deg angle and one 96 px/hex master per body with every zoom a downsample, pre-baked during generation on a worker pool, held in RAM (RENDERING.md § Level of detail, § One angle; TECH_FOUNDATIONS.md § Target hardware; BL-1246 ground one master). STILL OPEN: (e) the hillshade sign. (e) RULED (Ben, 2026-10-10): flip the hillshade - one NW light for ground, landforms, trees and structures (ground_bake.hpp hillshade_sign = -1). All parts of this entry are now ruled.",
+      "renumbered": "2026-10-09: was NR-991 on the sprint 51 branch; renumbered to clear sprint 50's NR-986/987",
+      "resolved": "2026-10-10"
+    },
+    "NR-1009": {
+      "id": "NR-1009",
+      "title": "Tiles hold their own ground: the honeycomb look, the pre-bake wait, and the pairing table taken",
+      "raised": "2026-10-09",
+      "kind": "question",
+      "status": "resolved",
+      "source": "the BL-1251 (tiles hold their own ground) lane, sprint 51",
+      "what": "(a) CALL: with each tile holding its own tone and variant and blending only in a 0.13-unit edge band, the ground at the 48 px rung reads as a HEXAGON MOSAIC (forest and fields especially); forest loses its organic outline. Options: accept; soften the tone/variant differences between tiles of one family (keeps edges, loses some of the per-tile read); a larger edge wobble (organic edges, but the close-zoom seam would no longer match the baked edges). (b) RISK: land chunks bake 25-35% slower (patterns +10-14%, border sets +8-20%), so the painting wait after Confirm may now sit near or over 15 s on a quiet PC (12-17 s in the best loaded runs vs 5-10 s before); a quiet re-measure is owed before the sprint closes. The master stays 1x (2x: 122 s). (c) TAKEN, novel: the border-set pairing table (ranked families: forest fringe, scrub fringe, scree lip downhill, field edge as hedge or furrowed headland, reed fringe, drift lip, snow drift; shore shelf for any land against water), the grass split (half its variants are furrowed fields), and the scatter design - RENDERING.md § Tiles hold their own ground records them. (d) Fringe bushes read as dark specks at 48 px and hedges as dashed lines - art iteration if wanted. RULED (Ben, 2026-10-10): (a) the honeycomb stays (\"I like the honeycomb\"); (b) measured on a quiet PC in Ben's own session: the painting wait was 14.2 s after Confirm, inside 15 s (before roads are painted, BL-1253 re-measures); (c) the pairing table stands; also ruled: the stronger grain stays on bare and volcanic ground even where it quiets the crack variant.",
+      "resolved": "2026-10-10"
+    },
+    "NR-1010": {
+      "id": "NR-1010",
+      "title": "Ground look C-F: the vision fog now darkens most of the map, and four smaller look notes",
+      "raised": "2026-10-10",
+      "kind": "question",
+      "status": "resolved",
+      "source": "the BL-1256 (ground look C-F) lane, sprint 51",
+      "what": "(a) CALL: outside the player corporation's vision the canvas washes the ground ~50% toward near-black (the activity fog, DISCOVERY.md). Over the new darker C-F palette the fogged ground sits at median luminance ~33 against ~58 baked, so most of the map in play reads very dark. Options: lighten the fog (e.g. 25-30%), make it a desaturation rather than a darkening, or keep. (b) TAKEN, novel: the bake has its own palette (palette::ground_tile_colour); the vector fallback, minimap and generation preview keep the old colours. (c) Mountain forms still read faceted (the landform pass was not retuned). (d) Rapids read as a white chain along the bank; sea glints as fine specks - art iteration if wanted. (e) The bake costs ~25-31% more per chunk (whole revealed home master 41 -> 52 s at 1x); the wait budget assumes the rounds are read (TECH_FOUNDATIONS). RULED (Ben, 2026-10-10): (a) lighten the fog to 20% (DISCOVERY.md, k_fog_strength). Ben walked the build: the look reads well, lenses look good, the painting wait felt quick (his session measured 53.3 s with a fast click-through - the separately tracked case). (b)-(e) stand as recorded.",
+      "resolved": "2026-10-10"
+    },
+    "NR-1011": {
+      "id": "NR-1011",
+      "title": "With the border wash gone, neighbouring nations' muted stroke colours read as one similar dark blue",
+      "raised": "2026-10-10",
+      "kind": "question",
+      "status": "resolved",
+      "source": "the BL-1292 (borders hard edges) lane, sprint 51",
+      "what": "The hard-edge stroke is drawn in a muted version of the nation's identity colour. With the wash retired the stroke is the only national read, and across a many-nation frontier the muted strokes look alike (dark blue). Options: draw the stroke in the nation's full identity colour; widen the stroke slightly; accept (borders are context, the Selection element names the nation). RULED (Ben, 2026-10-10): \"Borders also [great]\" - keep the stroke as built.",
+      "resolved": "2026-10-10"
+    },
+    "NR-1020": {
+      "id": "NR-1020",
+      "title": "The player is a nation: six calls before the doc sweep",
+      "raised": "2026-10-08",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Ben's 2026-10-08 direction (option A) - BL-1245 (player is a nation)",
+      "what": "Direction is ruled: the player is a nation with a space programme, reversing NR-885. Six calls remain, listed in BL-1245's design: the player's nation verbs; the nation step and grant register skipping the player's nation; what replaces 'answer to' in the design test; whether the space corporation is a separate actor or the space_programme line; the how-many-programmes generation parameter and its default; the elimination rule.",
+      "why_it_matters": "Every doc sweep and build item in sprint 52 reads these answers; NR-885's sweep touched 14 docs, and reversing it half-way leaves the corpus asserting two identities.",
+      "options": [
+        "Answer on one design form, then sweep in a single pass"
+      ],
+      "resolution": "Ben, 2026-10-10 (sprint 53 identity form): (1) verbs - budget weights, tariffs, law; force raised by the nation, its equipment bought; (2) the nation step skips the player's nation - recorded as a narrowing in AI_OPPONENT § 11; (3) design test - what the NATION can field / must answer to: other nations, its population, its corporations; (4) the space corporation is the CHAMPION, a separate corp the player operates directly; (5) the parameter is the MAJOR target (1..6, always hit) beside a TOTAL target (<= 40); a minor runs shallow with no specialist; (6) eliminated when it holds no territory. Written into the docs listed on BL-1245 (player is a nation)."
+    },
+    "NR-1025": {
+      "id": "NR-1025",
+      "title": "Up to six humans on the selection screen: is multiplayer now in prototype scope?",
+      "raised": "2026-10-10",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Ben, 2026-10-10 identity form ('Yes: the selection screen seats up to six humans')",
+      "what": "TECH_FOUNDATIONS.md § Direction and MULTIPLAYER_PRINCIPLES.md hold multiplayer OUT of prototype scope and off the backlog. Your answer commits the seat screen to up to six human picks. Written so far: STARTUP § The seat and CORPORATION_GENERATION say up to six humans may each take a major; MANUAL no longer says single-player. Not written: any amendment to TECH_FOUNDATIONS.",
+      "why_it_matters": "The standing rules forbid building outside the prototype scope; BL-1281 (nation selection screen) cannot build six seats until the scope says so.",
+      "options": [
+        "Amend TECH_FOUNDATIONS: multi-human seating (hot-seat or lockstep) enters scope",
+        "Design the screen for six seats, build one human seat now; scope stays as is",
+        "Single player only; drop the six-seat line"
+      ],
+      "recommendation": "Option 2: it costs nothing now and keeps the shape; MULTIPLAYER_PRINCIPLES already protects the lockstep path.",
+      "files": [
+        "docs/tech/TECH_FOUNDATIONS.md",
+        "docs/ui/STARTUP.md",
+        "docs/multiplayer/MULTIPLAYER_PRINCIPLES.md"
+      ],
+      "resolution": "Ben, 2026-10-10: design for six seats, build one human seat now; scope unchanged. Written into STARTUP § The seat and CORPORATION_GENERATION § Player corporation; MANUAL says single-player again."
+    },
+    "NR-1026": {
+      "id": "NR-1026",
+      "title": "New AI subject: rival nations and corporations acting toward a nation a human plays",
+      "raised": "2026-10-10",
+      "kind": "question",
+      "status": "resolved",
+      "source": "AI_OPPONENT.md § 11, raised 2026-10-10 with BL-1245 (player is a nation)",
+      "what": "No grant names a human-played STATE as the subject of AI action. NR-517 covers a rival acting politically against a corp a human owns; the 2026-08-18 grant lets nations carry pair-state toward another polity, but every polity was AI. Under the new identity, rival nations will declare stances at, set tariffs against and go to war with the player's nation, and rival firms will lobby it. Per the standing rule this is raised, not assumed.",
+      "why_it_matters": "Without it the AI nations must treat the player's nation as inert, which would gut Conflict; with it the register gains a new subject.",
+      "options": [
+        "Grant: rival nations and corporations may act toward a human-played nation with the same verbs they use on any nation",
+        "Grant with exclusions (name them)",
+        "Not yet: rivals treat the player's nation as inert until a later sprint"
+      ],
+      "recommendation": "Grant as option 1 - every verb is already legal toward an AI nation, and symmetry is a CONCEPT rule.",
+      "files": [
+        "docs/ai/AI_OPPONENT.md"
+      ],
+      "resolution": "Ben, 2026-10-10: GRANTED - rival nations and corporations may use the same verbs toward a human-played nation that they use toward any nation. Recorded in AI_OPPONENT § 11 with its admits / does-not-admit; NATIONS § The channel cites it."
+    },
+    "NR-1027": {
+      "id": "NR-1027",
+      "title": "DECISION TAKEN: 'major and seat-eligible are 1 to 1' read as one specialist per major and none elsewhere; minors keep background firms; majors are the space-programme nations",
+      "raised": "2026-10-10",
+      "kind": "decision",
+      "status": "resolved",
+      "source": "Ben, 2026-10-10 identity session",
+      "what": "Three readings taken on your behalf. (a) 1:1 means the specialist roster IS the champions - exactly one per major, so the specialist count equals the major target (1..6), overturning the fixed 8 and the rule that a nation holds every seat its cities bought. (b) Your 'minor: no corporations' is read as no SPECIALIST; background firms still form in minors, since without them a minor has no producers and its markets go empty. (c) BL-1245's 'how many nations run a space programme' parameter is the major target; a minor runs no space programme. Written: GLOSSARY, NATIONS § Major and minor nations, CORPORATION_GENERATION Pass 1.",
+      "why_it_matters": "(a) cuts full-AI corporations from ~8 to at most 6, which moves the economy gate; (b) decides whether minors have an economy at all.",
+      "recommendation": "Confirm, or overturn (b) if minors should hold no firms at all.",
+      "files": [
+        "docs/generation/CORPORATION_GENERATION.md",
+        "docs/politics/NATIONS.md",
+        "docs/GLOSSARY.md"
+      ],
+      "resolution": "Ben, 2026-10-10: all three readings confirmed - (a) one specialist per major, none elsewhere; (b) minors keep background firms; (c) majors are the space-programme nations, minors run none."
+    },
+    "NR-1028": {
+      "id": "NR-1028",
+      "title": "DECISION TAKEN: the nation buys equipment through the state procurement seam, not the market order book",
+      "raised": "2026-10-10",
+      "kind": "decision",
+      "status": "resolved",
+      "source": "Ben, 2026-10-10 identity form ('buys equipment from corporations on the market')",
+      "what": "NATIONS.md holds that a nation pays only by direct transfer and never places an order: the space programme already buys through the procurement seam at the supplier market's price. The form said 'on the market'; taken as that seam, so a nation still never touches the book. The rule that the player's corp is never drained by a state purchase stands, including by its own nation. Written: CONCEPT § Development through ages, MILITARY § The muster interface.",
+      "why_it_matters": "If you meant a real market buyer, the nation gains an order-book role and NATIONS.md's conservation ruling changes.",
+      "recommendation": "Confirm.",
+      "files": [
+        "docs/CONCEPT.md",
+        "docs/military/MILITARY.md",
+        "docs/politics/NATIONS.md"
+      ],
+      "resolution": "Ben, 2026-10-10: OVERTURNED - the nation is a real buyer on the order book for military equipment. Written into CONCEPT § Development through ages, MILITARY § The muster interface, and NATIONS (the table, 'touches the market for one thing only', § 2. Conservation's one exception). The space programme stays a procurement transfer; the 2026-08-22 'payment to corps is direct' ruling stands for everything else."
+    }
+  }
+}
