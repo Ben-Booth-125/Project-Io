@@ -1879,6 +1879,27 @@
     "src/ui/body_surface_canvas.cpp"
    ],
    "design": "SETTLED: PLANETARY.md § The national border band (hard edges only, 2026-10-10) and RENDERING.md § Roads and sea lanes (no drawn road network on the plain canvas at any rung; the Throughput lens keeps it). WORK: remove the border band wash (the per-tile falloff, incl. in the BL-1260 static stroke cache), keep the inset boundary stroke and its click corridor; remove the plain-canvas drawn road/lane network at the wide rungs; keep the Throughput lens network. Captures of a many-nation frontier at rungs 0-2; frame time."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 51,
+   "written": "2026-10-10",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 1,
+   "id": "BL-1263",
+   "short_name": "ANCHOR_RINGS_CLIP",
+   "author": "found by the BL-1262 and BL-1257 lanes (2026-10-10)",
+   "title": "Under the Throughput lens, logistics anchor rings draw over the header and comms chrome, outside the canvas",
+   "authority_doc": "docs/ui/LENSES.md",
+   "files": [
+    "src/ui/body_surface_canvas.cpp"
+   ],
+   "design": "Seen in before and after captures of BL-1257 and BL-1262 (pre-existing): the anchor rings (and their dark backing) are not clipped to the canvas rect. Clip them like every other canvas pass; capture rung 1 under Throughput with chrome in frame."
   }
  ]
 }
