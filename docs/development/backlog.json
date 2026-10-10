@@ -1728,7 +1728,7 @@
    "id": "BL-1256",
    "short_name": "GROUND_LOOK_C_F",
    "author": "Ben (2026-10-10, the ground look form: it3 C-F is the target)",
-   "title": "The ground looks like the it3 C-F reference: khaki/olive-grey palette with a wide value range, relief on every hex, a low-sun cast-shadow pass, grey-blue water with glints, rapids and rocky banks, and no per-tile tone",
+   "title": "The ground looks like the it3 C-F reference: khaki/olive-grey palette with a wide value range, relief on every hex, a low-sun cast-shadow pass, grey-blue water with glints, rapids and rocky banks; per-tile tone kept",
    "authority_doc": "docs/ui/RENDERING.md",
    "files": [
     "src/ui/ground_bake.cpp",
@@ -1736,7 +1736,7 @@
     "src/ui/terrain_palette.cpp",
     "tools/verify/ground_bake_check.cpp"
    ],
-   "design": "SETTLED: RENDERING.md § Art direction and palette (the it3 C-F target bullets) and § Tiles hold their own ground (no per-tile tone, 2026-10-10). WORK: palette toward khaki/olive-grey, widen the value range (lit slopes near warm off-white, shadows near black), cut the broad mottle, strengthen the grade S-curve; plains roll (folds ~0.3-0.5 hex apart); a cast-shadow pass on the height field from the NW light; water grey-blue with glints, rapids where rivers fall, rocky banks; same-terrain ground continuous (no per-tile tone/variant tint, patterns on continuous fields), different-terrain edges keep the band and border sets. Side-by-side captures against docs/ui/design/renders/map (it3 C-F), judged with Ben live. All harness rows (window invariance P24 etc.) keep passing; measure bake cost vs the 15 s wait."
+   "design": "SETTLED: RENDERING.md § Art direction and palette (the it3 C-F target bullets) and § Tiles hold their own ground (per-tile tone KEPT, Ben 2026-10-10 correction). WORK: palette toward khaki/olive-grey, widen the value range (lit slopes near warm off-white, shadows near black), cut the broad mottle, strengthen the grade S-curve; plains roll (folds ~0.3-0.5 hex apart); a cast-shadow pass on the height field from the NW light; water grey-blue with glints, rapids where rivers fall, rocky banks; per-tile tone and the edge band stay as built. Side-by-side captures against docs/ui/design/renders/map (it3 C-F), judged with Ben live. All harness rows (window invariance P24 etc.) keep passing; measure bake cost vs the 15 s wait."
   },
   {
    "status": "designed",

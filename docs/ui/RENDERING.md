@@ -240,14 +240,9 @@ tile, and it can be hard to see where one tile begins and ends."* The ground was
 interpolated between tile centres by design, and the terrain variants widened that blend to
 about a tile and a half, so neighbouring tiles melted together. Three changes answer it:
 
-- **No per-tile tone** (Ben, 2026-10-10, against the it3 C-F reference: *"drop per-tile tone;
-  tiles read by the seam and terrain only, as in the references"* — this revises the
-  2026-10-09 bullet below). Ground of the SAME terrain is continuous: no tile carries a tone,
-  variant tint or pattern bounded by its hex, and patterns (furrows, scree, ripples, tussocks)
-  follow continuous fields across tiles rather than filling a hex edge to edge. A tile is read
-  by the close-zoom seam (§ The grid rule) and by what its terrain is; where the terrain
-  CHANGES, the narrow edge band and the border sets below still hold, so different terrains
-  meet crisply. The 2026-10-09 rule, kept for different-terrain edges only:
+- **Per-tile tone stays** (Ben, 2026-10-10, confirming after the it3 C-F review — the
+  references show none, but the honeycomb tone is wanted). The palette moves toward the
+  target (§ Art direction and palette) while each tile keeps its own tone:
 - **Each tile keeps its own ground.** A tile's body carries its own material colour, its
   own variant and its own texture undiluted; it blends into a neighbour only in a **narrow
   band at the shared edge** — **0.13 canonical units each side of it**, 15% of the hex's
