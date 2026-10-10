@@ -619,12 +619,19 @@ The settled house values this doc consumes (authority for their settlement:
 | Canvas background | `#0F0F14` — matches the app clear colour |
 | Selection / EARNED accent | Amber `#E8A33D` |
 | Secondary accent | Saturated cyan `#3FC9E8` |
-| Ground | C-F: painterly relief base, near-future grade over it — **the it3 C-F render is the target** (below) |
+| Ground | C-F: painterly relief base, near-future grade over it — **detail from it3 C-F, colour from it1** (below) |
 
-**The target is it3's C-F panel: dark, cold, hostile** (Ben, 2026-10-10, judging the build
-against `docs/ui/design/renders/map/`). What it asks of the bake, procedurally, in this order:
+**Two references, two jobs** (Ben, 2026-10-10). **Detail and drama come from it3's C-F panel**
+(relief on every hex, the low-sun shadows, the wide light-to-dark range, the water forms, the
+town density); **colour comes from it1** — warm olive and khaki fields, rich green forest, white
+snowy peaks, a blue-green sea (Ben, the same day: *"we want more colour than the current render
+suggests … the key element I wanted to bring was the resolution / detail, and less the colour
+scheme"*). The C-F pass first took both from it3 and came out too grey; the palette below is it1's.
+Judged against `docs/ui/design/renders/map/`. What it asks of the bake, procedurally, in this order:
 
-- **Palette and value.** Base hues move from mint and teal toward **khaki and olive-grey**;
+- **Palette and value.** Base hues take **it1's colour** — warm olive and khaki, rich green
+  forest, white peaks, blue-green sea — not C-F's grey (the grade's desaturation eases to
+  match); from it3 the value structure stays:
   the value range widens — **lit slopes near a warm off-white, shadows near black** — where
   the build sat in a narrow mid-dark band; the broad dark mottle that belonged to no
   landform is cut. The grade's S-curve strengthens to hold the range. Sampled from the
