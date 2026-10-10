@@ -16,6 +16,11 @@
 //   T5 DETERMINISM  the whole sequence on a faithful copy of the world
 //               (world_copy_determinism) yields the identical command stream
 //               and trade book.
+//   T6 MARKETPLACE  a rival with ground in a market where it has no trade
+//               building, and a margin route leaving it, builds a Planetary
+//               Marketplace there (NR-1013; build budget widened to observe it).
+// NR-1018 (Ben, 2026-10-10): trade points belong to the market each trade
+// building stands in, so T1-T4's Marketplaces stand in the route's markets.
 //
 // The world is the app's campaign start for one seed (`build_app_start_world`),
 // seated as the app seats it; the route is made profitable by setting one good's
@@ -197,8 +202,6 @@ run_record run_sequence(world& w, const recipe_registry& reg, bool verbose)
         check(false, "fixture: a rival, a seated player, a home tile and two home markets");
         return rec;
     }
-    give_marketplace(w, rival, tile);
-    give_marketplace(w, player, tile);
     w.corporations.at(rival).balance += 1.0e7f; // the solvency gate is not under test here
     w.corporations.at(rival).trade_points = 20.0f;   // as made on the last trade pass
     w.corporations.at(player).trade_points = 20.0f;
@@ -230,6 +233,24 @@ run_record run_sequence(world& w, const recipe_registry& reg, bool verbose)
         return rec;
     }
     rig_profitable(w, rr);
+
+    // NR-1018 (Ben, 2026-10-10): a trade building makes its points for the
+    // market it stands in, and trades leave only from such a market. The
+    // rival's Marketplace stands on the route's SOURCE centre (the market it pins from);
+    // the player's on the route's DESTINATION centre, the market its losing
+    // trade below leaves from. Before the ruling both stood on the body's
+    // lowest tile id, which routes to whichever market is nearest it.
+    give_marketplace(w, rival, w.markets.at(rr.a).centre_tile);
+    give_marketplace(w, player, w.markets.at(rr.b).centre_tile);
+    if (verbose)
+    {
+        const std::vector<entity_id> src = corp_trade_markets(w, rival);
+        const std::map<entity_id, float> pts = market_trade_points(w, reg, nullptr, rival);
+        check(src.size() == 1 && src.front() == rr.a,
+              "NR-1018: the rival trades from exactly the market its Marketplace stands in");
+        check(pts.size() == 1 && pts.count(rr.a) == 1 && pts.at(rr.a) > 0.0f,
+              "NR-1018: its trade points are made for that market and no other");
+    }
     if (verbose)
         std::printf("  fixture: rival %llu, player %llu, route good %zu  %llu -> %llu\n",
                     static_cast<unsigned long long>(rival), static_cast<unsigned long long>(player),
@@ -384,6 +405,98 @@ run_record run_sequence(world& w, const recipe_registry& reg, bool verbose)
     return rec;
 }
 
+
+/// T6 (Ben, 2026-10-10, NR-1013; AI_OPPONENT.md § 11): a rival holding ground
+/// in a market where it has NO trade building, with a margin route leaving that
+/// market, proposes a Planetary Marketplace build there. The rival is the
+/// lowest-id non-player corporation with a home nation and such a market; the
+/// route is rigged as T1's is.
+void run_marketplace_build(world& w, const recipe_registry& reg)
+{
+    std::printf("T6 marketplace build\n");
+    const trade_params& tp = reg.trade();
+    const logistics_nodes nodes = collect_logistics_nodes(w);
+    trade_haul_memo memo;
+    std::vector<entity_id> ids;
+    for (const auto& [cid, cc] : w.corporations) { (void)cc; ids.push_back(cid); }
+    std::sort(ids.begin(), ids.end());
+
+    entity_id   rival = null_entity;
+    rigged_route rr;
+    for (const entity_id c : ids)
+    {
+        const corporation_component& cc = w.corporations.at(c);
+        if (c == w.player_entity || cc.is_player || w.nations.count(cc.home_nation) == 0)
+            continue;
+        const std::vector<entity_id> trading = corp_trade_markets(w, c);
+        for (const entity_id a : corp_markets(w, c))
+        {
+            if (std::binary_search(trading.begin(), trading.end(), a))
+                continue;
+            float best = 0.0f;
+            for (const auto& [b, mb] : w.markets)
+            {
+                if (b == a || mb.body != w.markets.at(a).body) continue;
+                for (std::size_t r = 0; r < resource_count; ++r)
+                {
+                    if (!(tp.capacity[r] > 0.0f) || reg.grid_goods().grid(r)) continue;
+                    const float ba = w.markets.at(a).base_price[r], bb = mb.base_price[r];
+                    if (!(ba > 0.0f) || !(bb > 0.0f)) continue;
+                    const float haul = trade_haul_per_unit(w, reg, nodes, memo, c, a, b, r);
+                    if (!std::isfinite(haul)) continue;
+                    const float m = (1.5f * bb - 0.5f * ba - haul) * tp.capacity[r];
+                    // Ascending b (std::map walk is unordered: compare ids on ties).
+                    if (m > best || (m == best && m > 0.0f && b < rr.b)) { best = m; rr = {a, b, r}; }
+                }
+            }
+            if (rr.a != null_entity) break;
+        }
+        if (rr.a != null_entity) { rival = c; break; }
+    }
+    if (rival == null_entity)
+    {
+        check(false, "fixture: a rival with ground in a market it does not trade from, and a route out of it");
+        return;
+    }
+    rig_profitable(w, rr);
+    w.corporations.at(rival).balance += 1.0e7f; // the solvency gate is not under test here
+    std::vector<trade_route_offer> ranked;
+    {
+        trade_haul_memo m2;
+        rank_trade_routes(w, reg, nodes, m2, rival, std::vector<entity_id>{rr.a}, ranked);
+    }
+    std::printf("  fixture: rival %llu, market %llu (no trade building of its), %zu margin routes out\n",
+                static_cast<unsigned long long>(rival), static_cast<unsigned long long>(rr.a),
+                ranked.size());
+    check(!ranked.empty(), "fixture: the shared ranking finds a margin route leaving that market");
+
+    corp_ai_params p;
+    p.cadence_k = 1;
+    // The Marketplace's flat score (0.4) is modest BY DESIGN — it must never
+    // out-bid a genuine economic build — so under the default one build per
+    // evaluation a better build hides it. The budget is widened here so the
+    // row observes the candidate itself, not the contest (the contest is the
+    // design, not the subject).
+    p.max_builds = 64;
+    economy_report report;
+    const std::size_t before = w.ai_decisions.total;
+    run_corp_strategic_step(w, reg, report, 100, p);
+    bool built = false;
+    for (const corp_decision& d : decisions_since(w.ai_decisions, before))
+    {
+        if (d.corp != rival) continue;
+        if (d.command.verb == corp_verb::build && d.command.type == building_type::planetary_marketplace
+            && market_for_tile(w, d.command.tile) == rr.a)
+        {
+            built = true;
+            std::printf("    Marketplace build at tile %llu, score %.4f\n",
+                        static_cast<unsigned long long>(d.command.tile), d.winning_score);
+        }
+    }
+    check(built, "a rival with no trade building in a market and a margin route out of it "
+                 "builds a Planetary Marketplace in that market's catchment");
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -407,6 +520,7 @@ int main(int argc, char** argv)
         return 1;
     }
     world copy = start->w; // faithful copy (BL-1034) for the determinism run
+    world fresh = start->w; // untouched by T1-T5, for T6
 
     const run_record a = run_sequence(start->w, start->reg, /*verbose=*/true);
     const run_record b = run_sequence(copy, start->reg, /*verbose=*/false);
@@ -414,6 +528,8 @@ int main(int argc, char** argv)
     check(!a.stream.empty() && a.stream == b.stream,
           "two runs from the same start issue the identical command stream");
     check(a.book == b.book, "and leave the identical trade book and reserves after every step");
+
+    run_marketplace_build(fresh, start->reg);
 
     std::printf("ai_trade_harness: %s (%d failure%s)\n", g_failures == 0 ? "PASS" : "FAIL",
                 g_failures, g_failures == 1 ? "" : "s");

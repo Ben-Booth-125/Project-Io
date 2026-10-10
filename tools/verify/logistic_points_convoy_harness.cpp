@@ -196,7 +196,12 @@ void enable_auto_trade(scenario& s, recipe_registry& reg)
     reg.set_trade(tp);
     const entity_id mp = s.w.create_entity();
     building_component b{};
-    b.tile               = tile_at(s.w, s.body, 20, 2); // far off every route
+    // Far off every route, and in the SOURCE market's catchment: NR-1018 (Ben,
+    // 2026-10-10) spends a building's points only on trades leaving the market
+    // it stands in. (20, 0) is 12 wrapped columns from both centres, 0 rows from
+    // the source and 3 from the destination; the (20, 2) it stood on before the
+    // ruling routes to the destination, and auto trade then shipped nothing.
+    b.tile               = tile_at(s.w, s.body, 20, 0);
     b.type               = building_type::planetary_marketplace;
     b.workforce_assigned = 1.0f;
     s.w.buildings[mp] = b;
