@@ -1,8 +1,8 @@
 #pragma once
 
 #include "detail_level.hpp"     // fold_state — the drill-through disclosure target (BL-214)
-#include "world/components.hpp"   // building_type / resource_type / sell_order
-#include "world/corp_command.hpp" // corp_command — the seam the order-book presses queue onto
+#include "world/components.hpp"   // building_type / resource_type
+#include "world/corp_command.hpp" // corp_command — the seam the ledger presses queue onto
 #include "world/entity.hpp"
 
 #include <imgui.h>
@@ -196,18 +196,6 @@ struct construction_state
     /// into `unit_roster_table()`.
     entity_id     pending_hire_tile      = null_entity;
     std::uint16_t pending_hire_unit_type = 0;
-
-    /// Pending player convoy-dispatch request (BL-601) — set by the market
-    /// Selection card's dispatch form and executed by `app::render` via
-    /// `apply_corp_command`'s `dispatch_convoy` verb (BL-452's own player seam;
-    /// the form is the front door onto it SUPPLY.md always specified but nothing
-    /// built). Same deferred path as `pending_tile`, for the same reason (UI
-    /// surfaces hold only `const world&`). `pending_dispatch_source` = null_entity
-    /// means nothing pending; the other three fields are meaningless until it is set.
-    entity_id     pending_dispatch_source = null_entity; ///< Source market (the card's own selection).
-    entity_id     pending_dispatch_dest   = null_entity; ///< Destination market.
-    resource_type pending_dispatch_good   = resource_type::iron_ore;
-    float         pending_dispatch_qty    = 0.0f;
 
     /// Pending demolition request — set by the building Selection element's Demolish
     /// control and executed by `app::render` via `demolish_building`. Takes the same
@@ -1115,11 +1103,10 @@ struct ui_state
     /// the UI surfaces hold a const world. null_entity = nothing pending.
     entity_id pending_survey_dispatch = null_entity;
 
-    /// Pending order-book commands (BL-293). The standing orders themselves moved
-    /// to `world::sell_orders` on 2026-08-07; what lives here is the REQUEST, for
-    /// the reason `pending_survey_dispatch` above lives here — the Market Ledger
-    /// holds a `const world&` and cannot mutate it, so it enqueues and
-    /// `app::render` applies.
+    /// Pending ledger commands (BL-293; the trade presses since BL-1269 —
+    /// `set_trade`, `clear_trade`, `set_trade_reserve`). What lives here is the
+    /// REQUEST, for the reason `pending_survey_dispatch` above lives here — the
+    /// ledgers do not mutate the world, so they enqueue and `app::render` applies.
     ///
     /// Applied through `apply_corp_command`, the same seam the rival-corp AI
     /// drives, so the player's press and the AI's command are the same code path
@@ -1127,6 +1114,12 @@ struct ui_state
     /// than a single slot because a frame can carry more than one press (add an
     /// order, remove another); drained in order each frame.
     std::vector<corp_command> pending_order_commands;
+
+    /// BL-1269: the seam's answer to the last TRADE press (`set_trade`,
+    /// `clear_trade`, `set_trade_reserve`), written by `app::render` when it drains
+    /// `pending_order_commands` and shown under the Trades tab's form. A refusal
+    /// mutates nothing, so the player is told why. Empty = nothing to say.
+    std::string trade_message;
 
     /// BL-323 S2b: the logistics-reach budget the UI must filter on, mirrored here
     /// from `recipe_registry::construction().max_logistics_reach` at load time.

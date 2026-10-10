@@ -2707,46 +2707,127 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // `expect_no_clipping` records zero even over visibly clipped frames
     // (NR-663), so the assertions are the whole verdict.
 
-    /// Read 1 — the player's own standing trades, as drawn.
-    v.set_function("my_trades", [this]() {
+    // One manual-trade row (BL-1269) as a Lua table — reads 1 and 2 share it.
+    const auto trade_row = [this](const ui::trade_row_record& r) {
+        sol::table row = m_lua.state().create_table();
+        row["trade_id"]    = r.trade_id;
+        row["good"]        = r.name;
+        row["good_key"]    = resource_names::name_of(r.resource); // the id set_trade takes
+        row["holder"]      = r.corp_name;
+        row["holder_id"]   = r.corp;
+        row["from_market"] = r.from_market;
+        row["from"]        = r.from_name;
+        row["to_market"]   = r.to_market;
+        row["to"]          = r.to_name;
+        row["points"]      = r.points;
+        row["units"]       = r.units;
+        row["mine"]        = r.mine;
+        return row;
+    };
+
+    /// Read 1 — the player's own manual trades touching the market, as drawn.
+    v.set_function("my_trades", [this, trade_row]() {
         sol::table out = m_lua.state().create_table();
         int i = 1;
         for (const ui::trade_row_record& r : ui::my_trades())
+            out[i++] = trade_row(r);
+        return out;
+    });
+
+    // The trade-points line AS DRAWN (BL-1269): made, reserve (as set and as
+    // used), auto, and what the player's manual trades ask for. `drawn` is false
+    // when the Trades tab was not on screen.
+    v.set_function("trade_points_panel", [this]() {
+        sol::table out = m_lua.state().create_table();
+        const ui::trade_points_record& p = ui::trade_points_read();
+        out["drawn"]        = p.drawn;
+        out["made"]         = p.made;
+        out["reserve"]      = p.reserve;
+        out["reserve_used"] = p.reserve_used;
+        out["auto"]         = p.auto_points;
+        out["manual_asked"] = p.manual_asked;
+        out["manual_count"] = p.manual_count;
+        return out;
+    });
+
+    // BL-1269: the player's manual trades in WORLD state, every one, in
+    // placement order — independent of any surface, so a check can cross the
+    // drawn rows against what the seam actually stored.
+    v.set_function("world_player_trades", [this]() {
+        sol::table out = m_lua.state().create_table();
+        int i = 1;
+        for (const standing_trade& t : m_world.trades)
         {
+            if (t.owner != m_world.player_entity)
+                continue;
             sol::table row = m_lua.state().create_table();
-            row["order_id"]  = r.order_id;
-            row["good"]      = r.name;
-            row["holder"]    = r.corp_name;
-            row["is_buy"]    = r.is_buy;
-            row["quantity"]  = r.quantity;
-            row["limit"]     = r.limit_price;
-            row["mine"]      = r.mine;
+            row["trade_id"]    = t.id;
+            row["good"]        = std::string(ui::resource_name(t.resource));
+            row["good_key"]    = resource_names::name_of(t.resource);
+            row["from_market"] = t.from_market;
+            row["to_market"]   = t.to_market;
+            row["points"]      = t.points;
             out[i++] = row;
         }
         return out;
     });
 
-    // Read 2 — every standing trade on the selected market's body, whoever owns
+    // BL-1269: press the Trades tab's own presses without a mouse — they enqueue
+    // exactly what the tab's buttons enqueue onto `pending_order_commands`, which
+    // app::render drains through apply_corp_command next frame (and writes the
+    // result to `trade_message`). `verify.set_trade` above goes straight to the
+    // seam; these go through the surface's queue, so a check can prove the
+    // queue path a click takes.
+    v.set_function("trades_tab_add", [this](const std::string& res, unsigned from, unsigned to,
+                                            double points) -> bool {
+        bool ok = false;
+        const resource_type r = resource_names::resource_from_name(res, ok);
+        if (!ok || !std::isfinite(points))
+            return false;
+        corp_command cmd;
+        cmd.corp         = m_world.player_entity;
+        cmd.verb         = corp_verb::set_trade;
+        cmd.target       = r;
+        cmd.subject      = static_cast<entity_id>(from);
+        cmd.counterparty = static_cast<entity_id>(to);
+        cmd.quantity     = static_cast<float>(points);
+        m_ui.pending_order_commands.push_back(cmd);
+        return true;
+    });
+    v.set_function("trades_tab_remove", [this](unsigned trade_id) {
+        corp_command cmd;
+        cmd.corp  = m_world.player_entity;
+        cmd.verb  = corp_verb::clear_trade;
+        cmd.order = static_cast<std::uint32_t>(trade_id);
+        m_ui.pending_order_commands.push_back(cmd);
+    });
+    v.set_function("trade_message", [this]() -> std::string { return m_ui.trade_message; });
+
+    // BL-1269: the market ids on a body, ascending — so a trade script can name a
+    // second market to trade to without guessing an id.
+    v.set_function("markets_on_body", [this](entity_id body) {
+        std::vector<entity_id> ids;
+        for (const auto& [mid, mc] : m_world.markets)
+            if (mc.body == body)
+                ids.push_back(mid);
+        std::sort(ids.begin(), ids.end());
+        sol::table out = m_lua.state().create_table();
+        int i = 1;
+        for (const entity_id m : ids)
+            out[i++] = m;
+        return out;
+    });
+
+    // Read 2 — every manual trade touching the selected market, whoever owns
     // it. `open` is the GATE (the player owns a building on that body), and it
     // is reported separately because a shut gate and an empty book are different
     // answers that the surface must not collapse — nor may a check.
-    v.set_function("market_trades", [this]() {
+    v.set_function("market_trades", [this, trade_row]() {
         sol::table out = m_lua.state().create_table();
         sol::table rows = m_lua.state().create_table();
         int i = 1;
         for (const ui::trade_row_record& r : ui::market_trades())
-        {
-            sol::table row = m_lua.state().create_table();
-            row["order_id"]  = r.order_id;
-            row["good"]      = r.name;
-            row["holder"]    = r.corp_name;
-            row["holder_id"] = r.corp;
-            row["is_buy"]    = r.is_buy;
-            row["quantity"]  = r.quantity;
-            row["limit"]     = r.limit_price;
-            row["mine"]      = r.mine;
-            rows[i++] = row;
-        }
+            rows[i++] = trade_row(r);
         out["open"] = ui::market_trades_open();
         out["rows"] = rows;
         return out;
@@ -2763,6 +2844,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         {
             sol::table row = m_lua.state().create_table();
             row["good"]         = r.name;
+            row["good_key"]     = resource_names::name_of(r.resource); // the id set_trade takes
             row["to"]           = r.dest_name;
             row["to_market"]    = r.dest_market;
             row["buy_price"]    = r.buy_price;
@@ -2800,28 +2882,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             row["buyer"]            = r.buyer;
             row["seller_is_market"] = r.seller_is_market;
             row["buyer_is_market"]  = r.buyer_is_market;
-            out[i++] = row;
-        }
-        return out;
-    });
-
-    // BL-1202 (order close notice): the player's self-closed sell orders the
-    // Trades tab DREW last frame, newest first — the reader of the clearing
-    // pass's agency-topic close line. `good_known` is false when the line's
-    // good/floor tag did not parse (a save from before the tag), and then
-    // `good` is "" and only `order_id` names the order.
-    v.set_function("closed_trades", [this]() {
-        sol::table out = m_lua.state().create_table();
-        int i = 1;
-        for (const ui::closed_trade_record& r : ui::closed_trades())
-        {
-            sol::table row = m_lua.state().create_table();
-            row["order_id"]   = r.order_id;
-            row["day"]        = r.day;
-            row["good_known"] = r.good_known;
-            row["good"]       = r.name;
-            row["floor"]      = r.floor_price;
-            row["why"]        = r.why;
             out[i++] = row;
         }
         return out;
@@ -2978,6 +3038,28 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return static_cast<int>(m_world.exchanges.size());
     });
 
+    // BL-1269: the exchange ring's span — oldest and newest econ tick it still
+    // holds, and how many of its rows name @p market — so a history read that
+    // comes back empty can say whether the market traded nothing or the ring
+    // rolled its rows out (the ring is bounded; rows per tick vary with the world).
+    v.set_function("exchange_ring_span", [this](entity_id market) {
+        sol::table out = m_lua.state().create_table();
+        const std::size_t n = m_world.exchanges.size();
+        int oldest = -1, newest = -1, here = 0;
+        for (std::size_t k = 0; k < n; ++k)
+        {
+            const exchange_record& e = m_world.exchanges.oldest_first(k);
+            if (oldest < 0 || e.tick < oldest) oldest = e.tick;
+            if (e.tick > newest) newest = e.tick;
+            if (e.market == market) ++here;
+        }
+        out["oldest_tick"] = oldest;
+        out["newest_tick"] = newest;
+        out["rows_here"]   = here;
+        out["rows"]        = static_cast<int>(n);
+        return out;
+    });
+
     // Every good the selected market actually trades (`base_price > 0`), so a
     // script can assert the table listed ALL of them and not just the handful
     // above the fold.
@@ -3035,6 +3117,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             else if (type == "launchpad")  bt = building_type::launchpad;
             else if (type == "logistics_hub") bt = building_type::inland_logistics_hub;
             else if (type == "military_base") bt = building_type::military_base; // BL-325 S1
+            else if (type == "marketplace") bt = building_type::planetary_marketplace; // BL-1269
             if (bt == building_type::none)
                 return;
             m_ui.construction.active = true;
@@ -3832,6 +3915,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             out["port_a"]       = static_cast<unsigned>(leg.port_a);
             out["port_b"]       = static_cast<unsigned>(leg.port_b);
             out["seeded_ports"] = seeded;
+            out["body"]         = static_cast<unsigned>(body); // BL-1269: the script stocks its markets
             // Grid positions of the two Ports, so the script can frame the sea leg.
             const auto& ta = m_world.tiles.at(leg.port_a);
             const auto& tb = m_world.tiles.at(leg.port_b);
@@ -4688,6 +4772,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (type == "port")       bt = building_type::port;
         else if (type == "launchpad")  bt = building_type::launchpad;
         else if (type == "hub")        bt = building_type::inland_logistics_hub;
+        else if (type == "marketplace") bt = building_type::planetary_marketplace; // BL-1269
         else
         {
             SDL_Log("verify.ledger_build: unrecognised type '%s' — refusing", type.c_str());
@@ -4746,6 +4831,22 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // so every available roster row returned rejected_funds no matter how much
     // credit it was lent. Lending goods is the same idea as lending credits, and
     // the fixture returns them the same way.
+    // BL-1269 (sea_lane.lua): put `qty` of `res` on market `market`'s SHELF — a
+    // verify-only fixture, like `grant_stock` but aimed at a named market, so a
+    // script can meet a trade building's upkeep (fuel and building materials,
+    // bought off its own market's shelf) where the world's shelves are bare.
+    // Refuses an unknown market, an unknown good, or a non-finite / non-positive
+    // quantity, mutating nothing.
+    v.set_function("stock_market", [this](unsigned market, const std::string& res, double qty) {
+        bool ok = false;
+        const resource_type r = resource_names::resource_from_name(res, ok);
+        const auto mit = m_world.markets.find(static_cast<entity_id>(market));
+        if (!ok || mit == m_world.markets.end() || !std::isfinite(qty) || !(qty > 0.0) || qty > 1.0e9)
+            return false;
+        mit->second.inventory[static_cast<std::size_t>(r)] += static_cast<float>(qty);
+        return true;
+    });
+
     v.set_function("grant_stock", [this](const std::string& res, double qty) {
         const auto it = m_world.corporations.find(m_world.player_entity);
         if (it == m_world.corporations.end())

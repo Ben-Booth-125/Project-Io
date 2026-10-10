@@ -24,23 +24,24 @@ float player_balance(const world& w)
 } // namespace
 
 // Declared in header_panel.hpp; shared with the Budget ledger (BL-171) so both the
-// header strip's STOCKPILE figure and the ledger's Cargo Value use one valuation.
-float player_stockpile_value(const world& w)
+// header strip's CARGO figure and the ledger's Cargo Value use one valuation.
+float player_cargo_value(const world& w)
 {
-    // BL-1003: pools key (corp, market), so each pool is valued at its OWN
-    // market's price; a body-level pool (a market-less body) has no price.
+    // BL-1265/BL-1269: no corporation holds a stockpile any more — what it makes
+    // lands on a market's shelf and is sold there (MARKETS.md § The shelf
+    // economy). The goods a corporation still OWNS are its trades' cargo in
+    // transit, bought at the source and sold on landing (TRADE.md § A trade), so
+    // that is what this values: each in-flight convoy's cargo at its destination
+    // market's current price — the price it will land into.
     float value = 0.0f;
-    for (const auto& [key, pool] : w.corp_market_pools)
+    for (const convoy_component& c : w.convoys)
     {
-        if (key.first != w.player_entity)
+        if (c.corp != w.player_entity || c.cargo_qty <= 0.0f)
             continue;
-        const auto mit = w.markets.find(key.second);
+        const auto mit = w.markets.find(c.dest_market);
         if (mit == w.markets.end())
             continue;
-        const market_component& mc = mit->second;
-        for (std::size_t r = 0; r < resource_count; ++r)
-            if (pool.quantities[r] > 0.0f)
-                value += pool.quantities[r] * mc.price[r];
+        value += c.cargo_qty * mit->second.price[static_cast<std::size_t>(c.cargo_resource)];
     }
     return value;
 }
@@ -77,7 +78,7 @@ void draw_header_panel(const world& w,
     ImGui::SetCursorPosY((header_panel_height - ImGui::GetFrameHeight()) * 0.5f);
 
     const float balance   = player_balance(w);
-    const float valuation = player_stockpile_value(w);
+    const float valuation = player_cargo_value(w);
 
     // Last-tick net change: the most recent balance step (newest minus previous).
     float net = 0.0f;
@@ -85,7 +86,7 @@ void draw_header_panel(const world& w,
         net = balance_history.back() - balance_history[balance_history.size() - 2];
 
     // Guaranteed-fit strip (LAYOUT.md container vocabulary): the strip never wraps
-    // to a second line. The three balance/stockpile/net figures are bounded-length
+    // to a second line. The three balance/cargo/net figures are bounded-length
     // (fmt::credits/rate abbreviate to a handful of characters) and always drawn in
     // full; the decorative extras — the in-debt flag and the sparkline — are the
     // genuine last resort to drop first when the available width is too narrow to
@@ -233,11 +234,13 @@ void draw_header_panel(const world& w,
             ImGui::SetTooltip("%s", debt_text.c_str());
     }
 
-    // --- Estimated stockpile valuation ---
+    // --- Cargo in transit, valued where it lands ---
     ImGui::SameLine();
-    ImGui::TextDisabled("   |   STOCKPILE");
+    ImGui::TextDisabled("   |   CARGO");
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Your trades' goods in transit, at the price where they land.");
     ImGui::SameLine();
-    fit_text(text_box::header_strip, "header.stockpile", fmt::credits(valuation).c_str(),
+    fit_text(text_box::header_strip, "header.cargo", fmt::credits(valuation).c_str(),
              ImGui::GetContentRegionAvail().x);
 
     // --- Last-tick net + a sparkline of recent balances ---

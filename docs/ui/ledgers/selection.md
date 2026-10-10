@@ -18,7 +18,7 @@ The centre column comes in two idioms. The **tile** takes a true **accordion** �
 | **Body** (planet/moon/asteroid/station) | action \| facts | Unsurveyed → **Dispatch Survey** (cost · ETA, funds-gated); surveyed → **Go to surface** | **Commercial activity** pulse — busy / steady / quiet or "outside your network" (`body_activity_visibility`) | Planetary surface |
 | **Body** (star) | action \| facts | none | none | — |
 | **Building** (player) | three-column card (`draw_building_selection_body`) | glyph grid: Manage, Mothball / Reopen, Auto workforce, Dismantle, Go to | `building_pages()`: Profitability (revenue vs segmented expenses, Net 6 mo., input basket) · Status · Workforce · Production method (every era-allowed recipe side by side, switched through `try_switch_recipe`) | host tile |
-| **Building** (rival) | three-column card | none — intel only | type-keyed glyph (type is public); owner; `Production: private` / `Stockpile: private`, lifted only under spectator god view | host tile |
+| **Building** (rival) | three-column card | none — intel only | type-keyed glyph (type is public); owner; `Production: private` (no stockpile row: no corporation holds one — `MARKETS.md` § The shelf economy), lifted only under spectator god view | host tile |
 | **Unit** | three-column card (`draw_unit_selection_body`) | **Go to** plus reserved slots | `unit_pages()`: Strength (`strength`, `count`) · Roster (type via `unit_roster_table()`, owner) | unit position |
 | **Battle** | own card (`draw_battle_selection`) | — | phase word, `round i / max_rounds`, each side's stack (`draw_battle_side`), redacted for the side the player cannot see | province |
 | **Market** | action \| facts | **Go to** — locate on canvas | (empty) | market centre |
