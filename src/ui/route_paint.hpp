@@ -16,8 +16,10 @@
 // (the quadratic B-spline of the tile-centre chain), a junction paired into
 // through-curves most-opposite first, an end or a three-way junction's odd
 // branch a straight spoke, a lane's rungs skipped, one width per tier — now
-// with a SURFACE per tier: Track ruts and a grass crown, Road gravel with
-// verges and ditches, Highway asphalt with kerbs and a centre line, Rail a
+// with a SURFACE per tier, read by colour and value at a thread's width
+// (BL-1257): Track pale packed dirt, Road paler gravel with a faint verge,
+// Highway a slightly darker asphalt between pale shoulders (a centre line
+// only where it can resolve), Rail a
 // ballast bed with sleepers and twin rails (a tier value nothing in the world
 // sets yet: the world has no rail rung), and a sea lane as a faint broken
 // wake on the water.
@@ -57,12 +59,15 @@ inline constexpr std::uint8_t k_route_highway = 3;
 inline constexpr std::uint8_t k_route_rail    = 4;
 
 /// Painted widths, the WHOLE surfaced width as a fraction of the hex
-/// circumradius — the canvas's named tier widths (RENDERING.md § Roads and sea
-/// lanes): Track 0.06, Road 0.09, Highway 0.12 (the 1 : 1.5 : 2 ladder), the
-/// sea lane 0.10; the rail bed 0.10. Verges, ditches, shoulders and the wake's
-/// spread lie outside the surfaced width.
-inline constexpr float k_route_width[5] = { 0.0f, 0.06f, 0.09f, 0.12f, 0.10f };
-inline constexpr float k_lane_paint_width = 0.10f;
+/// circumradius (RENDERING.md § Roads and sea lanes; Ben, 2026-10-10, BL-1257:
+/// thin pale threads, about 2-3% of a hex): Track 0.015, Road 0.022, Highway
+/// 0.03, the sea lane 0.025; the rail bed 0.10. On the ground a road is a
+/// detail of the land — the network as logistics is read through the
+/// Throughput lens, which the canvas draws at the old 1 : 1.5 : 2 weights.
+/// The margins (worn edge, verge, shoulder, the wake's spread) lie outside the
+/// surfaced width.
+inline constexpr float k_route_width[5] = { 0.0f, 0.015f, 0.022f, 0.03f, 0.10f };
+inline constexpr float k_lane_paint_width = 0.025f;
 
 /// One painted piece of a tile's route: a quadratic through-curve, a straight
 /// spoke, or a lone tile's yard, sampled as a polyline in TILE-RELATIVE

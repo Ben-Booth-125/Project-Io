@@ -406,11 +406,14 @@ width per tier — is unchanged; what changes is that the route is now a **pass 
 painted into the master after the base ground and border sets and before structures, so it
 takes the light, the grade and the lens wash like the ground does:
 
-- **Each tier has its own surface.** **Track:** dirt wheel ruts with a grass crown. **Road:**
-  packed gravel with grass verges and shallow ditches. **Highway:** asphalt with kerbs and a
-  painted centre line. **Rail:** a ballast bed with sleepers and twin rails — painted on the
+- **Each tier has its own surface**, read by colour and value at a thread's width (a few
+  master pixels — detail finer than that aliases, so a surface carries none). **Track:** pale
+  packed dirt, a little translucent, its edge worn soft. **Road:** paler, greyer gravel with a
+  faint verge. **Highway:** a slightly darker asphalt between pale shoulders, with a painted
+  centre line only where it can resolve (a surface at least 8 nominal pixels across).
+  **Rail:** a ballast bed with sleepers and twin rails — painted on the
   rail rung of the road ladder (INDUSTRIALISATION.md, the rail sink), wherever the world lays
-  it; its bed is **0.10** wide, a sea lane's width. Textures are procedural, hash-placed along
+  it; its bed is **0.10** wide. Textures are procedural, hash-placed along
   the curve, nominal-keyed, wrap-exact. A dash pattern (the centre line, the sleepers) runs a
   whole number of dashes along each half of a curve, pinned at the shared-edge midpoint, so it
   meets its neighbour tile's without a break.

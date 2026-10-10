@@ -166,13 +166,16 @@ inline double tier_hw(std::uint8_t tier)
 }
 inline double tier_out(std::uint8_t tier)
 {
+    // BL-1257: margins in proportion to the thread (about a master pixel
+    // each); a ditch or kerb a few pixels wide beside a 2 px road would read
+    // as a second, darker road.
     if (tier & 0x80u)
-        return 0.035; // the wake's spread past the lane's width
+        return 0.016; // the wake's spread past the lane's width
     switch (tier)
     {
-        case k_route_track:   return 0.020; // the worn margin
-        case k_route_road:    return 0.044; // verge, then the ditch
-        case k_route_highway: return 0.026; // the shoulder
+        case k_route_track:   return 0.008; // the worn margin
+        case k_route_road:    return 0.010; // the verge
+        case k_route_highway: return 0.010; // the pale shoulder
         default:              return 0.018; // ballast spill
     }
 }
@@ -638,14 +641,13 @@ void paint_routes(const bake_source& s, const geometry& g, const bake_params& p,
         cells_out = std::max(1, static_cast<int>(std::lround(period / target)));
         return period / cells_out;
     };
-    int wear_n, speck_n, wake_n, foam_n;
+    int wear_n, speck_n, wake_n;
     const double wear_c  = periodic_cell(0.32, wear_n);
     const double speck_c = periodic_cell(0.012, speck_n);
     const double wake_c  = periodic_cell(0.24, wake_n);
-    const double foam_c  = periodic_cell(0.022, foam_n);
     const double ns   = nominal_s(g);
     const double pxc  = 1.0 / g.s;          // one actual pixel (edge coverage)
-    const bool   fine = ns >= 40.0;         // sub-surface detail: ruts, lines, sleepers, speckle (nominal-keyed)
+    const bool   fine = ns >= 40.0;         // the rail bed's detail: sleepers, rails, speckle (nominal-keyed)
     const bool   mid  = ns >= 20.0;         // verges, ditches, kerbs
     const double k    = std::clamp(static_cast<double>(p.route_strength), 0.0, 1.0);
     const float  Lx = -0.554700196f, Ly = -0.832050323f; // the NW light every pass uses
@@ -680,25 +682,25 @@ void paint_routes(const bake_source& s, const geometry& g, const bake_params& p,
             float b_ = static_cast<float>(palette::col_b(dst));
             const float gr = r_, gg = g_, gb = b_; // the ground under the road
             const double d = h.d, hw = h.hw;
-            const double cov = std::clamp((hw - d) / pxc + 0.5, 0.0, 1.0); // the surface, anti-aliased
+            // The surface, anti-aliased as a box filter: the share of this
+            // pixel's span across the road that the surface covers. For a
+            // surface wider than a pixel this is the familiar one-pixel ramp;
+            // for a thread narrower than one (BL-1257: a Track is under 1.5
+            // master pixels, and a fraction of one on the far page) it is the
+            // thread's true area, not a half-strength pixel-wide line.
+            const double cov = std::clamp((std::min(d + 0.5 * pxc, hw) - std::max(d - 0.5 * pxc, -hw)) / pxc, 0.0, 1.0);
             const bool junction = h.covers >= 2;
             const bool lined = !junction && (h.kind == route_piece::curve || h.kind == route_piece::spoke);
             const bool edged = h.kind == route_piece::curve || h.kind == route_piece::spoke; // verges, ditches, shoulders
 
             if (water)
             {
-                // THE WAKE: a faint, broken, pale trail on the lane's water.
-                const double prof = 1.0 - smooth01(0.0, hw * 1.7, d);
-                const double brk  = smooth01(0.38, 0.62, rnoise(abx, aby, wake_c, wake_n, 0x3A11u));
-                double a = 0.15 * prof;
-                if (mid)
-                {
-                    const double edge = std::clamp(1.0 - std::fabs(d - hw * 0.85) / 0.012, 0.0, 1.0);
-                    a += 0.08 * edge;
-                }
-                if (fine && d < hw * 1.3) // soft flecks of foam, never a pixel grid
-                    a += 0.18 * smooth01(0.66, 0.84, rnoise(abx, aby, foam_c, foam_n, 0x3A12u))
-                              * (1.0 - smooth01(hw * 0.9, hw * 1.3, d));
+                // THE WAKE: a faint, broken, pale trail on the lane's water —
+                // at a thread's width (BL-1257) a soft profile broken along
+                // its length; no edge line or foam flecks, which alias there.
+                const double prof = 1.0 - smooth01(hw * 0.4, hw + tier_out(h.tier), d);
+                const double brk  = smooth01(0.34, 0.62, rnoise(abx, aby, wake_c, wake_n, 0x3A11u));
+                const double a = 0.26 * prof;
                 mixc(r_, g_, b_, 216.0f, 230.0f, 236.0f, a * brk * k);
                 dst = palette::col32(std::clamp(static_cast<int>(r_ + 0.5f), 0, 255),
                                      std::clamp(static_cast<int>(g_ + 0.5f), 0, 255),
@@ -733,79 +735,65 @@ void paint_routes(const bake_source& s, const geometry& g, const bake_params& p,
                 }
             }
             const double wear  = 0.92 + 0.16 * rnoise(abx, aby, wear_c, wear_n, 0x3A01u);
-            const double speck = fine ? (rspeck(abx, aby, speck_c, speck_n, 0x3A02u) - 0.5) : 0.0;
+            // The speckle is the rail bed's alone: the road tiers are too
+            // thin to carry a pixel-scale grain (BL-1257).
+            const double speck = fine && h.tier == k_route_rail ? (rspeck(abx, aby, speck_c, speck_n, 0x3A02u) - 0.5) : 0.0;
             const double lit = L * wear;
 
             switch (h.tier)
             {
+                // BL-1257: THIN PALE THREADS (Ben, 2026-10-10; RENDERING.md
+                // § Roads and sea lanes). At 0.015-0.03 of a hex a surface is
+                // one to four master pixels wide, so a tier reads by COLOUR AND
+                // VALUE, not by texture: ruts, crowns, ditches, kerbs and the
+                // speckle all alias at that width and are gone. What is left
+                // varies only at the wear noise's scale (a third of a hex),
+                // lit by the slope like the ground.
                 case k_route_track:
                 {
-                    // A worn margin, then dirt with wheel ruts and a grass crown.
+                    // Pale packed dirt, a little translucent (grass shows
+                    // through a track), its edge worn soft into the ground.
                     const double outer = hw + tier_out(h.tier);
-                    mixc(r_, g_, b_, 128.0f * static_cast<float>(lit), 108.0f * static_cast<float>(lit),
-                         80.0f * static_cast<float>(lit), 0.30 * (1.0 - smooth01(hw, outer, d)) * k);
-                    double sr = 140.0 * lit * (1.0 + 0.16 * speck), sg = 122.0 * lit * (1.0 + 0.16 * speck),
-                           sb = 94.0 * lit * (1.0 + 0.16 * speck);
-                    if (fine && lined)
-                    {
-                        const double u = d / hw;
-                        const double rut = std::clamp(1.0 - std::fabs(u - 0.58) / 0.18, 0.0, 1.0);
-                        sr *= 1.0 - 0.20 * rut; sg *= 1.0 - 0.21 * rut; sb *= 1.0 - 0.18 * rut;
-                        const double crown = 1.0 - smooth01(0.06, 0.22, u);
-                        sr += (gr * 0.98 - sr) * 0.50 * crown;
-                        sg += (gg * 1.02 - sg) * 0.50 * crown;
-                        sb += (gb * 0.96 - sb) * 0.50 * crown;
-                    }
-                    mixc(r_, g_, b_, static_cast<float>(sr), static_cast<float>(sg), static_cast<float>(sb), cov * k);
+                    const double worn = edged ? 0.22 * (1.0 - smooth01(hw, outer, d)) : 0.0;
+                    const double sr = 150.0 * lit, sg = 134.0 * lit, sb = 104.0 * lit;
+                    mixc(r_, g_, b_, static_cast<float>(sr), static_cast<float>(sg), static_cast<float>(sb),
+                         std::max(worn, 0.86 * cov) * k);
                     break;
                 }
                 case k_route_road:
                 {
-                    // Shallow ditches, grass verges, packed gravel.
-                    if (mid && edged)
+                    // Pale gravel, paler and greyer than a track, opaque, with a
+                    // faint lighter verge so its edge reads clean.
+                    if (edged)
                     {
-                        const double dc = hw + 0.031;
-                        const double ditch = std::clamp(1.0 - std::fabs(d - dc) / 0.013, 0.0, 1.0);
-                        const double dk = ditch * ditch * 0.32 * k;
-                        r_ *= static_cast<float>(1.0 - dk);
-                        g_ *= static_cast<float>(1.0 - dk * 0.80);
-                        b_ *= static_cast<float>(1.0 - dk * 0.90);
-                        const double verge = smooth01(hw - pxc, hw + pxc, d) * (1.0 - smooth01(hw + 0.014, hw + 0.020, d));
-                        mixc(r_, g_, b_, gr * 1.06f + 8.0f, gg * 1.10f + 12.0f, gb * 0.98f,
-                             0.45 * verge * k);
+                        const double verge = smooth01(hw - pxc, hw + pxc, d) * (1.0 - smooth01(hw, hw + tier_out(h.tier), d));
+                        mixc(r_, g_, b_, gr * 1.08f + 10.0f, gg * 1.10f + 12.0f, gb * 1.02f + 6.0f,
+                             0.30 * verge * k);
                     }
-                    double base = 1.0 + 0.24 * speck;
-                    if (fine && lined)
-                    {
-                        const double u = d / hw;
-                        base *= 1.0 - 0.06 * std::clamp(1.0 - std::fabs(u - 0.45) / 0.16, 0.0, 1.0); // wheel tracks
-                        base *= 1.0 + 0.04 * (1.0 - smooth01(0.0, 0.3, u));                         // the crown
-                    }
-                    const double sr = 166.0 * lit * base, sg = 154.0 * lit * base, sb = 128.0 * lit * base;
+                    const double sr = 168.0 * lit, sg = 162.0 * lit, sb = 144.0 * lit;
                     mixc(r_, g_, b_, static_cast<float>(sr), static_cast<float>(sg), static_cast<float>(sb), cov * k);
                     break;
                 }
                 case k_route_highway:
                 {
-                    // A gravel shoulder, asphalt, kerbs, a dashed centre line.
-                    if (mid && edged)
+                    // Pale gravel shoulders either side of a slightly darker
+                    // asphalt: a paved thread, wider than a road, its middle
+                    // grey. A dashed centre line only where it can resolve —
+                    // a surface at least 8 nominal pixels across.
+                    if (edged)
                     {
-                        const double sh = smooth01(hw - pxc, hw + pxc, d) * (1.0 - smooth01(hw + 0.016, hw + 0.026, d));
-                        mixc(r_, g_, b_, 148.0f * static_cast<float>(L), 142.0f * static_cast<float>(L),
-                             126.0f * static_cast<float>(L), 0.55 * sh * k);
+                        const double sh = smooth01(hw - pxc, hw + pxc, d) * (1.0 - smooth01(hw + 0.4 * tier_out(h.tier), hw + tier_out(h.tier), d));
+                        mixc(r_, g_, b_, 172.0f * static_cast<float>(L), 168.0f * static_cast<float>(L),
+                             154.0f * static_cast<float>(L), 0.65 * sh * k);
                     }
-                    const double base = (0.96 + 0.08 * wear) * (1.0 + 0.10 * speck);
-                    double sr = 66.0 * L * base, sg = 68.0 * L * base, sb = 73.0 * L * base;
-                    if (mid)
+                    const double base = 0.96 + 0.08 * wear;
+                    double sr = 112.0 * L * base, sg = 113.0 * L * base, sb = 114.0 * L * base;
+                    if (lined && ns * 2.0 * hw >= 8.0)
                     {
-                        const double kerb = std::clamp((d - (hw - 0.011)) / pxc + 0.5, 0.0, 1.0);
-                        sr += (184.0 * L - sr) * kerb; sg += (182.0 * L - sg) * kerb; sb += (174.0 * L - sb) * kerb;
-                    }
-                    if (fine && lined)
-                    {
-                        const double line = std::clamp((0.0045 - d) / pxc + 0.5, 0.0, 1.0)
+                        const double lhw = std::max(0.0045, 0.5 / ns);
+                        const double line = std::clamp((lhw - d) / pxc + 0.5, 0.0, 1.0)
                                           * dashes(h.along, h.half, 0.15, 0.55, pxc);
-                        sr += (230.0 - sr) * line; sg += (214.0 - sg) * line; sb += (148.0 - sb) * line;
+                        sr += (226.0 - sr) * line; sg += (214.0 - sg) * line; sb += (160.0 - sb) * line;
                     }
                     mixc(r_, g_, b_, static_cast<float>(sr), static_cast<float>(sg), static_cast<float>(sb), cov * k);
                     break;

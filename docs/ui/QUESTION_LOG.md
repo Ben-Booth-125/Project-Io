@@ -412,9 +412,9 @@ IT LIVES UNDER MY TRADES, NOT IN A FEED. The question it answers is about the pl
 
 **Answers:** How much can move through here, and how far is this ground from the capacity that would move it?
 
-**Because:** Active Logistic Points are a CAP: a march over the cap is refused outright, and LOGISTICS.md makes surfacing that non-optional -- 'a refusal nobody sees is silent interdiction again'. Without a surface the player meets the cap only as a move that mysteriously did not happen. It earns its space by costing none: it extends the Reach field the placement rule already computes rather than adding a surface, which is exactly the shape Ben's ruling asked for -- 'throughput is that field with a magnitude, so it is a small step from an existing surface rather than a new one'. It is off the lens bar, so it takes no strip slot from the eight lenses that answer first-sight questions.
+**Because:** Active Logistic Points are a CAP: a march over the cap is refused outright, and LOGISTICS.md makes surfacing that non-optional -- 'a refusal nobody sees is silent interdiction again'. Without a surface the player meets the cap only as a move that mysteriously did not happen. It earns its space by costing none: it extends the Reach field the placement rule already computes rather than adding a surface, which is exactly the shape Ben's ruling asked for -- 'throughput is that field with a magnitude, so it is a small step from an existing surface rather than a new one'. It is off the lens bar, so it takes no strip slot from the eight lenses that answer first-sight questions. IT ALSO CARRIES THE NETWORK (BL-1257, Ben 2026-10-10): on the ground a road is a thin pale thread of the land, so the road and lane network as logistics -- every road by tier at full weight, every lane in its blue, at every rung -- is read here, over the reach-cost field that network produces; the plain canvas keeps only a thin drawn network at the two widest rungs.
 
-*Demanded by BL-606 · `src/ui/body_surface_canvas.cpp` · id `throughput_lens`*
+*Demanded by BL-606, BL-1257 · `src/ui/body_surface_canvas.cpp` · id `throughput_lens`*
 
 ### Tile inspector
 
