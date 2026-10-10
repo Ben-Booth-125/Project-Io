@@ -10,13 +10,15 @@
 // ground bake. docs/ui/RENDERING.md § Roads and sea lanes is the authority.
 //
 // Roads (`road_level`) and sea lanes (`lane_level`) are painted INTO the
-// master, not stroked over it: the same geometry the canvas drew — a route
-// along its own tiles on the four-cardinal grid, one quadratic per tile from
-// shared-edge midpoint to shared-edge midpoint with the tile centre as control
-// (the quadratic B-spline of the tile-centre chain), a junction paired into
-// through-curves most-opposite first, an end or a three-way junction's odd
-// branch a straight spoke, a lane's rungs skipped, one width per tier — now
-// with a SURFACE per tier, read by colour and value at a thread's width
+// master, not stroked over it: a route along its own tiles on the
+// four-cardinal grid, a junction paired into through-curves most-opposite
+// first, an end or a three-way junction's odd branch a spoke, a lane's rungs
+// skipped, one width per tier. BL-1261 (roads as tile sets): each piece runs
+// between its edges' hashed CROSSING POINTS (route_crossing), a curve that
+// finds its way inside the tile — to the lower ground, around the road plan's
+// cluster — and carries its terrain's TREATMENT (hillside cut, forest
+// corridor, embankment, verge, street) in the ground beside it. Each tier has
+// a SURFACE, read by colour and value at a thread's width
 // (BL-1257): Track pale packed dirt, Road paler gravel with a faint verge,
 // Highway a slightly darker asphalt between pale shoulders (a centre line
 // only where it can resolve), Rail a
@@ -117,8 +119,9 @@ double route_piece_out(const route_piece& pc);
 /// § Roads and sea lanes: "a road meets a built tile through the building's
 /// set"). Only a tile standing works (stack structures, no settlement) with at
 /// least one road link is roaded: its cluster steps toward the tile's FREE side
-/// (the direction farthest, by angle, from every road link; north preferred on
-/// a tie, so the road runs past the cluster's front), shrinks by `scale`, and
+/// (the direction farthest, by angle, from every road link's edge midpoint;
+/// north preferred on a tie, so the road runs past the cluster's front),
+/// shrinks by `scale`, and
 /// stands its forecourt / yard / loading apron at (apx, apy) facing the road. A
 /// through-road bows away from the cluster (route derivation); a road that
 /// ends here ends at the apron. A town's tile is not roaded: its road runs

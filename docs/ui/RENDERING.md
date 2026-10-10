@@ -416,17 +416,31 @@ points on the tile edge, not just the centre"*). This revises the geometry rule 
 - **A road crosses a tile edge at its own point, not the midpoint.** Each shared edge a road
   crosses carries a **crossing point** placed by a hash of the edge (within the inner 70% of the
   edge), computed identically from both tiles so the road is continuous; a road of a higher tier
-  and a lower one crossing the same edge take separate points.
+  and a lower one crossing the same edge take separate points. **The values:** the point lies
+  within **0.35** of the edge's midpoint (the edge is one hex radius long), keyed on the edge's
+  west or north tile — its wrapped column, so the cylinder seam agrees — and the road leaves it
+  straight across the edge, so the two tiles' pieces meet in one direction; a rail point stands
+  half the band (0.35) along the edge from the road's.
 - **Inside the tile the road finds its way.** The path from crossing to crossing (or to a
   junction, or to a building's forecourt) is a smooth curve that **bends around higher ground** —
   it keeps to the lower side of the tile's relief rather than climbing over a hill — and **around
   the tile's structures** (the shared road plan). It passes through the centre only where the
-  ground lets it.
+  ground lets it. **The values:** a cubic between its two ends, bowed sideways by a profile that
+  leaves each end, its heading and its curvature where they were; the bow is chosen from a
+  bounded grid by the ground under the curve (the tile heights and the hills field, in the
+  hillshade's own units), its length and its bends, kept inside the hex, clear of the plan's
+  cluster, and no tighter than the tier's least turning radius — **0.22** of a hex for a road,
+  **0.60** for rail — wherever any candidate allows it.
 - **Each terrain family carries its own road treatment** — the road's tile set: on a slope the
   road is **cut into the hillside** with a shaded bank on the uphill side; across wet or low ground
   it runs on a low **embankment**; through forest it runs in a **cleared corridor**; on open
   ground a verge of worn grass; in a town it is the street. The road reads as built into the land,
-  in the same light and grade.
+  in the same light and grade. **The values** (past a Road's surface, as a fraction of the hex
+  radius; a Track takes 0.7 of each, a Highway 1.2, rail 1.7): the cut's uphill bank up to
+  **0.032**, rising with the slope across the road, and a downhill spoil edge up to **0.014**; the
+  forest corridor **0.09**, with the tree line's shade at its edge; the embankment's side slope
+  **0.024**; the worn verge **0.014**; a town's kerb **0.006**. The surface itself is lit by the
+  ground's own hillshade and takes a share of the ground's tone.
 - **Rail** follows the same routing with **gentler curvature** (a railway cannot turn as tightly
   as a road) and its own treatment — ballast, sleepers, twin rails, cuttings and embankments
   deeper than a road's — painted wherever the world lays the rail rung (BL-1255 rail rung).
@@ -452,7 +466,7 @@ takes the light, the grade and the lens wash like the ground does:
   rail rung of the road ladder (INDUSTRIALISATION.md, the rail sink), wherever the world lays
   it; its bed is **0.10** wide. Textures are procedural, hash-placed along
   the curve, nominal-keyed, wrap-exact. A dash pattern (the centre line, the sleepers) runs a
-  whole number of dashes along each half of a curve, pinned at the shared-edge midpoint, so it
+  whole number of dashes along each half of a curve, pinned at the edge's crossing point, so it
   meets its neighbour tile's without a break.
 - **A road meets a built tile through the building's set.** Each structure form carries a
   **roaded variant**: where a road enters a built tile it arrives at that structure's
@@ -463,10 +477,10 @@ takes the light, the grade and the lens wash like the ground does:
   (stack structures, no settlement) with a road link is **roaded**: its cluster and pad step
   **0.30** toward the tile's **free side** — of 24 headings, the one farthest by angle from
   every road link, north on a tie, so the road runs past the cluster's front — and shrink to
-  **0.80 / 0.70 / 0.60** for one / two / three or more links; a through-road **bows** away
-  from it (a sin² bow, which leaves its ends and their tangents where they were, so it still
-  meets its neighbours smoothly at the midpoints) until the road and its verges clear the
-  cluster; a road that ends here ends at a **forecourt apron** standing just outside the
+  **0.80 / 0.70 / 0.60** for one / two / three or more links; a through-road
+  **bows** away from it (the route's own bow, which leaves its ends and their headings where
+  they were, so it still meets its neighbours smoothly at the crossing points) until the road
+  and its verges clear the cluster; a road that ends here ends at a **forecourt apron** standing just outside the
   cluster on the road side — packed dirt for extraction, concrete for works that load and
   ship, paving otherwise — and a short spur joins a through-road to it. A **town's** tile is
   not re-planned: the road runs through as its street, and the town's blocks keep off it.

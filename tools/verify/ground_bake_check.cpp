@@ -2043,6 +2043,18 @@ void route_row(world& w, entity_id home, const bake_source& src0, const bake_par
             }
             std::printf("ROUTE-PROF  rederive_routes on %d road tiles (%zu pieces): %.2f ms; prepare_source (this world): %.2f ms\n",
                         nr, dense.route_pieces.size(), best, ps);
+            // BL-1261: this world's own network (its campaign roads and lanes).
+            bake_source own = src0;
+            double bo = 1e30;
+            for (int rep_ = 0; rep_ < 7; ++rep_)
+            {
+                const auto t0 = std::chrono::steady_clock::now();
+                rederive_routes(own);
+                bo = std::min(bo, std::chrono::duration<double, std::milli>(
+                                      std::chrono::steady_clock::now() - t0).count());
+            }
+            std::printf("ROUTE-PROF  rederive_routes on this world's own network (%zu pieces): %.2f ms\n",
+                        own.route_pieces.size(), bo);
         }
         return;
     }

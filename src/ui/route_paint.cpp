@@ -393,6 +393,27 @@ route_piece routed(const bake_source& s, const tile_ground& tg, const route_end&
         dy =  (b.x - a.x) / chord;
     }
     double px[kK], py[kK];
+    // The ground along each costed sample's bow line, fitted once per piece:
+    // V(B_k + s d) ~ q0 + q1 s + q2 s^2 through s = -0.4, 0, +0.4 at its
+    // quarter points (the bow moves a sample only along d), so a candidate
+    // costs its ground without sampling the field again.
+    constexpr int kNv = 3;              // samples k = 3, 6, 9: the quarters of the piece
+    constexpr int kSt = (kK - 1) / 4;
+    double q0[kNv] = {}, q1[kNv] = {}, q2[kNv] = {};
+    if (search && chord > 1e-9)
+    {
+        sample(a, b, rc.arm, 0.0, dx, dy, px, py);
+        for (int j = 0; j < kNv; ++j)
+        {
+            const int k = kSt * (j + 1);
+            const double vm = ground_v(s, tg, px[k] - 0.4 * dx, py[k] - 0.4 * dy);
+            const double v0 = ground_v(s, tg, px[k], py[k]);
+            const double vp = ground_v(s, tg, px[k] + 0.4 * dx, py[k] + 0.4 * dy);
+            q0[j] = v0;
+            q1[j] = (vp - vm) / 0.8;
+            q2[j] = (vp + vm - 2.0 * v0) / 0.32;
+        }
+    }
     // A candidate's cost (+inf when infeasible) and how far it misses the
     // disc (the fallback's measure when no bow clears it).
     const auto cost_of = [&](double beta, double& miss) -> double {
@@ -404,27 +425,28 @@ route_piece routed(const bake_source& s, const tile_ground& tg, const route_end&
             if (hex_dist(px[k], py[k]) > 0.8660254037844386)
                 inside = false;
             if (keep > 0.0)
-                miss = std::max(miss, keep - std::hypot(px[k] - kx, py[k] - ky));
+                miss = std::max(miss, keep - std::sqrt(sq(px[k] - kx) + sq(py[k] - ky)));
         }
         if (!inside || miss > 0.0)
             return 1e30;
-        // Length, bends and the least turning radius.
+        // Length, bends and the least turning radius (a vertex's turn from
+        // its chord angle: theta^2 ~ 2 (1 - cos theta)).
         double len = 0.0, bend = 0.0, rmin = 1e9;
         double ex = px[1] - px[0], ey = py[1] - py[0];
-        double el = std::hypot(ex, ey);
+        double el = std::sqrt(ex * ex + ey * ey);
         len += el;
         for (int k = 1; k < kK - 1; ++k)
         {
             const double fx = px[k + 1] - px[k], fy = py[k + 1] - py[k];
-            const double fl = std::hypot(fx, fy);
+            const double fl = std::sqrt(fx * fx + fy * fy);
             len += fl;
             if (el > 1e-9 && fl > 1e-9)
             {
                 const double cs = std::clamp((ex * fx + ey * fy) / (el * fl), -1.0, 1.0);
-                const double th = std::acos(cs);
-                bend += th * th;
-                if (th > 1e-9)
-                    rmin = std::min(rmin, 0.5 * (el + fl) / th);
+                const double th2 = 2.0 * (1.0 - cs);
+                bend += th2;
+                if (th2 > 1e-18)
+                    rmin = std::min(rmin, 0.5 * (el + fl) / std::sqrt(th2));
             }
             ex = fx; ey = fy; el = fl;
         }
@@ -434,15 +456,15 @@ route_piece routed(const bake_source& s, const tile_ground& tg, const route_end&
         // tighter bend takes the gentlest candidate.
         if (rmin < rc.r_min)
             c += 1e6 * (rc.r_min - rmin) / rc.r_min;
-        // The ground under it: the mean of the interior's even samples.
+        // The ground under it: the mean at the quarter points.
+        const curve_weights& W = cw();
         double v = 0.0;
-        int nv = 0;
-        for (int k = 2; k < kK - 1; k += 2)
+        for (int j = 0; j < kNv; ++j)
         {
-            v += ground_v(s, tg, px[k], py[k]);
-            ++nv;
+            const double sj = beta * W.w[kSt * (j + 1)];
+            v += q0[j] + q1[j] * sj + q2[j] * sj * sj;
         }
-        return c + v / nv;
+        return c + v / kNv;
     };
 
     double best_beta = 0.0;
@@ -458,14 +480,14 @@ route_piece routed(const bake_source& s, const tile_ground& tg, const route_end&
         };
         // A spoke (an end, a fork's branch) is half a through-curve's length
         // and bows half as far.
-        static constexpr double kGrid[9] = { 0.0, -0.15, 0.15, -0.30, 0.30, -0.45, 0.45, -0.60, 0.60 };
+        static constexpr double kGrid[7] = { 0.0, -0.20, 0.20, -0.40, 0.40, -0.60, 0.60 };
         const double gs = kind == route_piece::spoke ? 0.5 : 1.0;
         for (double beta : kGrid)
             consider(beta * gs);
         if (best < 1e30)
         {
             const double c0 = best_beta;
-            for (double dlt : { -0.075, 0.075, -0.0375, 0.0375 })
+            for (double dlt : { -0.10, 0.10, -0.05, 0.05 })
                 consider(c0 + dlt * gs);
         }
         else if (keep > 0.0)
@@ -480,7 +502,7 @@ route_piece routed(const bake_source& s, const tile_ground& tg, const route_end&
                 sample(a, b, rc.arm, beta, dx, dy, px, py);
                 double miss = 0.0;
                 for (int k = 1; k < kK - 1; ++k)
-                    miss = std::max(miss, keep - std::hypot(px[k] - kx, py[k] - ky));
+                    miss = std::max(miss, keep - std::sqrt(sq(px[k] - kx) + sq(py[k] - ky)));
                 best_beta = beta;
                 if (miss <= 0.0)
                     break;
@@ -843,6 +865,12 @@ road_plan tile_road_plan(const bake_source& s, std::size_t i)
     for (int k = 0; k < 4; ++k)
         if (links & (1u << k))
         {
+            // The link's direction (its edge's midpoint), not its crossing
+            // point (BL-1261): a road along a row whose two crossings both
+            // sit a little north would otherwise send the cluster south, in
+            // front of the road, where its standing forms hide it. The
+            // route's search keeps the road clear of the disc wherever the
+            // crossings fall.
             double mx, my;
             link_mid(r, k, mx, my);
             ang[deg++] = std::atan2(my, mx);
