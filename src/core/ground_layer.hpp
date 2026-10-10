@@ -19,9 +19,9 @@
 //
 // ONE MASTER PER BODY (docs/ui/RENDERING.md § Level of detail, Ben 2026-10-09:
 // "zooming doesn't add more detail"). Each body's ground is baked ONCE, whole
-// body, at 96 px per hex at the one camera angle (22.5 deg), in 512 px chunks
+// body, at 128 px per hex at the one camera angle (22.5 deg), in 512 px chunks
 // held in SYSTEM RAM. As each master chunk lands, the worker that baked it
-// box-downsamples it into its pieces of the 48 / 24 / 12 / 6 px levels — the
+// box-downsamples it into its pieces of the 64 / 32 / 16 / 8 px levels — the
 // mip chain — so every level is a chunked RAM image too. Each frame the
 // Planetary canvas draws ONE level, the coarsest at or above its drawn hex
 // radius (minified <= 2:1), and this layer uploads that level's visible
@@ -210,8 +210,8 @@ public:
     /// GPU texture LRU cap (textures of the active body; each <= 1 MB).
     static constexpr std::size_t k_gpu_cap = 320;
     /// RAM budget across bodies (TECH_FOUNDATIONS.md § Target hardware: 16 GB
-    /// minimum): the home body's master + chain is ~3.8 GB.
-    static constexpr long long   k_ram_budget = 6LL * 1024 * 1024 * 1024;
+    /// minimum): the home body's master + chain is ~6.7 GB at 128 px per hex.
+    static constexpr long long   k_ram_budget = 8LL * 1024 * 1024 * 1024;
     /// Master supersampling: 1x (measured 2026-10-09: the 2x whole-home bake
     /// does not fit the 15 s pre-bake budget — RENDERING.md § Level of detail).
     static constexpr int         k_master_ss = 1;

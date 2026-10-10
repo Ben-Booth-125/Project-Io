@@ -1021,10 +1021,10 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
     const bool   narrow_grid = src.gw < 5; // the gather's wrap round can be non-zero (see there)
     // Resolution-adaptive character (wave 2). The interpolation radius and the
     // detail amplitudes are CANONICAL-scale, so the same numbers that read as
-    // painterly at the 24 px tier read as plain blur at 48/96 — a colour field
-    // 1.4 tiles soft is 70 px soft up close. As the bake resolution grows past
+    // painterly at the 24 px tier read as plain blur up close — a colour field
+    // 1.4 tiles soft is 70 px soft at 48. As the bake resolution grows past
     // the play tier, tighten the field and lift the detail: res_t is 0 at
-    // 24 px/r and 1 at 96.
+    // 24 px/r and 1 from 72 (so the 128 px master takes it whole).
     const float  res_t = static_cast<float>(std::clamp((nominal_s(g) - 24.0) / 48.0, 0.0, 1.0));
     const double R     = p.blend_radius * (1.0 - 0.22 * res_t); // stays > 1 (corner coverage)
     const double R2    = R * R;
@@ -1054,15 +1054,15 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
     const double warp_cell2   = periodic_cell(p.warp_cell * 0.29, warp_cells2);
     const double detail_cell  = periodic_cell(p.detail_cell, detail_cells);
     const double detail_cell2 = periodic_cell(p.detail_cell * 0.41, detail_cells2);
-    // Close-tier grain: at high bake resolutions (the 48/96 px zoom tiers) the
+    // Close-tier grain: at high bake resolutions (>= 40 px/r: the master) the
     // standard octaves span many texels and the ground reads under-detailed up
     // close — one finer octave keys in on resolution alone.
     int fine_cells = 1;
     const double fine_cell = periodic_cell(0.155, fine_cells);
     const bool   fine_on   = nominal_s(g) >= 40.0;
     // BL-1254 (ground crisper): the crisp key, nominal-keyed — 0 below 40 px
-    // per hex (the far page bakes as before), full at the 96 px master. A
-    // fleck lattice of ~4 px at the master: sub-tile marks, close only.
+    // per hex (the far page bakes as before), full from 80 px (the 128 px
+    // master). A fleck lattice of ~6 px at the master: sub-tile marks, close only.
     const float  ck = p.crisp * static_cast<float>(std::clamp((nominal_s(g) - 40.0) / 40.0, 0.0, 1.0));
     int fleck_cells = 1;
     const double fleck_cell = periodic_cell(0.045, fleck_cells);
@@ -3285,7 +3285,7 @@ int choose_level(double draw_r)
     for (int k = k_level_count - 1; k > 0; --k)
         if (k_level_ppr[k] >= draw_r)
             return k;
-    return 0; // the master: minified up to 2:1, or magnified past 96 px
+    return 0; // the master: minified up to 2:1, or magnified past 128 px
 }
 
 void downsample_half(const std::uint32_t* src, int sw, int sh, std::uint32_t* dst)

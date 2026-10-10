@@ -1037,7 +1037,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // minified, < 1 magnified), the camera squash `sy` (the one angle), per-
     // slot cumulative bake ms / count since ground_stats_reset(), and per-slot
     // RAM and GPU bytes of the active body. Slot 0 = the far page, slot 1 + l
-    // = level l (1 = the 96 px master: its chunk bakes; 2..5 = the 48/24/12/6
+    // = level l (1 = the 128 px master: its chunk bakes; 2..5 = the 64/32/16/8
     // levels: mip pieces derived). `resident_bytes` = RAM + GPU, kept for old
     // scripts. Also: the active body's master progress, RAM across every
     // body, texture uploads since the reset, and the visible chunks still

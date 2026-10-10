@@ -227,7 +227,7 @@ void pool_row(const bake_source& src, const body_component& hb, int land_i, cons
     std::vector<win> jobs;
     struct tier { double ppr; double sy; int ss; };
     for (const tier t : { tier{ 24.0, 1.0, 2 }, tier{ 48.0, 1.0, 2 }, tier{ 48.0, k_tilt_sy, 2 },
-                          tier{ 96.0, 1.0, 1 } })
+                          tier{ k_master_ppr, k_tilt_sy, 1 } })
     {
         const geometry g = make_geometry(hb.grid_width, hb.grid_height, t.ppr, t.sy);
         bake_params prm = p;
@@ -285,10 +285,23 @@ void pool_row(const bake_source& src, const body_component& hb, int land_i, cons
 
 /// The whole-body master bake on the pool's thread count (RENDERING.md
 /// § Level of detail): every 512 px chunk of the master at @p ss, then its
-/// mip pieces. Returns the bake wall ms; prints the reading.
-double master_bake(const bake_source& src, const bake_params& p, int ss, const char* tag)
+/// mip pieces. Returns the bake wall ms; prints the reading. @p ppr other
+/// than the master's bakes a master-shaped image (aligned alike) at that
+/// resolution — the 96-vs-128 comparison reading (Ben, 2026-10-10).
+double master_bake(const bake_source& src, const bake_params& p, int ss, const char* tag,
+                   double ppr = k_master_ppr)
 {
-    const geometry g = make_master_geometry(src.gw, src.gh);
+    geometry g = make_master_geometry(src.gw, src.gh);
+    if (ppr != k_master_ppr)
+    {
+        g = make_geometry(src.gw, src.gh, ppr, k_tilt_sy);
+        const double period = src.gw * 1.7320508075688772;
+        const int A = k_master_align;
+        g.W = std::max(A, static_cast<int>(std::lround(period * ppr / A)) * A);
+        g.s = g.W / period;
+        const double y_max = 1.5 * (src.gh - 1) + 1.0;
+        g.H = (std::max(1, static_cast<int>(std::ceil((y_max - g.y_min) * g.s))) + A - 1) / A * A;
+    }
     bake_params prm = p;
     prm.supersample = ss;
     const int cw = (g.W + k_chunk_px - 1) / k_chunk_px;
@@ -346,7 +359,7 @@ double master_bake(const bake_source& src, const bake_params& p, int ss, const c
 /// the master geometry is aligned so every level is whole pixels and keeps
 /// the wrap; the chain built chunk by chunk equals the chain of the whole
 /// image; and the level chooser reads the coarsest level at or above the
-/// drawn radius (never past 2:1 minified; the master magnified past 96).
+/// drawn radius (never past 2:1 minified; the master magnified past 128).
 void master_row(const bake_source& src, const body_component& hb, int land_i, const bake_params& p)
 {
     const geometry m = make_master_geometry(hb.grid_width, hb.grid_height);
@@ -408,7 +421,7 @@ void master_row(const bake_source& src, const body_component& hb, int land_i, co
                         c.data() + static_cast<std::size_t>(y) * cs, static_cast<std::size_t>(cs) * 4u);
     }
     check(chunk_eq_bake, "P22", "a master chunk bakes byte-identical to its quadrant of a 2x2-chunk window (no chunk seam)");
-    check(placed == wl, "P22", "the mip chain built chunk by chunk equals the whole image's chain to the 6 px level");
+    check(placed == wl, "P22", "the mip chain built chunk by chunk equals the whole image's chain to the 8 px level");
     {
         std::vector<std::uint32_t> flat(16, 0xFF204060u), half(4);
         downsample_half(flat.data(), 4, 4, half.data());
@@ -417,11 +430,13 @@ void master_row(const bake_source& src, const body_component& hb, int land_i, co
     }
 
     // The chooser. Rung radii at 1720x1080 (drawn: 6.93 / 13.87 / 27.73 /
-    // 55.47 / 110.66) and 3840x2160 (14.0 ... 223.41).
+    // 55.47 / 110.66) and 3840x2160 (14.0 ... 223.41). The 128 px ladder
+    // (Ben, 2026-10-10): 8 / 16 / 32 / 64 / 128, so the reference window's
+    // five rungs read levels 4 / 3 / 2 / 1 / 0, every one minified.
     const struct { double r; int want; } rows[] = {
-        { 3.0, 4 }, { 5.93, 4 }, { 6.0, 4 }, { 6.01, 3 }, { 6.93, 3 }, { 12.0, 3 }, { 12.5, 2 },
-        { 13.87, 2 }, { 14.0, 2 }, { 24.5, 1 }, { 27.73, 1 }, { 48.5, 0 }, { 55.47, 0 },
-        { 96.0, 0 }, { 110.66, 0 }, { 223.41, 0 },
+        { 3.0, 4 }, { 6.93, 4 }, { 8.0, 4 }, { 8.01, 3 }, { 13.87, 3 }, { 16.0, 3 }, { 16.5, 2 },
+        { 27.73, 2 }, { 28.0, 2 }, { 32.0, 2 }, { 32.5, 1 }, { 55.47, 1 }, { 64.0, 1 },
+        { 64.5, 0 }, { 110.66, 0 }, { 128.0, 0 }, { 223.41, 0 },
     };
     bool all = true;
     for (const auto& row : rows)
@@ -438,7 +453,12 @@ void master_row(const bake_source& src, const body_component& hb, int land_i, co
         if (ppr / r < 1.0) never_mag = false;
         if (ppr / r > 2.0) within_2 = false;
     }
-    check(never_mag && within_2, "P22", "every radius from 6 to 96 px reads a level minified by 1:1 to 2:1");
+    check(never_mag && within_2, "P22", "every radius from 8 to 128 px reads a level minified by 1:1 to 2:1");
+    // RENDERING.md § Level of detail: no rung magnifies at the reference window.
+    bool ref_min = true;
+    for (const double r : { 6.93, 13.87, 27.73, 55.47, 110.66 })
+        ref_min = ref_min && k_level_ppr[choose_level(r)] >= r;
+    check(ref_min, "P22", "no rung of the reference 1720x1080 window magnifies (its top rung reads the master minified)");
 }
 
 /// P23 - the lock fast path (BL-1246): a window wholly inside survey-masked
@@ -1013,7 +1033,7 @@ void patch_row(const bake_source& src, const bake_params& p)
                 chunk_px ? 100.0 * patch_px / chunk_px : 0.0);
     check(inv_ok, "P24", "windows around installations re-baked and blitted leave a whole-chunk bake byte-identical");
     check(p24_ok, "P24", "a chunk patched by the window rule equals the chunk baked whole after the change");
-    check(p25_ok, "P25", "the windows' own mip pieces, placed, equal the whole chunk's chain at 48/24/12/6");
+    check(p25_ok, "P25", "the windows' own mip pieces, placed, equal the whole chunk's chain at 64/32/16/8");
 }
 
 } // namespace
@@ -2043,6 +2063,9 @@ int main(int argc, char** argv)
         const bake_source masked = prepare_source(w, home, /*reveal_all=*/false);
         master_bake(masked, p, 1, "masked");
         master_bake(src, p, 1, "revealed");
+        // The 96 px master this replaced, same pool and alignment (a reading).
+        master_bake(masked, p, 1, "masked@96", 96.0);
+        master_bake(src, p, 1, "revealed@96", 96.0);
         // An unsurveyed body: every tile the lock fill.
         for (const auto& [id, bd] : w.bodies)
             if (bd.grid_width > 0 && bd.survey.phase == survey_phase::hidden)
@@ -2094,7 +2117,7 @@ int main(int argc, char** argv)
         bake_params v_off = p;
         v_off.variant_strength = 0.0f;
         std::vector<std::uint32_t> tb(512u * 512u);
-        for (double tp : { 6.0, 12.0, 24.0, 48.0, 96.0 })
+        for (double tp : { k_far_ppr, k_level_ppr[3], k_level_ppr[2], k_level_ppr[1], k_master_ppr })
         {
             const geometry gt = make_geometry(hb.grid_width, hb.grid_height, tp);
             const int cw = std::min(512, gt.W), ch = std::min(512, gt.H);
@@ -2467,7 +2490,7 @@ int main(int argc, char** argv)
             const int aim = plain_i >= 0 ? plain_i : land_i;
             const int ar = aim / src.gw, ac = aim % src.gw;
             const double ax = 1.7320508075688772 * (ac + ((ar & 1) ? 0.5 : 0.0));
-            for (double tp : { 6.0, 12.0, 24.0, 48.0, 96.0 })
+            for (double tp : { k_far_ppr, k_level_ppr[3], k_level_ppr[2], k_level_ppr[1], k_master_ppr })
             {
                 if (!timing)
                     break;
@@ -2708,7 +2731,8 @@ int main(int argc, char** argv)
     {
         const int lr = land_i / src.gw, lc = land_i % src.gw;
         const double lx = 1.7320508075688772 * (lc + ((lr & 1) ? 0.5 : 0.0));
-        const double ladder[] = { k_far_ppr, 12.0, 24.0, 48.0, 96.0 };
+        const double ladder[] = { k_far_ppr, k_level_ppr[4], k_level_ppr[3], k_level_ppr[2],
+                                  k_level_ppr[1], k_master_ppr };
         std::vector<std::uint32_t> buf(512u * 512u);
         for (const double ppr : ladder)
         {

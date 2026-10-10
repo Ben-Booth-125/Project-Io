@@ -21,8 +21,8 @@
 -- fringe of trees, a hedge or furrowed headland, a pale shelf and shallows),
 -- and nothing that reads as a drawn hex outline. The mountain run is
 -- landform_relief.lua's best-linked range. The two close rungs (zoom 10 =
--- the 48 px tier at 22.5 degrees, zoom 20 = the 96 px tier at 45 degrees)
--- carry the read. Slow under a Debug build (every chunk bakes synchronously
+-- the 64 px level, zoom 20 = the 128 px master, both at the one 22.5 degree
+-- angle) carry the read. Slow under a Debug build (every chunk bakes synchronously
 -- at 2x supersample): allow several minutes per capture.
 
 verify.window(1720, 1080)
