@@ -83,25 +83,26 @@ colour32 tile_colour(terrain_substrate sub, terrain_cover cov, std::uint8_t dens
     return blend_round(base, cover_endpoint(cov), cover_fraction(density));
 }
 
-// BL-1256 (ground look C-F): the baked ground's palette. Values chosen against
-// the it3 C-F reference's sampled ground (RENDERING.md § Art direction and
-// palette): flat ground a khaki-grey, vegetation an olive barely greener than
-// the soil, forest a dark olive, water a grey-blue — the grade and the relief
-// then spread them from near black to a warm off-white.
+// BL-1256 (ground look): the baked ground's palette. Detail from it3 C-F,
+// COLOUR from it1 (RENDERING.md § Art direction and palette): fields and soil
+// a warm khaki-ochre, grassland an olive-khaki, forest a rich green, water a
+// blue-green teal, snow and ice white. Each entry keeps the luminance the C-F
+// pass tuned (the value structure is it3's) and takes it1's hue and chroma —
+// the grade and the relief then spread them from near black to off-white.
 colour32 ground_substrate_colour(terrain_substrate sub)
 {
     switch (sub)
     {
-        case terrain_substrate::barren:      return col32( 74,  68,  55, 255);
-        case terrain_substrate::rocky:       return col32( 66,  64,  58, 255);
-        case terrain_substrate::volcanic:    return col32( 52,  48,  44, 255);
-        case terrain_substrate::icy:         return col32(160, 166, 168, 255);
-        case terrain_substrate::ocean:       return col32( 36,  47,  55, 255);
-        case terrain_substrate::coast:       return col32( 50,  63,  70, 255);
-        case terrain_substrate::lake:        return col32( 44,  57,  64, 255);
-        case terrain_substrate::regolith:    return col32( 68,  66,  61, 255);
-        case terrain_substrate::metallic:    return col32( 70,  69,  65, 255);
-        case terrain_substrate::sedimentary: return col32( 73,  68,  56, 255);
+        case terrain_substrate::barren:      return col32( 84,  68,  42, 255);
+        case terrain_substrate::rocky:       return col32( 70,  64,  52, 255);
+        case terrain_substrate::volcanic:    return col32( 56,  48,  42, 255);
+        case terrain_substrate::icy:         return col32(176, 180, 182, 255);
+        case terrain_substrate::ocean:       return col32( 22,  50,  58, 255);
+        case terrain_substrate::coast:       return col32( 36,  66,  70, 255);
+        case terrain_substrate::lake:        return col32( 30,  60,  66, 255);
+        case terrain_substrate::regolith:    return col32( 72,  65,  54, 255);
+        case terrain_substrate::metallic:    return col32( 73,  68,  60, 255);
+        case terrain_substrate::sedimentary: return col32( 82,  67,  42, 255);
     }
     return col32(60, 60, 60, 255);
 }
@@ -110,15 +111,15 @@ colour32 ground_cover_endpoint(terrain_cover c)
 {
     switch (c)
     {
-        case terrain_cover::grass:  return col32( 56,  60,  43, 255);
-        case terrain_cover::forest: return col32( 32,  38,  29, 255);
-        case terrain_cover::marsh:  return col32( 42,  48,  39, 255);
-        case terrain_cover::scrub:  return col32( 57,  58,  45, 255);
-        case terrain_cover::snow:   return col32(184, 188, 190, 255);
-        case terrain_cover::dunes:  return col32(100,  92,  72, 255);
-        case terrain_cover::ash:    return col32( 45,  44,  42, 255);
-        case terrain_cover::salt:   return col32(148, 145, 137, 255);
-        case terrain_cover::urban:  return col32( 64,  62,  60, 255);
+        case terrain_cover::grass:  return col32( 66,  59,  34, 255);
+        case terrain_cover::forest: return col32( 30,  42,  20, 255);
+        case terrain_cover::marsh:  return col32( 38,  50,  36, 255);
+        case terrain_cover::scrub:  return col32( 64,  59,  36, 255);
+        case terrain_cover::snow:   return col32(198, 201, 202, 255);
+        case terrain_cover::dunes:  return col32(114,  94,  60, 255);
+        case terrain_cover::ash:    return col32( 46,  44,  41, 255);
+        case terrain_cover::salt:   return col32(152, 146, 132, 255);
+        case terrain_cover::urban:  return col32( 66,  62,  58, 255);
         case terrain_cover::none:   break;
     }
     return col32(0, 0, 0, 0);

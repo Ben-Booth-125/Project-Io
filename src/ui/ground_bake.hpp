@@ -222,9 +222,15 @@ struct bake_params
     float glint_strength  = 1.0f;
     float rapids_strength = 1.0f;
     float bank_rocks      = 1.0f;
+    /// Snowy peaks (it1's white caps): snow on the mountain form's high
+    /// ground, where the form rises past a snow line that falls as the tile
+    /// stands higher (snow_line is the tile height at which the line meets
+    /// the form's mid-flank). 0 = no caps.
+    float snow_caps       = 1.0f;
+    float snow_line       = 0.74f;
     // Near-future grade (the separable pass).
     bool  grade_enabled   = true;
-    float grade_desat     = 0.42f;  ///< Toward luma.
+    float grade_desat     = 0.15f;  ///< Toward luma (C-F 0.42; eased for it1's colour, BL-1256).
     float grade_cool[3]   = { 0.99f, 1.00f, 1.00f }; ///< Channel multipliers (r,g,b).
     float grade_lift      = 0.02f;  ///< Haze floor: lift toward the cool haze colour.
     /// The S-curve on luminance (BL-1256): exponent of the two power halves
