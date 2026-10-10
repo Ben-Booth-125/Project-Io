@@ -985,16 +985,16 @@ economy = {
     -- documented on research_params in src/world/nation_tech.hpp). A nation's RP
     -- per quarter = base + credit x spend + credit_sqrt x sqrt(spend) + per
     -- University + per institute, and the research line spends only what its
-    -- queue still owes. The SHAPE is these dials: linear today (base 0, sqrt 0).
-    -- First cut; nation_tech_harness's R0 pacing rows are the measurement. The
+    -- queue still owes. The SHAPE is these dials: base + sqrt (Ben, 2026-10-10).
+    -- 200 RP a cost unit: an age is ~80 years (Ben, 2026-10-10); harness R0 measures it. The
     -- loader rejects a negative or non-finite value by key.
     research = {
-        base_rp_per_nation          = 0.0,
-        rp_per_research_credit      = 12.0,
-        rp_per_research_credit_sqrt = 0.0,
+        base_rp_per_nation          = 120.0,
+        rp_per_research_credit      = 0.0,
+        rp_per_research_credit_sqrt = 20.0,
         rp_per_university           = 100.0, -- unmeasured: no University stands on any curated seed
         rp_per_institute            = 50.0,  -- unmeasured: likewise
-        rp_per_cost_unit            = 100.0,
+        rp_per_cost_unit            = 200.0,
     },
 
     -- BL-545/BL-546: the relational substrate's DECAY (sentiment.hpp). Each

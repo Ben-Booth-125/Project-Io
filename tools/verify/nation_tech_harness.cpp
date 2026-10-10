@@ -36,7 +36,7 @@
 // Usage: nation_tech_harness [--seeds N | --seed-list a,b,...] [--quarters Q] [--once]
 //                            [--base X] [--lin Y] [--sqrt Z] [--unit U]
 //   --seeds 0   fixture rows only (R1-R3) — the ctest invocation.
-//   default     all 16 library seeds, 16 live quarters, each seed built twice,
+//   default     all 16 library seeds, 32 live quarters, each seed built twice,
 //               on the registry's research dials (scripts/economy.lua) unless
 //               --base/--lin/--sqrt/--unit override them for a measurement.
 //
@@ -496,6 +496,7 @@ struct nation_row
     bool      source          = false;///< Some RP source at the seat (line share, building, base).
     double    rp_live         = 0.0;  ///< RP accrued over the live window.
     double    spend_live      = 0.0;  ///< Credits the research line spent over the window.
+    double    full_rp         = 0.0;  ///< RP it WOULD convert over the window spending its whole share every quarter.
     int       held_end        = 0;
 };
 
@@ -605,6 +606,11 @@ seed_run run_seed(std::uint32_t seed, int quarters, const dial_override& ov)
             nation_row& r = rows[a.nation];
             r.rp_live    += static_cast<double>(a.rp_milli) / 1000.0;
             r.spend_live += a.line_spend;
+            {   // the whole-tree rate: the base plus the line spending its WHOLE share
+                const double sh = std::max(0.0, static_cast<double>(a.line_share));
+                r.full_rp += p.base_rp_per_nation + p.rp_per_research_credit * sh
+                           + p.rp_per_research_credit_sqrt * std::sqrt(sh);
+            }
         }
         for (const entity_id nid : nids)
         {
@@ -655,6 +661,7 @@ void rows_r0(const std::vector<std::uint32_t>& seeds, int quarters, bool twice, 
     int  fails = 0;
     std::vector<double> q_src;  // quarters-to-major, nations with a source (never = quarters+1)
     std::vector<double> rp_src, spend_src;
+    double best_full = 0.0; // the richest nation's whole-share RP per quarter
     int src_n = 0, src_done = 0, total = 0;
     research_params used{};
     for (const std::uint32_t s : seeds)
@@ -687,6 +694,7 @@ void rows_r0(const std::vector<std::uint32_t>& seeds, int quarters, bool twice, 
             q_src.push_back(q);
             rp_src.push_back(r.rp_live / quarters);
             spend_src.push_back(r.spend_live / quarters);
+            best_full = std::max(best_full, r.full_rp / quarters);
         }
         src_n += s_src;
         src_done += s_done;
@@ -722,11 +730,21 @@ void rows_r0(const std::vector<std::uint32_t>& seeds, int quarters, bool twice, 
                 pct(rp_src, 0.1), pct(rp_src, 0.5), pct(rp_src, 0.9), pct(rp_src, 1.0),
                 pct(spend_src, 0.5), pct(spend_src, 0.9));
     constexpr double k_min_reach = 0.90;
-    std::printf("  thresholds: >= %.0f%% reach it in %d; median in [8, 12]; p10 >= 4\n",
-                100.0 * k_min_reach, quarters);
-    check(frac >= k_min_reach, "R0g PACING: >= 90% of nations with a source reach their first ring-2 major in 16 quarters");
-    check(med_q >= 8.0 && med_q <= 12.0, "R0h PACING: the median nation reaches it in 8-12 quarters");
-    check(fast_q >= 4.0, "R0i PACING: the fastest decile takes no fewer than ~4 quarters");
+    // The targets scale with the RP unit: set at 100 RP a unit (16 quarters, median 8-12, p10 >= 4),
+    // and Ben's 200 (an age is ~80 years) doubles them. --quarters should be 16 x the scale.
+    const double sc = used.rp_per_cost_unit / 100.0;
+    double tree_units = 0.0;
+    for (int n = 0; n < io::dg::node_count; ++n) tree_units += io::dg::nodes[static_cast<std::size_t>(n)].cost_units;
+    const double tree_q = best_full > 0.0 ? tree_units * used.rp_per_cost_unit / best_full : -1.0;
+    std::printf("  the richest nation, spending its whole research share every quarter, converts %.1f RP a quarter:\n"
+                "  the whole tree (%.0f units, %.0f RP) in %.0f quarters (%.1f years).\n",
+                best_full, tree_units, tree_units * used.rp_per_cost_unit, tree_q, tree_q / 4.0);
+    std::printf("  thresholds: >= %.0f%% reach it in %d; median in [%.0f, %.0f]; p10 >= %.0f\n",
+                100.0 * k_min_reach, static_cast<int>(16 * sc), 8 * sc, 12 * sc, 4 * sc);
+    check(quarters >= static_cast<int>(16 * sc) && frac >= k_min_reach,
+          "R0g PACING: >= 90% of nations with a source reach their first ring-2 major in 16 x scale quarters");
+    check(med_q >= 8.0 * sc && med_q <= 12.0 * sc, "R0h PACING: the median nation reaches it in 8-12 x scale quarters");
+    check(fast_q >= 4.0 * sc, "R0i PACING: the fastest decile takes no fewer than ~4 x scale quarters");
 }
 
 } // namespace
@@ -734,7 +752,7 @@ void rows_r0(const std::vector<std::uint32_t>& seeds, int quarters, bool twice, 
 int main(int argc, char** argv)
 {
     int  seed_count = 16;
-    int  quarters   = 16;
+    int  quarters   = 32; // 16 x the RP-unit scale (200 / 100)
     bool twice      = true;
     dial_override ov;
     std::vector<std::uint32_t> seeds;

@@ -47,12 +47,14 @@ class recipe_registry;
 ///   + rp_per_university x Universities + rp_per_institute x institutes
 ///
 /// all times `research_multiplier`. Its SHAPE is a dial change, not a code
-/// change: the defaults below are the linear first cut (base 0, sqrt 0), and a
-/// concave or floored conversion is a matter of setting the other two terms.
-/// Why the shape is open: treasuries span orders of magnitude, so a linear
-/// conversion tuned to the median nation lets the richest buy the tree in
-/// about three years while a quarter of nations never reach a major
-/// (nation_tech_harness's R0 pacing rows print the measurement).
+/// change. The defaults are Ben's ruling (2026-10-10): base + sqrt — 120 RP a
+/// quarter for every nation plus 20 x sqrt(credits the line spends), linear 0,
+/// 200 RP per cost unit (an age is about 80 years; Ben's correction of the
+/// 100-RP measurement, which ran about twice too fast). Why a base and a
+/// concave term: treasuries span orders of magnitude, and about a third of
+/// nations have almost none, so no line-only conversion reaches them; a
+/// linear one lets the richest buy the tree in quarters. nation_tech_harness
+/// R0 measures it on the 16 curated seeds.
 ///
 /// THE LINE PAYS WHAT THE QUEUE OWES. The academic-research line spends
 /// min(its share, the credits that would buy the RP the queue still owes) —
@@ -64,18 +66,18 @@ class recipe_registry;
 struct research_params
 {
     /// RP every nation gets each quarter, at no treasury cost.
-    float base_rp_per_nation = 0.0f;
+    float base_rp_per_nation = 120.0f;
     /// RP per credit the academic-research budget line spends (the linear term).
-    float rp_per_research_credit = 12.0f;
+    float rp_per_research_credit = 0.0f;
     /// RP per sqrt(credit) the line spends (the concave term).
-    float rp_per_research_credit_sqrt = 0.0f;
+    float rp_per_research_credit_sqrt = 20.0f;
     /// RP per quarter per completed University standing in the nation's territory.
     float rp_per_university = 100.0f;
     /// RP per quarter per completed research institute whose owner corp's home
     /// nation is this nation (NR-1023: the institute's corp `science` folds in).
     float rp_per_institute = 50.0f;
     /// The RP unit: a node costs `cost_units x rp_per_cost_unit`.
-    float rp_per_cost_unit = 100.0f;
+    float rp_per_cost_unit = 200.0f;
 };
 
 /// RP are held in MILLI-RP, an integer: a pool accrues small increments for
