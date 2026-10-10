@@ -473,7 +473,7 @@ Infrastructure buildings affect logistical or economic capacity rather than extr
 | Launchpad | Required to dispatch convoys to off-world bodies; consumes propellant per launch | 0 (built), 1 (operational) |
 | Inland Logistics Hub | Land-mode logistics node (`building_type::inland_logistics_hub`, BL-149): its tile joins the population-centre set that discounts the A\* haul cost of any intra-body convoy routed through it (LOGISTICS.md). The player-placeable counterpart to a city's free-hub discount — extends the cheap land network out to remote sites. Produces nothing (0 workforce); cost in `economy.buildings.inland_logistics_hub`. | 0 |
 | Military Base | Unit muster building (`building_type::military_base`, BL-325). Produces nothing, staffs at zero, and is deliberately **not** a supply anchor — military reach IS the economic reach field. `docs/military/MILITARY.md`. | any |
-| Research Institute | The "how does tech get done" building (`building_type::research_institute`, BL-332). Passive: a flat per-tick credit to its owner's `corporation_component::science`, a market-invisible accumulator, not a resource. | any |
+| Research Institute | The "how does tech get done" building (`building_type::research_institute`, BL-332). Passive: it adds research points each quarter to its owner's nation's research pool (`RESEARCH.md` § Research points); RP are not a resource and never reach a market. | any |
 | Schooling | Education building any settlement can host (`building_type::schooling`, BL-615 — stratum placement gates). Passive like the Research Institute; its qualification-raising effect belongs to POPULATION.md § Qualification. Placement is what defines it: it must stand **in** a population centre, of any stratum (POPULATION.md § Strata gate buildings). | any |
 | University | The Schooling building's City-tier sibling (`building_type::university`, BL-615). Passive; must stand in a centre of stratum **City (4) or above** — "you can't build a university in a town" (Ben, 2026-08-25). | any |
 | Orbital Port | Receives off-world convoys; required on any non-terrestrial body to accept supply | 1 |
@@ -1033,25 +1033,19 @@ note saying so, because a write with no read is otherwise indistinguishable from
 Guard: `tools/verify/chain_depth.cpp` — D1–D6 for the metric, G1 and G4 for required depth, G5 for
 the tick-0 opening. Measured on the authored recipes, the ancient ladder reaches **depth 3**.
 
-**`tech_locked` reaches a recipe too, now** (BL-588, 2026-08-24). Until this item `tech_locked`
-only ever meant a *building type* was ungated — the effect union (`tech_gate.hpp`) had no arm that
-could name a recipe. `unlock_recipe` is the third arm: a tech gate names a `recipe::name`
-(`tech_gate::unlocks_recipe`), and `recipe_unlocked(w, reg, corp, recipe_id)` resolves the id to
-that name and checks it against `world::has_tech`, at both `construct_building` (returning the
+**`tech_locked` reaches a recipe as well as a building type** (BL-588). `unlock_recipe` is a node
+effect arm beside the structure unlock: a node names a `recipe::name`, and
+`recipe_unlocked(w, reg, corp, recipe_id)` (`src/world/nation_tech.hpp`) resolves the id to that
+name and asks whether the corp's home nation holds the node, at both `construct_building` (returning the
 SAME `construction_result::tech_locked` the structure-level check already used) and
 `try_switch_recipe` (a new `recipe_switch_result::tech_locked`). It is checked at **both** doors,
 and that is not redundancy: guarding only placement would leave a one-click bypass — place an
 ungated method, retool onto the locked sibling in the same group, and the lock never has to be
 cleared. **`tech_locked` is the only recipe-level lock**; the era band decides which roster a
 campaign sees, and within that roster tech decides what a corp may run.
-First-cut authored gates (`tech_gate.cpp`): `E0-EC-01` unlocks the Toolmaker (BL-586) on owning a
-processing facility and a Cr 500 surplus; `E1-EC-01` unlocks the Bessemer Converter (BL-587) on
-already holding `machinery` in stockpile — the Converter's own reagent, not a cash figure, after a
-surplus-only first draft proved satisfiable by any solvent corp regardless of what it had actually
-built (caught by `tech_gate_harness`'s T3 fixture, corrected before landing); `E0-EC-03` unlocks
-`refined_copper` (BL-589) on owning a processing facility and a Cr 400 surplus — the roster's
-widest anachronism before this gate, since `refined_copper` is `any`-band at required depth 0 and
-could be smelted for free on tick one of an ancient campaign with no ancient identity to it at all.
+A recipe no node unlocks is open to every nation. The Toolmaker (BL-586), the Bessemer Converter
+(BL-587) and `refined_copper` (BL-589) are open to every nation from the start — NR-1022 (old gates
+open, Ben, 2026-10-10).
 
 **The Build door filters a tech-locked recipe out, the same way it does an era-locked one**
 (BL-593, 2026-08-24). The door's candidate filter (`selection_panel.cpp`) carries two clauses —
@@ -1059,9 +1053,8 @@ could be smelted for free on tick one of an ancient campaign with no ancient ide
 stated in the code's own comment: *"the door not showing what the gate would refuse."* Filtered was the ruled choice over
 shown-and-locked (Ben, 2026-08-24, same elicitation form as the opening ruling) — the alternative
 would have needed a new lock-reason string and a UI affordance the door doesn't have yet; the
-existing precedent already answers the question the same way. `refined_copper` is the first recipe
-this clause actually removes — every earlier tech gate targeted a `building_type`, never a recipe,
-so the branch was dead code on every campaign before `E0-EC-03`.
+existing precedent already answers the question the same way. The clause removes a recipe only
+where a node unlocks it and the corp's nation does not hold that node.
 
 **Depth has no player-facing readout.** It is an internal measure of the recipe graph and of what
 a corp has produced; no surface displays a reached-depth number, and none needs to, because the
@@ -1076,8 +1069,8 @@ Ben's steer authoring Sprint 17: *"most building types, and most recipes are not
 game start."* The opposite is now the design (Ben, 2026-08-29): a corp may run **any method its
 tech permits**, so the start gate is a **tech** question and nothing else.
 
-A fresh ancient corp — no tech earned, no buildings, no balance — sees **sixteen** of the ancient
-band's nineteen processing recipes open on tick one:
+A fresh ancient corp — its nation holding no node, no buildings, no balance — sees the ancient
+band's processing recipes open on tick one:
 
 | Group | Open at tick 0 | Why |
 |---|---|---|
@@ -1087,12 +1080,12 @@ band's nineteen processing recipes open on tick one:
 | Construction Materials | Potter's Kiln, Stonemason, Sawmill | BL-586's slice-1 buildings — foundational, not earned content. |
 | Metal Foundry | Bloomery Furnace (ore + timber → steel, the band's depth-one route), Bloomery, and the Smithy's two routes (steel, ordnance) | Open. The Furnace needs only raws; the bloom chain is limited by charcoal supply and by whether blooms find a buyer — a market fact, not a refusal. |
 | Advanced Fabrication | Shipwright | Open, and shut in practice by its own inputs: it draws `planks` and `cloth`, and the shipped ancient world produces no planks. |
-| **The one closure** | *(Toolmaker — tech)* | `E0-EC-01` "Tool-and-Die Practice" gates the Toolmaker on owning a processing facility and a Cr 500 surplus. A fresh corp meets neither. |
+| Toolmaker | Toolmaker | Open to every nation from the start — NR-1022 (old gates open). |
 
-**Exactly one ancient recipe is closed at tick 0, and tech closes it.** That is the whole shape of
-the start gate now. `refined_copper` is absent from the ancient band entirely — it carries an
-`industrial` era tag, so the band never lists it (an earlier reading had it closed by `E0-EC-03`
-instead; both close it, and the era tag closes it first).
+**No ancient recipe is closed at tick 0 by tech.** That is the whole shape of the start gate.
+`refined_copper` is absent from the ancient band entirely — it carries an `industrial` era tag, so
+the band never lists it.
+
 
 **An open method is not a viable one, and the difference matters.** Most of what opened is limited
 by supply rather than permission: the Shipwright needs planks nothing makes, and the Bloomery's

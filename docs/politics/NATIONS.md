@@ -312,8 +312,7 @@ economic premise already assumes nations that act.
 
 `run_nation_step` (`src/world/nation_step.{hpp,cpp}`) is where a nation acts. It runs **after
 `apply_budget`** — the treasury holds this quarter's levy and tariff only then; running it inside
-`run_economy_step` would spend last quarter's revenue — and **before `advance_tech_gates`**, whose
-`surplus` gate reads the corp balance a subsidy has just moved. Four moves, in order, and each is
+`run_economy_step` would spend last quarter's revenue. Four moves, in order, and each is
 somebody else's machinery:
 
 1. **Score.** `score_national_budgets` returns a weight vector for exactly the nations **due** on
@@ -334,6 +333,10 @@ somebody else's machinery:
    spend on a build. A dispatch that cannot proceed (the body was surveyed by someone else this
    very tick) is recorded on the report as a failed earmark and its credit **clawed back** to the
    treasury — a nation does not pay for a survey that did not start.
+
+**Research is the step's last move.** `advance_research` (`src/world/nation_tech.hpp`) runs after
+every other move in the step: the academic-research line pays what the queue still
+owes, and the pool flows down the queue (`docs/economy/RESEARCH.md` § Research points).
 
 The cadence key is `world::current_econ_tick` — the quarter counter, never the day tick.
 

@@ -164,7 +164,7 @@ Once per economy tick, per scope, in sorted order:
    deterministic).
 2. Filter by cooldown, at chain grain.
 3. Draw one, or none, from a **stream folded from `(world_seed, tick, scope_id)`**.
-4. Apply the effect through `modified_scalar` or a named consequence, or hold it pending the
+4. Apply the effect through a scalar modifier (`apply_scalar_modifier`) or a named consequence, or hold it pending the
    player's choice.
 5. **Tell the player.**
 
@@ -267,7 +267,8 @@ event record carries a successor and a chain-grain cooldown.
 | Concern | File |
 |---|---|
 | The predicate | `src/world/condition_set.{hpp,cpp}` |
-| The effect | `src/world/modifier_set.hpp`, `world.hpp` § `modified_scalar` |
+| The effect | `src/world/modifier_set.hpp` § `apply_scalar_modifier` |
+
 | The seeded-stream precedent | `src/world/campaign_battle.cpp` |
 | The surface | `src/ui/chat_panel.cpp` (the comms dock) |
 | Authored event data | `scripts/`, alongside the recipes and the tech tree |

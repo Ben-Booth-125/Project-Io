@@ -305,10 +305,10 @@ class of refusal never becomes a row at all: `construction_result::era_locked` a
 BL-593) `tech_locked` are filtered out of the candidate list before it renders, on one repeated
 argument stated in the filter's own code comment — *"the door not showing what the gate would
 refuse."* The two lock kinds resolve differently (never available in this campaign at all /
-earned by research, PRODUCTION.md § Chain depth) but share the same door-side treatment: not a
-reason string, an absent row. `refined_copper` (`E0-EC-03`, BL-589) was the first recipe the
-tech clause actually removed — every earlier tech gate targeted a `building_type`, never a
-recipe, so the branch was dead code until then. Filtered was the ruled choice over
+held by the corp's nation through research, PRODUCTION.md § Chain depth) but share the same
+door-side treatment: not a reason string, an absent row. The tech clause removes a recipe only
+where a node unlocks it and the corp's nation does not hold that node. Filtered was the ruled choice over
+
 shown-and-locked (Ben, 2026-08-24) — extending the existing era precedent rather than adding a
 new lock-reason string and UI affordance.
 
