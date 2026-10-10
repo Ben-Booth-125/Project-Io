@@ -40,16 +40,16 @@ harnesses.
 `digitisation_tree_data.hpp` + `tools/session/gen_tech_tree_table.js`, `world.hpp`,
 `components.hpp`, `nation_step.cpp`, `world_save.*`, `tech_gate.*`, `condition_set.cpp`, the band
 call sites, `economy_system.cpp` (science), new `tools/verify/nation_tech_harness.cpp`.
-- [ ] C1 Generator: store JSON → `digitisation_tree_data.hpp` (ids, tier, ring, cost units,
+- [x] C1 Generator: store JSON → `digitisation_tree_data.hpp` (ids, tier, ring, cost units,
   requirement groups, excludes, deed key, effect slots).
-- [ ] C2 `nation_tech_state` per nation: held bitset, pool, queue, in-progress remainder; saved at a
+- [x] C2 `nation_tech_state` per nation: held bitset, pool, queue, in-progress remainder; saved at a
   bumped `world_save_version` (`next_save_version.js`).
-- [ ] C3 Accrual: budget line + staffed Universities + research institutes → pool, per quarter;
+- [x] C3 Accrual: budget line + staffed Universities + research institutes → pool, per quarter;
   corp `science` folds in (NR-1023).
-- [ ] C4 Queue: enqueue-with-prerequisites, head funding, overflow, deed-waiting quests, pair guard.
-- [ ] C5 Retire `earned_techs`/gates/Lua tree (NR-1022); every consumer reads the nation's tree;
+- [x] C4 Queue: enqueue-with-prerequisites, head funding, overflow, deed-waiting quests, pair guard.
+- [x] C5 Retire `earned_techs`/gates/Lua tree (NR-1022); every consumer reads the nation's tree;
   band fixed `industrial` (ERAS.md).
-- [ ] C6 `nation_tech_harness`: R0–R3 rows; `save_roundtrip`; `world_determinism` x2.
+- [x] C6 `nation_tech_harness`: R0–R3 rows; `save_roundtrip`; `world_determinism` x2.
   provides: `nation_tech_state`, `nation_holds(w, nation, node)`, `enqueue_node`,
   `advance_research(w)`, `dg::nodes[]`, `dg::effect` slots.
   consumes: nothing from lane G.
