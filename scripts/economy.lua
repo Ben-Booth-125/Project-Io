@@ -587,17 +587,19 @@ economy = {
             -- AND BUILDING MATERIALS, bought off their own market's shelf like any
             -- upkeep; a trade building whose upkeep goes unmet that tick makes no
             -- trade points (TRADE.md § The Planetary Marketplace). Fuel is the
-            -- band's fuel (charcoal ancient, refined fuel industrial); building
+            -- band's bulk fuel (charcoal ancient, coal industrial — refined fuel was tried first and
+            -- stood over the fair-price ceiling at every Marketplace's market on the 16-seed gate, so no
+            -- trade building ever met its upkeep); building
             -- materials are the repair line's timber and stone. First cut, sized
             -- at roughly a fifth of each building's credit maintenance at authored
             -- base prices — proposed for Ben with the capacity table (BL-1270).
             port = {
                 ancient    = { charcoal = 0.10, timber = 0.10, stone = 0.10 },     -- 0.65 + 0.15 + 0.10 = 0.90
-                industrial = { refined_fuel = 0.08, timber = 0.10, stone = 0.10 }, -- 1.25 + 0.15 + 0.10 = 1.50
+                industrial = { coal = 0.40, timber = 0.10, stone = 0.10 }, -- 0.80 + 0.15 + 0.10 = 1.05
             },
             planetary_marketplace = {
                 ancient    = { charcoal = 0.15, timber = 0.15, stone = 0.15 },     -- 0.98 + 0.23 + 0.15 = 1.36
-                industrial = { refined_fuel = 0.10, timber = 0.15, stone = 0.15 }, -- 1.56 + 0.23 + 0.15 = 1.94
+                industrial = { coal = 0.60, timber = 0.15, stone = 0.15 }, -- 1.20 + 0.23 + 0.15 = 1.58
             },
         },
     },

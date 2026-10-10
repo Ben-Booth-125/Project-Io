@@ -483,6 +483,13 @@ struct seed_reading
     double t_points = 0.0, t_spent = 0.0, t_units = 0.0;
     long long t_ship_manual = 0, t_ship_auto = 0, t_refused_lp = 0;
     int t_ticks = 0, t_corps_max = 0, t_marketplaces_t50 = 0, t_ports_t50 = 0;
+    // Why a trade building is silent at t50 (first reason that applies):
+    // decommissioned, no workforce target, no effective staffing, upkeep unmet,
+    // else making points.
+    int t_mp_decom = 0, t_mp_notarget = 0, t_mp_unstaffed = 0, t_mp_unmet = 0, t_mp_making = 0;
+    // For an upkeep-unmet Marketplace: which basket good its market could not
+    // supply at t50 (empty shelf, or posted over the fair-price ceiling).
+    int t_short_empty[resource_count] = {}, t_short_ceiling[resource_count] = {};
     double secs_build = 0.0, secs_settle = 0.0, secs_play = 0.0;
     int    decom_at_build = 0, proc_at_build = 0; ///< processors when the world is handed to the settle
     int    firms_handoff = 0, firms_survived = 0, firms_end = 0, last_tick = 0;
@@ -1173,6 +1180,29 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
         if (k == k_g1_g2_play_tick)
             for (const auto& [bid, b] : w.buildings)
             {
+                if (b.type == building_type::planetary_marketplace && b.ticks_remaining <= 0)
+                {
+                    if (b.decommissioned)               ++r.t_mp_decom;
+                    else if (b.workforce_target <= 0)   ++r.t_mp_notarget;
+                    else if (!(b.workforce_assigned > 0.0f)) ++r.t_mp_unstaffed;
+                    else if (res.report.upkeep_unmet.count(bid))
+                    {
+                        ++r.t_mp_unmet;
+                        const entity_id mid = market_for_tile(w, b.tile);
+                        const auto basket = building_upkeep_goods(reg.building_upkeep(),
+                                                                  building_type::planetary_marketplace, reg.era());
+                        if (const auto mit = w.markets.find(mid); mit != w.markets.end())
+                            for (std::size_t g = 0; g < resource_count; ++g)
+                            {
+                                if (!(basket[g] > 0.0f)) continue;
+                                if (!shelf_admits(mit->second, g, reg.price_band().reservation_mult, false))
+                                    ++r.t_short_ceiling[g];
+                                else if (mit->second.inventory[g] < basket[g])
+                                    ++r.t_short_empty[g];
+                            }
+                    }
+                    else                                ++r.t_mp_making;
+                }
                 if (b.ticks_remaining > 0 || b.decommissioned) continue;
                 if (b.type == building_type::planetary_marketplace) ++r.t_marketplaces_t50;
                 else if (b.type == building_type::port)             ++r.t_ports_t50;
@@ -1360,6 +1390,15 @@ int main(int argc, char** argv)
                         static_cast<double>(r.t_ship_manual) / r.t_ticks, r.t_units / r.t_ticks,
                         static_cast<double>(r.t_refused_lp) / r.t_ticks, r.t_corps_max,
                         k_g1_g2_play_tick, r.t_marketplaces_t50, r.t_ports_t50);
+        if (r.t_ticks > 0)
+            std::printf("   Marketplaces at t%d: decommissioned %d, no workforce target %d, unstaffed %d,"
+                        " upkeep unmet %d, making points %d\n",
+                        k_g1_g2_play_tick, r.t_mp_decom, r.t_mp_notarget, r.t_mp_unstaffed,
+                        r.t_mp_unmet, r.t_mp_making);
+        for (std::size_t g = 0; g < resource_count; ++g)
+            if (r.t_short_empty[g] + r.t_short_ceiling[g] > 0)
+                std::printf("     upkeep short: good #%zu empty %d over-ceiling %d\n",
+                            g, r.t_short_empty[g], r.t_short_ceiling[g]);
         std::printf(" G4 seat %llu \"%s\"  operating net, last %d settle quarters:",
                     static_cast<unsigned long long>(r.seat), r.seat_name.c_str(), k_seat_settle_window);
         double sm = 0;
