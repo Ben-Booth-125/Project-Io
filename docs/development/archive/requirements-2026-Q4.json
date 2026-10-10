@@ -774,6 +774,43 @@
       ],
       "resolution": "Closed at the sprint 48 close (2026-10-04): every row terminal; see row evidence."
     },
+    "lens-washes-ground": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "visual: lens_modes.lua over a built region, every lens"
+          ],
+          "requirement": "Under every lens the baked ground draws with its structures, settlements, landforms and rivers, and the lens colours tiles as a translucent wash in the same geometry; unanswered tiles take no wash.",
+          "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
+          "result_metric": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "visual: owner_multi_select.lua",
+            "live click: Ben picks owners and sees their buildings"
+          ],
+          "requirement": "The owner lenses: picked identity wash, unpicked grey wash plus rim; buildings visible through both.",
+          "notes": "Live click owed: Ben picks owners and sees their buildings through the wash. Live click passed: Ben, 2026-10-10 (v0.1.29 Release build).",
+          "result_metric": ""
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "visual: lens press checks still pass",
+            "headless: frame time under a lens at every rung"
+          ],
+          "requirement": "Hit-testing under a lens unchanged; 60 fps at every rung under a lens; the world untouched.",
+          "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
+          "result_metric": ""
+        }
+      ],
+      "resolution": "Sprint 51 closed 2026-10-10 with this group built; only the live-click rows remain pending. Live clicks passed by Ben 2026-10-10."
+    },
     "markets-can-die": {
       "rows": [
         {
@@ -893,6 +930,53 @@
         }
       ],
       "resolution": "Closed at the sprint 48 close (2026-10-04): every row terminal; see row evidence."
+    },
+    "owner-multi-select": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "visual: lens_modes.lua (or a new owner_multi_select.lua) default captures for both lenses"
+          ],
+          "requirement": "Picked owners tint their identity colour, unpicked owners one owned-grey distinct from unowned ground; Corporation defaults to the player, Company to none.",
+          "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
+          "result_metric": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "visual: two rivals picked via the verify API",
+            "live click: Ben shift-clicks and uses the checklist"
+          ],
+          "requirement": "The key is a checklist (count header, search, swatch rows for owners on the active body); shift-click on an owned tile toggles its owner; a plain click is unchanged.",
+          "notes": "Live click owed: Ben shift-clicks and uses the checklist (lenses walked 2026-10-10, picking not explicitly). Live click passed: Ben, 2026-10-10 (v0.1.29 Release build).",
+          "result_metric": ""
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "visual: captured"
+          ],
+          "requirement": "Rival HQ stars draw only while picked; hover lights the hovered owner group regardless of the set; the sets survive a body switch.",
+          "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
+          "result_metric": ""
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "verification": [
+            "review: mirrors rendered",
+            "headless: world_determinism twice, digests identical to the base (render-only change)"
+          ],
+          "requirement": "ACTIONS.json and question_log.json updated; the world is untouched.",
+          "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
+          "result_metric": ""
+        }
+      ],
+      "resolution": "Sprint 51 closed 2026-10-10 with this group built; only the live-click rows remain pending. Live clicks passed by Ben 2026-10-10."
     },
     "pools-per-market": {
       "rows": [
@@ -1611,6 +1695,64 @@
       ],
       "resolution": "Closed at the sprint 48 close (2026-10-04): every row terminal; see row evidence."
     },
+    "structures-baked": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: ground_bake_check extended (wrap and determinism rows)",
+            "visual: ground_bake.lua staged buildings of every type"
+          ],
+          "requirement": "An installation pass behind a stamp seam keyed by what a stamp depicts draws one procedural form per placeable building type (processing keyed on the recipe family), NW-lit, before the grade, deterministic and wrap-exact.",
+          "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
+          "result_metric": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "visual: staged stacked tile, settlement ladder, rival plant"
+          ],
+          "requirement": "A stacked tile stands up to three structures, one per stack, dominant largest and front; settlements step by scale, razed as ruin; a site under construction bakes as scaffolding; no owner colour, no state cue.",
+          "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
+          "result_metric": ""
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "headless: re-bake count over a play year recorded"
+          ],
+          "requirement": "The chunk content hash folds installations and nothing tick-rate; re-bakes over a play year follow construction events only.",
+          "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
+          "result_metric": ""
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "verification": [
+            "visual: captures at every rung",
+            "live click: Ben presses single and stacked tiles"
+          ],
+          "requirement": "The canvas draws no building glyph, stack ring, +N badge, corp emblem tag, settlement or ruin skyline or density dot; hit zones unchanged; the Selection neighbourhood view shows the baked ground.",
+          "notes": "Live click owed: Ben presses single and stacked tiles (look walked and approved 2026-10-10). Live click passed: Ben, 2026-10-10 (v0.1.29 Release build).",
+          "result_metric": ""
+        },
+        {
+          "id": "R5",
+          "status": "complete",
+          "verification": [
+            "headless: world_determinism twice, digests identical to the base (render-only change)",
+            "live click: Ben looks at every rung including the far page"
+          ],
+          "requirement": "Bake time per tier recorded before and after; the oblique tiers stand structures up; the world is untouched.",
+          "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
+          "result_metric": ""
+        }
+      ],
+      "resolution": "Sprint 51 closed 2026-10-10 with this group built; only the live-click rows remain pending. Live clicks passed by Ben 2026-10-10."
+    },
     "terrain-variant-families": {
       "rows": [
         {
@@ -1646,6 +1788,74 @@
         }
       ],
       "resolution": "Closed with sprint 51 (v0.1.29). Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10."
+    },
+    "tile-production-section": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "visual: scripts/verify/tile_production.lua captures the band on a built tile"
+          ],
+          "requirement": "The tile nav carries six sections with Production first; the nav wraps at six.",
+          "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
+          "result_metric": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "visual: a stacked tile and an idle building captured",
+            "review: one classification function, two callers"
+          ],
+          "requirement": "Production lists one row per stack (stack_members) with type glyph, count, good, output per tick and running state with its reason; the reason comes from the same classification function the building hover card calls.",
+          "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
+          "result_metric": ""
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "visual: captured",
+            "live click: Ben presses a good row"
+          ],
+          "requirement": "The catchment market is named with one row per good made then per good deposited: price and short/balanced/surplus; a row press opens the Market ledger aimed at that market and good.",
+          "notes": "Live click owed: Ben presses a good row (not walked at the close). Live click passed: Ben, 2026-10-10 (v0.1.29 Release build).",
+          "result_metric": ""
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "verification": [
+            "visual: unbuilt and rival tiles captured"
+          ],
+          "requirement": "An unbuilt tile states \"Nothing built here\" and lists its deposited goods at their market; a rival stack row shows type, count, owner and \"private\".",
+          "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
+          "result_metric": ""
+        },
+        {
+          "id": "R5",
+          "status": "complete",
+          "verification": [
+            "visual: captured"
+          ],
+          "requirement": "The building card Status page shows running state with its reason, never a bare \"Operating.\".",
+          "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
+          "result_metric": ""
+        },
+        {
+          "id": "R6",
+          "status": "complete",
+          "verification": [
+            "review: question_log entry rendered",
+            "headless: world_determinism twice, digests identical to the base (render-only change)"
+          ],
+          "requirement": "question_log.json carries the section; the world is untouched.",
+          "notes": "Cut gate on 18401ff2+ (merged with main): ground_bake_check all pass; world_determinism digests identical to main (0940087E0DA9E19A / A3F88D5EFA458544 / 7F722EFFCC288BA8); walked live by Ben 2026-10-08..10.",
+          "result_metric": ""
+        }
+      ],
+      "resolution": "Sprint 51 closed 2026-10-10 with this group built; only the live-click rows remain pending. Live clicks passed by Ben 2026-10-10."
     },
     "world-built-once-and-moved": {
       "rows": [
