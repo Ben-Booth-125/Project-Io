@@ -1072,8 +1072,8 @@
    "design": "Found by the BL-1186 diagnosis (2026-10-04): market catchments are assigned by grid distance and ignore water, so a tile can belong to a market across a strait it cannot ship over; local draws treat it as the same market. Measure how many tiles and buildings sit across water from their market centre on the 16 seeds before designing. Read beside BL-1190 (markets meet firms)."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 50,
    "written": "2026-10-04",
    "requires": [
@@ -1364,8 +1364,8 @@
    "design": "SPRINT 51 ADDITION (Ben, 2026-10-08, the chain-start form): the player sees UNMET WANT - inputs a market's processors want and cannot get - on the market ledger or a lens, in the visibility pass. MOVED (Ben, 2026-10-07, the live walk): sprint 50 -> 51. Built and merged on worktree-sprint-50 (3306c300; R1, R2, R4 complete), but at the live click Ben \"couldn't find what I am looking for in the trade-flow lens\" - saved for sprint 51's visibility pass, which asks first what the player is looking for. SETTLED (Ben, 2026-10-07, the lens form): a PLAYER lens over the player's own flows only; the whole-world diagnosis stays headless (BL-1223, gate logistics row). Refusals: a marker per short market coloured by the best class over the player's sources, hover lists classes by good. Design in docs/ui/LENSES.md § Trade-flow lens. WORK: the dispatcher records the player corporation's shipments and best class per (good, destination market) each pass as a transient output the simulation never reads and the save never holds; the `trade_flow` overlay_mode at the enum's end; the Planetary arrows, markers, hover and class key; the question_log entry; the ACTIONS entry for the lens cycle if it changes. Before mint: Ben's cut form 2026-10-07 set DIAGNOSTIC scope (player polish in sprint 51)."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 50,
    "written": "2026-10-07",
    "requires": [],
@@ -1433,8 +1433,8 @@
    "design": "COMPLETE (Ben, 2026-10-07, the live walk: \"I like these glyphs\"). Merged 75367957. SETTLED (Ben, 2026-10-07): every built lens sits in at least one rung row of the strip and carries its OWN glyph - none borrows another lens's mark, none is keyboard-only (LENSES.md § The strip rotates with the rung). The check (2026-10-07, overlay.cpp): Trade flow is on no strip and borrows supply; Company is on the Planetary strip borrowing the corporation mark beside Corporation; Supply-routes is on the Solar strip borrowing supply beside Supply; Reach is on the Solar strip borrowing the convoy chevron. WORK: four new glyphs in src/ui/icons.* under the (dl, centre, r, colour) contract, catalogued in ICONS.md; Trade flow added to planetary_modes; ACTIONS entries for the strip presses; captures of all three rung strips. NOTE: the LENSES.md roster lists a `culture` lens with no overlay_mode in code - a doc/code mismatch to raise, not this item's work."
   },
   {
-   "status": "designed",
-   "glyph": "✓",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 50,
    "written": "2026-10-07",
    "requires": [],
@@ -1633,8 +1633,8 @@
    "design": "MERGED (a6910272 + 88304efb, 2026-10-08; two review rounds): a new processor judged on supply; plants under construction count against spare; landed-cost pricing. 5 seeds: settle builds starved at handoff 110 -> 0; G1 76.7 -> 80.5, G1b 16.2 -> 11.2. NOTE (review): a site stalled indefinitely reserves its draw indefinitely - watch with BL-1236 (plant builds stall). FOUND by processor_placement_probe (BL-1233): the 12-tick settle scorer adds 221-271 processors by handoff and 96-156 of them are input-starved, nearly all on PROCESSED inputs (consumer goods, ordnance, machinery, propellant); seed 0 alone has 110 of 117 starved after BL-1233. Generation's new sized rule does not reach the scorer. DIAGNOSE: which candidate gate admits them (recipe_inputs_obtainable reading opening stock as cover? the BL-1187 build-only-what-runs test at settle prices?), then fix the estimate inside the scorer grant. Read with BL-1233."
   },
   {
-   "status": "designed",
-   "glyph": "✓",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 50,
    "written": "2026-10-08",
    "requires": [],
@@ -1766,8 +1766,8 @@
    "design": "BACKLOGGED by Ben (2026-10-09, launch fuel form) - both questions open, for a ruling when space access matters. Context: MARKETS.md step 4 reserves a pad pool's propellant from auto-surplus (Ben 2026-10-09; may still be sold by a standing order). Cold review of the PROPELLANT lane found three rival paths that ignore that reservation: (a) corp_ai.cpp listable_surplus (~2572) uses processor_reservation, so the trade candidate places an uncapped sell order that empties the pad pool, re-placed each time stock rebuilds; (b) the scorer's directed dispatch (~2735) has no reservation and can haul pad propellant to the capital market on the same body; (c) space_programme.cpp (~140-175) buys 50-unit lumps from the pool holding most unreserved stock - pad pools are now where propellant piles up. Q1: should the scorer sell/haul only above the pad reservation? Q2: should the space programme buy only the excess? No seed had a launchpad at t50 in sprint 50, so the effect is latent."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 50,
    "written": "2026-10-09",
    "requires": [],
