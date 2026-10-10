@@ -32,22 +32,25 @@
 //       queues the DG-PR-EX-A path and the PACING rows hold the arithmetic to
 //       the pacing targets — they may FAIL until the conversion is set, and are
 //       reported, never weakened. The run is byte-identical twice. Each seed
-//       also prints what the DEFERRED unlocks would close at the seat.
+//       also prints the launchpads standing and inter-body convoys in flight,
+//       seat through live tick 20 (what Rocketry's launch gate touches).
 //
 // BL-1274, requirement group "tech-effects-wired":
 //   T1  (R1) the effect audit: every node carries >= 1 machine effect; every
-//       row of the generated table is read, deferred or declared unread by
+//       row of the generated table is read or declared unread by
 //       nation_tech.cpp (classify_effect) against the live registry; the store's
 //       kind agrees; the code's declared-unread systems are exactly the systems
 //       the store waits on. (Store == header is gen_tech_tree_table.js --check.)
 //   T2  (R2) the lever rows: every read modifier row moves nation_scalar by
 //       exactly its value for the holding nation and not another; extraction
-//       through extraction_nominal; research through advance_research; the
-//       deferred propellant gate measured as it would rule.
+//       through extraction_nominal (Farms are the Farm); processing through
+//       credit_processing_outputs; research through advance_research;
+//       Rocketry's space_dispatch; logistics_cost through price_convoy_leg on
+//       one generated world (haul only, never port handling).
 //
 // Usage: nation_tech_harness [--seeds N | --seed-list a,b,...] [--quarters Q] [--once]
 //                            [--base X] [--lin Y] [--sqrt Z] [--unit U]
-//   --seeds 0   fixture rows only (R1-R3) — the ctest invocation.
+//   --seeds 0   fixture rows (R1-R3, T1, T2) plus T2-live's one generated world — the ctest invocation.
 //   default     all 16 library seeds, 32 live quarters, each seed built twice,
 //               on the registry's research dials (scripts/economy.lua) unless
 //               --base/--lin/--sqrt/--unit override them for a measurement.
@@ -58,6 +61,7 @@
 #include "harness_params.hpp"
 #include "world/campaign_settle.hpp"
 #include "world/components.hpp"
+#include "world/construction.hpp"
 #include "world/economy_system.hpp"
 #include "world/finish_campaign_world.hpp"
 #include "world/nation_budget.hpp"
@@ -65,6 +69,7 @@
 #include "world/recipe_registry.hpp"
 #include "world/resource_names.hpp"
 #include "world/spawn_seat.hpp"
+#include "world/supply_system.hpp"
 #include "world/world.hpp"
 #include "world/world_save.hpp"
 
@@ -136,7 +141,7 @@ entity_id add_tile(world& w, entity_id body, entity_id owner_nation)
 }
 
 entity_id add_building(world& w, entity_id corp, entity_id tile, building_type type,
-                       int ticks_remaining, bool decommissioned, float workforce = 0.5f)
+                       int ticks_remaining, bool decommissioned, float workforce = -1.0f)
 {
     const entity_id b = w.create_entity();
     building_component bc{};
@@ -144,7 +149,9 @@ entity_id add_building(world& w, entity_id corp, entity_id tile, building_type t
     bc.type               = type;
     bc.ticks_remaining    = ticks_remaining;
     bc.decommissioned     = decommissioned;
-    bc.workforce_assigned = workforce;
+    // Staffed as the build door staffs it (construction_initial_workforce), unless a
+    // row deliberately overrides it.
+    bc.workforce_assigned = workforce < 0.0f ? construction_initial_workforce(type) : workforce;
     w.buildings[b] = bc;
     w.corporations.at(corp).assets.push_back(b);
     return b;
@@ -215,8 +222,8 @@ void rows_r1()
     add_building(f.w, f.corp, other_tile, building_type::research_institute, 0, false);
     add_building(f.w, f.corp2, other_tile, building_type::research_institute, 0, false);
     add_building(f.w, f.corp2, other_tile, building_type::research_institute, 5, false);
-    // BL-1274: STAFFED only — a completed University or institute with no
-    // workforce assigned counts nothing (RESEARCH.md § Research points).
+    // BL-1274 GUARD: STAFFED only. No door makes an unstaffed University or institute
+    // today (both staff at construction); one with no workforce counts nothing.
     add_building(f.w, f.corp, home_tile, building_type::university, 0, false, 0.0f);
     add_building(f.w, f.corp, other_tile, building_type::research_institute, 0, false, 0.0f);
 
@@ -477,7 +484,6 @@ const char* reading_name(effect_reading r)
     switch (r)
     {
         case effect_reading::read:     return "read";
-        case effect_reading::deferred: return "deferred";
         case effect_reading::unread:   return "unread";
         case effect_reading::invalid:  return "INVALID";
     }
@@ -529,20 +535,17 @@ void rows_t1(const recipe_registry& reg)
                         kind_name(e.kind), e.subject, e.scope, e.target[0] ? e.target : e.waits_on);
         }
         // The store's KIND must say what the code does: an unread row is
-        // unread, a deferred row deferred, and every other row is read.
-        const bool store_unread   = e.kind == io::dg::effect_kind::unread;
-        const bool store_deferred = e.deferred[0] != '\0';
-        if (r != effect_reading::invalid
-            && ((store_unread != (r == effect_reading::unread))
-                || (store_deferred != (r == effect_reading::deferred))))
+        // unread and every other row is read — two states, no third.
+        const bool store_unread = e.kind == io::dg::effect_kind::unread;
+        if (r != effect_reading::invalid && store_unread != (r == effect_reading::unread))
             ++kind_mismatch;
         if (store_unread) ++waits[e.waits_on];
     }
     for (const io::dg::node& n : io::dg::nodes)
         if (n.deed_waits_on[0] != '\0') ++waits[n.deed_waits_on];
     for (const auto& [k, c] : tally) std::printf("     %-34s %3d rows\n", k.c_str(), c);
-    check(invalid == 0, "T1c every effect row is read, deferred or declared unread (none INVALID)");
-    check(kind_mismatch == 0, "T1d the store's kind agrees with the code: unread rows unread, deferred deferred, the rest read");
+    check(invalid == 0, "T1c every effect row is read or declared unread (none INVALID)");
+    check(kind_mismatch == 0, "T1d the store's kind agrees with the code: unread rows unread, the rest read");
 
     // The declared-unread list and the store's waits_on set are the same set.
     const auto& declared = declared_unread_systems();
@@ -597,6 +600,7 @@ effect_target target_for(const io::dg::effect& e)
     }
     else if (s.rfind("group:", 0) == 0) t.group = after("group:");
     else if (s.rfind("recipe:", 0) == 0) t.recipe = after("recipe:");
+    else if (s.rfind("site:", 0) == 0) t.site = after("site:");
     else if (s == "building:university") { t.building = building_type::university; t.scoped_only = true; }
     return t;
 }
@@ -720,32 +724,169 @@ void rows_t2(const recipe_registry& reg)
               "T2f Universities +20%: the holder's University term x1.2 inside its x1.01 total; the other nation's x1");
     }
 
-    // (d) Unlocks. No recipe or structure unlock is ENFORCED: the only recipes a
-    // node unlocks that the registry carries are the two propellant routes, and
-    // that gate is deferred (it closes the space programme at the start).
+    // (d) Farms are the Farm (BL-1274 review #5): Hybrid Seed moves a Farm's
+    // draw, not a Fishing Wharf's, though both draw produce.
     {
         fixture f = make_fixture();
-        const std::uint16_t atm  = reg.recipe_id("propellant_atmospheric");
-        const std::uint16_t elec = reg.recipe_id("propellant_electrolysis");
-        const std::uint16_t steel = reg.recipe_id("steel");
-        check(atm != no_recipe && elec != no_recipe, "T2g the propellant routes exist in the registry");
-        const bool open_now = recipe_unlocked(f.w, reg, f.corp, atm) && recipe_unlocked(f.w, reg, f.corp, elec)
-                           && recipe_unlocked(f.w, reg, f.corp2, atm);
-        const bool ruled_closed = !recipe_unlocked_if_ruled(f.w, reg, f.corp, atm)
-                               && !recipe_unlocked_if_ruled(f.w, reg, f.corp, elec);
-        f.w.nation_tech[f.nation].held.set(static_cast<std::size_t>(node("DG-PR-EN-C")));
-        const bool ruled_open_holder = recipe_unlocked_if_ruled(f.w, reg, f.corp, atm)
-                                    && recipe_unlocked_if_ruled(f.w, reg, f.corp, elec);
-        const bool ruled_closed_other = !recipe_unlocked_if_ruled(f.w, reg, f.corp2, atm);
-        check(open_now, "T2h DEFERRED: the propellant routes stay open to every corp (the gate is not enforced)");
-        check(ruled_closed && ruled_open_holder && ruled_closed_other,
-              "T2i ...were it ruled: closed until the home nation holds Propellant Synthesis, then open for its corps only");
-        check(recipe_unlocked_if_ruled(f.w, reg, f.corp2, steel), "T2j a recipe no node names is open either way");
-        bool all_open = true;
-        for (std::uint8_t ty = 0; ty < building_type_count; ++ty)
-            all_open = all_open && structure_unlocked(f.w, f.corp2, static_cast<building_type>(ty));
-        check(all_open, "T2k no structure unlock is read: every building type is open to every nation");
+        const entity_id t1 = add_tile(f.w, f.body, f.nation);
+        f.w.tiles[t1].resource_deposit[static_cast<std::size_t>(resource_type::agricultural_produce)] = 50.0f;
+        building_component farm{};
+        farm.tile               = t1;
+        farm.type               = building_type::extraction_site;
+        farm.target_resource    = resource_type::agricultural_produce;
+        farm.workforce_assigned = 0.5f;
+        const float before = extraction_nominal(f.w, reg, farm, 1.0f, f.corp);
+        f.w.nation_tech[f.nation].held.set(static_cast<std::size_t>(node("DG-PR-EX-C1"))); // Farms +5%
+        const float after = extraction_nominal(f.w, reg, farm, 1.0f, f.corp);
+        check(before > 0.0f && after == before * 1.05f
+                  && extraction_nominal(f.w, reg, farm, 1.0f, f.corp2) == before,
+              "T2g Hybrid Seed: a Farm (produce from a deposit) of the holder's corp draws x1.05; the other nation's the same");
+        effect_target wharf;
+        wharf.resource = static_cast<int>(resource_type::agricultural_produce);
+        wharf.site     = extraction_site_name(resource_type::agricultural_produce, /*depositless=*/true);
+        check(wharf.site == "fishing_wharf"
+                  && nation_scalar(f.w, f.nation, modifier_subject::extraction_rate, wharf, 100.0f) == 100.0f,
+              "T2h ...and a Fishing Wharf drawing the same good is not a Farm: untouched");
     }
+
+    // (e) Processing through its real read site, credit_processing_outputs: a
+    // propellant run of the holder's corp credits x1.2 (Propellant Synthesis),
+    // the other nation's corp the base, on both routes.
+    {
+        fixture f = make_fixture();
+        bool routes = true, moved = true, other = true;
+        for (const char* name : { "propellant_atmospheric", "propellant_electrolysis" })
+        {
+            const recipe* rc = reg.get_recipe(reg.recipe_id(name));
+            if (rc == nullptr) { routes = false; continue; }
+            world w0 = f.w;
+            stockpile_component base{}, held{}, oth{};
+            const float q0 = credit_processing_outputs(w0, reg, f.corp, *rc, base, 2.0f);
+            world w1 = f.w;
+            w1.nation_tech[f.nation].held.set(static_cast<std::size_t>(node("DG-PR-EN-C")));
+            const float q1 = credit_processing_outputs(w1, reg, f.corp, *rc, held, 2.0f);
+            const float q2 = credit_processing_outputs(w1, reg, f.corp2, *rc, oth, 2.0f);
+            const std::size_t pr = static_cast<std::size_t>(resource_type::propellant);
+            std::printf("     %s: base %.4f  holder %.4f  other nation %.4f (propellant credited)\n",
+                        name, base.quantities[pr], held.quantities[pr], oth.quantities[pr]);
+            moved = moved && base.quantities[pr] > 0.0f && held.quantities[pr] == base.quantities[pr] * 1.2f && q1 > q0;
+            other = other && oth.quantities[pr] == base.quantities[pr] && q2 == q0;
+        }
+        check(routes, "T2i both propellant routes exist in the registry, and stay open to every corp");
+        check(moved, "T2j Propellant Synthesis: a run of the holder's corp credits x1.2 propellant, on both routes");
+        check(other, "T2k ...and the other nation's corp is credited the base");
+        bool open = true;
+        for (const char* name : { "propellant_atmospheric", "propellant_electrolysis" })
+            open = open && recipe_unlocked(f.w, reg, f.corp, reg.recipe_id(name))
+                        && recipe_unlocked(f.w, reg, f.corp2, reg.recipe_id(name));
+        bool all_types = true;
+        for (std::uint8_t ty = 0; ty < building_type_count; ++ty)
+            all_types = all_types && structure_unlocked(f.w, f.corp2, static_cast<building_type>(ty));
+        check(open && all_types, "T2l no recipe or structure unlock is read: propellant and every building type open to every nation");
+    }
+
+    // (f) Rocketry gates launch: the space_dispatch mechanic.
+    {
+        fixture f = make_fixture();
+        const bool closed = !nation_mechanic(f.w, f.nation, "space_dispatch")
+                         && !nation_mechanic(f.w, f.other, "space_dispatch");
+        f.w.nation_tech[f.nation].held.set(static_cast<std::size_t>(node("DG-NE-SO-B")));
+        const bool holder = nation_mechanic(f.w, f.nation, "space_dispatch");
+        const bool other  = !nation_mechanic(f.w, f.other, "space_dispatch");
+        check(closed && holder && other,
+              "T2m Rocketry: space_dispatch is closed to every nation at the start, open to its holder only");
+        check(nation_mechanic(f.w, f.nation, "no_such_mechanic"), "T2n a mechanic no node names is open");
+    }
+}
+
+/// T2 (live) — logistics_cost through its real read site, price_convoy_leg, on
+/// a generated world (a hand fixture cannot route a leg). The corp's home nation
+/// holds Freight Practice I (-1% logistics cost): an overland leg costs x0.99;
+/// a ported leg discounts its haul and not its port handling; a node held by
+/// another nation moves nothing.
+bool rows_t2_live(std::uint32_t seed, bool overland_rows)
+{
+    std::printf("\nT2 (live, seed %u) logistics_cost through price_convoy_leg\n", seed);
+    lua_state lua;
+    world_params wp;
+    wp.seed = seed;
+    auto start = std::make_unique<app_start_world>();
+    try { build_app_start_world(lua, wp, *start); }
+    catch (const std::exception& e) { std::printf("  FAIL  world build threw: %s\n", e.what()); ++g_failures; return false; }
+    world& w = start->w;
+    const recipe_registry& reg = start->reg;
+    run_app_validation_settle(w, start->reg);
+    const logistics_nodes nodes = collect_logistics_nodes(w);
+    const std::size_t ri = static_cast<std::size_t>(resource_type::steel);
+    const float qty = 10.0f;
+
+    std::vector<entity_id> mids;
+    for (const auto& kv : w.markets) mids.push_back(kv.first);
+    std::sort(mids.begin(), mids.end());
+
+    struct found_leg { entity_id corp = null_entity, src = null_entity, dest = null_entity; convoy_leg leg; };
+    found_leg overland, ported;
+    for (const auto& [key, pool] : w.corp_market_pools)
+    {
+        if (overland.corp != null_entity && ported.corp != null_entity) break;
+        const auto cit = w.corporations.find(key.first);
+        if (cit == w.corporations.end() || cit->second.home_nation == null_entity) continue;
+        const auto sit = w.markets.find(key.second);
+        if (sit == w.markets.end()) continue;
+        for (const entity_id d : mids)
+        {
+            if (d == key.second || w.markets.at(d).body != sit->second.body) continue;
+            const convoy_leg l = price_convoy_leg(w, reg, nodes, key.first, key.second, d, ri, qty,
+                                                  reg.logistics_cost(convoy_mode::space));
+            if (!l.viable || !(l.cost > 0.0f)) continue;
+            found_leg& slot = l.port_a != null_entity ? ported : overland;
+            if (slot.corp == null_entity) slot = { key.first, key.second, d, l };
+        }
+    }
+    if (overland_rows)
+        check(overland.corp != null_entity, "T2o the seed carries a viable overland leg to measure");
+    if (overland.corp == null_entity) return false;
+
+    auto reprice = [&](const found_leg& f) {
+        return price_convoy_leg(w, reg, nodes, f.corp, f.src, f.dest, ri, qty,
+                                reg.logistics_cost(convoy_mode::space));
+    };
+    const entity_id home = w.corporations.at(overland.corp).home_nation;
+    entity_id elsewhere = null_entity;
+    for (const auto& kv : w.nations)
+        if (kv.first != home && (elsewhere == null_entity || kv.first < elsewhere)) elsewhere = kv.first;
+    const int fr = node("DG-NE-FR-T1");
+
+    world saved = w;
+    if (overland_rows)
+    {
+    if (elsewhere != null_entity)
+        w.nation_tech[elsewhere].held.set(static_cast<std::size_t>(fr));
+    const float other_cost = reprice(overland).cost;
+    w = saved;
+    w.nation_tech[home].held.set(static_cast<std::size_t>(fr));
+    const float held_cost = reprice(overland).cost;
+    std::printf("     overland leg: base %.4f  holder %.4f  (node held elsewhere: %.4f)\n",
+                overland.leg.cost, held_cost, other_cost);
+    check(held_cost == overland.leg.cost * 0.99f, "T2p Freight Practice I: the holder's corp prices an overland leg x0.99");
+    check(other_cost == overland.leg.cost, "T2q ...and the node held by another nation moves the leg nothing");
+    }
+
+    if (ported.corp == null_entity)
+    {
+        std::printf("     no ported leg on this seed\n");
+        return false;
+    }
+    w = saved;
+    w.nation_tech[w.corporations.at(ported.corp).home_nation].held.set(static_cast<std::size_t>(fr));
+    const float p_after = reprice(ported).cost;
+    const double handling = static_cast<double>(reg.port_handling()) * 2.0 * qty; // two ports
+    const double expect   = (static_cast<double>(ported.leg.cost) - handling) * 0.99 + handling;
+    std::printf("     ported leg: base %.4f  holder %.4f  expected haul-only %.4f (handling %.4f)\n",
+                ported.leg.cost, p_after, expect, handling);
+    check(std::fabs(static_cast<double>(p_after) - expect) <= 1e-4 * std::max(1.0, expect),
+          "T2r ...and a ported leg discounts its haul, never its port handling");
+    return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -808,8 +949,8 @@ struct seed_run
     bool                    none_held_open  = false;
     bool                    empty_at_seat   = false;
     int                     nations         = 0;
-    int                     would_close     = 0; ///< Processors at the seat running a recipe a DEFERRED unlock would close.
-    int                     launchpads      = 0; ///< Launchpads standing at the seat (the deferred space_dispatch mechanic).
+    int                     launchpads      = 0; ///< Most launchpads standing, seat through live tick 20.
+    int                     space_convoys   = 0; ///< Most inter-body convoys in flight, seat through live tick 20.
     std::vector<nation_row> rows;
     std::uint64_t           digest          = 0;
     double                  secs            = 0.0;
@@ -856,19 +997,19 @@ seed_run run_seed(std::uint32_t seed, int quarters, const dial_override& ov)
     for (const auto& [nid, st] : w.nation_tech)
         if (!st.empty()) out.empty_at_seat = false;
 
-    // BL-1274: what the DEFERRED gates would close at the seat, were they ruled
-    // in — the measurement Ben's call on them needs. Nothing is closed today.
-    for (const auto& [cid, cc] : w.corporations)
-        for (const entity_id bid : cc.assets)
-        {
-            const auto bit = w.buildings.find(bid);
-            if (bit == w.buildings.end() || bit->second.decommissioned) continue;
-            const building_component& b = bit->second;
-            if (b.type == building_type::processing_facility && b.recipe != no_recipe
-                && !recipe_unlocked_if_ruled(w, reg, cid, b.recipe))
-                ++out.would_close;
-            if (b.type == building_type::launchpad) ++out.launchpads;
-        }
+    // BL-1274: what Rocketry's launch gate (space_dispatch) touches — launchpads
+    // standing and inter-body convoys in flight, at the seat and over the first
+    // 20 live ticks (counted in the loop below).
+    const auto count_space = [&](int& pads, int& convoys) {
+        int p_now = 0, c_now = 0;
+        for (const auto& [bid, b] : w.buildings)
+            if (b.type == building_type::launchpad && !b.decommissioned) ++p_now;
+        for (const convoy_component& c : w.convoys)
+            if (c.mode == convoy_mode::space) ++c_now;
+        pads    = std::max(pads, p_now);
+        convoys = std::max(convoys, c_now);
+    };
+    count_space(out.launchpads, out.space_convoys);
 
     std::vector<entity_id> nids;
     for (const auto& kv : w.nations) nids.push_back(kv.first);
@@ -878,7 +1019,8 @@ seed_run run_seed(std::uint32_t seed, int quarters, const dial_override& ov)
         for (const entity_id bid : cc.assets)
         {
             const auto bit = w.buildings.find(bid);
-            if (bit == w.buildings.end() || bit->second.ticks_remaining > 0 || bit->second.decommissioned)
+            if (bit == w.buildings.end() || bit->second.ticks_remaining > 0 || bit->second.decommissioned
+                || !(bit->second.workforce_assigned > 0.0f))
                 continue;
             if (bit->second.type == building_type::university)
             {
@@ -918,6 +1060,8 @@ seed_run run_seed(std::uint32_t seed, int quarters, const dial_override& ov)
         advance_surveys(w, k_econ_tick_days);
         w.current_day_tick = day;
         const settle_tick_result res = run_settle_tick(w, reg, first + (qtr - 1), day, /*spectating=*/false);
+        if (qtr <= 20)
+            count_space(out.launchpads, out.space_convoys);
         for (const research_accrual& a : res.report.research)
         {
             nation_row& r = rows[a.nation];
@@ -1016,9 +1160,9 @@ void rows_r0(const std::vector<std::uint32_t>& seeds, int quarters, bool twice, 
         src_n += s_src;
         src_done += s_done;
         std::printf("  seed %-10u nations %2d  with a source %2d  reached DG-PR-EX-A %2d  median q %5.1f"
-                    "  if-ruled: %d propellant plants, %d launchpads"
+                    "  seat..t20: %d launchpads, %d space convoys"
                     "  digest %016llx %s (%.0f s)\n",
-                    s, a.nations, s_src, s_done, median_of(qs), a.would_close, a.launchpads,
+                    s, a.nations, s_src, s_done, median_of(qs), a.launchpads, a.space_convoys,
                     static_cast<unsigned long long>(a.digest), twice ? (same ? "twice-equal" : "DIFFERS") : "",
                     a.secs);
     }
@@ -1108,6 +1252,20 @@ int main(int argc, char** argv)
         reg.load_from_lua(lua);
         rows_t1(reg);
         rows_t2(reg);
+    }
+    {
+        // Curated seeds for the rows a hand fixture cannot route: the overland
+        // rows on the first (28, the fastest build), then seeds in turn until
+        // one carries a ported leg for the handling split.
+        bool ported = false;
+        bool first_live = true;
+        for (const std::uint32_t s : { 28u, 40u, 12u, 9u, 43u })
+        {
+            ported = rows_t2_live(s, first_live);
+            first_live = false;
+            if (ported) break;
+        }
+        check(ported, "T2s a curated seed carries a ported leg (the handling split was measured)");
     }
 
     if (seeds.empty() && seed_count > 0)

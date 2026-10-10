@@ -113,14 +113,14 @@ advantage in machine form, one entry per lever (`../RESEARCH.md` § Effects no s
 
 | Kind | Fields | Moves |
 |---|---|---|
-| `modifier` | `subject`, `scope`, `op`, `value` | A named scalar (`modifier_subject`) where the scope matches: `all`, `resource:<good>`, `group:<recipe group>`, `recipe:<recipe>` or `building:<type>`. A list of scopes is one modifier per member. `+5%` is `multiply 1.05`; a *+N% national research* share is `add 0.0N`, summed |
+| `modifier` | `subject`, `scope`, `op`, `value` | A named scalar (`modifier_subject`) where the scope matches: `all`, `resource:<good>`, `group:<recipe group>`, `recipe:<recipe>`, `building:<type>` or `site:<named extraction site>` (`site:farm` is the Farm, not a Fishing Wharf drawing the same good). A list of scopes is one modifier per member. `+5%` is `multiply 1.05`; a *+N% national research* share is `add 0.0N`, summed |
 | `unlock_recipe` | `recipe` | Closes a registry recipe until the corporation's nation holds the node |
 | `unlock_structure` | `structure` | The same, for a building type |
 | `mechanic` | `key` | A named rule a system switches on |
 | `unread` | `what`, `waits_on` | Nothing: the lever is a system the game does not carry; `waits_on` names it |
 
-An unlock or mechanic may carry `deferred` — authored, and not enforced until the named ruling is
-taken. A quest's **deed** has the same pair: a machine form, or a `deed_effect` of kind `unread`
+An effect has two states and no third: a system reads it, or it is `unread`. A modifier's sign and
+size match its advantage's prose. A quest's **deed** has the same pair: a machine form, or a `deed_effect` of kind `unread`
 naming the system it waits on. A placeholder carries one `unread` effect waiting on its system.
 Held effects fold in node order. `tools/session/tech_tree_store.js --check` holds the store's
 shape; `nation_tech_harness` holds the store to what the code reads.
@@ -194,8 +194,8 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 | `DG-PR-EN-B2` | Uranium Enrichment | minor | 3 | Nuclear Plant output +25% | Fuel Economy IV |
 | `DG-PR-EN-B` | Civil Nuclear Power | major | 4 | unlocks the Nuclear Plant: powers 4 province buildings with no fuel draw. Trap: each one raises every rival’s Alarm toward you by 2 | Reactor Safety + Uranium Enrichment |
 | `DG-PR-EN-C1` | Cryogenic Storage | minor | 3 | propellant holding losses -50% | Fuel Economy VI |
-| `DG-PR-EN-C2` | Rocket-Fuel Chemistry | minor | 3 | propellant recipe +5% yield | Fuel Economy VI |
-| `DG-PR-EN-C` | Propellant Synthesis | major | 4 | Chemical Plants unlock the propellant recipe at +20% yield | Cryogenic Storage + Rocket-Fuel Chemistry |
+| `DG-PR-EN-C2` | Rocket-Fuel Chemistry | minor | 3 | propellant recipes +5% yield | Fuel Economy VI |
+| `DG-PR-EN-C` | Propellant Synthesis | major | 4 | propellant recipes +20% yield | Cryogenic Storage + Rocket-Fuel Chemistry |
 | `DG-PR-EN-M` | Energy Security | mastery | 4 | -3% fuel draw at every building | Civil Nuclear Power + Propellant Synthesis |
 | `DG-PR-EN-Q` | Propellant at Scale | quest | 4 | propellant output +15%. **Deed:** a propellant plant fully staffed for 8 quarters. **Keys next age:** In-Situ Propellant | Propellant Synthesis |
 

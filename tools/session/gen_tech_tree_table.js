@@ -58,8 +58,7 @@ nodes.forEach((n, i) => {
       if (e.kind === 'modifier' && !OPS[e.op]) { console.error(`${n.id}: unknown op ${e.op}`); process.exit(1); }
       effects.push({ node: i, kind: e.kind, subject: e.subject || '', scope: sc || '',
         op: e.kind === 'modifier' ? e.op : 'multiply', value: e.kind === 'modifier' ? e.value : 1,
-        target: e.recipe || e.structure || e.key || '', what: e.what || '', waits_on: e.waits_on || '',
-        deferred: e.deferred || '' });
+        target: e.recipe || e.structure || e.key || '', what: e.what || '', waits_on: e.waits_on || '' });
     }
   }
   effectRange.push([begin, effects.length]);
@@ -134,9 +133,8 @@ lines.push('};');
 lines.push('');
 lines.push('/// One machine effect of one node. A modifier moves `subject` (a modifier_subject key) where its');
 lines.push('/// `scope` matches: "all", "resource:<good>", "group:<recipe group>", "recipe:<recipe>",');
-lines.push('/// "building:<type>". An unlock names its recipe or structure in `target`; a mechanic its key.');
-lines.push('/// `unread` names the system it waits on. `deferred` non-empty: authored, read by nothing until');
-lines.push('/// the named ruling is taken.');
+lines.push('/// "building:<type>", "site:<named extraction site>". An unlock names its recipe or structure in');
+lines.push('/// `target`; a mechanic its key. `unread` names the system it waits on.');
 lines.push('struct effect');
 lines.push('{');
 lines.push('    std::int16_t node;');
@@ -148,7 +146,6 @@ lines.push('    float        value;');
 lines.push('    const char*  target;');
 lines.push('    const char*  what;');
 lines.push('    const char*  waits_on;');
-lines.push('    const char*  deferred;');
 lines.push('};');
 lines.push('');
 lines.push('inline constexpr std::array<node, node_count> nodes = {{');
@@ -175,7 +172,7 @@ lines.push('');
 lines.push('inline constexpr std::array<effect, effect_count> effects = {{');
 effects.forEach((e, k) => {
   lines.push(`    /* ${String(k).padStart(3)} */ {${e.node}, effect_kind::${e.kind}, ${cstr(e.subject)}, ${cstr(e.scope)}, ` +
-    `effect_op::${e.op}, ${flt(e.value)}, ${cstr(e.target)}, ${cstr(e.what)}, ${cstr(e.waits_on)}, ${cstr(e.deferred)}},`);
+    `effect_op::${e.op}, ${flt(e.value)}, ${cstr(e.target)}, ${cstr(e.what)}, ${cstr(e.waits_on)}},`);
 });
 lines.push('}};');
 lines.push('');

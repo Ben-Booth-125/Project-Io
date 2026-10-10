@@ -639,8 +639,9 @@ enum class building_type : uint8_t
     military_base       = 6, ///< BL-325 S1: unit muster building. Produces nothing, staffs at zero,
                              ///< and is deliberately NOT a supply anchor — military reach IS the
                              ///< economic reach field (BL-325 ruling 3). Hire moves onto it in S2.
-    research_institute  = 7, ///< BL-332: the dedicated "how does tech get done" building. Passive
-                             ///< like military_base (produces nothing tradeable, staffs at zero) —
+    research_institute  = 7, ///< BL-332: the dedicated "how does tech get done" building. Produces
+                             ///< nothing tradeable; staffed at construction like the University
+                             ///< (Ben, 2026-10-10) and counted only while staffed —
                              ///< its output is research points, each quarter, into its owning
                              ///< corp's home nation's pool (BL-1273; nation_tech.hpp's
                              ///< `advance_research`), not a resource_type.

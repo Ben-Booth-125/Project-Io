@@ -178,12 +178,14 @@ enqueue_result enqueue_node(world& w, entity_id nation, int node);
 /// What a modifier is being asked about: the thing at the read site. A
 /// modifier's scope matches when it is "all", or names this target's resource
 /// ("resource:<good>"), recipe group ("group:<group>"), recipe
-/// ("recipe:<name>") or building type ("building:<type>").
+/// ("recipe:<name>"), building type ("building:<type>") or named extraction
+/// site ("site:<farm|fishing_wharf|well>", `extraction_site_name`).
 struct effect_target
 {
     int              resource = -1;   ///< resource_type index, or -1.
     std::string_view group;           ///< recipe::group, or empty.
     std::string_view recipe;          ///< recipe::name, or empty.
+    std::string_view site;            ///< A named extraction site, or empty.
     building_type    building = building_type::none;
     /// Match ONLY effects scoped to this target — "all" does not match. The
     /// University term uses it, so a nation-wide research share is not
@@ -191,19 +193,26 @@ struct effect_target
     bool             scoped_only = false;
 };
 
-/// How code treats one effect row.
+/// The named site an extraction site of @p target is, where a node can name it:
+/// "farm" (produce from a deposit), "fishing_wharf" (produce with no deposit),
+/// "well" (water with no deposit); empty otherwise (Mines and Oil Platforms are
+/// scoped by their resources). @p depositless is placement_rules'
+/// is_depositless_site for the site's tile.
+std::string_view extraction_site_name(resource_type target, bool depositless);
+
+/// How code treats one effect row. Two states, no third (RESEARCH.md): a
+/// system reads it, or it is declared unread.
 enum class effect_reading : std::uint8_t
 {
     read = 0,  ///< A consumer reads it: the held node moves its lever.
-    deferred,  ///< A known lever, authored, deliberately not enforced until a ruling.
     unread,    ///< Declared unread: waits on a system named in `declared_unread_systems`.
     invalid,   ///< The store and this code disagree (unknown subject/scope/key/system,
                ///< an unlock naming nothing, a modifier on an unwired subject).
 };
 
 /// The code's declaration for one effect row. @p reg, when given, also checks
-/// that an unlock names a recipe the registry carries; without it a recipe
-/// unlock is judged by kind alone.
+/// that an unlock names a recipe the registry carries and a group/recipe scope
+/// names one; without it those are judged by shape alone.
 effect_reading classify_effect(const io::dg::effect& e, const recipe_registry* reg = nullptr);
 
 /// The systems the code declares effects (and deeds) may wait on — the
@@ -224,30 +233,39 @@ float research_multiplier(const world& w, entity_id nation);
 /// node moves a scalar. A nation holding nothing returns @p base untouched —
 /// the same bits, no arithmetic — so a world where nothing is held is
 /// bit-identical to one with no effect layer at all.
+///
+/// KNOWN GAP: the read sites apply these to the TICK (the draw, the credited
+/// output, the priced leg); the profitability estimates building_profit.cpp and
+/// corp_ai.cpp score with (`estimate_prospective_profit`, the scorer's margins)
+/// do not fold processing_yield in, so the AI under-prices a held yield node.
+/// Deliberate for now (BL-1274 fix round): the AI's margins are not this
+/// item's to move.
 float nation_scalar(const world& w, entity_id nation, modifier_subject subject,
                     const effect_target& target, float base);
 
-/// Whether @p corp may build @p type: true unless a node with a READ
+/// Whether @p nation may use the mechanic @p key: true when no node carries a
+/// read `mechanic` effect with that key, else true only once the nation holds
+/// one that does. `space_dispatch` (Rocketry, Ben 2026-10-10): an inter-body
+/// convoy dispatches only for a corp whose home nation holds it — read in
+/// price_convoy_leg's inter-body branch, beside the launchpad check.
+bool nation_mechanic(const world& w, entity_id nation, std::string_view key);
+
+/// Whether @p corp may build @p type: true unless a node with a read
 /// `unlock_structure` effect naming the type is not held by the corp's home
 /// nation. The single read point the placement check and the construction
-/// door share. No Digitisation node's structure unlock is read today (the
-/// Nuclear Plant does not exist; the Launchpad's is deferred), so every type is
+/// door share. No Digitisation node unlocks a structure the registry carries
+/// (the Nuclear Plant and the Container Port are unread), so every type is
 /// open to every nation. `null_entity` = open.
 bool structure_unlocked(const world& w, entity_id corp, building_type type);
 
 /// The recipe counterpart of `structure_unlocked`, same contract: the build
 /// door, the retool door, the corp scorer and the selection panel all ask it.
-/// A recipe named by a READ `unlock_recipe` effect is closed until the corp's
-/// home nation holds the node. Deferred unlocks (the propellant routes) are not
-/// enforced here.
+/// A recipe named by a read `unlock_recipe` effect is closed until the corp's
+/// home nation holds the node. None is named today: the propellant routes are
+/// open to every nation (Ben, 2026-10-10 — Propellant Synthesis is a yield
+/// bonus), and fertiliser, plastics and microchips are unread.
 bool recipe_unlocked(const world& w, const recipe_registry& reg, entity_id corp,
                      std::uint16_t recipe_id);
-
-/// What `recipe_unlocked` WOULD answer were every deferred unlock enforced —
-/// the measurement a ruling on a deferred gate needs (nation_tech_harness).
-/// Not read by the simulation.
-bool recipe_unlocked_if_ruled(const world& w, const recipe_registry& reg, entity_id corp,
-                              std::uint16_t recipe_id);
 
 /// The quarterly research pass, once per economy tick from the nation step:
 /// for every nation (ascending id) accrue RP — the academic-research line pays

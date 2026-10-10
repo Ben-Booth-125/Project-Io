@@ -65,13 +65,26 @@ for (const n of nodes) if (!n.requires.length && !(n.tier === 'travel' && /-T1$/
 // (the header this store renders into, via gen_tech_tree_table.js, is what that audit reads).
 const SUBJECTS = new Set(['extraction_rate', 'processing_yield', 'unit_upkeep', 'logistics_cost',
                           'wage_floor', 'collapse_strain', 'national_research']); // modifier_set.hpp
-const SCOPE_RE = /^(all|resource:[a-z_]+|group:[A-Za-z &]+|recipe:[a-z_]+|building:[a-z_]+)$/;
+const SCOPE_RE = /^(all|resource:[a-z_]+|group:[A-Za-z &]+|recipe:[a-z_]+|building:[a-z_]+|site:[a-z_]+)$/;
 const str = v => typeof v === 'string' && v.length > 0;
+// An effect has two states (RESEARCH.md): read, or unread. No third.
+const STATES_ONLY = new Set(['kind', 'subject', 'scope', 'op', 'value', 'recipe', 'structure', 'key', 'what', 'waits_on']);
+
+// THE DIRECTION AUDIT (BL-1274 review #3): a modifier's sign and size must be the prose's. Every
+// percentage in `advantage` is read as signed ("+5%", "-10%"; an unsigned one is unparseable
+// unless an unread effect carries it); those an unread effect's own `what` carries are struck out
+// in order; what remains must equal the node's modifiers, in order: multiply value = 1 + p/100,
+// add value = p/100.
+const pcts = s => [...String(s).replace(/−/g, '-').matchAll(/([+-]?)(\d+(?:\.\d+)?)%/g)]
+  .map(m => (m[1] ? (m[1] === '-' ? -1 : 1) * Number(m[2]) : NaN));
+const close = (a, b) => (Number.isNaN(a) && Number.isNaN(b)) || Math.abs(a - b) < 1e-9;
+const unparsed = [];
+
 for (const n of nodes) {
   if (!Array.isArray(n.effects) || !n.effects.length) { err(`${n.id}: needs at least one effect`); continue; }
   for (const e of n.effects) {
     const at = `${n.id}: effect ${JSON.stringify(e)}`;
-    if (e.deferred !== undefined && !str(e.deferred)) err(`${at}: deferred must name the ruling it waits on`);
+    for (const k of Object.keys(e)) if (!STATES_ONLY.has(k)) err(`${at}: unknown field "${k}"`);
     switch (e.kind) {
       case 'modifier': {
         if (!SUBJECTS.has(e.subject)) err(`${at}: unknown modifier subject`);
@@ -81,7 +94,6 @@ for (const n of nodes) {
         if (e.op !== 'multiply' && e.op !== 'add') err(`${at}: op must be multiply or add`);
         if (typeof e.value !== 'number' || !Number.isFinite(e.value)) err(`${at}: value must be a finite number`);
         if (e.op === 'multiply' && !(e.value > 0)) err(`${at}: a multiply must be positive`);
-        if (e.deferred !== undefined) err(`${at}: a modifier is never deferred`);
         break;
       }
       case 'unlock_recipe': if (!str(e.recipe)) err(`${at}: needs recipe`); break;
@@ -89,9 +101,28 @@ for (const n of nodes) {
       case 'mechanic': if (!str(e.key)) err(`${at}: needs key`); break;
       case 'unread':
         if (!str(e.what) || !str(e.waits_on)) err(`${at}: unread needs what and waits_on`);
-        if (e.deferred !== undefined) err(`${at}: an unread effect is not deferred`);
         break;
       default: err(`${at}: unknown kind`);
+    }
+  }
+  // The direction audit.
+  {
+    const prose = pcts(n.advantage);
+    const rest = prose.slice();
+    let ok = true;
+    for (const e of n.effects.filter(x => x.kind === 'unread')) {
+      for (const p of pcts(e.what)) {
+        const i = rest.findIndex(q => close(q, p));
+        if (i < 0) { ok = false; unparsed.push(`${n.id}: unread "${e.what}" names ${p}% the advantage does not`); }
+        else rest.splice(i, 1);
+      }
+    }
+    if (rest.some(Number.isNaN)) { ok = false; unparsed.push(`${n.id}: an unsigned percentage no unread effect carries, in "${n.advantage}"`); }
+    const mods = n.effects.filter(x => x.kind === 'modifier')
+      .map(e => (e.op === 'multiply' ? (e.value - 1) * 100 : e.value * 100));
+    if (ok && (mods.length !== rest.length || !mods.every((m, i) => close(Math.round(m * 1e6) / 1e6, rest[i])))) {
+      err(`${n.id}: modifier direction/size [${mods.map(m => (m > 0 ? '+' : '') + Math.round(m * 1e6) / 1e6 + '%').join(', ')}]` +
+          ` disagrees with the advantage's [${rest.map(p => (p > 0 ? '+' : '') + p + '%').join(', ')}]: "${n.advantage}"`);
     }
   }
   if (n.placeholder && !(n.effects.length === 1 && n.effects[0].kind === 'unread' && n.effects[0].waits_on === n.placeholder))
@@ -101,6 +132,7 @@ for (const n of nodes) {
     if (!d || d.kind !== 'unread' || !str(d.waits_on)) err(`${n.id}: a quest's deed_effect is {kind: "unread", waits_on} until a deed reader exists`);
   } else if (n.deed_effect !== undefined) err(`${n.id}: only a quest carries a deed_effect`);
 }
+for (const u of unparsed) err(`direction audit cannot parse — ${u}`);
 
 // Reachability from the roots (placeholders count as reachable; they can be researched).
 const held = new Set(nodes.filter(n => !n.requires.length).map(n => n.id));

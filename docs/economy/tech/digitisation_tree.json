@@ -409,7 +409,7 @@
     {
      "kind": "modifier",
      "subject": "extraction_rate",
-     "scope": "resource:agricultural_produce",
+     "scope": "site:farm",
      "op": "multiply",
      "value": 1.05
     }
@@ -465,7 +465,7 @@
     {
      "kind": "modifier",
      "subject": "extraction_rate",
-     "scope": "resource:agricultural_produce",
+     "scope": "site:farm",
      "op": "multiply",
      "value": 1.25
     },
@@ -1032,7 +1032,11 @@
     {
      "kind": "modifier",
      "subject": "logistics_cost",
-     "scope": "resource:refined_fuel",
+     "scope": [
+      "resource:petroleum",
+      "resource:refined_fuel",
+      "resource:coal"
+     ],
      "op": "multiply",
      "value": 0.9
     }
@@ -1284,7 +1288,7 @@
      "DG-PR-EN-T6"
     ]
    ],
-   "advantage": "propellant recipe +5% yield",
+   "advantage": "propellant recipes +5% yield",
    "effects": [
     {
      "kind": "modifier",
@@ -1311,18 +1315,8 @@
      "DG-PR-EN-C2"
     ]
    ],
-   "advantage": "Chemical Plants unlock the propellant recipe at +20% yield",
+   "advantage": "propellant recipes +20% yield",
    "effects": [
-    {
-     "kind": "unlock_recipe",
-     "recipe": "propellant_atmospheric",
-     "deferred": "ruling owed (BL-1274): gating it closes the space programme at the start of play"
-    },
-    {
-     "kind": "unlock_recipe",
-     "recipe": "propellant_electrolysis",
-     "deferred": "ruling owed (BL-1274): gating it closes the space programme at the start of play"
-    },
     {
      "kind": "modifier",
      "subject": "processing_yield",
@@ -1666,8 +1660,7 @@
     {
      "kind": "mechanic",
      "key": "space_dispatch",
-     "what": "the Launchpad may operate; convoys may dispatch to other bodies",
-     "deferred": "ruling owed (BL-1274): gating it closes the space programme at the start of play"
+     "what": "the Launchpad may operate; convoys may dispatch to other bodies"
     }
    ],
    "cost_units": 24

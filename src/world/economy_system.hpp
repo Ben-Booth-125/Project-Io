@@ -920,6 +920,14 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
                          const building_component& b, float contention,
                          entity_id corp = null_entity);
 
+/// Credit one processing run's outputs (`batches` x each output) to @p pool
+/// under the BL-708 stockpile ceiling, each output scaled by @p corp's home
+/// nation's held processing_yield modifiers (BL-1274). Returns the units
+/// credited. The one place a processor's output accrues; exported so a harness
+/// can measure a yield node there.
+float credit_processing_outputs(world& w, const recipe_registry& reg, entity_id corp,
+                                const recipe& rcp, stockpile_component& pool, float batches);
+
 /// The BL-181 per-building workforce-dial solver: the workforce target (0–200,
 /// step 10) that maximises this building's estimated net this tick against the
 /// local market's price response. Exported (BL-202) so the strategic scorer can

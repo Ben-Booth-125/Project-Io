@@ -683,7 +683,12 @@ bool route_intra_body(world& w, const recipe_registry& reg, const logistics_node
 /// The priced tail every intra-body route shares: each leg's rate x distance x qty x
 /// (1 - its discount), plus handling x ports x qty. A single land leg is exactly the
 /// pre-BL-1186 expression (0 + x is x), so a land route prices to the same bits.
-convoy_leg finish_route(const intra_route& route, float qty, float handling)
+/// @p haul maps the HAUL part of the cost (the legs, before port handling) to
+/// what is charged — BL-1274's logistics_cost modifiers fold in there and never
+/// into handling, which a node of its own may move later without a
+/// double-discount. The identity for a market's own leg.
+template <typename Haul>
+convoy_leg finish_route(const intra_route& route, float qty, float handling, Haul&& haul)
 {
     convoy_leg leg;
     float cost = 0.0f;
@@ -692,6 +697,7 @@ convoy_leg finish_route(const intra_route& route, float qty, float handling)
         const route_leg& l = route.legs[static_cast<std::size_t>(i)];
         cost += l.unit_cost * l.dist * qty * (1.0f - l.discount);
     }
+    cost = haul(cost);
     if (route.ports > 0)
         cost += handling * static_cast<float>(route.ports) * qty;
     // A cost that is not a finite, non-negative number is not a price. Reached
@@ -819,17 +825,14 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
     const entity_id              dest_body   = dest_market.body;
 
     // BL-1274: the corp's home nation's held-node logistics_cost modifiers
-    // (scope "all" or the cargo good), folded into the priced leg at this one
-    // seam, so the dispatcher, the player's verb and the rival scorer all pay
-    // the same figure. A nation holding nothing gets the cost back untouched.
-    const auto nation_priced = [&](convoy_leg l) {
-        if (l.viable)
-        {
-            effect_target at;
-            at.resource = static_cast<int>(ri);
-            l.cost = nation_scalar(w, corp.home_nation, modifier_subject::logistics_cost, at, l.cost);
-        }
-        return l;
+    // (scope "all" or the cargo good), folded into the HAUL part of the priced
+    // leg at this one seam — never into port handling — so the dispatcher, the
+    // player's verb and the rival scorer all pay the same figure. A nation
+    // holding nothing gets the cost back untouched.
+    const auto nation_haul = [&](float haul) {
+        effect_target at;
+        at.resource = static_cast<int>(ri);
+        return nation_scalar(w, corp.home_nation, modifier_subject::logistics_cost, at, haul);
     };
 
     if (src_body == dest_body)
@@ -846,9 +849,9 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
         intra_route route;
         if (!route_intra_body(w, reg, nodes, src_body, origin, dest_centre, route))
             return leg;
-        leg = finish_route(route, qty, reg.port_handling());
+        leg = finish_route(route, qty, reg.port_handling(), nation_haul);
         leg.origin_tile = origin; // BL-1195: the lane starts where the haul was priced from
-        return nation_priced(leg);
+        return leg;
     }
 
     convoy_mode mode;
@@ -858,6 +861,11 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
     {
         // Inter-body: straight-line space lane, launchpad-gated.
         if (!corp_has_launchpad_on(w, corp, src_body))
+            return leg;
+        // ROCKETRY GATES LAUNCH (Ben, 2026-10-10; ERAS.md § Era 2 -> Era 3
+        // gate, "Rocketry research purchased"): the pad operates only for a corp
+        // whose home nation holds Rocketry's `space_dispatch` mechanic.
+        if (!nation_mechanic(w, corp.home_nation, "space_dispatch"))
             return leg;
         // BL-308: the pad also has to be FUELLED. A launch burns
         // `launch_draw_per_convoy()` from the corp's stockpile on the source
@@ -882,7 +890,11 @@ convoy_leg price_convoy_leg(world& w, const recipe_registry& reg,
         travel_ticks = (dist > 1.0f) ? static_cast<int>(dist + 0.999f) : 1;
     }
 
-    return nation_priced(finish_leg(mode, unit_cost, dist, qty, 0.0f, travel_ticks));
+    // A space lane is all haul (no port handling).
+    convoy_leg space = finish_leg(mode, unit_cost, dist, qty, 0.0f, travel_ticks);
+    if (space.viable)
+        space.cost = nation_haul(space.cost);
+    return space;
 }
 
 convoy_leg price_market_export_leg(world& w, const recipe_registry& reg,
@@ -908,7 +920,7 @@ convoy_leg price_market_export_leg(world& w, const recipe_registry& reg,
     if (!route_intra_body(w, reg, nodes, body, sit->second.centre_tile,
                           dit->second.centre_tile, route))
         return convoy_leg{};
-    convoy_leg leg = finish_route(route, qty, reg.port_handling());
+    convoy_leg leg = finish_route(route, qty, reg.port_handling(), [](float c) { return c; });
     leg.origin_tile = sit->second.centre_tile; // BL-1195: the lane starts at the centre
     return leg;
 }
