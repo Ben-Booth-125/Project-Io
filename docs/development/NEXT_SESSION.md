@@ -375,6 +375,11 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   road tiles 75,952; 1.06x; gate G1 96.7 / G1b 1.7 / t50 87.3 / G2 95.6 / income 34,896. App
   BUILD_OK, road_generation_harness 0 failures. LEFT: visual-check lane; BL-1119 R4 quiet timing
   (now on the snapped roads) + R6 haulage; close.
+  **VISUAL CHECKS MERGED 5b334c76:** air_gate 30/30, sea_lane 137/137 (both shown able to fail);
+  A3 fixed by drawing the refusal on the one-method grid (not by loosening). Refusal text clips at
+  panel width (cosmetic); sea capture beam faint at zoom 4 (data asserts carry it). NR-990 novelty
+  (verify fixtures fabricate state). **BL-1119 R4+R6 lane running** (quiet machine — launch nothing
+  heavy until it reports). Then: CLOSE.
   The hand-made `s50-round4-demand` worktree can be removed. Then merge the probe and
   bring Ben a lever form (dial reads past the start-up glut / reflex skips dial-idled plants / dial
   re-raises; generation must not place unpriced-output recipes; mid-chain starvation).
