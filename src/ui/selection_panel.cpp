@@ -857,7 +857,7 @@ void draw_selection_action(const world& w, const recipe_registry& reg,
                 close_all_panels(ui);
                 ui.show_market_ledger = true;
                 ui.market_ledger_view = 1; // Trades
-                ui.selected_entity    = sel; // already true; stated because the aim depends on it
+                ui.market_ledger_focus = sel; // aim it even if the selection is unchanged
             }
             ImGui::SetItemTooltip("Open this market's trades in the Market ledger.");
             break;

@@ -8,7 +8,9 @@
 #include "text_fit.hpp"
 
 #include "world/market_clearing.hpp" // market_for_tile — the nation presence row
-#include "world/supply_system.hpp"  // price_trade_leg — the Trades tab's haulage term
+#include "world/corp_command.hpp"   // max_trade_points — the form's and reserve's range
+#include "world/supply_system.hpp"  // collect_logistics_nodes — the node set the ranking prices against
+#include "world/trade.hpp"          // rank_trade_routes — read 3 is the trade pass's own ranking
 
 #include <imgui.h>
 
@@ -116,6 +118,7 @@ entity_id   g_cache_market  = null_entity;
 int         g_cache_tick    = -1;
 std::size_t g_cache_markets = 0;
 std::size_t g_cache_assets  = 0;
+entity_id   g_cache_player  = null_entity; // a seat change re-prices: the haul is the corp's
 
 // The add-trade form's state. Namespace-scope, not function-local, so a potential
 // trade's "+" press can PREFILL it (good, from here, to there) — read 3 answers
@@ -142,6 +145,7 @@ void clear_trade_records()
     g_cache_tick         = -1;
     g_cache_markets      = 0;
     g_cache_assets       = 0;
+    g_cache_player       = null_entity;
 }
 
 /// A corporation's display name; "Corp #n" when it has none.
@@ -283,22 +287,25 @@ trade_points_record collect_trade_points(const world& w)
     return p;
 }
 
-/// READ 3 — the potential-trade derivation. Buy price here against sell price
-/// there, LESS THE HAULAGE THE ROUTE WOULD COST.
+/// READ 3 — the potential-trade derivation: the routes FROM this market the
+/// trade pass itself would rank, best margin per trade point first.
 ///
-/// The haulage term is `price_trade_leg`'s own answer for a ONE-UNIT leg, so it
-/// is the number the trade pass would charge — not a second cost model that could
-/// disagree with the one that bills. That is also why the ledger holds a
-/// non-const `world&`: the call warms the A* cache and mutates no game state.
+/// NOT A SECOND PRICING MODEL. Each row is a `trade_route_offer` out of
+/// `rank_trade_routes` (trade.hpp) — the ranking auto trade spends by and the
+/// scorer's trade candidate reads — so a row exists exactly when the pass would
+/// consider the route: the source shelf holds the good under the fair-price
+/// ceiling, the buy is the source's POSTED price, the haul is
+/// `trade_haul_per_unit`'s, and the margin clears `dispatch_margin()` of the
+/// source price. A route that will not price, or a good trade does not carry,
+/// produces NO ROW. The ledger holds a non-const `world&` for this call: it warms
+/// the A* cache and mutates no game state.
 ///
-/// A leg that will not price produces NO ROW, and neither does a good trade does
-/// not carry (capacity 0). An unreachable market is not a trade at a worse margin;
-/// it is not a trade, and listing it with an invented haulage would be exactly the
-/// invented figure this surface is under instruction to avoid.
-///
-/// Cost control: the gross-spread test comes BEFORE the pricing call, so the A*
-/// runs at most once per destination market rather than once per (market, good).
-/// The result is cached by the caller against the econ tick.
+/// Cost control: the ranking is asked one destination at a time with
+/// `reach = {here, there}` (one shared haul memo), so it never prices pairs that
+/// do not leave this market's neighbourhood of the question; the gross-spread
+/// test inside it comes before any path is priced. The rows from THIS market
+/// are kept, re-sorted with the ranking's own order. Cached by the caller
+/// against the econ tick.
 std::vector<potential_trade_record> derive_potential_trades(
     world& w, const recipe_registry& reg, entity_id here_mid)
 {
@@ -307,12 +314,11 @@ std::vector<potential_trade_record> derive_potential_trades(
     const entity_id corp = w.player_entity;
     if (w.corporations.find(corp) == w.corporations.end())
         return out;
-    const auto hit = w.markets.find(here_mid);
-    if (hit == w.markets.end())
+    if (w.markets.find(here_mid) == w.markets.end())
         return out;
-    const market_component& here = hit->second;
 
     const logistics_nodes nodes = collect_logistics_nodes(w);
+    trade_haul_memo       memo;
 
     // Ascending market id — deterministic, and the same order on every frame.
     std::vector<entity_id> dests;
@@ -324,59 +330,48 @@ std::vector<potential_trade_record> derive_potential_trades(
     }
     std::sort(dests.begin(), dests.end());
 
+    std::vector<trade_route_offer> offers;
+    std::vector<trade_route_offer> pair_offers;
     for (const entity_id dm : dests)
     {
-        const market_component& there = w.markets.at(dm);
-        for (std::size_t r = 0; r < resource_count; ++r)
-        {
-            if (here.base_price[r] <= 0.0f || there.base_price[r] <= 0.0f)
-                continue; // not traded at both ends
-            if (!(trade_capacity(reg, r) > 0.0f))
-                continue; // trade moves none of this good
-            const float buy  = here.price[r];
-            const float sell = there.price[r];
-            if (!(sell > buy))
-                continue; // no gross spread — prune before paying for a path
-
-            const convoy_leg leg = price_trade_leg(w, reg, nodes, corp, here_mid, dm, r, 1.0f);
-            if (!leg.viable)
-                continue;
-
-            const float margin = sell - buy - leg.cost;
-            if (!(margin > 0.0f))
-                continue; // the haulage ate the spread
-
-            potential_trade_record rec;
-            rec.resource     = static_cast<resource_type>(r);
-            rec.name         = presentation_of(rec.resource).name;
-            rec.dest_market  = dm;
-            rec.dest_name    = market_city_name(w, dm);
-            rec.buy_price    = buy;
-            rec.sell_price   = sell;
-            rec.haulage      = leg.cost;
-            rec.margin       = margin;
-            rec.travel_ticks = leg.travel_ticks;
-            out.push_back(rec);
-        }
+        const std::vector<entity_id> reach = (here_mid < dm)
+            ? std::vector<entity_id>{here_mid, dm} : std::vector<entity_id>{dm, here_mid};
+        rank_trade_routes(w, reg, nodes, memo, corp, reach, pair_offers);
+        for (const trade_route_offer& o : pair_offers)
+            if (o.a == here_mid)
+                offers.push_back(o);
     }
 
     // RANKING IS PERMITTED HERE, and this is the one surface where that has been
     // ruled on explicitly (`CONCEPT.md` § Player identity, and Ben the same day:
     // "Market prices is a vital pillar of gameplay, but the strategy 'just build
-    // the most profitable' is a red herring"). A potential trade sorted by margin
-    // is one input among several — the player still weighs reach, stock,
-    // competition and what the price does next — so ordering it does not decide
-    // the game. Ordering TILES TO BUILD ON by margin does, and is refused.
-    std::sort(out.begin(), out.end(),
-              [](const potential_trade_record& a, const potential_trade_record& b) {
-                  if (a.margin != b.margin)
-                      return a.margin > b.margin;
-                  if (a.dest_market != b.dest_market)
-                      return a.dest_market < b.dest_market;
-                  return a.resource < b.resource;
-              });
-    if (out.size() > k_potential_rows)
-        out.resize(k_potential_rows);
+    // the most profitable' is a red herring"). A potential trade is one input
+    // among several — the player still weighs reach, stock, competition and what
+    // the price does next. The ORDER is the trade pass's own: margin per point,
+    // ties by source, destination, good.
+    std::sort(offers.begin(), offers.end(), [](const trade_route_offer& x, const trade_route_offer& y) {
+        if (x.score != y.score) return x.score > y.score;
+        if (x.a != y.a)         return x.a < y.a;
+        if (x.b != y.b)         return x.b < y.b;
+        return x.r < y.r;
+    });
+    if (offers.size() > k_potential_rows)
+        offers.resize(k_potential_rows);
+
+    for (const trade_route_offer& o : offers)
+    {
+        potential_trade_record rec;
+        rec.resource         = static_cast<resource_type>(o.r);
+        rec.name             = presentation_of(rec.resource).name;
+        rec.dest_market      = o.b;
+        rec.dest_name        = market_city_name(w, o.b);
+        rec.haulage          = o.landed - posted_price(w.markets.at(here_mid), o.r);
+        rec.buy_price        = o.landed - rec.haulage;
+        rec.margin           = o.margin_per_unit;
+        rec.sell_price       = o.margin_per_unit + o.landed;
+        rec.margin_per_point = o.score;
+        out.push_back(rec);
+    }
     return out;
 }
 
@@ -414,7 +409,18 @@ std::vector<exchange_row_record> derive_exchange_rows(const world& w, entity_id 
 /// The trade-points line and the reserve control (TRADE.md § Auto and reserved
 /// trade): what the player's Marketplaces and Ports made, how much of it is held
 /// back for manual trades, and the rest — auto.
-void draw_trade_points(const trade_points_record& p, ui_state& state, entity_id corp)
+/// Is a press of @p verb by @p corp already queued this frame? The queue drains
+/// in app::render after the ledgers draw, so a second press before the first
+/// has been answered is refused here rather than applied twice.
+bool press_pending(const ui_state& state, corp_verb verb, entity_id corp)
+{
+    for (const corp_command& c : state.pending_order_commands)
+        if (c.verb == verb && c.corp == corp)
+            return true;
+    return false;
+}
+
+void draw_trade_points(trade_points_record& p, ui_state& state, entity_id corp)
 {
     // The notes below are sentences, and the column is ~380 px: they WRAP at the
     // column edge rather than clip (NR-709's family).
@@ -434,20 +440,40 @@ void draw_trade_points(const trade_points_record& p, ui_state& state, entity_id 
         ImGui::EndTooltip();
     }
 
-    // The reserve control. The edit buffer follows the world's value until the
-    // player starts typing in it, so a set elsewhere (a load, a script) is what
-    // the field shows next frame.
+    // The reserve control. The EDITED value is kept until it is sent or the
+    // world's value changes underneath it (a load, a script, the press landing);
+    // only then does the field re-sync. Re-syncing on focus loss would reset the
+    // field on the very mouse-down that presses "Set reserve" and disable the
+    // button before its release — the press could never fire.
     static float edit_reserve = 0.0f;
-    static bool  editing      = false;
-    if (!editing)
+    static float seen_world   = -1.0f; // never a legal reserve: the first frame syncs
+    static bool  dirty        = false;
+    if (p.reserve != seen_world)
+    {
+        seen_world   = p.reserve;
         edit_reserve = p.reserve;
+        dirty        = false;
+    }
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.40f);
-    ImGui::InputFloat("##reserve", &edit_reserve, 1.0f, 5.0f, "%.1f");
-    editing = ImGui::IsItemActive();
-    if (edit_reserve < 0.0f)
+    if (ImGui::InputFloat("##reserve", &edit_reserve, 1.0f, 5.0f, "%.1f"))
+        dirty = true;
+    {
+        // The step "+" is the group's last frame-height square (verify presses it).
+        const ImVec2 mx = ImGui::GetItemRectMax();
+        const ImVec2 mn = ImGui::GetItemRectMin();
+        const float  fh = ImGui::GetFrameHeight();
+        p.plus_x = mx.x - fh * 0.5f;
+        p.plus_y = (mn.y + mx.y) * 0.5f;
+    }
+    // The seam's range: finite, >= 0, <= max_trade_points.
+    if (!std::isfinite(edit_reserve) || edit_reserve < 0.0f)
         edit_reserve = 0.0f;
+    if (edit_reserve > max_trade_points)
+        edit_reserve = max_trade_points;
     ImGui::SameLine();
-    ImGui::BeginDisabled(edit_reserve == p.reserve);
+    const bool pending = press_pending(state, corp_verb::set_trade_reserve, corp);
+    p.set_enabled = dirty && edit_reserve != p.reserve && !pending;
+    ImGui::BeginDisabled(!p.set_enabled);
     if (ImGui::Button("Set reserve"))
     {
         corp_command cmd;
@@ -455,6 +481,13 @@ void draw_trade_points(const trade_points_record& p, ui_state& state, entity_id 
         cmd.verb     = corp_verb::set_trade_reserve;
         cmd.quantity = edit_reserve;
         state.pending_order_commands.push_back(cmd);
+    }
+    {
+        const ImVec2 mx = ImGui::GetItemRectMax();
+        const ImVec2 mn = ImGui::GetItemRectMin();
+        p.set_x = (mn.x + mx.x) * 0.5f;
+        p.set_y = (mn.y + mx.y) * 0.5f;
+        p.edit  = edit_reserve;
     }
     ImGui::EndDisabled();
     ImGui::SetItemTooltip("Trade points held back for your manual trades.\n"
@@ -554,15 +587,23 @@ void draw_add_trade_form(const world& w, const recipe_registry& reg, ui_state& s
 
     ImGui::SetNextItemWidth(field_w);
     ImGui::InputFloat("Points", &g_form_points, 0.5f, 1.0f, "%.1f");
-    if (g_form_points < 0.0f)
+    // Bounded to the seam's own range (finite, > 0, <= max_trade_points), so the
+    // preview below never prints inf or NaN and the press is never one the seam
+    // refuses for its size.
+    if (!std::isfinite(g_form_points) || g_form_points < 0.0f)
         g_form_points = 0.0f;
+    if (g_form_points > max_trade_points)
+        g_form_points = max_trade_points;
     if (g_form_good >= 0)
         ImGui::TextDisabled("Ships up to %.1f units a tick.",
                             static_cast<double>(g_form_points
                                 * trade_capacity(reg, static_cast<std::size_t>(g_form_good))));
 
+    // One Add per answer: while a set_trade press is queued and not yet applied,
+    // a second press would add the same trade twice.
     const bool can_add = g_form_good >= 0 && g_form_to != null_entity
-                      && g_form_to != g_form_from && g_form_points > 0.0f;
+                      && g_form_to != g_form_from && g_form_points > 0.0f
+                      && !press_pending(state, corp_verb::set_trade, corp);
     ImGui::BeginDisabled(!can_add);
     if (ImGui::Button("Add trade"))
     {
@@ -734,7 +775,7 @@ void draw_potential_table(const std::vector<potential_trade_record>& rows, entit
             ImGui::Text("Sell there    %.2f", static_cast<double>(r.sell_price));
             ImGui::Text("Haulage /unit %.2f", static_cast<double>(r.haulage));
             ImGui::Text("Margin /unit  %.2f", static_cast<double>(r.margin));
-            ImGui::Text("Arrives in    %d qtr", r.travel_ticks);
+            ImGui::Text("Margin /point %.2f", static_cast<double>(r.margin_per_point));
             ImGui::EndTooltip();
         }
 
@@ -890,8 +931,10 @@ void draw_trades_tab(world& w, const recipe_registry& reg, ui_state& state,
         (pcit != w.corporations.end()) ? pcit->second.assets.size() : 0;
 
     if (g_cache_market != mid || g_cache_tick != w.current_econ_tick
-        || g_cache_markets != w.markets.size() || g_cache_assets != assets)
+        || g_cache_markets != w.markets.size() || g_cache_assets != assets
+        || g_cache_player != corp)
     {
+        g_cache_player  = corp;
         g_cache_market  = mid;
         g_cache_tick    = w.current_econ_tick;
         g_cache_markets = w.markets.size();
@@ -990,7 +1033,7 @@ void draw_trades_tab(world& w, const recipe_registry& reg, ui_state& state,
         }
         else
         {
-            ImGui::TextDisabled("Buy here, sell there, less haulage. Per unit.");
+            ImGui::TextDisabled("Routes the trade pass would rank from here, best per point.");
             ImGui::BeginChild("##pot_box", {0.0f, table_height(k_pot_cap)}, false);
             draw_potential_table(g_potential, mid);
             ImGui::EndChild();
@@ -1543,18 +1586,25 @@ entity_id                                  trades_market()      { return g_trade
 void draw_market_ledger(world& w, const recipe_registry& reg, ui_state& s,
                         const market_plot_history& history, bool& open)
 {
+    // Every path that does not draw the Trades tab drops its records, so a
+    // closed, collapsed or empty ledger never reads as this frame's Trades tab.
     if (!open)
+    {
+        clear_trade_records();
         return;
+    }
 
     // Re-hosted into the shell fold-out column (BL-122); closed via the nav rail.
     if (!ui::foldout_begin("Market Ledger"))
     {
+        clear_trade_records();
         ui::foldout_end();
         return;
     }
 
     if (w.markets.empty())
     {
+        clear_trade_records();
         ImGui::TextDisabled("No markets.");
         ui::foldout_end();
         return;
@@ -1579,7 +1629,20 @@ void draw_market_ledger(world& w, const recipe_registry& reg, ui_state& s,
     // to it. `last_seen_selection` guards this so the player can still browse
     // away with the combos afterward without being yanked back every frame.
     entity_id pending_focus_market = null_entity;
-    if (s.selected_entity != last_seen_selection)
+    // An explicit aim (the market Selection card's Trades door) wins even when
+    // the selection itself has not changed since the ledger last looked.
+    if (s.market_ledger_focus != null_entity)
+    {
+        const auto fit = w.markets.find(s.market_ledger_focus);
+        if (fit != w.markets.end())
+        {
+            selected_body        = fit->second.body;
+            pending_focus_market = s.market_ledger_focus;
+        }
+        last_seen_selection   = s.selected_entity;
+        s.market_ledger_focus = null_entity; // consume the request
+    }
+    else if (s.selected_entity != last_seen_selection)
     {
         last_seen_selection = s.selected_entity;
         const auto fit = w.markets.find(s.selected_entity);
@@ -1613,6 +1676,7 @@ void draw_market_ledger(world& w, const recipe_registry& reg, ui_state& s,
     const std::vector<entity_id> body_markets = markets_on_body(w, selected_body);
     if (body_markets.empty())
     {
+        clear_trade_records();
         ImGui::TextDisabled("No markets on this body.");
         ui::foldout_end();
         return;
@@ -1648,6 +1712,7 @@ void draw_market_ledger(world& w, const recipe_registry& reg, ui_state& s,
 
     if (w.markets.find(selected_market) == w.markets.end())
     {
+        clear_trade_records();
         ui::foldout_end();
         return;
     }
@@ -1679,6 +1744,16 @@ void draw_market_ledger(world& w, const recipe_registry& reg, ui_state& s,
         s.market_ledger_view = 0;
     ImGui::Separator();
     ImGui::Spacing();
+
+    // The trade press's answer belongs to the market and tab it was given on.
+    static entity_id msg_market = null_entity;
+    static int       msg_view   = -1;
+    if (msg_market != selected_market || msg_view != s.market_ledger_view)
+    {
+        msg_market = selected_market;
+        msg_view   = s.market_ledger_view;
+        s.trade_message.clear();
+    }
 
     if (s.market_ledger_view == 1)
     {

@@ -31,7 +31,7 @@ belongs to `SUPPLY.md`.
 | View | Answers (one question) | Content |
 |---|---|---|
 | **Goods** *(default)* | What is each good worth here, and which way is it moving? | A table, one row per traded good: **item glyph · name · price · price vs base · 8-quarter graph**, the graph flattened INTO the row rather than stacked under it. Every row is drawn against a **shared `price / base_price` axis with a 1.0 baseline**, which is what makes goods comparable; direction is carried by the line's colour. **`body_average_price` does not fit and is dropped** — see below |
-| **Trades** | What positions do I hold, what else is standing here, and what could I be doing? | **Four headed sections**, each bounded and scrolling inside itself. Three reads, kept visibly distinct (`MARKETS.md` § Trades) — **My trades** (with the `place_sell_order` form folded under it and an `x` per row); **All trades here**, gated on the player owning a building on the body; **Potential trades**, ranked by margin — plus the history half, **Recent trades**, over the exchange record. See § 2b |
+| **Trades** | What am I moving in and out of this market, how much of my trade capacity do I steer, and what could I be moving? | **Five headed sections** in one scroller, the long ones bounded and scrolling inside themselves (`TRADE.md`): **Trade points** (made / manual / auto, the reserve field and **Set reserve**); **My trades** (the player's trades through this market, an `x` per row, the **Add a trade** form folded under it); **All trades here**, gated on the player owning a building on the body; **Potential trades**, the trade pass's own ranking from this market, best per point, a `+` per row that fills the form; and **Recent exchanges**, over the exchange record. See § 2b |
 
 **Above the tabs, below the selectors: the nation presence row.** A wrapped row of one chip per
 nation operating in the selected market, wrapping to two or three rows if it must. **These are colour chips with initials, not flags**, and for now **placeholder chips at that**
@@ -78,7 +78,7 @@ of my trade capacity do I steer, and what could I be moving?"**
 | **Trade points** | The acting corp's `trade_points` made on the last pass, its `trade_reserve` as used (clamped to what it makes), and the rest — auto. The reserve field and its **Set reserve** press (`set_trade_reserve`); a warning when the reserve exceeds what is made, or the manual trades ask for more than it covers | `Made X pts · manual Y · auto Z` |
 | **My trades** | The acting corp's manual trades (`world::trades`) that **leave or land on the selected market**, in placement order — the order the reserve is spent in. A count of its trades elsewhere; the **Add a trade** fold (good, from, to, points → `set_trade`); the seam's answer to the last trade press | Good · Route (`from > to`, by city) · Pts · `x` (`clear_trade`); units a tick on hover |
 | **All trades here** | Every corporation's manual trades touching this market | Good · Holder · Route · Pts |
-| **Potential trades** | A derivation: buy here, sell there, less haulage. Per unit, ranked by margin; only goods trade carries (capacity > 0) | Good · To · Margin · `+` (fills the Add a trade form) |
+| **Potential trades** | The trade pass's own ranking (`rank_trade_routes`) of routes leaving this market: only goods trade carries, a source shelf that holds the good under the fair-price ceiling, a margin above `dispatch_margin()` of the source price. Margin per unit; ordered by margin per point, best first | Good · To · Margin · `+` (fills the Add a trade form); buy, sell, haul, per-unit and per-point margin on hover |
 | **Recent exchanges** | The exchange record filtered to this market, newest first | qtr · Good · With · **Revenue** |
 
 **A trade lists under both of its markets.** It leaves one and lands on the other, and the
@@ -89,13 +89,15 @@ over "an order here", "either", and "any discovered market" — taken for the or
 for the trades that replaced it). Shut, the section says so in words — "You hold no building on
 *X*" — because a shut gate and an empty list are different answers.
 
-**Potential trades price the real leg.** The haulage term is `price_trade_leg`'s own cost for a
-one-unit leg, so the figure the player acts on is the figure the trade pass would bill; there is
-no second haulage model to disagree with the one that charges. A lane that will not price
-produces **no row** — an unreachable market is not a trade at a worse margin, it is not a trade.
-The read is cached against the econ tick and the player's asset count, because pricing runs an
-A\* on a cache miss and doing that per frame over every market is the shape of the stall that
-narrowed `invalidate_logistics_caches`.
+**Potential trades are the trade pass's own ranking, not a second model.** Each row is an offer
+from `rank_trade_routes` (`TRADE.md` § Auto and reserved trade) — the ranking auto trade spends by —
+asked one destination at a time and kept where the source is this market. So the buy is the
+source's **posted** price, the haul is `trade_haul_per_unit`'s, a shelf that holds none of the good
+or that the fair-price ceiling refuses produces no row, and a route whose margin does not clear
+`dispatch_margin()` of the source price produces none either: a row is a route the pass itself would
+consider. The order is the pass's own — margin per trade point (per-unit margin × the good's
+capacity). The read is cached against the econ tick, the player's asset count and the seat, because
+pricing runs an A\* on a cache miss.
 
 **The `+` fills the form; it does not trade.** A ranked row becomes a trade only when the player
 sets its points and presses Add — points auto would otherwise spend — so the ranking stays one

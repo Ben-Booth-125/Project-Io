@@ -2747,6 +2747,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["auto"]         = p.auto_points;
         out["manual_asked"] = p.manual_asked;
         out["manual_count"] = p.manual_count;
+        out["edit"]         = p.edit;        // the reserve field as drawn
+        out["set_enabled"]  = p.set_enabled; // "Set reserve" pressable this frame
+        out["plus_x"] = p.plus_x; out["plus_y"] = p.plus_y; // the field's "+" step
+        out["set_x"]  = p.set_x;  out["set_y"]  = p.set_y;  // "Set reserve"
         return out;
     });
 
@@ -2851,7 +2855,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             row["sell_price"]   = r.sell_price;
             row["haulage"]      = r.haulage;
             row["margin"]       = r.margin;
-            row["travel_ticks"] = r.travel_ticks;
+            row["margin_per_point"] = r.margin_per_point; // the ranking key
             out[i++] = row;
         }
         return out;

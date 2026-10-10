@@ -9,10 +9,12 @@
 --
 -- What this holds down:
 --
---   1. THE PRESSES REACH THE SEAM. Add (set_trade), x (clear_trade) and Set
---      reserve (set_trade_reserve) are enqueued exactly as the tab's buttons
---      enqueue them, applied by app::render, and land in WORLD state; the tab's
---      next frame draws what the world now holds, and the seam's answer is shown.
+--   1. THE PRESSES REACH THE SEAM. The reserve is set by CLICKING the tab's own
+--      "+" step and "Set reserve" button through the real input path (a review
+--      found the button could never fire: the field re-synced on the mouse-down
+--      and disabled it before release). Add (set_trade) and x (clear_trade) are
+--      enqueued exactly as the tab's buttons enqueue them. All are applied by
+--      app::render and land in WORLD state; the seam's answer is shown.
 --   2. THE TRADE-POINTS LINE IS THE WORLD'S. made / reserve / auto are the
 --      corporation record's, with the reserve clamped to what is made.
 --   3. THE READS ARE DISTINCT, AND THE GATE ON READ 2 IS REAL - including SHUT.
@@ -47,11 +49,27 @@ verify.expect(near(pts.made, verify.player_trade_points()),
 print(string.format("MEASURED trade points: made %.2f, reserve %.2f (used %.2f), auto %.2f",
     pts.made, pts.reserve, pts.reserve_used, pts.auto))
 
-verify.expect(verify.set_trade_reserve(3.0), "set_trade_reserve(3) applied")
-verify.frames(2)
+-- The tab's own reserve control, pressed with the mouse: three clicks on the
+-- field's "+" step (1.0 each), then "Set reserve".
+local r0 = pts.reserve
+verify.expect(not pts.set_enabled, "'Set reserve' is idle while the field equals the reserve")
+verify.expect(pts.plus_x > 0 and pts.set_x > 0, "the reserve control published its press points")
+for _ = 1, 3 do
+    verify.click(pts.plus_x, pts.plus_y)
+    verify.frames(2)
+end
 pts = verify.trade_points_panel()
-verify.expect(near(pts.reserve, 3.0), "the line reads the reserve as set (" .. pts.reserve .. ")")
-verify.expect(near(pts.reserve_used, math.min(3.0, pts.made)),
+verify.expect(near(pts.edit, r0 + 3.0), "the '+' step edited the field (" .. pts.edit .. ")")
+verify.expect(pts.set_enabled, "'Set reserve' is pressable once the field differs")
+verify.expect(near(pts.reserve, r0), "editing alone sends nothing (" .. pts.reserve .. ")")
+verify.click(pts.set_x, pts.set_y)
+verify.frames(3) -- press frame, drain frame, redraw frame
+pts = verify.trade_points_panel()
+verify.expect(near(pts.reserve, r0 + 3.0),
+    "the 'Set reserve' CLICK set the reserve (" .. pts.reserve .. ", answer: " .. verify.trade_message() .. ")")
+verify.expect(near(pts.edit, pts.reserve) and not pts.set_enabled,
+    "the field re-syncs to the world once the press lands")
+verify.expect(near(pts.reserve_used, math.min(pts.reserve, pts.made)),
     "the reserve is clamped to what is made (" .. pts.reserve_used .. ")")
 verify.expect(near(pts.auto, math.max(0.0, pts.made - pts.reserve_used)),
     "auto is the rest (" .. pts.auto .. ")")
@@ -200,11 +218,11 @@ if #pot > 0 then
         local want = r.sell_price - r.buy_price - r.haulage
         if math.abs(r.margin - want) > math.max(1e-3, math.abs(want) * 1e-4) then bad_margin = bad_margin + 1 end
         if r.margin <= 0.0 then non_positive = non_positive + 1 end
-        if prev ~= nil and r.margin > prev + 1e-4 then out_of_order = out_of_order + 1 end
-        prev = r.margin
+        if prev ~= nil and r.margin_per_point > prev + 1e-4 then out_of_order = out_of_order + 1 end
+        prev = r.margin_per_point
     end
     verify.expect(bad_margin == 0, "margin is sell there - buy here - haulage (" .. bad_margin .. " wrong)")
-    verify.expect(out_of_order == 0, "potential trades are ranked by margin, best first")
+    verify.expect(out_of_order == 0, "potential trades are in the trade pass's order: margin per point, best first")
     verify.expect(non_positive == 0, "a listed potential trade clears its haulage")
 else
     print("MEASURED: no potential trade clears its haulage from this market")

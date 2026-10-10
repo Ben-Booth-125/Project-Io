@@ -1121,6 +1121,12 @@ struct ui_state
     /// mutates nothing, so the player is told why. Empty = nothing to say.
     std::string trade_message;
 
+    /// BL-1269: an explicit request to aim the Market ledger at this market (the
+    /// market Selection card's Trades door). Consumed by the ledger's next draw;
+    /// unlike following `selected_entity`, it fires even when the selection has
+    /// not changed since the ledger last looked. null_entity = no request.
+    entity_id market_ledger_focus = null_entity;
+
     /// BL-323 S2b: the logistics-reach budget the UI must filter on, mirrored here
     /// from `recipe_registry::construction().max_logistics_reach` at load time.
     ///

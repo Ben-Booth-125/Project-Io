@@ -13,9 +13,9 @@ namespace ui {
 /// Draws the Market Ledger window. open controls visibility (toggled by nav rail).
 ///
 /// @param w       World. NON-CONST, and for exactly one reason: the Trades tab's
-///                potential-trade derivation prices real trade legs through
-///                `price_trade_leg`, which takes a `world&` because it warms the
-///                A* path cache. That call mutates no game state (supply_system.hpp
+///                potential-trade read is the trade pass's own ranking,
+///                `rank_trade_routes`, which takes a `world&` because it warms the
+///                A* path cache. That call mutates no game state (trade.hpp
 ///                says so in as many words), and pricing through the same function
 ///                the trade pass bills with is the whole point — there is no second
 ///                haulage model for the surface to disagree with. Nothing else here
@@ -131,6 +131,12 @@ struct trade_points_record
     float auto_points   = 0.0f;  ///< made - reserve_used: the rest is auto.
     float manual_asked  = 0.0f;  ///< Sum of the player's manual trades' points, everywhere.
     int   manual_count  = 0;     ///< The player's manual trades, everywhere.
+    // The reserve control AS DRAWN, so a check can press it through the real
+    // input path (verify.click) rather than calling the seam around it.
+    float edit          = 0.0f;  ///< The value in the reserve field.
+    bool  set_enabled   = false; ///< Whether "Set reserve" was pressable this frame.
+    float plus_x = -1.0f, plus_y = -1.0f; ///< Screen centre of the field's "+" step.
+    float set_x  = -1.0f, set_y  = -1.0f; ///< Screen centre of "Set reserve".
 };
 
 /// The trade-points read as last drawn.
@@ -139,23 +145,26 @@ const trade_points_record& trade_points_read();
 /// One row of the potential-trades DERIVATION — read 3, and the only one with no
 /// store behind it.
 ///
-/// `margin` is `sell_price - buy_price - haulage`, per unit, and every term is a
-/// real read: the two prices come from the two `market_component`s and `haulage`
-/// is `price_trade_leg`'s own cost for a one-unit leg, so the figure a player
-/// acts on is the figure the trade pass would charge them. A leg that will not
-/// price (no anchor, no route, no pad, no propellant) produces NO ROW — an
-/// unreachable market is not a trade at a worse margin, it is not a trade.
+/// A ROW IS A `trade_route_offer` FROM `rank_trade_routes` (trade.hpp) — the
+/// ranking the trade pass's auto trade spends by — kept where the source is the
+/// selected market. So `buy_price` is the source's POSTED price, `haulage` is
+/// `trade_haul_per_unit`'s, `sell_price` the destination's dispatch price, and
+/// `margin` (`sell - buy - haulage`, per unit) clears `dispatch_margin()` of the
+/// source price; a source shelf the fair-price ceiling refuses, or that holds
+/// none of the good, produces NO ROW, as does a route that will not price.
+/// Rows are ordered by `margin_per_point` (margin x the good's trade capacity),
+/// the pass's own order.
 struct potential_trade_record
 {
     resource_type resource     = resource_type::iron_ore;
     const char*   name         = "";
     entity_id     dest_market  = null_entity;
     std::string   dest_name;                   ///< `market_city_name` of the destination.
-    float         buy_price    = 0.0f;         ///< `price[r]` at the SELECTED market.
-    float         sell_price   = 0.0f;         ///< `price[r]` at the destination.
-    float         haulage      = 0.0f;         ///< Per-unit haul cost on the priced leg.
+    float         buy_price    = 0.0f;         ///< POSTED price at the SELECTED market.
+    float         sell_price   = 0.0f;         ///< The destination's dispatch price.
+    float         haulage      = 0.0f;         ///< `trade_haul_per_unit` on the route.
     float         margin       = 0.0f;         ///< sell - buy - haulage, per unit.
-    int           travel_ticks = 1;            ///< Quarters the leg takes.
+    float         margin_per_point = 0.0f;     ///< margin x capacity(resource): the ranking key.
 };
 
 /// One row of the exchange-record read — the history half, over `world::exchanges`.
@@ -198,7 +207,7 @@ const std::vector<trade_row_record>& market_trades();
 /// trades of markets they operate in, not of the whole system.
 bool market_trades_open();
 
-/// Read 3 — the potential-trade derivation, ordered by margin, best first.
+/// Read 3 — the trade pass's ranked routes from this market, best margin per point first.
 /// Ranking is permitted HERE and only here (`CONCEPT.md` § Player identity: rank
 /// where the top row is one input among several, not where it IS the move).
 const std::vector<potential_trade_record>& potential_trades();
