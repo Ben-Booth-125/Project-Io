@@ -969,6 +969,11 @@ and how far is this ground from the capacity that would move it? Owned by BL-606
 rather than a new one. Its companion duty is the same section's *"surfacing is
 non-optional"*: a cap nobody can see is silent interdiction again.
 
+**The road network is drawn at full weight under this lens** (Ben, 2026-10-10). On the
+ground roads are thin pale threads of the land (RENDERING.md § Roads and sea lanes), so the
+network as logistics — every road and lane by tier, at the 1 : 1.5 : 2 weights — is read
+here, over the reach-cost field the network itself produces.
+
 **Data definition.** Two reads, both of things that already exist.
 
 - The **field** is `body_reach_field`, read per tile through the const

@@ -1711,6 +1711,81 @@
     "src/world/history_sim.cpp"
    ],
    "design": "DESIGNED in INDUSTRIALISATION.md (Ben, 2026-09-15, the three sinks: Rail = the road ladder's next rung, on corridors from the city, feeding property 7 - cheaper long hauls on land; also § the corridor throughput and rail rung row, and road tiers with the rail rung stamped from corridors) and ROADMAP.md (Logistics modes: rail as its own mode). NOT BUILT: road_level stops at Highway (3); the industry tree unlocks Rail Head (IN-MV-1a) but nothing lays track. WORK (design owed where the docs are silent - LOGISTICS.md § 1 traversal cost and § 4 roads must say how rail prices a haul, whether it is a road_level value or its own field, how a player builds it, and how the Industrialisation span stamps it): a world-mover - measure before/after on market_viability and the haulage readings, report digest movement, re-bless only with authorisation. RENDERING: the rail surface (ballast, sleepers, twin rails) is already painted by the route pass (BL-1253, roads painted) for a tier nothing sets yet - wire it to the rung."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 51,
+   "written": "2026-10-10",
+   "requires": [
+    "BL-1246"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 4,
+   "id": "BL-1256",
+   "short_name": "GROUND_LOOK_C_F",
+   "author": "Ben (2026-10-10, the ground look form: it3 C-F is the target)",
+   "title": "The ground looks like the it3 C-F reference: khaki/olive-grey palette with a wide value range, relief on every hex, a low-sun cast-shadow pass, grey-blue water with glints, rapids and rocky banks, and no per-tile tone",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "files": [
+    "src/ui/ground_bake.cpp",
+    "src/ui/ground_bake.hpp",
+    "src/ui/terrain_palette.cpp",
+    "tools/verify/ground_bake_check.cpp"
+   ],
+   "design": "SETTLED: RENDERING.md § Art direction and palette (the it3 C-F target bullets) and § Tiles hold their own ground (no per-tile tone, 2026-10-10). WORK: palette toward khaki/olive-grey, widen the value range (lit slopes near warm off-white, shadows near black), cut the broad mottle, strengthen the grade S-curve; plains roll (folds ~0.3-0.5 hex apart); a cast-shadow pass on the height field from the NW light; water grey-blue with glints, rapids where rivers fall, rocky banks; same-terrain ground continuous (no per-tile tone/variant tint, patterns on continuous fields), different-terrain edges keep the band and border sets. Side-by-side captures against docs/ui/design/renders/map (it3 C-F), judged with Ben live. All harness rows (window invariance P24 etc.) keep passing; measure bake cost vs the 15 s wait."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 51,
+   "written": "2026-10-10",
+   "requires": [
+    "BL-1253"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1257",
+   "short_name": "ROADS_THIN_LENS",
+   "author": "Ben (2026-10-10, the ground look form: it3 C-F is the target)",
+   "title": "Roads on the ground are thin pale threads (~2-3% of a hex); the Throughput lens draws the network at full weight",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "files": [
+    "src/ui/route_paint.hpp",
+    "src/ui/route_paint.cpp",
+    "src/ui/body_surface_canvas.cpp"
+   ],
+   "design": "SETTLED: RENDERING.md § Roads and sea lanes (tier widths Track 0.015, Road 0.022, Highway 0.03, lane 0.025; the thin drawn network at the two widest rungs keeps 1:1.5:2 weights) and LENSES.md § Throughput lens (draws the road network at full weight). WORK: retune route_paint widths and surfaces so thin roads still read their tier (colour/texture), re-check the road/structure agreement and forecourts at the new widths, add the network draw to the Throughput lens. Harness P28-P30 keep passing."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 51,
+   "written": "2026-10-10",
+   "requires": [
+    "BL-1241"
+   ],
+   "blocked_on": null,
+   "parked": false,
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 3,
+   "id": "BL-1258",
+   "short_name": "TOWNS_DENSER",
+   "author": "Ben (2026-10-10, the ground look form: it3 C-F is the target)",
+   "title": "Towns are denser and larger: compact multi-storey blocks with lit roofs, shaded sides, stacks and a street grid, reading as a town from the mid rungs",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "files": [
+    "src/ui/structure_stamps.cpp",
+    "tools/verify/ground_bake_check.cpp"
+   ],
+   "design": "SETTLED: RENDERING.md § Art direction and palette (towns bullet). WORK: procedural settlement forms in structure_stamps scaled up in footprint, height and block count by scale step, with lit roofs, shaded sides, stacks and a street grid that the route plan (tile_road_plan) keeps as streets; read as a town at rung 2. Window invariance and the bounds mode keep passing. Authored town stamps are a later item."
   }
  ]
 }

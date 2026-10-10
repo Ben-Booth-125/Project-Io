@@ -240,6 +240,14 @@ tile, and it can be hard to see where one tile begins and ends."* The ground was
 interpolated between tile centres by design, and the terrain variants widened that blend to
 about a tile and a half, so neighbouring tiles melted together. Three changes answer it:
 
+- **No per-tile tone** (Ben, 2026-10-10, against the it3 C-F reference: *"drop per-tile tone;
+  tiles read by the seam and terrain only, as in the references"* — this revises the
+  2026-10-09 bullet below). Ground of the SAME terrain is continuous: no tile carries a tone,
+  variant tint or pattern bounded by its hex, and patterns (furrows, scree, ripples, tussocks)
+  follow continuous fields across tiles rather than filling a hex edge to edge. A tile is read
+  by the close-zoom seam (§ The grid rule) and by what its terrain is; where the terrain
+  CHANGES, the narrow edge band and the border sets below still hold, so different terrains
+  meet crisply. The 2026-10-09 rule, kept for different-terrain edges only:
 - **Each tile keeps its own ground.** A tile's body carries its own material colour, its
   own variant and its own texture undiluted; it blends into a neighbour only in a **narrow
   band at the shared edge** — **0.13 canonical units each side of it**, 15% of the hex's
@@ -460,10 +468,13 @@ both draw by one rule:
   road lattice's rungs are real roads and are drawn). On the lapse's small map
   the walk's staircase is first string-pulled over the water, then corner-cut, every
   cut checked against the sea.
-- **One named width per tier**, as a fraction of the drawn hex radius (floored at a
-  10 px radius so the tiers stay apart on the whole-grid view): **Track 0.06, Road
-  0.09, Highway 0.12** — the 1 : 1.5 : 2 ladder — and the **sea lane 0.10**, told
-  from the road ladder by its sea blue rather than its weight.
+- **One named width per tier**, as a fraction of the hex radius: **Track 0.015, Road
+  0.022, Highway 0.03** — thin pale threads, as in the references (Ben, 2026-10-10: roads
+  about 2-3% of a hex; they were 0.06 / 0.09 / 0.12) — and the **sea lane 0.025**. On the
+  ground a road is a detail of the land, not the logistics map: **the network is read
+  through a lens** (LENSES.md § Throughput lens draws the road network at full weight), and
+  the thin drawn network at the two widest rungs keeps the old 1 : 1.5 : 2 weights so the
+  web stays legible there.
 - **LOD:** below a **20 px drawn radius** (`k_route_lod_radius_px` — between the
   second rung, ~13 px, and the third, ~27 px) a curve is **one stroke**, its two
   halves joined in a single path, with no round joint at the apex, and each half is
@@ -595,7 +606,31 @@ The settled house values this doc consumes (authority for their settlement:
 | Canvas background | `#0F0F14` — matches the app clear colour |
 | Selection / EARNED accent | Amber `#E8A33D` |
 | Secondary accent | Saturated cyan `#3FC9E8` |
-| Ground | C-F: painterly relief base, near-future grade over it |
+| Ground | C-F: painterly relief base, near-future grade over it — **the it3 C-F render is the target** (below) |
+
+**The target is it3's C-F panel: dark, cold, hostile** (Ben, 2026-10-10, judging the build
+against `docs/ui/design/renders/map/`). What it asks of the bake, procedurally, in this order:
+
+- **Palette and value.** Base hues move from mint and teal toward **khaki and olive-grey**;
+  the value range widens — **lit slopes near a warm off-white, shadows near black** — where
+  the build sat in a narrow mid-dark band; the broad dark mottle that belonged to no
+  landform is cut. The grade's S-curve strengthens to hold the range.
+- **Relief everywhere.** Every hex carries terrain shape: **plains roll** as low hills with
+  folds ~0.3-0.5 hex apart (they were held calm), ranges rise above them. The landform
+  forms keep their drama on top.
+- **Cast shadows.** A **low-sun shadow pass** on the height field throws shadow across the
+  ground behind ridges and hills, from the same NW light, so relief reads as mass, not only
+  as slope shading.
+- **Water.** Rivers and sea move from saturated royal blue to **grey-blue**, with specular
+  glints, white **rapids** where a river falls, and **rocky banks**.
+- **Towns.** Settlements are **denser and larger**: compact blocks of multi-storey buildings
+  with lit roofs, shaded sides, stacks and a street grid, reading as a town from the mid rungs.
+- **Forests** keep their current procedural form for now (Ben did not take the conifer change).
+
+Truly painterly trees and towns need authored brushes and stamps; that is a later item, on
+the stamp seam that already exists. What the reference owes to its low perspective camera —
+silhouetted ridges, foreshortening, distance haze — is out of reach of the top-down bake
+(§ The staged end-state).
 
 **Assets.** Authored raster brushes and structure stamps — the project's first
 shipped raster art beyond fonts — live under **`assets/brushes/`**, resolved
