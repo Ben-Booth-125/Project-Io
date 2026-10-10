@@ -718,24 +718,40 @@ struct world_digest_pin
 // households BL-1196/1163/1179, density per good BL-1204, the seat's clean
 // slate BL-1206, shelf k = 1 BL-1209, no unobtainable sites BL-1183).
 // The 2026-10-04 values are one commit back in git history.
+// RE-PINNED 2026-10-10 (sprint 50's one re-bless, with the shelf economy and
+// trade; Ben's go 2026-10-10, PREPARED for his authorisation against the shape
+// in docs/development/drafts/sprint-50-shelf-rebless.md, which carries the old ->
+// new rows and every named cause): taken by player_seed_sweep --digest --arc legacy
+// over the sixteen library seeds on a build of c8752b8a (claude/shelf-economy-
+// trade-42f8f4), same toolchain. Every row seated exactly one player. All
+// sixteen rows moved from D_search on. Generation through the spans is
+// unchanged (rebless_shape_probe: every span counter, region, centre and market
+// identical to sprint 49's tree); road length -3% from no parallel roads
+// (BL-1252). D_search on carries the landscape search's economy, so every
+// campaign-economy mover reaches it: sprint 50's supply-judged plants (BL-1217
+// D5/D6, R1-R3; BL-1227, BL-1233, BL-1234, BL-1235), power per grid
+// (BL-1230/1232), the lane follows its legs (BL-1195), and the shelf economy
+// and trade (BL-1265..1270, the rulings of 2026-10-10, the rival Marketplace
+// scored as any build). The 2026-10-07 values are one commit back in git
+// history.
 const std::vector<world_digest_pin> k_world_digest_pins = {
     //  seed  D_search               D_land                 D_settle               D_seat
-    { 46u, 0x99B20B3C6471638Eull, 0x9F23835060D6CB06ull, 0x455C25076561A790ull, 0x8FBAB8D732E218D5ull },
-    { 28u, 0x1EFCD95FE3895DBFull, 0xE71300727201D677ull, 0x43C621C42EE3271Bull, 0x39C2B4893B51E82Aull },
-    { 11u, 0xFB6424C90C5972DDull, 0xDBB8076A6F5BC69Aull, 0xE71133211D684A04ull, 0xC39D7005E176B578ull },
-    { 31u, 0x74FE029BE89D146Eull, 0x1A08D918D489053Aull, 0x95251B6FE8704D80ull, 0x4FE7B921C2A3858Full },
-    { 40u, 0x5452676FAF2AC979ull, 0x98363380358CC5F2ull, 0x2C94EDA4C86E7F80ull, 0xDE01AAB5D43805C5ull },
-    { 12u, 0x7D3A9131228C5447ull, 0xEE91397B8FAF2691ull, 0x7E30725B21569028ull, 0x91B50799C205725Cull },
-    { 37u, 0x6B74B416CF11B2E7ull, 0xCC3D13E5C3351F2Bull, 0x0E2591ED42220ACDull, 0xD86655D212C2010Cull },
-    { 13u, 0x62EA922DB948C1D1ull, 0xE914EF28C7A04EB8ull, 0x2B30AE5ECCE5F546ull, 0xA691D8C22B98D898ull },
-    { 41u, 0x741C2B7AC7620075ull, 0xECFE4BE5E812C8C9ull, 0x0E7DFD7D7A7E9003ull, 0x0A4867E97095DB6Full },
-    { 43u, 0xD485E514436FC786ull, 0xD0D730522E621FB3ull, 0x961E98C0296C0E1Dull, 0x4AEA2C6DFBE01185ull },
-    { 32u, 0x0895DA418FB7B07Dull, 0x4633FAD27EBD92D4ull, 0xBCA3389F93E8F4B1ull, 0xFEC52B768A0FFD10ull },
-    { 10u, 0xC7B8CFBCEDBC9B4Eull, 0x08B86D9A796ADC90ull, 0xAB86E45167836328ull, 0xBF3C45C13116AA76ull },
-    { 25u, 0x6E0CCB13CA9EF879ull, 0x9D05CA13D1ADF2ABull, 0x50C3A24ECD65009Cull, 0x84E1F25F72674237ull },
-    { 38u, 0xDF4B4578E1B02ADFull, 0x2D9F257DC7C7C793ull, 0xA86EBE57A22D309Dull, 0x3E05C240744C9B70ull },
-    {  9u, 0x5E71BFBFE5B35706ull, 0xAD76B7051D97C4E6ull, 0xCC3A31D59FFC6430ull, 0x0284969236D60376ull },
-    {  0u, 0xC43566CEFAAF8F39ull, 0x58940249CE0D9132ull, 0x0F672ECBEFF3B6C0ull, 0x5935E03F97BC4B46ull },
+    { 46u, 0x15000AB5CDBA31DDull, 0x9EB740B16DBA683Eull, 0xA0AF1921499CCB6Full, 0x0F9B4E5EB684F655ull },
+    { 28u, 0x2A3C5EB7128592A1ull, 0x46C5A1CC30239685ull, 0xB6785C9351DB15A4ull, 0xFD3A5291D01296E4ull },
+    { 11u, 0x15403A4A46BEF999ull, 0x270AF4F3AA0F0648ull, 0x556557C498A9A0A7ull, 0x3D925E9D1C5CD710ull },
+    { 31u, 0xE39B47DD9AD359A7ull, 0xD45A71EE592CE871ull, 0x2C7FDE6FE4BEC1FAull, 0x8F04A63FAEFCAC1Bull },
+    { 40u, 0xCBFCE09CC1B06984ull, 0x4A1303236DDF2211ull, 0xE9C583E9E85EC029ull, 0x9E39162A58F2AA54ull },
+    { 12u, 0xCF299A2FC0276D71ull, 0xAB86671F633BEE19ull, 0x4773BAE16D62EEB4ull, 0xDC1EFF2770055430ull },
+    { 37u, 0xB6601B169F4E7E8Aull, 0x38D6D8880CDF452Eull, 0x22FDFCC633568677ull, 0xF1C7C84C7547512Cull },
+    { 13u, 0xD8D6549E3262096Dull, 0xC4115119693167FCull, 0x8E73484527229EB3ull, 0xC202FBCB55E41E6Full },
+    { 41u, 0x60BEB25E3E716973ull, 0x6B77CD095F83E40Eull, 0x1193D914F618A145ull, 0x77681A86941FDCCEull },
+    { 43u, 0x693ADC75B1DCF2CCull, 0x40BB0EAF8D1FEF02ull, 0x9DBCA94FFC898CDAull, 0x8ACBBA485B64A596ull },
+    { 32u, 0x723F6339DCBEB496ull, 0x3EFD3C6DF1053A90ull, 0x4CAB3C1C15520557ull, 0x6D69F90977C18765ull },
+    { 10u, 0x57F8EE05A084ADAFull, 0x29C5DB3CE3447F1Bull, 0x293FB881F054AD2Bull, 0xD7C3C79BBB476E05ull },
+    { 25u, 0x5673EF3E96DC986Full, 0x0308707F605E33FCull, 0xF6B6AA92D949D68Full, 0x6C792D86BA50756Full },
+    { 38u, 0xF5BB184F9DB176C3ull, 0x4839F3DCE495D788ull, 0x85B63173B7038B1Aull, 0x6E628DC35D273164ull },
+    {  9u, 0xDEFB0792E143B7B0ull, 0x6D9A7F18C7B8D6F7ull, 0xB2DE4707C2B27602ull, 0xB595A8F1922B4A8Dull },
+    {  0u, 0xC815FD288A21C365ull, 0x4172C1FDAD356D3Full, 0x2256035B1F424456ull, 0xAB00AFACE912BA8Aull },
 };
 
 // THE SHIPPED ARC'S PINS (BL-1044) — the same sixteen library worlds on the
@@ -811,24 +827,40 @@ const std::vector<world_digest_pin> k_world_digest_pins = {
 // (BL-1196/1163/1179), shelf k = 1 (BL-1209), the seat's clean slate
 // (BL-1206), no unobtainable sites (BL-1183 C1). The 2026-10-04 values are one
 // commit back in git history.
+// RE-PINNED 2026-10-10 (sprint 50's one re-bless, with the shelf economy and
+// trade; Ben's go 2026-10-10, PREPARED for his authorisation against the shape
+// in docs/development/drafts/sprint-50-shelf-rebless.md, which carries the old ->
+// new rows and every named cause): taken by player_seed_sweep --digest
+// over the sixteen library seeds on a build of c8752b8a (claude/shelf-economy-
+// trade-42f8f4), same toolchain. Every row seated exactly one player. All
+// sixteen rows moved from D_search on. Generation through the spans is
+// unchanged (rebless_shape_probe: every span counter, region, centre and market
+// identical to sprint 49's tree); road length -3% from no parallel roads
+// (BL-1252). D_search on carries the landscape search's economy, so every
+// campaign-economy mover reaches it: sprint 50's supply-judged plants (BL-1217
+// D5/D6, R1-R3; BL-1227, BL-1233, BL-1234, BL-1235), power per grid
+// (BL-1230/1232), the lane follows its legs (BL-1195), and the shelf economy
+// and trade (BL-1265..1270, the rulings of 2026-10-10, the rival Marketplace
+// scored as any build). The 2026-10-07 values are one commit back in git
+// history.
 const std::vector<world_digest_pin> k_shipped_digest_pins = {
     //  seed  D_search               D_land                 D_settle               D_seat
-    { 46u, 0x447A1E86FC2FA441ull, 0xA063F01DCEE5CCBDull, 0x9B67089BEC4FEB9Aull, 0x70F09094E9DACEC0ull },
-    { 28u, 0x876D419405ED40C3ull, 0x7B114F30EF9442C8ull, 0x3FE193B19D45CD41ull, 0x2873CC6AB7E59ECDull },
-    { 11u, 0x00297EE71A9C4AD8ull, 0xB57B6FE05F4CA85Eull, 0x696F162B519F8476ull, 0x59D0BB1BCD925157ull },
-    { 31u, 0x76BE58A2272C98FCull, 0xE5F5BC29D381DA57ull, 0xD2C0B66B1D8006EFull, 0x7EA4EFD9D12B6251ull },
-    { 40u, 0x9208A632B3CAD766ull, 0xA0D72CB637CB7FDDull, 0x7619E371E5B53B51ull, 0x70471A466ECA279Bull },
-    { 12u, 0x18A5741AB8504230ull, 0x4DE1C6A2594D33EFull, 0x8C4623D450F1F536ull, 0x9664B20733E9359Full },
-    { 37u, 0x117C377EA9E31DE2ull, 0xDC58DE35F15B8E3Bull, 0xD2D4D5B6185B3192ull, 0x55A94AE4DC9AB84Bull },
-    { 13u, 0x320F15EFA010E9B4ull, 0xFAB4CD5842319A91ull, 0x0928BC574ED6D3E0ull, 0x24CBFB265549FD88ull },
-    { 41u, 0xD14DF4409D806F07ull, 0xEA417F7927CE8CA1ull, 0x0E47B3CA66F3383Full, 0x900DE56D25D1D461ull },
-    { 43u, 0x11411BC159733D0Bull, 0x9EF416685AAE20A0ull, 0x8894484311E63B66ull, 0xC813327BF358EFC9ull },
-    { 32u, 0xC536B6E1F9BDA013ull, 0xD8719F504BC32D86ull, 0x4963D79FC29B5AF9ull, 0xC6FEBE72FA2FA51Aull },
-    { 10u, 0x0F4407C70B4DF54Bull, 0x89ECFE6D59DD0EF4ull, 0x2CFE162D6B8B1C62ull, 0x4570671D135F16B6ull },
-    { 25u, 0x33A1A21D99F399B2ull, 0xE9F8530ECAA59E79ull, 0xBED51C01DA829370ull, 0x25E74197CD2F134Aull },
-    { 38u, 0x0842AD7CB1C46C88ull, 0x02D84FBB1960C63Full, 0x56FA72573A7AD9F5ull, 0xD0FE83DA18F683C2ull },
-    {  9u, 0xC7FC8A2410FE181Full, 0x298489BC06ACC751ull, 0x34B00A511A13DAADull, 0xD9F4A6171224D823ull },
-    {  0u, 0xC8964E73F6BAC81Bull, 0xE22562E3C4EAAD26ull, 0x8A6F5A96D6A3795Dull, 0x383572BE156A317Bull },
+    { 46u, 0xE857EF697B32414Cull, 0x260E53AADA8849D1ull, 0x899594D4AA1A20BEull, 0x74B80BE9E112EFB1ull },
+    { 28u, 0xE12DBAECD33C9288ull, 0x93E415AC6AF5B186ull, 0xAE7FB6CBB13D1628ull, 0xD4951549DC2D47BBull },
+    { 11u, 0x26C93057012F3530ull, 0x9B7CDE116CE09AD8ull, 0xCC1FA69D400771D4ull, 0xDD7949C9813E9AB2ull },
+    { 31u, 0x3F9C00C195B5D34Bull, 0x66D07EB8F0E6A674ull, 0xDCEBB4CBE2A07B4Cull, 0x1B8708BE7B755BDDull },
+    { 40u, 0xA713EAD245D9BF56ull, 0xF2DFE1F97C114A29ull, 0x37F5677329AFFA4Full, 0x0DE716963DE993DFull },
+    { 12u, 0xAC41EACA9CF7D585ull, 0x5AC3561DEC2684B7ull, 0x9E5702EB517252BFull, 0xABBFD3C81D82A260ull },
+    { 37u, 0xE8A486CC82858034ull, 0xA2BD79B6D806EC2Aull, 0xE8927C489BF453AEull, 0x8AF1D9E01FAF8E9Eull },
+    { 13u, 0x5365FB19C0F2051Cull, 0x5D729C088C591FCCull, 0x2356EAA67110CEECull, 0x50D31C5A2D40197Eull },
+    { 41u, 0x2A3B071C5C08D005ull, 0x2A668F3608A8A9CAull, 0x931CB1AD0FDC10AEull, 0xBCC8455039B6A90Cull },
+    { 43u, 0xEC09BA30C3E775ABull, 0xC80BB5B6C357CCEDull, 0x30FA691F77F5F20Cull, 0xA0B9709C554F4119ull },
+    { 32u, 0xDAAF44506F4FCC39ull, 0xF1BC195D4D470F2Aull, 0x1406DE954031713Full, 0xEDBB64BC6F85B809ull },
+    { 10u, 0x6AFC73F266139568ull, 0xE7103A70D1BCE72Full, 0xA27A640C1C73386Bull, 0xEC38A152E75A18ABull },
+    { 25u, 0xD1F59B38B9084262ull, 0x983769D00E2B5100ull, 0x036733CB29398645ull, 0x3981912734A17B1Eull },
+    { 38u, 0x4D68D855F5B02CDCull, 0x99CCE0E126970AAEull, 0xB12835B20C94631Dull, 0xF98FE3C37A462F6Cull },
+    {  9u, 0x0C031EBD181246C9ull, 0xA0DB2911AC4D54CDull, 0x006024B19FDE282Aull, 0xBCABCDDD45FE94D1ull },
+    {  0u, 0x11013ABA30FEF609ull, 0x03C94D12B1B6DE3Full, 0x4923571EB300BBE7ull, 0x83FDC354F7E4E3B4ull },
 };
 
 const std::vector<world_digest_pin>& digest_pins(world_arc arc)
