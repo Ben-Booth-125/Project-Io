@@ -862,8 +862,8 @@
    "design": "BEN'S NOTE (2026-10-03, keeping BL-1107's mapping for now): \"I was considering amenities and goods that people consume through ages, rather than more commercial products.\" Today a cultural preference weights only the four abstract goods (farm, ore, energy, port), so a cradle's amenity must map onto a commercial good (forest -> energy). The idea: a small set of consumed amenity goods -- the things a people eats, drinks, wears and burns across the ages -- that preference attaches to, distinct from the industrial goods. DESIGN FIRST (a design session with Ben): which goods, how they map to TILES.md amenity classes, how they enter the want and trade, and how they hand over to the campaign's named resources. Not built until designed."
   },
   {
-   "status": "designed",
-   "glyph": "✓",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 50,
    "written": "2026-10-03",
    "requires": [],
