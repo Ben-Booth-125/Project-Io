@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*24 entries — 24 open, 0 resolved.*
+*25 entries — 25 open, 0 resolved.*
 
 ---
 
@@ -216,6 +216,20 @@ Two readings taken on your behalf. (a) 'Grows relatively large' is read as the l
 > **Recommendation:** Confirm, or say how large the rise may go.
 
 *Files: `docs/generation/GENERATION_STRATEGY.md`, `docs/generation/CIVILISATION.md`, `docs/generation/EXPLORATION.md`, `docs/lore/HISTORY.md`*
+
+### NR-1035 — Sprint 50 onto main: G3 (firms alive at tick 400) moved 99.8% -> 95.8%; every other gate digit identical
+*question · raised 2026-10-10 · from Main-session gates on the sprint 50 merge (a560c5d7 + d8d2a04c), 2026-10-10*
+
+market_viability on merged main: G1 93.3, G1 t50 87.5, G1b 5.7, G2 113.4 - identical to sprint 50 tip c8752b8a - but G3 95.8% (1959/2045) against the tip's 99.8%. world_determinism PASS; player_seed_sweep --guard 12 ALL PASS; history_sim_harness at its 2-failure baseline (R3a2/R3a3). The likeliest cause is sprint 51's main-side world movers (BL-1218 wharf placed on shore, BL-1227 mine candidate priced at its stack rank, both in placement_rules) meeting the shelf economy for the first time; not attributed.
+
+**Why it matters.** G3 stays far above its 70% target, so nothing fails; but the merged world is not the one sprint 50's re-bless described, and the version cut reads this tree.
+
+- Accept: record the merged reading as the cut baseline
+- Attribute first: run market_viability on sprint 51's tip and sprint 50's tip on this binary (about two hours) before the cut
+
+> **Recommendation:** Accept, and let the next re-bless attribute it - every G1/G2 digit held.
+
+*Files: `tools/verify/market_viability.cpp`, `src/world/placement_rules.cpp`*
 
 ---
 

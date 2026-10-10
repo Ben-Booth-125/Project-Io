@@ -354,6 +354,26 @@
     "docs/lore/HISTORY.md"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-1035",
+   "title": "Sprint 50 onto main: G3 (firms alive at tick 400) moved 99.8% -> 95.8%; every other gate digit identical",
+   "raised": "2026-10-10",
+   "kind": "question",
+   "status": "open",
+   "source": "Main-session gates on the sprint 50 merge (a560c5d7 + d8d2a04c), 2026-10-10",
+   "what": "market_viability on merged main: G1 93.3, G1 t50 87.5, G1b 5.7, G2 113.4 - identical to sprint 50 tip c8752b8a - but G3 95.8% (1959/2045) against the tip's 99.8%. world_determinism PASS; player_seed_sweep --guard 12 ALL PASS; history_sim_harness at its 2-failure baseline (R3a2/R3a3). The likeliest cause is sprint 51's main-side world movers (BL-1218 wharf placed on shore, BL-1227 mine candidate priced at its stack rank, both in placement_rules) meeting the shelf economy for the first time; not attributed.",
+   "why_it_matters": "G3 stays far above its 70% target, so nothing fails; but the merged world is not the one sprint 50's re-bless described, and the version cut reads this tree.",
+   "options": [
+    "Accept: record the merged reading as the cut baseline",
+    "Attribute first: run market_viability on sprint 51's tip and sprint 50's tip on this binary (about two hours) before the cut"
+   ],
+   "recommendation": "Accept, and let the next re-bless attribute it - every G1/G2 digit held.",
+   "files": [
+    "tools/verify/market_viability.cpp",
+    "src/world/placement_rules.cpp"
+   ],
+   "resolution": null
   }
  ]
 }
