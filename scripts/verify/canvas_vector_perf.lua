@@ -3,7 +3,9 @@
 -- every zoom).
 --
 -- NOT a golden check: it asserts nothing. Per rung, plain and under two lenses
--- (Market, categorical; Population, sequential — both wash the ground, BL-1250),
+-- (Market, categorical; Population, sequential — both wash the ground, BL-1250;
+-- Throughput, which also draws the whole road and lane network at full weight
+-- at every rung, BL-1257),
 -- it waits for the ground to be final, takes one still capture (rungs 0 and 1 —
 -- the two the vector budget bites at — and rungs 3 and 4, where the close-zoom
 -- seam draws, BL-1251), then pans 300 frames and writes the
@@ -40,7 +42,7 @@ do
     print(string.format("CANVAS_MASTER %d/%d complete in %.0f ms", r.ready, r.total, r.ms))
 end
 
-for _, lens in ipairs({ "none", "market", "population" }) do
+for _, lens in ipairs({ "none", "market", "population", "throughput" }) do
     verify.set_overlay(lens)
     for k = 0, 4 do
         verify.set_zoom(kMinZoom * (2 ^ k))

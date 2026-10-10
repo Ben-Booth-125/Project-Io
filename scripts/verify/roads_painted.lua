@@ -16,6 +16,13 @@
 --   lane_port   a sea lane's end beside a port city (the wake);
 --   coast_lane  a coastal run of a lane (the wake along the shore).
 --
+-- Each framing is taken twice: on the plain canvas, where a road is a thin pale
+-- thread painted into the ground (0.015-0.03 of a hex) and the drawn network
+-- stays only at rung 1; and under the THROUGHPUT lens (BL-1257, LENSES.md
+-- § Throughput lens), which draws the whole road and lane network at full
+-- weight (1 : 1.5 : 2, lanes in their blue) over its reach-cost field at
+-- every rung -- roads_painted_<framing>_throughput_rung<k>.
+--
 -- No assertion pins a pixel and no golden is compared: captures for the eye.
 -- The framings are route_curves.lua's (seed 0's stamped fields, read once);
 -- the city is re-found from population_centres so a moved city fails loudly.
@@ -62,9 +69,17 @@ for _, f in ipairs(framings) do
                       "roads_painted: the " .. f.name .. " framing still has its city at "
                       .. f.city[1] .. "," .. f.city[2])
     end
-    for _, k in ipairs({ 1, 2, 3, 4 }) do
-        verify.center_tile(f.col, f.row, kMinZoom * (2 ^ k))
-        settle()
-        verify.capture(string.format("roads_painted_%s_rung%d", f.name, k))
+    for _, lens in ipairs({ "none", "throughput" }) do
+        verify.set_overlay(lens)
+        for _, k in ipairs({ 1, 2, 3, 4 }) do
+            verify.center_tile(f.col, f.row, kMinZoom * (2 ^ k))
+            settle()
+            if lens == "none" then
+                verify.capture(string.format("roads_painted_%s_rung%d", f.name, k))
+            else
+                verify.capture(string.format("roads_painted_%s_%s_rung%d", f.name, lens, k))
+            end
+        end
     end
 end
+verify.set_overlay("none")

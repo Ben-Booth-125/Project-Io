@@ -527,7 +527,10 @@ ImU32 fog_dim(ImU32 c, float vision)
 }
 
 /// ROUTE STROKE WIDTHS, one named constant per tier (RENDERING.md § Roads and sea
-/// lanes; Ben, 2026-10-03: "make them thinner"). Each is the stroke width as a fraction
+/// lanes; Ben, 2026-10-03: "make them thinner"). These are the DRAWN network's weights —
+/// the thin network at the two widest rungs and the Throughput lens's full-weight network
+/// at every rung (BL-1257) — not the painted roads, which are thin threads in the bake
+/// (route_paint.hpp k_route_width). Each is the stroke width as a fraction
 /// of the drawn hex circumradius, which is floored at 10 px before it is applied so
 /// the tiers stay apart on the whole-grid view. Half the widths the straight-segment
 /// roads used (0.12 / 0.18 / 0.24); the 1 : 1.5 : 2 ladder between the tiers is kept,
@@ -4625,7 +4628,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // below a pixel: the two widest rungs, a drawn radius under k_route_lod_radius_px
             // (20 px — between rung 2, ~14 px, and rung 3, ~27 px). A tile whose ground is not
             // yet baked (the vector fallback) keeps the drawn network at every rung.
-            const bool route_drawn = !on_bake || draw_r < k_route_lod_radius_px;
+            //
+            // THE THROUGHPUT LENS DRAWS THE NETWORK AT EVERY RUNG (BL-1257; Ben, 2026-10-10;
+            // LENSES.md § Throughput lens). On the ground a road is a thin pale thread of the
+            // land (0.015-0.03 of a hex, route_paint.hpp k_route_width); the network AS
+            // LOGISTICS — every road by tier at the 1 : 1.5 : 2 weights below, every lane in its
+            // blue — is read through this lens, over the reach-cost field it produces.
+            const bool route_lens  = state.overlay == overlay_mode::throughput;
+            const bool route_drawn = !on_bake || draw_r < k_route_lod_radius_px || route_lens;
             const float route_r = std::max(10.0f, draw_r) * state.dbg_route_width_scale;
             if (route_drawn && tile.road_level > 0)
             {
