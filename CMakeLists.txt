@@ -599,6 +599,9 @@ add_executable(spawn_solvency
     # `nmake all` stops every target after it and reads as a suite of
     # "Not Run" (found 2026-09-02, BL-744).
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+    # works_registry.cpp: load_app_generation_inputs (harness_params.hpp) loads the
+    # app's works table, so the target links works_registry::load_from_lua.
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/works_registry.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
 )
 target_include_directories(spawn_solvency PRIVATE
@@ -640,6 +643,8 @@ add_executable(landscape_search_harness
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/landscape_search_harness.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world_gen_config.cpp"
+    # works_registry.cpp: load_app_generation_inputs loads the app's works table.
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/works_registry.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
 )
 target_include_directories(landscape_search_harness PRIVATE

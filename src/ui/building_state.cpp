@@ -4,7 +4,8 @@
 #include "world/economy_system.hpp"  // economy_report / building_report
 #include "world/placement_rules.hpp" // is_depositless_site — an idle Well/Wharf is labour-short (BL-1198/1199)
 #include "world/recipe_registry.hpp" // price_band — the fair-price ceiling multiple
-#include "world/world.hpp"           // pool_key_for_tile, find_pool
+#include "world/market_clearing.hpp" // market_for_tile — the tile's market catchment
+#include "world/world.hpp"
 
 #include <cstdio>
 
@@ -38,7 +39,7 @@ const building_report* report_row(const economy_report* report, entity_id id)
 input_short_cause input_cause_of(const world& w, const recipe_registry* reg,
                                  const building_component& b, resource_type r)
 {
-    const entity_id key = pool_key_for_tile(w, b.tile);
+    const entity_id key = market_for_tile(w, b.tile);
     const auto      mit = w.markets.find(key);
     if (mit == w.markets.end())
         return input_short_cause::unknown; // market-less body: no shelf to read
