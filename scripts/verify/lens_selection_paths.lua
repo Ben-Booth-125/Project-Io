@@ -71,10 +71,20 @@ local function hover_then_select(lens, name)
     shot(name .. "_hover")
     verify.click_tile(probe_col, probe_row)
     shot(name .. "_selected")
+    return verify.pointer_target()
 end
 
 hover_then_select("resource",    "path_resource")
-hover_then_select("market",      "path_market")
+-- The Market lens is HOW a market is selected from the map: the centre glyph
+-- and its hit zone retired from the plain canvas (Ben, 2026-10-10), so a press
+-- on the catchment is the canvas route (the Market ledger is the other).
+local mk = hover_then_select("market", "path_market")
+verify.expect(mk.selection_kind == "market",
+              "market lens: a catchment press selects the MARKET (got " ..
+              tostring(mk.selection_kind) .. ")")
+verify.expect(mk.open_panel == "market",
+              "market lens: the press opens the Market ledger (got " ..
+              tostring(mk.open_panel) .. ")")
 hover_then_select("scarcity",    "path_scarcity")
 hover_then_select("corporation", "path_corporation")
 hover_then_select("company",     "path_company")

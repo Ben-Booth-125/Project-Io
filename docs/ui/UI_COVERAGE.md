@@ -8,18 +8,18 @@
 
 ## Headline
 
-**104 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
+**110 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
 
-**61 of 104 elements can be changed without any check going red.**
+**59 of 110 elements can be changed without any check going red.**
 That is the number that matters to a UI pass: the re-verification cost is near zero,
 and so is the safety net.
 
 | Class | Count | What green means |
 |---|---|---|
 | **GOLDEN** | 3 | A committed `scripts/verify/golden/*.png` diffs this element on every run. It fails by itself. |
-| **ASSERTED** | 40 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
-| **CLIP-ONLY** | 14 | The only assertion reaching it is `expect_no_clipping`. Green means "no string overran its box", not "this element is right". |
-| **CAPTURE-ONLY** | 39 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
+| **ASSERTED** | 48 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
+| **CLIP-ONLY** | 15 | The only assertion reaching it is `expect_no_clipping`. Green means "no string overran its box", not "this element is right". |
+| **CAPTURE-ONLY** | 36 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
 | **NONE** | 8 | No verify script drives this element at all. |
 
 ## GOLDEN (3)
@@ -27,55 +27,63 @@ and so is the safety net.
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
 | `UI-016` Planetary Canvas > Building markers | sub-element | `built_tile_render`, `stacked_tile_ring`, `icon_silhouettes` | 3 | 0 | 0 |
-| `UI-040` Lens system (overlay_mode family) > Supply lens | sub-element | `supply_lens`, `lens_modes`, `icon_silhouettes`, `lens_strip_and_fields` | 5 | 0 | 2 |
+| `UI-040` Lens system (overlay_mode family) > Supply lens | sub-element | `supply_lens`, `lens_modes`, `icon_silhouettes`, `lens_strip_and_fields` | 6 | 0 | 2 |
 | `UI-063` Icon vocabulary | element | `icon_silhouettes` | 0 | 0 | 0 |
 
-## ASSERTED (40)
+## ASSERTED (48)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
+| `UI-006` Solar Canvas > Home halo | sub-element | `player_presence`, `start_framing` | 2 | 0 | 1 |
 | `UI-009` Circumplanetary Canvas | canvas | `canvas_levels`, `survey`, `landform_relief`, `tile_texture`, `spectator_god_view` | 1 | 0 | 0 |
-| `UI-020` Planetary Canvas > Corporate borders (reach rings) | sub-element | `corp_lens_border`, `corporate_reach`, `border_band` | 6 | 0 | 3 |
+| `UI-019` Planetary Canvas > Home-cluster ring | sub-element | `corporate_reach`, `player_presence` | 6 | 0 | 2 |
+| `UI-020` Planetary Canvas > Corporate borders (reach rings) | sub-element | `corp_lens_border`, `corporate_reach`, `border_band` | 10 | 0 | 4 |
 | `UI-021` Planetary Canvas > Survey region mask | sub-element | `survey`, `visibility`, `survey_dispatch` | 4 | 0 | 0 |
-| `UI-027` Minimap > Lens mode bar | control | `lens_strip`, `lens_modes`, `lens_strip_and_fields` | 5 | 0 | 2 |
+| `UI-027` Minimap > Lens mode bar | control | `lens_strip`, `lens_modes`, `lens_strip_and_fields` | 6 | 0 | 2 |
 | `UI-028` Minimap > Lens legend fold-out | sub-element | `lens_legend`, `lens_strip_and_fields` | 5 | 0 | 3 |
-| `UI-029` Lens system (overlay_mode family) | element | `lens_modes`, `default_lens`, `lens_strip_and_fields` | 5 | 0 | 2 |
-| `UI-030` Lens system (overlay_mode family) > Corporation lens | sub-element | `corporation_lens`, `corp_lens_border`, `lens_modes`, `lens_strip_and_fields` | 5 | 0 | 2 |
-| `UI-032` Lens system (overlay_mode family) > Resource lens | sub-element | `resource_lens`, `lens_modes`, `lens_strip_and_fields` | 5 | 0 | 2 |
-| `UI-033` Lens system (overlay_mode family) > Market lens | sub-element | `market_lens`, `lens_modes`, `lens_strip_and_fields` | 5 | 0 | 2 |
-| `UI-034` Lens system (overlay_mode family) > Population lens | sub-element | `population_lens`, `population_legibility`, `lens_modes`, `lens_strip_and_fields` | 5 | 0 | 2 |
+| `UI-029` Lens system (overlay_mode family) | element | `lens_modes`, `default_lens`, `lens_strip_and_fields` | 6 | 0 | 2 |
+| `UI-030` Lens system (overlay_mode family) > Corporation lens | sub-element | `corporation_lens`, `corp_lens_border`, `lens_modes`, `lens_strip_and_fields` | 6 | 0 | 2 |
+| `UI-032` Lens system (overlay_mode family) > Resource lens | sub-element | `resource_lens`, `lens_modes`, `lens_strip_and_fields` | 7 | 0 | 2 |
+| `UI-033` Lens system (overlay_mode family) > Market lens | sub-element | `market_lens`, `lens_modes`, `lens_strip_and_fields` | 6 | 0 | 2 |
+| `UI-034` Lens system (overlay_mode family) > Population lens | sub-element | `population_lens`, `population_legibility`, `lens_modes`, `lens_strip_and_fields` | 6 | 0 | 2 |
 | `UI-037` Lens system (overlay_mode family) > Continent lens | sub-element | `continents_terrain`, `tile_texture`, `landform_relief`, `save_load`, `lens_strip_and_fields` | 11 | 0 | 3 |
-| `UI-038` Lens system (overlay_mode family) > Scarcity lens | sub-element | `scarcity_lens`, `lens_modes`, `lens_strip_and_fields` | 5 | 0 | 2 |
+| `UI-038` Lens system (overlay_mode family) > Scarcity lens | sub-element | `scarcity_lens`, `lens_modes`, `lens_strip_and_fields` | 6 | 0 | 2 |
 | `UI-039` Lens system (overlay_mode family) > Industry lens | sub-element | `industry_lens`, `province_render`, `lens_strip_and_fields` | 5 | 0 | 0 |
-| `UI-041` Lens system (overlay_mode family) > Reach lens | sub-element | `lens_modes`, `lens_legend`, `province_render`, `lens_strip_and_fields` | 5 | 0 | 5 |
-| `UI-042` Lens system (overlay_mode family) > Supply-routes lens | sub-element | `lens_modes`, `province_render`, `lens_strip_and_fields` | 5 | 0 | 2 |
+| `UI-041` Lens system (overlay_mode family) > Reach lens | sub-element | `lens_modes`, `lens_legend`, `province_render`, `lens_strip_and_fields` | 6 | 0 | 5 |
+| `UI-042` Lens system (overlay_mode family) > Supply-routes lens | sub-element | `lens_modes`, `province_render`, `lens_strip_and_fields` | 6 | 0 | 2 |
 | `UI-043` Selection band | element | `selection_band`, `selection_redesign`, `selection_bar`, `shell_pass`, `lens_one_tier`, `lens_region_destinations` | 28 | 1 | 3 |
-| `UI-044` Selection band > Active/Focus/Selection pointer-state model | sub-element | `click_injection`, `lens_structure_pivot`, `hover_freeze`, `lens_selection_paths`, `lens_one_tier`, `lens_strip_and_fields`, `lens_region_destinations` | 58 | 0 | 7 |
+| `UI-044` Selection band > Active/Focus/Selection pointer-state model | sub-element | `click_injection`, `lens_structure_pivot`, `hover_freeze`, `lens_selection_paths`, `lens_one_tier`, `lens_strip_and_fields`, `lens_region_destinations` | 60 | 0 | 7 |
 | `UI-045` Selection band > Tile selection layout | sub-element | `selection_tile_layout`, `selection_accordion`, `ui_shell_fixture` | 9 | 1 | 2 |
+| `UI-117` Selection band > Water tile selection | sub-element | `water_tile_selection` | 1 | 0 | 1 |
 | `UI-047` Selection band > Building selection action/facts | sub-element | `building_element`, `sticky_card`, `construction_ledger_tabs` | 32 | 1 | 7 |
 | `UI-048` Selection band > Tile selection layout > Tile construction ledger (build-here fold-out) | sub-element | `tile_build_ledger`, `tile_build_ledger_survives`, `drill_through_fold`, `construction_ledger_tabs` | 32 | 1 | 7 |
 | `UI-049` Hover Card | element | `hover_freeze`, `sticky_card`, `border_band`, `lens_one_tier`, `lens_strip_and_fields` | 29 | 0 | 4 |
-| `UI-050` Hover Card > Hover content dispatch (lens-keyed) | sub-element | `lens_structure_pivot`, `lens_selection_paths`, `lens_one_tier`, `lens_strip_and_fields` | 36 | 0 | 3 |
+| `UI-050` Hover Card > Hover content dispatch (lens-keyed) | sub-element | `lens_structure_pivot`, `lens_selection_paths`, `lens_one_tier`, `lens_strip_and_fields` | 38 | 0 | 3 |
 | `UI-074` Construction Ledger | ledger | `construction_ledger`, `construction_panel`, `build_door_wide_roster`, `construction_ledger_tabs` | 32 | 1 | 7 |
 | `UI-075` Construction Ledger > Build view | view | `tile_build_ledger`, `roads`, `build_door_wide_roster`, `fresh_start_build` | 1 | 0 | 0 |
-| `UI-076` Construction Ledger > Manage view | view | `building_management`, `building_management_shell`, `recipe_workforce`, `building_profit`, `processing_management_ux`, `v009_batch` | 8 | 0 | 0 |
+| `UI-076` Construction Ledger > Manage view | view | `building_management`, `building_management_shell`, `recipe_workforce`, `building_profit`, `processing_management_ux`, `v009_batch` | 9 | 0 | 0 |
 | `UI-077` Construction Ledger > Sell Orders view | view | `sell_order` | 3 | 0 | 0 |
 | `UI-078` Corporation ledger (rail slot 8, Diplomacy) | ledger | `diplomacy_groups`, `corp_disclosure` | 16 | 3 | 6 |
 | `UI-079` Corporation ledger (rail slot 8, Diplomacy) > Stance groups and the row action strip | view | `diplomacy_groups`, `corp_disclosure` | 16 | 3 | 6 |
-| `UI-080` Market Ledger | ledger | `market_ledger`, `lens_structure_pivot`, `goods_table` | 19 | 1 | 1 |
+| `UI-080` Market Ledger | ledger | `market_ledger`, `lens_structure_pivot`, `goods_table`, `lens_ledger_pairs` | 20 | 1 | 5 |
 | `UI-081` Market Ledger > Goods table | view | `market_ledger`, `goods_table`, `market_density` | 8 | 1 | 0 |
-| `UI-082` Market Ledger > Trades view | view | `market_ledger`, `trades_tab` | 25 | 1 | 0 |
+| `UI-082` Market Ledger > Trades view | view | `market_ledger`, `trades_tab`, `order_close_notice` | 33 | 1 | 0 |
+| `UI-092` New World wizard | view | `planetology_generation`, `history_lapse_press` | 38 | 0 | 11 |
 | `UI-096` Planetary Canvas > National border band | sub-element | `border_band` | 6 | 0 | 3 |
 | `UI-097` Planetary Canvas > Province render and selection | sub-element | `province_render`, `lens_structure_pivot` | 11 | 0 | 1 |
 | `UI-098` Lens system (overlay_mode family) > Throughput lens | sub-element | `throughput_lens`, `lens_strip_and_fields` | 5 | 0 | 0 |
 | `UI-100` Corporation ledger | ledger | `corp_dashboard` | 10 | 1 | 0 |
-| `UI-105` Generation Ledger | ledger | `save_load` | 6 | 0 | 3 |
+| `UI-105` Generation Ledger | ledger | `save_load`, `generation_ledger` | 6 | 1 | 5 |
 | `UI-111` Spectator god view | element | `spectator_god_view` | 1 | 0 | 0 |
 | `UI-112` Market Ledger > Nation presence row | sub-element | `goods_table` | 8 | 1 | 0 |
 | `UI-113` Convoys Ledger | ledger | `convoys_ledger`, `ledger_pass` | 7 | 2 | 4 |
 | `UI-114` Nav rail slot fit | chrome | `nav_rail_fit`, `shell_pass` | 3 | 1 | 1 |
+| `UI-118` New World wizard > Wizard lapse-round time-lapse map (rounds 4 and 5) | sub-element | `history_lapse`, `history_lapse_press`, `sea_lanes`, `roads_carried` | 48 | 1 | 11 |
+| `UI-119` New World wizard > Wizard lapse-round top-sixteen board (rounds 4 and 5) | sub-element | `history_lapse`, `history_lapse_press` | 38 | 1 | 11 |
+| `UI-120` New World wizard > Wizard pass round (one of three) | sub-element | `history_lapse_press` | 38 | 0 | 11 |
+| `UI-121` New World wizard > Wizard lapse-round legend (rounds 3-6) | sub-element | `round_legends`, `sea_lanes` | 5 | 0 | 0 |
 
-## CLIP-ONLY (14)
+## CLIP-ONLY (15)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
@@ -90,25 +98,24 @@ and so is the safety net.
 | `UI-059` Navigation pane (nav rail) | panel | `nav_rail`, `shell_pass` | 0 | 1 | 1 |
 | `UI-061` System menu (session-control popup) | control | `shell_pass` | 0 | 1 | 1 |
 | `UI-067` Time panel | panel | `time_controls`, `shell_pass` | 0 | 1 | 1 |
-| `UI-084` History Ledger (Story/Chain/Tiles) | ledger | `history_ledger_and_comms`, `drill_through_fold`, `text_overflow_floor` | 0 | 2 | 0 |
-| `UI-087` History Ledger (Story/Chain/Tiles) > Tiles view | view | `history_ledger_and_comms`, `text_overflow_floor` | 0 | 2 | 0 |
+| `UI-084` History Ledger (Story/Chain/Ages/Tectonics) | ledger | `history_ledger_and_comms`, `drill_through_fold`, `text_overflow_floor` | 0 | 2 | 0 |
+| `UI-116` History Ledger (Story/Chain/Ages/Tectonics) > Ages view | view | `ages_replay` | 0 | 1 | 0 |
+| `UI-115` History Ledger (Story/Chain/Ages/Tectonics) > Tectonics view | view | `ledger_pass` | 0 | 1 | 0 |
 | `UI-091` Main Menu | view | `main_menu`, `planetology_generation`, `shell_pass` | 0 | 1 | 1 |
 
-## CAPTURE-ONLY (39)
+## CAPTURE-ONLY (36)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
 | `UI-003` Solar Canvas > Asteroid belt render | sub-element | `canvas_levels` | 0 | 0 | 0 |
 | `UI-004` Solar Canvas > Survey badge | sub-element | `survey` | 0 | 0 | 0 |
 | `UI-005` Solar Canvas > Activity badge | sub-element | `commercial_fog` | 0 | 0 | 0 |
-| `UI-006` Solar Canvas > Home halo | sub-element | `player_presence`, `start_framing` | 0 | 0 | 0 |
 | `UI-008` Solar Canvas > Scale bar + zoom slider | control | `canvas_levels`, `zoom_ladder` | 0 | 0 | 0 |
 | `UI-010` Circumplanetary Canvas > Anchor + moon orbit render | sub-element | `canvas_levels` | 0 | 0 | 0 |
 | `UI-014` Planetary Canvas > Hex tile grid render | sub-element | `tile_texture`, `province_render`, `zoom_ladder` | 0 | 0 | 0 |
 | `UI-015` Planetary Canvas > Terrain channels (composition hue + landform relief/glyph) | sub-element | `landform_relief`, `tile_texture`, `continents_terrain` | 0 | 0 | 0 |
 | `UI-017` Planetary Canvas > Road network render | sub-element | `roads` | 0 | 0 | 0 |
 | `UI-018` Planetary Canvas > Settlement markers (civic chrome) | sub-element | `settlement_labels`, `pop_markers` | 0 | 0 | 0 |
-| `UI-019` Planetary Canvas > Home-cluster ring + HQ star | sub-element | `corporate_reach`, `player_presence` | 0 | 0 | 0 |
 | `UI-022` Planetary Canvas > Activity/vision fog layers (permanent pockets, corridors, convoy beam) | sub-element | `commercial_fog`, `intrabody_fog`, `visibility`, `proximity_glimpse` | 0 | 0 | 0 |
 | `UI-023` Planetary Canvas > Placement-suitability surface | sub-element | `build_legibility`, `tile_build_ledger` | 0 | 0 | 0 |
 | `UI-024` Planetary Canvas > Construction placement ghost | sub-element | `construction_panel`, `build_walkthrough` | 0 | 0 | 0 |
@@ -126,10 +133,9 @@ and so is the safety net.
 | `UI-070` Balance Ledger | ledger | `balance_ledger`, `budget_ledger_ranked`, `debt_interest` | 0 | 0 | 0 |
 | `UI-071` Balance Ledger > Treasury view | view | `balance_ledger` | 0 | 0 | 0 |
 | `UI-072` Balance Ledger > Cashflow view | view | `budget_ledger_ranked` | 0 | 0 | 0 |
-| `UI-085` History Ledger (Story/Chain/Tiles) > Story view | view | `history_ledger_and_comms` | 0 | 0 | 0 |
-| `UI-086` History Ledger (Story/Chain/Tiles) > Chain view | view | `drill_through_fold` | 0 | 0 | 0 |
-| `UI-092` New World wizard | view | `planetology_generation` | 0 | 0 | 0 |
-| `UI-093` New World wizard > Wizard round (one of three) | sub-element | `planetology_generation` | 0 | 0 | 0 |
+| `UI-085` History Ledger (Story/Chain/Ages/Tectonics) > Story view | view | `history_ledger_and_comms` | 0 | 0 | 0 |
+| `UI-086` History Ledger (Story/Chain/Ages/Tectonics) > Chain view | view | `drill_through_fold` | 0 | 0 | 0 |
+| `UI-093` New World wizard > Wizard planetology round (one of three) | sub-element | `planetology_generation` | 0 | 0 | 0 |
 | `UI-094` Zoom ladder navigation model | element | `zoom_ladder`, `canvas_levels`, `descend_into_selection` | 0 | 0 | 0 |
 | `UI-095` Zoom ladder navigation model > Keyboard navigation bindings | sub-element | `descend_into_selection` | 0 | 0 | 0 |
 | `UI-106` AI decision feed | ledger | `decision_feed` | 0 | 0 | 0 |
@@ -157,6 +163,42 @@ Checks driving a surface no catalogue element claims. This is the catalogue's
 staleness detector — a non-empty list means the UI grew and the spine did not.
 
 - `acquisitions_ledger` (11 captures, 32 expects) — Verify the Acquisitions ledger and its profitability fold-out.
+- `campaign_lapse` (4 captures, 1 expects) — campaign_lapse — BL-723's visual half: the spectated campaign as a film strip.
+- `canvas_vector_perf` (1 captures, 0 expects) — The Planetary canvas's vector layer at every rung (sprint 51; PLANETARY.md
+- `culture_overrun` (6 captures, 2 expects) — BL-1092 R4 -- THE 400 BCE CLAMP on an OVERRUN seed (Ben, 2026-09-24,
 - `export_mockdata` (0 captures, 0 expects) — Export live economy data to CSV for external ledger mock-ups (e.g. Power BI).
+- `fleets_and_ties` (12 captures, 13 expects) — FLEETS AND TIES (BL-1095; Ben, 2026-09-24, sprint 47 rulings R13;
+- `ground_bake` (14 captures, 6 expects) — BL-732 (ground bake renderer) + wave 2 — the baked painterly ground,
+- `ground_crisp` (1 captures, 0 expects) — BL-1254 (ground crisper) — RENDERING.md § Tiles hold their own ground, the
+- `ground_disk_cache` (0 captures, 21 expects) — BL-1259 (ground disk cache) — RENDERING.md § Chunks, cache and invalidation,
+- `ground_disk_cache_bench` (0 captures, 4 expects) — BL-1259 (ground disk cache) — the LIVE path's reading (TECH_FOUNDATIONS.md
+- `ground_fill_bench` (0 captures, 0 expects) — Ground one master — the fill-time bench (BL-1246; docs/ui/RENDERING.md
+- `ground_look` (1 captures, 0 expects) — BL-1256 (ground look C-F) — RENDERING.md § Art direction and palette: the
+- `ground_master_complete` (0 captures, 0 expects) — BL-1246 (ground one master): the home body's master ALWAYS completes — from
+- `ground_rebake` (0 captures, 3 expects) — BL-1241 (structures baked) — requirement group `structures-baked` row R3:
+- `ground_sharpness` (3 captures, 4 expects) — BL-1246 (ground one master) — docs/ui/RENDERING.md § Level of detail.
+- `history_lapse_empires` (5 captures, 3 expects) — The EMPIRES round's time-lapse map, its top-16 board and the arc readout
+- `history_lapse_hard` (7 captures, 5 expects) — THE HARD BORDER on the Empires round, and its carry into Exploration
+- `history_lapse_marks` (7 captures, 2 expects) — THE MARKS THAT EARN THEIR PLACE (BL-1094; Ben, 2026-09-24, sprint 47
+- `history_lapse_works` (8 captures, 8 expects) — THE WORKS AND THE RUNG ON ROUND 6 (BL-1099, BL-1100; Ben, 2026-09-24,
+- `life_to_people` (9 captures, 6 expects) — BL-1091 -- FROM LIFE TO PEOPLE: the Life round hands a named world and its
+- `names_and_voice` (6 captures, 10 expects) — BL-1106 -- THE TICKER AND BOARD SPEAK THE HISTORY'S WORDS.
+- `owner_multi_select` (6 captures, 17 expects) — Visual verification for the owner multi-select (BL-1240; LENSES.md § Corporation
 - `pan_perf` (0 captures, 0 expects) — Pan-cost measurement (the "stutter while panning" report, 2026-08-02).
+- `realm_identity` (11 captures, 20 expects) — A realm keeps its identity across the wizard's seams (BL-1087 colour,
+- `refunds_flow_shown` (1 captures, 3 expects) — BL-1215 (refunds flow shown): the Corporation ledger's Balance card names
+- `river_course` (6 captures, 0 expects) — BL-1242 (landforms and rivers baked): a river from source to mouth.
+- `roads_painted` (2 captures, 2 expects) — ROADS AND SEA LANES PAINTED INTO THE GROUND (BL-1253; Ben, 2026-10-09: "roads go
+- `round4_arc_reach` (3 captures, 4 expects) — BL-891 -- CAN A PLAYER ACTUALLY REACH ROUND 4 AND READ THE ARC OFF IT?
+- `round5_wait` (2 captures, 5 expects) — BL-1084 (world built once and moved) -- ROUND 5'S WAIT, PHOTOGRAPHED.
+- `round6_mid_tail` (2 captures, 11 expects) — BL-1084 (world built once and moved), the K4 cold review -- ROUND 6 WHILE ITS
+- `route_curves` (2 captures, 5 expects) — ROADS AS THINNER CURVES, SEA LANES ON THEIR SEA PATH (Ben, 2026-10-03, playing
+- `routes_and_splits` (10 captures, 16 expects) — BL-1092 -- ROUTES AND SPLITS ON THE MAP: the migration shows its roads
+- `seat_pick` (4 captures, 24 expects) — The corporation selection canvas, and the pick as a reproducible game act
+- `terrain_variants` (1 captures, 0 expects) — BL-1243 (terrain variant families) — RENDERING.md § Mountains, rivers and
+- `tile_production` (4 captures, 18 expects) — The tile Selection element's PRODUCTION section (BL-1239, tile production
+- `towns_denser` (3 captures, 4 expects) — TOWNS DENSER (BL-1258; Ben, 2026-10-10: towns should read like the it3 C-F
+- `trade_flow_lens` (8 captures, 5 expects) — Visual verification for the Trade-flow lens (overlay_mode::trade_flow, BL-1222).
+- `turbulence_lean` (5 captures, 1 expects) — Verification for BL-839 — the historical turbulence lean, in the wizard.
+- `wharf_on_shore` (5 captures, 0 expects) — BL-1218 (wharf placed on shore): the construction ledger offers a Fishing
 

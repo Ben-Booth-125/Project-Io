@@ -1748,8 +1748,9 @@ body_frame_stamp make_body_frame_stamp(const world& w, entity_id body)
 }
 
 /// Nearest-wins marker hit resolution shared by hover and click (BL-031/BL-059):
-/// unit outranks building outranks market_centre within the glyph radii; the
-/// tile fallback stays with the callers. Unit was added above building by
+/// unit outranks building within the glyph radii; the tile fallback stays with
+/// the callers. (The market-centre marker kind retired with its glyph — Ben,
+/// 2026-10-10; a market is reached through the Market lens or its ledger.) Unit was added above building by
 /// BL-575, matching the repeat-click cycle's own order (Battle -> Soldier ->
 /// Building -> Province — SELECTION.md § Tile repeat-click selection cycle):
 /// a unit standing on a built tile must be reachable on the FIRST click, not
@@ -1759,10 +1760,8 @@ entity_id resolve_marker_hit(const std::vector<marker_hit_zone>& zones, float mx
 {
     float     best_unit_d2 = std::numeric_limits<float>::max();
     float     best_bld_d2  = std::numeric_limits<float>::max();
-    float     best_mkt_d2  = std::numeric_limits<float>::max();
     entity_id unit = null_entity;
     entity_id bld  = null_entity;
-    entity_id mkt  = null_entity;
     for (const marker_hit_zone& hz : zones)
     {
         const float dx = mx - hz.centre.x;
@@ -1780,13 +1779,8 @@ entity_id resolve_marker_hit(const std::vector<marker_hit_zone>& zones, float mx
             best_bld_d2 = d2;
             bld         = hz.id;
         }
-        else if (hz.kind == marker_hit_zone::kind::market_centre && d2 < best_mkt_d2)
-        {
-            best_mkt_d2 = d2;
-            mkt         = hz.id;
-        }
     }
-    return unit != null_entity ? unit : (bld != null_entity ? bld : mkt);
+    return unit != null_entity ? unit : bld;
 }
 
 /// Nearest-wins STRUCTURE hit resolution (BL-601) — resolve_marker_hit's
@@ -5647,47 +5641,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         state.hovered_structure_kind = sk;
     }
 
-    // Market-centre markers (BL-059). Draw a circle+cross glyph at each market's
-    // centre tile position and register a hit zone for click-selection (BL-031).
-    // Drawn after the tile loop so markers sit above all tile chrome. Only markets
-    // anchored to the active body (and with a valid centre_tile) are shown.
-    {
-        constexpr ImU32 mkt_col = IM_COL32(255, 220, 80, 220);
-        const float mkt_r = std::max(3.0f, draw_r * 0.28f);
-
-        for (const auto& [mid, mk] : w.markets)
-        {
-            if (mk.body != state.active_body)
-                continue;
-            if (mk.centre_tile == null_entity)
-                continue;
-            const auto ctc_it = w.tiles.find(mk.centre_tile);
-            if (ctc_it == w.tiles.end())
-                continue;
-            const tile_component& ctc = ctc_it->second;
-            const ImVec2 lc = hex_local_centre(ctc.grid_x, ctc.grid_y, hex_size);
-            const ImVec2 sc = to_screen(lc);
-
-            // Draw on every visible wrap copy.
-            const int k_min = (period_px > 0.0f)
-                ? static_cast<int>(std::ceil((visible_left  - sc.x) / period_px)) : 0;
-            const int k_max = (period_px > 0.0f)
-                ? static_cast<int>(std::floor((visible_right - sc.x) / period_px)) : 0;
-            for (int k = k_min; k <= k_max; ++k)
-            {
-                const ImVec2 mc = {sc.x + static_cast<float>(k) * period_px, sc.y};
-                icons::market_centre(dl, mc, mkt_r, mkt_col);
-            }
-
-            // Hit zone on the canonical copy (k==0).
-            marker_hit_zone hz;
-            hz.id     = mid;
-            hz.kind   = marker_hit_zone::kind::market_centre;
-            hz.centre = sc;
-            hz.radius = mkt_r * 2.0f;
-            state.marker_hit_zones.push_back(hz);
-        }
-    }
+    // No market-centre marker (Ben, 2026-10-10: "We should remove the HQ glyph
+    // and market center glyphs"). A market is selected through the MARKET LENS —
+    // a press on its catchment, SELECTION.md § A lens collapses selection to ONE
+    // TIER — or from the Market ledger; with no lens a press on a centre tile
+    // resolves as any other tile or building press.
 
     // Population centres (BL-083; BL-1241, structures baked). Every generated
     // settlement is a STRUCTURE baked into the ground art — footprint and height
@@ -5758,80 +5716,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
-    // Corporate HQ marker (BL-182 foundation; the border RING retired BL-329,
-    // 2026-08-08 — Ben's live critique: "retire the circle around corp
-    // buildings. It doesn't show anything informative." The reach fog/lens
-    // already shows supply reach properly; this fixed-radius, non-growing ring
-    // duplicated that less accurately and added noise). What remains is just
-    // the seat marker itself, from the PERSISTED hq_building (designated
-    // deterministically at generation) — drawn on the corp's HOME body only
-    // (the single-home model; branch offices are deferred with the full
-    // BL-182 mechanic).
-    auto draw_corp_hq = [&](entity_id corp_id, const corporation_component& cc)
-    {
-        if (cc.hq_building == null_entity)
-            return;
-        const auto b = w.buildings.find(cc.hq_building);
-        if (b == w.buildings.end())
-            return;
-        const auto t = w.tiles.find(b->second.tile);
-        if (t == w.tiles.end() || t->second.body != state.active_body)
-            return;
-
-        const ImU32  accent = corp_identity(corp_id);
-        const ImVec2 hq_lc  = hex_local_centre(t->second.grid_x, t->second.grid_y, hex_size);
-        const ImVec2 hq_s   = to_screen(hq_lc);
-        const float  hq_r   = std::max(4.0f, draw_r * 0.5f);
-
-        const int k_min = (period_px > 0.0f)
-            ? static_cast<int>(std::ceil((visible_left  - hq_s.x - hq_r) / period_px)) : 0;
-        const int k_max = (period_px > 0.0f)
-            ? static_cast<int>(std::floor((visible_right - hq_s.x + hq_r) / period_px)) : 0;
-        for (int k = k_min; k <= k_max; ++k)
-        {
-            const float off = static_cast<float>(k) * period_px;
-            icons::hq(dl, { hq_s.x + off, hq_s.y }, hq_r, accent);
-        }
-    };
-
-    // The player's HQ marker is always-on identity chrome (BL-085 lineage), drawn on
-    // the player's home body regardless of the active lens.
-    if (state.active_body == w.home_body && w.player_entity != null_entity)
-    {
-        const auto pc = w.corporations.find(w.player_entity);
-        if (pc != w.corporations.end())
-            draw_corp_hq(w.player_entity, pc->second);
-    }
-
-    // Rival HQ markers (BL-183 lineage): under the Corporation lens, every rival
-    // corp's seat reads from the same persisted hq_building via the shared lambda
-    // above. The player's own marker is the always-on chrome above (excluded here,
-    // no double-draw). Each rival's marker is drawn on its OWN home body
-    // (draw_corp_hq gates on the seat's body), so a rival only shows one when its
-    // home body is the one on screen.
-    //
-    // SPLIT WITH THE TINT (Ben, 2026-08-28): the Corporation lens shows rival
-    // corporations' seats, the Company lens shows background firms' seats, and
-    // neither shows the other's. Before the split this loop drew every non-player
-    // corp — background firms included, and they outnumber the rivals — so the
-    // marker layer answered "where is everyone" when the lens was asking "where
-    // are my rivals". Same population rule as compute_tile_fill, so a seat and
-    // its tiles never appear under different lenses.
-    if (state.overlay == overlay_mode::corporation || state.overlay == overlay_mode::company)
-    {
-        const bool want_background = (state.overlay == overlay_mode::company);
-        for (const auto& [corp_id, cc] : w.corporations)
-        {
-            if (corp_id == w.player_entity)
-                continue;
-            if (cc.is_background != want_background)
-                continue;
-            // BL-1240: a rival's or firm's seat follows the picked set.
-            if (!state.lens_owner_picked(corp_id, want_background))
-                continue;
-            draw_corp_hq(corp_id, cc);
-        }
-    }
+    // No HQ star, the player's or anyone's, plain or under a lens (Ben,
+    // 2026-10-10: "We should remove the HQ glyph"). The Corporation and Company
+    // lenses carry an owner by its tile tint alone; the picked set (BL-1240)
+    // drives the tint and nothing else on this canvas.
 
     // Trade-flow lens (BL-1222; LENSES.md § Trade-flow lens). Reads only the
     // player's own dispatcher record (`w.player_trade_flow`, written by
@@ -6219,7 +6107,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     }
 
     // Hover-card (BL-060, BL-020). Resolve the hovered entity in marker-priority
-    // order (building > market_centre > tile — mirroring click priority). Track
+    // order (unit > building > tile — mirroring click priority). Track
     // stable hover ticks and show the lens-contextual "why not what" card after
     // kHoverAppearDelaySec of rest on the same entity.
     {
@@ -6374,7 +6262,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // construction gesture, not a selection one, so it must not retarget the
     // Selection info element.
     // BL-031: marker hit zones take priority over tile selection (unit >
-    // building > market_centre; closest-wins tie-break within a kind).
+    // building; closest-wins tie-break within a kind).
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
     {
         // March-picking mode (BL-575) outranks everything below, exactly as
@@ -6451,8 +6339,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // be over (the BL-603 ordering, unchanged).
             const bool lensed = (state.overlay != overlay_mode::none);
 
-            // Resolve marker hit zones in priority order (BL-031): building
-            // outranks market-centre; both outrank tile. Shared with hover.
+            // Resolve marker hit zones in priority order (BL-031): unit
+            // outranks building; both outrank tile. Shared with hover.
             // Suppressed entirely under a lens by the rule above.
             //
             // GROUND-SPACE CURSOR (BL-1241 fix round): the zones are registered

@@ -20,10 +20,11 @@ namespace ui {
 /// Callers place this inside a draw_hover_card content lambda; the function
 /// emits ImGui widgets only and owns no window.
 ///
-/// Dispatch table (entity kind × lens — the 3 implemented exemplars):
+/// Dispatch table (entity kind × lens — the implemented exemplars):
 ///   tile       × resource  → deposit richness for lens_resource + why label
 ///   building   × supply    → type + output rate + operational status
-///   market     × market    → price for lens_resource + supply/demand why
+/// (The market-centre variants retired with the canvas's market glyph, Ben
+/// 2026-10-10; a hovered catchment speaks through the structure card.)
 ///
 /// Any unimplemented (kind, lens) pair falls back to a brief type label so
 /// the card is never blank.
