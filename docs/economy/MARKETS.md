@@ -1152,34 +1152,36 @@ ceil_mult               >  1 + haulage_per_unit / base_price
 ```
 
 **The haulage is measured, not assumed.** `tools/verify/haulage_measure.cpp` walks every market
-in the real generated world, finds its nearest market neighbour by the terrain-weighted A* cost,
-and reports `logistics_cost(mode) × path.cost` — *exactly* the per-unit figure `dispatch_convoys`
-debits (`supply_system.cpp`). Over 5 seeds, 39 markets on 5 multi-market bodies:
+in the real generated world, prices one unit to every other market on its body with
+`price_market_export_leg` — the router the dispatcher and placement both ask (`SUPPLY.md`
+§ Logistical cost): one land leg, or land → port → sea → port → land, node discount on each land
+leg, handling at each port — and keeps the cheapest as its nearest neighbour. A pair the router
+refuses is no neighbour. Over the default 5 seeds, 21 markets on 5 multi-market bodies, 17 of
+which have a neighbour the router reaches:
 
 | Market → nearest market neighbour | credits per unit |
 |---|---|
-| p10 | 0.08 |
-| median | 0.76 |
-| p90 | 5.65 |
-| max | 7.84 |
+| p10 | 0.23 |
+| median | 0.33 |
+| p90 | 0.62 |
+| max | 0.69 |
 
 The denominator is the **cheapest good carrying a base price: 1.00** (regolith, sitting at the
 stone/sand bulk floor — `RESOURCES.md` § What trades). The binding case is therefore the worst
 haul against the cheapest good:
 
 ```
-ceil > 1 + 7.84 / 1.00 = 8.84   ->   10.0
+ceil > 1 + 0.69 / 1.00 = 1.69
 ```
 
-**Why a smaller ceiling is not enough.** A ceiling of 4.0 clears the *median* neighbour pair
-(which needs 1.76) but not the p90 (6.65); the tail — the worst-connected market pair carrying
-the cheapest good — is permanently unservable at any scarcity. 10.0 covers **every**
-nearest-neighbour pair measured, for **every** priced good, with headroom below it.
+**The haulage bound does not bind the ceiling.** On the router's price the worst nearest pair
+needs 1.69, so 10.0 covers every nearest-neighbour pair with wide headroom. What demands more than
+4 is the second reading below, the spread within the ordinary raw tier (`ceil > 6`).
 
-**A second, independent reading agrees on the shape.** The requirement's other half is that a
+**The second, independent reading is the binding one.** The requirement's other half is that a
 scarce cheap good must be able to outprice an abundant dear one. Read *within a tier* — which is
 the only coherent reading, since RESOURCES.md promises margin widens *between* tiers — the
-ordinary raw tier spans 1.00 to 6.00 (`rare_earth_ore`), demanding `ceil > 6`, inside the
+ordinary raw tier spans 1.00 to 6.00 (`rare_earth_ore`), demanding `ceil > 6`, above the
 haulage bound. Read *across* tiers it would demand 280 (1.00 against `spacecraft_components`
 at 280), which would delete the tier model; that reading is rejected and recorded (NR-291).
 
