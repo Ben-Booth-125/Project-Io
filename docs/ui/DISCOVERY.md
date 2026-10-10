@@ -244,7 +244,10 @@ so an own-territory home planet still carries fog of war.
 Three vision layers, all derived VIEW state (`ui_state`, rebuilt each frame by `ui::update_body_vision`
 for the active body — never serialised, no feedback into `world/*`). A tile's `vision` is `1` in the
 permanent layers, else the moving beam's intensity; the fog wash scales with `1 − vision`, applied over
-the lens fill so a fogged region's analytic read dims with it. Survey owns the *unrevealed* tiles.
+the lens fill so a fogged region's analytic read dims with it. **Its strength is 20%** at no vision (Ben, 2026-10-10:
+*"lighten the fog to 20%, it's too dark"* — it was 50%, which over the darker it3 C-F ground left most of
+the map in play near black): unseen ground is washed a fifth of the way toward near-black, enough to
+read as unseen without hiding the ground. Survey owns the *unrevealed* tiles.
 
 **Roads take the same wash (BL-185, roads under fog).** The lens fill and the road spans go through
 a single `fog_dim` (`body_surface_canvas.cpp`), so the fog reads as one uniform wash — a road on an

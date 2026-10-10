@@ -541,12 +541,17 @@ void prim_blended_hex(ImDrawList* dl, const ImVec2 verts[6], ImVec2 centre,
 /// road span reads). Every layer the fog covers goes through this one function — the
 /// lens fill and, since BL-185, the road spans — so the fog reads as a single wash
 /// rather than a dark ground with brightly-lit roads laid over it.
+/// The activity fog's strength: how far unseen ground is washed toward near-black.
+/// 0.5 until 2026-10-10; Ben, walking the it3 C-F palette: "lighten the fog to 20%,
+/// it's too dark" (DISCOVERY.md § The two fogs).
+constexpr float k_fog_strength = 0.2f;
+
 ImU32 fog_dim(ImU32 c, float vision)
 {
     if (vision >= 1.0f)
         return c;
     const ImU32 alpha = (c >> IM_COL32_A_SHIFT) & 0xFFu;
-    const ImU32 dim   = lerp_colour(c, IM_COL32(8, 10, 16, 255), 0.5f * (1.0f - vision));
+    const ImU32 dim   = lerp_colour(c, IM_COL32(8, 10, 16, 255), k_fog_strength * (1.0f - vision));
     return (dim & ~(0xFFu << IM_COL32_A_SHIFT)) | (alpha << IM_COL32_A_SHIFT);
 }
 
@@ -5114,9 +5119,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 }
                 if (vision < 1.0f)
                 {
-                    // fog_dim's wash (lerp toward (8,10,16) by 0.5*(1-vision)),
+                    // fog_dim's wash (lerp toward (8,10,16) by k_fog_strength*(1-vision)),
                     // as an alpha overlay over the baked ground.
-                    const int fa = static_cast<int>(std::lround(127.5f * (1.0f - vision)));
+                    const int fa = static_cast<int>(std::lround(255.0f * k_fog_strength * (1.0f - vision)));
                     if (fa > 0)
                     {
                         const ImU32 fc = IM_COL32(8, 10, 16, fa);
