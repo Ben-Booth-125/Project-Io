@@ -22,12 +22,9 @@
 //   exactly one node per tree derives as ROOT by the generator's own rule (its OWN `links` is
 //   empty) and it is the spire's ring-1 major — so each edge is declared once, on the node
 //   farther from the root (BL-974);
-//   where a generated header exists on disk (src/world/<tree>_tree_data.hpp), the table
-//   regenerated in memory from the store matches it byte for byte, line endings normalised —
-//   a stale header is a failure naming the regeneration command (BL-974);
 //   FORK REACHABILITY (BL-1038, the check BL-930's commit asked for): each side of every fork
-//   can still be bought while its partner is refused, under the SIM's availability rules
-//   (history_sim.cpp `*_node_available`: excludes, the ring lock read off `open "ring N"`,
+//   can still be bought while its partner is refused, under the tree grammar's availability
+//   rules (excludes, the ring lock read off `open "ring N"`,
 //   rule 2's OR travel with the root exempt, a milestone's `requires` AND set and its
 //   `requires_fork` either-side), with every endowment gate assumed satisfiable — a gate is
 //   a question about the map, a fork side no map can reach is a question about the store.
@@ -37,12 +34,16 @@
 //
 // Run on a store other than the canonical one (a pre-cut store from git, say) with
 //   node tools/session/tree_lint.js <tree> --store <path>
-// The generated-header comparison is skipped then (the header transcribes the canonical
-// store, not the override), and the summary line says so.
+//
+// THE GENERATION TREES ARE A RECORD (TREES.md, Ben 2026-10-10): the pre-game history runs no
+// tree, so no C++ table is generated from these stores and nothing in the sim reads them. The
+// lint keeps the record internally consistent; there is no generated header to compare.
 
 const fs = require('fs');
 const path = require('path');
-const gen = require('./gen_empire_tree_table.js');
+// A node is the ROOT iff its OWN declared `links` is empty (BL-974): each edge is declared
+// once, on the node farther from the root.
+const isRootNode = n => (n.links || []).length === 0;
 
 const root = path.resolve(__dirname, '..', '..');
 const dir = path.join(root, 'docs', 'generation', 'trees');
@@ -61,18 +62,16 @@ const DIFFUSION = new Set(['practice', 'artifact', 'capacity']);
 const MOD_TERMS = new Set(['reach', 'carrying_capacity', 'manpower', 'defence', 'industrial', 'stores',
   'cohesion', 'assimilation', 'plague', 'research', 'forage', 'muster_cost']);
 // The machine keys a non-modifier effect may carry when the sim reads it by identity
-// (TREES.md § Effects; src/world/tree_effect.hpp `tree_effect_key` is the C++ twin, and
-// gen_empire_tree_table.js carries the same list — change all three together, BL-973).
+// (TREES.md § Effects, BL-973).
 const EFFECT_KEYS = new Set(['sea_legs', 'post_roads']);
 const KINDS = new Set(['minor', 'major', 'milestone']);
 const CAP = 64;
 
-// FORK REACHABILITY (BL-1038). The sim's availability test, transcribed from
-// history_sim.cpp's `empire_node_available` / `exploration_node_available` /
-// `industry_node_available` (one shape, three trees), over a held SET of ids:
+// FORK REACHABILITY (BL-1038). The tree grammar's availability test (one shape, every
+// tree), over a held SET of ids:
 //   - never a held node, never a node whose fork partner is held;
 //   - ring r > 1 only once a held node carries `open "ring r"`;
-//   - rule 2: the root (own `links` empty, gen.isRootNode) is exempt; any other node with a
+//   - rule 2: the root (own `links` empty, isRootNode) is exempt; any other node with a
 //     neighbour needs one neighbour held;
 //   - a milestone needs its whole `requires` set and, where it has one, either side of its
 //     `requires_fork`. (`requires_any` is honoured too, though no invested store uses it and
@@ -95,7 +94,7 @@ function forkReachabilityFailures(nodes, byId, adj) {
       if (!openers || ![...openers].some(x => held.has(x))) return false;
     }
     const nb = adj.get(n.id);
-    if (!gen.isRootNode(n) && nb.size > 0 && ![...nb].some(x => held.has(x))) return false;
+    if (!isRootNode(n) && nb.size > 0 && ![...nb].some(x => held.has(x))) return false;
     if (n.kind === 'milestone') {
       for (const r of (n.requires || [])) if (!held.has(r)) return false;
       if (Array.isArray(n.requires_fork) && n.requires_fork.length === 2
@@ -346,42 +345,17 @@ function lintTree(name, spec, storeOverride) {
     for (const n of nodes) if (!seen.has(n.id)) fail(`${n.id}: unreachable from the root ${rootNode.id}`);
   }
 
-  // The root by DERIVATION, not by reachability. The generated table (and the sim's rule-2
-  // skip) call a node the root iff its OWN declared `links` is empty — gen.isRootNode is that
-  // one rule. So the store must declare each edge once, on the node farther from the root:
+  // The root by DERIVATION, not by reachability: a node is the root iff its OWN declared
+  // `links` is empty — isRootNode is that one rule. So the store must declare each edge once, on the node farther from the root:
   // every other node then declares at least the edge toward the root, and only the root is
   // empty. A store that declares edges outward from the lower id instead derives every leaf
   // as a root and the true root as none — an unlockable tree in C++ (BL-930's defect, latent
   // in the other stores until BL-974).
-  const derivedRoots = nodes.filter(n => gen.isRootNode(n)).map(n => n.id);
+  const derivedRoots = nodes.filter(n => isRootNode(n)).map(n => n.id);
   if (derivedRoots.length !== 1)
     fail(`root: ${derivedRoots.length} node(s) derive as root by empty links (${derivedRoots.join(', ') || 'none'}); exactly one expected — declare each edge once, on the node farther from the root`);
   else if (rootNode && derivedRoots[0] !== rootNode.id)
     fail(`root: ${derivedRoots[0]} derives as root by empty links, but the spire's ring-1 major is ${rootNode.id}`);
-
-  // The generated header, where one exists on disk: regenerate the table in memory through
-  // the generator's own function and compare. Nothing else in the loop (edit JSON → lint →
-  // regenerate → rebuild) checks that the regeneration happened; a stale header silently runs
-  // the old tree. Line endings are normalised because git may check the header out as CRLF
-  // while the generator writes LF.
-  let headerChecked = false;
-  const headerPath = gen.headerPath(name);
-  if (!storeOverride && fs.existsSync(headerPath)) {
-    headerChecked = true;
-    const norm = s => s.replace(/\r\n/g, '\n');
-    try {
-      const expected = norm(gen.generate(name).text);
-      const actual = norm(fs.readFileSync(headerPath, 'utf8'));
-      if (expected !== actual) {
-        const e = expected.split('\n'), a = actual.split('\n');
-        let i = 0; while (i < e.length && i < a.length && e[i] === a[i]) i++;
-        const show = x => x === undefined ? '<eof>' : JSON.stringify(x);
-        fail(`header stale: src/world/${path.basename(headerPath)} differs from the store at line ${i + 1} (header: ${show(a[i])}; store: ${show(e[i])}) — regenerate: node tools/session/gen_empire_tree_table.js ${name}`);
-      }
-    } catch (e) {
-      fail(`header: could not regenerate the table from the store: ${e.message}`);
-    }
-  }
 
   // Doc cross-check.
   if (!fs.existsSync(docPath)) fail(`doc missing: ${spec.doc}`);
@@ -395,7 +369,7 @@ function lintTree(name, spec, storeOverride) {
   const counts = { minor: 0, major: 0, milestone: 0 };
   for (const n of nodes) if (counts[n.kind] != null) counts[n.kind]++;
   const forks = nodes.filter(n => n.excludes != null).length / 2;
-  console.log(`${failures ? 'FAIL' : 'OK  '} ${name}: ${nodes.length}/${CAP} nodes — ${counts.major} major, ${counts.minor} minor, ${counts.milestone} milestone, ${forks} fork(s), ${rings} rings, ${branches.size - 1} branches + spire${headerChecked ? ', header checked' : ''}${storeOverride ? `, store ${storeOverride} (header not compared)` : ''}${failures ? `, ${failures} failure(s)` : ''}`);
+  console.log(`${failures ? 'FAIL' : 'OK  '} ${name}: ${nodes.length}/${CAP} nodes — ${counts.major} major, ${counts.minor} minor, ${counts.milestone} milestone, ${forks} fork(s), ${rings} rings, ${branches.size - 1} branches + spire${storeOverride ? `, store ${storeOverride}` : ''}${failures ? `, ${failures} failure(s)` : ''}`);
   return failures;
 }
 

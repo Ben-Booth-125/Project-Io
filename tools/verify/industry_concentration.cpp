@@ -517,10 +517,6 @@ int main(int argc, char** argv)
             if (c == cap.end()) return false;
             col = R[c->second].col; row = R[c->second].row; return true;
         };
-        auto tree_q = [&](int n) -> int {
-            if (n < 0 || n >= static_cast<int>(polities.size())) return 0;
-            return industry_tree_industrial_q(polities[n].industry_mask);
-        };
         NAT.erase(-1);
         const auto nat_rank = ranked(NAT, &agg::ip);
         long long nat_tot = 0;
@@ -531,10 +527,10 @@ int main(int argc, char** argv)
             const agg& a = NAT[n];
             std::printf("NAT seed=%u rank=%zu nation=%d lm=%d regions=%lld pop=%lld urban=%lld employed=%lld "
                         "cities=%lld works=%lld ip=%lld ip_share=%.3f ip_treas=%lld budget=%lld firms=%lld "
-                        "specialists=%lld buildings=%lld seats=%lld tree_q=%d fuel=%lld ind_year=%lld\n",
+                        "specialists=%lld buildings=%lld seats=%lld fuel=%lld ind_year=%lld\n",
                         seed, i + 1, n, nat_lm(n), a.regions, a.pop, a.urban, a.employed, a.cities, a.works,
                         a.ip, share(a.ip, nat_tot), a.ip_treasury, a.budget, a.firms, a.specialists,
-                        a.buildings, a.seats, tree_q(n), a.fuel_w ? a.fuel_wsum / a.fuel_w : -1,
+                        a.buildings, a.seats, a.fuel_w ? a.fuel_wsum / a.fuel_w : -1,
                         (n >= 0 && n < static_cast<int>(polities.size())) ? (long long)polities[n].industrial_year : -1);
         }
 
@@ -699,7 +695,7 @@ int main(int argc, char** argv)
             const agg& a = NAT[who];
             row += " end_urban=" + std::to_string(a.urban) + " end_employed=" + std::to_string(a.employed) +
                    " end_works=" + std::to_string(a.works) + " end_treas_share=" +
-                   std::to_string(a.ip ? (a.ip_treasury * 1000 / a.ip) : 0) + " tree_q=" + std::to_string(tree_q(who));
+                   std::to_string(a.ip ? (a.ip_treasury * 1000 / a.ip) : 0);
             if (tl)
                 for (int y : {1700, 1750, 1800, 1850, 1900, 1930, 1960})
                 {

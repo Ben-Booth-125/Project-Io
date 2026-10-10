@@ -534,26 +534,18 @@ history_sim_params industrialisation_sim_params(const world_params& params)
     // overturned). Re-anchoring them at 1660 would consolidate a second time
     // and call every pair met during Exploration near home.
 
-    // THE INDUSTRY TREE, IN THIS SPAN ONLY (BL-1038; TREES.md sec Milestones:
-    // it opens at its root to every living polity at 1660). Opened at the
-    // span's own start, which is 1660 at the defaults -- the tree belongs to
-    // this span, so a harness that moves the span's open moves the tree's
-    // with it rather than leaving a gap or an overlap.
-    hp.industry_tree_enabled = true;
-    hp.industry_open_year    = hp.start_year;
-
     // BL-1041 — INDUSTRY POINTS, IN THIS SPAN ONLY (INDUSTRIALISATION.md sec Beat
-    // 1). They open with the Industry tree, at the span's own open year, and
-    // accrue on every region with centres plus a share of each capital's
-    // surplus; the constants are the struct's (history_sim.hpp says why each).
-    // Two defaults ride with them (RULED, Ben 2026-09-18, wave 1 form), each
-    // its own switch: A, a region the span founds inherits its parent's
-    // surveyed fuel at a discount; B, every Industry fuel read (the gate, its
-    // re-check, the seam flag, `ground_fuel`) takes the survey rather than
-    // energy_q. Both are inert wherever nothing was surveyed.
+    // 1). They open at the span's own start, which is 1660 at the defaults --
+    // so a harness that moves the span's open moves the points' with it rather
+    // than leaving a gap or an overlap -- and accrue on every region with
+    // centres plus a share of each capital's surplus; the constants are the
+    // struct's (history_sim.hpp says why each). One default rides with them
+    // (RULED, Ben 2026-09-18, wave 1 form, DEFAULT A): a region the span
+    // founds inherits its parent's surveyed fuel at a discount. Inert wherever
+    // nothing was surveyed.
+    hp.industry_open_year                   = hp.start_year;
     hp.industry_points_enabled              = true;
     hp.industry_survey_inherits_at_founding = true; // DEFAULT A
-    hp.industry_fuel_gate_reads_survey      = true; // DEFAULT B
 
     // BL-1142 -- FAR REALMS ACROSS WATER MEET AND BIND (INDUSTRIALISATION.md sec
     // Far pairs meet and bind, and this phase makes them: "far pairs bind across

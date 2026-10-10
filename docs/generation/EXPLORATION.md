@@ -148,6 +148,8 @@ with no reason. The pair is what makes a trade route a consequence rather than a
 **The road ladder gets its third rung here.** The Empire sim promotes a corridor by use — a Track
 at four uses, a Road above it, and no tier beyond. A phase about throughput is where the next rung
 belongs, bought with capital rather than earned by traffic, which is Ben's *"upgrade of roads"*.
+Every polity may buy it from a measured year, the same for all (`trees/TREES.md`: the history
+holds no technology).
 
 **A resumed corridor reopens at the rung it was recorded at (Ben, 2026-09-18).** A span that opens
 from a handoff seeds each corridor at its recorded rung: a bought rung is never demoted to the rung
@@ -307,10 +309,9 @@ whether its seat has a port (Ben, 2026-09-24).** A coastal people taken by force
 polity, and nothing about its coast makes it a trade province; which verb binds is decided on the
 ground's terms in § Two ways to claim ground across water.
 
-**The asymmetry that permits either is technological, and it is a node, not a rank.** Nothing
-reads size. What decides who can arrive at all is what the arriving polity holds — the sea legs
-and the institutions — exactly as the explorer set at 1200 CE is a held rim milestone rather than
-a ranking (`CIVILISATION.md` § Some peoples gain the capacity to explore).
+**The asymmetry that permits either is never a rank.** Nothing reads size. Sea legs open on a
+date, the same for every polity (Ben, 2026-10-10; `trees/TREES.md`); from then on what decides who
+arrives is what the arriving power can field and pay for — its fleet, its treasury, its reach.
 
 ---
 
@@ -465,7 +466,8 @@ The reading is structural rather than a tuning miss, and the figures say so: at 
 2026-09-11): the navy CARRIES too, as a starting fleet earned at sea in the Empires age.** A
 polity accrues **naval points** through the Empires span from three deeds: the coastal provinces
 it holds, counted per year held; the sea crossings it makes, the sea legs it walks; and the
-coastal sea techs it takes (Deep-Hull Sail and on, `trees/EMPIRE_TREE.md`). At the handoff its
+coastal sea techs it holds, a ramp of measured years the same for every polity
+(`trees/TREES.md`). At the handoff its
 points become its opening `navy_stock`, so the coastal empires open the age already at sea and
 the Exploration age's first crossings, purchases and lanes follow who held the sea before it.
 **The points pass to the polity that earned them:** a polity that lost its coast keeps its
@@ -755,9 +757,8 @@ expire, which nothing in the Empire phase does.
 **The verbs are the Empire verbs, and a treasury spends beside them.** Settle, Invest,
 Consolidate and Campaign carry over unchanged. What this phase adds is the ability to spend on a
 port, a hull or a garrison, and to bind. The first three are one scored allocation inside the
-upkeep step (§ Force persists now); a binding forms by the treaty test (§ What a treaty is). The
-tree node a polity invests in is still weighed on the scorer's one shape (`trees/TREES.md`
-§ The scorer).
+upkeep step (§ Force persists now); a binding forms by the treaty test (§ What a treaty is).
+Invest raises the capacity ladder alone: the history runs no technology tree (`trees/TREES.md`).
 
 **If the shared engine turns out to be the wrong frame, the tell will be a reading it cannot
 move** (§ What the phase is judged on). Revising it then is Ben's call and is explicitly left
@@ -765,23 +766,13 @@ open; forking it pre-emptively is not.
 
 ---
 
-## The tree
+## No tree
 
-**The Exploration tree is the third of four** (`trees/TREES.md`), and its existence is Ben's
-ruling of 2026-09-11: *"Exploration and industry use different trees."* The chain is
-Colonisation → Empire → **Exploration** → Industry.
-
-**The Empire tree's rim milestone — *The Enforceable Promise* — opens THIS tree**, not the
-Industry tree, and the Industry tree's root is gated behind Exploration's own rim. That is the
-whole structural consequence of the ruling, and it is why a 1960 spread is now manufactured across
-two intervening trees rather than one.
-
-**Sized to 460 years**, which is roughly a quarter of the Empire phase's span, so the tree is
-correspondingly shallower — three rings, four branches, three milestones (`trees/TREES.md`
-§ Sizes). Its concerns are the phase's: hulls and crossings, the charter and the treasury,
-the port and the garrison, and what a people does with a good it did not grow.
-
-Its nodes, its forks and its scorer terms are `trees/EXPLORATION_TREE.md`'s.
+**The phase runs no technology tree (Ben, 2026-10-10; `trees/TREES.md`).** Research is not a
+thing the history does: every playable nation starts the campaign at the same tech level. What the
+Exploration tree's design gated — sea legs and the bought third road rung — opens on a measured
+year for every polity; `trees/EXPLORATION_TREE.md` is the record of that design and nothing reads
+it.
 
 ---
 
@@ -832,8 +823,6 @@ and what preference different cultures develop for these goods."*
 - **Standing treaties and their remaining terms** — the diplomatic position 1660 opens on.
 - **Ports, navies and standing armies**, at whatever level upkeep left them.
 - **The contact and want tables**, grown: a world that has met itself, mostly.
-- **Exploration tree masks** — what each polity brings into the Industry tree, which every living
-  polity enters at 1660 (`trees/TREES.md` § Milestones, and how a tree unlocks the next).
 - **The grudge table and the surviving network**, grown across the span and filtered over this
   span's dead, exactly as the Empire handoff filters its own.
 - **The sea legs it walked**, each with its count of uses — what the lane stamp reads
