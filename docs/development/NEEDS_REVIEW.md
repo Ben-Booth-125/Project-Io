@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*104 entries — 24 open, 80 resolved.*
+*105 entries — 25 open, 80 resolved.*
 
 ---
 
@@ -285,6 +285,22 @@ Two places TRADE.md leaves room the build filled narrowly. (1) REACH: auto trade
 > **Recommendation:** Limit manual trades to the auto reach (one rule for both); keep the single reserve until a surface asks for more.
 
 *Files: `src/world/trade.cpp (trade_is_valid, corp_trade_markets)`, `src/world/corp_command.cpp (set_trade)`*
+
+### NR-1019 — Marketplace retrofit: the record, the rates, the owner and siting rules (proposed by measurement)
+*novel-work · raised 2026-10-10 · from BL-1268 (trade in generation) lane, 2026-10-10*
+
+Built: through Exploration and Industrialisation each nation earns a trade record at its capital each round - its trade flows' volume (both ends) and the years of standing mutual treaties (tribute excluded). After generation the record is converted to points (flow_points_per_1000 = 40, relation_points_per_year = 1) and each market whose history traded buys min(3, points / 40000) completed Planetary Marketplaces. OWNER: the non-seat corporation with the most buildings in that market's catchment (ties to the lower id); a market with no corporation gets none. SITE: the free catchment tile nearest the market centre that passes placement. Measured on 16 seeds: 164 Marketplaces (2 to 19 per seed), all on the home body, held by 86 of ~2,040 corporations (about 17 specialists). The rates are the proposal TRADE.md asks Ben to approve; the owner and siting rules are new surface no doc states yet. Part B (trade points replacing the Exploration flows) is planned, not built: it moves the Trade reading, treaties, treasuries, lanes and the tariff postures, and needs a sweep and a re-bless.
+
+**Why it matters.** Retrofitted Marketplaces are most of the campaign's opening trade capacity.
+
+- Approve the rates, owner and siting rules as built
+- Change the price per Marketplace (30k -> 210 placed, 50k -> 135, 80k -> 69)
+- Prefer specialists as owners
+- Build Part B now
+
+> **Recommendation:** Approve as built after the 16-seed gate reads; write the owner and siting rules into TRADE.md § Trade in generation; Part B as its own item after the re-bless.
+
+*Files: `src/world/history_sim.cpp (accumulate_trade_record)`, `src/world/corporation_generation.cpp (retrofit_marketplaces)`, `scripts/world_gen.lua (trade_retrofit)`, `tools/verify/trade_retrofit_probe.cpp`*
 
 ---
 
