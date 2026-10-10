@@ -46,6 +46,8 @@
 #include "world/stance.hpp"
 #include "world/survey_system.hpp"
 #include "world/stockpile_budget.hpp" // BL-1042: the budget this search-less path states
+#include "world/resource_names.hpp" // resource_from_name(name, ok): the air-gate / sea-lane fixtures
+#include "world/supply_system.hpp"  // price_convoy_leg: the sea-lane fixture prices as the dispatch does
 
 #include <algorithm>
 #include <cctype>
@@ -3306,6 +3308,29 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // survives the mercenary tear-out that took accept_offer's `units` array.
         cmd.order = static_cast<uint32_t>(t.get_or("order", 0u));
 
+        // Sprint 50 (air_gate.lua / sea_lane.lua): set_recipe's recipe and
+        // dispatch_convoy's cargo + quantity. Named, not numbered, so a script
+        // cannot hand a positional id across a recipe-table change; an unknown
+        // name REJECTS rather than defaulting, and a quantity is range-checked
+        // as the float it lands in before the narrowing cast.
+        if (const sol::optional<std::string> rn = t["recipe_name"]; rn)
+        {
+            cmd.recipe = m_registry.recipe_id(*rn);
+            if (cmd.recipe == no_recipe) return "rejected_invalid";
+        }
+        if (const sol::optional<std::string> tn = t["target_name"]; tn)
+        {
+            bool ok = false;
+            cmd.target = resource_names::resource_from_name(*tn, ok);
+            if (!ok) return "rejected_invalid";
+        }
+        if (const sol::optional<double> q = t["quantity"]; q)
+        {
+            if (!std::isfinite(*q) || std::fabs(*q) > static_cast<double>(FLT_MAX))
+                return "rejected_invalid";
+            cmd.quantity = static_cast<float>(*q);
+        }
+
         // Range-check BEFORE the narrowing cast, not after — a value that fits a
         // Lua number can still be outside the destination's domain.
         const int wf = t.get_or("workforce", 100);
@@ -3488,6 +3513,558 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["levers_ok"]      = (c.levers_for != null_entity);
         out["levers_for"]     = static_cast<unsigned>(c.levers_for);
         return out;
+    });
+
+    // === Sprint 50: the air gate and the sea-route lane (air_gate.lua, sea_lane.lua) ===
+    //
+    // Readers of what a SURFACE listed or drew, plus two fixtures. Verify-only: bound
+    // behind --verify like everything here; nothing below runs in a played session.
+
+    // The Build door's processing rows as the door LISTED them on its last drawn
+    // frame (`construction_controls::door_recipes`, published by
+    // draw_construction_ledger_body after its era / tech / air filters). The door
+    // folds rows by building group, so a capture cannot show which recipe is behind
+    // a folded row; the check asserts on the ids instead. `drawn` is false when the
+    // door did not draw (no tile selection, ledger shut).
+    v.set_function("build_door", [this]() {
+        sol::state& st  = m_lua.state();
+        sol::table  out = st.create_table();
+        sol::table  names = st.create_table();
+        const auto& c = m_ui.construction_ui;
+        int n = 0;
+        for (const std::uint16_t id : c.door_recipes)
+        {
+            const recipe* rc = m_registry.get_recipe(id);
+            names[++n] = rc ? rc->name : std::string("?");
+        }
+        out["drawn"]   = (c.door_tile != null_entity);
+        out["tile"]    = static_cast<unsigned>(c.door_tile);
+        out["recipes"] = names;
+        out["count"]   = n;
+        return out;
+    });
+
+    // The method grid's OFFER for building `id` — `ui::method_grid_candidates`, the
+    // one list draw_production_method_section draws its rows from — plus the status
+    // line the grid draws under them (`ui::method_grid_status`, "" for none) and the
+    // building's active recipe. Read-only.
+    v.set_function("method_grid", [this](unsigned id_u) {
+        sol::state& st  = m_lua.state();
+        sol::table  out = st.create_table();
+        sol::table  names = st.create_table();
+        const entity_id id = static_cast<entity_id>(id_u);
+        const auto bit = m_world.buildings.find(id);
+        out["found"] = (bit != m_world.buildings.end());
+        int n = 0;
+        if (bit != m_world.buildings.end())
+        {
+            for (const int i : ui::method_grid_candidates(m_world, m_registry, bit->second))
+                names[++n] = m_registry.recipe_at(bit->second.type, i).name;
+            const recipe* cur = m_registry.get_recipe(bit->second.recipe);
+            out["active"] = cur ? cur->name : std::string();
+        }
+        out["recipes"] = names;
+        out["count"]   = n;
+        out["status"]  = std::string(ui::method_grid_status(id));
+        // Whether the grid DREW that line on its last frame — a recorded refusal the
+        // grid never shows is not a refusal the player can read.
+        out["status_drawn"] = (id != null_entity && ui::method_grid_status_drawn_for() == id);
+        return out;
+    });
+
+    // Press the method grid's Switch for building `id` onto recipe `name` — the
+    // grid button's own body (`ui::method_grid_press`: try_switch_recipe for the
+    // player, the refusal recorded for the status line). Aimed at any recipe,
+    // including one the grid does not offer, so a check can prove the seam refuses
+    // what the grid hides. Returns the recipe_switch_result as a string; an
+    // unknown recipe name refuses as "invalid" without pressing.
+    v.set_function("method_grid_press", [this](unsigned id_u, const std::string& name) -> std::string {
+        const std::uint16_t rid = m_registry.recipe_id(name);
+        if (rid == no_recipe)
+            return "invalid";
+        switch (ui::method_grid_press(m_world, m_registry, static_cast<entity_id>(id_u), rid))
+        {
+            case recipe_switch_result::applied:            return "applied";
+            case recipe_switch_result::on_cooldown:        return "on_cooldown";
+            case recipe_switch_result::insufficient_funds: return "insufficient_funds";
+            case recipe_switch_result::invalid:            return "invalid";
+            case recipe_switch_result::cross_group:        return "cross_group";
+            case recipe_switch_result::tech_locked:        return "tech_locked";
+            case recipe_switch_result::wrong_air:          return "wrong_air";
+        }
+        return "invalid";
+    });
+
+    // Every body that has a tile grid, with its atmosphere class and whether it is
+    // airless (`atmosphere_is_airless`, the codebase's one definition). Body-level
+    // data only — no tile is read. Sorted by entity id.
+    v.set_function("body_airs", [this]() {
+        sol::state& st  = m_lua.state();
+        sol::table  out = st.create_table();
+        std::vector<entity_id> ids;
+        for (const auto& [bid, bc] : m_world.bodies)
+            if (bc.grid_width > 0 && bc.grid_height > 0)
+                ids.push_back(bid);
+        std::sort(ids.begin(), ids.end());
+        int n = 0;
+        for (const entity_id bid : ids)
+        {
+            const body_component& bc = m_world.bodies.at(bid);
+            sol::table row = st.create_table();
+            row["body"] = static_cast<unsigned>(bid);
+            row["name"] = bc.name;
+            row["atmosphere"] =
+                bc.atmosphere == atmosphere_class::none     ? "none" :
+                bc.atmosphere == atmosphere_class::thin     ? "thin" :
+                bc.atmosphere == atmosphere_class::moderate ? "moderate" : "thick";
+            row["airless"] = atmosphere_is_airless(bc.atmosphere);
+            row["surveyed"] = (bc.survey.phase == survey_phase::surveyed);
+            row["home"]     = (bid == m_world.home_body); // the player's home planet (generated name)
+            out[++n] = row;
+        }
+        return out;
+    });
+
+    // FIXTURE: a FINISHED player-owned processing facility running recipe `name` on
+    // the first tile of the active body that the real construct_building accepts —
+    // so the air gate, placement rules and tech gate all apply at the seed exactly
+    // as at the Build button; only the construction wait is skipped
+    // (ticks_remaining := 0). Funds are topped up for the build and restored after,
+    // so the fixture does not move the player's balance. Returns
+    // {result, id, tile, x, y}; `result` is the construction_result name of the
+    // last attempt ("placed" on success).
+    //
+    // `direct` (optional): where the build door refuses every tile on PLACEMENT
+    // alone (invalid_tile / out_of_range — the player has no reach on the body),
+    // insert the works on the first land tile instead, still refusing a recipe the
+    // body's air cannot run. Result "inserted". For a check whose subject is the
+    // air gate on a body the player has not reached; never used to dodge the gate.
+    v.set_function("seed_processing", [this](const std::string& name,
+                                             sol::optional<bool> direct) {
+        sol::state& st  = m_lua.state();
+        sol::table  out = st.create_table();
+        out["result"] = std::string("no_tile");
+        const std::uint16_t rid = m_registry.recipe_id(name);
+        if (rid == no_recipe)
+        {
+            out["result"] = std::string("unknown_recipe");
+            return out;
+        }
+        const auto cit = m_world.corporations.find(m_world.player_entity);
+        if (cit == m_world.corporations.end())
+        {
+            out["result"] = std::string("no_corp");
+            return out;
+        }
+        std::unordered_set<entity_id> occupied;
+        for (const auto& [bid, bc] : m_world.buildings)
+            occupied.insert(bc.tile);
+        std::vector<entity_id> tiles;
+        for (const auto& [tid, tc] : m_world.tiles)
+            if (tc.body == m_ui.active_body && !occupied.count(tid))
+                tiles.push_back(tid);
+        std::sort(tiles.begin(), tiles.end()); // deterministic scan order
+        const float saved_balance = cit->second.balance;
+        std::string last = "no_tile";
+        for (const entity_id tid : tiles)
+        {
+            cit->second.balance = 1.0e9f;
+            entity_id built = null_entity;
+            const construction_result r =
+                construct_building(m_world, m_registry, m_world.player_entity, tid,
+                                   building_type::processing_facility,
+                                   resource_type::iron_ore, built, rid);
+            last = r == construction_result::placed                 ? "placed" :
+                   r == construction_result::invalid_tile           ? "invalid_tile" :
+                   r == construction_result::out_of_range           ? "out_of_range" :
+                   r == construction_result::insufficient_funds     ? "insufficient_funds" :
+                   r == construction_result::slot_occupied          ? "slot_occupied" :
+                   r == construction_result::insufficient_materials ? "insufficient_materials" :
+                   r == construction_result::tech_locked            ? "tech_locked" :
+                   r == construction_result::era_locked             ? "era_locked" :
+                   r == construction_result::wrong_air              ? "wrong_air" : "failed";
+            // A refusal that is not about THIS tile ends the scan: every tile would
+            // refuse it the same way, and that refusal is the answer.
+            if (r == construction_result::tech_locked || r == construction_result::era_locked
+                || r == construction_result::wrong_air)
+                break;
+            if (r != construction_result::placed)
+                continue;
+            building_component& b = m_world.buildings.at(built);
+            b.ticks_remaining = 0;
+            const auto& tc = m_world.tiles.at(tid);
+            out["id"]   = static_cast<unsigned>(built);
+            out["tile"] = static_cast<unsigned>(tid);
+            out["x"]    = tc.grid_x;
+            out["y"]    = tc.grid_y;
+            const recipe* rc = m_registry.get_recipe(b.recipe);
+            out["recipe"] = rc ? rc->name : std::string();
+            break;
+        }
+        cit->second.balance = saved_balance;
+        if (direct.value_or(false) && (last == "invalid_tile" || last == "out_of_range"))
+        {
+            const recipe* rc = m_registry.get_recipe(rid);
+            for (const entity_id tid : tiles)
+            {
+                const tile_component& tc = m_world.tiles.at(tid);
+                if (placement_rules::is_water_tile(tc.substrate))
+                    continue;
+                if (rc == nullptr || !recipe_runs_at_tile(m_world, *rc, tid))
+                {
+                    last = "wrong_air";
+                    break;
+                }
+                const entity_id bid = m_world.create_entity();
+                building_component b{};
+                b.tile                = tid;
+                b.type                = building_type::processing_facility;
+                b.recipe              = rid;
+                b.active_recipe_index = static_cast<int>(rid);
+                b.ticks_remaining     = 0;
+                m_world.buildings[bid] = b;
+                cit->second.assets.push_back(bid);
+                out["id"]     = static_cast<unsigned>(bid);
+                out["tile"]   = static_cast<unsigned>(tid);
+                out["x"]      = tc.grid_x;
+                out["y"]      = tc.grid_y;
+                out["recipe"] = rc->name;
+                last = "inserted";
+                break;
+            }
+        }
+        out["result"] = last;
+        SDL_Log("verify.seed_processing(%s): %s", name.c_str(), last.c_str());
+        return out;
+    });
+
+    // FIXTURE: a pair of markets on the ACTIVE body whose cheapest haul for the
+    // player runs land -> port -> sea -> port -> land (SUPPLY.md § Logistical
+    // cost). Ordered market pairs are tried in id order; a pair is taken when
+    // `price_convoy_leg` — the dispatch's own pricing — answers a three-leg route.
+    // Where the body's existing Ports give no such pair, a finished Port is laid on
+    // the last land tile before, and the first after, the water the pair's direct
+    // path crosses (the sea_port_gate.cpp idiom), and the pair is re-priced; Ports
+    // that did not produce a sea route are removed again. Grants `qty` of `res` to
+    // the player's pool at the source market so the script can dispatch through
+    // the real `dispatch_convoy` verb. Returns {ok, src, dst, port_a, port_b,
+    // seeded_ports}; market ids and Port TILE ids, no tile data.
+    v.set_function("sea_route_fixture", [this](const std::string& res, double qty_d,
+                                               sol::optional<int> min_span_opt) {
+        sol::state& st  = m_lua.state();
+        sol::table  out = st.create_table();
+        out["ok"] = false;
+        bool res_ok = false;
+        const resource_type r = resource_names::resource_from_name(res, res_ok);
+        if (!res_ok || !std::isfinite(qty_d) || !(qty_d > 0.0) || qty_d > 1.0e6)
+            return out;
+        const float     qty  = static_cast<float>(qty_d);
+        const std::size_t ri = static_cast<std::size_t>(r);
+        // The shortest land leg (in tile hops) a route must carry on BOTH ends to be
+        // taken, so the head can be seen on land as well as at sea. 0 = any.
+        const int min_span = std::max(0, min_span_opt.value_or(0));
+        const entity_id body = m_ui.active_body;
+        const entity_id corp = m_world.player_entity;
+        if (m_world.corporations.find(corp) == m_world.corporations.end())
+            return out;
+
+        std::vector<entity_id> mkts;
+        for (const auto& [mid, mc] : m_world.markets)
+            if (mc.body == body && mc.centre_tile != null_entity)
+                mkts.push_back(mid);
+        std::sort(mkts.begin(), mkts.end());
+
+        const auto price = [&](entity_id a, entity_id b) -> convoy_leg {
+            const logistics_nodes nodes = collect_logistics_nodes(m_world);
+            auto& pool = m_world.pool_at(corp, a);
+            const float before = pool.quantities[ri];
+            pool.quantities[ri] = std::max(before, qty);
+            const convoy_leg leg = price_convoy_leg(m_world, m_registry, nodes, corp, a, b, ri,
+                                                    qty, m_registry.logistics_cost(convoy_mode::space));
+            pool.quantities[ri] = before;
+            return leg;
+        };
+        const auto take = [&](entity_id a, entity_id b, const convoy_leg& leg, int seeded) {
+            m_world.pool_at(corp, a).quantities[ri] += qty;
+            out["ok"]           = true;
+            out["src"]          = static_cast<unsigned>(a);
+            out["dst"]          = static_cast<unsigned>(b);
+            out["port_a"]       = static_cast<unsigned>(leg.port_a);
+            out["port_b"]       = static_cast<unsigned>(leg.port_b);
+            out["seeded_ports"] = seeded;
+            // Grid positions of the two Ports, so the script can frame the sea leg.
+            const auto& ta = m_world.tiles.at(leg.port_a);
+            const auto& tb = m_world.tiles.at(leg.port_b);
+            out["port_a_x"] = ta.grid_x;
+            out["port_a_y"] = ta.grid_y;
+            out["port_b_x"] = tb.grid_x;
+            out["port_b_y"] = tb.grid_y;
+            SDL_Log("verify.sea_route_fixture: markets %u -> %u by sea, ports %u / %u (%d seeded)",
+                    static_cast<unsigned>(a), static_cast<unsigned>(b),
+                    static_cast<unsigned>(leg.port_a), static_cast<unsigned>(leg.port_b), seeded);
+        };
+
+        // The lane a sea leg would be drawn on, and the shorter of its two land
+        // legs in tiles: a pair whose land legs are a tile long cannot show the
+        // head on land, so the fixture prefers the pair whose shorter land leg is
+        // longest (ties to the lower ids).
+        const auto land_span = [&](entity_id a, entity_id b, const convoy_leg& leg) -> int {
+            convoy_component probe{};
+            probe.source_market = a;
+            probe.dest_market   = b;
+            probe.origin_tile   = leg.origin_tile;
+            probe.port_a        = leg.port_a;
+            probe.port_b        = leg.port_b;
+            probe.mode          = convoy_mode::sea;
+            const convoy_route lane = convoy_route_tiles(m_world, probe);
+            const int n = static_cast<int>(lane.tiles.size());
+            int ia = -1, ib = -1;
+            for (int i = 0; i < n; ++i)
+            {
+                if (ia < 0 && lane.tiles[static_cast<std::size_t>(i)] == leg.port_a) ia = i;
+                if (lane.tiles[static_cast<std::size_t>(i)] == leg.port_b) ib = i;
+            }
+            if (ia < 0 || ib <= ia) return -1;
+            return std::min(ia, n - 1 - ib);
+        };
+
+        // Pass 1: the body's Ports as they stand.
+        {
+            entity_id  best_a = null_entity, best_b = null_entity;
+            convoy_leg best_leg;
+            int        best_span = -1;
+            for (const entity_id a : mkts)
+                for (const entity_id b : mkts)
+                {
+                    if (a == b) continue;
+                    const convoy_leg leg = price(a, b);
+                    if (!(leg.viable && leg.port_a != null_entity && leg.port_b != null_entity))
+                        continue;
+                    const int span = land_span(a, b, leg);
+                    if (span > best_span)
+                    {
+                        best_span = span;
+                        best_a = a; best_b = b; best_leg = leg;
+                    }
+                }
+            if (best_a != null_entity && best_span >= min_span)
+            {
+                SDL_Log("verify.sea_route_fixture: shorter land leg %d tiles", best_span);
+                out["land_span"] = best_span;
+                take(best_a, best_b, best_leg, 0);
+                return out;
+            }
+        }
+
+        // Pass 2: seed a Port at each shore of the water the direct path crosses,
+        // on pairs whose path from the dispatch's own origin tile runs at least
+        // `min_span` land hops before the first water and after the last.
+        std::unordered_set<entity_id> occupied;
+        for (const auto& [bid, bc] : m_world.buildings)
+            occupied.insert(bc.tile);
+        for (const entity_id a : mkts)
+            for (const entity_id b : mkts)
+            {
+                if (a == b) continue;
+                const entity_id ca =
+                    convoy_origin_tile(m_world, m_world.corporations.at(corp), a);
+                const entity_id cb = m_world.markets.at(b).centre_tile;
+                if (ca == null_entity || ca == cb) continue;
+                std::vector<entity_id> path;
+                {
+                    const logistics_path& lp = intra_body_path(m_world, body, ca, cb);
+                    if (!lp.reachable || !lp.crosses_ocean || lp.tiles.size() < 3)
+                        continue;
+                    path = lp.tiles;
+                }
+                if (path.front() != ca)
+                    std::reverse(path.begin(), path.end()); // cache order is lo -> hi
+                std::size_t first = path.size(), last = 0;
+                for (std::size_t i = 0; i < path.size(); ++i)
+                    if (placement_rules::is_water_tile(m_world.tiles.at(path[i]).substrate))
+                    {
+                        first = std::min(first, i);
+                        last  = i;
+                    }
+                if (first == path.size() || first == 0 || last + 1 >= path.size())
+                    continue;
+                if (static_cast<int>(first) - 1 < min_span
+                    || static_cast<int>(path.size()) - 2 - static_cast<int>(last) < min_span)
+                    continue;
+                const entity_id pa = path[first - 1];
+                const entity_id pb = path[last + 1];
+                if (pa == pb || occupied.count(pa) || occupied.count(pb))
+                    continue;
+                std::vector<entity_id> placed;
+                for (const entity_id pt : {pa, pb})
+                {
+                    const entity_id p = m_world.create_entity();
+                    building_component pc{};
+                    pc.tile = pt;
+                    pc.type = building_type::port; // built + active: ticks_remaining 0
+                    m_world.buildings[p] = pc;
+                    m_world.corporations.at(corp).assets.push_back(p);
+                    placed.push_back(p);
+                }
+                invalidate_logistics_caches(m_world);
+                const convoy_leg leg = price(a, b);
+                if (leg.viable && leg.port_a != null_entity && leg.port_b != null_entity)
+                {
+                    const int span = land_span(a, b, leg);
+                    if (span >= min_span)
+                    {
+                        SDL_Log("verify.sea_route_fixture: shorter land leg %d tiles", span);
+                        out["land_span"] = span;
+                        take(a, b, leg, 2);
+                        return out;
+                    }
+                }
+                auto& assets = m_world.corporations.at(corp).assets;
+                for (const entity_id p : placed)
+                {
+                    m_world.buildings.erase(p);
+                    assets.erase(std::remove(assets.begin(), assets.end(), p), assets.end());
+                }
+                invalidate_logistics_caches(m_world);
+            }
+        SDL_Log("verify.sea_route_fixture: no market pair on the active body routes by sea");
+        return out;
+    });
+
+    // The player's convoys, newest last, as {id, src, dst, progress, mode, port_a,
+    // port_b, arrived}. Lets a script find the convoy it just dispatched.
+    v.set_function("convoys", [this]() {
+        sol::state& st  = m_lua.state();
+        sol::table  out = st.create_table();
+        int n = 0;
+        for (const convoy_component& cv : m_world.convoys)
+        {
+            if (cv.corp != m_world.player_entity) continue;
+            sol::table row = st.create_table();
+            row["id"]       = cv.id;
+            row["src"]      = static_cast<unsigned>(cv.source_market);
+            row["dst"]      = static_cast<unsigned>(cv.dest_market);
+            row["progress"] = cv.progress;
+            row["mode"]     = cv.mode == convoy_mode::sea   ? "sea"
+                            : cv.mode == convoy_mode::space ? "space" : "land";
+            row["port_a"]   = static_cast<unsigned>(cv.port_a);
+            row["port_b"]   = static_cast<unsigned>(cv.port_b);
+            row["arrived"]  = cv.arrived;
+            out[++n] = row;
+        }
+        return out;
+    });
+
+    // Convoy `id`'s lane AS THE CANVAS DREW IT: the convoy beam the Planetary
+    // canvas's vision pass built this frame (`ui_state::convoy_beams`, from
+    // convoy_route_tiles) whose path equals the convoy's route, and the head the
+    // canvas draws on it (convoy_lane_index over the beam's clock at the beam's
+    // progress — the draw's own rule, at a paused frame's zero step fraction).
+    //
+    // Returns positions and AGGREGATES only, never a tile's data: the lane's
+    // length, where the two Ports sit on it, how many of its tiles are water in
+    // each leg, the clock (`at`, fractions of journey time), the head index and
+    // which leg it is on, and whether the lane differs from the direct
+    // centre-to-centre path (`direct_same`).
+    v.set_function("convoy_lane", [this](unsigned id_u) {
+        sol::state& st  = m_lua.state();
+        sol::table  out = st.create_table();
+        out["found"] = false;
+        const convoy_component* cv = nullptr;
+        for (const convoy_component& c : m_world.convoys)
+            if (c.id == static_cast<std::uint32_t>(id_u)) { cv = &c; break; }
+        if (cv == nullptr)
+            return out;
+        out["found"] = true;
+        const convoy_route route = convoy_route_tiles(m_world, *cv);
+        out["route_n"] = static_cast<int>(route.tiles.size());
+
+        // The beam the canvas drew for this convoy.
+        const ui_state::convoy_beam* beam = nullptr;
+        for (const auto& cb : m_ui.convoy_beams)
+            if (cb.path == route.tiles) { beam = &cb; break; }
+        out["drawn"] = (beam != nullptr);
+        if (beam == nullptr || beam->path.empty())
+            return out;
+
+        const std::vector<entity_id>& path = beam->path;
+        const int n = static_cast<int>(path.size());
+        int ia = -1, ib = -1;
+        for (int i = 0; i < n; ++i)
+        {
+            if (ia < 0 && path[static_cast<std::size_t>(i)] == cv->port_a) ia = i;
+            if (path[static_cast<std::size_t>(i)] == cv->port_b) ib = i;
+        }
+        int water_land = 0, water_sea = 0;
+        for (int i = 0; i < n; ++i)
+        {
+            const bool wet = placement_rules::is_water_tile(
+                m_world.tiles.at(path[static_cast<std::size_t>(i)]).substrate);
+            if (!wet) continue;
+            if (ia >= 0 && ib > ia && i > ia && i < ib) ++water_sea;
+            else ++water_land;
+        }
+        const int head = std::clamp(convoy_lane_index(beam->at, beam->progress), 0, n - 1);
+        sol::table at = st.create_table();
+        for (int i = 0; i < n; ++i)
+            at[i + 1] = beam->at[static_cast<std::size_t>(i)];
+
+        // The direct centre-to-centre path the lane must NOT be.
+        bool direct_same = false;
+        int  direct_n    = 0;
+        const auto sm = m_world.markets.find(cv->source_market);
+        const auto dm = m_world.markets.find(cv->dest_market);
+        if (sm != m_world.markets.end() && dm != m_world.markets.end())
+        {
+            std::vector<entity_id> d =
+                intra_body_path(m_world, route.body, sm->second.centre_tile, dm->second.centre_tile).tiles;
+            if (!d.empty() && d.front() != sm->second.centre_tile)
+                std::reverse(d.begin(), d.end());
+            direct_n    = static_cast<int>(d.size());
+            direct_same = (d == path);
+        }
+
+        out["n"]           = n;
+        out["port_a_idx"]  = ia + 1; // 1-based for Lua; 0 = not on the lane
+        out["port_b_idx"]  = ib + 1;
+        out["water_sea"]   = water_sea;
+        out["water_land"]  = water_land;
+        out["head"]        = head + 1;
+        {
+            // Where the head stands, so a capture can be framed on it.
+            const auto& th = m_world.tiles.at(path[static_cast<std::size_t>(head)]);
+            out["head_x"] = th.grid_x;
+            out["head_y"] = th.grid_y;
+        }
+        out["head_leg"]    = (ia < 0 || ib < 0) ? "land"
+                           : head < ia           ? "land_out"
+                           : head < ib           ? "sea"
+                                                 : "land_in";
+        out["progress"]    = beam->progress;
+        out["at"]          = at;
+        out["direct_n"]    = direct_n;
+        out["direct_same"] = direct_same;
+        return out;
+    });
+
+    // Park convoy `id` at `progress` (the fraction of its travel time elapsed) —
+    // the one field `advance_convoys` moves — so the head can be framed on each leg
+    // and sampled across the whole lane: the dispatch's own travel time can be two
+    // econ ticks, too coarse to step through. Drops the derived logistics caches so
+    // the canvas's vision pass rebuilds its beams on the next frame (its cache key
+    // does not see a progress write); caches are derived, so no game outcome moves.
+    // Returns false for an unknown convoy or a progress outside [0, 1).
+    v.set_function("set_convoy_progress", [this](unsigned id_u, double p) -> bool {
+        if (!std::isfinite(p) || p < 0.0 || p >= 1.0)
+            return false;
+        for (convoy_component& c : m_world.convoys)
+            if (c.id == static_cast<std::uint32_t>(id_u))
+            {
+                c.progress = static_cast<float>(p);
+                invalidate_logistics_caches(m_world);
+                return true;
+            }
+        return false;
     });
 
     // The building Selection card's accordion PAGE LABELS for the current selection,
