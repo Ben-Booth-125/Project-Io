@@ -278,7 +278,13 @@ The two routes are `propellant_atmospheric` and `propellant_electrolysis` (BL-30
 Liquid oxygen has no `resource_type`: it is folded into each recipe, because nothing outside the
 Chemical Plant would ever hold it.
 
-On a body with an atmosphere, liquid oxygen is produced in Era 1 by cryogenic air separation — the Chemical Plant draws oxygen from the local atmosphere and consumes no stockpiled input (energy cost only, abstracted into the recipe rate). Propellant is therefore an Era 1 capability anywhere refined fuel is available. On airless bodies there is no atmosphere to separate, so the water-electrolysis recipe is the only liquid-oxygen route off-world; closing the in-situ propellant loop there (water → liquid oxygen, refined fuel shipped or synthesised) is the defining Era 2 logistical problem.
+On a body with an atmosphere, liquid oxygen is produced in Era 1 by cryogenic air separation — the Chemical Plant draws oxygen from the local atmosphere and consumes no stockpiled input (energy cost only, abstracted into the recipe rate). Propellant is therefore an Era 1 capability anywhere refined fuel is available. On airless bodies there is no atmosphere to separate, so the water-electrolysis recipe is the only liquid-oxygen route off-world. **And it runs only
+there (Ben, 2026-10-09):** `propellant_electrolysis` may be set only on an airless body, and
+`propellant_atmospheric` only on a body with an atmosphere — each route is the one its body's
+air allows, never a cheaper choice beside the other. "Airless" is planetology's own reading: an
+atmosphere class of `none` or `thin` (a trace atmosphere at zero surface pressure), the same
+bodies planetology routes to the airless tables (`atmosphere_class`, `src/world/components.hpp`;
+Ben's ruling 2026-10-09 applied with the existing definition). Closing the in-situ propellant loop there (water → liquid oxygen, refined fuel shipped or synthesised) is the defining Era 2 logistical problem.
 
 #### Electronics Lab
 
@@ -394,7 +400,10 @@ can still lose under glut.
 lowest marginal cost per unit of primary output — and that route must clear `profit_over_marginal`.
 Every other route clears `alternate_profit_over_marginal` instead (`0` = profitable at base), and
 the floor half regardless. A recipe whose primary output is an extractable raw is always an
-alternate: extraction is that good's cheapest route.
+alternate: extraction is that good's cheapest route. The anchor is chosen among the routes a
+**home body can run**, since the base-price table prices home-body markets: a route that runs only
+on an airless body (§ Chemical Plant, "And it runs only there") is always an alternate (Ben,
+2026-10-09) — so propellant anchors on `propellant_atmospheric`, at 64.0.
 
 **One price table for both bands.** A good's price is the larger of the two bands' anchor-route
 needs, and the bands are kept compatible by keeping their routes to a shared good at comparable
@@ -402,9 +411,10 @@ depth: the ancient chain reaches steel in one step (the Bloomery Furnace, ore an
 anchor sits beside the Smelter's rather than three doubling stages above it. A per-band price
 table was considered and rejected (Ben, 2026-09-02).
 
-**What is exempt, and says so.** A recipe whose every output is unpriced (propellant — consumed by
-the Launchpad, never sold) has no market margin to anchor and is listed, not failed. An **unpriced
-input** is a defect, not an exemption: the good cannot be bought at any price.
+**What is exempt, and says so.** A recipe whose every output is unpriced has no market margin to
+anchor and is listed, not failed — no recipe in the roster qualifies, since propellant carries a
+base price (`RESOURCES.md`, Ben 2026-10-08). An **unpriced input** is a defect, not an exemption:
+the good cannot be bought at any price.
 
 **Retune order.** Green is reached from costs and rates first (the per-batch wage and maintenance
 share move every row at once), then input quantities where a recipe is authored at zero or negative
@@ -491,8 +501,10 @@ corp's propellant stockpile on the *source* body and burns **1.0 unit per launch
 (`propellant_per_launch`, `src/world/supply_system.cpp`): per launch, not per unit of cargo and
 not per AU — the pad is the thing being fuelled. An unfuelled pad is exactly as shut as no pad at
 all. A convoy exporting propellant itself cannot burn the cargo it carries; the gate subtracts
-the cargo first. Propellant is deliberately **left out of the market's base-price table**, so it
-is made and burned within a corp's own pool rather than traded. See **`docs/economy/ERAS.md`**
+the cargo first. Propellant is priced and trades (`RESOURCES.md`), but **a pad's pool keeps its
+propellant**: where the corporation holds a Launchpad, its propellant is reserved from
+auto-surplus, so a corporation stockpiles launch fuel where it launches (`MARKETS.md` step 4;
+Ben, 2026-10-09). See **`docs/economy/ERAS.md`**
 for the Era 1→2 transition.
 
 *Save-format note.* Appending a `resource_type` value renumbers nothing but changes the length of
@@ -526,6 +538,16 @@ By default a player building's target is **auto-solved** each economy tick (`wor
 The target is the *heuristic*, not a hard goal: a manual tier chosen in the building-management UI **pins** the value and clears `workforce_auto`; the **Auto** control re-enables the solver. This is the sole sanctioned auto-action on the player's corp (see `.claude/rules/io-standing-rules.md` § player-corp exception).
 
 *Fidelity:* labour contention is held at its current value, input-price response is ignored (inputs valued at the current price), and the tier search is coarse (10 % steps) — so the solved target can hunt by ±one step.
+
+**An input is priced at what the draw pays (Ben, 2026-10-08; BL-1232, power plants per grid).**
+The solver values each input at its market's **posted price** — the price the draw is billed at
+(`FINANCE.md` § the ceiling: a draw reads and pays the posted price) — never at a forecast from
+this tick's listings alone, which reads a stocked shelf with little listed as a good at the 10×
+cap. Measured: a power plant paying about 3.2 a unit for petroleum, with 500–660 units on its
+market's shelf, was forecast at the cap and zeroed while it netted +13 to +17 a tick. **Power is
+read on its grid:** for a building that makes or uses power, the solver reads power's supply and
+demand pooled over the building's grid (`LOGISTICS.md` § 3a), the same pooled figures the market
+prices power on — never its own market's alone.
 
 ---
 
@@ -645,6 +667,19 @@ So power is:
 - **Stockpiled, with a ceiling.** Unlike every other good, its store is capped. A generator running
   into a full store is producing nothing anyone will ever buy — a real decision rather than an
   accounting detail.
+
+**Generation is sized per grid, not per body (Ben, 2026-10-07; BL-1232, power plants per grid).**
+Power moves only within a grid (`LOGISTICS.md` § 3a), so the world's generation is measured where
+it can be used: a body's power gap is the sum over its wired grids of `max(0, need − live output)`,
+and a power firm is placed in a short grid's provinces. A surplus on the core grid never cancels a
+deficit on another. A grid needing less than half of one plant's output is left to a road that
+joins it to a bigger one rather than given a plant of its own. **Unpowered grids first (Ben,
+2026-10-08):** the body's power firms — a capped number — go first to short grids with no
+generation at all, and only then to grids that already have some, so a core grid's shortfall
+cannot take every firm and leave a secondary grid dark for the campaign. The scorer's power-plant estimate
+reads the same per-grid gap, and counts plants already under construction on that grid as supply
+(`../ai/AI_OPPONENT.md`). Measured before: generation put every plant on the body's core grid on
+four of five seeds, and the settle then started 11–13 plants on a grid needing one.
 
 **Generation is a business, not a cost centre.** Background firms build power plants and run them at
 a profit, which is the point: it gives the world a firm type with a reason to exist, and it means

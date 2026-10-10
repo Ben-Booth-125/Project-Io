@@ -9,7 +9,7 @@
 -- 1720x1080 window, the whole home master baked first, three framings at the
 -- rungs the painted roads carry -- rung 2 (~27 px), rung 3 (~55 px) and rung 4
 -- (~110 px, the master near 1:1) -- plus rung 1 (~14 px), where a painted road
--- is near a pixel (the plain canvas draws no network at any rung, BL-1262):
+-- is near a pixel (the plain canvas draws no network at any rung, BL-1292):
 --
 --   city_roads  a city carrying all three tiers (Highway, Road, Track) and
 --               roads meeting its works (the roaded variant, the forecourt);

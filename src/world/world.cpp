@@ -153,6 +153,32 @@ uint64_t world::state_hash(int tick) const
             // are saved.
             for (const float x : m.household_weight) fnv1a_f32(h, x);
             for (const float x : m.hauler_want) fnv1a_f32(h, x);
+            // BL-1227: the unposted bid the scorer's veto reads, and its tick.
+            for (const float x : m.unposted_bid) fnv1a_f32(h, x);
+            for (const int32_t t : m.unposted_bid_tick) fnv1a_u32(h, static_cast<uint32_t>(t));
+            // BL-1217: the dial's pool-draw register and its tick — the scorer
+            // branches on both and both are saved. Folded SPARSELY (good index,
+            // value, tick; recorded slots only), so a world that never recorded
+            // one hashes as it did before.
+            for (std::size_t r = 0; r < m.dial_pool_draw.size(); ++r)
+                if (m.dial_pool_draw[r] != 0.0f || m.dial_pool_draw_tick[r] != 0)
+                {
+                    fnv1a_u32(h, static_cast<uint32_t>(r));
+                    fnv1a_f32(h, m.dial_pool_draw[r]);
+                    fnv1a_u32(h, static_cast<uint32_t>(m.dial_pool_draw_tick[r]));
+                }
+            // BL-1217 G1b R2: the background's draw at the last clear — the
+            // supply clause branches on it (input_reach.cpp) and it is saved.
+            // Folded SPARSELY on the dial register's argument (good index,
+            // value; non-zero slots only), behind a tag so the two sparse runs
+            // cannot alias.
+            for (std::size_t r = 0; r < m.background_fill.size(); ++r)
+                if (m.background_fill[r] != 0.0f)
+                {
+                    fnv1a_u32(h, 0xB6F11u);
+                    fnv1a_u32(h, static_cast<uint32_t>(r));
+                    fnv1a_f32(h, m.background_fill[r]);
+                }
         }
     }
 
@@ -170,6 +196,14 @@ uint64_t world::state_hash(int tick) const
         fnv1a_u32(h, key.first);
         fnv1a_u32(h, key.second);
         for (const float q : sc.quantities) fnv1a_f32(h, q);
+    }
+
+    // BL-1217 D5: the held opening stock — std::map, sorted by (corp, pool key).
+    for (const auto& [key, held] : opening_stock_held)
+    {
+        fnv1a_u32(h, key.first);
+        fnv1a_u32(h, key.second);
+        for (const float q : held) fnv1a_f32(h, q);
     }
 
     // Tiles: resource_remaining is drawn down by extraction every tick.

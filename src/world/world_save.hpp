@@ -345,7 +345,55 @@ inline constexpr uint32_t world_save_magic =
 /// building and per return and two per corporation; refused whole on the
 /// strict-equality contract, no migration. Claimed through
 /// `tools/session/next_save_version.js --kind world --claim`.
-inline constexpr uint32_t world_save_version = 37;
+/// Bumped to 38 by BL-1227 (idle mines, the unposted bid): the market record
+/// gains two resource-indexed arrays at its tail, after `hauler_want` --
+/// `unposted_bid` (float) and `unposted_bid_tick` (int32): the latest record of
+/// a buyer that takes or wants goods without posting a bid, and the econ tick
+/// it was recorded on, which the corp scorer's veto test reads for its
+/// cadence. A v37 stream is 2 x resource_count values short per market;
+/// refused whole on the strict-equality contract, no migration. Claimed through
+/// `tools/session/next_save_version.js --kind world --claim`.
+/// Bumped to 39 by BL-1217 D5 (opening stock held until a bid): a trailing
+/// section after the fold map -- `world::opening_stock_held`, a (corp, pool key)
+/// map of resource-indexed floats, the opening stock no market has yet bid for.
+/// A v38 stream lacks the section; refused whole on the strict-equality
+/// contract, no migration. Claimed through
+/// `tools/session/next_save_version.js --kind world --claim`.
+/// Bumped to 40 by BL-1217 (the dial's buyer signal), claimed past BL-1217
+/// D5's 39 (opening stock held, another branch): the market record gains two
+/// resource-indexed arrays at its tail, after `unposted_bid_tick` --
+/// `dial_pool_draw` (float) and `dial_pool_draw_tick` (int32): what running
+/// processors drew from their owners' pools and did not post as demand, and
+/// the econ tick it was recorded on, which the background workforce dial reads
+/// held for its cadence. A v38/v39 stream is 2 x resource_count values short
+/// per market; refused whole on the strict-equality contract, no migration.
+/// Claimed through `tools/session/next_save_version.js --kind world --claim`.
+/// Bumped to 41 by sprint 50 PROPELLANT (propellant routes follow the body's air,
+/// Ben 2026-10-09; PRODUCTION.md § Chemical Plant): the body record gains one
+/// byte, `body_component::atmosphere` (an `atmosphere_class`), after
+/// `mass_earths` -- the generated atmosphere, which gates the two propellant
+/// recipes. A v38 stream is one byte short per body, so its next body misreads;
+/// refused whole on the strict-equality contract, no migration. 39 (D5,
+/// opening_stock_held) and 40 (D3, unposted_rate) are claimed by other sprint 50
+/// branches; this stacks above them, and the integrator renumbers at the merge.
+/// Bumped to 42 by BL-1195 (the convoy lane follows the legs it travels;
+/// SUPPLY.md § Logistical cost): the convoy record gains three entity ids at its
+/// tail, after `cost_paid` -- `origin_tile`, `port_a`, `port_b`, the intra-body
+/// route's waypoints recorded at dispatch so position, vision, interdiction and
+/// capture read the land -> port -> sea -> port -> land route the haul was priced
+/// on. A v41 stream is three ids short per convoy; refused whole on the
+/// strict-equality contract, no migration. Claimed through
+/// `tools/session/next_save_version.js --kind world --claim`.
+/// Bumped to 43 by BL-1217 G1b R2 (spare supply counts what households and the
+/// background take, Ben 2026-10-09; AI_OPPONENT.md § 11): the market record
+/// gains one resource-indexed float array at its tail, after
+/// `dial_pool_draw_tick` -- `background_fill`, what the background channel drew
+/// at the last clear, which the supply clause (input_reach.cpp) now reads
+/// between clears. An older stream is resource_count floats short per market;
+/// refused whole on the strict-equality contract, no migration. Claimed
+/// through `tools/session/next_save_version.js --kind world --claim` (renumbered 45 -> 43 at the
+/// sprint 50 integration, stacked on BL-1195's 42).
+inline constexpr uint32_t world_save_version = 43;
 
 /// Write @p w as a complete world snapshot.
 ///

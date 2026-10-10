@@ -13,7 +13,7 @@
 // master, not stroked over it: a route along its own tiles on the
 // four-cardinal grid, a junction paired into through-curves most-opposite
 // first, an end or a three-way junction's odd branch a spoke, a lane's rungs
-// skipped, one width per tier. BL-1261 (roads as tile sets): each piece runs
+// skipped, one width per tier. BL-1291 (roads as tile sets): each piece runs
 // between its edges' hashed CROSSING POINTS (route_crossing), a curve that
 // finds its way inside the tile — to the lower ground, around the road plan's
 // cluster — and carries its terrain's TREATMENT (hillside cut, forest
@@ -76,7 +76,7 @@ inline constexpr float k_lane_paint_width = 0.025f;
 /// forecourt spur, sampled as a polyline in TILE-RELATIVE canonical units (the
 /// tile centre is the origin).
 ///
-/// BL-1261 (roads as tile sets): a curve or spoke ENDS at its edge's CROSSING
+/// BL-1291 (roads as tile sets): a curve or spoke ENDS at its edge's CROSSING
 /// POINT (route_crossing), heading straight across the edge, so the
 /// neighbour's piece leaves the same point in the same direction; between its
 /// ends it is a cubic bowed by a search that keeps it to the lower ground and
@@ -99,7 +99,7 @@ struct route_piece
     std::uint8_t pad_ = 0;
 };
 
-/// BL-1261: where a route crosses tile edge (link @p n of tile (@p c, @p r);
+/// BL-1291: where a route crosses tile edge (link @p n of tile (@p c, @p r);
 /// links E, W, S, N = 0-3), TILE-RELATIVE to (c, r), and the edge's outward
 /// unit normal. A hash of the edge — keyed on its WEST / NORTH tile's wrapped
 /// column and row and its axis, so both tiles, and both sides of the cylinder
@@ -110,7 +110,7 @@ struct route_piece
 inline constexpr double k_cross_band = 0.35;
 void route_crossing(int gw, int c, int r, int n, int net, double& x, double& y, double& nx, double& ny);
 
-/// BL-1261: the painted reach of a piece past its surfaced half-width — the
+/// BL-1291: the painted reach of a piece past its surfaced half-width — the
 /// tier's own margin and its terrain treatment (verge, hillside cut, forest
 /// corridor, embankment; RENDERING.md § Roads and sea lanes).
 double route_piece_out(const route_piece& pc);

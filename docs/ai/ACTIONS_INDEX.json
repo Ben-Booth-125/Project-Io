@@ -171,11 +171,11 @@
   ],
   [
    "lens.continent",
-   "Minimap lens bar, slot 6 (the two-interlocking-plates-split-by-a-diagonal-seam glyph)"
+   "Minimap lens bar, Planetary rung, slot 8 (the two-interlocking-plates-split-by-a-diagonal-seam glyph)"
   ],
   [
    "lens.company",
-   "Keyboard lens cycle only — no lens-bar slot yet (it has no distinct glyph; see BL-663)."
+   "Minimap lens strip, Planetary rung, slot 2 — the briefcase glyph (icons::company), beside Corporation's seal-square."
   ],
   [
    "lens.corporation",
@@ -195,7 +195,7 @@
   ],
   [
    "lens.industry",
-   "Off the lens bar (trimmed in BL-093 the day it shipped); the factory-silhouette glyph exists but is not on the strip"
+   "Minimap lens strip, Planetary rung, slot 6 — the factory-silhouette glyph (icons::industry)."
   ],
   [
    "lens.key_toggle",
@@ -203,15 +203,15 @@
   ],
   [
    "lens.market",
-   "Minimap lens bar, slot 4 (the three-ascending-vertical-bars glyph)"
+   "Minimap lens bar, Planetary rung slot 4, Circumplanetary rung slot 1 (the three-ascending-vertical-bars glyph)"
   ],
   [
    "lens.population",
-   "Minimap lens bar, slot 5 (the small figure glyph: round head over tapered torso)"
+   "Minimap lens bar, Planetary rung, slot 7 (the small figure glyph: round head over tapered torso)"
   ],
   [
    "lens.reach",
-   "Off the lens bar; currently reuses the convoy glyph (a dedicated glyph is an open TODO)"
+   "Minimap lens strip, Solar rung, slot 2 — the broadcast glyph (icons::reach): a source dot with two arcs widening up and right."
   ],
   [
    "lens.resource",
@@ -223,23 +223,23 @@
   ],
   [
    "lens.scarcity",
-   "Off the lens bar; the hollow downward-triangle glyph exists but is not on the strip. Reached by the keyboard lens-cycle only — an off-strip status that is a width call, never a data gate."
+   "Minimap lens strip — Planetary rung slot 5 and Circumplanetary rung slot 2 — the hollow downward-triangle glyph (icons::scarcity)."
   ],
   [
    "lens.supply",
-   "Off the lens bar; the two-parallel-horizontal-lines convoy glyph exists but is not on the strip"
+   "Minimap lens strip — Solar rung slot 1 and Circumplanetary rung slot 3 — the two-parallel-lines glyph (icons::supply)."
   ],
   [
    "lens.supply_routes",
-   "Off the lens bar; reuses the supply glyph"
+   "Minimap lens strip, Solar rung, slot 3 — the lane-graph glyph (icons::supply_routes): three nodes joined by edges of unequal weight."
   ],
   [
    "lens.throughput",
-   "Lens strip slot 6, on the minimap (draw_overlay_controls, src/ui/overlay.cpp). Its glyph is a TRUCK in profile (icons::throughput) — its own mark since BL-605, no longer the borrowed convoy chevron, because an on-screen lens carries one distinct glyph."
+   "Minimap lens strip, Planetary rung, slot 9 (draw_overlay_controls, src/ui/overlay.cpp). Its glyph is a TRUCK in profile (icons::throughput)."
   ],
   [
    "lens.trade_flow",
-   "Keyboard lens cycle only -- no lens-bar slot and no dedicated glyph (it borrows the supply mark in the cycle readout). LENSES.md § Trade-flow lens."
+   "Minimap lens strip, Planetary rung, slot 10 — the exchange glyph (icons::trade_flow, ⇄). LENSES.md § Trade-flow lens."
   ],
   [
    "ledger.nav_acquisitions",
@@ -452,6 +452,10 @@
   [
    "chrome.menu_new_game",
    "Main menu, primary button column"
+  ],
+  [
+   "chrome.menu_quick_start",
+   "Main menu, primary button column, between New Game and Quit"
   ],
   [
    "chrome.menu_quit",

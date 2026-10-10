@@ -259,7 +259,7 @@ constexpr float k_land_blend_strength = 0.35f;
 // ---------------------------------------------------------------------------
 // BL-601 — the national border band (plain-canvas chrome, no longer a lens)
 // ---------------------------------------------------------------------------
-// HARD EDGES ONLY (BL-1262; Ben, 2026-10-10: "a lot of visual clutter when many
+// HARD EDGES ONLY (BL-1292; Ben, 2026-10-10: "a lot of visual clutter when many
 // nations border each other. One fix would be removing shading inside national
 // borders, and just go with the hard edges"). A nation reads as a BORDERED
 // REGION: its identity colour is the inset boundary stroke and nothing else —
@@ -553,7 +553,7 @@ constexpr float k_lane_width         = 0.10f;
 /// 20 px sits between the second rung (~13 px) and the third (~27 px). The drawn
 /// network itself is the Throughput lens's (and the vector fallback's): on the plain
 /// canvas a road or lane over baked ground is painted into the bake at every rung,
-/// never drawn (BL-1262; Ben, 2026-10-10).
+/// never drawn (BL-1292; Ben, 2026-10-10).
 constexpr float k_route_lod_radius_px = 20.0f;
 
 /// Building silhouette radius as a fraction of the hex circumradius — since BL-1241
@@ -1691,18 +1691,14 @@ void draw_trade_flow_key(ImDrawList* dl, const ui_state& state, float max_rate, 
     }
 }
 
-/// BL-362: bumps whenever the logistics caches were cleared since the last look.
-/// invalidate_logistics_caches fires on every build/demolish/completion/road event,
-/// so a shrink of world.astar_cost_cache is the one cheap signal that covers them
-/// all; growth (ordinary path queries filling the cache) never bumps.
-std::uint32_t logistics_generation(const world& w)
+/// BL-362: changes whenever the logistics caches were cleared since the last look.
+/// BL-1195: read off world::logistics_cache_generation, which
+/// invalidate_logistics_caches and a load bump — exact, where the old proxy (a
+/// shrink of world.astar_cost_cache between two looks) missed a clear that was
+/// refilled before the next frame.
+std::uint64_t logistics_generation(const world& w)
 {
-    static std::size_t   last_size = 0;
-    static std::uint32_t gen       = 0;
-    const std::size_t size = w.astar_cost_cache.size();
-    if (size < last_size) ++gen;
-    last_size = size;
-    return gen;
+    return w.logistics_cache_generation;
 }
 
 /// BL-362 rebuild stamp for the per-frame derived views (vision model, marker
@@ -1715,7 +1711,7 @@ struct body_frame_stamp
     std::size_t   buildings = 0;
     std::size_t   convoys   = 0;
     std::size_t   units     = 0; // BL-575: invalidates the unit-marker groups on hire/disband; a march ORDER doesn't move a unit until a tick advances, which day_tick already catches.
-    std::uint32_t logi_gen  = ~0u; // default never matches a live stamp
+    std::uint64_t logi_gen  = ~0ull; // default never matches a live stamp
     bool operator==(const body_frame_stamp&) const = default;
 };
 
@@ -2134,6 +2130,24 @@ void update_body_vision(world& w, ui_state& state, double now_days)
     // Layer 3 (moving): the tile path + progress/speed of each live player intra-body
     // convoy, oriented src→dst. The renderer interpolates a head along it and trails a
     // dimming tail one econ tick's travel behind.
+    //
+    // BL-1195: a lane and its clock are a function of the convoy's endpoints and Ports
+    // and of the network, and the network changes only when the logistics caches are
+    // dropped. So each convoy's route is CACHED here, keyed on its id and the world's
+    // logistics_cache_generation (bumped by invalidate_logistics_caches and on load),
+    // with the route-defining fields kept beside it as a guard. A re-route — a road
+    // laid, a Port idled — bumps the generation and the next read rebuilds. View
+    // state only: nothing here is saved, hashed or read by the sim.
+    struct cached_lane
+    {
+        std::uint64_t gen = 0;
+        entity_id     src = null_entity, dst = null_entity, origin = null_entity;
+        entity_id     port_a = null_entity, port_b = null_entity;
+        convoy_mode   mode = convoy_mode::land;
+        convoy_route  route;
+    };
+    static std::map<std::uint32_t, cached_lane> s_lanes;
+    std::map<std::uint32_t, cached_lane> live;
     for (const auto& cv : w.convoys)
     {
         if (cv.corp != w.player_entity) continue;
@@ -2142,11 +2156,33 @@ void update_body_vision(world& w, ui_state& state, double now_days)
         // (world/logistics.hpp), because interdiction has to ask the SAME question
         // ("which tile is this convoy on?") and a second private copy of the
         // orientation rule would be a silent, unrenderable divergence.
-        convoy_route route = convoy_route_tiles(w, cv);
-        if (route.body != body || route.tiles.empty()) continue;
-        state.convoy_beams.push_back(
-            { std::move(route.tiles), std::clamp(cv.progress, 0.0f, 1.0f), std::max(cv.speed, 0.0f) });
+        cached_lane entry;
+        const auto hit = s_lanes.find(cv.id);
+        if (hit != s_lanes.end() && hit->second.gen == w.logistics_cache_generation
+            && hit->second.src == cv.source_market && hit->second.dst == cv.dest_market
+            && hit->second.origin == cv.origin_tile && hit->second.port_a == cv.port_a
+            && hit->second.port_b == cv.port_b && hit->second.mode == cv.mode)
+        {
+            entry = std::move(hit->second);
+        }
+        else
+        {
+            entry.gen    = w.logistics_cache_generation;
+            entry.src    = cv.source_market;
+            entry.dst    = cv.dest_market;
+            entry.origin = cv.origin_tile;
+            entry.port_a = cv.port_a;
+            entry.port_b = cv.port_b;
+            entry.mode   = cv.mode;
+            entry.route  = convoy_route_tiles(w, cv);
+        }
+        if (entry.route.body == body && !entry.route.tiles.empty())
+            state.convoy_beams.push_back(
+                { entry.route.tiles, std::clamp(cv.progress, 0.0f, 1.0f),
+                  std::max(cv.speed, 0.0f), entry.route.at });
+        live[cv.id] = std::move(entry);
     }
+    s_lanes.swap(live); // convoys that arrived or were cut drop out of the cache
 }
 
 void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_registry& reg,
@@ -2746,10 +2782,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             const int n = static_cast<int>(cb.path.size());
             if (n == 0) continue;
             // Head glides: last econ-step progress + this tick's fraction of a step.
+            // BL-1195: read off the lane's clock (convoy_lane_index), so the head
+            // stands where the sim says the cargo is — land legs slower than sea.
             const float p    = std::clamp(cb.progress + cb.speed * frac, 0.0f, 1.0f);
-            const int   head = std::clamp(static_cast<int>(std::lround(p * (n - 1))), 0, n - 1);
+            const int   head = std::clamp(convoy_lane_index(cb.at, p), 0, n - 1);
             // Tail = one econ tick's travel in tiles (>=1), dimming to 0 at its far end.
-            const int   tail = std::max(1, static_cast<int>(std::lround(cb.speed * (n - 1))));
+            const int   tail = std::max(1, head - std::max(0, convoy_lane_index(cb.at, p - cb.speed)));
             for (int i = head; i >= 0 && i >= head - tail; --i)
             {
                 const float inten = 1.0f - static_cast<float>(head - i) / static_cast<float>(tail);
@@ -3874,7 +3912,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // when displaying that lens. This will bring focus on to corporations" —
     // extended to all lenses on the same instruction.
     //
-    // The band is the inset rule alone (BL-1262, hard edges only): the per-tile
+    // The band is the inset rule alone (BL-1292, hard edges only): the per-tile
     // frontier depth and its inward wash are retired, so there is no pass here —
     // the rule's own neighbour test (emit_routes) is the frontier test.
     const bool draw_border_band = (state.overlay == overlay_mode::none)
@@ -4107,7 +4145,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // corridor's roads should not darken one hop early at its rim. Survey (BL-067) still
         // owns genuinely unrevealed tiles; this is only the commercial-reach fog.
         //
-        // PAINTED, NOT DRAWN, ON THE PLAIN CANVAS AT EVERY RUNG (BL-1253, BL-1262;
+        // PAINTED, NOT DRAWN, ON THE PLAIN CANVAS AT EVERY RUNG (BL-1253, BL-1292;
         // RENDERING.md § Roads and sea lanes). Roads and lanes are painted into the baked
         // ground (ui/route_paint.cpp), with a surface per tier, and the plain canvas draws
         // no network over them at any rung (Ben, 2026-10-10: the drawn web drew too much
@@ -4152,7 +4190,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // the water flows, so the stroke and its chevrons are retired.
 
         // National borders - the coloured rule (BL-601), the whole of the
-        // band since BL-1262 (hard edges only: no inward wash). It says WHICH
+        // band since BL-1292 (hard edges only: no inward wash). It says WHICH
         // frontier and whose, and it is what carries the hit corridor.
         //
         // ON THE PLAIN CANVAS ONLY (Ben, 2026-08-28). It was "always on,

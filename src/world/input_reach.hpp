@@ -45,24 +45,50 @@
 //     since its row supplies nothing of its new good yet. Without a report
 //     (generation, a hand-built world) the output is NOMINAL: rate x labour.
 //
-// SPARE OUTPUT: a producer market P's output of r, less the NOMINAL draw of r of
-// every standing consumer (a live, laboured processor whose recipe takes r) in a
-// market P is within reach of. Counting a consumer against every producer that
-// can feed it is deliberately conservative: one producer in reach does not admit
-// every consumer in reach of it.
+// SPARE OUTPUT is read over a SET, never per producer market (BL-1233 review): for
+// a consumer at market C, the REACH SET is the producer markets within reach of C
+// (each landing under the ceiling, below). Its spare is their summed output of r
+// less what the standing consumers (live, laboured processors whose recipe takes
+// r) can take FROM THE SET: a consumer market Q any of them reaches is charged
+// min(Q's NOMINAL draw, the summed output of the set markets that reach Q) —
+// each consumer counted ONCE, and never for more than the part of the set that
+// can feed it (review round 2: a large producer reaching only C beside a small
+// one that also reaches a hungry Q leaves the large one's output spare).
+// Counting it once per producer that reaches it was wrong (two producers of 1.0
+// each reaching one consumer of 1.5 read -0.5 apiece and summed to nothing,
+// where 0.5 is spare); charging Q's whole draw against the whole set was too.
+// Each charge is shared among the set markets that reach Q in proportion to
+// their output, which gives each producer market its own spare.
+//
+// EVERY BUYER, NOT ONLY PROCESSORS (BL-1217 G1b R2; AI_OPPONENT.md § 11, "Spare
+// supply counts what households and the background take", Ben 2026-10-09). A
+// consumer market Q's draw is its standing processors' draw PLUS the household
+// and background draw there — the same reach and the same charge, so a market
+// whose households empty the shelf leaves nothing spare for a new plant. In
+// PLAY (a report with rows) that is the draws those channels MADE at the last
+// clear (`market_component::household_fill + background_fill`), an aggregate
+// market fact. In GENERATION / a hand-built world (no report, no clear has
+// run) it is the GENERATION FORM: the household and background baskets at
+// base, `scale x (population demand_scale x basket + background demand_scale x
+// basket)`, summed over the centres whose tile the market serves — the reading
+// generation's final demand (`body_demand`) already takes, split by market —
+// over the buyers the clear would inject: a razed centre and a good the market
+// has no base price for bid nothing, as in `inject_population_demand` /
+// `inject_background_demand`. No forecast, and nothing per corporation.
 //
 // OBTAINABLE: an input r of a processor at market C, needing `need` units a tick,
 // is obtainable when
 //   (1) STOCK: the corp's own (corp, C) pool plus C's shelf — the shelf only where
 //       the fair-price ceiling admits it (`shelf_admits`, the production tick's own
 //       test) — covers `need` at the idle threshold `t_idle`; or
-//   (2) SUPPLY: the spare output of r over the producer markets within reach of
-//       C, each counted only if its unit LANDS at C at a price the ceiling admits
-//       (producer market's posted price + haul <= reservation_mult x base at C),
-//       covers `need` at `t_idle`. The asking building's own output and its own
-//       standing draw are taken out of the sum first.
+//   (2) SUPPLY: the spare output of r over C's reach set (producer markets within
+//       reach of C, each counted only if its unit LANDS at C at a price the
+//       ceiling admits: producer market's posted price + haul <= reservation_mult
+//       x base at C) covers `need` at `t_idle`. The asking building's own output
+//       and its own standing draw are taken out first, each once.
 // Its OBTAINABLE COST per unit is C's posted price when (1) holds; otherwise the
-// cheapest landed cost over the producer markets with spare.
+// cheapest landed cost over the set's producer markets that have SPARE (their
+// output less their share of the charges, the asker's own taken out).
 //
 // Deterministic: producers and draws are gathered into per-resource SORTED
 // vectors, every scan is ascending by id with strict comparisons, and every memo
@@ -74,6 +100,7 @@
 
 #include <array>
 #include <map>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -104,17 +131,68 @@ struct input_reach
     const economy_report*                            report = nullptr;
 
     struct producer { entity_id market; entity_id building; float out; };
-    struct supply   { entity_id market; float spare; float landed; };
+    /// One producer market of a reach set: its summed output and landed cost.
+    struct supply   { entity_id market; float out; float landed; };
+    /// A consumer market's REACH SET for one good (see SPARE OUTPUT).
+    /// A consumer market the set reaches: its draw and which set markets reach it.
+    struct reached_draw
+    {
+        entity_id        market;
+        float            draw;
+        std::vector<int> reachers; ///< indices into `markets`, ascending
+    };
+    struct reach_set
+    {
+        std::vector<supply>       markets; ///< producer markets, ascending id
+        std::vector<reached_draw> draws;   ///< consumer markets any of them reaches, ascending
+    };
 
     bool index_built = false;
     /// Per resource: every producer, sorted by (market, building).
     std::array<std::vector<producer>, resource_count>                      producers;
     /// Per resource: (market, summed nominal draw of standing consumers), sorted.
     std::array<std::vector<std::pair<entity_id, float>>, resource_count>   draws;
-    /// (producer market, r) -> spare output of r there.
-    std::map<std::pair<entity_id, std::size_t>, float>                     spare_memo;
-    /// (consumer market, r) -> the producer markets that can supply it.
-    std::map<std::pair<entity_id, std::size_t>, std::vector<supply>>       supply_memo;
+    /// (consumer market, r) -> its reach set.
+    std::map<std::pair<entity_id, std::size_t>, reach_set>                 supply_memo;
+
+    /// BL-1217 G1b R2: per resource, (market, household + background draw
+    /// there), sorted by market — the final buyers' draw (see EVERY BUYER).
+    /// Built lazily on the first spare question; forgotten by
+    /// `input_reach_invalidate`, never by a refresh (buildings do not move it).
+    bool final_built = false;
+    std::array<std::vector<std::pair<entity_id, float>>, resource_count>   final_draws;
+
+    // ---- refresh mode (`input_reach_refresh`, generation's placement) ----
+    /// What a building was indexed as: the fields its output and draw read.
+    struct building_sig
+    {
+        building_type type;
+        std::uint16_t recipe;
+        entity_id     tile;
+        resource_type target;
+        float         assigned, supply;
+        int           wt, ticks;
+        bool          decom;
+        bool operator==(const building_sig& o) const
+        {
+            return type == o.type && recipe == o.recipe && tile == o.tile && target == o.target
+                && assigned == o.assigned && supply == o.supply && wt == o.wt
+                && ticks == o.ticks && decom == o.decom;
+        }
+    };
+    struct indexed_building
+    {
+        building_sig sig;
+        entity_id    market = null_entity;
+        std::vector<std::pair<std::size_t, float>> out;  ///< (r, output)
+        std::vector<std::pair<std::size_t, float>> draw; ///< (r, draw)
+    };
+    bool refresh_mode = false;
+    /// Every processor / extraction site the refresh index holds, by id.
+    std::unordered_map<entity_id, indexed_building>                        seen;
+    /// Per resource: market -> building -> draw, so a market's sum is re-added in
+    /// ascending building id exactly as a full build adds it.
+    std::array<std::map<entity_id, std::map<entity_id, float>>, resource_count> draw_parts;
 };
 
 /// Read the node set and the dispatch margin. The producer index is built lazily.
@@ -123,6 +201,18 @@ input_reach make_input_reach(const world& w, const recipe_registry& reg);
 /// Forget the producer/draw index and the spare memos (the haul memo stays):
 /// call when buildings have changed since the context was first asked.
 void input_reach_invalidate(input_reach& ir);
+
+/// Bring the producer/draw index up to the buildings standing NOW, touching only
+/// the processors and extraction sites added, removed or changed (type, recipe,
+/// tile, target, labour, supply, construction, decommission) since the last
+/// refresh — the index it leaves is the one a full build would make, entry for
+/// entry and sum for sum (each market's draw re-added in ascending building
+/// id). The reach-set memo is dropped only when something changed. For a pass
+/// that decides buildings one by one against what stands (BL-1233, generation's
+/// sized placement), where a rebuild per decision cost the landscape search ~5x.
+/// Reads deposits and modifiers as a full build does, but does not watch them:
+/// a pass that changes a reserve or a modifier calls `input_reach_invalidate`.
+void input_reach_refresh(const world& w, const recipe_registry& reg, input_reach& ir);
 
 /// Output of resource @p r by building @p b per tick (see PRODUCER): actual when
 /// @p report carries rows, nominal otherwise; 0 for a non-producer.
@@ -183,13 +273,31 @@ bool building_makes(const world& w, const recipe_registry& reg, entity_id bid, s
 /// zero need passes every input and would admit any recipe.
 float judged_batches(const recipe_registry& reg, const building_component& b);
 
+/// The SUPPLY clause of `input_obtainable`, alone: the reachable spare of @p r
+/// at @p consumer_market (`reachable_supply`, @p self taken out) covers @p need
+/// at `t_idle`, with some producer landing a unit there. Writes the cheapest
+/// landed unit cost when given. A non-positive @p need is covered.
+bool input_supply_covers(world& w, const recipe_registry& reg, input_reach& ir,
+                         entity_id consumer_market, std::size_t r, float need, entity_id self,
+                         float* out_landed = nullptr);
+
+/// Every input of recipe @p rc by the SUPPLY clause alone (no stock): the test
+/// generation's placement asks (BL-1233, a processor needs SPARE reachable
+/// supply) — a new plant's draw is judged against the standing producers and
+/// consumers, never against an opening shelf it would eat through.
+bool recipe_inputs_supplied(world& w, const recipe_registry& reg, input_reach& ir,
+                            entity_id consumer_market, const recipe& rc, float batches,
+                            entity_id self);
+
 /// Is input @p r obtainable at @p consumer_market for a run needing @p need units?
 /// @p pool is the corp's (corp, market) pool, may be null. @p allow_supply false
-/// asks the STOCK clause alone.
+/// asks the STOCK clause alone; @p allow_stock false asks the SUPPLY clause
+/// alone (a recipe switch, Ben 2026-10-09: it adds a draw, as a build does), and
+/// then prices an obtainable input at the landed cost the supply clause found.
 input_access input_obtainable(world& w, const recipe_registry& reg, input_reach& ir,
                               entity_id consumer_market, const stockpile_component* pool,
                               std::size_t r, float need, entity_id self,
-                              bool allow_supply = true);
+                              bool allow_supply = true, bool allow_stock = true);
 
 /// Every input of recipe @p rc at once: true when each is obtainable; fills
 /// @p unit_cost[r] for each input with its obtainable cost (the posted price for
@@ -198,4 +306,4 @@ bool recipe_inputs_obtainable(world& w, const recipe_registry& reg, input_reach&
                               entity_id consumer_market, const stockpile_component* pool,
                               const recipe& rc, float batches, entity_id self,
                               std::array<float, resource_count>& unit_cost,
-                              bool allow_supply = true);
+                              bool allow_supply = true, bool allow_stock = true);

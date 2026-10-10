@@ -811,7 +811,7 @@ enum class tree_set : std::uint8_t { all = 0, clear_of_roads = 1, over_roads = 2
 
 /// One tree of a tile's stand: its root (tile-relative) and crown radius, and
 /// whether the stand keeps it (a works' cleared ground thins it). stamp_trees
-/// and tree_patch_boxes (BL-1261) share it, so the partial re-bake bounds
+/// and tree_patch_boxes (BL-1291) share it, so the partial re-bake bounds
 /// exactly the trees the stamp draws.
 struct stand_tree_t { double ox, oy; float cr; bool kept; };
 inline stand_tree_t stand_tree(int cw, int r, int k, float v_clump, float v_size, double g_x, double g_y,

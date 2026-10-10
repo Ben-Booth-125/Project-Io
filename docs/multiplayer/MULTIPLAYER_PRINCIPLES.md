@@ -94,6 +94,19 @@ maintain today and are expensive to recover once lost. They are framed as constr
    snapshot depend on wall-clock time, frame timing, or render state weakens both saves and the
    future resync path.
 
+5. **Key new state by corporation, never by "the player".** The world carries one seat
+   (`world::player_entity`, the one-`is_player` invariant), and that is the single-player fact
+   multiplayer would have to widen to N seats. Every surface that reads the seat directly adds to
+   that widening. When adding player-facing state — a dial, a flag, a cache, a notification queue —
+   store it per `corporation_component` and *read* it through the seat, so the seat stays a lookup
+   rather than a shape baked into the data.
+
+6. **Derive what a viewer knows as a function of the viewer.** The two fogs, competitor visibility
+   and anything else gated on knowledge (`docs/ui/DISCOVERY.md`) should be computed *for a given
+   corp* from shared state, not stored as one global "what the player has seen". Under lockstep every
+   client holds the whole world; what differs is only whose view is drawn. A per-viewer derivation is
+   also what the `--serve` actor boundary already needs (`docs/ai/AI_OPPONENT.md` § 10).
+
 ---
 
 ## The one sleeper risk — floating-point determinism

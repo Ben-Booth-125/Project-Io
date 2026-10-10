@@ -300,7 +300,7 @@ on the rail. Reserved slots stay `BeginDisabled`.
 
 | Glyph | Function | Shape | Colour | Lens |
 |---|---|---|---|---|
-| **Supply** | `supply(…, colour)` | Two parallel horizontal lines (route shorthand) | Caller stroke | `overlay_mode::supply`; reused for `overlay_mode::supply_routes` |
+| **Supply** | `supply(…, colour)` | Two parallel horizontal lines (route shorthand) | Caller stroke | `overlay_mode::supply` |
 | **Market** | `market(…, colour)` | Three ascending bars (price chart), outlined | Caller stroke | `overlay_mode::market` |
 | **Country** | `country(…, colour)` | Downward-pointing shield silhouette + dark outline | Caller fill | `overlay_mode::country` |
 | **Corporation** | `corporation(…, colour)` | Filled square + dark inner dot ("seal") | Caller fill | `overlay_mode::corporation` |
@@ -311,8 +311,11 @@ on the rail. Reserved slots stay `BeginDisabled`.
 | **Scarcity** | `scarcity(…, colour)` | Hollow downward-pointing triangle (empty / depleted motif; inverse of the filled resource pip) | Caller stroke | `overlay_mode::scarcity` |
 | **Industry** | `industry(…, colour)` | Factory silhouette — a filled body block with a two-tooth sawtooth roof and a left chimney rising above the roofline; distinct from the production up-triangle and the market bars (BL-084, industry lens) | Caller fill | `overlay_mode::industry` |
 | **Continent** | `continent(…, colour)` | Two filled, deliberately asymmetric quads split by a diagonal **gap** — the seam is the shape that carries the meaning, and it is a gap rather than a drawn hairline so it survives at strip size. Reads "the crust is in pieces, and this is where they meet"; distinct from the Country shield (a bordered *territory*) and from any solid landmass blob, because the lens shows the *boundary*, not the area (BL-226, continent lens) | Caller fill | `overlay_mode::continent` |
-| **Reach** | *(borrows `convoy`)* | The rightward chevron | Caller stroke | `overlay_mode::reach` |
 | **Throughput** | `throughput(…, colour)` | A **truck** in profile facing right — long cargo box, stepped-down cab with a raked windscreen, two wheels on the axle line; filled with the family's dark outline, hubs picked out in the outline colour so the undercarriage survives at strip size. Ben, 2026-08-25: *"just use a truck as the glyph."* Two abstract cuts were tried first and both failed at ~21px — a funnel narrowing to a node read as a bowtie (an X, already the *closed* affordance here) and a ringed node with flow stubs read as a lone ring; a truck needs no decoding, which beats metaphorical fidelity on a strip. Distinct from `convoy` (a bare chevron) and `supply` (two parallels) by being a *thing* rather than a mark, which matters because it borrowed the convoy chevron while it was keyboard-only (BL-605) | Caller fill | `overlay_mode::throughput` |
+| **Company** | `company(…, colour)` | A **briefcase** — a filled landscape case with the family's dark outline, a stroked carry handle standing on the lid, and a dark clasp band with a centred clasp. Background firms, the Corporation lens's mirror and its strip neighbour, so the mark is a *thing* rather than a variant of the corporation seal-square; the landscape proportion and the handle keep it apart from every square on the strip | Caller fill (handle in the same colour) | `overlay_mode::company` |
+| **Reach** | `reach(…, colour)` | A **broadcast mark** — a source dot in the lower-left with two concentric quarter-arcs widening to the upper right: how far the player's commerce carries from home. Distinct from `convoy` (a chevron) and from the Supply-routes node graph beside it on the Solar strip | Caller fill + stroke | `overlay_mode::reach` |
+| **Supply-routes** | `supply_routes(…, colour)` | A **lane graph** — three outlined nodes joined by three edges of unequal stroke weight, the lens's own log-scaled lane thickness in miniature. Distinct from `supply` (two bare parallels), its Solar-strip neighbour | Caller stroke + fill | `overlay_mode::supply_routes` |
+| **Trade flow** | `trade_flow(…, colour)` | An **exchange mark** (⇄) — an upper arrow pointing right and a lower arrow pointing left, each with a solid head; the lens draws market-to-market arrows, so the mark is the lens's own drawing. The solid heads keep it apart from `supply` (two bare parallels) | Caller stroke + fill | `overlay_mode::trade_flow` |
 
 > **Three rows above are stale** and are left rather than quietly deleted: **Country**,
 > **Opportunity** and **Production** name lenses Sprint 17b retired. The glyph functions
@@ -325,12 +328,11 @@ lens gets a highlighted backing and the `palette::selection` glyph colour, inact
 lenses use `palette::neutral`. The lens **name** is supplied as a hover tooltip via
 `overlay_mode_name`.
 
-The curated on-screen strip order is corporation / resource / market /
-population / continent / throughput; scarcity, industry, supply, reach
-and supply-routes are keyboard-cycle only (a width call, MINIMAP.md § Overlay
-controls). Reach and Supply-routes **borrow** the `convoy` / `supply` glyphs rather
-than carrying their own — adequate off-strip, where the glyph is never seen beside
-its lender. Note `resource` is **overloaded**: `resource(…, resource_type)` is the
+The strip is keyed on the rung (LENSES.md § The strip rotates with the rung): Planetary
+carries corporation / company / resource / market / scarcity / industry / population /
+continent / throughput / trade flow; Circumplanetary market / scarcity / supply; Solar
+supply / reach / supply-routes. Every lens carries its **own** glyph — none borrows
+another lens's mark (Ben, 2026-10-07). Note `resource` is **overloaded**: `resource(…, resource_type)` is the
 identity-coloured *pip* (a diamond), while `resource(…, ImU32)` is the *lens* glyph
 (the strata motif) — same name, disambiguated by the final argument type and by
 context (strip vs. canvas pip).

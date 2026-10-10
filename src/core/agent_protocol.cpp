@@ -144,6 +144,7 @@ const char* result_name(corp_command_result r)
         case corp_command_result::rejected_state:    return "rejected_state";
         case corp_command_result::rejected_tech_locked: return "rejected_tech_locked";
         case corp_command_result::rejected_era_locked: return "rejected_era_locked";
+        case corp_command_result::rejected_wrong_air: return "rejected_wrong_air";
         // BL-350's four distinguishable declines. Without these the switch fell
         // through and reported every one of them as "rejected_invalid", which
         // tells an agent its arguments were malformed when in fact they were

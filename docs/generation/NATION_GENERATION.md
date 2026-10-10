@@ -4,7 +4,7 @@
 > how the history's realms fold into nations, what the size floor merges away · how a resource
 > profile and a political character are derived from the ground a nation holds · how a nation
 > inherits its realm's name and colour · what treasury and substrate density it opens with · how
-> settlements are placed alongside.
+> settlements are placed alongside · how many nations, and how many majors, a world ends with.
 > **Not here:** what a nation *does* once the campaign runs (../politics/NATIONS) · how
 > corporations attach to one (CORPORATION_GENERATION) · which ladder produced the history it
 > inherits (../lore/HISTORY).
@@ -19,9 +19,10 @@ This document covers **only the generation strategy** — how a nation comes to 
 treasury, law authorship and the nation-behaviour grant (Ben, 2026-08-18). Where the two disagree
 about a field, generation wins on how it is **set** and NATIONS.md wins on what it **means**.
 
-**Nations are backdrop to the player, not the player.** The player is a **law subject** — a
-corporation that holds a seat (`docs/CONCEPT.md` § Player identity) — so the
-mechanics a nation holds stay a nation's and do not become the player's levers.
+**The player is one of the nations this doc makes (Ben, 2026-10-10).** It plays a **major** nation
+and operates that nation's champion (`docs/CONCEPT.md` § Player identity). Generation makes the
+player's nation exactly as it makes a rival's; nothing here is placed, sized or favoured for the
+player.
 
 ---
 
@@ -38,13 +39,43 @@ randomness. Tunable parameters — seed density, size variance, fragmentation �
 character to be shaped without re-authoring. Different seeds produce different political maps
 over the same tile geography.
 
-**The nation count is an outcome, not an input.** There is no nation-count target anywhere in the
-pipeline and no campaign-setup slider for it. Seeds scale with the body's habitable land area, and
-the merge pass absorbs every nation that fails to hold a minimum viable territory. How many
-nations a world ends up with therefore falls out of its landmass and coastline: a large, dry
-continental homeworld supports more nations than a small, ocean-heavy one. The two constants that
-shape it are `land_tiles_per_seed` and `min_nation_tiles` (`nation_params`,
-`src/world/nation_generation.hpp`) — both are retuning dials on *character*, not on count.
+### The nation count is a target (Ben, 2026-10-10)
+
+**Overturning** the standing ruling that the count is an outcome, never an input (Ben, 2026-07-30),
+and the "no nations slider" that went with it. The player sets two numbers on the wizard's setup round
+(`docs/ui/STARTUP.md` § Rounds), before the Life round builds the world:
+
+| Target | Means | Range |
+|---|---|---|
+| **Total** | nations alive on the homeworld when generation ends | at least the major target, **at most 40** |
+| **Major** | nations holding a champion when generation ends (`docs/GLOSSARY.md` § Major nation) | **1 to 6** |
+
+**Both targets are always hit (Ben, 2026-10-10).** A world that ends off either target is a defect,
+not a reported outcome — the reverse of NR-911's report-and-count rule, for these two numbers only.
+
+**How a target is hit: a lean, then in-world reconciliation (Ben, 2026-10-10, option C).** A count
+is never imposed by deleting, splitting or relabelling a nation. Two stages, in order:
+
+1. **The lean.** Each target conditions the passes that make the number. The total sets the seed
+   density of placement in place of `land_tiles_per_seed` alone, and the major target leans how
+   Industrialisation concentrates charter capital (`INDUSTRIALISATION.md` § 1). A lean lands
+   near the target; it does not promise it.
+2. **Reconciliation, by the history's own verbs.** Whatever gap the lean leaves is closed by events
+   the sim already knows, each recorded in the history with a cause a player can read:
+   - **too many nations** — conquest and absorption, the Empires and Exploration verbs;
+   - **too few nations** — a subject freed or a province seceding, the Exploration verbs;
+   - **too few majors** — a **national champion** chartered in the richest minor that lacks one;
+   - **too many majors** — a **cross-border buy-out**: one major's champion buys a surplus major's
+     specialist whole, and the seller becomes a minor.
+
+The mechanics of each step — which span runs the reconciliation, how the richest minor is read,
+how a buy-out is priced — are open design. `GENERATION_STRATEGY.md` § Asymmetry is the deliverable
+holds for everything else. These two counts are its one sanctioned exception: the player sets them,
+and the world's shape inside them stays the world's.
+
+The library spread shows why both stages are needed. Living polities run from about 40 to 115 across
+`seed_library.json`, so the 40 cap sits at the floor of every curated world, and reconciliation
+removes nations on almost every seed.
 
 **Same pipeline, all bodies.** Nation generation runs only on bodies with sufficient habitable
 area — the homeworld. The pipeline is body-agnostic; it reads tile
@@ -518,14 +549,13 @@ also reads.
 The homeworld is the only body with nation generation. The other prototype bodies are unclaimed
 territory.
 
-The homeworld's nation count is **not authored**. The size floor and seed density are
-fragmentation-modulated, and the default seed settles at **43 nations**. A count that high is the
-ladder doing its job, settled deliberately (Ben, 2026-07-30 — recorded in `../lore/HISTORY.md`
-§ Implementation): let naturally different cultures emerge; a war/conflict stage narrows the
-count if needed, rather than tuning the generator to a target. Sizes stay strongly varied. The
+The homeworld's nation count is **a player-set target**, hit by a lean and then reconciliation
+(§ The nation count is a target). The size floor and seed density stay fragmentation-modulated
+under the lean. The 2026-07-30 ruling's mechanism survives: let naturally different cultures emerge,
+and let a war/conflict stage narrow the count. Its premise, that the generator is never tuned to a
+target, is overturned (Ben, 2026-10-10). Sizes stay strongly varied. The
 base knobs are `land_tiles_per_seed`, `min_seed_separation`, and `min_nation_tiles`
-(`nation_params`), modulated by `nation_params_from_ladder`; the New World setup screen has
-**no nations slider** — the count is not the player's to set.
+(`nation_params`), modulated by `nation_params_from_ladder`; the targets of § The nation count is a target condition them.
 
 **What planetology data nation placement does and does not consume.** The ladder consumes the
 planetology state directly (`life_stage` peak, `arable_share`, `endemics`). `generate_nations`

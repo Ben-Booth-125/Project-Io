@@ -329,7 +329,7 @@ Products are the highest-value goods and the primary driver of market price dive
 |----------|---------------|---------------------|-----------|
 | Machinery | Steel + refined copper | Fabricator | 61.0 |
 | Electronics | Silicon + refined copper + REE alloy | Electronics Lab | 41.6 |
-| Propellant | Refined fuel + liquid oxygen | Chemical Plant | — (unpriced; consumed by the Launchpad, never sold) |
+| Propellant | Refined fuel + liquid oxygen | Chemical Plant | 64.0 |
 | Alloys | Steel + REE alloy | Fabricator | 85.0 |
 | Spacecraft components | Alloys + electronics | Assembly Plant | 310.0 |
 | **Ordnance** | **Steel + machinery** | **Fabricator**; also the **Smithy** on the ancient roster | 155.8 |
@@ -446,11 +446,18 @@ tradeable, and `resolve_price` / the clearing pass ignore everything else
   61.0, alloys 85.0, electronics 41.6, spacecraft components 310.0.
 - **The habitability tranche**: clean water 7.7, consumer goods 61.0, medical supplies 14.0.
 - **Ordnance** 140.8 (ancient 113.0).
+- **Propellant** 64.0 — derived below.
 - **Power** 2.6 and **construction capacity** 6.6 — the grid good and the
   construction sector's product (`docs/economy/PRODUCTION.md`).
 
-**Propellant is the one value with no base price.** It is made in a Chemical Plant and burned by
-a Launchpad, never mined and never sold, so it has no market presence.
+**Propellant has a base price (Ben, 2026-10-08; BL-1217, inputs reach processors).** It is made in a Chemical Plant and
+burned by a Launchpad from its corporation's own pool; the nation's space programme buys it — so
+it trades, and a plant that makes it can be judged by what it earns. Unpriced, every propellant
+plant forecast zero revenue and was idled the moment it stood (102 of them across the 16 curated
+seeds). Its base price is derived from its inputs as every Tier 3 product's is (`PRODUCTION.md` §
+The recipe margin anchor), on the route a body with an atmosphere runs — `propellant_atmospheric`,
+refined fuel ×2 — since the airless route runs only on airless bodies (Ben, 2026-10-09): marginal
+cost 31.95, so **64.0**. A pad's pool keeps its propellant from auto-surplus (`MARKETS.md` step 4).
 
 Water is in this tradeable set from tick 0: it carries an authored base price on the home-body
 markets and sits in the substrate demand basket (`scripts/economy.lua`, weight 0.40).

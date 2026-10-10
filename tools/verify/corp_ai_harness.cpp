@@ -24,8 +24,9 @@
 //        on the corp's home nation for the FULL survey cost of the top-scoring
 //        gated body; no home nation or no gating means no claim.
 //   R9 — build only what runs (BL-1187): the recipe chase refuses a sibling
-//        whose input is unobtainable and takes it once a producer or stock is
-//        in reach, read every tick over 12 evaluations.
+//        whose input is unobtainable and takes it once a producer is in reach;
+//        stock alone does not admit a switch (BL-1217 G1b R1, Ben 2026-10-09),
+//        read every tick over 12 evaluations.
 // Hand-builds a minimal world (no Lua / SDL / ImGui); kept outside src/ so the
 // CMake glob ignores it. Follows the corp_agency_harness.cpp pattern.
 
@@ -386,8 +387,17 @@ int main()
         // — vetoed; at cash 300 the same candidate passes (200 > 50).
         {
             const recipe_registry reg = make_registry();
-            auto builds_at = [&](float cash) {
+            // BL-1227 (review round 1): IN PLAY — econ tick 4, a market that
+            // has cleared and BIDS for the ore. At econ tick 0 the forecast reads
+            // a never-cleared market (no signal), which proves nothing about play.
+            auto builds_at = [&](float cash, bool ore_bid = true) {
                 scene s = make_scene(cash);
+                s.w.current_econ_tick = 4;
+                market_component& mc = s.w.markets.at(s.market);
+                if (ore_bid)
+                    mc.demand[ri(resource_type::iron_ore)] = 100.0f;
+                else
+                    mc.demand[ri(resource_type::steel)] = 100.0f; // cleared, but nobody bids for ore
                 economy_report rep; // strategic step needs no production report for builds
                 run_corp_strategic_step(s.w, reg, rep, /*tick=*/4); // AI corp index 0 -> due at tick%4==0
                 for (const corp_decision& d : s.w.ai_decisions.entries)
@@ -399,6 +409,9 @@ int main()
                   "BL-202 R2: the solvency gate blocks a build that breaches the reserve floor");
             check(builds_at(300.0f),
                   "BL-202 R2: the same candidate passes once cash clears the floor (gate, not ban)");
+            check(!builds_at(300.0f, /*ore_bid=*/false),
+                  "BL-1227: through the scorer, in play, a cleared market with no bid and nothing "
+                  "listed for the ore is DEAD - the same affordable mine is never built");
         }
 
         // Hysteresis / expected-loss veto: with a worthless market price the
@@ -1061,15 +1074,16 @@ int main()
     // inputs could be had, so a working plant moved onto a fatter sibling whose
     // inputs nothing supplied (seed 0: 16 clean-water plants to consumer goods
     // by tick 3, then starved). Now a sibling is proposed only when each input
-    // is obtainable at the plant's market (input_reach.hpp): stock at hand (pool
-    // + an admitted shelf, at t_idle) or a producer within reach.
+    // is obtainable at the plant's market (input_reach.hpp) — since BL-1217 G1b
+    // R1, by the SUPPLY clause alone: a producer within reach.
     //
     // One group, "Alpha": the incumbent `alpha_iron` (iron -> 1 steel, iron in
     // the pool) and `alpha_coal` (coal -> 3 steel), ~4x the margin. Three worlds,
     // each walked for 12 evaluations and read EVERY tick:
     //   (a) no coal anywhere            -> the switch is refused on every tick;
     //   (b) a coal mine in the market   -> the switch is taken;
-    //   (c) coal stock in the corp pool -> the switch is taken.
+    //   (c) coal stock in the corp pool -> the switch is REFUSED (BL-1217 G1b
+    //       R1: a switch is judged on supply alone, Ben 2026-10-09).
     {
         auto staged_registry = [&]() {
             recipe_registry reg = make_registry();
@@ -1175,10 +1189,19 @@ int main()
                   "in the plant's market (obtainable by supply)");
         }
         {
+            // BL-1217 G1b R1 (AI_OPPONENT.md, "A recipe switch is judged on
+            // supply too", Ben 2026-10-09): this row asserted TAKEN until the
+            // ruling. A switch adds a draw, as a build does, so stock alone
+            // (the corp's pool, no producer in reach) no longer admits it; the
+            // producer row above is what keeps the refusal non-vacuous.
             const walked r = walk(coal_source::pool);
-            check(!r.held.empty() && r.held.back() == r.coal,
-                  "BL-1187 R9: and TAKEN when the input is stock in the corp's own pool "
-                  "(obtainable by stock), so the refusal above is not vacuous");
+            bool never = !r.held.empty();
+            for (const uint16_t h : r.held)
+                if (h != r.iron) never = false;
+            check(never,
+                  "BL-1187 R9 / BL-1217 G1b R1: and REFUSED on every one of 12 evaluations "
+                  "when the input is only stock in the corp's own pool (a switch is judged "
+                  "on supply, Ben 2026-10-09)");
         }
     }
 

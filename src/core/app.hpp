@@ -414,6 +414,10 @@ private:
     /// Open the wizard at its first round. The menu's "New Game" button — it commits
     /// nothing and builds nothing, it just hands the player the first decision.
     void open_new_world_wizard();
+    /// The menu's "Quick Start" (STARTUP.md § Main menu, Ben 2026-10-08): Begin
+    /// with no wizard behind it -- the cold build on the menu's seed and
+    /// resources, the loading bar, then the seat canvas. No second build path.
+    void quick_start();
 
     /// Resolve the pending preferences against the seed, then re-run the Planetology
     /// chain over the prototype body set into m_wiz_preview (and m_wiz_undrawn, the

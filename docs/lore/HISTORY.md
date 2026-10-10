@@ -77,8 +77,8 @@ The campaign premise makes three big historical claims:
    `terrain_resistance`, `src/world/terrain_combat.cpp`).
 3. **Corporations as first-class actors.** An immortal legal fiction can own, trade, and expand
    across borders — and nations tolerate it. The *mechanism* — the enforceable promise, the
-   charter — is settled. The *player* is a corporation that holds a seat (`docs/CONCEPT.md`, Ben
-   2026-09-17, NR-885), and the rupture is **averted, not past** (Ben, 2026-07-30, BL-223).
+   charter — is settled. The *player* is a major nation operating its champion corporation
+   (`docs/CONCEPT.md`, Ben 2026-10-10), and the rupture is **averted, not past** (Ben, 2026-07-30, BL-223).
 
 None of these are natural defaults. Each is the residue of specific historical stages. This
 document names those stages, states the causal lesson each one carries, and marks the hooks

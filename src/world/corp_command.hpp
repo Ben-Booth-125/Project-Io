@@ -288,6 +288,7 @@ enum class corp_command_result : uint8_t
     rejected_reputation,      ///< The (buyer, supplier) reputation pair sits below the standing floor.
     rejected_cooldown,        ///< BL-430: economy.recipe_switch's cooldown has not elapsed on this building.
     rejected_no_lp,           ///< BL-597: no passive Logistic Points at the source anchor for this leg.
+    rejected_wrong_air,       ///< The recipe cannot run on this body's air: propellant_electrolysis only on an airless body, propellant_atmospheric only under air (Ben, 2026-10-09).
 };
 
 /// Apply one command through the player-grade seams. Deterministic; a rejected

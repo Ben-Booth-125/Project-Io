@@ -1,6 +1,6 @@
 ---
 name: market-viability
-description: Run the sprint 49 market viability gate (BL-1184) — one 16-seed reading on the shipped 1960 start that says whether the market economy is viable from day 1, against Ben's targets (pooled: >= 70% of built processors running at handoff, field income at tick 50 >= 50% of the settle close, >= 70% of firms alive at tick 400). Use it to judge ANY sprint 49 economy or generation change, before and after; a world-mover measures its own before/after with it, in isolation.
+description: Run the sprint 49 market viability gate (BL-1184) — one 16-seed reading on the shipped 1960 start that says whether the market economy is viable from day 1, against Ben's targets (pooled: >= 85% of built processors running at handoff, <= 5% input-starved, field income at tick 50 >= 50% of the settle close, >= 70% of firms alive at tick 400). Use it to judge ANY sprint 49 economy or generation change, before and after; a world-mover measures its own before/after with it, in isolation.
 ---
 
 # market-viability
@@ -51,7 +51,16 @@ keep-awake (`tools/session/keepawake.ps1 -Process market_viability`) on an unatt
   splits it by the state on the last tick it reported — ran, input-starved, other, or never
   reported. `build` is under construction.
   **Share running = run / built processors** (every state but `build`). The share over all
-  processors, construction included, is printed beside it. Target: pooled >= 70% at handoff.
+  processors, construction included, is printed beside it. Target: pooled >= 85% at handoff
+  (Ben, 2026-10-08; it was 70%).
+- **G1b, processors input-starved at handoff** — `input` now, plus `decom` whose last reported
+  state was input-starved (mothballed because its inputs never came), over built processors.
+  Target: pooled <= 5% (Ben, 2026-10-08). G1 alone counts a plant idled for want of a buyer as
+  a failure, which is the economy working; G1b is the starvation the sprint chases.
+- **G1 at tick 50** — the same share running, read at play tick 50. Target: pooled >= 85% (Ben,
+  2026-10-08): a plant rescued at the handoff only to be mothballed in play does not count.
+  **Deferred (Ben, 2026-10-09):** long-term viability moves to a later sprint, so this row is
+  reported but does not gate sprint 50; its printed FAIL is expected until that sprint.
 - **G2, field income per tick** — the sum of every corporation's filed `quarterly_return::income`,
   as WINDOW MEANS: the play 26-50 mean over the 12-tick settle mean. Pooled = sum / sum.
   Target: pooled >= 50%. The single ticks (settle close, tick 50) print per seed as context.
@@ -73,11 +82,14 @@ keep-awake (`tools/session/keepawake.ps1 -Process market_viability`) on an unatt
 The run closes with a per-seed table, the pooled rows, one `PASS`/`FAIL` line per target, and:
 
 ```
-market_viability: G1 x/70 G2 y/50 G3 z/70 | L to-short a% dry/read b starved/read c top-class K d%
+market_viability: G1 x/85 G1t50 x/85 G1b x/5 G2 y/50 G3 z/70 | abs run/built h R/B t50 R/B inc26-50 I/seed-tick | L to-short a% dry/read b starved/read c top-class K d%
 ```
 
-The `| L ...` tail is appended by the logistics row (below); the three G fields keep their
-place. `--no-logistics` drops the row and the tail.
+The G fields keep their place. The `| abs ...` segment gives the ABSOLUTE counts behind the
+shares: processors running / built (pooled) at the handoff and at tick 50, and the play 26-50
+field income per tick per seed. Read it whenever a share moves, since a share rises when its
+denominator falls (BL-1217 D5/D6 review). The `| L ...` tail is appended by the logistics row
+(below). `--no-logistics` drops the row and the tail.
 
 ## The logistics row (L) — BL-1223, reported, no target
 
@@ -116,8 +128,8 @@ dispatcher's order. They are not refusals by a rule:
 | `noshelfsurplus/ordered` | As `poolheld`, but every such pool surplus is under a standing sell order. The corp dispatcher never hauls an order-controlled (corp, body, good); the order sells it at home. |
 | `noshelfsurplus/none` | No shelf surplus and no shippable pool surplus on the body, pre-step. Nothing to ship. |
 | `grid` | A grid good. It is never cargo, so it is not classified. |
-| `stocked/ceiling` | Processor block only. Before the economy step, the processor's market shelf held >= 1 unit, but its price was over the BL-1172 fair-price ceiling (`!shelf_admits`, `reservation_mult x base`). The draw does not buy and does not bid. |
-| `stocked/thin` | Stocked and admitted, but pool plus the WHOLE shelf covers less than `t_idle` of a full run. This is `run_processing`'s early idle return, even with no contention. |
+| `stocked/thin` | Processor block only. Before the economy step, the processor's market shelf held >= 1 unit, but pool plus the WHOLE shelf covers less than `t_idle` of a full run: `run_processing`'s early idle return, at ANY price. Tested first, so a thin shelf is never counted as a ceiling lock; its "over ceiling" count says how many were also priced over. |
+| `stocked/ceiling` | Stocked enough to run, but priced over the BL-1172 fair-price ceiling (`!shelf_admits`, `reservation_mult x base`). The draw does not buy and does not bid. Only this class would run if the price fell. |
 | `stocked/contended` | Stocked, admitted and enough. Earlier draws in the step, or the BL-1209 pro-rata share of a short shelf, left this processor too little. |
 | `unpriced` | The processor's market has no base price for the input. Unpriced is unbuyable. |
 | `nomarket` | The processor has no tile market and draws a body pool. No market-export rule applies. |

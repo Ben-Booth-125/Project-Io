@@ -962,8 +962,11 @@ void app::draw_building_screen()
 {
     poll_worldgen();
 
+    // THE TOP BAND (STARTUP.md § Main menu; Ben, 2026-10-08): the window hangs
+    // from the top edge, horizontally centred, and its title is padded down so
+    // the bar lands on ui::loading_bar_y() -- never the window's vertical centre.
     const ImVec2 disp = ImGui::GetIO().DisplaySize;
-    ImGui::SetNextWindowPos({disp.x * 0.5f, disp.y * 0.5f}, ImGuiCond_Always, {0.5f, 0.5f});
+    ImGui::SetNextWindowPos({disp.x * 0.5f, 0.0f}, ImGuiCond_Always, {0.5f, 0.0f});
     constexpr ImGuiWindowFlags flags =
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
@@ -972,6 +975,10 @@ void app::draw_building_screen()
 
     if (ImGui::Begin("##building", nullptr, flags))
     {
+        // The lead above the bar: the title line, this screen's 10 px gap and
+        // the wait surface's own 10 px gap, each with its item spacing.
+        const float sp = ImGui::GetStyle().ItemSpacing.y;
+        ui::pad_to_loading_band(ImGui::GetTextLineHeightWithSpacing() + 2.0f * (10.0f + sp));
         const char* title = "BUILDING THE WORLD";
         const float tw = ImGui::CalcTextSize(title).x;
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (420.0f - tw) * 0.5f);
@@ -1745,7 +1752,9 @@ void app::load_economy()
     // headless harnesses, --serve, --verify — ran generated processors that could
     // never produce, reported as ordinary idleness. 20.3% of processing
     // building-ticks in tier_margin, silently dragging the BL-436 calibration.
-    assign_default_recipes(m_world, m_registry);
+    // BL-1217 D6: an unwanted default unplaces its processor (world build only;
+    // a loaded or settled world has no recipe-less processor to remove).
+    assign_default_recipes(m_world, m_registry, "load_economy");
 
     finish_economy_presentation();
 }
@@ -2805,6 +2814,10 @@ void app::render()
                 // research reaches this one, so saying "not researched yet" would
                 // send the player looking for a tech that does not exist.
                 m_ui.construction.last_message = "Not in this era."; break;
+            case construction_result::wrong_air:
+                // Propellant routes follow the body's air (Ben, 2026-10-09).
+                m_ui.construction.last_message =
+                    "This method cannot run on this body's air."; break;
             default:
                 m_ui.construction.last_message = "Construction failed."; break;
         }

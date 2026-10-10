@@ -1382,9 +1382,13 @@ int main(int argc, char** argv)
         const std::string s = argv[a];
         if (s == "--seeds" && a + 1 < argc) shipped_seeds = parse_seed_list(argv[++a]);
         else if (s == "--corps") g_read_corps = true;
+        // BL-1119 stale-flood probe: every row on worlds whose road passes re-price each
+        // route on the field as it stands (road_generation.hpp § g_road_probe_fresh_floods).
+        // A MEASUREMENT variant, not the shipped world.
+        else if (s == "--fresh-floods") g_road_probe_fresh_floods = true;
         else
         {
-            std::printf("usage: road_generation_harness [--seeds a,b,c] [--corps]\n");
+            std::printf("usage: road_generation_harness [--seeds a,b,c] [--corps] [--fresh-floods]\n");
             return 2;
         }
     }

@@ -434,6 +434,33 @@ candidate set is this subset of it:
 | `hire_unit(tile, unit_type)` | `hire_unit` at the corp's own completed `military_base` | Availability gated on stockpile/market access, never on cash; spend subject to the solvency gate |
 | `place_sell_order(body, target, quantity, floor)` | the order book | § 2C |
 
+**A plant the dial idled is not losing (Ben, 2026-10-08; BL-1235, dial hold outlasts reflex).**
+When the workforce dial sets a plant to zero, the maintenance it pays while idle is the cost the
+dial chose to carry, not a loss: the loss reflex counts no streak against it. And the dial's hold on
+a plant it zeroed ends the moment that plant's own forecast recovers — the plant is dialled again
+on the corporation's next evaluation, not after the fixed hold. Measured: the dial zeroed 503
+generation-built plants in the settle (178 on a start-up glut that had cleared by the handoff), and
+the 8-tick reflex mothballed most of them before the 16-tick hold let the dial look again.
+**At the handoff the seat's dial-idled plants return to auto (Ben, 2026-10-09; NR-986).** The
+scorer stops acting on the corporation the player takes, so a plant its dial left at zero would
+otherwise stay at zero until the player touched it. Each such plant is handed over with its
+workforce on auto, as every plant the player builds starts.
+
+**The dial forecasts at base where no fact exists yet (Ben, 2026-10-09; BL-1217, G1 plants
+running).** Where a plant's market lists none of its output and no bid for it has yet registered,
+the dial forecasts the output at its base price, not the floor — the same "no clear yet: no
+signal" reading the build veto takes (§ 2B): only on a market that has never cleared. An empty
+shelf with no bidder before any clear is an unknown, not a glut; after a clear it is a dead
+market. Otherwise the dial reads its buyer signal as usual (§ 11, the dial reads stock-fed
+consumers).
+
+**The reflex rescue reads an unpriced output as floored (Ben, 2026-10-09; BL-1217, inputs reach processors).** Tier 0's
+recipe rescue switches a floored processor to the recipe whose outputs sell best against their
+base price. An output with no base price is no evidence of health. It reads as floored, so the
+rescue never switches a plant into a recipe it cannot price. Measured before the ruling:
+floored refined-fuel plants switched into unpriced propellant 145 times in the settle, and the
+dial then idled them.
+
 The seam carries further verbs the scorer does not enumerate — `demolish`, `place_road`, the
 convoy pair, the procurement triple, the stance verbs, the unit verbs and `withdraw_from_battle`
 — which an agent on the seam (§ 10) issues directly. Scoring roads and demolition is BL-447
@@ -445,6 +472,22 @@ affinity × deposit richness × an **input-demand pull**, `input_demand_pull`, t
 tile's extractable deposits by what the economy's recipes want and cannot get — divided by the
 sites already targeting that resource, so the pull decays as the shortage is answered); recipes
 and dials enumerate per owned building. Bounded enumeration is what keeps the per-tick cost flat.
+
+**An extraction candidate is priced at the rank it would take (Ben, 2026-10-07; BL-1227, idle
+mines).** A new site on a tile that already carries a stack yields `0.8^(k−1)` of the first
+(`PRODUCTION.md` § Building stacks), so its build estimate reads its own stack rank, as BL-162's
+`estimate_prospective_profit` already models it — never the first site's output. Priced at rank 1,
+the scorer stacked up to 85 sites on one tile, the deep ones earning about a tenth of their running
+cost, and the loss reflex then idled them. This corrects a wrong estimate inside the existing
+scorer grant (§ 11); it adds no behaviour.
+
+**A power-plant candidate is priced against its grid's shortfall (Ben, 2026-10-07; BL-1232, power
+plants per grid).** Power moves only within its grid (`../economy/LOGISTICS.md` § 3a), so the
+estimate reads the grid's need less its live output **and less the output of plants already under
+construction on it**, and places nothing where that is not short. Blind to its own siblings under
+construction, the settle scorer started 11–13 plants on a grid needing one, most of which stalled
+and were decommissioned. Like the stack rank above, this is a corrected estimate inside the
+existing scorer grant (§ 11), not a new behaviour.
 
 **The processing-facility candidate** (BL-439, AI builds processors) runs on the same score curve
 and the same solvency, glut and reserve-floor gates as the extraction candidate, and differs only
@@ -461,8 +504,34 @@ where a processor genuinely differs from a mine:
   discovered as a seam rejection — a candidate that can only ever be refused costs a build slot to
   learn nothing), and **input access** — every input must be **obtainable** at the candidate's
   market (§ Build only what runs), since a processor with no reachable input is an immediate
-  loss-maker. The scorer asks exactly what the seam asks and no more: mirroring a lock
-  the seam does not apply would make the rival stricter than the rules it plays by.
+  loss-maker. The scorer **mirrors every lock the seam applies, and adds no lock of its own** —
+  a rule the seam does not enforce would make the rival play by stricter rules than the player.
+  Input access is not such a lock: the seam lets anyone build a plant that will starve, and the
+  scorer declining to is a judgement inside its own **estimate** (§ Build only what runs; the
+  supply rule below), the same judgement a sensible player makes, not a rule imposed on it.
+  **A build is judged on supply, not stock (Ben, 2026-10-08; BL-1234, settle scorer starves).**
+  For a NEW processor, an input is obtainable only when the spare reachable output of that input
+  covers the plant's draw at `t_idle` — the supply clause alone, the same sized test generation
+  places processors by (`../generation/CORPORATION_GENERATION.md` § Pass 3, "Sized to its
+  inputs"). A shelf with nothing replacing it is opening stock being drawn down, not a supply: on
+  seed 0 one steel shelf of 6,313 units with negative spare admitted 63 builds in eight ticks and
+  was empty by the tenth, and 97% of the settle's starved processors were admitted that way. Stock
+  still counts where a plant already stands and keeps its recipe — a resume — because there the
+  question is whether to run what exists, not whether to add a draw (a recipe switch adds one:
+  below). **A plant under construction
+  has already claimed its draw:** spare is net of every processor standing **or under
+  construction** in reach, charged at the draw it will take when it stands, so firms deciding in
+  the same ticks do not all count on the same spare; and a new plant is priced at the landed cost
+  of the supply that admitted it, not at a local shelf it will eat through. The shared reading
+  reaches every use of spare — a resume, a recipe switch, the reflex rescue — so a rival's plant
+  mid-build can hold back another's resume on the same producers, as the draw it has committed.
+  **A recipe switch is judged on supply too (Ben, 2026-10-09; BL-1217, G1b).** Switching a plant
+  onto a new recipe adds a draw it did not have, exactly as a build does, so the switch's inputs
+  are obtainable only by the supply clause; the opening shelf no longer admits it. That holds for
+  every switch — the strategic recipe chase and the reflex rescue alike. A resume keeps the stock
+  clause: it runs the recipe the plant already drew for. Measured before the ruling: 121 of the
+  314 plants starved at the handoff had been switched in the settle (116 by the strategic chase,
+  70 of them onto consumer goods off a shelf households were already emptying; 5 by the rescue).
 - **Pricing.** Priced by `estimate_prospective_profit` rather than the extraction candidate's
   inline revenue-minus-wages sum. The inline model survives on the extraction side because
   switching it would move every blessed golden for no player-visible gain; a new candidate had no
@@ -654,12 +723,35 @@ the floor; stage B layers priority buckets and predictive spending over it (§ 2
   (`base_rate × richness × workforce × (1 − hazard)`) over a horizon of
   `build_duration_ticks + forecast_clearing_ticks` (1 — "one clearing pass") against the **local
   market's PUBLIC `supply`/`demand` aggregates only** — the same facts `export_corp_blackboard`
-  would show a rival (BL-068, competitor visibility; DISCOVERY.md), never a private read. No
-  public demand signal (`demand <= 0`) yields no penalty (the AI cannot forecast against a fact
-  it cannot see); the projected supply/demand ratio is unpenalised at or below
+  would show a rival (BL-068, competitor visibility; DISCOVERY.md), never a private read. **A
+  market with no bid is read by what it lists (Ben, 2026-10-07; BL-1227, idle mines).** No bid
+  against listed supply is a glut, not a missing signal: the projected ratio is unbounded, so the
+  build is vetoed (the scorer had built 1,745 fibre and 461 hide sites into markets with no buyer
+  and hundreds of thousands of units listed). In play — once a market has cleared — no bid and
+  nothing listed is a **dead market**, and the build is vetoed too. Only before a market has ever
+  cleared is "no bid, nothing listed" no signal, and that yields no penalty (the AI cannot
+  forecast against a fact it cannot see). **What counts as a bid (Ben, 2026-10-07, scoping the
+  veto):** the market's demand **plus** the want the fair-price ceiling silenced (the hauler-only
+  register — an aggregate market fact, like demand; without it a mine is vetoed exactly when its
+  processors are priced out and need it most), **plus** the off-book **want** on that market — what
+  the space programme, network upkeep and procurement **wanted** there, filled or not (Ben,
+  2026-10-08: a buyer exists before its supply does, or no rival could build the first spacecraft
+  components or propellant plant; a record of draws alone only appears once the goods do), **plus**
+  the draws that take goods without posting a bid: space-lane launch fuel taken from a corporation's
+  pool, and building upkeep met from a corporation's own pool (Ben, 2026-10-08), **plus** what a
+  **running** processor in that market consumes, fed from a pool or the shelf — a running plant and
+  what it consumes are observable (`../ui/DISCOVERY.md` § Competitor visibility; Ben, 2026-10-08);
+  an idled or decommissioned plant consumes nothing and is no buyer. **Where a want with no holder
+  lands (2026-10-08, NR-984):** a nation's want for a good that no pool or shelf yet holds is
+  recorded at its **capital's** market — so a nation can start one such chain, at its capital,
+  and the want follows the good to wherever it is first held. Each of these is held for
+  the scorer's evaluation cadence, so a buyer is seen by every corporation that evaluates between
+  two of its draws, not only by one due on the next tick. Otherwise the projected supply/demand ratio is unpenalised at or below
   `glut_taper_ratio` (1.0), tapers the build's score linearly to zero at `glut_veto_ratio` (2.0),
-  and vetoes (removes the candidate entirely) at or above it. Applied only to build candidates;
-  dials and survey are unaffected (a body's total surveyed area doesn't glut a market).
+  and vetoes (removes the candidate entirely) at or above it. The taper and veto apply only to
+  build candidates; survey is unaffected (a body's total surveyed area doesn't glut a market). The
+  workforce dial reads a narrower buyer signal — posted demand plus what running processors draw
+  from their owners' pools (§ 11, the dial reads stock-fed consumers) — and is not vetoed.
 
 Verified by `tools/verify/corp_ai_predictive_harness.cpp` (R1: the reason→bucket mapping; R2: the
 Should-Have buffer is well-defined and never loosens the floor; R3: the forecast is
@@ -1843,3 +1935,109 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   one does.** Owner: BL-838 (fear of being next); `docs/generation/CIVILISATION.md` and
   `docs/politics/RELATIONS.md` carry the design.
 
+
+  **A rival may read its OWN refused processor as a bid for its own mine (Ben, 2026-10-07/08;
+  BL-1227, idle mines — the chain start).** The dead-market veto (§ 2B) stops a mine where no one
+  bids, and a processor cannot be built where no input is made, so without this a new
+  intermediate chain could not start in play at all. The grant: when the scorer refuses one of
+  the corporation's **own** processor candidates **only** because an input is not obtainable, that
+  candidate's prospective draw counts as a bid on the input, for the **same corporation's** mine
+  candidates in the veto test of the same evaluation — and nothing else.
+
+  **What it admits, and the scope is the whole of the grant.** It removes an impossibility; it
+  adds no motive. Ben (2026-10-08): *"If the problem is AI motivation, then ignore. This should
+  just be statistically possible."* So the refused draw lifts the veto and nothing more: whether
+  the mine is then built stays with the ordinary estimate, unboosted, and a chain that rarely
+  starts is the intended outcome, not a defect to tune.
+
+  **What it does NOT admit.** It is not a plan: no two-building candidate, no reserved site, no
+  memory of the refused processor across evaluations. It is private to the corporation that
+  refused — another firm's refused want is not a public signal (a public register was offered and
+  declined). It does not touch the player's corp. Pure, seeded, deterministic, replayable, legal
+  verbs only, never a planner. The player sees unmet want on a ledger or lens in the visibility
+  pass, not through this grant.
+
+
+  **The workforce dial may read the build veto's composite bid (Ben, 2026-10-09; BL-1217, G1
+  plants running — the dial's buyer signal).** Without it, the dial (`solve_workforce_target`)
+  forecasts a plant's output from its own market's posted demand alone. At the settle's start that
+  register is empty for goods whose consumers draw on their opening stock first: 244 steel
+  consumers were running and bidding nothing, so the dial zeroed the steel plants that fed them,
+  and the hold outlasted the demand's arrival two ticks later. The grant as given read the **same
+  composite bid** the build veto reads (§ 2B, "What counts as a bid").
+
+  **Narrowed the same day (Ben, 2026-10-09, the dial form).** Read by the dial, the composite bid would not
+  read as a per-tick rate: procurement and the space programme note a whole lump, a pool-fed draw
+  can also sit in posted demand, and later writers overwrite earlier ones. The grant is therefore:
+  the dial's buyer signal for an output is **posted demand plus what running processors drew from
+  their owners' pools** of that good — each unit once, never a unit already posted as demand — on
+  the plant's own market, held for the scorer's cadence. Nothing else of the composite bid reaches
+  the dial: no silenced want, procurement, space programme, launch fuel, upkeep or nation want.
+
+  **What it admits.** One input, already ruled observable (a running plant and what it consumes,
+  `../ui/DISCOVERY.md` § Competitor visibility). It is not a visibility change and adds no new
+  term to the estimate: the dial still weighs that signal against the shelf and the price exactly
+  as it weighs demand today.
+
+  **What it does NOT admit.** No veto on the dial; no read of another corporation's plan, stock,
+  or refused candidates; no body-wide or cross-market pooling; nothing for the player's corp.
+  Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
+
+
+  **Spare supply counts what households and the background take (Ben, 2026-10-09; BL-1217, G1b —
+  processors sized against every buyer).** The supply clause (§ Build only what runs) judged a
+  processor's input by the producers' output in reach less the draw of the *processors* already
+  standing there. Households and the background pull draw from the same shelves first, so the
+  clause admitted plants into markets whose output those buyers already took: 138 of the 314
+  plants starved at the handoff were outbid that way, with their input produced within reach. The
+  grant: spare reachable supply is net also of the **household and background draw** on each
+  market in reach — the draws those channels made at the last clear, an aggregate market fact like
+  demand. It reaches every use of the supply clause: generation's sized rule
+  (`../generation/CORPORATION_GENERATION.md` § Pass 3, "Sized to its inputs"), the scorer's build,
+  and the recipe switch.
+
+  **What it admits.** One more term in a test the scorer already runs; no new verb, no motive, no
+  read of another corporation's plan or stock. It is not a visibility change: households' and the
+  background's draws are aggregate market facts.
+
+  **What it does NOT admit.** No forecast of future household growth, no reservation against a
+  rival's plan, nothing for the player's corp. Pure, seeded, deterministic, replayable, legal
+  verbs only, never a planner.
+
+
+  **A rival may set its own trades (Ben, 2026-10-10; `../economy/TRADE.md`).** Trade is the only
+  way goods move between markets, and the player and every AI corporation trade. The grant: an AI
+  corporation may set, change and clear **manual trades** with the trade points its own Planetary
+  Marketplaces make — a route from one market's shelf to another's, a resource, and the points on
+  it — chosen by the scorer's ordinary estimate (the route's margin per point: destination price
+  less source price less the network's haul), and may set how much of its points it reserves from
+  auto. Auto trade itself is a system rule, not an AI decision, and needs no grant.
+
+  **What it admits.** One verb family — set, change, clear a trade; set the reserve — over the
+  corporation's own points, read from public prices and the network's haul. No read of another
+  corporation's trades, points or plans beyond what is observable on the map.
+
+  **What it does NOT admit.** No coordination between corporations; no trade on another owner's
+  points; nothing for the player's corp beyond its own opt-out dial. Pure, seeded,
+  deterministic, replayable, legal verbs only, never a planner.
+
+  **The player is a nation — a NARROWING, and one subject RAISED (Ben, 2026-10-10;
+  `../CONCEPT.md` § Player identity).** The player plays a major nation and operates its champion.
+  Two things follow without a new grant, because each takes behaviour away: the player's nation is
+  **never scored** by `nation_ai` (`../politics/NATIONS.md` § What a nation does each tick), and
+  its champion is the player's corp, never auto-acted on strategically, exactly as before. Minor
+  nations run shallower than the 2026-08-18 nation grant allows (`../politics/NATIONS.md` § Major
+  and minor nations), which is a narrowing too.
+
+  **A rival may act toward a nation a human plays — granted (Ben, 2026-10-10, NR-1026).** Rival
+  nations and rival corporations may use **the same verbs toward a human-played nation that they
+  use toward any nation**: a stance declared at it, a tariff aimed at it, war, a lobby paid to it.
+  It is a new subject, not a reading of NR-517, which reached only a corp a human owns.
+
+  **What it admits.** Exactly the verb set already legal toward an AI nation, chosen by the same
+  scorers on the same inputs; the human-played nation is scored as a counterparty like any other.
+
+  **What it does NOT admit.** No verb that exists only because the target is human; no read of the
+  player's private state beyond what any nation may observe; nothing that acts ON the player's
+  nation or champion, which stay unscored. Pure, seeded, deterministic, replayable, legal verbs
+  only, never a planner.

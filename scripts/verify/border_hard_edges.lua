@@ -1,4 +1,4 @@
--- BL-1262 (borders hard edges) — the plain canvas at the three widest rungs, framed
+-- BL-1292 (borders hard edges) — the plain canvas at the three widest rungs, framed
 -- on a many-nation frontier, so a reader can SEE what the plain canvas draws for
 -- national borders and roads (PLANETARY.md § The national border band;
 -- RENDERING.md § Roads and sea lanes).

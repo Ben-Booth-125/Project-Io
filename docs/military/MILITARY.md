@@ -321,6 +321,14 @@ in what it *does* is `docs/economy/LOGISTICS.md`'s question, not this document's
 
 ## The muster interface
 
+**The nation musters (Ben, 2026-10-10; `../CONCEPT.md` § Development through ages).** The player is a
+major nation, and a nation **raises its own units and buys their equipment from corporations**; it
+runs no arsenal of its own. So the hirer at a base is the nation, not its champion. The nation buys the
+equipment **as a real buyer on the order book** (Ben, 2026-10-10, NR-1028), so a nation's war
+demand moves the prices of the goods it arms with (`../politics/NATIONS.md` § 2. Conservation). Which verb a nation hires through, and who builds and owns the base, are open design.
+Everything below describes the base and the hire as ruled for a corporation, and holds wherever
+this paragraph does not override it.
+
 `building_type::military_base = 6` is the single economy → military interface. It is where units
 come from, and the only place they come from.
 

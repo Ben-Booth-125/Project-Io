@@ -307,6 +307,15 @@ struct construction_controls
     /// harness's clipping check is vacuous on this class of surface (NR-663), so a
     /// green picture proves nothing on its own.
     entity_id levers_for = null_entity;
+
+    /// The Build door's processing rows as the door LISTED them this frame: the
+    /// ABSOLUTE recipe ids that survived its filters (era, tech, the body's air),
+    /// and the tile they were listed for (`null_entity` when the door did not
+    /// draw). The door folds rows by building group, so a capture cannot show
+    /// which recipe sits behind a folded row; this is the surface reporting its
+    /// own list, read by the `air_gate.lua` check. VIEW state, not serialised.
+    std::vector<std::uint16_t> door_recipes;
+    entity_id                  door_tile = null_entity;
 };
 
 // --- Baked ground view (BL-732, docs/ui/RENDERING.md) ----------------------
@@ -1294,7 +1303,8 @@ struct ui_state
     /// the convoy's tile route in travel order (src→dst); progress/speed drive a head
     /// that interpolates smoothly along it between econ steps, with a tail that lags
     /// and dims one econ tick's travel behind the head.
-    struct convoy_beam { std::vector<entity_id> path; float progress = 0.0f; float speed = 0.0f; };
+    struct convoy_beam { std::vector<entity_id> path; float progress = 0.0f; float speed = 0.0f;
+                         std::vector<float> at; /* BL-1195: the lane's clock (convoy_route::at) */ };
     std::vector<convoy_beam> convoy_beams;
 
     // --- Throughput lens: this frame's active-LP anchor pools (BL-598) ---

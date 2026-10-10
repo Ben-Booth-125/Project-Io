@@ -360,7 +360,7 @@ bake_source prepare_source(const world& w, entity_id body, bool reveal_all = fal
 /// or family arrays in place (the harness builds neighbour variations so).
 void rederive_border_sets(bake_source& s);
 
-/// BL-1261 (roads as tile sets): the hills field the base bake shades (the
+/// BL-1291 (roads as tile sets): the hills field the base bake shades (the
 /// broad relief under the folds, ~1.15 and ~0.75 canonical, in [0, 1]) at
 /// ground point (x, y) — canonical, x unwrapped (the field is wrap-periodic)
 /// — with its gradient in @p gx, @p gy. The route derivation reads it to keep
@@ -368,7 +368,7 @@ void rederive_border_sets(bake_source& s);
 /// Pure; byte-identical to the field bake_window samples.
 float hill_field(const bake_source& s, double x, double y, float& gx, float& gy);
 
-/// BL-1261: the sub-tile relief's slope at ground point (x, y) as the base
+/// BL-1291: the sub-tile relief's slope at ground point (x, y) as the base
 /// hillshade reads it — the fold field (its amplitude from @p shape_bias,
 /// @p h and @p roll, the interpolated rolling relief bias, height and roll
 /// weight there) plus the hills (times @p roll) — in shading units (a slope
@@ -390,7 +390,7 @@ inline float tilt_weight(const bake_params& p, float roll)
 float landform_roll(std::uint8_t landform);
 
 struct pixel_rect;
-/// BL-1261: the partial re-bake's tree bound for a road change. Appends the
+/// BL-1291: the partial re-bake's tree bound for a road change. Appends the
 /// pixel boxes (absolute bake pixels) of every tree of tile (@p c, @p r) — @p c
 /// unwrapped — that a change to a road whose reach band lies within
 /// [bx0, bx1] x [by0, by1] (canonical, relative to that tile's centre) could

@@ -7,7 +7,7 @@
 -- border itself." So the band is not decoration: it is the only remaining way to
 -- reach a nation, and this check is what proves the route exists.
 --
--- HARD EDGES ONLY (BL-1262, Ben 2026-10-10): the band is the inset stroke alone;
+-- HARD EDGES ONLY (BL-1292, Ben 2026-10-10): the band is the inset stroke alone;
 -- the inward wash is retired. The corridor is the stroke's, so this check is
 -- unchanged by that ruling - it asserts the stroke's corridor, never a wash.
 --
@@ -108,7 +108,7 @@ if tp.ok then
 end
 
 -- Coarse zoom: the plain political outline with untinted ground inside it (the
--- read at every rung since BL-1262); no corridor registers at coarse fill.
+-- read at every rung since BL-1292); no corridor registers at coarse fill.
 verify.center_tile(s.unit.col, s.unit.row, 1.5)
 verify.frames(4)
 verify.capture("border_04_coarse_outline")

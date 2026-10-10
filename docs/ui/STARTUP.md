@@ -2,9 +2,9 @@
 
 > **Settles:** which screens sit between launch and the first frame of play, and in
 > what order · what the main menu offers · what the player chooses in the world
-> wizard and what its globe is for · what round 6's tail builds behind its lapse (the
-> carve, the search, the settle) and what Begin itself does · how the player comes to
-> be seated on a corporation.
+> wizard and what its setup round sets · what the Life round draws · what round 6's tail builds
+> behind its lapse (the carve, the search, the settle) and what Begin itself does · how the player
+> comes to be seated on a major nation.
 > **Not here:** the in-game shell (LAYOUT) · the view play opens on (CANVASES,
 > PLANETARY) · what the generator produces (generation/*).
 > **Confused with:** MENU.md, LAYOUT.md.
@@ -31,7 +31,7 @@ watched) and then finished: the landscape search, phase 6's single validation ru
 selected landscape (GENERATION_STRATEGY.md § The eight phases, phase 6), the settle. When the
 wizard ran, all of that work happened inside its last round (§ Round 6; § Handoff), and
 `building` is only the wait Begin makes if that round's worker has not yet landed. The player
-then **picks the seat on the corporation selection canvas at Begin**. See § The seat below.
+then **picks a major nation on the nation selection screen at Begin**. See § The seat below.
 
 **Only `in_game` simulates.** On the menu the loop just pumps events and draws. The wizard
 builds the world forward, one round at a time (§ The world cache), and its last round proves
@@ -68,7 +68,16 @@ settings hub (no Load/Save on the menu; `--load` is a command-line path). Conten
 - **Bodies** — a disabled slider, fixed at 5; the count knob is phased to a
   later update. No nation knob: nation count is a consequence of landmass, not
   a target (NATION_GENERATION.md).
-- **New Game** → `open_new_world_wizard()` (commits nothing); **Quit**.
+- **New Game** → `open_new_world_wizard()` (commits nothing); **Quick Start**; **Quit**.
+- **Quick Start (Ben, 2026-10-08)** — generates the world straight through on the menu's seed and
+  resources, with no wizard rounds drawn: the cold build behind one loading bar, then the **seat
+  screen**, so the player still chooses the corporation. It is the same world the wizard builds
+  on the same settings (§ Handoff: a cold build and an adopted world open on one state hash), so
+  it is a way past the rounds, not a different game.
+
+**Every loading bar sits in a top band (Ben, 2026-10-08):** about 15% of the window's height from
+the top, horizontally centred — the cold build, the wait on a round, the settle — never at the
+window's vertical centre, so the bar stays where the eye starts and the screen below it is free.
 
 Every widget edits `m_pending_world_params` (`world_params`), which the wizard
 continues to edit and `start_new_game()` finally consumes. The Planetology
@@ -93,7 +102,7 @@ empires, the exploration age and the industrialisation — § Rounds below.
   clears the Earth-like floor, and surfaces what that cost (`resolved_world::attempts`). The
   Life round then builds the **real** Life-gate world — the star, the system, the homeworld's
   tiles with their deposits, its rivers — into the first slot of § The world cache, rebuilding
-  it when a control moves: the globe's homeworld raster packs off it, and the Culture round
+  it when a control moves: the Life round's map draws off it, and the Culture round
   takes it forward rather than building its own. `m_world` is untouched until Begin adopts the
   last slot.
 - **Rounds are causal downward.** A change on round A invalidates every round below it and
@@ -103,34 +112,22 @@ empires, the exploration age and the industrialisation — § Rounds below.
   History ledger's Chain view (BL-211, history ledger) — the plots a player
   decided a world on are the plots they can reopen mid-campaign.
 
-### The globe — and why it does not take input
+### The Life map — the globe is retired
 
-The globe is BL-256 (wizard globe). The pane's right two-thirds is the world
-itself: round 1, System, draws the **system** (star colour and size, orbits, body sizes)
-so the screen is never empty while there is no body yet; round 2, Life, draws the
-**homeworld**, from the tile raster of the Life-gate world that round builds (§ New World
-wizard). It is the primary view and the charts are the extras on top. **The globe does not
-leave with the Life round (Ben, 2026-09-24):** it holds in the pane through the Culture
-round's wait under a 2400 BCE year stamp, so the pane is never blank. **The moment the record
-lands, the map replaces it in one sharp jump (Ben, 2026-09-25):** no cross-fade, so the globe
-never covers the map a player is reading.
+**The globe is retired (Ben, 2026-10-10).** The Life round draws the homeworld as the **2D map** the
+pass rounds already use, from the tile raster of the Life-gate world that round builds (§ New World
+wizard), over the same terrain base. Round 1, System, keeps its drawing of the system — star colour
+and size, orbits, body sizes — so the pane is never empty while there is no body yet. The map is the
+primary view and the charts are the extras on top.
 
-**It spins on a clock, and it takes no mouse input. That is the design, not a
-gap** (Ben, 2026-08-10): the globe turns one revolution a minute on wall time,
-frozen to 0 under `--verify` so a golden capture never races the animation.
+**One map from Life to Begin.** The Life round's map holds through the Culture round's wait under a
+2400 BCE year stamp, so the pane is never blank, and the Culture round's record plays on the same
+map when it lands. The 2026-09-24/25 rulings that the globe holds through that wait and is replaced
+in one sharp jump are retired with the globe: there is nothing to replace.
 
-There is **no pan**, on Ben's call, for a reason worth keeping: *an uncontrollable
-globe tells the player that generation is slightly beyond their reach.* It says
-the same thing the preferences model already says — **you set conditions here,
-you do not steer** — so a draggable camera would quietly contradict the screen's
-own premise in order to add a control nobody needed. The wizard resolves leans
-against a seed; the globe should feel like something you are watching resolve,
-not something you are operating.
-
-**Render technique.** The globe is drawn as **48 meridian slices**, each
-subdivided in latitude, every cell a quad — not a per-pixel inverse projection
-into a texture. Both avoid projecting ~7,500 hexes as polygons against ImGui's
-16-bit draw indices; the slice path gets there with less machinery.
+**The map takes no steering input.** The premise the globe carried survives it: **you set
+conditions here, you do not steer** (Ben, 2026-08-10). Whether a player may pan or zoom the Life
+map to read it is open design; nothing on it is a control over the world.
 
 ## Rounds — System, Life, Culture, Empires, Exploration, Industrialisation
 
@@ -151,6 +148,14 @@ The wizard does not stop at planetology. The four lapse rounds carry the generat
 phases — [`GENERATION_STRATEGY.md`](../generation/GENERATION_STRATEGY.md) § The eight
 phases — into the same idiom the planetology rounds established: a primary view filling
 the pane, charts as the extras on top, and **preferences, not parameters**.
+
+**A SETUP ROUND PRECEDES LIFE (Ben, 2026-10-10).** Before the Life round builds the world, the
+player sets the **nation targets**: how many nations the homeworld ends with (**total**, at most 40)
+and how many of them are **majors** (1 to 6). Both are always hit
+([`NATION_GENERATION.md`](../generation/NATION_GENERATION.md) § The nation count is a target).
+They are the wizard's one sanctioned exception to *preferences, not parameters*: a count a player
+plainly wants to set, hit by in-world events rather than by fiat. What else the setup round holds,
+and where it sits against System, is open design.
 
 **INHERITANCE IS NOT A ROUND (Ben, 2026-09-09; held 2026-09-24).** The third planetology round —
 *Inheritance*, which asked what the era before you already took — is retired and is not revived:
@@ -173,9 +178,8 @@ person exists only where a role gates something, and no role gates anything in a
 realm, a people, a creed and a firm are the actors the rounds name, and a face on one would be
 decoration. **Every lapse header names the body** the round is playing on.
 
-**Round 3 — Culture.** A 2D map in the globe's place — the globe holds through this round's
-wait under a 2400 BCE year stamp and the map replaces it in one sharp jump (Ben, 2026-09-25;
-§ The globe) —
+**Round 3 — Culture.** The Life round's 2D map, holding through this round's wait under a
+2400 BCE year stamp (§ The Life map) —
 playing the peopling of an empty world: where people started, the routes they took, and the
 cultures those routes produced. Its authority is
 [`COLONISATION.md`](../generation/COLONISATION.md). The map opens on the Life-gate world the
@@ -490,9 +494,10 @@ mark; nothing else does.
 
 Each round takes a lean per axis, resolved against the seed exactly as
 `world_preferences` are (PLANETOLOGY.md § Preferences, not parameters). No raw
-generated value is editable and no outcome is targeted; the axes name a *force*, and
-GENERATION_STRATEGY.md § Asymmetry is the deliverable still forbids steering to a result. The globe's
-no-input rule holds for the same reason it always did: **you set conditions here, you
+generated value is editable, and no outcome is targeted but the two nation counts of the
+setup round (§ Rounds); the axes name a *force*, and GENERATION_STRATEGY.md § Asymmetry is the
+deliverable still forbids steering to any other result. The map takes no steering input for the
+same reason: **you set conditions here, you
 do not steer.**
 
 ### The wait, then the lapse
@@ -581,8 +586,7 @@ peoples and watches city states organise them, and the same carry runs Empires i
 and Exploration into Industrialisation. **What carries is identity, by id, not paint:** a realm
 keeps its coined name, its pinned colour slot, its shade rung and its hard-border flag from the
 round that gave it each (§ Identity across the rounds), and a 1960 nation keeps its realm's
-name and colour at Begin. The Culture round has no lapse before it: it opens on the globe, which
-cross-fades into its map (§ Round 3).
+name and colour at Begin. The Culture round has no lapse before it: it opens on the Life round's map (§ The Life map).
 
 **The pass rounds draw the ground, not only the fill (Ben, 2026-09-11).** Rivers and the
 landform relief — mountains, highlands, the barriers the walk and the campaign both price — are
@@ -712,6 +716,31 @@ hash; the round-by-round path and the single call are one calculation, and they 
 at every round boundary, not only at Begin.
 
 ## The seat
+
+**The player picks a major nation, on a nation selection screen at Begin (Ben, 2026-10-10;
+`../CONCEPT.md` § Player identity).** This overturns the corporation selection canvas below at the
+grain of the pick: the list is of **major nations**, and picking one is becoming that nation and
+operating its champion. Only majors are offered; a minor cannot be played. Majors and seats are
+one-to-one, so the screen offers exactly the major target's count of rows. **The screen is shaped for up to
+six humans, each taking one major, and seats one (Ben, 2026-10-10, NR-1025)**: multiplayer stays
+outside the prototype scope (`../tech/TECH_FOUNDATIONS.md`), so the prototype seats a single human
+and nothing in the screen's design assumes there is only one.
+
+**The nation card (Ben, 2026-10-10).** *Its question: which nation am I?* The card carries six
+things, and the screen gives the nation more room than the firm card did:
+
+- its **territory, highlighted on the map** when its row is hovered;
+- its **population and GDP**;
+- its **treasury, debt and budget weights**;
+- its **champion** — the firm card below, unchanged in content;
+- its **resource profile and deposits**;
+- its **neighbours, with stances and grudges**.
+
+The briefing's origin sentence is read at the nation's grain where it names the realm, and at the
+champion's where it names the charter. The pick stays a game act and stays reproducible from
+(seed, pick); `take_seat` names a major nation. The rest of this section is the corporation
+canvas's design as ruled, and stands wherever it does not contradict the above.
+
 
 **The player picks the seat, on a corporation selection canvas at Begin** (Ben, 2026-09-09:
 *"Begin should go directly to a 'corporation selection' interactive canvas"*; asked whether that

@@ -2665,6 +2665,10 @@ void run_tail(generation_cursor& c)
             .workforce_assigned = 0.50f,
         };
         w.stockpiles[kepler_processor] = stockpile_component{};
+        // BL-1217 D6 (Ben, 2026-10-09): the pre-authored installation keeps its
+        // default recipe whatever the want; assign_default_recipes exempts
+        // exactly this id.
+        w.authored_processor = kepler_processor;
     }
 
     // BL-132 change (3): corporations generate BEFORE markets, not after --
@@ -3419,7 +3423,7 @@ void run_tail(generation_cursor& c)
 
         int with_air = 0;
         for (const auto& b : bs)
-            if (b.state.profile.atmosphere >= atmosphere_class::moderate) ++with_air;
+            if (!atmosphere_is_airless(b.state.profile.atmosphere)) ++with_air; // the one airless rule (components.hpp)
         std::snprintf(buf, sizeof buf, "%d of %d held an atmosphere. The rest are exposed rock.",
                       with_air, static_cast<int>(bs.size()));
         report->stage_lines.emplace_back(buf);

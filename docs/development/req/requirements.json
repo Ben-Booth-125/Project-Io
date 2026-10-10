@@ -6235,13 +6235,13 @@
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: gen_step_costs --finish, 16 curated seeds, Release"
      ],
      "requirement": "Road tiles and road pass time are recorded old -> new per seed, and generate_roads runs under ~10 s Release on the library seeds (BL-1077's target, folded in).",
      "notes": "Round 2, indicative: road pass at 40,000 seed 0 10.1 s, seed 28 6.6 s, seed 46 21.7 s -- the ~10 s target is met on seed 28 only; re-read after BL-1130 thins the centres.",
-     "result_metric": ""
+     "result_metric": "QUIET-ISH RE-READ 2026-10-10 (worktree-sprint-50 tip incl. BL-1252 snap 780336a6; gen_step_costs built by build_lua_harness.sh = /O2 /MD /DNDEBUG Release; one process per seed, sequential; residual background ~30% CPU of 16 threads: a game client + one ground_bake_check thread -- a first run under another lane's full load read 2-5x slower and was discarded). generate_roads (step 10) under ~10 s on 16 of 16 (max 6.2 s, seed 31); generate_roads + stamp_history_roads (10 + 15) under 10 s on 15 of 16 (seed 31 10.6 s). Per seed, built road tiles | roads + stamp = pass s (--finish run; the --roads run agrees within ~10%): 46 5758 | 4.6+3.0=7.6; 28 1891 | 1.3+0.8=2.1; 11 6923 | 5.8+3.6=9.4; 31 6848 | 6.2+4.4=10.6; 40 3750 | 3.4+2.1=5.4; 12 3959 | 2.8+1.6=4.4; 37 5445 | 4.8+3.2=8.0; 13 5976 | 5.1+3.2=8.3; 41 4810 | 3.4+1.8=5.2; 43 3581 | 6.0+3.1=9.0; 32 4243 | 3.4+2.1=5.5; 10 4940 | 4.2+2.7=6.8; 25 6512 | 5.6+3.4=9.0; 38 3603 | 3.2+1.6=4.8; 9 3981 | 3.3+1.6=5.0; 0 4569 | 3.8+2.5=6.3. Pooled built road tiles 76,789. OLD -> NEW generate_roads (round 2 at 40,000, indicative): seed 0 10.1 -> 3.8 s, seed 28 6.6 -> 1.3 s, seed 46 21.7 -> 4.6 s; the round 2 per-seed tile table did not survive (scratchpad), so tiles old -> new is pooled only: 79,154 (stale, pre-snap) -> 75,952 (BL-1252 merge reading, road_stale_flood_probe) -> 76,789 here (gen_step_costs built-world count, a different instrument). ROUND 6 TAIL (post-era + search + settle, STARTUP.md 35 s): seed 0 7.7+10.6+1.2 = 19.6 s (29.0 s with the 9.4 s Industrialisation span); seed 28 2.9+7.4+2.0 = 12.2 s (12.6 s with span). INSIDE 35 s on both. Across the 16, tail+span exceeds 35 s on seeds 11 (39.2), 31 (43.2), 13 (37.5) -- the span and the search, not roads. The search grew since the 2026-10-03 reading (seed 0 2.6 -> 10.6 s). TOOL DEFECT seen: gen_step_costs --roads REPLAY CHECK now DIVERGES on 16 of 16 (3-358 tiles), so its replay-row tiles/times no longer measure the built pass; these readings use the build's own step times and built count."
     },
     {
      "id": "R5",
@@ -6256,13 +6256,13 @@
     },
     {
      "id": "R6",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: haulage_measure against the 1055/802 baseline"
      ],
      "requirement": "Trade is read before and after, since goldens cannot see it: convoy traffic and far-trade on the library seeds, old -> new.",
      "notes": "",
-     "result_metric": ""
+     "result_metric": "ISOLATED 2026-10-10, BL-1252 snap on vs off (g_road_probe_no_snap; haulage_measure gained a verify-only --no-snap switch), worktree-sprint-50 tip. Scope: the snap only -- the pre-tree lattice has no switch, so BL-1119's own tree change is not isolable here. haulage_measure --far-trade, 16 curated seeds, one seed per process, window E (first play year) / Y (year 2); convoys dispatched, units delivered, off -> on: 46 E 636/2728 -> 579/2489, Y 642/2562 -> 670/2262; 28 E 338/1847 -> 329/1843, Y 352/1788 -> 369/1760; 11 E 451/2304 -> 431/2326, Y 435/1927 -> 427/1764; 31 E 497/2642 -> 502/2793, Y 523/3383 -> 522/3384; 40 E 484/2204 -> 451/2247, Y 494/2199 -> 486/2349; 12 E 333/1657 -> 338/1643, Y 365/1662 -> 352/1750; 37 E 387/1975 -> 390/1878, Y 386/1893 -> 400/1858; 13 E 421/1658 -> 477/1877, Y 487/1589 -> 480/1933; 41 E 613/2273 -> 564/2303, Y 585/2430 -> 559/2581; 43 E 265/1362 -> 336/1480, Y 270/1409 -> 352/1514; 32 E 514/1904 -> 477/1846, Y 484/1863 -> 473/1668; 10 E 551/2782 -> 554/3156, Y 538/3048 -> 559/3303; 25 E 703/3635 -> 730/3620, Y 680/3561 -> 676/3239; 38 E 476/1970 -> 462/1958, Y 467/2014 -> 454/2096; 9 E 432/1926 -> 456/1826, Y 431/1804 -> 440/1811; 0 E 464/2711 -> 473/2812, Y 589/1896 -> 455/1984. POOLED E 7,565 conv / 35,575 u (sold at destination 35,442) -> 7,549 / 36,095 (35,982): -0.2% convoys, +1.5% units. POOLED Y 7,728 / 35,028 (34,912) -> 7,674 / 35,255 (35,161): -0.7%, +0.6%. 0 failures every run. Per-seed swings to +/-25% (seed 43 +27% convoys; seed 0 Y -23%) are the start cascade BL-1252 already named (market folds read the road field), not dearer hauls. BASELINE FORM (haulage_measure 5 20, seeds 0-4, no pre-history): 2,378 all / 2,378 intra-body market->market off -> 2,360 / 2,360 on (-0.8%); nearest-market haul p10/median/p90 identical. The 1055/802 baseline is no longer a like-for-like comparator: since per-market pools every dispatch is market->market, so all == intra-body; today reads 2.2x / 2.9x it. No collapse: trade holds."
     },
     {
      "id": "R7",
@@ -6706,7 +6706,7 @@
      "verification": [
       "headless: market-viability skill, 16 curated seeds, after the re-bless"
      ],
-     "requirement": "G1 >= 70% of built processors running at handoff, pooled; G2 and G3 still pass. The cause is fixed in the network or dispatch, never by clamping the loss reflex.",
+     "requirement": "G1 >= 85% of built processors running at handoff and G1b <= 5% input-starved (now, or decommissioned after starving), pooled over 16 seeds; G2 and G3 still pass (targets: Ben, 2026-10-08; was G1 >= 70%). G1 at play tick 50 is reported, not gated: long-term viability deferred (Ben, 2026-10-09) to BL-1248 (plants survive to t50). The cause is fixed in the network, dispatch or placement, never by clamping the loss reflex.",
      "notes": "",
      "result_metric": ""
     }
@@ -6720,7 +6720,7 @@
    "evaluated_difficulty": null,
    "status": "in-flight",
    "promoted_from": "backlog.json BL-1222 - sprint 50 (Ben's cut form and lens form, 2026-10-07)",
-   "batch": "sprint-50",
+   "batch": "sprint-51",
    "resolved": null,
    "resolution": null,
    "rows": [
@@ -6746,12 +6746,12 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "deferred",
      "verification": [
       "live click: Ben cycles to the lens in the built app and hovers an arrow and a marker"
      ],
      "requirement": "The lens is reachable by the keyboard lens-cycle; hovering an arrow shows good, units and landed price; hovering a marker lists the classes by good.",
-     "notes": "Owed: Ben's live click.",
+     "notes": "Ben, 2026-10-07 live walk: could not find what he was looking for; moved to sprint 51 with BL-1222.",
      "result_metric": ""
     },
     {

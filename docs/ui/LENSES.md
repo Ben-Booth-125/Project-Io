@@ -342,10 +342,8 @@ they admit and in one default:
 A player who has learned to read one lens has learned to read the other, and the pair
 can be flipped between to compare.
 
-**Keyboard-cycle only for now.** It carries no distinct glyph yet and borrows the
-corporation mark, which is why it stays off the on-screen strip: an on-screen
-lens carries one distinct glyph, and Corp would be its immediate neighbour. It
-earns a strip slot when it earns a mark.
+**Glyph / access.** On the Planetary strip beside Corporation, with its own glyph
+distinct from the corporation mark (§ The strip rotates with the rung).
 
 ---
 
@@ -541,7 +539,7 @@ not a fixed set. Owned by BL-670 (rung-keyed lens strip).
 
 | Rung | On the strip |
 |---|---|
-| **Planetary** | Corporation, Company, Resource, Market, Scarcity, Industry, Population, Continent, Throughput |
+| **Planetary** | Corporation, Company, Resource, Market, Scarcity, Industry, Population, Continent, Throughput, Trade flow |
 | **Circumplanetary** | Market, Scarcity, Supply |
 | **Solar** | Supply, Reach, Supply-routes |
 
@@ -552,8 +550,10 @@ six of the twelve built lenses reachable only by the `L` / `Shift+L` cycle that 
 mentions. The keyboard cycle still reaches every lens from every rung; the strip is the discovery
 surface, not the only door.
 
-**Adding a lens means adding it to a rung row.** A lens named in no row is keyboard-only, which is
-a decision rather than an oversight only if it is written down.
+**Every lens has a glyph on the strip (Ben, 2026-10-07).** Each built lens sits in at least one
+rung row, and each carries its **own** glyph: no lens borrows another lens's mark, and no lens is
+keyboard-only. Adding a lens means adding it to a rung row and giving it a glyph in
+`src/ui/icons.*`, catalogued in ICONS.md.
 
 **Three lenses draw a value field, not a region**, and are therefore read-only surfaces: Population
 (per-tile habitability), Industry (per-tile substrate throughput) and Throughput (the reach-cost
@@ -715,9 +715,8 @@ lens; nation borders are not what this lens asks.
 
 ## Scarcity lens
 
-**Off the on-screen bar.** The minimap bar holds eight glyphs; Scarcity is reached by
-**keyboard lens-cycle only**. The `overlay_mode::scarcity` render pass fires when selected by
-keyboard exactly as a bar lens would.
+**Glyph / access.** On the Planetary and Circumplanetary strips (§ The strip rotates with the
+rung), and in the keyboard lens-cycle.
 
 **Intent.** The inverse of the Resource lens: read the map as an *absence surface* — where a chosen
 good is **scarce or absent**, so the player sees gaps rather than concentrations. Answers "where is
@@ -753,8 +752,8 @@ so market supply/demand populate before capture. Verified by `scripts/verify/sca
 
 ## Industry lens
 
-**Off the on-screen bar.** Like Scarcity, Industry is reached by **keyboard lens-cycle only**;
-the `overlay_mode::industry` render pass is unaffected by its absence from the bar.
+**Glyph / access.** On the Planetary strip (§ The strip rotates with the rung), and in the
+keyboard lens-cycle.
 
 **Intent.** Read the map as a *rival-plant surface*: where the industry the player did **not**
 build already stands — distinct from where people live (the population-centre markers) and from
@@ -880,8 +879,8 @@ read `palette::activity_known` green; gone-cold routes grey
 (`activity_stale`) — the activity-fog convention. No tile re-skin. The
 body-marker glow belongs on the **Solar** canvas (rung table).
 
-**Glyph / access.** Reuses `icons::convoy` (a dedicated glyph is an open TODO in
-`ui::icons`); not on the strip — keyboard lens-cycle only.
+**Glyph / access.** On the Solar strip with its own glyph, distinct from the convoy
+chevron (§ The strip rotates with the rung).
 
 **Key.** The shared `draw_scroll_list_key` chrome, headed "Reach (your trade
 network)"; an unrouted body honestly says "no routes from this body".
@@ -900,8 +899,8 @@ row per lane touching the active body, a **log-scaled thickness bar** from
 saturates rather than dominating linearly), recency-tier colour shared with
 Reach. The Solar-canvas graph is the lens's inter-body representation (rung table).
 
-**Glyph / access.** Reuses `icons::supply`; off the strip, reached by the
-keyboard lens-cycle.
+**Glyph / access.** On the Solar strip with its own glyph, distinct from Supply's
+two lines, its strip neighbour (§ The strip rotates with the rung).
 
 ## Trade-flow lens
 
@@ -910,7 +909,10 @@ shows convoys in flight and Supply-routes the lanes they carved; Trade-flow show
 **decision** behind them — what the player's dispatcher sent this pass, to where, at what
 landed price, and what it refused. Owned by BL-1222 (trade-flow lens). Ruled by Ben
 (2026-10-07, the lens form): a player lens over the player's own flows; the whole-world
-diagnosis stays headless (the market-viability skill's logistics row).
+diagnosis stays headless (the market-viability skill's logistics row). **The player sees unmet
+want (Ben, 2026-10-08, the chain-start form):** the inputs a market's processors want and cannot
+get are shown to the player, on the market ledger or on this lens — which surface is open, and is
+asked of the player's question first. Owner: BL-1222 (trade-flow lens).
 
 **Visibility.** The player's own flows only (DISCOVERY.md § Competitor visibility). A market
 being short of a good is a public market signal; the refusal is a fact about the player's own
@@ -952,8 +954,8 @@ game shows the lens from its first pass on.
 **Legend.** A class key (colour → class) and a flow-width key (units per tick), in the
 shared legend home.
 
-**Glyph / access.** Off the strip, reached by the keyboard lens-cycle. A strip slot and a
-dedicated glyph are not part of this design.
+**Glyph / access.** On the Planetary strip with its own glyph (§ The strip rotates with the
+rung), and in the keyboard lens-cycle.
 
 ## Throughput lens
 
@@ -1035,8 +1037,7 @@ anchor ring follows the **marker** convention rather than the road-span one: the
 survey mask owns it, the vision fog does not dim it — an anchor is a city or a
 completed port, as public as the building glyph beside it.
 
-**Glyph / access.** Off the strip, keyboard lens-cycle only; reuses
-`icons::convoy` on the same terms Reach does, the lens it extends.
+**Glyph / access.** On the Planetary strip with its own glyph (`icons::throughput`).
 
 **Legend.** A fixed-height gradient key (§ Legend placement) on the **foreground**
 draw list with an opaque fill, so it is readable over the Selection band. It

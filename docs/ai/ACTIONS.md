@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*161 entries — 28 gameplay · 25 canvas · 19 lens · 54 ledger · 35 chrome.*
+*162 entries — 28 gameplay · 25 canvas · 19 lens · 54 ledger · 36 chrome.*
 
 ---
 
@@ -66,6 +66,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 - The BL-615 stratum gate accepts the SPECIFIC named building's authored placement_gate (POPULATION.md § Strata gate buildings): schooling must stand ON a population-centre tile (needs_centre otherwise), a university on a centre of stratum City (4)+ (centre_too_small below it), and a heavy processor recipe (the steel-mill class: steel, steel_from_iron_nickel, steel_bessemer) within 6 grid steps of some centre (far_from_centre beyond). All three surface as rejected_placement through the seam; the reason codes are distinct at the placement layer.
 - The building type is UNLOCKED for the acting corporation (BL-344), AND, if a recipe is stated, that RECIPE is separately unlocked (BL-588). Two independent tech locks, shown two different ways. One building type is gated: military_base requires E0-ML-01 "Standing Garrison Doctrine" (2 extraction sites + Cr 2,000 balance) -- a locked STRUCTURE still appears as a row, showing "Locked - the technology that permits this has not been researched" in place of the Build button. Recipe-level gates (BL-588/BL-589) work differently: refined_copper requires E0-EC-03 (1 processing facility + Cr 400), the Toolmaker requires E0-EC-01 (1 processing facility + Cr 500), the Bessemer Converter requires E1-EC-01 (holding machinery in stockpile) -- a tech-locked RECIPE is filtered OUT of the ledger entirely (BL-593, 2026-08-24, Ben's ruling: "the door not showing what the gate would refuse", the same treatment era_locked already had), so it never appears as a row at all, locked or otherwise. Either way construct_building refuses with tech_locked, which the corp-command seam reports as rejected_tech_locked -- an agent driving construct_building/corp_command directly (rather than reading rows off the ledger) sees the SAME refusal code for both, since the door's filtering is a UI convenience, not a second gate.
 - The corporation's balance covers the full capex: registry build_cost plus the material costs priced at the tile's local market, times the tile's site multiplier (landform x reach x stack, rounded to whole ticks — a hard site draws more; PRODUCTION.md § Construction site time) (rejected_funds). The UI shows this one credit total and disables Build with 'Can't afford' when short.
+- A processing recipe — stated, or the default a recipe-less processor is seeded with — must run on the tile body's air (Ben, 2026-10-09; PRODUCTION.md § Chemical Plant): propellant_electrolysis only on an airless body (atmosphere none or thin), propellant_atmospheric only on a body with an atmosphere (rejected_wrong_air otherwise; construction_result::wrong_air). The ledger never offers a row this refuses.
 
 **Expected output.** The press enqueues a construction request; the app's mutable pass executes construct_building the same frame. On success a building entity exists immediately — staffed at 50% workforce (0 for a port), a processing facility seeded with the pressed row's recipe — and the capex is debited up front. Construction is then DURATIVE and material-gated: each economy tick (one quarter) it advances at a rate in [0,1] set by how much of its per-tick material need the local market can supply; scarce materials stretch the ETA and total shortage shows 'Paused - market can't supply materials'. Management controls unlock only when construction completes. A rejected attempt mutates nothing; the reason string appears at the top of the ledger (construction.last_message), and invalid rows already show reason-coded text in place of the Build button ('Cannot build on water', 'A port must sit on the coast', ...).
 
@@ -185,11 +186,11 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 (BL-386 landed 2026-08-14: the floor is now a genuine reservation price. The self-contradiction this entry used to carry — max() paid vs "nothing sells" — is resolved in favour of the second half.)
 
-Side effect: the (corp, body, resource) triple leaves the automatic surplus-selling path — the auto path yields to the standing order, which by default covers the same surplus — so a too-high floor stops that resource selling AT ALL on that body and the stock will pile up, and a cap holds back everything past it. Orders append, so position in the book is time priority; a rejected command mutates nothing.
+Side effect: at home, the (corp, body, resource) triple leaves the automatic surplus-selling path — the auto path yields to the standing order, which by default covers the same surplus. AN ORDER IS A FLOOR, NOT A HOLD (BL-1229, steel stays home): the floor refuses every home sale below its price, and auto-dispatch never chooses a haul that nets below it (the cargo then sells at the destination at that market's price, and a manual convoy is not floor-gated), but the goods still travel — auto-dispatch hauls the ordered surplus to another market whenever the haul nets more than the floor by the dispatch margin (the floor stands in for the home price where it is the higher), and sizes the haul so the destination lands no lower than floor + haul. A too-high floor therefore stops the resource selling at home and stops any haul that cannot beat it; stock no market will take at the floor stays in the pool. A cap limits only how much is LISTED at home per tick, not what may be hauled. A pool that dispatch hauled from this tick is NOT empty for the 4-tick auto-close, so an order stays alive while its goods are travelling. Orders append, so position in the book is time priority; a rejected command mutates nothing.
 
 THROUGHPUT: an uncapped order at floor 0 sells what auto-surplus would have sold — the trap a capped order used to spring by default (a player once measured 2,557,231 credits against 9,613,476 with no order, 15 million units piled behind a frozen quantity) is gone unless you set a cap. A second order on the same triple sells only what the first leaves, because time priority gives the first one the surplus first. Also: the response does NOT return the order's id, which `remove_sell_order` requires (BL-390).
 
-**Reason to select.** Price control the auto-sell path lacks: floor-protect against dumping stock into a crashed price, and optionally cap how much sells per quarter to hold surplus back for a better market. An order only ever sells SURPLUS — stock above what the corp's own processors reserve for their next run — so it cannot ration or starve the corp's own inputs; those are never offered. The manual side of the trade loop — the press when 'sell everything at whatever it fetches' is the wrong answer. The rival-corp scorer reaches for it on exactly one signal: stock past a hold threshold, listed at a floor over the rarity price.
+**Reason to select.** Price control the auto-sell path lacks: floor-protect against dumping stock into a crashed price — at home and on every haul — and optionally cap how much is listed at home per quarter. The order does not hold goods back from a better market: surplus still travels by auto-dispatch whenever a haul nets more than the floor. An order only ever sells SURPLUS — stock above what the corp's own processors reserve for their next run — so it cannot ration or starve the corp's own inputs; those are never offered. The manual side of the trade loop — the press when 'sell everything at whatever it fetches' is the wrong answer. The rival-corp scorer reaches for it on exactly one signal: stock past a hold threshold, listed at a floor over the rarity price.
 
 ### `gameplay.remove_sell_order` — The 'x' button at the end of each row in the 'My trades' section of the Market Ledger's Trades tab; also a corp_verb, issuable directly. The tab was called 'Sell Orders' and the button 'Remove' until the tab widened to hold four reads.
 
@@ -264,8 +265,9 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 - The recipe is valid for the building's type, and in the ACTIVE recipe's own group - a cross-group retool is refused outright, so it is never offered (rejected_invalid otherwise).
 - Construction is complete - the ledger draws 'Under construction.' instead of the levers while ticks_remaining > 0.
 - The building is a processing facility (nothing else has a method to choose; the section draws nothing for other types).
+- The recipe runs on the building's body's air (Ben, 2026-10-09; PRODUCTION.md § Chemical Plant): propellant_electrolysis only on an airless body, propellant_atmospheric only on a body with an atmosphere (rejected_wrong_air otherwise; try_switch_recipe returns wrong_air). The Method grid never offers a wrong-air row.
 
-**Expected output.** On success, an immediate component write gated by economy.recipe_switch (BL-430): a one-off credit cost debited from the corp and a cooldown before the SAME building may switch again through this seam (both configurable, default free/instant). From the next economy tick the building consumes the new recipe's inputs and produces its outputs; its profit readout, its input demand on the local market, and what it contributes to the pool all change with it. Re-selecting the recipe already active, switching on cooldown, or switching without enough credit all reject (rejected_state / on_cooldown / insufficient_funds at the command seam) and change nothing.
+**Expected output.** On success, an immediate component write gated by economy.recipe_switch (BL-430): a one-off credit cost debited from the corp and a cooldown before the SAME building may switch again through this seam (both configurable, default free/instant). From the next economy tick the building consumes the new recipe's inputs and produces its outputs; its profit readout, its input demand on the local market, and what it contributes to the pool all change with it. Re-selecting the recipe already active, switching on cooldown, or switching without enough credit all reject (rejected_state / on_cooldown / insufficient_funds at the command seam) and change nothing. A Switch press the seam still refuses (funds, tech, cooldown) is said in a status line under the grid rather than discarded.
 
 **Reason to select.** The first lever on a processor's profitability, free of capex: per-recipe margins genuinely diverge with local prices (steel can lose money on a tile where food rations clear well), so switching chases the better-clearing output with the plant already paid for. Every new processor defaults to the steel recipe, so this is typically the first press after building one.
 
@@ -910,18 +912,18 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 ### `lens.clear` — Minimap lens bar — the glyph of whichever lens is currently active (shown highlighted)
 
-**Press.** Single left-click on the currently-active (highlighted) lens glyph. This is the family's one toggle behaviour, stated here once: the bar is single-select with a null state, so re-selecting the active lens clears to no-lens (overlay_mode::none). Each bar-lens entry references this. Off-bar lenses have no glyph to re-click; they are cleared via the keyboard cycle or the clear hotkey (controls family).
+**Press.** Single left-click on the currently-active (highlighted) lens glyph. This is the family's one toggle behaviour, stated here once: the strip is single-select with a null state, so re-selecting the active lens clears to no-lens (overlay_mode::none). Each lens entry references this. A lens armed by the keyboard cycle while its glyph is not on the current rung's strip is cleared via the cycle or the clear hotkey (controls family).
 
 **Valid when:**
 - A bar lens must currently be active — with no lens active there is no highlighted glyph and this press does not exist.
 - Selecting a different lens is an ordinary switch, not a clear; only re-clicking the active one clears.
-- The bar carries six glyphs — Corporation, Country, Resource, Market, Population, Continent. Opportunity and Production were bar lenses until BL-604 retired both; a press on either no longer exists, and neither is reachable by the keyboard cycle.
+- Every built lens has a glyph on at least one rung's strip (Ben, 2026-10-07). The minimap lens strip is keyed on the canvas rung (LENSES.md § The strip rotates with the rung): Planetary carries Corporation, Company, Resource, Market, Scarcity, Industry, Population, Continent, Throughput, Trade flow; Circumplanetary Market, Scarcity, Supply; Solar Supply, Reach, Supply-routes. Opportunity, Production and Country were strip lenses until retired; a press on any of them no longer exists.
 
 **Expected output.** The canvas returns to plain terrain (overlay_mode::none) — the state the campaign opens in. All lens tints, marks, and keys disappear. Always-on chrome survives, now at FULL strength rather than the 0.45 a lens attenuates it to (BL-520): the substrate grain and cover pattern that texture the ground, the player-identity tile wash and outline (the home-cluster ring), selection outlines, and unit markers are not lens-dependent. No HQ star and no market-centre marker draw on this canvas (Ben, 2026-10-10: 'We should remove the HQ glyph and market center glyphs'). Pointer clicks revert to resolving the lowest drawn entity (marker, else tile), routing to the Tile Ledger.
 
 **Reason to select.** Return to the unskinned terrain read — when the current lens's tint is obscuring terrain, markers, or colours you need, or when a plain click should select the thing under the pointer rather than the lens's unit of meaning.
 
-### `lens.continent` — Minimap lens bar, slot 6 (the two-interlocking-plates-split-by-a-diagonal-seam glyph)
+### `lens.continent` — Minimap lens bar, Planetary rung, slot 8 (the two-interlocking-plates-split-by-a-diagonal-seam glyph)
 
 **Press.** Single left-click on the Continent glyph in the lens bar.
 
@@ -934,13 +936,13 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Why is the land shaped like that? Shows the plates that drifted the terrain into place, and above all where they meet — the seams the mountain ranges, rifts, and boundary-formed deposits came from. Honestly informational/orientational: it explains the map rather than driving an economic decision.
 
-### `lens.company` — Keyboard lens cycle only — no lens-bar slot yet (it has no distinct glyph; see BL-663).
+### `lens.company` — Minimap lens strip, Planetary rung, slot 2 — the briefcase glyph (icons::company), beside Corporation's seal-square.
 
-**Press.** Cycle the lens with the lens-cycle key until Company is active.
+**Press.** Single left-click on the Company (briefcase) glyph in the lens strip, or cycle with L / Shift+L until Company is active.
 
 **Valid when:**
-- The app is in-game on a body surface; like every lens it only re-skins the Planetary canvas.
-- If Company is already the active lens, cycling past it clears it (see lens.clear).
+- The app is in-game on a body surface; like every lens it only re-skins the Planetary canvas, and its glyph is on the Planetary strip only.
+- Re-clicking while active clears the lens (see lens.clear); the keyboard cycle (L / Shift+L) also reaches it from any rung.
 
 **Expected output.** On the Planetary canvas, every tile holding a BACKGROUND FIRM's building is filled by its owner, drawn identically to lens.corporation and admitting the opposite population: a corporation is the player and its rivals, a company is a background firm (GLOSSARY.md, Ben 2026-08-28). The two lenses are disjoint — no firm appears under both. The fill follows the lens's own PICKED SET (BL-1240): a picked firm's tiles take its identity colour; an unpicked firm's tiles take the owned-grey. No seat draws an HQ marker (Ben, 2026-10-10: 'We should remove the HQ glyph and market center glyphs'). The set DEFAULTS TO EMPTY (the player owns no company), so the lens opens with every firm's ground in grey — which already answers 'where do background firms operate' — and the player picks the firms to name with lens.owner_toggle or lens.owner_shift_pick. Its set is separate from the Corporation lens's, so flipping between the two keeps each one's picks. The key is the owner checklist ('Companies (n picked)', search box, a row per firm holding ground on the active body). Measured on the home body at generation: 373 background-firm buildings across 80 companies, against 33 rival buildings across 7 corporations, so this lens is much the busier of the pair. National borders are NOT drawn while any lens is active (2026-08-28).
 
@@ -1012,14 +1014,13 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Change the question's subject without changing the question: which good is this market pricing high, what is each market short of — by flipping the good while the lens holds.
 
-### `lens.industry` — Off the lens bar (trimmed in BL-093 the day it shipped); the factory-silhouette glyph exists but is not on the strip
+### `lens.industry` — Minimap lens strip, Planetary rung, slot 6 — the factory-silhouette glyph (icons::industry).
 
-**Press.** No bar press — reachable only via the keyboard lens-cycle (controls family owns the hotkeys).
+**Press.** Single left-click on the Industry glyph in the lens strip, or cycle with L / Shift+L.
 
 **Valid when:**
-- Only reachable by keyboard cycle.
 - Planetary-only. The field is read from the economy report, so at least one economy tick must have run before the tint has anything to show.
-- Cleared by cycling off it or the clear hotkey, not by a bar re-click.
+- Re-clicking while active clears the lens (see lens.clear); the keyboard cycle (L / Shift+L) also reaches it from any rung.
 
 **Expected output.** A sequential dark-to-amber tint over the tiles carrying buildings owned by BACKGROUND corporations (corporation_component.is_background). Per tile the value is the sum over those buildings of (0.5 + 0.5 x output share), where output share is that building's output this tick normalised to the largest background output on the body — so an idle or under-construction background plant still reads, a high-output one reads brightest, and two buildings on one tile stack. Normalised to the body maximum. Tiles with no background building keep plain terrain. Low-to-high amber gradient key titled 'Background industry'. Pure rendering — it changes nothing in the market arithmetic. Pointer clicks fall through to the tile (Tile Ledger); there is no dedicated ledger route. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour. National borders are NOT drawn while any lens is active (2026-08-28) — the inset border stroke is suppressed, and the border's click corridor goes with it. The plain canvas is the only place the national read appears.
 
@@ -1038,7 +1039,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Read the lens's colour code by name — which nation is which tint, which market is which catchment, which bodies your lanes reach. The collapsed header already reports how many rows are hiding, so open it when the count itself is not the answer you wanted.
 
-### `lens.market` — Minimap lens bar, slot 4 (the three-ascending-vertical-bars glyph)
+### `lens.market` — Minimap lens bar, Planetary rung slot 4, Circumplanetary rung slot 1 (the three-ascending-vertical-bars glyph)
 
 **Press.** Single left-click on the Market glyph in the lens bar.
 
@@ -1055,7 +1056,7 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Which market does a tile clear against, and where do market boundaries fall? Decide which catchment to build in (your output sells to the nearest centre) and read per-body prices on the Circumplanetary rung to pick where a good is dear enough to sell.
 
-### `lens.population` — Minimap lens bar, slot 5 (the small figure glyph: round head over tapered torso)
+### `lens.population` — Minimap lens bar, Planetary rung, slot 7 (the small figure glyph: round head over tapered torso)
 
 **Press.** Single left-click on the Population glyph in the lens bar.
 
@@ -1067,15 +1068,14 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Where does labour run at full efficiency? Site buildings where the marks read green (habitability >= 0.6 = full workforce), because the same wages buy less output on the red end. The siting complement to Resource's material read.
 
-### `lens.reach` — Off the lens bar; currently reuses the convoy glyph (a dedicated glyph is an open TODO)
+### `lens.reach` — Minimap lens strip, Solar rung, slot 2 — the broadcast glyph (icons::reach): a source dot with two arcs widening up and right.
 
-**Press.** No bar press — reachable only via the keyboard lens-cycle (controls family owns the hotkeys).
+**Press.** Single left-click on the Reach glyph in the lens strip, or cycle with L / Shift+L.
 
 **Valid when:**
-- Only reachable by keyboard cycle.
-- Planetary key today; the specified Solar connected-body glow is owed.
+- Planetary key today; the specified Solar connected-body glow is owed. Its glyph is on the Solar strip.
 - Shows the player's own trade routes only (competitor-visibility rule — rival lanes stay private).
-- Cleared by cycling off it or the clear hotkey.
+- Re-clicking while active clears the lens (see lens.clear); the keyboard cycle (L / Shift+L) also reaches it from any rung.
 
 **Expected output.** No tile re-skin. A connection-list key headed 'Reach (your trade network)' opens upward out of the minimap's header at top right (the lens chrome region), collapsed by default: one row per body the active body is routed to, name plus a recency dot — fresh routes green, gone-cold routes grey (the activity-fog colour convention). An unrouted body honestly reads 'no routes from this body'. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour. National borders are NOT drawn while any lens is active (2026-08-28) — the inset border stroke is suppressed, and the border's click corridor goes with it. The plain canvas is the only place the national read appears.
 
@@ -1115,74 +1115,71 @@ USE IT AS A PROBE, NOT AS A QUOTE. You cannot shop: the response carries no pric
 
 **Reason to select.** Compare or overlay deposits: see where two inputs to one recipe sit together, or narrow the map back to one good, without leaving the lens.
 
-### `lens.scarcity` — Off the lens bar; the hollow downward-triangle glyph exists but is not on the strip. Reached by the keyboard lens-cycle only — an off-strip status that is a width call, never a data gate.
+### `lens.scarcity` — Minimap lens strip — Planetary rung slot 5 and Circumplanetary rung slot 2 — the hollow downward-triangle glyph (icons::scarcity).
 
-**Press.** No bar press — reachable only via the keyboard lens-cycle (L / Shift+L; those hotkeys are catalogued in the controls family, not here).
+**Press.** Single left-click on the Scarcity glyph in the lens strip, or cycle with L / Shift+L (those hotkeys are catalogued in the controls family).
 
 | Arg | Type | Meaning |
 |---|---|---|
 | `resource` | `resource name (optional)` | The good whose shortfall is shown — scarcity of what? Set via the shared good selector (lens.good_selector), which appears in the on-canvas legend once the lens is active. |
 
 **Valid when:**
-- Only reachable by keyboard cycle — there is no glyph to click.
-- Planetary-only. The economy must have ticked so market supply/demand arrays are populated.
-- Cleared by cycling off it or pressing the clear hotkey (controls family), not by a bar re-click.
+- Planetary per-market shortfall blocks; Circumplanetary per-body shortfall badge. The economy must have ticked so market supply/demand arrays are populated.
+- Re-clicking while active clears the lens (see lens.clear); the keyboard cycle (L / Shift+L) also reaches it from any rung.
 
 **Expected output.** A market-level field, not per-tile: every tile in a market's catchment reads as one solid block, composited toward a hot red hue at opacity proportional to that market's supply shortfall of the selected good (max(0, demand - supply), normalised to the body's worst market). A met market keeps plain terrain; a short one reads hot. With one market per body the whole body is a single block — honest to the market structure. Abundant-to-scarce key plus the selected resource's swatch and the shared selector. A press on a catchment selects its MARKET and opens the Market ledger aimed at it (BL-664, one tier under a lens; markers take no part) - this is how a market is selected from the map, since the plain canvas carries no market-centre glyph or hit zone (Ben, 2026-10-10: 'We should remove the HQ glyph and market center glyphs'). Ground in no catchment answers nothing. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour. BEING RE-MADE (BL-662, Ben 2026-08-28): the lens keeps the name Scarcity, is re-cut to tint MARKETS, takes the retired Opportunity lens's glyph, and will route to a new Market-ledger sub-view. Not yet built — today it still draws per-market shortfall blocks. National borders are NOT drawn while any lens is active (2026-08-28) — the inset border stroke is suppressed, and the border's click corridor goes with it. The plain canvas is the only place the national read appears.
 
 **Reason to select.** Where did demand outrun supply for a chosen good last tick? The inverse of the Resource lens — gaps, not concentrations. Pick a good you can produce and find the hot markets: that is where to sell into or build supply for.
 
-### `lens.supply` — Off the lens bar; the two-parallel-horizontal-lines convoy glyph exists but is not on the strip
+### `lens.supply` — Minimap lens strip — Solar rung slot 1 and Circumplanetary rung slot 3 — the two-parallel-lines glyph (icons::supply).
 
-**Press.** No bar press — reachable only via the keyboard lens-cycle (controls family owns the hotkeys).
+**Press.** Single left-click on the Supply glyph in the lens strip, or cycle with L / Shift+L.
 
 **Valid when:**
-- Only reachable by keyboard cycle.
-- The one genuinely multi-rung lens: surfaces on all three canvases.
+- The one genuinely multi-rung lens: surfaces on all three canvases (its glyph sits on the Solar and Circumplanetary strips).
 - Shows player convoys only; nothing renders if no player convoy is in transit.
-- Cleared by cycling off it or the clear hotkey.
+- Re-clicking while active clears the lens (see lens.clear); the keyboard cycle (L / Shift+L) also reaches it from any rung.
 
 **Expected output.** Solar: a route line per player convoy currently in transit between bodies. Circumplanetary: a convoy-count badge beside each body's label. Planetary: a convoy glyph on the active body's tiles while a player convoy touches them. Lines and badges use a single neutral logistics hue — flow, not ownership. Tiles are not re-tinted; supply annotates, it does not re-skin terrain. The throughput scale-key is still owed. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour. National borders are NOT drawn while any lens is active (2026-08-28) — the inset border stroke is suppressed, and the border's click corridor goes with it. The plain canvas is the only place the national read appears.
 
 **Reason to select.** Where are my goods moving right now? Verify dispatched convoys are actually in flight and see the live shape of your logistics — the in-motion read; the standing lanes they carve belong to the Supply-routes lens.
 
-### `lens.supply_routes` — Off the lens bar; reuses the supply glyph
+### `lens.supply_routes` — Minimap lens strip, Solar rung, slot 3 — the lane-graph glyph (icons::supply_routes): three nodes joined by edges of unequal weight.
 
-**Press.** Cycle lenses with L (forward) / Shift+L (backward) until Supply-routes is active — it is the last mode in the cycle. No lens-bar slot.
+**Press.** Single left-click on the Supply-routes glyph in the lens strip, or cycle with L / Shift+L.
 
 **Valid when:**
-- In-game on a canvas (the lens-cycle keys are live).
-- Off the bar: reachable only via the keyboard lens cycle. (A 2026-07-31 doc note claimed the cycle could not reach this lens; that was stale — canvas_command.cpp anchors overlay_mode_count to supply_routes+1 with a static_assert, so the cycle covers all 14 modes.)
-- Planetary key only (the specified Solar aggregated-graph render is owed); player routes only.
+- In-game on a canvas.
+- Planetary key only (the specified Solar aggregated-graph render is owed); player routes only. Its glyph is on the Solar strip.
+- Re-clicking while active clears the lens (see lens.clear); the keyboard cycle (L / Shift+L) also reaches it from any rung.
 
 **Expected output.** No tile re-skin. A lane-list key: one row per standing trade lane touching the active body (one entry per body pair), with a log-scaled thickness bar from that lane's cumulative convoy count (a single completion reads as a thin sliver; heavy repeat traffic saturates rather than growing linearly) and the same recency-tier colouring as Reach. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour. National borders are NOT drawn while any lens is active (2026-08-28) — the inset border stroke is suppressed, and the border's click corridor goes with it. The plain canvas is the only place the national read appears.
 
 **Reason to select.** Which standing lanes carry my economy, and how heavily? The aggregate counterpart to Supply's in-flight convoys: the carved trade lanes and their traffic weight, for judging which routes are load-bearing and which are vestigial.
 
-### `lens.throughput` — Lens strip slot 6, on the minimap (draw_overlay_controls, src/ui/overlay.cpp). Its glyph is a TRUCK in profile (icons::throughput) — its own mark since BL-605, no longer the borrowed convoy chevron, because an on-screen lens carries one distinct glyph.
+### `lens.throughput` — Minimap lens strip, Planetary rung, slot 9 (draw_overlay_controls, src/ui/overlay.cpp). Its glyph is a TRUCK in profile (icons::throughput).
 
 **Press.** Click the truck glyph on the lens strip, or cycle with L / Shift+L (Trade-flow is the LAST lens in the family, so one Shift+L from no lens lands on Trade-flow, not Throughput). Re-clicking the active glyph clears to overlay_mode::none, per the strip toggle rule. Planetary rung only.
 
 **Valid when:**
-- Only reachable by keyboard cycle.
 - Planetary only. Needs the body's logistics reach field, which the app warms for the active body every frame before the draw.
 - Needs at least one supply anchor on the body (a city, or a BUILT and ACTIVE port or inland logistics hub) for the anchor rings and the LP totals; with none, the key says so rather than drawing a scale over nothing.
 - Reads the authored economy.military.active_lp_per_anchor_tick; an authored rate of zero yields no anchor rings.
-- Cleared by cycling off it or the clear hotkey, not by a bar re-click.
+- Re-clicking while active clears the lens (see lens.clear); the keyboard cycle (L / Shift+L) also reaches it from any rung.
 
 **Expected output.** Two layers over the Planetary surface. FIELD: every tile is composited 0.72 toward a deep-navy-to-cyan ramp over its weighted reach cost to the nearest supply anchor — cyan at an anchor, navy on the ground furthest from one, the cold end for anything unreachable. The cost ratio is square-root compressed before the ramp because the distribution is heavily left-skewed (measured on the home body: median 20.8 against a maximum 101.8 over 57 anchors), so a linear ramp would read as one flat wash. ANCHORS: every supply anchor tile carries a RING (not a filled mark, so the anchor's own ground stays readable under it), its thickness carrying that anchor's active Logistic Points as a share of the body's largest pool, in a hotter near-white cyan over a dark backing. NETWORK (BL-1257, Ben 2026-10-10): the whole road and sea-lane network is drawn over the field at FULL WEIGHT at every Planetary rung — roads by tier at the 1 : 1.5 : 2 stroke weights (Track, Road, Highway), lanes in their sea blue — because on the plain canvas a road is only a thin pale thread painted into the ground (0.015-0.03 of a hex) and no road network is drawn at any rung (Ben, 2026-10-10); this lens is where the network reads as logistics. KEY: a fixed-height gradient key flush-left of the minimap, drawn on ImGui's FOREGROUND list with an opaque fill so it is readable over the Selection band — the field ramp labelled far / at anchor, the anchor ring beside its per-anchor LP rate, and the body's anchor count and total LP per tick. Pure rendering: it computes no game state, mutates nothing, and cannot trigger the reach-field Dijkstra (it reads the const tile_reach_cost, whose -1 'not computed' case draws nothing). The LP pools are rebuilt every frame and never persisted — LP is a per-tick rate, never a stock. Pointer clicks fall through to the tile/province; there is no dedicated ledger route. Terrain texture (BL-520) survives this lens at 0.45 strength. National borders are NOT drawn while any lens is active (2026-08-28) — the inset border stroke is suppressed, and the border's click corridor goes with it. The plain canvas is the only place the national read appears.
 
 **Reason to select.** Select to answer 'how much can move through here, and how far is this ground from the capacity that would move it?' — before ordering a march that active LP could refuse, before siting a building whose supply has to come from somewhere, or when deciding where a new port or inland hub would actually widen the network. It is the surface half of the Logistic Points cap (LOGISTICS.md): a refused march is legible only if the player can see where throughput is thin, and a cap nobody can see is silent interdiction. It extends the Reach lens rather than replacing it — Reach spends the same field as a yes/no placement predicate, this spends the quantity that predicate throws away. It does NOT mean LP is priced by distance (it is not): the shading says how far this ground is from a generator, never that the points thin out on the way.
 
-### `lens.trade_flow` — Keyboard lens cycle only -- no lens-bar slot and no dedicated glyph (it borrows the supply mark in the cycle readout). LENSES.md § Trade-flow lens.
+### `lens.trade_flow` — Minimap lens strip, Planetary rung, slot 10 — the exchange glyph (icons::trade_flow, ⇄). LENSES.md § Trade-flow lens.
 
-**Press.** Cycle lenses with L (forward) / Shift+L (backward) until Trade flow is active -- it is the LAST mode in the cycle, so one Shift+L from no lens lands on it. Planetary rung.
+**Press.** Single left-click on the Trade flow glyph in the lens strip, or cycle with L / Shift+L -- it is the LAST mode in the cycle, so one Shift+L from no lens lands on it. Planetary rung.
 
 **Valid when:**
-- In-game on the Planetary canvas (the lens-cycle keys are live).
+- In-game on the Planetary canvas (the glyph is on the Planetary strip; the lens-cycle keys reach it from any rung).
 - Reads the dispatcher record of the corporation the player holds NOW: each pass is tagged with the corporation it was taken for, and the record is never saved. So the lens draws nothing until that corporation's first dispatch pass -- after a load, and after a seat change (the corporation left behind is never shown) -- and its key then reads 'no shipments'.
 - Player's flows only (DISCOVERY.md § Competitor visibility): no rival shipment, no market's own shelf export and no rival refusal appears.
-- Cleared by cycling off it or the clear hotkey (lens.clear).
+- Re-clicking while active clears the lens (see lens.clear); the keyboard cycle (L / Shift+L) also reaches it from any rung.
 
 **Expected output.** No tile re-skin. FLOWS: one arrow per (source market, destination market, good) the player shipped within the last four dispatch passes with both ends on the active body, market centre to market centre, in a neutral pale-steel logistics hue; stroke width from the window's mean units per tick against the body's heaviest flow (1.5 px trickle to 7 px). REFUSALS: a filled dot up-right of each market centre on the active body that is short of a good (last clear's demand above its supply) the player held in surplus and did not send there this pass, coloured by the best refusal class over that market's goods -- the corporation dispatcher's own rules, worst to best: grey no lane (another body, no viable leg), violet price gate (the destination's price does not clear the dispatch margin over the source's), red no route (same body, no viable leg), orange costly (routed, but the haul eats the margin), brown no propellant (a space lane, but the pool cannot fuel the launch), yellow no room (cannot absorb more at the landed cost), blue no funds (the rule would send, but the corporation cannot pay for the convoy), green room (the rule would send; held by the one-destination-per-pass rule or the passive-LP cap). HOVER: an immediate card at the cursor -- over an arrow: good, units per tick, landed price (the destination price the dispatcher netted against its haul), source -> destination; over a marker: the market and each short good with its class (or 'sent'). KEY: a fixed-height key in the minimap header -- the eight classes with their colours, and three flow-width samples labelled in units per tick. Pointer clicks fall through to the ground; nothing is selectable on the lens.
 
@@ -2021,9 +2018,20 @@ TRADES shows FOUR headed sections, each bounded and scrolling inside itself so a
 **Valid when:**
 - App is on the main menu screen.
 
-**Expected output.** The screen transitions to the New World wizard (app_screen::generating), opening on round 1 of 3. Nothing is generated or committed by this press; the wizard only previews.
+**Expected output.** The screen transitions to the New World wizard (app_screen::generating), opening on round 1 of 6 (System, Life, Culture, Empires, Exploration, Industrialisation). Nothing is generated or committed by this press; the wizard only previews.
 
-**Reason to select.** To start setting up a new world; this is the only route into play.
+**Reason to select.** To start setting up a new world round by round, choosing the planetology and history leans.
+
+### `chrome.menu_quick_start` — Main menu, primary button column, between New Game and Quit
+
+**Press.** Click Quick Start.
+
+**Valid when:**
+- App is on the main menu screen.
+
+**Expected output.** The world is built straight through on the menu's seed and resources with no wizard round drawn: the screen goes to the loading bar (app_screen::building) while the cold build runs (make_hard_coded_world, then finish_campaign_world, the same calls the wizard's Begin makes), then to the seat canvas (app_screen::choosing_seat), where the player picks the corporation. The same settings give the same world the wizard would have built.
+
+**Reason to select.** To start play on a known seed and resource level without walking the wizard's rounds; the seat is still chosen.
 
 ### `chrome.menu_quit` — Main menu, primary button column
 

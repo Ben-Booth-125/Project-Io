@@ -795,6 +795,81 @@ void throughput(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     dl->AddCircleFilled({ centre.x + bw * 0.62f, bed }, wr * 0.42f, outline);
 }
 
+void company(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // A briefcase. Landscape case + handle, so it cannot be read as a variant of
+    // the corporation seal-square standing next to it on the Planetary strip.
+    const float hw   = r;                    // case half-width
+    const float top  = centre.y - r * 0.38f; // case lid line
+    const float bot  = centre.y + r * 0.82f; // case base
+    dl->AddRectFilled({ centre.x - hw, top }, { centre.x + hw, bot }, colour, r * 0.18f);
+    dl->AddRect({ centre.x - hw, top }, { centre.x + hw, bot }, outline, r * 0.18f, 0, 1.0f);
+
+    // Handle: a stroked loop standing on the lid, in the fill colour so it reads
+    // as part of the case rather than as a second mark.
+    const float hh = r * 0.42f;
+    dl->AddRect({ centre.x - hh, centre.y - r * 0.85f }, { centre.x + hh, top + 0.5f },
+                colour, r * 0.12f, 0, std::max(1.5f, r * 0.20f));
+
+    // Clasp band across the case, with the clasp itself a small dark block.
+    const float band = top + (bot - top) * 0.38f;
+    dl->AddLine({ centre.x - hw + 1.0f, band }, { centre.x + hw - 1.0f, band }, outline, 1.0f);
+    const float cw = r * 0.18f;
+    dl->AddRectFilled({ centre.x - cw, band - cw }, { centre.x + cw, band + cw }, outline);
+}
+
+void reach(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // A broadcast mark: source dot bottom-left, two arcs widening to the upper
+    // right. Arcs swept a quarter-turn, from straight up to straight right of the
+    // source, so the whole mark sits inside the glyph square.
+    const ImVec2 src = { centre.x - r * 0.75f, centre.y + r * 0.75f };
+    const float  t   = std::max(1.5f, r * 0.22f);
+    dl->AddCircleFilled(src, std::max(1.5f, r * 0.26f), colour);
+    for (const float rad : { r * 0.85f, r * 1.50f })
+    {
+        dl->PathArcTo(src, rad, -3.14159265f * 0.5f, 0.0f, 12);
+        dl->PathStroke(colour, 0, t);
+    }
+}
+
+void supply_routes(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // A lane graph: three nodes, three edges of unequal weight — the lens's own
+    // log-scaled thickness encoding, in miniature.
+    const ImVec2 a = { centre.x - r * 0.88f, centre.y + r * 0.68f }; // left
+    const ImVec2 b = { centre.x + r * 0.02f, centre.y - r * 0.86f }; // top
+    const ImVec2 c = { centre.x + r * 0.90f, centre.y + r * 0.46f }; // right
+    dl->AddLine(a, c, colour, std::max(2.5f, r * 0.38f)); // the heavy lane
+    dl->AddLine(b, c, colour, std::max(1.5f, r * 0.22f)); // medium
+    dl->AddLine(a, b, colour, 1.0f);                       // light
+    const float nr = std::max(2.0f, r * 0.34f);
+    for (const ImVec2& p : { a, b, c })
+    {
+        dl->AddCircleFilled(p, nr, colour);
+        dl->AddCircle(p, nr, outline, 0, 1.0f);
+    }
+}
+
+void trade_flow(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // ⇄ — upper arrow right, lower arrow left, solid heads. The heads are the
+    // load-bearing part: without them this is the Supply glyph's two parallels.
+    const float t   = std::max(1.5f, r * 0.22f);
+    const float hl  = r * 0.62f; // head length along the shaft
+    const float hh  = r * 0.40f; // head half-height
+    const float yu  = centre.y - r * 0.45f;
+    const float yd  = centre.y + r * 0.45f;
+    const float x0  = centre.x - r;
+    const float x1  = centre.x + r;
+
+    dl->AddLine({ x0, yu }, { x1 - hl + 0.5f, yu }, colour, t);
+    dl->AddTriangleFilled({ x1 - hl, yu - hh }, { x1, yu }, { x1 - hl, yu + hh }, colour);
+
+    dl->AddLine({ x1, yd }, { x0 + hl - 0.5f, yd }, colour, t);
+    dl->AddTriangleFilled({ x0 + hl, yd - hh }, { x0 + hl, yd + hh }, { x0, yd }, colour);
+}
+
 void landform(ImDrawList* dl, ImVec2 centre, float r, terrain_landform lf, ImU32 colour)
 {
     // Terrain shape, not an entity — so every glyph here is STROKE-ONLY and none

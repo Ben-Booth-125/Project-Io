@@ -168,7 +168,7 @@ inline double tier_out(std::uint8_t tier)
     }
 }
 
-// BL-1261 (roads as tile sets): the terrain treatments — the road's tile set,
+// BL-1291 (roads as tile sets): the terrain treatments — the road's tile set,
 // RENDERING.md § Roads and sea lanes. Widths are canonical units PAST the
 // surfaced half-width, for a Road; treat_scale sizes them per tier. They widen
 // the road's footprint in the ground, never the road line itself: at the
@@ -239,7 +239,7 @@ route_piece straight(double ax, double ay, double bx, double by, std::uint8_t ti
 }
 
 // ---------------------------------------------------------------------------
-// BL-1261 (roads as tile sets) — the in-tile routing. RENDERING.md § Roads and
+// BL-1291 (roads as tile sets) — the in-tile routing. RENDERING.md § Roads and
 // sea lanes: a road crosses each edge at its own point and, inside the tile,
 // finds its way — a smooth curve that keeps to the lower side of the tile's
 // relief and clear of its road-plan cluster.
@@ -878,7 +878,7 @@ road_plan tile_road_plan(const bake_source& s, std::size_t i)
         if (links & (1u << k))
         {
             // The link's direction (its edge's midpoint), not its crossing
-            // point (BL-1261): a road along a row whose two crossings both
+            // point (BL-1291): a road along a row whose two crossings both
             // sit a little north would otherwise send the cluster south, in
             // front of the road, where its standing forms hide it. The
             // route's search keeps the road clear of the disc wherever the
@@ -1068,7 +1068,7 @@ void paint_routes(const bake_source& s, const geometry& g, const bake_params& p,
                 continue;
             }
 
-            // The ground's VISUAL slope under the road (BL-1261): the tile
+            // The ground's VISUAL slope under the road (BL-1291): the tile
             // gradient interpolated over the nearest centres plus the hills
             // field, each in the hillshade's units — what the light shows. It
             // lights the surface as the ground is lit (the hillshade's own
@@ -1125,14 +1125,14 @@ void paint_routes(const bake_source& s, const geometry& g, const bake_params& p,
             // The speckle is the rail bed's alone: the road tiers are too
             // thin to carry a pixel-scale grain (BL-1257).
             const double speck = fine && h.tier == k_route_rail ? (rspeck(abx, aby, speck_c, speck_n, 0x3A02u) - 0.5) : 0.0;
-            // BL-1261: the surface takes a share of the ground it crosses —
+            // BL-1291: the surface takes a share of the ground it crosses —
             // dust off a dark slope darkens it, a pale plain lifts it — so a
             // road reads as made of the land it runs on, not laid over it.
             const double gl  = 0.299 * gr + 0.587 * gg + 0.114 * gb;
             const double env = std::clamp(0.62 + 0.38 * gl / 100.0, 0.70, 1.10);
             const double lit = L * wear * env;
 
-            // THE TREATMENT (BL-1261, RENDERING.md § Roads and sea lanes: the
+            // THE TREATMENT (BL-1291, RENDERING.md § Roads and sea lanes: the
             // road's tile set): the ground either side of the surface, by the
             // terrain under the pixel. It widens the road's footprint in the
             // ground, never the line: each band is a few master pixels, and
@@ -1406,7 +1406,7 @@ int route_patch_boxes(const bake_source& a, const bake_source& b, const geometry
     };
     // A tree whose root stands within its crown of a road's reach is left out
     // of the stamp, and one whose canopy or shadow stands over the road draws
-    // after it (ground_bake.cpp stamp_trees); tree_patch_boxes (BL-1261) boxes
+    // after it (ground_bake.cpp stamp_trees); tree_patch_boxes (BL-1291) boxes
     // exactly the trees of a stand whose root a changed reach band can touch.
     // A structure's reach is rasterised (installation_tile_bounds) once per
     // tile per call, however many changed pieces pass near it: a settle that
@@ -1509,7 +1509,7 @@ int route_patch_boxes(const bake_source& a, const bake_source& b, const geometry
                         if (!road)
                             continue;
                         // The trees it clears, restores or now stands under
-                        // (BL-1261): the stand's own trees whose root the
+                        // (BL-1291): the stand's own trees whose root the
                         // half's reach band can touch, each boxed exactly
                         // (tree_patch_boxes), on this tile and its ring.
                         for (int kk = -1; kk < 6; ++kk)

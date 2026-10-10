@@ -26,9 +26,8 @@ struct continent_state;
 /// a scorching body has no polar band; a frozen body is all polar.
 enum class temperature_class : uint8_t { scorching, hot, temperate, cold, frozen };
 
-/// Atmospheric density class. `none` or `thin` gates out organic compositions
-/// (grassland, forest, wetland) and routes a body to the airless tables.
-enum class atmosphere_class : uint8_t { none, thin, moderate, thick };
+// `atmosphere_class` (and `atmosphere_is_airless`) live in components.hpp, so
+// the world's body record can carry the class (world_save_version 41).
 
 /// Surface water state. `liquid` runs the ocean pass; `polar_frozen` skips it and
 /// ices the polar rows; `none` produces no water at all.

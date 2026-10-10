@@ -2642,6 +2642,13 @@ std::vector<entity_id> generate_body_tiles(
     generation_record local;
     generation_record& seam = record ? *record : local;
 
+    // The body's generated atmosphere becomes world state here, where its
+    // profile is applied (world_save_version 41): the propellant routes read it
+    // (PRODUCTION.md § Chemical Plant). A scratch world with no body record —
+    // the wizard's probes, the ledger's regenerations — has nothing to carry it.
+    if (const auto bit = w.bodies.find(body_id); bit != w.bodies.end())
+        bit->second.atmosphere = profile.atmosphere;
+
     std::vector<entity_id> tile_ids =
         generate_body_surface(w, body_id, gw, gh, profile, seed, pl, seam, continent_bias, convergent,
                               continents, lake_size_cap);

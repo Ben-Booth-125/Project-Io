@@ -94,7 +94,7 @@
 //       sea lanes): the route pass pure, wrap-exact and seamless on every
 //       surface; the road / structure agreement; a route change re-baking
 //       only its window. `--routes` runs them alone with routes_*.png previews.
-//   P32-P34 Roads as tile sets (BL-1261, RENDERING.md § Roads and sea lanes):
+//   P32-P34 Roads as tile sets (BL-1291, RENDERING.md § Roads and sea lanes):
 //       crossing points agree from both tiles and across the seam and pieces
 //       meet there heading on; no road crosses a structure footprint; every
 //       terrain treatment is window-invariant and wrap-exact. `--roadsets`
@@ -2079,7 +2079,7 @@ void route_row(world& w, entity_id home, const bake_source& src0, const bake_par
             }
             std::printf("ROUTE-PROF  rederive_routes on %d road tiles (%zu pieces): %.2f ms; prepare_source (this world): %.2f ms\n",
                         nr, dense.route_pieces.size(), best, ps);
-            // BL-1261: this world's own network (its campaign roads and lanes).
+            // BL-1291: this world's own network (its campaign roads and lanes).
             bake_source own = src0;
             double bo = 1e30;
             for (int rep_ = 0; rep_ < 7; ++rep_)
@@ -2229,7 +2229,7 @@ void route_row(world& w, entity_id home, const bake_source& src0, const bake_par
         check(clear, "P29", "every through-road on a roaded tile clears the cluster disc by its half-width");
         check(ends, "P29", "a road arriving at a roaded tile ends at its forecourt");
         check(!tile_road_plan(s, town_i).roaded, "P29", "a town's tile is not re-planned: its road is a street");
-        // BL-1261: a road no longer passes through its tile's centre (it
+        // BL-1291: a road no longer passes through its tile's centre (it
         // finds its way between its crossing points), so the probe stands on
         // the highway tile's own curve, at its middle sample.
         double hx = kS3 * (ac - 2 + ((ar & 1) ? 0.5 : 0.0)), hy = 1.5 * ar;
@@ -2340,7 +2340,7 @@ void route_row(world& w, entity_id home, const bake_source& src0, const bake_par
 }
 
 // ---------------------------------------------------------------------------
-// BL-1261 (roads as tile sets), RENDERING.md § Roads and sea lanes: a road
+// BL-1291 (roads as tile sets), RENDERING.md § Roads and sea lanes: a road
 // crosses each edge at its own hashed point and finds its way inside the tile,
 // around higher ground and the road plan's cluster, in its terrain's treatment.
 //   P32 Crossing points agree: every edge's point is the same absolute point
@@ -3143,12 +3143,12 @@ int main(int argc, char** argv)
     if (argc > 1 && std::strcmp(argv[1], "--routes") == 0)
     {
         route_row(w, home, src, p, /*previews=*/true);
-        roadsets_row(src, p, /*previews=*/false); // BL-1261: P32-P34
+        roadsets_row(src, p, /*previews=*/false); // BL-1291: P32-P34
         std::printf("%s (%d failures)\n", g_failures ? "FAIL" : "PASS", g_failures);
         return g_failures ? 1 : 0;
     }
 
-    // --roadsets: the BL-1261 rows (P32-P34) alone, with roadsets_*.png previews.
+    // --roadsets: the BL-1291 rows (P32-P34) alone, with roadsets_*.png previews.
     if (argc > 1 && std::strcmp(argv[1], "--roadsets") == 0)
     {
         roadsets_row(src, p, /*previews=*/true);
@@ -4586,7 +4586,7 @@ int main(int argc, char** argv)
     // P26 / P27 - tiles hold their own ground (BL-1251).
     border_row(src, hb, p, /*previews=*/false);
     route_row(w, home, src, p, /*previews=*/false);
-    roadsets_row(src, p, /*previews=*/false); // BL-1261
+    roadsets_row(src, p, /*previews=*/false); // BL-1291
     // P31 - cast shadows (BL-1256).
     shadow_row(src, p);
 

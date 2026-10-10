@@ -404,10 +404,11 @@ seed_candidate_spend spend_stockpile_on_seed_candidate(world& w, const recipe_re
     // budget overload (whose refusal and NR-910 fallback run inside it), and the
     // second recipe pass a chartered processor needs.
     const charter_spend_params spend = stockpile_charter_spend(out.stockpile);
-    assign_default_recipes(w, reg);
+    // BL-1217 D6: an unwanted default unplaces its processor at both passes.
+    assign_default_recipes(w, reg, "stockpile apply: before");
     apply_landscape_candidate(w, reg, c, /*regenerate_specialists=*/true,
                               &out.stockpile.budget, spend, &out.report);
-    assign_default_recipes(w, reg);
+    assign_default_recipes(w, reg, "stockpile apply: after");
     out.spent = true;
     return out;
 }

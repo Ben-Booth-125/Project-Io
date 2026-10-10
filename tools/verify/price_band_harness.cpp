@@ -470,6 +470,77 @@ void run_sites_agree()
 
 } // namespace
 
+// --- P7: BL-1232 — the solver values an INPUT at its market's POSTED price ----
+//
+// PRODUCTION.md, "An input is priced at what the draw pays" (Ben, 2026-10-08).
+// One processor (1 iron_ore -> 1 steel a batch, one batch a tick at target 100)
+// on a market whose steel price is steady at 10 and where iron_ore is UNLISTED
+// against a heavy bid — the case the listings forecast read as a good at the
+// cap (10 x base). The posted price alone decides whether the plant runs: under
+// the steel price it runs, over it it does not. A market that has never
+// cleared posts 0, so the draw pays — and the solver reads — the base price.
+int solve_processor(float iron_base, float iron_posted)
+{
+    recipe_registry reg;
+    price_band_params pb;
+    pb.floor_mult = 0.25f;
+    pb.ceil_mult  = 10.0f;
+    reg.set_price_band(pb);
+    building_economics pe;
+    pe.base_rate = 1.0f;
+    reg.set_economics(building_type::processing_facility, pe);
+    recipe r;
+    r.name = "p7_smelt";
+    r.inputs [ri(resource_type::iron_ore)] = 1.0f;
+    r.outputs[ri(resource_type::steel)]    = 1.0f;
+    const std::uint16_t rid = reg.add_recipe(r);
+
+    world w;
+    const entity_id body = w.create_entity();
+    w.bodies[body] = body_component{};
+    const entity_id tile = w.create_entity();
+    tile_component tc{};
+    tc.body = body;
+    w.tiles[tile] = tc;
+    const entity_id mid = w.create_entity();
+    market_component mc;
+    mc.body = body;
+    mc.centre_tile = tile;
+    const std::size_t st = ri(resource_type::steel), io = ri(resource_type::iron_ore);
+    mc.base_price[st] = 10.0f; mc.price[st] = 10.0f;
+    mc.supply[st] = 1000.0f;   mc.demand[st] = 1000.0f;   // steady: ~10 whatever this plant adds
+    mc.base_price[io] = iron_base; mc.price[io] = iron_posted;
+    mc.supply[io] = 0.0f;      mc.demand[io] = 400.0f;    // unlisted, heavily bid
+    w.markets[mid] = mc;
+    building_component b{};
+    b.tile = tile;
+    b.type = building_type::processing_facility;
+    b.recipe = rid;
+    b.workforce_assigned = 1.0f;
+    b.workforce_target = 100;
+    const entity_id bid = w.create_entity();
+    w.buildings[bid] = b;
+    return solve_workforce_target(w, reg, w.buildings.at(bid), 1.0f);
+}
+
+void run_input_posted_price()
+{
+    std::printf("=== P7: BL-1232 the solver prices an input at the POSTED price ===\n\n");
+    const int cheap   = solve_processor(/*base=*/2.0f, /*posted=*/2.0f);
+    const int dear    = solve_processor(/*base=*/2.0f, /*posted=*/15.0f);
+    const int unclear = solve_processor(/*base=*/2.0f, /*posted=*/0.0f);
+    const int unclear_dear = solve_processor(/*base=*/15.0f, /*posted=*/0.0f);
+    std::printf("       target: posted 2 -> %d, posted 15 -> %d, never cleared (base 2) -> %d, "
+                "never cleared (base 15) -> %d\n", cheap, dear, unclear, unclear_dear);
+    check(cheap > 0,
+          "P7a an unlisted, heavily bid input posted at 2 (under the output's 10) is priced at 2 and the "
+          "plant runs (the listings forecast read it at the 10x cap, 20, and zeroed it)");
+    check(dear == 0, "P7b the same input POSTED at 15 (over the output's 10) zeroes the plant");
+    check(unclear > 0 && unclear_dear == 0,
+          "P7c a never-cleared market posts 0: the input is priced at its BASE (2 runs, 15 does not)");
+    std::printf("\n");
+}
+
 int main()
 {
     std::printf("\n=== price_band_harness (BL-442 step 1) ===\n");
@@ -481,6 +552,7 @@ int main()
     run_market_site();
     run_solver_site();
     run_sites_agree();
+    run_input_posted_price();
 
     if (g_failures == 0)
         std::printf("ALL PASS (0 failures)\n");

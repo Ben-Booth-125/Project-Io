@@ -3,7 +3,7 @@
 > **Settles:** how a corporation is assigned a nation, an industrial focus and an ownership
 > class · how a charter reaches the ground · where starting assets, HQ and border range are
 > placed · what finances and stockpile a corp opens with · how a corp is named, and how
-> background firms are produced · how the player's corp and its seat are chosen · what
+> background firms are produced · how a major nation's champion is chartered, and how the seat is chosen · what
 > generation deliberately declines to seed.
 > **Not here:** how a rival *decides* anything (../ai/AI_OPPONENT) · how the nation it
 > registers in was made (NATION_GENERATION) · what its money does thereafter
@@ -83,6 +83,16 @@ the spread is the world's, not capped. **A world whose budget opens no specialis
 world with no budget** (Ben, 2026-09-21, NR-910), so the player is seated from a specialist. The one
 exception — a world whose affording centres all find no ground for their specialist — is reported
 and counted, not patched (Ben, 2026-09-22, NR-911; `INDUSTRIALISATION.md` § 1).
+
+**AMENDED FORWARD (Ben, 2026-10-10): one specialist per major nation, and it is that nation's
+champion.** Majors and seats are one-to-one (`docs/GLOSSARY.md` § Major nation), so the specialist
+roster **is** the set of champions: exactly one per major, none in a minor, and the roster's size is
+the major target (`NATION_GENERATION.md` § The nation count is a target). This overturns, for
+specialists, both the fixed count of 8 and the 2026-09-17 rule that a nation holds every seat its cities
+bought: a major's champion is chartered in its richest affording centre, and every other affording
+centre spends its budget on background firms. The budgets still decide **which** nations can afford a
+champion; the major target decides **how many** do, through the lean and reconciliation that
+`NATION_GENERATION.md` owns.
 
 ### Pass 2 — Industrial focus assignment
 
@@ -293,6 +303,22 @@ not a broad presence across the nation.
   as idle plant. The reason is legibility: an idle building the player inherits reads as a
   broken economy, where an absent chain reads as a world that lacks it. BL-1185
   (chain-feasible placement) owns the work.
+- **Sized to its inputs — a processor needs SPARE reachable supply (Ben, 2026-10-07; BL-1233,
+  processors to inputs).** A producer within reach is necessary, not sufficient: every pass (the
+  charter web, Pass 6, the specialists, the seat's kit) places a processor only where the **spare**
+  reachable output of each of its inputs covers its draw at `t_idle` — a fifth of a full run.
+  Spare is the producers' output in reach less the draw of every processor already standing
+  there, **and less what households and the background pull draw there** (Ben, 2026-10-09;
+  `../ai/AI_OPPONENT.md` § 11, processors sized against every buyer; in generation, before any
+  clear, those draws are the household and background baskets whole at base — accepted by Ben,
+  2026-10-09, at the measured cost of a smaller economy: about a third fewer processors placed,
+  15% fewer firms, 29% less play income, and 96% of processors running at the handoff with 2%
+  starved), judged at the labour a new plant is judged at, the same test the play-time scorer uses
+  (`recipe_inputs_obtainable` with its supply clause). A good that fails is passed over at that
+  centre and retried once a firm producing its input is chartered, by the same retry the
+  chain-feasible rule uses. Measured before the rule: one rare-earth site yields about 6 units a
+  tick against a REE alloy plant's 32, and the charter web placed about one site per plant, so
+  bodies made 19–62% of the raw ore their processors wanted.
   - **Within reach, exactly — the dispatcher's own gate, with the destination short** (refined
     2026-10-05). The producer's market is the processor's market, or both of these hold for the
     pair: `price_market_export_leg(producer market, processor market)` is viable, and
@@ -398,6 +424,13 @@ pool warmed only by the pre-game ticks. Generated, not a flat give:
   corp advances the stream identically.
 
 A corp that placed no holdings (a deposit-poor nation) has no home body and gets no pool.
+
+**The opening stock goes on the shelves (Ben, 2026-10-10; `../economy/MARKETS.md` § The shelf
+economy).** Corporations hold no stockpiles. The stockpile this pass generates — the same total,
+by the same weights — is placed on the shelves of the markets each corporation sits in, its share
+split over its own markets. It is the market's from then on; nothing holds it back from sale.
+This supersedes the earlier rule that held opening stock in the corporation's pool until a market
+bid for it (Ben, 2026-10-09).
 
 ### Pass 5 — Naming
 
@@ -546,8 +579,29 @@ these goods (`goods_in_g`); it is not a count of goods with demand, since a clos
 have none yet.
 
 Derived
-demand counts what stands or is chartered, never what a refused firm would have wanted: a chain
-none of whose consumers can stand (a cold start) is not begun by it.
+demand counts what stands or is chartered, **and the prospective draw of a processor refused for
+want of spare input (Ben, 2026-10-07; BL-1233, processors to inputs)**: a processor the sized rule
+(§ Pass 3, "Sized to its inputs") turns away enters its input's demand, so the walk charters the
+extraction that would feed it, and the processor is placed on the retry once that firm lands.
+Without it the two rules deadlock — derived demand fills supply to exactly what stands, the sized
+rule then finds no spare, and a chain whose inputs are fully drawn is refused for the rest of the
+pass (measured: household goods' processors vanished and household fill fell by half). What it
+still never counts is a firm refused for any other reason: a chain none of whose consumers can
+stand (a cold start) is not begun by it.
+
+**No processor is placed beyond its output's want (Ben, 2026-10-09; BL-1217, G1 plants
+running).** Every path that places a processor — the walk's own charter, an extractor's attached
+processor, a background firm — is bounded by the want for what it makes: final demand plus the
+derived demand of what stands or is chartered. A good with no consumer gets no maker for its
+sake. Measured before the ruling: about 34 refined-fuel plants per seed stood against under one
+consumer, and the dial idled them all. **A processor laid with no recipe is not placed when its
+default output is unwanted (Ben, 2026-10-09):** it is not given another recipe in its place, nor
+left standing idle. **Two exceptions (Ben, 2026-10-09, measured).** The world's **pre-authored
+installation** keeps its default: it is the one steel maker the chain-feasibility test can see at
+the start, and unplacing it left no steel, alloys, consumer goods or machinery on any seed. And a
+**chartered processing firm keeps its second works** once the first covers the gap: the
+firm's authored pair stands whole (measured: 120 more plants running at the handoff and 8% more
+play income, the share running unchanged).
 
 **What Pass 6 does not do.** It does not seed any behavioural state, matching the contract the
 rest of this pipeline holds (§ Generation seeds no behaviour) — no sentiment, no diplomatic
@@ -559,6 +613,13 @@ consequences of Pass 6's output — how real background supply meets real popula
 ---
 
 ## Player corporation
+
+**The player's corporation is its nation's champion (Ben, 2026-10-10; `docs/CONCEPT.md` § Player
+identity).** The seat is taken by picking a **major nation**, and the champion of that nation is the
+firm `is_player` lands on: the shortlist below is a list of majors, each read through its one
+champion. Everything else in this section stands, re-read at that grain — the settle in spectate,
+the static score, the marked-not-removed floor, the clean slate of construction and the day-one kit.
+The seat is shaped for up to six humans, one major each, and the prototype seats one (`docs/ui/STARTUP.md` § The seat).
 
 One generated corporation is flagged as `is_player = true`. No special generation rules apply:
 the player starts on the same footing as any other corporation, and the flag is set **after** the
@@ -591,7 +652,7 @@ of the viable ones.** Design: BL-630 (spawn shortlist). The sequence:
    no player to ask draws one from the shortlist against the world seed), and `is_player` /
    `world::player_entity` are re-pointed onto it. The same world and the same pick seat the same
    firm in the same state.
-5. **The seat opens with a clean slate of construction (Ben, 2026-10-07; BL-1206).** During the
+5. **The seat opens with a clean slate of construction (Ben, 2026-10-07; BL-1206, seat day-1 profit).** During the
    settle the seated firm was an ordinary corporation under spectate, and its scorer started
    builds the player never chose. At the seat, every building of the seated firm still under
    construction is cancelled and everything already paid into it — its materials, its flat build
