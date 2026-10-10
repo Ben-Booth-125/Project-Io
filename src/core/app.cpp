@@ -2461,7 +2461,7 @@ void app::render()
     ui::draw_construction_panel(m_world, m_registry, m_last_econ_report, m_ui, &m_ui.show_construction_panel);
     // Market ledger — Goods and Trades. It takes a NON-CONST world and the recipe
     // registry because the Trades tab's potential-trade read prices real trade
-    // legs through `price_trade_leg` (which warms the A* cache and mutates no
+    // routes through `rank_trade_routes`, the trade pass's own ranking (which warms the A* cache and mutates no
     // game state), rather than inventing a second haulage model that could
     // disagree with the one that actually bills the player.
     ui::draw_market_ledger(m_world, m_registry, m_ui, m_market_history, m_ui.show_market_ledger);
@@ -2795,10 +2795,15 @@ void app::render()
     // seam-consuming shape as the survey dispatch above, applied through
     // apply_corp_command so the player's press and a rival corp's command share
     // one implementation. A TRADE press's result is surfaced on the Trades tab
-    // (`ui_state::trade_message`): `set_trade` can be refused for reasons the
-    // form does not pre-check (a good the destination does not trade, the
-    // corporation's list of trades full), and a refusal mutates nothing, so the
-    // player is told why. Other presses' rejections mean a race (the target
+    // (`ui_state::trade_message`), and a refusal mutates nothing, so the player
+    // is told why. What `set_trade` refuses is exactly `trade_is_valid` plus two
+    // bounds (corp_command.cpp): rejected_invalid for points that are not
+    // finite, not > 0 or above max_trade_points, the same market at both ends, a
+    // market that no longer exists, a good trade does not carry (capacity 0, or
+    // a grid good), or no acting corporation; rejected_state when the
+    // corporation already holds max_trades_per_corp trades. The form pre-checks
+    // most of these, so a refusal here is mostly a race or an edge the form let
+    // through; the message names the whole set rather than guessing one. Other presses' rejections mean a race (the target
     // already gone) and the correct response is to do nothing.
     for (corp_command& cmd : m_ui.pending_order_commands)
     {
@@ -2811,7 +2816,8 @@ void app::render()
                 m_ui.trade_message = applied ? "Trade set."
                     : (r == corp_command_result::rejected_state)
                         ? "You hold as many trades as a corporation may."
-                        : "That trade cannot run: both markets must trade the good.";
+                        : "Refused: it needs two different markets, a good trade carries, "
+                          "and points above 0.";
                 break;
             case corp_verb::clear_trade:
                 m_ui.trade_message = applied ? "Trade removed." : "That trade is already gone.";
