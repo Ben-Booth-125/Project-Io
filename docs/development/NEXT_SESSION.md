@@ -3,6 +3,15 @@
 Read this first after a compaction or in a new session. Then `REFINED.md` § Sprint 50 and the
 sprint 50 row in `sprints.json`. Mode for this work: **Delivery — Full**.
 
+## SPRINT 50 IS EXTENDED — read HANDOFF_SHELF_TRADE.md first (Ben, 2026-10-10)
+
+Ben redesigned the economy's spine mid-close: corporation pools retire (every good is on a market-owned
+shelf), and trade becomes the only way goods move between markets (Planetary Marketplaces and Ports make
+trade points; per-resource capacity; auto and reserved trades; AI manual trades; trade through all three
+generation rounds). Design: docs/economy/TRADE.md, MARKETS.md § The shelf economy. Work: BL-1265..BL-1270.
+**Another session builds it** — its handoff is docs/development/HANDOFF_SHELF_TRADE.md. Sprint 50 stays
+open; ONE re-bless after it lands. Still in this session: BL-1165 (untraced re-bless movements).
+
 ## Where the work lives
 
 - **Worktree:** `C:\Users\benbo\Project-Io\.claude\worktrees\sprint-50`, branch

@@ -1873,6 +1873,153 @@
     "src/world/economy_system.cpp"
    ],
    "design": "RULED (Ben, 2026-10-10, the doc-check form): widen the code to match the doc. PRODUCTION.md (~545-549): 'for a building that makes or uses power, the solver reads power's supply and demand pooled over the building's grid'. The code applies the pooled read to OUTPUTS only, and only for processing facilities (economy_system.cpp ~976-992, ~1013-1015); a power input is priced at the plant's own market's posted price (~1082). WORK: price power as an input on the grid too, by the same pooled read; measure the 16-seed gate before/after; a cold review (the dial and the player's auto-solver both call solve_workforce_target)."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 50,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the shelf economy and trade forms); filed by Claude",
+   "id": "BL-1265",
+   "short_name": "SHELF_ECONOMY",
+   "category": "Economy",
+   "priority": "S",
+   "difficulty": 5,
+   "authority_doc": "docs/economy/MARKETS.md",
+   "requires": [],
+   "files": [
+    "src/world/market_clearing.cpp",
+    "src/world/economy_system.cpp",
+    "src/world/corporation_generation.cpp",
+    "src/world/world_save.cpp"
+   ],
+   "title": "Corporations hold no stockpiles: production lands on the market shelf and is paid on landing; everyone buys from the shelf",
+   "design": "DESIGNED: MARKETS.md § The shelf economy (Ben, 2026-10-10). Retire corporation pools, auto-surplus, the processor reservation, the order book (buy and sell orders), the pad propellant reserve, opening stock held until a bid (world::opening_stock_held), the dial's stock-fed draw register (dial_pool_draw); production lands on its market's shelf, paid at the clearing price (the market is the counterparty); processors, construction, upkeep, procurement, the space programme and launches buy from the shelf under the ceiling; the opening stockpile (same total) goes onto the shelves of the corporations' markets. One save bump. Rewrite sibling docs that describe pools as the code changes. Handoff: docs/development/HANDOFF_SHELF_TRADE.md."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 50,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the shelf economy and trade forms); filed by Claude",
+   "id": "BL-1266",
+   "short_name": "TRADE_CORE",
+   "category": "Economy",
+   "priority": "S",
+   "difficulty": 5,
+   "authority_doc": "docs/economy/TRADE.md",
+   "requires": [
+    "BL-1265"
+   ],
+   "files": [
+    "src/world/supply_system.cpp",
+    "src/world/economy_system.cpp",
+    "scripts/economy.lua",
+    "scripts/recipes.lua"
+   ],
+   "title": "Trade is the only way goods move between markets: Planetary Marketplaces and Ports make trade points; trades buy, haul and land",
+   "design": "DESIGNED: TRADE.md (Ben, 2026-10-10). The Planetary Marketplace building and Port trade points (rates in data); trade-building upkeep of fuel and building materials from the shelf (unmet -> no points); per-resource trade capacity in data; the trade record (owner, source, destination, resource, points); auto allocation of unreserved points by margin per point; manual trades; a trade buys at the source shelf under the ceiling, pays the haul, travels as a convoy (BL-1195 legs, sweep, leg-time head) under the LP cap, lands and sells at the destination's clearing price; inter-body via a Launchpad and shelf propellant. Retire the corporation convoy and the market export. Handoff: docs/development/HANDOFF_SHELF_TRADE.md."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 50,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the shelf economy and trade forms); filed by Claude",
+   "id": "BL-1267",
+   "short_name": "AI_TRADES",
+   "category": "AI",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "requires": [
+    "BL-1266"
+   ],
+   "files": [
+    "src/world/corp_ai.cpp"
+   ],
+   "title": "A rival sets its own trades and its reserve, by the scorer's estimate",
+   "design": "DESIGNED: AI_OPPONENT.md § 11, 'A rival may set its own trades' (Ben, 2026-10-10). Verbs: set, change, clear a manual trade; set the reserve. Scored by margin per point on public prices and the network haul. Read the whole register first; the grant's scope is the whole of what is allowed. place_sell_order and the convoy verbs retire from the candidate set (ACTIONS.json). Handoff: docs/development/HANDOFF_SHELF_TRADE.md."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 50,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the shelf economy and trade forms); filed by Claude",
+   "id": "BL-1268",
+   "short_name": "TRADE_IN_GENERATION",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 4,
+   "authority_doc": "docs/economy/TRADE.md",
+   "requires": [
+    "BL-1266"
+   ],
+   "files": [
+    "src/world/exploration*.cpp",
+    "src/world/industrialisation*.cpp",
+    "src/world/corporation_generation.cpp"
+   ],
+   "title": "Trade runs through the history: nations earn trade points, replacing the Exploration flows; after Industrialisation the record retrofits Marketplaces",
+   "design": "DESIGNED: TRADE.md § Trade in generation (Ben, 2026-10-10). Exploration (1200-1660) and Industrialisation (1660-1960): nations earn trade points where they trade or have good relations, moving goods between their markets by the same capacity and network, replacing EXPLORATION.md's trade flows. After Industrialisation the record is consumed to retrofit Planetary Marketplaces where trade took place, owned by the corporations chartered there. The 1960 settle runs trade as play does. The seat holds a Marketplace only if its corporation has one. Rates and the retrofit rule: proposed by measurement, Ben approves. Handoff: docs/development/HANDOFF_SHELF_TRADE.md."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 50,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the shelf economy and trade forms); filed by Claude",
+   "id": "BL-1269",
+   "short_name": "TRADE_UI",
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/economy/TRADE.md",
+   "requires": [
+    "BL-1266"
+   ],
+   "files": [
+    "src/ui/selection_panel.cpp",
+    "src/ui/construction_panel.cpp",
+    "docs/ai/ACTIONS.json",
+    "docs/ui/question_log.json"
+   ],
+   "title": "The player sets manual trades and the reserve; the Marketplace is in the Build door; pool and order surfaces become shelf readings",
+   "design": "DESIGNED: TRADE.md (Ben, 2026-10-10). A ledger for manual trades (route, resource, points) and the reserve; the Planetary Marketplace in the Build door; sell-order and stockpile surfaces retire or read the shelf; ACTIONS.json and question_log entries; a live click. Coordinate with sprint 51's visibility pass and BL-1222 (trade-flow lens), which reads convoy records. Handoff: docs/development/HANDOFF_SHELF_TRADE.md."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 50,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the shelf economy and trade forms); filed by Claude",
+   "id": "BL-1270",
+   "short_name": "TRADE_CAPACITY_TABLE",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 2,
+   "authority_doc": "docs/economy/TRADE.md",
+   "requires": [
+    "BL-1266"
+   ],
+   "files": [
+    "scripts/economy.lua"
+   ],
+   "title": "The first trade capacity table, Marketplace and Port point rates and upkeep, proposed by measurement and approved by Ben",
+   "design": "DESIGNED: TRADE.md § The capacity table (Ben, 2026-10-10). Propose per-resource capacity, Marketplace and Port trade point rates, and trade-building upkeep; read the 16-seed market-viability gate with absolute counts; put the table to Ben. Not final until he approves. Handoff: docs/development/HANDOFF_SHELF_TRADE.md."
   }
  ]
 }

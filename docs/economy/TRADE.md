@@ -24,6 +24,14 @@ owner each tick, at its staffed rate, as a processor makes goods. Trade points a
 not a stock: made and spent within the tick, never banked — the Logistic Points rule
 (`LOGISTICS.md` § Logistic Points), applied to an owner's capacity.
 
+**Ports make trade points too (Ben, 2026-10-10).** A Port, besides its sea-lane role, makes trade
+points for its owner each tick, as a Marketplace does at a lower rate the data sets.
+
+**Trade buildings have upkeep (Ben, 2026-10-10).** A Planetary Marketplace and a Port each draw an
+upkeep of **fuel and building materials** every tick, bought from their own market's shelf like
+any other upkeep (`PRODUCTION.md`); the goods and amounts are authored in data. A trade building
+whose upkeep goes unmet makes no trade points that tick.
+
 **Trade points are separate from Logistic Points (Ben, 2026-10-10).** Trade points are how much
 an *owner* can move; Logistic Points are how much can move *through a place*. A shipment spends
 its owner's trade points and still passes the network's Logistic Point cap at the nodes it
@@ -41,7 +49,7 @@ A **trade** is a standing route set by an owner: *move resource R from market A 
 with P trade points*. Each tick it ships up to `P × capacity(R)` units:
 
 1. **It buys** at A's shelf, at A's posted price, as any buyer does — the fair-price ceiling
-   reads it like any other bid (`MARKETS.md`).
+   reads it like any other bid (Ben, 2026-10-10; `MARKETS.md`).
 2. **It pays the haul**, priced by the network from A to B (`LOGISTICS.md` § 1), and the goods
    travel as a convoy for the leg's travel time (`SUPPLY.md`), seen and interdicted along their
    lane.
@@ -85,7 +93,9 @@ campaign opens with (Ben, 2026-10-10).**
 - **After Industrialisation, the record is spent.** The trade points a history accumulated are
   consumed to **retrofit Planetary Marketplaces** where trade most likely took place: on the
   markets whose trade the history carried, owned by the corporations chartered there. A route
-  the history never traded gets no Marketplace for its sake.
+  the history never traded gets no Marketplace for its sake. How many points a nation earns per
+  unit of history trade or relation, and how the record converts into Marketplaces (count, size,
+  owner), are proposed by measurement and approved by Ben (2026-10-10), as the capacity table is.
 - **The 1960 settle** runs trade as play does, on the corporations' Marketplaces.
 - **The seat holds a Marketplace only if its corporation has one by the end of generation**
   (Ben, 2026-10-10); the player builds the first otherwise.

@@ -26,7 +26,11 @@ production used to land in, list from, and draw on — and with it everything th
 
 - **Production lands on the shelf, and landing is selling.** What a building makes goes onto the
   shelf of its own market the tick it is made, and its owner is paid the quantity at that tick's
-  clearing price. A glut lands at a low price: that is the signal, and the maker feels it.
+  clearing price — the market is the counterparty, whether or not anyone bids (Ben, 2026-10-10).
+  A glut drives that price to the floor: that is the signal, and the maker feels it.
+- **The order book retires (Ben, 2026-10-10).** No standing buy or sell orders: everyone buys at
+  the posted price, under the fair-price ceiling. Procurement contracts are not the order book and
+  stay (`CONTRACTS.md`); they deliver from and to shelves.
 - **Everyone buys from the shelf.** A processor's inputs, a construction site's materials,
   building upkeep, procurement, the space programme and a launch's propellant are all bought on
   the shelf at the posted price, under the fair-price ceiling. A corporation buys even its own
@@ -37,8 +41,8 @@ production used to land in, list from, and draw on — and with it everything th
   seeds — is placed on the shelves of the markets the corporations sit in, each corporation's
   share on its own markets (`../generation/CORPORATION_GENERATION.md` § Pass 4b).
 
-**What retires with the pool.** Auto-surplus and the processor reservation; standing sell orders
-and their floor (step 4 below); the pad's propellant reserve; opening stock held until a bid; the
+**What retires with the pool.** Auto-surplus and the processor reservation; the order book (standing buy
+and sell orders, and the sell order's floor, step 4 below); the pad's propellant reserve; opening stock held until a bid; the
 corporation convoy and the market export (`TRADE.md` § What trades replaces); the workforce
 dial's stock-fed draws (`../ai/AI_OPPONENT.md` § 11 — with no pool, a plant's whole want is
 posted demand). Where a section below speaks of pools, auto-surplus, sell orders or the export,
