@@ -239,14 +239,12 @@ research decides what a corp may run, and nothing else does. See `docs/economy/P
 
 ---
 
-## `science` is REACHED, not SPENT
+## A gate is REACHED; research points are SPENT
 
-A `tech_gate` is a predicate over corp state: it asks whether a condition holds, and holds again
-next tick. **Nothing in the gate system debits anything.** So science is a threshold a corp passes,
-not a currency it pays down — and making it spendable *"would need an entirely different mechanism
-and would be a design change, not a wiring job."* That is precisely what BL-478 (ancient research
-spend) owns (NR-387), and what the research budget lines in BL-538 (treasury priority lines) would
-supply.
+A gate is a predicate: it asks whether a condition holds, and holds again next tick. **Nothing in
+the gate system debits anything.** A quest's deed is a gate of this kind. Research points are the
+other mechanism a spend needed: they accrue to the nation and are paid down on nodes
+(`docs/economy/RESEARCH.md` § Research points; Ben, 2026-10-10), never through a predicate.
 
 ---
 

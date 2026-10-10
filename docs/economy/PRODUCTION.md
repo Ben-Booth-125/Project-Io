@@ -314,8 +314,8 @@ belong here rather than there:
 
 There is **no industrial ancient-arc shortcut here** — the deliberate omission stands. The
 ancient arc reaches ordnance through the **Smithy** (§ The ancient chain), because unit upkeep
-draws ordnance every tick in either arc, and a corp whose campaign runs the ancient band must be
-able to make the one good its own army needs.
+draws ordnance every tick in either arc, and the ancient roster carries a route to the one good an
+army needs.
 
 #### Assembly Plant
 
@@ -939,7 +939,7 @@ noun register as `ceramics`/`dressed_stone`/`tools`.
 **The Smithy's second recipe is the ancient arc's route to `ordnance`** (BL-460, ancient
 ordnance) — the same building, same `iron_blooms + charcoal` basket as its steel recipe,
 switchable between the two (§ Alternate production methods). Unit upkeep draws ordnance every
-tick in either arc, so an ancient-band campaign (§ The era band) must be able to make it. See
+tick in either arc, so the ancient roster (§ The era band) carries a route to it. See
 § Fabricator above and `RESOURCES.md` § The two terminal goods.
 
 **The load-bearing authoring is the tag on the coal-fired `steel` recipe, not the additions.**
@@ -1112,19 +1112,13 @@ shared by both arcs), `ancient`, or `industrial` (BL-433, era band). Authored as
 `scripts/economy.lua` and `scripts/recipes.lua`; an unknown string is a **load-time error**, not a
 silent fallback, because a typo would quietly re-admit a space-era entry to the ancient roster.
 
-The campaign's band is derived from the history the world was generated with, never from the
-epoch (Ben, 2026-09-24, superseding the reading under which `world_params::epoch_year` picked it):
-each NATION is `industrial` iff the realm it grew from reaches the industrial rung at
-the 1960 fold — `roster_band_for_capacity`, the same derivation that dates a polity's
-`industrial_year` (`../lore/HISTORY.md` § Stage 4) — and `ancient` otherwise. The verdict is
-persisted on each nation and applied to the registry on a new game
-(`app::load_economy`) and on a loaded save (`load_game_from`) alike, so a save never opens on a
-band its world did not earn. A seed on which no polity crosses is an ancient-band campaign — it is
-never offered a Launchpad, the petroleum and propellant chains, or the spacecraft chain — and the
-sim is never reshaped to force the industrial answer (delegated reading, 2026-09-24, NEEDS_REVIEW).
-**The band is per nation and the registry actor-aware (Ben, 2026-09-25, NR-929):** a
-corporation's roster is masked on its own nation's band, and the per-world verdict above is
-read per nation — `ERAS.md` § Where the ladder starts owns the rule. Epoch 0 is retired (NR-920).
+**The campaign's band is `industrial` for every nation (Ben, 2026-10-10, overturning NR-929's band
+per nation):** every nation is playable and starts at the same tech level, so no nation's firms are
+held to the ancient roster. The band is fixed — not derived from the history, not from the epoch —
+and reads the same on a new game (`app::load_economy`) and on a loaded save (`load_game_from`). The
+Launchpad, the petroleum and propellant chains and the spacecraft chain are open to every nation's
+firms, gated only by tech and placement. `ERAS.md` § Where the ladder starts owns the rule. Epoch 0
+is retired (NR-920).
 
 **The band masks; it never removes.** A recipe's id is its index in the authored list and that id
 is *stored* in `building_component.recipe`, so a filter that compacted the list would silently

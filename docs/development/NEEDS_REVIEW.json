@@ -2021,6 +2021,43 @@
     "docs/generation/trees/TREES.md",
     "src/world/history_sim.cpp"
    ]
+  },
+  {
+   "id": "NR-1025",
+   "title": "DECISION TAKEN: four loose ends of the retired generation trees",
+   "raised": "2026-10-10",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Sprint 52 sibling-doc sweep (2026-10-10), after research left generation",
+   "what": "(1) The explorer set dissolves: it was the Empire rim milestone and its only reader was entry to the Exploration tree; who crosses water is now date (sea legs), harbour and military capacity (can_field_naval). (2) No hard fuel gate replaces the Industry tree's fuel gate; fuel within reach stays a soft input to industry points. (3) The wizard board keeps no research column: the history researches nothing. (4) A quest's deed reads the NATION as its subject (condition_set gains a nation subject where it has only corps), wired with the effects (BL-1274, tech effects wired). The ancient roster stays authored as reference content no campaign nation is offered.",
+   "why_it_matters": "Each removes a reader of tree state without inventing a new gate; overturn any by naming the quantity that should gate it.",
+   "options": [],
+   "recommendation": "Taken.",
+   "files": [
+    "docs/generation/CIVILISATION.md",
+    "docs/generation/EXPLORATION.md",
+    "docs/generation/INDUSTRIALISATION.md",
+    "docs/ui/question_log.json"
+   ]
+  },
+  {
+   "id": "NR-1026",
+   "title": "What derives a nation's works lean (State Arsenal / Private Works) now the Industry tree is gone?",
+   "raised": "2026-10-10",
+   "kind": "question",
+   "status": "open",
+   "source": "Sprint 52 sibling-doc sweep (2026-10-10), after research left generation",
+   "what": "The Industry tree's fork between State Arsenal (heavy plant nation-owned) and Private Works (corporations own processing) fed the regime stub at the 1960 handover (INDUSTRIALISATION.md property 6, the stubs table). With no tree the lean has no source; the sweep left it written as open.",
+   "why_it_matters": "The regime stub, and how much of a nation's heavy plant its corporations may own at the epoch, read this lean.",
+   "options": [
+    "A: derive it from charter reach - the share of the realm's processing plant held by chartered firms at the 1960 fold (an in-world quantity with a visible cause)",
+    "B: drop the lean; the regime reads subject history and world war only",
+    "C: seed it from the nation's character enums"
+   ],
+   "recommendation": "A.",
+   "files": [
+    "docs/generation/INDUSTRIALISATION.md"
+   ]
   }
  ]
 }

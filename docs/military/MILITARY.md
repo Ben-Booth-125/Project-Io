@@ -419,9 +419,8 @@ graduated dial; quantity-scaled readiness is a follow-on.
 **`campaign_roster_band_for(era_band)` derives the band from the campaign's own era.** It is
 fixed at no single value, and it is **not** derived from a military-capacity score — that is the
 Era −1 settlement model — but from `recipe_registry::era()`, the same coarse ancient/industrial
-split every other era gate reads — the campaign band derived from the history's industry state at
-the 1960 fold (`../economy/ERAS.md` § Where the ladder starts): a world whose history never crossed
-the industrial rung opens at the roster's lowest band (`classical`), one that did at its highest
+split every other era gate reads. Every nation opens on the industrial band (`../economy/ERAS.md`
+§ Where the ladder starts; Ben, 2026-10-10), so the campaign roster opens at its highest band
 (`industrial`). Because bands are
 cumulative, every earlier row the corp's ground supports is exposed either way.
 
@@ -690,12 +689,9 @@ first terminal military good (BL-457, ordnance), added so this draw has somethin
 Naming a good here is a one-line `economy.lua` change, never a code change.
 
 > **The ordnance recipe is industrial.** The Fabricator recipe that makes ordnance is tagged
-> `era = "industrial"` (`scripts/recipes.lua` id 27), and a campaign whose derived band is
-> ancient (`recipe_registry::era()`, `src/world/recipe_registry.hpp`; `../economy/ERAS.md` § Where
-> the ladder starts) masks it out of the allowed recipes. So
-> an ancient-band campaign cannot produce the good its upkeep draws; the draw goes unmet and the
-> decay rule fires. That is the rule working as written, and a fact to price against when the
-> rates are set.
+> `era = "industrial"` (`scripts/recipes.lua` id 27). Every nation opens on the industrial band
+> (`../economy/ERAS.md` § Where the ladder starts; Ben, 2026-10-10), so the good every unit's upkeep
+> draws is one every nation's firms may make.
 
 **One decay rule, two triggers.** A unit is unsupplied if it sits beyond the reach field *or* its
 goods draw went unmet. Both fire the **same** subtraction on `supply_factor_permille`, because both

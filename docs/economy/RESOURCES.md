@@ -361,9 +361,10 @@ needs, so the one value serves both.
 Re-derive if either input's price or the recipe quantities move.
 
 **It has a producer in every era band.** The Fabricator recipe carries `era = "industrial"`, and
-unit upkeep draws ordnance every tick regardless of band, so an ancient-band campaign
-(`docs/economy/PRODUCTION.md` § The era band — which roster a campaign sees; the band is the
-history's, `docs/economy/ERAS.md` § Where the ladder starts) needs an ancient producer too: the
+unit upkeep draws ordnance every tick regardless of band, so the ancient roster
+(`docs/economy/PRODUCTION.md` § The era band — which roster a campaign sees; every campaign nation
+opens on the industrial band, `docs/economy/ERAS.md` § Where the ladder starts) carries a producer
+too: the
 Smithy — the same building that turns
 `iron_blooms + charcoal` into steel — carries an alternate recipe to `ordnance` at the identical
 basket (`docs/economy/PRODUCTION.md` § The ancient chain). `chain_depth`'s R1b row (producer and

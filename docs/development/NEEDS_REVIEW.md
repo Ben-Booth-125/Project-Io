@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*100 entries — 20 open, 80 resolved.*
+*102 entries — 22 open, 80 resolved.*
 
 ---
 
@@ -212,6 +212,32 @@ Ben ruled ocean crossings in generation gated by date. The two sibling pieces th
 > **Recommendation:** Taken.
 
 *Files: `docs/generation/trees/TREES.md`, `src/world/history_sim.cpp`*
+
+### NR-1025 — DECISION TAKEN: four loose ends of the retired generation trees
+*decision taken on your behalf · raised 2026-10-10 · from Sprint 52 sibling-doc sweep (2026-10-10), after research left generation*
+
+(1) The explorer set dissolves: it was the Empire rim milestone and its only reader was entry to the Exploration tree; who crosses water is now date (sea legs), harbour and military capacity (can_field_naval). (2) No hard fuel gate replaces the Industry tree's fuel gate; fuel within reach stays a soft input to industry points. (3) The wizard board keeps no research column: the history researches nothing. (4) A quest's deed reads the NATION as its subject (condition_set gains a nation subject where it has only corps), wired with the effects (BL-1274, tech effects wired). The ancient roster stays authored as reference content no campaign nation is offered.
+
+**Why it matters.** Each removes a reader of tree state without inventing a new gate; overturn any by naming the quantity that should gate it.
+
+> **Recommendation:** Taken.
+
+*Files: `docs/generation/CIVILISATION.md`, `docs/generation/EXPLORATION.md`, `docs/generation/INDUSTRIALISATION.md`, `docs/ui/question_log.json`*
+
+### NR-1026 — What derives a nation's works lean (State Arsenal / Private Works) now the Industry tree is gone?
+*question · raised 2026-10-10 · from Sprint 52 sibling-doc sweep (2026-10-10), after research left generation*
+
+The Industry tree's fork between State Arsenal (heavy plant nation-owned) and Private Works (corporations own processing) fed the regime stub at the 1960 handover (INDUSTRIALISATION.md property 6, the stubs table). With no tree the lean has no source; the sweep left it written as open.
+
+**Why it matters.** The regime stub, and how much of a nation's heavy plant its corporations may own at the epoch, read this lean.
+
+- A: derive it from charter reach - the share of the realm's processing plant held by chartered firms at the 1960 fold (an in-world quantity with a visible cause)
+- B: drop the lean; the regime reads subject history and world war only
+- C: seed it from the nation's character enums
+
+> **Recommendation:** A.
+
+*Files: `docs/generation/INDUSTRIALISATION.md`*
 
 ---
 

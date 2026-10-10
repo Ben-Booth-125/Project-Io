@@ -137,7 +137,7 @@ indexed by them):
 | `logistics_maintenance` | keeping the road/hub network standing (LOGISTICS.md) |
 | `schooling` | population capability |
 | `military_research` | force-side research, and a nation's own garrison upkeep (MILITARY.md § Nation garrisons) |
-| `academic_research` | the civil tech ladder — `science` is reached, not spent, and this is the debit BL-478 (ancient research spend) is shaped around |
+| `academic_research` | the civil tech ladder — treasury the line spends converts to the nation's research points (`../economy/RESEARCH.md` § Research points) |
 | `public_exploration` | state-funded survey — DISCOVERY.md's geographic fog |
 | `contracted_force` | buying force the nation does not raise — BL-572 (contract offers) derives an offer from this line's spendable share; the contract form itself carries no sell side to buy through (CONTRACTS.md § Explicitly out of scope) |
 | `strategic_reserve` | buying goods to **hold** — through BL-350's procurement seam from a named supplier, never on the market. Distinct from `reserve_fraction`, which withholds credits; this line spends them |
@@ -409,8 +409,8 @@ Ben: *"Treasury can be used for things that it is used for in the real world. Lo
 maintenance, Schooling, Military research, Academic research, public space exploration."*
 
 A nation holds **weights, not amounts** — § What a nation holds 3 is this ruling made data. Every
-line spends through machinery Io already has. Research in particular is the **debit mechanism
-BL-478 (ancient research spend) is shaped around**, since `science` is reached, not spent.
+line spends through machinery Io already has. Research in particular converts treasury into the
+nation's research points, which buy nodes of the age's tree (`../economy/RESEARCH.md`).
 
 *Owned by BL-537 (national budget) and BL-538 (treasury priority lines).*
 

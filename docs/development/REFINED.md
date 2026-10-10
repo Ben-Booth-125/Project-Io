@@ -17,7 +17,7 @@ never re-bless; BL-1277 owns the one re-bless. Ben's live click for BL-1276.
 - [x] D2 DIGITISATION_TREE.md + `digitisation_tree.json` (160 nodes) + `tools/session/tech_tree_store.js`.
 - [x] D3 TREES.md retired with the gate table; the four generation tree docs bannered; ERAS.md band
   fixed industrial; AI_OPPONENT.md § 11 research-queue grant.
-- [ ] D4 Sibling sweep of the generation, economy, politics and UI docs (agent, in place).
+- [x] D4 Sibling sweep of the generation, economy, politics and UI docs (agent, in place).
 
 ### Wave 1 — two lanes (worktrees)
 
