@@ -16,7 +16,7 @@
 --   R3  (captured) the card shows the "Refunds:" line under the net
 
 verify.window(1920, 1080)
-verify.econ_step(6) -- background firms start building
+verify.econ_step(24) -- background firms start building (6 was enough before sprint 50 made firms build only what runs)
 
 verify.show_seat_screen(true)
 verify.frames(3)
