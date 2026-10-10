@@ -415,13 +415,12 @@ pool warmed only by the pre-game ticks. Generated, not a flat give:
 
 A corp that placed no holdings (a deposit-poor nation) has no home body and gets no pool.
 
-**Opening stock is held, not listed, until someone bids for it (Ben, 2026-10-09; BL-1217, G1
-plants running).** The opening stockpile sits in the corporation's pool. It is not offered on a
-market shelf for a good that market has not yet bid for. Without this, the first clear shows
-steel and refined fuel listed everywhere and bid for nowhere: their consumers are drawing on their
-own opening stock, so the market reads a glut that does not exist, and the plants that make
-those goods are dialled to zero before the real demand registers. Once a market bids for a good,
-opening stock of it is listed by the ordinary sell rules.
+**The opening stock goes on the shelves (Ben, 2026-10-10; `../economy/MARKETS.md` § The shelf
+economy).** Corporations hold no stockpiles. The stockpile this pass generates — the same total,
+by the same weights — is placed on the shelves of the markets each corporation sits in, its share
+split over its own markets. It is the market's from then on; nothing holds it back from sale.
+This supersedes the earlier rule that held opening stock in the corporation's pool until a market
+bid for it (Ben, 2026-10-09).
 
 ### Pass 5 — Naming
 

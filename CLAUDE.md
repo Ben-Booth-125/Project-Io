@@ -79,6 +79,7 @@ owning doc(s) for a source file, ranked by how often work on it cited each — t
 | `docs/economy/CONTRACTS.md` | Promises between named parties: procurement, the buy side. |
 | `docs/economy/LOGISTICS.md` | The network: traversal cost, reach, roads, scale/travel time, interdiction, Logistic Points. *Logistics is the road.* |
 | `docs/economy/SUPPLY.md` | The flow: convoys — cargo, dispatch, cost, arrival. *Supply is the traffic.* |
+| `docs/economy/TRADE.md` | How goods move between markets: the Planetary Marketplace, trade points, per-resource capacity, auto and reserved trades, trade through the generation rounds. |
 | `docs/economy/TILES.md` | Two-axis terrain, deposit profiles, amenity tiles. |
 | `docs/economy/POPULATION.md` | Population centres, agglomeration, habitability, labour supply and contention. |
 | `docs/economy/ERAS.md` | The era ladder and the gate into space. |

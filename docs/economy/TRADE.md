@@ -71,6 +71,31 @@ Each owner chooses, per Marketplace or for all of them, how much of its trade po
 set **manual** trades as well as run auto — a grant in `../ai/AI_OPPONENT.md` § 11 — under the
 grant constraints every AI decision is bound by.
 
+## Trade in generation
+
+**Trade runs through every round of the history, and its record places the Marketplaces the
+campaign opens with (Ben, 2026-10-10).**
+
+- **The Exploration age (1200–1660) and the Industrialisation span (1660–1960):** a nation earns
+  **trade points** where it trades, or where its relations with another are good. Those points
+  move goods between the markets of the nations that hold them, by the same capacity and the same
+  network, and they replace the Exploration age's trade flows (`../generation/EXPLORATION.md`).
+  The history's points are a nation's, not a corporation's: no corporation exists before the
+  charter walk.
+- **After Industrialisation, the record is spent.** The trade points a history accumulated are
+  consumed to **retrofit Planetary Marketplaces** where trade most likely took place: on the
+  markets whose trade the history carried, owned by the corporations chartered there. A route
+  the history never traded gets no Marketplace for its sake.
+- **The 1960 settle** runs trade as play does, on the corporations' Marketplaces.
+- **The seat holds a Marketplace only if its corporation has one by the end of generation**
+  (Ben, 2026-10-10); the player builds the first otherwise.
+
+## The capacity table
+
+Each resource's trade capacity is authored in data. The first table is proposed by measurement:
+values set, read on the market-viability gate across the curated seeds, and put to Ben for
+approval (Ben, 2026-10-10). No value is final until he has approved it.
+
 ## What trade replaces
 
 The corporation convoy (a pool hauling its own surplus), the market export (a market shipping

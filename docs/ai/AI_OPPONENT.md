@@ -2003,3 +2003,20 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   **What it does NOT admit.** No forecast of future household growth, no reservation against a
   rival's plan, nothing for the player's corp. Pure, seeded, deterministic, replayable, legal
   verbs only, never a planner.
+
+
+  **A rival may set its own trades (Ben, 2026-10-10; `../economy/TRADE.md`).** Trade is the only
+  way goods move between markets, and the player and every AI corporation trade. The grant: an AI
+  corporation may set, change and clear **manual trades** with the trade points its own Planetary
+  Marketplaces make — a route from one market's shelf to another's, a resource, and the points on
+  it — chosen by the scorer's ordinary estimate (the route's margin per point: destination price
+  less source price less the network's haul), and may set how much of its points it reserves from
+  auto. Auto trade itself is a system rule, not an AI decision, and needs no grant.
+
+  **What it admits.** One verb family — set, change, clear a trade; set the reserve — over the
+  corporation's own points, read from public prices and the network's haul. No read of another
+  corporation's trades, points or plans beyond what is observable on the map.
+
+  **What it does NOT admit.** No coordination between corporations; no trade on another owner's
+  points; nothing for the player's corp beyond its own opt-out dial. Pure, seeded,
+  deterministic, replayable, legal verbs only, never a planner.
