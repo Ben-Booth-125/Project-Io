@@ -1951,6 +1951,15 @@
    "what": "AI_OPPONENT.md § Candidate enumeration ('A power-plant candidate is priced against its grid's shortfall', Ben 2026-10-07) and PRODUCTION.md § Power ('The scorer's power-plant estimate reads the same per-grid gap, and counts plants already under construction') state the scorer's power gate as the design. The code does not do it: corp_ai.cpp scores power recipes like any other processor group (~1586-1796); the gate exists only on branch bl1232-gate-remeasure (14969c85), unmerged, HELD by Ben. BL-1232 (power plants per grid) is complete, so no open item owns the held part. CALL: (a) file a backlog item that re-measures and merges the gate, docs unchanged; or (b) withdraw the rule from both docs until it is re-ruled.",
    "resolved": "2026-10-10",
    "resolution": "Ben, 2026-10-10 (doc-check form): file an item to re-measure the gate on the current tip, then merge or drop -> BL-1263 (power gate remeasure). Also ruled: power inputs read the grid too -> BL-1264 (power input on grid)."
+  },
+  {
+   "id": "NR-992",
+   "title": "Novel work: retire corporation pools - all production lands on market shelves (Ben, 2026-10-10)",
+   "raised": "2026-10-09",
+   "kind": "novel-work",
+   "status": "open",
+   "source": "Ben, sprint 50 close, the market stock form",
+   "what": "Ben (2026-10-10): remove corporation stockpiles - all of them, production lands on the shelf - and push initial goods to markets (the same total, redistributed to the markets the corporations sit in), to simplify the model and fix construction at game start; build now in sprint 50. Flagged as large scope growth mid-close: pools carry production, own-input draws, sell orders, corporation convoys, the launch fuel reservation, procurement, upkeep and the space programme, and several of this sprint’s rulings read pools (opening stock held, the dial’s stock-fed draws, R2’s spare charge). Paused for Ben’s design calls (who owns shelf goods; what replaces corporation hauling; extend 50 or own sprint) before any build. Owning docs to rewrite: MARKETS, PRODUCTION, SUPPLY, FINANCE, CORPORATION_GENERATION, AI_OPPONENT."
   }
  ]
 }
