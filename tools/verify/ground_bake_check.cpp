@@ -1430,6 +1430,8 @@ void crisp_row(const bake_source& src, const bake_params& p, const char* suffix)
         char path[160];
         std::snprintf(path, sizeof path, "crisp_%s%s.png", s.name, suffix);
         write_png_rgba(path, W, H, reinterpret_cast<const unsigned char*>(a.data()), W * 4);
+    }
+}
 
 // ---------------------------------------------------------------------------
 // BL-1253 (roads painted), RENDERING.md § Roads and sea lanes.
