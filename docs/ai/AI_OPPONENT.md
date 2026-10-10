@@ -2020,3 +2020,16 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   **What it does NOT admit.** No coordination between corporations; no trade on another owner's
   points; nothing for the player's corp beyond its own opt-out dial. Pure, seeded,
   deterministic, replayable, legal verbs only, never a planner.
+
+  **An AI nation may fill its own research queue (Ben, 2026-10-10; `../economy/RESEARCH.md` § The
+  research queue).** Every nation holds technology and researches from a queue. The grant: a
+  non-player nation's scorer may append **one frontier node at a time** to its own queue — a node
+  whose requirements it holds or has queued — chosen by the relief the node's effects give the
+  nation's binding terms, less its cost. The player's nation is never queued for.
+
+  **What it admits.** One verb — *queue a node* — over the nation's own tree, read from the nation's
+  own state and the tree's public shape. It may take a side of a pick-one pair by that same score.
+
+  **What it does NOT admit.** No plan beyond the next node; no read of another nation's queue or
+  holdings beyond what is observable; no deed pursued — a quest's deed is read, never acted toward.
+  Pure, seeded, deterministic, replayable, legal verbs only, never a planner.

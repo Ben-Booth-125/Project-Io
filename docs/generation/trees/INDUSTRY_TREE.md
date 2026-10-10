@@ -10,9 +10,13 @@
 > the unit roster and its band boundary (../MILITARY_HISTORY) · the other two trees
 > (EMPIRE_TREE, EXPLORATION_TREE) · the exploration age's own tree, which now holds the
 > maritime and chartering subjects this tree used to (EXPLORATION_TREE) · the 1960+
-> campaign tree (DIGITISATION_TREE).
+> campaign tree (../../economy/tech/DIGITISATION_TREE).
 > **Confused with:** ../../research/ANCIENT_TECH_LADDER.md, ../../research/TECH_EFFECTS.md,
 > ../../economy/RESEARCH.md, ../CORPORATION_GENERATION.md.
+
+> **RETIRED (Ben, 2026-10-10).** Research is removed from generation and nothing reads this tree; it
+> is the record of a retired design. What it gated is gated by date now (`TREES.md`); technology is
+> the campaign's (`../../economy/RESEARCH.md`).
 
 The Industry tree is the last of the four trees `TREES.md` defines, and it runs inside
 **Industrialisation, 1660 → 1960** (`../INDUSTRIALISATION.md`) — not the whole economy pass. The pass split

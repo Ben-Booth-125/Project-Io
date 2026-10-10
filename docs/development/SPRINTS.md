@@ -96,7 +96,24 @@ Ben, 2026-10-07: sprint 51 takes the player trading loop and the visibility suit
 
 Serial, not parallel (Ben, 2026-10-07, after a collision check): the lens and strip files (body_surface_canvas.cpp, overlay.cpp, icons.*) are sprint 50's BL-1222 (trade-flow lens) and BL-1225 (every lens on strip), and the panels' predictions read the tick that BL-1217 (inputs reach processors) may change.
 
-### Sprint 52 — the player is a nation
+### Sprint 52 — the Digitisation tech tree
+*Open · opened 2026-10-10 · Ben (2026-10-10: tech trees for the eras; research leaves generation; every nation starts equal; approved the 160-node tree as a delivery; all nations playable on the industrial band)*
+
+**Goal.** Every nation researches the Digitisation tree from an equal start - a research pool, a queue it can plan, 160 nodes of travel, minor, major and quest - and the history no longer researches at all.
+
+**Planned.**
+- WAVE 0 - THE DOCS. BL-1271 (Digitisation tree store): RESEARCH.md, DIGITISATION_TREE.md, the store and its check; TREES.md retired; the sibling sweep.
+- WAVE 1 - TWO LANES. BL-1272 (generation without research), a world-mover reporting movement; BL-1273 (nation tech state), the campaign core.
+- WAVE 2 - ON THE CORE. BL-1274 (tech effects wired), BL-1275 (nation research AI), BL-1276 (tech tree panel, Ben's live click).
+- CLOSE - BL-1277 (tech wave re-bless), described by shape, authorised by Ben.
+
+**Done when.** Every nation opens holding nothing and researches through its queue on a 16-seed run; the history carries no tree; Ben has queued a path in the live panel; one re-bless authorised.
+
+**Risk.** Two world-movers in one wave (the trees leaving generation; the band fixed industrial) - each measures its own before/after so the one re-bless can name both causes. 160 effects over levers that mostly do not exist yet - declared unread, never silent.
+
+Sprint 52 was the player-is-a-nation pivot until 2026-10-10; that sprint is now 53 (Ben).
+
+### Sprint 53 — the player is a nation
 *Proposed · Ben (2026-10-08: move the player to nations with space programmes, put it in sprint 52, cancel sprint 52's items and every untagged item)*
 
 **Goal.** The player plays a nation that runs a space programme, with a space corporation tied to it that can still acquire and raise funds internationally; generation decides how many nations run a programme.
@@ -110,7 +127,7 @@ Serial, not parallel (Ben, 2026-10-07, after a collision check): the lens and st
 
 **Risk.** The identity change was ruled once already three weeks ago (NR-885); a half-swept corpus is worse than either identity. Sweep before build, and grep the old wording (same-day rulings orphan siblings).
 
-Ben, 2026-10-08: cancelled 43 items to clear the sprint - 'if they're important we will reinvent them.' They restore with archive_landed.js --restore <ids>.
+Ben, 2026-10-08: cancelled 43 items to clear the sprint - 'if they're important we will reinvent them.' They restore with archive_landed.js --restore <ids>. Moved from sprint 52 to 53 (Ben, 2026-10-10): sprint 52 became the Digitisation tech tree.
 
 ## Where things stand
 
@@ -186,10 +203,11 @@ Ben, 2026-10-08: cancelled 43 items to clear the sprint - 'if they're important 
 | 49 | market viability | CLOSED 2026-10-07 on main: 16-seed market_viability G1 54.7 (FAIL, target 70) / G2 54.4 (PASS) / G3 88.9 (PASS); baseline was G1 17.6 / G2 27.5 / G3 31.3. G1 carried to sprint 50 as BL-1217 (inputs reach processors); seat profit 15/16. |
 | 50 | logistics and trade flow | Integrated 16-seed gate 2026-10-09 (39907baf, all wave 2b + G1b + BL-1195 merged; pooled by hand): G1 96.6 (1739/1801) PASS, G1b 1.9 (35) PASS, G1 t50 86.7 (2283/2633; deferred, passes), G2 95.8 PASS, G3 96.3 PASS; play income 34,922/seed-tick (smaller economy accepted with G1b R2). Sprint start: G1 54.7, G2 54.4, G3 88.9. Owed: BL-1252 no parallel roads (running), BL-1119 R4/R6 (quiet machine), live clicks (Build door wrong-air, sea-route convoy), close (doc check, BL-1165, the one re-bless with Ben, retro, cut, integrate to main). MERGED TO MAIN pre-shelf (Ben, 2026-10-10): the shelf economy and trade extension (BL-1265..BL-1270) and the one re-bless land on main later; sprint 50 stays open until then. |
 | 51 | visibility: the player's trading loop | PROPOSED 2026-10-07. Opens after sprint 50 closes - serial by Ben's call (2026-10-07): its surfaces read the dispatch and pricing rules sprint 50 is still moving. |
-| 52 | the player is a nation | PROPOSED 2026-10-08. A design-first sprint: rule the identity, sweep the docs, then cut the build. Sequencing against sprint 51 not yet ruled. |
+| 52 | the Digitisation tech tree | OPEN 2026-10-10. Designed and approved in one session (160 nodes, nation-held, a research queue); built on claude/tech-trees-game-eras-8036ed. |
+| 53 | the player is a nation | PROPOSED 2026-10-08. A design-first sprint: rule the identity, sweep the docs, then cut the build. Sequencing against sprint 51 not yet ruled. |
 
-**Next up.** SPRINT 50 OPEN (2026-10-07), logistics and trade flow; merged to main pre-shelf 2026-10-10 (Ben), the shelf/trade extension (BL-1265..BL-1270) and the one re-bless still owed; wave 0 instruments (BL-1223 gate logistics row, BL-1222 trade-flow lens), wave 1 diagnoses BL-1217 (inputs reach processors), wave 2 fixes in ranked order, wave 3 network shape (BL-1195, BL-1119), close with BL-1165 and one re-bless. SPRINT 51 PROPOSED, a visibility run over the player's trading loop; it opens after sprint 50 closes. SPRINT 52 PROPOSED (2026-10-08): the player is a nation (BL-1245); design first, NR-1020.
+**Next up.** SPRINT 50 OPEN (2026-10-07), logistics and trade flow; merged to main pre-shelf 2026-10-10 (Ben), the shelf/trade extension (BL-1265..BL-1270) and the one re-bless still owed; wave 0 instruments (BL-1223 gate logistics row, BL-1222 trade-flow lens), wave 1 diagnoses BL-1217 (inputs reach processors), wave 2 fixes in ranked order, wave 3 network shape (BL-1195, BL-1119), close with BL-1165 and one re-bless. SPRINT 51 PROPOSED, a visibility run over the player's trading loop; it opens after sprint 50 closes. SPRINT 52 OPEN (2026-10-10): the Digitisation tech tree (BL-1271..BL-1277), on claude/tech-trees-game-eras-8036ed. SPRINT 53 PROPOSED (2026-10-08): the player is a nation (BL-1245); design first, NR-1020.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*68 sprints archived cold; 3 open/gated in the hot store.*
+*68 sprints archived cold; 4 open/gated in the hot store.*

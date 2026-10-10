@@ -349,7 +349,7 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 52,
+   "sprint": 53,
    "written": "2026-10-08",
    "requires": [],
    "blocked_on": null,
@@ -1057,6 +1057,215 @@
    ],
    "title": "The first trade capacity table, Marketplace and Port point rates and upkeep, proposed by measurement and approved by Ben",
    "design": "DESIGNED: TRADE.md § The capacity table (Ben, 2026-10-10). Propose per-resource capacity, Marketplace and Port trade point rates, and trade-building upkeep; read the 16-seed market-viability gate with absolute counts; put the table to Ben. Not final until he approves. Handoff: docs/development/HANDOFF_SHELF_TRADE.md."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 52,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the tech-tree design session: 160 nodes approved, build as a delivery); filed by Claude",
+   "id": "BL-1271",
+   "short_name": "DIGITISATION_TREE_STORE",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 2,
+   "authority_doc": "docs/economy/tech/DIGITISATION_TREE.md",
+   "requires": [],
+   "files": [
+    "docs/economy/tech/DIGITISATION_TREE.md",
+    "docs/economy/tech/digitisation_tree.json",
+    "docs/economy/RESEARCH.md",
+    "tools/session/tech_tree_store.js",
+    "docs/generation/trees/TREES.md"
+   ],
+   "title": "The Digitisation tree is written down: its authority doc, its 160-node store, and a check that holds the store to the grammar",
+   "design": "DESIGNED: RESEARCH.md (the grammar, the queue, the nation holder) and DIGITISATION_TREE.md (the nodes). The doc-and-tool half of sprint 52: the store is canonical, the doc carries its rendered tables, tech_tree_store.js --check fails on a broken rule or a stale table. Every number in the store is a placeholder (Ben, 2026-10-10)."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 52,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the tech-tree design session: 160 nodes approved, build as a delivery); filed by Claude",
+   "id": "BL-1272",
+   "short_name": "GENERATION_WITHOUT_RESEARCH",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 4,
+   "authority_doc": "docs/generation/trees/TREES.md",
+   "requires": [],
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/history_sim.hpp",
+    "src/world/era_minus_one.cpp",
+    "src/world/tree_effect.hpp",
+    "src/world/empire_tree_data.hpp",
+    "src/world/exploration_tree_data.hpp",
+    "src/world/industry_tree_data.hpp",
+    "tools/session/gen_empire_tree_table.js",
+    "tools/session/tree_lint.js",
+    "tools/verify/history_sim_harness.cpp",
+    "tools/verify/exploration_sim_harness.cpp",
+    "tools/verify/industrialisation_sim_harness.cpp",
+    "tools/verify/industry_concentration.cpp",
+    "tools/verify/exploration_sweep.cpp",
+    "tools/verify/history_sweep.cpp",
+    "tools/verify/world_cursor_equivalence.cpp"
+   ],
+   "title": "The pre-game history runs no technology trees: no polity holds, earns or invests in a node, and what the trees gated is gated by measured dates",
+   "design": "DESIGNED: TREES.md (retired; the table of what each gate became). Remove the three invested trees from the Invest verb and every reader; sea legs (Ben: by date), the third road rung and coastal naval points gated by dates MEASURED as the median polity's acquisition year in the last-blessed history; tree modifiers and the industry-tree industry-points credit go. A world-mover: report digest movement, never re-bless (BL-1277 owns the one re-bless)."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 52,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the tech-tree design session: 160 nodes approved, build as a delivery); filed by Claude",
+   "id": "BL-1273",
+   "short_name": "NATION_TECH_STATE",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 5,
+   "authority_doc": "docs/economy/RESEARCH.md",
+   "requires": [
+    "BL-1271"
+   ],
+   "files": [
+    "src/world/nation_tech.hpp",
+    "src/world/nation_tech.cpp",
+    "src/world/digitisation_tree_data.hpp",
+    "tools/session/gen_tech_tree_table.js",
+    "src/world/world.hpp",
+    "src/world/components.hpp",
+    "src/world/nation_step.cpp",
+    "src/world/world_save.cpp",
+    "src/world/world_save.hpp",
+    "src/world/tech_gate.cpp",
+    "src/world/tech_gate.hpp",
+    "src/world/condition_set.cpp",
+    "src/world/hard_coded_world.cpp",
+    "src/world/finish_campaign_world.cpp",
+    "src/world/economy_system.cpp",
+    "tools/verify/nation_tech_harness.cpp"
+   ],
+   "title": "Every nation holds a Digitisation tree state, a research-point pool and a research queue, starts holding nothing, and researches by the queue",
+   "design": "DESIGNED: RESEARCH.md § Who holds technology, § Research points, § The research queue. Nation tech state (held set over 160 nodes, pool, queue) saved; RP from the academic-research budget line plus staffed Universities and research institutes; queue resolution with AND requirement groups, pick-one guard, deed-waiting quests, overflow; every nation starts holding nothing and on the industrial band (ERAS.md, Ben 2026-10-10). The old per-corp earned_techs gates and scripts/tech_tree.lua retire (NR-1022)."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 52,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the tech-tree design session: 160 nodes approved, build as a delivery); filed by Claude",
+   "id": "BL-1274",
+   "short_name": "TECH_EFFECTS_WIRED",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 4,
+   "authority_doc": "docs/economy/RESEARCH.md",
+   "requires": [
+    "BL-1273"
+   ],
+   "files": [
+    "docs/economy/tech/digitisation_tree.json",
+    "src/world/nation_tech.cpp",
+    "src/world/modifier_set.hpp",
+    "src/world/economy_system.cpp",
+    "src/world/supply_system.cpp",
+    "src/world/recipe_registry.hpp",
+    "tools/verify/nation_tech_harness.cpp"
+   ],
+   "title": "Every Digitisation node moves the lever it names, or is declared unread and listed by a harness",
+   "design": "DESIGNED: RESEARCH.md § Effects no system reads yet. Give each node a machine effect (recipe unlock, structure unlock, modifier subject x scope x value, mechanic key, or declared unread). Wire the levers the game carries now (extraction_rate, processing_yield, logistics_cost, wage_floor, unit_upkeep, the named recipe unlocks); declare the rest unread with the system each waits on. Never a silent node."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 52,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the tech-tree design session: 160 nodes approved, build as a delivery); filed by Claude",
+   "id": "BL-1275",
+   "short_name": "NATION_RESEARCH_AI",
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 3,
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "requires": [
+    "BL-1273"
+   ],
+   "files": [
+    "src/world/nation_ai.cpp",
+    "src/world/nation_ai.hpp",
+    "src/world/nation_tech.cpp",
+    "tools/verify/nation_tech_harness.cpp"
+   ],
+   "title": "An AI nation fills its research queue one frontier node at a time, by its scorer",
+   "design": "DESIGNED: AI_OPPONENT.md § 11 (an AI nation may fill its own research queue, Ben 2026-10-10) and RESEARCH.md § The research queue. One verb, queue a frontier node; score = relief to the nation's binding terms less cost; the player's nation never queued for; pure, seeded, replayable."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 52,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the tech-tree design session: 160 nodes approved, build as a delivery); filed by Claude",
+   "id": "BL-1276",
+   "short_name": "TECH_TREE_PANEL",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 4,
+   "authority_doc": "docs/economy/RESEARCH.md",
+   "requires": [
+    "BL-1273"
+   ],
+   "files": [
+    "src/ui/tech_tree_panel.cpp",
+    "src/ui/tech_tree_panel.hpp",
+    "src/core/app.cpp",
+    "src/core/verify_api.cpp",
+    "scripts/verify/tech_tree_panel.lua",
+    "docs/ai/ACTIONS.json",
+    "docs/ui/question_log.json",
+    "docs/ui/ui_elements.json"
+   ],
+   "title": "The research panel draws the Digitisation tree as a ring of three trees, shows every node's exact advantage, and lets me queue a path and see when it arrives",
+   "design": "DESIGNED: RESEARCH.md § The shape of an age's tree and § The research queue; the render approved in the design session (inspect + plan modes). Replaces the F9 constellation of scripts/tech_tree.lua. Tiers distinguishable at a glance; AND links marked; hover/press shows advantage, cost, requirements, deed; plan mode queues a node with its prerequisites and shows arrival quarters. Needs Ben's live click."
+  },
+  {
+   "status": "designed",
+   "glyph": "✓",
+   "sprint": 52,
+   "written": "2026-10-10",
+   "parked": false,
+   "blocked_on": null,
+   "author": "Ben (2026-10-10, the tech-tree design session: 160 nodes approved, build as a delivery); filed by Claude",
+   "id": "BL-1277",
+   "short_name": "TECH_WAVE_REBLESS",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 2,
+   "authority_doc": "docs/generation/trees/TREES.md",
+   "requires": [
+    "BL-1272",
+    "BL-1273",
+    "BL-1274"
+   ],
+   "files": [
+    "docs/generation/seed_library.json"
+   ],
+   "title": "Sprint 52's one re-bless: the world without generation research, on the industrial band, described by shape and authorised by Ben",
+   "design": "DESIGNED: DELIVERY.md § The digest re-bless is one act per wave. Before/after per cause (BL-1272 tree removal; BL-1273 band fixed industrial; BL-1274 effects if any move the opening), described in world shape; Ben authorises against the description."
   }
  ]
 }

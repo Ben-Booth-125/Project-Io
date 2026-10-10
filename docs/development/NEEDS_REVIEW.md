@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*97 entries — 17 open, 80 resolved.*
+*100 entries — 20 open, 80 resolved.*
 
 ---
 
@@ -176,9 +176,42 @@ Ben (2026-10-10): remove corporation stockpiles - all of them, production lands 
 
 Direction is ruled: the player is a nation with a space programme, reversing NR-885. Six calls remain, listed in BL-1245's design: the player's nation verbs; the nation step and grant register skipping the player's nation; what replaces 'answer to' in the design test; whether the space corporation is a separate actor or the space_programme line; the how-many-programmes generation parameter and its default; the elimination rule.
 
-**Why it matters.** Every doc sweep and build item in sprint 52 reads these answers; NR-885's sweep touched 14 docs, and reversing it half-way leaves the corpus asserting two identities.
+**Why it matters.** Every doc sweep and build item in sprint 53 reads these answers; NR-885's sweep touched 14 docs, and reversing it half-way leaves the corpus asserting two identities.
 
 - Answer on one design form, then sweep in a single pass
+
+### NR-1022 — DECISION TAKEN: the old campaign tech gates and scripts/tech_tree.lua retire; what they gated is open to every nation
+*decision taken on your behalf · raised 2026-10-10 · from Sprint 52 cut (Ben approved the 160-node Digitisation tree as a delivery, 2026-10-10)*
+
+The four hand-authored gates (garrison -> military base, toolmaker, Bessemer steel, refined copper) and the ~150-node inert Lua tree retire with per-corporation earned_techs. Taken because every nation now starts at the same tech level holding nothing, and a second gating system over the nation's tree would contradict it. The military base, toolmaker and both recipes are open from the start.
+
+**Why it matters.** BL-344's military-base gate was the deliberate proof that tech reaches military outcomes; the Digitisation tree's Force branch carries that proof now. If any of the four should stay gated, it becomes a node.
+
+> **Recommendation:** Taken; overturn by naming the node it should become.
+
+*Files: `src/world/tech_gate.cpp`, `scripts/tech_tree.lua`*
+
+### NR-1023 — DECISION TAKEN: research points come from the academic-research budget line, Universities and research institutes, into the nation's pool
+*decision taken on your behalf · raised 2026-10-10 · from Sprint 52 cut (Ben approved the 160-node Digitisation tree as a delivery, 2026-10-10)*
+
+RESEARCH.md names the budget line and Universities. The corporation-level science float from research institutes (accrued, never spent) folds into the institute's nation's pool rather than surviving as a second currency. Rates are dials for the sweep against the pacing rule.
+
+**Why it matters.** A corporation's research institute now feeds its nation, not the firm; whether a firm should keep a research stake of its own is RESEARCH.md's open question.
+
+> **Recommendation:** Taken.
+
+*Files: `docs/economy/RESEARCH.md`, `src/world/economy_system.cpp`*
+
+### NR-1024 — DECISION TAKEN: the third road rung and coastal naval points follow sea legs to measured dates
+*decision taken on your behalf · raised 2026-10-10 · from Sprint 52 cut (Ben approved the 160-node Digitisation tree as a delivery, 2026-10-10)*
+
+Ben ruled ocean crossings in generation gated by date. The two sibling pieces the trees gated - the treasury-bought third road rung (Post Roads) and naval points from coastal sea technology - take the same rule: the median polity's acquisition year in the last-blessed history. Applied as the sibling of an approved fix.
+
+**Why it matters.** Without a gate the road rung opens from the start and naval points vanish, both bigger world movers than a date.
+
+> **Recommendation:** Taken.
+
+*Files: `docs/generation/trees/TREES.md`, `src/world/history_sim.cpp`*
 
 ---
 

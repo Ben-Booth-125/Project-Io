@@ -43,18 +43,12 @@ superseding the reading under which the epoch picked the band): generation reads
 world it builds is the one the Industrialisation span closes on at 1960 whatever start is asked for
 (`../generation/INDUSTRIALISATION.md`).
 
-**The recipe band comes from the history's industry state, PER NATION (Ben, 2026-09-25,
-NR-929, overturning the per-world reading of 2026-09-24).** A nation is `industrial` iff the realm
-it grew from reaches the industrial rung of the capacity ladder at the 1960 fold —
-`roster_band_for_capacity`, the same derivation that dates a polity's `industrial_year`
-(`docs/lore/HISTORY.md` § Stage 4) — and `ancient` otherwise. The verdict is persisted on the nation
-and applied on a new game and on a loaded save alike, so no nation opens on a band its history did
-not earn. **The registry is actor-aware:** a corporation's browsable roster is masked on its own
-nation's band, so an ancient nation's firms are never offered the Launchpad, the petroleum and
-propellant chains or the spacecraft chain while an industrial neighbour's are. A world on which
-every nation derives `ancient` is a legitimate world, and the sim is never reshaped to force the
-other answer. Grain finer than the band reaches play as the nation's technology (`../generation/trees/TREES.md` § Who holds a tree).
-The design of the actor-aware registry is BL-1123's (band per nation). **Epoch 0 is retired (Ben,
+**Every nation opens on the industrial recipe band (Ben, 2026-10-10, overturning NR-929's band
+per nation).** Every nation is playable and every nation starts the campaign at the same tech level
+(`RESEARCH.md` § Who holds technology), so no nation is held to an ancient roster: the Launchpad, the
+petroleum and propellant chains and the spacecraft chain are open to every nation's firms, gated only
+by technology and placement. The band is fixed, not derived from the history, and reads the same on a
+new game and a loaded save. **Epoch 0 is retired (Ben,
 2026-09-25, NR-920):** the epoch names the calendar only. `docs/development/ROADMAP.md` § The two arcs owns which is the commercial product,
 and this document owns only the Era structure, which is the same on both.
 
@@ -124,15 +118,10 @@ history; the search itself is BL-770 (Era 0 candidate search).
 ## Three things that say "era" in code, and which one this is
 
 - **`era_band`** (`src/world/recipe_registry.hpp`) tags each authored building type and recipe
-  `any` / `ancient` / `industrial`, and the registry masks each corporation's browsable roster on
-  its own nation's band: `industrial` iff the realm the nation grew from reaches the industrial
-  rung at the 1960 fold, `ancient` otherwise (§ Where the ladder starts; Ben, 2026-09-25,
-  NR-929). The band is read off the finished history and never by it, so the band moves no
-  generated world and no epoch moves the band. It answers *which product is this nation playing*
-  — a per-nation fact fixed at generation (BL-433, era band) and saved with the world, so a
-  loaded save opens on the bands its history earned. Grain finer than the band reaches
-  play as the nation's technology — its tree masks and research pool
-  (`../generation/trees/TREES.md` § Who holds a tree). It is **not** the Era of this document.
+  `any` / `ancient` / `industrial`, and the registry masks the browsable roster on the world's band.
+  The campaign's band is always `industrial` (§ Where the ladder starts; Ben, 2026-10-10); the
+  `ancient` tag survives for content no campaign nation is offered. It is **not** the Era of this
+  document.
 - **`condition_subject::era`** (`src/world/condition_set.cpp`) is the predicate subject the laws
   and techs layers evaluate. It measures **1 for a corp that owns a launchpad and 0 otherwise** —
   a per-corp proxy for "has industrialised into space", chosen so that authored conditions keep

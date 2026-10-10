@@ -10,6 +10,10 @@
 > (EXPLORATION_TREE, INDUSTRY_TREE).
 > **Confused with:** TREES.md, ../CIVILISATION.md, ../../research/ANCIENT_TECH_LADDER.md.
 
+> **RETIRED (Ben, 2026-10-10).** Research is removed from generation and nothing reads this tree; it
+> is the record of a retired design. What it gated is gated by date now (`TREES.md`); technology is
+> the campaign's (`../../economy/RESEARCH.md`).
+
 The store is `empire_tree.json`; `node tools/session/tree_lint.js empire` holds the two together.
 
 ---

@@ -83,7 +83,8 @@ owning doc(s) for a source file, ranked by how often work on it cited each — t
 | `docs/economy/TILES.md` | Two-axis terrain, deposit profiles, amenity tiles. |
 | `docs/economy/POPULATION.md` | Population centres, agglomeration, habitability, labour supply and contention. |
 | `docs/economy/ERAS.md` | The era ladder and the gate into space. |
-| `docs/economy/RESEARCH.md` | Research points and technology unlocks (stub). |
+| `docs/economy/RESEARCH.md` | **Technology**: the nation holds it, every nation starts equal, research points, the grammar of every age's tree (travel/minor/major/quest, requirement groups, pairs, quests that key the next age, placeholders), the research queue. |
+| `docs/economy/tech/DIGITISATION_TREE.md` → `digitisation_tree.json` | The first age's tree: 160 nodes in three trees of three branches. **The store is canonical; query or check it with `node tools/session/tech_tree_store.js [--check]`, which also renders the doc's tables.** |
 | `docs/economy/SPACE_ASSETS.md` | Off-body assets (stub). |
 
 ### Military, politics, relations
@@ -104,7 +105,7 @@ owning doc(s) for a source file, ranked by how often work on it cited each — t
 | `docs/generation/CIVILISATION.md` | **How city states become empires** — the phase after migration: sparse settlements, materials spent on action, which creeds raise armies, what a civilisation is as distinct from a creed, and culture relations as the engine of conquest. Carries the DATA CONTRACT the Culture phase must satisfy. `COLONISATION.md` is its peaceful sibling. |
 | `docs/generation/EXPLORATION.md` | **The exploration age, 1200 → 1660** — the phase after Empires: capital as a per-polity treasury, treaties with a term, colonies as subjects with an overlord link, ports/navies/armies that decay, cultural preference for goods. Why conflict moves off the home coast. |
 | `docs/generation/INDUSTRIALISATION.md` | **1660 → 1960 — a PLACEHOLDER.** Owns only the boundary: which subjects are Industrialisation's (companies, prices, tariffs) rather than Exploration's. |
-| `docs/generation/trees/TREES.md` → `EMPIRE_TREE.md`, `EXPLORATION_TREE.md`, `INDUSTRY_TREE.md`, `DIGITISATION_TREE.md` | **The four technology trees** — three generated, Digitisation played; six domains plus a spire, 50 nodes on 4 rings, deed-gated quest majors, nation-held research — one grammar (minor/major/milestone, the spire, the five adjacency rules, forks, diffusion by kind, the scorer shape) and one doc + one JSON store per tree. `tree_lint.js` holds doc and store together. **Query the stores; never hand-edit one without re-running the lint.** |
+| `docs/generation/trees/TREES.md` | **Retired**: generation runs no tech trees (Ben, 2026-10-10). Holds the table of what each former tree gate became (dates). The four tree docs and stores beside it are the record of a retired design. |
 | `docs/generation/PROVINCES.md` | The spatial unit of consequence: partition rules, three domains, walk order. |
 | `docs/generation/NATION_GENERATION.md` | Territory placement, resource profile, character, naming. |
 | `docs/generation/CORPORATION_GENERATION.md` | Nation assignment, focus, starting assets, finances. |
