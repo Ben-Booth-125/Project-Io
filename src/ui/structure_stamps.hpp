@@ -168,12 +168,21 @@ void extract_installations(const world& w, entity_id body, const recipe_registry
 /// Honours @p tag exactly as the tree stamps do (never paints lock fill or the
 /// transparent margin). Deterministic and wrap-exact: hashes key on WRAPPED
 /// grid coordinates, positions on unwrapped centres.
+/// @p between (BL-1253): called once, after the ground parts (pads, fields,
+/// yards, forecourt aprons, a town's paving) and before the shadows and the
+/// standing structures — the route pass's slot (route_paint.hpp), so a road
+/// lies on the yard it arrives at and under every shadow and roof. Called even
+/// when nothing stands in reach.
 void stamp_installations(const bake_source& src, const geometry& g, const bake_params& p,
                          int px0, int py0, int pw, int ph, std::uint32_t* out,
-                         const std::uint8_t* tag);
+                         const std::uint8_t* tag,
+                         void (*between)(void*) = nullptr, void* between_ctx = nullptr);
 
 /// The installation fields the pass reads for every tile whose structures can
-/// reach the window, folded into one value for region_hash.
+/// reach the window, folded into one value for region_hash — with the route
+/// half (route_hash, BL-1253) folded in: a road is laid by a construction
+/// event like a building, re-bakes by the same partial windows, and decides a
+/// roaded cluster's layout.
 std::uint64_t installation_hash(const bake_source& src, const geometry& g,
                                 int px0, int py0, int pw, int ph);
 

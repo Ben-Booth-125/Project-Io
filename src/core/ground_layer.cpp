@@ -536,11 +536,13 @@ bool ground_layer::resnapshot(const world& w, bool assume_surveyed)
             return c;
         };
         std::printf("GROUND_FILL boundary diff (tiles): cls %d colour %d height %d cover %d "
-                    "density %d landform %d river_in %d family %d vparam %d installations %zu -> %zu\n",
+                    "density %d landform %d river_in %d family %d vparam %d installations %zu -> %zu "
+                    "road %d lane %d (route pieces %zu -> %zu)\n",
                     diff(o.cls, n.cls), diff(o.colour, n.colour), diff(o.height, n.height),
                     diff(o.cover, n.cover), diff(o.density, n.density), diff(o.landform, n.landform),
                     diff(o.river_in, n.river_in), diff(o.family, n.family), diff(o.vparam, n.vparam),
-                    o.inst.list.size(), n.inst.list.size());
+                    o.inst.list.size(), n.inst.list.size(), diff(o.road, n.road), diff(o.lane, n.lane),
+                    o.route_pieces.size(), n.route_pieces.size());
         std::fflush(stdout);
     }
     if (b->src_digest != before)

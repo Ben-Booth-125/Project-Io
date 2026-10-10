@@ -906,12 +906,16 @@
    "status": "drafted"
   },
   "planetary_routes": {
-   "surface": "Roads and sea lanes (Planetary canvas, always-on route strokes)",
+   "surface": "Roads and sea lanes (Planetary canvas, always-on: painted into the ground, drawn as thin strokes at the two widest rungs)",
    "answers": "Where can traffic move cheaply on this body - which ground is roaded, at what tier, and which water carries a lane?",
-   "because": "Roads are terrain, not an overlay: the road ladder (Track / Road / Highway) and the sea lane both discount traversal cost for every convoy and every reach read (LOGISTICS.md sec 1, sec 4b), so a player planning a site or a haul needs them on the plain canvas under every lens. Ben, 2026-10-03, playing the build: \"render [roads] as curves rather than lines, and make them thinner\" and \"sea lanes should always go over ocean, never over ground\". So both draw as smooth curves through their tile chains (a quadratic through each tile's two shared-edge midpoints, junctions paired into through-curves), at one named width per tier, half the old straight-segment widths, keeping the 1 : 1.5 : 2 ladder so the tiers still read apart. The sea lane had no stroke on the campaign map at all, though the stamped field shapes every sea leg's cost; it now draws along its own stamped water tiles in the sea blue the wizard's lapse uses, so the curve can never leave the sea.",
-   "backlog_item": [],
+   "because": "Roads are terrain, not an overlay: the road ladder (Track / Road / Highway) and the sea lane both discount traversal cost for every convoy and every reach read (LOGISTICS.md sec 1, sec 4b), so a player planning a site or a haul needs them on the plain canvas under every lens. Ben, 2026-10-03, playing the build: \"render [roads] as curves rather than lines, and make them thinner\" and \"sea lanes should always go over ocean, never over ground\". So both draw as smooth curves through their tile chains (a quadratic through each tile's two shared-edge midpoints, junctions paired into through-curves), at one named width per tier, half the old straight-segment widths, keeping the 1 : 1.5 : 2 ladder so the tiers still read apart. The sea lane had no stroke on the campaign map at all, though the stamped field shapes every sea leg's cost; it now draws along its own stamped water tiles in the sea blue the wizard's lapse uses, so the curve can never leave the sea. PAINTED INTO THE GROUND (BL-1253; Ben, 2026-10-09, walking the sprint 51 build: \"roads go over buildings, rather than being painted as an optional part of the building tile sets. Roads are also so simplified, we want to paint a texture on roads\"): the same curves are now a pass in the ground bake with a surface per tier - Track ruts and a grass crown, Road gravel with verges and ditches, Highway asphalt with kerbs and a centre line, a lane a faint broken wake on the water - so the tier reads from the surface itself, not only from a stroke weight. A road meets a built tile through that tile's roaded variant (the works step aside, the road bends round them and ends at a forecourt; a town keeps its blocks off its street), so a road never runs across a roof. The drawn strokes stay only at the two widest rungs (drawn radius under 20 px), where a painted road is under a pixel and the logistics web would otherwise vanish.",
+   "backlog_item": [
+    "BL-1253"
+   ],
    "files": [
     "src/ui/body_surface_canvas.cpp",
+    "src/ui/route_paint.cpp",
+    "src/ui/structure_stamps.cpp",
     "docs/ui/RENDERING.md"
    ],
    "status": "drafted"

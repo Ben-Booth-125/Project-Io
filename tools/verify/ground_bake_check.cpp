@@ -84,6 +84,10 @@
 //       (e)); crisp_<subject>[_flip].png. `--crisp --decomp` repeats it with
 //       crisp 0 (the pre-BL-1254 look, byte for byte), no variants, no
 //       detail and no grain. `--prof` carries a pre-BL-1254 configuration.
+//   P28-P30 Roads and sea lanes painted (BL-1253, RENDERING.md § Roads and
+//       sea lanes): the route pass pure, wrap-exact and seamless on every
+//       surface; the road / structure agreement; a route change re-baking
+//       only its window. `--routes` runs them alone with routes_*.png previews.
 //
 // Also prints bake time per tier (a measurement, not a check) and writes
 // feature_<form>_<tier>.png previews for the eye.
@@ -1426,6 +1430,423 @@ void crisp_row(const bake_source& src, const bake_params& p, const char* suffix)
         char path[160];
         std::snprintf(path, sizeof path, "crisp_%s%s.png", s.name, suffix);
         write_png_rgba(path, W, H, reinterpret_cast<const unsigned char*>(a.data()), W * 4);
+
+// ---------------------------------------------------------------------------
+// BL-1253 (roads painted), RENDERING.md § Roads and sea lanes.
+//   P28 The route pass on a staged network (a Highway, a Road, a Track, the
+//       Rail rung no world lays yet, a sea lane with its parallel run): pure,
+//       wrap-exact, seamless across a chunk edge (both axes) at the master
+//       geometry 1x and 2x, each surface actually draws (strength 0 differs).
+//   P29 The road / structure agreement: on every roaded works tile a through
+//       curve clears the cluster's keep-out disc by its half-width, an
+//       arriving road ends at the plan's forecourt, and the cluster moved; a
+//       town is not re-planned; a masked tile's road_level never reaches the
+//       source.
+//   P30 A road change re-bakes only its window: region_hash moves while
+//       terrain_hash does not, and the windows the rule draws (a road built,
+//       upgraded, removed; a lane stamped) re-baked and blitted over the old
+//       master chunk give the new chunk byte for byte, under 40% of it.
+// `--routes` runs P28-P30 alone and writes routes_*.png previews.
+// ---------------------------------------------------------------------------
+void route_row(world& w, entity_id home, const bake_source& src0, const bake_params& p, bool previews,
+               bool prof = false)
+{
+    constexpr double kS3 = 1.7320508075688772;
+    const auto land  = static_cast<std::uint8_t>(bake_source::tile_class::land);
+    const auto water = static_cast<std::uint8_t>(bake_source::tile_class::water);
+    const geometry m = make_master_geometry(src0.gw, src0.gh);
+    bake_params p1 = p;
+    p1.supersample = 1;
+    const auto idx = [&](int c, int r) {
+        return static_cast<std::size_t>(r) * src0.gw + ((c % src0.gw) + src0.gw) % src0.gw;
+    };
+
+    // --- Stage a network on the widest plain --------------------------------
+    bake_source s = src0;
+    s.road.assign(s.cls.size(), 0);
+    s.lane.assign(s.cls.size(), 0);
+    const int aim = std::max(0, homogeneous_aim(src0, terrain_cover::grass));
+    const int ar = aim / s.gw, ac = aim % s.gw;
+    const auto lay = [&](int c, int r, std::uint8_t tier) {
+        if (r >= 0 && r < s.gh && s.cls[idx(c, r)] == land)
+            s.road[idx(c, r)] = tier;
+    };
+    for (int c = ac - 3; c <= ac + 3; ++c) lay(c, ar, k_route_highway);
+    for (int c = ac - 3; c <= ac + 3; ++c) lay(c, ar + 2, k_route_road);
+    for (int r = ar; r <= ar + 4; ++r)     lay(ac + 3, r, k_route_track);
+    for (int c = ac - 3; c <= ac + 2; ++c) lay(c, ar + 4, k_route_rail);
+    lay(ac - 3, ar + 3, k_route_track); // a track north from the rail to the road row
+    // Works on the road row (a through-road bends round it) and at a track's
+    // end (it ends at the forecourt); a town on the highway (its street).
+    const auto stand = [&](std::size_t i, tile_installation ti) {
+        if (s.inst.of_tile[i] < 0)
+        {
+            s.inst.of_tile[i] = static_cast<std::int32_t>(s.inst.list.size());
+            s.inst.list.push_back(ti);
+        }
+        else
+            s.inst.list[static_cast<std::size_t>(s.inst.of_tile[i])] = ti;
+    };
+    tile_installation works;
+    works.stacks[0].subject = stamp_subject::building;
+    works.stacks[0].type    = static_cast<std::uint8_t>(building_type::processing_facility);
+    works.stacks[0].family  = static_cast<std::uint8_t>(processing_family::metal_foundry);
+    works.n_stacks = 1;
+    tile_installation mine = works;
+    mine.stacks[0].type   = static_cast<std::uint8_t>(building_type::extraction_site);
+    mine.stacks[0].family = static_cast<std::uint8_t>(extraction_family::mine);
+    tile_installation town;
+    town.settlement.subject = stamp_subject::settlement;
+    town.settlement.scale = 3;
+    const std::size_t works_i = idx(ac, ar + 2), mine_i = idx(ac + 3, ar + 5), town_i = idx(ac + 1, ar);
+    stand(works_i, works);
+    lay(ac + 3, ar + 5, k_route_track);
+    stand(mine_i, mine);
+    stand(town_i, town);
+    // A sea lane: two parallel runs on adjacent rows (the rungs between them
+    // are skipped) on open water.
+    int wi = -1, wbest = 0;
+    for (int r = s.gh / 4; r < s.gh * 3 / 4 - 2; ++r)
+        for (int c = 0; c < s.gw; ++c)
+        {
+            int run = 0;
+            for (int k = 0; k < 8; ++k)
+                for (int dr = 0; dr < 2; ++dr)
+                    run += s.cls[idx(c + k, r + dr)] == water;
+            if (run > wbest) { wbest = run; wi = static_cast<int>(idx(c, r)); }
+        }
+    const int wr = wi / s.gw, wc = wi % s.gw;
+    for (int k = 0; k < 8; ++k)
+        for (int dr = 0; dr < 2; ++dr)
+            if (s.cls[idx(wc + k, wr + dr)] == water)
+                s.lane[idx(wc + k, wr + dr)] = 1;
+    rederive_routes(s);
+    std::printf("P28: staged network at [%d,%d] (%zu pieces), lane at [%d,%d]\n", ac, ar,
+                s.route_pieces.size(), wc, wr);
+    check(!s.route_pieces.empty(), "P28", "the staged network derives pieces");
+
+    // --route-prof: the route pass's cost on a master chunk (a reading, not a
+    // check) — the chunk holding the staged network, and the same chunk with
+    // no route at all, at the master's 1x and at 2x, pass on vs off,
+    // interleaved, best of 9, wall time and this thread's cycles.
+    if (prof)
+    {
+        const geometry gm = m;
+        const double cx = kS3 * (ac + ((ar & 1) ? 0.5 : 0.0)) * gm.s;
+        const double cy = (1.5 * (ar + 2) - gm.y_min) * gm.s;
+        const int x0 = static_cast<int>(cx - 256) / 16 * 16;
+        const int y0 = std::clamp(static_cast<int>(cy - 256) / 16 * 16, 0, gm.H - 512);
+        bake_source none = src0;
+        rederive_routes(none); // no route: the pass's cull alone
+        std::vector<std::uint32_t> tb(512u * 512u);
+        for (int ss : { 1, 2 })
+        {
+            bake_params on = p;  on.supersample = ss;
+            bake_params of = on; of.route_strength = 0.0f;
+            struct cfg { const char* name; const bake_source* src; const bake_params* q; };
+            const cfg cfgs[] = { { "network, pass on ", &s, &on }, { "network, pass off", &s, &of },
+                                 { "no route at all  ", &none, &on } };
+            double wall[3] = { 1e30, 1e30, 1e30 }, cyc[3] = { 1e30, 1e30, 1e30 };
+            for (int rep_ = 0; rep_ < 9; ++rep_)
+                for (int k = 0; k < 3; ++k)
+                {
+                    const double c0 = thread_cpu_ms();
+                    const auto t0 = std::chrono::steady_clock::now();
+                    bake_region(*cfgs[k].src, gm, *cfgs[k].q, x0, y0, 512, 512, tb.data());
+                    const double c1 = thread_cpu_ms();
+                    wall[k] = std::min(wall[k], std::chrono::duration<double, std::milli>(
+                                                    std::chrono::steady_clock::now() - t0).count());
+                    if (c1 >= 0.0)
+                        cyc[k] = std::min(cyc[k], c1 - c0);
+                }
+            for (int k = 0; k < 3; ++k)
+                std::printf("ROUTE-PROF  master chunk %dx  %s  %8.1f ms wall  %8.1f Mcycles  (%+.1f%% vs pass off)\n",
+                            ss, cfgs[k].name, wall[k], cyc[k] < 1e29 ? cyc[k] : -1.0,
+                            100.0 * (wall[k] / wall[1] - 1.0));
+        }
+        // The window rule's own cost at a boundary that lays the whole network
+        // at once (the settle lands the campaign roads): the chunk's rects
+        // from "no road" to "the network", best of 5.
+        {
+            bake_source bare = s;
+            std::fill(bare.road.begin(), bare.road.end(), 0);
+            std::fill(bare.lane.begin(), bare.lane.end(), 0);
+            rederive_routes(bare);
+            bake_params q1 = p; q1.supersample = 1;
+            double best = 1e30;
+            std::vector<pixel_rect> rr;
+            bool ok = false;
+            for (int rep_ = 0; rep_ < 5; ++rep_)
+            {
+                const auto t0 = std::chrono::steady_clock::now();
+                ok = installation_patch_rects(bare, s, gm, q1, x0, y0, 512, 512, rr);
+                best = std::min(best, std::chrono::duration<double, std::milli>(
+                                          std::chrono::steady_clock::now() - t0).count());
+            }
+            long long area = 0;
+            for (const pixel_rect& r : rr) area += static_cast<long long>(r.w) * r.h;
+            std::printf("ROUTE-PROF  window rule, network laid at once: %.2f ms, %s, %zu windows, %.1f%% of the chunk\n",
+                        best, ok ? "patched" : "whole", rr.size(), 100.0 * area / (512.0 * 512.0));
+        }
+        // The snapshot's own cost: the source is re-taken on the main thread
+        // (every 30 frames in play, every frame under --verify), so deriving
+        // the pieces must stay cheap. A lattice about the campaign's density
+        // (every third row and every fourth column of land roaded).
+        {
+            bake_source dense = src0;
+            dense.road.assign(dense.cls.size(), 0);
+            dense.lane.assign(dense.cls.size(), 0);
+            int nr = 0;
+            for (std::size_t i = 0; i < dense.cls.size(); ++i)
+            {
+                const int r = static_cast<int>(i) / dense.gw, c = static_cast<int>(i) % dense.gw;
+                if (dense.cls[i] == land && (r % 3 == 0 || c % 4 == 0))
+                {
+                    dense.road[i] = static_cast<std::uint8_t>(1 + (r + c) % 3);
+                    ++nr;
+                }
+            }
+            double best = 1e30;
+            for (int rep_ = 0; rep_ < 7; ++rep_)
+            {
+                const auto t0 = std::chrono::steady_clock::now();
+                rederive_routes(dense);
+                best = std::min(best, std::chrono::duration<double, std::milli>(
+                                          std::chrono::steady_clock::now() - t0).count());
+            }
+            double ps = 1e30;
+            for (int rep_ = 0; rep_ < 3; ++rep_)
+            {
+                const auto t0 = std::chrono::steady_clock::now();
+                const bake_source again = prepare_source(w, home, /*reveal_all=*/true);
+                ps = std::min(ps, std::chrono::duration<double, std::milli>(
+                                      std::chrono::steady_clock::now() - t0).count());
+            }
+            std::printf("ROUTE-PROF  rederive_routes on %d road tiles (%zu pieces): %.2f ms; prepare_source (this world): %.2f ms\n",
+                        nr, dense.route_pieces.size(), best, ps);
+        }
+        return;
+    }
+
+    // A 16-aligned window around a tile, at the master geometry.
+    const auto window = [&](int c, int r, int& x0, int& y0, int side) {
+        const double x = kS3 * (c + ((r & 1) ? 0.5 : 0.0)) * m.s;
+        const double y = (1.5 * r - m.y_min) * m.s;
+        x0 = (static_cast<int>(x) - side / 2) / 16 * 16;
+        y0 = std::clamp((static_cast<int>(y) - side / 2) / 16 * 16, 0, m.H - side);
+    };
+    bake_params off = p;  off.route_strength = 0.0f;
+    bake_params off1 = p1; off1.route_strength = 0.0f;
+    struct aimc { const char* name; int c, r; };
+    const aimc aims[] = {
+        { "highway", ac - 2, ar }, { "road", ac - 1, ar + 2 }, { "track", ac + 3, ar + 1 },
+        { "rail", ac - 1, ar + 4 }, { "lane", wc + 3, wr }, { "town", ac + 1, ar },
+        { "works", ac, ar + 2 }, { "forecourt", ac + 3, ar + 5 },
+    };
+    const int side = 160;
+    bool pure = true, wrap = true, seam = true;
+    for (const aimc& a : aims)
+    {
+        int x0, y0;
+        window(a.c, a.r, x0, y0, side);
+        const bake_params* qs[] = { &p1, &p };
+        for (const bake_params* q : qs)
+        {
+            std::vector<std::uint32_t> b1(side * side), b2(side * side), bw(side * side), bo(side * side);
+            bake_region(s, m, *q, x0, y0, side, side, b1.data());
+            bake_region(s, m, *q, x0, y0, side, side, b2.data());
+            bake_region(s, m, *q, x0 + m.W, y0, side, side, bw.data());
+            pure = pure && b1 == b2;
+            wrap = wrap && b1 == bw;
+            // Seams: the same pixels as two windows split mid-way, each axis.
+            std::vector<std::uint32_t> l(static_cast<std::size_t>(side / 2) * side), rr(l.size());
+            bake_region(s, m, *q, x0, y0, side / 2, side, l.data());
+            bake_region(s, m, *q, x0 + side / 2, y0, side / 2, side, rr.data());
+            for (int y = 0; y < side && seam; ++y)
+                seam = std::memcmp(l.data() + static_cast<std::size_t>(y) * (side / 2),
+                                   b1.data() + static_cast<std::size_t>(y) * side, (side / 2) * 4u) == 0
+                    && std::memcmp(rr.data() + static_cast<std::size_t>(y) * (side / 2),
+                                   b1.data() + static_cast<std::size_t>(y) * side + side / 2, (side / 2) * 4u) == 0;
+            std::vector<std::uint32_t> top(static_cast<std::size_t>(side) * (side / 2)), bot(top.size());
+            bake_region(s, m, *q, x0, y0, side, side / 2, top.data());
+            bake_region(s, m, *q, x0, y0 + side / 2, side, side / 2, bot.data());
+            seam = seam && std::memcmp(top.data(), b1.data(), top.size() * 4u) == 0
+                        && std::memcmp(bot.data(), b1.data() + top.size(), bot.size() * 4u) == 0;
+            if (q == &p)
+            {
+                // The draws check and the previews read the master's own 1x.
+                bake_region(s, m, p1, x0, y0, side, side, b1.data());
+                bake_region(s, m, off1, x0, y0, side, side, bo.data());
+                int moved = 0;
+                for (std::size_t k = 0; k < b1.size(); ++k)
+                    moved += b1[k] != bo[k];
+                char what[96];
+                std::snprintf(what, sizeof what, "the %s surface draws (%d px moved by the pass)", a.name, moved);
+                check(moved > 200, "P28", what);
+                if (previews)
+                {
+                    char path[96];
+                    std::snprintf(path, sizeof path, "routes_%s.png", a.name);
+                    write_png_rgba(path, side, side, reinterpret_cast<const unsigned char*>(b1.data()), side * 4);
+                    std::snprintf(path, sizeof path, "routes_%s_off.png", a.name);
+                    write_png_rgba(path, side, side, reinterpret_cast<const unsigned char*>(bo.data()), side * 4);
+                }
+            }
+        }
+    }
+    check(pure, "P28", "the route pass is deterministic (1x and 2x, every surface)");
+    check(wrap, "P28", "the route pass is wrap-exact one period east (1x and 2x)");
+    check(seam, "P28", "the route pass is seamless across a chunk edge, both axes (1x and 2x)");
+    if (previews)
+    {
+        // The whole staged network at a glance, at the master (2x).
+        int x0, y0;
+        const int wv = 768, hv = 640;
+        window(ac, ar + 2, x0, y0, 0);
+        x0 = (x0 - wv / 2) / 16 * 16;
+        y0 = std::clamp(y0 - hv / 2, 0, m.H - hv) / 16 * 16;
+        std::vector<std::uint32_t> big(static_cast<std::size_t>(wv) * hv);
+        bake_region(s, m, p1, x0, y0, wv, hv, big.data());
+        write_png_rgba("routes_network.png", wv, hv, reinterpret_cast<const unsigned char*>(big.data()), wv * 4);
+        bake_region(s, m, off1, x0, y0, wv, hv, big.data());
+        write_png_rgba("routes_network_off.png", wv, hv, reinterpret_cast<const unsigned char*>(big.data()), wv * 4);
+    }
+
+    // --- P29: the agreement -----------------------------------------------
+    {
+        int roaded = 0;
+        bool clear = true, ends = true;
+        for (std::size_t i = 0; i < s.cls.size(); ++i)
+        {
+            const road_plan pl = tile_road_plan(s, i);
+            if (!pl.roaded)
+                continue;
+            ++roaded;
+            const int n = s.route_count[i];
+            int curves = 0;
+            bool at_apron = false;
+            for (int j = 0; j < n; ++j)
+            {
+                const route_piece& pc = s.route_pieces[static_cast<std::size_t>(s.route_first[i] + j)];
+                if (pc.tier & 0x80u)
+                    continue;
+                const double hw = 0.5 * k_route_width[pc.tier];
+                if (pc.kind == route_piece::curve)
+                {
+                    ++curves;
+                    for (int k = 2; k <= route_piece::k_pts - 3; ++k)
+                        clear = clear && std::hypot(pc.x[k] - pl.kx, pc.y[k] - pl.ky) >= pl.radius + hw;
+                }
+                if ((pc.kind == route_piece::spoke || pc.kind == route_piece::spur)
+                    && std::hypot(pc.x[0] - pl.apx, pc.y[0] - pl.apy) < 1e-5)
+                    at_apron = true;
+            }
+            if (curves == 0 && !at_apron)
+                ends = false; // an arriving road that did not end at the forecourt
+        }
+        const road_plan wp = tile_road_plan(s, works_i), mp = tile_road_plan(s, mine_i);
+        std::printf("P29: %d roaded works tiles; works cluster at (%.2f, %.2f) x%.2f, mine at (%.2f, %.2f) x%.2f\n",
+                    roaded, wp.kx, wp.ky, wp.scale, mp.kx, mp.ky, mp.scale);
+        check(wp.roaded && mp.roaded && std::hypot(wp.kx, wp.ky) > 0.1 && wp.scale < 1.0,
+              "P29", "a works tile a road meets takes its roaded variant (the cluster steps aside and shrinks)");
+        check(clear, "P29", "every through-road on a roaded tile clears the cluster disc by its half-width");
+        check(ends, "P29", "a road arriving at a roaded tile ends at its forecourt");
+        check(!tile_road_plan(s, town_i).roaded, "P29", "a town's tile is not re-planned: its road is a street");
+        const double hx = kS3 * (ac - 2 + ((ar & 1) ? 0.5 : 0.0)), hy = 1.5 * ar;
+        check(route_clearance(s, hx, hy) < 0.0 && route_clearance(s, hx, hy + 0.6) > 0.0,
+              "P29", "route_clearance is negative on a road and positive off it");
+        // The mask: a road on a masked tile never reaches the source.
+        const bake_source masked = prepare_source(w, home, /*reveal_all=*/false);
+        const auto masked_cls = static_cast<std::uint8_t>(bake_source::tile_class::masked);
+        tile_component* mt = nullptr;
+        for (auto& [id, t] : w.tiles)
+            if (t.body == home && t.grid_x >= 0 && t.grid_y >= 0 && t.grid_x < masked.gw && t.grid_y < masked.gh
+                && masked.cls[static_cast<std::size_t>(t.grid_y) * masked.gw + t.grid_x] == masked_cls)
+            {
+                mt = &t;
+                break;
+            }
+        if (mt)
+        {
+            const std::uint8_t keep = mt->road_level;
+            mt->road_level = 3;
+            const bake_source ms = prepare_source(w, home, /*reveal_all=*/false);
+            mt->road_level = keep;
+            check(ms.road[static_cast<std::size_t>(mt->grid_y) * ms.gw + mt->grid_x] == 0,
+                  "P29", "a masked tile's road never reaches the source (the survey mask)");
+        }
+        else
+            std::printf("SKIP  P29 mask: the home body has no masked tile\n");
+    }
+
+    // --- P30: a road change re-bakes only its window -----------------------
+    {
+        const auto with = [&](const bake_source& base, std::size_t i, std::uint8_t tier, bool lane) {
+            bake_source t = base;
+            (lane ? t.lane : t.road)[i] = tier;
+            rederive_routes(t);
+            return t;
+        };
+        struct change { const char* name; bake_source after; int c, r; bool one_tile = true; };
+        std::vector<change> changes;
+        if (s.cls[idx(ac - 4, ar)] == land)
+            changes.push_back({ "a road built (highway extended)", with(s, idx(ac - 4, ar), k_route_highway, false), ac - 4, ar });
+        changes.push_back({ "a road upgraded (track -> road)", with(s, idx(ac + 3, ar + 1), k_route_road, false), ac + 3, ar + 1 });
+        changes.push_back({ "a road removed (a link into the works)", with(s, idx(ac - 1, ar + 2), 0, false), ac - 1, ar + 2 });
+        changes.push_back({ "a lane stamped", with(s, idx(wc + 8, wr), 1, true), wc + 8, wr });
+        // A track cut through the deepest forest: the trees it clears and the
+        // canopies that now stand over it.
+        {
+            const int fa = homogeneous_aim(src0, terrain_cover::forest);
+            if (fa >= 0)
+            {
+                const int fr = fa / s.gw, fc = fa % s.gw;
+                bake_source cut = s;
+                for (int c = fc - 1; c <= fc + 1; ++c)
+                    if (cut.cls[idx(c, fr)] == land)
+                        cut.road[idx(c, fr)] = k_route_track;
+                rederive_routes(cut);
+                changes.push_back({ "a track cut through a forest", std::move(cut), fc, fr, false }); // three tiles: past 40% is the rule working
+            }
+        }
+        bool hash_ok = true, rule_ok = true, small = true;
+        for (const change& ch : changes)
+        {
+            int x0, y0;
+            window(ch.c, ch.r, x0, y0, 0);
+            x0 = std::max(0, x0) / k_chunk_px * k_chunk_px;
+            y0 = std::max(0, y0) / k_chunk_px * k_chunk_px; // the master chunk lattice
+            const int cw_ = std::min(k_chunk_px, m.W - x0), ch_ = std::min(k_chunk_px, m.H - y0);
+            hash_ok = hash_ok && region_hash(s, m, x0, y0, cw_, ch_) != region_hash(ch.after, m, x0, y0, cw_, ch_)
+                              && terrain_hash(s, m, x0, y0, cw_, ch_) == terrain_hash(ch.after, m, x0, y0, cw_, ch_);
+            std::vector<pixel_rect> rects;
+            const bool ok = installation_patch_rects(s, ch.after, m, p1, x0, y0, cw_, ch_, rects, 1.0);
+            std::vector<std::uint32_t> base(static_cast<std::size_t>(cw_) * ch_), target(base.size()), o;
+            bake_region(s, m, p1, x0, y0, cw_, ch_, base.data());
+            bake_region(ch.after, m, p1, x0, y0, cw_, ch_, target.data());
+            long long area = 0;
+            for (const pixel_rect& r : rects)
+            {
+                o.assign(static_cast<std::size_t>(r.w) * r.h, 0u);
+                bake_region(ch.after, m, p1, r.x0, r.y0, r.w, r.h, o.data());
+                for (int y = 0; y < r.h; ++y)
+                    std::memcpy(base.data() + static_cast<std::size_t>(r.y0 - y0 + y) * cw_ + (r.x0 - x0),
+                                o.data() + static_cast<std::size_t>(y) * r.w, static_cast<std::size_t>(r.w) * 4u);
+                area += static_cast<long long>(r.w) * r.h;
+            }
+            const double frac = area / (static_cast<double>(cw_) * ch_);
+            int miss = 0;
+            for (std::size_t q = 0; q < base.size(); ++q)
+                miss += base[q] != target[q];
+            std::printf("P30: %-40s chunk at (%d,%d)  %zu window%s  %.1f%% of the chunk  %d px missed%s\n",
+                        ch.name, x0, y0, rects.size(), rects.size() == 1 ? "" : "s", 100.0 * frac, miss,
+                        ok ? "" : "  [rule refused]");
+            rule_ok = rule_ok && ok && miss == 0 && !rects.empty();
+            small = small && (!ch.one_tile || frac < 0.40);
+        }
+        check(hash_ok, "P30", "a route change moves region_hash and leaves terrain_hash (a partial, not a whole, re-bake)");
+        check(rule_ok, "P30", "the windows around a route change, re-baked and blitted, give the new chunk byte for byte");
+        check(small, "P30", "a one-tile route change's windows stay under 40% of the chunk");
     }
 }
 
@@ -1581,6 +2002,21 @@ int main(int argc, char** argv)
     if (argc > 1 && std::strcmp(argv[1], "--border") == 0)
     {
         border_row(src, hb, p, /*previews=*/true);
+        std::printf("%s (%d failures)\n", g_failures ? "FAIL" : "PASS", g_failures);
+        return g_failures ? 1 : 0;
+    }
+
+    // --route-prof: the route pass's per-chunk cost (BL-1253), a reading.
+    if (argc > 1 && std::strcmp(argv[1], "--route-prof") == 0)
+    {
+        route_row(w, home, src, p, /*previews=*/false, /*prof=*/true);
+        return 0;
+    }
+
+    // --routes: the BL-1253 rows (P28-P30) alone, with previews.
+    if (argc > 1 && std::strcmp(argv[1], "--routes") == 0)
+    {
+        route_row(w, home, src, p, /*previews=*/true);
         std::printf("%s (%d failures)\n", g_failures ? "FAIL" : "PASS", g_failures);
         return g_failures ? 1 : 0;
     }
@@ -3002,6 +3438,7 @@ int main(int argc, char** argv)
 
     // P26 / P27 - tiles hold their own ground (BL-1251).
     border_row(src, hb, p, /*previews=*/false);
+    route_row(w, home, src, p, /*previews=*/false);
 
     std::printf("\n%s (%d failure%s)\n", g_failures ? "FAILED" : "ALL PASS",
                 g_failures, g_failures == 1 ? "" : "s");

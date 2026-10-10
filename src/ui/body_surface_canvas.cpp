@@ -541,8 +541,9 @@ constexpr float k_lane_width         = 0.10f;
 /// Below this DRAWN hex radius a road or lane curve takes the wide-rung LOD: one
 /// stroke per curve, two segments a half (chords at the coarse fill), no apex
 /// joint (RENDERING.md § Roads and sea lanes; the 60 fps budget, Ben 2026-10-09).
-/// 20 px sits between the second rung (~13 px) and the third (~27 px): the third
-/// rung and up draw the curve as they always have.
+/// 20 px sits between the second rung (~13 px) and the third (~27 px). It is also
+/// where the drawn network ENDS (BL-1253, roads painted): from the third rung up a
+/// road or lane over baked ground is painted into the bake, not drawn.
 constexpr float k_route_lod_radius_px = 20.0f;
 
 /// Building silhouette radius as a fraction of the hex circumradius — since BL-1241
@@ -4617,8 +4618,16 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // the player operates, so an edge touching a reached tile is inside that reach — a
             // corridor's roads should not darken one hop early at its rim. Survey (BL-067) still
             // owns genuinely unrevealed tiles; this is only the commercial-reach fog.
+            //
+            // PAINTED FROM THE THIRD RUNG UP (BL-1253; RENDERING.md § Roads and sea lanes).
+            // Roads and lanes are painted into the baked ground (ui/route_paint.cpp), with a
+            // surface per tier. The thin drawn network stays only where the painted roads fall
+            // below a pixel: the two widest rungs, a drawn radius under k_route_lod_radius_px
+            // (20 px — between rung 2, ~14 px, and rung 3, ~27 px). A tile whose ground is not
+            // yet baked (the vector fallback) keeps the drawn network at every rung.
+            const bool route_drawn = !on_bake || draw_r < k_route_lod_radius_px;
             const float route_r = std::max(10.0f, draw_r) * state.dbg_route_width_scale;
-            if (tile.road_level > 0)
+            if (route_drawn && tile.road_level > 0)
             {
                 ImU32 col; float thick;
                 switch (tile.road_level)
@@ -4635,7 +4644,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // along the lane's own water tiles — never between its ends — as the same smooth
             // curve, in the soft sea blue the wizard's lapse draws a lane in. Always-on like
             // roads: a lane is part of the network a convoy rides, not an overlay.
-            if (tile.lane_level > 0)
+            if (route_drawn && tile.lane_level > 0)
                 draw_network([](const tile_component& t) { return t.lane_level; },
                              IM_COL32(140, 200, 245, 190), route_r * k_lane_width, true);
 

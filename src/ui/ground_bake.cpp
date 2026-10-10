@@ -708,6 +708,9 @@ bake_source prepare_source(const world& w, entity_id body, bool reveal_all,
     // river, and a visible reach's width must not change when ground upstream
     // is surveyed.
     std::vector<std::uint8_t> raw_in(n, 0), raw_out(n, 0);
+    // BL-1253: road and lane tiers, read in this same pass over the tiles.
+    s.road.assign(n, 0);
+    s.lane.assign(n, 0);
 
     for (const auto& [id, t] : w.tiles)
     {
@@ -737,6 +740,13 @@ bake_source prepare_source(const world& w, entity_id body, bool reveal_all,
 
         s.cls[i]    = static_cast<std::uint8_t>(water ? bake_source::tile_class::water
                                                       : bake_source::tile_class::land);
+        // BL-1253: a revealed tile's route (a masked one carries none). Roads
+        // on land, lanes on water, as the world lays them; rail is a tier
+        // value (k_route_rail) no world sets yet.
+        if (!water && t.road_level > 0)
+            s.road[i] = static_cast<std::uint8_t>(std::min<int>(t.road_level, k_route_highway));
+        if (water && t.lane_level > 0)
+            s.lane[i] = t.lane_level;
         s.colour[i] = palette::tile_colour(t.substrate, t.cover, t.cover_density);
         s.height[i] = t.height;
         s.relief_bias[i] = palette::relief_amount(t.landform);
@@ -772,6 +782,7 @@ bake_source prepare_source(const world& w, entity_id body, bool reveal_all,
                 (height_at(s, c, r + 1) - height_at(s, c, r - 1)) / (2.0 * 1.5));
         }
     extract_installations(w, body, reg, s); // BL-1241 (structures baked)
+    rederive_routes(s); // BL-1253 (roads painted): after the installations, whose plan the pieces read
     return s;
 }
 
@@ -786,9 +797,16 @@ namespace {
 /// lit from the NW — the same light every other pass uses. Stamps respect the
 /// tag buffer: a lock-fill or transparent pixel is never painted, so nothing
 /// leaks through the survey mask.
+///
+/// BL-1253: @p which splits the stand around the painted roads. A tree whose
+/// standing canopy (or its shadow) would overlap a road's painted reach is
+/// drawn AFTER the route pass (which = 2), so a tree in front of a road hides
+/// it rather than being painted over; every other tree draws here (which = 1).
+/// 0 = every tree, no split. With no road near, 1 draws exactly what 0 does.
+enum class tree_set : std::uint8_t { all = 0, clear_of_roads = 1, over_roads = 2 };
 void stamp_trees(const bake_source& src, const geometry& g, const bake_params& p,
                  int px0, int py0, int pw, int ph, std::uint32_t* out,
-                 const std::uint8_t* tag)
+                 const std::uint8_t* tag, tree_set which = tree_set::all)
 {
     // An (optionally elliptical) soft blob: bry > brx bakes the pre-stretched
     // verticals an oblique geometry needs, so a canopy squashes back to round
@@ -889,6 +907,7 @@ void stamp_trees(const bake_source& src, const geometry& g, const bake_params& p
             const double hy = 1.5 * r;
             const std::uint32_t tc = src.colour[i];
             const float clear_r = installation_clear_radius(src, i); // BL-1241: works stand on cleared ground
+            const road_plan plan = tile_road_plan(src, i);           // BL-1253: where a roaded cluster stands
             for (int k = 0; k < n; ++k)
             {
                 const float a1 = hash01(cw, r, 0x7E00u + static_cast<std::uint32_t>(k) * 3u);
@@ -911,6 +930,28 @@ void stamp_trees(const bake_source& src, const geometry& g, const bake_params& p
                 const double tx  = hx + ox_;
                 const double ty  = hy + oy_;
                 const float  cr  = (0.085f + 0.055f * a3) * (forest ? 1.0f : 0.62f) * v_size;
+                // BL-1253: no tree stands on a road or its verges, nor inside a
+                // roaded cluster that stepped off the tile centre.
+                if (route_clearance(src, tx, ty) < cr + 0.02)
+                    continue;
+                if (plan.roaded && std::hypot(ox_ - plan.kx, oy_ - plan.ky) < plan.radius + cr)
+                    continue;
+                if (which != tree_set::all)
+                {
+                    // The ground points the tree's pixels stand over: its root,
+                    // up its standing canopy (~3.1 crowns north once squashed),
+                    // across its crown and down its SE shadow.
+                    bool over = false;
+                    for (int sy = 0; sy < 5 && !over; ++sy)
+                        for (int sx = 0; sx < 3 && !over; ++sx)
+                        {
+                            static constexpr double dyk[5] = { -3.1, -2.0, -1.0, 0.0, 0.85 };
+                            static constexpr double dxk[3] = { -1.0, 0.0, 1.3 };
+                            over = route_clearance(src, tx + dxk[sx] * cr, ty + dyk[sy] * cr) < 0.0;
+                        }
+                    if (over != (which == tree_set::over_roads))
+                        continue;
+                }
                 const double pxc = tx * g.s;               // absolute bake pixels
                 const double pyc = (ty - g.y_min) * g.s;
                 const float  pr  = cr * static_cast<float>(g.s);
@@ -961,6 +1002,7 @@ struct feature_px
 {
     float rx = 0.0f, ry = 0.0f;
     std::int32_t owner = -1; ///< -1: no ground here (margin, lock fill).
+    float lift = 0.0f;       ///< BL-1253: the oblique displacement the ground here was resolved at (the route pass rides it).
 };
 
 /// The per-pixel base bake for one window: interpolated colour, hillshade,
@@ -1759,6 +1801,7 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                 f.rx    = static_cast<float>(rdx);
                 f.ry    = static_cast<float>(sy_ - 1.5 * orow);
                 f.owner = owner;
+                f.lift  = static_cast<float>(hlift);
             }
             double wsum = 0.0, cr = 0.0, cg = 0.0, cb = 0.0;
             double hsum = 0.0, gx = 0.0, gy = 0.0, rb = 0.0, jt = 0.0;
@@ -2995,13 +3038,49 @@ void bake_region_at(const bake_source& src, const geometry& g, const bake_params
                  std::min(0.9f, p.edge_ink  * static_cast<float>(g.ss)),
                  std::min(0.9f, p.shore_ink * static_cast<float>(g.ss)));
 
-    if (ns >= 40.0 && p.tree_density > 0.0f)
-        stamp_trees(src, g, p, px0 - A, py0 - A, apw, aph, abuf.data(), atag.data());
+    // BL-1253: a tree standing over a painted road draws after the road (the
+    // route slot below); the rest of the stand draws here, as it always has.
+    const bool trees = ns >= 40.0 && p.tree_density > 0.0f;
+    const bool split = trees && !src.route_pieces.empty();
+    if (trees)
+        stamp_trees(src, g, p, px0 - A, py0 - A, apw, aph, abuf.data(), atag.data(),
+                    split ? tree_set::clear_of_roads : tree_set::all);
 
     // Landform relief and carved rivers (BL-1242).
     bake_terrain_features(src, g, p, apw, aph, abuf.data(), atag.data(), acov.data(), afpx.data());
-    if (p.installations) // BL-1241: structures, after the trees, before the grade
-        stamp_installations(src, g, p, px0 - A, py0 - A, apw, aph, abuf.data(), atag.data());
+    // Roads and sea lanes (BL-1253, route_paint.hpp), then the installations
+    // (BL-1241): the route pass runs INSIDE the installation pass, between its
+    // ground parts (pads, yards, aprons, a town's paving) and its shadows and
+    // standing structures — a road lies on the yard it arrives at, shadows
+    // fall across it, and no roof is ever under it.
+    struct route_call
+    {
+        const bake_source& src; const geometry& g; const bake_params& p;
+        int x0, y0, w, h; std::uint32_t* buf; const std::uint8_t* tag; const std::uint8_t* cov;
+        const feature_px* fpx;
+        bool split_trees;
+        static void run(void* ctx)
+        {
+            const route_call& c = *static_cast<const route_call*>(ctx);
+            if (c.p.route_strength > 0.0f && !c.src.route_pieces.empty())
+            {
+                const std::size_t n = static_cast<std::size_t>(c.w) * c.h;
+                std::vector<float> lift(n);
+                for (std::size_t k = 0; k < n; ++k)
+                    lift[k] = c.fpx[k].lift;
+                paint_routes(c.src, c.g, c.p, c.x0, c.y0, c.w, c.h, c.buf, c.tag, c.cov, lift.data());
+            }
+            if (c.split_trees) // the trees that stand over a road, over it
+                stamp_trees(c.src, c.g, c.p, c.x0, c.y0, c.w, c.h, c.buf, c.tag, tree_set::over_roads);
+        }
+    };
+    route_call rc{ src, g, p, px0 - A, py0 - A, apw, aph, abuf.data(), atag.data(), acov.data(), afpx.data(),
+                   split };
+    if (p.installations)
+        stamp_installations(src, g, p, px0 - A, py0 - A, apw, aph, abuf.data(), atag.data(),
+                            &route_call::run, &rc);
+    else
+        route_call::run(&rc);
 
     // The separable near-future grade. Its haze lift falls and its contrast
     // rises with resolution (BL-736): haze is blur-adjacent, and the close
@@ -3331,7 +3410,13 @@ bool installation_patch_rects(const bake_source& old_src, const bake_source& new
     std::vector<grid_cell> tiles;
     if (changed_installation_tiles(old_src, new_src, g, px0, py0, pw, ph, tiles) < 0)
         return false;
-    if (tiles.empty())
+    // BL-1253: a route change (a road built or upgraded, a lane stamped)
+    // repaints its pieces, the pieces it re-pairs or bends next door, the trees
+    // it clears and a re-planned cluster — boxes the route module draws.
+    std::vector<pixel_rect> route_boxes;
+    if (route_patch_boxes(old_src, new_src, g, p, px0, py0, pw, ph, route_boxes) < 0)
+        return false;
+    if (tiles.empty() && route_boxes.empty())
         return true;
 
     // One changed tile's reach, in pixels: every pixel its structures touch
@@ -3348,6 +3433,23 @@ bool installation_patch_rects(const bake_source& old_src, const bake_source& new
     const auto ceil_a  = [&](int v) { return -floor_a(-v); };
     const int wx1 = px0 + pw, wy1 = py0 + ph;
     const bool trees = nominal_s(g) >= 40.0 && p.tree_density > 0.0f;
+    // Pad, align outward (relative to the window origin, which the caller
+    // keeps on the alignment lattice), clip, keep.
+    const auto keep = [&](int x0, int y0, int x1, int y1) {
+        if (x0 >= x1 || y0 >= y1)
+            return;
+        x0 -= k_patch_pad; y0 -= k_patch_pad;
+        x1 += k_patch_pad; y1 += k_patch_pad;
+        x0 = px0 + floor_a(x0 - px0); y0 = py0 + floor_a(y0 - py0);
+        x1 = px0 + ceil_a(x1 - px0);  y1 = py0 + ceil_a(y1 - py0);
+        x0 = std::max(x0, px0); y0 = std::max(y0, py0);
+        x1 = std::min(x1, wx1); y1 = std::min(y1, wy1);
+        if (x0 >= x1 || y0 >= y1)
+            return; // its reach falls outside this window
+        out.push_back({ x0, y0, x1 - x0, y1 - y0 });
+    };
+    for (const pixel_rect& b : route_boxes)
+        keep(b.x0, b.y0, b.x0 + b.w, b.y0 + b.h);
     const auto land = static_cast<std::uint8_t>(bake_source::tile_class::land);
     for (const grid_cell& t : tiles)
     {
@@ -3378,22 +3480,14 @@ bool installation_patch_rects(const bake_source& old_src, const bake_source& new
                  static_cast<int>(std::ceil ((hx + side) * g.s)) + 2,
                  static_cast<int>(std::ceil ((hy + down - g.y_min) * g.s)) + 2);
         }
-        if (x0 >= x1 || y0 >= y1)
-            continue; // nothing either side draws
-        x0 -= k_patch_pad; y0 -= k_patch_pad;
-        x1 += k_patch_pad; y1 += k_patch_pad;
-        // Aligned outward (relative to the window origin, which the caller
-        // keeps on the alignment lattice), then clipped to the window.
-        x0 = px0 + floor_a(x0 - px0); y0 = py0 + floor_a(y0 - py0);
-        x1 = px0 + ceil_a(x1 - px0);  y1 = py0 + ceil_a(y1 - py0);
-        x0 = std::max(x0, px0); y0 = std::max(y0, py0);
-        x1 = std::min(x1, wx1); y1 = std::min(y1, wy1);
-        if (x0 >= x1 || y0 >= y1)
-            continue; // its reach falls outside this window
-        out.push_back({ x0, y0, x1 - x0, y1 - y0 });
+        keep(x0, y0, x1, y1); // nothing either side draws: an empty box, dropped
     }
     // Merge overlapping or touching rectangles into their bounding box until
-    // none touch (a handful per chunk: quadratic is fine).
+    // none touch (a handful per chunk: quadratic is fine) — but only where the
+    // box costs no more pixels than the two apart (BL-1253: a road crossing a
+    // chunk diagonally is a chain of windows, and its bounding box was the
+    // whole chunk). Two windows left overlapping bake the same pixels twice,
+    // byte-identical (window invariance), so the blit order cannot matter.
     for (bool merged = true; merged;)
     {
         merged = false;
@@ -3406,6 +3500,9 @@ bool installation_patch_rects(const bake_source& old_src, const bake_source& new
                     continue;
                 const int x0 = std::min(a.x0, b.x0), y0 = std::min(a.y0, b.y0);
                 const int x1 = std::max(a.x0 + a.w, b.x0 + b.w), y1 = std::max(a.y0 + a.h, b.y0 + b.h);
+                if (static_cast<long long>(x1 - x0) * (y1 - y0)
+                    > static_cast<long long>(a.w) * a.h + static_cast<long long>(b.w) * b.h)
+                    continue; // the box would bake more than the pair: keep both
                 out[i] = { x0, y0, x1 - x0, y1 - y0 };
                 out.erase(out.begin() + static_cast<std::ptrdiff_t>(j));
                 merged = true;

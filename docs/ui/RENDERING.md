@@ -76,7 +76,7 @@ untouched by construction):
 | **Biome brushes** | `cover` × `cover_density` | Authored painterly stamps (forest canopy, scrub, marsh…) scattered by density, hash-seeded from grid coordinates |
 | **Landform relief** | `landform`, `height` | The dramatic landforms' own forms — massif and ridge, canyon cut, crater bowl, rift fissure (§ Mountains, rivers and terrain variety) |
 | **Water & rivers** | water substrates, `river_edges` + flow | Sea, lakes, and carved, curved river courses that widen downstream, with bank treatment (§ Mountains, rivers and terrain variety) |
-| **Roads and sea lanes** | `road_level`, `lane_level` | The road lattice and the stamped lanes, smooth curves along their own tiles at the named tier widths (§ Roads and sea lanes) |
+| **Roads and sea lanes** | `road_level`, `lane_level`, the installations' road plan | The road lattice and the stamped lanes, smooth curves along their own tiles at the named tier widths, a surface per tier — painted in the installation pass's slot, after its ground parts and before its shadows and standing structures (§ Roads and sea lanes) |
 | **Installations** | buildings (type, active recipe, stack membership), settlements (scale, razed) | Structure stamps — § Installations below |
 | **Near-future grade** | — (a colour pass) | Desaturation, cool cast, distance haze — **a separable final pass**, tunable without re-authoring any brush |
 
@@ -187,7 +187,10 @@ ground retires only as coverage arrives.
   - It is **aligned outward to 16 px**, so every mip level's piece of it is whole pixels
     and derives from the window alone, and clipped to the chunk. A structure that
     straddles chunks, or the wrap seam, is a window in each chunk it reaches.
-  - Overlapping or touching windows **merge** into their bounding box.
+  - Overlapping or touching windows **merge** into their bounding box where that box
+    costs no more pixels than the two apart; otherwise both stand, and their overlap
+    bakes twice, identically (a road crossing a chunk is a chain of windows, never the
+    chunk's whole bounding box).
   - Past **40 % of the chunk**, or on **any terrain change**, the chunk re-bakes whole.
   This rests on the bake being **window-invariant**: any window bakes byte-identical to
   the same pixels of a larger bake, structures, trees, post passes and all
@@ -399,16 +402,38 @@ takes the light, the grade and the lens wash like the ground does:
   packed gravel with grass verges and shallow ditches. **Highway:** asphalt with kerbs and a
   painted centre line. **Rail:** a ballast bed with sleepers and twin rails — painted on the
   rail rung of the road ladder (INDUSTRIALISATION.md, the rail sink), wherever the world lays
-  it. Textures are procedural, hash-placed along the curve, nominal-keyed, wrap-exact.
+  it; its bed is **0.10** wide, a sea lane's width. Textures are procedural, hash-placed along
+  the curve, nominal-keyed, wrap-exact. A dash pattern (the centre line, the sleepers) runs a
+  whole number of dashes along each half of a curve, pinned at the shared-edge midpoint, so it
+  meets its neighbour tile's without a break.
 - **A road meets a built tile through the building's set.** Each structure form carries a
   **roaded variant**: where a road enters a built tile it arrives at that structure's
   forecourt, yard or loading apron; a road that continues through the tile **bends around the
   cluster** along the tile's free side. A road is never painted across a roof or a pad.
+- **One plan, both passes.** How a road meets a built tile is decided once, by a plan both the
+  route pass and the installation pass read, so they cannot disagree. A tile standing works
+  (stack structures, no settlement) with a road link is **roaded**: its cluster and pad step
+  **0.30** toward the tile's **free side** — of 24 headings, the one farthest by angle from
+  every road link, north on a tie, so the road runs past the cluster's front — and shrink to
+  **0.80 / 0.70 / 0.60** for one / two / three or more links; a through-road **bows** away
+  from it (a sin² bow, which leaves its ends and their tangents where they were, so it still
+  meets its neighbours smoothly at the midpoints) until the road and its verges clear the
+  cluster; a road that ends here ends at a **forecourt apron** standing just outside the
+  cluster on the road side — packed dirt for extraction, concrete for works that load and
+  ship, paving otherwise — and a short spur joins a through-road to it. A **town's** tile is
+  not re-planned: the road runs through as its street, and the town's blocks keep off it.
+- **The route pass paints in the installation pass's slot** — after its ground parts (pads,
+  yards, aprons, a town's paving), before its shadows and standing structures — so a road lies
+  on the yard it arrives at and on a town's paving, structures' shadows fall across it, and no
+  roof is ever under it. No tree stands on a road or its verges; a tree whose canopy stands
+  over one is drawn after the road, so it hides the road behind it.
 - **Sea lanes are a faint wake** painted on the water — a pale, broken trail along the lane's
   sea tiles — not a stroke over it.
 - **At the two widest rungs a thin drawn network stays** over the ground (the LOD below), so
   the logistics web still reads where the painted roads fall below a pixel; from the third
-  rung up, roads and lanes are painted only.
+  rung up, roads and lanes are painted only. The drawn network ends at the LOD's own
+  threshold, a **20 px drawn radius** (`k_route_lod_radius_px`); a tile whose ground is not yet
+  baked (the vector fallback) keeps it at every rung.
 - A built or upgraded road dirties only the window around its tiles (§ Chunks, cache and
   invalidation, the partial re-bake), and the survey mask and the reach fog treat a painted
   road as ground.
