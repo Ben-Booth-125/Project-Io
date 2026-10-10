@@ -2797,10 +2797,12 @@ void app::render()
     // one implementation. A TRADE press's result is surfaced on the Trades tab
     // (`ui_state::trade_message`), and a refusal mutates nothing, so the player
     // is told why. What `set_trade` refuses is exactly `trade_is_valid` plus two
-    // bounds (corp_command.cpp): rejected_invalid for points that are not
+    // bounds (corp_command.cpp): rejected_invalid for a source market where the
+    // corporation holds no trade building (Ben, 2026-10-10), points that are not
     // finite, not > 0 or above max_trade_points, the same market at both ends, a
     // market that no longer exists, a good trade does not carry (capacity 0, or
-    // a grid good), or no acting corporation; rejected_state when the
+    // a grid good), or no acting corporation; rejected_placement when no leg
+    // reaches the destination from the source market's centre; rejected_state when the
     // corporation already holds max_trades_per_corp trades. The form pre-checks
     // most of these, so a refusal here is mostly a race or an edge the form let
     // through; the message names the whole set rather than guessing one. Other presses' rejections mean a race (the target
@@ -2816,8 +2818,10 @@ void app::render()
                 m_ui.trade_message = applied ? "Trade set."
                     : (r == corp_command_result::rejected_state)
                         ? "You hold as many trades as a corporation may."
-                        : "Refused: it needs two different markets, a good trade carries, "
-                          "and points above 0.";
+                    : (r == corp_command_result::rejected_placement)
+                        ? "Refused: no route reaches that market from here."
+                        : "Refused: it must leave a market where you hold a Marketplace or Port, "
+                          "go to a different market, carry a good trade carries, and have points above 0.";
                 break;
             case corp_verb::clear_trade:
                 m_ui.trade_message = applied ? "Trade removed." : "That trade is already gone.";

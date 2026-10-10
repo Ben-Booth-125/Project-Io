@@ -4851,6 +4851,61 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return true;
     });
 
+    // Verify-only: give the PLAYER a completed, staffed Planetary Marketplace in
+    // market @p market's catchment, on the free tile nearest its centre that
+    // placement allows — the history retrofit's own siting (TRADE.md § Trade in
+    // generation), so a script can exercise a manual trade, which must leave a
+    // market where its owner holds a trade building (Ben, 2026-10-10). Returns
+    // the building id, or 0 when the market is unknown or no tile qualifies
+    // (nothing mutated).
+    v.set_function("grant_marketplace", [this](unsigned market) -> unsigned {
+        const auto mit = m_world.markets.find(static_cast<entity_id>(market));
+        const auto cit = m_world.corporations.find(m_world.player_entity);
+        if (mit == m_world.markets.end() || cit == m_world.corporations.end())
+            return 0u;
+        long long cx = 0, cy = 0;
+        if (const auto ct = m_world.tiles.find(mit->second.centre_tile); ct != m_world.tiles.end())
+        {
+            cx = ct->second.grid_x;
+            cy = ct->second.grid_y;
+        }
+        std::unordered_set<entity_id> occupied;
+        for (const auto& [bid, bc] : m_world.buildings)
+            occupied.insert(bc.tile);
+        const placement_gate gate =
+            m_registry.placement_gate_for(building_type::planetary_marketplace, no_recipe);
+        entity_id best = null_entity;
+        long long best_d2 = std::numeric_limits<long long>::max();
+        for (const auto& [tid, tc] : m_world.tiles)
+        {
+            if (tc.body != mit->second.body || occupied.count(tid) != 0
+                || market_for_tile(m_world, tid) != mit->first)
+                continue;
+            const long long dx = tc.grid_x - cx, dy = tc.grid_y - cy;
+            const long long d2 = dx * dx + dy * dy;
+            if (d2 > best_d2 || (d2 == best_d2 && tid > best))
+                continue;
+            if (!placement_rules::can_place_in_world(m_world, tid, building_type::planetary_marketplace,
+                                                     resource_type::iron_ore, -1.0f,
+                                                     m_world.player_entity, gate))
+                continue;
+            best_d2 = d2;
+            best    = tid;
+        }
+        if (best == null_entity)
+            return 0u;
+        const entity_id bid = m_world.create_entity();
+        building_component bc;
+        bc.tile               = best;
+        bc.type               = building_type::planetary_marketplace;
+        bc.workforce_assigned = 0.5f; // the retrofit's staffing
+        m_world.buildings[bid]  = bc;
+        m_world.stockpiles[bid] = stockpile_component{};
+        cit->second.assets.push_back(bid);
+        invalidate_logistics_caches(m_world);
+        return static_cast<unsigned>(bid);
+    });
+
     v.set_function("grant_stock", [this](const std::string& res, double qty) {
         const auto it = m_world.corporations.find(m_world.player_entity);
         if (it == m_world.corporations.end())

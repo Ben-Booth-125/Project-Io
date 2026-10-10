@@ -54,6 +54,15 @@ verify.expect(where.market ~= nil and where.market ~= 0,
     "the Trades tab drew for a market (market " .. tostring(where.market) .. ")")
 local here, home_body = where.market, where.body
 
+-- A manual trade must leave a market where its owner holds a trade building
+-- (TRADE.md, Ben 2026-10-10), and the seat opens with none. Give the player a
+-- completed Marketplace in this market (the retrofit's siting) and run one
+-- tick so the trade pass records its points.
+local granted = verify.grant_marketplace(here)
+verify.expect(granted ~= 0, "fixture: the player holds a Marketplace in this market (building " .. granted .. ")")
+verify.econ_step(1)
+verify.frames(2)
+
 -- =========================================================================
 -- 2. THE TRADE-POINTS LINE IS THE WORLD'S
 -- =========================================================================
