@@ -752,9 +752,10 @@ building(s)**, each with an **influence range** (the union of a corp's HQ ranges
 A corp opens with **one HQ** and can **build more as it advances** (tech/law-gated), which creates
 the specialisation lever — **tall** (deepen fewer HQs) vs **wide** (spread more HQs). Intended as a
 *gameplay* mechanic (range gates/modifies where the corp can operate), not just a visual layer, and
-extensible via laws and technology. It **generalises** the player-only home-cluster ring + `hq` star
-(BL-085, home-cluster ring) into a real ranged border for every corporation on the **Corporation**
-lens. The persisted HQ + influence range (Pass 3b) is the data-model foundation; what BL-182
+extensible via laws and technology. It would give every corporation a real ranged border on the
+**Corporation** lens; the Planetary canvas draws no HQ mark of its own (the home-cluster ring retired
+with BL-329, and the HQ star with Ben's 2026-10-10 ruling — PLANETARY.md), so a border is the
+lens's to draw, not a glyph's. The persisted HQ + influence range (Pass 3b) is the data-model foundation; what BL-182
 owns beyond it: the **operate-gate** (border restricts where a corp can build), the **national
 origin gate** (corps start home-nation-confined; international reach for 1–2 great powers,
 tech-gated), **branch offices** on non-home bodies, the **cost-field** range shape, and the
