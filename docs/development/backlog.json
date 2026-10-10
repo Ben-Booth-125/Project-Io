@@ -1799,7 +1799,7 @@
    "parked": false,
    "priority": "C",
    "difficulty": 2,
-   "id": "BL-1259",
+   "id": "BL-1261",
    "short_name": "ROAD_REPLAY_DIVERGES",
    "category": "Tooling",
    "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
@@ -1808,7 +1808,7 @@
    "files": [
     "tools/verify/gen_step_costs.cpp"
    ],
-   "design": "FOUND (BL-1119 R4 lane, 2026-10-10, on 0217f351): gen_step_costs --roads REPLAY CHECK reports DIVERGES on 16 of 16 curated seeds (3-358 tiles differ), so its replay rows no longer reproduce the built road pass. Likely cause: the replay does not mirror what the build now does - the history stamp after generate_roads, sea lanes, or BL-1252's snap (stamp_edge reshapes the laid route; road_stale_flood_probe's replay was updated for it and is faithful). R4's readings avoided the replay rows (they used the build's own step times and the built tile count). Fix the replay so it reproduces the built field, and make the check fail loudly rather than print."
+   "design": "RENUMBERED 2026-10-10 (id collision with the sprint 51 session) from BL-1259. FOUND (BL-1119 R4 lane, 2026-10-10, on 0217f351): gen_step_costs --roads REPLAY CHECK reports DIVERGES on 16 of 16 curated seeds (3-358 tiles differ), so its replay rows no longer reproduce the built road pass. Likely cause: the replay does not mirror what the build now does - the history stamp after generate_roads, sea lanes, or BL-1252's snap (stamp_edge reshapes the laid route; road_stale_flood_probe's replay was updated for it and is faithful). R4's readings avoided the replay rows (they used the build's own step times and the built tile count). Fix the replay so it reproduces the built field, and make the check fail loudly rather than print."
   },
   {
    "status": "proposed",
@@ -1820,7 +1820,7 @@
    "parked": false,
    "priority": "B",
    "difficulty": 3,
-   "id": "BL-1260",
+   "id": "BL-1262",
    "short_name": "ROUND_SIX_TAIL_SPAN_SEARCH",
    "category": "Generation",
    "authority_doc": "docs/ui/STARTUP.md",
@@ -1830,7 +1830,49 @@
     "src/world/landscape_search.cpp",
     "tools/verify/gen_step_costs.cpp"
    ],
-   "design": "MEASURED (BL-1119 R4, Release, 2026-10-10, ~30% residual load): the round 6 tail (post-era + landscape search + settle) is 19.6 s on seed 0 and 12.2 s on seed 28, inside STARTUP.md's 35 s, the seeds BL-1119's done-when named. Counting the Industrialisation span, three other curated seeds exceed it: 11 39.2 s, 31 43.2 s, 13 37.5 s. Roads are not the cost (road pass <= 10.6 s everywhere). The landscape search has grown since the 2026-10-03 reading (seed 0: 2.6 -> 10.6 s) and the span itself is up to ~9 s. DIAGNOSE first, on a quiet machine: what in the search grew (more candidates? the BL-1217 generation changes - the want test, the household/background charge - run per candidate?), and whether the 35 s target is per seed or for the curated two. Ben's call whether the target covers all sixteen."
+   "design": "RENUMBERED 2026-10-10 (id collision with the sprint 51 session) from BL-1260. MEASURED (BL-1119 R4, Release, 2026-10-10, ~30% residual load): the round 6 tail (post-era + landscape search + settle) is 19.6 s on seed 0 and 12.2 s on seed 28, inside STARTUP.md's 35 s, the seeds BL-1119's done-when named. Counting the Industrialisation span, three other curated seeds exceed it: 11 39.2 s, 31 43.2 s, 13 37.5 s. Roads are not the cost (road pass <= 10.6 s everywhere). The landscape search has grown since the 2026-10-03 reading (seed 0: 2.6 -> 10.6 s) and the span itself is up to ~9 s. DIAGNOSE first, on a quiet machine: what in the search grew (more candidates? the BL-1217 generation changes - the want test, the household/background charge - run per candidate?), and whether the 35 s target is per seed or for the curated two. Ben's call whether the target covers all sixteen."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "written": "2026-10-10",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "priority": "B",
+   "difficulty": 3,
+   "id": "BL-1263",
+   "short_name": "POWER_GATE_REMEASURE",
+   "category": "AI",
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "author": "Claude (sprint 50 doc check; Ben 2026-10-10, NR-991)",
+   "title": "The scorer prices a power plant against its grid's shortfall - re-measured on the current tip, then merged or dropped",
+   "files": [
+    "src/world/corp_ai.cpp"
+   ],
+   "design": "RULED (Ben, 2026-10-10, the doc-check form, resolving NR-991): file the work - re-measure the held power gate on the current tip, then merge or drop. CONTEXT: AI_OPPONENT.md (~484) and PRODUCTION.md (~678-680) state that the scorer prices a power plant against its grid's shortfall (Ben 2026-10-07/08, the power path form). The gate exists only on the unmerged branch bl1232-gate-remeasure (14969c85); Ben HELD it then; BL-1232 (power plants per grid) closed without it, so the docs state a rule the code does not run. WORK: merge the branch onto the current sprint tip (much has moved: G1b grant, opening stock hold, dial rework), measure the 16-seed market-viability gate with and without, and bring Ben the call. If dropped, withdraw the rule from both docs."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "written": "2026-10-10",
+   "requires": [],
+   "blocked_on": null,
+   "parked": false,
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1264",
+   "short_name": "POWER_INPUT_ON_GRID",
+   "category": "Economy",
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "author": "Claude (sprint 50 doc check; Ben 2026-10-10)",
+   "title": "The workforce solver prices a plant's power INPUT pooled over its grid, as it does power output",
+   "files": [
+    "src/world/economy_system.cpp"
+   ],
+   "design": "RULED (Ben, 2026-10-10, the doc-check form): widen the code to match the doc. PRODUCTION.md (~545-549): 'for a building that makes or uses power, the solver reads power's supply and demand pooled over the building's grid'. The code applies the pooled read to OUTPUTS only, and only for processing facilities (economy_system.cpp ~976-992, ~1013-1015); a power input is priced at the plant's own market's posted price (~1082). WORK: price power as an input on the grid too, by the same pooled read; measure the 16-seed gate before/after; a cold review (the dial and the player's auto-solver both call solve_workforce_target)."
   }
  ]
 }

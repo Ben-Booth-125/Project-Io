@@ -381,7 +381,7 @@ plants are now mostly 'other' (decommissioned / no workforce / unsupplied, 30-57
   (verify fixtures fabricate state). **BL-1119 R4+R6 lane running** (quiet machine — launch nothing
   heavy until it reports). Then: CLOSE.
   **BL-1119 R4/R6 MERGED 0217f351** (both PASS; R4 marked complete despite ~30% residual load —
-  two runs agree). Filed BL-1259 (gen_step_costs road replay diverges) and BL-1260 (round 6 tail
+  two runs agree). Filed BL-1261 (gen_step_costs road replay diverges; renumbered from 1259 after an id collision with sprint 51) and BL-1262 (round 6 tail
   > 35 s on seeds 11/31/13 incl. the span; search grew 2.6 -> 10.6 s on seed 0).
   **CLOSE STARTED:** doc-check lane running (all ~40 rulings: doc/code/siblings/owner; fixes doc-
   only gaps; writes a repeatable tools/session script, skill needs Ben's permission); BL-1165 lane
