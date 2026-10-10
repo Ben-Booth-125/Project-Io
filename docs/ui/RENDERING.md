@@ -111,7 +111,10 @@ ground retires only as coverage arrives.
   - **System RAM** holds each baked body's master and its mip chain, chunk by
     chunk (~6.7 GB for the 261×121 home body at 128 px per hex), plus its far page. **The home body's master is pinned in RAM** and never dropped (Ben, 2026-10-10: at
     128 px a single visit elsewhere had evicted it, and coming home re-baked for ~71 s).
-    Other bodies share the rest of a **RAM budget of 8 GB**: when a body's master must
+    Other bodies share the rest of a **RAM budget that scales with the machine** — the ground as a
+    whole may hold **45% of installed RAM**, home included, so other bodies get what the pinned
+    home leaves of it (Ben, 2026-10-10; ~0.5 GB on a 16 GB PC, so other bodies there stream
+    from the disk cache on each visit, ~7.7 GB on 32 GB): when a body's master must
     leave RAM it **spills to a disk cache** — its finished chunks written to local disk —
     and streams back from there on the next visit, in seconds from an SSD instead of a
     re-bake; only chunks whose content hash moved meanwhile re-bake. The far page stays

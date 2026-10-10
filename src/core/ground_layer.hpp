@@ -58,7 +58,7 @@
 //
 // RAM (BL-1259, Ben 2026-10-10): the HOME body's master is pinned — never
 // dropped, and not counted against the budget. The other bodies share a
-// budget (ram_budget, 8 GB): when one must leave RAM, the least-recently-
+// budget (others_budget(): 45% of installed RAM less the pinned home): when one must leave RAM, the least-recently-
 // visited one SPILLS to the disk cache — its finished chunks (master piece +
 // mip pieces + the content hash each was baked against) are written by one
 // writer thread, atomically (temp file + rename), and its RAM freed — keeping
@@ -237,8 +237,12 @@ public:
 
     // --- BL-1259: the disk cache ---------------------------------------
     /// RAM budget across the bodies OTHER than home (home is pinned outside
-    /// it). Verify may lower it to force a spill (verify.ground_set_ram_budget).
-    long long ram_budget = k_ram_budget;
+    /// it). -1 = automatic (Ben, 2026-10-10: scale with installed RAM): the
+    /// ground as a whole may hold k_ram_share of the machine's RAM, and the
+    /// other bodies get what the pinned home leaves of that (others_budget()).
+    /// Verify sets an explicit value to force a spill (verify.ground_set_ram_budget).
+    long long ram_budget = -1;
+    long long others_budget() const;
     struct cache_body
     {
         entity_id     body = null_entity;
@@ -295,7 +299,7 @@ public:
     /// RAM budget across the bodies other than home (TECH_FOUNDATIONS.md §
     /// Target hardware: 16 GB minimum; RENDERING.md § Chunks, cache and
     /// invalidation): the home master is pinned outside it.
-    static constexpr long long   k_ram_budget = 8LL * 1024 * 1024 * 1024;
+    static constexpr double      k_ram_share  = 0.45; ///< Share of installed RAM the whole ground may hold.
     /// Disk cache cap across bodies (BL-1259): LRU by body past it.
     /// IO_GROUND_CACHE_CAP_GB overrides.
     static constexpr long long   k_disk_cap = 32LL * 1024 * 1024 * 1024;

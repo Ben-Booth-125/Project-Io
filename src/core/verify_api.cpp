@@ -1210,8 +1210,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     });
     v.set_function("ground_set_ram_budget", [this](double gb) {
         const double prev = static_cast<double>(m_ground.ram_budget) / 1073741824.0;
-        if (std::isfinite(gb) && gb >= 0.0)
-            m_ground.ram_budget = static_cast<long long>(gb * 1073741824.0);
+        if (std::isfinite(gb))   // a negative value restores the automatic budget
+            m_ground.ram_budget = gb >= 0.0 ? static_cast<long long>(gb * 1073741824.0) : -1;
         return prev;
     });
     v.set_function("set_pan",  [this](float x, float y) {

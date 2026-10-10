@@ -613,6 +613,21 @@ void ground_layer::drop_master(body_state& b)
     b.background = false;
 }
 
+long long ground_layer::others_budget() const
+{
+    if (ram_budget >= 0)
+        return ram_budget; // verify override
+    const long long installed = static_cast<long long>(SDL_GetSystemRAM()) * 1024 * 1024; // MiB -> bytes
+    long long pinned_ram = 0;
+    for (const auto& [id, bp] : m_bodies)
+        if (pinned(id))
+            pinned_ram += bp->ram;
+    // The home master counts at its whole size even while it is still filling.
+    if (const body_state* h = find(m_home))
+        pinned_ram = std::max(pinned_ram, master_bytes(*h));
+    return std::max(0LL, static_cast<long long>(installed * k_ram_share) - pinned_ram);
+}
+
 long long ground_layer::budget_total() const
 {
     long long total = 0;
@@ -632,7 +647,8 @@ void ground_layer::make_room(long long need, entity_id keep_a, entity_id keep_b)
         need = 0;
     else if (const body_state* k = find(keep_a))
         total -= k->ram;
-    while (total + need > ram_budget)
+    const long long budget = others_budget();
+    while (total + need > budget)
     {
         body_state* victim = nullptr;
         for (auto& [id, bp] : m_bodies)
@@ -1466,14 +1482,14 @@ void ground_layer::feed(bool verify)
                 const gb::geometry gl = gb::level_geometry(m, l);
                 est += static_cast<long long>(gl.W) * gl.H * 4;
             }
-            if (!pinned(c.id) && total + est > ram_budget)
+            if (!pinned(c.id) && total + est > others_budget())
                 continue;
             b = ensure_body(w, c.id);
             if (!b)
                 continue;
             b->background = true;
         }
-        else if (!pinned(c.id) && total - b->ram + master_bytes(*b) > ram_budget)
+        else if (!pinned(c.id) && total - b->ram + master_bytes(*b) > others_budget())
             continue;
         housekeep(*b);
         fill_body(*b, k_prio_background, b->lv[0].cw * 0.5, b->lv[0].ch * 0.5);
