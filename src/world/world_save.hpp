@@ -399,7 +399,10 @@ inline constexpr uint32_t world_save_magic =
 /// pool-draw register (v40) and the order book (sell and buy orders) are
 /// gone; the order book's id slot carries `next_trade_id`, its vector slot the
 /// manual trades (`standing_trade`), and the corporation record gains
-/// `trade_reserve` and `trade_points` at its tail. Refused whole on the
+/// `trade_reserve` and `trade_points` at its tail, the market record
+/// `trade_lp_spare` (the Logistic Points its anchor had left after the last
+/// trade pass; read by the rival Marketplace build, added before v46 left this
+/// branch), and the exchange row `side` and `parties`. Refused whole on the
 /// strict-equality contract, no migration. Claimed through
 /// `tools/session/next_save_version.js --kind world --claim` (v44/v45 were
 /// claimed by other branches).

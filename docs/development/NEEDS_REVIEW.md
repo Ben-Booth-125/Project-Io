@@ -1543,7 +1543,7 @@ The 2026-10-10 grant lets a rival set its own trades with the points "its own Pl
 
 > **Recommendation:** Grant, scored like the bootstrap port: a flat, modest score that never outbids an economic build, gated on the corporation having routes with margin.
 
-> **RESOLVED.** Ben, 2026-10-10 (review form): GRANTED - a rival may build a Planetary Marketplace, with a modest flat score (the bootstrap-port shape). Written into AI_OPPONENT.md § 11.
+> **RESOLVED.** Ben, 2026-10-10 (review form): GRANTED - a rival may build a Planetary Marketplace, with a modest flat score (the bootstrap-port shape). Written into AI_OPPONENT.md § 11. SUPERSEDED the same day (Ben, 2026-10-10, in session): the flat score raised a Marketplace in nearly every market a rival sat in, so the Marketplace is now scored as every build is - net (the profit of the trades its points would carry, read from what the last tick left over: spare goods and the anchor's Logistic Points left) less maintenance, wage and upkeep, over capex. AI_OPPONENT.md § 11 carries it.
 
 *Files: `src/world/corp_ai.cpp`, `docs/ai/AI_OPPONENT.md § 11`*
 

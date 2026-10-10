@@ -132,6 +132,7 @@ int main()
         w.markets.at(hh_market).unposted_bid_tick[hh_food] = 1234;   // BL-1227
 
         w.markets.at(hh_market).background_fill[hh_food]     = 5.875f; // BL-1217 G1b R2
+        w.markets.at(hh_market).trade_lp_spare               = 6.125f; // v46: rival Marketplace estimate
     }
 
     // BL-1266 (world_save_version 46): a MANUAL TRADE and a corporation's trade

@@ -626,6 +626,45 @@ void p8_partial_lp_sends()
     }
 }
 
+// ---------------------------------------------------------------------------
+// P9 — the trade pass records what each market's anchor has LEFT
+// ---------------------------------------------------------------------------
+// `market_component::trade_lp_spare` (read by the rival Marketplace build's
+// estimate, AI_OPPONENT.md § 11) is the anchor's pool AFTER the pass's
+// draws — not the fresh pool. P8.1's fixture, an anchor of 50: the shipment
+// draws it down and the source market reads 50 less the cargo sent.
+void p9_spare_recorded()
+{
+    std::printf("\n-- P9  run_trades records each market's Logistic Points left --\n");
+    scenario s = make_scenario(/*stock=*/100.0f, 1000.0f);
+    recipe_registry reg = make_registry(50.0f);
+    enable_auto_trade(s, reg);
+    s.w.markets.at(s.dst_market).price[r_iron]  = 10.0f;
+    s.w.markets.at(s.dst_market).demand[r_iron] = 30.0f;
+    s.w.markets.at(s.dst_market).supply[r_iron] = 0.0f;
+    economy_report rep;
+    run_trades(s.w, reg, rep);
+    float cargo = 0.0f;
+    for (const convoy_component& c : s.w.convoys)
+        cargo += c.cargo_qty;
+    const float spare = s.w.markets.at(s.src_market).trade_lp_spare;
+    std::printf("   cargo %.3f, source spare %.3f\n", cargo, spare);
+    check(cargo > 0.0f && approx(spare, 50.0f - cargo),
+          "P9.1 the source market's trade_lp_spare is its anchor's 50 less the cargo the pass sent");
+
+    // P8.1's anchor of 20, all of it drawn: nothing left.
+    scenario s2 = make_scenario(100.0f, 1000.0f);
+    recipe_registry reg2 = make_registry(20.0f);
+    enable_auto_trade(s2, reg2);
+    s2.w.markets.at(s2.dst_market).price[r_iron]  = 10.0f;
+    s2.w.markets.at(s2.dst_market).demand[r_iron] = 30.0f;
+    s2.w.markets.at(s2.dst_market).supply[r_iron] = 0.0f;
+    economy_report rep2;
+    run_trades(s2.w, reg2, rep2);
+    check(approx(s2.w.markets.at(s2.src_market).trade_lp_spare, 0.0f),
+          "P9.2 an anchor the pass drew dry records nothing left");
+}
+
 int main()
 {
     std::printf("=== logistic_points_convoy_harness (BL-597, LP_PASSIVE_CONVOYS) ===\n");
@@ -638,6 +677,7 @@ int main()
     p6_shared_pool_contention();
     p7_default_is_private_and_fresh();
     p8_partial_lp_sends();
+    p9_spare_recorded();
 
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;
